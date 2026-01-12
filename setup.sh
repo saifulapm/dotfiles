@@ -68,7 +68,7 @@ if [[ -f "$DOTFILES/packages.list" ]]; then
         header "DNF Packages"
         readarray -t pkg_array <<< "$packages"
         count=${#pkg_array[@]}
-        sudo dnf install -y "${pkg_array[@]}" &>/dev/null
+        spin "  Installing $count packages" sudo dnf install -y "${pkg_array[@]}"
         done_msg "$count packages installed"
     fi
 fi
