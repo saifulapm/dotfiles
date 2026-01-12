@@ -117,8 +117,9 @@ if [[ -f "$DOTFILES/go.list" ]]; then
     if [[ -n "$go_pkgs" ]]; then
         header "Go Packages"
         if ! command -v go &>/dev/null; then
-            skip_msg "skipped (go not installed)"
-        else
+            spin "  Installing Go" sudo dnf install -y golang 2>/dev/null
+        fi
+        if command -v go &>/dev/null; then
             count=0
             while IFS= read -r pkg; do
                 name=$(basename "$pkg" | cut -d'@' -f1)
