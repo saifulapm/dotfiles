@@ -30,3 +30,25 @@ dotfiles/
 ## Usage
 
 Edit the list files to add packages, then run `./setup.sh` to apply changes.
+
+## Secrets
+
+Secrets are encrypted with [age](https://github.com/FiloSottile/age) and stored in `secrets.age` (gitignored).
+
+```bash
+secrets init          # Create new encrypted secrets file
+secrets edit          # Edit secrets (decrypt, edit, re-encrypt)
+secrets get KEY       # Get a single secret value
+eval "$(secrets load)" # Load all secrets as env vars
+```
+
+In configs, use environment variables:
+```lua
+-- Example: nvim/lua/plugins/lsp.lua
+license_key = os.getenv("INTELEPHENSE_KEY")
+```
+
+Or fetch directly:
+```bash
+KEY=$(secrets get INTELEPHENSE_KEY)
+```
