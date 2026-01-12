@@ -1,0 +1,5 @@
+# COPR repositories to enable
+# Format: username/repo
+# Lines starting with # are ignored
+
+yalter/niri

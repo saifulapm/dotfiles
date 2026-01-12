@@ -1,0 +1,7 @@
+# Cargo packages to install
+# Lines starting with # are ignored
+
+# Example:
+# starship
+# zoxide
+# eza

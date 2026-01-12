@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Nova Theme Current
+# Shows the currently active theme
+
+THEME_NAME_PATH="$HOME/.config/nova/current/theme.name"
+
+if [[ -f "$THEME_NAME_PATH" ]]; then
+    # Format theme name nicely
+    cat "$THEME_NAME_PATH" | sed -E 's/(^|-)([a-z])/\1\u\2/g; s/-/ /g'
+else
+    echo "No theme set"
+fi

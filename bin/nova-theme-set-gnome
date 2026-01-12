@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Nova GNOME Theme Setter
+# Syncs theme settings to GNOME/GTK
+
+THEME_PATH="$HOME/.config/nova/current/theme"
+
+# Set color scheme based on light/dark mode
+if [[ -f "$THEME_PATH/light.mode" ]]; then
+    gsettings set org.gnome.desktop.interface color-scheme "prefer-light"
+    gsettings set org.gnome.desktop.interface gtk-theme "Adwaita"
+else
+    gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"
+    gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark"
+fi
+
+# Set icon theme if specified
+ICONS_THEME="$THEME_PATH/icons.theme"
+if [[ -f "$ICONS_THEME" ]]; then
+    gsettings set org.gnome.desktop.interface icon-theme "$(<$ICONS_THEME)"
+else
+    # Default icon theme
+    gsettings set org.gnome.desktop.interface icon-theme "Adwaita"
+fi

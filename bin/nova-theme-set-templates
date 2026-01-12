@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# Nova Theme Template Processor
+# Generates themed configs from templates using colors.toml
+
+TEMPLATES_DIR="$HOME/.dotfiles/themes/templates"
+USER_TEMPLATES_DIR="$HOME/.config/nova/themed"
+NEXT_THEME_DIR="$HOME/.config/nova/current/next-theme"
+COLORS_FILE="$NEXT_THEME_DIR/colors.toml"
+
+# Convert hex color to decimal RGB (e.g., "#1e1e2e" -> "30,30,46")
+hex_to_rgb() {
+    local hex="${1#\#}"
+    printf "%d,%d,%d" "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}"
+}
+
+# Only generate dynamic templates for themes with a colors.toml definition
+if [[ ! -f "$COLORS_FILE" ]]; then
+    exit 0
+fi
+
+# Create sed script for substitutions
+sed_script=$(mktemp)
+
+# Generate standard and _strip substitutions
+# Parse colors.toml manually since yq has issues with some patterns
+while IFS='=' read -r key value; do
+    key=$(echo "$key" | xargs)
+    value=$(echo "$value" | xargs | tr -d '"')
+    [[ -z "$key" || "$key" =~ ^# ]] && continue
+    echo "s|{{ $key }}|$value|g" >> "$sed_script"
+    # Strip # from hex colors
+    value_strip="${value#\#}"
+    echo "s|{{ ${key}_strip }}|$value_strip|g" >> "$sed_script"
+done < "$COLORS_FILE"
+
+# Generate _rgb substitutions for hex colors
+while IFS='=' read -r key value; do
+    key=$(echo "$key" | xargs)
+    value=$(echo "$value" | xargs | tr -d '"')
+    if [[ $value =~ ^# ]]; then
+        rgb=$(hex_to_rgb "$value")
+        echo "s|{{ ${key}_rgb }}|${rgb}|g" >> "$sed_script"
+    fi
+done < "$COLORS_FILE"
+
+# Add special substitutions
+# GTK theme based on light/dark mode
+if [[ -f "$NEXT_THEME_DIR/light.mode" ]]; then
+    echo 's|{{ gtk_theme }}|Adwaita|g' >> "$sed_script"
+else
+    echo 's|{{ gtk_theme }}|Adwaita-dark|g' >> "$sed_script"
+fi
+
+shopt -s nullglob
+
+# Process user templates first (highest priority)
+if [[ -d "$USER_TEMPLATES_DIR" ]]; then
+    for tpl in "$USER_TEMPLATES_DIR"/*.tpl; do
+        filename=$(basename "$tpl" .tpl)
+        output_path="$NEXT_THEME_DIR/$filename"
+        if [[ ! -f "$output_path" ]]; then
+            sed -f "$sed_script" "$tpl" > "$output_path"
+        fi
+    done
+fi
+
+# Process built-in templates
+for tpl in "$TEMPLATES_DIR"/*.tpl; do
+    filename=$(basename "$tpl" .tpl)
+    output_path="$NEXT_THEME_DIR/$filename"
+
+    # Don't overwrite configs already in output directory
+    if [[ ! -f "$output_path" ]]; then
+        sed -f "$sed_script" "$tpl" > "$output_path"
+    fi
+done
+
+rm "$sed_script"
+
+# Deploy configs to their proper locations
+deploy_config() {
+    local src="$1"
+    local dest="$2"
+
+    if [[ -f "$src" ]]; then
+        mkdir -p "$(dirname "$dest")"
+        cp "$src" "$dest"
+    fi
+}
+
+THEME_DIR="$NEXT_THEME_DIR"
+
+# Deploy to ~/.config locations
+deploy_config "$THEME_DIR/alacritty.toml" "$HOME/.config/alacritty/colors.toml"
+deploy_config "$THEME_DIR/ghostty.conf" "$HOME/.config/ghostty/themes/nova"
+deploy_config "$THEME_DIR/kitty.conf" "$HOME/.config/kitty/themes/nova.conf"
+deploy_config "$THEME_DIR/waybar.css" "$HOME/.config/waybar/colors.css"
+deploy_config "$THEME_DIR/mako.ini" "$HOME/.config/mako/config"
+# walker.css stays in ~/.config/nova/current/theme/ where style.css imports it from
+deploy_config "$THEME_DIR/btop.theme" "$HOME/.config/btop/themes/nova.theme"
+deploy_config "$THEME_DIR/niri.kdl" "$HOME/.config/niri/theme.kdl"
+
+# Hyprland configs (if using hyprland)
+deploy_config "$THEME_DIR/hyprland.conf" "$HOME/.config/hypr/themes/nova.conf"
+deploy_config "$THEME_DIR/hyprlock.conf" "$HOME/.config/hypr/hyprlock-theme.conf"

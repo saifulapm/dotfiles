@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Nova VS Code Theme Setter
+# Syncs theme to VS Code, VSCodium, and Cursor
+
+VS_CODE_THEME="$HOME/.config/nova/current/theme/vscode.json"
+
+# Check if jq is available
+if ! command -v jq &>/dev/null; then
+    exit 0
+fi
+
+set_theme() {
+    local editor_cmd="$1"
+    local settings_path="$2"
+
+    # Check if editor is installed
+    if ! command -v "$editor_cmd" &>/dev/null; then
+        return 0
+    fi
+
+    if [[ -f "$VS_CODE_THEME" ]]; then
+        theme_name=$(jq -r '.name' "$VS_CODE_THEME")
+        extension=$(jq -r '.extension' "$VS_CODE_THEME")
+
+        # Install extension if specified and not already installed
+        if [[ -n "$extension" && "$extension" != "null" ]]; then
+            if ! "$editor_cmd" --list-extensions 2>/dev/null | grep -Fxq "$extension"; then
+                "$editor_cmd" --install-extension "$extension" >/dev/null 2>&1
+            fi
+        fi
+
+        # Create settings file if it doesn't exist
+        mkdir -p "$(dirname "$settings_path")"
+        [[ -f "$settings_path" ]] || printf '{\n}\n' > "$settings_path"
+
+        # Add colorTheme key if not present
+        if ! grep -q '"workbench.colorTheme"' "$settings_path" 2>/dev/null; then
+            sed -i -E '0,/\{/{s/\{/{ "workbench.colorTheme": "",/}' "$settings_path"
+        fi
+
+        # Update colorTheme value
+        sed -i -E \
+            "s/(\"workbench.colorTheme\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")/\1$theme_name\2/" \
+            "$settings_path"
+    fi
+}
+
+# Apply to all supported editors
+set_theme "code" "$HOME/.config/Code/User/settings.json"
+set_theme "codium" "$HOME/.config/VSCodium/User/settings.json"
+set_theme "cursor" "$HOME/.config/Cursor/User/settings.json"

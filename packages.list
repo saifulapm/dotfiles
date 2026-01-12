@@ -1,0 +1,19 @@
+# DNF packages to install
+# Lines starting with # are ignored
+
+# Development
+git
+neovim
+tmux
+zsh
+
+# Build essentials
+gcc
+make
+cmake
+
+# Tools
+ripgrep
+fd-find
+fzf
+htop

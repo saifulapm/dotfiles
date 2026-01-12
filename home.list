@@ -1,0 +1,7 @@
+# Home directory dotfiles to symlink
+# Format: filename (will be symlinked from config/home/filename to ~/filename)
+# Lines starting with # are ignored
+
+# Example:
+# .zshrc
+# .tmux.conf
