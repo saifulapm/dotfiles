@@ -2,6 +2,14 @@
 
 DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Cache sudo credentials upfront
+echo "This script requires sudo access."
+sudo -v || exit 1
+# Keep sudo alive in background
+(while true; do sudo -n true; sleep 50; done) &
+SUDO_PID=$!
+trap "kill $SUDO_PID 2>/dev/null" EXIT
+
 # Install gum if not present
 if ! command -v gum &>/dev/null; then
     echo "Installing gum..."
@@ -60,7 +68,7 @@ if [[ -f "$DOTFILES/packages.list" ]]; then
         header "DNF Packages"
         readarray -t pkg_array <<< "$packages"
         count=${#pkg_array[@]}
-        spin "  Installing $count packages" sudo dnf install -y "${pkg_array[@]}" 2>/dev/null || true
+        sudo dnf install -y "${pkg_array[@]}" &>/dev/null
         done_msg "$count packages installed"
     fi
 fi
