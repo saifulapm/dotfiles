@@ -1,0 +1,6 @@
+# Flatpak packages to install
+# Lines starting with # are ignored
+
+# Example:
+# com.spotify.Client
+# org.gimp.GIMP

@@ -16,6 +16,8 @@ dotfiles/
 ├── install.sh        # Remote installer
 ├── copr.list         # COPR repositories
 ├── packages.list     # DNF packages
+├── flatpak.list      # Flatpak packages
+├── snap.list         # Snap packages
 ├── cargo.list        # Cargo packages
 ├── go.list           # Go packages
 ├── symlinks.list     # Partial symlinks (src:dest)

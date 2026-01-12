@@ -76,6 +76,46 @@ if [[ -f "$DOTFILES/packages.list" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────
+# Flatpak Packages
+# ─────────────────────────────────────────────────────────────
+if [[ -f "$DOTFILES/flatpak.list" ]]; then
+    flatpaks=$(read_list "$DOTFILES/flatpak.list")
+    if [[ -n "$flatpaks" ]]; then
+        header "Flatpak Packages"
+        if ! command -v flatpak &>/dev/null; then
+            spin "  Installing Flatpak" sudo dnf install -y flatpak
+            flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        fi
+        count=0
+        while IFS= read -r pkg; do
+            spin "  Installing $pkg" flatpak install -y flathub "$pkg"
+            ((count++))
+        done <<< "$flatpaks"
+        done_msg "$count packages installed"
+    fi
+fi
+
+# ─────────────────────────────────────────────────────────────
+# Snap Packages
+# ─────────────────────────────────────────────────────────────
+if [[ -f "$DOTFILES/snap.list" ]]; then
+    snaps=$(read_list "$DOTFILES/snap.list")
+    if [[ -n "$snaps" ]]; then
+        header "Snap Packages"
+        if ! command -v snap &>/dev/null; then
+            spin "  Installing Snapd" sudo dnf install -y snapd
+            sudo ln -sf /var/lib/snapd/snap /snap 2>/dev/null || true
+        fi
+        count=0
+        while IFS= read -r pkg; do
+            spin "  Installing $pkg" sudo snap install $pkg
+            ((count++))
+        done <<< "$snaps"
+        done_msg "$count packages installed"
+    fi
+fi
+
+# ─────────────────────────────────────────────────────────────
 # Fonts
 # ─────────────────────────────────────────────────────────────
 if [[ -d "$DOTFILES/fonts" ]]; then
