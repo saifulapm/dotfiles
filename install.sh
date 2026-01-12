@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Config - change these
-REPO="saiful/dotfiles"
+REPO="saifulapm/dotfiles"
 BRANCH="main"
 
 # ─────────────────────────────────────────────────────────────
