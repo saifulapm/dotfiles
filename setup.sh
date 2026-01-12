@@ -155,14 +155,15 @@ if [[ -d "$DOTFILES/config" ]]; then
     if [[ $count -gt 0 ]]; then
         header "Config Symlinks"
         mkdir -p ~/.config
+        linked=0
         for item in "${configs[@]}"; do
             name=$(basename "$item")
             [[ "$name" == "home" ]] && continue
-            rm -rf "$HOME/.config/$name"
+            spin "  Linking $name" rm -rf "$HOME/.config/$name"
             ln -sf "$item" "$HOME/.config/$name"
-            gum style --foreground 8 "  → $name"
+            ((linked++))
         done
-        done_msg "$count configs linked"
+        done_msg "$linked configs linked"
     fi
 fi
 
@@ -178,9 +179,8 @@ if [[ -d "$DOTFILES/config/home" ]]; then
         count=0
         for item in "${home_files[@]}"; do
             name=$(basename "$item")
-            rm -rf "$HOME/$name"
+            spin "  Linking $name" rm -rf "$HOME/$name"
             ln -sf "$item" "$HOME/$name"
-            gum style --foreground 8 "  → $name"
             ((count++))
         done
         done_msg "$count dotfiles linked"
@@ -200,10 +200,9 @@ if [[ -f "$DOTFILES/symlinks.list" ]]; then
             src_path="$DOTFILES/$src"
             dest_path="$HOME/$dest"
             if [[ -e "$src_path" ]]; then
-                mkdir -p "$(dirname "$dest_path")"
+                spin "  Linking $dest" mkdir -p "$(dirname "$dest_path")"
                 rm -rf "$dest_path"
                 ln -sf "$src_path" "$dest_path"
-                gum style --foreground 8 "  → $dest"
                 ((count++))
             fi
         done <<< "$symlinks"
@@ -225,15 +224,16 @@ if [[ -d "$DOTFILES/bin" ]]; then
     if [[ $count -gt 0 ]]; then
         header "Custom Executables"
         mkdir -p ~/.local/bin
+        linked=0
         for script in "${bins[@]}"; do
             [[ -f "$script" ]] || continue
             name=$(basename "$script")
             [[ "$name" == ".gitkeep" ]] && continue
-            chmod +x "$script"
+            spin "  Linking $name" chmod +x "$script"
             ln -sf "$script" ~/.local/bin/"$name"
-            gum style --foreground 8 "  → $name"
+            ((linked++))
         done
-        done_msg "$count executables linked"
+        done_msg "$linked executables linked"
     fi
 fi
 
