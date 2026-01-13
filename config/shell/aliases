@@ -1,0 +1,76 @@
+# ─────────────────────────────────────────────────────────────
+# File system
+# ─────────────────────────────────────────────────────────────
+if command -v eza &>/dev/null; then
+    alias ls='eza -lh --group-directories-first --icons=auto'
+    alias la='ls -a'
+    alias lt='eza --tree --level=2 --long --icons --git'
+    alias lta='lt -a'
+else
+    alias ls='ls --color=auto -lh'
+    alias la='ls -a'
+fi
+
+alias ff="fzf --preview 'bat --style=numbers --color=always {}'"
+
+# Zoxide (smarter cd)
+if command -v zoxide &>/dev/null; then
+    alias cd="z"
+fi
+
+# Open files with default application
+open() {
+    xdg-open "$@" >/dev/null 2>&1 &
+}
+
+# ─────────────────────────────────────────────────────────────
+# Navigation
+# ─────────────────────────────────────────────────────────────
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias ~='cd ~'
+
+# ─────────────────────────────────────────────────────────────
+# Tools
+# ─────────────────────────────────────────────────────────────
+alias n='nvim'
+alias v='nvim'
+alias c='code'
+alias d='docker'
+alias dc='docker compose'
+alias k='kubectl'
+
+# ─────────────────────────────────────────────────────────────
+# Git
+# ─────────────────────────────────────────────────────────────
+alias g='git'
+alias gs='git status'
+alias ga='git add'
+alias gc='git commit'
+alias gcm='git commit -m'
+alias gcam='git commit -a -m'
+alias gcad='git commit -a --amend'
+alias gp='git push'
+alias gpl='git pull'
+alias gco='git checkout'
+alias gb='git branch'
+alias gd='git diff'
+alias gl='git log --oneline -10'
+alias glog='git log --graph --oneline --decorate'
+
+# ─────────────────────────────────────────────────────────────
+# Safety
+# ─────────────────────────────────────────────────────────────
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
+
+# ─────────────────────────────────────────────────────────────
+# Misc
+# ─────────────────────────────────────────────────────────────
+alias cls='clear'
+alias reload='source ~/.bashrc'
+alias path='echo -e ${PATH//:/\\n}'
+alias ports='ss -tulanp'
+alias myip='curl -s ifconfig.me'

@@ -1,0 +1,41 @@
+# Better readline defaults
+set meta-flag on
+set input-meta on
+set output-meta on
+set convert-meta off
+
+# Case-insensitive completion
+set completion-ignore-case on
+set completion-prefix-display-length 2
+
+# Show all completions at once
+set show-all-if-ambiguous on
+set show-all-if-unmodified on
+
+# Arrow keys search history based on typed prefix
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+"\e[C": forward-char
+"\e[D": backward-char
+
+# Trailing slash for symlinked directories
+set mark-symlinked-directories on
+
+# Don't match hidden files unless pattern starts with dot
+set match-hidden-files off
+
+# Show all results at once
+set page-completions off
+
+# Ask if more than 200 completions
+set completion-query-items 200
+
+# Show file info like ls -F
+set visible-stats on
+
+# Smarter completion after cursor
+set skip-completed-text on
+
+# Colored completions
+set colored-stats on
+set colored-completion-prefix on

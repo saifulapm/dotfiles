@@ -1,0 +1,30 @@
+# ─────────────────────────────────────────────────────────────
+# Tool Initialization
+# ─────────────────────────────────────────────────────────────
+
+# Mise (runtime version manager)
+if command -v mise &>/dev/null; then
+    eval "$(mise activate bash)"
+fi
+
+# Starship prompt
+if command -v starship &>/dev/null; then
+    eval "$(starship init bash)"
+fi
+
+# Zoxide (smarter cd)
+if command -v zoxide &>/dev/null; then
+    eval "$(zoxide init bash)"
+fi
+
+# FZF
+if command -v fzf &>/dev/null; then
+    if [[ -f /usr/share/fzf/shell/key-bindings.bash ]]; then
+        source /usr/share/fzf/shell/key-bindings.bash
+    fi
+fi
+
+# Secrets (load encrypted secrets as env vars)
+if command -v secrets &>/dev/null && [[ -f ~/.dotfiles/secrets.age ]]; then
+    eval "$(secrets load 2>/dev/null)"
+fi
