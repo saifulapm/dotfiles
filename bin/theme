@@ -51,9 +51,13 @@ generate_theme() {
         fi
     done < "$colors_file"
 
-    # Generate btop theme
+    # Apply btop theme (use static file if exists, otherwise generate from template)
     mkdir -p "$HOME/.config/btop/themes"
-    sed -f "$sed_script" "$TEMPLATES_DIR/btop.theme.tpl" > "$HOME/.config/btop/themes/current.theme"
+    if [[ -f "$THEMES_DIR/$name/btop.theme" ]]; then
+        cp "$THEMES_DIR/$name/btop.theme" "$HOME/.config/btop/themes/current.theme"
+    else
+        sed -f "$sed_script" "$TEMPLATES_DIR/btop.theme.tpl" > "$HOME/.config/btop/themes/current.theme"
+    fi
 
     # Generate shell theme (FZF colors)
     sed -f "$sed_script" "$TEMPLATES_DIR/fzf.sh.tpl" > "$DOTFILES/shell/theme"
