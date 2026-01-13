@@ -1,5 +1,5 @@
 /* Walker theme - imports colors from theme-generated CSS */
-@import "~/.config/dotfiles/walker-theme.css";
+@import "../../../../../.config/dotfiles/walker-theme.css";
 
 * {
   all: unset;
