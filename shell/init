@@ -18,7 +18,7 @@ if command -v zoxide &>/dev/null; then
 fi
 
 # Try (project launcher)
-if command -v try &>/dev/null; then
+if command -v try &>/dev/null && [[ -d ~/Work/tries ]]; then
     eval "$(try init ~/Work/tries)"
 fi
 
