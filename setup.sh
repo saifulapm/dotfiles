@@ -199,8 +199,7 @@ if [[ -d "$DOTFILES/config" ]]; then
         for item in "${configs[@]}"; do
             name=$(basename "$item")
             [[ "$name" == "home" ]] && continue
-            spin "  Linking $name" rm -rf "$HOME/.config/$name"
-            ln -sf "$item" "$HOME/.config/$name"
+            spin "  Linking $name" bash -c "rm -rf '$HOME/.config/$name' && ln -sf '$item' '$HOME/.config/$name'"
             ((linked++))
         done
         done_msg "$linked configs linked"
@@ -219,8 +218,7 @@ if [[ -d "$DOTFILES/config/home" ]]; then
         count=0
         for item in "${home_files[@]}"; do
             name=$(basename "$item")
-            spin "  Linking $name" rm -rf "$HOME/$name"
-            ln -sf "$item" "$HOME/$name"
+            spin "  Linking $name" bash -c "rm -rf '$HOME/$name' && ln -sf '$item' '$HOME/$name'"
             ((count++))
         done
         done_msg "$count dotfiles linked"
@@ -240,9 +238,7 @@ if [[ -f "$DOTFILES/symlinks.list" ]]; then
             src_path="$DOTFILES/$src"
             dest_path="$HOME/$dest"
             if [[ -e "$src_path" ]]; then
-                spin "  Linking $dest" mkdir -p "$(dirname "$dest_path")"
-                rm -rf "$dest_path"
-                ln -sf "$src_path" "$dest_path"
+                spin "  Linking $dest" bash -c "mkdir -p '$(dirname "$dest_path")' && rm -rf '$dest_path' && ln -sf '$src_path' '$dest_path'"
                 ((count++))
             fi
         done <<< "$symlinks"
@@ -269,8 +265,7 @@ if [[ -d "$DOTFILES/bin" ]]; then
             [[ -f "$script" ]] || continue
             name=$(basename "$script")
             [[ "$name" == ".gitkeep" ]] && continue
-            spin "  Linking $name" chmod +x "$script"
-            ln -sf "$script" ~/.local/bin/"$name"
+            spin "  Linking $name" bash -c "chmod +x '$script' && ln -sf '$script' ~/.local/bin/'$name'"
             ((linked++))
         done
         done_msg "$linked executables linked"
