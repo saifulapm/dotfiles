@@ -79,7 +79,7 @@ if [[ -f "$DOTFILES/packages.list" ]]; then
         installed=0
         skipped=0
         while IFS= read -r pkg; do
-            if ! rpm -q "$pkg" &>/dev/null; then
+            if ! dnf list installed "$pkg" &>/dev/null; then
                 spin "  Installing $pkg" sudo dnf install -y "$pkg"
                 ((installed++))
             else
