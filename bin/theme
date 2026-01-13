@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# Theme generator - generates configs from templates using colors.toml
+
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+THEMES_DIR="$DOTFILES/themes"
+TEMPLATES_DIR="$DOTFILES/templates"
+THEME_FILE="$HOME/.config/dotfiles/theme"
+
+# Convert hex to RGB (e.g., "#1e1e2e" -> "30,30,46")
+hex_to_rgb() {
+    local hex="${1#\#}"
+    printf "%d,%d,%d" "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}"
+}
+
+# Generate configs from templates
+generate_theme() {
+    local name="$1"
+    local colors_file="$THEMES_DIR/$name/colors.toml"
+
+    if [[ ! -f "$colors_file" ]]; then
+        echo "Theme not found: $name"
+        echo "Available themes:"
+        ls -1 "$THEMES_DIR"
+        return 1
+    fi
+
+    # Create sed script for substitutions
+    local sed_script=$(mktemp)
+
+    # Parse colors.toml and generate substitutions
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ "$key" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$key" ]] && continue
+
+        # Trim whitespace and quotes
+        key=$(echo "$key" | xargs)
+        value=$(echo "$value" | xargs | tr -d '"')
+
+        # Standard: {{ key }} -> value
+        echo "s|{{ $key }}|$value|g" >> "$sed_script"
+
+        # Strip: {{ key_strip }} -> value without #
+        echo "s|{{ ${key}_strip }}|${value#\#}|g" >> "$sed_script"
+
+        # RGB: {{ key_rgb }} -> decimal RGB
+        if [[ "$value" =~ ^# ]]; then
+            local rgb=$(hex_to_rgb "$value")
+            echo "s|{{ ${key}_rgb }}|$rgb|g" >> "$sed_script"
+        fi
+    done < "$colors_file"
+
+    # Generate btop theme
+    mkdir -p "$HOME/.config/btop/themes"
+    sed -f "$sed_script" "$TEMPLATES_DIR/btop.theme.tpl" > "$HOME/.config/btop/themes/current.theme"
+
+    # Generate shell theme (FZF colors)
+    sed -f "$sed_script" "$TEMPLATES_DIR/fzf.sh.tpl" > "$DOTFILES/shell/theme"
+
+    # Save current theme name
+    mkdir -p "$(dirname "$THEME_FILE")"
+    echo "$name" > "$THEME_FILE"
+
+    rm "$sed_script"
+
+    echo "Theme applied: $name"
+    echo "Restart terminal for full effect"
+}
+
+case "$1" in
+    set)
+        if [[ -z "$2" ]]; then
+            echo "Usage: theme set <name>"
+            echo "Available themes:"
+            ls -1 "$THEMES_DIR"
+            exit 1
+        fi
+        generate_theme "$2"
+        ;;
+    list)
+        ls -1 "$THEMES_DIR"
+        ;;
+    current)
+        if [[ -f "$THEME_FILE" ]]; then
+            cat "$THEME_FILE"
+        else
+            echo "none"
+        fi
+        ;;
+    *)
+        echo "Usage: theme [set <name>|list|current]"
+        echo ""
+        echo "Commands:"
+        echo "  set <name>  Apply a theme"
+        echo "  list        List available themes"
+        echo "  current     Show current theme"
+        ;;
+esac

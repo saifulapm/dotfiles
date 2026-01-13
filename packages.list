@@ -32,3 +32,18 @@ mise
 unzip
 p7zip
 unrar
+
+# Shell essentials
+bash-completion
+
+# Network tools
+curl
+wget
+
+# CLI utilities
+jq
+tree
+
+# System monitor
+btop
+fastfetch

@@ -294,6 +294,21 @@ if [[ -d "$DOTFILES/scripts" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────
+# Theme Setup
+# ─────────────────────────────────────────────────────────────
+if [[ -x "$DOTFILES/bin/theme" ]]; then
+    header "Theme Setup"
+    # Apply default theme if not set
+    if [[ ! -f "$HOME/.config/dotfiles/theme" ]]; then
+        spin "  Applying catppuccin theme" "$DOTFILES/bin/theme" set catppuccin
+        done_msg "Default theme applied"
+    else
+        current_theme=$(cat "$HOME/.config/dotfiles/theme")
+        skip_msg "Theme already set: $current_theme"
+    fi
+fi
+
+# ─────────────────────────────────────────────────────────────
 # Done
 # ─────────────────────────────────────────────────────────────
 echo ""
