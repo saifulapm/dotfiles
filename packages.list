@@ -24,3 +24,11 @@ starship
 ffmpeg
 ImageMagick
 lazygit
+
+# Runtime manager
+mise
+
+# Archive tools
+unzip
+p7zip
+unrar
