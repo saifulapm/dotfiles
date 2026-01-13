@@ -15,4 +15,4 @@ SHELL_CONFIG="$DOTFILES/shell"
 [[ -f "$SHELL_CONFIG/inputrc" ]] && bind -f "$SHELL_CONFIG/inputrc"
 
 # Local overrides (not tracked in git)
-[[ -f ~/.bashrc.local ]] && source ~/.bashrc.local
+[[ -f ~/.bashrc.local ]] && source ~/.bashrc.local || true
