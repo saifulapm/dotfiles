@@ -34,9 +34,9 @@ alias ~='cd ~'
 # ─────────────────────────────────────────────────────────────
 # Tools
 # ─────────────────────────────────────────────────────────────
-alias n='nvim'
+n() { if [[ $# -eq 0 ]]; then nvim .; else nvim "$@"; fi; }
 alias v='nvim'
-alias c='clear'
+alias cl='clear'
 alias opc='opencode'
 alias d='docker'
 alias dc='docker compose'

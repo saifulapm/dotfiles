@@ -62,6 +62,10 @@ generate_theme() {
     # Generate shell theme (FZF colors)
     sed -f "$sed_script" "$TEMPLATES_DIR/fzf.sh.tpl" > "$DOTFILES/shell/theme"
 
+    # Generate ghostty theme
+    mkdir -p "$HOME/.config/dotfiles"
+    sed -f "$sed_script" "$TEMPLATES_DIR/ghostty.conf.tpl" > "$HOME/.config/dotfiles/ghostty-theme.conf"
+
     # Save current theme name
     mkdir -p "$(dirname "$THEME_FILE")"
     echo "$name" > "$THEME_FILE"

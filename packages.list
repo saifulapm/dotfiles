@@ -21,9 +21,6 @@ age
 bat
 zoxide
 starship
-ffmpeg
-ffmpeg-libs
-ffmpeg-devel
 ImageMagick
 lazygit
 
@@ -32,8 +29,7 @@ mise
 
 # Archive tools
 unzip
-p7zip
-p7zip-plugins
+7zip
 unrar
 
 # Shell essentials
@@ -49,3 +45,6 @@ tree
 # System monitor
 btop
 fastfetch
+
+# Terminal
+ghostty

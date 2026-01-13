@@ -27,6 +27,9 @@ if command -v fzf &>/dev/null; then
     if [[ -f /usr/share/fzf/shell/key-bindings.bash ]]; then
         source /usr/share/fzf/shell/key-bindings.bash
     fi
+    if [[ -f /usr/share/bash-completion/completions/fzf ]]; then
+        source /usr/share/bash-completion/completions/fzf
+    fi
 fi
 
 # Secrets - load manually when needed:

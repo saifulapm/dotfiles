@@ -84,14 +84,12 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────
-# FFmpeg Swap (replace ffmpeg-free with full ffmpeg from RPMFusion)
+# FFmpeg (from RPMFusion, replaces free versions)
 # ─────────────────────────────────────────────────────────────
-if rpm -q ffmpeg-free &>/dev/null; then
-    header "FFmpeg Swap"
-    spin "  Replacing ffmpeg-free with ffmpeg" sudo dnf swap ffmpeg-free ffmpeg --allowerasing -y
-    done_msg "ffmpeg swapped"
-elif rpm -q ffmpeg &>/dev/null; then
-    : # ffmpeg already installed, skip silently
+if ! rpm -q ffmpeg &>/dev/null; then
+    header "FFmpeg"
+    spin "  Installing ffmpeg (RPMFusion)" sudo dnf install -y --allowerasing ffmpeg ffmpeg-libs ffmpeg-devel
+    done_msg "ffmpeg installed"
 fi
 
 # ─────────────────────────────────────────────────────────────
