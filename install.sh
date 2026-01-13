@@ -12,9 +12,9 @@ DOTFILES="$HOME/.dotfiles"
 
 echo "Cloning dotfiles..."
 if [[ -d "$DOTFILES/.git" ]]; then
-    # Reset local changes and pull latest
-    git -C "$DOTFILES" reset --hard --quiet
-    git -C "$DOTFILES" pull --quiet
+    # Fetch latest and reset to origin
+    git -C "$DOTFILES" fetch --quiet origin
+    git -C "$DOTFILES" reset --hard --quiet origin/$BRANCH
 else
     rm -rf "$DOTFILES"
     git clone --quiet "https://github.com/$REPO.git" "$DOTFILES"
