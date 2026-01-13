@@ -52,8 +52,11 @@ if [[ -f "$DOTFILES/copr.list" ]]; then
         header "COPR Repositories"
         count=0
         while IFS= read -r repo; do
-            spin "  Enabling $repo" sudo dnf copr enable -y "$repo" 2>/dev/null || true
-            ((count++))
+            if ! dnf repolist | grep -q "${repo##*/}"; then
+                echo -n "  Enabling $repo... "
+                sudo dnf copr enable -y "$repo" >/dev/null 2>&1 && echo "done" || echo "failed"
+                ((count++))
+            fi
         done <<< "$repos"
         done_msg "$count repos enabled"
     fi
