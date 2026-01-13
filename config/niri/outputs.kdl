@@ -1,0 +1,12 @@
+// Output configuration
+// Run `niri msg outputs` to list all outputs and their modes
+// https://yalter.github.io/niri/Configuration:-Outputs
+
+// Example output configuration (uncomment and modify as needed)
+/-output "eDP-1" {
+    // off
+    mode "1920x1080@120.030"
+    scale 2
+    transform "normal"
+    position x=1280 y=0
+}

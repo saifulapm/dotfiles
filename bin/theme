@@ -66,6 +66,21 @@ generate_theme() {
     mkdir -p "$HOME/.config/dotfiles"
     sed -f "$sed_script" "$TEMPLATES_DIR/ghostty.conf.tpl" > "$HOME/.config/dotfiles/ghostty-theme.conf"
 
+    # Generate niri colors
+    mkdir -p "$HOME/.config/niri"
+    sed -f "$sed_script" "$TEMPLATES_DIR/niri.kdl.tpl" > "$HOME/.config/niri/colors.kdl"
+
+    # Set GNOME/GTK theme (dark mode)
+    if command -v gsettings &>/dev/null; then
+        gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
+        gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark" 2>/dev/null || true
+    fi
+
+    # Reload niri if running
+    if command -v niri &>/dev/null && niri msg version &>/dev/null 2>&1; then
+        niri msg action reload-config 2>/dev/null || true
+    fi
+
     # Save current theme name
     mkdir -p "$(dirname "$THEME_FILE")"
     echo "$name" > "$THEME_FILE"

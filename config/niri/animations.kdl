@@ -1,0 +1,7 @@
+// Animation settings
+// https://yalter.github.io/niri/Configuration:-Animations
+
+animations {
+    // off
+    // slowdown 3.0
+}

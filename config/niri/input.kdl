@@ -1,0 +1,35 @@
+// Input device configuration
+// https://yalter.github.io/niri/Configuration:-Input
+
+input {
+    keyboard {
+        xkb {
+            // layout "us,ru"
+            // options "grp:win_space_toggle,compose:ralt,ctrl:nocaps"
+        }
+
+        numlock
+    }
+
+    touchpad {
+        tap
+        natural-scroll
+        // accel-speed 0.2
+        // accel-profile "flat"
+    }
+
+    mouse {
+        // natural-scroll
+        // accel-speed 0.2
+        // accel-profile "flat"
+    }
+
+    trackpoint {
+        // natural-scroll
+        // accel-speed 0.2
+        // accel-profile "flat"
+    }
+
+    // warp-mouse-to-focus
+    // focus-follows-mouse max-scroll-amount="0%"
+}

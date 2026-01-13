@@ -1,0 +1,49 @@
+// Layout settings
+// https://yalter.github.io/niri/Configuration:-Layout
+
+layout {
+    gaps 16
+
+    center-focused-column "never"
+
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+    }
+
+    default-column-width { proportion 0.5; }
+
+    // Focus ring - colors set by theme in colors.kdl
+    focus-ring {
+        width 2
+        // Colors are overridden by colors.kdl
+        active-color "#7fc8ff"
+        inactive-color "#505050"
+    }
+
+    // Border - colors set by theme in colors.kdl
+    border {
+        off
+        width 2
+        // Colors are overridden by colors.kdl
+        active-color "#ffc87f"
+        inactive-color "#505050"
+        urgent-color "#9b0000"
+    }
+
+    shadow {
+        // on
+        softness 30
+        spread 5
+        offset x=0 y=5
+        color "#0007"
+    }
+
+    struts {
+        // left 64
+        // right 64
+        // top 64
+        // bottom 64
+    }
+}

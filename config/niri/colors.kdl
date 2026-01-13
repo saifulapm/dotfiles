@@ -1,0 +1,15 @@
+// Niri Theme Colors
+// This file is overwritten by `theme set <name>`
+// Default: catppuccin
+
+layout {
+    focus-ring {
+        active-color "#89b4fa"
+        inactive-color "#585b70"
+    }
+
+    border {
+        active-color "#89b4fa"
+        inactive-color "#585b70"
+    }
+}

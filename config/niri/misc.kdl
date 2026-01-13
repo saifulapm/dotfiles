@@ -1,0 +1,26 @@
+// Miscellaneous settings
+
+// Spawn processes at startup
+// spawn-at-startup "walker" "--gapplication-service"
+
+hotkey-overlay {
+    // skip-at-startup
+}
+
+// Ask clients to omit client-side decorations
+prefer-no-csd
+
+// Screenshot path
+screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+
+// Cursor settings
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 24
+}
+
+// Environment variables
+environment {
+    GTK_THEME "Adwaita-dark"
+    QT_QPA_PLATFORMTHEME "qt5ct"
+}

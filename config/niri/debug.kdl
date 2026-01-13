@@ -1,0 +1,11 @@
+// Debug settings
+
+debug {
+    // preview-render "screencast"
+    // dbus-interfaces-in-non-session-instances
+    // enable-overlay-planes
+    // disable-cursor-plane
+    // disable-direct-scanout
+    render-drm-device "/dev/dri/renderD128"
+    // ignore-drm-device "/dev/dri/renderD129"
+}

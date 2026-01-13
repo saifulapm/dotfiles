@@ -1,0 +1,7 @@
+// Workspace configuration
+// https://yalter.github.io/niri/Configuration:-Workspaces
+
+// Named workspaces (optional)
+// workspace "browser"
+// workspace "code"
+// workspace "terminal"
