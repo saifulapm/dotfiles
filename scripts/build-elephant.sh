@@ -83,7 +83,25 @@ echo "Elephant build complete!"
 echo "Binary: $BIN_DIR/elephant"
 echo "Providers: $PROVIDERS_DIR/"
 ls -la "$PROVIDERS_DIR/"
-echo ""
-echo "To enable the service, run:"
-echo "  elephant service enable"
-echo "  systemctl --user start elephant.service"
+
+# Install systemd service with explicit path (avoids conflict with /usr/local/bin/elephant)
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SERVICE_SRC="$DOTFILES_DIR/config/systemd/user/elephant.service"
+SERVICE_DST="$HOME/.config/systemd/user/elephant.service"
+
+if [[ -f "$SERVICE_SRC" ]]; then
+    echo ""
+    echo "Installing systemd service..."
+    mkdir -p "$(dirname "$SERVICE_DST")"
+    cp "$SERVICE_SRC" "$SERVICE_DST"
+    systemctl --user daemon-reload
+    systemctl --user enable elephant.service
+    systemctl --user restart elephant.service
+    echo "Service enabled and started"
+else
+    echo ""
+    echo "To enable the service, run:"
+    echo "  systemctl --user daemon-reload"
+    echo "  systemctl --user enable elephant.service"
+    echo "  systemctl --user start elephant.service"
+fi
