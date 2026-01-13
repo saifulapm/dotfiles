@@ -1,7 +1,7 @@
 // Miscellaneous settings
 
 // Spawn processes at startup
-// spawn-at-startup "walker" "--gapplication-service"
+spawn-at-startup "walker" "--gapplication-service"
 
 hotkey-overlay {
     // skip-at-startup
