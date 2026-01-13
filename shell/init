@@ -29,7 +29,5 @@ if command -v fzf &>/dev/null; then
     fi
 fi
 
-# Secrets (load encrypted secrets as env vars)
-if command -v secrets &>/dev/null && [[ -f ~/.dotfiles/secrets.age ]]; then
-    eval "$(secrets load 2>/dev/null)"
-fi
+# Secrets - load manually when needed:
+# eval "$(secrets load)"
