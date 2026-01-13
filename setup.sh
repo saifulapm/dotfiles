@@ -70,6 +70,18 @@ if [[ -f "$DOTFILES/copr.list" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────
+# RPMFusion Repository
+# ─────────────────────────────────────────────────────────────
+if ! rpm -q rpmfusion-free-release &>/dev/null; then
+    header "RPMFusion Repository"
+    echo -n "  Enabling RPMFusion Free... "
+    sudo dnf install -y "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" >/dev/null 2>&1 && echo "done" || echo "failed"
+    echo -n "  Enabling RPMFusion Non-Free... "
+    sudo dnf install -y "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm" >/dev/null 2>&1 && echo "done" || echo "failed"
+    done_msg "RPMFusion enabled"
+fi
+
+# ─────────────────────────────────────────────────────────────
 # DNF Packages
 # ─────────────────────────────────────────────────────────────
 if [[ -f "$DOTFILES/packages.list" ]]; then
@@ -79,7 +91,7 @@ if [[ -f "$DOTFILES/packages.list" ]]; then
         installed=0
         skipped=0
         while IFS= read -r pkg; do
-            if [[ -z "$(dnf repoquery --installed --whatprovides "$pkg" 2>/dev/null)" ]]; then
+            if ! rpm -q "$pkg" &>/dev/null; then
                 spin "  Installing $pkg" sudo dnf install -y "$pkg"
                 ((installed++))
             else

@@ -22,6 +22,8 @@ bat
 zoxide
 starship
 ffmpeg
+ffmpeg-libs
+ffmpeg-devel
 ImageMagick
 lazygit
 
@@ -31,6 +33,7 @@ mise
 # Archive tools
 unzip
 p7zip
+p7zip-plugins
 unrar
 
 # Shell essentials
@@ -38,7 +41,6 @@ bash-completion
 
 # Network tools
 curl
-wget
 
 # CLI utilities
 jq
