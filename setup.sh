@@ -38,6 +38,13 @@ spin() {
     gum spin --spinner dot --title "$1" -- "${@:2}"
 }
 
+# Check if symlink points to correct target
+is_linked() {
+    local target="$1"
+    local link="$2"
+    [[ -L "$link" && "$(readlink "$link")" == "$target" ]]
+}
+
 # Banner
 echo ""
 gum style --border rounded --padding "0 2" --border-foreground 14 --bold "Fedora Asahi Setup"
@@ -69,12 +76,17 @@ if [[ -f "$DOTFILES/packages.list" ]]; then
     packages=$(read_list "$DOTFILES/packages.list")
     if [[ -n "$packages" ]]; then
         header "DNF Packages"
-        count=0
+        installed=0
+        skipped=0
         while IFS= read -r pkg; do
-            spin "  Installing $pkg" sudo dnf install -y "$pkg"
-            ((count++))
+            if ! rpm -q "$pkg" &>/dev/null; then
+                spin "  Installing $pkg" sudo dnf install -y "$pkg"
+                ((installed++))
+            else
+                ((skipped++))
+            fi
         done <<< "$packages"
-        done_msg "$count packages installed"
+        done_msg "$installed installed, $skipped skipped"
     fi
 fi
 
@@ -89,12 +101,17 @@ if [[ -f "$DOTFILES/flatpak.list" ]]; then
             spin "  Installing Flatpak" sudo dnf install -y flatpak
             flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         fi
-        count=0
+        installed=0
+        skipped=0
         while IFS= read -r pkg; do
-            spin "  Installing $pkg" flatpak install -y flathub "$pkg"
-            ((count++))
+            if ! flatpak list --app | grep -q "$pkg"; then
+                spin "  Installing $pkg" flatpak install -y flathub "$pkg"
+                ((installed++))
+            else
+                ((skipped++))
+            fi
         done <<< "$flatpaks"
-        done_msg "$count packages installed"
+        done_msg "$installed installed, $skipped skipped"
     fi
 fi
 
@@ -109,12 +126,18 @@ if [[ -f "$DOTFILES/snap.list" ]]; then
             spin "  Installing Snapd" sudo dnf install -y snapd
             sudo ln -sf /var/lib/snapd/snap /snap 2>/dev/null || true
         fi
-        count=0
+        installed=0
+        skipped=0
         while IFS= read -r pkg; do
-            spin "  Installing $pkg" sudo snap install $pkg
-            ((count++))
+            pkg_name=$(echo "$pkg" | awk '{print $1}')
+            if ! snap list "$pkg_name" &>/dev/null; then
+                spin "  Installing $pkg_name" sudo snap install $pkg
+                ((installed++))
+            else
+                ((skipped++))
+            fi
         done <<< "$snaps"
-        done_msg "$count packages installed"
+        done_msg "$installed installed, $skipped skipped"
     fi
 fi
 
@@ -125,21 +148,25 @@ if [[ -d "$DOTFILES/fonts" ]]; then
     shopt -s nullglob
     fonts=("$DOTFILES/fonts"/*)
     shopt -u nullglob
-    count=0
-    for f in "${fonts[@]}"; do
-        [[ "$(basename "$f")" != ".gitkeep" ]] && ((count++)) || true
-    done
-    if [[ $count -gt 0 ]]; then
-        header "Fonts"
-        mkdir -p ~/.local/share/fonts
-        for font in "${fonts[@]}"; do
-            [[ "$(basename "$font")" == ".gitkeep" ]] && continue
-            name=$(basename "$font")
+
+    header "Fonts"
+    mkdir -p ~/.local/share/fonts
+    installed=0
+    skipped=0
+    for font in "${fonts[@]}"; do
+        name=$(basename "$font")
+        [[ "$name" == ".gitkeep" ]] && continue
+        if [[ ! -e "$HOME/.local/share/fonts/$name" ]]; then
             cp -r "$font" ~/.local/share/fonts/
-        done
+            ((installed++))
+        else
+            ((skipped++))
+        fi
+    done
+    if [[ $installed -gt 0 ]]; then
         spin "  Updating font cache" fc-cache -f
-        done_msg "$count fonts installed"
     fi
+    done_msg "$installed installed, $skipped skipped"
 fi
 
 # ─────────────────────────────────────────────────────────────
@@ -153,12 +180,17 @@ if [[ -f "$DOTFILES/cargo.list" ]]; then
             spin "  Installing Rust" bash -c 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>/dev/null'
             source "$HOME/.cargo/env"
         fi
-        count=0
+        installed=0
+        skipped=0
         while IFS= read -r pkg; do
-            spin "  Installing $pkg" cargo install "$pkg" 2>/dev/null || true
-            ((count++))
+            if ! command -v "$pkg" &>/dev/null; then
+                spin "  Installing $pkg" cargo install "$pkg" 2>/dev/null || true
+                ((installed++))
+            else
+                ((skipped++))
+            fi
         done <<< "$cargo_pkgs"
-        done_msg "$count packages installed"
+        done_msg "$installed installed, $skipped skipped"
     fi
 fi
 
@@ -173,13 +205,18 @@ if [[ -f "$DOTFILES/go.list" ]]; then
             spin "  Installing Go" sudo dnf install -y golang 2>/dev/null
         fi
         if command -v go &>/dev/null; then
-            count=0
+            installed=0
+            skipped=0
             while IFS= read -r pkg; do
                 name=$(basename "$pkg" | cut -d'@' -f1)
-                spin "  Installing $name" go install "$pkg" 2>/dev/null || true
-                ((count++))
+                if ! command -v "$name" &>/dev/null; then
+                    spin "  Installing $name" go install "$pkg" 2>/dev/null || true
+                    ((installed++))
+                else
+                    ((skipped++))
+                fi
             done <<< "$go_pkgs"
-            done_msg "$count packages installed"
+            done_msg "$installed installed, $skipped skipped"
         fi
     fi
 fi
@@ -191,22 +228,23 @@ if [[ -d "$DOTFILES/config" ]]; then
     shopt -s nullglob
     configs=("$DOTFILES/config"/*)
     shopt -u nullglob
-    count=0
-    for c in "${configs[@]}"; do
-        [[ "$(basename "$c")" != "home" ]] && ((count++)) || true
-    done
-    if [[ $count -gt 0 ]]; then
-        header "Config Symlinks"
-        mkdir -p ~/.config
-        linked=0
-        for item in "${configs[@]}"; do
-            name=$(basename "$item")
-            [[ "$name" == "home" ]] && continue
-            spin "  Linking $name" bash -c "rm -rf '$HOME/.config/$name' && ln -sf '$item' '$HOME/.config/$name'"
+
+    header "Config Symlinks"
+    mkdir -p ~/.config
+    linked=0
+    skipped=0
+    for item in "${configs[@]}"; do
+        name=$(basename "$item")
+        [[ "$name" == "home" ]] && continue
+        if ! is_linked "$item" "$HOME/.config/$name"; then
+            rm -rf "$HOME/.config/$name"
+            ln -sf "$item" "$HOME/.config/$name"
             ((linked++))
-        done
-        done_msg "$linked configs linked"
-    fi
+        else
+            ((skipped++))
+        fi
+    done
+    done_msg "$linked linked, $skipped skipped"
 fi
 
 # ─────────────────────────────────────────────────────────────
@@ -218,13 +256,19 @@ if [[ -d "$DOTFILES/config/home" ]]; then
     shopt -u nullglob
     if [[ ${#home_files[@]} -gt 0 ]]; then
         header "Home Dotfiles"
-        count=0
+        linked=0
+        skipped=0
         for item in "${home_files[@]}"; do
             name=$(basename "$item")
-            spin "  Linking $name" bash -c "rm -rf '$HOME/$name' && ln -sf '$item' '$HOME/$name'"
-            ((count++))
+            if ! is_linked "$item" "$HOME/$name"; then
+                rm -rf "$HOME/$name"
+                ln -sf "$item" "$HOME/$name"
+                ((linked++))
+            else
+                ((skipped++))
+            fi
         done
-        done_msg "$count dotfiles linked"
+        done_msg "$linked linked, $skipped skipped"
     fi
 fi
 
@@ -235,17 +279,24 @@ if [[ -f "$DOTFILES/symlinks.list" ]]; then
     symlinks=$(read_list "$DOTFILES/symlinks.list")
     if [[ -n "$symlinks" ]]; then
         header "Partial Symlinks"
-        count=0
+        linked=0
+        skipped=0
         while IFS=: read -r src dest; do
             [[ -z "$src" || -z "$dest" ]] && continue
             src_path="$DOTFILES/$src"
             dest_path="$HOME/$dest"
             if [[ -e "$src_path" ]]; then
-                spin "  Linking $dest" bash -c "mkdir -p '$(dirname "$dest_path")' && rm -rf '$dest_path' && ln -sf '$src_path' '$dest_path'"
-                ((count++))
+                if ! is_linked "$src_path" "$dest_path"; then
+                    mkdir -p "$(dirname "$dest_path")"
+                    rm -rf "$dest_path"
+                    ln -sf "$src_path" "$dest_path"
+                    ((linked++))
+                else
+                    ((skipped++))
+                fi
             fi
         done <<< "$symlinks"
-        done_msg "$count symlinks created"
+        done_msg "$linked linked, $skipped skipped"
     fi
 fi
 
@@ -256,27 +307,28 @@ if [[ -d "$DOTFILES/bin" ]]; then
     shopt -s nullglob
     bins=("$DOTFILES/bin"/*)
     shopt -u nullglob
-    count=0
-    for b in "${bins[@]}"; do
-        [[ -f "$b" && "$(basename "$b")" != ".gitkeep" ]] && ((count++)) || true
-    done
-    if [[ $count -gt 0 ]]; then
-        header "Custom Executables"
-        mkdir -p ~/.local/bin
-        linked=0
-        for script in "${bins[@]}"; do
-            [[ -f "$script" ]] || continue
-            name=$(basename "$script")
-            [[ "$name" == ".gitkeep" ]] && continue
-            spin "  Linking $name" bash -c "chmod +x '$script' && ln -sf '$script' ~/.local/bin/'$name'"
+
+    header "Custom Executables"
+    mkdir -p ~/.local/bin
+    linked=0
+    skipped=0
+    for script in "${bins[@]}"; do
+        [[ -f "$script" ]] || continue
+        name=$(basename "$script")
+        [[ "$name" == ".gitkeep" ]] && continue
+        chmod +x "$script"
+        if ! is_linked "$script" "$HOME/.local/bin/$name"; then
+            ln -sf "$script" ~/.local/bin/"$name"
             ((linked++))
-        done
-        done_msg "$linked executables linked"
-    fi
+        else
+            ((skipped++))
+        fi
+    done
+    done_msg "$linked linked, $skipped skipped"
 fi
 
 # ─────────────────────────────────────────────────────────────
-# Custom Scripts
+# Custom Scripts (always run for updates)
 # ─────────────────────────────────────────────────────────────
 if [[ -d "$DOTFILES/scripts" ]]; then
     shopt -s nullglob
