@@ -17,6 +17,11 @@ if command -v zoxide &>/dev/null; then
     eval "$(zoxide init bash)"
 fi
 
+# Try (project launcher)
+if command -v try &>/dev/null; then
+    eval "$(try init ~/Work/tries)"
+fi
+
 # FZF
 if command -v fzf &>/dev/null; then
     if [[ -f /usr/share/fzf/shell/key-bindings.bash ]]; then
