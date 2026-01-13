@@ -15,8 +15,9 @@ if ! command -v go &>/dev/null; then
     exit 1
 fi
 
-# Ensure bin directory exists
+# Ensure directories exist
 mkdir -p "$BIN_DIR"
+mkdir -p "$PROVIDERS_DIR"
 
 # Clone/update elephant
 if [[ -d "$ELEPHANT_DIR" ]]; then
@@ -29,16 +30,15 @@ else
     cd "$ELEPHANT_DIR"
 fi
 
-# Build main binary
+# Build main binary from module root
 echo "Building elephant..."
-cd cmd
-go build -o elephant elephant.go
+cd "$ELEPHANT_DIR"
+go build -buildvcs=false -trimpath -o elephant ./cmd/elephant
 cp elephant "$BIN_DIR/"
 echo "Installed: $BIN_DIR/elephant"
 
-# Build providers
-mkdir -p "$PROVIDERS_DIR"
-cd ../internal/providers
+# Build providers from module root
+cd "$ELEPHANT_DIR"
 
 # All providers except archlinuxpkgs (Arch-specific)
 PROVIDERS=(
@@ -54,26 +54,25 @@ PROVIDERS=(
     websearch
     todo
     bookmarks
-    unicodes
+    unicode
     windows
     snippets
     nirisessions
-    onepassword
+    1password
+    dnfpackages
 )
 
 echo ""
 echo "Building providers..."
 for provider in "${PROVIDERS[@]}"; do
-    if [[ -d "$provider" ]]; then
+    provider_path="./internal/providers/$provider"
+    if [[ -d "$ELEPHANT_DIR/internal/providers/$provider" ]]; then
         echo "  Building: $provider"
-        cd "$provider"
-        go build -buildmode=plugin 2>/dev/null || {
-            echo "    Warning: Failed to build $provider (may not exist yet)"
-            cd ..
-            continue
-        }
-        cp "${provider}.so" "$PROVIDERS_DIR/"
-        cd ..
+        if go build -buildvcs=false -trimpath -buildmode=plugin -o "$PROVIDERS_DIR/${provider}.so" "$provider_path" 2>/dev/null; then
+            echo "    OK"
+        else
+            echo "    Warning: Failed to build $provider"
+        fi
     else
         echo "  Skipping: $provider (directory not found)"
     fi
@@ -83,6 +82,7 @@ echo ""
 echo "Elephant build complete!"
 echo "Binary: $BIN_DIR/elephant"
 echo "Providers: $PROVIDERS_DIR/"
+ls -la "$PROVIDERS_DIR/"
 echo ""
 echo "To enable the service, run:"
 echo "  elephant service enable"
