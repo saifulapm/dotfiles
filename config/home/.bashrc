@@ -2,7 +2,8 @@
 [[ $- != *i* ]] && return
 
 # Dotfiles shell config
-SHELL_CONFIG="$HOME/.config/shell"
+DOTFILES="$HOME/.dotfiles"
+SHELL_CONFIG="$DOTFILES/shell"
 
 [[ -f "$SHELL_CONFIG/options" ]]   && source "$SHELL_CONFIG/options"
 [[ -f "$SHELL_CONFIG/envs" ]]      && source "$SHELL_CONFIG/envs"
