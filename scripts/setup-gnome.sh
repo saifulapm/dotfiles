@@ -39,6 +39,24 @@ if [[ -d "/usr/share/icons/Yaru" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────
+# Create Nautilus navigation icon symlinks
+# ─────────────────────────────────────────────────────────────
+# Yaru icons don't include go-previous/go-next, causing blank
+# navigation buttons in Nautilus. Symlink from Adwaita icons.
+if [[ -d "/usr/share/icons/Yaru/scalable/actions" ]]; then
+    ADWAITA_ACTIONS="/usr/share/icons/Adwaita/symbolic/actions"
+    YARU_ACTIONS="/usr/share/icons/Yaru/scalable/actions"
+
+    if [[ -f "$ADWAITA_ACTIONS/go-previous-symbolic.svg" ]]; then
+        if [[ ! -L "$YARU_ACTIONS/go-previous-symbolic.svg" ]]; then
+            echo "  Creating Nautilus navigation icon symlinks..."
+            sudo ln -snf "$ADWAITA_ACTIONS/go-previous-symbolic.svg" "$YARU_ACTIONS/go-previous-symbolic.svg"
+            sudo ln -snf "$ADWAITA_ACTIONS/go-next-symbolic.svg" "$YARU_ACTIONS/go-next-symbolic.svg"
+        fi
+    fi
+fi
+
+# ─────────────────────────────────────────────────────────────
 # Update icon caches
 # ─────────────────────────────────────────────────────────────
 echo "  Updating icon caches..."
