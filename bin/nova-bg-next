@@ -13,11 +13,18 @@ CURRENT_BACKGROUND_LINK="$HOME/.config/nova/current/background"
 mapfile -d '' -t BACKGROUNDS < <(find -L "$USER_BACKGROUNDS_PATH" "$THEME_BACKGROUNDS_PATH" -maxdepth 1 -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.webp" \) -print0 2>/dev/null | sort -z)
 TOTAL=${#BACKGROUNDS[@]}
 
+reload_swaybg() {
+    if systemctl --user is-active swaybg.service &>/dev/null; then
+        systemctl --user restart swaybg.service
+    else
+        pkill -x swaybg 2>/dev/null
+        swaybg -i "$CURRENT_BACKGROUND_LINK" -m fill &>/dev/null &
+        disown
+    fi
+}
+
 if [[ $TOTAL -eq 0 ]]; then
     notify-send "No backgrounds found for theme: $THEME_NAME" -t 2000
-    pkill -x swaybg
-    swaybg --color '#1e1e2e' &>/dev/null &
-    disown
 else
     # Get current background from symlink
     if [[ -L "$CURRENT_BACKGROUND_LINK" ]]; then
@@ -47,8 +54,6 @@ else
     mkdir -p "$(dirname "$CURRENT_BACKGROUND_LINK")"
     ln -nsf "$NEW_BACKGROUND" "$CURRENT_BACKGROUND_LINK"
 
-    # Relaunch swaybg
-    pkill -x swaybg
-    swaybg -i "$CURRENT_BACKGROUND_LINK" -m fill &>/dev/null &
-    disown
+    # Reload swaybg
+    reload_swaybg
 fi
