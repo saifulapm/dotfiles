@@ -67,7 +67,7 @@ pamixer
 pulseaudio-utils
 
 # Screen recording
-gpu-screen-recorder
+wf-recorder
 
 # Voxtype dependencies
 wtype
