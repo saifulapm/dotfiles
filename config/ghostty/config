@@ -2,9 +2,9 @@
 config-file = ?"~/.config/dotfiles/ghostty-theme.conf"
 
 # Font
-font-family = "JetBrainsMono Nerd Font"
+font-family = "Maple Mono"
 font-style = Regular
-font-size = 9
+font-size = 10
 
 # Window
 window-theme = ghostty
