@@ -1,0 +1,50 @@
+#!/bin/bash
+# Reload foot terminal colors using OSC escape sequences
+
+COLORS_FILE="$HOME/.config/nova/current/theme/foot-colors.ini"
+
+[[ ! -f "$COLORS_FILE" ]] && exit 1
+
+# Parse color value
+get_color() {
+    grep "^$1=" "$COLORS_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' '
+}
+
+# Send OSC sequence to change a color
+# Usage: send_osc <osc_code> <color_hex> <pts>
+send_osc() {
+    local code="$1" hex="$2" pts="$3"
+    [[ -z "$hex" ]] && return
+    printf '\033]%s;rgb:%s/%s/%s\033\\' "$code" "${hex:0:2}" "${hex:2:2}" "${hex:4:2}" > "$pts" 2>/dev/null
+}
+
+# Send palette color (OSC 4)
+send_palette() {
+    local idx="$1" hex="$2" pts="$3"
+    [[ -z "$hex" ]] && return
+    printf '\033]4;%s;rgb:%s/%s/%s\033\\' "$idx" "${hex:0:2}" "${hex:2:2}" "${hex:4:2}" > "$pts" 2>/dev/null
+}
+
+# Apply colors to a single PTY
+apply_to_pts() {
+    local pts="$1"
+
+    # Foreground (OSC 10) and Background (OSC 11)
+    send_osc 10 "$(get_color foreground)" "$pts"
+    send_osc 11 "$(get_color background)" "$pts"
+
+    # Palette colors 0-7 (regular)
+    for i in {0..7}; do
+        send_palette "$i" "$(get_color "regular$i")" "$pts"
+    done
+
+    # Palette colors 8-15 (bright)
+    for i in {0..7}; do
+        send_palette "$((i+8))" "$(get_color "bright$i")" "$pts"
+    done
+}
+
+# Apply to all accessible PTYs
+for pts in /dev/pts/[0-9]*; do
+    [[ -w "$pts" ]] && apply_to_pts "$pts"
+done
