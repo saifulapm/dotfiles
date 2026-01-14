@@ -27,26 +27,14 @@ if command -v gsettings &>/dev/null; then
 fi
 
 # ─────────────────────────────────────────────────────────────
-# Fix Nautilus icon compatibility with Yaru theme
+# Fix Yaru icon theme inheritance (Fedora compatibility)
 # ─────────────────────────────────────────────────────────────
-YARU_ACTIONS="/usr/share/icons/Yaru/scalable/actions"
-ADWAITA_ACTIONS="/usr/share/icons/Adwaita/symbolic/actions"
-
-if [[ -d "$ADWAITA_ACTIONS" ]] && [[ -d "/usr/share/icons/Yaru" ]]; then
-    echo "  Fixing Nautilus navigation icons..."
-
-    # Create actions directory if it doesn't exist
-    if [[ ! -d "$YARU_ACTIONS" ]]; then
-        sudo mkdir -p "$YARU_ACTIONS"
-    fi
-
-    # Symlink navigation icons from Adwaita to Yaru
-    for icon in go-previous-symbolic.svg go-next-symbolic.svg; do
-        if [[ -f "$ADWAITA_ACTIONS/$icon" ]] && [[ ! -e "$YARU_ACTIONS/$icon" ]]; then
-            sudo ln -snf "$ADWAITA_ACTIONS/$icon" "$YARU_ACTIONS/$icon"
-            echo "    Linked $icon"
-        fi
-    done
+# Yaru inherits from "Humanity" which doesn't exist on Fedora
+# Replace with Adwaita for proper icon fallback
+YARU_INDEX="/usr/share/icons/Yaru/index.theme"
+if [[ -f "$YARU_INDEX" ]] && grep -q "Inherits=Humanity" "$YARU_INDEX"; then
+    echo "  Fixing Yaru icon theme inheritance (Humanity -> Adwaita)..."
+    sudo sed -i 's/Inherits=Humanity,hicolor/Inherits=Adwaita,hicolor/' "$YARU_INDEX"
 fi
 
 # ─────────────────────────────────────────────────────────────
