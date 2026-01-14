@@ -82,7 +82,7 @@
     }
   },
   "bluetooth": {
-    "format": "",
+    "format": "󰂯",
     "format-off": "󰂲",
     "format-disabled": "󰂲",
     "format-connected": "󰂱",
