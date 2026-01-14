@@ -6,6 +6,7 @@ PID=$(pgrep -x wf-recorder)
 if [ -n "$PID" ]; then
     # Stop recording
     kill -SIGINT "$PID"
+    sleep 0.3  # Wait for process to exit before refreshing indicator
 else
     # Start recording
     mkdir -p "$HOME/Videos/Recordings"
