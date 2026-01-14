@@ -1,0 +1,45 @@
+#!/bin/bash
+# Launch the Nova screensaver in fullscreen terminal
+
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+
+# Exit early if tte is not installed
+if ! command -v tte &>/dev/null; then
+    notify-send "Screensaver requires tte" "Install with: pip install terminaltexteffects"
+    exit 1
+fi
+
+# Exit early if screensaver is already running
+if pgrep -f "nova-cmd-screensaver" &>/dev/null; then
+    exit 0
+fi
+
+# Check if screensaver is disabled
+if [[ -f ~/.local/state/nova/toggles/screensaver-off ]]; then
+    exit 0
+fi
+
+# Close walker if open
+walker -q 2>/dev/null
+
+# Launch screensaver in ghostty (preferred) or alacritty
+if command -v ghostty &>/dev/null; then
+    ghostty \
+        --class=org.nova.screensaver \
+        --config-file="$DOTFILES/default/ghostty/screensaver" \
+        --font-size=18 \
+        -e nova-cmd-screensaver &
+elif command -v alacritty &>/dev/null; then
+    alacritty \
+        --class=org.nova.screensaver \
+        -o "window.padding.x=0" \
+        -o "window.padding.y=0" \
+        -o "colors.primary.background='#000000'" \
+        -o "font.size=18" \
+        -e nova-cmd-screensaver &
+else
+    notify-send "Screensaver requires ghostty or alacritty"
+    exit 1
+fi
+
+disown

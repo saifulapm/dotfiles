@@ -1,0 +1,5 @@
+# Python packages to install
+# Install with: pip install -r pip.list
+
+# Terminal text effects (for screensaver)
+terminaltexteffects

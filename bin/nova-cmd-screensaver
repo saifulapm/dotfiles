@@ -1,0 +1,39 @@
+#!/bin/bash
+# Run the Nova screensaver using random effects from TTE
+
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+SCREENSAVER_TEXT="$DOTFILES/default/branding/screensaver.txt"
+
+exit_screensaver() {
+    pkill -x tte 2>/dev/null
+    exit 0
+}
+
+# Exit the screensaver on signals and input
+trap exit_screensaver SIGINT SIGTERM SIGHUP SIGQUIT
+
+# Set background color to black
+printf '\033]11;rgb:00/00/00\007'
+
+# Hide cursor
+printf '\033[?25l'
+
+tty=$(tty 2>/dev/null)
+
+while true; do
+    tte -i "$SCREENSAVER_TEXT" \
+        --frame-rate 120 \
+        --canvas-width 0 \
+        --canvas-height 0 \
+        --anchor-canvas c \
+        --anchor-text c \
+        --random-effect \
+        --no-wrap &
+
+    # Wait for tte to finish or exit on keypress
+    while pgrep -t "${tty#/dev/}" -x tte >/dev/null 2>&1; do
+        if read -n1 -t 1 2>/dev/null; then
+            exit_screensaver
+        fi
+    done
+done
