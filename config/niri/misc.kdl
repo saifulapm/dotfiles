@@ -1,6 +1,7 @@
 // Miscellaneous settings
 
 // Spawn processes at startup
+spawn-at-startup "elephant"
 spawn-at-startup "walker" "--gapplication-service"
 
 hotkey-overlay {

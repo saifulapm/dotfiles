@@ -1,0 +1,9 @@
+#!/bin/bash
+# Restart walker and elephant services
+
+pkill -x elephant 2>/dev/null
+pkill -f "walker --gapplication-service" 2>/dev/null
+sleep 0.5
+setsid elephant &
+setsid walker --gapplication-service &
+echo "Walker restarted"

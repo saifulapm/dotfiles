@@ -10,6 +10,14 @@ binds {
     Mod+D hotkey-overlay-title="Run Application" { spawn-sh "exec walker --width 644 --maxheight 300 --minheight 300"; }
     Super+Alt+L hotkey-overlay-title="Lock Screen" { spawn "swaylock"; }
 
+    // Walker modules
+    Mod+Ctrl+E hotkey-overlay-title="Emoji Picker" { spawn "walker" "-m" "symbols"; }
+    Mod+Ctrl+V hotkey-overlay-title="Clipboard" { spawn "walker" "-m" "clipboard"; }
+
+    // Nova menu
+    Mod+Space hotkey-overlay-title="Nova Menu" { spawn "nova-menu"; }
+    Mod+Slash hotkey-overlay-title="Keybindings" { spawn "nova-menu-keybindings"; }
+
     // Screen reader toggle
     Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
 

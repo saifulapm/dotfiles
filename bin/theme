@@ -110,6 +110,9 @@ generate_theme() {
     # Reload foot server (updates all client windows)
     pkill -SIGUSR1 -x foot 2>/dev/null || true
 
+    # Reload walker theme (if running as service)
+    pkill -SIGUSR1 -f "walker --gapplication-service" 2>/dev/null || true
+
     rm "$sed_script"
 
     echo "Theme applied: $name"
