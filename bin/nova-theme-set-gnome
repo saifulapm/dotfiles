@@ -1,24 +1,50 @@
 #!/bin/bash
 
 # Nova GNOME Theme Setter
-# Syncs theme settings to GNOME/GTK
+# Syncs theme settings to GNOME/GTK for file manager theming
 
-THEME_PATH="$HOME/.config/nova/current/theme"
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+THEME_NAME="$1"
+
+# If no theme name provided, try to get current theme
+if [[ -z "$THEME_NAME" ]]; then
+    THEME_FILE="$HOME/.config/dotfiles/theme"
+    if [[ -f "$THEME_FILE" ]]; then
+        THEME_NAME="$(<$THEME_FILE)"
+    fi
+fi
+
+# Exit if still no theme
+if [[ -z "$THEME_NAME" ]]; then
+    echo "Usage: nova-theme-set-gnome <theme-name>"
+    exit 1
+fi
+
+THEME_PATH="$DOTFILES/themes/$THEME_NAME"
+
+# Check if theme exists
+if [[ ! -d "$THEME_PATH" ]]; then
+    echo "Theme not found: $THEME_NAME"
+    exit 1
+fi
 
 # Set color scheme based on light/dark mode
 if [[ -f "$THEME_PATH/light.mode" ]]; then
-    gsettings set org.gnome.desktop.interface color-scheme "prefer-light"
-    gsettings set org.gnome.desktop.interface gtk-theme "Adwaita"
+    gsettings set org.gnome.desktop.interface color-scheme "prefer-light" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface gtk-theme "Adwaita" 2>/dev/null || true
 else
-    gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"
-    gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark"
+    gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark" 2>/dev/null || true
 fi
 
 # Set icon theme if specified
-ICONS_THEME="$THEME_PATH/icons.theme"
-if [[ -f "$ICONS_THEME" ]]; then
-    gsettings set org.gnome.desktop.interface icon-theme "$(<$ICONS_THEME)"
+ICONS_FILE="$THEME_PATH/icons.theme"
+if [[ -f "$ICONS_FILE" ]]; then
+    ICON_THEME="$(<$ICONS_FILE)"
+    # Trim whitespace
+    ICON_THEME="${ICON_THEME// /}"
+    gsettings set org.gnome.desktop.interface icon-theme "$ICON_THEME" 2>/dev/null || true
 else
     # Default icon theme
-    gsettings set org.gnome.desktop.interface icon-theme "Adwaita"
+    gsettings set org.gnome.desktop.interface icon-theme "Adwaita" 2>/dev/null || true
 fi

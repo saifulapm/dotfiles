@@ -8,6 +8,7 @@ binds {
     // Applications
     Mod+T hotkey-overlay-title="Open Terminal" { spawn "footclient"; }
     Mod+D hotkey-overlay-title="Run Application" { spawn "fuzzel"; }
+    Mod+E hotkey-overlay-title="File Manager" { spawn "nautilus"; }
     Super+Alt+L hotkey-overlay-title="Lock Screen" { spawn "swaylock"; }
 
     // Fuzzel tools

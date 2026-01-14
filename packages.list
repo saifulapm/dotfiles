@@ -79,3 +79,11 @@ swaybg
 # Voxtype dependencies
 wtype
 wl-clipboard
+
+# File manager
+nautilus
+sushi
+ffmpegthumbnailer
+gvfs-mtp
+gvfs-nfs
+gvfs-smb

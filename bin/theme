@@ -88,11 +88,8 @@ generate_theme() {
     mkdir -p "$HOME/.config/mako"
     sed -f "$sed_script" "$TEMPLATES_DIR/mako.ini.tpl" > "$HOME/.config/mako/config"
 
-    # Set GNOME/GTK theme (dark mode)
-    if command -v gsettings &>/dev/null; then
-        gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
-        gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark" 2>/dev/null || true
-    fi
+    # Set GNOME/GTK theme for file manager (handles light/dark mode and icon theme)
+    nova-theme-set-gnome "$name" 2>/dev/null || true
 
     # Reload niri if running
     if command -v niri &>/dev/null && niri msg version &>/dev/null 2>&1; then
