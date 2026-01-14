@@ -1,14 +1,18 @@
 #!/bin/bash
 # Toggle screen recording with wf-recorder
 
-if pgrep -x wf-recorder >/dev/null; then
-    pkill -SIGINT -x wf-recorder
+PID=$(pgrep -x wf-recorder)
+
+if [ -n "$PID" ]; then
+    # Stop recording
+    kill -SIGINT "$PID"
 else
+    # Start recording
     mkdir -p "$HOME/Videos/Recordings"
     # Get the first available output from niri
     OUTPUT=$(niri msg outputs 2>/dev/null | grep -oP '(?<=\()\w+-\d+(?=\))' | head -1)
     OUTPUT=${OUTPUT:-eDP-1}  # Fallback to eDP-1
-    wf-recorder -o "$OUTPUT" -f "$HOME/Videos/Recordings/$(date +%Y%m%d_%H%M%S).mp4" &
+    wf-recorder -o "$OUTPUT" -f "$HOME/Videos/Recordings/$(date +%Y%m%d_%H%M%S).mp4" >/dev/null 2>&1 &
 fi
 
 # Refresh waybar indicator
