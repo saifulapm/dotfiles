@@ -70,9 +70,9 @@ generate_theme() {
     mkdir -p "$HOME/.config/niri"
     sed -f "$sed_script" "$TEMPLATES_DIR/niri.kdl.tpl" > "$HOME/.config/niri/colors.kdl"
 
-    # Generate walker theme CSS
-    mkdir -p "$HOME/.config/dotfiles"
-    sed -f "$sed_script" "$TEMPLATES_DIR/walker.css.tpl" > "$HOME/.config/dotfiles/walker-theme.css"
+    # Generate fuzzel theme colors
+    mkdir -p "$HOME/.config/nova/current/theme"
+    sed -f "$sed_script" "$TEMPLATES_DIR/fuzzel-colors.ini.tpl" > "$HOME/.config/nova/current/theme/fuzzel-colors.ini"
 
     # Generate waybar theme CSS
     mkdir -p "$HOME/.config/nova/current/theme"
@@ -113,9 +113,6 @@ generate_theme() {
 
     # Reload foot colors using OSC escape sequences
     nova-reload-foot-colors 2>/dev/null || true
-
-    # Reload walker theme (if running as service)
-    pkill -SIGUSR1 -f "walker --gapplication-service" 2>/dev/null || true
 
     # Reload mako
     makoctl reload 2>/dev/null || true

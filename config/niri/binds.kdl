@@ -7,12 +7,12 @@ binds {
 
     // Applications
     Mod+T hotkey-overlay-title="Open Terminal" { spawn "footclient"; }
-    Mod+D hotkey-overlay-title="Run Application" { spawn-sh "exec walker --width 644 --maxheight 300 --minheight 300"; }
+    Mod+D hotkey-overlay-title="Run Application" { spawn "fuzzel"; }
     Super+Alt+L hotkey-overlay-title="Lock Screen" { spawn "swaylock"; }
 
-    // Walker modules
-    Mod+Ctrl+E hotkey-overlay-title="Emoji Picker" { spawn "walker" "-m" "symbols"; }
-    Mod+Ctrl+V hotkey-overlay-title="Clipboard" { spawn "walker" "-m" "clipboard"; }
+    // Fuzzel tools
+    Mod+Ctrl+E hotkey-overlay-title="Emoji Picker" { spawn "nova-emoji-picker"; }
+    Mod+Ctrl+V hotkey-overlay-title="Clipboard" { spawn "nova-clipboard"; }
 
     // Nova menu
     Mod+Space hotkey-overlay-title="Nova Menu" { spawn "nova-menu"; }

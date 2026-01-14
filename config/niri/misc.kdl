@@ -1,8 +1,7 @@
 // Miscellaneous settings
 
 // Spawn processes at startup
-spawn-at-startup "elephant"
-spawn-at-startup "walker" "--gapplication-service"
+spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 spawn-at-startup "mako"
 
 hotkey-overlay {

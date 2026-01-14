@@ -1,5 +1,5 @@
 #!/bin/bash
-# Display niri keybindings using walker dmenu
+# Display niri keybindings using fuzzel dmenu
 
 BINDS_FILE="${DOTFILES:-$HOME/.dotfiles}/config/niri/binds.kdl"
 
@@ -27,5 +27,5 @@ parse_bindings() {
 if [[ "$1" == "--print" || "$1" == "-p" ]]; then
     parse_bindings
 else
-    parse_bindings | walker --dmenu -p 'Keybindings' --width 600 --maxheight 500
+    parse_bindings | fuzzel --dmenu -p "Keybindings" -w 70 -l 20
 fi

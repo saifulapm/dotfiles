@@ -1,0 +1,15 @@
+#!/bin/bash
+# Clipboard manager using cliphist and fuzzel
+
+if ! command -v cliphist &>/dev/null; then
+    notify-send "Error" "cliphist not installed" 2>/dev/null
+    echo "Error: cliphist not installed" >&2
+    exit 1
+fi
+
+selected=$(cliphist list | fuzzel --dmenu --prompt="  " --placeholder="Clipboard history..." -w 60 -l 15)
+
+if [[ -n "$selected" ]]; then
+    echo "$selected" | cliphist decode | wl-copy
+    notify-send "Clipboard" "Item copied" 2>/dev/null || true
+fi

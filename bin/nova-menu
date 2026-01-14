@@ -1,12 +1,12 @@
 #!/bin/bash
-# Nova Menu - hierarchical menu system using walker
+# Nova Menu - hierarchical menu system using fuzzel
 
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 
 menu() {
     local prompt="$1"
     shift
-    printf '%s\n' "$@" | walker --dmenu --width 320 --minheight 1 --maxheight 600 -p "$prompt"
+    printf '%s\n' "$@" | fuzzel --dmenu -p "$prompt" -w 35 -l 10
 }
 
 show_style_menu() {
@@ -29,7 +29,7 @@ show_theme_menu() {
     fi
 
     # Show theme picker
-    theme=$(printf '%s\n' $themes | walker --dmenu -p 'Theme' --width 400 --maxheight 500)
+    theme=$(printf '%s\n' $themes | fuzzel --dmenu -p "Theme" -w 40 -l 15)
 
     if [[ -n "$theme" ]]; then
         theme set "$theme"
@@ -80,7 +80,7 @@ show_main_menu() {
     local choice
     choice=$(menu "Nova" "  Apps" "  Keybindings" "  Style" "  Toggle" "  Setup" "  System")
     case "$choice" in
-        *Apps*) walker ;;
+        *Apps*) fuzzel ;;
         *Keybindings*) nova-menu-keybindings ;;
         *Style*) show_style_menu ;;
         *Toggle*) show_toggle_menu ;;
