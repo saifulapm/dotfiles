@@ -119,8 +119,10 @@
     "on-scroll-right": ""
   },
   "custom/screenrecording-indicator": {
+    "format": "{}",
     "on-click": "nova-cmd-screenrecord",
     "exec": "$HOME/.dotfiles/default/waybar/indicators/screen-recording.sh",
+    "interval": "once",
     "signal": 8,
     "return-type": "json"
   },
