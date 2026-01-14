@@ -84,6 +84,10 @@ generate_theme() {
     # Generate foot colors
     sed -f "$sed_script" "$TEMPLATES_DIR/foot-colors.ini.tpl" > "$HOME/.config/nova/current/theme/foot-colors.ini"
 
+    # Generate mako config
+    mkdir -p "$HOME/.config/mako"
+    sed -f "$sed_script" "$TEMPLATES_DIR/mako.ini.tpl" > "$HOME/.config/mako/config"
+
     # Set GNOME/GTK theme (dark mode)
     if command -v gsettings &>/dev/null; then
         gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
@@ -112,6 +116,9 @@ generate_theme() {
 
     # Reload walker theme (if running as service)
     pkill -SIGUSR1 -f "walker --gapplication-service" 2>/dev/null || true
+
+    # Reload mako
+    makoctl reload 2>/dev/null || true
 
     rm "$sed_script"
 

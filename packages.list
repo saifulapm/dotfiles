@@ -63,6 +63,9 @@ qalculate
 # Status bar
 waybar
 
+# Notifications
+mako
+
 # Audio control
 wiremix
 pamixer
