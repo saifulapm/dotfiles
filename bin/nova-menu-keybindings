@@ -4,23 +4,28 @@
 BINDS_FILE="${DOTFILES:-$HOME/.dotfiles}/config/niri/binds.kdl"
 
 parse_bindings() {
-    grep -E '^\s*(Mod|Super|Ctrl|Alt|Shift)' "$BINDS_FILE" | while IFS= read -r line; do
-        # Extract key combo and title/action
-        if [[ "$line" =~ ([A-Za-z+_]+)[[:space:]]+hotkey-overlay-title=\"([^\"]+)\" ]]; then
-            key="${BASH_REMATCH[1]}"
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^[[:space:]]*//.* ]] && continue
+        [[ -z "${line// }" ]] && continue
+
+        # Match lines with hotkey-overlay-title (preferred)
+        if [[ "$line" =~ ^[[:space:]]*(Mod|Super|Ctrl|Alt|Shift|XF86|Print)[A-Za-z0-9+_]*[[:space:]]+.*hotkey-overlay-title=\"([^\"]+)\" ]]; then
+            key=$(echo "$line" | grep -oE '^[[:space:]]*(Mod|Super|Ctrl|Alt|Shift|XF86|Print)[A-Za-z0-9+_]*' | xargs)
             title="${BASH_REMATCH[2]}"
-            printf "%-25s  %s\n" "$key" "$title"
-        elif [[ "$line" =~ ([A-Za-z+_0-9]+)[[:space:]]+\{ ]]; then
-            key="${BASH_REMATCH[1]}"
-            # Extract action from inside braces
-            action=$(echo "$line" | sed -n 's/.*{\s*\([^;]*\).*/\1/p' | head -1)
-            [[ -n "$action" ]] && printf "%-25s  %s\n" "$key" "$action"
+            [[ "$title" != "null" && -n "$key" ]] && printf "%-28s %s\n" "$key" "$title"
+        # Match lines without hotkey-overlay-title but with action
+        elif [[ "$line" =~ ^[[:space:]]*(Mod|Super|Ctrl|Alt|Shift|XF86|Print)[A-Za-z0-9+_]*[[:space:]]+(\{|\{[[:space:]]*$) ]]; then
+            key=$(echo "$line" | grep -oE '^[[:space:]]*(Mod|Super|Ctrl|Alt|Shift|XF86|Print)[A-Za-z0-9+_]*' | xargs)
+            # Extract action from braces
+            action=$(echo "$line" | sed -n 's/.*{[[:space:]]*\([a-z-]*\).*/\1/p')
+            [[ -n "$key" && -n "$action" ]] && printf "%-28s %s\n" "$key" "$action"
         fi
-    done | sort -u
+    done < "$BINDS_FILE" | sort -t' ' -k1,1
 }
 
 if [[ "$1" == "--print" || "$1" == "-p" ]]; then
     parse_bindings
 else
-    parse_bindings | walker --dmenu -p 'Keybindings' --width 700 --maxheight 500
+    parse_bindings | walker --dmenu -p 'Keybindings' --width 600 --maxheight 500
 fi

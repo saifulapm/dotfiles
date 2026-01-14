@@ -1,72 +1,85 @@
 #!/bin/bash
 # Nova Menu - hierarchical menu system using walker
 
-BACK_TO_EXIT=false
-
-back_to() {
-    if [[ "$BACK_TO_EXIT" == "true" ]]; then
-        exit 0
-    elif [[ -n "$1" ]]; then
-        "$1"
-    else
-        show_main_menu
-    fi
-}
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 
 menu() {
     local prompt="$1"
-    local options="$2"
-    echo -e "$options" | walker --dmenu --width 320 --minheight 1 --maxheight 600 -p "$prompt"
+    shift
+    printf '%s\n' "$@" | walker --dmenu --width 320 --minheight 1 --maxheight 600 -p "$prompt"
 }
 
 show_style_menu() {
-    case $(menu "Style" "  Theme\n  Background") in
+    local choice
+    choice=$(menu "Style" "  Theme" "  Background")
+    case "$choice" in
         *Theme*) show_theme_menu ;;
-        *Background*) nova-bg-next ;;
-        *) back_to show_main_menu ;;
+        *Background*) show_background_menu ;;
     esac
 }
 
 show_theme_menu() {
-    # Use theme picker with previews if elephant module exists
-    if [[ -f ~/.config/elephant/menus/nova_themes.lua ]]; then
-        walker -m menus:novathemes --width 800 --minheight 400
-    else
-        # Fallback: list themes in dmenu
-        theme=$(ls -1 "${DOTFILES:-$HOME/.dotfiles}/themes" | menu "Theme" "$(cat)")
-        [[ -n "$theme" && "$theme" != "CNCLD" ]] && theme set "$theme"
+    local themes theme
+
+    # Get list of available themes
+    themes=$(ls -1 "$DOTFILES/themes" 2>/dev/null)
+    if [[ -z "$themes" ]]; then
+        notify-send "No themes found" "Check $DOTFILES/themes directory"
+        return
+    fi
+
+    # Show theme picker
+    theme=$(printf '%s\n' $themes | walker --dmenu -p 'Theme' --width 400 --maxheight 500)
+
+    if [[ -n "$theme" ]]; then
+        theme set "$theme"
+        notify-send "Theme Applied" "$theme"
     fi
 }
 
+show_background_menu() {
+    local choice
+    choice=$(menu "Background" "  Next" "  Random" "  From Theme")
+    case "$choice" in
+        *Next*) nova-bg-next ;;
+        *Random*) nova-bg-next --random 2>/dev/null || nova-bg-next ;;
+        *From\ Theme*) nova-bg-next --theme 2>/dev/null || nova-bg-next ;;
+    esac
+}
+
 show_setup_menu() {
-    case $(menu "Setup" "  Audio\n  Wifi\n  Bluetooth") in
+    local choice
+    choice=$(menu "Setup" "  Audio" "  Wifi" "  Bluetooth")
+    case "$choice" in
         *Audio*) nova-launch-audio ;;
         *Wifi*) nova-launch-wifi ;;
         *Bluetooth*) nova-launch-bluetooth ;;
-        *) back_to show_main_menu ;;
     esac
 }
 
 show_toggle_menu() {
-    case $(menu "Toggle" "  Screensaver\n  Nightlight") in
+    local choice
+    choice=$(menu "Toggle" "  Screensaver")
+    case "$choice" in
         *Screensaver*) nova-toggle-screensaver ;;
-        *Nightlight*) nova-toggle-nightlight 2>/dev/null || notify-send "Not implemented" ;;
-        *) back_to show_main_menu ;;
     esac
 }
 
 show_system_menu() {
-    case $(menu "System" "  Lock\n  Screensaver\n  Restart\n  Shutdown") in
+    local choice
+    choice=$(menu "System" "  Lock" "  Screensaver" "  Restart" "  Shutdown")
+    case "$choice" in
         *Lock*) swaylock ;;
         *Screensaver*) nova-launch-screensaver ;;
         *Restart*) systemctl reboot ;;
         *Shutdown*) systemctl poweroff ;;
-        *) back_to show_main_menu ;;
     esac
 }
 
 show_main_menu() {
-    case $(menu "Nova" "  Apps\n  Keybindings\n  Style\n  Toggle\n  Setup\n  System") in
+    local choice
+    choice=$(menu "Nova" "  Apps" "  Keybindings" "  Style" "  Toggle" "  Setup" "  System")
+    case "$choice" in
         *Apps*) walker ;;
         *Keybindings*) nova-menu-keybindings ;;
         *Style*) show_style_menu ;;
@@ -77,17 +90,13 @@ show_main_menu() {
 }
 
 # Allow direct submenu access
-if [[ -n "$1" ]]; then
-    BACK_TO_EXIT=true
-    case "${1,,}" in
-        style) show_style_menu ;;
-        theme) show_theme_menu ;;
-        toggle) show_toggle_menu ;;
-        setup) show_setup_menu ;;
-        system) show_system_menu ;;
-        keybindings) nova-menu-keybindings ;;
-        *) show_main_menu ;;
-    esac
-else
-    show_main_menu
-fi
+case "${1,,}" in
+    style) show_style_menu ;;
+    theme) show_theme_menu ;;
+    background) show_background_menu ;;
+    toggle) show_toggle_menu ;;
+    setup) show_setup_menu ;;
+    system) show_system_menu ;;
+    keybindings) nova-menu-keybindings ;;
+    *) show_main_menu ;;
+esac
