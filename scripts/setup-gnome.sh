@@ -30,11 +30,12 @@ fi
 # Fix Yaru icon theme inheritance (Fedora compatibility)
 # ─────────────────────────────────────────────────────────────
 # Yaru inherits from "Humanity" which doesn't exist on Fedora
-# Replace with Adwaita for proper icon fallback
-YARU_INDEX="/usr/share/icons/Yaru/index.theme"
-if [[ -f "$YARU_INDEX" ]] && grep -q "Inherits=Humanity" "$YARU_INDEX"; then
-    echo "  Fixing Yaru icon theme inheritance (Humanity -> Adwaita)..."
-    sudo sed -i 's/Inherits=Humanity,hicolor/Inherits=Adwaita,hicolor/' "$YARU_INDEX"
+# Replace with Adwaita for proper icon fallback (all variants)
+if [[ -d "/usr/share/icons/Yaru" ]]; then
+    if grep -q ",Humanity," /usr/share/icons/Yaru*/index.theme 2>/dev/null; then
+        echo "  Fixing Yaru icon theme inheritance (Humanity -> Adwaita)..."
+        sudo sed -i 's/,Humanity,/,Adwaita,/g' /usr/share/icons/Yaru*/index.theme
+    fi
 fi
 
 # ─────────────────────────────────────────────────────────────
