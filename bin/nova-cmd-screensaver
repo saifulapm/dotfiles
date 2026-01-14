@@ -6,10 +6,11 @@ SCREENSAVER_TEXT="$DOTFILES/default/branding/screensaver.txt"
 
 exit_screensaver() {
     pkill -x tte 2>/dev/null
+    pkill -f org.nova.screensaver 2>/dev/null
     exit 0
 }
 
-# Exit the screensaver on signals and input
+# Exit on signals
 trap exit_screensaver SIGINT SIGTERM SIGHUP SIGQUIT
 
 # Set background color to black
@@ -23,16 +24,15 @@ tty=$(tty 2>/dev/null)
 while true; do
     tte -i "$SCREENSAVER_TEXT" \
         --frame-rate 120 \
-        --canvas-width 0 \
-        --canvas-height 0 \
         --anchor-canvas c \
         --anchor-text c \
         --random-effect \
-        --no-wrap &
+        --no-eol \
+        --no-restore-cursor &
 
-    # Wait for tte to finish or exit on keypress
+    # Wait for tte and check for keypress
     while pgrep -t "${tty#/dev/}" -x tte >/dev/null 2>&1; do
-        if read -n1 -t 1 2>/dev/null; then
+        if read -n1 -t 1; then
             exit_screensaver
         fi
     done

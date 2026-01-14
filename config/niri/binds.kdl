@@ -180,7 +180,7 @@ binds {
     Mod+Alt+B hotkey-overlay-title="Next Background" { spawn "nova-bg-next"; }
 
     // Screensaver
-    Mod+Alt+S hotkey-overlay-title="Launch Screensaver" { spawn "nova-launch-screensaver"; }
+    Mod+Alt+Z hotkey-overlay-title="Launch Screensaver" { spawn "nova-launch-screensaver"; }
 
     // Shortcuts inhibit toggle
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
