@@ -52,6 +52,7 @@ fastfetch
 
 # Terminal
 ghostty
+alacritty
 
 # App launcher
 walker

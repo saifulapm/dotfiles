@@ -78,6 +78,9 @@ generate_theme() {
     mkdir -p "$HOME/.config/nova/current/theme"
     sed -f "$sed_script" "$TEMPLATES_DIR/waybar.css.tpl" > "$HOME/.config/nova/current/theme/waybar.css"
 
+    # Generate alacritty theme
+    sed -f "$sed_script" "$TEMPLATES_DIR/alacritty.toml.tpl" > "$HOME/.config/nova/current/theme/alacritty.toml"
+
     # Set GNOME/GTK theme (dark mode)
     if command -v gsettings &>/dev/null; then
         gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
