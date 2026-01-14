@@ -87,3 +87,20 @@ ffmpegthumbnailer
 gvfs-mtp
 gvfs-nfs
 gvfs-smb
+
+# GNOME/GTK theming
+yaru-icon-theme
+gnome-themes-extra
+xdg-desktop-portal-gtk
+
+# Liberation fonts (for fontconfig mappings)
+liberation-fonts-common
+liberation-sans-fonts
+liberation-serif-fonts
+liberation-mono-fonts
+
+# System fonts
+google-noto-sans-fonts
+google-noto-serif-fonts
+google-noto-emoji-fonts
+google-noto-sans-cjk-fonts
