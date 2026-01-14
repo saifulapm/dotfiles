@@ -176,6 +176,9 @@ binds {
     // Screen recording toggle
     Mod+Alt+R hotkey-overlay-title="Toggle Screen Recording" { spawn "nova-cmd-screenrecord"; }
 
+    // Cycle background wallpaper
+    Mod+Alt+B hotkey-overlay-title="Next Background" { spawn "nova-bg-next"; }
+
     // Shortcuts inhibit toggle
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
 
