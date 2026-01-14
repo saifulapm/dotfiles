@@ -258,7 +258,7 @@ if [[ -d "$DOTFILES/config" ]]; then
     skipped=0
     for item in "${configs[@]}"; do
         name=$(basename "$item")
-        [[ "$name" == "home" ]] && continue
+        [[ "$name" == "home" || "$name" == "systemd" ]] && continue
         if ! is_linked "$item" "$HOME/.config/$name"; then
             rm -rf "$HOME/.config/$name"
             ln -sf "$item" "$HOME/.config/$name"
