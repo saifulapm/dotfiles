@@ -5,7 +5,10 @@ if pgrep -x wf-recorder >/dev/null; then
     pkill -SIGINT -x wf-recorder
 else
     mkdir -p "$HOME/Videos/Recordings"
-    wf-recorder -f "$HOME/Videos/Recordings/$(date +%Y%m%d_%H%M%S).mp4" &
+    # Get the first available output from niri
+    OUTPUT=$(niri msg outputs 2>/dev/null | grep -oP '(?<=\()\w+-\d+(?=\))' | head -1)
+    OUTPUT=${OUTPUT:-eDP-1}  # Fallback to eDP-1
+    wf-recorder -o "$OUTPUT" -f "$HOME/Videos/Recordings/$(date +%Y%m%d_%H%M%S).mp4" &
 fi
 
 # Refresh waybar indicator
