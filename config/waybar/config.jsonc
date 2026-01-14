@@ -111,12 +111,8 @@
     "modules": ["custom/expand-icon", "tray"]
   },
   "custom/expand-icon": {
-    "format": "",
-    "tooltip": false,
-    "on-scroll-up": "",
-    "on-scroll-down": "",
-    "on-scroll-left": "",
-    "on-scroll-right": ""
+    "format": "󰅂",
+    "tooltip": false
   },
   "custom/screenrecording-indicator": {
     "format": "{}",
