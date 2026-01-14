@@ -1,0 +1,4 @@
+#!/bin/bash
+# Launch audio mixer TUI (wiremix)
+
+exec nova-launch-or-focus-tui wiremix

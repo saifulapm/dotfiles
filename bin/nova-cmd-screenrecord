@@ -1,0 +1,12 @@
+#!/bin/bash
+# Toggle screen recording with gpu-screen-recorder
+
+if pgrep -f "^gpu-screen-recorder" >/dev/null; then
+    pkill -SIGINT -f "^gpu-screen-recorder"
+else
+    mkdir -p "$HOME/Videos/Recordings"
+    gpu-screen-recorder -w screen -f 60 -o "$HOME/Videos/Recordings/$(date +%Y%m%d_%H%M%S).mp4" &
+fi
+
+# Refresh waybar indicator
+pkill -RTMIN+8 waybar

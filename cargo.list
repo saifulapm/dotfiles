@@ -3,3 +3,7 @@
 
 # Shell tools
 eza
+
+# TUI apps for waybar
+impala
+bluetui

@@ -1,0 +1,33 @@
+# Voxtype Configuration
+#
+# Location: ~/.config/voxtype/config.toml
+# All settings can be overridden via CLI flags
+
+state_file = "auto"
+
+[hotkey]
+# Hotkey is configured in niri keybinds
+enabled = false
+
+[audio]
+device = "default"
+sample_rate = 16000
+max_duration_secs = 60
+
+[whisper]
+# Model options: tiny, tiny.en, base, base.en, small, small.en, medium, medium.en, large-v3, large-v3-turbo
+# .en models are English-only but faster and more accurate for English
+model = "base.en"
+language = "en"
+translate = false
+
+[output]
+# Primary output mode: "type" or "clipboard"
+mode = "type"
+fallback_to_clipboard = true
+type_delay_ms = 1
+
+[output.notification]
+on_recording_start = false
+on_recording_stop = false
+on_transcription = false

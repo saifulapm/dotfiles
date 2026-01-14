@@ -18,7 +18,7 @@
     "on-click": "activate",
     "format": "{icon}",
     "format-icons": {
-      "default": "",
+      "default": "",
       "1": "1",
       "2": "2",
       "3": "3",
@@ -33,22 +33,21 @@
     }
   },
   "custom/nova": {
-    "format": "<span font='omarchy'>\ue900</span>",
-    "on-click": "nova-menu",
-    "on-click-right": "xdg-terminal-exec",
-    "tooltip-format": "Nova Menu\n\nSuper + Alt + Space"
+    "format": "󰣇",
+    "on-click": "walker",
+    "on-click-right": "ghostty",
+    "tooltip-format": "App Launcher (Mod+D)"
   },
   "cpu": {
     "interval": 5,
     "format": "󰍛",
     "on-click": "nova-launch-or-focus-tui btop",
-    "on-click-right": "alacritty"
+    "on-click-right": "ghostty"
   },
   "clock": {
     "format": "{:L%A %H:%M}",
     "format-alt": "{:L%d %B W%V %Y}",
-    "tooltip": false,
-    "on-click-right": "nova-launch-floating-terminal-with-presentation nova-tz-select"
+    "tooltip": false
   },
   "network": {
     "format-icons": ["󰤯", "󰤟", "󰤢", "󰤥", "󰤨"],
@@ -67,7 +66,7 @@
     "format": "{capacity}% {icon}",
     "format-discharging": "{icon}",
     "format-charging": "{icon}",
-    "format-plugged": "",
+    "format-plugged": "",
     "format-icons": {
       "charging": ["󰢜", "󰂆", "󰂇", "󰂈", "󰢝", "󰂉", "󰢞", "󰂊", "󰂋", "󰂅"],
       "default": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
@@ -83,7 +82,7 @@
     }
   },
   "bluetooth": {
-    "format": "",
+    "format": "",
     "format-off": "󰂲",
     "format-disabled": "󰂲",
     "format-connected": "󰂱",
@@ -97,10 +96,10 @@
     "on-click-right": "pamixer -t",
     "tooltip-format": "Playing at {volume}%",
     "scroll-step": 5,
-    "format-muted": "",
+    "format-muted": "",
     "format-icons": {
-      "headphone": "",
-      "default": ["", "", ""]
+      "headphone": "",
+      "default": ["", "", ""]
     }
   },
   "group/tray-expander": {
@@ -112,7 +111,7 @@
     "modules": ["custom/expand-icon", "tray"]
   },
   "custom/expand-icon": {
-    "format": "",
+    "format": "",
     "tooltip": false,
     "on-scroll-up": "",
     "on-scroll-down": "",
@@ -143,4 +142,3 @@
     "spacing": 17
   }
 }
-

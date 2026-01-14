@@ -1,0 +1,6 @@
+#!/bin/bash
+# Select voxtype model
+
+if command -v voxtype &>/dev/null; then
+    voxtype model
+fi

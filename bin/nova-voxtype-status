@@ -1,0 +1,10 @@
+#!/bin/bash
+# Output voxtype status as JSON for waybar
+
+if command -v voxtype &>/dev/null; then
+    voxtype status --follow --extended --format json 2>/dev/null | while read -r line; do
+        echo "$line" | jq -c '. + {alt: .class}'
+    done
+else
+    echo '{"alt": "", "tooltip": ""}'
+fi

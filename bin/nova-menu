@@ -1,0 +1,13 @@
+#!/bin/bash
+# Main menu launcher
+
+case "$1" in
+    power)
+        # Show power options via walker
+        walker --modules power 2>/dev/null || \
+        echo -e "Shutdown\nReboot\nSuspend\nLogout" | walker --dmenu
+        ;;
+    *)
+        walker
+        ;;
+esac

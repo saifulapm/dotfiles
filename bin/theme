@@ -74,6 +74,10 @@ generate_theme() {
     mkdir -p "$HOME/.config/dotfiles"
     sed -f "$sed_script" "$TEMPLATES_DIR/walker.css.tpl" > "$HOME/.config/dotfiles/walker-theme.css"
 
+    # Generate waybar theme CSS
+    mkdir -p "$HOME/.config/nova/current/theme"
+    sed -f "$sed_script" "$TEMPLATES_DIR/waybar.css.tpl" > "$HOME/.config/nova/current/theme/waybar.css"
+
     # Set GNOME/GTK theme (dark mode)
     if command -v gsettings &>/dev/null; then
         gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true

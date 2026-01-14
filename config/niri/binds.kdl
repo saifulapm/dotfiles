@@ -170,6 +170,13 @@ binds {
     Ctrl+Print { screenshot-screen; }
     Alt+Print { screenshot-window; }
 
+    // Voxtype dictation (hold to record)
+    Mod+Ctrl+X hotkey-overlay-title="Start Dictation" { spawn "voxtype" "record" "start"; }
+    Mod+Ctrl+X trigger-on-release=true hotkey-overlay-title=null { spawn "voxtype" "record" "stop"; }
+
+    // Screen recording toggle
+    Mod+Alt+R hotkey-overlay-title="Toggle Screen Recording" { spawn "nova-cmd-screenrecord"; }
+
     // Shortcuts inhibit toggle
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
 

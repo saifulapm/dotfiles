@@ -12,6 +12,8 @@ gcc
 make
 cmake
 golang
+dbus-devel
+pkgconf-pkg-config
 
 # Tools
 ripgrep
@@ -54,3 +56,17 @@ ghostty
 walker
 libqalculate
 qalculate
+
+# Status bar
+waybar
+
+# Audio control
+wiremix
+pamixer
+
+# Screen recording
+gpu-screen-recorder
+
+# Voxtype dependencies
+wtype
+wl-clipboard

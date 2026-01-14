@@ -1,0 +1,5 @@
+#!/bin/bash
+# Launch wifi TUI (impala)
+
+rfkill unblock wifi 2>/dev/null
+exec nova-launch-or-focus-tui impala

@@ -1,0 +1,4 @@
+#!/bin/bash
+# Launch TUI app in terminal with custom app-id
+
+exec ghostty --class="nova.$(basename $1)" -e "$@"

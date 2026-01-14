@@ -1,0 +1,6 @@
+#!/bin/bash
+# Open voxtype config in editor
+
+if command -v voxtype &>/dev/null; then
+    ${EDITOR:-nvim} ~/.config/voxtype/config.toml
+fi

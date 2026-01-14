@@ -1,0 +1,5 @@
+#!/bin/bash
+# Launch bluetooth TUI (bluetui)
+
+rfkill unblock bluetooth 2>/dev/null
+exec nova-launch-or-focus-tui bluetui

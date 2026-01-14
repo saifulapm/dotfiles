@@ -1,0 +1,11 @@
+#!/bin/bash
+# Launch or focus TUI app (niri version)
+
+APP_CLASS="nova.$(basename "$1")"
+
+# Check if window exists
+if niri msg windows 2>/dev/null | grep -q "$APP_CLASS"; then
+    niri msg action focus-window --app-id "$APP_CLASS"
+else
+    exec nova-launch-tui "$@"
+fi
