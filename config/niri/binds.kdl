@@ -6,7 +6,7 @@ binds {
     Mod+Shift+Slash { show-hotkey-overlay; }
 
     // Applications
-    Mod+T hotkey-overlay-title="Open Terminal" { spawn "ghostty"; }
+    Mod+T hotkey-overlay-title="Open Terminal" { spawn "footclient"; }
     Mod+D hotkey-overlay-title="Run Application" { spawn-sh "exec walker --width 644 --maxheight 300 --minheight 300"; }
     Super+Alt+L hotkey-overlay-title="Lock Screen" { spawn "swaylock"; }
 

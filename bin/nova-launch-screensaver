@@ -22,8 +22,15 @@ fi
 # Close walker if open
 walker -q 2>/dev/null
 
-# Launch screensaver in ghostty (preferred) or alacritty
-if command -v ghostty &>/dev/null; then
+# Launch screensaver in foot (preferred), ghostty, or alacritty
+if command -v foot &>/dev/null; then
+    foot \
+        --app-id=org.nova.screensaver \
+        -o pad=0x0 \
+        -o colors.background=000000 \
+        -o font="Maple Mono:size=18" \
+        nova-cmd-screensaver &
+elif command -v ghostty &>/dev/null; then
     ghostty \
         --class=org.nova.screensaver \
         --config-file="$DOTFILES/default/ghostty/screensaver" \
@@ -38,7 +45,7 @@ elif command -v alacritty &>/dev/null; then
         -o "font.size=18" \
         -e nova-cmd-screensaver &
 else
-    notify-send "Screensaver requires ghostty or alacritty"
+    notify-send "Screensaver requires foot, ghostty, or alacritty"
     exit 1
 fi
 

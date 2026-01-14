@@ -81,6 +81,9 @@ generate_theme() {
     # Generate alacritty theme
     sed -f "$sed_script" "$TEMPLATES_DIR/alacritty.toml.tpl" > "$HOME/.config/nova/current/theme/alacritty.toml"
 
+    # Generate foot colors
+    sed -f "$sed_script" "$TEMPLATES_DIR/foot-colors.ini.tpl" > "$HOME/.config/nova/current/theme/foot-colors.ini"
+
     # Set GNOME/GTK theme (dark mode)
     if command -v gsettings &>/dev/null; then
         gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
@@ -103,6 +106,9 @@ generate_theme() {
 
     # Reload waybar
     pkill -SIGUSR2 waybar 2>/dev/null || true
+
+    # Reload foot server (updates all client windows)
+    pkill -SIGUSR1 -x foot 2>/dev/null || true
 
     rm "$sed_script"
 
