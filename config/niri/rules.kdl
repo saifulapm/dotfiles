@@ -33,3 +33,21 @@ window-rule {
     geometry-corner-radius 12
     clip-to-geometry true
 }
+
+// Default transparency for inactive windows (like Omarchy)
+window-rule {
+    match is-active=false
+    opacity 0.95
+}
+
+// Full opacity for media/video apps
+window-rule {
+    match app-id=r#"^(mpv|vlc|imv|com\.obsproject\.Studio|org\.kde\.kdenlive|org\.gnome\.NautilusPreviewer)$"#
+    opacity 1.0
+}
+
+// Full opacity for games
+window-rule {
+    match app-id=r#"^(steam|com\.libretro\.RetroArch)$"#
+    opacity 1.0
+}

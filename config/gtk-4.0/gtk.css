@@ -1,0 +1,16 @@
+/* Make headerbar buttons minimal like Omarchy */
+headerbar button:not(.suggested-action):not(.destructive-action) {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+headerbar button:not(.suggested-action):not(.destructive-action):hover {
+  background: alpha(currentColor, 0.1);
+}
+
+/* Remove button borders globally */
+.flat {
+  border: none;
+  box-shadow: none;
+}

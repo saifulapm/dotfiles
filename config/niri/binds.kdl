@@ -180,6 +180,9 @@ binds {
     Mod+G       { toggle-window-floating; }
     Mod+Shift+G { switch-focus-between-floating-and-tiling; }
 
+    // Window opacity
+    Mod+Shift+O hotkey-overlay-title="Toggle Opacity" { toggle-window-rule-opacity; }
+
     // Tabbed display
     Mod+Shift+W { toggle-column-tabbed-display; }
 
