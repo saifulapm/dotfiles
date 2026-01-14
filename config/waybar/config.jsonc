@@ -33,7 +33,7 @@
     }
   },
   "custom/nova": {
-    "format": "󰣇",
+    "format": "󰣛",
     "on-click": "walker",
     "on-click-right": "ghostty",
     "tooltip-format": "App Launcher (Mod+D)"
