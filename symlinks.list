@@ -6,3 +6,5 @@
 
 # Example:
 # claude/settings.json:.claude/settings.json
+
+config/brave-flags.conf:.config/brave-flags.conf

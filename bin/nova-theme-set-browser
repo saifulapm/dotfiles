@@ -1,16 +1,12 @@
 #!/bin/bash
 
-# Set browser theme color for Chromium (omarchy-chromium fork)
-# Uses CLI flags for live theme changes
+# Set browser theme color for Chromium and Brave browsers
+# - Chromium: Uses CLI flags for live theme changes (omarchy-chromium fork)
+# - Brave: Uses policy files for theme configuration
 
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 THEME_DIR="$DOTFILES/themes"
 THEME_FILE="$HOME/.config/nova/current/theme.name"
-
-# Only works with omarchy-chromium
-if ! command -v chromium &>/dev/null; then
-    exit 0
-fi
 
 CURRENT_THEME=$(cat "$THEME_FILE" 2>/dev/null || echo "")
 
@@ -27,12 +23,33 @@ else
     THEME_RGB="28,32,39"
 fi
 
-# Set theme color
-chromium --no-startup-window --set-theme-color="$THEME_RGB" >/dev/null 2>&1
+# Convert RGB to hex (e.g., "30,30,46" -> "#1e1e2e")
+rgb_to_hex() {
+    local rgb="$1"
+    printf '#%02x%02x%02x' ${rgb//,/ }
+}
 
-# Set color scheme (light/dark)
+THEME_HEX=$(rgb_to_hex "$THEME_RGB")
+
+# Determine if light or dark mode
 if [[ -f "$THEME_DIR/$CURRENT_THEME/light.mode" ]]; then
-    chromium --no-startup-window --set-color-scheme="light" >/dev/null 2>&1
+    COLOR_SCHEME="light"
 else
-    chromium --no-startup-window --set-color-scheme="dark" >/dev/null 2>&1
+    COLOR_SCHEME="dark"
+fi
+
+# Set theme for Chromium (omarchy-chromium fork with CLI support)
+if command -v chromium &>/dev/null; then
+    chromium --no-startup-window --set-theme-color="$THEME_RGB" >/dev/null 2>&1
+    chromium --no-startup-window --set-color-scheme="$COLOR_SCHEME" >/dev/null 2>&1
+fi
+
+# Set theme for Brave using policy files
+if command -v brave &>/dev/null; then
+    POLICY_DIR="/etc/brave/policies/managed"
+
+    if [[ -d "$POLICY_DIR" ]]; then
+        echo "{\"BrowserThemeColor\": \"$THEME_HEX\"}" | sudo tee "$POLICY_DIR/color.json" >/dev/null
+        brave --refresh-platform-policy --no-startup-window >/dev/null 2>&1
+    fi
 fi

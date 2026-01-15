@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Setup Brave browser policy directory
+# Run once during system setup (requires sudo)
+
+POLICY_DIR="/etc/brave/policies/managed"
+
+if [[ ! -d "$POLICY_DIR" ]]; then
+    echo "Creating Brave policy directory..."
+    sudo mkdir -p "$POLICY_DIR"
+    sudo chmod 755 /etc/brave /etc/brave/policies "$POLICY_DIR"
+    echo "Done. Brave policy directory created at $POLICY_DIR"
+else
+    echo "Brave policy directory already exists at $POLICY_DIR"
+fi
