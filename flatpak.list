@@ -1,5 +1,2 @@
 # Flatpak packages to install
 # Lines starting with # are ignored
-
-# Note: LocalSend uses native binary
-# Install with: ./scripts/install-localsend.sh
