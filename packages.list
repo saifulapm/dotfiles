@@ -114,8 +114,8 @@ hyprpicker
 # Night light
 wlsunset
 
-# Lock screen
-swaylock
+# Lock screen (swaylock-effects from COPR: solopasha/hyprland)
+swaylock-effects
 swayidle
 
 # Power management

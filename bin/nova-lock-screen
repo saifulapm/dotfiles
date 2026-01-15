@@ -1,10 +1,13 @@
 #!/bin/bash
-# Lock the screen using swaylock
+# Lock the screen using swaylock-effects
 
-# Lock the screen
-pidof swaylock || swaylock -f &
+# Don't lock if already locked
+pidof swaylock && exit 0
 
-# Ensure 1password is locked if running
+# Lock the screen with blur effect
+swaylock -f &
+
+# Lock 1password if running
 if pgrep -x "1password" >/dev/null; then
     1password --lock 2>/dev/null &
 fi
