@@ -52,9 +52,9 @@ window-rule {
     opacity 1.0
 }
 
-// Image viewer as floating centered
+// Media and utility apps as floating (like omarchy)
 window-rule {
-    match app-id="imv"
+    match app-id=r#"^(imv|mpv|org\.gnome\.Evince|org\.gnome\.NautilusPreviewer|com\.gabm\.satty|org\.gnome\.Calculator)$"#
     open-floating true
 }
 
