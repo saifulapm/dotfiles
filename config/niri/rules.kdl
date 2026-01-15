@@ -63,3 +63,75 @@ window-rule {
     match app-id=r#"^(steam|com\.libretro\.RetroArch)$"#
     opacity 1.0
 }
+
+// Browser windows - subtle transparency
+window-rule {
+    match app-id=r#"^(firefox|zen-browser|chromium|brave-browser|google-chrome|vivaldi).*$"#
+    opacity 0.97
+}
+
+// Full opacity for video content
+window-rule {
+    match app-id=r#"^(firefox|zen-browser|chromium|brave-browser|google-chrome).*$"# title=r#".*(YouTube|Netflix|Twitch|Zoom).*"#
+    opacity 1.0
+}
+
+// Terminal windows
+window-rule {
+    match app-id=r#"^(Alacritty|kitty|foot|footclient|com\.mitchellh\.ghostty)$"#
+    opacity 0.97
+}
+
+// Steam - float and full opacity
+window-rule {
+    match app-id="steam"
+    open-floating true
+    opacity 1.0
+}
+
+// JetBrains - full opacity
+window-rule {
+    match app-id=r#"^jetbrains-.*$"#
+    opacity 1.0
+}
+
+// Chromium PiP (Firefox already has rule above)
+window-rule {
+    match app-id=r#"^(chromium|brave-browser|google-chrome).*$"# title=r#"Picture.in.Picture"#
+    open-floating true
+    opacity 1.0
+    focus-ring { off; }
+    border { off; }
+}
+
+// 1Password - block from screen capture
+window-rule {
+    match app-id=r#"^1[Pp]assword$"#
+    open-floating true
+    block-out-from "screen-capture"
+}
+
+// Bitwarden
+window-rule {
+    match app-id=r#"^(Bitwarden|com\.bitwarden\.desktop)$"#
+    open-floating true
+    block-out-from "screen-capture"
+}
+
+// GTK file dialogs as floating
+window-rule {
+    match title=r#"^(Open|Save|Save As|Select|Choose|Export|Import).*"#
+    open-floating true
+}
+
+// LocalSend floating
+window-rule {
+    match app-id=r#"^(localsend|org\.localsend\.localsend_app)$"#
+    open-floating true
+}
+
+// TUI apps floating
+window-rule {
+    match app-id=r#"^nova\.(btop|wiremix|bluetui|lazydocker|lazygit)$"#
+    open-floating true
+}

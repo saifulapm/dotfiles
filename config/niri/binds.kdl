@@ -11,6 +11,13 @@ binds {
     Mod+E hotkey-overlay-title="File Manager" { spawn "nautilus"; }
     Super+Alt+L hotkey-overlay-title="Lock Screen" { spawn "nova-lock-screen"; }
 
+    // Browser
+    Mod+Shift+B hotkey-overlay-title="Browser" { spawn "nova-launch-browser"; }
+    Mod+Shift+Alt+B hotkey-overlay-title="Browser Private" { spawn "nova-launch-browser" "--private"; }
+
+    // Editor
+    Mod+Alt+E hotkey-overlay-title="Editor" { spawn "nova-launch-editor"; }
+
     // Fuzzel tools
     Mod+Ctrl+E hotkey-overlay-title="Emoji Picker" { spawn "nova-emoji-picker"; }
     Mod+Shift+V hotkey-overlay-title="Clipboard" { spawn "nova-clipboard"; }
@@ -31,6 +38,11 @@ binds {
     // Screen reader toggle
     Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
 
+    // System menu
+    Mod+Shift+Escape hotkey-overlay-title="System Menu" { spawn "nova-menu" "system"; }
+    XF86PowerOff allow-when-locked=true { spawn "nova-menu" "system"; }
+    XF86Calculator { spawn "gnome-calculator"; }
+
     // Volume controls (with OSD)
     XF86AudioRaiseVolume allow-when-locked=true { spawn "swayosd-client" "--output-volume" "raise"; }
     XF86AudioLowerVolume allow-when-locked=true { spawn "swayosd-client" "--output-volume" "lower"; }
@@ -46,6 +58,17 @@ binds {
     // Brightness controls (with OSD)
     XF86MonBrightnessUp   allow-when-locked=true { spawn "swayosd-client" "--brightness" "raise"; }
     XF86MonBrightnessDown allow-when-locked=true { spawn "swayosd-client" "--brightness" "lower"; }
+
+    // Fine volume control (+/- 1%)
+    Alt+XF86AudioRaiseVolume allow-when-locked=true { spawn "swayosd-client" "--output-volume" "+1"; }
+    Alt+XF86AudioLowerVolume allow-when-locked=true { spawn "swayosd-client" "--output-volume" "-1"; }
+
+    // Fine brightness control (+/- 1)
+    Alt+XF86MonBrightnessUp allow-when-locked=true { spawn "swayosd-client" "--brightness" "+1"; }
+    Alt+XF86MonBrightnessDown allow-when-locked=true { spawn "swayosd-client" "--brightness" "-1"; }
+
+    // Switch audio output
+    Mod+XF86AudioMute allow-when-locked=true { spawn "nova-audio-switch"; }
 
     // Overview
     Mod+O repeat=false { toggle-overview; }
@@ -203,6 +226,23 @@ binds {
     // Screensaver
     Mod+Alt+Z hotkey-overlay-title="Launch Screensaver" { spawn "nova-launch-screensaver"; }
 
+    // Visual controls
+    Mod+Shift+Space hotkey-overlay-title="Toggle Waybar" { spawn "nova-toggle-waybar"; }
+    Mod+Ctrl+Alt+Space hotkey-overlay-title="Theme Menu" { spawn "nova-menu" "theme"; }
+
+    // Utilities
+    Mod+Print hotkey-overlay-title="Color Picker" { spawn "nova-color-picker"; }
+    Mod+Ctrl+A hotkey-overlay-title="Audio Controls" { spawn "nova-launch-tui" "wiremix"; }
+    Mod+Ctrl+B hotkey-overlay-title="Bluetooth" { spawn "nova-launch-tui" "bluetui"; }
+    Mod+Ctrl+W hotkey-overlay-title="WiFi" { spawn "nova-launch-tui" "impala"; }
+    Mod+Ctrl+T hotkey-overlay-title="System Monitor" { spawn "nova-launch-tui" "btop"; }
+    Mod+Ctrl+Shift+I hotkey-overlay-title="Toggle Idle" { spawn "nova-toggle-idle"; }
+    Mod+Ctrl+Alt+N hotkey-overlay-title="Toggle Nightlight" { spawn "nova-toggle-nightlight"; }
+
+    // Info notifications
+    Mod+Ctrl+Alt+T hotkey-overlay-title="Show Time" { spawn "nova-notify-time"; }
+    Mod+Ctrl+Alt+P hotkey-overlay-title="Battery Status" { spawn "nova-notify-battery"; }
+
     // Shortcuts inhibit toggle
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
 
@@ -211,6 +251,7 @@ binds {
     Mod+Shift+N hotkey-overlay-title="Dismiss All" { spawn "makoctl" "dismiss" "--all"; }
     Mod+Ctrl+N hotkey-overlay-title="Toggle DND" { spawn "makoctl" "mode" "-t" "do-not-disturb"; }
     Mod+Alt+N hotkey-overlay-title="Invoke Last" { spawn "makoctl" "invoke"; }
+    Mod+Shift+Alt+N hotkey-overlay-title="Restore Notification" { spawn "makoctl" "restore"; }
 
     // Session
     Mod+Shift+E { quit; }

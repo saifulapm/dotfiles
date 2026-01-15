@@ -1,0 +1,15 @@
+#!/bin/bash
+# Show battery status notification
+
+# Get battery device (handles both BAT* and macsmc-battery)
+BATTERY_DEV=$(upower -e | grep -E 'battery|BAT' | head -1)
+
+if [[ -z "$BATTERY_DEV" ]]; then
+    notify-send "Battery" "No battery found"
+    exit 0
+fi
+
+PERCENT=$(upower -i "$BATTERY_DEV" | awk -F: '/percentage/ { gsub(/[%[:space:]]/, "", $2); printf("%d", $2+0.5) }')
+STATUS=$(upower -i "$BATTERY_DEV" | grep -E "state:" | awk '{print $2}')
+
+notify-send "Battery $PERCENT%" "$STATUS"

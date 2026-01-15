@@ -1,0 +1,4 @@
+#!/bin/bash
+# Show current time as notification
+
+notify-send "$(date '+%H:%M')" "$(date '+%A, %B %d')"
