@@ -5,11 +5,11 @@
 pidof swaylock && exit 0
 
 # Get current background image
-CURRENT_BG=$(cat ~/.config/nova/current/background 2>/dev/null)
+BG_IMAGE="$HOME/.config/nova/current/background"
 
-# Build swaylock args
-if [[ -n "$CURRENT_BG" && -f "$CURRENT_BG" ]]; then
-    swaylock -f -i "$CURRENT_BG" &
+# Lock with background image if exists
+if [[ -e "$BG_IMAGE" ]]; then
+    swaylock -f -i "$BG_IMAGE" &
 else
     swaylock -f &
 fi
