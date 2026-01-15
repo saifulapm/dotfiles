@@ -90,16 +90,19 @@ echo "Updating $GRUB_FILE..."
 # Remove old resume parameters if present
 sudo sed -i 's/resume=[^ "]*//g; s/resume_offset=[^ "]*//g' "$GRUB_FILE"
 
-# Add new resume parameters
-if grep -q '^GRUB_CMDLINE_LINUX=' "$GRUB_FILE"; then
+# Add new resume parameters (check both GRUB_CMDLINE_LINUX and GRUB_CMDLINE_LINUX_DEFAULT)
+if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$GRUB_FILE"; then
+    sudo sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=\"|GRUB_CMDLINE_LINUX_DEFAULT=\"$RESUME_PARAM |" "$GRUB_FILE"
+    echo "Updated GRUB_CMDLINE_LINUX_DEFAULT:"
+    grep '^GRUB_CMDLINE_LINUX_DEFAULT=' "$GRUB_FILE"
+elif grep -q '^GRUB_CMDLINE_LINUX=' "$GRUB_FILE"; then
     sudo sed -i "s|^GRUB_CMDLINE_LINUX=\"|GRUB_CMDLINE_LINUX=\"$RESUME_PARAM |" "$GRUB_FILE"
+    echo "Updated GRUB_CMDLINE_LINUX:"
+    grep '^GRUB_CMDLINE_LINUX=' "$GRUB_FILE"
 else
-    echo "GRUB_CMDLINE_LINUX=\"$RESUME_PARAM\"" | sudo tee -a "$GRUB_FILE"
+    echo "GRUB_CMDLINE_LINUX_DEFAULT=\"$RESUME_PARAM\"" | sudo tee -a "$GRUB_FILE"
+    echo "Added GRUB_CMDLINE_LINUX_DEFAULT"
 fi
-
-# Show updated line
-echo "Updated GRUB_CMDLINE_LINUX:"
-grep '^GRUB_CMDLINE_LINUX=' "$GRUB_FILE"
 
 # Regenerate grub config
 echo ""
