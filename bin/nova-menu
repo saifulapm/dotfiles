@@ -15,11 +15,11 @@ menu() {
 show_screenshot_menu() {
     local choice
     choice=$(menu "Screenshot" \
-        "  Interactive" \
-        "  Full Screen" \
-        "  Window" \
-        "  Region (clipboard)" \
-        "  Region (edit)")
+        "󰹑  Interactive" \
+        "󰍹  Full Screen" \
+        "󱂬  Window" \
+        "󰩭  Region (clipboard)" \
+        "󰏫  Region (edit)")
     case "$choice" in
         *Interactive*) nova-cmd-screenshot interactive ;;
         *Full*) nova-cmd-screenshot screen ;;
@@ -39,9 +39,9 @@ show_screenrecord_menu() {
 
     local choice
     choice=$(menu "Screen Record" \
-        "  Desktop Audio" \
-        "  Microphone Only" \
-        "  No Audio")
+        "󰕾  Desktop Audio" \
+        "󰍬  Microphone Only" \
+        "󰝟  No Audio")
     case "$choice" in
         *Desktop*) nova-cmd-screenrecord --desktop ;;
         *Microphone*) nova-cmd-screenrecord --mic ;;
@@ -53,8 +53,8 @@ show_screenrecord_menu() {
 show_capture_menu() {
     local choice
     choice=$(menu "Capture" \
-        "  Screenshot" \
-        "  Screen Record" \
+        "󰹑  Screenshot" \
+        "󰻃  Screen Record" \
         "󰃉  Color Picker")
     case "$choice" in
         *Screenshot*) show_screenshot_menu ;;
@@ -70,9 +70,9 @@ show_capture_menu() {
 show_share_menu() {
     local choice
     choice=$(menu "Share" \
-        "  Clipboard" \
-        "  File" \
-        "  Folder")
+        "󰅍  Clipboard" \
+        "󰈔  File" \
+        "󰉋  Folder")
     case "$choice" in
         *Clipboard*) nova-launch-floating-terminal nova-cmd-share clipboard ;;
         *File*) nova-launch-floating-terminal nova-cmd-share file ;;
@@ -106,8 +106,8 @@ show_toggle_menu() {
 show_trigger_menu() {
     local choice
     choice=$(menu "Trigger" \
-        "  Capture" \
-        "  Share" \
+        "󰹑  Capture" \
+        "󰁦  Share" \
         "󰔎  Toggle")
     case "$choice" in
         *Capture*) show_capture_menu ;;
@@ -123,10 +123,10 @@ show_trigger_menu() {
 show_learn_menu() {
     local choice
     choice=$(menu "Learn" \
-        "  Keybindings" \
-        "  Niri Docs" \
+        "󰌌  Keybindings" \
+        "󰖟  Niri Docs" \
         "󰣇  Arch Wiki" \
-        "  Neovim" \
+        "󰅩  Neovim" \
         "󱆃  Bash")
     case "$choice" in
         *Keybindings*) nova-menu-keybindings ;;
@@ -160,7 +160,7 @@ show_theme_menu() {
 
 show_background_menu() {
     local choice
-    choice=$(menu "Background" "  Next" "  Random" "  From Theme")
+    choice=$(menu "Background" "󰒭  Next" "󰒝  Random" "󰸌  From Theme")
     case "$choice" in
         *Next*) nova-bg-next ;;
         *Random*) nova-bg-next --random 2>/dev/null || nova-bg-next ;;
@@ -173,7 +173,7 @@ show_style_menu() {
     local choice
     choice=$(menu "Style" \
         "󰸌  Theme" \
-        "  Background")
+        "󰸉  Background")
     case "$choice" in
         *Theme*) show_theme_menu ;;
         *Background*) show_background_menu ;;
@@ -187,12 +187,12 @@ show_style_menu() {
 show_config_menu() {
     local choice
     choice=$(menu "Config" \
-        "  Niri" \
-        "  Swaylock" \
-        "  Swayidle" \
-        "  Mako" \
+        "󱂀  Niri" \
+        "󰌾  Swaylock" \
+        "󰒲  Swayidle" \
+        "󰂚  Mako" \
         "󰍜  Waybar" \
-        "  Foot")
+        "󰆍  Foot")
     case "$choice" in
         *Niri*) $EDITOR "$DOTFILES/config/niri/config.kdl" ;;
         *Swaylock*) $EDITOR "$DOTFILES/config/swaylock/config" 2>/dev/null || $EDITOR "$HOME/.config/swaylock/config" ;;
@@ -207,13 +207,13 @@ show_config_menu() {
 show_setup_menu() {
     local choice
     choice=$(menu "Setup" \
-        "  Audio" \
-        "  Wifi" \
+        "󰕾  Audio" \
+        "󰖩  Wifi" \
         "󰂯  Bluetooth" \
         "󱐋  Power Profile" \
         "󰍹  Monitors" \
-        "  Keybindings" \
-        "  Config")
+        "󰌌  Keybindings" \
+        "󰒓  Config")
     case "$choice" in
         *Audio*) nova-launch-audio ;;
         *Wifi*) nova-launch-wifi ;;
@@ -230,7 +230,7 @@ show_setup_menu() {
 # System Menu
 # ─────────────────────────────────────────────────────────────
 show_system_menu() {
-    local options="  Lock\n󱄄  Screensaver"
+    local options="󰌾  Lock\n󱄄  Screensaver"
 
     # Add suspend option
     options="$options\n󰒲  Suspend"
@@ -262,12 +262,12 @@ show_main_menu() {
     local choice
     choice=$(menu "Nova" \
         "󰀻  Apps" \
-        "  Keybindings" \
+        "󰌌  Keybindings" \
         "󰧑  Learn" \
         "󱓞  Trigger" \
-        "  Style" \
-        "  Setup" \
-        "  System")
+        "󰸌  Style" \
+        "󰒓  Setup" \
+        "󰐥  System")
     case "$choice" in
         *Apps*) fuzzel ;;
         *Keybindings*) nova-menu-keybindings ;;
