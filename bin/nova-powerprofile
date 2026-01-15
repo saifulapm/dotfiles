@@ -1,5 +1,5 @@
 #!/bin/bash
-# Select and set power profile
+# Select and set power profile (matches omarchy approach)
 
 current=$(powerprofilesctl get 2>/dev/null)
 if [[ -z "$current" ]]; then
@@ -7,26 +7,19 @@ if [[ -z "$current" ]]; then
     exit 1
 fi
 
-# Get available profiles (balanced, power-saver, performance)
-profiles=$(powerprofilesctl list 2>/dev/null | grep -E '^\*?\s+[a-z-]+:' | sed 's/[*:]//g' | awk '{print $1}')
+# Get available profiles using omarchy's parsing method
+profiles=$(powerprofilesctl list 2>/dev/null | \
+    awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }' | \
+    tac)
 
-# Mark current profile
-menu_items=""
-while IFS= read -r profile; do
-    [[ -z "$profile" ]] && continue
-    if [[ "$profile" == "$current" ]]; then
-        menu_items+="$profile (current)\n"
-    else
-        menu_items+="$profile\n"
-    fi
-done <<< "$profiles"
+if [[ -z "$profiles" ]]; then
+    notify-send "Power Profile" "No profiles available"
+    exit 1
+fi
 
-# Show menu
-selected=$(echo -e "$menu_items" | grep -v '^$' | fuzzel --dmenu -p "Power Profile: " -w 30 -l 5)
+# Show menu (current profile will be at top due to tac reversal)
+selected=$(printf '%s\n' $profiles | fuzzel --dmenu -p "Power Profile: " -w 30 -l 5)
 [[ -z "$selected" ]] && exit 0
-
-# Remove (current) suffix if present
-selected=$(echo "$selected" | sed 's/ (current)//')
 
 # Set profile if different
 if [[ "$selected" != "$current" ]]; then
