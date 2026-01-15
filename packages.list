@@ -88,6 +88,16 @@ gvfs-mtp
 gvfs-nfs
 gvfs-smb
 
+# Media playback
+mpv
+playerctl
+
+# Image viewer
+imv
+
+# PDF/Document viewer
+evince
+
 # GNOME/GTK theming
 yaru-icon-theme
 gnome-themes-extra

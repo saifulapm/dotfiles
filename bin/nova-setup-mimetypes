@@ -1,0 +1,45 @@
+#!/bin/bash
+# Set up MIME type associations for media files
+
+echo "Setting up MIME type associations..."
+
+# Update desktop database
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+
+# Images -> imv
+echo "Setting imv as default image viewer..."
+xdg-mime default imv.desktop image/png
+xdg-mime default imv.desktop image/jpeg
+xdg-mime default imv.desktop image/gif
+xdg-mime default imv.desktop image/webp
+xdg-mime default imv.desktop image/bmp
+xdg-mime default imv.desktop image/tiff
+
+# PDFs -> evince
+echo "Setting evince as default PDF viewer..."
+xdg-mime default org.gnome.Evince.desktop application/pdf
+
+# Videos -> mpv
+echo "Setting mpv as default video player..."
+xdg-mime default mpv.desktop video/mp4
+xdg-mime default mpv.desktop video/x-msvideo
+xdg-mime default mpv.desktop video/x-matroska
+xdg-mime default mpv.desktop video/x-flv
+xdg-mime default mpv.desktop video/x-ms-wmv
+xdg-mime default mpv.desktop video/mpeg
+xdg-mime default mpv.desktop video/ogg
+xdg-mime default mpv.desktop video/webm
+xdg-mime default mpv.desktop video/quicktime
+xdg-mime default mpv.desktop video/3gpp
+xdg-mime default mpv.desktop video/3gpp2
+xdg-mime default mpv.desktop video/x-ms-asf
+xdg-mime default mpv.desktop video/x-ogm+ogg
+xdg-mime default mpv.desktop video/x-theora+ogg
+xdg-mime default mpv.desktop application/ogg
+
+echo "MIME type associations configured!"
+echo ""
+echo "Default applications:"
+echo "  Images: imv"
+echo "  Videos: mpv"
+echo "  PDFs:   evince"
