@@ -1,7 +1,11 @@
 #!/bin/bash
-# Display niri keybindings using fuzzel dmenu
+# Display niri keybindings using fuzzel dmenu and execute selected binding
 
 BINDS_FILE="${DOTFILES:-$HOME/.dotfiles}/config/niri/binds.kdl"
+
+# Create temp file for binding -> action mapping
+ACTIONS_FILE=$(mktemp)
+trap "rm -f $ACTIONS_FILE" EXIT
 
 parse_bindings() {
     while IFS= read -r line; do
@@ -9,23 +13,85 @@ parse_bindings() {
         [[ "$line" =~ ^[[:space:]]*//.* ]] && continue
         [[ -z "${line// }" ]] && continue
 
-        # Match lines with hotkey-overlay-title (preferred)
+        # Match lines with hotkey-overlay-title
         if [[ "$line" =~ ^[[:space:]]*(Mod|Super|Ctrl|Alt|Shift|XF86|Print)[A-Za-z0-9+_]*[[:space:]]+.*hotkey-overlay-title=\"([^\"]+)\" ]]; then
             key=$(echo "$line" | grep -oE '^[[:space:]]*(Mod|Super|Ctrl|Alt|Shift|XF86|Print)[A-Za-z0-9+_]*' | xargs)
             title="${BASH_REMATCH[2]}"
-            [[ "$title" != "null" && -n "$key" ]] && printf "%-28s %s\n" "$key" "$title"
+            [[ "$title" == "null" || -z "$key" ]] && continue
+
+            # Extract action - could be spawn, niri action, or built-in
+            if [[ "$line" =~ spawn[[:space:]]+\"([^\"]+)\" ]]; then
+                action="spawn:${BASH_REMATCH[1]}"
+            elif [[ "$line" =~ spawn-sh[[:space:]]+\"([^\"]+)\" ]]; then
+                action="spawn-sh:${BASH_REMATCH[1]}"
+            elif [[ "$line" =~ \{[[:space:]]*([a-z-]+) ]]; then
+                action="niri:${BASH_REMATCH[1]}"
+            else
+                action="unknown"
+            fi
+
+            display=$(printf "%-28s %s" "$key" "$title")
+            echo "$display|$action" >> "$ACTIONS_FILE"
+            echo "$display"
+
         # Match lines without hotkey-overlay-title but with action
-        elif [[ "$line" =~ ^[[:space:]]*(Mod|Super|Ctrl|Alt|Shift|XF86|Print)[A-Za-z0-9+_]*[[:space:]]+(\{|\{[[:space:]]*$) ]]; then
+        elif [[ "$line" =~ ^[[:space:]]*(Mod|Super|Ctrl|Alt|Shift|XF86|Print)[A-Za-z0-9+_]*[[:space:]]+\{ ]]; then
             key=$(echo "$line" | grep -oE '^[[:space:]]*(Mod|Super|Ctrl|Alt|Shift|XF86|Print)[A-Za-z0-9+_]*' | xargs)
-            # Extract action from braces
-            action=$(echo "$line" | sed -n 's/.*{[[:space:]]*\([a-z-]*\).*/\1/p')
-            [[ -n "$key" && -n "$action" ]] && printf "%-28s %s\n" "$key" "$action"
+            [[ -z "$key" ]] && continue
+
+            # Extract action
+            if [[ "$line" =~ spawn[[:space:]]+\"([^\"]+)\" ]]; then
+                action="spawn:${BASH_REMATCH[1]}"
+                action_name="${BASH_REMATCH[1]}"
+            elif [[ "$line" =~ spawn-sh[[:space:]]+\"([^\"]+)\" ]]; then
+                action="spawn-sh:${BASH_REMATCH[1]}"
+                action_name="$(echo "${BASH_REMATCH[1]}" | cut -c1-20)"
+            elif [[ "$line" =~ \{[[:space:]]*([a-z-]+) ]]; then
+                action="niri:${BASH_REMATCH[1]}"
+                action_name="${BASH_REMATCH[1]}"
+            else
+                continue
+            fi
+
+            display=$(printf "%-28s %s" "$key" "$action_name")
+            echo "$display|$action" >> "$ACTIONS_FILE"
+            echo "$display"
         fi
     done < "$BINDS_FILE" | sort -t' ' -k1,1
+}
+
+execute_action() {
+    local action="$1"
+    local type="${action%%:*}"
+    local cmd="${action#*:}"
+
+    case "$type" in
+        spawn)
+            # Execute spawn command
+            exec $cmd &
+            ;;
+        spawn-sh)
+            # Execute shell command
+            exec bash -c "$cmd" &
+            ;;
+        niri)
+            # Execute niri action
+            niri msg action "$cmd" 2>/dev/null
+            ;;
+    esac
 }
 
 if [[ "$1" == "--print" || "$1" == "-p" ]]; then
     parse_bindings
 else
-    parse_bindings | fuzzel --dmenu -p "Keybindings" -w 70 -l 20
+    selected=$(parse_bindings | fuzzel --dmenu -p "Keybindings" -w 70 -l 20)
+
+    if [[ -n "$selected" ]]; then
+        # Look up action from temp file
+        action=$(grep -F "$selected|" "$ACTIONS_FILE" | head -1 | cut -d'|' -f2)
+
+        if [[ -n "$action" && "$action" != "unknown" ]]; then
+            execute_action "$action"
+        fi
+    fi
 fi

@@ -1,20 +1,73 @@
 #!/bin/bash
 # Toggle screen recording with wf-recorder
+# Usage: nova-cmd-screenrecord [--desktop|--mic|--both]
 
-PID=$(pgrep -x wf-recorder)
+OUTPUT_DIR="${XDG_VIDEOS_DIR:-$HOME/Videos}/Recordings"
+mkdir -p "$OUTPUT_DIR"
 
-if [ -n "$PID" ]; then
+# Check if recording is active
+if pgrep -x wf-recorder > /dev/null; then
     # Stop recording
-    kill -SIGINT "$PID"
-    sleep 0.3  # Wait for process to exit before refreshing indicator
-else
-    # Start recording
-    mkdir -p "$HOME/Videos/Recordings"
-    # Get the first available output from niri
-    OUTPUT=$(niri msg outputs 2>/dev/null | grep -oP '(?<=\()\w+-\d+(?=\))' | head -1)
-    OUTPUT=${OUTPUT:-eDP-1}  # Fallback to eDP-1
-    wf-recorder -o "$OUTPUT" -f "$HOME/Videos/Recordings/$(date +%Y%m%d_%H%M%S).mp4" >/dev/null 2>&1 &
+    pkill -SIGINT wf-recorder
+    sleep 0.3
+    notify-send "Screen Recording" "Recording saved to $OUTPUT_DIR"
+    pkill -RTMIN+8 waybar 2>/dev/null
+    exit 0
 fi
 
-# Refresh waybar indicator
-pkill -RTMIN+8 waybar
+# Parse arguments
+AUDIO_MODE="${1:---desktop}"
+AUDIO_ARGS=""
+
+# Get audio sources
+get_default_sink() {
+    pactl get-default-sink 2>/dev/null
+}
+
+get_default_source() {
+    pactl get-default-source 2>/dev/null
+}
+
+case "$AUDIO_MODE" in
+    --desktop)
+        # Desktop audio only (monitor of default sink)
+        SINK=$(get_default_sink)
+        if [[ -n "$SINK" ]]; then
+            AUDIO_ARGS="--audio=${SINK}.monitor"
+        fi
+        ;;
+    --mic)
+        # Microphone only
+        SOURCE=$(get_default_source)
+        if [[ -n "$SOURCE" ]]; then
+            AUDIO_ARGS="--audio=$SOURCE"
+        fi
+        ;;
+    --both)
+        # Both desktop and microphone
+        # wf-recorder only supports one audio source, so we use default
+        AUDIO_ARGS="--audio"
+        ;;
+    --no-audio)
+        # No audio
+        AUDIO_ARGS=""
+        ;;
+    *)
+        # Default to desktop audio
+        SINK=$(get_default_sink)
+        if [[ -n "$SINK" ]]; then
+            AUDIO_ARGS="--audio=${SINK}.monitor"
+        fi
+        ;;
+esac
+
+# Get the focused output from niri
+OUTPUT=$(niri msg outputs --json 2>/dev/null | jq -r '.[] | select(.focused) | .name' | head -1)
+OUTPUT=${OUTPUT:-eDP-1}
+
+# Start recording
+FILENAME="$OUTPUT_DIR/screenrecording-$(date +'%Y-%m-%d_%H-%M-%S').mp4"
+wf-recorder -o "$OUTPUT" -f "$FILENAME" $AUDIO_ARGS >/dev/null 2>&1 &
+
+notify-send "Screen Recording" "Recording started..."
+pkill -RTMIN+8 waybar 2>/dev/null

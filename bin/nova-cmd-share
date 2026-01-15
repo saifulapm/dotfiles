@@ -1,0 +1,36 @@
+#!/bin/bash
+# Share files via LocalSend
+
+MODE="${1:-clipboard}"
+
+case "$MODE" in
+    clipboard)
+        # Share clipboard content
+        TMP_FILE=$(mktemp /tmp/clipboard-share-XXXXXX.txt)
+        wl-paste > "$TMP_FILE"
+        if [[ -s "$TMP_FILE" ]]; then
+            flatpak run org.localsend.localsend_app --send "$TMP_FILE"
+        else
+            notify-send "Share" "Clipboard is empty"
+        fi
+        rm -f "$TMP_FILE"
+        ;;
+    file)
+        # Select and share a file
+        FILE=$(find "$HOME" -maxdepth 4 -type f 2>/dev/null | fzf --prompt="Select file: ")
+        if [[ -n "$FILE" && -f "$FILE" ]]; then
+            flatpak run org.localsend.localsend_app --send "$FILE"
+        fi
+        ;;
+    folder)
+        # Select and share a folder
+        FOLDER=$(find "$HOME" -maxdepth 3 -type d 2>/dev/null | fzf --prompt="Select folder: ")
+        if [[ -n "$FOLDER" && -d "$FOLDER" ]]; then
+            flatpak run org.localsend.localsend_app --send "$FOLDER"
+        fi
+        ;;
+    *)
+        echo "Usage: nova-cmd-share [clipboard|file|folder]"
+        exit 1
+        ;;
+esac

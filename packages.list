@@ -104,3 +104,19 @@ google-noto-sans-fonts
 google-noto-serif-fonts
 google-noto-emoji-fonts
 google-noto-sans-cjk-fonts
+
+# Screenshot tools
+grim
+slurp
+satty
+hyprpicker
+
+# Night light
+wlsunset
+
+# Lock screen
+swaylock
+swayidle
+
+# Power management
+power-profiles-daemon

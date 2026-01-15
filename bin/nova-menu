@@ -9,26 +9,147 @@ menu() {
     printf '%s\n' "$@" | fuzzel --dmenu -p "$prompt" -w 35 -l 10
 }
 
-show_style_menu() {
+# ─────────────────────────────────────────────────────────────
+# Capture Submenu
+# ─────────────────────────────────────────────────────────────
+show_screenshot_menu() {
     local choice
-    choice=$(menu "Style" "  Theme" "  Background")
+    choice=$(menu "Screenshot" \
+        "  Interactive" \
+        "  Full Screen" \
+        "  Window" \
+        "  Region (clipboard)" \
+        "  Region (edit)")
     case "$choice" in
-        *Theme*) show_theme_menu ;;
-        *Background*) show_background_menu ;;
+        *Interactive*) nova-cmd-screenshot interactive ;;
+        *Full*) nova-cmd-screenshot screen ;;
+        *Window*) nova-cmd-screenshot window ;;
+        *clipboard*) nova-cmd-screenshot region ;;
+        *edit*) nova-cmd-screenshot region-edit ;;
+        *) show_capture_menu ;;
     esac
 }
 
+show_screenrecord_menu() {
+    # If already recording, stop it
+    if pgrep -x wf-recorder > /dev/null; then
+        nova-cmd-screenrecord
+        return
+    fi
+
+    local choice
+    choice=$(menu "Screen Record" \
+        "  Desktop Audio" \
+        "  Microphone Only" \
+        "  No Audio")
+    case "$choice" in
+        *Desktop*) nova-cmd-screenrecord --desktop ;;
+        *Microphone*) nova-cmd-screenrecord --mic ;;
+        *No*) nova-cmd-screenrecord --no-audio ;;
+        *) show_capture_menu ;;
+    esac
+}
+
+show_capture_menu() {
+    local choice
+    choice=$(menu "Capture" \
+        "  Screenshot" \
+        "  Screen Record" \
+        "󰃉  Color Picker")
+    case "$choice" in
+        *Screenshot*) show_screenshot_menu ;;
+        *Record*) show_screenrecord_menu ;;
+        *Color*) nova-color-picker ;;
+        *) show_trigger_menu ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────
+# Share Submenu
+# ─────────────────────────────────────────────────────────────
+show_share_menu() {
+    local choice
+    choice=$(menu "Share" \
+        "  Clipboard" \
+        "  File" \
+        "  Folder")
+    case "$choice" in
+        *Clipboard*) nova-launch-floating-terminal nova-cmd-share clipboard ;;
+        *File*) nova-launch-floating-terminal nova-cmd-share file ;;
+        *Folder*) nova-launch-floating-terminal nova-cmd-share folder ;;
+        *) show_trigger_menu ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────
+# Toggle Submenu
+# ─────────────────────────────────────────────────────────────
+show_toggle_menu() {
+    local choice
+    choice=$(menu "Toggle" \
+        "󱄄  Screensaver" \
+        "󰔎  Night Light" \
+        "󱫖  Idle Lock" \
+        "󰍜  Top Bar")
+    case "$choice" in
+        *Screensaver*) nova-toggle-screensaver ;;
+        *Night*) nova-toggle-nightlight ;;
+        *Idle*) nova-toggle-idle ;;
+        *Bar*) nova-toggle-waybar ;;
+        *) show_trigger_menu ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────
+# Trigger Menu
+# ─────────────────────────────────────────────────────────────
+show_trigger_menu() {
+    local choice
+    choice=$(menu "Trigger" \
+        "  Capture" \
+        "  Share" \
+        "󰔎  Toggle")
+    case "$choice" in
+        *Capture*) show_capture_menu ;;
+        *Share*) show_share_menu ;;
+        *Toggle*) show_toggle_menu ;;
+        *) show_main_menu ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────
+# Learn Menu
+# ─────────────────────────────────────────────────────────────
+show_learn_menu() {
+    local choice
+    choice=$(menu "Learn" \
+        "  Keybindings" \
+        "  Niri Docs" \
+        "󰣇  Arch Wiki" \
+        "  Neovim" \
+        "󱆃  Bash")
+    case "$choice" in
+        *Keybindings*) nova-menu-keybindings ;;
+        *Niri*) xdg-open "https://yalter.github.io/niri/" ;;
+        *Arch*) xdg-open "https://wiki.archlinux.org/" ;;
+        *Neovim*) xdg-open "https://www.lazyvim.org/keymaps" ;;
+        *Bash*) xdg-open "https://devhints.io/bash" ;;
+        *) show_main_menu ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────
+# Style Menu
+# ─────────────────────────────────────────────────────────────
 show_theme_menu() {
     local themes theme
 
-    # Get list of available themes
     themes=$(ls -1 "$DOTFILES/themes" 2>/dev/null)
     if [[ -z "$themes" ]]; then
         notify-send "No themes found" "Check $DOTFILES/themes directory"
         return
     fi
 
-    # Show theme picker
     theme=$(printf '%s\n' $themes | fuzzel --dmenu -p "Theme" -w 40 -l 15)
 
     if [[ -n "$theme" ]]; then
@@ -44,59 +165,138 @@ show_background_menu() {
         *Next*) nova-bg-next ;;
         *Random*) nova-bg-next --random 2>/dev/null || nova-bg-next ;;
         *From\ Theme*) nova-bg-next --theme 2>/dev/null || nova-bg-next ;;
+        *) show_style_menu ;;
+    esac
+}
+
+show_style_menu() {
+    local choice
+    choice=$(menu "Style" \
+        "󰸌  Theme" \
+        "  Background")
+    case "$choice" in
+        *Theme*) show_theme_menu ;;
+        *Background*) show_background_menu ;;
+        *) show_main_menu ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────
+# Setup Menu
+# ─────────────────────────────────────────────────────────────
+show_config_menu() {
+    local choice
+    choice=$(menu "Config" \
+        "  Niri" \
+        "  Swaylock" \
+        "  Swayidle" \
+        "  Mako" \
+        "󰍜  Waybar" \
+        "  Foot")
+    case "$choice" in
+        *Niri*) $EDITOR "$DOTFILES/config/niri/config.kdl" ;;
+        *Swaylock*) $EDITOR "$DOTFILES/config/swaylock/config" 2>/dev/null || $EDITOR "$HOME/.config/swaylock/config" ;;
+        *Swayidle*) $EDITOR "$DOTFILES/config/swayidle/config" 2>/dev/null || notify-send "Swayidle" "Edit via toggle script" ;;
+        *Mako*) $EDITOR "$DOTFILES/config/mako/config" ;;
+        *Waybar*) $EDITOR "$DOTFILES/config/waybar/config.jsonc" ;;
+        *Foot*) $EDITOR "$DOTFILES/config/foot/foot.ini" ;;
+        *) show_setup_menu ;;
     esac
 }
 
 show_setup_menu() {
     local choice
-    choice=$(menu "Setup" "  Audio" "  Wifi" "  Bluetooth")
+    choice=$(menu "Setup" \
+        "  Audio" \
+        "  Wifi" \
+        "󰂯  Bluetooth" \
+        "󱐋  Power Profile" \
+        "󰍹  Monitors" \
+        "  Keybindings" \
+        "  Config")
     case "$choice" in
         *Audio*) nova-launch-audio ;;
         *Wifi*) nova-launch-wifi ;;
         *Bluetooth*) nova-launch-bluetooth ;;
+        *Power*) nova-powerprofile ;;
+        *Monitors*) $EDITOR "$DOTFILES/config/niri/outputs.kdl" ;;
+        *Keybindings*) $EDITOR "$DOTFILES/config/niri/binds.kdl" ;;
+        *Config*) show_config_menu ;;
+        *) show_main_menu ;;
     esac
 }
 
-show_toggle_menu() {
-    local choice
-    choice=$(menu "Toggle" "  Screensaver")
-    case "$choice" in
-        *Screensaver*) nova-toggle-screensaver ;;
-    esac
-}
-
+# ─────────────────────────────────────────────────────────────
+# System Menu
+# ─────────────────────────────────────────────────────────────
 show_system_menu() {
+    local options="  Lock\n󱄄  Screensaver"
+
+    # Add suspend option
+    options="$options\n󰒲  Suspend"
+
+    # Check if hibernate is available
+    if grep -q disk /sys/power/state 2>/dev/null; then
+        options="$options\n󰤁  Hibernate"
+    fi
+
+    options="$options\n󰜉  Restart\n󰐥  Shutdown"
+
     local choice
-    choice=$(menu "System" "  Lock" "  Screensaver" "  Restart" "  Shutdown")
+    choice=$(printf "$options" | fuzzel --dmenu -p "System" -w 35 -l 8)
     case "$choice" in
         *Lock*) swaylock ;;
         *Screensaver*) nova-launch-screensaver ;;
+        *Suspend*) systemctl suspend ;;
+        *Hibernate*) systemctl hibernate ;;
         *Restart*) systemctl reboot ;;
         *Shutdown*) systemctl poweroff ;;
+        *) show_main_menu ;;
     esac
 }
 
+# ─────────────────────────────────────────────────────────────
+# Main Menu
+# ─────────────────────────────────────────────────────────────
 show_main_menu() {
     local choice
-    choice=$(menu "Nova" "  Apps" "  Keybindings" "  Style" "  Toggle" "  Setup" "  System")
+    choice=$(menu "Nova" \
+        "󰀻  Apps" \
+        "  Keybindings" \
+        "󰧑  Learn" \
+        "󱓞  Trigger" \
+        "  Style" \
+        "  Setup" \
+        "  System")
     case "$choice" in
         *Apps*) fuzzel ;;
         *Keybindings*) nova-menu-keybindings ;;
+        *Learn*) show_learn_menu ;;
+        *Trigger*) show_trigger_menu ;;
         *Style*) show_style_menu ;;
-        *Toggle*) show_toggle_menu ;;
         *Setup*) show_setup_menu ;;
         *System*) show_system_menu ;;
     esac
 }
 
-# Allow direct submenu access
+# ─────────────────────────────────────────────────────────────
+# Direct submenu access
+# ─────────────────────────────────────────────────────────────
 case "${1,,}" in
+    apps) fuzzel ;;
+    keybindings) nova-menu-keybindings ;;
+    learn) show_learn_menu ;;
+    trigger) show_trigger_menu ;;
+    capture) show_capture_menu ;;
+    screenshot) show_screenshot_menu ;;
+    screenrecord) show_screenrecord_menu ;;
+    share) show_share_menu ;;
+    toggle) show_toggle_menu ;;
     style) show_style_menu ;;
     theme) show_theme_menu ;;
     background) show_background_menu ;;
-    toggle) show_toggle_menu ;;
     setup) show_setup_menu ;;
+    config) show_config_menu ;;
     system) show_system_menu ;;
-    keybindings) nova-menu-keybindings ;;
     *) show_main_menu ;;
 esac

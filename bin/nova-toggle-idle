@@ -1,0 +1,23 @@
+#!/bin/bash
+# Toggle idle lock (swayidle)
+
+STATE_DIR="$HOME/.local/state/nova/toggles"
+STATE_FILE="$STATE_DIR/idle-off"
+
+if [[ -f "$STATE_FILE" ]]; then
+    # Currently disabled, enable it
+    rm -f "$STATE_FILE"
+    pkill swayidle 2>/dev/null
+    swayidle -w \
+        timeout 300 'swaylock -f' \
+        timeout 600 'niri msg action power-off-monitors' \
+        resume 'niri msg action power-on-monitors' \
+        before-sleep 'swaylock -f' &
+    notify-send "Idle Lock" "Enabled"
+else
+    # Currently enabled, disable it
+    mkdir -p "$STATE_DIR"
+    touch "$STATE_FILE"
+    pkill swayidle 2>/dev/null
+    notify-send "Idle Lock" "Disabled"
+fi

@@ -1,0 +1,10 @@
+#!/bin/bash
+# Pick a color from the screen and copy to clipboard
+
+# Check if hyprpicker is running (cancel if so)
+pkill hyprpicker && exit 0
+
+color=$(hyprpicker -a 2>/dev/null)
+if [[ -n "$color" ]]; then
+    notify-send "Color Picker" "Copied: $color"
+fi

@@ -1,6 +1,5 @@
 # Flatpak packages to install
 # Lines starting with # are ignored
 
-# Example:
-# com.spotify.Client
-# org.gimp.GIMP
+# File sharing
+org.localsend.localsend_app

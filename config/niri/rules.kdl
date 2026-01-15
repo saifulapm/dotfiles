@@ -21,6 +21,12 @@ window-rule {
     border { off; }
 }
 
+// Floating terminal for presentations
+window-rule {
+    match app-id="nova.floating"
+    open-floating true
+}
+
 // Block password managers from screen capture
 /-window-rule {
     match app-id=r#"^org\.keepassxc\.KeePassXC$"#

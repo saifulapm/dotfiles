@@ -1,0 +1,43 @@
+#!/bin/bash
+# Take screenshots using niri's built-in tools or grim/slurp for region selection
+
+MODE="${1:-interactive}"
+OUTPUT_DIR="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"
+mkdir -p "$OUTPUT_DIR"
+
+case "$MODE" in
+    interactive)
+        # Use niri's built-in screenshot UI
+        niri msg action screenshot
+        ;;
+    screen)
+        # Screenshot the focused screen
+        niri msg action screenshot-screen
+        ;;
+    window)
+        # Screenshot the focused window
+        niri msg action screenshot-window
+        ;;
+    region)
+        # Select region and copy to clipboard
+        SELECTION=$(slurp 2>/dev/null)
+        [[ -z "$SELECTION" ]] && exit 0
+        grim -g "$SELECTION" - | wl-copy
+        notify-send "Screenshot" "Copied to clipboard"
+        ;;
+    region-edit)
+        # Select region and open in satty for editing
+        SELECTION=$(slurp 2>/dev/null)
+        [[ -z "$SELECTION" ]] && exit 0
+        FILENAME="$OUTPUT_DIR/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png"
+        grim -g "$SELECTION" - | satty --filename - \
+            --output-filename "$FILENAME" \
+            --early-exit \
+            --save-after-copy \
+            --copy-command 'wl-copy'
+        ;;
+    *)
+        echo "Usage: nova-cmd-screenshot [interactive|screen|window|region|region-edit]"
+        exit 1
+        ;;
+esac

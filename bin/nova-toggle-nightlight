@@ -1,0 +1,11 @@
+#!/bin/bash
+# Toggle night light (wlsunset)
+
+if pgrep -x wlsunset > /dev/null; then
+    pkill wlsunset
+    notify-send "Night Light" "Disabled"
+else
+    # Temperature: 4000K (warm) at night
+    wlsunset -T 4000 -t 4000 &
+    notify-send "Night Light" "Enabled"
+fi

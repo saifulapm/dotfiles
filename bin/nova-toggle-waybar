@@ -1,0 +1,9 @@
+#!/bin/bash
+# Toggle waybar visibility
+
+pkill -USR1 waybar
+
+# Notify based on current state (after toggle)
+if pgrep -x waybar > /dev/null; then
+    notify-send "Waybar" "Toggled"
+fi

@@ -1,0 +1,4 @@
+#!/bin/bash
+# Launch a floating terminal window
+
+exec footclient --app-id=nova.floating "$@"
