@@ -9,6 +9,7 @@ ARCH="aarch64"
 REPO_API="https://api.github.com/repos/omacom-io/omarchy-chromium/releases/latest"
 INSTALL_DIR="/opt/omarchy-chromium"
 VERSION_FILE="${INSTALL_DIR}/.version"
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 
 info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
 success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
@@ -51,36 +52,50 @@ if [[ -f "$VERSION_FILE" ]]; then
     INSTALLED_VERSION=$(cat "$VERSION_FILE")
     if [[ "$INSTALLED_VERSION" == "$LATEST_VERSION" ]]; then
         success "Already up to date!"
-        exit 0
+    else
+        info "Update available: $INSTALLED_VERSION → $LATEST_VERSION"
     fi
-    info "Update available: $INSTALLED_VERSION → $LATEST_VERSION"
 fi
 
-# Download and extract
-temp_dir=$(mktemp -d)
-cd "$temp_dir"
+# Download and extract if not up to date
+if [[ ! -f "$VERSION_FILE" ]] || [[ "$(cat "$VERSION_FILE")" != "$LATEST_VERSION" ]]; then
+    temp_dir=$(mktemp -d)
+    cd "$temp_dir"
 
-info "Downloading omarchy-chromium..."
-curl -L -o "$PACKAGE_NAME" "$DOWNLOAD_URL"
+    info "Downloading omarchy-chromium..."
+    curl -L -o "$PACKAGE_NAME" "$DOWNLOAD_URL"
 
-info "Extracting..."
-tar -xf "$PACKAGE_NAME"
+    info "Extracting..."
+    tar -xf "$PACKAGE_NAME"
 
-# Install
-info "Installing..."
-mkdir -p "$INSTALL_DIR"
-[[ -d "usr" ]] && cp -r usr/* /usr/ 2>/dev/null || true
-[[ -d "opt" ]] && cp -r opt/* /opt/ 2>/dev/null || true
+    # Install
+    info "Installing..."
+    mkdir -p "$INSTALL_DIR"
+    [[ -d "usr" ]] && cp -r usr/* /usr/ 2>/dev/null || true
+    [[ -d "opt" ]] && cp -r opt/* /opt/ 2>/dev/null || true
 
-echo "$LATEST_VERSION" > "$VERSION_FILE"
+    echo "$LATEST_VERSION" > "$VERSION_FILE"
 
-# Cleanup
-cd /
-rm -rf "$temp_dir"
+    # Cleanup
+    cd /
+    rm -rf "$temp_dir"
 
-# Update desktop database
-update-desktop-database /usr/share/applications 2>/dev/null || true
+    # Update desktop database
+    update-desktop-database /usr/share/applications 2>/dev/null || true
 
-success "Omarchy Chromium $LATEST_VERSION installed!"
+    success "Omarchy Chromium $LATEST_VERSION installed!"
+fi
+
+# Setup user config (runs as the actual user, not root)
+ACTUAL_USER="${SUDO_USER:-$USER}"
+ACTUAL_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
+
+info "Setting up browser config for $ACTUAL_USER..."
+
+# Link chromium flags
+sudo -u "$ACTUAL_USER" ln -sf "$DOTFILES/config/chromium-flags.conf" "$ACTUAL_HOME/.config/chromium-flags.conf"
+
+success "Setup complete!"
 echo ""
+echo "Extension loaded from: $DOTFILES/default/chromium/extensions/copy-url"
 echo "Theme will apply automatically when you change themes."
