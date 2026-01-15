@@ -3,6 +3,7 @@
 // Spawn processes at startup
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 spawn-at-startup "mako"
+spawn-at-startup "nova-start-idle"
 
 hotkey-overlay {
     // skip-at-startup

@@ -88,6 +88,9 @@ generate_theme() {
     mkdir -p "$HOME/.config/mako"
     sed -f "$sed_script" "$TEMPLATES_DIR/mako.ini.tpl" > "$HOME/.config/mako/config"
 
+    # Generate swaylock theme
+    sed -f "$sed_script" "$TEMPLATES_DIR/swaylock.conf.tpl" > "$HOME/.config/nova/current/theme/swaylock.conf"
+
     # Set GNOME/GTK theme for file manager (handles light/dark mode and icon theme)
     nova-theme-set-gnome "$name" 2>/dev/null || true
 

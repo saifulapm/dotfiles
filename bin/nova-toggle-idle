@@ -1,16 +1,23 @@
 #!/bin/bash
 # Toggle idle lock (swayidle)
-# When enabled: locks screen after 5 min, turns off monitors after 10 min
-# When disabled: screen never locks automatically
+# Timeline: screensaver (2.5min) → lock (5min) → display off (5.5min)
+
+STATE_DIR="$HOME/.local/state/nova/toggles"
+STATE_FILE="$STATE_DIR/idle-off"
+
+mkdir -p "$STATE_DIR"
 
 if pgrep -x swayidle > /dev/null; then
     pkill -x swayidle
+    touch "$STATE_FILE"
     notify-send "Idle Lock" "Disabled - Screen won't lock automatically"
 else
+    rm -f "$STATE_FILE"
     swayidle -w \
-        timeout 300 'swaylock -f' \
-        timeout 600 'niri msg action power-off-monitors' \
+        timeout 150 'nova-launch-screensaver' \
+        timeout 300 'nova-lock-screen' \
+        timeout 330 'niri msg action power-off-monitors' \
         resume 'niri msg action power-on-monitors' \
-        before-sleep 'swaylock -f' &
-    notify-send "Idle Lock" "Enabled - Screen locks after 5 min idle"
+        before-sleep 'nova-lock-screen' &
+    notify-send "Idle Lock" "Enabled - Screensaver 2.5min, Lock 5min"
 fi

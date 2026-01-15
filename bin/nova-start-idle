@@ -1,0 +1,22 @@
+#!/bin/bash
+# Start swayidle on login (called from niri autostart)
+# Respects the idle-off toggle state
+
+STATE_FILE="$HOME/.local/state/nova/toggles/idle-off"
+
+# Don't start if idle was disabled
+[[ -f "$STATE_FILE" ]] && exit 0
+
+# Don't start if already running
+pgrep -x swayidle > /dev/null && exit 0
+
+# Start swayidle with timeline:
+# 150s (2.5min) - Screensaver
+# 300s (5min) - Lock screen
+# 330s (5.5min) - Display off
+exec swayidle -w \
+    timeout 150 'nova-launch-screensaver' \
+    timeout 300 'nova-lock-screen' \
+    timeout 330 'niri msg action power-off-monitors' \
+    resume 'niri msg action power-on-monitors' \
+    before-sleep 'nova-lock-screen'

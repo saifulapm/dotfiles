@@ -1,0 +1,17 @@
+# Swaylock configuration
+
+# Appearance
+ignore-empty-password
+show-failed-attempts
+indicator-caps-lock
+
+# Font
+font=JetBrainsMono Nerd Font
+font-size=24
+
+# Indicator
+indicator-radius=120
+indicator-thickness=20
+
+# Include theme colors
+include=~/.config/nova/current/theme/swaylock.conf
