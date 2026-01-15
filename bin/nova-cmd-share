@@ -1,6 +1,6 @@
 #!/bin/bash
-# Share clipboard, file, or folder using LocalSend
-# Opens LocalSend GUI with files ready to send (detached via systemd-run)
+# Share clipboard, file, or folder using LocalSend (like omarchy)
+# Uses --headless flag for CLI mode
 
 if (($# == 0)); then
     echo "Usage: nova-cmd-share [clipboard|file|folder]"
@@ -32,12 +32,12 @@ else
     fi
 fi
 
-# Launch LocalSend detached via systemd-run (like omarchy)
+# Run LocalSend in headless mode via systemd-run (like omarchy)
 if [[ $MODE != "clipboard" ]] && echo "$FILES" | grep -q $'\n'; then
     readarray -t FILE_ARRAY <<< "$FILES"
-    systemd-run --user --quiet --collect localsend "${FILE_ARRAY[@]}"
+    systemd-run --user --quiet --collect localsend --headless send "${FILE_ARRAY[@]}"
 else
-    systemd-run --user --quiet --collect localsend "$FILES"
+    systemd-run --user --quiet --collect localsend --headless send "$FILES"
 fi
 
 exit 0
