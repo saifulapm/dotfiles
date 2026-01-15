@@ -1,5 +1,6 @@
 #!/bin/bash
-# Share clipboard, file, or folder using LocalSend (matches omarchy approach)
+# Share clipboard, file, or folder using LocalSend
+# Opens LocalSend GUI with files ready to send (detached via systemd-run)
 
 if (($# == 0)); then
     echo "Usage: nova-cmd-share [clipboard|file|folder]"
@@ -23,36 +24,20 @@ else
         FILES="$*"
     else
         if [[ $MODE == "folder" ]]; then
-            # Pick a single folder from home directory
             FILES=$(find "$HOME" -type d 2>/dev/null | fzf)
         else
-            # Pick one or more files from home directory
             FILES=$(find "$HOME" -type f 2>/dev/null | fzf --multi)
         fi
         [[ -z "$FILES" ]] && exit 0
     fi
 fi
 
-# Use native localsend with headless mode (like omarchy), fallback to flatpak
-if command -v localsend &>/dev/null; then
-    # Native localsend - use headless mode via systemd-run
-    if [[ $MODE != "clipboard" ]] && echo "$FILES" | grep -q $'\n'; then
-        # Multiple files selected - convert newlines to array
-        readarray -t FILE_ARRAY <<< "$FILES"
-        systemd-run --user --quiet --collect localsend send "${FILE_ARRAY[@]}"
-    else
-        # Single file or clipboard mode
-        systemd-run --user --quiet --collect localsend send "$FILES"
-    fi
+# Launch LocalSend detached via systemd-run (like omarchy)
+if [[ $MODE != "clipboard" ]] && echo "$FILES" | grep -q $'\n'; then
+    readarray -t FILE_ARRAY <<< "$FILES"
+    systemd-run --user --quiet --collect localsend "${FILE_ARRAY[@]}"
 else
-    # Flatpak fallback (no headless support)
-    notify-send "Share" "Opening LocalSend..."
-    if [[ $MODE != "clipboard" ]] && echo "$FILES" | grep -q $'\n'; then
-        readarray -t FILE_ARRAY <<< "$FILES"
-        flatpak run org.localsend.localsend_app "${FILE_ARRAY[@]}" &
-    else
-        flatpak run org.localsend.localsend_app "$FILES" &
-    fi
+    systemd-run --user --quiet --collect localsend "$FILES"
 fi
 
 exit 0

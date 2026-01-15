@@ -1,6 +1,6 @@
 #!/bin/bash
-# Install LocalSend native binary (for headless CLI support)
-# This replaces the flatpak version with native binary
+# Install LocalSend native binary
+# Opens GUI with file pre-selected when called with file argument
 
 set -e
 
@@ -74,17 +74,11 @@ EOF
 # Cleanup
 rm -rf "$TMP_DIR"
 
-# Verify installation
-if command -v localsend &>/dev/null; then
-    echo "LocalSend installed successfully!"
-    echo "Location: $(which localsend)"
-    echo ""
-    echo "You can now use: localsend --help"
-    echo "Headless mode: localsend send <file>"
-else
-    echo "Installation complete. Add ~/.local/bin to PATH if not already."
-    echo "LocalSend binary: $INSTALL_DIR/bin/localsend"
-fi
+echo ""
+echo "LocalSend installed successfully!"
+echo "Location: $INSTALL_DIR/bin/localsend"
+echo ""
+echo "Usage: localsend <file>  # Opens GUI with file ready to send"
 
 # Optional: Remove flatpak version
 if flatpak list 2>/dev/null | grep -q "org.localsend.localsend_app"; then
