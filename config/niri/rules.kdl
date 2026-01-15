@@ -52,6 +52,12 @@ window-rule {
     opacity 1.0
 }
 
+// Image viewer as floating centered
+window-rule {
+    match app-id="imv"
+    open-floating true
+}
+
 // Full opacity for games
 window-rule {
     match app-id=r#"^(steam|com\.libretro\.RetroArch)$"#
