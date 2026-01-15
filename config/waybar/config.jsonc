@@ -34,9 +34,9 @@
   },
   "custom/nova": {
     "format": "󰣛",
-    "on-click": "walker",
+    "on-click": "nova-menu",
     "on-click-right": "ghostty",
-    "tooltip-format": "App Launcher (Mod+D)"
+    "tooltip-format": "Nova Menu"
   },
   "cpu": {
     "interval": 5,

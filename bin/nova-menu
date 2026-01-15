@@ -231,22 +231,17 @@ show_setup_menu() {
 # System Menu
 # ─────────────────────────────────────────────────────────────
 show_system_menu() {
-    local options="󰌾  Lock\n󱄄  Screensaver\n󰒲  Suspend"
-
-    # Check if hibernate is available
-    if grep -q disk /sys/power/state 2>/dev/null; then
-        options="$options\n󰤁  Hibernate"
-    fi
-
-    options="$options\n󰜉  Restart\n󰐥  Shutdown"
-
     local choice
-    choice=$(printf "$options" | fuzzel --dmenu -p "System" -w 35 -l 8)
+    choice=$(menu "System" \
+        "󰌾  Lock" \
+        "󱄄  Screensaver" \
+        "󰒲  Suspend" \
+        "󰜉  Restart" \
+        "󰐥  Shutdown")
     case "$choice" in
         *Lock*) nova-lock-screen ;;
         *Screensaver*) nova-launch-screensaver ;;
         *Suspend*) systemctl suspend ;;
-        *Hibernate*) systemctl hibernate ;;
         *Restart*) nova-cmd-reboot ;;
         *Shutdown*) nova-cmd-shutdown ;;
         *) show_main_menu ;;
