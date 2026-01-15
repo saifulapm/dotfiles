@@ -1,12 +1,16 @@
 #!/bin/bash
 
-# Set browser theme color for Chromium
-# Standard chromium doesn't support live theme changes like omarchy's fork
-# User must restart browser to see changes
+# Set browser theme color for Chromium (omarchy-chromium fork)
+# Uses CLI flags for live theme changes
 
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 THEME_DIR="$DOTFILES/themes"
 THEME_FILE="$HOME/.config/nova/current/theme.name"
+
+# Only works with omarchy-chromium
+if ! command -v chromium &>/dev/null; then
+    exit 0
+fi
 
 CURRENT_THEME=$(cat "$THEME_FILE" 2>/dev/null || echo "")
 
@@ -16,32 +20,19 @@ fi
 
 CHROMIUM_THEME="$THEME_DIR/$CURRENT_THEME/chromium.theme"
 
-if [[ ! -f "$CHROMIUM_THEME" ]]; then
-    # No chromium theme defined for this theme
-    exit 0
-fi
-
-THEME_RGB=$(<"$CHROMIUM_THEME")
-# Convert RGB to integer for Chromium user_color
-# Format: R,G,B -> single integer
-IFS=',' read -r R G B <<< "$THEME_RGB"
-USER_COLOR=$(( (R << 16) + (G << 8) + B ))
-
-# Determine color scheme (light/dark)
-if [[ -f "$THEME_DIR/$CURRENT_THEME/light.mode" ]]; then
-    COLOR_SCHEME=1  # Light
+if [[ -f "$CHROMIUM_THEME" ]]; then
+    THEME_RGB=$(<"$CHROMIUM_THEME")
 else
-    COLOR_SCHEME=2  # Dark
+    # Default neutral grey if theme doesn't have a color
+    THEME_RGB="28,32,39"
 fi
 
-# Update Chromium Preferences
-PREFS_FILE="$HOME/.config/chromium/Default/Preferences"
-if [[ -f "$PREFS_FILE" ]]; then
-    # Use jq to update theme settings
-    if command -v jq &>/dev/null; then
-        tmp=$(mktemp)
-        jq ".browser.theme.color_scheme = $COLOR_SCHEME | .browser.theme.user_color = $USER_COLOR" \
-            "$PREFS_FILE" > "$tmp" && mv "$tmp" "$PREFS_FILE"
-        notify-send "Browser Theme" "Restart Chromium to apply theme changes"
-    fi
+# Set theme color
+chromium --no-startup-window --set-theme-color="$THEME_RGB" >/dev/null 2>&1
+
+# Set color scheme (light/dark)
+if [[ -f "$THEME_DIR/$CURRENT_THEME/light.mode" ]]; then
+    chromium --no-startup-window --set-color-scheme="light" >/dev/null 2>&1
+else
+    chromium --no-startup-window --set-color-scheme="dark" >/dev/null 2>&1
 fi
