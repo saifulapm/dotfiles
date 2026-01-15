@@ -31,12 +31,10 @@ else
     fi
 fi
 
-# Launch LocalSend
+# Launch LocalSend detached via systemd-run
 if echo "$FILES" | grep -q $'\n'; then
     readarray -t FILE_ARRAY <<< "$FILES"
-    localsend "${FILE_ARRAY[@]}" &
+    systemd-run --user --quiet --collect localsend "${FILE_ARRAY[@]}"
 else
-    localsend "$FILES" &
+    systemd-run --user --quiet --collect localsend "$FILES"
 fi
-
-exit 0

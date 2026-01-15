@@ -1,5 +1,4 @@
 #!/bin/bash
 # Launch a floating terminal window
-# Uses foot with app-id for niri floating rule
 
-foot --app-id=nova.floating "$@"
+exec footclient --app-id=nova.floating "$@"
