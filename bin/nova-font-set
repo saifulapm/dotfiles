@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Set the system-wide monospace font that should be used by the terminal, waybar, etc.
+# The font name must be one of the ones returned by nova-font-list.
+
+font_name="$1"
+
+if [[ -z "$font_name" ]]; then
+  echo "Usage: nova-font-set <font-name>"
+  exit 1
+fi
+
+if ! fc-list | grep -iq "$font_name"; then
+  echo "Font '$font_name' not found."
+  exit 1
+fi
+
+# Update Ghostty
+if [[ -f ~/.config/ghostty/config ]]; then
+  sed -i "s/font-family = .*/font-family = \"$font_name\"/g" ~/.config/ghostty/config
+fi
+
+# Update Foot
+if [[ -f ~/.config/foot/foot.ini ]]; then
+  sed -i "s/^font=.*/font=$font_name:size=12/g" ~/.config/foot/foot.ini
+fi
+
+# Update Alacritty
+if [[ -f ~/.config/alacritty/alacritty.toml ]]; then
+  sed -i "s/family = \".*\"/family = \"$font_name\"/g" ~/.config/alacritty/alacritty.toml
+fi
+
+# Update Waybar
+if [[ -f ~/.config/waybar/style.css ]]; then
+  sed -i "s/font-family: .*/font-family: '$font_name';/g" ~/.config/waybar/style.css
+fi
+
+# Update Swaylock
+if [[ -f ~/.config/swaylock/config ]]; then
+  sed -i "s/^font=.*/font=$font_name/g" ~/.config/swaylock/config
+fi
+
+# Update fontconfig for monospace
+if [[ -f ~/.config/fontconfig/fonts.conf ]]; then
+  if command -v xmlstarlet &>/dev/null; then
+    xmlstarlet ed -L \
+      -u '//match[@target="pattern"][test/string="monospace"]/edit[@name="family"]/string' \
+      -v "$font_name" \
+      ~/.config/fontconfig/fonts.conf 2>/dev/null
+  fi
+fi
+
+# Restart waybar to apply changes
+pkill -USR2 waybar 2>/dev/null || true
+
+notify-send "Font Changed" "$font_name"
+
+# Note about terminal restart
+if pgrep -x ghostty > /dev/null; then
+  notify-send "Restart Required" "Restart Ghostty to see font change"
+fi

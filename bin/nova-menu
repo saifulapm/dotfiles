@@ -176,12 +176,26 @@ show_style_menu() {
     local choice
     choice=$(menu "Style" \
         "󰸌  Theme" \
+        "  Font" \
         "󰸉  Background")
     case "$choice" in
         *Theme*) show_theme_menu ;;
+        *Font*) show_font_menu ;;
         *Background*) show_background_menu ;;
         *) show_main_menu ;;
     esac
+}
+
+show_font_menu() {
+    local current fonts selected
+    current=$(nova-font-current)
+    fonts=$(nova-font-list)
+
+    selected=$(echo "$fonts" | fuzzel --dmenu -p "Font: " -w 50 -l 15)
+
+    if [[ -n "$selected" && "$selected" != "$current" ]]; then
+        nova-font-set "$selected"
+    fi
 }
 
 # ─────────────────────────────────────────────────────────────
