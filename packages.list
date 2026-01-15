@@ -65,6 +65,9 @@ waybar
 # Notifications
 mako
 
+# On-screen display
+swayosd
+
 # Audio control
 wiremix
 pamixer
