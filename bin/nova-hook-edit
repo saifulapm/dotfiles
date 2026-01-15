@@ -1,0 +1,47 @@
+#!/bin/bash
+# Edit or create a hook
+
+HOOKS_DIR="$HOME/.config/nova/hooks"
+EXAMPLES_DIR="$HOME/.dotfiles/default/hooks"
+
+mkdir -p "$HOOKS_DIR"
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: nova-hook-edit <hook-name>"
+    echo ""
+    echo "Available hooks:"
+    echo "  theme-set    - Called after theme change"
+    echo "  post-install - Called after installations"
+    echo "  post-update  - Called after updates"
+    echo ""
+    echo "Existing hooks:"
+    ls -1 "$HOOKS_DIR" 2>/dev/null || echo "  (none)"
+    exit 1
+fi
+
+HOOK_NAME="$1"
+HOOK_PATH="$HOOKS_DIR/$HOOK_NAME"
+
+# If hook doesn't exist, copy from example if available
+if [[ ! -f "$HOOK_PATH" ]]; then
+    if [[ -f "$EXAMPLES_DIR/${HOOK_NAME}.example" ]]; then
+        cp "$EXAMPLES_DIR/${HOOK_NAME}.example" "$HOOK_PATH"
+        chmod +x "$HOOK_PATH"
+        echo "Created new hook from template: $HOOK_PATH"
+    else
+        # Create basic hook
+        cat > "$HOOK_PATH" << 'EOF'
+#!/bin/bash
+# Hook: HOOK_NAME
+# Arguments available: $@
+
+echo "Hook running with args: $@"
+EOF
+        sed -i "s/HOOK_NAME/$HOOK_NAME/" "$HOOK_PATH"
+        chmod +x "$HOOK_PATH"
+        echo "Created new hook: $HOOK_PATH"
+    fi
+fi
+
+# Open in editor
+"${EDITOR:-nvim}" "$HOOK_PATH"

@@ -1,0 +1,34 @@
+#!/bin/bash
+# Configure DNS settings
+
+echo "Select DNS provider:"
+choice=$(gum choose "Cloudflare (1.1.1.1)" "Google (8.8.8.8)" "Quad9 (9.9.9.9)" "System Default")
+
+case "$choice" in
+    *Cloudflare*)
+        dns="1.1.1.1"
+        ;;
+    *Google*)
+        dns="8.8.8.8"
+        ;;
+    *Quad9*)
+        dns="9.9.9.9"
+        ;;
+    *)
+        echo "Using system default DNS"
+        sudo resolvectl revert
+        exit 0
+        ;;
+esac
+
+# Get active network interface
+interface=$(ip route | grep default | awk '{print $5}' | head -1)
+
+if [[ -n "$interface" ]]; then
+    echo "Setting DNS to $dns on $interface..."
+    sudo resolvectl dns "$interface" "$dns"
+    echo "DNS configured!"
+    resolvectl status "$interface"
+else
+    echo "No active network interface found"
+fi

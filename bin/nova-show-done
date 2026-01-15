@@ -1,0 +1,10 @@
+#!/bin/bash
+# Show completion animation and wait for keypress
+
+echo
+if command -v gum &>/dev/null; then
+    gum spin --spinner "globe" --title "Done! Press any key to close..." -- bash -c 'read -n 1 -s'
+else
+    echo -e "\033[32m✓ Done! Press any key to close...\033[0m"
+    read -n 1 -s
+fi

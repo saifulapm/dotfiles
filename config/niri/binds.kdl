@@ -206,6 +206,12 @@ binds {
     // Shortcuts inhibit toggle
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
 
+    // Notifications (makoctl)
+    Mod+N hotkey-overlay-title="Dismiss Notification" { spawn "makoctl" "dismiss"; }
+    Mod+Shift+N hotkey-overlay-title="Dismiss All" { spawn "makoctl" "dismiss" "--all"; }
+    Mod+Ctrl+N hotkey-overlay-title="Toggle DND" { spawn "makoctl" "mode" "-t" "do-not-disturb"; }
+    Mod+Alt+N hotkey-overlay-title="Invoke Last" { spawn "makoctl" "invoke"; }
+
     // Session
     Mod+Shift+E { quit; }
     Ctrl+Alt+Delete { quit; }

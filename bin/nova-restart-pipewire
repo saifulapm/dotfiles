@@ -1,0 +1,5 @@
+#!/bin/bash
+# Restart pipewire audio service
+
+echo -e "Restarting pipewire audio service...\n"
+systemctl --user restart pipewire.service

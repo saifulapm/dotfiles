@@ -1,0 +1,21 @@
+#!/bin/bash
+# Dismiss a mako notification by its summary text
+# Used by interactive notifications to dismiss themselves after clicking
+
+if (($# == 0)); then
+  echo "Usage: nova-notification-dismiss <summary>"
+  exit 1
+fi
+
+# makoctl list returns JSON, use jq to find matching notification ID
+if command -v jq &>/dev/null; then
+  notification_id=$(makoctl list | jq -r --arg summary "$1" \
+    '.data[][] | select(.summary.data | contains($summary)) | .id.data' | head -n1)
+
+  if [[ -n $notification_id ]]; then
+    makoctl dismiss -n "$notification_id"
+  fi
+else
+  # Fallback: dismiss all if jq not available
+  makoctl dismiss
+fi

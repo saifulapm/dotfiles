@@ -1,0 +1,4 @@
+#!/bin/bash
+# Reload mako notification daemon configuration
+
+makoctl reload

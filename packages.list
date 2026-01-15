@@ -49,6 +49,7 @@ tree
 # System monitor
 btop
 fastfetch
+dust
 
 # Terminal
 foot

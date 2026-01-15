@@ -1,0 +1,6 @@
+#!/bin/bash
+# Generic app restart helper
+
+pkill -x "$1"
+sleep 0.2
+setsid "$@" >/dev/null 2>&1 &

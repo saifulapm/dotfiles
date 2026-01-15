@@ -1,0 +1,28 @@
+#!/bin/bash
+# Interactive DNF package installer using gum
+
+echo "Search for packages to install:"
+query=$(gum input --placeholder "Enter package name...")
+
+if [[ -z "$query" ]]; then
+    echo "No query provided"
+    exit 1
+fi
+
+# Search for packages
+echo "Searching for '$query'..."
+packages=$(dnf search "$query" 2>/dev/null | grep -E "^[^ ]+ :" | head -20)
+
+if [[ -z "$packages" ]]; then
+    echo "No packages found"
+    exit 1
+fi
+
+# Let user select
+selected=$(echo "$packages" | gum filter --height 15 --header "Select package to install")
+
+if [[ -n "$selected" ]]; then
+    pkg_name=$(echo "$selected" | cut -d'.' -f1)
+    echo "Installing $pkg_name..."
+    sudo dnf install -y "$pkg_name"
+fi

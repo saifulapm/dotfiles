@@ -1,0 +1,4 @@
+#!/bin/bash
+# Restart SwayOSD volume/brightness overlay
+
+nova-restart-app swayosd-server

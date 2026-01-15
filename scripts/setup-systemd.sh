@@ -8,9 +8,10 @@ SERVICE_DIR="$HOME/.config/systemd/user"
 
 echo "Setting up systemd user services..."
 
-# Copy service files
+# Copy service and timer files
 mkdir -p "$SERVICE_DIR"
 cp "$DOTFILES_DIR/config/systemd/user/"*.service "$SERVICE_DIR/" 2>/dev/null || true
+cp "$DOTFILES_DIR/config/systemd/user/"*.timer "$SERVICE_DIR/" 2>/dev/null || true
 
 # Reload systemd
 systemctl --user daemon-reload
@@ -25,6 +26,9 @@ systemctl --user add-wants niri.service swayidle.service
 systemctl --user enable elephant.service 2>/dev/null || true
 systemctl --user enable voxtype.service 2>/dev/null || true
 
+# Enable battery monitor timer
+systemctl --user enable nova-battery-monitor.timer 2>/dev/null || true
+
 echo "Systemd services configured!"
 echo "- waybar: starts with niri"
 echo "- swaybg: starts with niri"
@@ -32,3 +36,4 @@ echo "- mako: starts with niri"
 echo "- swayidle: starts with niri"
 echo "- elephant: starts with graphical-session"
 echo "- voxtype: starts with graphical-session"
+echo "- nova-battery-monitor: timer runs every 30s"

@@ -1,0 +1,4 @@
+#!/bin/bash
+# List available power profiles
+
+powerprofilesctl list 2>/dev/null | grep -E "^\*?\s+" | sed 's/^[ *]*//' | sed 's/:$//'

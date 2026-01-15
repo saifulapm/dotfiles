@@ -1,0 +1,13 @@
+#!/bin/bash
+# Interactive DNF package remover using gum
+
+echo "Listing installed packages..."
+packages=$(dnf list installed 2>/dev/null | tail -n +2 | awk '{print $1}')
+
+selected=$(echo "$packages" | gum filter --height 15 --header "Select package to remove")
+
+if [[ -n "$selected" ]]; then
+    pkg_name=$(echo "$selected" | cut -d'.' -f1)
+    echo "Removing $pkg_name..."
+    sudo dnf remove -y "$pkg_name"
+fi

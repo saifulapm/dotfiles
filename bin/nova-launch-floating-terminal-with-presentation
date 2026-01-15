@@ -1,0 +1,15 @@
+#!/bin/bash
+# Launch a floating terminal with Nova logo, execute command, show done animation
+# Used for install/update workflows
+
+cmd="$*"
+
+if [[ -z "$cmd" ]]; then
+    echo "Usage: nova-launch-floating-terminal-with-presentation <command>"
+    exit 1
+fi
+
+exec setsid footclient \
+    --app-id=nova.floating \
+    --title="Nova" \
+    -e bash -c "nova-show-logo; $cmd; if [ \$? -ne 130 ]; then nova-show-done; fi"

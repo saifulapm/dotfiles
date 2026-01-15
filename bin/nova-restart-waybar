@@ -1,0 +1,4 @@
+#!/bin/bash
+# Restart waybar status bar
+
+nova-restart-app waybar

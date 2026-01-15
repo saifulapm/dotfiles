@@ -1,0 +1,36 @@
+#!/bin/bash
+# Install VSCode on Fedora
+
+echo "Installing VSCode..."
+
+# Add Microsoft repo if not present
+if ! dnf repolist | grep -q "code"; then
+    echo "Adding Microsoft VSCode repository..."
+    sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
+fi
+
+# Install VSCode
+sudo dnf install -y code
+
+# Configure VSCode
+mkdir -p ~/.vscode ~/.config/Code/User
+
+cat > ~/.vscode/argv.json << 'EOF'
+{
+  "password-store":"gnome-libsecret"
+}
+EOF
+
+# Disable auto-update (Fedora manages updates)
+cat > ~/.config/Code/User/settings.json << 'EOF'
+{
+  "update.mode": "none"
+}
+EOF
+
+# Apply theme if available
+nova-theme-set-vscode 2>/dev/null || true
+
+echo "VSCode installed!"
+notify-send "VSCode" "Installation complete"

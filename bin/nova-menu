@@ -6,12 +6,16 @@ DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 menu() {
     local prompt="$1"
     shift
-    printf '%s\n' "$@" | fuzzel --dmenu -p "$prompt: " -w 35 -l 10
+    printf '%s\n' "$@" | fuzzel --dmenu -p "$prompt: " -w 35 -l 12
 }
 
 open_in_editor() {
     notify-send "Editing config" "$1"
     nova-launch-editor "$1"
+}
+
+present_terminal() {
+    nova-launch-floating-terminal-with-presentation "$@"
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -36,7 +40,6 @@ show_screenshot_menu() {
 }
 
 show_screenrecord_menu() {
-    # If already recording, stop it
     if pgrep -x wf-recorder > /dev/null; then
         nova-cmd-screenrecord
         return
@@ -80,8 +83,8 @@ show_share_menu() {
         "󰉋  Folder")
     case "$choice" in
         *Clipboard*) nova-cmd-share clipboard ;;
-        *File*) nova-launch-floating-terminal nova-cmd-share file ;;
-        *Folder*) nova-launch-floating-terminal nova-cmd-share folder ;;
+        *File*) present_terminal nova-cmd-share file ;;
+        *Folder*) present_terminal nova-cmd-share folder ;;
         *) show_trigger_menu ;;
     esac
 }
@@ -95,12 +98,14 @@ show_toggle_menu() {
         "󱄄  Screensaver" \
         "󰔎  Night Light" \
         "󱫖  Idle Lock" \
-        "󰍜  Top Bar")
+        "󰍜  Top Bar" \
+        "󰒲  Suspend")
     case "$choice" in
         *Screensaver*) nova-toggle-screensaver ;;
         *Night*) nova-toggle-nightlight ;;
         *Idle*) nova-toggle-idle ;;
         *Bar*) nova-toggle-waybar ;;
+        *Suspend*) present_terminal nova-toggle-suspend ;;
         *) show_trigger_menu ;;
     esac
 }
@@ -130,11 +135,13 @@ show_learn_menu() {
     choice=$(menu "Learn" \
         "󰌌  Keybindings" \
         "󰖟  Niri Docs" \
+        "󰣇  Fedora Docs" \
         "󰅩  Neovim" \
         "󱆃  Bash")
     case "$choice" in
         *Keybindings*) nova-menu-keybindings ;;
-        *Niri*) xdg-open "https://yalter.github.io/niri/" ;;
+        *Niri*) xdg-open "https://github.com/YaLTeR/niri/wiki" ;;
+        *Fedora*) xdg-open "https://docs.fedoraproject.org/" ;;
         *Neovim*) xdg-open "https://www.lazyvim.org/keymaps" ;;
         *Bash*) xdg-open "https://devhints.io/bash" ;;
         *) show_main_menu ;;
@@ -208,13 +215,50 @@ show_config_menu() {
         "󰌾  Swaylock" \
         "󰂚  Mako" \
         "󰍜  Waybar" \
-        "󰆍  Foot")
+        "󰆍  Foot" \
+        "󰊠  Ghostty" \
+        "󰆍  Alacritty")
     case "$choice" in
         *Niri*) open_in_editor ~/.config/niri/config.kdl ;;
         *Swaylock*) open_in_editor ~/.config/swaylock/config ;;
         *Mako*) open_in_editor ~/.config/mako/config ;;
         *Waybar*) open_in_editor ~/.config/waybar/config.jsonc ;;
         *Foot*) open_in_editor ~/.config/foot/foot.ini ;;
+        *Ghostty*) open_in_editor ~/.config/ghostty/config ;;
+        *Alacritty*) open_in_editor ~/.config/alacritty/alacritty.toml ;;
+        *) show_setup_menu ;;
+    esac
+}
+
+show_power_menu() {
+    local profiles current selected
+    profiles=$(nova-powerprofiles-list)
+    current=$(powerprofilesctl get 2>/dev/null)
+
+    selected=$(echo "$profiles" | fuzzel --dmenu -p "Power Profile: " -w 40 -l 5)
+
+    if [[ -n "$selected" ]]; then
+        powerprofilesctl set "$selected"
+        notify-send "Power Profile" "Set to $selected"
+    fi
+}
+
+show_restart_menu() {
+    local choice
+    choice=$(menu "Restart" \
+        "󰂚  Mako" \
+        "󰍜  Waybar" \
+        "󰝚  SwayOSD" \
+        "󰕾  Pipewire" \
+        "󰂯  Bluetooth" \
+        "󰖩  WiFi")
+    case "$choice" in
+        *Mako*) nova-restart-mako && notify-send "Mako" "Reloaded" ;;
+        *Waybar*) nova-restart-waybar && notify-send "Waybar" "Restarted" ;;
+        *SwayOSD*) nova-restart-swayosd && notify-send "SwayOSD" "Restarted" ;;
+        *Pipewire*) present_terminal nova-restart-pipewire ;;
+        *Bluetooth*) present_terminal nova-restart-bluetooth ;;
+        *WiFi*) present_terminal nova-restart-wifi ;;
         *) show_setup_menu ;;
     esac
 }
@@ -228,14 +272,18 @@ show_setup_menu() {
         "󱐋  Power Profile" \
         "󰍹  Monitors" \
         "󰌌  Keybindings" \
+        "󱔫  DNS" \
+        "󰑓  Restart" \
         "󰒓  Config")
     case "$choice" in
         *Audio*) nova-launch-audio ;;
         *Wifi*) nova-launch-wifi ;;
         *Bluetooth*) nova-launch-bluetooth ;;
-        *Power*) nova-powerprofile ;;
+        *Power*) show_power_menu ;;
         *Monitors*) open_in_editor ~/.config/niri/outputs.kdl ;;
         *Keybindings*) open_in_editor ~/.config/niri/binds.kdl ;;
+        *DNS*) present_terminal nova-setup-dns ;;
+        *Restart*) show_restart_menu ;;
         *Config*) show_config_menu ;;
         *) show_main_menu ;;
     esac
@@ -258,6 +306,158 @@ show_system_menu() {
         *Suspend*) systemctl suspend ;;
         *Restart*) nova-cmd-reboot ;;
         *Shutdown*) nova-cmd-shutdown ;;
+        *) show_main_menu ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────
+# Install Menu
+# ─────────────────────────────────────────────────────────────
+show_install_development_menu() {
+    local choice
+    choice=$(menu "Development" \
+        "󰫏  Ruby on Rails" \
+        "  Node.js" \
+        "  Bun" \
+        "  Deno" \
+        "  Go" \
+        "  Python" \
+        "  Rust" \
+        "  Java" \
+        "  .NET")
+    case "$choice" in
+        *Ruby*) present_terminal "nova-install-dev-env ruby" ;;
+        *Node*) present_terminal "nova-install-dev-env node" ;;
+        *Bun*) present_terminal "nova-install-dev-env bun" ;;
+        *Deno*) present_terminal "nova-install-dev-env deno" ;;
+        *Go*) present_terminal "nova-install-dev-env go" ;;
+        *Python*) present_terminal "nova-install-dev-env python" ;;
+        *Rust*) present_terminal "nova-install-dev-env rust" ;;
+        *Java*) present_terminal "nova-install-dev-env java" ;;
+        *NET*) present_terminal "nova-install-dev-env dotnet" ;;
+        *) show_install_menu ;;
+    esac
+}
+
+show_install_editor_menu() {
+    local choice
+    choice=$(menu "Editor" \
+        "  VSCode" \
+        "  Helix" \
+        "  Emacs")
+    case "$choice" in
+        *VSCode*) present_terminal nova-install-vscode ;;
+        *Helix*) present_terminal "sudo dnf install -y helix && notify-send 'Helix installed'" ;;
+        *Emacs*) present_terminal "sudo dnf install -y emacs && notify-send 'Emacs installed'" ;;
+        *) show_install_menu ;;
+    esac
+}
+
+show_install_terminal_menu() {
+    local choice
+    choice=$(menu "Terminal" \
+        "  Alacritty" \
+        "󰊠  Ghostty" \
+        "  Kitty" \
+        "󰆍  Foot")
+    case "$choice" in
+        *Alacritty*) present_terminal "sudo dnf install -y alacritty && notify-send 'Alacritty installed'" ;;
+        *Ghostty*) present_terminal "sudo dnf install -y ghostty && notify-send 'Ghostty installed'" ;;
+        *Kitty*) present_terminal "sudo dnf install -y kitty && notify-send 'Kitty installed'" ;;
+        *Foot*) present_terminal "sudo dnf install -y foot && notify-send 'Foot installed'" ;;
+        *) show_install_menu ;;
+    esac
+}
+
+show_install_ai_menu() {
+    local choice
+    choice=$(menu "AI" \
+        "  Dictation (Voxtype)" \
+        "󱚤  Ollama")
+    case "$choice" in
+        *Dictation*) present_terminal "bash $DOTFILES/scripts/setup-voxtype.sh" ;;
+        *Ollama*) present_terminal "curl -fsSL https://ollama.com/install.sh | sh" ;;
+        *) show_install_menu ;;
+    esac
+}
+
+show_install_service_menu() {
+    local choice
+    choice=$(menu "Service" \
+        "  Tailscale" \
+        "󰟵  Bitwarden" \
+        "  Docker")
+    case "$choice" in
+        *Tailscale*) present_terminal "sudo dnf install -y tailscale && sudo systemctl enable --now tailscaled && notify-send 'Tailscale installed'" ;;
+        *Bitwarden*) present_terminal "flatpak install -y flathub com.bitwarden.desktop && notify-send 'Bitwarden installed'" ;;
+        *Docker*) present_terminal nova-install-docker ;;
+        *) show_install_menu ;;
+    esac
+}
+
+show_install_menu() {
+    local choice
+    choice=$(menu "Install" \
+        "󰣇  Package (DNF)" \
+        "󰖟  Web App" \
+        "󰵮  Development" \
+        "  Editor" \
+        "  Terminal" \
+        "󱚤  AI" \
+        "  Service")
+    case "$choice" in
+        *Package*) present_terminal nova-pkg-install ;;
+        *Web*) present_terminal nova-webapp-install ;;
+        *Development*) show_install_development_menu ;;
+        *Editor*) show_install_editor_menu ;;
+        *Terminal*) show_install_terminal_menu ;;
+        *AI*) show_install_ai_menu ;;
+        *Service*) show_install_service_menu ;;
+        *) show_main_menu ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────
+# Remove Menu
+# ─────────────────────────────────────────────────────────────
+show_remove_development_menu() {
+    local choice
+    choice=$(menu "Remove Dev" \
+        "󰫏  Ruby" \
+        "  Node.js" \
+        "  Bun" \
+        "  Deno" \
+        "  Go" \
+        "  Python" \
+        "  Rust" \
+        "  Java" \
+        "  .NET")
+    case "$choice" in
+        *Ruby*) present_terminal "nova-remove-dev-env ruby" ;;
+        *Node*) present_terminal "nova-remove-dev-env node" ;;
+        *Bun*) present_terminal "nova-remove-dev-env bun" ;;
+        *Deno*) present_terminal "nova-remove-dev-env deno" ;;
+        *Go*) present_terminal "nova-remove-dev-env go" ;;
+        *Python*) present_terminal "nova-remove-dev-env python" ;;
+        *Rust*) present_terminal "nova-remove-dev-env rust" ;;
+        *Java*) present_terminal "nova-remove-dev-env java" ;;
+        *NET*) present_terminal "nova-remove-dev-env dotnet" ;;
+        *) show_remove_menu ;;
+    esac
+}
+
+show_remove_menu() {
+    local choice
+    choice=$(menu "Remove" \
+        "󰣇  Package (DNF)" \
+        "󰖟  Web App" \
+        "󰵮  Development" \
+        "  Dictation")
+    case "$choice" in
+        *Package*) present_terminal nova-pkg-remove ;;
+        *Web*) present_terminal nova-webapp-remove ;;
+        *Development*) show_remove_development_menu ;;
+        *Dictation*) present_terminal "bash $DOTFILES/scripts/setup-voxtype.sh --remove" ;;
         *) show_main_menu ;;
     esac
 }
@@ -291,32 +491,6 @@ show_main_menu() {
 }
 
 # ─────────────────────────────────────────────────────────────
-# Install Menu
-# ─────────────────────────────────────────────────────────────
-show_install_menu() {
-    local choice
-    choice=$(menu "Install" \
-        "󰖟  Web App")
-    case "$choice" in
-        *Web*) nova-launch-floating-terminal nova-webapp-install ;;
-        *) show_main_menu ;;
-    esac
-}
-
-# ─────────────────────────────────────────────────────────────
-# Remove Menu
-# ─────────────────────────────────────────────────────────────
-show_remove_menu() {
-    local choice
-    choice=$(menu "Remove" \
-        "󰖟  Web App")
-    case "$choice" in
-        *Web*) nova-launch-floating-terminal nova-webapp-remove ;;
-        *) show_main_menu ;;
-    esac
-}
-
-# ─────────────────────────────────────────────────────────────
 # Direct submenu access
 # ─────────────────────────────────────────────────────────────
 case "${1,,}" in
@@ -334,7 +508,14 @@ case "${1,,}" in
     background) show_background_menu ;;
     setup) show_setup_menu ;;
     config) show_config_menu ;;
+    power) show_power_menu ;;
+    restart) show_restart_menu ;;
     install) show_install_menu ;;
+    development) show_install_development_menu ;;
+    editor) show_install_editor_menu ;;
+    terminal) show_install_terminal_menu ;;
+    ai) show_install_ai_menu ;;
+    service) show_install_service_menu ;;
     remove) show_remove_menu ;;
     system) show_system_menu ;;
     *) show_main_menu ;;

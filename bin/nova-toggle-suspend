@@ -1,0 +1,17 @@
+#!/bin/bash
+# Toggle system suspend capability
+
+STATE_DIR="$HOME/.local/state/nova/toggles"
+STATE_FILE="$STATE_DIR/suspend-on"
+
+mkdir -p "$STATE_DIR"
+
+if [[ -f "$STATE_FILE" ]]; then
+    rm -f "$STATE_FILE"
+    sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+    notify-send "Suspend" "Disabled - System will not suspend"
+else
+    touch "$STATE_FILE"
+    sudo systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target
+    notify-send "Suspend" "Enabled - System can suspend"
+fi

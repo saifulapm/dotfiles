@@ -88,6 +88,9 @@ generate_theme() {
     mkdir -p "$HOME/.config/mako"
     sed -f "$sed_script" "$TEMPLATES_DIR/mako.ini.tpl" > "$HOME/.config/mako/config"
 
+    # Generate mako config to nova theme dir and symlink
+    sed -f "$sed_script" "$TEMPLATES_DIR/mako.ini.tpl" > "$HOME/.config/nova/current/theme/mako.ini"
+ 
     # Generate swaylock config
     mkdir -p "$HOME/.config/swaylock"
     sed -f "$sed_script" "$TEMPLATES_DIR/swaylock.conf.tpl" > "$HOME/.config/swaylock/config"
@@ -118,8 +121,14 @@ generate_theme() {
     # Reload mako
     makoctl reload 2>/dev/null || true
 
+    # Reload SwayOSD
+    nova-restart-swayosd 2>/dev/null || true
+
     # Set browser theme (requires restart)
     nova-theme-set-browser 2>/dev/null || true
+
+    # Run user hook
+    nova-hook theme-set "$name" 2>/dev/null || true
 
     rm "$sed_script"
 

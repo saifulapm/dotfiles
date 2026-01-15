@@ -2,6 +2,4 @@
 # Format: full package path
 # Lines starting with # are ignored
 
-# Example:
-# github.com/jesseduffield/lazygit@latest
-# github.com/charmbracelet/glow@latest
+github.com/jesseduffield/lazydocker@latest

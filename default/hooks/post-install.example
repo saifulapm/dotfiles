@@ -1,0 +1,11 @@
+#!/bin/bash
+# Example hook: Called after package installations
+# Copy this to ~/.config/nova/hooks/post-install and make executable
+
+echo "Post-install hook running..."
+
+# Example: Update font cache after installing fonts
+# fc-cache -f
+
+# Example: Restart services after installing new packages
+# systemctl --user restart waybar
