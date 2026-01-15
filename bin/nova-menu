@@ -176,7 +176,7 @@ show_style_menu() {
     local choice
     choice=$(menu "Style" \
         "󰸌  Theme" \
-        "  Font" \
+        "󰛖  Font" \
         "󰸉  Background")
     case "$choice" in
         *Theme*) show_theme_menu ;;
