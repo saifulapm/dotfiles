@@ -6,7 +6,7 @@ DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 menu() {
     local prompt="$1"
     shift
-    printf '%s\n' "$@" | fuzzel --dmenu -p "$prompt" -w 35 -l 10
+    printf '%s\n' "$@" | fuzzel --dmenu -p "$prompt: " -w 35 -l 10
 }
 
 open_in_editor() {
@@ -79,7 +79,7 @@ show_share_menu() {
         "󰈔  File" \
         "󰉋  Folder")
     case "$choice" in
-        *Clipboard*) nova-launch-floating-terminal nova-cmd-share clipboard ;;
+        *Clipboard*) nova-cmd-share clipboard ;;
         *File*) nova-launch-floating-terminal nova-cmd-share file ;;
         *Folder*) nova-launch-floating-terminal nova-cmd-share folder ;;
         *) show_trigger_menu ;;

@@ -7,12 +7,13 @@ if [[ -z "$current" ]]; then
     exit 1
 fi
 
-# Get available profiles
-profiles=$(powerprofilesctl list 2>/dev/null | grep -oP '^\s*\K\w+(?=:)')
+# Get available profiles (balanced, power-saver, performance)
+profiles=$(powerprofilesctl list 2>/dev/null | grep -E '^\*?\s+[a-z-]+:' | sed 's/[*:]//g' | awk '{print $1}')
 
 # Mark current profile
 menu_items=""
 while IFS= read -r profile; do
+    [[ -z "$profile" ]] && continue
     if [[ "$profile" == "$current" ]]; then
         menu_items+="$profile (current)\n"
     else
@@ -21,7 +22,7 @@ while IFS= read -r profile; do
 done <<< "$profiles"
 
 # Show menu
-selected=$(echo -e "$menu_items" | grep -v '^$' | fuzzel --dmenu -p "Power Profile" -w 30 -l 5)
+selected=$(echo -e "$menu_items" | grep -v '^$' | fuzzel --dmenu -p "Power Profile: " -w 30 -l 5)
 [[ -z "$selected" ]] && exit 0
 
 # Remove (current) suffix if present
