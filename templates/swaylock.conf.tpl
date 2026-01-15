@@ -1,4 +1,4 @@
-# Swaylock-effects configuration - generated from theme
+# Swaylock configuration - generated from theme
 
 # Behavior
 ignore-empty-password
@@ -9,17 +9,14 @@ indicator-caps-lock
 font=JetBrainsMono Nerd Font
 font-size=24
 
-# Indicator (centered, large like hyprlock)
+# Indicator
 indicator-radius=120
 indicator-thickness=20
 
-# Effects (blur like hyprlock)
-screenshots
-effect-blur=20x3
-effect-vignette=0.5:0.5
-fade-in=0.2
+# Image scaling
+scaling=fill
 
-# Colors from theme
+# Colors
 color={{ background_strip }}
 ring-color={{ accent_strip }}
 ring-ver-color={{ accent_strip }}
@@ -27,10 +24,10 @@ ring-wrong-color={{ color1_strip }}
 ring-clear-color={{ foreground_strip }}
 key-hl-color={{ accent_strip }}
 bs-hl-color={{ color1_strip }}
-inside-color={{ background_strip }}88
-inside-ver-color={{ background_strip }}88
-inside-wrong-color={{ background_strip }}88
-inside-clear-color={{ background_strip }}88
+inside-color={{ background_strip }}
+inside-ver-color={{ background_strip }}
+inside-wrong-color={{ background_strip }}
+inside-clear-color={{ background_strip }}
 line-color=00000000
 separator-color=00000000
 text-color={{ foreground_strip }}

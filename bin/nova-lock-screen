@@ -1,16 +1,21 @@
 #!/bin/bash
-# Lock the screen using swaylock-effects
+# Lock the screen using swaylock with theme background
 
 # Don't lock if already locked
 pidof swaylock && exit 0
 
-# Lock the screen with blur effect
-swaylock -f &
+# Get current background image
+CURRENT_BG=$(cat ~/.config/nova/current/background 2>/dev/null)
+
+# Build swaylock args
+if [[ -n "$CURRENT_BG" && -f "$CURRENT_BG" ]]; then
+    swaylock -f -i "$CURRENT_BG" &
+else
+    swaylock -f &
+fi
 
 # Lock 1password if running
-if pgrep -x "1password" >/dev/null; then
-    1password --lock 2>/dev/null &
-fi
+pgrep -x "1password" && 1password --lock 2>/dev/null &
 
 # Stop screensaver if running
 pkill -f org.nova.screensaver 2>/dev/null
