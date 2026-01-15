@@ -1,0 +1,13 @@
+#!/bin/bash
+# Lock the screen using swaylock
+
+# Lock the screen
+pidof swaylock || swaylock -f &
+
+# Ensure 1password is locked if running
+if pgrep -x "1password" >/dev/null; then
+    1password --lock 2>/dev/null &
+fi
+
+# Stop screensaver if running
+pkill -f org.nova.screensaver 2>/dev/null

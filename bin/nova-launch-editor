@@ -1,0 +1,17 @@
+#!/bin/bash
+# Launch the default editor
+# Terminal editors open in a terminal, GUI editors launch directly
+
+EDITOR="${EDITOR:-nvim}"
+
+case "$EDITOR" in
+    nvim|vim|nano|micro|hx|helix)
+        exec footclient -e "$EDITOR" "$@"
+        ;;
+    code|code-oss)
+        exec "$EDITOR" "$@" &
+        ;;
+    *)
+        exec "$EDITOR" "$@" &
+        ;;
+esac

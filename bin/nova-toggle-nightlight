@@ -1,11 +1,11 @@
 #!/bin/bash
 # Toggle night light (wlsunset)
+# Warm temperature (4000K) when enabled, kills process when disabled
 
 if pgrep -x wlsunset > /dev/null; then
-    pkill wlsunset
-    notify-send "Night Light" "Disabled"
+    pkill -x wlsunset
+    notify-send "Night Light" "Disabled - Normal screen temperature"
 else
-    # Temperature: 4000K (warm) at night
-    wlsunset -T 4000 -t 4000 &
-    notify-send "Night Light" "Enabled"
+    wlsunset -T 4000 -t 3500 &
+    notify-send "Night Light" "Enabled - Warm screen temperature"
 fi

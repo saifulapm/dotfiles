@@ -9,6 +9,11 @@ menu() {
     printf '%s\n' "$@" | fuzzel --dmenu -p "$prompt" -w 35 -l 10
 }
 
+open_in_editor() {
+    notify-send "Editing config" "$1"
+    nova-launch-editor "$1"
+}
+
 # ─────────────────────────────────────────────────────────────
 # Capture Submenu
 # ─────────────────────────────────────────────────────────────
@@ -125,13 +130,11 @@ show_learn_menu() {
     choice=$(menu "Learn" \
         "󰌌  Keybindings" \
         "󰖟  Niri Docs" \
-        "󰣇  Arch Wiki" \
         "󰅩  Neovim" \
         "󱆃  Bash")
     case "$choice" in
         *Keybindings*) nova-menu-keybindings ;;
         *Niri*) xdg-open "https://yalter.github.io/niri/" ;;
-        *Arch*) xdg-open "https://wiki.archlinux.org/" ;;
         *Neovim*) xdg-open "https://www.lazyvim.org/keymaps" ;;
         *Bash*) xdg-open "https://devhints.io/bash" ;;
         *) show_main_menu ;;
@@ -189,17 +192,15 @@ show_config_menu() {
     choice=$(menu "Config" \
         "󱂀  Niri" \
         "󰌾  Swaylock" \
-        "󰒲  Swayidle" \
         "󰂚  Mako" \
         "󰍜  Waybar" \
         "󰆍  Foot")
     case "$choice" in
-        *Niri*) $EDITOR "$DOTFILES/config/niri/config.kdl" ;;
-        *Swaylock*) $EDITOR "$DOTFILES/config/swaylock/config" 2>/dev/null || $EDITOR "$HOME/.config/swaylock/config" ;;
-        *Swayidle*) $EDITOR "$DOTFILES/config/swayidle/config" 2>/dev/null || notify-send "Swayidle" "Edit via toggle script" ;;
-        *Mako*) $EDITOR "$DOTFILES/config/mako/config" ;;
-        *Waybar*) $EDITOR "$DOTFILES/config/waybar/config.jsonc" ;;
-        *Foot*) $EDITOR "$DOTFILES/config/foot/foot.ini" ;;
+        *Niri*) open_in_editor ~/.config/niri/config.kdl ;;
+        *Swaylock*) open_in_editor ~/.config/swaylock/config ;;
+        *Mako*) open_in_editor ~/.config/mako/config ;;
+        *Waybar*) open_in_editor ~/.config/waybar/config.jsonc ;;
+        *Foot*) open_in_editor ~/.config/foot/foot.ini ;;
         *) show_setup_menu ;;
     esac
 }
@@ -219,8 +220,8 @@ show_setup_menu() {
         *Wifi*) nova-launch-wifi ;;
         *Bluetooth*) nova-launch-bluetooth ;;
         *Power*) nova-powerprofile ;;
-        *Monitors*) $EDITOR "$DOTFILES/config/niri/outputs.kdl" ;;
-        *Keybindings*) $EDITOR "$DOTFILES/config/niri/binds.kdl" ;;
+        *Monitors*) open_in_editor ~/.config/niri/outputs.kdl ;;
+        *Keybindings*) open_in_editor ~/.config/niri/binds.kdl ;;
         *Config*) show_config_menu ;;
         *) show_main_menu ;;
     esac
@@ -230,10 +231,7 @@ show_setup_menu() {
 # System Menu
 # ─────────────────────────────────────────────────────────────
 show_system_menu() {
-    local options="󰌾  Lock\n󱄄  Screensaver"
-
-    # Add suspend option
-    options="$options\n󰒲  Suspend"
+    local options="󰌾  Lock\n󱄄  Screensaver\n󰒲  Suspend"
 
     # Check if hibernate is available
     if grep -q disk /sys/power/state 2>/dev/null; then
@@ -245,12 +243,12 @@ show_system_menu() {
     local choice
     choice=$(printf "$options" | fuzzel --dmenu -p "System" -w 35 -l 8)
     case "$choice" in
-        *Lock*) swaylock ;;
+        *Lock*) nova-lock-screen ;;
         *Screensaver*) nova-launch-screensaver ;;
         *Suspend*) systemctl suspend ;;
         *Hibernate*) systemctl hibernate ;;
-        *Restart*) systemctl reboot ;;
-        *Shutdown*) systemctl poweroff ;;
+        *Restart*) nova-cmd-reboot ;;
+        *Shutdown*) nova-cmd-shutdown ;;
         *) show_main_menu ;;
     esac
 }

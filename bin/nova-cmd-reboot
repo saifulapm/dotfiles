@@ -1,0 +1,9 @@
+#!/bin/bash
+# Reboot command that closes all windows first (allows apps to save state)
+
+# Schedule the reboot after closing windows
+nohup bash -c "sleep 2 && systemctl reboot" >/dev/null 2>&1 &
+
+# Close all windows via niri
+niri msg action close-window 2>/dev/null
+sleep 1
