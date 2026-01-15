@@ -1,4 +1,17 @@
-# Swaylock theme colors - generated from theme
+# Swaylock configuration - generated from theme
+
+# Appearance
+ignore-empty-password
+show-failed-attempts
+indicator-caps-lock
+
+# Font
+font=JetBrainsMono Nerd Font
+font-size=24
+
+# Indicator
+indicator-radius=120
+indicator-thickness=20
 
 # Background
 color={{ background_strip }}
