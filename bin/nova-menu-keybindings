@@ -84,7 +84,7 @@ execute_action() {
 if [[ "$1" == "--print" || "$1" == "-p" ]]; then
     parse_bindings
 else
-    selected=$(parse_bindings | fuzzel --dmenu -p "Keybindings" -w 70 -l 20)
+    selected=$(parse_bindings | fuzzel --dmenu -p "Keybinding: Search" -w 70 -l 20)
 
     if [[ -n "$selected" ]]; then
         # Look up action from temp file
