@@ -89,13 +89,14 @@ fi
 # Setup user config (runs as the actual user, not root)
 ACTUAL_USER="${SUDO_USER:-$USER}"
 ACTUAL_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
+ACTUAL_DOTFILES="$ACTUAL_HOME/.dotfiles"
 
 info "Setting up browser config for $ACTUAL_USER..."
 
 # Link chromium flags
-sudo -u "$ACTUAL_USER" ln -sf "$DOTFILES/config/chromium-flags.conf" "$ACTUAL_HOME/.config/chromium-flags.conf"
+sudo -u "$ACTUAL_USER" ln -sf "$ACTUAL_DOTFILES/config/chromium-flags.conf" "$ACTUAL_HOME/.config/chromium-flags.conf"
 
 success "Setup complete!"
 echo ""
-echo "Extension loaded from: $DOTFILES/default/chromium/extensions/copy-url"
+echo "Extension loaded from: $ACTUAL_DOTFILES/default/chromium/extensions/copy-url"
 echo "Theme will apply automatically when you change themes."
