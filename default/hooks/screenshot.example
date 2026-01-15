@@ -1,0 +1,13 @@
+#!/bin/bash
+# Hook: screenshot
+# Called after screenshot is saved
+# Arguments: $1 = screenshot file path
+
+FILE="$1"
+echo "Screenshot saved: $FILE"
+
+# Example: Upload to cloud storage
+# rclone copy "$FILE" remote:screenshots/
+
+# Example: Open in image editor
+# gimp "$FILE" &

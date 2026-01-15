@@ -1,36 +1,67 @@
 #!/bin/bash
-# Run a named hook from ~/.config/nova/hooks/
+# Nova Hook System - Execute user-defined hooks for various events
 #
-# Available hooks:
-#   theme-set    - Called after theme is changed (receives theme name as arg)
-#   post-update  - Called after system updates
-#   post-install - Called after package installations
-#
-# Example: Create ~/.config/nova/hooks/theme-set with:
-#   #!/bin/bash
-#   echo "Theme changed to: $1"
+# Hooks are stored in ~/.config/nova/hooks/
+# Each hook is a bash script that receives event-specific arguments
 
-set -e
+HOOKS_DIR="$HOME/.config/nova/hooks"
 
-if [[ $# -lt 1 ]]; then
-    echo "Usage: nova-hook <hook-name> [args...]"
-    echo ""
-    echo "Available hooks:"
-    echo "  theme-set    - After theme change (arg: theme name)"
-    echo "  post-update  - After system updates"
-    echo "  post-install - After package installations"
-    echo ""
-    echo "Hooks directory: ~/.config/nova/hooks/"
-    exit 1
-fi
+show_help() {
+    cat << 'EOF'
+Usage: nova-hook <command> [args...]
 
-HOOK_NAME="$1"
-HOOK_PATH="$HOME/.config/nova/hooks/$HOOK_NAME"
-shift
+Commands:
+    <hook-name> [args]   Run a hook with optional arguments
+    list                 List all available hooks
+    help                 Show this help message
 
-# Create hooks directory if it doesn't exist
-mkdir -p "$HOME/.config/nova/hooks"
+Available Hooks:
+    theme-set <name>     After theme change
+    font-set <name>      After font change
+    screenshot <file>    After screenshot saved
+    pkg-install <pkg>    After package installed
 
-if [[ -f "$HOOK_PATH" && -x "$HOOK_PATH" ]]; then
-    bash "$HOOK_PATH" "$@"
-fi
+Hooks Directory: ~/.config/nova/hooks/
+
+Examples:
+    nova-hook theme-set catppuccin
+    nova-hook list
+EOF
+}
+
+list_hooks() {
+    echo "Installed hooks:"
+    if [[ -d "$HOOKS_DIR" ]] && [[ -n "$(ls -A "$HOOKS_DIR" 2>/dev/null)" ]]; then
+        for hook in "$HOOKS_DIR"/*; do
+            [[ -x "$hook" ]] && echo "  ✓ $(basename "$hook")" || echo "  ○ $(basename "$hook") (not executable)"
+        done
+    else
+        echo "  (none)"
+    fi
+}
+
+run_hook() {
+    local hook_name="$1"
+    shift
+    local hook_path="$HOOKS_DIR/$hook_name"
+
+    mkdir -p "$HOOKS_DIR"
+
+    if [[ ! -f "$hook_path" ]]; then
+        return 0  # Silent skip if hook doesn't exist
+    fi
+
+    if [[ ! -x "$hook_path" ]]; then
+        echo "Warning: Hook '$hook_name' exists but is not executable" >&2
+        return 0
+    fi
+
+    bash "$hook_path" "$@"
+}
+
+case "${1:-}" in
+    -h|--help|help) show_help ;;
+    list) list_hooks ;;
+    "") show_help; exit 1 ;;
+    *) run_hook "$@" ;;
+esac

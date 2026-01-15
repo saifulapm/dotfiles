@@ -1,0 +1,10 @@
+#!/bin/bash
+# Hook: pkg-install
+# Called after a package is installed
+# Arguments: $1 = package name
+
+PKG="$1"
+echo "Package installed: $PKG"
+
+# Example: Update font cache if font package
+# [[ "$PKG" == *font* ]] && fc-cache -f

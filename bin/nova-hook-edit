@@ -1,47 +1,62 @@
 #!/bin/bash
-# Edit or create a hook
+# Create or edit Nova hooks
 
 HOOKS_DIR="$HOME/.config/nova/hooks"
-EXAMPLES_DIR="$HOME/.dotfiles/default/hooks"
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+EXAMPLES_DIR="$DOTFILES/default/hooks"
 
-mkdir -p "$HOOKS_DIR"
+show_help() {
+    cat << 'EOF'
+Usage: nova-hook-edit <hook-name>
 
-if [[ $# -lt 1 ]]; then
-    echo "Usage: nova-hook-edit <hook-name>"
-    echo ""
-    echo "Available hooks:"
-    echo "  theme-set    - Called after theme change"
-    echo "  post-install - Called after installations"
-    echo "  post-update  - Called after updates"
-    echo ""
-    echo "Existing hooks:"
-    ls -1 "$HOOKS_DIR" 2>/dev/null || echo "  (none)"
-    exit 1
-fi
+Creates a new hook from template or opens existing hook in editor.
 
-HOOK_NAME="$1"
-HOOK_PATH="$HOOKS_DIR/$HOOK_NAME"
+Available hook templates:
+    theme-set      After theme changes
+    font-set       After font changes
+    screenshot     After screenshot taken
+    pkg-install    After package installed
 
-# If hook doesn't exist, copy from example if available
-if [[ ! -f "$HOOK_PATH" ]]; then
-    if [[ -f "$EXAMPLES_DIR/${HOOK_NAME}.example" ]]; then
-        cp "$EXAMPLES_DIR/${HOOK_NAME}.example" "$HOOK_PATH"
-        chmod +x "$HOOK_PATH"
-        echo "Created new hook from template: $HOOK_PATH"
-    else
-        # Create basic hook
-        cat > "$HOOK_PATH" << 'EOF'
-#!/bin/bash
-# Hook: HOOK_NAME
-# Arguments available: $@
-
-echo "Hook running with args: $@"
+Examples:
+    nova-hook-edit theme-set
+    nova-hook-edit my-custom-hook
 EOF
-        sed -i "s/HOOK_NAME/$HOOK_NAME/" "$HOOK_PATH"
-        chmod +x "$HOOK_PATH"
-        echo "Created new hook: $HOOK_PATH"
-    fi
-fi
 
-# Open in editor
-"${EDITOR:-nvim}" "$HOOK_PATH"
+    echo ""
+    echo "Existing hooks in $HOOKS_DIR:"
+    ls -1 "$HOOKS_DIR" 2>/dev/null || echo "  (none)"
+}
+
+create_hook() {
+    local hook_name="$1"
+    local hook_path="$HOOKS_DIR/$hook_name"
+
+    mkdir -p "$HOOKS_DIR"
+
+    # If hook doesn't exist, create from template or default
+    if [[ ! -f "$hook_path" ]]; then
+        if [[ -f "$EXAMPLES_DIR/${hook_name}.example" ]]; then
+            cp "$EXAMPLES_DIR/${hook_name}.example" "$hook_path"
+            echo "Created from template: $hook_path"
+        else
+            cat > "$hook_path" << EOF
+#!/bin/bash
+# Hook: $hook_name
+# Arguments: \$@
+
+# Your code here
+echo "Hook '$hook_name' executed with args: \$@"
+EOF
+            echo "Created new hook: $hook_path"
+        fi
+        chmod +x "$hook_path"
+    fi
+
+    # Open in editor
+    "${EDITOR:-${VISUAL:-nano}}" "$hook_path"
+}
+
+case "${1:-}" in
+    -h|--help|"") show_help ;;
+    *) create_hook "$1" ;;
+esac

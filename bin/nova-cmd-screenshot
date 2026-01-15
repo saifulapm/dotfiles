@@ -35,6 +35,8 @@ case "$MODE" in
             --early-exit \
             --save-after-copy \
             --copy-command 'wl-copy'
+        # Run user hook
+        [[ -f "$FILENAME" ]] && nova-hook screenshot "$FILENAME" 2>/dev/null || true
         ;;
     *)
         echo "Usage: nova-cmd-screenshot [interactive|screen|window|region|region-edit]"
