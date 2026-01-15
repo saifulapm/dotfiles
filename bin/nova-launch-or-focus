@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Launch or focus application by window pattern (niri version)
+
+if (($# < 2)); then
+    echo "Usage: nova-launch-or-focus [window-pattern] [launch-command]"
+    exit 1
+fi
+
+PATTERN="$1"
+shift
+
+# Check if window exists by title
+if niri msg windows 2>/dev/null | grep -qi "$PATTERN"; then
+    niri msg action focus-window
+else
+    exec $@
+fi

@@ -123,3 +123,9 @@ power-profiles-daemon
 
 # LocalSend dependency (ARM64 only)
 libayatana-appindicator-gtk3
+
+# Interactive prompts (for webapp install/remove)
+gum
+
+# Wayland session manager (for webapp launching)
+uwsm
