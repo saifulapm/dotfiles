@@ -1,5 +1,5 @@
 # Flatpak packages to install
 # Lines starting with # are ignored
 
-# Note: LocalSend uses native binary for headless CLI support
-# Install with: ./scripts/install-localsend.sh
+# File sharing
+org.localsend.localsend_app

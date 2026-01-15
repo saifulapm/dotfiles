@@ -120,6 +120,3 @@ swayidle
 
 # Power management
 power-profiles-daemon
-
-# LocalSend dependency
-libayatana-appindicator-gtk3
