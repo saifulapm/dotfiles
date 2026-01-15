@@ -11,29 +11,15 @@ FLUTTER_VERSION="3.25.0"
 echo "=== LocalSend Build Script ==="
 echo ""
 
-# Check dependencies
-check_deps() {
-    local missing=()
+# Install dependencies
+install_deps() {
+    local packages=(
+        git curl clang cmake ninja-build pkg-config
+        gtk3-devel libayatana-appindicator-gtk3-devel
+    )
 
-    # Check for required system packages
-    for pkg in git curl clang cmake ninja-build pkg-config; do
-        if ! command -v $pkg &>/dev/null; then
-            missing+=($pkg)
-        fi
-    done
-
-    # Check for GTK development files
-    if ! pkg-config --exists gtk+-3.0 2>/dev/null; then
-        missing+=("gtk3-devel")
-    fi
-
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        echo "Missing dependencies: ${missing[*]}"
-        echo ""
-        echo "Install with:"
-        echo "  sudo dnf install ${missing[*]} gtk3-devel libayatana-appindicator-gtk3-devel"
-        exit 1
-    fi
+    echo "Installing build dependencies..."
+    sudo dnf install -y "${packages[@]}"
 }
 
 # Install Flutter
@@ -150,8 +136,7 @@ EOF
 }
 
 # Main
-echo "Checking dependencies..."
-check_deps
+install_deps
 
 echo ""
 install_flutter
