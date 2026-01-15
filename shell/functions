@@ -85,10 +85,18 @@ iso2sd() {
         echo "Example: iso2sd ~/Downloads/fedora.iso /dev/sda"
         echo -e "\nAvailable drives:"
         lsblk -d -o NAME,SIZE,TYPE | grep disk
-    else
-        sudo dd bs=4M status=progress oflag=sync if="$1" of="$2"
-        sudo eject "$2"
+        return 1
     fi
+    if [[ ! -f "$1" ]]; then
+        echo "Error: Input file '$1' not found"
+        return 1
+    fi
+    if [[ ! -b "$2" ]]; then
+        echo "Error: '$2' is not a valid block device"
+        return 1
+    fi
+    sudo dd bs=4M status=progress oflag=sync if="$1" of="$2"
+    sudo eject "$2"
 }
 
 # Format drive as exFAT
@@ -98,20 +106,24 @@ format-drive() {
         echo "Example: format-drive /dev/sda 'My Stuff'"
         echo -e "\nAvailable drives:"
         lsblk -d -o NAME -n | awk '{print "/dev/"$1}'
-    else
-        echo "WARNING: This will completely erase all data on $1 and label it '$2'."
-        read -rp "Are you sure you want to continue? (y/N): " confirm
-        if [[ "$confirm" =~ ^[Yy]$ ]]; then
-            sudo wipefs -a "$1"
-            sudo dd if=/dev/zero of="$1" bs=1M count=100 status=progress
-            sudo parted -s "$1" mklabel gpt
-            sudo parted -s "$1" mkpart primary 1MiB 100%
-            partition="$([[ $1 == *"nvme"* ]] && echo "${1}p1" || echo "${1}1")"
-            sudo partprobe "$1" || true
-            sudo udevadm settle || true
-            sudo mkfs.exfat -n "$2" "$partition"
-            echo "Drive $1 formatted as exFAT and labeled '$2'."
-        fi
+        return 1
+    fi
+    if [[ ! -b "$1" ]]; then
+        echo "Error: '$1' is not a valid block device"
+        return 1
+    fi
+    echo "WARNING: This will completely erase all data on $1 and label it '$2'."
+    read -t 30 -rp "Are you sure you want to continue? (y/N): " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        sudo wipefs -a "$1"
+        sudo dd if=/dev/zero of="$1" bs=1M count=100 status=progress
+        sudo parted -s "$1" mklabel gpt
+        sudo parted -s "$1" mkpart primary 1MiB 100%
+        partition="$([[ $1 == *"nvme"* ]] && echo "${1}p1" || echo "${1}1")"
+        sudo partprobe "$1" || true
+        sudo udevadm settle || true
+        sudo mkfs.exfat -n "$2" "$partition"
+        echo "Drive $1 formatted as exFAT and labeled '$2'."
     fi
 }
 
@@ -167,4 +179,22 @@ killp() {
 # Weather
 weather() {
     curl -s "wttr.in/${1:-}"
+}
+
+# ─────────────────────────────────────────────────────────────
+# Utilities
+# ─────────────────────────────────────────────────────────────
+
+# Open files with default application
+open() {
+    xdg-open "$@" >/dev/null 2>&1 &
+}
+
+# Open nvim (current dir if no args)
+n() {
+    if [[ $# -eq 0 ]]; then
+        nvim .
+    else
+        nvim "$@"
+    fi
 }

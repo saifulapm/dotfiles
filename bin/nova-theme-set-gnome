@@ -8,7 +8,7 @@ THEME_NAME="$1"
 
 # If no theme name provided, try to get current theme
 if [[ -z "$THEME_NAME" ]]; then
-    THEME_FILE="$HOME/.config/dotfiles/theme"
+    THEME_FILE="$HOME/.config/nova/current/theme.name"
     if [[ -f "$THEME_FILE" ]]; then
         THEME_NAME="$(<$THEME_FILE)"
     fi

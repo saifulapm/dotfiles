@@ -5,7 +5,7 @@
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 THEMES_DIR="$DOTFILES/themes"
 TEMPLATES_DIR="$DOTFILES/templates"
-THEME_FILE="$HOME/.config/dotfiles/theme"
+THEME_FILE="$HOME/.config/nova/current/theme.name"
 
 # Convert hex to RGB (e.g., "#1e1e2e" -> "30,30,46")
 hex_to_rgb() {
@@ -63,8 +63,8 @@ generate_theme() {
     sed -f "$sed_script" "$TEMPLATES_DIR/fzf.sh.tpl" > "$DOTFILES/shell/theme"
 
     # Generate ghostty theme
-    mkdir -p "$HOME/.config/dotfiles"
-    sed -f "$sed_script" "$TEMPLATES_DIR/ghostty.conf.tpl" > "$HOME/.config/dotfiles/ghostty-theme.conf"
+    mkdir -p "$HOME/.config/nova/current/theme"
+    sed -f "$sed_script" "$TEMPLATES_DIR/ghostty.conf.tpl" > "$HOME/.config/nova/current/theme/ghostty.conf"
 
     # Generate niri colors
     mkdir -p "$HOME/.config/niri"

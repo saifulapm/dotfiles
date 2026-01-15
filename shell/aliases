@@ -7,8 +7,8 @@ if command -v eza &>/dev/null; then
     alias lt='eza --tree --level=2 --long --icons --git'
     alias lta='lt -a'
 else
-    alias ls='ls --color=auto -lh'
-    alias la='ls -a'
+    alias ls='command ls --color=auto -lh'
+    alias la='command ls -a --color=auto -lh'
 fi
 
 alias ff="fzf --preview 'bat --style=numbers --color=always {}'"
@@ -17,11 +17,6 @@ alias ff="fzf --preview 'bat --style=numbers --color=always {}'"
 if command -v zoxide &>/dev/null; then
     alias cd="z"
 fi
-
-# Open files with default application
-open() {
-    xdg-open "$@" >/dev/null 2>&1 &
-}
 
 # ─────────────────────────────────────────────────────────────
 # Navigation
@@ -34,7 +29,6 @@ alias ~='cd ~'
 # ─────────────────────────────────────────────────────────────
 # Tools
 # ─────────────────────────────────────────────────────────────
-n() { if [[ $# -eq 0 ]]; then nvim .; else nvim "$@"; fi; }
 alias v='nvim'
 alias cl='clear'
 alias opc='opencode'

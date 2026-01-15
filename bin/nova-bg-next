@@ -2,7 +2,7 @@
 # Cycle through background images for current theme
 
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
-THEME_FILE="$HOME/.config/dotfiles/theme"
+THEME_FILE="$HOME/.config/nova/current/theme.name"
 THEME_NAME=$(cat "$THEME_FILE" 2>/dev/null || echo "catppuccin")
 
 THEME_BACKGROUNDS_PATH="$DOTFILES/themes/$THEME_NAME/backgrounds/"

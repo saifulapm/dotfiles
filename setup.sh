@@ -45,6 +45,15 @@ is_linked() {
     [[ -L "$link" && "$(readlink "$link")" == "$target" ]]
 }
 
+# Backup existing file/dir before removing (if not a symlink)
+backup_and_remove() {
+    local path="$1"
+    if [[ -e "$path" && ! -L "$path" ]]; then
+        mv "$path" "$path.backup.$(date +%s)"
+    fi
+    rm -rf "$path"
+}
+
 # Banner
 echo ""
 gum style --border rounded --padding "0 2" --border-foreground 14 --bold "Fedora Asahi Setup"
@@ -260,7 +269,7 @@ if [[ -d "$DOTFILES/config" ]]; then
         name=$(basename "$item")
         [[ "$name" == "home" || "$name" == "systemd" ]] && continue
         if ! is_linked "$item" "$HOME/.config/$name"; then
-            rm -rf "$HOME/.config/$name"
+            backup_and_remove "$HOME/.config/$name"
             ln -sf "$item" "$HOME/.config/$name"
             ((linked++))
         else
@@ -284,7 +293,7 @@ if [[ -d "$DOTFILES/config/home" ]]; then
         for item in "${home_files[@]}"; do
             name=$(basename "$item")
             if ! is_linked "$item" "$HOME/$name"; then
-                rm -rf "$HOME/$name"
+                backup_and_remove "$HOME/$name"
                 ln -sf "$item" "$HOME/$name"
                 ((linked++))
             else
@@ -311,7 +320,7 @@ if [[ -f "$DOTFILES/symlinks.list" ]]; then
             if [[ -e "$src_path" ]]; then
                 if ! is_linked "$src_path" "$dest_path"; then
                     mkdir -p "$(dirname "$dest_path")"
-                    rm -rf "$dest_path"
+                    backup_and_remove "$dest_path"
                     ln -sf "$src_path" "$dest_path"
                     ((linked++))
                 else
@@ -377,11 +386,11 @@ fi
 if [[ -x "$DOTFILES/bin/theme" ]]; then
     header "Theme Setup"
     # Apply default theme if not set
-    if [[ ! -f "$HOME/.config/dotfiles/theme" ]]; then
+    if [[ ! -f "$HOME/.config/nova/current/theme.name" ]]; then
         spin "  Applying catppuccin theme" "$DOTFILES/bin/theme" set catppuccin
         done_msg "Default theme applied"
     else
-        current_theme=$(cat "$HOME/.config/dotfiles/theme")
+        current_theme=$(cat "$HOME/.config/nova/current/theme.name")
         skip_msg "Theme already set: $current_theme"
     fi
 fi
