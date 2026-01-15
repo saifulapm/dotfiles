@@ -31,12 +31,20 @@ else
     fi
 fi
 
-# Launch LocalSend with file (opens GUI with file ready to send)
+# Launch LocalSend (uses native binary, falls back to flatpak)
+run_localsend() {
+    if command -v localsend &>/dev/null; then
+        localsend "$@" &
+    else
+        flatpak run org.localsend.localsend_app "$@" &
+    fi
+}
+
 if echo "$FILES" | grep -q $'\n'; then
     readarray -t FILE_ARRAY <<< "$FILES"
-    flatpak run org.localsend.localsend_app "${FILE_ARRAY[@]}" &
+    run_localsend "${FILE_ARRAY[@]}"
 else
-    flatpak run org.localsend.localsend_app "$FILES" &
+    run_localsend "$FILES"
 fi
 
 exit 0
