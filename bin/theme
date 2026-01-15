@@ -114,6 +114,9 @@ generate_theme() {
     # Reload mako
     makoctl reload 2>/dev/null || true
 
+    # Set browser theme (requires restart)
+    nova-theme-set-browser 2>/dev/null || true
+
     rm "$sed_script"
 
     echo "Theme applied: $name"

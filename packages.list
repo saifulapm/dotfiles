@@ -55,6 +55,9 @@ foot
 ghostty
 alacritty
 
+# Browser
+chromium
+
 # App launcher
 fuzzel
 cliphist
