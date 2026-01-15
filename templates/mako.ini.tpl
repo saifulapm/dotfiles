@@ -1,4 +1,4 @@
-include=~/.dotfiles/config/mako/config
+include=~/.dotfiles/default/mako/core.ini
 
 text-color={{ foreground }}
 border-color={{ accent }}
