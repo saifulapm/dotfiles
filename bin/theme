@@ -92,6 +92,11 @@ generate_theme() {
     sed -f "$sed_script" "$TEMPLATES_DIR/mako.ini.tpl" > "$HOME/.config/nova/current/theme/mako.ini"
     mkdir -p ~/.config/mako
     ln -snf ~/.config/nova/current/theme/mako.ini ~/.config/mako/config
+
+    # Generate lazygit config to nova theme dir and symlink
+    sed -f "$sed_script" "$TEMPLATES_DIR/lazygit.yml.tpl" > "$HOME/.config/nova/current/theme/lazygit.yml"
+    mkdir -p ~/.config/lazygit
+    ln -snf ~/.config/nova/current/theme/lazygit.yml ~/.config/lazygit/config.yml
  
     # Generate swaylock config
     mkdir -p "$HOME/.config/swaylock"

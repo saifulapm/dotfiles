@@ -26,6 +26,7 @@ zoxide
 starship
 ImageMagick
 lazygit
+git-delta
 
 # Runtime manager
 mise
