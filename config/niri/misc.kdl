@@ -3,6 +3,7 @@
 // Spawn processes at startup (mako, swayidle managed by systemd)
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 spawn-at-startup "swayosd-server"
+spawn-at-startup "fcitx5"
 
 hotkey-overlay {
     // skip-at-startup

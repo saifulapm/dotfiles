@@ -120,6 +120,8 @@ google-noto-sans-fonts
 google-noto-serif-fonts
 google-noto-emoji-fonts
 google-noto-sans-cjk-fonts
+google-noto-sans-bengali-fonts
+google-noto-serif-bengali-fonts
 
 # Screenshot tools
 grim
@@ -139,6 +141,12 @@ power-profiles-daemon
 
 # LocalSend dependency (ARM64 only)
 libayatana-appindicator-gtk3
+
+# Input method (Bangla support)
+fcitx5
+fcitx5-gtk
+fcitx5-qt
+fcitx5-m17n
 
 # Interactive prompts (for webapp install/remove)
 gum
