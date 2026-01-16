@@ -1,0 +1,53 @@
+[mgr]
+show_hidden = false
+sort_by = "mtime"
+ratio = [2, 3, 3]
+linemode = "size_and_mtime"
+
+[preview]
+wrap = "no"
+max_width  = 2000
+max_height = 2000
+
+[opener]
+play = [
+	{ run = 'mpv "$@"', orphan = true, for = "unix" },
+]
+edit = [
+	{ run = '$EDITOR "$@"', block = true, for = "unix" },
+]
+open = [
+	{ run = 'xdg-open "$@"', desc = "Open" },
+]
+add-sub = [
+  { run  = ''' echo sub-add "'$0'" | socat - /tmp/mpv.sock ''', desc = "Add sub to MPV" },
+]
+extract = [
+	{ run = 'ouch decompress "$@"', desc = "Extract here", block = true },
+]
+
+[open]
+rules = [
+	# Archives - extract with enter
+	{ mime = "application/zip", use = "extract" },
+	{ mime = "application/x-tar", use = "extract" },
+	{ mime = "application/x-bzip*", use = "extract" },
+	{ mime = "application/x-7z-compressed", use = "extract" },
+	{ mime = "application/x-xz", use = "extract" },
+	{ mime = "application/x-rar", use = "extract" },
+	{ mime = "application/gzip", use = "extract" },
+
+	{ mime = "text/*", use = "edit" },
+	{ mime = "video/*", use = "play" },
+  { mime = "audio/*", use = "play" },
+  { mime = "image/*", use = "open" },
+
+	# { mime = "application/json", use = "edit" },
+	{ name = "*.json", use = "edit" },
+	{ name = "*.js", use = "edit" },
+	{ name = "*.ts", use = "edit" },
+
+	# Multiple openers for a single rule
+	{ name = "*.html", use = [ "open", "edit" ] },
+	{ name = "*.{ass,srt,ssa,sty,sup,vtt}", use = [ "add-sub", "edit" ] },
+]

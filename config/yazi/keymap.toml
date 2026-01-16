@@ -1,0 +1,69 @@
+[[mgr.prepend_keymap]]
+on   = "!"
+run  = 'shell "$SHELL" --block'
+desc = "Open shell here"
+
+[[input.prepend_keymap]]
+on   = "<Esc>"
+run  = "close"
+desc = "Cancel input"
+
+[[mgr.prepend_keymap]]
+on   = "l"
+run  = "plugin smart-enter"
+desc = "Enter the child directory, or open the file"
+
+[[mgr.prepend_keymap]]
+on   = "p"
+run  = "plugin smart-paste"
+desc = "Paste into the hovered directory or CWD"
+
+[[mgr.prepend_keymap]]
+on   = "t"
+run  = "plugin smart-tab"
+desc = "Create a tab and enter the hovered directory"
+
+[[mgr.prepend_keymap]]
+on   = "2"
+run  = "plugin smart-switch 1"
+desc = "Switch or create tab 2"
+
+[[mgr.prepend_keymap]]
+on = [ "g", "r" ]
+run = 'shell -- ya emit cd "$(git rev-parse --show-toplevel)"'
+desc = "Go to the root of the repository"
+
+# [[manager.prepend_keymap]]
+# on  = "y"
+# run = [ 'shell -- for path in "$@"; do echo "file://$path"; done | wl-copy -t text/uri-list', "yank" ]
+# desc = "Copy the paths to the clipboard"
+
+[[mgr.prepend_keymap]]
+on   = "T"
+run  = "plugin toggle-pane min-preview"
+desc = "Show or hide the preview pane"
+
+[[mgr.prepend_keymap]]
+on  = "k"
+run = "plugin arrow -1"
+
+[[mgr.prepend_keymap]]
+on  = "j"
+run = "plugin arrow 1"
+
+[[mgr.prepend_keymap]]
+on  = "K"
+run = "plugin parent-arrow -1"
+
+[[mgr.prepend_keymap]]
+on  = "J"
+run = "plugin parent-arrow 1"
+
+[[mgr.prepend_keymap]]
+on   = "e"
+run  = 'shell "ouch decompress \"$@\"" --confirm'
+desc = "Extract archive"
+
+# [[manager.prepend_keymap]]
+# on  = "q"
+# run = "plugin confirm-quit"

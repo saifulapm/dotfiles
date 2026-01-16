@@ -1,7 +1,7 @@
 #!/bin/bash
 # Setup GNOME/GTK initial configuration
 # - Sets default GTK theme and color scheme
-# - Fixes Nautilus icon compatibility with Yaru theme
+# - Fixes Yaru icon theme inheritance for Fedora
 # - Updates icon caches
 
 set -e
@@ -35,24 +35,6 @@ if [[ -d "/usr/share/icons/Yaru" ]]; then
     if grep -q ",Humanity," /usr/share/icons/Yaru*/index.theme 2>/dev/null; then
         echo "  Fixing Yaru icon theme inheritance (Humanity -> Adwaita)..."
         sudo sed -i 's/,Humanity,/,Adwaita,/g' /usr/share/icons/Yaru*/index.theme
-    fi
-fi
-
-# ─────────────────────────────────────────────────────────────
-# Create Nautilus navigation icon symlinks
-# ─────────────────────────────────────────────────────────────
-# Yaru icons don't include go-previous/go-next, causing blank
-# navigation buttons in Nautilus. Symlink from Adwaita icons.
-if [[ -d "/usr/share/icons/Yaru/scalable/actions" ]]; then
-    ADWAITA_ACTIONS="/usr/share/icons/Adwaita/symbolic/actions"
-    YARU_ACTIONS="/usr/share/icons/Yaru/scalable/actions"
-
-    if [[ -f "$ADWAITA_ACTIONS/go-previous-symbolic.svg" ]]; then
-        if [[ ! -L "$YARU_ACTIONS/go-previous-symbolic.svg" ]]; then
-            echo "  Creating Nautilus navigation icon symlinks..."
-            sudo ln -snf "$ADWAITA_ACTIONS/go-previous-symbolic.svg" "$YARU_ACTIONS/go-previous-symbolic.svg"
-            sudo ln -snf "$ADWAITA_ACTIONS/go-next-symbolic.svg" "$YARU_ACTIONS/go-next-symbolic.svg"
-        fi
     fi
 fi
 

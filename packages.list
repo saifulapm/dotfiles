@@ -86,10 +86,9 @@ swaybg
 wtype
 wl-clipboard
 
-# File manager
-nautilus
-sushi
+# File manager (yazi dependencies)
 ffmpegthumbnailer
+poppler-utils
 gvfs-mtp
 gvfs-nfs
 gvfs-smb

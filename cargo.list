@@ -7,3 +7,7 @@ eza
 # TUI apps for waybar
 impala
 bluetui
+
+# File manager
+yazi-fm
+ouch
