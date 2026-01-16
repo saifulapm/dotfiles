@@ -53,6 +53,14 @@ cargo_bin_name() {
     esac
 }
 
+# Get cargo install command for package (some need git install)
+cargo_install_cmd() {
+    case "$1" in
+        yazi-fm) echo "cargo install --locked --git https://github.com/sxyazi/yazi.git yazi-fm" ;;
+        *) echo "cargo install --locked $1" ;;
+    esac
+}
+
 # Banner
 echo ""
 gum style --border rounded --padding "0 2" --border-foreground 14 --bold "Fedora Asahi Setup"
@@ -216,7 +224,8 @@ if [[ -f "$DOTFILES/cargo.list" ]]; then
         while IFS= read -r pkg; do
             bin_name=$(cargo_bin_name "$pkg")
             if ! command -v "$bin_name" &>/dev/null; then
-                spin "  Installing $pkg" cargo install "$pkg" 2>/dev/null || true
+                install_cmd=$(cargo_install_cmd "$pkg")
+                spin "  Installing $pkg" bash -c "$install_cmd" 2>/dev/null || true
                 ((installed++))
             else
                 ((skipped++))
