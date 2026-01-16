@@ -45,6 +45,13 @@ is_linked() {
     [[ -L "$link" && "$(readlink "$link")" == "$target" ]]
 }
 
+# Map cargo package names to binary names (when different)
+cargo_bin_name() {
+    case "$1" in
+        yazi-fm) echo "yazi" ;;
+        *) echo "$1" ;;
+    esac
+}
 
 # Banner
 echo ""
@@ -207,7 +214,8 @@ if [[ -f "$DOTFILES/cargo.list" ]]; then
         installed=0
         skipped=0
         while IFS= read -r pkg; do
-            if ! command -v "$pkg" &>/dev/null; then
+            bin_name=$(cargo_bin_name "$pkg")
+            if ! command -v "$bin_name" &>/dev/null; then
                 spin "  Installing $pkg" cargo install "$pkg" 2>/dev/null || true
                 ((installed++))
             else
