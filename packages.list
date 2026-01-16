@@ -106,6 +106,9 @@ evince
 
 # GNOME/GTK theming
 yaru-icon-theme
+breeze-gtk
+breeze-icon-theme
+breeze-cursor-theme
 gnome-themes-extra
 xdg-desktop-portal-gtk
 

@@ -46,5 +46,14 @@ if [[ -f "$ICONS_FILE" ]]; then
     gsettings set org.gnome.desktop.interface icon-theme "$ICON_THEME" 2>/dev/null || true
 else
     # Default icon theme
-    gsettings set org.gnome.desktop.interface icon-theme "Adwaita" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface icon-theme "breeze" 2>/dev/null || true
 fi
+
+# Set fonts
+gsettings set org.gnome.desktop.interface font-name "Maple Mono NF 11" 2>/dev/null || true
+gsettings set org.gnome.desktop.interface document-font-name "Maple Mono NF 11" 2>/dev/null || true
+gsettings set org.gnome.desktop.interface monospace-font-name "Maple Mono NF 11" 2>/dev/null || true
+
+# Set font rendering
+gsettings set org.gnome.desktop.interface font-antialiasing "rgba" 2>/dev/null || true
+gsettings set org.gnome.desktop.interface font-hinting "full" 2>/dev/null || true
