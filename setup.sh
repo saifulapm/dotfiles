@@ -276,9 +276,9 @@ fi
 # Home Directory Dotfiles
 # ─────────────────────────────────────────────────────────────
 if [[ -d "$DOTFILES/config/home" ]]; then
-    shopt -s nullglob
+    shopt -s nullglob dotglob
     home_files=("$DOTFILES/config/home"/*)
-    shopt -u nullglob
+    shopt -u nullglob dotglob
     if [[ ${#home_files[@]} -gt 0 ]]; then
         header "Home Dotfiles"
         linked=0
