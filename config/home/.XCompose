@@ -1,0 +1,46 @@
+# XCompose - Custom compose key sequences
+# Trigger with CapsLock (compose:caps in keyboard options)
+# Usage: CapsLock + sequence
+
+include "%L"
+
+# Emoji - CapsLock + m + key
+<Multi_key> <m> <s> : "😄" # smile
+<Multi_key> <m> <c> : "😂" # cry
+<Multi_key> <m> <l> : "😍" # love
+<Multi_key> <m> <v> : "✌️"  # victory
+<Multi_key> <m> <h> : "❤️"  # heart
+<Multi_key> <m> <y> : "👍" # yes
+<Multi_key> <m> <n> : "👎" # no
+<Multi_key> <m> <f> : "🖕" # finger
+<Multi_key> <m> <w> : "🤞" # wish
+<Multi_key> <m> <r> : "🤘" # rock
+<Multi_key> <m> <k> : "😘" # kiss
+<Multi_key> <m> <e> : "🙄" # eyeroll
+<Multi_key> <m> <d> : "🤤" # drool
+<Multi_key> <m> <m> : "💰" # money
+<Multi_key> <m> <x> : "🎉" # celebrate
+<Multi_key> <m> <1> : "💯" # 100%
+<Multi_key> <m> <t> : "🥂" # toast
+<Multi_key> <m> <p> : "🙏" # pray
+<Multi_key> <m> <i> : "😉" # wink
+<Multi_key> <m> <o> : "👌" # OK
+<Multi_key> <m> <g> : "👋" # greeting
+<Multi_key> <m> <a> : "💪" # arm
+<Multi_key> <m> <b> : "🤯" # mind blown
+
+# Typography - CapsLock + space + key
+<Multi_key> <space> <space> : "—" # em dash
+<Multi_key> <minus> <minus> : "–" # en dash
+<Multi_key> <period> <period> <period> : "…" # ellipsis
+<Multi_key> <less> <less> : "«" # left guillemet
+<Multi_key> <greater> <greater> : "»" # right guillemet
+<Multi_key> <t> <m> : "™" # trademark
+<Multi_key> <c> <o> : "©" # copyright
+<Multi_key> <r> <o> : "®" # registered
+
+# Arrows - CapsLock + arrow direction
+<Multi_key> <minus> <greater> : "→" # right arrow
+<Multi_key> <less> <minus> : "←" # left arrow
+<Multi_key> <bar> <asciicircum> : "↑" # up arrow
+<Multi_key> <bar> <v> : "↓" # down arrow
