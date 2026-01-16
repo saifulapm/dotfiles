@@ -46,6 +46,7 @@ iwd
 # CLI utilities
 jq
 tree
+xdg-terminal-exec
 
 # System monitor
 btop
@@ -142,5 +143,3 @@ libayatana-appindicator-gtk3
 # Interactive prompts (for webapp install/remove)
 gum
 
-# Wayland session manager (for webapp launching)
-uwsm

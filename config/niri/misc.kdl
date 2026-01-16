@@ -20,8 +20,10 @@ cursor {
     xcursor-size 24
 }
 
-// Environment variables
+// Environment variables (session-wide)
 environment {
+    TERMINAL "xdg-terminal-exec"
+    EDITOR "nvim"
     GTK_THEME "Adwaita-dark"
     QT_QPA_PLATFORMTHEME "qt5ct"
 }

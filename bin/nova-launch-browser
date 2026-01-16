@@ -14,4 +14,4 @@ else
   private_flag="--incognito"
 fi
 
-exec setsid uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"
+exec setsid "$browser_exec" "${@/--private/$private_flag}" >/dev/null 2>&1
