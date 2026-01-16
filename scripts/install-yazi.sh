@@ -7,6 +7,10 @@ set -e
 VERSION="25.5.31"
 ARCH=$(uname -m)
 INSTALL_DIR="$HOME/.local/bin"
+TMP_DIR=""
+
+cleanup() { [[ -n "$TMP_DIR" ]] && rm -rf "$TMP_DIR"; }
+trap cleanup EXIT
 
 if command -v yazi &>/dev/null; then
     echo "Yazi already installed: $(yazi --version)"
@@ -38,5 +42,4 @@ cp "$TMP_DIR"/yazi-*/yazi "$INSTALL_DIR/"
 cp "$TMP_DIR"/yazi-*/ya "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/yazi" "$INSTALL_DIR/ya"
 
-rm -rf "$TMP_DIR"
 echo "Yazi installed: $INSTALL_DIR/yazi"

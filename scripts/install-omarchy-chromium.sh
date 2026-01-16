@@ -10,6 +10,10 @@ REPO_API="https://api.github.com/repos/omacom-io/omarchy-chromium/releases/lates
 INSTALL_DIR="/opt/omarchy-chromium"
 VERSION_FILE="${INSTALL_DIR}/.version"
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+TMP_DIR=""
+
+cleanup() { [[ -n "$TMP_DIR" ]] && rm -rf "$TMP_DIR"; }
+trap cleanup EXIT
 
 info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
 success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
@@ -59,8 +63,8 @@ fi
 
 # Download and extract if not up to date
 if [[ ! -f "$VERSION_FILE" ]] || [[ "$(cat "$VERSION_FILE")" != "$LATEST_VERSION" ]]; then
-    temp_dir=$(mktemp -d)
-    cd "$temp_dir"
+    TMP_DIR=$(mktemp -d)
+    cd "$TMP_DIR"
 
     info "Downloading omarchy-chromium..."
     curl -L -o "$PACKAGE_NAME" "$DOWNLOAD_URL"
@@ -75,10 +79,6 @@ if [[ ! -f "$VERSION_FILE" ]] || [[ "$(cat "$VERSION_FILE")" != "$LATEST_VERSION
     [[ -d "opt" ]] && cp -r opt/* /opt/ 2>/dev/null || true
 
     echo "$LATEST_VERSION" > "$VERSION_FILE"
-
-    # Cleanup
-    cd /
-    rm -rf "$temp_dir"
 
     # Update desktop database
     update-desktop-database /usr/share/applications 2>/dev/null || true

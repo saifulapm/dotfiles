@@ -8,6 +8,10 @@ set -e
 VERSION="1.17.0"
 ARCH=$(uname -m)
 INSTALL_DIR="$HOME/.local"
+TMP_DIR=""
+
+cleanup() { [[ -n "$TMP_DIR" ]] && rm -rf "$TMP_DIR"; }
+trap cleanup EXIT
 
 echo "Installing LocalSend v${VERSION}..."
 
@@ -26,7 +30,7 @@ case "$ARCH" in
     aarch64)
         # tar.gz (no AppImage for ARM64)
         DOWNLOAD_URL="https://github.com/localsend/localsend/releases/download/v${VERSION}/LocalSend-${VERSION}-linux-arm-64.tar.gz"
-        TMP_DIR=$(mktemp -d)
+        TMP_DIR=$(mktemp -d)  # Will be cleaned by trap
 
         echo "Downloading tar.gz (ARM64)..."
         curl -L -o "$TMP_DIR/localsend.tar.gz" "$DOWNLOAD_URL"
@@ -47,8 +51,6 @@ cd "$HOME/.local/lib/localsend"
 exec "$HOME/.local/lib/localsend/localsend_app" "$@"
 EOF
         chmod +x "$INSTALL_DIR/bin/localsend"
-
-        rm -rf "$TMP_DIR"
 
         echo ""
         echo "Note: ARM64 version opens GUI (no --headless support)"
