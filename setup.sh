@@ -280,6 +280,30 @@ if [[ -f "$DOTFILES/pip.list" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────
+# NPM Packages
+# ─────────────────────────────────────────────────────────────
+if [[ -f "$DOTFILES/npm.list" ]]; then
+    npm_pkgs=$(read_list "$DOTFILES/npm.list")
+    if [[ -n "$npm_pkgs" ]]; then
+        header "NPM Packages"
+        if ! command -v npm &>/dev/null; then
+            spin "  Installing nodejs-npm" sudo dnf install -y nodejs-npm
+        fi
+        installed=0
+        skipped=0
+        while IFS= read -r pkg; do
+            if ! npm list -g "$pkg" &>/dev/null; then
+                spin "  Installing $pkg" npm install -g "$pkg" || true
+                ((installed++))
+            else
+                ((skipped++))
+            fi
+        done <<< "$npm_pkgs"
+        done_msg "$installed installed, $skipped skipped"
+    fi
+fi
+
+# ─────────────────────────────────────────────────────────────
 # Config Symlinks (~/.config)
 # ─────────────────────────────────────────────────────────────
 if [[ -d "$DOTFILES/config" ]]; then
