@@ -22,14 +22,6 @@ binds {
     Mod+Ctrl+E hotkey-overlay-title="Emoji Picker" { spawn "nova-emoji-picker"; }
     Mod+Shift+V hotkey-overlay-title="Clipboard" { spawn "nova-clipboard"; }
 
-    // macOS-style copy/paste (uses Ctrl+Insert/Shift+Insert - works in terminals too)
-    // -s 50 adds delay to avoid modifier conflict with Mod key
-    Mod+C hotkey-overlay-title="Copy" { spawn "wtype" "-s" "50" "-M" "ctrl" "-P" "Insert" "-p" "Insert" "-m" "ctrl"; }
-    Mod+V hotkey-overlay-title="Paste" { spawn "wtype" "-s" "50" "-M" "shift" "-P" "Insert" "-p" "Insert" "-m" "shift"; }
-    Mod+X hotkey-overlay-title="Cut" { spawn "wtype" "-M" "ctrl" "-P" "x" "-p" "x" "-m" "ctrl"; }
-    Mod+A hotkey-overlay-title="Select All" { spawn "wtype" "-M" "ctrl" "-P" "a" "-p" "a" "-m" "ctrl"; }
-    Mod+Z hotkey-overlay-title="Undo" { spawn "wtype" "-M" "ctrl" "-P" "z" "-p" "z" "-m" "ctrl"; }
-    Mod+Shift+Z hotkey-overlay-title="Redo" { spawn "wtype" "-M" "ctrl" "-M" "shift" "-P" "z" "-p" "z" "-m" "shift" "-m" "ctrl"; }
     Mod+W hotkey-overlay-title="Close Window" { close-window; }
 
     // Nova menu
