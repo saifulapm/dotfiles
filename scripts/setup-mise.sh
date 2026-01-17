@@ -2,6 +2,11 @@
 
 # Setup Work directory with mise config
 
+# Activate mise if available (needed when running from setup.sh)
+if command -v mise &>/dev/null; then
+    eval "$(mise activate bash)"
+fi
+
 mkdir -p "$HOME/Work"
 mkdir -p "$HOME/Work/tries"
 
