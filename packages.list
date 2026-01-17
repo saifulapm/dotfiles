@@ -145,10 +145,10 @@ power-profiles-daemon
 libayatana-appindicator-gtk3
 
 # Input method (Bangla support)
-fcitx5
-fcitx5-gtk
-fcitx5-qt
-fcitx5-m17n
+# fcitx5
+# fcitx5-gtk
+# fcitx5-qt
+# fcitx5-m17n
 
 # Interactive prompts (for webapp install/remove)
 gum
