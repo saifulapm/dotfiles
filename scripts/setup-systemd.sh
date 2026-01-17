@@ -17,6 +17,7 @@ cp "$DOTFILES_DIR/config/systemd/user/"*.timer "$SERVICE_DIR/" 2>/dev/null || tr
 systemctl --user daemon-reload
 
 # Enable services to start with niri
+systemctl --user add-wants niri.service foot-server.service
 systemctl --user add-wants niri.service waybar.service
 systemctl --user add-wants niri.service swaybg.service
 systemctl --user add-wants niri.service mako.service
@@ -30,6 +31,7 @@ systemctl --user enable voxtype.service 2>/dev/null || true
 systemctl --user enable nova-battery-monitor.timer 2>/dev/null || true
 
 echo "Systemd services configured!"
+echo "- foot-server: starts with niri"
 echo "- waybar: starts with niri"
 echo "- swaybg: starts with niri"
 echo "- mako: starts with niri"
