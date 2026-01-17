@@ -43,10 +43,14 @@ bash-completion
 curl
 iwd
 
+# Bluetooth stack (for bluetui)
+bluez
+
 # CLI utilities
 jq
 tree
 xdg-terminal-exec
+expect
 
 # System monitor
 btop

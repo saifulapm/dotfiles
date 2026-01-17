@@ -203,13 +203,14 @@ if [[ -f "$DOTFILES/cargo.list" ]]; then
         header "Cargo Packages"
         if ! command -v cargo &>/dev/null; then
             spin "  Installing Rust" bash -c 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>/dev/null'
-            source "$HOME/.cargo/env"
         fi
+        # Always source cargo env if it exists (needed even if system cargo was found)
+        [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
         installed=0
         skipped=0
         while IFS= read -r pkg; do
             if ! command -v "$pkg" &>/dev/null; then
-                spin "  Installing $pkg" cargo install --locked "$pkg" 2>/dev/null || true
+                spin "  Installing $pkg" cargo install "$pkg" || true
                 ((installed++))
             else
                 ((skipped++))
