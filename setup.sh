@@ -58,11 +58,14 @@ if [[ -f "$DOTFILES/copr.list" ]]; then
     repos=$(read_list "$DOTFILES/copr.list")
     if [[ -n "$repos" ]]; then
         header "COPR Repositories"
+        # Ensure copr plugin is available
+        if ! rpm -q dnf-plugins-core &>/dev/null; then
+            spin "  Installing dnf-plugins-core" sudo dnf install -y dnf-plugins-core
+        fi
         count=0
         while IFS= read -r repo; do
             if ! dnf repolist | grep -q "${repo##*/}"; then
-                echo -n "  Enabling $repo... "
-                sudo dnf copr enable -y "$repo" >/dev/null 2>&1 && echo "done" || echo "failed"
+                spin "  Enabling $repo" sudo dnf -y copr enable "$repo"
                 ((count++))
             fi
         done <<< "$repos"
@@ -75,10 +78,8 @@ fi
 # ─────────────────────────────────────────────────────────────
 header "RPMFusion Repository"
 if ! rpm -q rpmfusion-free-release &>/dev/null; then
-    echo -n "  Enabling RPMFusion Free... "
-    sudo dnf install -y "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" && echo "done" || echo "failed"
-    echo -n "  Enabling RPMFusion Non-Free... "
-    sudo dnf install -y "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm" && echo "done" || echo "failed"
+    spin "  Enabling RPMFusion Free" sudo dnf install -y "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+    spin "  Enabling RPMFusion Non-Free" sudo dnf install -y "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
     done_msg "RPMFusion enabled"
 else
     skip_msg "RPMFusion already enabled"

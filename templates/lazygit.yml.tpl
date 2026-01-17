@@ -28,10 +28,9 @@ gui:
       - "{{ color3 }}"
 
 git:
-  paging:
-    colorArg: always
-    pager: delta --paging=never
-
+  pagers:
+    - colorArg: always
+      pager: delta --paging=never
   pull:
     mode: rebase
 

@@ -62,6 +62,9 @@ alacritty
 fuzzel
 cliphist
 
+# Window manager
+niri
+
 # Status bar
 waybar
 
