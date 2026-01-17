@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Omarchy Chromium Installer/Updater for Fedora (aarch64)
+# Omarchy Chromium Installer/Updater for Fedora (x86_64 and aarch64)
 # Based on: https://github.com/omacom-io/omarchy-chromium
 
 set -e
 
-ARCH="aarch64"
+ARCH=$(uname -m)
 REPO_API="https://api.github.com/repos/omacom-io/omarchy-chromium/releases/latest"
 INSTALL_DIR="/opt/omarchy-chromium"
 VERSION_FILE="${INSTALL_DIR}/.version"
@@ -25,9 +25,8 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Check system architecture
-system_arch=$(uname -m)
-if [[ "$system_arch" != "aarch64" ]]; then
-    error "This script is for aarch64 architecture. Your system is: $system_arch"
+if [[ "$ARCH" != "x86_64" && "$ARCH" != "aarch64" ]]; then
+    error "Unsupported architecture: $ARCH"
 fi
 
 # Install dependencies
@@ -46,7 +45,7 @@ DOWNLOAD_URL=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains
 PACKAGE_NAME=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"${ARCH}\")) | .name")
 
 if [[ -z "$LATEST_VERSION" ]] || [[ -z "$DOWNLOAD_URL" ]]; then
-    error "Could not find aarch64 package in latest release"
+    error "Could not find $ARCH package in latest release"
 fi
 
 info "Latest version: $LATEST_VERSION"

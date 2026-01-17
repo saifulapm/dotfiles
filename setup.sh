@@ -46,9 +46,17 @@ is_linked() {
 }
 
 
+# Detect architecture for banner
+ARCH=$(uname -m)
+if [[ "$ARCH" == "aarch64" ]]; then
+    BANNER_TEXT="Fedora Asahi Setup"
+else
+    BANNER_TEXT="Fedora Setup"
+fi
+
 # Banner
 echo ""
-gum style --border rounded --padding "0 2" --border-foreground 14 --bold "Fedora Asahi Setup"
+gum style --border rounded --padding "0 2" --border-foreground 14 --bold "$BANNER_TEXT"
 echo ""
 
 # ─────────────────────────────────────────────────────────────
