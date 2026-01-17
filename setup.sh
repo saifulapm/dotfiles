@@ -254,14 +254,14 @@ if [[ -f "$DOTFILES/pip.list" ]]; then
     pip_pkgs=$(read_list "$DOTFILES/pip.list")
     if [[ -n "$pip_pkgs" ]]; then
         header "Pip Packages"
-        if ! command -v pip &>/dev/null; then
+        if ! command -v pip3 &>/dev/null; then
             spin "  Installing python3-pip" sudo dnf install -y python3-pip
         fi
         installed=0
         skipped=0
         while IFS= read -r pkg; do
-            if ! pip show "$pkg" &>/dev/null; then
-                spin "  Installing $pkg" pip install --user "$pkg" 2>/dev/null || true
+            if ! pip3 show "$pkg" &>/dev/null; then
+                spin "  Installing $pkg" pip3 install --user "$pkg" || true
                 ((installed++))
             else
                 ((skipped++))
