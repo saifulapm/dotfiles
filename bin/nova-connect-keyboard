@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+DEVICE="E0:EB:40:DE:0D:4B"
+DEVICE_NAME="Magic Keyboard"
+
+# Function to send notifications
+notify() {
+  notify-send "Bluetooth $DEVICE_NAME" "$1" --icon=input-keyboard
+}
+
+# Initial notification
+notify "Starting connection process..."
+echo "Waiting 10 seconds..."
+sleep 10
+
+# Use expect to automate bluetoothctl interaction
+expect <<EOF
+spawn bluetoothctl
+expect "#"
+
+# Start scanning
+send "scan on\r"
+expect "Discovery started"
+
+# Wait for device to appear
+set timeout 55
+expect "*Magic Keyboard*"
+send "pair $DEVICE\r"
+expect {
+    "Request confirmation" {
+        send "yes\r"
+        exp_continue
+    }
+    "Pairing successful" {
+        send "trust $DEVICE\r"
+    }
+}
+
+expect "trust succeeded"
+send "connect $DEVICE\r"
+expect "Connection successful"
+send "exit\r"
+expect eof
+EOF
+
+# Check if connection was successful
+if bluetoothctl info "$DEVICE" | grep -q "Connected: yes"; then
+  notify "Successfully connected!"
+else
+  notify "Connection failed. Please try again."
+fi
