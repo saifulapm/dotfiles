@@ -1,0 +1,92 @@
+#!/bin/bash
+# Update all packages and run setup scripts in update mode
+
+DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Use gum for styling (matches setup.sh)
+header() { echo ""; gum style --foreground 12 --bold "[$1]"; }
+done_msg() { gum style --foreground 10 "  ✓ $1"; }
+spin() { gum spin --spinner dot --title "$1" -- "${@:2}"; }
+
+read_list() {
+    local file="$1"
+    [[ -f "$file" ]] && grep -v '^#' "$file" | grep -v '^$' || true
+}
+
+echo ""
+gum style --border rounded --padding "0 2" --border-foreground 14 --bold "Nova Update"
+echo ""
+
+# DNF
+header "DNF Packages"
+spin "  Updating system packages" sudo dnf upgrade -y
+done_msg "System updated"
+
+# Flatpak
+if command -v flatpak &>/dev/null; then
+    header "Flatpak Packages"
+    spin "  Updating flatpaks" flatpak update -y
+    done_msg "Flatpaks updated"
+fi
+
+# Snap
+if command -v snap &>/dev/null; then
+    header "Snap Packages"
+    spin "  Updating snaps" sudo snap refresh
+    done_msg "Snaps updated"
+fi
+
+# Cargo
+if [[ -f "$DOTFILES/cargo.list" ]]; then
+    [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+    if command -v cargo &>/dev/null; then
+        header "Cargo Packages"
+        cargo_pkgs=$(read_list "$DOTFILES/cargo.list")
+        while IFS= read -r pkg; do
+            [[ -z "$pkg" ]] && continue
+            spin "  Updating $pkg" cargo install "$pkg"
+        done <<< "$cargo_pkgs"
+        done_msg "Cargo packages updated"
+    fi
+fi
+
+# Go
+if [[ -f "$DOTFILES/go.list" ]]; then
+    if command -v go &>/dev/null; then
+        header "Go Packages"
+        go_pkgs=$(read_list "$DOTFILES/go.list")
+        while IFS= read -r pkg; do
+            [[ -z "$pkg" ]] && continue
+            name=$(basename "$pkg" | cut -d'@' -f1)
+            spin "  Updating $name" go install "$pkg"
+        done <<< "$go_pkgs"
+        done_msg "Go packages updated"
+    fi
+fi
+
+# Pip
+if [[ -f "$DOTFILES/pip.list" ]]; then
+    if command -v pip3 &>/dev/null; then
+        header "Pip Packages"
+        pip_pkgs=$(read_list "$DOTFILES/pip.list")
+        while IFS= read -r pkg; do
+            [[ -z "$pkg" ]] && continue
+            spin "  Updating $pkg" pip3 install --user --upgrade "$pkg"
+        done <<< "$pip_pkgs"
+        done_msg "Pip packages updated"
+    fi
+fi
+
+# Run install scripts with --update
+header "Install Scripts"
+for script in "$DOTFILES/scripts"/install-*.sh "$DOTFILES/scripts"/setup-*.sh; do
+    [[ -f "$script" ]] || continue
+    name=$(basename "$script")
+    chmod +x "$script"
+    spin "  Running $name" "$script" --update || true
+done
+done_msg "Scripts completed"
+
+echo ""
+gum style --foreground 10 --bold "✓ Update complete!"
+echo ""

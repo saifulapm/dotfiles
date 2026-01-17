@@ -5,6 +5,9 @@
 
 set -e
 
+UPDATE_MODE=false
+[[ "$1" == "--update" ]] && UPDATE_MODE=true
+
 VERSION="1.17.0"
 ARCH=$(uname -m)
 INSTALL_DIR="$HOME/.local"
@@ -12,6 +15,11 @@ TMP_DIR=""
 
 cleanup() { [[ -n "$TMP_DIR" ]] && rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
+
+if command -v localsend &>/dev/null && [[ "$UPDATE_MODE" == "false" ]]; then
+    echo "LocalSend already installed"
+    exit 0
+fi
 
 echo "Installing LocalSend v${VERSION}..."
 

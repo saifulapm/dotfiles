@@ -3,8 +3,16 @@
 
 set -e
 
+UPDATE_MODE=false
+[[ "$1" == "--update" ]] && UPDATE_MODE=true
+
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 ARCH=$(uname -m)
+
+if command -v voxtype &>/dev/null && [[ "$UPDATE_MODE" == "false" ]]; then
+    echo "voxtype already installed"
+    exit 0
+fi
 
 TEMP_DIR=$(mktemp -d)
 cleanup() { rm -rf "$TEMP_DIR"; }

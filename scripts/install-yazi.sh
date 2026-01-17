@@ -4,6 +4,9 @@
 
 set -e
 
+UPDATE_MODE=false
+[[ "$1" == "--update" ]] && UPDATE_MODE=true
+
 VERSION="25.5.31"
 ARCH=$(uname -m)
 INSTALL_DIR="$HOME/.local/bin"
@@ -12,7 +15,7 @@ TMP_DIR=""
 cleanup() { [[ -n "$TMP_DIR" ]] && rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-if command -v yazi &>/dev/null; then
+if command -v yazi &>/dev/null && [[ "$UPDATE_MODE" == "false" ]]; then
     echo "Yazi already installed: $(yazi --version)"
     exit 0
 fi
