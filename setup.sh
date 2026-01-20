@@ -361,34 +361,6 @@ if [[ -d "$DOTFILES/config/home" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────
-# Partial Symlinks
-# ─────────────────────────────────────────────────────────────
-if [[ -f "$DOTFILES/symlinks.list" ]]; then
-    symlinks=$(read_list "$DOTFILES/symlinks.list")
-    if [[ -n "$symlinks" ]]; then
-        header "Partial Symlinks"
-        linked=0
-        skipped=0
-        while IFS=: read -r src dest; do
-            [[ -z "$src" || -z "$dest" ]] && continue
-            src_path="$DOTFILES/$src"
-            dest_path="$HOME/$dest"
-            if [[ -e "$src_path" ]]; then
-                if ! is_linked "$src_path" "$dest_path"; then
-                    mkdir -p "$(dirname "$dest_path")"
-                    rm -rf "$dest_path"
-                    ln -sf "$src_path" "$dest_path"
-                    ((linked++))
-                else
-                    ((skipped++))
-                fi
-            fi
-        done <<< "$symlinks"
-        done_msg "$linked linked, $skipped skipped"
-    fi
-fi
-
-# ─────────────────────────────────────────────────────────────
 # Custom Executables
 # ─────────────────────────────────────────────────────────────
 if [[ -d "$DOTFILES/bin" ]]; then

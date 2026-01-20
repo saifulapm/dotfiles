@@ -9,7 +9,11 @@ mkdir -p "$OUTPUT_DIR"
 if pgrep -x wf-recorder > /dev/null; then
     # Stop recording
     pkill -SIGINT wf-recorder
-    sleep 0.3
+    # Wait for wf-recorder to actually exit (max 5 seconds)
+    for i in {1..50}; do
+        pgrep -x wf-recorder > /dev/null || break
+        sleep 0.1
+    done
     notify-send "Screen Recording" "Recording saved to $OUTPUT_DIR"
     pkill -RTMIN+8 waybar 2>/dev/null
     exit 0

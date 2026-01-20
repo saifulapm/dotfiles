@@ -18,5 +18,6 @@ EOF
 
 mise trust ~/Work/.mise.toml
 
-# Install node globally
+# Install node globally - use mise install explicitly to ensure it's installed
 mise use -g node@lts
+mise install node@lts

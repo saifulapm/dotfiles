@@ -25,6 +25,4 @@ if [[ -n "$selected" ]]; then
     pkg_name=$(echo "$selected" | cut -d'.' -f1)
     echo "Installing $pkg_name..."
     sudo dnf install -y "$pkg_name"
-    # Run user hook
-    nova-hook pkg-install "$pkg_name" 2>/dev/null || true
 fi

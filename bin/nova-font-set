@@ -55,9 +55,6 @@ pkill -USR2 waybar 2>/dev/null || true
 
 notify-send "Font Changed" "$font_name"
 
-# Run user hook
-nova-hook font-set "$font_name" 2>/dev/null || true
-
 # Note about terminal restart
 if pgrep -x ghostty > /dev/null; then
   notify-send "Restart Required" "Restart Ghostty to see font change"
