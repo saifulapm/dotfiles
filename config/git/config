@@ -1,28 +1,75 @@
-# See https://git-scm.com/docs/git-config
+[user]
+  name = "Saiful Islam"
+  email = "saiful.apm@gmail.com"
+
+[github]
+  user = "saifulapm"
+
+[core]
+  excludesfile = ~/.gitignore
+  quotepath = false
+  # line endings
+  # force LF during add
+  autocrlf = input
+  # autocrlf = true # for windows to convert to CRLF on checkout and LF on add
+  # warn but allow line ending conversion to proceed
+  safecrlf = warn
+  # prevent crlf (then you will have to deal with the problem -- dos2unix, etc)
+  #safecrlf = true
+  editor = vim
+  #editor = subl -w
+  pager = delta
 
 [alias]
 	co = checkout
 	br = branch
 	ci = commit
 	st = status
+
 [init]
-	defaultBranch = master
+  defaultBranch = main
+
 [pull]
-	rebase = true 			 # Rebase (instead of merge) on pull
+  rebase = true 			 # Rebase (instead of merge) on pull
+
 [push]
-	autoSetupRemote = true   # Automatically set upstream branch on push
+  autoSetupRemote = true   # Automatically set upstream branch on push
+
 [diff]
-	algorithm = histogram    # Clearer diffs on moved/edited lines
-	colorMoved = plain       # Highlight moved blocks in diffs
-	mnemonicPrefix = true    # More intuitive refs in diff output
+  algorithm = histogram    # Clearer diffs on moved/edited lines
+  colorMoved = plain       # Highlight moved blocks in diffs
+  mnemonicPrefix = true    # More intuitive refs in diff output
+
 [commit]
-	verbose = true           # Include diff comment in commit message template
+  verbose = true           # Include diff comment in commit message template
+
 [column]
-	ui = auto 			     # Output in columns when possible
+  ui = auto 			     # Output in columns when possible
+
 [branch]
-	sort = -committerdate    # Sort branches by most recent commit first
+  sort = -committerdate    # Sort branches by most recent commit first
+
 [tag]
-	sort = -version:refname  # Sort version numbers as you would expect
+  sort = -version:refname  # Sort version numbers as you would expect
+
 [rerere]
-	enabled = true           # Record and reuse conflict resolutions
-	autoupdate = true        # Apply stored conflict resolutions automatically
+  enabled = true           # Record and reuse conflict resolutions
+  autoupdate = true        # Apply stored conflict resolutions automatically
+
+[interactive]
+  diffFilter = delta --color-only --features=interactive
+
+[delta]
+  features = decorations
+
+[delta "interactive"]
+  keep-plus-minus-markers = false
+
+[delta "decorations"]
+  commit-decoration-style = blue ol
+  commit-style = raw
+  file-style = omit
+  hunk-header-decoration-style = blue box
+  hunk-header-file-style = red
+  hunk-header-line-number-style = "#067a00"
+  hunk-header-style = file line-number syntax

@@ -1,2 +1,4 @@
 # Flatpak packages to install
 # Lines starting with # are ignored
+
+app.zen_browser.zen

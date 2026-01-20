@@ -132,8 +132,13 @@ if [[ -f "$DOTFILES/flatpak.list" ]]; then
         header "Flatpak Packages"
         if ! command -v flatpak &>/dev/null; then
             spin "  Installing Flatpak" sudo dnf install -y flatpak
-            flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         fi
+
+	# Ensure Flathub remote exists
+        if ! flatpak remotes --columns=name | grep -qx flathub; then
+            spin "  Adding Flathub remote" flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+        fi
+
         installed=0
         skipped=0
         while IFS= read -r pkg; do

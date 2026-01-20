@@ -131,8 +131,10 @@ google-noto-emoji-fonts
 google-noto-sans-cjk-fonts
 google-noto-sans-bengali-fonts
 google-noto-serif-bengali-fonts
+google-noto-emoji-color-fonts
 
 # Screenshot tools
+mesa-libGLES
 grim
 slurp
 satty
