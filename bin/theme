@@ -109,6 +109,12 @@ generate_theme() {
     sed -f "$sed_script" "$TEMPLATES_DIR/gtk.css.tpl" > "$HOME/.config/gtk-3.0/gtk.css"
     sed -f "$sed_script" "$TEMPLATES_DIR/gtk.css.tpl" > "$HOME/.config/gtk-4.0/gtk.css"
 
+    # Generate yazi theme
+    if [[ -f "$TEMPLATES_DIR/yazi-theme.toml.tpl" ]]; then
+        mkdir -p "$HOME/.config/yazi"
+        sed -f "$sed_script" "$TEMPLATES_DIR/yazi-theme.toml.tpl" > "$HOME/.config/yazi/theme.toml"
+    fi
+
     # Set GNOME/GTK theme for file manager (handles light/dark mode and icon theme)
     nova-theme-set-gnome "$name" 2>/dev/null || true
 

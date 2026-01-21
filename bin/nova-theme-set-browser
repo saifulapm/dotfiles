@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Set browser theme color for Chromium and Brave browsers
-# - Chromium: Uses CLI flags for live theme changes (omarchy-chromium fork)
+# Set browser theme color for Chromium, Brave, and Zen browsers
+# - Chromium: Generates dynamic theme extension
 # - Brave: Uses policy files for theme configuration
+# - Zen: Generates userChrome.css in profile directories
 
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
 THEME_DIR="$DOTFILES/themes"
@@ -14,42 +15,255 @@ if [[ -z "$CURRENT_THEME" ]]; then
     exit 0
 fi
 
+COLORS_TOML="$THEME_DIR/$CURRENT_THEME/colors.toml"
 CHROMIUM_THEME="$THEME_DIR/$CURRENT_THEME/chromium.theme"
 
-if [[ -f "$CHROMIUM_THEME" ]]; then
-    THEME_RGB=$(<"$CHROMIUM_THEME")
-else
-    # Default neutral grey if theme doesn't have a color
-    THEME_RGB="28,32,39"
-fi
+# Parse a color from colors.toml (returns hex without #)
+get_color() {
+    local key="$1"
+    grep "^$key = " "$COLORS_TOML" 2>/dev/null | sed 's/.*= *"\(#\)\?\([^"]*\)".*/\2/'
+}
 
-# Convert RGB to hex (e.g., "30,30,46" -> "#1e1e2e")
+# Convert hex to RGB array string for JSON (e.g., "1e1e2e" -> "[30, 30, 46]")
+hex_to_rgb_array() {
+    local hex="$1"
+    local r=$((16#${hex:0:2}))
+    local g=$((16#${hex:2:2}))
+    local b=$((16#${hex:4:2}))
+    echo "[$r, $g, $b]"
+}
+
+# Convert RGB string to hex (e.g., "30,30,46" -> "#1e1e2e")
 rgb_to_hex() {
     local rgb="$1"
     printf '#%02x%02x%02x' ${rgb//,/ }
 }
 
+# Darken a hex color by a percentage (0-100)
+darken_hex() {
+    local hex="$1"
+    local percent="${2:-10}"
+    local r=$((16#${hex:0:2}))
+    local g=$((16#${hex:2:2}))
+    local b=$((16#${hex:4:2}))
+    local factor=$((100 - percent))
+    r=$((r * factor / 100))
+    g=$((g * factor / 100))
+    b=$((b * factor / 100))
+    printf '%02x%02x%02x' $r $g $b
+}
+
+# Lighten a hex color by a percentage (0-100)
+lighten_hex() {
+    local hex="$1"
+    local percent="${2:-10}"
+    local r=$((16#${hex:0:2}))
+    local g=$((16#${hex:2:2}))
+    local b=$((16#${hex:4:2}))
+    r=$((r + (255 - r) * percent / 100))
+    g=$((g + (255 - g) * percent / 100))
+    b=$((b + (255 - b) * percent / 100))
+    printf '%02x%02x%02x' $r $g $b
+}
+
+# Get theme RGB from chromium.theme or default
+if [[ -f "$CHROMIUM_THEME" ]]; then
+    THEME_RGB=$(<"$CHROMIUM_THEME")
+else
+    THEME_RGB="28,32,39"
+fi
+
 THEME_HEX=$(rgb_to_hex "$THEME_RGB")
+
+# Get colors from colors.toml
+BG_HEX=$(get_color "background")
+FG_HEX=$(get_color "foreground")
+COLOR0_HEX=$(get_color "color0")    # surface
+COLOR8_HEX=$(get_color "color8")    # surface1/lighter surface
+ACCENT_HEX=$(get_color "accent")
+
+# Compute derived colors
+CRUST_HEX=$(darken_hex "$BG_HEX" 15)      # darker than background
+MANTLE_HEX=$(darken_hex "$BG_HEX" 8)      # slightly darker than background
+SURFACE_HEX="$COLOR0_HEX"                  # surface0
+
+# Convert to RGB arrays for Chrome extension
+BG_RGB=$(hex_to_rgb_array "$BG_HEX")
+FG_RGB=$(hex_to_rgb_array "$FG_HEX")
+SURFACE_RGB=$(hex_to_rgb_array "$SURFACE_HEX")
+CRUST_RGB=$(hex_to_rgb_array "$CRUST_HEX")
+ACCENT_RGB=$(hex_to_rgb_array "$ACCENT_HEX")
 
 # Determine if light or dark mode
 if [[ -f "$THEME_DIR/$CURRENT_THEME/light.mode" ]]; then
     COLOR_SCHEME="light"
+    # For light themes, swap the logic for crust/surface
+    CRUST_HEX=$(lighten_hex "$BG_HEX" 5)
+    MANTLE_HEX=$(lighten_hex "$BG_HEX" 3)
+    CRUST_RGB=$(hex_to_rgb_array "$CRUST_HEX")
 else
     COLOR_SCHEME="dark"
 fi
 
-# Set theme for Chromium (omarchy-chromium fork with CLI support)
-if command -v chromium &>/dev/null; then
-    chromium --no-startup-window --set-theme-color="$THEME_RGB" >/dev/null 2>&1
-    chromium --no-startup-window --set-color-scheme="$COLOR_SCHEME" >/dev/null 2>&1
-fi
+# ============================================================================
+# Chromium: Generate dynamic theme extension
+# ============================================================================
+set_chromium_theme() {
+    local ext_dir="$DOTFILES/default/chromium/extensions/dynamic-theme"
+    mkdir -p "$ext_dir"
 
-# Set theme for Brave using policy files
-if command -v brave &>/dev/null; then
-    POLICY_DIR="/etc/brave/policies/managed"
+    # Use timestamp for version to force extension reload
+    local version="1.0.$(date +%s)"
 
-    if [[ -d "$POLICY_DIR" ]]; then
-        echo "{\"BrowserThemeColor\": \"$THEME_HEX\"}" | sudo tee "$POLICY_DIR/color.json" >/dev/null
-        brave --refresh-platform-policy --no-startup-window >/dev/null 2>&1
+    cat > "$ext_dir/manifest.json" << EOF
+{
+  "manifest_version": 3,
+  "version": "$version",
+  "name": "Nova Dynamic Theme",
+  "description": "Auto-generated theme for $CURRENT_THEME",
+  "theme": {
+    "colors": {
+      "frame": $CRUST_RGB,
+      "frame_inactive": $CRUST_RGB,
+      "frame_incognito": $CRUST_RGB,
+      "frame_incognito_inactive": $CRUST_RGB,
+      "toolbar": $BG_RGB,
+      "tab_text": $FG_RGB,
+      "tab_background_text": $FG_RGB,
+      "bookmark_text": $FG_RGB,
+      "omnibox_background": $SURFACE_RGB,
+      "omnibox_text": $FG_RGB,
+      "ntp_background": $BG_RGB,
+      "ntp_text": $FG_RGB,
+      "ntp_link": $ACCENT_RGB,
+      "button_background": $SURFACE_RGB
+    }
+  }
+}
+EOF
+}
+
+# ============================================================================
+# Brave: Use policy files for theme configuration
+# ============================================================================
+set_brave_theme() {
+    # Check for Brave (native or flatpak)
+    local brave_cmd=""
+    if command -v brave-browser &>/dev/null; then
+        brave_cmd="brave-browser"
+    elif command -v brave &>/dev/null; then
+        brave_cmd="brave"
+    elif flatpak list 2>/dev/null | grep -q "com.brave.Browser"; then
+        brave_cmd="flatpak run com.brave.Browser"
+    else
+        return
     fi
-fi
+
+    local policy_dir="/etc/brave/policies/managed"
+
+    # Create policy directory if it doesn't exist
+    if [[ ! -d "$policy_dir" ]]; then
+        sudo mkdir -p "$policy_dir" 2>/dev/null || return
+    fi
+
+    # Write the policy file
+    local policy_file="$policy_dir/color.json"
+    if [[ -w "$policy_file" ]] || [[ -w "$policy_dir" ]]; then
+        echo "{\"BrowserThemeColor\": \"#$BG_HEX\"}" > "$policy_file"
+    else
+        echo "{\"BrowserThemeColor\": \"#$BG_HEX\"}" | sudo tee "$policy_file" >/dev/null 2>&1 || return
+    fi
+
+    # Try to refresh policy (may not work for all installations)
+    if [[ "$brave_cmd" != flatpak* ]]; then
+        $brave_cmd --refresh-platform-policy --no-startup-window >/dev/null 2>&1 &
+    fi
+}
+
+# ============================================================================
+# Zen Browser: Generate userChrome.css in profile directories
+# ============================================================================
+set_zen_theme() {
+    local zen_base="$HOME/.var/app/app.zen_browser.zen/.zen"
+
+    if [[ ! -d "$zen_base" ]]; then
+        return
+    fi
+
+    # Find all profile directories (they contain prefs.js)
+    for profile_dir in "$zen_base"/*; do
+        if [[ -d "$profile_dir" && -f "$profile_dir/prefs.js" ]]; then
+            local chrome_dir="$profile_dir/chrome"
+            mkdir -p "$chrome_dir"
+
+            # Create user.js to enable userChrome.css support
+            cat > "$profile_dir/user.js" << 'USERJS'
+// Enable userChrome.css support
+user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
+USERJS
+
+            cat > "$chrome_dir/userChrome.css" << EOF
+/* Nova Dynamic Theme - Auto-generated for $CURRENT_THEME */
+
+:root {
+  --zen-colors-primary: #$SURFACE_HEX !important;
+  --zen-primary-color: #$ACCENT_HEX !important;
+  --zen-colors-secondary: #$SURFACE_HEX !important;
+  --zen-colors-tertiary: #$CRUST_HEX !important;
+  --zen-colors-border: #$ACCENT_HEX !important;
+  --toolbarbutton-icon-fill: #$ACCENT_HEX !important;
+  --lwt-text-color: #$FG_HEX !important;
+  --toolbar-field-color: #$FG_HEX !important;
+  --toolbar-field-focus-color: #$FG_HEX !important;
+  --toolbar-color: #$FG_HEX !important;
+  --newtab-text-primary-color: #$FG_HEX !important;
+  --arrowpanel-color: #$FG_HEX !important;
+  --arrowpanel-background: #$BG_HEX !important;
+  --sidebar-text-color: #$FG_HEX !important;
+  --lwt-sidebar-text-color: #$FG_HEX !important;
+  --lwt-sidebar-background-color: #$CRUST_HEX !important;
+  --toolbar-bgcolor: #$SURFACE_HEX !important;
+  --newtab-background-color: #$BG_HEX !important;
+  --zen-themed-toolbar-bg: #$CRUST_HEX !important;
+  --zen-main-browser-background: #$CRUST_HEX !important;
+  --toolbox-bgcolor-inactive: #$CRUST_HEX !important;
+}
+
+.sidebar-placesTree {
+  background-color: #$BG_HEX !important;
+}
+
+#zen-workspaces-button {
+  background-color: #$BG_HEX !important;
+}
+
+#TabsToolbar {
+  background-color: #$CRUST_HEX !important;
+}
+
+.urlbar-background {
+  background-color: #$BG_HEX !important;
+}
+
+.urlbarView-url {
+  color: #$ACCENT_HEX !important;
+}
+
+hbox#titlebar {
+  background-color: #$CRUST_HEX !important;
+}
+
+#zen-appcontent-navbar-container {
+  background-color: #$CRUST_HEX !important;
+}
+EOF
+        fi
+    done
+}
+
+# ============================================================================
+# Apply themes to all browsers
+# ============================================================================
+set_chromium_theme
+set_brave_theme
+set_zen_theme

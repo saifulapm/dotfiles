@@ -64,6 +64,16 @@ on   = "e"
 run  = 'shell "ouch decompress \"$@\"" --confirm'
 desc = "Extract archive"
 
+[[mgr.prepend_keymap]]
+on   = [ "c", "m" ]
+run  = "plugin chmod"
+desc = "Chmod on selected files"
+
+[[mgr.prepend_keymap]]
+on   = "u"
+run  = "plugin restore"
+desc = "Restore from trash"
+
 # [[manager.prepend_keymap]]
 # on  = "q"
 # run = "plugin confirm-quit"

@@ -10,3 +10,6 @@ bluetui
 
 # Archive tool (yazi dependency)
 ouch
+
+# Hex viewer (yazi preview)
+hexyl

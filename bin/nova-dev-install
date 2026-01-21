@@ -1,0 +1,105 @@
+#!/bin/bash
+
+if [[ -z "$1" ]]; then
+  echo "Usage: nova-dev-install <ruby|node|bun|deno|go|php|laravel|python|elixir|phoenix|rust|java|zig|ocaml|dotnet|clojure>" >&2
+  exit 1
+fi
+
+install_php() {
+  sudo dnf install -y php php-cli php-common php-mbstring php-xml php-curl php-zip php-intl php-bcmath php-pdo composer
+
+  if [[ ":$PATH:" != *":$HOME/.config/composer/vendor/bin:"* ]]; then
+    echo 'export PATH="$HOME/.config/composer/vendor/bin:$PATH"' >>"$HOME/.bashrc"
+    source "$HOME/.bashrc"
+  fi
+}
+
+install_node() {
+  echo -e "Installing Node.js...\n"
+  mise use --global node
+}
+
+case "$1" in
+ruby)
+  echo -e "Installing Ruby on Rails...\n"
+  sudo dnf install -y libyaml-devel
+  mise use --global ruby@latest
+  mise settings add idiomatic_version_file_enable_tools ruby
+  echo "gem: --no-document" > ~/.gemrc
+  mise x ruby -- gem install rails --no-document
+  ;;
+node)
+  install_node
+  ;;
+bun)
+  echo -e "Installing Bun...\n"
+  mise use -g bun@latest
+  ;;
+deno)
+  echo -e "Installing Deno...\n"
+  mise use -g deno@latest
+  ;;
+go)
+  echo -e "Installing Go...\n"
+  mise use --global go@latest
+  ;;
+php)
+  echo -e "Installing PHP...\n"
+  install_php
+  ;;
+laravel)
+  echo -e "Installing PHP and Laravel...\n"
+  install_php
+  install_node
+  composer global require laravel/installer
+  ;;
+python)
+  echo -e "Installing Python...\n"
+  mise use --global python@latest
+  echo -e "\nInstalling uv...\n"
+  curl -fsSL https://astral.sh/uv/install.sh | sh
+  ;;
+elixir)
+  echo -e "Installing Elixir...\n"
+  mise use --global erlang@latest
+  mise use --global elixir@latest
+  mise x elixir -- mix local.hex --force
+  ;;
+phoenix)
+  echo -e "Installing Phoenix Framework...\n"
+  mise use --global erlang@latest
+  mise use --global elixir@latest
+  mise x elixir -- mix local.hex --force
+  mise x elixir -- mix local.rebar --force
+  mise x elixir -- mix archive.install hex phx_new --force
+  ;;
+rust)
+  echo -e "Installing Rust...\n"
+  bash -c "$(curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs)" -- -y
+  ;;
+java)
+  echo -e "Installing Java...\n"
+  mise use --global java@latest
+  ;;
+zig)
+  echo -e "Installing Zig...\n"
+  mise use --global zig@latest
+  mise use -g zls@latest
+  ;;
+ocaml)
+  echo -e "Installing OCaml...\n"
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)"
+  opam init --yes
+  eval "$(opam env)"
+  opam install ocaml-lsp-server odoc ocamlformat utop --yes
+  ;;
+dotnet)
+  echo -e "Installing .NET...\n"
+  mise use --global dotnet@latest
+  ;;
+clojure)
+  echo -e "Installing Clojure...\n"
+  sudo dnf install -y rlwrap
+  mise use --global clojure@latest
+  ;;
+esac

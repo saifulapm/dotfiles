@@ -30,7 +30,7 @@ alias ~='cd ~'
 # Tools
 # ─────────────────────────────────────────────────────────────
 alias v='nvim'
-alias cl='clear'
+alias c='clear'
 alias opc='opencode'
 alias d='docker'
 alias dc='docker compose'
@@ -40,20 +40,23 @@ alias r='rails'
 # ─────────────────────────────────────────────────────────────
 # Git
 # ─────────────────────────────────────────────────────────────
-alias g='git'
-alias gs='git status'
-alias ga='git add'
-alias gc='git commit'
-alias gcm='git commit -m'
-alias gcam='git commit -a -m'
-alias gcad='git commit -a --amend'
-alias gp='git push'
-alias gpl='git pull'
-alias gco='git checkout'
-alias gb='git branch'
-alias gd='git diff'
-alias gl='git log --oneline -10'
-alias glog='git log --graph --oneline --decorate'
+alias g="git"
+alias gst="git status"
+alias gb="git branch"
+alias gc="git commit"
+alias gl="git log --oneline --decorate --color"
+alias amend="git add . && git commit --amend --no-edit"
+alias commit="git add . && git commit -m"
+alias diff="git diff"
+alias force="git push --force"
+alias nuke="git clean -df && git reset --hard"
+alias pop="git stash pop"
+alias pull="git pull"
+alias push="git push -u origin main"
+alias resolve="git add . && git commit --no-edit"
+alias stash="git stash -u"
+alias unstage="git restore --staged ."
+alias wip="commit wip"
 
 # ─────────────────────────────────────────────────────────────
 # Safety
@@ -63,9 +66,16 @@ alias cp='cp -i'
 alias mv='mv -i'
 
 # ─────────────────────────────────────────────────────────────
+# DNF
+# ─────────────────────────────────────────────────────────────
+alias di="sudo dnf install"
+alias du="sudo dnf update"
+alias dr="sudo dnf remove"
+alias ds="sudo dnf search"
+
+# ─────────────────────────────────────────────────────────────
 # Misc
 # ─────────────────────────────────────────────────────────────
-alias cls='clear'
 alias reload='source ~/.bashrc'
 alias path='echo -e ${PATH//:/\\n}'
 alias ports='ss -tulanp'

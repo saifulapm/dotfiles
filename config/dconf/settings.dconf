@@ -1,0 +1,38 @@
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+cursor-theme='Adwaita'
+document-font-name='Maple Mono 10'
+font-antialiasing='rgba'
+font-hinting='full'
+font-name='Maple Mono, 10'
+gtk-theme='Adwaita'
+icon-theme='Adwaita'
+monospace-font-name='Maple Mono 10'
+text-scaling-factor=1.0
+
+[org/gnome/nautilus/preferences]
+default-folder-viewer='icon-view'
+migrated-gtk-settings=true
+search-filter-time-type='last_modified'
+
+[org/gnome/nautilus/window-state]
+initial-size=(890, 550)
+initial-size-file-chooser=(890, 550)
+
+[org/gtk/gtk4/settings/file-chooser]
+show-hidden=false
+sort-directories-first=false
+
+[org/gtk/settings/file-chooser]
+date-format='regular'
+location-mode='path-bar'
+show-hidden=false
+show-size-column=true
+show-type-column=true
+sidebar-width=177
+sort-column='name'
+sort-directories-first=false
+sort-order='ascending'
+type-format='category'
+window-position=(45, 45)
+window-size=(708, 452)

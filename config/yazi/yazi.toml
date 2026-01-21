@@ -25,6 +25,9 @@ add-sub = [
 extract = [
 	{ run = 'ouch decompress "$@"', desc = "Extract here", block = true },
 ]
+reveal = [
+	{ run = 'mediainfo "$1" | less', block = true, desc = "Media info" },
+]
 
 [open]
 rules = [
@@ -38,16 +41,28 @@ rules = [
 	{ mime = "application/gzip", use = "extract" },
 
 	{ mime = "text/*", use = "edit" },
-	{ mime = "video/*", use = "play" },
-  { mime = "audio/*", use = "play" },
-  { mime = "image/*", use = "open" },
+	{ mime = "video/*", use = [ "play", "reveal" ] },
+	{ mime = "audio/*", use = [ "play", "reveal" ] },
+	{ mime = "image/*", use = "open" },
 
-	# { mime = "application/json", use = "edit" },
+	# PDF opens with evince
+	{ mime = "application/pdf", use = "open" },
+
+	# Common config files
 	{ name = "*.json", use = "edit" },
 	{ name = "*.js", use = "edit" },
 	{ name = "*.ts", use = "edit" },
+	{ name = "*.md", use = "edit" },
+	{ name = "*.yaml", use = "edit" },
+	{ name = "*.yml", use = "edit" },
+	{ name = "*.toml", use = "edit" },
+	{ name = "*.lua", use = "edit" },
+	{ name = "*.sh", use = "edit" },
 
 	# Multiple openers for a single rule
 	{ name = "*.html", use = [ "open", "edit" ] },
 	{ name = "*.{ass,srt,ssa,sty,sup,vtt}", use = [ "add-sub", "edit" ] },
+
+	# Fallback
+	{ name = "*", use = "open" },
 ]

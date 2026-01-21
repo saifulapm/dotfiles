@@ -317,11 +317,83 @@ show_install_menu() {
     local choice
     choice=$(menu "Install" \
         "󰣇  Package (DNF)" \
-        "󰖟  Web App")
+        "󰖟  Web App" \
+        "󰵮  Development")
     case "$choice" in
         *Package*) present_terminal nova-pkg-install ;;
         *Web*) present_terminal nova-webapp-install ;;
+        *Development*) show_install_development_menu ;;
         *) show_main_menu ;;
+    esac
+}
+
+show_install_development_menu() {
+    local choice
+    choice=$(menu "Install" \
+        "󰫏  Ruby on Rails" \
+        "  JavaScript" \
+        "  Go" \
+        "  PHP" \
+        "  Python" \
+        "  Elixir" \
+        "  Zig" \
+        "  Rust" \
+        "  Java" \
+        "  .NET" \
+        "  OCaml" \
+        "  Clojure")
+    case "$choice" in
+        *Rails*) present_terminal nova-dev-install ruby ;;
+        *JavaScript*) show_install_javascript_menu ;;
+        *Go*) present_terminal nova-dev-install go ;;
+        *PHP*) show_install_php_menu ;;
+        *Python*) present_terminal nova-dev-install python ;;
+        *Elixir*) show_install_elixir_menu ;;
+        *Zig*) present_terminal nova-dev-install zig ;;
+        *Rust*) present_terminal nova-dev-install rust ;;
+        *Java*) present_terminal nova-dev-install java ;;
+        *NET*) present_terminal nova-dev-install dotnet ;;
+        *OCaml*) present_terminal nova-dev-install ocaml ;;
+        *Clojure*) present_terminal nova-dev-install clojure ;;
+        *) show_install_menu ;;
+    esac
+}
+
+show_install_javascript_menu() {
+    local choice
+    choice=$(menu "Install" \
+        "  Node.js" \
+        "  Bun" \
+        "  Deno")
+    case "$choice" in
+        *Node*) present_terminal nova-dev-install node ;;
+        *Bun*) present_terminal nova-dev-install bun ;;
+        *Deno*) present_terminal nova-dev-install deno ;;
+        *) show_install_development_menu ;;
+    esac
+}
+
+show_install_php_menu() {
+    local choice
+    choice=$(menu "Install" \
+        "  PHP" \
+        "  Laravel")
+    case "$choice" in
+        *PHP*) present_terminal nova-dev-install php ;;
+        *Laravel*) present_terminal nova-dev-install laravel ;;
+        *) show_install_development_menu ;;
+    esac
+}
+
+show_install_elixir_menu() {
+    local choice
+    choice=$(menu "Install" \
+        "  Elixir" \
+        "  Phoenix")
+    case "$choice" in
+        *Elixir*) present_terminal nova-dev-install elixir ;;
+        *Phoenix*) present_terminal nova-dev-install phoenix ;;
+        *) show_install_development_menu ;;
     esac
 }
 
@@ -332,11 +404,83 @@ show_remove_menu() {
     local choice
     choice=$(menu "Remove" \
         "󰣇  Package (DNF)" \
-        "󰖟  Web App")
+        "󰖟  Web App" \
+        "󰵮  Development")
     case "$choice" in
         *Package*) present_terminal nova-pkg-remove ;;
         *Web*) present_terminal nova-webapp-remove ;;
+        *Development*) show_remove_development_menu ;;
         *) show_main_menu ;;
+    esac
+}
+
+show_remove_development_menu() {
+    local choice
+    choice=$(menu "Remove" \
+        "󰫏  Ruby on Rails" \
+        "  JavaScript" \
+        "  Go" \
+        "  PHP" \
+        "  Python" \
+        "  Elixir" \
+        "  Zig" \
+        "  Rust" \
+        "  Java" \
+        "  .NET" \
+        "  OCaml" \
+        "  Clojure")
+    case "$choice" in
+        *Rails*) present_terminal nova-dev-remove ruby ;;
+        *JavaScript*) show_remove_javascript_menu ;;
+        *Go*) present_terminal nova-dev-remove go ;;
+        *PHP*) show_remove_php_menu ;;
+        *Python*) present_terminal nova-dev-remove python ;;
+        *Elixir*) show_remove_elixir_menu ;;
+        *Zig*) present_terminal nova-dev-remove zig ;;
+        *Rust*) present_terminal nova-dev-remove rust ;;
+        *Java*) present_terminal nova-dev-remove java ;;
+        *NET*) present_terminal nova-dev-remove dotnet ;;
+        *OCaml*) present_terminal nova-dev-remove ocaml ;;
+        *Clojure*) present_terminal nova-dev-remove clojure ;;
+        *) show_remove_menu ;;
+    esac
+}
+
+show_remove_javascript_menu() {
+    local choice
+    choice=$(menu "Remove" \
+        "  Node.js" \
+        "  Bun" \
+        "  Deno")
+    case "$choice" in
+        *Node*) present_terminal nova-dev-remove node ;;
+        *Bun*) present_terminal nova-dev-remove bun ;;
+        *Deno*) present_terminal nova-dev-remove deno ;;
+        *) show_remove_development_menu ;;
+    esac
+}
+
+show_remove_php_menu() {
+    local choice
+    choice=$(menu "Remove" \
+        "  PHP" \
+        "  Laravel")
+    case "$choice" in
+        *PHP*) present_terminal nova-dev-remove php ;;
+        *Laravel*) present_terminal nova-dev-remove laravel ;;
+        *) show_remove_development_menu ;;
+    esac
+}
+
+show_remove_elixir_menu() {
+    local choice
+    choice=$(menu "Remove" \
+        "  Elixir" \
+        "  Phoenix")
+    case "$choice" in
+        *Elixir*) present_terminal nova-dev-remove elixir ;;
+        *Phoenix*) present_terminal nova-dev-remove phoenix ;;
+        *) show_remove_development_menu ;;
     esac
 }
 
@@ -389,7 +533,9 @@ case "${1,,}" in
     power) show_power_menu ;;
     restart) show_restart_menu ;;
     install) show_install_menu ;;
+    install-development) show_install_development_menu ;;
     remove) show_remove_menu ;;
+    remove-development) show_remove_development_menu ;;
     system) show_system_menu ;;
     *) show_main_menu ;;
 esac

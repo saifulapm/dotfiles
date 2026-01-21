@@ -34,3 +34,12 @@ node_modules/
 
 # Backup files created by setup.sh
 *.backup.*
+
+# Emacs - ignore everything except config files
+config/emacs/*
+!config/emacs/early-init.el
+!config/emacs/init.el
+!config/emacs/modules/
+
+# Yazi plugins (installed via ya pkg)
+config/yazi/plugins/

@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "version": "1.0.1768948635",
+  "name": "Nova Dynamic Theme",
+  "description": "Auto-generated theme for nord",
+  "theme": {
+    "colors": {
+      "frame": [39, 44, 54],
+      "frame_inactive": [39, 44, 54],
+      "frame_incognito": [39, 44, 54],
+      "frame_incognito_inactive": [39, 44, 54],
+      "toolbar": [46, 52, 64],
+      "tab_text": [216, 222, 233],
+      "tab_background_text": [216, 222, 233],
+      "bookmark_text": [216, 222, 233],
+      "omnibox_background": [59, 66, 82],
+      "omnibox_text": [216, 222, 233],
+      "ntp_background": [46, 52, 64],
+      "ntp_text": [216, 222, 233],
+      "ntp_link": [129, 161, 193],
+      "button_background": [59, 66, 82]
+    }
+  }
+}

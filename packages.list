@@ -27,6 +27,7 @@ starship
 ImageMagick
 lazygit
 git-delta
+lynx
 
 # Runtime manager
 mise
@@ -100,6 +101,11 @@ gvfs-mtp
 gvfs-nfs
 gvfs-smb
 
+# Yazi enhanced previews
+chafa
+mediainfo
+perl-Image-ExifTool
+
 # Media playback
 mpv
 playerctl
@@ -143,6 +149,7 @@ hyprpicker
 
 # Night light
 wlsunset
+brightnessctl
 
 # Lock screen
 swaylock
@@ -159,6 +166,9 @@ libayatana-appindicator-gtk3
 # fcitx5-gtk
 # fcitx5-qt
 # fcitx5-m17n
+
+# Browser
+chromium
 
 # Interactive prompts (for webapp install/remove)
 gum
