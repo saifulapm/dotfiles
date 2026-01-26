@@ -93,6 +93,18 @@ else
     skip_msg "RPMFusion already enabled"
 fi
 
+# Function to add dnf config if not present in a file
+add_config_if_not_present() {
+  local file="$1"
+  local config="$2"
+  grep -qF "$config" "$file" || echo "$config" | sudo tee -a "$file" >/dev/null
+}
+
+# Check and add configuration settings to /etc/dnf/dnf.conf
+add_config_if_not_present "/etc/dnf/dnf.conf" "max_parallel_downloads=5"
+add_config_if_not_present "/etc/dnf/dnf.conf" "fastestmirror=True"
+add_config_if_not_present "/etc/dnf/dnf.conf" "defaultyes=True"
+
 # ─────────────────────────────────────────────────────────────
 # FFmpeg (from RPMFusion, replaces free versions)
 # ─────────────────────────────────────────────────────────────
