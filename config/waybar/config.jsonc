@@ -7,6 +7,8 @@
   "modules-left": ["custom/nova", "niri/workspaces"],
   "modules-center": ["clock", "custom/voxtype", "custom/screenrecording-indicator"],
   "modules-right": [
+    "custom/idle-indicator",
+    "custom/dnd-indicator",
     "group/tray-expander",
     "bluetooth",
     "network",
@@ -139,6 +141,20 @@
     "tooltip": true,
     "on-click-right": "nova-voxtype-config",
     "on-click": "nova-voxtype-model"
+  },
+  "custom/idle-indicator": {
+    "format": "{}",
+    "exec": "$HOME/.dotfiles/default/waybar/indicators/idle.sh",
+    "interval": "once",
+    "signal": 9,
+    "return-type": "json"
+  },
+  "custom/dnd-indicator": {
+    "format": "{}",
+    "exec": "$HOME/.dotfiles/default/waybar/indicators/notification-silencing.sh",
+    "interval": "once",
+    "signal": 10,
+    "return-type": "json"
   },
   "tray": {
     "icon-size": 12,

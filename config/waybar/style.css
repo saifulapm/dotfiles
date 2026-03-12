@@ -86,3 +86,14 @@ tooltip {
 #custom-voxtype.recording {
   color: #a55555;
 }
+
+#custom-idle-indicator,
+#custom-dnd-indicator {
+  min-width: 12px;
+  margin: 0 4px;
+}
+
+#custom-idle-indicator.active,
+#custom-dnd-indicator.active {
+  color: @accent;
+}
