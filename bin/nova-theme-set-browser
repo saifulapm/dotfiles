@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Set browser theme color for Chromium, Brave, and Zen browsers
-# - Chromium: Generates dynamic theme extension
-# - Brave: Uses policy files for theme configuration
+# - Chromium/Brave: Policy-based BrowserThemeColor (live reload)
 # - Zen: Generates userChrome.css in profile directories
 
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
@@ -16,27 +15,11 @@ if [[ -z "$CURRENT_THEME" ]]; then
 fi
 
 COLORS_TOML="$THEME_DIR/$CURRENT_THEME/colors.toml"
-CHROMIUM_THEME="$THEME_DIR/$CURRENT_THEME/chromium.theme"
 
 # Parse a color from colors.toml (returns hex without #)
 get_color() {
     local key="$1"
     grep "^$key = " "$COLORS_TOML" 2>/dev/null | sed 's/.*= *"\(#\)\?\([^"]*\)".*/\2/'
-}
-
-# Convert hex to RGB array string for JSON (e.g., "1e1e2e" -> "[30, 30, 46]")
-hex_to_rgb_array() {
-    local hex="$1"
-    local r=$((16#${hex:0:2}))
-    local g=$((16#${hex:2:2}))
-    local b=$((16#${hex:4:2}))
-    echo "[$r, $g, $b]"
-}
-
-# Convert RGB string to hex (e.g., "30,30,46" -> "#1e1e2e")
-rgb_to_hex() {
-    local rgb="$1"
-    printf '#%02x%02x%02x' ${rgb//,/ }
 }
 
 # Darken a hex color by a percentage (0-100)
@@ -66,81 +49,39 @@ lighten_hex() {
     printf '%02x%02x%02x' $r $g $b
 }
 
-# Get theme RGB from chromium.theme or default
-if [[ -f "$CHROMIUM_THEME" ]]; then
-    THEME_RGB=$(<"$CHROMIUM_THEME")
-else
-    THEME_RGB="28,32,39"
-fi
-
-THEME_HEX=$(rgb_to_hex "$THEME_RGB")
-
 # Get colors from colors.toml
 BG_HEX=$(get_color "background")
 FG_HEX=$(get_color "foreground")
-COLOR0_HEX=$(get_color "color0")    # surface
-COLOR8_HEX=$(get_color "color8")    # surface1/lighter surface
+SURFACE_HEX=$(get_color "color0")
 ACCENT_HEX=$(get_color "accent")
 
 # Compute derived colors
-CRUST_HEX=$(darken_hex "$BG_HEX" 15)      # darker than background
-MANTLE_HEX=$(darken_hex "$BG_HEX" 8)      # slightly darker than background
-SURFACE_HEX="$COLOR0_HEX"                  # surface0
-
-# Convert to RGB arrays for Chrome extension
-BG_RGB=$(hex_to_rgb_array "$BG_HEX")
-FG_RGB=$(hex_to_rgb_array "$FG_HEX")
-SURFACE_RGB=$(hex_to_rgb_array "$SURFACE_HEX")
-CRUST_RGB=$(hex_to_rgb_array "$CRUST_HEX")
-ACCENT_RGB=$(hex_to_rgb_array "$ACCENT_HEX")
-
-# Determine if light or dark mode
 if [[ -f "$THEME_DIR/$CURRENT_THEME/light.mode" ]]; then
-    COLOR_SCHEME="light"
-    # For light themes, swap the logic for crust/surface
     CRUST_HEX=$(lighten_hex "$BG_HEX" 5)
-    MANTLE_HEX=$(lighten_hex "$BG_HEX" 3)
-    CRUST_RGB=$(hex_to_rgb_array "$CRUST_HEX")
 else
-    COLOR_SCHEME="dark"
+    CRUST_HEX=$(darken_hex "$BG_HEX" 15)
 fi
 
 # ============================================================================
-# Chromium: Generate dynamic theme extension
+# Chromium: Policy-based theming (live reload)
 # ============================================================================
 set_chromium_theme() {
-    local ext_dir="$DOTFILES/default/chromium/extensions/dynamic-theme"
-    mkdir -p "$ext_dir"
+    command -v chromium &>/dev/null || return
 
-    # Use timestamp for version to force extension reload
-    local version="1.0.$(date +%s)"
+    # Policy-based theming (live reload, like omarchy)
+    local policy_dir="/etc/chromium/policies/managed"
+    if [[ ! -d "$policy_dir" ]]; then
+        sudo mkdir -p "$policy_dir" 2>/dev/null || return
+    fi
 
-    cat > "$ext_dir/manifest.json" << EOF
-{
-  "manifest_version": 3,
-  "version": "$version",
-  "name": "Nova Dynamic Theme",
-  "description": "Auto-generated theme for $CURRENT_THEME",
-  "theme": {
-    "colors": {
-      "frame": $CRUST_RGB,
-      "frame_inactive": $CRUST_RGB,
-      "frame_incognito": $CRUST_RGB,
-      "frame_incognito_inactive": $CRUST_RGB,
-      "toolbar": $BG_RGB,
-      "tab_text": $FG_RGB,
-      "tab_background_text": $FG_RGB,
-      "bookmark_text": $FG_RGB,
-      "omnibox_background": $SURFACE_RGB,
-      "omnibox_text": $FG_RGB,
-      "ntp_background": $BG_RGB,
-      "ntp_text": $FG_RGB,
-      "ntp_link": $ACCENT_RGB,
-      "button_background": $SURFACE_RGB
-    }
-  }
-}
-EOF
+    local policy_file="$policy_dir/color.json"
+    if [[ -w "$policy_file" ]] || [[ -w "$policy_dir" ]]; then
+        echo "{\"BrowserThemeColor\": \"#$BG_HEX\"}" > "$policy_file"
+    else
+        echo "{\"BrowserThemeColor\": \"#$BG_HEX\"}" | sudo tee "$policy_file" >/dev/null 2>&1 || return
+    fi
+
+    chromium --refresh-platform-policy --no-startup-window >/dev/null 2>&1 &
 }
 
 # ============================================================================
