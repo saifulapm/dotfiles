@@ -7,6 +7,7 @@ binds {
 
     // Applications
     Mod+T hotkey-overlay-title="Open Terminal" { spawn "footclient"; }
+    Mod+Alt+Return hotkey-overlay-title="Tmux Terminal" { spawn "footclient" "bash" "-c" "tmux attach || tmux new -s Work"; }
     Mod+D hotkey-overlay-title="Run Application" { spawn "fuzzel"; }
     Mod+E hotkey-overlay-title="File Manager" { spawn "foot" "-e" "yazi"; }
     Super+Alt+L hotkey-overlay-title="Lock Screen" { spawn "nova-lock-screen"; }
