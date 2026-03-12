@@ -1,4 +1,6 @@
 #!/bin/bash
-# List available power profiles
 
-powerprofilesctl list 2>/dev/null | grep -E "^\*?\s+" | sed 's/^[ *]*//' | sed 's/:$//'
+# Returns available power profiles (used by setup-power.sh)
+powerprofilesctl list |
+  awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }' |
+  tac
