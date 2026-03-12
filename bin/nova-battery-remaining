@@ -1,10 +1,24 @@
 #!/bin/bash
-# Returns the battery percentage remaining as an integer
 
-upower -i $(upower -e | grep BAT) \
-| awk -F: '/percentage/ {
-    gsub(/[%[:space:]]/, "", $2);
-    val=$2;
-    printf("%d\n", (val+0.5))
+# Returns battery time remaining in compact format (e.g., "2h 15m").
+battery_info=$(upower -i $(upower -e | grep BAT))
+
+echo "$battery_info" | awk '/time to (empty|full)/ {
+    value = $4
+    unit = $5
+    if (unit == "minutes") {
+        hours = int(value / 60)
+        minutes = int(value % 60)
+    } else {
+        hours = int(value)
+        minutes = int((value - hours) * 60)
+    }
+    if (hours > 0 && minutes > 0) {
+        printf "%dh %dm", hours, minutes
+    } else if (hours > 0) {
+        printf "%dh", hours
+    } else {
+        printf "%dm", minutes
+    }
     exit
-  }'
+}'

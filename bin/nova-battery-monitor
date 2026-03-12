@@ -2,6 +2,8 @@
 # Battery monitor - run by systemd timer every 30 seconds
 # Alerts if battery is critically low
 
+nova-battery-present || exit 0
+
 BATTERY_THRESHOLD=10
 NOTIFICATION_FLAG="/run/user/$UID/nova_battery_notified"
 BATTERY_LEVEL=$(nova-battery-remaining)
