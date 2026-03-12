@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Sets the specified image as the current background
+
+if [[ -z $1 ]]; then
+  echo "Usage: nova-theme-bg-set <path-to-image>" >&2
+  exit 1
+fi
+
+BACKGROUND="$1"
+CURRENT_BACKGROUND_LINK="$HOME/.config/nova/current/background"
+
+ln -nsf "$BACKGROUND" "$CURRENT_BACKGROUND_LINK"
+
+pkill -x swaybg
+setsid swaybg -i "$CURRENT_BACKGROUND_LINK" -m fill >/dev/null 2>&1 &
+disown

@@ -216,6 +216,7 @@ binds {
 
     // Cycle background wallpaper
     Mod+Alt+B hotkey-overlay-title="Next Background" { spawn "nova-bg-next"; }
+    Mod+Ctrl+Space hotkey-overlay-title="Background Menu" { spawn "nova-bg-menu"; }
 
     // Screensaver
     Mod+Alt+Z hotkey-overlay-title="Launch Screensaver" { spawn "nova-launch-screensaver"; }

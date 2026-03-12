@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Re-apply current theme (useful after config changes)
+theme set "$(theme current)"

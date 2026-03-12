@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Fuzzel-based background picker for current theme
+
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+CURRENT_THEME=$(theme current)
+
+if [[ "$CURRENT_THEME" == "none" ]]; then
+    notify-send "No theme set" "Set a theme first with: theme set <name>"
+    exit 1
+fi
+
+BG_DIR="$DOTFILES/themes/$CURRENT_THEME/backgrounds"
+
+if [[ ! -d "$BG_DIR" ]]; then
+    notify-send "No backgrounds" "Theme '$CURRENT_THEME' has no backgrounds directory"
+    exit 1
+fi
+
+# List background filenames and let user pick
+CHOICE=$(ls -1 "$BG_DIR" | fuzzel --dmenu --prompt "Background: ")
+
+if [[ -n "$CHOICE" ]]; then
+    nova-theme-bg-set "$BG_DIR/$CHOICE"
+fi
