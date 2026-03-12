@@ -1,21 +1,45 @@
 #!/bin/bash
 # Toggle screen recording with wf-recorder
-# Usage: nova-cmd-screenrecord [--desktop|--mic|--both]
+# Usage: nova-cmd-screenrecord [--desktop|--mic|--both|--no-audio]
 
+[[ -f ~/.config/user-dirs.dirs ]] && source ~/.config/user-dirs.dirs
 OUTPUT_DIR="${XDG_VIDEOS_DIR:-$HOME/Videos}/Recordings"
 mkdir -p "$OUTPUT_DIR"
 
-# Check if recording is active
+trim_and_notify() {
+    local latest="$1"
+    if [[ -n "$latest" && -f "$latest" ]]; then
+        # Trim first 100ms to remove noise frame
+        local trimmed="${latest%.mp4}-trimmed.mp4"
+        if ffmpeg -y -ss 0.1 -i "$latest" -c copy "$trimmed" -loglevel quiet 2>/dev/null; then
+            mv "$trimmed" "$latest"
+        else
+            rm -f "$trimmed"
+        fi
+
+        # Generate preview and notify with click-to-open
+        local preview="${latest%.mp4}-preview.png"
+        ffmpeg -y -i "$latest" -ss 00:00:00.1 -vframes 1 -q:v 2 "$preview" -loglevel quiet 2>/dev/null
+
+        (
+            ACTION=$(notify-send "Screen recording saved" "Click to open" -t 10000 -i "${preview:-$latest}" -A "default=open")
+            [[ "$ACTION" == "default" ]] && mpv "$latest"
+            rm -f "$preview"
+        ) &
+    fi
+}
+
+# Stop if already recording
 if pgrep -x wf-recorder > /dev/null; then
-    # Stop recording
     pkill -SIGINT wf-recorder
-    # Wait for wf-recorder to actually exit (max 5 seconds)
     for i in {1..50}; do
         pgrep -x wf-recorder > /dev/null || break
         sleep 0.1
     done
-    notify-send "Screen Recording" "Recording saved to $OUTPUT_DIR"
     pkill -RTMIN+8 waybar 2>/dev/null
+
+    latest="$OUTPUT_DIR/$(ls -t "$OUTPUT_DIR" | head -1)"
+    trim_and_notify "$latest"
     exit 0
 fi
 
@@ -23,55 +47,30 @@ fi
 AUDIO_MODE="${1:---desktop}"
 AUDIO_ARGS=""
 
-# Get audio sources
-get_default_sink() {
-    pactl get-default-sink 2>/dev/null
-}
-
-get_default_source() {
-    pactl get-default-source 2>/dev/null
-}
-
 case "$AUDIO_MODE" in
     --desktop)
-        # Desktop audio only (monitor of default sink)
-        SINK=$(get_default_sink)
-        if [[ -n "$SINK" ]]; then
-            AUDIO_ARGS="--audio=${SINK}.monitor"
-        fi
+        SINK=$(pactl get-default-sink 2>/dev/null)
+        [[ -n "$SINK" ]] && AUDIO_ARGS="--audio=${SINK}.monitor"
         ;;
     --mic)
-        # Microphone only
-        SOURCE=$(get_default_source)
-        if [[ -n "$SOURCE" ]]; then
-            AUDIO_ARGS="--audio=$SOURCE"
-        fi
+        SOURCE=$(pactl get-default-source 2>/dev/null)
+        [[ -n "$SOURCE" ]] && AUDIO_ARGS="--audio=$SOURCE"
         ;;
-    --both)
-        # Both desktop and microphone
-        # wf-recorder only supports one audio source, so we use default
-        AUDIO_ARGS="--audio"
-        ;;
-    --no-audio)
-        # No audio
-        AUDIO_ARGS=""
-        ;;
+    --both)   AUDIO_ARGS="--audio" ;;
+    --no-audio) AUDIO_ARGS="" ;;
     *)
-        # Default to desktop audio
-        SINK=$(get_default_sink)
-        if [[ -n "$SINK" ]]; then
-            AUDIO_ARGS="--audio=${SINK}.monitor"
-        fi
+        SINK=$(pactl get-default-sink 2>/dev/null)
+        [[ -n "$SINK" ]] && AUDIO_ARGS="--audio=${SINK}.monitor"
         ;;
 esac
 
-# Get the focused output from niri
 OUTPUT=$(niri msg outputs --json 2>/dev/null | jq -r '.[] | select(.focused) | .name' | head -1)
 OUTPUT=${OUTPUT:-eDP-1}
 
-# Start recording
 FILENAME="$OUTPUT_DIR/screenrecording-$(date +'%Y-%m-%d_%H-%M-%S').mp4"
-wf-recorder -o "$OUTPUT" -f "$FILENAME" $AUDIO_ARGS >/dev/null 2>&1 &
+
+# Use h264 codec for Mac-compatible sharing
+wf-recorder -o "$OUTPUT" -c h264_vaapi -f "$FILENAME" $AUDIO_ARGS >/dev/null 2>&1 &
 
 notify-send "Screen Recording" "Recording started..."
 pkill -RTMIN+8 waybar 2>/dev/null
