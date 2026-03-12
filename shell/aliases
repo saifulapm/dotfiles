@@ -12,6 +12,7 @@ else
 fi
 
 alias ff="fzf --preview 'bat --style=numbers --color=always {}'"
+alias eff='$EDITOR "$(ff)"'        # open fzf result in editor
 
 # Zoxide (smarter cd)
 if command -v zoxide &>/dev/null; then
@@ -36,6 +37,8 @@ alias d='docker'
 alias dc='docker compose'
 alias k='kubectl'
 alias r='rails'
+alias cx='claude --dangerously-skip-permissions'
+alias t='tmux attach || tmux new -s Work'
 
 # ─────────────────────────────────────────────────────────────
 # Git
@@ -47,12 +50,12 @@ alias gc="git commit"
 alias gl="git log --oneline --decorate --color"
 alias amend="git add . && git commit --amend --no-edit"
 alias commit="git add . && git commit -m"
-alias diff="git diff"
+alias gdiff="git diff"
 alias force="git push --force"
 alias nuke="git clean -df && git reset --hard"
 alias pop="git stash pop"
 alias pull="git pull"
-alias push="git push -u origin main"
+alias push="git push -u origin HEAD"
 alias resolve="git add . && git commit --no-edit"
 alias stash="git stash -u"
 alias unstage="git restore --staged ."
@@ -69,7 +72,7 @@ alias mv='mv -i'
 # DNF
 # ─────────────────────────────────────────────────────────────
 alias di="sudo dnf install"
-alias du="sudo dnf update"
+alias dnfu="sudo dnf update"
 alias dr="sudo dnf remove"
 alias ds="sudo dnf search"
 
