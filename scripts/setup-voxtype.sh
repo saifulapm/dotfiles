@@ -68,11 +68,11 @@ else
     sudo cp target/release/voxtype /usr/local/bin/
 fi
 
-# Setup config
-mkdir -p ~/.config/voxtype
+# Config is symlinked by setup.sh, verify it exists
 if [[ ! -f ~/.config/voxtype/config.toml ]]; then
-    cp "$DOTFILES/config/voxtype/config.toml" ~/.config/voxtype/
-    echo "Config installed to ~/.config/voxtype/config.toml"
+    mkdir -p ~/.config/voxtype
+    ln -sf "$DOTFILES/config/voxtype/config.toml" ~/.config/voxtype/config.toml
+    echo "Config linked to ~/.config/voxtype/config.toml"
 fi
 
 # Download whisper model and setup systemd

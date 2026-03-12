@@ -72,9 +72,9 @@ if [[ -f "$DOTFILES/copr.list" ]]; then
         fi
         count=0
         while IFS= read -r repo; do
-            if ! dnf repolist | grep -q "${repo##*/}"; then
+            if ! dnf repolist --enabled 2>/dev/null | grep -qi "${repo//\//:}"; then
                 spin "  Enabling $repo" sudo dnf -y copr enable "$repo"
-                ((count++))
+                ((count++)) || true
             fi
         done <<< "$repos"
         done_msg "$count repos enabled"
@@ -126,9 +126,9 @@ if [[ -f "$DOTFILES/packages.list" ]]; then
         while IFS= read -r pkg; do
             if ! rpm -q "$pkg" &>/dev/null; then
                 spin "  Installing $pkg" sudo dnf install -y "$pkg"
-                ((installed++))
+                ((installed++)) || true
             else
-                ((skipped++))
+                ((skipped++)) || true
             fi
         done <<< "$packages"
         done_msg "$installed installed, $skipped skipped"
@@ -146,7 +146,7 @@ if [[ -f "$DOTFILES/flatpak.list" ]]; then
             spin "  Installing Flatpak" sudo dnf install -y flatpak
         fi
 
-	# Ensure Flathub remote exists
+        # Ensure Flathub remote exists
         if ! flatpak remotes --columns=name | grep -qx flathub; then
             spin "  Adding Flathub remote" flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
         fi
@@ -156,9 +156,9 @@ if [[ -f "$DOTFILES/flatpak.list" ]]; then
         while IFS= read -r pkg; do
             if ! flatpak list --app | grep -q "$pkg"; then
                 spin "  Installing $pkg" flatpak install -y flathub "$pkg"
-                ((installed++))
+                ((installed++)) || true
             else
-                ((skipped++))
+                ((skipped++)) || true
             fi
         done <<< "$flatpaks"
         done_msg "$installed installed, $skipped skipped"
@@ -182,9 +182,9 @@ if [[ -f "$DOTFILES/snap.list" ]]; then
             pkg_name=$(echo "$pkg" | awk '{print $1}')
             if ! snap list "$pkg_name" &>/dev/null; then
                 spin "  Installing $pkg_name" sudo snap install $pkg
-                ((installed++))
+                ((installed++)) || true
             else
-                ((skipped++))
+                ((skipped++)) || true
             fi
         done <<< "$snaps"
         done_msg "$installed installed, $skipped skipped"
@@ -208,9 +208,9 @@ if [[ -d "$DOTFILES/fonts" ]]; then
         [[ "$name" == ".gitkeep" ]] && continue
         if [[ ! -e "$HOME/.local/share/fonts/$name" ]]; then
             cp -r "$font" ~/.local/share/fonts/
-            ((installed++))
+            ((installed++)) || true
         else
-            ((skipped++))
+            ((skipped++)) || true
         fi
     done
     if [[ $installed -gt 0 ]]; then
@@ -236,9 +236,9 @@ if [[ -f "$DOTFILES/cargo.list" ]]; then
         while IFS= read -r pkg; do
             if ! command -v "$pkg" &>/dev/null; then
                 spin "  Installing $pkg" cargo install "$pkg" || true
-                ((installed++))
+                ((installed++)) || true
             else
-                ((skipped++))
+                ((skipped++)) || true
             fi
         done <<< "$cargo_pkgs"
         done_msg "$installed installed, $skipped skipped"
@@ -262,9 +262,9 @@ if [[ -f "$DOTFILES/go.list" ]]; then
                 name=$(basename "$pkg" | cut -d'@' -f1)
                 if ! command -v "$name" &>/dev/null; then
                     spin "  Installing $name" go install "$pkg" 2>/dev/null || true
-                    ((installed++))
+                    ((installed++)) || true
                 else
-                    ((skipped++))
+                    ((skipped++)) || true
                 fi
             done <<< "$go_pkgs"
             done_msg "$installed installed, $skipped skipped"
@@ -287,9 +287,9 @@ if [[ -f "$DOTFILES/pip.list" ]]; then
         while IFS= read -r pkg; do
             if ! pip3 show "$pkg" &>/dev/null; then
                 spin "  Installing $pkg" pip3 install --user "$pkg" || true
-                ((installed++))
+                ((installed++)) || true
             else
-                ((skipped++))
+                ((skipped++)) || true
             fi
         done <<< "$pip_pkgs"
         done_msg "$installed installed, $skipped skipped"
@@ -311,9 +311,9 @@ if [[ -f "$DOTFILES/npm.list" ]]; then
         while IFS= read -r pkg; do
             if ! npm list -g "$pkg" &>/dev/null; then
                 spin "  Installing $pkg" npm install -g "$pkg" || true
-                ((installed++))
+                ((installed++)) || true
             else
-                ((skipped++))
+                ((skipped++)) || true
             fi
         done <<< "$npm_pkgs"
         done_msg "$installed installed, $skipped skipped"
@@ -339,9 +339,9 @@ if [[ -d "$DOTFILES/config" ]]; then
         if ! is_linked "$item" "$HOME/.config/$name"; then
             rm -rf "$HOME/.config/$name"
             ln -sf "$item" "$HOME/.config/$name"
-            ((linked++))
+            ((linked++)) || true
         else
-            ((skipped++))
+            ((skipped++)) || true
         fi
     done
     done_msg "$linked linked, $skipped skipped"
@@ -363,9 +363,9 @@ if [[ -d "$DOTFILES/config/home" ]]; then
             if ! is_linked "$item" "$HOME/$name"; then
                 rm -rf "$HOME/$name"
                 ln -sf "$item" "$HOME/$name"
-                ((linked++))
+                ((linked++)) || true
             else
-                ((skipped++))
+                ((skipped++)) || true
             fi
         done
         done_msg "$linked linked, $skipped skipped"
@@ -391,9 +391,9 @@ if [[ -d "$DOTFILES/bin" ]]; then
         chmod +x "$script"
         if ! is_linked "$script" "$HOME/.local/bin/$name"; then
             ln -sf "$script" ~/.local/bin/"$name"
-            ((linked++))
+            ((linked++)) || true
         else
-            ((skipped++))
+            ((skipped++)) || true
         fi
     done
     done_msg "$linked linked, $skipped skipped"
@@ -414,7 +414,7 @@ if [[ -d "$DOTFILES/scripts" ]]; then
             name=$(basename "$script")
             chmod +x "$script"
             spin "  Running $name" "$script" || true
-            ((count++))
+            ((count++)) || true
         done
         done_msg "$count scripts completed"
     fi

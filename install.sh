@@ -10,11 +10,16 @@ set -e
 
 DOTFILES="$HOME/.dotfiles"
 
+# Ensure git is available
+if ! command -v git &>/dev/null; then
+    echo "Installing git..."
+    sudo dnf install -y git
+fi
+
 echo "Cloning dotfiles..."
 if [[ -d "$DOTFILES/.git" ]]; then
-    # Fetch latest and reset to origin
     git -C "$DOTFILES" fetch --quiet origin
-    git -C "$DOTFILES" reset --hard --quiet origin/$BRANCH
+    git -C "$DOTFILES" reset --hard --quiet "origin/$BRANCH"
 else
     rm -rf "$DOTFILES"
     git clone --quiet "https://github.com/$REPO.git" "$DOTFILES"

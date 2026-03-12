@@ -4,7 +4,17 @@
 
 set -e
 
+UPDATE_MODE=false
+[[ "$1" == "--update" ]] && UPDATE_MODE=true
+
 FONTS_DIR="$HOME/.local/share/fonts"
+
+# Skip if all font dirs already exist (unless updating)
+if [[ -d "$FONTS_DIR/MapleMono" && -d "$FONTS_DIR/MapleMono-NF" && -d "$FONTS_DIR/NerdFontsSymbolsOnly" && "$UPDATE_MODE" == "false" ]]; then
+    echo "Fonts already installed (use --update to re-download)"
+    exit 0
+fi
+
 TEMP_DIR=$(mktemp -d)
 
 cleanup() {

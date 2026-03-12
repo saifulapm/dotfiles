@@ -1,6 +1,18 @@
 #!/bin/bash
 # Install default webapps (same as omarchy)
 
+# Skip if nova-webapp-install is not available yet
+if ! command -v nova-webapp-install &>/dev/null; then
+    echo "nova-webapp-install not found, skipping webapps"
+    exit 0
+fi
+
+# Skip if webapps already installed (check for first one)
+if [[ -f "$HOME/.local/share/applications/HEY.desktop" ]]; then
+    echo "Webapps already installed"
+    exit 0
+fi
+
 nova-webapp-install "HEY" https://app.hey.com HEY.png "nova-webapp-handler-hey %u" "x-scheme-handler/mailto"
 nova-webapp-install "Basecamp" https://launchpad.37signals.com Basecamp.png
 nova-webapp-install "WhatsApp" https://web.whatsapp.com/ WhatsApp.png

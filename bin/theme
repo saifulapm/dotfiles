@@ -27,6 +27,7 @@ generate_theme() {
 
     # Create sed script for substitutions
     local sed_script=$(mktemp)
+    trap "rm -f '$sed_script'" RETURN
 
     # Parse colors.toml and generate substitutions
     while IFS='=' read -r key value; do
@@ -51,8 +52,15 @@ generate_theme() {
         fi
     done < "$colors_file"
 
-    # Apply btop theme (use static file if exists, otherwise generate from template)
+    # Ensure output directories exist
+    local nova_theme="$HOME/.config/nova/current/theme"
+    mkdir -p "$nova_theme"
     mkdir -p "$HOME/.config/btop/themes"
+    mkdir -p "$HOME/.config/mako"
+    mkdir -p "$HOME/.config/lazygit"
+    mkdir -p "$HOME/.config/swaylock"
+
+    # Apply btop theme (use static file if exists, otherwise generate from template)
     if [[ -f "$THEMES_DIR/$name/btop.theme" ]]; then
         cp "$THEMES_DIR/$name/btop.theme" "$HOME/.config/btop/themes/current.theme"
     else
@@ -62,56 +70,34 @@ generate_theme() {
     # Generate shell theme (FZF colors)
     sed -f "$sed_script" "$TEMPLATES_DIR/fzf.sh.tpl" > "$DOTFILES/shell/theme"
 
-    # Generate ghostty theme
-    mkdir -p "$HOME/.config/nova/current/theme"
-    sed -f "$sed_script" "$TEMPLATES_DIR/ghostty.conf.tpl" > "$HOME/.config/nova/current/theme/ghostty.conf"
+    # Generate terminal themes (nova theme dir, included by app configs)
+    sed -f "$sed_script" "$TEMPLATES_DIR/ghostty.conf.tpl" > "$nova_theme/ghostty.conf"
+    sed -f "$sed_script" "$TEMPLATES_DIR/alacritty.toml.tpl" > "$nova_theme/alacritty.toml"
+    sed -f "$sed_script" "$TEMPLATES_DIR/foot-colors.ini.tpl" > "$nova_theme/foot-colors.ini"
 
-    # Generate niri colors
-    mkdir -p "$HOME/.config/niri"
+    # Generate niri colors (written into symlinked config dir)
     sed -f "$sed_script" "$TEMPLATES_DIR/niri.kdl.tpl" > "$HOME/.config/niri/colors.kdl"
 
-    # Generate fuzzel theme colors
-    mkdir -p "$HOME/.config/nova/current/theme"
-    sed -f "$sed_script" "$TEMPLATES_DIR/fuzzel-colors.ini.tpl" > "$HOME/.config/nova/current/theme/fuzzel-colors.ini"
+    # Generate app theme configs (nova theme dir, symlinked by apps)
+    sed -f "$sed_script" "$TEMPLATES_DIR/fuzzel-colors.ini.tpl" > "$nova_theme/fuzzel-colors.ini"
+    sed -f "$sed_script" "$TEMPLATES_DIR/waybar.css.tpl" > "$nova_theme/waybar.css"
+    sed -f "$sed_script" "$TEMPLATES_DIR/mako.ini.tpl" > "$nova_theme/mako.ini"
+    sed -f "$sed_script" "$TEMPLATES_DIR/lazygit.yml.tpl" > "$nova_theme/lazygit.yml"
 
-    # Generate waybar theme CSS
-    mkdir -p "$HOME/.config/nova/current/theme"
-    sed -f "$sed_script" "$TEMPLATES_DIR/waybar.css.tpl" > "$HOME/.config/nova/current/theme/waybar.css"
+    # Symlink generated configs into app config dirs
+    ln -snf "$nova_theme/mako.ini" ~/.config/mako/config
+    [ -L ~/.config/lazygit ] && rm ~/.config/lazygit && mkdir -p ~/.config/lazygit
+    ln -snf "$nova_theme/lazygit.yml" ~/.config/lazygit/config.yml
 
-    # Generate alacritty theme
-    sed -f "$sed_script" "$TEMPLATES_DIR/alacritty.toml.tpl" > "$HOME/.config/nova/current/theme/alacritty.toml"
-
-    # Generate foot colors
-    sed -f "$sed_script" "$TEMPLATES_DIR/foot-colors.ini.tpl" > "$HOME/.config/nova/current/theme/foot-colors.ini"
-
-    # Generate mako config
-    mkdir -p "$HOME/.config/mako"
-    sed -f "$sed_script" "$TEMPLATES_DIR/mako.ini.tpl" > "$HOME/.config/mako/config"
-
-    # Generate mako config to nova theme dir and symlink
-    sed -f "$sed_script" "$TEMPLATES_DIR/mako.ini.tpl" > "$HOME/.config/nova/current/theme/mako.ini"
-    mkdir -p ~/.config/mako
-    ln -snf ~/.config/nova/current/theme/mako.ini ~/.config/mako/config
-
-    # Generate lazygit config to nova theme dir and symlink
-    sed -f "$sed_script" "$TEMPLATES_DIR/lazygit.yml.tpl" > "$HOME/.config/nova/current/theme/lazygit.yml"
-    [ -L ~/.config/lazygit ] && rm ~/.config/lazygit
-    mkdir -p ~/.config/lazygit
-    ln -snf ~/.config/nova/current/theme/lazygit.yml ~/.config/lazygit/config.yml
- 
     # Generate swaylock config
-    mkdir -p "$HOME/.config/swaylock"
     sed -f "$sed_script" "$TEMPLATES_DIR/swaylock.conf.tpl" > "$HOME/.config/swaylock/config"
 
-    # Generate GTK CSS colors
-    mkdir -p "$HOME/.config/gtk-3.0"
-    mkdir -p "$HOME/.config/gtk-4.0"
+    # Generate GTK CSS colors (written into symlinked config dirs)
     sed -f "$sed_script" "$TEMPLATES_DIR/gtk.css.tpl" > "$HOME/.config/gtk-3.0/gtk.css"
     sed -f "$sed_script" "$TEMPLATES_DIR/gtk.css.tpl" > "$HOME/.config/gtk-4.0/gtk.css"
 
-    # Generate yazi theme
+    # Generate yazi theme (written into symlinked config dir)
     if [[ -f "$TEMPLATES_DIR/yazi-theme.toml.tpl" ]]; then
-        mkdir -p "$HOME/.config/yazi"
         sed -f "$sed_script" "$TEMPLATES_DIR/yazi-theme.toml.tpl" > "$HOME/.config/yazi/theme.toml"
     fi
 
@@ -146,8 +132,6 @@ generate_theme() {
 
     # Set browser theme (requires restart)
     nova-theme-set-browser 2>/dev/null || true
-
-    rm "$sed_script"
 
     echo "Theme applied: $name"
     echo "Restart terminal for full effect"
