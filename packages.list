@@ -167,6 +167,9 @@ libayatana-appindicator-gtk3
 # fcitx5-qt
 # fcitx5-m17n
 
+# x86/x86-64 emulation (for 16K page incompatible apps)
+fex-emu
+
 # Browser
 chromium
 
