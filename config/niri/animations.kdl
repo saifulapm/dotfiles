@@ -1,7 +1,62 @@
 // Animation settings
-// https://yalter.github.io/niri/Configuration:-Animations
+// https://niri-wm.github.io/niri/Configuration:-Animations
 
 animations {
-    // off
-    // slowdown 3.0
+    // Workspace switching — slightly bouncy for tactile feel
+    workspace-switch {
+        spring damping-ratio=0.9 stiffness=900 epsilon=0.0001
+    }
+
+    // Window open — smooth fade-in with expo ease
+    window-open {
+        duration-ms 200
+        curve "ease-out-expo"
+    }
+
+    // Window close — quick fade-out
+    window-close {
+        duration-ms 150
+        curve "ease-out-quad"
+    }
+
+    // Camera scrolling — smooth and responsive
+    horizontal-view-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    // Window movement (reorder, consume/expel) — matched with view movement
+    window-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    // Window resize — matched with movement for sync
+    window-resize {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    // Config notification — gentle bounce
+    config-notification-open-close {
+        spring damping-ratio=0.7 stiffness=800 epsilon=0.001
+    }
+
+    // Exit confirmation dialog
+    exit-confirmation-open-close {
+        spring damping-ratio=0.7 stiffness=500 epsilon=0.01
+    }
+
+    // Screenshot UI — smooth fade-in
+    screenshot-ui-open {
+        duration-ms 200
+        curve "ease-out-expo"
+    }
+
+    // Overview zoom — smooth with slight bounce
+    overview-open-close {
+        spring damping-ratio=0.9 stiffness=700 epsilon=0.0001
+    }
+
+    // Alt-Tab close
+    recent-windows-close {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.001
+    }
 }
