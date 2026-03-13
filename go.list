@@ -3,3 +3,4 @@
 # Lines starting with # are ignored
 
 github.com/jesseduffield/lazydocker@latest
+github.com/meowrain/localsend-go@latest

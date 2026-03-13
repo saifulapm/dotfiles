@@ -234,6 +234,10 @@ binds {
     Mod+Ctrl+Shift+I hotkey-overlay-title="Toggle Idle" { spawn "nova-toggle-idle"; }
     Mod+Ctrl+Alt+N hotkey-overlay-title="Toggle Nightlight" { spawn "nova-toggle-nightlight"; }
 
+    // Share (LocalSend)
+    Mod+Ctrl+S hotkey-overlay-title="Share Clipboard" { spawn "nova-cmd-share" "clipboard"; }
+    Mod+Ctrl+Shift+S hotkey-overlay-title="Share File" { spawn "nova-cmd-share" "file"; }
+
     // Info notifications
     Mod+Ctrl+Alt+T hotkey-overlay-title="Show Time" { spawn "nova-notify-time"; }
     Mod+Ctrl+Alt+P hotkey-overlay-title="Battery Status" { spawn "nova-notify-battery"; }

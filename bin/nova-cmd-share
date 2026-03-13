@@ -1,40 +1,55 @@
 #!/bin/bash
-# Share clipboard, file, or folder using LocalSend
 
-if (($# == 0)); then
-    echo "Usage: nova-cmd-share [clipboard|file|folder]"
+# Share clipboard, file, or folder using localsend-go (LocalSend protocol).
+# Works with LocalSend app on iOS/Android/desktop.
+#
+# Usage: nova-cmd-share [clipboard|file|folder|receive]
+
+SEND_CMD="localsend-go"
+
+if ! command -v "$SEND_CMD" &>/dev/null; then
+    notify-send -u critical "LocalSend" "localsend-go not found. Install with: go install github.com/meowrain/localsend-go@latest"
     exit 1
 fi
 
-MODE="$1"
-shift
+MODE="${1:-clipboard}"
+shift 2>/dev/null
 
-if [[ $MODE == "clipboard" ]]; then
-    TEMP_FILE=$(mktemp --suffix=.txt)
-    wl-paste > "$TEMP_FILE"
-    if [[ ! -s "$TEMP_FILE" ]]; then
-        notify-send "Share" "Clipboard is empty"
-        rm -f "$TEMP_FILE"
-        exit 1
-    fi
-    FILES="$TEMP_FILE"
-else
-    if (($# > 0)); then
-        FILES="$*"
-    else
-        if [[ $MODE == "folder" ]]; then
-            FILES=$(find "$HOME" -type d 2>/dev/null | fzf)
-        else
-            FILES=$(find "$HOME" -type f 2>/dev/null | fzf --multi)
+case "$MODE" in
+    clipboard)
+        TEMP_FILE=$(mktemp --suffix=.txt)
+        wl-paste > "$TEMP_FILE"
+        if [[ ! -s "$TEMP_FILE" ]]; then
+            rm -f "$TEMP_FILE"
+            notify-send "Share" "Clipboard is empty"
+            exit 0
         fi
-        [[ -z "$FILES" ]] && exit 0
-    fi
-fi
-
-# Launch LocalSend detached via systemd-run
-if echo "$FILES" | grep -q $'\n'; then
-    readarray -t FILE_ARRAY <<< "$FILES"
-    systemd-run --user --quiet --collect localsend "${FILE_ARRAY[@]}"
-else
-    systemd-run --user --quiet --collect localsend "$FILES"
-fi
+        "$SEND_CMD" send "$TEMP_FILE"
+        rm -f "$TEMP_FILE"
+        ;;
+    file)
+        if (($# > 0)); then
+            "$SEND_CMD" send "$@"
+        else
+            FILE=$(find "$HOME" -maxdepth 4 -type f 2>/dev/null | fzf --prompt="Select file: ")
+            [[ -z "$FILE" ]] && exit 0
+            "$SEND_CMD" send "$FILE"
+        fi
+        ;;
+    folder)
+        if (($# > 0)); then
+            "$SEND_CMD" send "$@"
+        else
+            FOLDER=$(find "$HOME" -maxdepth 4 -type d 2>/dev/null | fzf --prompt="Select folder: ")
+            [[ -z "$FOLDER" ]] && exit 0
+            "$SEND_CMD" send "$FOLDER"
+        fi
+        ;;
+    receive)
+        "$SEND_CMD" receive
+        ;;
+    *)
+        echo "Usage: nova-cmd-share [clipboard|file|folder|receive]"
+        exit 1
+        ;;
+esac
