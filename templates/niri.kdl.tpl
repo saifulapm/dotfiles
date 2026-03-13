@@ -5,10 +5,39 @@ layout {
     focus-ring {
         active-color "{{ accent }}"
         inactive-color "{{ color8 }}"
+        urgent-color "{{ color1 }}"
     }
 
     border {
         active-color "{{ accent }}"
         inactive-color "{{ color8 }}"
+        urgent-color "{{ color1 }}"
+    }
+
+    shadow {
+        color "#00000064"
+    }
+
+    tab-indicator {
+        active-color "{{ accent }}"
+        inactive-color "{{ color8 }}"
+        urgent-color "{{ color1 }}"
+    }
+
+    insert-hint {
+        color "{{ accent }}80"
+    }
+
+    background-color "transparent"
+}
+
+overview {
+    backdrop-color "{{ background }}"
+}
+
+recent-windows {
+    highlight {
+        active-color "{{ accent }}cc"
+        urgent-color "{{ color1 }}cc"
     }
 }
