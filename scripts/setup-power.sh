@@ -48,6 +48,14 @@ if [[ ! -f "$SLEEP_DIR/keyboard-backlight" ]]; then
     sudo install -m 755 "$DOTFILES/config/systemd/system-sleep/keyboard-backlight" "$SLEEP_DIR/keyboard-backlight" 2>/dev/null || true
 fi
 
+# ── Disable suspend/hibernate (Asahi Linux wake issues) ──
+if ! systemctl is-enabled sleep.target &>/dev/null 2>&1 || \
+   systemctl status sleep.target 2>&1 | grep -q "masked"; then
+    : # Already masked
+else
+    sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target 2>/dev/null || true
+fi
+
 # ── Faster shutdown ──
 SHUTDOWN_CONF="/etc/systemd/system.conf.d/faster-shutdown.conf"
 if [[ ! -f "$SHUTDOWN_CONF" ]]; then
