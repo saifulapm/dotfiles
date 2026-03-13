@@ -7,10 +7,13 @@ window-rule {
     default-column-width {}
 }
 
-// Firefox picture-in-picture as floating
+// Firefox picture-in-picture as floating (bottom-right corner)
 window-rule {
     match app-id=r#"firefox$"# title="^Picture-in-Picture$"
     open-floating true
+    default-floating-position x=32 y=32 relative-to="bottom-right"
+    default-column-width { fixed 480; }
+    default-window-height { fixed 270; }
 }
 
 // Screensaver fullscreen
@@ -35,7 +38,7 @@ window-rule {
 }
 
 // Rounded corners for all windows
-/-window-rule {
+window-rule {
     geometry-corner-radius 12
     clip-to-geometry true
 }
@@ -134,4 +137,18 @@ window-rule {
 window-rule {
     match app-id=r#"^nova\.(btop|wiremix|bluetui|lazydocker|lazygit)$"#
     open-floating true
+}
+
+// Show wallpaper in overview backdrop
+layer-rule {
+    match namespace="^wallpaper$"
+    place-within-backdrop true
+}
+
+// Shadows for floating windows
+window-rule {
+    match is-floating=true
+    shadow {
+        on
+    }
 }
