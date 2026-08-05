@@ -30,9 +30,8 @@ Item {
     property var bar: null
     property var settings: ({})
 
-    // Default order, upstream's minus the indicator we do not ship
-    // (screen recording).
-    readonly property var defaultItems: ["dictation", "reminder", "dnd", "nightlight", "stayawake"]
+    // Upstream's default order.
+    readonly property var defaultItems: ["screenrecording", "dictation", "reminder", "dnd", "nightlight", "stayawake"]
 
     function setting(name, fallback) {
         const value = settings ? settings[name] : undefined;
@@ -328,12 +327,23 @@ Item {
     // Registered ids match the bar registry's, so every indicator stays usable
     // on its own (`"dnd"` in a bar array) as well as inside this container.
     readonly property var indicatorRegistry: ({
+            "screenrecording": screenRecordingComponent,
             "dictation": dictationComponent,
             "dnd": dndComponent,
             "reminder": reminderComponent,
             "nightlight": nightLightComponent,
             "stayawake": stayAwakeComponent
         })
+
+    Component {
+        id: screenRecordingComponent
+        ScreenRecording {
+            theme: root.theme
+            bar: root.bar
+            shell: root.shell
+            indicatorHost: root
+        }
+    }
 
     Component {
         id: dictationComponent

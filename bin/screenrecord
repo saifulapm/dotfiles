@@ -1,0 +1,378 @@
+#!/usr/bin/env bash
+# screenrecord — start/stop a screen recording. Port of omarchy's
+# bin/omarchy-capture-screenrecording (CREDITS.md): the same command surface
+# (bare toggle, `--fullscreen`, `--with-desktop-audio`,
+# `--with-microphone-audio`, `--stop-recording`), the same output naming
+# (`screenrecording-<timestamp>.mp4` under the XDG videos dir), the same
+# refuse-to-double-start rule, the same SIGINT-then-hard-kill stop with its
+# 5-second grace, and the same start/save notifications.
+#
+# The recorder underneath is different, and that is what most of the deviations
+# come from: theirs drives gpu-screen-recorder on Hyprland, ours drives
+# wf-recorder on niri.
+#
+#   * Capture target. Theirs asks hyprctl for the focused monitor and feeds
+#     slurp a rectangle list built from `hyprctl clients`, then freezes the
+#     screen with hyprpicker while the pick happens. None of those three tools
+#     exist on niri, so ours has two explicit modes instead of their one smart
+#     picker: `--region` runs a bare slurp (`wf-recorder -g "X,Y WxH"`), and
+#     `--fullscreen` reads `niri msg --json focused-output` and records the
+#     whole output (`wf-recorder -o <name>`), which needs no interaction. Their
+#     "a click snaps to the window you clicked" nicety needs a window-rectangle
+#     list; niri does publish one, but slurp then only ever offers rectangles
+#     from the current workspace and the gain did not justify the divergence.
+#
+#   * Audio. wf-recorder captures exactly ONE device, so their third menu row
+#     (desktop audio *and* microphone merged into one track, which they get by
+#     passing `default_output|default_input` to gpu-screen-recorder) is not
+#     portable — mixing the two would need a null sink plus loopbacks, i.e.
+#     pactl/pw-loopback, neither of which is installed. `--with-desktop-audio`
+#     records the default sink's PulseAudio monitor source and
+#     `--with-microphone-audio` records the default source; asking for both is
+#     refused with a notification that says why rather than silently dropping
+#     one.
+#
+#   * Post-processing. Theirs re-encodes the finished file to trim a warmup
+#     GOP and loudnorm the audio, and renders a preview thumbnail for the
+#     notification. Both need ffmpeg/ffprobe, which are not installed here
+#     (Fedora's ffmpeg-free provides the libraries wf-recorder links, not the
+#     CLIs), so ours saves what wf-recorder wrote and notifies with the path.
+#
+#   * Indicator refresh. Theirs pokes the shell (`omarchy-shell -q
+#     omarchy.indicators refresh`) after every start and stop. Ours writes the
+#     recording's path to $XDG_STATE_HOME/qshell/screenrecording and deletes it
+#     when the recorder exits; the bar indicator watches that file, so the file
+#     changing IS the refresh — same pattern as bin/reminder. Nothing polls.
+#     The delete is done by a supervisor that waits on wf-recorder rather than
+#     by the stop path, so a recorder that dies on its own (crash, or a Ctrl+C
+#     in the terminal it was started from) still clears the indicator and still
+#     notifies.
+#
+# Codecs: Fedora's ffmpeg-free has no libx264, so wf-recorder falls back to
+# libvpx-vp9 — CPU VP9 at 2560x1600 is not a real-time encoder. libopenh264 is
+# present and is what we ask for; if a machine lacks it, the supervisor retries
+# once with wf-recorder's own default rather than failing the recording. The
+# audio codec is left alone for the same reason: ffmpeg-free ships no AAC
+# encoder (upstream's `-ac aac`; `-C aac` here makes wf-recorder exit silently
+# without writing a file), so audio recordings are Opus in MP4, which every
+# modern player handles but some old ones do not.
+set -euo pipefail
+
+self="$(readlink -f "${BASH_SOURCE[0]}")"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell"
+state_file="$state_dir/screenrecording"
+log_file="${XDG_RUNTIME_DIR:-/tmp}/qshell-screenrecord.log"
+glyph="󰻂" # md-record_circle, the indicator's glyph
+
+# Upstream honours XDG_VIDEOS_DIR and drops recordings straight into it; ours
+# keeps them together in a Screencasts subfolder.
+[[ -f $HOME/.config/user-dirs.dirs ]] && source "$HOME/.config/user-dirs.dirs"
+output_dir="${QSHELL_SCREENRECORD_DIR:-${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts}"
+
+codec="${QSHELL_SCREENRECORD_CODEC:-libopenh264}"
+bitrate="${QSHELL_SCREENRECORD_BITRATE:-8000000}"
+framerate="${QSHELL_SCREENRECORD_FRAMERATE:-30}"
+
+notify() { # [-u urgency] title [body]
+  local urgency="normal"
+  if [[ ${1:-} == "-u" ]]; then
+    urgency="$2"
+    shift 2
+  fi
+  notify-send -a qshell -u "$urgency" "$glyph $1" "${2:-}" >/dev/null 2>&1 || true
+}
+
+# ------------------------------------------------------------------- state
+recording_active() { pgrep -x wf-recorder >/dev/null 2>&1; }
+
+state_file_path() { [[ -f $state_file ]] && head -n1 "$state_file" || true; }
+
+state_write() {
+  mkdir -p "$state_dir"
+  printf '%s\n' "$1" >"$state_file.tmp"
+  mv "$state_file.tmp" "$state_file" # atomic: the watcher never sees a half-write
+}
+
+state_clear() { rm -f "$state_file" "$state_file.tmp"; }
+
+# The state file and the live process can disagree only if a recorder was
+# killed outright (SIGKILL takes the supervisor with it). Reconciling on read
+# is what keeps a stale file from lighting the indicator forever: dropping the
+# file is itself the event that turns the indicator off.
+reconcile() {
+  if recording_active; then
+    [[ -f $state_file ]] || state_write ""
+  else
+    [[ -f $state_file ]] && state_clear
+  fi
+  return 0
+}
+
+json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+# ------------------------------------------------------------- capture args
+focused_output() {
+  niri msg --json focused-output 2>/dev/null |
+    sed -n 's/.*"name":"\([^"]*\)".*/\1/p' | head -n1
+}
+
+# slurp prints "X,Y WxH" in the compositor's logical coordinates, which is
+# exactly the format and the space wf-recorder's -g wants.
+pick_region() {
+  local selection
+  selection="$(slurp 2>/dev/null || true)"
+  [[ $selection =~ ^-?[0-9]+,-?[0-9]+[[:space:]][0-9]+x[0-9]+$ ]] || return 1
+  printf '%s' "$selection"
+}
+
+default_sink_monitor() {
+  local sink
+  sink="$(wpctl inspect @DEFAULT_AUDIO_SINK@ 2>/dev/null |
+    sed -n 's/.*node\.name = "\(.*\)"/\1/p' | head -n1)"
+  [[ -n $sink ]] || return 1
+  # pipewire-pulse names a sink's monitor source "<sink>.monitor", which is
+  # what wf-recorder's (default) PulseAudio backend resolves.
+  printf '%s.monitor' "$sink"
+}
+
+default_source() {
+  wpctl inspect @DEFAULT_AUDIO_SOURCE@ 2>/dev/null |
+    sed -n 's/.*node\.name = "\(.*\)"/\1/p' | head -n1
+}
+
+# --------------------------------------------------------------- supervisor
+# Runs detached (setsid) so it outlives the invocation that started it: it owns
+# the state file for the whole life of the recording and is what notifies once
+# wf-recorder has finished writing the file.
+supervise() {
+  local file="$1"
+  shift
+  state_write "$file"
+
+  local status=0
+  wf-recorder -y -f "$file" -c "$codec" -p "b=$bitrate" -r "$framerate" "$@" \
+    >>"$log_file" 2>&1 || status=$?
+
+  # A machine without libopenh264 fails immediately and has written nothing;
+  # retry once on wf-recorder's own codec choice before giving up.
+  if ((status != 0)) && [[ ! -s $file ]] && grep -q "Failed to find the given codec" "$log_file"; then
+    status=0
+    wf-recorder -y -f "$file" -r "$framerate" "$@" >>"$log_file" 2>&1 || status=$?
+  fi
+
+  state_clear
+
+  if [[ -s $file ]]; then
+    notify "Screen recording saved" "$file"
+  else
+    rm -f "$file"
+    notify -u critical "Screen recording failed" "Nothing was written. See $log_file"
+  fi
+}
+
+# --------------------------------------------------------------------- start
+start_recording() {
+  local mode="$1" desktop_audio="$2" microphone_audio="$3"
+
+  if recording_active; then
+    notify "Screen recording already running" "Stop it first"
+    return 1
+  fi
+
+  if [[ $desktop_audio == true && $microphone_audio == true ]]; then
+    notify -u critical "Screen recording" \
+      "wf-recorder records one audio device — pick desktop audio or the microphone, not both"
+    return 1
+  fi
+
+  local capture_args=()
+  case "$mode" in
+  fullscreen)
+    local output
+    output="$(focused_output)"
+    if [[ -z $output ]]; then
+      notify -u critical "Screen recording" "Could not determine the focused output"
+      return 1
+    fi
+    capture_args=(-o "$output")
+    ;;
+  region)
+    local geometry
+    geometry="$(pick_region)" || return 1 # cancelled: no notification, as upstream
+    capture_args=(-g "$geometry")
+    ;;
+  esac
+
+  local audio_args=() device=""
+  if [[ $desktop_audio == true ]]; then
+    if ! device="$(default_sink_monitor)"; then
+      notify -u critical "Screen recording" "No default audio output to record"
+      return 1
+    fi
+    audio_args=(--audio="$device")
+  elif [[ $microphone_audio == true ]]; then
+    device="$(default_source)"
+    if [[ -z $device ]]; then
+      notify -u critical "Screen recording" "No default microphone to record"
+      return 1
+    fi
+    audio_args=(--audio="$device")
+  fi
+
+  mkdir -p "$output_dir" || {
+    notify -u critical "Screen recording" "Cannot create $output_dir"
+    return 1
+  }
+
+  local file="$output_dir/screenrecording-$(date +'%Y-%m-%d_%H-%M-%S').mp4"
+  : >"$log_file"
+  setsid --fork "$self" __supervise "$file" "${capture_args[@]}" "${audio_args[@]}" \
+    >/dev/null 2>&1 </dev/null
+
+  # Upstream waits for gpu-screen-recorder to create the file before it calls
+  # the recording started; same here, with the process check that catches a
+  # recorder which refused to start at all.
+  local waited=0
+  while ((waited < 50)); do
+    recording_active && [[ -f $file ]] && break
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+
+  if ! recording_active; then
+    state_clear
+    notify -u critical "Screen recording failed to start" "See $log_file"
+    return 1
+  fi
+
+  notify "Screen recording started" "$file"
+}
+
+# ---------------------------------------------------------------------- stop
+stop_recording() {
+  local polite="$1"
+
+  if ! recording_active; then
+    reconcile
+    [[ $polite == true ]] && notify "No screen recording is running"
+    return 1
+  fi
+
+  local file
+  file="$(state_file_path)"
+
+  # SIGINT is what makes wf-recorder flush the trailer and close the container;
+  # anything harsher leaves an unplayable file (upstream's comment, and it
+  # holds for wf-recorder too).
+  pkill -INT -x wf-recorder || true
+
+  # Upstream's 5-second grace before the hard kill.
+  local count=0
+  while recording_active && ((count < 50)); do
+    sleep 0.1
+    count=$((count + 1))
+  done
+
+  if recording_active; then
+    pkill -KILL -x wf-recorder || true
+    state_clear
+    notify -u critical "Screen recording error" \
+      "Recording process had to be force-killed. Video may be corrupted."
+    return 1
+  fi
+
+  # The supervisor clears the state file and sends the "saved" notification;
+  # give it a moment so `stop` does not return before the indicator is off.
+  count=0
+  while [[ -f $state_file ]] && ((count < 30)); do
+    sleep 0.1
+    count=$((count + 1))
+  done
+  reconcile
+
+  [[ -n $file ]] && printf '%s\n' "$file"
+  return 0
+}
+
+# -------------------------------------------------------------------- status
+print_status() {
+  reconcile
+  local active=false file="" tooltip="Screen Recording"
+  if recording_active; then
+    active=true
+    file="$(state_file_path)"
+    tooltip="Stop recording"
+  fi
+
+  if [[ ${1:-} == "--json" ]]; then
+    printf '{"recording":%s,"file":"%s","tooltip":"%s"}\n' \
+      "$active" "$(json_escape "$file")" "$(json_escape "$tooltip")"
+  elif [[ $active == true ]]; then
+    printf 'recording %s\n' "$file"
+  else
+    printf 'idle\n'
+  fi
+}
+
+# --------------------------------------------------------------------- usage
+usage() {
+  cat <<'EOF'
+Usage: screenrecord [--region|--fullscreen] [--with-desktop-audio|--with-microphone-audio]
+       screenrecord stop | --stop-recording
+       screenrecord status [--json]
+
+  --region              pick an area with slurp (default)
+  --fullscreen          record the focused output, no interaction
+  --with-desktop-audio  also record the default audio output
+  --with-microphone-audio
+                        also record the default microphone
+  stop                  stop a running recording; says so politely if none is
+  --stop-recording      stop a running recording; exits 1 if none is (upstream's
+                        contract, for a keybind that falls through to the menu)
+EOF
+}
+
+# ---------------------------------------------------------------------- main
+mode="region"
+desktop_audio=false
+microphone_audio=false
+action="start"
+
+case "${1:-}" in
+__supervise)
+  shift
+  supervise "$@"
+  exit 0
+  ;;
+esac
+
+for arg in "$@"; do
+  case "$arg" in
+  --region) mode="region" ;;
+  --fullscreen | --output | --screen) mode="fullscreen" ;;
+  --with-desktop-audio) desktop_audio=true ;;
+  --with-microphone-audio) microphone_audio=true ;;
+  stop) action="stop-polite" ;;
+  --stop-recording) action="stop" ;;
+  status) action="status" ;;
+  --json) ;; # consumed by `status`
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "screenrecord: unknown argument: $arg" >&2
+    usage >&2
+    exit 2
+    ;;
+  esac
+done
+
+case "$action" in
+status) print_status "${2:-}" ;;
+stop) stop_recording false ;;
+stop-polite)
+  stop_recording true || true
+  ;;
+start) start_recording "$mode" "$desktop_audio" "$microphone_audio" ;;
+esac

@@ -199,6 +199,14 @@ ShellRoot {
         menuLoader.item.toggle();
     }
 
+    // Open the menu straight at a submenu (or fire a leaf) by id or alias —
+    // what the IPC `menu open <route>` does, for callers already inside the
+    // shell (the screen-recording indicator opens `capture.screenrecord`).
+    function openMenu(route) {
+        menuLoader.active = true;
+        return menuLoader.item.openRoute(route);
+    }
+
     function toggleThemes() {
         themesLoader.active = true;
         themesLoader.item.toggle();
@@ -404,8 +412,7 @@ ShellRoot {
         // Jump straight to a submenu (or fire a leaf) by id or alias:
         // `qs ipc call menu open system`, `… open screenshot`.
         function open(route: string): string {
-            menuLoader.active = true;
-            return menuLoader.item.openRoute(route);
+            return shell.openMenu(route);
         }
     }
 

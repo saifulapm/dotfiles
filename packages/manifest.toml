@@ -124,6 +124,12 @@ arch = "all"
 why = "D-Bus power-profile switching (power-saver/balanced/performance) behind the power panel's profile row; quickshell's PowerProfiles service is dead air without the daemon"
 
 [[pkg]]
+name = "wf-recorder"
+category = "core"
+arch = "all"
+why = "The screen recorder behind bin/screenrecord and the bar's screen-recording indicator (omarchy uses gpu-screen-recorder, which is Arch/AUR-only and NVIDIA/AMD-oriented; wf-recorder is the wlroots-native equivalent niri supports). Installed by hand 2026-08-06. Note: Fedora's ffmpeg-free ships no libx264, so wf-recorder's own default falls back to CPU libvpx-vp9, which cannot keep up at 2560x1600 — bin/screenrecord asks for libopenh264 (present here) and retries on wf-recorder's default if a machine lacks it. ffmpeg-free also ships no AAC encoder, so audio recordings are Opus in MP4 rather than upstream's AAC. There is no ffmpeg/ffprobe CLI on this box either, so upstream's post-processing pass (warmup-GOP trim, loudnorm, preview thumbnail) is not ported"
+
+[[pkg]]
 name = "wlsunset"
 category = "core"
 arch = "all"

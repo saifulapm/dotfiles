@@ -407,6 +407,7 @@ Scope {
             "reminder": reminderComponent,
             "stayawake": stayAwakeComponent,
             "nightlight": nightLightComponent,
+            "screenrecording": screenRecordingComponent,
             "ai": aiComponent,
             "weather": weatherComponent,
             "monitor": monitorComponent,
@@ -1632,6 +1633,14 @@ Scope {
         NightLight {
             theme: barRoot.theme
             nightlight: barRoot.shell.nightlight
+        }
+    }
+
+    Component {
+        id: screenRecordingComponent
+        ScreenRecording {
+            theme: barRoot.theme
+            shell: barRoot.shell
         }
     }
 

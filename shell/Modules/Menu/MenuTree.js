@@ -57,7 +57,7 @@ var TREE = {
     "capture": {
         "icon": "󰄀",
         "label": "Capture",
-        "aliases": ["screenshot", "screenshots", "shot", "grab", "screen"]
+        "aliases": ["screenshot", "screenshots", "shot", "grab", "screen", "screenrecord", "screen-record", "screenrecording", "record"]
     },
     // Omarchy files this under their Trigger submenu, next to Capture — our
     // tree hoisted Capture to the root, so Emoji sits beside it.
@@ -134,6 +134,70 @@ var TREE = {
         "description": "Screenshot the whole focused screen",
         "when": "command -v niri",
         "action": "niri msg action screenshot-screen"
+    },
+    // Omarchy's trigger.capture.screenrecord submenu, one row per audio
+    // variant with Stop declared first and guarded by a `pgrep` test, exactly
+    // as theirs is. Two differences, both from wf-recorder: their single smart
+    // picker becomes an explicit Region/Screen split (see bin/screenrecord),
+    // and their "desktop + microphone audio" row cannot exist because
+    // wf-recorder records one device — the microphone gets its own rows
+    // instead. Their webcam row needs mpv + v4l2-ctl, neither installed.
+    "capture.screenrecord": {
+        "icon": "󰻂",
+        "label": "Screenrecord",
+        "aliases": ["record", "recording", "screenrecording", "screen-record", "video", "capture-video"],
+        "description": "Record the screen to a video file",
+        "when": "command -v wf-recorder"
+    },
+    "capture.screenrecord.stop": {
+        "icon": "󰓛",
+        "label": "Stop Screenrecording",
+        "aliases": ["stop", "end", "finish"],
+        "description": "Stop the running screen recording and save the file",
+        "when": "pgrep -x wf-recorder",
+        "action": "screenrecord stop"
+    },
+    "capture.screenrecord.region": {
+        "icon": "󰩭",
+        "label": "Region, no audio",
+        "aliases": ["area", "selection", "crop"],
+        "description": "Pick an area and record it without sound",
+        "action": "screenrecord --region"
+    },
+    "capture.screenrecord.region-audio": {
+        "icon": "󰕾",
+        "label": "Region with desktop audio",
+        "aliases": ["area", "sound", "output"],
+        "description": "Pick an area and record it with the desktop audio",
+        "action": "screenrecord --region --with-desktop-audio"
+    },
+    "capture.screenrecord.region-mic": {
+        "icon": "󰍬",
+        "label": "Region with microphone",
+        "aliases": ["area", "mic", "voice"],
+        "description": "Pick an area and record it with the microphone",
+        "action": "screenrecord --region --with-microphone-audio"
+    },
+    "capture.screenrecord.screen": {
+        "icon": "󰍹",
+        "label": "Screen, no audio",
+        "aliases": ["display", "monitor", "fullscreen", "output"],
+        "description": "Record the whole focused screen without sound",
+        "action": "screenrecord --fullscreen"
+    },
+    "capture.screenrecord.screen-audio": {
+        "icon": "󰕾",
+        "label": "Screen with desktop audio",
+        "aliases": ["display", "sound", "fullscreen"],
+        "description": "Record the whole focused screen with the desktop audio",
+        "action": "screenrecord --fullscreen --with-desktop-audio"
+    },
+    "capture.screenrecord.screen-mic": {
+        "icon": "󰍬",
+        "label": "Screen with microphone",
+        "aliases": ["display", "mic", "voice", "fullscreen"],
+        "description": "Record the whole focused screen with the microphone",
+        "action": "screenrecord --fullscreen --with-microphone-audio"
     },
 
     // ------------------------------------------------------------ background

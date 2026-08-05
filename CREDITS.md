@@ -328,10 +328,45 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   ports of `shell/plugins/bar/indicators/StayAwake.qml`, `Dnd.qml`,
   `Reminder.qml` and `NightLight.qml` (their glyphs, their tooltip wording —
   the night light one names what a click does, not what is on — and their
-  click rules). We ship no screen-recording indicator, so that entry is
-  absent; their reveal snaps open where ours slides; and a standalone
+  click rules). Their reveal snaps open where ours slides; and a standalone
   indicator named directly in a bar array collapses when off instead of
   reserving an empty slot.
+- **Screen recording** from `shell/plugins/bar/indicators/ScreenRecording.qml`
+  and `bin/omarchy-capture-screenrecording`, ported as
+  `shell/Modules/Bar/widgets/ScreenRecording.qml` and `bin/screenrecord`. From
+  the indicator: their glyph 󰻂, their "Stop recording"/"Screen Recording"
+  tooltip pair, their rule that the indicator is active exactly while a
+  recorder process is alive, and their click behaviour — stop while recording,
+  otherwise open the capture menu's Screenrecord submenu (theirs shells out to
+  `omarchy-menu toggle trigger.capture.screenrecord`, ours opens the same
+  submenu in-process). From the script: the command surface (`--fullscreen`,
+  `--with-desktop-audio`, `--with-microphone-audio`, `--stop-recording`), the
+  `screenrecording-<timestamp>.mp4` naming under the XDG videos dir, the
+  refusal to start a second recording, the wait for the output file before
+  calling the recording started, and the stop path — SIGINT so the container is
+  closed properly, a 5-second grace, then a hard kill with their
+  "may be corrupted" critical notification. The menu rows are their
+  `trigger.capture.screenrecord` structure: Stop declared first and guarded by
+  a `pgrep` test, then one row per audio variant.
+  The recorder underneath is different — theirs drives gpu-screen-recorder on
+  Hyprland, ours drives wf-recorder on niri — and that accounts for the
+  deviations. Their one smart picker (slurp fed rectangles from
+  `hyprctl clients`, over a hyprpicker screen freeze, snapping a bare click to
+  the window under it) has no niri equivalent, so ours splits into an explicit
+  `--region` (bare slurp → `wf-recorder -g`) and `--fullscreen`
+  (`niri msg --json focused-output` → `wf-recorder -o`). wf-recorder records a
+  single audio device, so their merged "desktop + microphone audio" row cannot
+  be ported and the microphone gets rows of its own; their webcam overlay needs
+  mpv and v4l2-ctl, neither installed. Their post-processing pass (warmup-GOP
+  trim, loudnorm, preview thumbnail in the saved notification) needs the
+  ffmpeg/ffprobe CLIs, which this box does not have. And where they poke the
+  shell over IPC (`omarchy-shell -q omarchy.indicators refresh`) after every
+  start and stop, ours writes the recording's path to a state file the
+  indicator watches, as `bin/reminder` already does — the file changing is the
+  refresh, and because a supervisor process clears it when wf-recorder exits
+  for any reason, a recorder that dies on its own clears the indicator too.
+  Their `pgrep` check survives as the reconciliation `screenrecord status
+  --json` runs on every read.
 - **Dictation indicator** from `shell/plugins/bar/indicators/Dictation.qml` and
   `bin/omarchy-voxtype-status`: dictation state as a bar indicator fed by a
   long-running `voxtype status --follow --extended --format json` process
