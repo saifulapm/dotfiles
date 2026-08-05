@@ -176,9 +176,27 @@ ShellRoot {
         remindersLoader.item.toggle();
     }
 
+    // Returns false when the lock refused to arm (its PAM config is missing) —
+    // the loader is dropped again rather than left holding a module that will
+    // never lock.
     function lockSession() {
         lockLoader.active = true;
-        lockLoader.item.lock();
+        if (lockLoader.item.lock())
+            return true;
+        releaseLockIfIdle();
+        return false;
+    }
+
+    // The lock unloads itself after unlock (see the Connections below); this is
+    // the same release for the paths that wake it without locking — a preview
+    // that has been dismissed.
+    function releaseLockIfIdle() {
+        if (!lockLoader.active)
+            return;
+        const item = lockLoader.item;
+        if (item !== null && (item.locked || item.previewVisible))
+            return;
+        Qt.callLater(() => lockLoader.active = false);
     }
 
     // For anything that must not re-lock an already locked session (the idle
@@ -224,7 +242,11 @@ ShellRoot {
         target: lockLoader.active ? lockLoader.item : null
         function onLockedChanged() {
             if (!lockLoader.item.locked)
-                Qt.callLater(() => lockLoader.active = false);
+                shell.releaseLockIfIdle();
+        }
+        function onPreviewVisibleChanged() {
+            if (!lockLoader.item.previewVisible)
+                shell.releaseLockIfIdle();
         }
     }
 
@@ -546,12 +568,92 @@ ShellRoot {
         target: "lock"
 
         function lock(): string {
-            shell.lockSession();
-            return "ok";
+            return shell.lockSession() ? "ok" : "missing-pam";
         }
 
         function status(): string {
             return lockLoader.active && lockLoader.item.locked ? "locked" : "unlocked";
+        }
+
+        function isLocked(): string {
+            return shell.locked ? "true" : "false";
+        }
+
+        // Everything the lock knows about itself, for diagnosing a lock that
+        // did not arm (omarchy's `status`; ours keeps the older string verb).
+        function state(): string {
+            if (!lockLoader.active)
+                return JSON.stringify({
+                    loaded: false,
+                    locked: false
+                });
+            const l = lockLoader.item;
+            return JSON.stringify({
+                loaded: true,
+                locked: l.locked,
+                requested: l.lockRequested,
+                pending: l.pendingSessionLock,
+                secure: l.secure,
+                realScreens: l.realScreenCount(),
+                passwordPam: l.passwordPamConfigured,
+                fingerprint: l.fingerprintConfigured,
+                authenticating: l.authenticating,
+                blanked: l.blanked,
+                failedAttempts: l.failedAttempts,
+                failureMessage: l.failureMessage,
+                background: l.backgroundPath,
+                preview: l.previewVisible,
+                lastEvent: l.lastEvent,
+                lastEventAt: l.lastEventAt
+            });
+        }
+
+        // Draws the lock screen without locking anything, so the design can be
+        // looked at (and a theme judged) without a password between the user
+        // and their session. Click or Escape dismisses it.
+        function preview(): string {
+            lockLoader.active = true;
+            lockLoader.item.showPreview();
+            return "ok";
+        }
+
+        function hidePreview(): string {
+            if (lockLoader.active)
+                lockLoader.item.hidePreview();
+            return "ok";
+        }
+
+        // Undo the lock screen's own 5 s blank. Ours, not omarchy's: on a live
+        // session a mouse move does this, but nothing can move the mouse
+        // headlessly in the nested dev session.
+        function wake(): string {
+            if (!lockLoader.active)
+                return "idle";
+            lockLoader.item.runWake();
+            return "ok";
+        }
+
+        // Type into the lock's password field from outside it, and submit what
+        // is there. Nested dev session ONLY, same gate as devUnlock: this is
+        // how the failure path is verified on a box with no key-injection tool
+        // — submitting a wrong password still has to go through PAM, so it
+        // grants nothing that typing would not.
+        function devPassword(text: string): string {
+            if (Quickshell.env("QSHELL_DEV") !== "1")
+                return "denied";
+            if (!lockLoader.active)
+                return "idle";
+            lockLoader.item.enteredPassword = text;
+            return "ok";
+        }
+
+        function devSubmit(): string {
+            if (Quickshell.env("QSHELL_DEV") !== "1")
+                return "denied";
+            if (!lockLoader.active)
+                return "idle";
+            lockLoader.item.submitPassword(lockLoader.item.enteredPassword);
+            return "ok";
         }
 
         // Escape hatch for the nested dev session ONLY. In a production session

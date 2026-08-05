@@ -4,3 +4,10 @@
 // the shell under test renders inside the window — the live session is never
 // touched.
 spawn-at-startup "sh" "-c" "QSHELL_DEV=1 qs -p ~/.dotfiles/shell"
+
+// niri's own hotkey panel opens dead center at startup, over exactly the part
+// of the screen a centered overlay under test wants (the lock's password
+// field). Nothing here is driven by keyboard, so nothing needs the cheat sheet.
+hotkey-overlay {
+    skip-at-startup
+}

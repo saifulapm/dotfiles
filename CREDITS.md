@@ -427,6 +427,40 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   Not ported: their history panel (they have none either — the models exist
   for the IPC and the replay), and the bar-position clearance is our bar's
   since ours reads it from `shell.json`.
+- **Lock screen design** from `shell/plugins/lock/` (`LockView.qml`,
+  `Service.qml`): the whole face — the current wallpaper redrawn behind the
+  lock and blurred to nothing (their blur radius, multiplier and slight
+  contrast cut), one 381×67 password field centered on it and nothing else,
+  the masked characters centered and letter-spaced with their fit-to-width
+  shrink so a long password never clips silently, the caret that only exists
+  once something is typed, the field's own text standing in for a label
+  ("Enter Password", "Checking…", the failure in italic), the failed-attempt
+  count carried in that message, the border that is accent until a password is
+  wrong and error afterwards, typing clearing the failure, Escape and Ctrl+U
+  clearing the field, and the fingerprint glyph pinned inside the right edge
+  with the field's padding reserved on both sides so the dots stay centered
+  around it. Their `[lock]` theme section is the colour contract, resolved
+  against our tokens: background at 0.8 alpha, their own placeholder recipe
+  (foreground at 0.66), accent and error borders, accent at 0.45 for the
+  selection. Their service comes with it: the requested / pending / secure
+  split with the screen-stabilize queue behind it (a lock asked for while
+  outputs are still settling waits rather than mapping against a screen list
+  about to change), the refusal to lock at all without a readable PAM config,
+  the password and fingerprint PAM flows running side by side with the
+  fingerprint one retried on failure and armed only once the compositor
+  confirms the lock, the five-second idle blank with its wall-clock check so a
+  countdown frozen by suspend takes a fresh run-up instead of blanking a
+  just-woken screen, and the preview overlay that draws the lock screen
+  without locking anything. Adapted: they blank and wake through their own
+  brightness helpers, we use the two niri DPMS actions the idle service
+  already uses (and only run the wake when we are the reason the monitors are
+  off — theirs fires a helper on every pointer motion); their `border` role is
+  dead in their view (idle and typing share `border-active`), so ours has no
+  idle border either; their event log goes to the journal, ours to `status`;
+  and our LazyLoader, our own `pam.d/` (PAM resolves `include` inside the
+  custom config directory, hence the tracked symlinks to the system files),
+  our `locked` property and our `devUnlock` escape hatch are unchanged
+  underneath it.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -759,3 +793,15 @@ Direct file-level copies (source path → destination path):
   Added at the end, not theirs: `normalizeAppToken` / `focusCandidates` /
   `appIdScore` / `matchWindowId`, which are what click-to-focus needs on niri —
   upstream hands the app name to a Hyprland helper script instead.
+- omarchy `shell/plugins/lock/LockView.qml` → `shell/Modules/Lock/LockView.qml`:
+  near-verbatim port of the view — the cache-busting `file://…?v=` background
+  URL, the `TextMetrics` measurement that drives the fit-to-width dot scale,
+  the fingerprint reserve on both margins, the password-text sync guard, the
+  focus-on-enable rule, their signal set (`submitPassword`,
+  `passwordTextEdited`, `clearFailureRequested`, `wakeRequested`), the wake
+  MouseArea, and every size and ratio in the field. Their `Style`/`Color`
+  singletons become properties resolved from the theme this shell injects,
+  their `BorderSurface` becomes a plain `Rectangle` (we ship no gradient or
+  per-side border specs) with our motion token animating the state change, and
+  their unused `failedAttempts` view property was dropped — the count is
+  rendered through `failureMessage`, as it is upstream.
