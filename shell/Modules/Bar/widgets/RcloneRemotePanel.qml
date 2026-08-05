@@ -3,10 +3,11 @@ import "../components"
 import "DropboxModel.js" as Format
 
 // rclone-remote panel — ours, in the Dropbox panel's visual language
-// (omarchy's design; CREDITS.md), grown out of the iCloud panel: a hero of
-// the instance's mark over a rotating phrase, then a MOUNT section (the
-// on/off switch, and the folder behind it), a STORAGE section exactly when
-// the backend's `rclone about` answered with quota (dropbox does;
+// (omarchy's design; CREDITS.md), grown out of the iCloud panel and reshaped
+// to the user's sketch (2026-08-06): the hero IS the mount surface — the
+// instance's mark, the name over the mount path, a folder button and the
+// on/off switch on the trailing edge — followed by a STORAGE section exactly
+// when the backend's `rclone about` answered with quota (dropbox does;
 // iclouddrive cannot), and an ACCOUNT section (the remote, its reachability,
 // and — when a probe has failed — the re-auth row). Re-authenticating an
 // rclone session is interactive (Apple 2FA, Dropbox browser OAuth) and no
@@ -26,16 +27,6 @@ BarPanel {
     panelTitle: ""
     cardWidth: 380
 
-    // ------------------------------------------------------------- phrases
-    property int phraseIndex: 0
-    readonly property var activePhrases: {
-        const fromConfig = panel.service.config ? panel.service.config.phrases : undefined;
-        if (fromConfig && fromConfig.length > 0)
-            return fromConfig;
-        return ["Ferrying folders", "Drizzling data", "Raining files", "Seeding the cloud", "Minding memories", "Shuffling shards", "Polishing pixels", "Braiding bytes"];
-    }
-    readonly property string heroPhraseText: activePhrases[phraseIndex % activePhrases.length]
-
     readonly property string mountHint: service.mountActive ? "Unmount the " + service.label + " folder" : "Mount " + service.label + " at " + service.mountPoint
 
     readonly property string reachabilityText: {
@@ -53,9 +44,9 @@ BarPanel {
     readonly property real quotaFraction: panel.quotaVisible ? Math.max(0, Math.min(1, panel.service.quotaUsed / panel.service.quotaTotal)) : 0
 
     // -------------------------------------------------------------- cursor
-    // The actionable rows, top to bottom, as they currently exist: the mount
-    // switch always, the folder only once there is a folder to open, the
-    // re-auth row only while a failed probe holds it up.
+    // The actionable targets, in reading order: the hero switch always, the
+    // hero folder button only once there is a folder to open, the re-auth
+    // row only while a failed probe holds it up.
     readonly property var cursorRows: {
         const rows = ["mount"];
         if (panel.service.mounted)
@@ -161,35 +152,6 @@ BarPanel {
         panel.service.probe();
     }
 
-    Timer {
-        id: phraseTimer
-        interval: 2800
-        running: panel.opened && panel.service.mountActive
-        repeat: true
-        onTriggered: phraseSwap.restart()
-    }
-
-    SequentialAnimation {
-        id: phraseSwap
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 0.0
-            duration: 180
-            easing.type: Easing.OutQuad
-        }
-        ScriptAction {
-            script: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
-        }
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 1.0
-            duration: 260
-            easing.type: Easing.InQuad
-        }
-    }
-
     // -------------------------------------------------------------- content
     Column {
         id: sections
@@ -198,16 +160,14 @@ BarPanel {
         spacing: panel.theme.space(3)
 
         // ------------------------------------------------------------ hero
-        // The switch rides the hero's trailing edge, as the dropbox and
-        // tailscale heroes have it, and the subtitle is the rotating phrase
-        // alone — the mount state already has a whole section saying it, so
-        // an unmounted hero shows just the mark and the name (user redesign,
-        // 2026-08-06).
+        // The hero is the whole mount surface (user redesign, 2026-08-06):
+        // the mark, the name over the mount path, a folder button, and the
+        // switch on the trailing edge — no MOUNT section repeating any of it.
         Item {
             id: hero
 
             width: parent.width
-            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight)
+            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight, folderAction.implicitHeight)
 
             RcloneRemoteMark {
                 id: heroIcon
@@ -234,12 +194,27 @@ BarPanel {
                 onToggled: panel.toggleMount()
             }
 
+            // Open folder, as just the folder — dimmed while there is no
+            // mounted folder to open.
+            GlyphAction {
+                id: folderAction
+                anchors.right: powerSwitch.left
+                anchors.rightMargin: panel.theme.space(2)
+                anchors.verticalCenter: parent.verticalCenter
+                glyph: "󰉋" // md-folder
+                enabled: panel.service.mounted
+                hasCursor: panel.hasCursorOn("open")
+                hint: "Open folder"
+                onHovered: panel.setCursorOn("open")
+                onActivated: panel.service.openFolder()
+            }
+
             Column {
                 id: heroLabels
 
                 anchors.left: heroIcon.right
                 anchors.leftMargin: panel.theme.space(3)
-                anchors.right: powerSwitch.left
+                anchors.right: folderAction.left
                 anchors.rightMargin: panel.theme.space(3)
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.5)
@@ -255,14 +230,12 @@ BarPanel {
                 }
 
                 Text {
-                    id: heroMeta
-                    visible: panel.service.mountActive
                     width: parent.width
-                    text: panel.heroPhraseText
+                    text: panel.service.mountPoint === "" ? "—" : panel.service.mountPoint
                     color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.833)
-                    elide: Text.ElideRight
+                    font.family: panel.theme.fontMono
+                    font.pixelSize: panel.theme.fontPx(0.75)
+                    elide: Text.ElideMiddle
                 }
             }
         }
@@ -276,115 +249,6 @@ BarPanel {
             font.family: panel.theme.fontUi
             font.pixelSize: panel.theme.fontPx(0.833)
             wrapMode: Text.WordWrap
-        }
-
-        // ----------------------------------------------------------- mount
-        SectionHeader {
-            text: "MOUNT"
-        }
-
-        CursorSurface {
-            id: mountRow
-
-            width: parent.width
-            implicitHeight: mountInner.implicitHeight + panel.theme.space(3)
-            hasCursor: panel.hasCursorOn("mount")
-
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onEntered: panel.setCursorOn("mount")
-                onClicked: panel.toggleMount()
-            }
-
-            Item {
-                id: mountInner
-
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.leftMargin: panel.theme.space(2.5)
-                anchors.rightMargin: panel.theme.space(2.5)
-                implicitHeight: mountLabels.implicitHeight
-
-                Column {
-                    id: mountLabels
-
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: panel.theme.space(0.25)
-
-                    Text {
-                        width: parent.width
-                        text: panel.service.mountActive ? "Mounted" : "Not mounted"
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.917)
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        width: parent.width
-                        text: panel.service.mountPoint === "" ? "—" : panel.service.mountPoint
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.75)
-                        elide: Text.ElideRight
-                    }
-                }
-            }
-        }
-
-        CursorSurface {
-            id: openRow
-
-            visible: panel.service.mounted
-            width: parent.width
-            implicitHeight: visible ? openInner.implicitHeight + panel.theme.space(3) : 0
-            hasCursor: panel.hasCursorOn("open")
-
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onEntered: panel.setCursorOn("open")
-                onClicked: panel.service.openFolder()
-            }
-
-            Item {
-                id: openInner
-
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.leftMargin: panel.theme.space(2.5)
-                anchors.rightMargin: panel.theme.space(2.5)
-                implicitHeight: Math.max(openGlyph.implicitHeight, openLabel.implicitHeight)
-
-                OpticalGlyph {
-                    id: openGlyph
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "󰉋" // md-folder
-                    color: panel.theme.textPrimary
-                    pixelSize: panel.theme.fontPx(1.083)
-                }
-
-                Text {
-                    id: openLabel
-                    anchors.left: openGlyph.right
-                    anchors.leftMargin: panel.theme.space(2)
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Open folder"
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
-                    elide: Text.ElideRight
-                }
-            }
         }
 
         // --------------------------------------------------------- storage
@@ -555,6 +419,54 @@ BarPanel {
             color: parent.valueColor
             font.family: panel.theme.fontMono
             font.pixelSize: panel.theme.fontPx(0.833)
+        }
+    }
+
+    // The dropbox panel's PanelActionButton: a bordered square holding one
+    // glyph, dimmed while it has nothing to act on, with the shared cursor
+    // border when the keyboard is on it.
+    component GlyphAction: Rectangle {
+        id: glyphAction
+
+        property string glyph: ""
+        property bool enabled: true
+        property bool hasCursor: false
+        property string hint: ""
+
+        signal hovered
+        signal activated
+
+        implicitWidth: panel.theme.space(8)
+        implicitHeight: panel.theme.space(7)
+        radius: panel.theme.radius(0.75)
+        color: glyphHover.hovered && glyphAction.enabled ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
+        border.width: panel.theme.borderWidth
+        border.color: glyphAction.hasCursor && glyphAction.enabled ? panel.theme.alpha(panel.theme.accent, 0.6) : panel.theme.surface3
+        opacity: glyphAction.enabled ? 1 : 0.45
+
+        OpticalGlyph {
+            anchors.centerIn: parent
+            text: glyphAction.glyph
+            color: panel.theme.textPrimary
+            pixelSize: panel.theme.fontPx(1.083)
+        }
+
+        HoverHandler {
+            id: glyphHover
+            cursorShape: glyphAction.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onHoveredChanged: if (hovered && glyphAction.enabled)
+                glyphAction.hovered()
+        }
+
+        TapHandler {
+            enabled: glyphAction.enabled
+            onTapped: glyphAction.activated()
+        }
+
+        Hint {
+            visible: glyphHover.hovered && glyphAction.enabled && glyphAction.hint !== ""
+            anchor: glyphAction
+            text: glyphAction.hint
         }
     }
 
