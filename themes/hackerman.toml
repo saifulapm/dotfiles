@@ -47,3 +47,9 @@ border-width = 1
 [motion]
 duration = 100
 easing = "snap"
+
+# Omarchy's hyprland_active_border for this theme (MIT, see CREDITS.md):
+# rgba(26a269ee) rgba(2ec27eee) 45deg.
+# One token, gradient or solid: "#hex #hex angledeg" | "#hex".
+[border]
+active = "#26a269ee #2ec27eee 45deg"

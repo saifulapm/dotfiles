@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../Commons/color.js" as ColorMath
 import "../Commons/defaults.js" as Defaults
+import "../Commons/gradient.js" as Gradient
 
 // Token resolution + live reload. Instantiated once by shell.qml and passed
 // down by property injection — relative-path singleton imports do not share
@@ -65,9 +66,12 @@ QtObject {
         const n = Number(tok(key));
         return isFinite(n) ? n : Number(builtin[key]);
     }
+    // Every color leaving this service goes through Gradient.qmlColor: a theme
+    // writes 8-digit hex the way CSS, niri and omarchy do (#rrggbbaa), and Qt
+    // reads that byte order as #aarrggbb.
     function col(key) {
         const v = String(tok(key));
-        return /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(v) ? v : String(builtin[key]);
+        return /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(v) ? Gradient.qmlColor(v) : String(builtin[key]);
     }
 
     // ---------------------------------------------------- per-surface tokens
@@ -98,12 +102,27 @@ QtObject {
     // Per-surface color: [section] key wins, else the base-token fallback the
     // caller passes in. `fallback` is a color, so callers stay readable
     // (theme.sCol("bar", "text", theme.textPrimary)).
+    //
+    // A border-ish key may hold a gradient instead of a color; color-only
+    // consumers get its first stop, which is omarchy's gradient_start
+    // degradation. Use sSpec() where the gradient itself can be drawn.
     function sCol(section, key, fallback) {
         const v = rawTok(section + "." + key);
         if (v === undefined)
             return fallback;
         const s = deref(v);
-        return /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(s) ? s : fallback;
+        if (/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(s))
+            return Gradient.qmlColor(s);
+        const first = Gradient.firstColor(s);
+        return first !== "" ? Gradient.qmlColor(first) : fallback;
+    }
+
+    // The raw gradient-or-solid string behind a surface's border key, for the
+    // renderers that can draw a gradient. `fallbackSpec` is used verbatim when
+    // the section does not name the key.
+    function sSpec(section, key, fallbackSpec) {
+        const v = rawTok(section + "." + key);
+        return v === undefined ? String(fallbackSpec) : deref(v);
     }
 
     // The `-alpha` companion of a surface key, clamped to 0..1.
@@ -148,6 +167,19 @@ QtObject {
     readonly property color error: col("accent.error")
     readonly property color warn: col("accent.warn")
     readonly property color okColor: col("accent.ok")
+    // The theme's active-border token: one string carrying either a solid
+    // color or a gradient ("#26a269ee #2ec27eee 45deg"), omarchy's grammar
+    // for hyprland_active_border. Derived from the accent when a theme omits
+    // it, the same way text.on-accent is — a literal default would give every
+    // theme without the token tokyo-night's blue.
+    readonly property string borderActiveSpec: {
+        const v = rawTok("border.active");
+        return v !== undefined ? deref(v) : String(col("accent.accent"));
+    }
+    readonly property color borderActive: {
+        const first = Gradient.firstColor(borderActiveSpec);
+        return first !== "" ? Gradient.qmlColor(first) : col("accent.accent");
+    }
     readonly property real radiusBase: num("shape.radius")
     readonly property int borderWidth: Math.round(num("shape.border-width"))
     readonly property real spaceUnit: num("space.unit")
@@ -184,7 +216,11 @@ QtObject {
     readonly property QtObject panel: QtObject {
         readonly property color background: root.sComposed("panel", "background", root.surface1, 1.0)
         readonly property color text: root.sCol("panel", "text", root.textPrimary)
-        readonly property color border: root.sComposed("panel", "border", root.surface3, 1.0)
+        // Chains to the theme's active border, as omarchy's popups.border
+        // does — so a card picks up a gradient theme without every theme
+        // having to restate it.
+        readonly property string borderSpec: root.sSpec("panel", "border", root.borderActiveSpec)
+        readonly property color border: root.sComposed("panel", "border", root.borderActive, 1.0)
     }
     readonly property QtObject tooltip: QtObject {
         readonly property color background: root.sComposed("tooltip", "background", root.surface1, 0.97)
@@ -206,7 +242,8 @@ QtObject {
         readonly property color text: root.sCol("lock", "text", root.textPrimary)
         readonly property color placeholder: root.sCol("lock", "placeholder", root.alpha(root.textPrimary, 0.66))
         readonly property color textError: root.sCol("lock", "text-error", root.error)
-        readonly property color borderActive: root.sComposed("lock", "border-active", root.accent, root.sAlpha("lock", "border", 1.0))
+        readonly property string borderActiveSpec: root.sSpec("lock", "border-active", root.borderActiveSpec)
+        readonly property color borderActive: root.sComposed("lock", "border-active", root.borderActive, root.sAlpha("lock", "border", 1.0))
         readonly property color borderError: root.sComposed("lock", "border-error", root.error, root.sAlpha("lock", "border", 1.0))
         readonly property color selection: root.sComposed("lock", "selection", root.accent, 0.45)
     }

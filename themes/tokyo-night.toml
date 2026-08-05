@@ -62,6 +62,24 @@ easing = "standard"
 height = 26
 width-vertical = 28
 
+# The active-window / active-surface border. ONE token, holding either a solid
+# color or a gradient, in omarchy's grammar for hyprland_active_border:
+#
+#   active = "#7aa2f7"                        solid
+#   active = "#26a269ee #2ec27eee 45deg"      gradient (angle optional)
+#
+# Colors may carry an alpha byte last (#rrggbbaa), the way CSS and niri write
+# it. The angle is Hyprland's: 0 is left-to-right and increases clockwise on
+# screen; bin/theme-apply converts it to CSS for niri's `angle=`.
+#
+# Omitted, it derives from accent.accent — so a theme only names it to add a
+# gradient or to pull the border off the accent. It drives niri's border and
+# focus-ring (active-gradient when it is a gradient, active-color when it is
+# not), the bar-widget flyout card, and the lock field. Surfaces that cannot
+# draw a gradient take its first stop.
+[border]
+active = "accent.accent"
+
 # ---------------------------------------------------------------------------
 # PER-SURFACE OVERRIDES
 #
@@ -83,7 +101,8 @@ width-vertical = 28
 #                    text [ansi.white], active [accent.error]
 #                    (also carries the base keys height / width-vertical above)
 #   [panel]          bar-widget flyout cards. background [surface.1] + -alpha,
-#                    text [text.primary], border [surface.3] + -alpha
+#                    text [text.primary], border [border.active] + -alpha —
+#                    gradient-or-solid, drawn as a gradient ring when it is one
 #   [tooltip]        background [surface.1] + -alpha [0.97],
 #                    text [ansi.white], border [ansi.white] + -alpha
 #   [notifications]  background [surface.2] + -alpha, text [text.primary],
@@ -92,7 +111,8 @@ width-vertical = 28
 #                    countdown [accent.accent]
 #   [lock]           background [surface.1] + -alpha [0.8], text [text.primary],
 #                    placeholder [text.primary @ 0.66], text-error [accent.error],
-#                    border-active [accent.accent], border-error [accent.error],
+#                    border-active [border.active] (gradient-or-solid, drawn as
+#                    a gradient ring when it is one), border-error [accent.error],
 #                    border-alpha [1.0] (shared by both border states — they are
 #                    mutually exclusive in time), selection [accent.accent] +
 #                    -alpha [0.45]

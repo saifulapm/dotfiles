@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Widgets
+import "../../components"
 
 // The lock screen's face, split out of the service exactly as omarchy splits
 // theirs (CREDITS.md): the session-lock surface and the preview overlay both
@@ -216,7 +217,10 @@ Item {
             anchors.centerIn: parent
             color: root.fieldColor
             radius: root.theme.radius(1)
-            border.width: root.outlineThickness
+            // A gradient active border is drawn by the Shape ring at the end
+            // of this item instead. The error state is always a solid color,
+            // so a failed attempt goes back to the plain Rectangle border.
+            border.width: fieldBorder.active ? 0 : root.outlineThickness
             border.color: root.errorState ? root.borderErrorColor : root.borderActiveColor
             clip: true
 
@@ -315,6 +319,15 @@ Item {
                 font.pixelSize: Math.round(root.fieldFontSize * 1.1)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
+            }
+
+            GradientBorder {
+                id: fieldBorder
+                anchors.fill: parent
+                z: 100
+                spec: root.errorState ? "" : root.theme.lock.borderActiveSpec
+                borderWidth: root.outlineThickness
+                cornerRadius: inputField.radius
             }
         }
     }

@@ -10,14 +10,18 @@ layout {
     // backdrop-color below is what shows.
     background-color "transparent"
 
+    // border.active carries either a solid color or a gradient; the
+    // {{ niri_active }} template function in bin/theme-apply writes
+    // active-color or active-gradient accordingly. A *-gradient key takes
+    // precedence over the matching *-color, so only one is ever emitted.
     focus-ring {
-        active-color "{{accent.accent}}"
+        {{ niri_active border.active }}
         inactive-color "{{surface.3}}"
         urgent-color "{{accent.error}}"
     }
 
     border {
-        active-color "{{accent.accent}}"
+        {{ niri_active border.active }}
         inactive-color "{{surface.3}}"
         urgent-color "{{accent.error}}"
     }

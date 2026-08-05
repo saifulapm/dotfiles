@@ -47,3 +47,9 @@ border-width = 1
 [motion]
 duration = 150
 easing = "standard"
+
+# Omarchy's hyprland_active_border for this theme (MIT, see CREDITS.md):
+# rgba(8a8588ee) rgba(e2dddcee) — no angle, so left-to-right.
+# One token, gradient or solid: "#hex #hex angledeg" | "#hex".
+[border]
+active = "#8a8588ee #e2dddcee"

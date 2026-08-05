@@ -17,6 +17,7 @@ const STATE = path.join(HOME, ".local/state/qshell/theme.toml")
 // become globals despite this module's "use strict".
 ;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/color.js"), "utf8"))
 ;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/defaults.js"), "utf8"))
+;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/gradient.js"), "utf8"))
 
 // Same limited walker as Services/Theme.qml — sections, key = value,
 // quoted keys, strings/numbers/bare words, inline comments.
@@ -46,26 +47,81 @@ const tokens = Object.assign({}, THEME_DEFAULTS,
 // runs on every theme change and at bootstrap.
 fs.mkdirSync(path.join(HOME, ".config/qshell"), { recursive: true })
 
+// A token's value may name another token ("accent.accent") instead of
+// carrying a literal — the same indirection Services/Theme.qml resolves with
+// deref(). Flatten the whole map once here so every template, template
+// function and OSC write below sees a literal. Bounded, so a cycle settles on
+// the last value seen rather than hanging.
+for (const key of Object.keys(tokens)) {
+  let v = String(tokens[key]).trim()
+  for (let i = 0; i < 8; i++) {
+    if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(v)) break
+    const next = tokens[v]
+    if (next === undefined || String(next).trim() === v) break
+    v = String(next).trim()
+  }
+  tokens[key] = v
+}
+
 // Derived tokens — same construction rules as Services/Theme.qml.
 if (!tokens["text.on-accent"] && tokens["accent.accent"]) {
   tokens["text.on-accent"] = ensureContrast(
     tokens["surface.0"] || "#16161e", tokens["accent.accent"], 4.5)
 }
 
+// The active-border token, derived from the accent when a theme omits it —
+// same rule as text.on-accent above, and the same rule Services/Theme.qml
+// applies, so a theme without the token looks identical either side of the
+// shell boundary.
+if (!tokens["border.active"]) tokens["border.active"] = tokens["accent.accent"]
+
 // GTK polarity, derived here so the settings.ini template and the gsettings
 // calls below read the same decision.
 const mode = String(tokens["meta.mode"]) === "light" ? "light" : "dark"
 tokens["gtk.prefer-dark"] = mode === "light" ? "0" : "1"
 
+// Template functions — `{{ fn token }}`. Plain `{{token}}` substitution stays
+// what it was; these exist for the one thing it cannot express, which is a
+// token whose VALUE decides which config KEY gets written. Omarchy has the
+// same split (their sed script gets pre-computed `{{ shell_gradient X }}` /
+// `{{ hypr_gradient X }}` entries alongside the flat colors).
+const TEMPLATE_FNS = {
+  // niri's active border/focus-ring line. A gradient token becomes
+  // `active-gradient from=… to=… angle=… relative-to="workspace-view"`; a
+  // solid one stays `active-color "…"`. Angles are stored in Hyprland's
+  // convention (the themes were ported from there); niri reads CSS angles,
+  // hence cssAngle.
+  niri_active: spec => {
+    const g = parseSpec(spec)
+    if (!g.enabled) {
+      const flat = firstColor(spec)
+      return `active-color "${flat || spec}"`
+    }
+    const from = g.colors[0]
+    const to = g.colors[g.colors.length - 1]
+    return `active-gradient from="${from}" to="${to}" angle=${cssAngle(g.angle)} relative-to="workspace-view"`
+  },
+  // The flat color a gradient degrades to, for configs with nowhere to put
+  // one (theirs: gradient_start).
+  gradient_start: spec => firstColor(spec) || spec
+}
+
 let missing = []
 function render(tmpl) {
-  return tmpl.replace(/\{\{([A-Za-z0-9_.-]+)(?:\|(hexa?))?\}\}/g, (m, key, filter) => {
-    const v = tokens[key]
-    if (v === undefined) { missing.push(key); return m }
-    if (filter === "hex") return String(v).replace(/^#/, "")
-    if (filter === "hexa") return String(v).replace(/^#/, "") + "ff"
-    return String(v)
-  })
+  return tmpl
+    .replace(/\{\{\s*([a-z_]+)\s+([A-Za-z0-9_.-]+)\s*\}\}/g, (m, fn, key) => {
+      if (!TEMPLATE_FNS[fn]) { missing.push(fn + "()"); return m }
+      const v = tokens[key]
+      if (v === undefined) { missing.push(key); return m }
+      return TEMPLATE_FNS[fn](String(v))
+    })
+    .replace(/\{\{([A-Za-z0-9_.-]+)(?:\|(hexa?))?\}\}/g, (m, key, filter) => {
+      const v = tokens[key]
+      if (v === undefined) { missing.push(key); return m }
+      if (filter === "hex") return String(v).replace(/^#/, "")
+      if (filter === "hexa") return String(v).replace(/^#/, "") + "ff"
+      return String(v)
+    })
 }
 
 function writeAtomic(dest, content) {

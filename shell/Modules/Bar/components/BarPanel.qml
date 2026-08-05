@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../../../components"
 
 // Anchored popup panel for bar widgets — omarchy's plugin panels, adapted
 // to niri: a fullscreen Overlay window whose scrim dismisses on click (niri
@@ -139,7 +140,9 @@ PanelWindow {
         // The [panel] surface (omarchy's [popups]): a theme section restyles
         // every bar flyout card at once, and falls back to the base tokens.
         color: panelWindow.theme.panel.background
-        border.width: panelWindow.theme.borderWidth
+        // A gradient border is drawn by the Shape ring below instead; the
+        // Rectangle's own border would paint its first stop underneath it.
+        border.width: cardBorder.active ? 0 : panelWindow.theme.borderWidth
         border.color: panelWindow.theme.panel.border
         clip: true
 
@@ -203,6 +206,16 @@ PanelWindow {
                     spacing: panelWindow.theme.space(2)
                 }
             }
+        }
+
+        // On top of the content, like the Rectangle border it replaces.
+        GradientBorder {
+            id: cardBorder
+            anchors.fill: parent
+            z: 100
+            spec: panelWindow.theme.panel.borderSpec
+            borderWidth: panelWindow.theme.borderWidth
+            cornerRadius: card.radius
         }
     }
 }

@@ -569,6 +569,19 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   becomes a `[<section>]` block spliced into ours, replacing only that block.
   `themes/tokyo-night.toml`'s `[lock]` section is their
   `themes/tokyo-night/shell.lock.toml`, values verbatim.
+- **Gradient border tokens** from `bin/omarchy-theme-set-templates`
+  (`parse_gradient` / `shell_gradient_value` / `gradient_start_value`) and
+  `shell/Commons/Border.qml` + `BorderGeometry.js`: one token carrying either
+  a solid color or a gradient (`"#a #b 45deg"`), the angle as the token ending
+  in `deg`, the first stop as the flat-color degradation for consumers that
+  cannot draw one, and `gradientEndpoints` verbatim in
+  `shell/Commons/gradient.js`. `shell/components/GradientBorder.qml` is their
+  Border.qml idea narrowed to a uniform-width ring (their per-side widths and
+  hand-rolled arc paths are not ported). The `[border] active` values in
+  `themes/{hackerman,solitude,last-horizon}.toml` are their
+  `hyprland_active_border`, colors and angle verbatim; the template-function
+  layer in `bin/theme-apply` mirrors their pre-computed `{{ shell_gradient X }}`
+  / `{{ hypr_gradient X }}` sed entries.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
