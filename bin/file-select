@@ -4,10 +4,11 @@
 # name in its two error messages differs. bin/tailscale-send is its one caller
 # here, for the tailscale panel's Taildrop send.
 #
-# NOTE: this needs an xdg-desktop-portal implementation on the session bus, and
-# there is none installed on this machine — the call below fails cleanly with
-# EXIT_CHOOSER_FAILED, which is exactly the case tailscale-send reports as
-# "The file chooser did not open".
+# NOTE: this needs a portal backend that implements FileChooser. The gnome
+# backend advertises it but delegates the work to nautilus, so on a machine
+# without nautilus the request is answered as cancelled and no dialog is ever
+# drawn — see home/dot_config/xdg-desktop-portal/niri-portals.conf, which pins
+# FileChooser to the gtk backend for exactly that reason.
 
 # Python rather than bash, alone among the commands here, because the portal
 # answers a request with a Response signal addressed to the connection that

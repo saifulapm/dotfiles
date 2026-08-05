@@ -85,7 +85,7 @@ why = "Screencast/screenshot portal backend for niri (was a niri weak dep; claim
 name = "xdg-desktop-portal-gtk"
 category = "core"
 arch = "all"
-why = "Portal fallback: file choosers, settings for GTK apps (was a niri weak dep; claimed intentionally)"
+why = "Portal fallback: file choosers, settings for GTK apps (was a niri weak dep; claimed intentionally). Since 2026-08-05 it is the FileChooser backend by explicit preference — see home/dot_config/xdg-desktop-portal/niri-portals.conf: the gnome backend advertises FileChooser but delegates it to nautilus, which is not installed, so every request died with \"The name is not activatable\" and no dialog ever appeared"
 
 [[pkg]]
 name = "wireplumber"
@@ -138,10 +138,10 @@ why = "The tailnet joining these three machines, and what the bar's `tailscale` 
 #     here and surfaces an "Authorize Tailscale operator" row that runs exactly
 #     that command under pkexec, rather than letting the switch fail silently.
 #   * the panel's Taildrop send button falls back to a file chooser
-#     (bin/file-select) when no files are named, and that needs an
-#     xdg-desktop-portal implementation. There is none installed here, so that
-#     path reports "The file chooser did not open" until one is; naming files on
-#     bin/tailscale-send's command line needs no portal.
+#     (bin/file-select) when no files are named, which goes through
+#     xdg-desktop-portal. That was broken for every app on this machine, not
+#     just this one, until the niri-portals.conf above pinned FileChooser to
+#     the gtk backend; verified on screen afterwards.
 #
 # Tailscale also publishes its own dnf repo, which carries releases sooner than
 # Fedora's — same package name, same two architectures, and only one of the two
