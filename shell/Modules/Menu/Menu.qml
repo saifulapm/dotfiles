@@ -152,9 +152,6 @@ Scope {
         case "lock":
             shellRoot.lockSession();
             break;
-        case "lockPreview":
-            shellRoot.previewLock();
-            break;
         case "dnd":
             shellRoot.notifs.dnd = !shellRoot.notifs.dnd;
             break;

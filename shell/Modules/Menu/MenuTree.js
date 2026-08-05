@@ -226,16 +226,6 @@ var TREE = {
         "description": "Lock the session",
         "call": "lock"
     },
-    // Not omarchy's — their preview IPC has no row and no bind. A leaf beside
-    // Lock rather than a submenu under it, because locking is the common
-    // action and must not grow a keystroke.
-    "system.lockpreview": {
-        "icon": "󰛐",
-        "label": "Lock Preview",
-        "aliases": ["preview", "lockscreen-preview", "lock-screen"],
-        "description": "Show the lock screen without locking",
-        "call": "lockPreview"
-    },
     "system.suspend": {
         "icon": "󰒲",
         "label": "Suspend",

@@ -1,13 +1,16 @@
 import QtQuick
 import QtQuick.Effects
+import Quickshell
+import Quickshell.Widgets
 
 // The lock screen's face, split out of the service exactly as omarchy splits
 // theirs (CREDITS.md): the session-lock surface and the preview overlay both
 // mount this, so what a preview shows is what a lock shows.
 //
 // Their design, our tokens: a blurred copy of the current wallpaper under one
-// centered password field. No clock, no date, no media — upstream draws none
-// of them, and the field is the whole interface.
+// centered password field. Upstream draws nothing else at all — the identity
+// block above the field (avatar, time, date) is ours, and the field stays
+// exactly where they put it so everything hangs off dead centre.
 Item {
     id: root
 
@@ -24,6 +27,11 @@ Item {
     property bool syncingPasswordText: false
 
     readonly property string placeholderText: "Enter Password"
+    // The user's portrait, the conventional path a login manager reads. There
+    // is no probe: Image reports Ready or Error, and Error simply means the
+    // block collapses to the clock alone.
+    readonly property string facePath: Quickshell.env("HOME") + "/.face"
+    readonly property int avatarSize: 96
     readonly property int fieldWidth: 381
     readonly property int fieldHeight: 67
     readonly property int outlineThickness: 3
@@ -95,6 +103,13 @@ Item {
             Qt.callLater(forcePasswordFocus);
     }
 
+    // Only ticks while this view is up — the lock module is lazy, so nothing
+    // here exists on an unlocked desktop.
+    SystemClock {
+        id: lockClock
+        precision: SystemClock.Minutes
+    }
+
     // Measures the masked password at full size; passwordDotScale compares this
     // against the field width to decide how far the dots must shrink to fit.
     TextMetrics {
@@ -139,6 +154,58 @@ Item {
                 root.forcePasswordFocus();
             }
             onPositionChanged: root.wakeRequested()
+        }
+
+        // Ours, not omarchy's. Hangs off the field rather than sharing a
+        // column with it, so the field itself stays dead centre whether or not
+        // there is a portrait to draw.
+        Column {
+            id: identity
+
+            anchors.horizontalCenter: inputField.horizontalCenter
+            anchors.bottom: inputField.top
+            anchors.bottomMargin: root.theme.space(10)
+            spacing: root.theme.space(3)
+
+            ClippingRectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: root.avatarSize
+                height: root.avatarSize
+                visible: face.status === Image.Ready
+                color: "transparent"
+                // Round on a rounded theme, square on a sharp one — the same
+                // shape token every other surface in the shell reads.
+                radius: root.theme.radiusBase > 0 ? width / 2 : 0
+                border.width: root.outlineThickness
+                border.color: root.borderActiveColor
+
+                Image {
+                    id: face
+                    anchors.fill: parent
+                    source: "file://" + root.facePath
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false
+                    sourceSize.width: width
+                    sourceSize.height: height
+                }
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                color: root.textColor
+                font.family: root.theme.fontMono
+                font.pixelSize: root.theme.fontPx(5)
+                text: Qt.formatDateTime(lockClock.date, "HH:mm")
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                color: root.placeholderColor
+                font.family: root.theme.fontUi
+                font.pixelSize: root.theme.fontPx(1.1)
+                text: Qt.formatDateTime(lockClock.date, "dddd, d MMMM")
+            }
         }
 
         Rectangle {

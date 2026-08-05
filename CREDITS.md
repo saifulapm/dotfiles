@@ -430,7 +430,9 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
 - **Lock screen design** from `shell/plugins/lock/` (`LockView.qml`,
   `Service.qml`): the whole face — the current wallpaper redrawn behind the
   lock and blurred to nothing (their blur radius, multiplier and slight
-  contrast cut), one 381×67 password field centered on it and nothing else,
+  contrast cut), one 381×67 password field centered on it (upstream draws
+  nothing else at all — the avatar, time and date above it are ours, hung off
+  the field so it keeps their dead-centre position),
   the masked characters centered and letter-spaced with their fit-to-width
   shrink so a long password never clips silently, the caret that only exists
   once something is typed, the field's own text standing in for a label

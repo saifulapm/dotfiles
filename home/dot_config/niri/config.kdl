@@ -431,9 +431,6 @@ binds {
     // Mod+Ctrl+B was the free key next to the other picker binds.
     Mod+Ctrl+B hotkey-overlay-title="Pick a Wallpaper" { spawn "qs" "ipc" "call" "wallpaper" "toggle"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "ipc" "call" "lock" "lock"; }
-    // Draws the lock screen without locking: Shift on the lock bind. Omarchy
-    // has the preview IPC but no bind for it.
-    Super+Alt+Shift+L hotkey-overlay-title="Preview the Lock Screen" { spawn "qs" "ipc" "call" "lock" "preview"; }
     // Omarchy's notification binds all hang off comma (dismiss last on
     // SUPER+comma, history on SUPER+SHIFT+ALT+comma). Mod+Comma is niri's
     // consume-window-into-column, a default we keep, so dismiss-last takes
