@@ -1,0 +1,49 @@
+# Hackerman — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Hackerman"
+mode = "dark"
+
+[surface]
+"0" = "#080910"
+"1" = "#0B0C16"
+"2" = "#151828"
+"3" = "#252a39"
+
+[text]
+primary = "#ddf7ff"
+muted = "#535c7a"
+inverse = "#06060c"
+
+[accent]
+accent = "#82FB9C"
+error = "#50f872"
+warn = "#50f7d4"
+ok = "#4fe88f"
+
+[ansi]
+black = "#080910"
+red = "#50f872"
+green = "#4fe88f"
+yellow = "#50f7d4"
+blue = "#829dd4"
+magenta = "#86a7df"
+cyan = "#7cf8f7"
+white = "#ddf7ff"
+bright-black = "#2d3450"
+bright-red = "#85ff9d"
+bright-green = "#9cf7c2"
+bright-yellow = "#a4ffec"
+bright-blue = "#c4d2ed"
+bright-magenta = "#cddbf4"
+bright-cyan = "#d1fffe"
+bright-white = "#ddf7ff"
+
+[shape]
+radius = 0
+border-width = 1
+
+[motion]
+duration = 100
+easing = "snap"

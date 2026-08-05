@@ -1,0 +1,49 @@
+# Miasma — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Miasma"
+mode = "dark"
+
+[surface]
+"0" = "#191919"
+"1" = "#222222"
+"2" = "#2c2c2c"
+"3" = "#383837"
+
+[text]
+primary = "#c2c2b0"
+muted = "#666666"
+inverse = "#121212"
+
+[accent]
+accent = "#78824b"
+error = "#685742"
+warn = "#b36d43"
+ok = "#5f875f"
+
+[ansi]
+black = "#191919"
+red = "#685742"
+green = "#5f875f"
+yellow = "#b36d43"
+blue = "#78824b"
+magenta = "#bb7744"
+cyan = "#c9a554"
+white = "#c2c2b0"
+bright-black = "#666666"
+bright-red = "#685742"
+bright-green = "#5f875f"
+bright-yellow = "#b36d43"
+bright-blue = "#78824b"
+bright-magenta = "#bb7744"
+bright-cyan = "#c9a554"
+bright-white = "#c2c2b0"
+
+[shape]
+radius = 8
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

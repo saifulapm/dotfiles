@@ -1,0 +1,49 @@
+# Vantablack — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Vantablack"
+mode = "dark"
+
+[surface]
+"0" = "#090909"
+"1" = "#000000"
+"2" = "#1a1a1a"
+"3" = "#2c2c2c"
+
+[text]
+primary = "#ffffff"
+muted = "#7a7a7a"
+inverse = "#070707"
+
+[accent]
+accent = "#8d8d8d"
+error = "#a4a4a4"
+warn = "#cecece"
+ok = "#b6b6b6"
+
+[ansi]
+black = "#090909"
+red = "#a4a4a4"
+green = "#b6b6b6"
+yellow = "#cecece"
+blue = "#8d8d8d"
+magenta = "#9b9b9b"
+cyan = "#b0b0b0"
+white = "#ffffff"
+bright-black = "#7a7a7a"
+bright-red = "#a4a4a4"
+bright-green = "#b6b6b6"
+bright-yellow = "#cecece"
+bright-blue = "#8d8d8d"
+bright-magenta = "#9b9b9b"
+bright-cyan = "#b0b0b0"
+bright-white = "#ffffff"
+
+[shape]
+radius = 2
+border-width = 1
+
+[motion]
+duration = 120
+easing = "standard"

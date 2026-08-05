@@ -1,0 +1,196 @@
+#!/usr/bin/env -S mise exec -- node
+// theme-port-omarchy [--force] [--all | <name>...]
+//
+// Converts omarchy themes (~/ref/omarchy/themes/<name>/colors.toml, MIT —
+// CREDITS.md) into our token schema at themes/<name>.toml. Existing files
+// are skipped unless --force: hand-tuned themes must win over generated
+// ports (omarchy's "first writer wins" rule).
+//
+// Colors are ported; non-color character (radius/motion/density) is ours,
+// assigned per theme in CHARACTER below — that split is the whole point of
+// our token schema.
+"use strict"
+const fs = require("fs")
+const os = require("os")
+const path = require("path")
+
+const ROOT = path.resolve(__dirname, "..")
+const OMARCHY = path.join(os.homedir(), "ref/omarchy/themes")
+
+;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/color.js"), "utf8"))
+
+// sRGB mix, same construction omarchy's templates use for derived shades.
+function mix(aHex, bHex, t) {
+  const a = hexToRgb(aHex), b = hexToRgb(bHex)
+  return rgbToHex({
+    r: a.r + (b.r - a.r) * t,
+    g: a.g + (b.g - a.g) * t,
+    b: a.b + (b.b - a.b) * t
+  })
+}
+
+// Non-color character per theme. Anything not listed gets the house default.
+// Values chosen to match each theme's temperament, not copied from anywhere.
+const CHARACTER = {
+  default:        { radius: 8,  motion: 150, easing: "standard" },
+  "retro-82":     { radius: 0,  motion: 0,   easing: "snap" },     // CRT: square, instant
+  hackerman:      { radius: 0,  motion: 100, easing: "snap" },
+  vantablack:     { radius: 2,  motion: 120, easing: "standard" },
+  "matte-black":  { radius: 4,  motion: 150, easing: "standard" },
+  solitude:       { radius: 6,  motion: 150, easing: "standard" }, // omarchy's own 6
+  lumon:          { radius: 12, motion: 250, easing: "standard" }, // rounded corporate calm
+  catppuccin:     { radius: 10, motion: 180, easing: "standard" },
+  "catppuccin-latte": { radius: 10, motion: 180, easing: "standard" },
+  "rose-pine":    { radius: 10, motion: 180, easing: "standard" },
+  "flexoki-light": { radius: 6, motion: 150, easing: "standard" },
+  white:          { radius: 6,  motion: 120, easing: "standard" }
+}
+
+// Flat key = "value" walker — omarchy colors.toml has no sections.
+function parseFlat(raw) {
+  const out = {}
+  for (const lineRaw of String(raw).split("\n")) {
+    const line = lineRaw.trim()
+    if (!line || line.startsWith("#")) continue
+    const kv = line.match(/^([A-Za-z0-9_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/)
+    if (kv) out[kv[1]] = (kv[2] ?? kv[3] ?? kv[4]).trim()
+  }
+  return out
+}
+
+// Subset of omarchy's derivation cascade (bin/omarchy-theme-color) — enough
+// that every key we consume resolves for all 22 built-in themes.
+function resolve(c) {
+  const pick = (...keys) => keys.map(k => c[k]).find(v => v !== undefined)
+  const out = {}
+  out.background = pick("background", "bg", "color0")
+  out.foreground = pick("foreground", "fg", "color7")
+  out.accent = pick("accent", "color4", "blue")
+  out.red = pick("red", "color1") || out.accent
+  out.green = pick("green", "color2") || out.accent
+  out.yellow = pick("yellow", "color3") || out.accent
+  out.blue = pick("blue", "color4") || out.accent
+  out.magenta = pick("magenta", "purple", "color5") || out.accent
+  out.cyan = pick("cyan", "color6") || out.accent
+  out.bright_foreground = pick("bright_foreground", "bright_fg", "color15") || out.foreground
+  out.dark_foreground = pick("dark_foreground", "dark_fg", "color8") || out.foreground
+  out.muted = pick("muted") || out.dark_foreground
+  out.dark_background = pick("dark_background", "dark_bg") || mix(out.background, "#000000", 0.25)
+  out.darker_background = pick("darker_background", "darker_bg") || mix(out.background, "#000000", 0.5)
+  out.lighter_background = pick("lighter_background", "lighter_bg") || out.background
+  for (const k of ["red", "yellow", "green", "cyan", "blue", "magenta"]) {
+    out["bright_" + k] = pick("bright_" + k) || mix(out[k], "#ffffff", 0.2)
+  }
+  out.mode = pick("mode", "theme_type")
+  if (!out.mode) {
+    const bg = hexToRgb(out.background)
+    out.mode = (bg.r + bg.g + bg.b) * 255 > 382 ? "light" : "dark"
+  }
+  return out
+}
+
+function titleCase(slug) {
+  return slug.replace(/(^|-)([a-z0-9])/g, (m, s, ch) => (s ? " " : "") + ch.toUpperCase())
+}
+
+function port(name) {
+  const src = path.join(OMARCHY, name, "colors.toml")
+  if (!fs.existsSync(src)) {
+    console.error(`skip ${name}: no colors.toml`)
+    return false
+  }
+  const c = resolve(parseFlat(fs.readFileSync(src, "utf8")))
+  const light = c.mode === "light"
+  const ch = CHARACTER[name] || CHARACTER.default
+
+  // Light themes read their ramp the other way: "dark/darker background" is
+  // further from white, i.e. the *recessed* surface. surface.0 stays the
+  // outermost shell surface (bar), surface.2/3 the raised ones.
+  const surface0 = c.dark_background
+  const surface1 = c.background
+  const surface2 = c.lighter_background
+  const surface3 = mix(surface2, c.bright_foreground, 0.08)
+
+  // Generated ports get contrast fixed, not just warned: primary must hold
+  // 4.5:1 on the lightest surface it sits on, muted 3:1 on the darkest.
+  const primary = ensureContrast(ensureContrast(c.bright_foreground, surface0, 4.5), surface2, 4.5)
+  const muted = ensureContrast(c.muted, surface0, 3.0)
+  const inverse = light ? surface1 : c.darker_background
+
+  const lines = []
+  const kv = (k, v) => lines.push(`${k} = "${v}"`)
+  lines.push(`# ${titleCase(name)} — ported from omarchy (MIT, see CREDITS.md).`)
+  lines.push(`# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.`)
+  lines.push("")
+  lines.push("[meta]")
+  kv("name", titleCase(name))
+  kv("mode", c.mode)
+  lines.push("")
+  lines.push("[surface]")
+  kv('"0"', surface0)
+  kv('"1"', surface1)
+  kv('"2"', surface2)
+  kv('"3"', surface3)
+  lines.push("")
+  lines.push("[text]")
+  kv("primary", primary)
+  kv("muted", muted)
+  kv("inverse", inverse)
+  lines.push("")
+  lines.push("[accent]")
+  kv("accent", c.accent)
+  kv("error", c.red)
+  kv("warn", c.yellow)
+  kv("ok", c.green)
+  lines.push("")
+  lines.push("[ansi]")
+  kv("black", light ? c.darker_background : c.dark_background)
+  kv("red", c.red)
+  kv("green", c.green)
+  kv("yellow", c.yellow)
+  kv("blue", c.blue)
+  kv("magenta", c.magenta)
+  kv("cyan", c.cyan)
+  kv("white", c.foreground)
+  kv("bright-black", c.muted)
+  kv("bright-red", c.bright_red)
+  kv("bright-green", c.bright_green)
+  kv("bright-yellow", c.bright_yellow)
+  kv("bright-blue", c.bright_blue)
+  kv("bright-magenta", c.bright_magenta)
+  kv("bright-cyan", c.bright_cyan)
+  kv("bright-white", c.bright_foreground)
+  lines.push("")
+  lines.push("[shape]")
+  lines.push(`radius = ${ch.radius}`)
+  lines.push("border-width = 1")
+  lines.push("")
+  lines.push("[motion]")
+  lines.push(`duration = ${ch.motion}`)
+  kv("easing", ch.easing)
+  lines.push("")
+
+  const dest = path.join(ROOT, "themes", name + ".toml")
+  fs.writeFileSync(dest, lines.join("\n"))
+  console.log(`ported ${name} (${c.mode}, radius ${ch.radius}, motion ${ch.motion}ms)`)
+  return true
+}
+
+const args = process.argv.slice(2)
+const force = args.includes("--force")
+let names = args.filter(a => !a.startsWith("--"))
+if (args.includes("--all") || names.length === 0) {
+  names = fs.readdirSync(OMARCHY).filter(n =>
+    fs.existsSync(path.join(OMARCHY, n, "colors.toml")))
+}
+
+let done = 0
+for (const name of names.sort()) {
+  const dest = path.join(ROOT, "themes", name + ".toml")
+  if (fs.existsSync(dest) && !force) {
+    console.log(`skip ${name}: themes/${name}.toml exists (hand-tuned wins; --force to overwrite)`)
+    continue
+  }
+  if (port(name)) done++
+}
+console.log(`theme-port-omarchy: ${done} theme(s) written`)

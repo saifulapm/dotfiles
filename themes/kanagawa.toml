@@ -1,0 +1,49 @@
+# Kanagawa — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Kanagawa"
+mode = "dark"
+
+[surface]
+"0" = "#17171e"
+"1" = "#1f1f28"
+"2" = "#223249"
+"3" = "#313f52"
+
+[text]
+primary = "#dcd7ba"
+muted = "#61627b"
+inverse = "#111116"
+
+[accent]
+accent = "#dcd7ba"
+error = "#c34043"
+warn = "#c0a36e"
+ok = "#76946a"
+
+[ansi]
+black = "#17171e"
+red = "#c34043"
+green = "#76946a"
+yellow = "#c0a36e"
+blue = "#7e9cd8"
+magenta = "#957fb8"
+cyan = "#6a9589"
+white = "#dcd7ba"
+bright-black = "#54546D"
+bright-red = "#e82424"
+bright-green = "#98bb6c"
+bright-yellow = "#e6c384"
+bright-blue = "#7fb4ca"
+bright-magenta = "#938aa9"
+bright-cyan = "#7aa89f"
+bright-white = "#dcd7ba"
+
+[shape]
+radius = 8
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

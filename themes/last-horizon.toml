@@ -1,0 +1,49 @@
+# Last Horizon — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Last Horizon"
+mode = "dark"
+
+[surface]
+"0" = "#090809"
+"1" = "#0c0b0c"
+"2" = "#0c0b0c"
+"3" = "#1d1c1d"
+
+[text]
+primary = "#e2dddc"
+muted = "#645a5d"
+inverse = "#060606"
+
+[accent]
+accent = "#b59790"
+error = "#c38b7b"
+warn = "#6B5E73"
+ok = "#87a9b0"
+
+[ansi]
+black = "#090809"
+red = "#c38b7b"
+green = "#87a9b0"
+yellow = "#6B5E73"
+blue = "#b59790"
+magenta = "#c4d8e2"
+cyan = "#a5a0b6"
+white = "#FAFCFB"
+bright-black = "#584e51"
+bright-red = "#c38b7b"
+bright-green = "#87a9b0"
+bright-yellow = "#6B5E73"
+bright-blue = "#b59790"
+bright-magenta = "#c4d8e2"
+bright-cyan = "#a5a0b6"
+bright-white = "#e2dddc"
+
+[shape]
+radius = 8
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

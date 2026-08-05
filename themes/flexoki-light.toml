@@ -1,0 +1,49 @@
+# Flexoki Light — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Flexoki Light"
+mode = "light"
+
+[surface]
+"0" = "#f2efe4"
+"1" = "#FFFCF0"
+"2" = "#E6E4D9"
+"3" = "#d5d3c9"
+
+[text]
+primary = "#100F0F"
+muted = "#8c8a82"
+inverse = "#FFFCF0"
+
+[accent]
+accent = "#205EA6"
+error = "#D14D41"
+warn = "#D0A215"
+ok = "#879A39"
+
+[ansi]
+black = "#e5e2d8"
+red = "#D14D41"
+green = "#879A39"
+yellow = "#D0A215"
+blue = "#205EA6"
+magenta = "#CE5D97"
+cyan = "#3AA99F"
+white = "#100F0F"
+bright-black = "#B7B5AC"
+bright-red = "#D14D41"
+bright-green = "#879A39"
+bright-yellow = "#D0A215"
+bright-blue = "#4385BE"
+bright-magenta = "#CE5D97"
+bright-cyan = "#3AA99F"
+bright-white = "#100F0F"
+
+[shape]
+radius = 6
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

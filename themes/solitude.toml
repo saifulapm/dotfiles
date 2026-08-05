@@ -1,0 +1,49 @@
+# Solitude — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Solitude"
+mode = "dark"
+
+[surface]
+"0" = "#0c0e10"
+"1" = "#101315"
+"2" = "#101315"
+"3" = "#1c1f22"
+
+[text]
+primary = "#a5aeb4"
+muted = "#5b5f66"
+inverse = "#080a0b"
+
+[accent]
+accent = "#798186"
+error = "#565d60"
+warn = "#d9dbdc"
+ok = "#9fa5a9"
+
+[ansi]
+black = "#0c0e10"
+red = "#565d60"
+green = "#9fa5a9"
+yellow = "#d9dbdc"
+blue = "#798186"
+magenta = "#aeaeae"
+cyan = "#707070"
+white = "#cacccc"
+bright-black = "#4b4e55"
+bright-red = "#de6145"
+bright-green = "#343d41"
+bright-yellow = "#c9c2b4"
+bright-blue = "#5d6367"
+bright-magenta = "#9a9a9a"
+bright-cyan = "#707070"
+bright-white = "#a5aeb4"
+
+[shape]
+radius = 6
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

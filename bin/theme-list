@@ -1,0 +1,53 @@
+#!/usr/bin/env -S mise exec -- node
+// theme-list [--json]
+// Plain: one theme name per line (same as theme-set with no args, minus marker).
+// --json: array of { name, title, mode, current, tokens } where tokens is the
+// flat "section.key" map the shell's Theme.qml consumes — this feeds the
+// theme switcher's live preview without QML ever parsing TOML files.
+"use strict"
+const fs = require("fs")
+const os = require("os")
+const path = require("path")
+
+const ROOT = path.resolve(__dirname, "..")
+const THEMES = path.join(ROOT, "themes")
+const NAME_FILE = path.join(os.homedir(), ".local/state/qshell/theme.name")
+
+function parseToml(raw) {
+  const out = {}
+  let section = ""
+  for (const lineRaw of String(raw).split("\n")) {
+    const line = lineRaw.trim()
+    if (!line || line.startsWith("#")) continue
+    const sec = line.match(/^\[([A-Za-z0-9_.-]+)\]\s*(#.*)?$/)
+    if (sec) { section = sec[1]; continue }
+    const kv = line.match(/^(?:"([^"]+)"|([A-Za-z0-9_-]+))\s*=\s*(?:"([^"]*)"|(-?\d+(?:\.\d+)?)|([A-Za-z][A-Za-z0-9_-]*))\s*(#.*)?$/)
+    if (!kv || !section) continue
+    const key = kv[1] !== undefined ? kv[1] : kv[2]
+    out[section + "." + key] = kv[3] !== undefined ? kv[3] : (kv[4] !== undefined ? kv[4] : kv[5])
+  }
+  return out
+}
+
+let current = ""
+try { current = fs.readFileSync(NAME_FILE, "utf8").trim() } catch (e) {}
+
+const names = fs.readdirSync(THEMES)
+  .filter(f => f.endsWith(".toml")).map(f => f.slice(0, -5)).sort()
+
+if (!process.argv.includes("--json")) {
+  for (const n of names) console.log(n)
+  process.exit(0)
+}
+
+const list = names.map(name => {
+  const tokens = parseToml(fs.readFileSync(path.join(THEMES, name + ".toml"), "utf8"))
+  return {
+    name,
+    title: tokens["meta.name"] || name,
+    mode: tokens["meta.mode"] === "light" ? "light" : "dark",
+    current: name === current,
+    tokens
+  }
+})
+process.stdout.write(JSON.stringify(list))

@@ -1,0 +1,49 @@
+# Gruvbox — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Gruvbox"
+mode = "dark"
+
+[surface]
+"0" = "#1e1e1e"
+"1" = "#282828"
+"2" = "#3c3836"
+"3" = "#48433e"
+
+[text]
+primary = "#d4be98"
+muted = "#71675e"
+inverse = "#161616"
+
+[accent]
+accent = "#7daea3"
+error = "#ea6962"
+warn = "#d8a657"
+ok = "#a9b665"
+
+[ansi]
+black = "#1e1e1e"
+red = "#ea6962"
+green = "#a9b665"
+yellow = "#d8a657"
+blue = "#7daea3"
+magenta = "#d3869b"
+cyan = "#89b482"
+white = "#d4be98"
+bright-black = "#665c54"
+bright-red = "#ea6962"
+bright-green = "#a9b665"
+bright-yellow = "#d8a657"
+bright-blue = "#7daea3"
+bright-magenta = "#d3869b"
+bright-cyan = "#89b482"
+bright-white = "#d4be98"
+
+[shape]
+radius = 8
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

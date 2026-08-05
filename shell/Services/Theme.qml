@@ -22,7 +22,25 @@ QtObject {
 
     property var values: builtin
 
+    // Preview overlay for the theme switcher: a full candidate token map that
+    // temporarily replaces the loaded theme (not merged with it — a preview
+    // must show the candidate's fallbacks, not the current theme's values).
+    // Any real theme load clears it, so applying a theme needs no handshake.
+    property var previewValues: null
+
+    function preview(tokens) {
+        previewValues = tokens && typeof tokens === "object" ? tokens : null;
+    }
+
+    function endPreview() {
+        previewValues = null;
+    }
+
     function tok(key) {
+        if (previewValues !== null) {
+            const p = previewValues[key];
+            return p !== undefined ? p : builtin[key];
+        }
         const v = values[key];
         return v !== undefined ? v : builtin[key];
     }
@@ -124,6 +142,7 @@ QtObject {
     function load(raw) {
         const parsed = parseToml(raw);
         values = Object.keys(parsed).length > 0 ? parsed : builtin;
+        previewValues = null;
         validateContrast();
     }
 

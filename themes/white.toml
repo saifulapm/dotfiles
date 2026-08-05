@@ -1,0 +1,49 @@
+# White — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "White"
+mode = "light"
+
+[surface]
+"0" = "#f5f5f5"
+"1" = "#ffffff"
+"2" = "#c0c0c0"
+"3" = "#b1b1b1"
+
+[text]
+primary = "#000000"
+muted = "#808080"
+inverse = "#ffffff"
+
+[accent]
+accent = "#6e6e6e"
+error = "#2a2a2a"
+warn = "#4a4a4a"
+ok = "#3a3a3a"
+
+[ansi]
+black = "#e8e8e8"
+red = "#2a2a2a"
+green = "#3a3a3a"
+yellow = "#4a4a4a"
+blue = "#1a1a1a"
+magenta = "#2e2e2e"
+cyan = "#3e3e3e"
+white = "#000000"
+bright-black = "#808080"
+bright-red = "#2a2a2a"
+bright-green = "#3a3a3a"
+bright-yellow = "#4a4a4a"
+bright-blue = "#1a1a1a"
+bright-magenta = "#2e2e2e"
+bright-cyan = "#3e3e3e"
+bright-white = "#000000"
+
+[shape]
+radius = 6
+border-width = 1
+
+[motion]
+duration = 120
+easing = "standard"

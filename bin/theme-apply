@@ -70,7 +70,8 @@ const OUTPUTS = {
     path.join(HOME, ".config/gtk-3.0/gtk.css"),
     path.join(HOME, ".config/gtk-4.0/gtk.css")
   ],
-  "fuzzel.ini.tmpl": [path.join(HOME, ".config/fuzzel/fuzzel.ini")]
+  "fuzzel.ini.tmpl": [path.join(HOME, ".config/fuzzel/fuzzel.ini")],
+  "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")]
 }
 
 for (const [tmplName, dests] of Object.entries(OUTPUTS)) {
@@ -81,6 +82,13 @@ for (const [tmplName, dests] of Object.entries(OUTPUTS)) {
 }
 if (missing.length) console.warn("theme-apply: tokens missing from theme:",
   [...new Set(missing)].join(", "))
+
+// ---- GTK light/dark polarity (new + libadwaita apps; best-effort) ----
+const mode = String(tokens["meta.mode"]) === "light" ? "light" : "dark"
+try {
+  execSync(`gsettings set org.gnome.desktop.interface color-scheme prefer-${mode}`, { stdio: "ignore" })
+  execSync(`gsettings set org.gnome.desktop.interface gtk-theme ${mode === "light" ? "Adwaita" : "Adwaita-dark"}`, { stdio: "ignore" })
+} catch (e) { /* gsettings absent or no session bus */ }
 
 // ---- live foot retheme via OSC (written to each foot child's pty) ----
 const ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",

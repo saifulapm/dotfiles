@@ -1,0 +1,49 @@
+# Lumon — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Lumon"
+mode = "dark"
+
+[surface]
+"0" = "#101b21"
+"1" = "#16242d"
+"2" = "#1b2d40"
+"3" = "#2c3e4f"
+
+[text]
+primary = "#f2fcff"
+muted = "#4e6881"
+inverse = "#0b1216"
+
+[accent]
+accent = "#8bc9eb"
+error = "#4d86b0"
+warn = "#6fa4c9"
+ok = "#5e95bc"
+
+[ansi]
+black = "#101b21"
+red = "#4d86b0"
+green = "#5e95bc"
+yellow = "#6fa4c9"
+blue = "#6fb8e3"
+magenta = "#8bc9eb"
+cyan = "#b4e4f6"
+white = "#d6e2ee"
+bright-black = "#304860"
+bright-red = "#73a6cb"
+bright-green = "#86b7d8"
+bright-yellow = "#9dcae5"
+bright-blue = "#f2fcff"
+bright-magenta = "#b1d8ee"
+bright-cyan = "#d1eef8"
+bright-white = "#f2fcff"
+
+[shape]
+radius = 12
+border-width = 1
+
+[motion]
+duration = 250
+easing = "standard"

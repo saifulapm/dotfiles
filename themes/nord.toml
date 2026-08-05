@@ -1,0 +1,49 @@
+# Nord — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Nord"
+mode = "dark"
+
+[surface]
+"0" = "#222730"
+"1" = "#2e3440"
+"2" = "#3b4252"
+"3" = "#484e5e"
+
+[text]
+primary = "#d8dee9"
+muted = "#657084"
+inverse = "#191c23"
+
+[accent]
+accent = "#81a1c1"
+error = "#bf616a"
+warn = "#ebcb8b"
+ok = "#a3be8c"
+
+[ansi]
+black = "#222730"
+red = "#bf616a"
+green = "#a3be8c"
+yellow = "#ebcb8b"
+blue = "#81a1c1"
+magenta = "#b48ead"
+cyan = "#88c0d0"
+white = "#d8dee9"
+bright-black = "#4c566a"
+bright-red = "#bf616a"
+bright-green = "#a3be8c"
+bright-yellow = "#ebcb8b"
+bright-blue = "#81a1c1"
+bright-magenta = "#b48ead"
+bright-cyan = "#8fbcbb"
+bright-white = "#d8dee9"
+
+[shape]
+radius = 8
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

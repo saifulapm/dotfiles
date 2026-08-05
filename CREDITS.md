@@ -15,6 +15,11 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   child's pty so open terminals retheme without restart.
 - **Structural token concept** from `shell/Commons/Style.qml`: spacing scale as the
   shell's rem, font size ratios, state-token alpha recipes.
+- **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
+  `tokyo-night.toml` are generated ports of omarchy's theme colors via
+  `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
+  Non-color tokens (shape/motion) in those files are ours. Muted/primary text
+  colors may differ from the source where our contrast floor adjusted them.
 
 ## DankMaterialShell (MIT) — github.com/AvengeMedia/DankMaterialShell
 

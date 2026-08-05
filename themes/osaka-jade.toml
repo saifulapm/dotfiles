@@ -1,0 +1,49 @@
+# Osaka Jade — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Osaka Jade"
+mode = "dark"
+
+[surface]
+"0" = "#0c1512"
+"1" = "#111c18"
+"2" = "#23372B"
+"3" = "#344536"
+
+[text]
+primary = "#F7E8B2"
+muted = "#53685B"
+inverse = "#090f0d"
+
+[accent]
+accent = "#509475"
+error = "#FF5345"
+warn = "#459451"
+ok = "#549e6a"
+
+[ansi]
+black = "#0c1512"
+red = "#FF5345"
+green = "#549e6a"
+yellow = "#459451"
+blue = "#509475"
+magenta = "#D2689C"
+cyan = "#2DD5B7"
+white = "#C1C497"
+bright-black = "#53685B"
+bright-red = "#db9f9c"
+bright-green = "#63b07a"
+bright-yellow = "#E5C736"
+bright-blue = "#ACD4CF"
+bright-magenta = "#75bbb3"
+bright-cyan = "#8CD3CB"
+bright-white = "#F7E8B2"
+
+[shape]
+radius = 8
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

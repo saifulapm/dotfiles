@@ -1,0 +1,49 @@
+# Catppuccin — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Catppuccin"
+mode = "dark"
+
+[surface]
+"0" = "#161622"
+"1" = "#1e1e2e"
+"2" = "#313244"
+"3" = "#3d3f52"
+
+[text]
+primary = "#cdd6f4"
+muted = "#5f6378"
+inverse = "#101019"
+
+[accent]
+accent = "#89b4fa"
+error = "#f38ba8"
+warn = "#f9e2af"
+ok = "#a6e3a1"
+
+[ansi]
+black = "#161622"
+red = "#f38ba8"
+green = "#a6e3a1"
+yellow = "#f9e2af"
+blue = "#89b4fa"
+magenta = "#f5c2e7"
+cyan = "#94e2d5"
+white = "#cdd6f4"
+bright-black = "#585b70"
+bright-red = "#f38ba8"
+bright-green = "#a6e3a1"
+bright-yellow = "#f9e2af"
+bright-blue = "#89b4fa"
+bright-magenta = "#f5c2e7"
+bright-cyan = "#94e2d5"
+bright-white = "#cdd6f4"
+
+[shape]
+radius = 10
+border-width = 1
+
+[motion]
+duration = 180
+easing = "standard"

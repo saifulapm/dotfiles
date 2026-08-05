@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # theme-set <name> — activate a theme from themes/ and fan it out.
+# theme-set        — list themes (* marks the active one).
 #
 # The active theme is a REGULAR file written atomically (cp + same-dir mv).
 # Never a symlink: repointing a symlink is invisible to the shell's inotify
@@ -9,11 +10,20 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 state_dir="$HOME/.local/state/qshell"
 state="$state_dir/theme.toml"
+name_file="$state_dir/theme.name"
+
+if [[ $# -eq 0 ]]; then
+  current=""
+  [[ -f $name_file ]] && current="$(<"$name_file")"
+  for f in "$root"/themes/*.toml; do
+    n="$(basename "${f%.toml}")"
+    if [[ $n == "$current" ]]; then echo "* $n"; else echo "  $n"; fi
+  done
+  exit 0
+fi
 
 if [[ $# -ne 1 ]]; then
-  echo "usage: theme-set <name>" >&2
-  echo "available:" >&2
-  for f in "$root"/themes/*.toml; do echo "  $(basename "${f%.toml}")" >&2; done
+  echo "usage: theme-set [<name>]" >&2
   exit 1
 fi
 
@@ -23,8 +33,15 @@ if [[ ! -f $src ]]; then
   exit 1
 fi
 
+# Compositor-level crossfade: freeze the screen, apply everything underneath,
+# fade to the fully rethemed desktop in one motion. Best-effort — a dead or
+# absent niri must never block a theme change.
+timeout 1 niri msg action do-screen-transition --delay-ms 200 >/dev/null 2>&1 || true
+
 mkdir -p "$state_dir"
 cp "$src" "$state.tmp"
 mv "$state.tmp" "$state"
+printf '%s\n' "$1" >"$name_file.tmp"
+mv "$name_file.tmp" "$name_file"
 
 exec "$root/bin/theme-apply"

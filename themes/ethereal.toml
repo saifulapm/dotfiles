@@ -1,0 +1,49 @@
+# Ethereal — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Ethereal"
+mode = "dark"
+
+[surface]
+"0" = "#040816"
+"1" = "#060B1E"
+"2" = "#131a3a"
+"3" = "#262843"
+
+[text]
+primary = "#ffcead"
+muted = "#6d7db6"
+inverse = "#030610"
+
+[accent]
+accent = "#7d82d9"
+error = "#ED5B5A"
+warn = "#E9BB4F"
+ok = "#92a593"
+
+[ansi]
+black = "#040816"
+red = "#ED5B5A"
+green = "#92a593"
+yellow = "#E9BB4F"
+blue = "#7d82d9"
+magenta = "#c89dc1"
+cyan = "#a3bfd1"
+white = "#ffcead"
+bright-black = "#6d7db6"
+bright-red = "#faaaa9"
+bright-green = "#c4cfc4"
+bright-yellow = "#f7dc9c"
+bright-blue = "#c2c4f0"
+bright-magenta = "#ead7e7"
+bright-cyan = "#dfeaf0"
+bright-white = "#ffcead"
+
+[shape]
+radius = 8
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

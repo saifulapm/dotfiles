@@ -1,0 +1,49 @@
+# Rose Pine — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Rose Pine"
+mode = "light"
+
+[surface]
+"0" = "#ede7e1"
+"1" = "#faf4ed"
+"2" = "#f2e9e1"
+"3" = "#e6ddd9"
+
+[text]
+primary = "#575279"
+muted = "#888487"
+inverse = "#faf4ed"
+
+[accent]
+accent = "#56949f"
+error = "#b4637a"
+warn = "#ea9d34"
+ok = "#286983"
+
+[ansi]
+black = "#e1dbd5"
+red = "#b4637a"
+green = "#286983"
+yellow = "#ea9d34"
+blue = "#56949f"
+magenta = "#907aa9"
+cyan = "#d7827e"
+white = "#575279"
+bright-black = "#cecacd"
+bright-red = "#b4637a"
+bright-green = "#286983"
+bright-yellow = "#ea9d34"
+bright-blue = "#56949f"
+bright-magenta = "#907aa9"
+bright-cyan = "#d7827e"
+bright-white = "#575279"
+
+[shape]
+radius = 10
+border-width = 1
+
+[motion]
+duration = 180
+easing = "standard"

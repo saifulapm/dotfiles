@@ -1,0 +1,49 @@
+# Ristretto — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Ristretto"
+mode = "dark"
+
+[surface]
+"0" = "#211b1b"
+"1" = "#2c2525"
+"2" = "#3d2f2a"
+"3" = "#4b3d38"
+
+[text]
+primary = "#e6d9db"
+muted = "#72696a"
+inverse = "#181414"
+
+[accent]
+accent = "#f38d70"
+error = "#fd6883"
+warn = "#f9cc6c"
+ok = "#adda78"
+
+[ansi]
+black = "#211b1b"
+red = "#fd6883"
+green = "#adda78"
+yellow = "#f9cc6c"
+blue = "#f38d70"
+magenta = "#a8a9eb"
+cyan = "#85dacc"
+white = "#e6d9db"
+bright-black = "#72696a"
+bright-red = "#ff8297"
+bright-green = "#c8e292"
+bright-yellow = "#fcd675"
+bright-blue = "#f8a788"
+bright-magenta = "#bebffd"
+bright-cyan = "#9bf1e1"
+bright-white = "#e6d9db"
+
+[shape]
+radius = 8
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"

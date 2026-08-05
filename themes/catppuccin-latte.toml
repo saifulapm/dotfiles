@@ -1,0 +1,49 @@
+# Catppuccin Latte — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Catppuccin Latte"
+mode = "light"
+
+[surface]
+"0" = "#e3e4e8"
+"1" = "#eff1f5"
+"2" = "#dce0e8"
+"3" = "#d0d4de"
+
+[text]
+primary = "#4c4f69"
+muted = "#7f8290"
+inverse = "#eff1f5"
+
+[accent]
+accent = "#1e66f5"
+error = "#d20f39"
+warn = "#df8e1d"
+ok = "#40a02b"
+
+[ansi]
+black = "#d7d8dc"
+red = "#d20f39"
+green = "#40a02b"
+yellow = "#df8e1d"
+blue = "#1e66f5"
+magenta = "#ea76cb"
+cyan = "#179299"
+white = "#4c4f69"
+bright-black = "#acb0be"
+bright-red = "#d20f39"
+bright-green = "#40a02b"
+bright-yellow = "#df8e1d"
+bright-blue = "#1e66f5"
+bright-magenta = "#ea76cb"
+bright-cyan = "#179299"
+bright-white = "#4c4f69"
+
+[shape]
+radius = 10
+border-width = 1
+
+[motion]
+duration = 180
+easing = "standard"

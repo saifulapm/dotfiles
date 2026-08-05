@@ -1,0 +1,49 @@
+# Retro 82 — ported from omarchy (MIT, see CREDITS.md).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+
+[meta]
+name = "Retro 82"
+mode = "dark"
+
+[surface]
+"0" = "#031222"
+"1" = "#05182e"
+"2" = "#0a2540"
+"3" = "#1d3449"
+
+[text]
+primary = "#f6dcac"
+muted = "#2a6b78"
+inverse = "#020c17"
+
+[accent]
+accent = "#faa968"
+error = "#f85525"
+warn = "#e97b3c"
+ok = "#028391"
+
+[ansi]
+black = "#031222"
+red = "#f85525"
+green = "#028391"
+yellow = "#e97b3c"
+blue = "#3f8f8a"
+magenta = "#3f8f8a"
+cyan = "#8cbfb8"
+white = "#f6dcac"
+bright-black = "#2a6b78"
+bright-red = "#f85525"
+bright-green = "#028391"
+bright-yellow = "#e97b3c"
+bright-blue = "#faa968"
+bright-magenta = "#3f8f8a"
+bright-cyan = "#8cbfb8"
+bright-white = "#f6dcac"
+
+[shape]
+radius = 0
+border-width = 1
+
+[motion]
+duration = 0
+easing = "snap"
