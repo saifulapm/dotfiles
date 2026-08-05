@@ -313,10 +313,28 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   ports of `shell/plugins/bar/indicators/StayAwake.qml`, `Dnd.qml`,
   `Reminder.qml` and `NightLight.qml` (their glyphs, their tooltip wording —
   the night light one names what a click does, not what is on — and their
-  click rules). We ship no dictation or screen-recording indicators, so those
-  entries are absent; their reveal snaps open where ours slides; and a
-  standalone indicator named directly in a bar array collapses when off instead
-  of reserving an empty slot.
+  click rules). We ship no screen-recording indicator, so that entry is
+  absent; their reveal snaps open where ours slides; and a standalone
+  indicator named directly in a bar array collapses when off instead of
+  reserving an empty slot.
+- **Dictation indicator** from `shell/plugins/bar/indicators/Dictation.qml` and
+  `bin/omarchy-voxtype-status`: dictation state as a bar indicator fed by a
+  long-running `voxtype status --follow --extended --format json` process
+  parsed line by line — their status helper is ported as `bin/voxtype-status`,
+  including the fallback JSON record it prints when voxtype is not installed
+  and their reason for `exec`-ing the follower as the bar's direct child (a
+  pipeline or coproc would orphan it under the systemd user instance). Their
+  state mapping is ported too: `alt` first and `class` as the fallback, the
+  microphone glyph while recording and 󰔟 while transcribing, "Dictate" as the
+  idle tooltip. Two deviations: upstream's indicator is active only while
+  `recording`, and an inactive indicator draws its inactive glyph, so their
+  transcribing glyph is never rendered — ours is active for both working
+  states so the hourglass actually shows; and where their click opens the
+  voxtype config TUI and restarts their shell, ours toggles recording (their
+  config opener is on right-click, without the restart — an indicator that
+  follows a stream needs no reload). The niri binds beside it are omarchy's
+  `default/hypr/bindings/voxtype.lua`: their SUPER+CTRL+X toggle verbatim, and
+  their F9 push-to-talk as a second toggle, because niri has no release binds.
 - **Night light service design** from `shell/plugins/services/nightlight/`
   (`Service.qml`, `NightlightModel.js`): night light as a two-state switch
   rather than a schedule — their 4000 K night and 6500 K day temperatures,

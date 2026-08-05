@@ -403,6 +403,7 @@ Scope {
             "update": updateComponent,
             "indicators": indicatorsComponent,
             "dnd": dndComponent,
+            "dictation": dictationComponent,
             "reminder": reminderComponent,
             "stayawake": stayAwakeComponent,
             "nightlight": nightLightComponent,
@@ -1608,6 +1609,13 @@ Scope {
         Dnd {
             theme: barRoot.theme
             notifs: barRoot.shell.notifs
+        }
+    }
+
+    Component {
+        id: dictationComponent
+        Dictation {
+            theme: barRoot.theme
         }
     }
 

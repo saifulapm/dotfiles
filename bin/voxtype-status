@@ -1,0 +1,29 @@
+#!/bin/bash
+# voxtype-status — stream voxtype's dictation state as bar-friendly JSON lines.
+#
+# Direct port of omarchy's bin/omarchy-voxtype-status (MIT, see CREDITS.md),
+# down to the fallback line it prints when voxtype is not installed, so a
+# machine without dictation still gets one well-formed idle record instead of
+# a broken pipe.
+#
+# One line per state change, forever: `voxtype status --follow` reads the
+# daemon's state file, so it is an event stream, not a poll — and it survives a
+# `systemctl --user restart voxtype` (verified) because the state lives in
+# $XDG_RUNTIME_DIR/voxtype/state rather than in a connection to the daemon.
+#
+# States seen on the wire: stopped (no daemon), idle, recording, transcribing.
+# `--extended` adds model/device/backend, which is what makes voxtype's own
+# tooltip text worth showing.
+#
+# Upstream's comment on the exec is worth keeping: the follower must stay the
+# bar's DIRECT child so quickshell's cleanup reaches it. A pipeline or a coproc
+# here would leave `voxtype status --follow` orphaned under the systemd user
+# instance. setpriv --pdeathsig is the other half of that — quickshell does not
+# signal a Process child when the shell exits.
+
+if ! command -v voxtype >/dev/null 2>&1; then
+    echo '{"alt": "", "class": "idle", "tooltip": ""}'
+    exit 0
+fi
+
+exec setpriv --pdeathsig TERM voxtype status --follow --extended --format json

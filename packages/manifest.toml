@@ -112,6 +112,12 @@ arch = "all"
 why = "Renders the Wi-Fi share QR matrix for the network panel (bin/network-qr pipes it through `qrencode --type ASCII`); the panel hides its share button when this is missing, so the feature is dead without it"
 
 [[pkg]]
+name = "wtype"
+category = "core"
+arch = "all"
+why = "`xdotool type` for Wayland — how voxtype puts a finished transcript into the focused window (see [[tool]] voxtype). Without it voxtype falls back to the clipboard and dictation stops short of actually typing (`voxtype setup check` says so in as many words). Installed 2026-08-06; it is also this machine's only key-injection tool, so the emoji picker and clipboard manager can now paste into the focused window the way omarchy does, instead of only copying and notifying"
+
+[[pkg]]
 name = "power-profiles-daemon"
 category = "core"
 arch = "all"
@@ -343,3 +349,32 @@ why  = "Rust language server for eglot"
 name = "nerd-font-jetbrains-mono"
 via  = "chezmoi external → ~/.local/share/fonts (upstream nerd-fonts release tarball)"
 why  = "Bar/terminal glyphs; not packaged in Fedora"
+
+[[tool]]
+name = "voxtype"
+via  = "upstream install (github.com/peteonrails/voxtype releases, voxtype.io/download) → ~/.local/bin/voxtype, then `voxtype setup --download --model base.en` and `voxtype setup systemd`"
+why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows and what Mod+Ctrl+X / F9 drive"
+
+# Notes on the voxtype entry above (installed by hand 2026-08-06, v0.7.5):
+#
+#   * Fedora does not package it — `dnf search voxtype` finds nothing — so it
+#     is a single user-local binary: an 11 MB stripped aarch64 ELF in
+#     ~/.local/bin, no rpm, no dnf update path. `voxtype check-update` is the
+#     only upgrade channel.
+#   * `voxtype info variants` reports AVX2=false and no GPU on this Mac, so
+#     transcription is plain CPU whisper.cpp. The model itself
+#     (~/.local/share/voxtype/models/ggml-base.en.bin, 141 MB) is downloaded,
+#     not in this repo.
+#   * `voxtype setup systemd` writes ~/.config/systemd/user/voxtype.service,
+#     which is NOT chezmoi-managed (unlike taildrop-receive.service) — a
+#     restore has to re-run that command, and the daemon only runs because
+#     `systemctl --user enable --now voxtype` was run once.
+#   * The daemon publishes its state to $XDG_RUNTIME_DIR/voxtype/state, which
+#     is what `voxtype status --follow` streams and therefore what
+#     bin/voxtype-status and the bar's dictation indicator read. Because the
+#     state is a file rather than a connection, the follower survives a daemon
+#     restart (verified).
+#   * voxtype's own evdev hotkey ([hotkey] key = SCROLLLOCK) needs the user in
+#     the `input` group and is inert here; the niri binds (Mod+Ctrl+X, F9 →
+#     `voxtype record toggle`) are what drive it instead, which is upstream's
+#     documented compositor-keybinding mode.

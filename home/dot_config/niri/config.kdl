@@ -439,6 +439,19 @@ binds {
     Mod+Alt+Comma hotkey-overlay-title="Dismiss Last Notification" { spawn "qs" "ipc" "call" "notifs" "dismissOne"; }
     Mod+Shift+Alt+Comma hotkey-overlay-title="Show Notification History" { spawn "qs" "ipc" "call" "notifs" "showHistory"; }
 
+    // Voice dictation (voxtype), state shown by the bar's dictation indicator.
+    // Omarchy's own toggle chord is SUPER+CTRL+X; Ctrl+X is free here.
+    //
+    // Their second bind is F9 as push-to-talk — press starts, and a separate
+    // `release = true` bind stops. niri has no release binds: a bind takes
+    // repeat, cooldown-ms, allow-when-locked, allow-inhibiting and
+    // hotkey-overlay-title, and nothing else (niri-config/src/binds.rs), so
+    // hold-to-talk cannot be expressed. F9 is therefore a second toggle, which
+    // is also why both binds set repeat=false — key repeat on a toggle would
+    // flap the recorder while the key is held.
+    Mod+Ctrl+X repeat=false hotkey-overlay-title="Toggle Dictation" { spawn "voxtype" "record" "toggle"; }
+    F9 repeat=false hotkey-overlay-title="Toggle Dictation" { spawn "voxtype" "record" "toggle"; }
+
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
     // For example, this is a standard bind to toggle the screen reader (orca).
