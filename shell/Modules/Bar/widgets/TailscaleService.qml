@@ -95,6 +95,44 @@ QtObject {
     // not "not looked yet".
     property bool detailsLoaded: false
 
+    // ------------------------------------------------- taildrop auto-receive
+    // Ours, with no upstream: omarchy's plugin can only send. Taildrop on Linux
+    // parks received files in tailscaled's inbox until somebody runs
+    // `tailscale file get`, so bin/taildrop-receive sits blocked in one for us
+    // (taildrop-receive.service) and writes what it is doing here. Watching
+    // that file is the whole read path — no poll, and a state that has not
+    // moved rewrites byte-identical content, so the watcher stays quiet.
+    readonly property string receiveStatePath: Quickshell.env("HOME") + "/.local/state/qshell/taildrop"
+    // The script's own word: waiting | denied | logged-out | offline |
+    // unavailable | idle | error. Empty until the file has been read.
+    property string receiveState: ""
+    property string receiveDetail: ""
+    property string receiveHint: ""
+    property string receiveDir: ""
+    // Files still sitting in tailscaled's inbox. Zero whenever the loop is
+    // healthy — it empties the inbox the instant anything lands — so a non-zero
+    // count means nothing is collecting them.
+    property int receivePending: 0
+    property int receiveCount: 0
+    // systemctl's word for the unit, read when the panel opens and not before.
+    property string receiveUnit: ""
+    readonly property bool receiveActive: receiveUnit === "active"
+    // Running, but the loop itself is stuck on something (no operator, logged
+    // out, tailscaled down) rather than parked waiting for a file.
+    readonly property bool receiveStuck: receiveState !== "" && receiveState !== "waiting" && receiveState !== "idle"
+
+    readonly property string receiveSummary: {
+        if (receiveUnit === "")
+            return "Unknown";
+        if (!receiveActive)
+            return receiveUnit === "failed" ? "Failed" : "Off";
+        if (receiveState === "")
+            return "Starting…";
+        if (receiveState === "waiting")
+            return receiveCount > 0 ? "On — " + receiveCount + " received" : "On";
+        return "Retrying";
+    }
+
     readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 30, 5, 3600)
     readonly property bool busy: presenceProcess.running || statusProcess.running || exitNodeListProcess.running || accountsProcess.running || actionProcess.running || loginProcess.running || switchProcess.running || operatorProcess.running || exitNodeProcess.running
     readonly property string userName: Quickshell.env("USER") || Quickshell.env("LOGNAME") || ""
@@ -119,6 +157,8 @@ QtObject {
     property string _exitNodeError: ""
     property string _operatorOutput: ""
     property string _operatorError: ""
+    property string _receiveUnitOutput: ""
+    property string _receiveInboxOutput: ""
     // A details pass asked for while the presence probe is still in flight —
     // the panel opens on top of the startup probe often enough.
     property bool _pendingDetails: false
@@ -278,6 +318,20 @@ QtObject {
                 accountsProcess.running = true;
                 launched = true;
             }
+            // The receive service is asked about on panel open and nowhere
+            // else: its state file already pushes every change, and this only
+            // adds what the file cannot say — whether the unit is running at
+            // all, and what is in the inbox while nothing is collecting it.
+            if (!receiveUnitProcess.running) {
+                _receiveUnitOutput = "";
+                receiveUnitProcess.command = cmd(["systemctl", "--user", "is-active", "taildrop-receive.service"]);
+                receiveUnitProcess.running = true;
+            }
+            if (!receiveInboxProcess.running) {
+                _receiveInboxOutput = "";
+                receiveInboxProcess.command = cmd(["curl", "-s", "--max-time", "5", "--unix-socket", "/run/tailscale/tailscaled.sock", "http://local-tailscaled.sock/localapi/v0/files/"]);
+                receiveInboxProcess.running = true;
+            }
         }
         // Arm on the launch that needs watching and leave it alone after that.
         // Restarting it every refresh pushes the deadline out ahead of a hung
@@ -379,6 +433,29 @@ QtObject {
         selectedAccountId = parsed.selectedAccountId;
         selectedAccountLabel = parsed.selectedAccountLabel;
         accountsAccessDenied = false;
+    }
+
+    function parseReceiveState(raw) {
+        const parsed = Model.parseReceiveState(raw);
+        if (!parsed) {
+            clearReceiveState();
+            return;
+        }
+        receiveState = parsed.state;
+        receiveDetail = parsed.detail;
+        receiveHint = parsed.hint;
+        receiveDir = parsed.dir;
+        receivePending = parsed.pending;
+        receiveCount = parsed.received;
+    }
+
+    function clearReceiveState() {
+        receiveState = "";
+        receiveDetail = "";
+        receiveHint = "";
+        receiveDir = "";
+        receivePending = 0;
+        receiveCount = 0;
     }
 
     function parseExitNodeList(raw) {
@@ -829,6 +906,51 @@ QtObject {
             }
             root.delayedRefresh.restart();
         }
+    }
+
+    readonly property Process receiveUnitProcess: Process {
+        running: false
+        command: []
+        stdout: StdioCollector {
+            id: receiveUnitStdout
+            waitForEnd: true
+            onStreamFinished: root._receiveUnitOutput = text
+        }
+        // `is-active` exits non-zero for everything but "active"; the word on
+        // stdout is the answer in either case.
+        onExited: {
+            const out = String(receiveUnitStdout.text || root._receiveUnitOutput || "").trim();
+            root.receiveUnit = out === "" ? "unknown" : out.split("\n")[0];
+        }
+    }
+
+    readonly property Process receiveInboxProcess: Process {
+        running: false
+        command: []
+        stdout: StdioCollector {
+            id: receiveInboxStdout
+            waitForEnd: true
+            onStreamFinished: root._receiveInboxOutput = text
+        }
+        onExited: exitCode => {
+            if (exitCode !== 0)
+                return;
+            const count = Model.parseInboxCount(String(receiveInboxStdout.text || root._receiveInboxOutput || ""));
+            if (count >= 0)
+                root.receivePending = count;
+        }
+    }
+
+    // The receive service's own report. `reload()` at startup matters: the view
+    // stays unloaded until something reads it, and neither loaded nor
+    // loadFailed ever fires until then.
+    readonly property FileView receiveStateFile: FileView {
+        path: root.receiveStatePath
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseReceiveState(text())
+        onLoadFailed: root.clearReceiveState()
+        Component.onCompleted: reload()
     }
 
     Component.onCompleted: refresh()

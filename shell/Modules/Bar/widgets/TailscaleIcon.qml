@@ -24,6 +24,10 @@ Item {
     property string fontFamily: ""
     property bool crossed: false
     property bool warning: false
+    // Ours: the same corner badge carrying a short count instead of the "!",
+    // for files waiting in the Taildrop inbox. `warning` wins — a device that
+    // still has to be authorized is the more urgent thing to say.
+    property string badgeText: ""
 
     width: iconSize
     height: iconSize
@@ -91,10 +95,16 @@ Item {
     }
 
     Rectangle {
-        visible: root.warning
-        width: Math.max(7, parent.width * 0.42)
-        height: width
-        radius: width / 2
+        id: badge
+
+        readonly property string label: root.warning ? "!" : root.badgeText
+
+        visible: badge.label !== ""
+        // A circle for the single "!", widening into a pill for a count that
+        // does not fit in one.
+        width: Math.max(height, badgeLabel.implicitWidth + 3)
+        height: Math.max(7, parent.height * 0.42)
+        radius: height / 2
         color: root.badgeColor
         border.width: 1
         border.color: root.badgeBorderColor
@@ -102,11 +112,12 @@ Item {
         anchors.bottom: parent.bottom
 
         Text {
+            id: badgeLabel
             anchors.centerIn: parent
-            text: "!"
+            text: badge.label
             color: root.badgeTextColor
             font.family: root.fontFamily
-            font.pixelSize: Math.max(6, parent.height * 0.72)
+            font.pixelSize: Math.max(6, badge.height * 0.72)
             font.bold: true
         }
     }

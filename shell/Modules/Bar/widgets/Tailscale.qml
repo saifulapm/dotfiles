@@ -39,7 +39,12 @@ BarButton {
         pollingAllowed: rootItem.visible && rootItem.bar !== null
     }
 
-    tooltipText: "Tailscale — " + (tailscale.statusText === "" ? "Unknown" : tailscale.statusText)
+    tooltipText: {
+        const base = "Tailscale — " + (tailscale.statusText === "" ? "Unknown" : tailscale.statusText);
+        if (tailscale.receivePending > 0)
+            return base + " · " + tailscale.receivePending + " file" + (tailscale.receivePending === 1 ? "" : "s") + " waiting in the Taildrop inbox";
+        return base;
+    }
 
     // Persist an inline shell.json setting for this widget (the panel's recent
     // Mullvad regions), merging over whatever the entry already carries.
@@ -80,7 +85,11 @@ BarButton {
         color: rootItem.tailscale.active ? rootItem.barFg : Qt.darker(rootItem.barFg, 1.55)
         crossed: !rootItem.tailscale.active && !rootItem.tailscale.needsLogin
         warning: rootItem.tailscale.needsLogin
-        badgeColor: rootItem.theme.error
+        // Files sitting in the inbox with nothing collecting them. The healthy
+        // loop empties it the instant anything lands, so this can only appear
+        // while the receive service is stopped or backing off.
+        badgeText: rootItem.tailscale.receivePending > 0 ? (rootItem.tailscale.receivePending > 9 ? "9+" : String(rootItem.tailscale.receivePending)) : ""
+        badgeColor: rootItem.tailscale.needsLogin ? rootItem.theme.error : rootItem.theme.accent
         // The badge sits in a ring of the bar's own background, so it reads as
         // a hole punched in the mark rather than a ninth dot.
         badgeBorderColor: rootItem.bar ? rootItem.bar.barBackground : rootItem.theme.surface1

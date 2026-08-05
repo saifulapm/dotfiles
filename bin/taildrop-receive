@@ -1,0 +1,268 @@
+#!/usr/bin/env bash
+# taildrop-receive — move Taildrop files out of tailscaled's inbox as they
+# arrive, and say so.
+#
+# Taildrop on Linux does not write received files anywhere: tailscaled parks
+# them in its own inbox until somebody runs `tailscale file get`. `--wait`
+# blocks until at least one file is pending and then moves the lot, so the
+# whole receiver is a loop around one blocking call — no timer, no polling,
+# nothing running between transfers. Run by taildrop-receive.service.
+#
+# `--verbose` only prints a summary ("moved 3/3 files"), never the names, so
+# the target directory is listed either side of the get and the difference is
+# what the notification names. `--conflict=rename` means an arriving duplicate
+# always shows up as a new name, so the diff never misses one.
+#
+# Everything that can go wrong here is a state, not a crash: no CLI, no
+# operator, logged out, tailscaled down. Each backs off (60 s, then 2, 5 and 10
+# minutes), keeps trying quietly, and logs one line when the state changes and
+# nothing at all when it does not — a service that has sat unauthorized for a
+# week leaves three lines in the journal, not a week of retries.
+#
+# The state file the shell's tailscale widget reads is written on every state
+# change: ~/.local/state/qshell/taildrop.
+set -uo pipefail
+
+target_dir="${TAILDROP_DIR:-$HOME/Downloads}"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell"
+state_file="$state_dir/taildrop"
+socket="/run/tailscale/tailscaled.sock"
+
+glyph="󰇚" # md-download
+
+# The backoff ladder, in seconds. The last step repeats forever.
+backoff_steps=(60 120 300 600)
+backoff_index=0
+
+state=""
+detail=""
+hint=""
+since=0
+received=0
+quick_cycles=0
+
+mkdir -p "$state_dir"
+
+json_escape() { # string
+  local s=${1//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\t'/\\t}
+  s=${s//$'\r'/}
+  printf '%s' "$s"
+}
+
+# Whatever is still sitting in the inbox. Only meaningful while backing off —
+# while the loop is healthy it is emptied the instant anything lands — so it is
+# read on the way into a backoff sleep and nowhere else. The LocalAPI answers
+# `null` for an empty inbox and an array of {Name,Size} otherwise; the operator
+# user may read it, which is the same permission the get itself needs.
+pending_count() {
+  local body
+  body=$(curl -s --max-time 5 --unix-socket "$socket" \
+    http://local-tailscaled.sock/localapi/v0/files/ 2>/dev/null) || return 1
+  [[ -n $body && $body != null ]] || {
+    printf '0'
+    return 0
+  }
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$(jq -r 'if type == "array" then length else 0 end' <<<"$body" 2>/dev/null || printf 0)"
+  else
+    printf '%s' "$(grep -o '"Name"' <<<"$body" | wc -l)"
+  fi
+}
+
+# The shell watches this file; it must be a regular file replaced atomically in
+# its own directory or the FileView's inotify watch does not fire. `since`
+# moves only when the state itself moves, so a retry that changes nothing
+# rewrites byte-identical content and the watcher stays quiet.
+state_write() { # pending
+  local pending=${1:-0}
+  # Never let an unreadable count out as a hole in the JSON.
+  [[ $pending =~ ^[0-9]+$ ]] || pending=0
+  {
+    printf '{"state":"%s","detail":"%s","hint":"%s","dir":"%s","pending":%s,"received":%s,"since":%s}\n' \
+      "$(json_escape "$state")" \
+      "$(json_escape "$detail")" \
+      "$(json_escape "$hint")" \
+      "$(json_escape "$target_dir")" \
+      "$pending" "$received" "$since"
+  } >"$state_file.tmp" && mv "$state_file.tmp" "$state_file"
+}
+
+# One line per state change. A retry that lands in the state it was already in
+# says nothing. Returns success when the state actually moved, so a caller can
+# write the state file on the change and not on every retry.
+set_state() { # state detail [hint]
+  local next=$1 next_detail=$2 next_hint=${3:-}
+  local changed=1
+  [[ $next == "$state" && $next_detail == "$detail" ]] && changed=0
+  state=$next
+  detail=$next_detail
+  hint=$next_hint
+  if ((changed)); then
+    since=$(date +%s)
+    printf 'taildrop: %s — %s\n' "$state" "$detail"
+    [[ -z $hint ]] || printf 'taildrop: %s\n' "$hint"
+  fi
+  ((changed))
+}
+
+snapshot() {
+  find "$target_dir" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | LC_ALL=C sort
+}
+
+# What the target directory gained since the given listing. Succeeds when
+# something arrived, and says so on the way past.
+report_arrivals() { # before-listing
+  local before=$1 after
+  after=$(snapshot)
+  mapfile -t arrived < <(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after"))
+  ((${#arrived[@]} > 0)) || return 1
+  received=$((received + ${#arrived[@]}))
+  printf 'taildrop: received %d file(s) [%s]: %s\n' \
+    "${#arrived[@]}" "${out%%$'\n'*}" "${arrived[*]}"
+  notify_received "${arrived[@]}"
+  # The counter moved even though the state did not; the shell reads both.
+  state_write 0
+}
+
+notify_received() { # name...
+  local -a names=("$@")
+  local title body
+  if ((${#names[@]} == 1)); then
+    title="Received a file"
+  else
+    title="Received ${#names[@]} files"
+  fi
+  if ((${#names[@]} > 5)); then
+    body=$(printf '%s\n' "${names[@]:0:5}")
+    body+=$'\n'"and $((${#names[@]} - 5)) more"
+  else
+    body=$(printf '%s\n' "${names[@]}")
+  fi
+  body+=$'\n'"in ${target_dir/#$HOME/\~}"
+  notify-send -a qshell "$glyph $title" "$body" >/dev/null 2>&1 || true
+}
+
+# A sleep the TERM trap can interrupt without bash announcing the killed child.
+# A plain foreground `sleep` puts a "Terminated  sleep 60" line in the journal
+# every time the service is stopped or restarted.
+nap() { # seconds
+  sleep "$1" &
+  wait $! 2>/dev/null
+}
+
+sleep_backoff() {
+  local seconds=${backoff_steps[backoff_index]}
+  ((backoff_index < ${#backoff_steps[@]} - 1)) && ((backoff_index++))
+  nap "$seconds"
+}
+
+# Classify a refusal into a state the shell can act on. tailscale says all of
+# this in prose on stderr, so prose is what there is to match.
+classify() { # stderr
+  local text=$1
+  local lower=${text,,}
+  case "$lower" in
+  *"operator"* | *"access denied"* | *"permission denied"* | *"use sudo"*)
+    set_state denied "Tailscale refuses file access to this user" \
+      "run: sudo tailscale set --operator=$USER"
+    ;;
+  *"logged out"* | *"not logged in"* | *"needslogin"* | *"logged-out"*)
+    set_state logged-out "Tailscale is logged out" \
+      "run: tailscale up"
+    ;;
+  *"is tailscaled running"* | *"connection refused"* | *"no such file"* | *"is not running"* | *"failed to connect"*)
+    set_state offline "tailscaled is not reachable" \
+      "run: sudo systemctl start tailscaled"
+    ;;
+  *)
+    # `--verbose` puts its "moved 0/0 files" summary on stdout ahead of the
+    # refusal, so it is the first line of a combined capture and never the
+    # interesting one.
+    local trimmed=${text#moved *files$'\n'}
+    set_state error "${trimmed%%$'\n'*}"
+    [[ -n $detail ]] || set_state error "tailscale file get failed"
+    ;;
+  esac
+}
+
+trap 'exit 0' TERM INT HUP
+
+while :; do
+  if ! command -v tailscale >/dev/null 2>&1; then
+    set_state unavailable "no tailscale on PATH" "install tailscale to receive files"
+    state_write 0
+    sleep_backoff
+    continue
+  fi
+
+  if ! mkdir -p "$target_dir" 2>/dev/null; then
+    set_state error "cannot create $target_dir"
+    state_write 0
+    sleep_backoff
+    continue
+  fi
+
+  before=$(snapshot)
+
+  # Coming back from a refusal, the same get WITHOUT --wait is the retry: it
+  # returns either way, so it re-tests the permission and collects anything
+  # already queued instead of vanishing into a blocking read. Without this a
+  # recovery is invisible — the blocking call succeeds and then simply does not
+  # return, leaving the journal and the panel saying "denied" until, some day, a
+  # file arrives.
+  if ((backoff_index > 0)); then
+    out=$(tailscale file get --verbose --conflict=rename "$target_dir" 2>&1)
+    rc=$?
+    if ((rc != 0)); then
+      classify "$out"
+      state_write "$(pending_count || printf 0)"
+      sleep_backoff
+      continue
+    fi
+    backoff_index=0
+    report_arrivals "$before" && before=$(snapshot)
+  fi
+
+  # Announce the blocked state before blocking in it: from here until a file
+  # arrives this process is parked in a read on tailscaled's socket. A retry
+  # that is still refused never gets here, so a service that has been
+  # unauthorized for a week has said so exactly once.
+  set_state waiting "waiting for files in ${target_dir/#$HOME/\~}" && state_write 0
+
+  started=$SECONDS
+  # Combined: on the way out `--verbose` prints a "moved N/M files" summary on
+  # stdout, and every refusal is prose on stderr. Both are wanted.
+  out=$(tailscale file get --wait --verbose --conflict=rename "$target_dir" 2>&1)
+  rc=$?
+
+  if ((rc != 0)); then
+    classify "$out"
+    state_write "$(pending_count || printf 0)"
+    sleep_backoff
+    continue
+  fi
+
+  if report_arrivals "$before"; then
+    quick_cycles=0
+    continue
+  fi
+
+  # `--wait` blocks on an empty inbox, so a return with nothing new is either a
+  # file that landed under a name that already existed (impossible with
+  # --conflict=rename) or a wakeup we do not understand. Tolerate a few, then
+  # slow down rather than spin.
+  if ((SECONDS - started < 2)); then
+    ((quick_cycles++))
+    if ((quick_cycles >= 3)); then
+      set_state idle "get returned with nothing to move; slowing down"
+      state_write 0
+      nap 30
+      quick_cycles=0
+    fi
+  else
+    quick_cycles=0
+  fi
+done

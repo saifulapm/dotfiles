@@ -391,8 +391,56 @@ function isAccessDenied(text) {
     return /profiles access denied/i.test(value) || /access denied/i.test(value) || /must be root/i.test(value) || /operator/i.test(value) || /permission denied/i.test(value) || /\bsudo\b/i.test(value);
 }
 
+// Ours, with no upstream: the one JSON line bin/taildrop-receive writes to
+// ~/.local/state/qshell/taildrop. A missing or half-written file is simply "no
+// report yet", never an error on screen.
+function parseReceiveState(raw) {
+    var text = String(raw || "").trim();
+    if (text === "")
+        return null;
+    var data = null;
+    try {
+        data = JSON.parse(text);
+    } catch (e) {
+        return null;
+    }
+    if (!data || typeof data !== "object")
+        return null;
+    return {
+        state: String(data.state || ""),
+        detail: String(data.detail || ""),
+        hint: String(data.hint || ""),
+        dir: String(data.dir || ""),
+        pending: Math.max(0, parseInt(data.pending, 10) || 0),
+        received: Math.max(0, parseInt(data.received, 10) || 0),
+        since: Math.max(0, parseInt(data.since, 10) || 0)
+    };
+}
+
+// tailscaled's LocalAPI answers `null` for an empty inbox and an array of
+// {Name,Size} otherwise. -1 means "could not tell", which is not the same as
+// zero and must not light a badge.
+function parseInboxCount(raw) {
+    var text = String(raw || "").trim();
+    if (text === "")
+        return -1;
+    if (text === "null")
+        return 0;
+    var data = null;
+    try {
+        data = JSON.parse(text);
+    } catch (e) {
+        return -1;
+    }
+    if (data === null)
+        return 0;
+    return data instanceof Array ? data.length : -1;
+}
+
 if (typeof module !== "undefined") {
     module.exports = {
+        parseReceiveState: parseReceiveState,
+        parseInboxCount: parseInboxCount,
         filterIPv4: filterIPv4,
         filterIPv6: filterIPv6,
         cleanDnsName: cleanDnsName,

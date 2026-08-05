@@ -39,6 +39,29 @@ BarPanel {
 
     readonly property string toggleHint: tailscale.active ? "Turn Tailscale off" : (tailscale.needsLogin ? "Authorize this device" : "Turn Tailscale on")
 
+    // ---------------------------------------------------- auto-receive advice
+    // Only ever one sentence, and only when there is something to do about it.
+    readonly property string receiveNotice: {
+        const ts = panel.tailscale;
+        if (ts.receiveUnit === "" || ts.receiveUnit === "unknown")
+            return "";
+        if (!ts.receiveActive)
+            return "Received files stay in Tailscale's inbox until the receive service runs.";
+        if (ts.receiveStuck)
+            return ts.receiveDetail === "" ? "The receive service is retrying." : ts.receiveDetail + ".";
+        return "";
+    }
+
+    readonly property string receiveCommand: {
+        const ts = panel.tailscale;
+        if (panel.receiveNotice === "")
+            return "";
+        if (!ts.receiveActive)
+            return "systemctl --user enable --now taildrop-receive.service";
+        // The script writes its own advice as "run: <command>".
+        return ts.receiveHint.replace(/^run:\s*/, "");
+    }
+
     // -------------------------------------------------------------- cursor
     property string focusSection: "header"
     property int accountIndex: 0
@@ -765,6 +788,30 @@ BarPanel {
                     value: panel.tailscale.selfIp
                     copyValue: panel.tailscale.selfIp
                 }
+
+                // Ours: Taildrop only half works on Linux out of the box —
+                // tailscaled holds received files in an inbox until something
+                // runs `tailscale file get`. taildrop-receive.service is what
+                // runs it here, so the panel says whether it is up.
+                InfoPair {
+                    width: parent.width
+                    label: "Auto-receive"
+                    value: panel.tailscale.receiveSummary
+                }
+
+                InfoPair {
+                    width: parent.width
+                    visible: panel.tailscale.receivePending > 0
+                    label: "Inbox"
+                    value: panel.tailscale.receivePending + (panel.tailscale.receivePending === 1 ? " file waiting" : " files waiting")
+                }
+
+                NoticeRow {
+                    width: parent.width
+                    visible: panel.receiveNotice !== ""
+                    text: panel.receiveNotice
+                    command: panel.receiveCommand
+                }
             }
 
             // --------------------------------------------------- connections
@@ -1022,6 +1069,68 @@ BarPanel {
             color: panel.theme.textPrimary
             font.family: panel.theme.fontMono
             font.pixelSize: panel.theme.fontPx(0.833)
+        }
+    }
+
+    // Ours: a sentence about something the shell cannot fix by itself, over the
+    // command that fixes it. Tapping copies the command — this shell has no
+    // terminal to hand it to, and typing a `--operator=` line back out of a
+    // screenshot is exactly the kind of thing a panel should spare you.
+    component NoticeRow: Rectangle {
+        id: noticeRow
+
+        property string text: ""
+        property string command: ""
+
+        implicitHeight: visible ? noticeColumn.implicitHeight + panel.theme.space(3) : 0
+        radius: panel.theme.radius(0.75)
+        color: panel.theme.surface2
+
+        HoverHandler {
+            id: noticeHover
+            enabled: noticeRow.command !== ""
+            cursorShape: Qt.PointingHandCursor
+        }
+
+        TapHandler {
+            enabled: noticeRow.command !== ""
+            onTapped: panel.tailscale.copyToClipboard(noticeRow.command)
+        }
+
+        Hint {
+            visible: noticeHover.hovered
+            anchor: noticeRow
+            text: "Copy command"
+        }
+
+        Column {
+            id: noticeColumn
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: panel.theme.space(3)
+            anchors.rightMargin: panel.theme.space(3)
+            spacing: panel.theme.space(1)
+
+            Text {
+                width: parent.width
+                text: noticeRow.text
+                color: panel.theme.textMuted
+                font.family: panel.theme.fontUi
+                font.pixelSize: panel.theme.fontPx(0.833)
+                wrapMode: Text.WordWrap
+            }
+
+            Text {
+                width: parent.width
+                visible: noticeRow.command !== ""
+                text: noticeRow.command
+                color: panel.theme.textPrimary
+                font.family: panel.theme.fontMono
+                font.pixelSize: panel.theme.fontPx(0.833)
+                elide: Text.ElideRight
+            }
         }
     }
 
