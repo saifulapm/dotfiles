@@ -6,14 +6,20 @@ aarch64) and an Intel NUC (Fedora minimal, x86_64).
 
 ## Restore
 
-On a fresh Fedora minimal install, from a TTY, one command:
+The repo lives at github.com/saifulapm/dotfiles (private; the pre-2026-08
+content survives on the `archive-pre-qshell` branch). Because the remote is
+SSH-only, a fresh machine needs `~/.ssh` restored FIRST — it lives in iCloud
+Drive: either `rclone config` an iCloud remote and
+`rclone copy iCloud:.ssh ~/.ssh && chmod 700 ~/.ssh && chmod 600 ~/.ssh/*
+&& chmod 644 ~/.ssh/*.pub`, or copy it from another machine. (The ssh
+config's `UseKeychain` needs the `IgnoreUnknown UseKeychain` guard line on
+Linux; the synced copy carries it.)
+
+Then, on a fresh Fedora minimal install, from a TTY, one command:
 
 ```sh
-sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply --source ~/.dotfiles <repo-url>
+sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply --source ~/.dotfiles git@github.com:saifulapm/dotfiles.git
 ```
-
-(No git remote exists yet — `<repo-url>` is pending; until it does, the only
-copy of this repo is the working tree on the MacBook.)
 
 That run asks which machine this is, then installs every package in
 `packages/manifest.toml` (sudo prompts on the TTY), enforces
