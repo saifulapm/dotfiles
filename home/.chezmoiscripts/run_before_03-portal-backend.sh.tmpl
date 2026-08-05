@@ -10,9 +10,10 @@
 # that directory rather than adding to it (which would hide the gnome and gtk
 # backends along with everything they carry).
 #
-# Idempotent, and re-runs when the file below changes.
-#
-# portal file hash: {{ include "../packages/qshell.portal" | sha256sum }}
+# Runs on every apply; the src-vs-dest cmp below is the real change gate.
+# (Was run_onchange, but run_onchange records "done" on exit 0 — a run whose
+# pkexec was declined skipped gracefully and was never retried until the
+# portal file itself changed. Found 2026-08-06.)
 set -euo pipefail
 
 src="{{ .chezmoi.homeDir }}/.dotfiles/packages/qshell.portal"

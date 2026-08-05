@@ -1,14 +1,23 @@
 #!/bin/bash
-# Installs everything declared in packages/manifest.toml. Re-runs on any
-# manifest edit (chezmoi keys run_onchange to this template's rendered
-# content, which embeds the manifest hash below).
+# Installs everything declared in packages/manifest.toml.
 #
-# manifest hash: {{ include "../packages/manifest.toml" | sha256sum }}
+# Runs on EVERY apply, gated by its own state file rather than run_onchange:
+# run_onchange records "done" the moment the script exits 0, so a run that
+# skipped for lack of sudo (any background apply) was marked done and the
+# next TERMINAL apply silently never installed anything (found 2026-08-06).
+# Here the hash is written only after dnf actually succeeds, so a skipped
+# run stays pending until a terminal apply lands it.
 set -euo pipefail
 
 root="{{ .chezmoi.workingTree }}"
 manifest="$root/packages/manifest.toml"
 arch="$(uname -m)"
+
+hashfile="$HOME/.local/state/qshell/packages.sha256"
+current="$(sha256sum "$manifest" | cut -d' ' -f1)"
+if [ -f "$hashfile" ] && [ "$(cat "$hashfile")" = "$current" ]; then
+  exit 0
+fi
 
 # Root policy, and which run gets which path:
 #   * The fresh-machine bootstrap and any interactive `chezmoi apply` have a
@@ -89,3 +98,7 @@ if [ -n "$unwanted" ]; then
   echo "install-packages: WARNING — conflicting packages present: ${unwanted//$'\n'/ }" >&2
   echo "install-packages: remove with: sudo dnf remove ${unwanted//$'\n'/ }" >&2
 fi
+
+# Success — record it so healthy applies skip the dnf round trip entirely.
+mkdir -p "$(dirname "$hashfile")"
+printf '%s\n' "$current" >"$hashfile"

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Enable user units shipped in dot_config/systemd/user. Re-runs when this
-# script changes; no sudo needed (user manager).
+# Enable user units shipped in dot_config/systemd/user. Runs on every apply
+# (enable --now on an enabled unit is a cheap no-op); no sudo needed (user
+# manager). Was run_onchange, but a run that skipped — no user session, or
+# the old degraded-state bug below — was recorded as done and never retried.
 # unit-list: qshell-updates.timer taildrop-receive.service
 set -euo pipefail
 
