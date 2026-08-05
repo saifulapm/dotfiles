@@ -185,7 +185,22 @@ QtObject {
     readonly property real spaceUnit: num("space.unit")
     readonly property real density: num("space.density")
     readonly property string fontUi: String(tok("font.ui"))
-    readonly property string fontMono: String(tok("font.mono"))
+    // The concrete family the fontconfig `monospace` alias resolves to right
+    // now — what `bin/font-set` writes and what every app asking for
+    // "monospace" gets. Re-resolved whenever fonts.conf changes.
+    property string resolvedMono: String(builtin["font.mono"])
+    // PRECEDENCE (ours, not omarchy's — their family is system-wide, full
+    // stop): a theme that names font.mono wins, because a theme pinning its
+    // typeface is a deliberate choice. A theme that stays quiet — which is
+    // every ported one — follows the system alias, so `font-set` moves it.
+    // And the alias only speaks once the user's fonts.conf exists: on a
+    // machine where font-set has never run, `monospace` resolves to whatever
+    // fontconfig picked (Noto Sans Mono here), and silently retyping the
+    // desktop in it is not a decision this service gets to make.
+    readonly property string fontMono: {
+        const v = rawTok("font.mono");
+        return v !== undefined ? String(v) : resolvedMono;
+    }
     readonly property int fontSize: Math.round(num("font.size"))
     readonly property int motionDuration: Math.round(num("motion.duration"))
     readonly property int barHeight: Math.round(num("bar.height"))
@@ -350,7 +365,39 @@ QtObject {
         onLoadFailed: root.overrideValues = ({})
     }
 
+    // ------------------------------------------------------ font resolution
+    // Theirs (Commons/Style.qml): ask fc-match what `monospace` is, and ask
+    // again whenever the fontconfig file changes, so `font-set` lands live
+    // instead of needing the shell restart their script performs.
+    property Process fcMatch: Process {
+        id: fcMatch
+        command: ["fc-match", "-f", "%{family[0]}", "monospace"]
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                const name = String(text || "").trim();
+                if (name.length > 0)
+                    root.resolvedMono = name;
+            }
+        }
+    }
+
+    property FileView fontconfigFile: FileView {
+        id: fontconfigFile
+        path: Quickshell.env("HOME") + "/.config/fontconfig/fonts.conf"
+        watchChanges: true
+        printErrors: false
+        onLoaded: fcMatch.running = true
+        onFileChanged: reload()
+        // Deleting the file (or never having written one) hands the default
+        // back to the builtin token rather than to fontconfig's own pick.
+        onLoadFailed: root.resolvedMono = String(root.builtin["font.mono"])
+    }
+
     // FileView stays unloaded until something reads it, and nothing reads a
     // file that is usually absent — without this neither signal ever fires.
-    Component.onCompleted: overrideFile.reload()
+    Component.onCompleted: {
+        overrideFile.reload();
+        fontconfigFile.reload();
+    }
 }

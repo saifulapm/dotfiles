@@ -36,6 +36,16 @@ var TREE = {
         "description": "Switch the desktop theme",
         "call": "themes"
     },
+    // Omarchy's style.font, one row further out (theirs lives under Style,
+    // ours hoists the style rows to the root beside Theme). Its children are
+    // NOT declared here — they are the installed monospace families, injected
+    // by withFonts() below from `bin/font-set --json`.
+    "font": {
+        "icon": "󰛖",
+        "label": "Font",
+        "aliases": ["fonts", "typeface", "monospace", "mono", "typography"],
+        "description": "Set the system monospace font"
+    },
     // Omarchy's style.background, one row further out: theirs is a single
     // leaf that opens the picker, ours also carries their bg-next cycle.
     "background": {
@@ -264,3 +274,51 @@ var TREE = {
         "action": "systemctl poweroff"
     }
 };
+
+// The Font submenu's rows are whatever monospace families are installed, so
+// they cannot be declared above. Returns a fresh tree with one row per family
+// inserted immediately after the "font" node, keeping declaration order (which
+// is display order) intact.
+//
+// Ids are slugged from the family name because a dotted id declares its
+// parent; a collision just gets a numeric suffix. The tick on the active
+// family goes through `state`, resolved in-process by Menu.qml, rather than a
+// shell test per row.
+var FONT_LIMIT = 40;
+
+function fontSlug(name) {
+    return String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "font";
+}
+
+function withFonts(tree, families) {
+    if (!families || families.length === 0)
+        return tree;
+
+    var out = {};
+    var seen = {};
+    for (var id in tree) {
+        out[id] = tree[id];
+        if (id !== "font")
+            continue;
+        for (var i = 0; i < families.length && i < FONT_LIMIT; i++) {
+            var name = families[i] && families[i].name ? String(families[i].name) : "";
+            if (!name)
+                continue;
+            var slug = fontSlug(name);
+            if (seen[slug])
+                slug = slug + "-" + i;
+            seen[slug] = true;
+            out["font." + slug] = {
+                "icon": "󰛖",
+                "label": name,
+                "aliases": [name.toLowerCase()],
+                "description": "Set the system monospace font to " + name,
+                // Single-quoted for `bash -lc`; a family name with a quote in
+                // it is not a thing, but close the hole anyway.
+                "action": "\"$HOME/.dotfiles/bin/font-set\" '" + name.replace(/'/g, "'\\''") + "'",
+                "state": "font:" + name
+            };
+        }
+    }
+    return out;
+}

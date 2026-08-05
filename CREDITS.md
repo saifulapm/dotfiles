@@ -582,6 +582,15 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   `hyprland_active_border`, colors and angle verbatim; the template-function
   layer in `bin/theme-apply` mirrors their pre-computed `{{ shell_gradient X }}`
   / `{{ hypr_gradient X }}` sed entries.
+- **Font switcher** from `bin/omarchy-font-set` + `bin/omarchy-font-list` +
+  `shell/Commons/Style.qml`: fontconfig as the source of truth, the user
+  `fonts.conf` with a `prepend_first`/`binding="strong"` edit on the
+  `monospace` alias (file shape verbatim), `fc-list :spacing=100` with their
+  emoji/signwriting filter for the family list, and resolving the alias in the
+  shell with `fc-match -f "%{family[0]}" monospace` behind a `FileView` on
+  fonts.conf. Ours instead of theirs: the shell follows the change live rather
+  than restarting itself, a theme's own `font.mono` wins over the alias, and
+  the alias is consulted only once a user fonts.conf exists.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).

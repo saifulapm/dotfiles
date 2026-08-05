@@ -25,7 +25,12 @@ Scope {
     property int selectedIndex: 0
     property var navStack: []
 
-    readonly property var built: MenuModel.buildItems(MenuTree.TREE)
+    // Installed monospace families, read on open — the Font submenu's rows
+    // cannot be declared in the tree because they depend on what is installed.
+    property var fontFamilies: []
+    property string currentMono: ""
+
+    readonly property var built: MenuModel.buildItems(MenuTree.withFonts(MenuTree.TREE, fontFamilies))
     readonly property var items: built.items
     readonly property var itemOrder: built.itemOrder
 
@@ -67,6 +72,7 @@ Scope {
         filterText = "";
         selectedIndex = 0;
         opened = true;
+        fontProc.running = true;
         evaluateGuards();
         rebuildDisplay();
     }
@@ -171,6 +177,11 @@ Scope {
         case "nightlight":
             return !!shellRoot.nightlight.enabled;
         default:
+            // "font:<family>" ticks the family the monospace alias currently
+            // resolves to. Carried as a state rather than a `checked` shell
+            // test so the batch does not grow one fc-match per installed font.
+            if (name.indexOf("font:") === 0)
+                return name.substring(5) === currentMono;
             return false;
         }
     }
@@ -339,6 +350,36 @@ Scope {
         guardProc.collected = "";
         guardProc.command = ["bash", "-lc", script];
         guardProc.running = true;
+    }
+
+    // Populated as soon as the module loads, not only on show(): the rows have
+    // to exist before `qs ipc call menu open font.<slug>` can route to one.
+    Component.onCompleted: fontProc.running = true
+
+    Process {
+        id: fontProc
+        command: [Quickshell.env("HOME") + "/.dotfiles/bin/font-set", "--json"]
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                let list = [];
+                try {
+                    list = JSON.parse(String(text || "[]"));
+                } catch (e) {
+                    console.warn("Menu: font-set --json parse failed:", e);
+                    return;
+                }
+                menuRoot.fontFamilies = list;
+                let current = "";
+                for (let i = 0; i < list.length; i++) {
+                    if (list[i].current)
+                        current = String(list[i].name);
+                }
+                menuRoot.currentMono = current;
+                if (menuRoot.opened)
+                    menuRoot.rebuildDisplay();
+            }
+        }
     }
 
     Process {

@@ -37,15 +37,33 @@ function parseToml(raw) {
   return out
 }
 
-const tokens = Object.assign({}, THEME_DEFAULTS,
-  parseToml(fs.readFileSync(STATE, "utf8")))
+const themeTokens = parseToml(fs.readFileSync(STATE, "utf8"))
+const tokens = Object.assign({}, THEME_DEFAULTS, themeTokens)
 
-// The shell's machine-level override (~/.config/qshell/theme-override.toml)
-// is watched by a FileView, and a FileView cannot arm its watch on a path
-// whose parent directory does not exist — it would then need a shell restart
-// the first time the file is created. Guarantee the directory instead: this
-// runs on every theme change and at bootstrap.
-fs.mkdirSync(path.join(HOME, ".config/qshell"), { recursive: true })
+// Same font precedence Services/Theme.qml applies, so the shell and the
+// templated terminal configs never disagree: a theme that names font.mono
+// wins; one that stays quiet follows the fontconfig `monospace` alias, but
+// only once bin/font-set has actually written it. With no user fonts.conf
+// the builtin default stands — retyping the desktop in fontconfig's own pick
+// is not something applying a theme should do.
+const USER_FONTCONF = path.join(HOME, ".config/fontconfig/fonts.conf")
+if (themeTokens["font.mono"] === undefined && fs.existsSync(USER_FONTCONF)) {
+  try {
+    const resolved = execSync("fc-match -f '%{family[0]}' monospace").toString().trim()
+    if (resolved) tokens["font.mono"] = resolved
+  } catch (e) { /* no fontconfig; keep the builtin default */ }
+}
+
+// The shell watches two optional files that may not exist yet
+// (~/.config/qshell/theme-override.toml and the fontconfig alias
+// bin/font-set writes), and a FileView cannot arm its watch on a path whose
+// parent directory is missing — the file's first appearance would then need a
+// shell restart to be noticed. Guarantee the directories instead: this runs
+// on every theme change and at bootstrap.
+// Same story for the fontconfig directory the shell watches for bin/font-set.
+for (const dir of [".config/qshell", ".config/fontconfig"]) {
+  fs.mkdirSync(path.join(HOME, dir), { recursive: true })
+}
 
 // A token's value may name another token ("accent.accent") instead of
 // carrying a literal — the same indirection Services/Theme.qml resolves with
