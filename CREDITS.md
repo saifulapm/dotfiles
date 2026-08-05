@@ -62,13 +62,43 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   label sniffing (`windowIsLong`, `windowSpanMs`, `windowTitle`) is what
   reconciles Claude spelling its windows out ("Session (5-hour)") with Codex
   abbreviating them ("5h window", "30m window"). Their SVG provider marks are
-  copied verbatim, including the light/dark swap of the Codex mark. Not
-  ported: their multi-device sync layer, their `stats-cache.json` and
-  `history.jsonl` readers (ours reads the scanners instead), and their
+  copied verbatim, including the light/dark swap of the Codex mark. Their
+  multi-device sync is ported too — the transport as `Services/Sync.qml` (see
+  below) and the merge rules here: what a provider contributes to a snapshot,
+  the sums for prompts/sessions/token buckets, the union of active dates
+  rather than a sum of counts (working on two machines on one day is one
+  active day, which is why the dates travel and not just a count), the
+  fallback to the widest count for snapshots written before those dates
+  existed, `recentDays` accumulating only into the local seven-day window, the
+  merged view that replaces counted-from-disk numbers while keeping every
+  account-level fact local, and their "Merged from N devices" footer. Rate
+  limits are deliberately absent from a snapshot, as upstream: they are
+  account-level, so the provider already reports usage across every machine
+  and merging them would double-count. Not ported: their `stats-cache.json`
+  and `history.jsonl` readers (ours reads the scanners instead) and their
   background polls — this shell does not poll, so the panel refreshes when it
   opens and from a refresh button they do not have. Their plugin has no plan
   table driving limits: the plan is a label and the numbers come from the
   provider, so our `plan` widget setting only overrides that label.
+- **Cross-machine sync** from the sync half of `shell/plugins/model-usage/Main.qml`
+  → `shell/Services/Sync.qml`: the whole design — one snapshot file per
+  machine written into a shared directory with every snapshot in that
+  directory read back, so the folder's own sync tool is the transport and
+  there is no server or protocol; the `mkdir -p` → atomic write → scan
+  sequence on a 1 s debounce with a re-run queued if one was requested while
+  running; their marker-framed `bash` reader (`===<path>===` … `=== EOM ===`,
+  `nullglob`) and its tolerant parse that drops snapshots it cannot read;
+  their path expansion (`~`, `$HOME/`, relative-to-home, absolute), their
+  device-id sanitising and its hostname/`$HOST`/`$USER` fallback chain, their
+  permissive reading of the enable flag, the dummy snapshot path that keeps
+  the FileView valid while sync is off, and their status strings. Generalized
+  in one respect: upstream hardcodes model-usage's single payload, while this
+  takes named sections (`publish("providers", …)` /
+  `snapshotsFor("providers")`) so other modules can share the transport.
+  Sections sit at the top level of the file beside `deviceId`/`updatedAt`, so
+  a model-usage snapshot written here has the same shape as one written by
+  their shell. Merging stays with each module, since what it means to combine
+  two payloads is not the transport's business.
 - **Monitor plugin design** from `shell/plugins/panels/monitor/` (`Panel.qml`,
   `Model.js`): the hero naming the current brightness mood over a "Display"
   title, their brightness mood-name ladder itself, the live brightness slider

@@ -55,7 +55,12 @@ Item {
     property int totalPrompts: 0
     property int totalSessions: 0
     property int activeDays: 0
+    property var activeDates: []
     property var modelUsage: ({})
+
+    // Bumped whenever a scan lands; the widget publishes a new sync snapshot
+    // off this (omarchy's Main.qml watches the same property).
+    property double lastRefreshedAtMs: 0
 
     function refresh(force) {
         if (!enabled || usageScanner.running)
@@ -87,6 +92,7 @@ Item {
             provider.totalPrompts = data.totalPrompts || 0;
             provider.totalSessions = data.totalSessions || 0;
             provider.activeDays = data.activeDays || 0;
+            provider.activeDates = data.activeDates || [];
             provider.modelUsage = data.modelUsage || ({});
 
             provider.rateLimitPercent = data.rateLimitPercent === undefined || data.rateLimitPercent === null ? -1 : data.rateLimitPercent;
@@ -123,6 +129,9 @@ Item {
                 console.warn("model-usage/codex", String(text).trim())
         }
 
-        onExited: provider.refreshing = false
+        onExited: {
+            provider.refreshing = false;
+            provider.lastRefreshedAtMs = Date.now();
+        }
     }
 }

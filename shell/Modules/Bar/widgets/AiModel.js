@@ -212,6 +212,244 @@ function formatDuration(ms) {
     return Math.max(1, minutes) + "m";
 }
 
+// ------------------------------------------------------------------- syncing
+// Merging snapshots from several machines. Transport and device identity are
+// the Sync service's job; what it MEANS to combine two payloads is this
+// module's, and these rules are omarchy's.
+
+function numberValue(value) {
+    const n = Number(value || 0);
+    return isFinite(n) ? Math.round(n) : 0;
+}
+
+function dateString(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+}
+
+function recentDateStrings() {
+    const result = [];
+    for (let offset = 6; offset >= 0; offset--) {
+        const date = new Date();
+        date.setDate(date.getDate() - offset);
+        result.push(dateString(date));
+    }
+    return result;
+}
+
+function emptyTokenBucket() {
+    return {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadInputTokens: 0,
+        cacheCreationInputTokens: 0
+    };
+}
+
+function addObjectNumbers(target, source) {
+    if (!source)
+        return;
+    for (const key in source)
+        target[key] = numberValue(target[key]) + numberValue(source[key]);
+}
+
+function cloneValue(value, fallback) {
+    if (value === undefined || value === null)
+        return fallback;
+    try {
+        return JSON.parse(JSON.stringify(value));
+    } catch (e) {
+        return fallback;
+    }
+}
+
+// What one provider contributes to this machine's snapshot. Rate limits are
+// deliberately absent: they are account-level, not machine-level — the
+// provider already reports usage across every machine, so merging them would
+// double-count.
+function providerSnapshot(provider) {
+    return {
+        providerId: provider.providerId,
+        providerName: provider.providerName,
+        ready: provider.ready === true,
+        todayPrompts: numberValue(provider.todayPrompts),
+        todaySessions: numberValue(provider.todaySessions),
+        todayTotalTokens: numberValue(provider.todayTotalTokens),
+        todayTokensByModel: cloneValue(provider.todayTokensByModel, ({})),
+        recentDays: cloneValue(provider.recentDays, []),
+        totalPrompts: numberValue(provider.totalPrompts),
+        totalSessions: numberValue(provider.totalSessions),
+        activeDays: numberValue(provider.activeDays),
+        activeDates: cloneValue(provider.activeDates, []),
+        modelUsage: cloneValue(provider.modelUsage, ({}))
+    };
+}
+
+// The `providers` section this machine publishes.
+function localProvidersPayload(providers) {
+    const out = {};
+    for (let i = 0; i < providers.length; i++) {
+        const provider = providers[i];
+        if (provider && provider.enabled)
+            out[provider.providerId] = providerSnapshot(provider);
+    }
+    return out;
+}
+
+// Entries are the Sync service's snapshotsFor("providers"), this machine's own
+// included: [{ deviceId, updatedAt, data }].
+function aggregateSnapshots(entries) {
+    const list = Array.isArray(entries) ? entries : [];
+    const dates = recentDateStrings();
+    const devices = {};
+    const providers = {};
+
+    function providerAcc(id) {
+        if (providers[id])
+            return providers[id];
+        const recentByDay = {};
+        for (let d = 0; d < dates.length; d++)
+            recentByDay[dates[d]] = 0;
+        providers[id] = {
+            providerId: id,
+            providerName: "",
+            ready: false,
+            todayPrompts: 0,
+            todaySessions: 0,
+            todayTotalTokens: 0,
+            todayTokensByModel: ({}),
+            recentByDay: recentByDay,
+            totalPrompts: 0,
+            totalSessions: 0,
+            activeDays: 0,
+            activeDates: ({}),
+            modelUsage: ({}),
+            devices: ({})
+        };
+        return providers[id];
+    }
+
+    for (let i = 0; i < list.length; i++) {
+        const entry = list[i] || {};
+        const device = String(entry.deviceId || "device");
+        devices[device] = true;
+        const snapshotProviders = entry.data || {};
+        for (const providerId in snapshotProviders) {
+            const stats = snapshotProviders[providerId] || {};
+            const acc = providerAcc(String(providerId));
+            acc.devices[device] = true;
+            if (stats.providerName && acc.providerName === "")
+                acc.providerName = String(stats.providerName);
+            acc.ready = acc.ready || stats.ready === true;
+            acc.todayPrompts += numberValue(stats.todayPrompts);
+            acc.todaySessions += numberValue(stats.todaySessions);
+            acc.todayTotalTokens += numberValue(stats.todayTotalTokens);
+            acc.totalPrompts += numberValue(stats.totalPrompts);
+            acc.totalSessions += numberValue(stats.totalSessions);
+            // Active days overlap between machines, so union the dates rather
+            // than summing counts. Snapshots written before activeDates
+            // existed only carry a count; the widest one stands in for them.
+            const activeDates = Array.isArray(stats.activeDates) ? stats.activeDates : [];
+            for (let ad = 0; ad < activeDates.length; ad++)
+                acc.activeDates[String(activeDates[ad])] = true;
+            acc.activeDays = Math.max(acc.activeDays, numberValue(stats.activeDays));
+            addObjectNumbers(acc.todayTokensByModel, stats.todayTokensByModel || {});
+
+            const recent = Array.isArray(stats.recentDays) ? stats.recentDays : [];
+            for (let r = 0; r < recent.length; r++) {
+                const day = recent[r] || {};
+                const date = String(day.date || "");
+                if (acc.recentByDay[date] !== undefined)
+                    acc.recentByDay[date] += numberValue(day.messageCount);
+            }
+
+            const usage = stats.modelUsage || {};
+            for (const modelId in usage) {
+                let bucket = acc.modelUsage[modelId];
+                if (!bucket)
+                    bucket = acc.modelUsage[modelId] = emptyTokenBucket();
+                const source = usage[modelId] || {};
+                bucket.inputTokens += numberValue(source.inputTokens);
+                bucket.outputTokens += numberValue(source.outputTokens);
+                bucket.cacheReadInputTokens += numberValue(source.cacheReadInputTokens);
+                bucket.cacheCreationInputTokens += numberValue(source.cacheCreationInputTokens);
+            }
+        }
+    }
+
+    const outProviders = {};
+    for (const id in providers) {
+        const acc = providers[id];
+        const recentDays = [];
+        for (let di = 0; di < dates.length; di++)
+            recentDays.push({
+                date: dates[di],
+                messageCount: acc.recentByDay[dates[di]] || 0
+            });
+        const providerDevices = Object.keys(acc.devices).sort();
+        outProviders[id] = {
+            providerId: acc.providerId,
+            providerName: acc.providerName,
+            ready: acc.ready || providerDevices.length > 0,
+            todayPrompts: acc.todayPrompts,
+            todaySessions: acc.todaySessions,
+            todayTotalTokens: acc.todayTotalTokens,
+            todayTokensByModel: acc.todayTokensByModel,
+            recentDays: recentDays,
+            totalPrompts: acc.totalPrompts,
+            totalSessions: acc.totalSessions,
+            activeDays: Math.max(acc.activeDays, Object.keys(acc.activeDates).length),
+            modelUsage: acc.modelUsage,
+            deviceCount: providerDevices.length,
+            devices: providerDevices
+        };
+    }
+
+    return {
+        deviceCount: Object.keys(devices).length,
+        providers: outProviders
+    };
+}
+
+// The provider as the panel should see it: counted-from-disk numbers replaced
+// by the merged ones when sync has any, everything account-level (limits,
+// tier, status) always from the local provider.
+function displayProvider(provider, aggregate) {
+    const merged = aggregate && aggregate.providers ? aggregate.providers[provider.providerId] : null;
+    const synced = !!merged;
+
+    return {
+        providerId: provider.providerId,
+        providerName: provider.providerName,
+        markSource: provider.markSource,
+        enabled: provider.enabled,
+        ready: provider.ready || synced,
+        refreshing: provider.refreshing,
+        rateLimitPercent: provider.rateLimitPercent,
+        rateLimitLabel: provider.rateLimitLabel,
+        rateLimitResetAt: provider.rateLimitResetAt,
+        secondaryRateLimitPercent: provider.secondaryRateLimitPercent,
+        secondaryRateLimitLabel: provider.secondaryRateLimitLabel,
+        secondaryRateLimitResetAt: provider.secondaryRateLimitResetAt,
+        tierLabel: provider.tierLabel,
+        usageStatusText: provider.usageStatusText,
+        authHelpText: provider.authHelpText,
+        todayPrompts: synced ? merged.todayPrompts : provider.todayPrompts,
+        todaySessions: synced ? merged.todaySessions : provider.todaySessions,
+        todayTotalTokens: synced ? merged.todayTotalTokens : provider.todayTotalTokens,
+        todayTokensByModel: synced ? merged.todayTokensByModel : provider.todayTokensByModel,
+        recentDays: synced ? merged.recentDays : provider.recentDays,
+        totalPrompts: synced ? merged.totalPrompts : provider.totalPrompts,
+        totalSessions: synced ? merged.totalSessions : provider.totalSessions,
+        activeDays: synced ? merged.activeDays : provider.activeDays,
+        modelUsage: synced ? merged.modelUsage : provider.modelUsage,
+        syncEnabled: synced,
+        syncDeviceCount: synced ? Number(merged.deviceCount || 0) : 0
+    };
+}
+
 // ------------------------------------------------------------------ providers
 // A subscription earns a place in the bar and the panel by having actually
 // produced numbers. Presence on disk is not enough: a box that installed a CLI

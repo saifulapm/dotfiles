@@ -38,6 +38,12 @@ ShellRoot {
     property Idle idle: Idle {
         shellRoot: shell
     }
+    // Cross-machine snapshot sync. Inert until shell.json's root `sync` block
+    // points it at a shared directory, so it costs one /etc/hostname read
+    // until then.
+    property Sync sync: Sync {
+        shellRoot: shell
+    }
 
     // Hardcoded fallback: a broken or missing shell.json still renders this
     // usable bar. The on-disk shell.json fully replaces it when valid — no

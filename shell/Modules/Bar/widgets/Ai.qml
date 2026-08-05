@@ -30,7 +30,23 @@ BarIcon {
     }
 
     readonly property var allProviders: [claudeProvider, codexProvider]
-    readonly property var providers: allProviders.filter(p => p.enabled && Model.providerHasData(p))
+
+    // ------------------------------------------------------------- syncing
+    // The Sync service owns transport and device identity; the merge rules
+    // are model-usage's, in AiModel.js. With sync off there are no snapshots
+    // and every provider falls back to its own numbers.
+    readonly property var sync: bar && bar.shell ? bar.shell.sync : null
+    readonly property var aggregate: Model.aggregateSnapshots(sync ? sync.snapshotsFor("providers") : [])
+
+    // This machine's contribution. Recomputed whenever any provider's counts
+    // change; the service debounces the write.
+    readonly property var localPayload: Model.localProvidersPayload(allProviders)
+    onLocalPayloadChanged: if (sync)
+        sync.publish("providers", localPayload)
+
+    // Each provider as the panel should see it: merged counts where sync has
+    // them, account-level facts always local.
+    readonly property var providers: allProviders.filter(p => p.enabled).map(p => Model.displayProvider(p, aggregate)).filter(Model.providerHasData)
 
     // The selection follows the provider, not the slot it happens to sit in:
     // a provider whose first scan lands while the panel is open would

@@ -50,7 +50,12 @@ Item {
     property int totalPrompts: 0
     property int totalSessions: 0
     property int activeDays: 0
+    property var activeDates: []
     property var modelUsage: ({})
+
+    // Bumped whenever a refresh lands; the widget publishes a new sync
+    // snapshot off this (omarchy's Main.qml watches the same property).
+    property double lastRefreshedAtMs: 0
 
     // ------------------------------------------------------- credentials
     property var credentials: ({
@@ -138,6 +143,8 @@ Item {
 
     function finishRefresh() {
         refreshing = probing || scanning;
+        if (!refreshing)
+            lastRefreshedAtMs = Date.now();
     }
 
     FileView {
@@ -168,6 +175,7 @@ Item {
                     provider.totalPrompts = data.totalPrompts || 0;
                     provider.totalSessions = data.totalSessions || 0;
                     provider.activeDays = data.activeDays || 0;
+                    provider.activeDates = data.activeDates || [];
                     provider.modelUsage = data.modelUsage || ({});
                     provider.ready = true;
                 } catch (e) {

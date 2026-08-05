@@ -537,6 +537,27 @@ BarPanel {
         }
     }
 
+    // Only speaks up when the numbers cover more than this machine.
+    Text {
+        readonly property string footer: {
+            const sync = panel.usage.sync;
+            if (sync && String(sync.statusText || "") !== "")
+                return sync.statusText;
+            if (panel.provider && panel.provider.syncEnabled && panel.provider.syncDeviceCount > 0)
+                return "Merged from " + panel.provider.syncDeviceCount + " device" + (panel.provider.syncDeviceCount === 1 ? "" : "s");
+            return "";
+        }
+
+        visible: footer !== ""
+        width: parent.width
+        horizontalAlignment: Text.AlignHCenter
+        text: footer
+        color: panel.theme.textMuted
+        font.family: panel.theme.fontUi
+        font.pixelSize: panel.theme.fontPx(0.75)
+        elide: Text.ElideRight
+    }
+
     component SectionHeader: Text {
         color: panel.theme.textMuted
         font.family: panel.theme.fontUi
