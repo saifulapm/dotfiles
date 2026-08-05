@@ -22,9 +22,18 @@ QtObject {
 
     property var values: builtin
 
+    // Machine-level overrides from ~/.config/qshell/theme-override.toml.
+    // Layered on top of whatever theme is active, so a per-machine tweak
+    // survives theme switches (omarchy's ~/.config/omarchy/shell.toml).
+    // It also wins over a preview, so the switcher shows what you would
+    // actually get rather than the candidate theme's unmodified values.
+    property var overrideValues: ({})
+
     // Preview overlay for the theme switcher: a full candidate token map that
     // temporarily replaces the loaded theme (not merged with it — a preview
     // must show the candidate's fallbacks, not the current theme's values).
+    // The map comes from `bin/theme-list --json`, which parses the whole file,
+    // so it carries the theme's per-surface sections too.
     // Any real theme load clears it, so applying a theme needs no handshake.
     property var previewValues: null
 
@@ -36,12 +45,20 @@ QtObject {
         previewValues = null;
     }
 
+    // Raw lookup through the whole layer stack — override > preview-or-theme.
+    // Returns undefined when no layer defines the key, so callers can tell
+    // "unset" from "set to something unparseable".
+    function rawTok(key) {
+        const o = overrideValues[key];
+        if (o !== undefined)
+            return o;
+        const base = previewValues !== null ? previewValues : values;
+        const v = base[key];
+        return v !== undefined ? v : undefined;
+    }
+
     function tok(key) {
-        if (previewValues !== null) {
-            const p = previewValues[key];
-            return p !== undefined ? p : builtin[key];
-        }
-        const v = values[key];
+        const v = rawTok(key);
         return v !== undefined ? v : builtin[key];
     }
     function num(key) {
@@ -51,6 +68,63 @@ QtObject {
     function col(key) {
         const v = String(tok(key));
         return /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(v) ? v : String(builtin[key]);
+    }
+
+    // ---------------------------------------------------- per-surface tokens
+    // A theme (or the machine override) may carry optional sections that
+    // restyle ONE surface — [lock], [bar], [panel], [tooltip],
+    // [notifications], [menu], [osd] — without touching the base tokens every
+    // other surface reads. Anything a section omits falls back to the base
+    // token the surface would otherwise have used, so a section is always a
+    // partial override. Omarchy's surface-role model (Commons/Color.qml,
+    // CREDITS.md) adapted to our single-file themes.
+
+    // A section value may name another token instead of carrying a literal:
+    // `border = "accent.error"` reads accent.error. Bounded, so a cycle
+    // resolves to the last value seen rather than hanging.
+    function deref(value) {
+        let s = String(value === undefined ? "" : value).trim();
+        for (let i = 0; i < 8; i++) {
+            if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(s))
+                break;
+            const next = rawTok(s) !== undefined ? rawTok(s) : builtin[s];
+            if (next === undefined || String(next).trim() === s)
+                break;
+            s = String(next).trim();
+        }
+        return s;
+    }
+
+    // Per-surface color: [section] key wins, else the base-token fallback the
+    // caller passes in. `fallback` is a color, so callers stay readable
+    // (theme.sCol("bar", "text", theme.textPrimary)).
+    function sCol(section, key, fallback) {
+        const v = rawTok(section + "." + key);
+        if (v === undefined)
+            return fallback;
+        const s = deref(v);
+        return /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(s) ? s : fallback;
+    }
+
+    // The `-alpha` companion of a surface key, clamped to 0..1.
+    function sAlpha(section, key, fallback) {
+        const v = rawTok(section + "." + key + "-alpha");
+        if (v === undefined)
+            return fallback;
+        const n = Number(v);
+        return isFinite(n) ? Math.max(0, Math.min(1, n)) : fallback;
+    }
+
+    // X + X-alpha composed into one color (omarchy's composed()). Used where
+    // an alpha companion is meaningful — card and scrim fills, borders — not
+    // for plain text colors, which have no companion.
+    function sComposed(section, key, colorFallback, alphaFallback) {
+        const base = sCol(section, key, colorFallback);
+        const a = sAlpha(section, key, alphaFallback);
+        if (a >= 0.999)
+            return base;
+        const c = Qt.color(base);
+        return Qt.rgba(c.r, c.g, c.b, c.a * a);
     }
 
     // ------------------------------------------------------------- tokens
@@ -94,6 +168,62 @@ QtObject {
         if (e === "spring")
             return Easing.OutBack;
         return Easing.OutCubic;
+    }
+
+    // -------------------------------------------------- surface accessors
+    // One object per themable surface. Every member falls back to the base
+    // token the surface used before per-surface overrides existed, so a theme
+    // that ships no sections renders exactly as it did.
+    readonly property QtObject bar: QtObject {
+        readonly property color background: root.sComposed("bar", "background", root.surface1, 1.0)
+        readonly property color text: root.sCol("bar", "text", root.col("ansi.white"))
+        // Widgets calling attention to themselves (recording, updates, urgent).
+        readonly property color active: root.sCol("bar", "active", root.error)
+    }
+    // Bar widget flyout cards (omarchy's [popups]).
+    readonly property QtObject panel: QtObject {
+        readonly property color background: root.sComposed("panel", "background", root.surface1, 1.0)
+        readonly property color text: root.sCol("panel", "text", root.textPrimary)
+        readonly property color border: root.sComposed("panel", "border", root.surface3, 1.0)
+    }
+    readonly property QtObject tooltip: QtObject {
+        readonly property color background: root.sComposed("tooltip", "background", root.surface1, 0.97)
+        readonly property color text: root.sCol("tooltip", "text", root.col("ansi.white"))
+        readonly property color border: root.sComposed("tooltip", "border", root.col("ansi.white"), 1.0)
+    }
+    readonly property QtObject notifications: QtObject {
+        readonly property color background: root.sComposed("notifications", "background", root.surface2, 1.0)
+        readonly property color text: root.sCol("notifications", "text", root.textPrimary)
+        readonly property color textMuted: root.sCol("notifications", "text-muted", root.textMuted)
+        readonly property color border: root.sComposed("notifications", "border", root.accent, 1.0)
+        readonly property color borderError: root.sComposed("notifications", "border-error", root.error, 1.0)
+        readonly property color countdown: root.sCol("notifications", "countdown", root.accent)
+    }
+    // border / border-active / border-error share one alpha companion: the
+    // three states are mutually exclusive in time, so one is enough (theirs).
+    readonly property QtObject lock: QtObject {
+        readonly property color background: root.sComposed("lock", "background", root.surface1, 0.8)
+        readonly property color text: root.sCol("lock", "text", root.textPrimary)
+        readonly property color placeholder: root.sCol("lock", "placeholder", root.alpha(root.textPrimary, 0.66))
+        readonly property color textError: root.sCol("lock", "text-error", root.error)
+        readonly property color borderActive: root.sComposed("lock", "border-active", root.accent, root.sAlpha("lock", "border", 1.0))
+        readonly property color borderError: root.sComposed("lock", "border-error", root.error, root.sAlpha("lock", "border", 1.0))
+        readonly property color selection: root.sComposed("lock", "selection", root.accent, 0.45)
+    }
+    // Defined for themes to target; the Menu and OSD modules themselves still
+    // read base tokens (see the migration note in themes/tokyo-night.toml).
+    readonly property QtObject menu: QtObject {
+        readonly property color background: root.sComposed("menu", "background", root.surface1, 1.0)
+        readonly property color text: root.sCol("menu", "text", root.textPrimary)
+        readonly property color border: root.sComposed("menu", "border", root.surface3, 1.0)
+        readonly property color scrim: root.sComposed("menu", "scrim", root.surface0, 0.5)
+        readonly property color selectedBackground: root.sComposed("menu", "selected-background", root.accent, 0.15)
+        readonly property color selectedText: root.sCol("menu", "selected-text", root.accent)
+    }
+    readonly property QtObject osd: QtObject {
+        readonly property color background: root.sComposed("osd", "background", root.surface1, 1.0)
+        readonly property color text: root.sCol("osd", "text", root.textPrimary)
+        readonly property color border: root.sComposed("osd", "border", root.surface3, 1.0)
     }
 
     // ------------------------------------------------------------ helpers
@@ -168,4 +298,22 @@ QtObject {
         onFileChanged: reload()
         onLoadFailed: root.values = root.builtin
     }
+
+    // Machine-level override, layered over every theme. Absent by default;
+    // watching adds the parent directory too, so creating and deleting the
+    // file both take effect live. text() is stale inside the change signal,
+    // so both paths route through reload() → onLoaded.
+    property FileView overrideFile: FileView {
+        id: overrideFile
+        path: Quickshell.env("HOME") + "/.config/qshell/theme-override.toml"
+        watchChanges: true
+        printErrors: false
+        onLoaded: root.overrideValues = root.parseToml(text())
+        onFileChanged: reload()
+        onLoadFailed: root.overrideValues = ({})
+    }
+
+    // FileView stays unloaded until something reads it, and nothing reads a
+    // file that is usually absent — without this neither signal ever fires.
+    Component.onCompleted: overrideFile.reload()
 }

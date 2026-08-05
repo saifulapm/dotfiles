@@ -39,6 +39,13 @@ function parseToml(raw) {
 const tokens = Object.assign({}, THEME_DEFAULTS,
   parseToml(fs.readFileSync(STATE, "utf8")))
 
+// The shell's machine-level override (~/.config/qshell/theme-override.toml)
+// is watched by a FileView, and a FileView cannot arm its watch on a path
+// whose parent directory does not exist — it would then need a shell restart
+// the first time the file is created. Guarantee the directory instead: this
+// runs on every theme change and at bootstrap.
+fs.mkdirSync(path.join(HOME, ".config/qshell"), { recursive: true })
+
 // Derived tokens — same construction rules as Services/Theme.qml.
 if (!tokens["text.on-accent"] && tokens["accent.accent"]) {
   tokens["text.on-accent"] = ensureContrast(

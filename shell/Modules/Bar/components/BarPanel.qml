@@ -136,9 +136,11 @@ PanelWindow {
         width: panelWindow.cardWidth
         height: Math.min(cardContent.implicitHeight + panelWindow.theme.space(8), panelWindow.height - (panelWindow.barVertical ? 0 : panelWindow.barExtent) - 6 - panelWindow.theme.space(4))
         radius: panelWindow.theme.radius(1.5)
-        color: panelWindow.theme.surface1
+        // The [panel] surface (omarchy's [popups]): a theme section restyles
+        // every bar flyout card at once, and falls back to the base tokens.
+        color: panelWindow.theme.panel.background
         border.width: panelWindow.theme.borderWidth
-        border.color: panelWindow.theme.surface3
+        border.color: panelWindow.theme.panel.border
         clip: true
 
         opacity: panelWindow.opened ? 1 : 0
@@ -189,7 +191,7 @@ PanelWindow {
                 Text {
                     visible: panelWindow.panelTitle !== ""
                     text: panelWindow.panelTitle
-                    color: panelWindow.theme.textPrimary
+                    color: panelWindow.theme.panel.text
                     font.family: panelWindow.theme.fontUi
                     font.pixelSize: panelWindow.theme.fontPx(1.083)
                     font.weight: Font.DemiBold

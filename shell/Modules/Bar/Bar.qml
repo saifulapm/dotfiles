@@ -122,12 +122,17 @@ Scope {
     // foreground (our ansi.white), attention = red. 420 ms InOutCubic
     // transitions carry theme swaps — but not the auto-contrast swap, which
     // has to land in the same frame as the transparency it belongs to.
-    readonly property color barBackground: theme.surface1
-    readonly property color themeForeground: theme.col("ansi.white")
+    // Read through the [bar] surface, so a theme (or the machine override) can
+    // restyle the bar alone; each key falls back to the base token it always
+    // used.
+    readonly property color barBackground: theme.bar.background
+    readonly property color themeForeground: theme.bar.text
     // The other candidate for a transparent bar's text: the bar's own
     // background color, which is by construction the opposite polarity of the
     // foreground and so reads over a wallpaper the foreground disappears into.
-    readonly property color themeContrastForeground: theme.surface1
+    // Taken without the alpha companion — a translucent contrast color would
+    // defeat the purpose.
+    readonly property color themeContrastForeground: theme.sCol("bar", "background", theme.surface1)
     property color transparentForeground: themeForeground
     property bool useTransparentForeground: false
     property bool foregroundAnimationEnabled: true
@@ -841,15 +846,20 @@ Scope {
                     implicitWidth: tooltipLabel.implicitWidth + 20
                     implicitHeight: tooltipLabel.implicitHeight + 14
                     radius: barRoot.theme.radiusBase
-                    color: barRoot.theme.alpha(barRoot.barBackground, 0.97)
+                    // The [tooltip] surface. Defaults reproduce what this
+                    // bubble always drew (bar background at 0.97, foreground
+                    // text and border) — but the bubble is opaque chrome of
+                    // its own, so it takes the theme's foreground rather than
+                    // the bar's wallpaper-sampled contrast color.
+                    color: barRoot.theme.tooltip.background
                     border.width: 1
-                    border.color: panel.barForeground
+                    border.color: barRoot.theme.tooltip.border
 
                     Text {
                         id: tooltipLabel
                         anchors.centerIn: parent
                         text: panel.tooltipText
-                        color: panel.barForeground
+                        color: barRoot.theme.tooltip.text
                         font.family: barRoot.theme.fontMono
                         font.pixelSize: barRoot.theme.fontPx(1.0)
                         horizontalAlignment: Text.AlignHCenter

@@ -555,6 +555,20 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   the slot that sized itself from that widget), and the weather widget's
   temperature is hidden vertically the way their glyph-only weather button
   already is.
+- **Per-surface theme overrides** from `shell/Commons/Color.qml` +
+  `default/themed/shell.toml.tpl`: the surface-role model (one named section
+  per themable surface, every key falling back to a foundational token), the
+  `X` + `X-alpha` companion pairs composed into one color (`composed()` /
+  `pick()`), values that name another token instead of carrying a literal,
+  and the machine-level override file layered over whatever theme is active
+  (their `~/.config/omarchy/shell.toml`, ours
+  `~/.config/qshell/theme-override.toml`) — all folded into our single file
+  per theme rather than their generated second file. `bin/theme-port-omarchy
+  --sections` is their `apply_shell_section_overrides`
+  (`bin/omarchy-theme-set-templates`): a theme's `shell.<section>.toml`
+  becomes a `[<section>]` block spliced into ours, replacing only that block.
+  `themes/tokyo-night.toml`'s `[lock]` section is their
+  `themes/tokyo-night/shell.lock.toml`, values verbatim.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).

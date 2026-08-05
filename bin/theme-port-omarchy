@@ -1,5 +1,6 @@
 #!/usr/bin/env -S mise exec -- node
 // theme-port-omarchy [--force] [--all | <name>...]
+// theme-port-omarchy --sections [--all | <name>...]
 //
 // Converts omarchy themes (~/ref/omarchy/themes/<name>/colors.toml, MIT —
 // CREDITS.md) into our token schema at themes/<name>.toml. Existing files
@@ -9,6 +10,14 @@
 // Colors are ported; non-color character (radius/motion/density) is ours,
 // assigned per theme in CHARACTER below — that split is the whole point of
 // our token schema.
+//
+// --sections is the per-surface half. An omarchy theme may ship
+// `shell.<section>.toml` files that override one surface of their generated
+// shell.toml (their apply_shell_section_overrides splices them in); ours
+// become a `[<section>]` block in our single theme file. This mode MERGES:
+// it replaces only the named block and leaves every other line — including
+// all our character tokens — exactly as it found them. It never creates a
+// theme file, so it is safe to re-run over hand-tuned themes.
 "use strict"
 const fs = require("fs")
 const os = require("os")
@@ -176,12 +185,90 @@ function port(name) {
   return true
 }
 
+// ------------------------------------------------------- per-surface sections
+// Their override files come in two shapes: a bare key = value list (the file
+// name already says which section it is, e.g. shell.lock.toml) or the same
+// list under a redundant [<section>] header. Their strip_shell_section_header
+// tolerates both, so this does too.
+function parseSectionFile(raw, section) {
+  const out = []
+  for (const lineRaw of String(raw).split("\n")) {
+    const line = lineRaw.trim()
+    if (!line || line.startsWith("#")) continue
+    if (line === `[${section}]`) continue
+    const kv = line.match(/^([A-Za-z0-9_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/)
+    if (kv) out.push([kv[1], (kv[2] ?? kv[3] ?? kv[4]).trim()])
+  }
+  return out
+}
+
+// Replace the `[section]` block of a theme file in place, or append one when
+// it has none. A block runs from its header to the next section header (or
+// EOF); everything outside it is copied through byte for byte.
+function spliceSection(text, section, pairs) {
+  const block = [`[${section}]`, ...pairs.map(([k, v]) => `${k} = "${v}"`)]
+  // Work without the file's trailing newline and put exactly one back, so a
+  // re-run over an unchanged theme is a byte-for-byte no-op.
+  const lines = String(text).replace(/\n$/, "").split("\n")
+  const header = new RegExp(`^\\s*\\[${section}\\]\\s*(#.*)?$`)
+  const anyHeader = /^\s*\[[^\]]+\]\s*(#.*)?$/
+
+  const start = lines.findIndex(l => header.test(l))
+  if (start < 0) {
+    const body = String(text).replace(/\n+$/, "")
+    return body + "\n\n" + block.join("\n") + "\n"
+  }
+  let end = start + 1
+  while (end < lines.length && !anyHeader.test(lines[end])) end++
+  // Rewind past the blank-line padding before the next section and hand it
+  // back untouched, so re-running never adds or eats a blank line.
+  let bodyEnd = end
+  while (bodyEnd > start + 1 && lines[bodyEnd - 1].trim() === "") bodyEnd--
+  return lines.slice(0, start).concat(block, lines.slice(bodyEnd)).join("\n") + "\n"
+}
+
+function portSections(name) {
+  const dir = path.join(OMARCHY, name)
+  const dest = path.join(ROOT, "themes", name + ".toml")
+  if (!fs.existsSync(dest)) {
+    console.log(`skip ${name}: themes/${name}.toml does not exist (port the theme first)`)
+    return 0
+  }
+  let files = []
+  try {
+    files = fs.readdirSync(dir).filter(f => /^shell\..+\.toml$/.test(f) && f !== "shell.toml").sort()
+  } catch (e) { /* no such theme in the reference clone */ }
+  if (files.length === 0) return 0
+
+  let text = fs.readFileSync(dest, "utf8")
+  let count = 0
+  for (const file of files) {
+    const section = file.slice("shell.".length, -".toml".length)
+    if (!/^[A-Za-z0-9_-]+$/.test(section)) continue
+    const pairs = parseSectionFile(fs.readFileSync(path.join(dir, file), "utf8"), section)
+    if (pairs.length === 0) continue
+    text = spliceSection(text, section, pairs)
+    console.log(`${name}: merged [${section}] from ${file} (${pairs.length} key(s))`)
+    count++
+  }
+  if (count > 0) fs.writeFileSync(dest, text)
+  return count
+}
+
 const args = process.argv.slice(2)
 const force = args.includes("--force")
+const sectionsOnly = args.includes("--sections")
 let names = args.filter(a => !a.startsWith("--"))
 if (args.includes("--all") || names.length === 0) {
   names = fs.readdirSync(OMARCHY).filter(n =>
     fs.existsSync(path.join(OMARCHY, n, "colors.toml")))
+}
+
+if (sectionsOnly) {
+  let merged = 0
+  for (const name of names.sort()) merged += portSections(name)
+  console.log(`theme-port-omarchy: ${merged} section(s) merged`)
+  process.exit(0)
 }
 
 let done = 0

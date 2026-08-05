@@ -61,3 +61,65 @@ easing = "standard"
 [bar]
 height = 26
 width-vertical = 28
+
+# ---------------------------------------------------------------------------
+# PER-SURFACE OVERRIDES
+#
+# Everything above is a BASE token: it applies everywhere. The sections below
+# restyle ONE surface each, and only the keys they name — anything a section
+# omits keeps the base-token recipe that surface already used. Omarchy's
+# surface-role model (their generated shell.toml), folded into our one file
+# per theme.
+#
+# A value may be a #rrggbb / #rrggbbaa literal, or the name of another token
+# ("accent.error", "surface.2"), which is followed.
+#
+# Where an alpha companion makes sense, the section takes `<key>-alpha` beside
+# `<key>` (0 = invisible, 1 = opaque); the pair composes into one color.
+#
+# Surfaces and their keys (fallback in brackets):
+#
+#   [bar]            background [surface.1] + -alpha [1.0]
+#                    text [ansi.white], active [accent.error]
+#                    (also carries the base keys height / width-vertical above)
+#   [panel]          bar-widget flyout cards. background [surface.1] + -alpha,
+#                    text [text.primary], border [surface.3] + -alpha
+#   [tooltip]        background [surface.1] + -alpha [0.97],
+#                    text [ansi.white], border [ansi.white] + -alpha
+#   [notifications]  background [surface.2] + -alpha, text [text.primary],
+#                    text-muted [text.muted], border [accent.accent] + -alpha,
+#                    border-error [accent.error] + -alpha,
+#                    countdown [accent.accent]
+#   [lock]           background [surface.1] + -alpha [0.8], text [text.primary],
+#                    placeholder [text.primary @ 0.66], text-error [accent.error],
+#                    border-active [accent.accent], border-error [accent.error],
+#                    border-alpha [1.0] (shared by both border states — they are
+#                    mutually exclusive in time), selection [accent.accent] +
+#                    -alpha [0.45]
+#   [menu]           background [surface.1] + -alpha, text [text.primary],
+#                    border [surface.3] + -alpha, scrim [surface.0] + -alpha [0.5],
+#                    selected-background [accent.accent] + -alpha [0.15],
+#                    selected-text [accent.accent]
+#   [osd]            background [surface.1] + -alpha, text [text.primary],
+#                    border [surface.3] + -alpha
+#
+# [bar], [panel], [tooltip], [notifications] and [lock] are wired to their
+# surfaces. [menu] and [osd] are defined and resolvable but the Menu and OSD
+# modules still read base tokens — porting them is follow-up work.
+#
+# The same sections are accepted in ~/.config/qshell/theme-override.toml, a
+# machine-level file layered over whatever theme is active (see CREDITS.md).
+# ---------------------------------------------------------------------------
+
+# Omarchy ships this exact override for tokyo-night (themes/tokyo-night/
+# shell.lock.toml, MIT — see CREDITS.md): the lock screen goes monochrome,
+# every role collapsing onto the theme's plain foreground. `border` is their
+# idle-field role; our field, like theirs, is always active-or-error, so it is
+# carried for completeness rather than read.
+[lock]
+text = "#a9b1d6"
+placeholder = "#a9b1d6"
+text-error = "#a9b1d6"
+border = "#a9b1d6"
+border-active = "#a9b1d6"
+border-error = "#a9b1d6"

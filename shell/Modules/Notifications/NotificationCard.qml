@@ -57,7 +57,9 @@ Rectangle {
     // Their urgency ladder: critical borrows the urgent colour, low dims,
     // everything else takes the accent. It colours the countdown rail and,
     // for critical (which has no countdown), the card border.
-    readonly property color accentColor: urgency === 2 ? theme.error : (urgency === 0 ? theme.textMuted : theme.accent)
+    // Read through the [notifications] surface, so a theme section restyles
+    // toasts alone; every key falls back to the base token it always used.
+    readonly property color accentColor: urgency === 2 ? theme.notifications.borderError : (urgency === 0 ? theme.notifications.textMuted : theme.notifications.countdown)
 
     // `notify-send -i <name>` arrives as an `image-path` hint, which
     // Quickshell hands over as `image://icon/<name>` — and its icon provider
@@ -88,9 +90,9 @@ Rectangle {
     implicitWidth: theme.space(95)
     implicitHeight: mainColumn.implicitHeight + border.width * 2
     radius: theme.radius(1)
-    color: theme.surface2
+    color: theme.notifications.background
     border.width: Math.max(theme.borderWidth, theme.space(0.5))
-    border.color: urgency === 2 ? theme.error : theme.accent
+    border.color: urgency === 2 ? theme.notifications.borderError : theme.notifications.border
     clip: true
 
     HoverHandler {
@@ -153,7 +155,7 @@ Rectangle {
                     anchors.centerIn: parent
                     visible: root.hasGlyph && smallIconImage.status !== Image.Ready
                     text: root.glyph
-                    color: root.theme.textPrimary
+                    color: root.theme.notifications.text
                     font.family: root.glyphFamily
                     font.pixelSize: root.theme.fontPx(2.333)
                 }
@@ -163,7 +165,7 @@ Rectangle {
                 Layout.alignment: Qt.AlignVCenter
                 visible: root.compactGlyph
                 text: root.glyph
-                color: root.theme.textPrimary
+                color: root.theme.notifications.text
                 font.family: root.glyphFamily
                 font.pixelSize: root.theme.fontPx(1.167)
             }
@@ -177,7 +179,7 @@ Rectangle {
                     Layout.fillWidth: true
                     visible: root.summary.length > 0
                     text: root.summary
-                    color: root.theme.textPrimary
+                    color: root.theme.notifications.text
                     font.family: root.theme.fontUi
                     font.pixelSize: root.theme.fontPx(1.167)
                     font.bold: true
@@ -192,7 +194,7 @@ Rectangle {
                     visible: root.sanitizedBody.length > 0
                     text: root.styledBody
                     textFormat: Text.StyledText
-                    color: root.theme.textMuted
+                    color: root.theme.notifications.textMuted
                     font.family: root.theme.fontUi
                     font.pixelSize: root.theme.fontPx(1.167)
                     wrapMode: Text.WordWrap

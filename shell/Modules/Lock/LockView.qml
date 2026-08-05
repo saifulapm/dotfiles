@@ -39,17 +39,18 @@ Item {
     readonly property int passwordDotFontSize: theme.fontPx(1.773)
     readonly property int passwordDotLetterSpacing: Math.round(theme.fontPx(1.333) * 0.19)
 
-    // Colors are the roles omarchy's [lock] theme section names, resolved
-    // against our token schema: their background at 0.8 alpha, their
-    // foreground-mixed placeholder (their own fallback recipe), accent for the
-    // live border, error for the failed one.
-    readonly property color fieldColor: theme.alpha(theme.surface1, 0.8)
-    readonly property color textColor: theme.textPrimary
-    readonly property color placeholderColor: theme.alpha(theme.textPrimary, 0.66)
-    readonly property color textErrorColor: theme.error
-    readonly property color borderActiveColor: theme.accent
-    readonly property color borderErrorColor: theme.error
-    readonly property color selectionColor: theme.alpha(theme.accent, 0.45)
+    // Colors are the roles omarchy's [lock] theme section names, now read
+    // through the surface accessor: a theme's own [lock] section overrides
+    // them, and anything it omits keeps the base-token recipe it always had
+    // (background at 0.8 alpha, foreground-mixed placeholder, accent for the
+    // live border, error for the failed one).
+    readonly property color fieldColor: theme.lock.background
+    readonly property color textColor: theme.lock.text
+    readonly property color placeholderColor: theme.lock.placeholder
+    readonly property color textErrorColor: theme.lock.textError
+    readonly property color borderActiveColor: theme.lock.borderActive
+    readonly property color borderErrorColor: theme.lock.borderError
+    readonly property color selectionColor: theme.lock.selection
 
     // Space to keep clear on each side of the field for the fingerprint icon
     // (icon width plus a gap) so the centered dots never run under it.
