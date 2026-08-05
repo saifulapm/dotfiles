@@ -125,6 +125,12 @@ category = "shell"
 arch = "all"
 why = "The shell runtime (from COPR errornointernet/quickshell); pulls its own Qt6 runtime deps"
 
+[[pkg]]
+name = "google-noto-color-emoji-fonts"
+category = "shell"
+arch = "all"
+why = "The desktop's only emoji coverage — nothing else installed carries U+1F600 (verified with fc-match/fc-list on 2026-08-05, before this was added), so the emoji picker, notification bodies and any chat/web app render tofu boxes without it. Fedora's package is named google-noto-color-emoji-fonts, NOT google-noto-emoji-color-fonts (that name does not exist in F44)"
+
 # ------------------------------------------------------------------ dev
 
 [[pkg]]

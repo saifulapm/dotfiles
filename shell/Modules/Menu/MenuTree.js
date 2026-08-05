@@ -41,6 +41,15 @@ var TREE = {
         "label": "Capture",
         "aliases": ["screenshot", "screenshots", "shot", "grab", "screen"]
     },
+    // Omarchy files this under their Trigger submenu, next to Capture — our
+    // tree hoisted Capture to the root, so Emoji sits beside it.
+    "emoji": {
+        "icon": "󰇵",
+        "label": "Emoji",
+        "aliases": ["emojis", "emoticon", "smiley", "symbols"],
+        "description": "Search an emoji and copy it to the clipboard",
+        "call": "emojis"
+    },
     "toggle": {
         "icon": "󰔎",
         "label": "Toggle",

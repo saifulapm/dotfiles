@@ -419,6 +419,10 @@ binds {
     Mod+D hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Space hotkey-overlay-title="Open the Menu" { spawn "qs" "ipc" "call" "menu" "toggle"; }
     Mod+Shift+T hotkey-overlay-title="Switch Theme" { spawn "qs" "ipc" "call" "theme" "toggle"; }
+    // Omarchy's own emoji bind (SUPER+CTRL+E). Their commented-out
+    // SUPER+PERIOD alternative is unavailable here: Mod+Period is niri's
+    // expel-window-from-column.
+    Mod+Ctrl+E hotkey-overlay-title="Pick an Emoji" { spawn "qs" "ipc" "call" "emojis" "toggle"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "ipc" "call" "lock" "lock"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.

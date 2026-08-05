@@ -5,6 +5,7 @@ import Quickshell.Services.Mpris
 
 import qs.Services
 import qs.Modules.Bar
+import qs.Modules.Emojis
 import qs.Modules.Lock
 import qs.Modules.Launcher
 import qs.Modules.Menu
@@ -132,6 +133,11 @@ ShellRoot {
     function toggleThemes() {
         themesLoader.active = true;
         themesLoader.item.toggle();
+    }
+
+    function toggleEmojis() {
+        emojisLoader.active = true;
+        emojisLoader.item.toggle();
     }
 
     function lockSession() {
@@ -330,6 +336,35 @@ ShellRoot {
         function open(route: string): string {
             menuLoader.active = true;
             return menuLoader.item.openRoute(route);
+        }
+    }
+
+    LazyLoader {
+        id: emojisLoader
+        active: false
+        component: Emojis {
+            theme: shell.theme
+        }
+    }
+
+    IpcHandler {
+        target: "emojis"
+
+        function toggle(): string {
+            shell.toggleEmojis();
+            return "ok";
+        }
+
+        function show(): string {
+            emojisLoader.active = true;
+            emojisLoader.item.show();
+            return "ok";
+        }
+
+        function hide(): string {
+            if (emojisLoader.active)
+                emojisLoader.item.hide();
+            return "ok";
         }
     }
 

@@ -66,6 +66,16 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   our tree is a JS object in `Modules/Menu/MenuTree.js` and our Apps row hands
   off to the launcher — and rows the shell owns itself (launcher, theme
   switcher, DND, lock) run in-process instead of shelling out.
+- **Emoji picker design** from `shell/plugins/emojis/Emojis.qml`: the flat
+  grid of glyph cells with no group headers and no recents section, the query
+  line that doubles as the card header, and their keyboard model (←/→ by one
+  cell, ↑/↓ by a row, PageUp/PageDown by a screenful, the first press parking
+  on the first cell instead of stepping, Enter to take the cursor's emoji,
+  Escape clearing the query before it closes, hover moving the cursor).
+  Their selection path is `wl-copy --sensitive --foreground` plus a
+  `wtype -M shift -k Insert` paste into the focused window, with the offer
+  killed afterwards; no key-injection tool is installed here, so ours does a
+  plain persistent `wl-copy` and confirms with a notification instead.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -141,6 +151,15 @@ Direct file-level copies (source path → destination path):
   `/etc/NetworkManager/conf.d` global-dns file and `/etc/systemd/resolved.conf`
   rewrite (which is what makes the original need sudo/pkexec) are deliberately
   not ported: this repo does not write `/etc` without approval.
+- omarchy `shell/plugins/emojis/emojis.json` → `shell/Modules/Emojis/emojis.json`:
+  verbatim, byte-for-byte — their 1870-record emoji dataset (`{e, k}`: the
+  glyph and its name plus search keywords as one lowercase string).
+- omarchy `shell/plugins/emojis/EmojiSearch.js` → `shell/Modules/Emojis/EmojiSearch.js`:
+  direct port of the search — the whole of it is a case-insensitive substring
+  test of the trimmed query against each record's `k` text, with no
+  tokenizing and no ranking (results keep the file's Unicode-group order) and
+  the scan capped at 1000 hits. Only whitespace changed, to house 4-space
+  qmlformat.
 - omarchy `shell/plugins/panels/clock/Model.js` → `shell/Modules/Bar/widgets/ClockModel.js`:
   near-verbatim port of the date/format math (format ring, ISO week, year/life
   progress parsing and percentages, six-row month grid). Vertical-bar formats and
