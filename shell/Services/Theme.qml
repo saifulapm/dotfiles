@@ -83,6 +83,10 @@ QtObject {
     readonly property int fontSize: Math.round(num("font.size"))
     readonly property int motionDuration: Math.round(num("motion.duration"))
     readonly property int barHeight: Math.round(num("bar.height"))
+    // A bar on the left or right edge is a column, and a column needs more
+    // room than a strip does: omarchy's two bar sizes, 26 horizontal / 28
+    // vertical, as two tokens instead of one.
+    readonly property int barWidthVertical: Math.round(num("bar.width-vertical"))
     readonly property int easing: {
         const e = String(tok("motion.easing"));
         if (e === "snap")

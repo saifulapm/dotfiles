@@ -68,23 +68,32 @@ PanelWindow {
             open();
     }
 
-    // The bar can be moved to the bottom edge, and the card has to follow:
+    // The bar can be moved to any screen edge, and the card has to follow:
     // hanging off the top of the screen would leave it detached from the
-    // widget it belongs to.
-    readonly property bool barAtBottom: anchorItem && anchorItem.bar && anchorItem.bar.position === "bottom"
+    // widget it belongs to. Omarchy's four PopupCard cases, in our
+    // full-screen-overlay geometry.
+    readonly property string barPosition: anchorItem && anchorItem.bar ? String(anchorItem.bar.position) : "top"
+    readonly property bool barAtBottom: barPosition === "bottom"
+    readonly property bool barVertical: barPosition === "left" || barPosition === "right"
+    readonly property int barExtent: anchorItem && anchorItem.bar && anchorItem.bar.barSize > 0 ? anchorItem.bar.barSize : theme.barHeight
 
-    // Card x: centered under the anchor, clamped to the screen with an 8 px
-    // inset. The bar window spans the full output, so bar coords are screen
-    // coords. Computed imperatively at open (+ once settled).
+    // Where the card hangs off the anchor: centered under it on a horizontal
+    // bar, centered beside it on a vertical one — both clamped to the screen
+    // with an 8 px inset. The bar window spans its whole edge of the output,
+    // so bar coords are screen coords. Computed imperatively at open (+ once
+    // settled): mapToItem is not reactive to ancestor positions.
     property real anchorCenterX: width / 2
+    property real anchorCenterY: height / 2
 
     function updateAnchor() {
         const bar = anchorItem ? anchorItem.bar : null;
         if (!anchorItem || !bar || !bar.contentItem)
             return;
-        const point = anchorItem.mapToItem(bar.contentItem, anchorItem.width / 2, 0);
+        const point = anchorItem.mapToItem(bar.contentItem, anchorItem.width / 2, anchorItem.height / 2);
         if (point.x > 0)
             anchorCenterX = point.x;
+        if (point.y > 0)
+            anchorCenterY = point.y;
     }
 
     Timer {
@@ -114,10 +123,18 @@ PanelWindow {
     Rectangle {
         id: card
 
-        x: Math.max(8, Math.min(panelWindow.anchorCenterX - width / 2, panelWindow.width - width - 8))
-        y: panelWindow.barAtBottom ? panelWindow.height - panelWindow.theme.barHeight - 6 - height : panelWindow.theme.barHeight + 6
+        x: {
+            if (!panelWindow.barVertical)
+                return Math.max(8, Math.min(panelWindow.anchorCenterX - width / 2, panelWindow.width - width - 8));
+            return panelWindow.barPosition === "left" ? panelWindow.barExtent + 6 : panelWindow.width - panelWindow.barExtent - 6 - width;
+        }
+        y: {
+            if (panelWindow.barVertical)
+                return Math.max(8, Math.min(panelWindow.anchorCenterY - height / 2, panelWindow.height - height - 8));
+            return panelWindow.barAtBottom ? panelWindow.height - panelWindow.barExtent - 6 - height : panelWindow.barExtent + 6;
+        }
         width: panelWindow.cardWidth
-        height: Math.min(cardContent.implicitHeight + panelWindow.theme.space(8), panelWindow.height - panelWindow.theme.barHeight - 6 - panelWindow.theme.space(4))
+        height: Math.min(cardContent.implicitHeight + panelWindow.theme.space(8), panelWindow.height - (panelWindow.barVertical ? 0 : panelWindow.barExtent) - 6 - panelWindow.theme.space(4))
         radius: panelWindow.theme.radius(1.5)
         color: panelWindow.theme.surface1
         border.width: panelWindow.theme.borderWidth

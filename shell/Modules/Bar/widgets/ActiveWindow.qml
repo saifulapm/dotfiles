@@ -3,13 +3,16 @@ import "../components"
 
 // Focused window title, omarchy-style: bare text at 0.85 opacity, elided at
 // maxWidth, animated width; middle or right click closes the window.
+//
+// Hidden on a vertical bar, exactly as theirs is: a title is a run of text,
+// and a 28 px column has nowhere to put one.
 BarButton {
     id: rootItem
 
     required property var niri
     property int maxWidth: 280
 
-    visible: niri.focusedTitle !== ""
+    visible: niri.focusedTitle !== "" && !vertical
     tooltipText: label.truncated ? niri.focusedTitle : ""
 
     onTapped: button => {

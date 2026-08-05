@@ -60,3 +60,4 @@ easing = "standard"
 
 [bar]
 height = 26
+width-vertical = 28

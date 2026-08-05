@@ -99,10 +99,13 @@ def hex_rgb(value):
 
 
 def strip_box(position, width, height, bar_size):
-    """The screen rectangle the bar covers. Their crop cases, top/bottom only:
-    a left/right bar is not something this shell can render yet."""
+    """The screen rectangle the bar covers — their four crop cases."""
     if position == "bottom":
         return (0, max(0, height - bar_size), width, min(bar_size, height))
+    if position == "left":
+        return (0, 0, min(bar_size, width), height)
+    if position == "right":
+        return (max(0, width - bar_size), 0, min(bar_size, width), height)
     return (0, 0, width, min(bar_size, height))
 
 
@@ -201,7 +204,7 @@ def main():
     if not HEX.match(text_color or ""):
         print(text_color or "#ffffff")
         return
-    if not HEX.match(background_color or "") or position not in ("top", "bottom") or not str(bar_size).isdigit():
+    if not HEX.match(background_color or "") or position not in ("top", "bottom", "left", "right") or not str(bar_size).isdigit():
         fail(text_color)
     bar_size = int(bar_size)
     if bar_size <= 0:

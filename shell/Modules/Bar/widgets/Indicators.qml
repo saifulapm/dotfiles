@@ -170,8 +170,11 @@ Item {
     }
 
     // ---------------------------------------------------------------- layout
-    implicitWidth: inactiveArea.width + activeRow.implicitWidth
-    implicitHeight: parent ? parent.height : theme.barHeight
+    readonly property bool vertical: bar ? bar.vertical === true : false
+    readonly property int barSize: bar ? bar.barSize : theme.barHeight
+
+    implicitWidth: bar && bar.vertical === true ? barSize : (layout.item ? layout.item.implicitWidth : 0)
+    implicitHeight: bar && bar.vertical === true ? (layout.item ? layout.item.implicitHeight : 0) : barSize
 
     ListModel {
         id: activeModel
@@ -190,59 +193,132 @@ Item {
         onHoveredChanged: root.setIndicatorAreaHovered(hovered)
     }
 
-    Row {
-        height: root.height
-        spacing: 0
+    // Both blocks, laid out along the bar: side by side on a horizontal bar,
+    // stacked on a vertical one (upstream keeps two arrangements too). Either
+    // way the inactive block sits on the far side of the active one, so the
+    // reveal grows away from the clock instead of shoving the lit indicators
+    // out from under the pointer.
+    Loader {
+        id: layout
 
-        Item {
-            id: inactiveArea
+        anchors.fill: parent
+        sourceComponent: root.vertical ? verticalIndicators : horizontalIndicators
+    }
 
-            width: root.revealInactive ? inactiveRow.implicitWidth : 0
-            height: root.height
-            clip: true
+    Component {
+        id: horizontalIndicators
 
-            // Upstream's reveal snaps; ours slides, like our tray drawer.
-            Behavior on width {
-                NumberAnimation {
-                    duration: 180
-                    easing.type: Easing.OutCubic
+        Row {
+            spacing: 0
+
+            Item {
+                id: inactiveArea
+
+                width: root.revealInactive ? inactiveRow.implicitWidth : 0
+                height: root.height
+                clip: true
+
+                // Upstream's reveal snaps; ours slides, like our tray drawer.
+                Behavior on width {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                Row {
+                    id: inactiveRow
+                    // Slides in from the outer edge, so the icons closest to
+                    // the active block arrive first.
+                    x: inactiveArea.width - implicitWidth
+                    height: parent.height
+                    spacing: 0
+
+                    Repeater {
+                        model: root.indicatorIds
+                        IndicatorSlot {
+                            required property string modelData
+                            indicatorId: modelData
+                            indicatorBlock: "inactive"
+                        }
+                    }
+                }
+
+                HoverHandler {
+                    onHoveredChanged: root.setIndicatorAreaHovered(hovered)
                 }
             }
 
             Row {
-                id: inactiveRow
-                // Slides in from the outer edge, so the icons closest to the
-                // active block arrive first.
-                x: inactiveArea.width - implicitWidth
-                height: parent.height
+                id: activeRow
+                height: root.height
                 spacing: 0
 
                 Repeater {
-                    model: root.indicatorIds
+                    model: activeModel
                     IndicatorSlot {
-                        required property string modelData
-                        indicatorId: modelData
-                        indicatorBlock: "inactive"
+                        required property string activeId
+                        indicatorId: activeId
+                        indicatorBlock: "active"
                     }
                 }
             }
-
-            HoverHandler {
-                onHoveredChanged: root.setIndicatorAreaHovered(hovered)
-            }
         }
+    }
 
-        Row {
-            id: activeRow
-            height: root.height
+    Component {
+        id: verticalIndicators
+
+        Column {
             spacing: 0
 
-            Repeater {
-                model: activeModel
-                IndicatorSlot {
-                    required property string activeId
-                    indicatorId: activeId
-                    indicatorBlock: "active"
+            Item {
+                id: verticalInactiveArea
+
+                width: root.barSize
+                height: root.revealInactive ? verticalInactiveColumn.implicitHeight : 0
+                clip: true
+
+                Behavior on height {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                Column {
+                    id: verticalInactiveColumn
+                    y: verticalInactiveArea.height - implicitHeight
+                    width: parent.width
+                    spacing: 0
+
+                    Repeater {
+                        model: root.indicatorIds
+                        IndicatorSlot {
+                            required property string modelData
+                            indicatorId: modelData
+                            indicatorBlock: "inactive"
+                        }
+                    }
+                }
+
+                HoverHandler {
+                    onHoveredChanged: root.setIndicatorAreaHovered(hovered)
+                }
+            }
+
+            Column {
+                id: verticalActiveColumn
+                width: root.barSize
+                spacing: 0
+
+                Repeater {
+                    model: activeModel
+                    IndicatorSlot {
+                        required property string activeId
+                        indicatorId: activeId
+                        indicatorBlock: "active"
+                    }
                 }
             }
         }
@@ -314,8 +390,11 @@ Item {
         readonly property var entry: root.entryForId(indicatorId)
         readonly property var known: root.indicatorRegistry[indicatorId]
 
-        implicitWidth: source.item && source.item.visible ? source.item.implicitWidth : 0
-        implicitHeight: root.height
+        readonly property bool shown: source.item !== null && source.item.visible
+        // Along the bar the slot is the indicator's own size and collapses
+        // with it; across the bar it is the bar's thickness.
+        implicitWidth: root.vertical ? root.barSize : (shown ? source.item.implicitWidth : 0)
+        implicitHeight: root.vertical ? (shown ? source.item.implicitHeight : 0) : root.height
         width: implicitWidth
         height: implicitHeight
 

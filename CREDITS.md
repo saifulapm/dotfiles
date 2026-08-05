@@ -522,11 +522,39 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   0.9 opacity, 120 ms fade). Cross-panel Tab/Shift+Tab over
   `panelNavigationSlots`, their configurable `centerAnchor`, their `bar-off`
   flag file as the bar-hide switch, and the rule that a widget which hides
-  itself takes no space. Adapted: only the top and bottom edges exist here
-  (a vertical bar is later work, so their left/right edge result folds onto the
-  nearer horizontal one), their `interactive`/`pressable`/`concealed` trio
-  collapses onto `enabled` + opacity, tooltips are suppressed for the duration
-  of a gesture, and panels follow the bar to the bottom edge.
+  itself takes no space. Adapted: their `interactive`/`pressable`/`concealed`
+  trio collapses onto `enabled` + opacity, tooltips are suppressed for the
+  duration of a gesture, and panels follow the bar to whichever edge it is on.
+- **Vertical bars** from the same files plus `Ui/WidgetButton.qml`,
+  `Ui/BarIconButton.qml` and the widgets that carry a vertical variant
+  (`bar/widgets/Workspaces.qml`, `ActiveWindow.qml`, `Spacer.qml`,
+  `Tray.qml`, `Indicators.qml`, `panels/clock/BarWidget.qml` + `Model.js`,
+  `services/media/BarWidget.qml`, `panels/power/Panel.qml`, `Ui/PopupCard.qml`):
+  `bar.position` of `"left"`/`"right"` turns the bar on its side. Theirs, in
+  order: the anchor set that pins a bar to one edge and spans the other axis,
+  their two bar sizes (26 horizontal / 28 vertical — here two theme tokens,
+  `bar.height` and `bar.width-vertical`), Column-based sections where the
+  left/right arrays become the top and bottom ends with the center anchor
+  pinned to the vertical center, the 8 px section insets moving to the top and
+  bottom, `fixedWidth`↔`fixedHeight` swapping on every button and status slot
+  so a slot is a fixed extent ALONG the bar and the bar's thickness across it,
+  the open-panel pill rotating onto the bar's inner edge, the drop marker
+  crossing the bar instead of running down it, tooltips 6 px off the widget's
+  desktop-facing side, panels opening beside the bar centered on their widget,
+  the bar-move gesture offering all four edges with a slab per edge, and the
+  wallpaper strip sampled down the bar's own column. Widget by widget, theirs:
+  the window title is hidden outright, the media title and the battery
+  percentage give way to the glyph alone, the clock becomes a stack of short
+  lines with its own `verticalFormat`/`verticalFormatAlt` settings and its own
+  four-entry format ring (`"HH\n—\nmm"` and the rest, verbatim), the
+  workspaces grid switches to one column, the tray drawer slides up from the
+  pinned items behind a quarter-turned chevron, and the indicator container
+  stacks its active and revealed blocks. Ours on top: their invariant that an
+  implicit size never reads the parent's is now enforced in `BarButton`
+  (a widget reading `parent.height` on a vertical bar closes a size cycle with
+  the slot that sized itself from that widget), and the weather widget's
+  temperature is hidden vertically the way their glyph-only weather button
+  already is.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -763,11 +791,13 @@ Direct file-level copies (source path → destination path):
   taking our `bar` section map instead of their `bar.layout`). Dropped: their
   tray pinning, custom-module path resolution, `inlineSettingsDelta` (our bar
   patches settings in place by another route) and `pickDrawnSlot` (our centre
-  anchor mounts its widget once, not twice). Added: `horizontalEdge`, which
-  folds their left/right edge result onto the nearer horizontal edge.
+  anchor mounts its widget once, not twice). `normalizePosition` takes all
+  four edges and `nearestDropTarget` keeps their axis switch, so the same
+  functions serve a vertical bar; `isVerticalPosition` is ours.
 - omarchy `bin/omarchy-bar-text-color` → `bin/bar-text-color`: port of the
   sampler — the cover-fit-then-crop of the wallpaper down to the strip the bar
-  covers, the mean pixel, the WCAG luminance/contrast pair, the
+  covers — all four of their crop cases, so a left or right bar samples the
+  column down its own edge — the mean pixel, the WCAG luminance/contrast pair, the
   better-contrast-wins decision, and the rule that every failure prints the
   theme foreground so the bar is never left unstyled. Adapted: written in
   Python because nothing in the ImageMagick family is installed here (GdkPixbuf

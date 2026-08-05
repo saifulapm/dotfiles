@@ -325,7 +325,9 @@ BarButton {
 
     Text {
         anchors.verticalCenter: parent.verticalCenter
-        visible: rootItem.reportTempNum !== ""
+        // Their weather bar widget is glyph-only; ours adds the temperature,
+        // which is the part that has no room on a vertical bar.
+        visible: !rootItem.vertical && rootItem.reportTempNum !== ""
         text: rootItem.reportTempNum + "°"
         color: rootItem.contentColor
         font.family: rootItem.theme.fontMono

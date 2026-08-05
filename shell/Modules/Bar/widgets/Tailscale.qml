@@ -22,15 +22,13 @@ import "../components"
 BarButton {
     id: rootItem
 
-    fixedWidth: 27
+    // The icon slot, on whichever axis runs along the bar.
+    fixedWidth: vertical ? -1 : 27
+    fixedHeight: vertical ? 27 : -1
 
     // Only ever visible behind a real CLI, and never before the presence probe
     // has answered.
     visible: tailscale.probed && tailscale.installed
-    // A hidden widget must not leave its slot behind: the bar's WidgetSlot
-    // sizes itself from implicitWidth, so an invisible 27 px button would hold
-    // a 27 px hole open in the section.
-    implicitWidth: visible ? fixedWidth : 0
 
     readonly property TailscaleService tailscale: TailscaleService {
         settings: rootItem.settings

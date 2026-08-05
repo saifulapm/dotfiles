@@ -33,12 +33,17 @@ function entryIndex(entries, name) {
     return -1;
 }
 
-// Only top and bottom this pass: the vertical bar (their left/right, with the
-// stacked module lists and the rotated labels that come with it) is a later
-// piece of work, so a stored "left"/"right" is not a position we can render.
+// All four screen edges, verbatim from theirs. "left"/"right" put the bar on
+// its side: the sections stack, the widgets are icon-slot tall instead of
+// icon-slot wide, and panels open beside the bar rather than under it.
 function normalizePosition(value) {
     const next = String(value || "").trim();
-    return next === "bottom" ? "bottom" : "top";
+    return /^(top|bottom|left|right)$/.test(next) ? next : "top";
+}
+
+function isVerticalPosition(value) {
+    const next = normalizePosition(value);
+    return next === "left" || next === "right";
 }
 
 // Split the screen along its diagonals (in normalized space, so widescreens
@@ -66,24 +71,14 @@ function nearestScreenEdge(point, screenWidth, screenHeight) {
     return edge;
 }
 
-// With no vertical bar to move to, a left/right result is folded onto the
-// nearer horizontal edge instead of being dropped: dragging into the left half
-// of the screen still reads as "put the bar where I am pointing", and ignoring
-// it would make the gesture feel broken over most of the screen.
-function horizontalEdge(point, screenWidth, screenHeight) {
-    const edge = nearestScreenEdge(point, screenWidth, screenHeight);
-    if (edge === "top" || edge === "bottom")
-        return edge;
-    return screenHeight > 0 && point.y > screenHeight / 2 ? "bottom" : "top";
-}
-
 // Resolve a pointer anywhere along the bar to the closest insertion edge.
 // Requiring the pointer to sit inside another widget makes the empty space
 // around a centered group a dead zone, even though it visually reads as the
-// most natural place to drop. Verbatim from theirs, minus the vertical axis.
-function nearestDropTarget(candidates, point) {
+// most natural place to drop. Verbatim from theirs, including their axis
+// switch: a vertical bar measures along y.
+function nearestDropTarget(candidates, point, vertical) {
     const rows = Array.isArray(candidates) ? candidates : [];
-    const axis = Number(point && point.x);
+    const axis = Number(vertical ? (point && point.y) : (point && point.x));
     if (!isFinite(axis))
         return null;
 
@@ -94,8 +89,8 @@ function nearestDropTarget(candidates, point) {
         if (!row || !row.slot)
             continue;
 
-        const start = Number(row.x);
-        const size = Number(row.width);
+        const start = Number(vertical ? row.y : row.x);
+        const size = Number(vertical ? row.height : row.width);
         if (!isFinite(start) || !isFinite(size) || size <= 0)
             continue;
 
@@ -162,8 +157,8 @@ if (typeof module !== "undefined") {
         entryId: entryId,
         entryIndex: entryIndex,
         normalizePosition: normalizePosition,
+        isVerticalPosition: isVerticalPosition,
         nearestScreenEdge: nearestScreenEdge,
-        horizontalEdge: horizontalEdge,
         nearestDropTarget: nearestDropTarget,
         moveEntry: moveEntry
     };

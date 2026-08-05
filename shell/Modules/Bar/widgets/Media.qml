@@ -51,7 +51,9 @@ BarButton {
         anchors.verticalCenter: parent.verticalCenter
         width: Math.min(implicitWidth, 180)
         elide: Text.ElideRight
-        visible: rootItem.player !== null && rootItem.player.trackTitle !== ""
+        // Glyph only on a vertical bar — theirs hides the scrolling title
+        // there for the same reason the window title goes away entirely.
+        visible: !rootItem.vertical && rootItem.player !== null && rootItem.player.trackTitle !== ""
         text: rootItem.player ? rootItem.player.trackTitle : ""
         color: rootItem.contentColor
         opacity: 0.85

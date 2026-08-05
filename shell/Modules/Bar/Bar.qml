@@ -12,10 +12,17 @@ import "BarModel.js" as BarModel
 // theme swap, and a configurable center anchor pinned dead-center.
 //
 // The interaction machinery below is omarchy's too (CREDITS.md): press-drag a
-// widget to reorder it, press-drag the empty center to move the bar to another
-// screen edge, double-click it to toggle transparency (with an auto-contrast
-// foreground sampled from the wallpaper behind the bar), an accent pill under
-// the widget whose panel is open, and Tab to walk between panels.
+// widget to reorder it, press-drag the empty center to move the bar to any of
+// the four screen edges, double-click it to toggle transparency (with an
+// auto-contrast foreground sampled from the wallpaper behind the bar), an
+// accent pill under the widget whose panel is open, and Tab to walk between
+// panels.
+//
+// `bar.position` of "left" or "right" turns the whole thing on its side: the
+// sections stack, each widget is a bar-thickness cell, the clock becomes a
+// stack of short lines, and panels open beside the bar. Section names stay as
+// they are — on a vertical bar "left" is the top end and "right" the bottom —
+// so moving the bar never rewrites the layout.
 //
 // Widgets live in the registry below and are instantiated only when named in
 // the config's bar.left / bar.center / bar.right arrays. Unknown ids render
@@ -52,9 +59,14 @@ Scope {
             right: (Array.isArray(config.right) ? config.right : []).map(normalizeEntry)
         })
 
-    // Only top/bottom this pass — a vertical bar is a later piece of work, so
-    // BarModel folds a stored "left"/"right" back onto "top".
+    // Any of the four screen edges. "left"/"right" turn the bar on its side:
+    // the sections stack top→center→bottom, each widget is a bar-thickness
+    // wide cell, and panels open beside the bar instead of under it.
     readonly property string position: BarModel.normalizePosition(config.position)
+    readonly property bool vertical: BarModel.isVerticalPosition(position)
+    // The bar's thickness. Omarchy's two sizes: a column needs more room than
+    // a strip, so a vertical bar is its own theme token.
+    readonly property int barSize: vertical ? theme.barWidthVertical : theme.barHeight
     // Which center widget is pinned dead-center. Omarchy's centerAnchor,
     // configurable here instead of hardcoded to the clock; an id that is not
     // in the center section falls back to centering the whole group.
@@ -172,7 +184,9 @@ Scope {
         if (!requestedTransparent || foregroundProc.running)
             return;
         const first = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
-        foregroundProc.command = [barRoot.binDir + "bar-text-color", barRoot.position, String(barRoot.theme.barHeight), colorHex(barRoot.themeForeground), colorHex(barRoot.themeContrastForeground)].concat(first ? ["--screen", Math.round(first.width) + "x" + Math.round(first.height)] : []);
+        // The sampled strip is the one the bar actually covers, which on a
+        // vertical bar is a column down the left or right edge.
+        foregroundProc.command = [barRoot.binDir + "bar-text-color", barRoot.position, String(barRoot.barSize), colorHex(barRoot.themeForeground), colorHex(barRoot.themeContrastForeground)].concat(first ? ["--screen", Math.round(first.width) + "x" + Math.round(first.height)] : []);
         foregroundProc.running = true;
     }
 
@@ -263,6 +277,8 @@ Scope {
             return JSON.stringify({
                 hidden: barRoot.barHidden,
                 position: barRoot.position,
+                vertical: barRoot.vertical,
+                size: barRoot.barSize,
                 transparent: barRoot.transparent,
                 requestedTransparent: barRoot.requestedTransparent,
                 foreground: barRoot.colorHex(barRoot.barForeground),
@@ -346,9 +362,9 @@ Scope {
     function updateBarMove(screenPoint) {
         if (!barMoveActive || !barMoveScreen)
             return;
-        // Their nearestScreenEdge, constrained: with no vertical bar yet, a
-        // left/right result folds onto the nearer horizontal edge.
-        barMoveCandidate = BarModel.horizontalEdge(screenPoint, barMoveScreen.width, barMoveScreen.height);
+        // Their nearestScreenEdge, unconstrained: all four edges are bars the
+        // shell can render, so the triangle the pointer is in names the edge.
+        barMoveCandidate = BarModel.nearestScreenEdge(screenPoint, barMoveScreen.width, barMoveScreen.height);
     }
 
     function clearBarMove() {
@@ -408,9 +424,12 @@ Scope {
             // what else is on the bar — the tray suppresses the SNI item of
             // any app that has a dedicated widget in the layout.
             readonly property var layoutConfig: barRoot.layoutOf
-            // Which edge the bar is on, for panels anchoring under (or over)
-            // their widget.
+            // Which edge the bar is on, for panels anchoring under (or over,
+            // or beside) their widget, and the orientation every widget lays
+            // itself out along.
             readonly property string position: barRoot.position
+            readonly property bool vertical: barRoot.vertical
+            readonly property int barSize: barRoot.barSize
 
             // Cold-start metric consumed by bin/bench: ms from process launch
             // to this bar window finishing construction.
@@ -418,13 +437,18 @@ Scope {
 
             screen: modelData
             visible: !barRoot.barHidden
+            // Their anchor set: a bar spans the edge it sits on and is pinned
+            // to it, so a vertical bar takes both top and bottom and only its
+            // own side, and the free axis is left at 0 (the layer surface
+            // stretches it).
             anchors {
-                top: barRoot.position !== "bottom"
-                bottom: barRoot.position === "bottom"
-                left: true
-                right: true
+                top: barRoot.position === "top" || barRoot.vertical
+                bottom: barRoot.position === "bottom" || barRoot.vertical
+                left: barRoot.position === "left" || !barRoot.vertical
+                right: barRoot.position === "right" || !barRoot.vertical
             }
-            implicitHeight: barRoot.theme.barHeight
+            implicitWidth: barRoot.vertical ? barRoot.barSize : 0
+            implicitHeight: barRoot.vertical ? 0 : barRoot.barSize
 
             property color barBackground: barRoot.barBackground
             property color barForeground: barRoot.barForeground
@@ -524,11 +548,14 @@ Scope {
             // edge, so a scene point inside it is offset from the screen point
             // the full-screen ghost overlay draws in.
             function windowScreenPoint(scenePoint) {
+                let x = scenePoint.x;
                 let y = scenePoint.y;
                 if (barRoot.position === "bottom")
                     y += Math.max(0, panel.screen.height - panel.height);
+                else if (barRoot.position === "right")
+                    x += Math.max(0, panel.screen.width - panel.width);
                 return {
-                    x: scenePoint.x,
+                    x: x,
                     y: y
                 };
             }
@@ -549,6 +576,16 @@ Scope {
                     return null;
                 const p = windowScreenPoint(slotScenePoint(slot));
                 const thickness = 3; // omarchy's Style.spacing.xs
+                // The marker lies across the bar at the insertion boundary, so
+                // it is a vertical rule on a horizontal bar and a horizontal
+                // one on a vertical bar.
+                if (barRoot.vertical)
+                    return {
+                        x: p.x,
+                        y: p.y + (after ? slot.height : 0) - thickness / 2,
+                        width: slot.width,
+                        height: thickness
+                    };
                 return {
                     x: p.x + (after ? slot.width : 0) - thickness / 2,
                     y: p.y,
@@ -572,10 +609,12 @@ Scope {
                     candidates.push({
                         slot: slot,
                         x: p.x,
-                        width: slot.width
+                        y: p.y,
+                        width: slot.width,
+                        height: slot.height
                     });
                 }
-                return BarModel.nearestDropTarget(candidates, scenePoint);
+                return BarModel.nearestDropTarget(candidates, scenePoint, barRoot.vertical);
             }
 
             function visibleModuleSlot(section, widgetId, sourceSlot) {
@@ -778,10 +817,19 @@ Scope {
                         const target = panel.tooltipTarget;
                         if (!target)
                             return;
+                        // Their four cases: the bubble sits 6 px off the
+                        // widget on the side the desktop is on.
                         let localX = target.width / 2 - tooltipWindow.implicitWidth / 2;
                         let localY = target.height + 6;
-                        if (barRoot.position === "bottom")
+                        if (barRoot.position === "bottom") {
                             localY = -tooltipWindow.implicitHeight - 6;
+                        } else if (barRoot.position === "left") {
+                            localX = target.width + 6;
+                            localY = target.height / 2 - tooltipWindow.implicitHeight / 2;
+                        } else if (barRoot.position === "right") {
+                            localX = -tooltipWindow.implicitWidth - 6;
+                            localY = target.height / 2 - tooltipWindow.implicitHeight / 2;
+                        }
                         const point = panel.contentItem.mapFromItem(target, localX, localY);
                         tooltipAnchor.rect.x = Math.round(point.x);
                         tooltipAnchor.rect.y = Math.round(point.y);
@@ -810,77 +858,171 @@ Scope {
             }
 
             // ------------------------------------------------------ layout
-            Row {
-                anchors.left: parent.left
-                anchors.leftMargin: 8
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                spacing: 0
-                Repeater {
-                    model: barRoot.modelLeft
-                    WidgetSlot {
-                        section: "left"
-                        barWindow: panel
+            // Two arrangements of the same three sections, one loaded at a
+            // time (omarchy's horizontalBar / verticalBar). On a vertical bar
+            // "left" means the top end, "right" the bottom one, and the
+            // center anchor is pinned to the vertical center — the sections
+            // keep their config names so moving the bar never rewrites the
+            // layout.
+            Loader {
+                anchors.fill: parent
+                sourceComponent: barRoot.vertical ? verticalBar : horizontalBar
+            }
+
+            Component {
+                id: horizontalBar
+
+                Item {
+                    anchors.fill: parent
+
+                    Row {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 8
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        spacing: 0
+                        Repeater {
+                            model: barRoot.modelLeft
+                            WidgetSlot {
+                                section: "left"
+                                barWindow: panel
+                            }
+                        }
                     }
-                }
-            }
 
-            // Center anchor (by default the clock) is pinned to the true
-            // center; the flanking rows hang off it.
-            WidgetSlot {
-                id: centerAnchorSlot
-                visible: barRoot.centerAnchorIndex >= 0
-                modelData: barRoot.centerAnchorWidget
-                index: barRoot.centerAnchorIndex
-                section: "center"
-                barWindow: panel
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-            }
-
-            Row {
-                anchors.right: centerAnchorSlot.left
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                spacing: 0
-                visible: barRoot.centerAnchorIndex >= 0
-                Repeater {
-                    model: barRoot.modelCenterBefore
+                    // Center anchor (by default the clock) is pinned to the
+                    // true center; the flanking rows hang off it.
                     WidgetSlot {
+                        id: centerAnchorSlot
+                        visible: barRoot.centerAnchorIndex >= 0
+                        modelData: barRoot.centerAnchorWidget
+                        index: barRoot.centerAnchorIndex
                         section: "center"
                         barWindow: panel
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Row {
+                        anchors.right: centerAnchorSlot.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        spacing: 0
+                        visible: barRoot.centerAnchorIndex >= 0
+                        Repeater {
+                            model: barRoot.modelCenterBefore
+                            WidgetSlot {
+                                section: "center"
+                                barWindow: panel
+                            }
+                        }
+                    }
+
+                    Row {
+                        anchors.left: barRoot.centerAnchorIndex >= 0 ? centerAnchorSlot.right : undefined
+                        anchors.horizontalCenter: barRoot.centerAnchorIndex >= 0 ? undefined : parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        spacing: 0
+                        Repeater {
+                            model: barRoot.modelCenterAfter
+                            WidgetSlot {
+                                section: "center"
+                                barWindow: panel
+                                indexOffset: barRoot.centerAnchorIndex >= 0 ? barRoot.centerAnchorIndex + 1 : 0
+                            }
+                        }
+                    }
+
+                    Row {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        spacing: 0
+                        Repeater {
+                            model: barRoot.modelRight
+                            WidgetSlot {
+                                section: "right"
+                                barWindow: panel
+                            }
+                        }
                     }
                 }
             }
 
-            Row {
-                anchors.left: barRoot.centerAnchorIndex >= 0 ? centerAnchorSlot.right : undefined
-                anchors.horizontalCenter: barRoot.centerAnchorIndex >= 0 ? undefined : parent.horizontalCenter
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                spacing: 0
-                Repeater {
-                    model: barRoot.modelCenterAfter
+            Component {
+                id: verticalBar
+
+                Item {
+                    anchors.fill: parent
+
+                    Column {
+                        anchors.top: parent.top
+                        anchors.topMargin: 8
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 0
+                        Repeater {
+                            model: barRoot.modelLeft
+                            WidgetSlot {
+                                section: "left"
+                                barWindow: panel
+                            }
+                        }
+                    }
+
                     WidgetSlot {
+                        id: centerAnchorSlotVertical
+                        visible: barRoot.centerAnchorIndex >= 0
+                        modelData: barRoot.centerAnchorWidget
+                        index: barRoot.centerAnchorIndex
                         section: "center"
                         barWindow: panel
-                        indexOffset: barRoot.centerAnchorIndex >= 0 ? barRoot.centerAnchorIndex + 1 : 0
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
                     }
-                }
-            }
 
-            Row {
-                anchors.right: parent.right
-                anchors.rightMargin: 8
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                spacing: 0
-                Repeater {
-                    model: barRoot.modelRight
-                    WidgetSlot {
-                        section: "right"
-                        barWindow: panel
+                    Column {
+                        anchors.bottom: centerAnchorSlotVertical.top
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 0
+                        visible: barRoot.centerAnchorIndex >= 0
+                        Repeater {
+                            model: barRoot.modelCenterBefore
+                            WidgetSlot {
+                                section: "center"
+                                barWindow: panel
+                            }
+                        }
+                    }
+
+                    Column {
+                        anchors.top: barRoot.centerAnchorIndex >= 0 ? centerAnchorSlotVertical.bottom : undefined
+                        anchors.verticalCenter: barRoot.centerAnchorIndex >= 0 ? undefined : parent.verticalCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 0
+                        Repeater {
+                            model: barRoot.modelCenterAfter
+                            WidgetSlot {
+                                section: "center"
+                                barWindow: panel
+                                indexOffset: barRoot.centerAnchorIndex >= 0 ? barRoot.centerAnchorIndex + 1 : 0
+                            }
+                        }
+                    }
+
+                    Column {
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 8
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 0
+                        Repeater {
+                            model: barRoot.modelRight
+                            WidgetSlot {
+                                section: "right"
+                                barWindow: panel
+                            }
+                        }
                     }
                 }
             }
@@ -991,17 +1133,21 @@ Scope {
             // One fixed-geometry slab per edge, crossfaded on candidate
             // changes. Resizing a single slab between edges repaints
             // mid-transition and flickers; fading between static ones does
-            // not. (Two slabs, not their four: no vertical bar yet.)
+            // not. All four of theirs, each drawn at the thickness that edge
+            // would actually give the bar.
             Repeater {
-                model: ["top", "bottom"]
+                model: ["top", "bottom", "left", "right"]
 
                 Rectangle {
                     required property string modelData
 
-                    x: 0
-                    y: modelData === "bottom" ? parent.height - height : 0
-                    width: parent.width
-                    height: barRoot.theme.barHeight
+                    readonly property bool edgeVertical: modelData === "left" || modelData === "right"
+                    readonly property int edgeSize: edgeVertical ? barRoot.theme.barWidthVertical : barRoot.theme.barHeight
+
+                    x: modelData === "right" ? parent.width - edgeSize : 0
+                    y: modelData === "bottom" ? parent.height - edgeSize : 0
+                    width: edgeVertical ? edgeSize : parent.width
+                    height: edgeVertical ? parent.height : edgeSize
                     color: barRoot.transparent ? "transparent" : barRoot.barBackground
                     border.width: 1
                     border.color: barRoot.barForeground
@@ -1142,17 +1288,19 @@ Scope {
         // A widget can say how long the open-panel pill should be, so it
         // tracks what the widget paints rather than the slot it fills.
         readonly property real panelIndicatorExtent: {
-            const hint = activeItem && "openPanelIndicatorWidth" in activeItem ? activeItem.openPanelIndicatorWidth : undefined;
+            const key = barRoot.vertical ? "openPanelIndicatorHeight" : "openPanelIndicatorWidth";
+            const hint = activeItem && key in activeItem ? activeItem[key] : undefined;
             if (hint !== undefined && hint !== null && hint > 0)
                 return Math.round(hint);
-            return Math.max(10, Math.round(slot.width * 0.55));
+            return Math.max(10, Math.round((barRoot.vertical ? slot.height : slot.width) * 0.55));
         }
 
-        anchors.top: parent ? parent.top : undefined
-        anchors.bottom: parent ? parent.bottom : undefined
-        // A widget that hides itself takes no space (omarchy's rule — ours
-        // used to keep the fixedWidth of a hidden button as a dead gap).
-        width: activeItem && activeItem.visible ? activeItem.implicitWidth : 0
+        // Across the bar the slot is the bar's thickness; along it, whatever
+        // the widget paints. A widget that hides itself takes no space
+        // (omarchy's rule — ours used to keep the fixedWidth of a hidden
+        // button as a dead gap).
+        width: barRoot.vertical ? barRoot.barSize : (activeItem && activeItem.visible ? activeItem.implicitWidth : 0)
+        height: barRoot.vertical ? (activeItem && activeItem.visible ? activeItem.implicitHeight : 0) : barRoot.barSize
         z: slotPointer.dragging ? 100 : 0
 
         Component.onCompleted: barWindow.registerModuleSlot(slot)
@@ -1219,19 +1367,20 @@ Scope {
         }
 
         // The open-panel pill: an accent bar on the widget's inner edge — the
-        // one facing the desktop — so it underlines a top bar and overlines a
-        // bottom one. It reads as pointing at the panel that opened.
+        // one facing the desktop — so it underlines a top bar, overlines a
+        // bottom one, and points inward from a left or right one. It reads as
+        // pointing at the panel that opened.
         Rectangle {
             readonly property int inset: 2
 
             visible: opacity > 0
             opacity: slot.panelOpen && !slot.dragSource ? 0.9 : 0
             color: barRoot.theme.accent
-            width: slot.panelIndicatorExtent
-            height: 2
+            width: barRoot.vertical ? 2 : slot.panelIndicatorExtent
+            height: barRoot.vertical ? slot.panelIndicatorExtent : 2
             radius: Math.min(width, height) / 2
-            x: Math.round((parent.width - width) / 2)
-            y: barRoot.position === "top" ? parent.height - height - inset : inset
+            x: barRoot.vertical ? (barRoot.position === "left" ? parent.width - width - inset : inset) : Math.round((parent.width - width) / 2)
+            y: barRoot.vertical ? Math.round((parent.height - height) / 2) : (barRoot.position === "top" ? parent.height - height - inset : inset)
             z: 50
 
             Behavior on opacity {
@@ -1523,8 +1672,8 @@ Scope {
         id: missingComponent
         Item {
             property string missingId: "?"
-            implicitWidth: missingLabel.implicitWidth + barRoot.theme.space(2)
-            implicitHeight: parent ? parent.height : missingLabel.implicitHeight
+            implicitWidth: barRoot.vertical ? barRoot.barSize : missingLabel.implicitWidth + barRoot.theme.space(2)
+            implicitHeight: barRoot.vertical ? missingLabel.implicitHeight + barRoot.theme.space(2) : (parent ? parent.height : missingLabel.implicitHeight)
             Text {
                 id: missingLabel
                 anchors.centerIn: parent

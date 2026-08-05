@@ -47,12 +47,19 @@ Item {
     readonly property var pinnedItems: allItems.filter(i => rootItem.classify(i) === "pinned")
     readonly property var drawerItems: allItems.filter(i => rootItem.classify(i) === "drawer")
 
+    readonly property bool vertical: bar ? bar.vertical === true : false
+    readonly property int barSize: bar ? bar.barSize : theme.barHeight
+
     readonly property int trayItemExtent: 27
     readonly property int drawerCount: drawerItems.length
     readonly property int drawerExtent: drawerCount * trayItemExtent
-    // The drawer block reserves its full slide-in width at all times; the
+    // The drawer block reserves its full slide-in extent at all times; the
     // chevron rides the reveal from its outer end inward.
     readonly property int drawerBlockWidth: allItems.length > 0 ? trayItemExtent + drawerExtent : 0
+
+    // The chevron, whichever arrangement built it: the manage card hangs off
+    // it, and it is the one part of the tray that is always on the bar.
+    property Item chevronItem: null
 
     property bool expanded: false
     property real revealProgress: expanded ? 1 : 0
@@ -135,94 +142,205 @@ Item {
 
     function openPanel() {
         panelLoader.active = true;
-        panelLoader.item.anchorItem = expandIcon;
+        panelLoader.item.anchorItem = chevronItem !== null ? chevronItem : rootItem;
         panelLoader.item.toggle();
     }
 
-    implicitWidth: drawerBlockWidth + pinnedRow.implicitWidth
-    implicitHeight: parent ? parent.height : trayItemExtent
+    implicitWidth: bar && bar.vertical === true ? barSize : (layout.item ? layout.item.implicitWidth : 0)
+    implicitHeight: bar && bar.vertical === true ? (layout.item ? layout.item.implicitHeight : 0) : barSize
     // Stays mounted while only hidden items remain, so the chevron — and with
     // it the manage card — cannot be locked away by hiding everything.
     visible: allItems.length > 0
 
-    Item {
-        id: drawerArea
+    // Two arrangements of the same drawer (omarchy's horizontalTray /
+    // verticalTray): on a horizontal bar the drawer slides open sideways with
+    // the pinned items beside it, on a vertical one it slides open upward with
+    // the pinned items below it. Either way the drawer opens away from the
+    // section's outer end, i.e. toward the middle of the bar.
+    Loader {
+        id: layout
 
-        x: 0
-        width: rootItem.drawerBlockWidth
-        height: rootItem.height
-        visible: rootItem.allItems.length > 0
+        anchors.fill: parent
+        sourceComponent: rootItem.vertical ? verticalTray : horizontalTray
+    }
 
-        // The collapsed drawer keeps its slide-in space reserved, and that
-        // space is empty: mask it out so drifting past the tray neither pops
-        // the drawer open nor swallows a click meant for what's underneath.
-        // Omarchy's containmentMask, moved down onto the hovered item — a
-        // pointer handler tests its own parent's containment, and a mask on an
-        // ancestor does not gate the handlers nested below it.
-        containmentMask: QtObject {
-            function contains(point: point): bool {
-                if (point.y < 0 || point.y > drawerArea.height)
-                    return false;
-                return point.x >= rootItem.drawerExtent - rootItem.revealExtent && point.x <= drawerArea.width;
-            }
-        }
-
-        HoverHandler {
-            onHoveredChanged: rootItem.expanded = hovered
-        }
-
-        BarIcon {
-            id: expandIcon
-
-            theme: rootItem.theme
-            bar: rootItem.bar
-            // MD chevron-left: the drawer opens leftward, away from the bar
-            // edge. (Omarchy's FontAwesome chevron has no glyph in our
-            // Symbols Nerd Font fallback.)
-            glyph: "󰅁"
-            tooltipText: "Tray — right-click to manage"
-            x: rootItem.drawerExtent - rootItem.revealExtent
-
-            onTapped: button => {
-                if (button === Qt.RightButton)
-                    rootItem.openPanel();
-            }
-        }
+    Component {
+        id: horizontalTray
 
         Item {
-            id: trayClip
+            implicitWidth: rootItem.drawerBlockWidth + pinnedRow.implicitWidth
+            implicitHeight: rootItem.trayItemExtent
 
-            x: rootItem.trayItemExtent
-            width: rootItem.drawerExtent
-            height: rootItem.height
-            clip: true
+            Item {
+                id: drawerArea
+
+                x: 0
+                width: rootItem.drawerBlockWidth
+                height: parent.height
+                visible: rootItem.allItems.length > 0
+
+                // The collapsed drawer keeps its slide-in space reserved, and
+                // that space is empty: mask it out so drifting past the tray
+                // neither pops the drawer open nor swallows a click meant for
+                // what's underneath. Omarchy's containmentMask, moved down
+                // onto the hovered item — a pointer handler tests its own
+                // parent's containment, and a mask on an ancestor does not
+                // gate the handlers nested below it.
+                containmentMask: QtObject {
+                    function contains(point: point): bool {
+                        if (point.y < 0 || point.y > drawerArea.height)
+                            return false;
+                        return point.x >= rootItem.drawerExtent - rootItem.revealExtent && point.x <= drawerArea.width;
+                    }
+                }
+
+                HoverHandler {
+                    onHoveredChanged: rootItem.expanded = hovered
+                }
+
+                BarIcon {
+                    id: expandIcon
+
+                    theme: rootItem.theme
+                    bar: rootItem.bar
+                    // MD chevron-left: the drawer opens leftward, away from
+                    // the bar edge. (Omarchy's FontAwesome chevron has no
+                    // glyph in our Symbols Nerd Font fallback.)
+                    glyph: "󰅁"
+                    tooltipText: "Tray — right-click to manage"
+                    x: rootItem.drawerExtent - rootItem.revealExtent
+
+                    Component.onCompleted: rootItem.chevronItem = expandIcon
+
+                    onTapped: button => {
+                        if (button === Qt.RightButton)
+                            rootItem.openPanel();
+                    }
+                }
+
+                Item {
+                    id: trayClip
+
+                    x: rootItem.trayItemExtent
+                    width: rootItem.drawerExtent
+                    height: parent.height
+                    clip: true
+
+                    Row {
+                        id: trayIcons
+
+                        x: rootItem.drawerExtent - rootItem.revealExtent
+                        height: parent.height
+                        spacing: 0
+                        layer.enabled: true
+
+                        Repeater {
+                            model: rootItem.drawerItems
+                            TrayItem {}
+                        }
+                    }
+                }
+            }
 
             Row {
-                id: trayIcons
+                id: pinnedRow
 
-                x: rootItem.drawerExtent - rootItem.revealExtent
+                x: rootItem.drawerBlockWidth
                 height: parent.height
                 spacing: 0
-                layer.enabled: true
 
                 Repeater {
-                    model: rootItem.drawerItems
+                    model: rootItem.pinnedItems
                     TrayItem {}
                 }
             }
         }
     }
 
-    Row {
-        id: pinnedRow
+    Component {
+        id: verticalTray
 
-        x: rootItem.drawerBlockWidth
-        height: rootItem.height
-        spacing: 0
+        Item {
+            implicitWidth: rootItem.barSize
+            implicitHeight: rootItem.drawerBlockWidth + pinnedColumn.implicitHeight
 
-        Repeater {
-            model: rootItem.pinnedItems
-            TrayItem {}
+            Item {
+                id: verticalDrawerArea
+
+                y: 0
+                width: parent.width
+                height: rootItem.drawerBlockWidth
+                visible: rootItem.allItems.length > 0
+
+                containmentMask: QtObject {
+                    function contains(point: point): bool {
+                        if (point.x < 0 || point.x > verticalDrawerArea.width)
+                            return false;
+                        return point.y >= rootItem.drawerExtent - rootItem.revealExtent && point.y <= verticalDrawerArea.height;
+                    }
+                }
+
+                HoverHandler {
+                    onHoveredChanged: rootItem.expanded = hovered
+                }
+
+                BarIcon {
+                    id: verticalExpandIcon
+
+                    theme: rootItem.theme
+                    bar: rootItem.bar
+                    // The same chevron, turned a quarter clockwise so it
+                    // points up the bar — the direction the drawer opens
+                    // (omarchy rotates theirs the same way).
+                    glyph: "󰅁"
+                    glyphRotation: 90
+                    tooltipText: "Tray — right-click to manage"
+                    y: rootItem.drawerExtent - rootItem.revealExtent
+
+                    Component.onCompleted: rootItem.chevronItem = verticalExpandIcon
+
+                    onTapped: button => {
+                        if (button === Qt.RightButton)
+                            rootItem.openPanel();
+                    }
+                }
+
+                Item {
+                    id: verticalTrayClip
+
+                    y: rootItem.trayItemExtent
+                    width: parent.width
+                    height: rootItem.drawerExtent
+                    clip: true
+
+                    Column {
+                        id: verticalTrayIcons
+
+                        y: rootItem.drawerExtent - rootItem.revealExtent
+                        width: parent.width
+                        spacing: 0
+                        layer.enabled: true
+
+                        Repeater {
+                            model: rootItem.drawerItems
+                            TrayItem {}
+                        }
+                    }
+                }
+            }
+
+            Column {
+                id: pinnedColumn
+
+                y: rootItem.drawerBlockWidth
+                width: parent.width
+                spacing: 0
+
+                Repeater {
+                    model: rootItem.pinnedItems
+                    TrayItem {}
+                }
+            }
         }
     }
 
@@ -244,14 +362,17 @@ Item {
 
         theme: rootItem.theme
         bar: rootItem.bar
-        fixedWidth: rootItem.trayItemExtent
+        fixedWidth: rootItem.vertical ? -1 : rootItem.trayItemExtent
+        fixedHeight: rootItem.vertical ? rootItem.trayItemExtent : -1
         tooltipText: rootItem.trayTooltip(modelData)
         visible: modelData.status !== Status.Passive
 
+        // The menu opens off the bar-facing edge of the item: below it on a
+        // horizontal bar, beside it on a vertical one.
         function displayMenu() {
             if (!modelData.hasMenu || !rootItem.bar)
                 return;
-            const point = trayItemRoot.mapToItem(rootItem.bar.contentItem, 0, trayItemRoot.height);
+            const point = trayItemRoot.mapToItem(rootItem.bar.contentItem, rootItem.vertical ? trayItemRoot.width : 0, rootItem.vertical ? 0 : trayItemRoot.height);
             modelData.display(rootItem.bar, Math.round(point.x), Math.round(point.y));
         }
 

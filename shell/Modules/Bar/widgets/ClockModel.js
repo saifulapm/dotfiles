@@ -21,8 +21,13 @@ var WEEKDAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "fr
 // without one: ISO 8601 writes time on a 24-hour clock.
 var CLOCK_FORMATS = ["dddd HH:mm", "dddd h:mm AP", "HH:mm", "h:mm AP", "ddd d MMM HH:mm", "ddd d MMM h:mm AP", "d MMMM 'W'ww yyyy", "yyyy-MM-dd HH:mm"]
 
-function clockFormats() {
-    return CLOCK_FORMATS.slice()
+// Vertical bars have room for a few stacked lines and nothing else, so the
+// ring stays short. AM/PM costs a fourth line, which is why only the plain
+// time carries it here. Theirs, verbatim.
+var VERTICAL_CLOCK_FORMATS = ["HH\n—\nmm", "h\n—\nmm\nAP", "dd\nMMM\n'W'ww\n''yy", "HH\nmm"]
+
+function clockFormats(vertical) {
+    return vertical ? VERTICAL_CLOCK_FORMATS.slice() : CLOCK_FORMATS.slice()
 }
 
 // The presets in a fixed order, plus the configured alternate and current

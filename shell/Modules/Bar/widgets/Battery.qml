@@ -30,9 +30,15 @@ BarButton {
         return m >= 60 ? Math.floor(m / 60) + "h " + (m % 60) + "m" : m + "m";
     }
 
+    // The percentage label is a horizontal-bar affordance (their power widget
+    // suppresses it on a vertical bar too); vertically the widget is always
+    // the icon slot.
+    readonly property bool percentageShown: showPercentage && !vertical
+
     visible: present
     active: low
-    fixedWidth: showPercentage ? -1 : 27
+    fixedWidth: vertical ? -1 : (percentageShown ? -1 : 27)
+    fixedHeight: vertical ? 27 : -1
     tooltipText: {
         if (!present)
             return "";
@@ -74,7 +80,7 @@ BarButton {
 
     Text {
         anchors.verticalCenter: parent.verticalCenter
-        visible: rootItem.showPercentage
+        visible: rootItem.percentageShown
         text: rootItem.pct + "%"
         color: rootItem.contentColor
         font.family: rootItem.theme.fontMono

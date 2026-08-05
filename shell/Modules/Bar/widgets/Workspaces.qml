@@ -14,14 +14,25 @@ Item {
 
     readonly property var shown: niri.workspaces.filter(w => screenName === "" || w.output === screenName)
 
-    implicitWidth: row.implicitWidth
-    implicitHeight: parent ? parent.height : row.implicitHeight
+    readonly property bool vertical: bar ? bar.vertical === true : false
+    readonly property int barSize: bar ? bar.barSize : theme.barHeight
 
-    Row {
-        id: row
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        spacing: 1
+    implicitWidth: bar && bar.vertical === true ? barSize : grid.implicitWidth
+    implicitHeight: bar && bar.vertical === true ? grid.implicitHeight : barSize
+
+    // Omarchy's grid: one row of pips on a horizontal bar, one column on a
+    // vertical one, with their spacing pair (1 px between columns, 2 px
+    // between rows).
+    Grid {
+        id: grid
+        // Filled rather than anchored per orientation: on a horizontal bar the
+        // pips take their height from the row that holds them, and on a
+        // vertical one they carry their own (see the fixedHeight below), so
+        // one anchor set serves both without a size cycle.
+        anchors.centerIn: parent
+        columns: rootItem.vertical ? 1 : Math.max(1, rootItem.shown.length)
+        columnSpacing: rootItem.vertical ? 0 : 1
+        rowSpacing: rootItem.vertical ? 2 : 0
 
         Repeater {
             model: rootItem.shown
@@ -33,7 +44,8 @@ Item {
 
                 theme: rootItem.theme
                 bar: rootItem.bar
-                fixedWidth: 20
+                fixedWidth: rootItem.vertical ? -1 : 20
+                fixedHeight: rootItem.vertical ? rootItem.barSize : -1
                 active: modelData.is_urgent === true
                 opacity: modelData.is_active || modelData.active_window_id !== null ? 1 : 0.5
 

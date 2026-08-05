@@ -41,5 +41,6 @@ var THEME_DEFAULTS = {
   "font.size": 12,
   "motion.duration": 150,
   "motion.easing": "standard",
-  "bar.height": 26
+  "bar.height": 26,
+  "bar.width-vertical": 28
 }
