@@ -167,10 +167,28 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   colorization to the bar foreground, and the right-click manage card (title and
   caption over per-item rows with Pin / Hide toggles). Their FontAwesome chevron
   is a Material Design glyph here (the FontAwesome range does not render under
-  our Nerd Font fallback), their Dropbox dedicated-widget ownership check is
-  dropped (we ship no Dropbox widget), and their in-house `QsMenuOpener` menu
-  rendering is not used — our tray items open the application's own menu through
-  `display()`.
+  our Nerd Font fallback) and their in-house `QsMenuOpener` menu rendering is
+  not used — our tray items open the application's own menu through
+  `display()`. Their dedicated-widget ownership rule is ported (see below): an
+  app whose own bar widget is in the layout has its tray item suppressed, and
+  gets it back the moment that widget leaves the layout.
+- **Dropbox plugin design** from `shell/plugins/panels/dropbox/` (`Panel.qml`,
+  `Service.qml`, `DropboxIcon.qml`): the drawn five-tile Dropbox mark carrying
+  the whole state (full foreground while an authenticated daemon syncs, dimmed
+  and darkened while it is paused or logged out) instead of a glyph ladder, the
+  bar button's left-opens / right-refreshes / middle-logs-in split, the hero of
+  the mark over a rotating sync phrase ("Filing files", "Boxing bytes", …) with
+  their 180/260 ms cross-fade between phrases and the compact on/off switch on
+  its trailing edge, the optimistic pause/resume state that flips the icon on
+  the click rather than when dropboxd settles, their startup ramp and
+  post-command settle re-polls, the login row and its authentication-URL
+  scraping out of the CLI's own output, the "Stored X of Y" line against their
+  hard-coded plan quotas, the RECENT FILES list with per-kind glyphs and
+  relative times, and their single cursor model shared by mouse and keyboard
+  (header ↔ files, Enter activates, r/l/p). Ours on top: the folder walk is
+  split off the presence probe so the periodic refresh stays cheap, the
+  "Stored" row opens the Dropbox folder (`o`), and files open with `xdg-open`
+  rather than `uwsm-app -- nautilus --select`.
 - **Menu framework and filter semantics** from `shell/plugins/menu/` (`Menu.qml`,
   `MenuModel.js`) and the tree format of `default/omarchy/omarchy-menu.jsonc`:
   the hierarchical tree keyed by dotted ids with the kind inferred from the
@@ -557,6 +575,44 @@ Direct file-level copies (source path → destination path):
   `list.sh`'s thumbnail cache is not ported: those thumbnails are rendered by
   ImageMagick, which is not installed here, so the picker decodes the originals
   at thumbnail size instead.
+- omarchy `shell/plugins/panels/dropbox/status.py` → `bin/dropbox-status`:
+  direct copy — the `~/.dropbox/info.json` account read, their plan→quota
+  table, the `dropbox-cli status` invocation and its stopped-daemon sniffing,
+  and the single-pass folder walk that totals bytes while keeping the N most
+  recently modified files in a heap. Three additions, each marked in the file:
+  the CLI is looked up as `dropbox-cli` *or* `dropbox` (Fedora's
+  nautilus-dropbox installs the second name), the resolved name is reported
+  back as `cli` so the shell drives the same binary, and `--probe` answers the
+  presence question without walking the folder.
+- omarchy `shell/plugins/panels/dropbox/Model.js` → `shell/Modules/Bar/widgets/DropboxModel.js`:
+  near-verbatim port — the status envelope and its defaults, the
+  image/video/document extension tables behind the row glyphs, and the byte,
+  percentage, usage-line, relative-time and file-meta formatting. Only
+  whitespace changed (house 4-space qmlformat); their glyphs are already
+  Material Design codepoints and survive our Nerd Font fallback as they are.
+- omarchy `shell/plugins/panels/dropbox/DropboxIcon.qml` →
+  `shell/Modules/Bar/widgets/DropboxIcon.qml`: verbatim — the five-tile mark
+  drawn with `QtQuick.Shapes`, tile geometry and all. It replaces their login
+  row's Devicons brand glyph too, which does not render here.
+- omarchy `shell/plugins/panels/dropbox/Service.qml` →
+  `shell/Modules/Bar/widgets/DropboxService.qml`: near-verbatim port of the
+  service — the settings readers, the optimistic `_desired`/`active` pair, the
+  status apply, the login/pause/resume commands, the authentication-URL
+  scraper, and all five timers (periodic refresh, startup ramp, delayed
+  refresh, action-status expiry, post-command settle). Changed: it is a
+  `QtObject` rather than an `Item` so it can hang off a bar button, everything
+  is gated behind one presence probe (nothing runs at all without a CLI), the
+  periodic refresh asks only the cheap `--probe` question and runs only while
+  the widget is on a visible bar, a full pass requested while another run is in
+  flight is queued instead of dropped, every child process is wrapped in
+  `setpriv --pdeathsig TERM`, and `openFile` uses `xdg-open` (so their
+  `fileUri` encoder is gone with the nautilus call it fed).
+- omarchy `shell/plugins/bar/widgets/TrayModel.js` →
+  `shell/Modules/Bar/widgets/TrayModel.js`: near-verbatim port of the
+  dedicated-widget ownership rule — the case-insensitive id/title/tooltip test
+  for a Dropbox tray item, the layout entry-id reader that accepts both plain
+  strings and `{id, …}` objects, and the section scan. Only the widget id
+  differs: their plugin id `omarchy.dropbox`, our registry id `dropbox`.
 - omarchy `shell/plugins/panels/clock/Model.js` → `shell/Modules/Bar/widgets/ClockModel.js`:
   near-verbatim port of the date/format math (format ring, ISO week, year/life
   progress parsing and percentages, six-row month grid). Vertical-bar formats and

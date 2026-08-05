@@ -103,6 +103,7 @@ Scope {
             "ai": aiComponent,
             "weather": weatherComponent,
             "monitor": monitorComponent,
+            "dropbox": dropboxComponent,
             "spacer": spacerComponent
         })
 
@@ -117,6 +118,10 @@ Scope {
             // Widgets reach the shell (updateEntryInline, toggleLauncher)
             // through their injected `bar`.
             readonly property var shell: barRoot.shell
+            // The normalized layout, for widgets whose behavior depends on
+            // what else is on the bar — the tray suppresses the SNI item of
+            // any app that has a dedicated widget in the layout.
+            readonly property var layoutConfig: barRoot.layoutOf
 
             // Cold-start metric consumed by bin/bench: ms from process launch
             // to this bar window finishing construction.
@@ -557,6 +562,13 @@ Scope {
         MonitorWidget {
             theme: barRoot.theme
             shell: barRoot.shell
+        }
+    }
+
+    Component {
+        id: dropboxComponent
+        Dropbox {
+            theme: barRoot.theme
         }
     }
 

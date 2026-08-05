@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.SystemTray
 import "../components"
+import "TrayModel.js" as TrayModel
 
 // StatusNotifier tray, ported from omarchy's tray widget (CREDITS.md).
 //
@@ -29,8 +30,18 @@ Item {
     readonly property var pinnedIds: settings && Array.isArray(settings.pinned) ? settings.pinned : []
     readonly property var hiddenIds: settings && Array.isArray(settings.hidden) ? settings.hidden : []
 
+    // An app the bar already carries a dedicated widget for keeps its status
+    // out of the tray — otherwise Dropbox sits on the bar twice, once as its
+    // own widget and once as an SNI item. Omarchy's TrayModel rule, and like
+    // theirs it is keyed on the live layout: drop "dropbox" from the layout
+    // and its own tray item comes straight back.
+    function ownedByDedicatedWidget(item) {
+        const layout = bar && bar.layoutConfig ? bar.layoutConfig : null;
+        return TrayModel.ownedByDedicatedWidget(item, layout);
+    }
+
     // Everything the tray knows about, for the manage card.
-    readonly property var manageItems: SystemTray.items.values
+    readonly property var manageItems: SystemTray.items.values.filter(i => !rootItem.ownedByDedicatedWidget(i))
     // Passive items are idle-by-declaration and never reach the bar.
     readonly property var allItems: manageItems.filter(i => i.status !== Status.Passive)
     readonly property var pinnedItems: allItems.filter(i => rootItem.classify(i) === "pinned")

@@ -123,6 +123,23 @@ category = "core"
 arch = "all"
 why = "Wayland gamma/night-light daemon driven by the shell's nightlight service and indicator (omarchy uses hyprsunset; wlsunset is the compositor-neutral equivalent for niri)"
 
+# NOT installed, listed for the record: the bar carries a `dropbox` widget
+# (shell/Modules/Bar/widgets/Dropbox.qml, off the default layout — add
+# "dropbox" to a bar section to use it), which stays hidden and idle unless a
+# Dropbox CLI is on PATH. On Fedora that CLI comes from **nautilus-dropbox**,
+# which is NOT in Fedora proper: it lives in RPM Fusion nonfree (a repo this
+# machine does not enable), and Dropbox also publishes its own
+# nautilus-dropbox rpm at dropbox.com/install-linux. Either one installs
+# /usr/bin/dropbox, which then downloads the proprietary daemon on first
+# `dropbox start` (bin/dropbox-status probes for `dropbox-cli` first, upstream
+# omarchy's Arch name, then `dropbox`).
+#
+# It is deliberately not an entry here, and cannot become one on the two Macs:
+# Dropbox ships no aarch64 Linux daemon at all, so nautilus-dropbox is
+# x86_64-only and only the Intel NUC could ever run it. Adding it would also
+# mean enabling RPM Fusion nonfree and accepting a proprietary always-on
+# daemon — both decisions for the user, not for the manifest.
+#
 # NOT installed, listed for the record: the network panel's speed test needs
 # nothing beyond curl (bin/network-speedtest measures /proc/net/dev deltas
 # while curl saturates fast.com's endpoints), and `iw` is used only when it
