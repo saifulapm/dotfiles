@@ -95,8 +95,10 @@ Scope {
             "kb": kbComponent,
             "tray": trayComponent,
             "update": updateComponent,
+            "indicators": indicatorsComponent,
             "dnd": dndComponent,
             "reminder": reminderComponent,
+            "stayawake": stayAwakeComponent,
             "ai": aiComponent,
             "weather": weatherComponent,
             "monitor": monitorComponent,
@@ -145,6 +147,44 @@ Scope {
                 ColorAnimation {
                     duration: 420
                     easing.type: Easing.InOutCubic
+                }
+            }
+
+            // ------------------------------------------- indicator reveal
+            // Omarchy's center-section hover, ported: their center module
+            // list fills the whole bar surface behind the left/right
+            // sections, so the pointer anywhere on the bar reveals the
+            // collapsed indicators — which is the only way to reach them
+            // when nothing is active and the widget has no width of its own.
+            // The 120 ms release debounce is theirs; the suppression while a
+            // widget panel is open replaces the per-panel opt-outs their
+            // clock and weather panels set by hand.
+            property bool centerSectionHovered: false
+            property bool centerSectionRevealHeld: false
+            readonly property bool centerHoverRevealSuppressed: activePanel !== null
+
+            function setCenterSectionHovered(hovered) {
+                centerSectionHovered = hovered;
+                if (hovered) {
+                    centerRevealTimer.stop();
+                    centerSectionRevealHeld = true;
+                } else {
+                    centerRevealTimer.restart();
+                }
+            }
+
+            Timer {
+                id: centerRevealTimer
+                interval: 120
+                onTriggered: panel.centerSectionRevealHeld = panel.centerSectionHovered
+            }
+
+            // Declared first so it sits under every widget; a HoverHandler
+            // observes without consuming, so nothing above it is affected.
+            Item {
+                anchors.fill: parent
+                HoverHandler {
+                    onHoveredChanged: panel.setCenterSectionHovered(hovered)
                 }
             }
 
@@ -458,10 +498,26 @@ Scope {
     }
 
     Component {
+        id: indicatorsComponent
+        Indicators {
+            theme: barRoot.theme
+            shell: barRoot.shell
+        }
+    }
+
+    Component {
         id: dndComponent
         Dnd {
             theme: barRoot.theme
             notifs: barRoot.shell.notifs
+        }
+    }
+
+    Component {
+        id: stayAwakeComponent
+        StayAwake {
+            theme: barRoot.theme
+            idle: barRoot.shell.idle
         }
     }
 

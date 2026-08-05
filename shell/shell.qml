@@ -32,6 +32,12 @@ ShellRoot {
     // The popup UI below stays lazy.
     property Notifs notifs: Notifs {}
     property Audio audio: Audio {}
+    // Eager like Notifs, and for the same kind of reason: an idle monitor
+    // that is not armed is not an idle monitor. It costs one wayland object
+    // and one file watcher.
+    property Idle idle: Idle {
+        shellRoot: shell
+    }
 
     // Hardcoded fallback: a broken or missing shell.json still renders this
     // usable bar. The on-disk shell.json fully replaces it when valid — no
@@ -155,6 +161,10 @@ ShellRoot {
         lockLoader.active = true;
         lockLoader.item.lock();
     }
+
+    // For anything that must not re-lock an already locked session (the idle
+    // service's lock stage).
+    readonly property bool locked: lockLoader.active && lockLoader.item !== null && lockLoader.item.locked
 
     FileView {
         id: configFile

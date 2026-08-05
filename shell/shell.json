@@ -1,9 +1,13 @@
 {
   "version": 1,
+  "idle": {
+    "screensaver": 150,
+    "lock": 300
+  },
   "bar": {
     "position": "top",
     "left": ["launcher", "workspaces", "window"],
-    "center": ["dnd", "reminder", "clock", "update"],
-    "right": ["tray", "media", "kb", "mic", "bluetooth", "network", "audio", "battery"]
+    "center": ["indicators", "clock", "weather", "update"],
+    "right": ["tray", "media", "ai", "kb", "mic", "bluetooth", "network", "audio", "monitor", "battery"]
   }
 }

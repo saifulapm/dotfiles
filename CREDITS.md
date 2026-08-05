@@ -106,6 +106,48 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   message file per reminder under `$XDG_RUNTIME_DIR`; ours is a JSON file the
   shell can read, reconciled against the live timers on every read so a login
   that drops transient units cannot leave phantoms behind.
+- **Idle service design** from `shell/plugins/services/idle/` (`Service.qml`,
+  `IdleModel.js`): one compositor idle monitor armed at the FIRST stage
+  deadline with the later stages hanging off it as one-shot timers carrying
+  the difference, their `screensaver`/`lock` seconds config block and its 150 /
+  300 defaults (`secondsFromConfig`'s fallback rules included), activity
+  cancelling every pending stage, honoring idle inhibitors, and stay-awake as
+  the presence of a state file that suspends the whole cycle — plus their
+  `enable`/`disable`/`toggle`/`status` IPC verbs, where enable/disable act on
+  idle detection rather than on stay-awake. Two adaptations: their first stage
+  launches a screensaver window (and their Hyprland `openwindow`/`closewindow`
+  tracking, launch grace and dismiss handling all exist to know whether that
+  window is still up) — we ship no screensaver, so ours powers the monitors off
+  through niri's DPMS action and drops that bookkeeping; and because launching
+  their screensaver itself reads as activity they ignore the wake signal while
+  it is up and let the lock fire underneath it, whereas ours takes the plain
+  swayidle-style rule that any activity cancels the cycle and powers the
+  monitors back on. Their flag file lives at
+  `~/.local/state/omarchy/indicators/stay-awake` and is probed by a shell
+  command on every directory change; ours is `~/.local/state/qshell/stay-awake`
+  read directly by a `FileView`, so `touch`/`rm` from a terminal toggles it as
+  well as the indicator does.
+- **Indicator container** from `shell/plugins/bar/widgets/Indicators.qml` and
+  `Ui/BarIndicator.qml`: the two-block design (active indicators always
+  visible, inactive ones collapsed inside a clip container that opens on
+  hover), each indicator mounted once per block with the block name and an
+  `activeOverride` pushed into it, `belongsInBlock` deciding which copy renders,
+  newly-activated indicators unshifted onto the far side of the active block so
+  what is already showing does not shift under the pointer, the active-block
+  guard that ignores a copy reporting inactive before it has ever been observed
+  active, the 120 ms hide debounce shared by the container's own hover and its
+  revealed items', the `items` and `alwaysShow` inline settings, and the bar's
+  center-region hover as the reveal source of last resort (with nothing active
+  the widget has no width to hover). Their two-state indicator styling is
+  ported with it: ON lit and OFF dimmed to 0.45, both glyphs and both tooltip
+  strings per indicator, and state carried by opacity rather than by the bar's
+  attention color. The stay-awake, do-not-disturb and reminder indicators are
+  ports of `shell/plugins/bar/indicators/StayAwake.qml`, `Dnd.qml` and
+  `Reminder.qml` (their glyphs, their tooltip wording, their click rules). We
+  ship no dictation, screen-recording or night-light indicators, so those
+  entries are absent; their reveal snaps open where ours slides; and a
+  standalone indicator named directly in a bar array collapses when off instead
+  of reserving an empty slot.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).

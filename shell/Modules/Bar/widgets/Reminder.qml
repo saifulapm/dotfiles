@@ -3,19 +3,18 @@ import Quickshell
 import Quickshell.Io
 import "../components"
 
-// Pending reminders, omarchy-style status slot: the reminder glyph, visible
-// only while something is armed, with the CLI's own tooltip text. Ported from
-// their bar indicator (CREDITS.md) — same glyph, same tooltip strings, same
-// click rule (with reminders pending, click notifies the list; with none, it
-// opens the capture flow) and the same `reminder show --json` contract.
+// Pending reminders, ported from omarchy's Reminder indicator (CREDITS.md) —
+// same glyph, same tooltip (the CLI's own wording in both states), same click
+// rule (with reminders pending, click notifies the list; with none, it opens
+// the capture flow) and the same `reminder show --json` contract.
 //
 // Their indicator is refreshed by the CLI poking the shell over IPC after
 // every add and every fire. Ours watches the store the CLI writes instead:
 // the file changing is the event, so the count is live without the CLI
-// needing to know the shell exists. Nothing polls — a reminder's countdown
-// does not move the count, and the entry disappears when its timer fires and
-// rewrites the store.
-BarIcon {
+// needing to know the shell exists — and the container needs no refresh
+// broadcast. Nothing polls: a reminder's countdown does not move the count,
+// and the entry disappears when its timer fires and rewrites the store.
+BarIndicator {
     id: rootItem
 
     required property var shell
@@ -25,10 +24,12 @@ BarIcon {
 
     readonly property string binPath: Quickshell.env("HOME") + "/.dotfiles/bin/reminder"
 
-    glyph: "󰢌" // md-reminder
-    status: true
-    visible: count > 0
-    tooltipText: tooltip
+    active: count > 0
+    activeGlyph: "󰢌" // md-reminder
+    inactiveGlyph: "󰢌"
+    // The CLI writes both states' wording ("1 reminder" / "Set Reminder").
+    activeTooltip: tooltip
+    inactiveTooltip: tooltip
 
     function refresh() {
         if (!jsonProc.running)

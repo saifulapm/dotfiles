@@ -23,6 +23,9 @@ Item {
 
     property string tooltipText: ""
     property bool active: false
+    // Whether `active` recolors the content. Indicators carry their state in
+    // opacity instead and switch this off (omarchy's WidgetButton).
+    property bool useActiveColor: true
     property bool dimmed: false
     // Width of one content slot: -1 sizes to content + margins.
     property real fixedWidth: -1
@@ -48,8 +51,12 @@ Item {
 
     // Color offered to content glyphs/labels: active swaps to the attention
     // color, with omarchy's 160 ms transition.
-    readonly property color contentColor: active ? theme.error : barFg
+    readonly property color contentColor: active && useActiveColor ? theme.error : barFg
     readonly property color barFg: bar ? bar.barForeground : theme.textPrimary
+
+    // Live hover state, for widgets that hang behavior off it (the indicator
+    // container holds its reveal open while a revealed item is hovered).
+    readonly property alias hovered: hover.hovered
 
     Row {
         id: contentRow
