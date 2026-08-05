@@ -198,11 +198,16 @@ BarPanel {
         spacing: panel.theme.space(3)
 
         // ------------------------------------------------------------ hero
+        // The switch rides the hero's trailing edge, as the dropbox and
+        // tailscale heroes have it, and the subtitle is the rotating phrase
+        // alone — the mount state already has a whole section saying it, so
+        // an unmounted hero shows just the mark and the name (user redesign,
+        // 2026-08-06).
         Item {
             id: hero
 
             width: parent.width
-            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight)
+            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight)
 
             RcloneRemoteMark {
                 id: heroIcon
@@ -215,12 +220,27 @@ BarPanel {
                 opacity: panel.service.mountActive ? 1.0 : 0.5
             }
 
+            // The service flips `mountActive` optimistically, so the knob
+            // throws on the click rather than when the FUSE mount settles.
+            ToggleSwitch {
+                id: powerSwitch
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                checked: panel.service.mountActive
+                busy: panel.service.busy
+                hasCursor: panel.hasCursorOn("mount")
+                hint: panel.mountHint
+                onHovered: panel.setCursorOn("mount")
+                onToggled: panel.toggleMount()
+            }
+
             Column {
                 id: heroLabels
 
                 anchors.left: heroIcon.right
                 anchors.leftMargin: panel.theme.space(3)
-                anchors.right: parent.right
+                anchors.right: powerSwitch.left
+                anchors.rightMargin: panel.theme.space(3)
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.5)
 
@@ -236,8 +256,9 @@ BarPanel {
 
                 Text {
                     id: heroMeta
+                    visible: panel.service.mountActive
                     width: parent.width
-                    text: panel.service.mountActive ? panel.heroPhraseText : "Not mounted"
+                    text: panel.heroPhraseText
                     color: panel.theme.textMuted
                     font.family: panel.theme.fontUi
                     font.pixelSize: panel.theme.fontPx(0.833)
@@ -285,20 +306,19 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.leftMargin: panel.theme.space(2.5)
                 anchors.rightMargin: panel.theme.space(2.5)
-                implicitHeight: Math.max(mountLabels.implicitHeight, mountSwitch.implicitHeight)
+                implicitHeight: mountLabels.implicitHeight
 
                 Column {
                     id: mountLabels
 
                     anchors.left: parent.left
-                    anchors.right: mountSwitch.left
-                    anchors.rightMargin: panel.theme.space(2)
+                    anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: panel.theme.space(0.25)
 
                     Text {
                         width: parent.width
-                        text: panel.service.mountActive ? "Mounted" : "Unmounted"
+                        text: panel.service.mountActive ? "Mounted" : "Not mounted"
                         color: panel.theme.textPrimary
                         font.family: panel.theme.fontUi
                         font.pixelSize: panel.theme.fontPx(0.917)
@@ -313,20 +333,6 @@ BarPanel {
                         font.pixelSize: panel.theme.fontPx(0.75)
                         elide: Text.ElideRight
                     }
-                }
-
-                // The service flips `mountActive` optimistically, so the knob
-                // throws on the click rather than when the FUSE mount settles.
-                ToggleSwitch {
-                    id: mountSwitch
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    checked: panel.service.mountActive
-                    busy: panel.service.busy
-                    hasCursor: false
-                    hint: panel.mountHint
-                    onHovered: panel.setCursorOn("mount")
-                    onToggled: panel.toggleMount()
                 }
             }
         }
