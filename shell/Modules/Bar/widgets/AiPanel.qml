@@ -63,16 +63,33 @@ BarPanel {
         width: parent.width
         height: Math.max(heroMark.height, heroLabels.implicitHeight, refreshButton.height)
 
-        Image {
+        // Providers with a brand asset draw it; the rest fall back to a glyph.
+        Item {
             id: heroMark
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            source: panel.provider ? panel.provider.markSource : ""
             width: 26
             height: 26
-            sourceSize.width: 52
-            sourceSize.height: 52
-            fillMode: Image.PreserveAspectFit
+
+            readonly property string markUrl: panel.provider ? String(panel.provider.markSource || "") : ""
+            readonly property string glyph: panel.provider ? String(panel.provider.markGlyph || "") : ""
+
+            Image {
+                anchors.fill: parent
+                visible: heroMark.glyph === ""
+                source: heroMark.markUrl
+                sourceSize.width: 52
+                sourceSize.height: 52
+                fillMode: Image.PreserveAspectFit
+            }
+
+            OpticalGlyph {
+                anchors.centerIn: parent
+                visible: heroMark.glyph !== ""
+                text: heroMark.glyph
+                color: panel.usage.alarming ? panel.theme.error : panel.theme.textPrimary
+                pixelSize: 24
+            }
         }
 
         Column {

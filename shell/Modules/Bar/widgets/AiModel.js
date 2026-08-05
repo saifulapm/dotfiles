@@ -424,6 +424,7 @@ function displayProvider(provider, aggregate) {
         providerId: provider.providerId,
         providerName: provider.providerName,
         markSource: provider.markSource,
+        markGlyph: provider.markGlyph === undefined ? "" : provider.markGlyph,
         enabled: provider.enabled,
         ready: provider.ready || synced,
         refreshing: provider.refreshing,

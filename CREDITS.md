@@ -62,7 +62,10 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   label sniffing (`windowIsLong`, `windowSpanMs`, `windowTitle`) is what
   reconciles Claude spelling its windows out ("Session (5-hour)") with Codex
   abbreviating them ("5h window", "30m window"). Their SVG provider marks are
-  copied verbatim, including the light/dark swap of the Codex mark. Their
+  copied verbatim, including the light/dark swap of the Codex mark. (The third
+  provider in our panel, GitHub Copilot, is NOT theirs — `AiCopilot.qml` and
+  `bin/copilot-usage-scan` are ours, written to the same provider contract so
+  it drops in beside these two.) Their
   multi-device sync is ported too — the transport as `Services/Sync.qml` (see
   below) and the merge rules here: what a provider contributes to a snapshot,
   the sums for prompts/sessions/token buckets, the union of active dates

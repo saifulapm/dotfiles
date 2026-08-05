@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""Scan GitHub Copilot CLI usage and emit compact stats as one JSON object.
+
+Not an omarchy port — their model-usage plugin ships Claude and Codex only.
+This follows the contract their providers publish (and that
+`bin/codex-usage-scan` emits), so the Copilot provider drops into the same
+panel beside the other two.
+
+Two independent halves, either of which may be missing:
+
+  Quota    GET https://api.github.com/copilot_internal/user, authenticated
+           with the OAuth token the CLI stores in ~/.copilot/config.json
+           under `copilotTokens`. Returns the plan and a `quota_snapshots`
+           map: `chat`, `completions` and `premium_interactions`, each with
+           `unlimited`, `percent_remaining`, `entitlement`/`remaining` and
+           `credits_used`, plus a top-level `quota_reset_date`. Only quotas
+           that are actually capped become a window — on plans where chat and
+           completions are unlimited there is nothing to meter.
+
+           NOTE: copilot_internal/* is the undocumented endpoint the editor
+           plugins use. It is not part of GitHub's public API and may change
+           without notice; every field read here is treated as optional.
+
+  Usage    ~/.copilot/session-store.db (SQLite, WAL), table
+           `assistant_usage_events` — one row per model call with its model,
+           token counts and `created_at`. Rows land per turn rather than at
+           session shutdown, so a session still in progress is counted too.
+           Opened read-only, which is safe while the CLI is running.
+
+Timestamps are UTC; days are bucketed in local time, as the other scanners do.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sqlite3
+import sys
+import urllib.error
+import urllib.request
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+COPILOT_HOME = Path(os.environ.get("COPILOT_HOME") or (Path.home() / ".copilot"))
+CONFIG_PATH = COPILOT_HOME / "config.json"
+DB_PATH = COPILOT_HOME / "session-store.db"
+USER_ENDPOINT = "https://api.github.com/copilot_internal/user"
+
+now = datetime.now()
+today = now.strftime("%Y-%m-%d")
+recent_dates = [(now - timedelta(days=offset)).strftime("%Y-%m-%d") for offset in range(6, -1, -1)]
+recent = {day: {"date": day, "messageCount": 0} for day in recent_dates}
+
+
+def number(value):
+    try:
+        return int(value or 0)
+    except Exception:
+        return 0
+
+
+def local_day(value):
+    """UTC ISO-8601 (with or without a trailing Z) → local YYYY-MM-DD."""
+    text = str(value or "").strip()
+    if not text:
+        return today
+    try:
+        if text.endswith("Z"):
+            parsed = datetime.fromisoformat(text[:-1] + "+00:00")
+        else:
+            parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone().strftime("%Y-%m-%d")
+    except Exception:
+        return today
+
+
+# --------------------------------------------------------------- local usage
+def scan_usage():
+    result = {
+        "todayPrompts": 0,
+        "todaySessions": 0,
+        "todayTotalTokens": 0,
+        "todayTokensByModel": {},
+        "recentDays": [recent[day] for day in recent_dates],
+        "totalPrompts": 0,
+        "totalSessions": 0,
+        "activeDays": 0,
+        "activeDates": [],
+        "modelUsage": {},
+    }
+    if not DB_PATH.exists():
+        return result
+
+    try:
+        connection = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return result
+
+    try:
+        rows = connection.execute(
+            "select session_id, model, input_tokens, output_tokens,"
+            " cache_read_tokens, cache_write_tokens, initiator, created_at"
+            " from assistant_usage_events"
+        ).fetchall()
+    except sqlite3.Error:
+        # An older or newer CLI may not have this table.
+        return result
+    finally:
+        connection.close()
+
+    model_usage = {}
+    today_tokens_by_model = {}
+    today_sessions = set()
+    all_sessions = set()
+    active_days = set()
+    today_prompts = 0
+    today_total = 0
+    total_prompts = 0
+
+    for session_id, model, input_tokens, output_tokens, cache_read, cache_write, initiator, created_at in rows:
+        # Copilot reports cache reads/writes alongside input_tokens rather than
+        # inside it (its own session summary prints the same four numbers), so
+        # they are kept as separate buckets and nothing is subtracted.
+        input_tokens = number(input_tokens)
+        output_tokens = number(output_tokens)
+        cache_read = number(cache_read)
+        cache_write = number(cache_write)
+        total = input_tokens + output_tokens + cache_read + cache_write
+        if total <= 0:
+            continue
+
+        name = str(model or "copilot")
+        day = local_day(created_at)
+        session_key = str(session_id or "")
+
+        bucket = model_usage.setdefault(name, {
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+        })
+        bucket["inputTokens"] += input_tokens
+        bucket["outputTokens"] += output_tokens
+        bucket["cacheReadInputTokens"] += cache_read
+        bucket["cacheCreationInputTokens"] += cache_write
+
+        # Sub-agent calls are real token spend but they are not prompts the
+        # user typed, so only user-initiated turns are counted as prompts.
+        if str(initiator or "user") == "user":
+            total_prompts += 1
+            if day == today:
+                today_prompts += 1
+
+        all_sessions.add(session_key)
+        active_days.add(day)
+        if day in recent:
+            recent[day]["messageCount"] += total
+        if day == today:
+            today_sessions.add(session_key)
+            today_total += total
+            today_tokens_by_model[name] = today_tokens_by_model.get(name, 0) + total
+
+    result.update({
+        "todayPrompts": today_prompts,
+        "todaySessions": len(today_sessions),
+        "todayTotalTokens": today_total,
+        "todayTokensByModel": today_tokens_by_model,
+        "recentDays": [recent[day] for day in recent_dates],
+        "totalPrompts": total_prompts,
+        "totalSessions": len(all_sessions),
+        "activeDays": len(active_days),
+        "activeDates": sorted(active_days),
+        "modelUsage": model_usage,
+    })
+    return result
+
+
+# --------------------------------------------------------------------- quota
+def read_token():
+    """The CLI writes config.json as JSONC — a plain JSON parse fails on it."""
+    try:
+        raw = CONFIG_PATH.read_text()
+    except OSError:
+        return ""
+    try:
+        cleaned = re.sub(r"^\s*//.*$", "", raw, flags=re.M)
+        config = json.loads(cleaned)
+    except Exception:
+        return ""
+    tokens = config.get("copilotTokens") or {}
+    if not isinstance(tokens, dict):
+        return ""
+    for value in tokens.values():
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+def quota_window(snapshot, reset_at, token_based):
+    """One capped quota → the window shape the panel meters."""
+    if not isinstance(snapshot, dict):
+        return None
+    if snapshot.get("unlimited") is True or snapshot.get("has_quota") is False:
+        return None
+
+    remaining_percent = snapshot.get("percent_remaining")
+    if remaining_percent is None:
+        return None
+    try:
+        used = max(0.0, min(1.0, (100.0 - float(remaining_percent)) / 100.0))
+    except (TypeError, ValueError):
+        return None
+
+    unit = "AI credits" if token_based else "premium requests"
+    return {"percent": used, "label": f"Monthly ({unit})", "resetAt": reset_at}
+
+
+def fetch_quota():
+    result = {
+        "rateLimitPercent": -1,
+        "rateLimitLabel": "",
+        "rateLimitResetAt": "",
+        "secondaryRateLimitPercent": -1,
+        "secondaryRateLimitLabel": "",
+        "secondaryRateLimitResetAt": "",
+        "tierLabel": "",
+        "usageStatusText": "",
+        "authHelpText": "",
+    }
+
+    token = read_token()
+    if not token:
+        result["usageStatusText"] = "Waiting for auth"
+        result["authHelpText"] = "Run `copilot login` to authenticate."
+        return result
+
+    request = urllib.request.Request(USER_ENDPOINT, headers={
+        "Authorization": "token " + token,
+        "Accept": "application/json",
+        "User-Agent": "qshell-model-usage",
+    })
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as exc:
+        result["usageStatusText"] = "Copilot limits unavailable"
+        result["authHelpText"] = (
+            "GitHub rejected the stored Copilot token (401). Run `copilot login`."
+            if exc.code == 401 else
+            f"GitHub's Copilot usage endpoint returned status {exc.code}."
+        )
+        return result
+    except Exception as exc:
+        result["usageStatusText"] = "Copilot limits unavailable"
+        result["authHelpText"] = f"Couldn't reach GitHub's Copilot usage endpoint: {exc}"
+        return result
+
+    plan = str(payload.get("copilot_plan") or "")
+    result["tierLabel"] = plan.replace("_", " ").title() if plan else ""
+
+    reset_date = str(payload.get("quota_reset_date") or "").strip()
+    reset_at = f"{reset_date}T00:00:00+00:00" if re.match(r"^\d{4}-\d{2}-\d{2}$", reset_date) else ""
+
+    snapshots = payload.get("quota_snapshots") or {}
+    if not isinstance(snapshots, dict):
+        snapshots = {}
+    token_based = bool((snapshots.get("premium_interactions") or {}).get("token_based_billing"))
+
+    # Premium interactions is the budget that actually runs out; chat and
+    # completions are unlimited on most plans and drop out of quota_window.
+    ordered = ["premium_interactions", "chat", "completions"]
+    windows = []
+    for key in ordered:
+        window = quota_window(snapshots.get(key), reset_at, token_based)
+        if window:
+            if key != "premium_interactions":
+                window["label"] = f"Monthly ({key})"
+            windows.append(window)
+
+    if windows:
+        result["rateLimitPercent"] = windows[0]["percent"]
+        result["rateLimitLabel"] = windows[0]["label"]
+        result["rateLimitResetAt"] = windows[0]["resetAt"]
+    if len(windows) > 1:
+        result["secondaryRateLimitPercent"] = windows[1]["percent"]
+        result["secondaryRateLimitLabel"] = windows[1]["label"]
+        result["secondaryRateLimitResetAt"] = windows[1]["resetAt"]
+
+    if not windows:
+        # Authenticated, but nothing is metered on this plan.
+        result["usageStatusText"] = ""
+    return result
+
+
+def main():
+    if len(sys.argv) > 1:
+        print("Usage: copilot-usage-scan", file=sys.stderr)
+        return 1
+
+    out = {"ready": True, "hasLocalStats": True}
+    out.update(scan_usage())
+    out.update(fetch_quota())
+    print(json.dumps(out, separators=(",", ":")))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -3,11 +3,13 @@ import Quickshell
 import "../components"
 import "AiModel.js" as Model
 
-// Model usage — omarchy's model-usage plugin, both providers. This is their
-// Main.qml's job: hold every provider, and let through only the ones that are
-// switched on AND have actually produced numbers. A machine that installed a
-// CLI and never ran it gets no tab full of zeroes, and a machine that has run
-// neither shows no widget at all.
+// Model usage — omarchy's model-usage plugin. This is their Main.qml's job:
+// hold every provider, and let through only the ones that are switched on AND
+// have actually produced numbers. A CLI that was installed and never run gets
+// no tab full of zeroes, and a machine that has run none shows no widget.
+//
+// Claude and Codex are their two providers; GitHub Copilot is ours, following
+// the same contract (see AiCopilot.qml).
 //
 // The bar glyph carries the alarm: when the selected provider's fullest
 // window — the one that stops the next prompt — is at 90% or more, the glyph
@@ -20,8 +22,8 @@ BarIcon {
 
     glyph: "󱚣" // md-robot_excited, their model-usage glyph
 
-    // Each provider can be switched off through the widget's inline
-    // shell.json entry: {"id": "ai", "providers": {"codex": {"enabled": false}}}
+    // Any provider can be switched off through the widget's inline shell.json
+    // entry: {"id": "ai", "providers": {"copilot": {"enabled": false}}}
     function providerEnabled(id) {
         const providers = setting("providers", null);
         if (!providers || !providers[id])
@@ -29,7 +31,7 @@ BarIcon {
         return providers[id].enabled !== false;
     }
 
-    readonly property var allProviders: [claudeProvider, codexProvider]
+    readonly property var allProviders: [claudeProvider, codexProvider, copilotProvider]
 
     // ------------------------------------------------------------- syncing
     // The Sync service owns transport and device identity; the merge rules
@@ -104,7 +106,13 @@ BarIcon {
         darkSurface: rootItem.theme.mode !== "light"
     }
 
-    // Both providers are scanned once at startup so the bar knows whether it
+    AiCopilot {
+        id: copilotProvider
+        enabled: rootItem.providerEnabled("copilot")
+        settings: rootItem.settings
+    }
+
+    // Every provider is scanned once at startup so the bar knows whether it
     // has anything to show at all — that is the gate above, and without it a
     // machine with usage would show no widget until its panel was opened.
     // Everything after that is refresh-on-open; this shell does not poll.
