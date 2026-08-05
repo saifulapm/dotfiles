@@ -296,36 +296,6 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
-        target: "osd"
-
-        function brightnessUp(): string {
-            osd.brightnessAdjust(1);
-            return "ok";
-        }
-
-        function brightnessDown(): string {
-            osd.brightnessAdjust(-1);
-            return "ok";
-        }
-
-        function status(): string {
-            return JSON.stringify({
-                armed: osd.armed,
-                showing: osd.showing,
-                everShown: osd.everShown,
-                kind: osd.kind,
-                level: osd.level,
-                audioReady: shell.audio.ready,
-                sinkNull: shell.audio.sink === null,
-                volume: shell.audio.volume,
-                sourceNull: shell.audio.source === null,
-                sourceAudioNull: shell.audio.source !== null && shell.audio.source.audio === null,
-                micMuted: shell.audio.micMuted
-            });
-        }
-    }
-
     LazyLoader {
         id: launcherLoader
         active: false

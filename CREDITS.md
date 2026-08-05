@@ -461,6 +461,36 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   custom config directory, hence the tracked symlinks to the system files),
   our `locked` property and our `devUnlock` escape hatch are unchanged
   underneath it.
+- **On-screen display** from `shell/plugins/osd/Osd.qml`: the whole pill —
+  the card measured out of its own columns rather than fixed widths so the
+  padding is identical on every side whatever it carries, the icon column
+  measured by glyph *ink* (Nerd Font glyphs draw well outside their cell) and
+  pinned to the widest glyph the model can return so the bar never shifts as
+  volume crosses a threshold, the readout column sized to "100%" so the digits
+  don't jitter, their two-thirds gap between a glyph and a message against the
+  full gap around the bar's hard edge, the message that grows to a cap and
+  elides (a wider cap for media OSDs), the 142 px bar with its 140 ms OutCubic
+  fill, the bottom-centered placement 67 px up, the full-screen overlay with an
+  empty input region so it never eats a click, and their show/replace/timeout
+  choreography: state is assigned *before* `opened` flips, so a fresh OSD
+  starts at its value and only an update to a still-visible one animates,
+  while a new kind replaces a visible pill in place and re-arms the 1200 ms
+  timeout (`duration: 0` holds it open until `close`). Their `osd` IPC surface
+  comes with it (`show` with their whole payload — icon/message/value/max/
+  progressText/duration — plus `close`, `state`, `ping`), so any process can
+  raise any kind; our `brightnessUp`/`brightnessDown`/`status` sit beside it.
+  Adapted: `BorderSurface` becomes a plain `Rectangle` in our tokens (their
+  `popups.border` default is the accent, so the border is ours-as-accent), and
+  the bar takes our corner radius where theirs is square by construction
+  (their rounding token is 0). Kept ours underneath: the eager-logic/lazy-
+  window split, the PipeWire-reactive volume and mic paths (upstream has no
+  reactive path at all — every OSD there is pushed by a helper script), the
+  two-second arm delay that swallows the login flash, and the one-shot
+  `brightnessctl -m` parse. Their per-level icon names are picked by the same
+  ladder their audio panel uses (their volume keybind script only ever sends
+  muted-or-high), and a volume above 100% shows a full bar over a truthful
+  readout, which is what their model does with a value clamped at `max`
+  beside a caller-supplied `progressText`.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -805,3 +835,13 @@ Direct file-level copies (source path → destination path):
   per-side border specs) with our motion token animating the state change, and
   their unused `failedAttempts` view property was dropped — the count is
   rendered through `failureMessage`, as it is upstream.
+- omarchy `shell/plugins/osd/OsdModel.js` → `shell/Modules/Osd/OsdModel.js`:
+  near-verbatim port of the icon table and the payload model — every name
+  alias, the literal-glyph passthrough for names it doesn't know, the
+  percentage fallback ladder, and `stateForShow` with its clamp, its
+  "a message suppresses the bar" rule, its `progressText` override and its
+  duration parse. Their four FontAwesome-range speaker glyphs (U+EEE8,
+  U+F026-F028) are replaced with the Material Design ladder 󰖁 󰕿 󰖀 󰕾 in the
+  same four slots, because only the MD range renders under our Symbols Nerd
+  Font fallback; `widestIcon` follows. Every other glyph in the table is
+  already MD and is theirs unchanged.
