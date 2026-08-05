@@ -431,6 +431,13 @@ binds {
     // Mod+Ctrl+B was the free key next to the other picker binds.
     Mod+Ctrl+B hotkey-overlay-title="Pick a Wallpaper" { spawn "qs" "ipc" "call" "wallpaper" "toggle"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "ipc" "call" "lock" "lock"; }
+    // Omarchy's notification binds all hang off comma (dismiss last on
+    // SUPER+comma, history on SUPER+SHIFT+ALT+comma). Mod+Comma is niri's
+    // consume-window-into-column, a default we keep, so dismiss-last takes
+    // the Alt variant — which is their invokeLast chord, left unbound here
+    // because clicking a toast already invokes its default action.
+    Mod+Alt+Comma hotkey-overlay-title="Dismiss Last Notification" { spawn "qs" "ipc" "call" "notifs" "dismissOne"; }
+    Mod+Shift+Alt+Comma hotkey-overlay-title="Show Notification History" { spawn "qs" "ipc" "call" "notifs" "showHistory"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
