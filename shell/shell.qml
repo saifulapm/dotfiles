@@ -187,6 +187,13 @@ ShellRoot {
         return false;
     }
 
+    // Draw the lock screen without locking anything. Click or Escape dismisses
+    // it, and the module unloads again straight after.
+    function previewLock() {
+        lockLoader.active = true;
+        lockLoader.item.showPreview();
+    }
+
     // The lock unloads itself after unlock (see the Connections below); this is
     // the same release for the paths that wake it without locking — a preview
     // that has been dismissed.
@@ -612,8 +619,7 @@ ShellRoot {
         // looked at (and a theme judged) without a password between the user
         // and their session. Click or Escape dismisses it.
         function preview(): string {
-            lockLoader.active = true;
-            lockLoader.item.showPreview();
+            shell.previewLock();
             return "ok";
         }
 
