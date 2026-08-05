@@ -37,13 +37,7 @@ why = "Terminal. Lightest maintained Wayland-native terminal; retheme-able live 
 name = "wl-clipboard"
 category = "core"
 arch = "all"
-why = "wl-copy/wl-paste — Wayland clipboard CLI; required by cliphist and shell scripts"
-
-[[pkg]]
-name = "cliphist"
-category = "core"
-arch = "all"
-why = "SUPERSEDED by Modules/Clipboard — the shell now owns the history store itself (bin/clipboard-capture + ~/.local/state/qshell/clipboard). Nothing in the repo calls cliphist any more; kept installed pending the user's removal decision, like fuzzel"
+why = "wl-copy/wl-paste — Wayland clipboard CLI. bin/clipboard-capture owns the history store with a pair of `wl-paste --watch` children, and the emoji and clipboard pickers copy through wl-copy; wtype then pastes. The shell's whole clipboard story rests on it"
 
 [[pkg]]
 name = "jq"
@@ -321,11 +315,18 @@ why = "Ships qmlls (eglot) and qmlformat (pre-commit hook) — the only package 
 
 # ------------------------------------------------------------------ optional
 
-[[pkg]]
-name = "fuzzel"
-category = "optional"
-arch = "all"
-why = "Interim launcher until Modules/Launcher is built; also a theme fan-out target (was a niri weak dep; claimed intentionally)"
+# Removed 2026-08-06 by user decision, together: fuzzel and cliphist, plus the
+# nanosvg dependency dnf then had no use for — 3 packages, 3 MiB. Both were
+# scaffolding the shell had already replaced and both had been marked SUPERSEDED
+# here for a while, pending exactly this call:
+#
+#   * fuzzel was the interim launcher and a theme fan-out target. Modules/Launcher
+#     replaced it, niri's Mod+D has pointed at `qs ipc call launcher toggle` since
+#     then, and templates/fuzzel.ini.tmpl is deleted with this commit.
+#   * cliphist was the clipboard history. Modules/Clipboard + bin/clipboard-capture
+#     own the store (~/.local/state/qshell/clipboard) and nothing in the repo has
+#     called cliphist since. wl-clipboard stays — it is what our own capture and
+#     the pickers use.
 
 # Removed 2026-08-06 by user decision ("I no need bangla input"): fcitx5,
 # fcitx5-m17n and m17n-db, plus the fcitx5-data/fcitx5-libs/m17n-lib/xcb-imdkit

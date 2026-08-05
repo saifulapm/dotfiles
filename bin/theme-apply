@@ -44,7 +44,7 @@ const tokens = Object.assign({}, THEME_DEFAULTS, themeTokens)
 // templated app configs never disagree: a theme that names the token wins; one
 // that stays quiet follows the fontconfig `monospace` alias. Both tokens read
 // that one alias — this desktop draws in a single family — and it is asked for
-// by name here because a template hands a concrete family to foot/fuzzel/GTK,
+// by name here because a template hands a concrete family to foot and GTK,
 // not an alias each would resolve for itself.
 {
   let resolved = ""
@@ -163,7 +163,6 @@ const OUTPUTS = {
     path.join(HOME, ".config/gtk-3.0/settings.ini"),
     path.join(HOME, ".config/gtk-4.0/settings.ini")
   ],
-  "fuzzel.ini.tmpl": [path.join(HOME, ".config/fuzzel/fuzzel.ini")],
   "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")]
 }
 
