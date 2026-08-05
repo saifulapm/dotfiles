@@ -727,6 +727,15 @@ binds {
     Mod+Shift+A hotkey-overlay-title="Annotate Last Capture" { spawn "sh" "-c" "screenshot-annotate"; }
     // Omarchy: SUPER+CTRL+PRINT — OCR, the same slot.
     Mod+Ctrl+Print hotkey-overlay-title="Extract Text (OCR)" { spawn "sh" "-c" "screenshot-ocr"; }
+    // Apple keyboards have NO Print key, so every Print bind above is dead on
+    // this hardware — the macOS-style Mod+Shift+number family from the
+    // pre-qshell dotfiles-linux is the reachable set (Cmd+Shift+3/4/5 muscle
+    // memory; 6 = OCR as that repo had it, 7 = region → annotate, ours).
+    Mod+Shift+3 hotkey-overlay-title="Screenshot: Full Screen" { screenshot-screen; }
+    Mod+Shift+4 hotkey-overlay-title="Screenshot: Region" { screenshot; }
+    Mod+Shift+5 hotkey-overlay-title="Screenshot: Focused Window" { screenshot-window; }
+    Mod+Shift+6 hotkey-overlay-title="Screenshot: OCR Region" { spawn "sh" "-c" "screenshot-ocr"; }
+    Mod+Shift+7 hotkey-overlay-title="Screenshot: Region + Annotate" { spawn "sh" "-c" "screenshot-annotate --region"; }
     // Omarchy: ALT+PRINT — taken by screenshot-window above. Stops a running
     // recording, else opens the capture menu's Screenrecord submenu.
     Mod+Print hotkey-overlay-title="Screen Recording" { spawn "sh" "-c" "screenrecord --stop-recording || qs ipc call menu open screenrecording"; }
