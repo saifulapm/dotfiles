@@ -35,6 +35,23 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   KNOWN/OTHER NETWORKS sections with inline passphrase entry and
   forget-on-hover, the centered QR and speed-test overlays, and the same single
   cursor model shared by mouse and keyboard.
+- **Weather plugin design** from `shell/plugins/panels/weather/`: the two-source
+  fetch (wttr.in for the full report, Open-Meteo for the fast day/night-aware
+  current conditions and daily forecast, with coordinates driving Open-Meteo
+  first and wttr filling in behind it), the hero of condition glyph and
+  oversized temperature beside the location label and the FEELS / WIND / HUMID
+  read-outs, the three-day forecast row, the click-to-edit location label with
+  debounced Open-Meteo geocoding (arrow-key suggestion list, coordinates stored
+  with the name, empty commit clearing back to IP auto-detect, the spinner held
+  until the report for the new location lands so stale data is never shown
+  under a new label), the imperial/metric decision from an explicit `unit`
+  setting then the reported country then the locale, the bounded 2.5 s retry
+  rounds on both fetches, and the widget hiding itself until it has a report.
+  Their location lives in an `omarchy-weather-location`-owned `weather.json`;
+  ours is the widget's inline shell.json entry (with the old plain-text
+  `weather-location` state file still honoured), so their save helper and its
+  file-watch race workaround are not ported. Their bar right-click sends the
+  report as a notification; ours middle-clicks to refresh.
 - **Tray widget design** from `shell/plugins/bar/widgets/Tray.qml`: the
   pinned/drawer/hidden bucket model persisted as two id lists in the widget's
   inline settings entry, the hover-revealed drawer (600 ms OutCubic reveal of a
@@ -216,6 +233,21 @@ Direct file-level copies (source path → destination path):
   (the FontAwesome range does not render under our Nerd Font fallback),
   `signalStrength` is normalised here because quickshell reports 0..1, and
   whitespace follows house 4-space qmlformat.
+- omarchy `shell/plugins/panels/weather/Model.js` →
+  `shell/Modules/Bar/widgets/WeatherModel.js`: near-verbatim port of the whole
+  weather model — the wttr.in location query, the Open-Meteo geocoding parse and
+  commit rules, the temperature rounding/conversion/formatting, the
+  unit/locale/country imperial decision, the day-name and forecast-day builders
+  for both sources, the Open-Meteo current-condition normalisation into wttr's
+  shape, the day-icon pick (hourly entry nearest noon) and the WMO→wttr code
+  mapping. Their `parseWeatherStatus` (the `status.sh` bar-script bridge) and
+  their `weather.json` reader are dropped — our widget reads the report directly
+  and takes its location from the inline settings entry. `iconForCode` keeps
+  their exact wttr code groups and day/night split but returns Material Design
+  glyphs (the FontAwesome and weather ranges do not render under our Nerd Font
+  fallback), with their single rain group split into drizzle/light rain and
+  moderate/heavy rain; `openMeteoDescription` is ours (Open-Meteo sends no
+  wording, and their hero never showed one).
 - omarchy `bin/omarchy-network-status` → `bin/network-status`: direct port, same
   `--verbose` key/tab/value output contract. Byte counters come from
   `/proc/net/dev` instead of `/sys/class/net/*/statistics`, the route is parsed
