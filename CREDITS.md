@@ -21,6 +21,12 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   persisted to shell.json; plus the inline widget-settings pattern
   (layout entries as `{id, ...settings}` objects, `updateEntryInline` writing
   them back atomically, format-ring cycling on the bar clock).
+- **Audio plugin design** from `shell/plugins/panels/audio/`: hero with a master
+  mute switch over the now-playing context, OUTPUT/INPUT/SOURCES sections with
+  right-aligned percentages, the live microphone meter driven by
+  `PwNodePeakMonitor`, per-application stream rows with their own sliders, the
+  snapshot-plus-settle-timer around PipeWire's node lists, and the single
+  cursor model shared by mouse hover and keyboard (j/k, h/l, Enter, m).
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -52,6 +58,16 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
 ---
 Direct file-level copies (source path → destination path):
 
+- omarchy `shell/plugins/panels/audio/Model.js` → `shell/Modules/Bar/widgets/AudioModel.js`:
+  near-verbatim port of the node/stream math (playback-stream and audio-source
+  tests, device and stream labelling, headphone/bluetooth/HDMI glyph picks, the
+  volume mood-name ladder, and the MPRIS-to-stream matching that names a
+  generic `audio-src` stream after the player it belongs to). Their
+  `parseSinkAvailability` was dropped (it parses an omarchy helper script we do
+  not ship), the two type tests take the resolved type name as an argument
+  because quickshell exposes `PwNode.type` as a numeric flags enum, video
+  sources are excluded from the audio-source test, and whitespace was restyled
+  to house 4-space qmlformat.
 - omarchy `shell/plugins/panels/clock/Model.js` → `shell/Modules/Bar/widgets/ClockModel.js`:
   near-verbatim port of the date/format math (format ring, ISO week, year/life
   progress parsing and percentages, six-row month grid). Vertical-bar formats and
