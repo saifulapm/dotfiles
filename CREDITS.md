@@ -92,6 +92,20 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   with a notification (as the emoji picker does) and the open action is not
   ported. Their history-index helper scripts are not needed as a result — the
   picker copies through `wl-copy` directly.
+- **Reminders design** from `bin/omarchy-reminder`, `shell/plugins/reminders/`
+  and `shell/plugins/bar/indicators/Reminder.qml`: reminders as transient
+  systemd user timers (one per reminder, `systemd-run --user --on-active`,
+  cancelled by stopping the unit) so nothing in the shell counts down, the
+  two-step capture flow (minutes, then an optional message) as a single
+  centered input line asked twice, and the bar indicator that shows only while
+  something is armed — same glyph, same `count`/`tooltip` JSON contract, and
+  the same click rule where a pending list notifies itself and an empty one
+  opens the flow. Their indicator is refreshed by the CLI poking the shell over
+  IPC; ours watches the store file the CLI writes, which is the same event with
+  no coupling back to the shell. Their store is the timer list itself plus a
+  message file per reminder under `$XDG_RUNTIME_DIR`; ours is a JSON file the
+  shell can read, reconciled against the live timers on every read so a login
+  that drops transient units cannot leave phantoms behind.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -196,6 +210,28 @@ Direct file-level copies (source path → destination path):
   projections, and the plain case-insensitive substring filter in `displayRows`.
   Their `module.exports` tail was dropped and whitespace restyled to house
   4-space qmlformat.
+- omarchy `bin/omarchy-reminder` → `bin/reminder`: direct port of the command
+  surface and every user-visible string — the bare `<minutes> [message]` form
+  with its "Your N minutes are up" default, the confirmation notification
+  ("<message> in N minutes" / "Reminder set for N minutes" over "You'll be
+  reminded at HH:MM"), the `show` listing notification and its
+  "<label> in <remaining> (HH:MM)" lines with their minutes/seconds
+  formatting, `show --json`'s exact object shape and "Set Reminder" /
+  "1 reminder" / "N reminders" tooltip ladder, `clear` stopping every matching
+  unit straight from systemd, and the `systemd-run --user --quiet --collect
+  --on-active` firing mechanism with the message carried on the unit's command
+  line. Added: a `$XDG_STATE_HOME/qshell/reminders.json` store written
+  atomically (the shell watches it in place of their IPC refresh call, and it
+  is reconciled against the live timers on every read), `add`, `done` for
+  cancelling one by id/index/message-prefix, and a `list` that prints to the
+  terminal where theirs aliases `list` to the `show` notification. Their
+  `-i` summons our overlay through `qs ipc` instead of `omarchy-shell`.
+- omarchy `shell/plugins/reminders/ReminderFlowModel.js` →
+  `shell/Modules/Reminders/ReminderFlowModel.js`: near-verbatim port of the
+  capture flow's validation — minutes as a positive integer and nothing else
+  (their CLI parses no richer time input either), and the CLI argument list
+  that carries the message only when one was typed. Their `module.exports`
+  tail was dropped and whitespace restyled to house 4-space qmlformat.
 - omarchy `shell/plugins/panels/clock/Model.js` → `shell/Modules/Bar/widgets/ClockModel.js`:
   near-verbatim port of the date/format math (format ring, ISO week, year/life
   progress parsing and percentages, six-row month grid). Vertical-bar formats and

@@ -96,6 +96,7 @@ Scope {
             "tray": trayComponent,
             "update": updateComponent,
             "dnd": dndComponent,
+            "reminder": reminderComponent,
             "ai": aiComponent,
             "weather": weatherComponent,
             "monitor": monitorComponent,
@@ -461,6 +462,14 @@ Scope {
         Dnd {
             theme: barRoot.theme
             notifs: barRoot.shell.notifs
+        }
+    }
+
+    Component {
+        id: reminderComponent
+        Reminder {
+            theme: barRoot.theme
+            shell: barRoot.shell
         }
     }
 

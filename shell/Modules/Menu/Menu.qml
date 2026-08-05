@@ -143,6 +143,9 @@ Scope {
         case "clipboard":
             shellRoot.toggleClipboard();
             break;
+        case "reminders":
+            shellRoot.toggleReminders();
+            break;
         case "lock":
             shellRoot.lockSession();
             break;

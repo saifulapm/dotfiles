@@ -60,6 +60,14 @@ var TREE = {
         "description": "Pick something copied earlier and copy it again",
         "call": "clipboard"
     },
+    // Omarchy files this under their Trigger submenu, with the same three
+    // rows; ours sits at the root next to the other pickers.
+    "reminder": {
+        "icon": "󰢌",
+        "label": "Reminder",
+        "aliases": ["reminders", "remind", "timer", "alarm"],
+        "description": "Set a reminder that notifies you later"
+    },
     "toggle": {
         "icon": "󰔎",
         "label": "Toggle",
@@ -108,6 +116,29 @@ var TREE = {
         "description": "Screenshot the whole focused screen",
         "when": "command -v niri",
         "action": "niri msg action screenshot-screen"
+    },
+
+    // -------------------------------------------------------------- reminder
+    "reminder.set": {
+        "icon": "󰢌",
+        "label": "Set one",
+        "aliases": ["reminder-set", "remind"],
+        "description": "Ask for a delay and a message",
+        "call": "reminders"
+    },
+    "reminder.show": {
+        "icon": "󰢌",
+        "label": "Show all",
+        "aliases": ["reminder-show", "upcoming"],
+        "description": "Notify what is still outstanding",
+        "action": "\"$HOME/.dotfiles/bin/reminder\" show"
+    },
+    "reminder.clear": {
+        "icon": "󰢌",
+        "label": "Clear all",
+        "aliases": ["reminder-clear"],
+        "description": "Cancel every outstanding reminder",
+        "action": "\"$HOME/.dotfiles/bin/reminder\" clear"
     },
 
     // ---------------------------------------------------------------- toggle

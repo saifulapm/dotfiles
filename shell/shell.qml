@@ -13,6 +13,7 @@ import qs.Modules.Menu
 import qs.Modules.Notifications
 import qs.Modules.Osd
 import qs.Modules.Polkit
+import qs.Modules.Reminders
 import qs.Modules.ThemeSwitcher
 import qs.Modules.Background
 
@@ -143,6 +144,11 @@ ShellRoot {
 
     function toggleClipboard() {
         clipboard.toggle();
+    }
+
+    function toggleReminders() {
+        remindersLoader.active = true;
+        remindersLoader.item.toggle();
     }
 
     function lockSession() {
@@ -396,6 +402,35 @@ ShellRoot {
 
         function hide(): string {
             clipboard.hide();
+            return "ok";
+        }
+    }
+
+    LazyLoader {
+        id: remindersLoader
+        active: false
+        component: ReminderFlow {
+            theme: shell.theme
+        }
+    }
+
+    IpcHandler {
+        target: "reminders"
+
+        function toggle(): string {
+            shell.toggleReminders();
+            return "ok";
+        }
+
+        function show(): string {
+            remindersLoader.active = true;
+            remindersLoader.item.show();
+            return "ok";
+        }
+
+        function hide(): string {
+            if (remindersLoader.active)
+                remindersLoader.item.hide();
             return "ok";
         }
     }

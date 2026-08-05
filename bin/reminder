@@ -1,0 +1,331 @@
+#!/usr/bin/env bash
+# reminder — lightweight desktop reminders. Port of omarchy's omarchy-reminder
+# (CREDITS.md): same command surface (bare `<minutes> [message]`, `show`,
+# `show --json`, `clear`, `-i`), same confirmation/notification wording, same
+# JSON contract for the bar indicator, and the same firing mechanism — a
+# transient systemd user timer per reminder, so nothing polls.
+#
+# Two adaptations:
+#   * Upstream keeps no store at all: the live systemd timers ARE the list and
+#     the message lives in a scratch file under $XDG_RUNTIME_DIR. Here the list
+#     is $XDG_STATE_HOME/qshell/reminders.json (written atomically), which the
+#     shell watches with a FileView — that file changing is what refreshes the
+#     bar indicator, replacing upstream's `omarchy-shell indicators refresh`
+#     call. Systemd stays the authority on *existence*: every read reconciles
+#     the store against the live timers, so reminders whose timers died (a new
+#     login drops transient units) never linger as phantoms.
+#   * `add` and `done` subcommands exist on top of upstream's set, and `list`
+#     prints to the terminal where upstream aliases it to the `show`
+#     notification.
+#
+# Time input is whole minutes only — upstream parses nothing richer, and the
+# capture flow validates the same `^[0-9]+$`.
+set -euo pipefail
+
+self="$(readlink -f "${BASH_SOURCE[0]}")"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell"
+store="$state_dir/reminders.json"
+unit_prefix="qshell-reminder-"
+empty_store='{"version":1,"reminders":[]}'
+glyph="󰢌" # md-reminder
+
+notify() { # title [body]
+  notify-send -a qshell "$glyph $1" "${2:-}" >/dev/null 2>&1 || true
+}
+
+# ------------------------------------------------------------------- storage
+store_read() {
+  local raw=""
+  [[ -f $store ]] && raw="$(cat "$store" 2>/dev/null || true)"
+  if [[ -z $raw ]] || ! jq -e '.reminders | type == "array"' <<<"$raw" >/dev/null 2>&1; then
+    printf '%s' "$empty_store"
+  else
+    printf '%s' "$raw"
+  fi
+}
+
+store_write() {
+  # Never let a failed jq (which yields an empty string) truncate the store.
+  if ! jq -e '.reminders | type == "array"' <<<"$1" >/dev/null 2>&1; then
+    echo "reminder: refusing to write a malformed store" >&2
+    return 1
+  fi
+  mkdir -p "$state_dir"
+  printf '%s\n' "$1" >"$store.tmp"
+  mv "$store.tmp" "$store" # atomic: watchers never see a half-written store
+}
+
+# Units of the reminder timers systemd currently holds, as a JSON array.
+live_timers() {
+  systemctl --user list-timers --all --no-pager --output=json "${unit_prefix}*.timer" 2>/dev/null |
+    jq -c '[.[] | .unit | select(. != null)]' 2>/dev/null || printf '[]'
+}
+
+# Drop entries whose timer is gone, persist if that changed anything, and echo
+# the reconciled store. A systemctl or jq hiccup leaves the store untouched
+# rather than wiping it.
+sync_store() {
+  local cur live pruned
+  cur="$(store_read)"
+  live="$(live_timers)"
+  if ! jq -e 'type == "array"' <<<"$live" >/dev/null 2>&1; then
+    printf '%s' "$cur"
+    return 0
+  fi
+  # The unit is bound to a variable first: jq evaluates index()'s argument
+  # against index()'s own input (the array), not against the element.
+  pruned="$(jq -c --argjson live "$live" \
+    '{version: 1, reminders: [.reminders[] | .unit as $u | select(($live | index($u + ".timer")) != null)] | sort_by(.at)}' <<<"$cur")"
+  if [[ "$pruned" != "$(jq -c '{version: 1, reminders: (.reminders | sort_by(.at))}' <<<"$cur")" ]]; then
+    store_write "$pruned"
+  fi
+  printf '%s' "$pruned"
+}
+
+store_drop() { # id
+  local cur next
+  cur="$(store_read)"
+  next="$(jq -c --arg id "$1" '{version: 1, reminders: [.reminders[] | select(.id != $id)]}' <<<"$cur")"
+  store_write "$next"
+}
+
+# --------------------------------------------------------------- projections
+# Upstream's format_remaining, as a jq function: minutes and seconds, either
+# alone when the other is zero.
+jq_fmt='def fmt($s): (if $s < 0 then 0 else $s end) as $t | ($t / 60 | floor) as $m | ($t % 60) as $r |
+  if $m > 0 and $r > 0 then "\($m)m \($r)s" elif $m > 0 then "\($m)m" else "\($r)s" end;'
+
+# The shape the bar indicator consumes: {count, active, tooltip, reminders[]}.
+report_json() { # snapshot now
+  jq -c --argjson now "$2" "$jq_fmt"'
+    [.reminders[] | {
+      id: .id,
+      unit: .unit,
+      timer: (.unit + ".timer"),
+      minutes: .minutes,
+      message: .message,
+      label: .label,
+      remaining: fmt(.at - $now),
+      remainingSeconds: (if .at - $now < 0 then 0 else .at - $now end),
+      at: .at,
+      atTime: (.at | strflocaltime("%-H:%M"))
+    }] as $rs |
+    {
+      count: ($rs | length),
+      active: (($rs | length) > 0),
+      tooltip: (if ($rs | length) == 0 then "Set Reminder"
+                elif ($rs | length) == 1 then "1 reminder"
+                else "\($rs | length) reminders" end),
+      reminders: $rs
+    }' <<<"$1"
+}
+
+report_lines() { # snapshot now  →  "<label> in <remaining> (<atTime>)" per line
+  report_json "$1" "$2" | jq -r '.reminders[] | "\(.label) in \(.remaining) (\(.atTime))"'
+}
+
+# ---------------------------------------------------------------- subcommands
+show_reminders() {
+  local body
+  body="$(report_lines "$(sync_store)" "$(date +%s)")"
+  if [[ -z $body ]]; then
+    notify "Upcoming reminders" "No outstanding reminders"
+  else
+    notify "Upcoming reminders" "$body"
+  fi
+}
+
+list_reminders() {
+  local snapshot now
+  snapshot="$(sync_store)"
+  now="$(date +%s)"
+  if [[ "$(report_json "$snapshot" "$now" | jq -r '.count')" == "0" ]]; then
+    echo "No outstanding reminders"
+    return 0
+  fi
+  report_json "$snapshot" "$now" |
+    jq -r '.reminders | to_entries[] | "\(.key + 1)\t\(.value.id)\t\(.value.label)\tin \(.value.remaining) (\(.value.atTime))"' |
+    column -t -s $'\t'
+}
+
+stop_units() { # unit...
+  local unit
+  for unit in "$@"; do
+    systemctl --user stop "$unit.timer" >/dev/null 2>&1 || true
+    systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
+  done
+}
+
+# Accepts an id, a unit name, a 1-based index from `list`, or a message prefix.
+resolve_id() { # selector
+  jq -r --arg sel "$1" '
+    (.reminders | map(.id)) as $ids |
+    if ($ids | index($sel)) != null then $sel
+    elif (.reminders | map(select(.unit == $sel or .unit == ($sel | sub("\\.timer$"; "")))) | first) != null
+      then (.reminders | map(select(.unit == $sel or .unit == ($sel | sub("\\.timer$"; "")))) | first | .id)
+    elif ($sel | test("^[0-9]+$")) and ($sel | tonumber) >= 1 and ($sel | tonumber) <= ($ids | length)
+      then $ids[($sel | tonumber) - 1]
+    else (.reminders | map(select(.label | ascii_downcase | startswith($sel | ascii_downcase))) | first | .id // "")
+    end // ""' <<<"$2"
+}
+
+done_reminder() { # selector
+  local snapshot id entry
+  snapshot="$(sync_store)"
+  id="$(resolve_id "$1" "$snapshot")"
+
+  if [[ -z $id ]]; then
+    echo "reminder: no reminder matches '$1'" >&2
+    return 1
+  fi
+
+  entry="$(jq -c --arg id "$id" '.reminders[] | select(.id == $id)' <<<"$snapshot")"
+  stop_units "$(jq -r '.unit' <<<"$entry")"
+  store_drop "$id"
+  notify "Reminder cancelled" "$(jq -r '.label' <<<"$entry")"
+}
+
+clear_reminders() {
+  local units
+  # Straight from systemd, like upstream's — this also sweeps up any timer the
+  # store lost track of, which stopping only the listed units would leave armed.
+  units="$(live_timers | jq -r '.[] | sub("\\.timer$"; "")')"
+  # shellcheck disable=SC2086 # unit names are our own [a-z0-9-] ids
+  [[ -n $units ]] && stop_units $units
+  store_write "$empty_store"
+  notify "All reminders have been cleared"
+}
+
+# Internal: what the transient timer runs. The message rides on the command
+# line (as upstream's does), so firing never depends on the store being intact.
+fire_reminder() { # id message
+  notify "Reminder" "$2"
+  store_drop "$1"
+}
+
+open_interactive() {
+  # `qs ipc call <target> show` is swallowed by quickshell's CLI (it prints the
+  # target listing instead of calling), so the summon route is toggle.
+  qs ipc call reminders toggle >/dev/null 2>&1 ||
+    echo "reminder: the shell is not running" >&2
+}
+
+add_reminder() { # minutes [message words...]
+  local minutes=${1:-}
+  shift || true
+  local message="$*"
+  local custom_message="$message"
+
+  if [[ -z $minutes || ! $minutes =~ ^[0-9]+$ ]] || ((10#$minutes == 0)); then
+    usage
+    exit 1
+  fi
+  # Base 10 explicitly: a typed "008" is not octal, it is eight minutes.
+  minutes=$((10#$minutes))
+
+  [[ -z $message ]] && message="Your ${minutes} minutes are up"
+
+  local set_at id unit label
+  set_at="$(date +%s)"
+  id="${minutes}m-${set_at}"
+  local snapshot n=0
+  snapshot="$(sync_store)"
+  while [[ "$(jq -r --arg id "$id" 'any(.reminders[]; .id == $id)' <<<"$snapshot")" == "true" ]]; do
+    n=$((n + 1))
+    id="${minutes}m-${set_at}-${n}"
+  done
+  unit="${unit_prefix}${id}"
+  label="$custom_message"
+  [[ -z $label ]] && label="${minutes}-min reminder"
+
+  local remind_at confirmation confirmation_title
+  remind_at="$(date -d "+${minutes} minutes" +%H:%M)"
+  confirmation="You'll be reminded at $remind_at"
+  confirmation_title="Reminder set for ${minutes} minutes"
+  [[ -n $custom_message ]] && confirmation_title="$custom_message in ${minutes} minutes"
+
+  systemd-run --user --quiet --collect --on-active="$((minutes * 60))" \
+    --unit="$unit" --description="qshell reminder: $label" \
+    -- "$self" fire "$id" "$message"
+
+  store_write "$(jq -c \
+    --arg id "$id" \
+    --arg unit "$unit" \
+    --arg message "$custom_message" \
+    --arg label "$label" \
+    --argjson minutes "$minutes" \
+    --argjson createdAt "$set_at" \
+    --argjson at "$((set_at + minutes * 60))" \
+    '{version: 1, reminders: ((.reminders // []) + [{id: $id, unit: $unit, minutes: $minutes, message: $message, label: $label, createdAt: $createdAt, at: $at}] | sort_by(.at))}' \
+    <<<"$snapshot")"
+
+  notify "$confirmation_title" "$confirmation"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: reminder [-i|--interactive]
+       reminder [add] <minutes> [message]
+       reminder list [-j|--json]
+       reminder show [-j|--json]
+       reminder done <id|index|message-prefix>
+       reminder clear
+EOF
+}
+
+case ${1:-} in
+-i | --interactive)
+  open_interactive
+  exit 0
+  ;;
+-h | --help | help)
+  usage
+  exit 0
+  ;;
+add)
+  shift
+  add_reminder "$@"
+  exit 0
+  ;;
+show)
+  case ${2:-} in
+  -j | --json) report_json "$(sync_store)" "$(date +%s)" ;;
+  "") show_reminders ;;
+  *)
+    usage
+    exit 1
+    ;;
+  esac
+  exit 0
+  ;;
+list)
+  case ${2:-} in
+  -j | --json) report_json "$(sync_store)" "$(date +%s)" ;;
+  "") list_reminders ;;
+  *)
+    usage
+    exit 1
+    ;;
+  esac
+  exit 0
+  ;;
+done | cancel)
+  [[ -z ${2:-} ]] && {
+    usage
+    exit 1
+  }
+  done_reminder "$2"
+  exit 0
+  ;;
+clear)
+  clear_reminders
+  exit 0
+  ;;
+fire)
+  [[ -z ${2:-} ]] && exit 1
+  fire_reminder "$2" "${3:-}"
+  exit 0
+  ;;
+esac
+
+add_reminder "$@"
