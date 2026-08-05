@@ -35,6 +35,28 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   KNOWN/OTHER NETWORKS sections with inline passphrase entry and
   forget-on-hover, the centered QR and speed-test overlays, and the same single
   cursor model shared by mouse and keyboard.
+- **Model-usage plugin design** from `shell/plugins/model-usage/`
+  (`Panel.qml`, `Main.qml`, `providers/Claude.qml`): reading Anthropic's own
+  rate limits from the OAuth usage endpoint with the token in
+  `~/.claude/.credentials.json` (their request, their `anthropic-beta` header,
+  their bucket preference of the OAuth-apps weekly bucket over the plain
+  seven-day one), their percent-vs-fraction scale detection and reset-timestamp
+  normalisation, the two windows normalised into one record so the meters speak
+  one language, the "binding window" idea (the fullest window is the one that
+  stops the next prompt) and the `alarming` state it drives at 90 %, the hero
+  naming the tool over the plan, the LIMITS section as a labelled meter with a
+  "Resets in …" countdown and their duration formatting, the 30 s tick that
+  keeps those countdowns honest while the panel sits open, the TOKENS BY DAY
+  rows scaled to the busiest day with today picked out, the TOKENS BY MODEL
+  rows as a share bar filling the row behind the label, their top-four cut, and
+  their model-id prettifier and token-count abbreviations. Their plan/tier
+  label rules come with it (`default_claude_max_20x` → "Max 20x"). Not ported:
+  their Codex provider, their multi-device sync layer, their `stats-cache.json`
+  and `history.jsonl` readers (ours reads `bin/claude-usage-scan` instead), and
+  their 15-minute background poll — this shell does not poll, so the panel
+  refreshes when it opens and from a refresh button they do not have. Their
+  plugin has no plan table driving limits: the plan is a label and the numbers
+  are Anthropic's, so our `plan` widget setting only overrides that label.
 - **Monitor plugin design** from `shell/plugins/panels/monitor/` (`Panel.qml`,
   `Model.js`): the hero naming the current brightness mood over a "Display"
   title, their brightness mood-name ladder itself, the live brightness slider
@@ -272,6 +294,18 @@ Direct file-level copies (source path → destination path):
   (the FontAwesome range does not render under our Nerd Font fallback),
   `signalStrength` is normalised here because quickshell reports 0..1, and
   whitespace follows house 4-space qmlformat.
+- omarchy `shell/plugins/model-usage/providers/Claude.qml` +
+  `shell/plugins/model-usage/Panel.qml` →
+  `shell/Modules/Bar/widgets/AiModel.js`: near-verbatim port of their limit
+  layer, lifted out of QML into one model file — `parseNumber`,
+  `utilizationPayloadUsesPercentScale`, `normalizeUtilization`,
+  `normalizeResetAt`, `oauthUsageBucket` and their bucket preference,
+  `bindingWindow`, `resetMsFor`, `formatDuration`, `formatTier`,
+  `formatTokenCount`, `modelWordCase`/`friendlyModelName` and their `dayName`.
+  Their `windowIsLong`/`windowSpanMs`/`windowTitle` label sniffing is not
+  ported: it exists to reconcile Claude's and Codex's differently-worded
+  labels, and with one provider the two windows are named where they are
+  parsed. `formatPlanSetting` is ours, for the `plan` widget setting.
 - omarchy `shell/plugins/panels/monitor/Model.js` →
   `shell/Modules/Bar/widgets/MonitorModel.js`: partial port — their brightness
   clamp, scale normalisation and brightness mood-name ladder are verbatim.
