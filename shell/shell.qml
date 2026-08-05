@@ -11,6 +11,7 @@ import qs.Modules.Notifications
 import qs.Modules.Osd
 import qs.Modules.Polkit
 import qs.Modules.ThemeSwitcher
+import qs.Modules.Background
 
 // Single long-running ShellRoot. One process: panels are summoned by IPC
 // into this instance, never by spawning a second `qs`.
@@ -41,25 +42,78 @@ ShellRoot {
             }
         })
     property var config: fallbackConfig
+    // False while shell.json exists but is broken: settings writes must not
+    // clobber a config the user could still fix by hand. A missing file is
+    // fine to create.
+    property bool configWritable: true
 
     function applyConfig(raw) {
         const text = String(raw || "").trim();
         if (!text) {
             config = fallbackConfig;
+            configWritable = true;
             return;
         }
         try {
             const parsed = JSON.parse(text);
             if (parsed && typeof parsed === "object" && parsed.version === 1) {
                 config = parsed;
+                configWritable = true;
             } else {
                 console.warn("shell.json missing version: 1 — using fallback config");
                 config = fallbackConfig;
+                configWritable = false;
             }
         } catch (e) {
             console.warn("shell.json parse failed — using fallback config:", e);
             config = fallbackConfig;
+            configWritable = false;
         }
+    }
+
+    // Rewrite the layout entry (or entries) matching widgetId with the given
+    // inline-settings object, and persist shell.json — omarchy's
+    // updateEntryInline. All other config keys pass through untouched; an
+    // entry whose only key is `id` collapses back to the plain string form.
+    function updateEntryInline(widgetId, entry) {
+        if (!configWritable) {
+            console.warn("shell.json is broken on disk — refusing to overwrite it with widget settings");
+            return false;
+        }
+        const copy = JSON.parse(JSON.stringify(config));
+        if (!copy.bar || typeof copy.bar !== "object")
+            return false;
+        let dirty = false;
+        for (const section of ["left", "center", "right"]) {
+            const arr = copy.bar[section];
+            if (!Array.isArray(arr))
+                continue;
+            for (let i = 0; i < arr.length; i++) {
+                const id = typeof arr[i] === "string" ? arr[i] : (arr[i] && arr[i].id);
+                if (id !== widgetId)
+                    continue;
+                const next = {
+                    id: widgetId
+                };
+                for (const key in entry) {
+                    if (key !== "id")
+                        next[key] = entry[key];
+                }
+                const replacement = Object.keys(next).length === 1 ? widgetId : next;
+                if (JSON.stringify(arr[i]) !== JSON.stringify(replacement)) {
+                    arr[i] = replacement;
+                    dirty = true;
+                }
+            }
+        }
+        if (!dirty)
+            return false;
+        copy.version = 1;
+        // Applied in memory first so the UI reflects the write immediately;
+        // the FileView round trip re-delivers the same content.
+        config = copy;
+        configFile.setText(JSON.stringify(copy, null, 2) + "\n");
+        return true;
     }
 
     // Shared entry point for the bar's launcher button and the IPC target.
@@ -69,12 +123,21 @@ ShellRoot {
     }
 
     FileView {
+        id: configFile
         path: Quickshell.shellDir + "/shell.json"
         watchChanges: true
+        // Writes go through a temp file + rename, so the inotify watcher
+        // (and any external reader) never sees a half-written config.
+        atomicWrites: true
         printErrors: false
         onLoaded: shell.applyConfig(text())
         onFileChanged: reload()
         onLoadFailed: shell.applyConfig("")
+        onSaveFailed: error => console.warn("shell.json write failed:", error)
+    }
+
+    Background {
+        theme: shell.theme
     }
 
     Bar {

@@ -15,6 +15,12 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   child's pty so open terminals retheme without restart.
 - **Structural token concept** from `shell/Commons/Style.qml`: spacing scale as the
   shell's rem, font size ratios, state-token alpha recipes.
+- **Clock/calendar plugin design** from `shell/plugins/panels/clock/`: hero date
+  over a year-progress rail, memento-mori life bar with inline birth-year editor,
+  ISO week-number gutter, locale-honoring week start with click-to-toggle
+  persisted to shell.json; plus the inline widget-settings pattern
+  (layout entries as `{id, ...settings}` objects, `updateEntryInline` writing
+  them back atomically, format-ring cycling on the bar clock).
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -44,5 +50,9 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
 - Used as API reference only; no code copied.
 
 ---
-Direct file-level copies, if any are made later, get listed here with source path,
-destination path, and commit.
+Direct file-level copies (source path → destination path):
+
+- omarchy `shell/plugins/panels/clock/Model.js` → `shell/Modules/Bar/widgets/ClockModel.js`:
+  near-verbatim port of the date/format math (format ring, ISO week, year/life
+  progress parsing and percentages, six-row month grid). Vertical-bar formats and
+  the node test exports were dropped; whitespace restyled to house 4-space qmlformat.

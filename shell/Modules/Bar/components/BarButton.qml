@@ -10,6 +10,17 @@ Item {
     required property var theme
     property var bar: null
 
+    // This widget's inline shell.json entry ({id, ...}), injected by the
+    // bar's WidgetSlot. Plain-string layout entries arrive as just {id}.
+    property var settings: ({})
+
+    // Read one user-tunable value from the inline entry, with a fallback
+    // for missing/null values (omarchy's BarWidget.setting).
+    function setting(name, fallback) {
+        const value = settings ? settings[name] : undefined;
+        return value === undefined || value === null ? fallback : value;
+    }
+
     property string tooltipText: ""
     property bool active: false
     property bool dimmed: false

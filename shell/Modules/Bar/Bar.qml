@@ -19,18 +19,66 @@ Scope {
     required property var niri
     property var config: ({})
 
+    // Layout entries are either plain widget-id strings ("clock") or inline
+    // settings objects ({"id": "clock", "format": …}), omarchy-style. Both
+    // normalize to objects here; the entry reaches its widget as `settings`.
+    function normalizeEntry(entry) {
+        if (typeof entry === "string")
+            return ({
+                    id: entry
+                });
+        if (entry && typeof entry === "object" && typeof entry.id === "string")
+            return entry;
+        return ({
+                id: String(entry)
+            });
+    }
+
     readonly property var layoutOf: ({
-            left: Array.isArray(config.left) ? config.left : [],
-            center: Array.isArray(config.center) ? config.center : [],
-            right: Array.isArray(config.right) ? config.right : []
+            left: (Array.isArray(config.left) ? config.left : []).map(normalizeEntry),
+            center: (Array.isArray(config.center) ? config.center : []).map(normalizeEntry),
+            right: (Array.isArray(config.right) ? config.right : []).map(normalizeEntry)
         })
 
-    // The clock anchors the center section like omarchy's centerAnchor:
-    // widgets before it lay out leftward, widgets after it rightward, and
-    // the clock itself never moves off dead-center.
-    readonly property int centerAnchorIndex: layoutOf.center.indexOf("clock")
-    readonly property var centerBefore: centerAnchorIndex >= 0 ? layoutOf.center.slice(0, centerAnchorIndex) : []
-    readonly property var centerAfter: centerAnchorIndex >= 0 ? layoutOf.center.slice(centerAnchorIndex + 1) : layoutOf.center
+    // Repeater models hold only the id strings, and keep their identity while
+    // the id sequence is unchanged — so a settings write (which replaces the
+    // whole config object) updates live widgets in place instead of
+    // recreating them. Recreating would destroy the very panel the settings
+    // were just edited from. The center split (omarchy's centerAnchor: the
+    // clock pinned dead-center, neighbors flanking it) is computed in the
+    // same pass — deriving it from separate reactive properties left a
+    // transient evaluation where the flanking rows still contained the
+    // clock, instantiating it twice.
+    property var modelLeft: []
+    property var modelRight: []
+    property var modelCenterBefore: []
+    property var modelCenterAfter: []
+    property int centerAnchorIndex: -1
+
+    onLayoutOfChanged: syncModels()
+    Component.onCompleted: syncModels()
+
+    function sameIds(a, b) {
+        return a.join("\u001f") === b.join("\u001f");
+    }
+
+    function syncModels() {
+        const leftIds = layoutOf.left.map(e => e.id);
+        const centerIds = layoutOf.center.map(e => e.id);
+        const rightIds = layoutOf.right.map(e => e.id);
+        const anchor = centerIds.indexOf("clock");
+        const before = anchor >= 0 ? centerIds.slice(0, anchor) : [];
+        const after = anchor >= 0 ? centerIds.slice(anchor + 1) : centerIds;
+        centerAnchorIndex = anchor;
+        if (!sameIds(leftIds, modelLeft))
+            modelLeft = leftIds;
+        if (!sameIds(rightIds, modelRight))
+            modelRight = rightIds;
+        if (!sameIds(before, modelCenterBefore))
+            modelCenterBefore = before;
+        if (!sameIds(after, modelCenterAfter))
+            modelCenterAfter = after;
+    }
 
     // ------------------------------------------------------ widget registry
     readonly property var registry: ({
@@ -48,6 +96,9 @@ Scope {
             "tray": trayComponent,
             "update": updateComponent,
             "dnd": dndComponent,
+            "ai": aiComponent,
+            "weather": weatherComponent,
+            "monitor": monitorComponent,
             "spacer": spacerComponent
         })
 
@@ -58,6 +109,10 @@ Scope {
             id: panel
 
             required property var modelData
+
+            // Widgets reach the shell (updateEntryInline, toggleLauncher)
+            // through their injected `bar`.
+            readonly property var shell: barRoot.shell
 
             // Cold-start metric consumed by bin/bench: ms from process launch
             // to this bar window finishing construction.
@@ -90,6 +145,20 @@ Scope {
                     duration: 420
                     easing.type: Easing.InOutCubic
                 }
+            }
+
+            // One widget panel open at a time per screen.
+            property var activePanel: null
+
+            function requestPanel(p) {
+                if (activePanel && activePanel !== p)
+                    activePanel.close();
+                activePanel = p;
+            }
+
+            function releasePanel(p) {
+                if (activePanel === p)
+                    activePanel = null;
             }
 
             // ------------------------------------------------------ tooltip
@@ -179,8 +248,10 @@ Scope {
                 anchors.bottom: parent.bottom
                 spacing: 0
                 Repeater {
-                    model: barRoot.layoutOf.left
-                    WidgetSlot {}
+                    model: barRoot.modelLeft
+                    WidgetSlot {
+                        section: "left"
+                    }
                 }
             }
 
@@ -189,6 +260,8 @@ Scope {
                 id: centerAnchorSlot
                 visible: barRoot.centerAnchorIndex >= 0
                 modelData: "clock"
+                index: barRoot.centerAnchorIndex
+                section: "center"
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
@@ -201,8 +274,10 @@ Scope {
                 spacing: 0
                 visible: barRoot.centerAnchorIndex >= 0
                 Repeater {
-                    model: barRoot.centerBefore
-                    WidgetSlot {}
+                    model: barRoot.modelCenterBefore
+                    WidgetSlot {
+                        section: "center"
+                    }
                 }
             }
 
@@ -213,8 +288,11 @@ Scope {
                 anchors.bottom: parent.bottom
                 spacing: 0
                 Repeater {
-                    model: barRoot.centerAfter
-                    WidgetSlot {}
+                    model: barRoot.modelCenterAfter
+                    WidgetSlot {
+                        section: "center"
+                        indexOffset: barRoot.centerAnchorIndex >= 0 ? barRoot.centerAnchorIndex + 1 : 0
+                    }
                 }
             }
 
@@ -225,8 +303,10 @@ Scope {
                 anchors.bottom: parent.bottom
                 spacing: 0
                 Repeater {
-                    model: barRoot.layoutOf.right
-                    WidgetSlot {}
+                    model: barRoot.modelRight
+                    WidgetSlot {
+                        section: "right"
+                    }
                 }
             }
         }
@@ -234,20 +314,46 @@ Scope {
 
     component WidgetSlot: Loader {
         required property var modelData
+        required property int index
+        property string section: "center"
+        // The flanking center rows repeat over slices of the center model;
+        // the offset maps a slice-local index back to the section index.
+        property int indexOffset: 0
         readonly property string widgetId: String(modelData)
+        // Reactive against the live config: a settings write lands here and
+        // is pushed into the running widget without recreating it.
+        readonly property var entry: {
+            const arr = barRoot.layoutOf[section];
+            const e = Array.isArray(arr) ? arr[index + indexOffset] : undefined;
+            return e && e.id === widgetId ? e : ({
+                    id: widgetId
+                });
+        }
         readonly property var known: barRoot.registry[widgetId]
         anchors.top: parent ? parent.top : undefined
         anchors.bottom: parent ? parent.bottom : undefined
         width: item ? item.implicitWidth : 0
         sourceComponent: known !== undefined ? known : missingComponent
+        onEntryChanged: {
+            if (item && "settings" in item)
+                item.settings = entry;
+        }
         onLoaded: {
             if ("screenName" in item)
                 item.screenName = panel.screen.name;
             if ("bar" in item)
                 item.bar = panel;
+            if ("settings" in item)
+                item.settings = entry;
             if (known === undefined) {
                 item.missingId = widgetId;
                 console.warn("Bar: unknown widget id in config:", widgetId);
+            }
+            // Dev hook (like QSHELL_DEV): auto-open a widget's panel so
+            // headless sessions can verify panel rendering.
+            if (Quickshell.env("QSHELL_TEST_PANEL") === widgetId && typeof item.openPanel === "function") {
+                const target = item;
+                Qt.callLater(() => target.openPanel());
             }
         }
     }
@@ -355,6 +461,27 @@ Scope {
         Dnd {
             theme: barRoot.theme
             notifs: barRoot.shell.notifs
+        }
+    }
+
+    Component {
+        id: aiComponent
+        Ai {
+            theme: barRoot.theme
+        }
+    }
+
+    Component {
+        id: weatherComponent
+        Weather {
+            theme: barRoot.theme
+        }
+    }
+
+    Component {
+        id: monitorComponent
+        MonitorWidget {
+            theme: barRoot.theme
         }
     }
 
