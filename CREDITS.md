@@ -35,6 +35,19 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   KNOWN/OTHER NETWORKS sections with inline passphrase entry and
   forget-on-hover, the centered QR and speed-test overlays, and the same single
   cursor model shared by mouse and keyboard.
+- **Tray widget design** from `shell/plugins/bar/widgets/Tray.qml`: the
+  pinned/drawer/hidden bucket model persisted as two id lists in the widget's
+  inline settings entry, the hover-revealed drawer (600 ms OutCubic reveal of a
+  clipped icon row, with the chevron riding the reveal at the drawer's outer end
+  and the reserved empty space masked out of hit testing), symbolic-icon
+  detection by the freedesktop `-symbolic` suffix with `MultiEffect`
+  colorization to the bar foreground, and the right-click manage card (title and
+  caption over per-item rows with Pin / Hide toggles). Their FontAwesome chevron
+  is a Material Design glyph here (the FontAwesome range does not render under
+  our Nerd Font fallback), their Dropbox dedicated-widget ownership check is
+  dropped (we ship no Dropbox widget), and their in-house `QsMenuOpener` menu
+  rendering is not used — our tray items open the application's own menu through
+  `display()`.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
