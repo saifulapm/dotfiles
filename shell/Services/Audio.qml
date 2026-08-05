@@ -16,6 +16,21 @@ QtObject {
     readonly property bool micMuted: source && source.audio ? source.audio.muted : false
     readonly property bool ready: Pipewire.ready && sink !== null
 
+    function setVolume(v) {
+        if (sink && sink.audio)
+            sink.audio.volume = Math.max(0, Math.min(1, v));
+    }
+
+    function toggleMute() {
+        if (sink && sink.audio)
+            sink.audio.muted = !sink.audio.muted;
+    }
+
+    function toggleMicMute() {
+        if (source && source.audio)
+            source.audio.muted = !source.audio.muted;
+    }
+
     property PwObjectTracker tracker: PwObjectTracker {
         objects: [root.sink, root.source].filter(n => n !== null)
     }

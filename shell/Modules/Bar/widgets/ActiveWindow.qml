@@ -1,24 +1,39 @@
 import QtQuick
+import "../components"
 
-Item {
+// Focused window title, omarchy-style: bare text at 0.85 opacity, elided at
+// maxWidth, animated width; middle or right click closes the window.
+BarButton {
     id: rootItem
 
-    required property var theme
     required property var niri
-    property int maxWidth: 420
+    property int maxWidth: 280
 
-    implicitWidth: Math.min(label.implicitWidth, maxWidth)
-    implicitHeight: parent ? parent.height : label.implicitHeight
-    visible: rootItem.niri.focusedTitle !== ""
+    visible: niri.focusedTitle !== ""
+    tooltipText: label.truncated ? niri.focusedTitle : ""
+
+    onTapped: button => {
+        if (button === Qt.MiddleButton || button === Qt.RightButton)
+            rootItem.niri.closeFocusedWindow();
+    }
+
+    Behavior on implicitWidth {
+        NumberAnimation {
+            duration: 180
+            easing.type: Easing.OutCubic
+        }
+    }
 
     Text {
         id: label
         anchors.verticalCenter: parent.verticalCenter
         width: Math.min(implicitWidth, rootItem.maxWidth)
         elide: Text.ElideRight
-        color: rootItem.theme.textMuted
-        font.family: rootItem.theme.fontUi
-        font.pixelSize: rootItem.theme.fontPx(0.917)
+        opacity: 0.85
+        color: rootItem.contentColor
+        font.family: rootItem.theme.fontMono
+        font.pixelSize: rootItem.theme.fontPx(1.0)
+        renderType: Text.NativeRendering
         text: rootItem.niri.focusedTitle
     }
 }

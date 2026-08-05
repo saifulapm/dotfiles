@@ -2,8 +2,8 @@
   "version": 1,
   "bar": {
     "position": "top",
-    "left": ["workspaces", "window"],
-    "center": ["clock"],
-    "right": []
+    "left": ["launcher", "workspaces", "window"],
+    "center": ["dnd", "clock", "update"],
+    "right": ["tray", "media", "kb", "mic", "bluetooth", "network", "audio", "battery"]
   }
 }

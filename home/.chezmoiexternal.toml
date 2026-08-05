@@ -1,0 +1,11 @@
+# External assets managed by chezmoi. Pinned versions — never "latest" — so
+# all three machines converge on identical bytes.
+
+# Symbols-only Nerd Font: bar/OSD icon glyphs render through fontconfig
+# fallback while text stays on stock Fedora JetBrains Mono. ~2 MB instead of
+# shipping a full patched font family.
+[".local/share/fonts/nerd-symbols"]
+    type = "archive"
+    url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.0/NerdFontsSymbolsOnly.tar.xz"
+    refreshPeriod = "0"
+    include = ["*.ttf"]

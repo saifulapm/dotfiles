@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic dnf update count for the shell bar
+
+[Timer]
+OnStartupSec=10min
+OnUnitActiveSec=6h
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

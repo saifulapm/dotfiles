@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Mpris
 
 import qs.Services
 import qs.Modules.Bar
@@ -9,6 +10,7 @@ import qs.Modules.Launcher
 import qs.Modules.Notifications
 import qs.Modules.Osd
 import qs.Modules.Polkit
+import qs.Modules.ThemeSwitcher
 
 // Single long-running ShellRoot. One process: panels are summoned by IPC
 // into this instance, never by spawning a second `qs`.
@@ -58,6 +60,12 @@ ShellRoot {
             console.warn("shell.json parse failed — using fallback config:", e);
             config = fallbackConfig;
         }
+    }
+
+    // Shared entry point for the bar's launcher button and the IPC target.
+    function toggleLauncher() {
+        launcherLoader.active = true;
+        launcherLoader.item.toggle();
     }
 
     FileView {
@@ -191,8 +199,7 @@ ShellRoot {
         target: "launcher"
 
         function toggle(): string {
-            launcherLoader.active = true;
-            launcherLoader.item.toggle();
+            shell.toggleLauncher();
             return "ok";
         }
 
@@ -205,6 +212,36 @@ ShellRoot {
         function hide(): string {
             if (launcherLoader.active)
                 launcherLoader.item.hide();
+            return "ok";
+        }
+    }
+
+    LazyLoader {
+        id: themesLoader
+        active: false
+        component: ThemeSwitcher {
+            theme: shell.theme
+        }
+    }
+
+    IpcHandler {
+        target: "theme"
+
+        function toggle(): string {
+            themesLoader.active = true;
+            themesLoader.item.toggle();
+            return "ok";
+        }
+
+        function show(): string {
+            themesLoader.active = true;
+            themesLoader.item.show();
+            return "ok";
+        }
+
+        function hide(): string {
+            if (themesLoader.active)
+                themesLoader.item.hide();
             return "ok";
         }
     }
@@ -230,6 +267,45 @@ ShellRoot {
             if (lockLoader.active)
                 lockLoader.item.forceUnlock();
             return "ok";
+        }
+    }
+
+    // Media keys land here (niri binds spawn `qs ipc call media …`). The
+    // Mpris singleton is lazy — it only touches D-Bus on the first call.
+    IpcHandler {
+        target: "media"
+
+        function activePlayer(): var {
+            const all = Mpris.players.values;
+            return all.find(p => p.isPlaying) || all[0] || null;
+        }
+
+        function playPause(): string {
+            const p = activePlayer();
+            if (p && p.canTogglePlaying)
+                p.togglePlaying();
+            return p ? "ok" : "no player";
+        }
+
+        function stop(): string {
+            const p = activePlayer();
+            if (p)
+                p.stop();
+            return p ? "ok" : "no player";
+        }
+
+        function next(): string {
+            const p = activePlayer();
+            if (p && p.canGoNext)
+                p.next();
+            return p ? "ok" : "no player";
+        }
+
+        function previous(): string {
+            const p = activePlayer();
+            if (p && p.canGoPrevious)
+                p.previous();
+            return p ? "ok" : "no player";
         }
     }
 

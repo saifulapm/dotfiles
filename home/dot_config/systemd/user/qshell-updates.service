@@ -1,0 +1,8 @@
+[Unit]
+Description=Count pending dnf updates for the shell bar
+
+[Service]
+Type=oneshot
+ExecStart=%h/.dotfiles/bin/check-updates
+Nice=19
+IOSchedulingClass=idle

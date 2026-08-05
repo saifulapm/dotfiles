@@ -1,10 +1,15 @@
 import QtQuick
+import "../components"
 
+// Omarchy-style workspaces: the focused one is a filled circle glyph, the
+// rest show their number; empty workspaces sit at half strength; urgent
+// turns the attention color. 20 px slots, chrome-less.
 Item {
     id: rootItem
 
     required property var theme
     required property var niri
+    property var bar: null
     property string screenName: ""
 
     readonly property var shown: niri.workspaces.filter(w => screenName === "" || w.output === screenName)
@@ -14,47 +19,42 @@ Item {
 
     Row {
         id: row
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: rootItem.theme.space(1)
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        spacing: 1
 
         Repeater {
             model: rootItem.shown
 
-            delegate: Rectangle {
-                id: pill
+            delegate: BarButton {
+                id: wsButton
 
                 required property var modelData
 
-                width: Math.max(height, wsLabel.implicitWidth + rootItem.theme.space(3))
-                height: rootItem.theme.barHeight - rootItem.theme.space(2)
-                anchors.verticalCenter: parent.verticalCenter
-                radius: rootItem.theme.radius(0.5)
-                color: modelData.is_active ? rootItem.theme.alpha(rootItem.theme.accent, 0.25) : (hover.hovered ? rootItem.theme.alpha(rootItem.theme.textPrimary, 0.08) : "transparent")
-                border.width: modelData.is_urgent ? rootItem.theme.borderWidth : 0
-                border.color: rootItem.theme.error
+                theme: rootItem.theme
+                bar: rootItem.bar
+                fixedWidth: 20
+                active: modelData.is_urgent === true
+                opacity: modelData.is_active || modelData.active_window_id !== null ? 1 : 0.5
 
-                Behavior on color {
-                    ColorAnimation {
-                        duration: rootItem.theme.time(0.6)
-                        easing.type: rootItem.theme.easing
-                    }
+                onTapped: rootItem.niri.focusWorkspace(wsButton.modelData.id)
+
+                OpticalGlyph {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: wsButton.modelData.is_active === true
+                    text: "󱓻" // md-circle_medium, omarchy's focused marker
+                    color: wsButton.contentColor
+                    pixelSize: 13
                 }
 
                 Text {
-                    id: wsLabel
-                    anchors.centerIn: parent
-                    color: pill.modelData.is_active ? rootItem.theme.accent : rootItem.theme.textMuted
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: wsButton.modelData.is_active !== true
+                    text: wsButton.modelData.name || wsButton.modelData.idx
+                    color: wsButton.contentColor
                     font.family: rootItem.theme.fontMono
-                    font.pixelSize: rootItem.theme.fontPx(0.917)
-                    text: pill.modelData.name || pill.modelData.idx
-                }
-
-                HoverHandler {
-                    id: hover
-                }
-
-                TapHandler {
-                    onTapped: rootItem.niri.focusWorkspace(pill.modelData.id)
+                    font.pixelSize: rootItem.theme.fontPx(1.0)
+                    renderType: Text.NativeRendering
                 }
             }
         }

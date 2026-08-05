@@ -23,6 +23,32 @@ QtObject {
         return w && w.appId ? w.appId : "";
     }
 
+    // XKB layout names + active index, pushed by KeyboardLayoutsChanged /
+    // KeyboardLayoutSwitched. Empty until the first event after connect.
+    property var keyboardLayouts: []
+    property int keyboardLayoutIdx: 0
+    readonly property string keyboardLayoutName: keyboardLayouts[keyboardLayoutIdx] || ""
+
+    function switchKeyboardLayout() {
+        request({
+            Action: {
+                SwitchLayout: {
+                    layout: "Next"
+                }
+            }
+        });
+    }
+
+    function closeFocusedWindow() {
+        request({
+            Action: {
+                CloseWindow: {
+                    id: null
+                }
+            }
+        });
+    }
+
     function focusWorkspace(id) {
         request({
             Action: {
@@ -64,6 +90,11 @@ QtObject {
                 });
                 break;
             }
+        case "WorkspaceActiveWindowChanged":
+            workspaces = workspaces.map(w => w.id === p.workspace_id ? Object.assign({}, w, {
+                    active_window_id: p.active_window_id !== undefined ? p.active_window_id : null
+                }) : w);
+            break;
         case "WorkspaceUrgencyChanged":
             workspaces = workspaces.map(w => w.id === p.id ? Object.assign({}, w, {
                     is_urgent: p.urgent
@@ -109,6 +140,13 @@ QtObject {
             }
         case "WindowFocusChanged":
             focusedWindowId = p.id !== undefined && p.id !== null ? p.id : null;
+            break;
+        case "KeyboardLayoutsChanged":
+            keyboardLayouts = p.keyboard_layouts.names || [];
+            keyboardLayoutIdx = p.keyboard_layouts.current_idx || 0;
+            break;
+        case "KeyboardLayoutSwitched":
+            keyboardLayoutIdx = p.idx || 0;
             break;
         }
     }

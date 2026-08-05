@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# check-updates — count pending dnf updates into a state file the shell
+# watches (Modules/Bar SystemUpdate widget). Run by the qshell-updates.timer
+# systemd user timer; the shell itself never polls.
+set -uo pipefail
+
+state_dir="$HOME/.local/state/qshell"
+state="$state_dir/updates"
+mkdir -p "$state_dir"
+
+# Exit 100 = updates available, 0 = none. -q keeps output parseable; the
+# listing starts after a blank line, one package per line.
+count="$(dnf -q check-update 2>/dev/null | awk 'NF >= 3 && $1 ~ /\./ { n++ } END { print n + 0 }')" || true
+count="${count:-0}"
+
+printf '%s\n' "$count" >"$state.tmp"
+mv "$state.tmp" "$state"

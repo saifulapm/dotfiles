@@ -23,6 +23,10 @@ input {
 
         // Enable numlock on startup, omitting this setting disables it.
         numlock
+
+        // Omarchy-matched key repeat: snappier than the 600/25 default.
+        repeat-delay 250
+        repeat-rate 40
     }
 
     // Next sections include libinput settings.
@@ -36,6 +40,8 @@ input {
         // drag false
         // drag-lock
         natural-scroll
+        // Mac-style whole-pad clicks (omarchy: clickfinger_behavior).
+        click-method "clickfinger"
         // accel-speed 0.2
         // accel-profile "flat"
         // scroll-method "two-finger"
@@ -65,8 +71,8 @@ input {
     // warp-mouse-to-focus
 
     // Focus windows and outputs automatically when moving the mouse into them.
-    // Setting max-scroll-amount="0%" makes it work only on windows already fully on screen.
-    // focus-follows-mouse max-scroll-amount="0%"
+    // "0%" = only when it would not scroll the view (omarchy: follow_mouse 1).
+    focus-follows-mouse max-scroll-amount="0%"
 }
 
 // You can configure outputs by their name, which you can find
@@ -111,7 +117,10 @@ input {
 // https://niri-wm.github.io/niri/Configuration:-Layout
 layout {
     // Set gaps around windows in logical pixels.
-    gaps 16
+    // Omarchy feel: gaps_in 5 (= 10 px between windows) / gaps_out 10, and
+    // niri's `gaps N` is N between columns AND to the screen edge — so 10
+    // is an exact translation.
+    gaps 10
 
     // When to center a column when changing focus, options are:
     // - "never", default behavior, focusing an off-screen column will keep at the left
@@ -153,10 +162,10 @@ layout {
     // Alternatively, you can override it with a window rule called
     // `draw-border-with-background`.
 
-    // You can change how the focus ring looks.
+    // Border (below) plays the omarchy role: drawn around every window.
+    // The focus ring would double up with it, so it's off.
     focus-ring {
-        // Uncomment this line to disable the focus ring.
-        // off
+        off
 
         // How many logical pixels the ring extends out from the windows.
         width 4
@@ -192,17 +201,15 @@ layout {
     }
 
     // You can also add a border. It's similar to the focus ring, but always visible.
+    // Omarchy: border_size 2 on all windows. Colors here are fallbacks —
+    // the theme include at the end of this file overrides them per theme.
     border {
-        // The settings are the same as for the focus ring.
-        // If you enable the border, you probably want to disable the focus ring.
-        off
-
-        width 4
-        active-color "#ffc87f"
-        inactive-color "#505050"
+        width 2
+        active-color "#7aa2f7"
+        inactive-color "#2f3549"
 
         // Color of the border around windows that request your attention.
-        urgent-color "#9b0000"
+        urgent-color "#f7768e"
 
         // Gradients can use a few different interpolation color spaces.
         // For example, this is a pastel rainbow gradient via in="oklch longer hue".
@@ -274,8 +281,9 @@ spawn-at-startup "qs"
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
 
 hotkey-overlay {
-    // Uncomment this line to disable the "Important Hotkeys" pop-up at startup.
-    // skip-at-startup
+    // No hotkey pop-up at login, and hide actions that have no bind.
+    skip-at-startup
+    hide-not-bound
 }
 
 // Uncomment this line to ask the clients to omit their client-side decorations if possible.
@@ -283,7 +291,16 @@ hotkey-overlay {
 // Additionally, clients will be informed that they are tiled, removing some client-side rounded corners.
 // This option will also fix border/focus ring drawing behind some semitransparent windows.
 // After enabling or disabling this, you need to restart the apps for this to take effect.
-// prefer-no-csd
+// Required for borders to draw *around* windows (not as a rect behind them)
+// and for correct shadows/rounded corners.
+prefer-no-csd
+
+// Hide the cursor while typing and after 5 s idle.
+cursor {
+    xcursor-size 24
+    hide-when-typing
+    hide-after-inactive-ms 5000
+}
 
 // You can change the path where screenshots are saved.
 // A ~ at the front will be expanded to the home directory.
@@ -302,6 +319,37 @@ animations {
 
     // Slow down all animations by this factor. Values below 1 speed them up instead.
     // slowdown 3.0
+
+    // Omarchy's timing, translated. easeOutQuint = cubic-bezier(0.23 1 0.32 1)
+    // is its signature curve; windowsIn 410 ms, windowsOut 149 ms linear.
+    window-open {
+        duration-ms 400
+        curve "cubic-bezier" 0.23 1 0.32 1
+    }
+
+    window-close {
+        duration-ms 150
+        curve "linear"
+    }
+
+    // Keep these three identical — niri drives synchronized animations from
+    // whichever one is "in charge", and mismatched params look broken.
+    window-movement {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.0001
+    }
+
+    window-resize {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.0001
+    }
+
+    horizontal-view-movement {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.0001
+    }
+
+    // Snappier than default; springs track touchpad swipe velocity.
+    workspace-switch {
+        spring damping-ratio=1.0 stiffness=1200 epsilon=0.0001
+    }
 }
 
 // Window rules let you adjust behavior for individual windows.
@@ -339,11 +387,16 @@ window-rule {
     // block-out-from "screencast"
 }
 
-// Example: enable rounded corners for all windows.
-// (This example rule is commented out with a "/-" in front.)
-/-window-rule {
-    geometry-corner-radius 12
-    clip-to-geometry true
+// Rounded corners come from the theme include at the end of this file
+// (the radius is a theme token). These two rules are omarchy's window
+// opacity: 0.985 active / 0.96 inactive.
+window-rule {
+    opacity 0.985
+}
+
+window-rule {
+    match is-active=false
+    opacity 0.96
 }
 
 binds {
@@ -364,6 +417,7 @@ binds {
     // Suggested binds for running programs: terminal, app launcher, screen locker.
     Mod+T hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
     Mod+D hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
+    Mod+Shift+T hotkey-overlay-title="Switch Theme" { spawn "qs" "ipc" "call" "theme" "toggle"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "ipc" "call" "lock" "lock"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
@@ -380,12 +434,11 @@ binds {
     XF86AudioMute        allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
     XF86AudioMicMute     allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
 
-    // Example media keys mapping using playerctl.
-    // This will work with any MPRIS-enabled media player.
-    XF86AudioPlay        allow-when-locked=true { spawn-sh "playerctl play-pause"; }
-    XF86AudioStop        allow-when-locked=true { spawn-sh "playerctl stop"; }
-    XF86AudioPrev        allow-when-locked=true { spawn-sh "playerctl previous"; }
-    XF86AudioNext        allow-when-locked=true { spawn-sh "playerctl next"; }
+    // Media keys route through the shell's MPRIS service (no playerctl).
+    XF86AudioPlay        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "playPause"; }
+    XF86AudioStop        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "stop"; }
+    XF86AudioPrev        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "previous"; }
+    XF86AudioNext        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "next"; }
 
     // Example brightness key mappings for brightnessctl.
     // You can use regular spawn with multiple arguments too (to avoid going through "sh"),
@@ -630,3 +683,8 @@ binds {
     // moving the mouse or pressing any other key.
     Mod+Shift+P { power-off-monitors; }
 }
+
+// Theme colors + corner radius, rendered by bin/theme-apply on every theme
+// switch. Last so its settings override the fallbacks above. Optional so a
+// fresh machine boots before the first theme-apply run.
+include optional=true "~/.local/state/qshell/niri-theme.kdl"
