@@ -94,6 +94,18 @@ arch = "aarch64"
 why = "One-shot backlight get/set for the OSD path (keybind → shell IPC → brightnessctl); laptops/HDMI-less Macs only — the NUC has no backlight"
 
 [[pkg]]
+name = "qrencode"
+category = "core"
+arch = "all"
+why = "Renders the Wi-Fi share QR matrix for the network panel (bin/network-qr pipes it through `qrencode --type ASCII`); the panel hides its share button when this is missing, so the feature is dead without it"
+
+# NOT installed, listed for the record: the network panel's speed test needs
+# nothing beyond curl (bin/network-speedtest measures /proc/net/dev deltas
+# while curl saturates fast.com's endpoints), and `iw` is used only when it
+# happens to be present, for the dBm and bitrate readings nmcli does not
+# report. Neither is worth a package entry on its own.
+
+[[pkg]]
 name = "chezmoi"
 category = "core"
 arch = "all"

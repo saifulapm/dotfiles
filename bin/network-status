@@ -1,0 +1,193 @@
+#!/bin/bash
+# network-status — print the active route's network status for the shell.
+#
+# Direct port of omarchy's bin/omarchy-network-status (MIT, see CREDITS.md).
+# Same output contract, so the panel's parser is theirs too:
+#
+#   no args    one tab-separated line: kind<TAB>label<TAB>signal<TAB>freq
+#   --verbose  one "key<TAB>value" pair per line
+#
+# Differences from the original: byte counters are read from /proc/net/dev
+# rather than /sys/class/net/<if>/statistics, the route is parsed out of
+# `ip route get` text instead of `ip -j` + jq (one dependency less), and the
+# SSID/signal/frequency come from nmcli, with `iw` used only when it happens
+# to be installed (for the dBm reading and the negotiated bitrate, neither of
+# which nmcli reports).
+
+internet_probe=1.1.1.1
+
+case "${1:-}" in
+"") verbose=false ;;
+--verbose) verbose=true ;;
+*)
+    echo "Usage: network-status [--verbose]" >&2
+    exit 2
+    ;;
+esac
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# The default route to the probe address is the connection every reading in
+# this script describes: the panel talks about the link the machine is
+# actually using, not whatever NetworkManager enumerates first.
+route_field() {
+    awk -v key="$1" '{ for (i = 1; i <= NF; i++) if ($i == key) { print $(i + 1); exit } }'
+}
+
+read_route() {
+    route=$(ip route get "$internet_probe" 2>/dev/null | head -n 1)
+    iface=$(route_field dev <<<"$route")
+    gateway=$(route_field via <<<"$route")
+    address=$(route_field src <<<"$route")
+}
+
+is_wireless() { [[ -d /sys/class/net/$1/wireless ]]; }
+
+# The in-use row of NetworkManager's scan cache. `-e no` keeps ':' and '\'
+# unescaped so the SSID matches what everything else reports, which means the
+# SSID must be queried last and reassembled from the remaining fields.
+wifi_line() {
+    LC_ALL=C nmcli -e no -t -f IN-USE,SIGNAL,FREQ,SSID dev wifi list ifname "$1" --rescan no 2>/dev/null |
+        awk -F: '$1 == "*" { print; exit }'
+}
+
+wifi_field() {
+    local line=$1 index=$2
+    awk -F: -v n="$index" '{
+    if (n < 4) { print $n; exit }
+    value = $4
+    for (i = 5; i <= NF; i++) value = value ":" $i
+    print value
+    exit
+  }' <<<"$line"
+}
+
+digits_only() { echo "${1%%[!0-9]*}"; }
+
+print_status() {
+    local line state
+
+    read_route
+
+    if [[ -z $iface ]]; then
+        printf 'disconnected\t\t\t\n'
+        return
+    fi
+
+    if ! is_wireless "$iface"; then
+        printf 'ethernet\t%s\t\t\n' "$iface"
+        return
+    fi
+
+    if have nmcli; then
+        state=$(LC_ALL=C nmcli -e no -t -f GENERAL.STATE dev show "$iface" 2>/dev/null | awk -F: '{ print $2; exit }')
+        if [[ $state != 100* ]]; then
+            printf 'disconnected\t\t\t\n'
+            return
+        fi
+
+        line=$(wifi_line "$iface")
+        printf 'wifi\t%s\t%s\t%s\n' \
+            "$(wifi_field "$line" 4)" \
+            "$(wifi_field "$line" 2)" \
+            "$(digits_only "$(wifi_field "$line" 3)")"
+        return
+    fi
+
+    printf 'wifi\t%s\t\t\n' "$iface"
+}
+
+ping_latency_ms() {
+    LC_ALL=C ping -n -c 1 -W 1 "$1" 2>/dev/null |
+        awk -F'time[=<]' '/time[=<]/ { split($2, parts, " "); print parts[1]; exit }'
+}
+
+# Both probes run at once: the panel samples this every 1.5s, and two serial
+# one-second timeouts would not fit inside that.
+print_ping_samples() {
+    local gw=$1 tmpdir router_pid="" internet_pid=""
+
+    have ping || return
+    tmpdir=$(mktemp -d) || return
+
+    if [[ -n $gw ]]; then
+        ping_latency_ms "$gw" >"$tmpdir/router" &
+        router_pid=$!
+    fi
+
+    ping_latency_ms "$internet_probe" >"$tmpdir/internet" &
+    internet_pid=$!
+
+    if [[ -n $router_pid ]]; then
+        wait "$router_pid"
+        printf 'router_ping_ms\t%s\n' "$(cat "$tmpdir/router")"
+    fi
+
+    wait "$internet_pid"
+    printf 'internet_ping_ms\t%s\n' "$(cat "$tmpdir/internet")"
+    rm -rf "$tmpdir"
+}
+
+# Interface byte counters. /proc/net/dev pads the name and glues the colon to
+# it, so squeeze the separators: field 1 is the name, 2 is rx_bytes, and the
+# eight receive columns put tx_bytes at 10.
+print_counters() {
+    sed 's/^[[:space:]]*//' /proc/net/dev |
+        awk -F'[:[:space:]]+' -v want="$1" '$1 == want {
+      printf "rx_bytes\t%s\n", $2
+      printf "tx_bytes\t%s\n", $10
+      exit
+    }'
+}
+
+print_verbose() {
+    local prefix line link
+
+    read_route
+    [[ -n $iface ]] || return
+
+    prefix=$(ip -o -4 addr show dev "$iface" 2>/dev/null | awk '{ print $4; exit }')
+    prefix=${prefix##*/}
+
+    printf 'iface\t%s\n' "$iface"
+    printf 'ip\t%s\n' "$address"
+    printf 'prefix\t%s\n' "$prefix"
+    printf 'gateway\t%s\n' "$gateway"
+
+    print_counters "$iface"
+
+    if is_wireless "$iface"; then
+        printf 'type\twifi\n'
+
+        if have nmcli; then
+            line=$(wifi_line "$iface")
+            printf 'ssid\t%s\n' "$(wifi_field "$line" 4)"
+            printf 'signal\t%s\n' "$(wifi_field "$line" 2)"
+            printf 'freq\t%s\n' "$(digits_only "$(wifi_field "$line" 3)")"
+        fi
+
+        # Nothing above reports transmit rate or a dBm figure; iw does, when
+        # it is installed. It is not a dependency of this script.
+        if have iw; then
+            link=$(iw dev "$iface" link 2>/dev/null)
+            if [[ -n $link ]]; then
+                printf 'signal_dbm\t%s\n' "$(awk '/signal:/ { print $2; exit }' <<<"$link")"
+                printf 'bitrate\t%s %s\n' \
+                    "$(awk '/tx bitrate:/ { print $3; exit }' <<<"$link")" \
+                    "$(awk '/tx bitrate:/ { print $4; exit }' <<<"$link")"
+            fi
+        fi
+    else
+        printf 'type\tethernet\n'
+        [[ -r /sys/class/net/$iface/speed ]] && printf 'speed\t%s\n' "$(cat /sys/class/net/$iface/speed)"
+        [[ -r /sys/class/net/$iface/duplex ]] && printf 'duplex\t%s\n' "$(cat /sys/class/net/$iface/duplex)"
+    fi
+
+    print_ping_samples "$gateway"
+}
+
+if [[ $verbose == true ]]; then
+    print_verbose
+else
+    print_status
+fi

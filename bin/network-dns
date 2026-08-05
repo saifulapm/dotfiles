@@ -1,0 +1,170 @@
+#!/bin/bash
+# network-dns — show or set the DNS servers NetworkManager hands to resolved.
+#
+# Ported from omarchy's bin/omarchy-dns (MIT, see CREDITS.md), reduced to the
+# half of it that stays inside NetworkManager: `nmcli connection modify` on
+# every wifi/ethernet profile followed by `nmcli device reapply` on the active
+# devices, which is exactly their set_connection_dns +
+# reapply_active_dns_connections pair.
+#
+# Deliberately NOT ported: their /etc/NetworkManager/conf.d global-dns file and
+# their rewrite of /etc/systemd/resolved.conf (which is why the original needs
+# sudo/pkexec for everything). This repo does not write /etc without approval,
+# and per-connection DNS with ignore-auto-dns achieves the same result for the
+# links that are actually up. NetworkManager still asks polkit to authorize
+# modifying a system connection, so the shell's polkit agent prompts once.
+#
+#   no args                    print the current provider
+#   DHCP|Cloudflare|Google     apply that provider
+#   Custom "1.1.1.1 9.9.9.9"   apply the given servers
+
+set -euo pipefail
+
+CLOUDFLARE_V4="1.1.1.1 1.0.0.1"
+CLOUDFLARE_V6="2606:4700:4700::1111 2606:4700:4700::1001"
+GOOGLE_V4="8.8.8.8 8.8.4.4"
+GOOGLE_V6="2001:4860:4860::8888 2001:4860:4860::8844"
+
+nm_get() {
+    LC_ALL=C nmcli -e no -g "$@" 2>/dev/null
+}
+
+# The profile on the default route is the one the panel is describing; the
+# first managed profile is only a fallback for a box that is offline.
+active_profile() {
+    local device profile
+    device=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
+
+    if [[ -n $device ]]; then
+        profile=$(nm_get GENERAL.CONNECTION device show "$device")
+        if [[ -n $profile && $profile != "--" ]]; then
+            echo "$profile"
+            return
+        fi
+    fi
+
+    nm_get NAME,TYPE connection show |
+        awk -F: '$2 == "802-11-wireless" || $2 == "802-3-ethernet" { print $1; exit }'
+}
+
+current_provider() {
+    local profile servers
+    profile=$(active_profile)
+    [[ -n $profile ]] || {
+        echo "DHCP"
+        return
+    }
+
+    servers=$(nm_get ipv4.dns,ipv6.dns connection show "$profile" | tr '\n,' '  ')
+
+    if [[ -z ${servers// /} ]]; then
+        echo "DHCP"
+    elif [[ $servers == *"1.1.1.1"* || $servers == *"2606:4700:4700::1111"* ]]; then
+        echo "Cloudflare"
+    elif [[ $servers == *"8.8.8.8"* || $servers == *"2001:4860:4860::8888"* ]]; then
+        echo "Google"
+    else
+        echo "Custom"
+    fi
+}
+
+dns_connection_type() {
+    case "$1" in
+    802-11-wireless | 802-3-ethernet) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+
+# Servers arrive as one space-separated list and are split by family here, the
+# same way their split_dns_servers does, so a mixed list lands in the right
+# ipv4./ipv6. properties instead of being rejected wholesale.
+split_servers() {
+    local server clean
+    ipv4_dns=""
+    ipv6_dns=""
+
+    for server in ${1//,/ }; do
+        clean=${server#dns+tls://}
+        clean=${clean#dns+udp://}
+        clean=${clean%%#*}
+        clean=${clean#[}
+        clean=${clean%]}
+
+        [[ -n $clean ]] || continue
+        if [[ $clean == *:* ]]; then
+            ipv6_dns+="${ipv6_dns:+ }$clean"
+        else
+            ipv4_dns+="${ipv4_dns:+ }$clean"
+        fi
+    done
+}
+
+set_connection_dns() {
+    local v4=${1:-} v6=${2:-} ignore=no uuid type
+
+    [[ -n ${v4}${v6} ]] && ignore=yes
+
+    while IFS=: read -r uuid type; do
+        [[ -n $uuid ]] || continue
+        dns_connection_type "$type" || continue
+
+        nmcli connection modify "$uuid" \
+            ipv4.ignore-auto-dns "$ignore" \
+            ipv4.dns "$v4" \
+            ipv6.ignore-auto-dns "$ignore" \
+            ipv6.dns "$v6" \
+            >/dev/null
+    done < <(nm_get UUID,TYPE connection show)
+}
+
+# A modified profile only publishes its DNS on reapply; without this the change
+# lands in the stored connection and nothing else happens until the next
+# reconnect.
+reapply_active_connections() {
+    local device type state
+
+    while IFS=: read -r device type state; do
+        [[ -n $device && $state == connected ]] || continue
+        case "$type" in
+        wifi | ethernet)
+            nmcli device reapply "$device" >/dev/null 2>&1 || true
+            ;;
+        esac
+    done < <(nm_get DEVICE,TYPE,STATE device status)
+}
+
+usage() {
+    echo "Usage: network-dns [DHCP|Cloudflare|Google|Custom \"<servers>\"]" >&2
+}
+
+if (($# == 0)); then
+    current_provider
+    exit 0
+fi
+
+case "$1" in
+DHCP | dhcp)
+    set_connection_dns "" ""
+    ;;
+Cloudflare | cloudflare)
+    set_connection_dns "$CLOUDFLARE_V4" "$CLOUDFLARE_V6"
+    ;;
+Google | google)
+    set_connection_dns "$GOOGLE_V4" "$GOOGLE_V6"
+    ;;
+Custom | custom)
+    servers=${2:-}
+    if [[ -z ${servers// /} ]]; then
+        echo "Error: no DNS servers provided." >&2
+        exit 1
+    fi
+    split_servers "$servers"
+    set_connection_dns "$ipv4_dns" "$ipv6_dns"
+    ;;
+*)
+    usage
+    exit 1
+    ;;
+esac
+
+reapply_active_connections
