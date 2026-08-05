@@ -126,10 +126,16 @@ PanelWindow {
             id: keyCatcher
             anchors.fill: parent
             focus: true
-            Keys.onEscapePressed: panelWindow.close()
+            // Content gets first refusal on every key, Escape included: a
+            // panel with something open inside it (the tailscale panel's copy
+            // menu, its region picker) closes that first and accepts the
+            // event. An Escape nobody claimed closes the card.
             Keys.onPressed: event => {
-                if (event.key !== Qt.Key_Escape)
-                    panelWindow.contentKey(event);
+                panelWindow.contentKey(event);
+                if (!event.accepted && event.key === Qt.Key_Escape) {
+                    panelWindow.close();
+                    event.accepted = true;
+                }
             }
 
             Column {

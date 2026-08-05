@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# tailscale-send — send files to a machine on your tailnet with Taildrop.
+# Port of omarchy's omarchy-tailscale-send (CREDITS.md): the same argument
+# shape (`<machine> [file...]`), the same short-name-in-messages rule, the same
+# file-chooser fallback when no files are named, and the same
+# `tailscale file cp --update-interval=0` transfer with a toast either way.
+#
+# The tailscale panel's per-machine send button calls this with just a machine,
+# so the chooser path is the one it uses.
+#
+# Adaptations: notifications go through plain notify-send (this desktop's
+# notification server is the shell's own), and the chooser is bin/file-select.
+
+set -euo pipefail
+
+glyph="󰒊" # md-send
+
+notify() { # title [body...]
+  local urgency=normal
+  if [[ ${1:-} == "-u" ]]; then
+    urgency=$2
+    shift 2
+  fi
+  notify-send -a qshell -u "$urgency" "$glyph $1" "${2:-}" >/dev/null 2>&1 || true
+}
+
+if (($# < 1)); then
+  echo "Usage: tailscale-send <machine> [file...]" >&2
+  exit 1
+fi
+
+machine="$1"
+shift
+
+# Address the machine by whatever name we were handed, but talk about it by
+# its short name, so a MagicDNS name does not spill into every message.
+name="${machine%%.*}"
+
+files=("$@")
+
+if ((${#files[@]} == 0)); then
+  # Command substitution so the chooser's exit status survives: reading it
+  # through a process substitution reports success for a chooser that never
+  # opened, which is indistinguishable here from someone deciding not to send.
+  picked=$(file-select --title "Send to $name" --multiple) || status=$?
+
+  if ((${status:-0} > 1)); then
+    notify -u critical "Could not send to $name" "The file chooser did not open"
+    exit 1
+  fi
+
+  readarray -t files <<<"$picked"
+  [[ -n $picked ]] || exit 0
+fi
+
+if ((${#files[@]} == 1)); then
+  what=$(basename "${files[0]}")
+else
+  what="${#files[@]} files"
+fi
+
+if error=$(tailscale file cp --update-interval=0 -- "${files[@]}" "$machine:" 2>&1); then
+  notify "Sent to $name" "$what"
+else
+  notify -u critical "Could not send to $name" "${error:-Taildrop transfer failed}"
+  exit 1
+fi

@@ -189,6 +189,33 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   split off the presence probe so the periodic refresh stays cheap, the
   "Stored" row opens the Dropbox folder (`o`), and files open with `xdg-open`
   rather than `uwsm-app -- nautilus --select`.
+- **Tailscale plugin design** from `shell/plugins/panels/tailscale/` (`Panel.qml`,
+  `Service.qml`, `TailscaleIcon.qml`, and their `README.md` as the intent doc):
+  the mark drawn as a 3×3 dot grid with the six inactive dots faded, carrying
+  all three states itself (plain while the tailnet is up, struck through while
+  it is down, badged with a red "!" while the device needs authorizing), the
+  bar button's left-opens / right-toggles / middle-refreshes split, the hero of
+  the mark over a rotating phrase ("Encrypting connections", "Braiding
+  packets", …) with their 180/260 ms cross-fade and the compact on/off switch
+  on its trailing edge, the optimistic on/off state that flips the mark on the
+  click rather than when tailscaled settles, their login dance (`tailscale up`
+  streamed line by line with the first authentication URL handed to the
+  browser, a 10 s fallback that re-reads it from the status), the CONNECTIONS
+  list of login profiles with the switching row pulsing, their operator escape
+  hatch (a profile read refused for want of privileges raises a row that runs
+  `tailscale set --operator=$USER` under pkexec instead of failing silently),
+  the EXIT NODES list with the tailnet's own nodes, the recently-used Mullvad
+  regions and the searchable region picker folded in behind a "+" row, the
+  MACHINES list with per-OS glyphs, IP · DNS captions, a Taildrop send button
+  gated on the tailnet's file-sharing capability and their four-way copy menu
+  (name / DNS name / IPv6 / IPv4), and their single cursor model shared by
+  mouse and keyboard (header → connections → exit nodes → machines, Enter
+  activates, t/r/c/n/d/s). Ours on top: the Mullvad table and the profile list
+  are read on panel open rather than on every tick (only the status feeds the
+  bar mark), a THIS DEVICE block names the status, tailnet name and address
+  their panel never shows, the copy menu is an inline expansion of the machine
+  row rather than a `QtQuick.Controls` popup, and any privileged refusal — not
+  only the one wording their profile list produces — raises the authorize row.
 - **Menu framework and filter semantics** from `shell/plugins/menu/` (`Menu.qml`,
   `MenuModel.js`) and the tree format of `default/omarchy/omarchy-menu.jsonc`:
   the hierarchical tree keyed by dotted ids with the kind inferred from the
@@ -607,6 +634,51 @@ Direct file-level copies (source path → destination path):
   flight is queued instead of dropped, every child process is wrapped in
   `setpriv --pdeathsig TERM`, and `openFile` uses `xdg-open` (so their
   `fileUri` encoder is gone with the nautilus call it fed).
+- omarchy `shell/plugins/panels/tailscale/Model.js` →
+  `shell/Modules/Bar/widgets/TailscaleModel.js`: near-verbatim port — the
+  IPv4/IPv6 filters keyed on Tailscale's own ranges, the DNS-name cleaning and
+  host-name display rules, the OS glyph table, the Mullvad host test, the peer
+  normaliser, the `tailscale exit-node list` fixed-column table parser and its
+  per-city region roll-up, the `status --json` and `switch --list --json`
+  parses, the Taildrop capability and target tests, and the login plan. Only
+  whitespace changed (house 4-space qmlformat), and their glyphs are already
+  Material Design codepoints so they survive our Nerd Font fallback as they
+  are. One function is ours: `isAccessDenied`, which widens their single
+  "profiles access denied" test to the other prose tailscale answers a
+  non-operator with.
+- omarchy `shell/plugins/panels/tailscale/TailscaleIcon.qml` →
+  `shell/Modules/Bar/widgets/TailscaleIcon.qml`: verbatim — the 3×3 dot grid
+  with the six inactive dots at 0.24 opacity, the −45° slash at 1.22× the
+  mark's width, and the badge circle at 0.42× with its "!" . Their
+  `BorderSurface` and `Color`/`Style` singletons become plain properties the
+  caller fills in, since this component knows nothing of a theme.
+- omarchy `shell/plugins/panels/tailscale/Service.qml` →
+  `shell/Modules/Bar/widgets/TailscaleService.qml`: near-verbatim port of the
+  service — the settings readers, the optimistic `_desired`/`active` pair, the
+  status/accounts/exit-node parses, the copy and Taildrop helpers, up/down,
+  profile switching, exit-node setting, the pkexec operator authorization, the
+  authentication-URL scraper, and all six timers (periodic refresh, startup
+  ramp, delayed refresh, poll watchdog with their arm-once reasoning,
+  action-status expiry, login timeout). Changed: it is a `QtObject` rather than
+  an `Item` so it can hang off a bar button, everything is gated behind one
+  `command -v tailscale` probe (nothing runs at all without a CLI, where theirs
+  re-runs `which` on every refresh), the periodic refresh reads only the status
+  and runs only while the widget is on a visible bar, every child process is
+  wrapped in `setpriv --pdeathsig TERM`, the browser is reached with
+  `Qt.openUrlExternally` rather than `omarchy-launch-browser`, and every
+  privileged refusal raises the authorize row.
+- omarchy `bin/omarchy-tailscale-send` → `bin/tailscale-send`: near-verbatim
+  port — the `<machine> [file...]` shape, the short-name-in-messages rule, the
+  chooser fallback with their exit-status reasoning (a chooser that never
+  opened is not the same as nothing picked), the `tailscale file cp
+  --update-interval=0` transfer and a toast either way. Notifications go
+  through plain `notify-send` instead of `omarchy-notification-send`.
+- omarchy `bin/omarchy-file-select` → `bin/file-select`: direct copy — the
+  portal `OpenFile` call, the request path predicted from the bus name and
+  token so the Response subscription is in place before asking, the
+  case-doubled extension filters, the 600 s answer timeout and the
+  nothing-picked / chooser-failed exit split. Only the program name in its two
+  error messages differs.
 - omarchy `shell/plugins/bar/widgets/TrayModel.js` →
   `shell/Modules/Bar/widgets/TrayModel.js`: near-verbatim port of the
   dedicated-widget ownership rule — the case-insensitive id/title/tooltip test
