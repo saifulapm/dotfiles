@@ -45,6 +45,11 @@ if (!tokens["text.on-accent"] && tokens["accent.accent"]) {
     tokens["surface.0"] || "#16161e", tokens["accent.accent"], 4.5)
 }
 
+// GTK polarity, derived here so the settings.ini template and the gsettings
+// calls below read the same decision.
+const mode = String(tokens["meta.mode"]) === "light" ? "light" : "dark"
+tokens["gtk.prefer-dark"] = mode === "light" ? "0" : "1"
+
 let missing = []
 function render(tmpl) {
   return tmpl.replace(/\{\{([A-Za-z0-9_.-]+)(?:\|(hexa?))?\}\}/g, (m, key, filter) => {
@@ -70,6 +75,10 @@ const OUTPUTS = {
     path.join(HOME, ".config/gtk-3.0/gtk.css"),
     path.join(HOME, ".config/gtk-4.0/gtk.css")
   ],
+  "gtk-settings.ini.tmpl": [
+    path.join(HOME, ".config/gtk-3.0/settings.ini"),
+    path.join(HOME, ".config/gtk-4.0/settings.ini")
+  ],
   "fuzzel.ini.tmpl": [path.join(HOME, ".config/fuzzel/fuzzel.ini")],
   "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")]
 }
@@ -83,12 +92,27 @@ for (const [tmplName, dests] of Object.entries(OUTPUTS)) {
 if (missing.length) console.warn("theme-apply: tokens missing from theme:",
   [...new Set(missing)].join(", "))
 
-// ---- GTK light/dark polarity (new + libadwaita apps; best-effort) ----
-const mode = String(tokens["meta.mode"]) === "light" ? "light" : "dark"
+// ---- GTK light/dark polarity ----
+// Two channels, because neither covers everything: gsettings is what
+// libadwaita apps read (and what a gsettings desktop backend would broadcast),
+// and settings.ini above is what plain GTK reads on niri, where no such
+// backend runs.
 try {
   execSync(`gsettings set org.gnome.desktop.interface color-scheme prefer-${mode}`, { stdio: "ignore" })
-  execSync(`gsettings set org.gnome.desktop.interface gtk-theme ${mode === "light" ? "Adwaita" : "Adwaita-dark"}`, { stdio: "ignore" })
+  // Always "Adwaita", never "Adwaita-dark": that theme does not exist on disk
+  // (GTK3's Adwaita is built into the library and its dark variant is the
+  // prefer-dark flag in settings.ini), and naming it drops GTK to the light
+  // default — measured, it was why every GTK app stayed light on a dark theme.
+  execSync("gsettings set org.gnome.desktop.interface gtk-theme Adwaita", { stdio: "ignore" })
 } catch (e) { /* gsettings absent or no session bus */ }
+
+// The portal's GTK backend draws the file dialog we fall back to, and it reads
+// settings.ini once at startup — so it has to be restarted to follow a theme
+// switch. try-restart leaves it alone when it is not running, and it is
+// D-Bus activated, so this costs nothing at idle.
+try {
+  execSync("systemctl --user try-restart xdg-desktop-portal-gtk.service", { stdio: "ignore" })
+} catch (e) { /* no systemd user session */ }
 
 // ---- live foot retheme via OSC (written to each foot child's pty) ----
 const ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
