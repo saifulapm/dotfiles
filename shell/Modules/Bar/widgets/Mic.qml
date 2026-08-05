@@ -10,7 +10,8 @@ BarIcon {
     glyph: audio.micMuted ? "󰍭" : "󰍬" // mic-off / mic
     visible: audio.source !== null
     dimmed: audio.micMuted
-    tooltipText: audio.micMuted ? "Microphone muted" : "Microphone live"
+    active: audio.micInUse // omarchy: lit while an app holds the mic
+    tooltipText: audio.micMuted ? "Microphone muted" : (audio.micInUse ? "Microphone in use" : "Microphone live")
 
     onTapped: rootItem.audio.toggleMicMute()
     onWheelMoved: delta => {

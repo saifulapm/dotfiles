@@ -16,6 +16,20 @@ QtObject {
     readonly property bool micMuted: source && source.audio ? source.audio.muted : false
     readonly property bool ready: Pipewire.ready && sink !== null
 
+    // An application holds the microphone: any live capture stream, minus the
+    // asahi-audio effect chain's own streams and the shell's mic-meter node
+    // (PwNodePeakMonitor spawns a "quickshell" AudioInStream while the audio
+    // panel is open, which must not light the indicator). Presence-based on
+    // purpose — per-stream mute state would need a tracker per stream node,
+    // and "an app has the mic open" is the signal omarchy's widget carries.
+    // Re-evaluates only when the node list changes; no polling.
+    readonly property bool micInUse: !micMuted && Pipewire.nodes.values.some(n => {
+        if (!n || !n.isStream || n.isSink)
+            return false;
+        const name = n.name || "";
+        return !name.startsWith("effect_") && !name.startsWith("audio_effect.") && name !== "quickshell";
+    })
+
     function setVolume(v) {
         if (sink && sink.audio)
             sink.audio.volume = Math.max(0, Math.min(1, v));

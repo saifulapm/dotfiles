@@ -27,6 +27,21 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   `PwNodePeakMonitor`, per-application stream rows with their own sliders, the
   snapshot-plus-settle-timer around PipeWire's node lists, and the single
   cursor model shared by mouse hover and keyboard (j/k, h/l, Enter, m).
+  Deliberately NOT ported (2026-08-06 parity audit): their
+  `omarchy-audio-sink-availability` filter, which drops sinks whose ports are
+  all "not available" (unplugged HDMI/headphone jacks) from the OUTPUT list.
+  It reads `pactl`, and no machine here ships it (Fedora's pipewire-pulse
+  carries no pactl; pw-dump is absent too, and quickshell's Pipewire API
+  exposes no port availability), so the filter would be dead code on every
+  target — this Mac's graph shows a single sink regardless. If an unplugged
+  HDMI sink ever pollutes the NUC's output list, install `pulseaudio-utils`
+  and port the script's awk over `pactl list sinks` plus their
+  `parseSinkAvailability`/`sinkAvailable` wiring. Their microphone widget's
+  in-use state IS ported (2026-08-06): `Services/Audio.qml` `micInUse` lights
+  the bar mic when any application holds a capture stream — presence-based
+  rather than their per-stream mute test, since untracked PipeWire nodes
+  carry no live mute state here, with the asahi-audio effect streams and the
+  shell's own panel meter node excluded.
 - **Network plugin design** from `shell/plugins/panels/network/`: the hero with
   QR-share, speed-test and radio-switch actions over a rotating connection
   phrase, the always-mounted live stats grid (ping, packet loss, rates, totals,
@@ -122,6 +137,22 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   the theme). Their brightness helper, `hyprctl` monitor keywords and OSD summon
   are replaced by `brightnessctl` and `niri msg output`, which also gives us a
   VRR toggle they have no equivalent for.
+- **Battery service** from `shell/plugins/services/battery/` (`Service.qml`,
+  `BatteryModel.js`), ported 2026-08-06 as `shell/Services/Battery.qml`: the
+  low-battery warning at 10% while discharging that fires once and re-arms
+  when the state stops qualifying (their `shouldWarnLowBattery` rules and
+  `PersistentProperties` reload guard), their notification wording ("Time to
+  recharge!", "Battery is down to N%", critical, 30 s, the 󱐋 glyph), and the
+  automatic power-profile switch on AC↔battery transitions. Two adaptations:
+  their 30-second check timer is not ported — the UPower display device
+  pushes percentage and state changes, so the logic re-evaluates from
+  bindings (event-driven, identical observable behaviour); and their
+  `omarchy-powerprofiles-set` per-source saved-profile files are not ported —
+  upstream only writes them from a CLI this desktop does not ship, so this is
+  their exact fallback behaviour (AC → performance when the daemon offers it,
+  else balanced; battery → balanced) through quickshell's PowerProfiles
+  service instead of `powerprofilesctl`. Their `omarchy-hook` call has no
+  counterpart (no plugin system here).
 - **Power plugin design** from `shell/plugins/panels/power/` (`Panel.qml`,
   `Model.js`): the hero of battery glyph, bold title and rotating status phrase
   beside the percentage at display size, over a charge bar that animates its
@@ -273,8 +304,13 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   and anything multi-line or long keeps their `wtype -M shift -k Insert` with
   the primary selection set to the same bytes so a terminal pastes the right
   thing — typing multi-line text into a shell would execute each line, which
-  a bracketed paste does not. Their Alt+Enter open action (browser for a URL,
-  editor otherwise, image editor for a screenshot) is still not ported.
+  a bracketed paste does not. Their Alt+Enter open action is ported
+  (2026-08-06) as `bin/clipboard-open`, a port of `omarchy-clipboard-open`:
+  the same URL sniff (embedded http(s) URL first, then a lone bare domain
+  promoted to https), the same scratch-file-for-text flow, the entry still
+  travelling by index. Their tensaku-edit image editor and
+  `omarchy-launch-browser`/`-editor` launchers are not shipped, so all three
+  destinations resolve through `xdg-open`.
 - **Reminders design** from `bin/omarchy-reminder`, `shell/plugins/reminders/`
   and `shell/plugins/bar/indicators/Reminder.qml`: reminders as transient
   systemd user timers (one per reminder, `systemd-run --user --on-active`,
