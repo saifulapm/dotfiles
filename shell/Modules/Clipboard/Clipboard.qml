@@ -19,10 +19,13 @@ import "ClipboardHistory.js" as ClipboardHistory
 //   * The picker window is LazyLoader-gated and does not exist until first
 //     summoned.
 //
-// Selection differs from upstream by necessity, exactly as the emoji picker
-// does: theirs copies the entry and then pastes it into the focused window
-// with `wtype -M shift -k Insert`. No key-injection tool is installed here, so
-// the entry goes to the clipboard as a normal copy and a notification says so.
+// Selection is upstream's: Enter copies the entry AND puts it into the focused
+// window, Shift+Enter only copies. Both go through `bin/clipboard-paste`, our
+// merge of their omarchy-clipboard-paste-text and -paste-file, which takes the
+// history index rather than the content — clipboard entries have no business
+// on argv. The delivery differs from their bare `wtype -M shift -k Insert`,
+// which pastes the PRIMARY selection in foot and nothing at all in GTK3 apps;
+// the script documents what was measured and what it does instead.
 Scope {
     id: clipboardRoot
 
@@ -206,24 +209,30 @@ Scope {
     }
 
     // ------------------------------------------------------------ activate
+    // Enter: copy the entry and put it into the focused window. Closing first
+    // is upstream's order and it is load-bearing — the helper waits out the
+    // keyboard handover, and it can only reach the application once this layer
+    // surface has let go.
     function activateIndex(index) {
         if (index < 0 || index >= displayModel.count)
             return;
         const row = displayModel.get(index);
         hide();
+        if (row.entryType === "image" || row.fullText)
+            Quickshell.execDetached([binDir + "clipboard-paste", "--history-index", String(row.historyIndex)]);
+    }
 
-        if (row.entryType === "image") {
-            // The bytes go back on the clipboard under their own mime type, so
-            // the receiving app sees a picture and not a path.
-            Quickshell.execDetached(["bash", "-c", 'wl-copy --type "$1" <"$2"', "clipboard-copy", String(row.mime), String(row.path)]);
-            Quickshell.execDetached(["notify-send", "-a", "qshell", "-t", "2000", "Copied image", "On the clipboard — paste with Ctrl+V"]);
+    // Shift+Enter: copy only, upstream's second Enter. The toast is ours —
+    // with nothing typed, a picker that just closes looks like it did nothing.
+    function copyIndex(index) {
+        if (index < 0 || index >= displayModel.count)
             return;
-        }
-
-        if (!row.fullText)
+        const row = displayModel.get(index);
+        hide();
+        if (row.entryType !== "image" && !row.fullText)
             return;
-        Quickshell.execDetached(["wl-copy", "--type", "text/plain", String(row.fullText)]);
-        Quickshell.execDetached(["notify-send", "-a", "qshell", "-t", "2000", "Copied to clipboard", "Paste with Ctrl+V"]);
+        Quickshell.execDetached([binDir + "clipboard-paste", "--copy-only", "--history-index", String(row.historyIndex)]);
+        Quickshell.execDetached(["notify-send", "-a", "qshell", "-t", "2000", row.entryType === "image" ? "Copied image" : "Copied to clipboard", "Paste with Ctrl+V"]);
     }
 
     // -------------------------------------------------------------- capture
@@ -414,7 +423,9 @@ Scope {
                         } else if (event.key === Qt.Key_End) {
                             clipboardRoot.selectAbsolute(displayModel.count - 1);
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            if (clipboardRoot.cursorActive)
+                            if (clipboardRoot.cursorActive && shift)
+                                clipboardRoot.copyIndex(clipboardRoot.selectedIndex);
+                            else if (clipboardRoot.cursorActive)
                                 clipboardRoot.activateIndex(clipboardRoot.selectedIndex);
                             else if (displayModel.count > 0)
                                 clipboardRoot.cursorActive = true;
@@ -632,13 +643,13 @@ Scope {
                             }
                         }
 
-                        // Upstream has no footer; Shift+Delete is worth saying
-                        // out loud, and so is the fact that Enter only copies.
+                        // Upstream has no footer; the two Enters and
+                        // Shift+Delete are all worth saying out loud.
                         Text {
                             id: footer
                             width: parent.width
                             elide: Text.ElideRight
-                            text: "enter copy   ·   del remove   ·   shift+del clear all"
+                            text: "enter paste   ·   shift+enter copy   ·   del remove   ·   shift+del clear all"
                             color: clipboardRoot.theme.textMuted
                             font.family: clipboardRoot.theme.fontUi
                             font.pixelSize: clipboardRoot.theme.fontPx(0.75)

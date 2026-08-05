@@ -1,0 +1,105 @@
+#!/bin/bash
+# clipboard-paste — put a clipboard-history entry back on the clipboard and,
+# unless --copy-only, into the focused window.
+#
+#   clipboard-paste [--copy-only] --history-index <index>
+#
+# Port of omarchy's bin/omarchy-clipboard-paste-text and
+# bin/omarchy-clipboard-paste-file (MIT, see CREDITS.md), merged: our history
+# store has the same shape as theirs, so one index resolves either an image or
+# a text entry and the picker does not have to hand over the content. That is
+# also why the entry travels by INDEX and never on argv — argv is
+# world-readable in /proc, and clipboard entries are exactly the kind of thing
+# that should not be.
+#
+# How the paste is delivered, and why it is not simply their Shift+Insert
+# (measured on this machine — see bin/emoji-insert for the full note): foot
+# maps Shift+Insert to the PRIMARY selection, and GTK3 apps ignore wtype's
+# modifiers entirely while accepting typed characters. So:
+#
+#   * short single-line text is TYPED (`wtype -`), which lands in both;
+#   * anything multi-line or long is copied and pasted with their
+#     Shift+Insert, and the primary selection is set to the same bytes so a
+#     terminal's Shift+Insert pastes the right thing. Typing multi-line text
+#     into a shell would EXECUTE each line as it arrives, which is the real
+#     reason the split exists — a paste is bracketed, typing is not.
+#
+# Either way the entry is on the clipboard first, so Ctrl+V still works if the
+# injected paste does not reach the application.
+
+set -uo pipefail
+
+# Longest single-line entry we are willing to type keystroke by keystroke.
+type_limit=500
+
+copy_only=false
+index=""
+
+while (($# > 0)); do
+    case "$1" in
+    --copy-only)
+        copy_only=true
+        shift
+        ;;
+    --history-index)
+        index="${2:-}"
+        shift 2
+        ;;
+    *)
+        echo "Usage: clipboard-paste [--copy-only] --history-index <index>" >&2
+        exit 1
+        ;;
+    esac
+done
+
+[[ $index =~ ^[0-9]+$ ]] || exit 1
+
+history_path="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/clipboard/history.json"
+[[ -r $history_path ]] || exit 1
+
+entry_type=$(jq -er --argjson i "$index" '.[$i].type' "$history_path") || exit 1
+
+entry_text() {
+    jq -j --argjson i "$index" '.[$i].text' "$history_path"
+}
+
+paste_key() {
+    # Modifiers get released when wtype exits, so this is self-contained.
+    wtype -M shift -k Insert -m shift 2>/dev/null || true
+}
+
+case "$entry_type" in
+image)
+    path=$(jq -er --argjson i "$index" '.[$i].path' "$history_path") || exit 1
+    mime=$(jq -er --argjson i "$index" '.[$i].mime // "image/png"' "$history_path") || exit 1
+    [[ -r $path ]] || exit 1
+
+    # The bytes go back under their own mime type, so the receiving app sees a
+    # picture and not a path.
+    wl-copy --type "$mime" <"$path"
+    $copy_only && exit 0
+
+    sleep 0.15
+    paste_key
+    ;;
+text)
+    entry_text | wl-copy --type text/plain
+    $copy_only && exit 0
+
+    length=$(jq -r --argjson i "$index" '.[$i].text | length' "$history_path")
+    multiline=$(jq -r --argjson i "$index" 'if (.[$i].text | test("\n")) then "yes" else "no" end' "$history_path")
+
+    # The picker's layer surface has to hand the keyboard back first.
+    sleep 0.15
+
+    if [[ $multiline == "no" && $length -le $type_limit ]]; then
+        entry_text | wtype - 2>/dev/null || paste_key
+    else
+        entry_text | wl-copy --primary --type text/plain
+        paste_key
+    fi
+    ;;
+*)
+    exit 1
+    ;;
+esac

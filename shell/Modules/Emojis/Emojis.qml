@@ -12,11 +12,13 @@ import "EmojiSearch.js" as EmojiSearch
 // substring filter in EmojiSearch.js. The chrome is our launcher/menu
 // language: scrim, surface1 card, accent cursor fill.
 //
-// Selection differs from upstream by necessity: theirs copies to a transient
-// `wl-copy --sensitive --foreground` offer and immediately pastes it with
-// `wtype -M shift -k Insert`, then kills the offer. No key-injection tool is
-// installed here (no wtype/ydotool/dotool), so the emoji goes to the clipboard
-// as a normal, persistent copy and a notification says so — the user pastes.
+// Enter inserts the emoji into the focused window, as upstream does, through
+// `bin/emoji-insert` — a port of their omarchy-menu-emoji-insert whose paste
+// mechanism had to change: their `wtype -M shift -k Insert` pastes the PRIMARY
+// selection in foot and does nothing at all in GTK3 apps, so ours types the
+// emoji instead (their own other branch). The script explains the measurement.
+// Shift+Enter is ours: it copies without typing, which is what this picker did
+// before wtype existed and the way out if an application refuses the keystroke.
 //
 // LazyLoader-gated — nothing here exists until first summoned via IPC.
 Scope {
@@ -145,19 +147,35 @@ Scope {
     }
 
     // ------------------------------------------------------------ activate
+    readonly property string binDir: Quickshell.env("HOME") + "/.dotfiles/bin/"
+
     function activateIndex(index) {
         if (index < 0 || index >= displayModel.count)
             return;
         applySelected(displayModel.get(index).emoji);
     }
 
+    function copyIndex(index) {
+        if (index < 0 || index >= displayModel.count)
+            return;
+        copySelected(displayModel.get(index).emoji);
+    }
+
     function applySelected(emoji) {
         if (!emoji)
             return;
+        // Close first: the helper waits out the keyboard handover, and it can
+        // only type into the application once this layer surface lets go.
         hide();
-        // A plain (daemonizing) wl-copy, not upstream's --sensitive
-        // --foreground offer: with no key-injection tool to paste it for us,
-        // the copy has to outlive this call.
+        Quickshell.execDetached([binDir + "emoji-insert", String(emoji)]);
+    }
+
+    function copySelected(emoji) {
+        if (!emoji)
+            return;
+        hide();
+        // A plain (daemonizing) wl-copy: nothing is going to paste it, so the
+        // copy has to outlive this call.
         Quickshell.execDetached(["wl-copy", "--type", "text/plain", String(emoji)]);
         Quickshell.execDetached(["notify-send", "-a", "qshell", "-t", "2000", "Copied " + emoji, "On the clipboard — paste with Ctrl+V"]);
     }
@@ -260,7 +278,9 @@ Scope {
                     } else if (event.key === Qt.Key_PageDown) {
                         emojisRoot.selectPage(1);
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        if (emojisRoot.cursorActive)
+                        if (emojisRoot.cursorActive && (event.modifiers & Qt.ShiftModifier))
+                            emojisRoot.copyIndex(emojisRoot.selectedIndex);
+                        else if (emojisRoot.cursorActive)
                             emojisRoot.activateIndex(emojisRoot.selectedIndex);
                         else if (displayModel.count > 0)
                             emojisRoot.cursorActive = true;

@@ -1,0 +1,42 @@
+#!/bin/bash
+# emoji-insert — put an emoji into the focused window.
+#
+# Port of omarchy's bin/omarchy-menu-emoji-insert (MIT, see CREDITS.md), with
+# their paste mechanism replaced after measuring it on this machine.
+#
+# Theirs copies to a transient `wl-copy --type text/plain --sensitive
+# --foreground` offer, sends `wtype -M shift -k Insert -m shift`, then kills
+# the offer so the emoji never sticks to the clipboard. Shift+Insert does not
+# survive the trip here:
+#
+#   * in foot — our terminal, where Alacritty is theirs — Shift+Insert pastes
+#     the PRIMARY selection, not the clipboard (verified: a window fed
+#     Shift+Insert received the primary text while the clipboard held
+#     something else), so their sequence would paste whatever was last
+#     selected with the mouse;
+#   * in GTK3 apps neither Shift+Insert nor Ctrl+V from wtype pastes at all,
+#     while plain typed characters arrive perfectly and the app can read both
+#     selections — so it is wtype's modifier path that those toolkits ignore,
+#     not the clipboard.
+#
+# Typing the emoji is what works in both, and it is upstream's own other
+# branch (omarchy-clipboard-paste-text types the text when not asked for
+# --shift-insert). It also keeps their real intent — the emoji never touches
+# the clipboard, so it cannot pollute the clipboard history.
+#
+# The sleep is theirs: the picker's layer surface has to hand the keyboard
+# back to the application before anything typed can land in it.
+
+emoji=${1:-}
+[[ -n $emoji ]] || exit 0
+
+sleep 0.15
+
+if printf '%s' "$emoji" | wtype - 2>/dev/null; then
+    exit 0
+fi
+
+# wtype missing or the compositor refused the virtual keyboard: fall back to
+# the behaviour this picker had before wtype was installed.
+printf '%s' "$emoji" | wl-copy --type text/plain
+notify-send -a qshell -t 2000 "Copied $emoji" "Could not type it — on the clipboard, paste with Ctrl+V"

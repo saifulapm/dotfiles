@@ -240,10 +240,19 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   cell, ↑/↓ by a row, PageUp/PageDown by a screenful, the first press parking
   on the first cell instead of stepping, Enter to take the cursor's emoji,
   Escape clearing the query before it closes, hover moving the cursor).
-  Their selection path is `wl-copy --sensitive --foreground` plus a
-  `wtype -M shift -k Insert` paste into the focused window, with the offer
-  killed afterwards; no key-injection tool is installed here, so ours does a
-  plain persistent `wl-copy` and confirms with a notification instead.
+  Their selection path — insert into the focused window and leave nothing on
+  the clipboard — is ported through `bin/emoji-insert`, our version of
+  `bin/omarchy-menu-emoji-insert`, including the sleep that waits out the
+  keyboard handover. The delivery differs: theirs is `wl-copy --sensitive
+  --foreground` plus `wtype -M shift -k Insert` with the offer killed
+  afterwards, and Shift+Insert does not survive the trip here — foot maps it
+  to the PRIMARY selection (Alacritty, their terminal, maps it to the
+  clipboard) and GTK3 apps ignore wtype's modifiers entirely while accepting
+  typed characters. So ours types the emoji, which is upstream's own other
+  branch (`omarchy-clipboard-paste-text` types the text when not asked for
+  `--shift-insert`) and reaches the same end: nothing is left behind.
+  Shift+Enter for a copy without typing is ours, as is the fallback to a
+  persistent copy plus a notification when wtype cannot run at all.
 - **Clipboard manager design** from `shell/plugins/clipboard/Clipboard.qml`: the
   always-loaded capture half (the shell supervises the `wl-paste --watch`
   process itself and brings it back a second after it dies, because a dead
@@ -254,12 +263,18 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   model (Delete removes the row under the cursor, Shift+Delete asks before
   clearing everything, Home/End, PageUp/PageDown by six, Escape clearing the
   query before it closes, the first press parking the cursor instead of
-  stepping). Their Enter pastes into the focused window via
-  `wtype -M shift -k Insert` and their Alt+Enter opens the entry in a browser or
-  editor; no key-injection tool is installed here, so Enter copies and confirms
-  with a notification (as the emoji picker does) and the open action is not
-  ported. Their history-index helper scripts are not needed as a result — the
-  picker copies through `wl-copy` directly.
+  stepping), plus their two Enters: Enter copies the entry and pastes it into
+  the focused window, Shift+Enter only copies. `bin/clipboard-paste` is
+  `bin/omarchy-clipboard-paste-text` and `bin/omarchy-clipboard-paste-file`
+  merged — our history store has their shape, so one `--history-index`
+  resolves either kind and the content never travels on argv, which is their
+  reason for the index in the first place. The paste itself deviates for the
+  reasons given under the emoji picker: a short single-line entry is typed,
+  and anything multi-line or long keeps their `wtype -M shift -k Insert` with
+  the primary selection set to the same bytes so a terminal pastes the right
+  thing — typing multi-line text into a shell would execute each line, which
+  a bracketed paste does not. Their Alt+Enter open action (browser for a URL,
+  editor otherwise, image editor for a screenshot) is still not ported.
 - **Reminders design** from `bin/omarchy-reminder`, `shell/plugins/reminders/`
   and `shell/plugins/bar/indicators/Reminder.qml`: reminders as transient
   systemd user timers (one per reminder, `systemd-run --user --on-active`,
