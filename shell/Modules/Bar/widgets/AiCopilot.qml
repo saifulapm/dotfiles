@@ -35,6 +35,10 @@ Item {
 
     property bool ready: false
     property bool refreshing: false
+    // False when the scanner could not read the session-store DB — the local
+    // counters are then absent, not genuinely zero, and the panel must not
+    // present them as real numbers.
+    property bool hasLocalStats: true
 
     // ------------------------------------------------------------- limits
     property real rateLimitPercent: -1
@@ -81,6 +85,9 @@ Item {
         try {
             const data = JSON.parse(raw.split("\n").pop());
             provider.ready = !!data.ready;
+            provider.hasLocalStats = data.hasLocalStats !== false;
+            if (!provider.hasLocalStats && !data.usageStatusText)
+                provider.usageStatusText = "Local usage unavailable (session store unreadable)";
 
             provider.todayPrompts = data.todayPrompts || 0;
             provider.todaySessions = data.todaySessions || 0;

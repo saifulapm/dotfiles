@@ -8,9 +8,19 @@ state_dir="$HOME/.local/state/qshell"
 state="$state_dir/updates"
 mkdir -p "$state_dir"
 
-# Exit 100 = updates available, 0 = none. -q keeps output parseable; the
-# listing starts after a blank line, one package per line.
-count="$(dnf -q check-update 2>/dev/null | awk 'NF >= 3 && $1 ~ /\./ { n++ } END { print n + 0 }')" || true
+# Exit 100 = updates available, 0 = none; anything else is a hard failure
+# (network down, rpm lock) whose empty output must not masquerade as a real
+# zero — keep the previous count and let the next timer run try again.
+listing="$(dnf -q check-update 2>/dev/null)"
+rc=$?
+if [[ $rc -ne 0 && $rc -ne 100 ]]; then
+  echo "check-updates: dnf check-update failed (rc $rc); keeping previous count" >&2
+  exit 0
+fi
+
+# -q keeps output parseable; the listing starts after a blank line, one
+# package per line.
+count="$(awk 'NF >= 3 && $1 ~ /\./ { n++ } END { print n + 0 }' <<<"$listing")"
 count="${count:-0}"
 
 printf '%s\n' "$count" >"$state.tmp"

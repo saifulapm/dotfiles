@@ -80,6 +80,7 @@ def local_day(value):
 # --------------------------------------------------------------- local usage
 def scan_usage():
     result = {
+        "hasLocalStats": True,
         "todayPrompts": 0,
         "todaySessions": 0,
         "todayTotalTokens": 0,
@@ -97,6 +98,9 @@ def scan_usage():
     try:
         connection = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
     except sqlite3.Error:
+        # The DB exists but cannot be opened (locked WAL, permissions). Zeros
+        # here would be a lie, so say the local stats are missing instead.
+        result["hasLocalStats"] = False
         return result
 
     try:
@@ -106,7 +110,9 @@ def scan_usage():
             " from assistant_usage_events"
         ).fetchall()
     except sqlite3.Error:
-        # An older or newer CLI may not have this table.
+        # An older or newer CLI may not have this table — or the read itself
+        # failed (SQLITE_BUSY). Either way these are not real zeros.
+        result["hasLocalStats"] = False
         return result
     finally:
         connection.close()
@@ -300,7 +306,9 @@ def main():
         print("Usage: copilot-usage-scan", file=sys.stderr)
         return 1
 
-    out = {"ready": True, "hasLocalStats": True}
+    # hasLocalStats comes from scan_usage: True with real (possibly zero)
+    # counts, False when the session store could not be read.
+    out = {"ready": True}
     out.update(scan_usage())
     out.update(fetch_quota())
     print(json.dumps(out, separators=(",", ":")))

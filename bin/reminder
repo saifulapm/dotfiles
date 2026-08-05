@@ -51,23 +51,43 @@ store_write() {
     return 1
   fi
   mkdir -p "$state_dir"
-  printf '%s\n' "$1" >"$store.tmp"
-  mv "$store.tmp" "$store" # atomic: watchers never see a half-written store
+  # mktemp, not a fixed name: two invocations writing at once (two reminders
+  # firing in the same second) must not steal each other's temp file.
+  local tmp
+  tmp="$(mktemp "$store.XXXXXX")"
+  printf '%s\n' "$1" >"$tmp"
+  mv "$tmp" "$store" # atomic: watchers never see a half-written store
+}
+
+# Serialize a read-modify-write of the store, flock-style like
+# bin/clipboard-capture's emit lock: without it, concurrent invocations (two
+# transient timers firing together) interleave read/write and one drop is lost.
+with_store_lock() { # fn args...
+  mkdir -p "$state_dir"
+  (
+    flock 9
+    "$@"
+  ) 9>>"$store.lock"
 }
 
 # Units of the reminder timers systemd currently holds, as a JSON array.
+# Fails with no output when systemctl or jq does: an error here must stay
+# distinguishable from a real empty list, or a dead user bus would read as
+# "no timers" and prune every reminder.
 live_timers() {
-  systemctl --user list-timers --all --no-pager --output=json "${unit_prefix}*.timer" 2>/dev/null |
-    jq -c '[.[] | .unit | select(. != null)]' 2>/dev/null || printf '[]'
+  local raw
+  raw="$(systemctl --user list-timers --all --no-pager --output=json "${unit_prefix}*.timer" 2>/dev/null)" || return 1
+  jq -c '[.[] | .unit | select(. != null)]' <<<"$raw" 2>/dev/null
 }
 
 # Drop entries whose timer is gone, persist if that changed anything, and echo
 # the reconciled store. A systemctl or jq hiccup leaves the store untouched
-# rather than wiping it.
-sync_store() {
+# rather than wiping it: live_timers then emits nothing, which fails the
+# array check below (unlike a fabricated '[]', which would pass it).
+sync_store_locked() {
   local cur live pruned
   cur="$(store_read)"
-  live="$(live_timers)"
+  live="$(live_timers)" || live=""
   if ! jq -e 'type == "array"' <<<"$live" >/dev/null 2>&1; then
     printf '%s' "$cur"
     return 0
@@ -82,11 +102,19 @@ sync_store() {
   printf '%s' "$pruned"
 }
 
-store_drop() { # id
+sync_store() {
+  with_store_lock sync_store_locked
+}
+
+store_drop_locked() { # id
   local cur next
   cur="$(store_read)"
   next="$(jq -c --arg id "$1" '{version: 1, reminders: [.reminders[] | select(.id != $id)]}' <<<"$cur")"
   store_write "$next"
+}
+
+store_drop() { # id
+  with_store_lock store_drop_locked "$1"
 }
 
 # --------------------------------------------------------------- projections
@@ -189,10 +217,12 @@ clear_reminders() {
   local units
   # Straight from systemd, like upstream's — this also sweeps up any timer the
   # store lost track of, which stopping only the listed units would leave armed.
-  units="$(live_timers | jq -r '.[] | sub("\\.timer$"; "")')"
+  # A live_timers failure is tolerated here: clearing is explicit user intent,
+  # so the store is wiped either way and only the stop sweep is skipped.
+  units="$(live_timers | jq -r '.[] | sub("\\.timer$"; "")')" || units=""
   # shellcheck disable=SC2086 # unit names are our own [a-z0-9-] ids
   [[ -n $units ]] && stop_units $units
-  store_write "$empty_store"
+  with_store_lock store_write "$empty_store"
   notify "All reminders have been cleared"
 }
 
@@ -210,39 +240,20 @@ open_interactive() {
     echo "reminder: the shell is not running" >&2
 }
 
-add_reminder() { # minutes [message words...]
-  local minutes=${1:-}
-  shift || true
-  local message="$*"
-  local custom_message="$message"
-
-  if [[ -z $minutes || ! $minutes =~ ^[0-9]+$ ]] || ((10#$minutes == 0)); then
-    usage
-    exit 1
-  fi
-  # Base 10 explicitly: a typed "008" is not octal, it is eight minutes.
-  minutes=$((10#$minutes))
-
-  [[ -z $message ]] && message="Your ${minutes} minutes are up"
-
-  local set_at id unit label
-  set_at="$(date +%s)"
+# The snapshot-to-write span runs under the store lock: a reminder firing in
+# between would otherwise be resurrected by a write based on the stale
+# snapshot. The systemd-run inside holds the lock for milliseconds, and the
+# soonest possible firing is a minute away.
+add_reminder_locked() { # minutes set_at message custom_message label
+  local minutes="$1" set_at="$2" message="$3" custom_message="$4" label="$5"
+  local snapshot id unit n=0
+  snapshot="$(sync_store_locked)"
   id="${minutes}m-${set_at}"
-  local snapshot n=0
-  snapshot="$(sync_store)"
   while [[ "$(jq -r --arg id "$id" 'any(.reminders[]; .id == $id)' <<<"$snapshot")" == "true" ]]; do
     n=$((n + 1))
     id="${minutes}m-${set_at}-${n}"
   done
   unit="${unit_prefix}${id}"
-  label="$custom_message"
-  [[ -z $label ]] && label="${minutes}-min reminder"
-
-  local remind_at confirmation confirmation_title
-  remind_at="$(date -d "+${minutes} minutes" +%H:%M)"
-  confirmation="You'll be reminded at $remind_at"
-  confirmation_title="Reminder set for ${minutes} minutes"
-  [[ -n $custom_message ]] && confirmation_title="$custom_message in ${minutes} minutes"
 
   systemd-run --user --quiet --collect --on-active="$((minutes * 60))" \
     --unit="$unit" --description="qshell reminder: $label" \
@@ -258,6 +269,35 @@ add_reminder() { # minutes [message words...]
     --argjson at "$((set_at + minutes * 60))" \
     '{version: 1, reminders: ((.reminders // []) + [{id: $id, unit: $unit, minutes: $minutes, message: $message, label: $label, createdAt: $createdAt, at: $at}] | sort_by(.at))}' \
     <<<"$snapshot")"
+}
+
+add_reminder() { # minutes [message words...]
+  local minutes=${1:-}
+  shift || true
+  local message="$*"
+  local custom_message="$message"
+
+  if [[ -z $minutes || ! $minutes =~ ^[0-9]+$ ]] || ((10#$minutes == 0)); then
+    usage
+    exit 1
+  fi
+  # Base 10 explicitly: a typed "008" is not octal, it is eight minutes.
+  minutes=$((10#$minutes))
+
+  [[ -z $message ]] && message="Your ${minutes} minutes are up"
+
+  local set_at label
+  set_at="$(date +%s)"
+  label="$custom_message"
+  [[ -z $label ]] && label="${minutes}-min reminder"
+
+  local remind_at confirmation confirmation_title
+  remind_at="$(date -d "+${minutes} minutes" +%H:%M)"
+  confirmation="You'll be reminded at $remind_at"
+  confirmation_title="Reminder set for ${minutes} minutes"
+  [[ -n $custom_message ]] && confirmation_title="$custom_message in ${minutes} minutes"
+
+  with_store_lock add_reminder_locked "$minutes" "$set_at" "$message" "$custom_message" "$label"
 
   notify "$confirmation_title" "$confirmation"
 }

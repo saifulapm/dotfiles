@@ -11,8 +11,12 @@ set -euo pipefail
 results_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bench"
 mkdir -p "$results_dir"
 out="$results_dir/$(date +%Y%m%d-%H%M%S)-$(uname -m).txt"
-log=$(mktemp)
-trap 'rm -f "$log"' EXIT
+# The relaunched shell keeps this fd for its whole life, so the log lives at a
+# persistent path (truncated each run) instead of a mktemp file an EXIT trap
+# deletes — unlinking it would leave qs -v writing into an invisible deleted
+# tmpfs inode until the next restart.
+log="$results_dir/.last-qs.log"
+: >"$log"
 
 now_ms() { date +%s%N | cut -c1-13; }
 
@@ -44,8 +48,15 @@ done
 
 qspid=$(pgrep -x qs | head -1)
 
-# ---- 4a. launcher cold latency (before anything settles it stays honest:
-# LazyLoader has never been active in this process)
+# ---- 2. idle RSS (settle first, and sample BEFORE the launcher tests: the
+# launcher's LazyLoader stays resident once loaded, so measuring after them
+# would charge the launcher tree to "idle")
+sleep 5
+rss_kb=$(awk '/VmRSS/ {print $2}' "/proc/$qspid/status")
+
+# ---- 4a. launcher cold latency (still honest this late: nothing above
+# summons the launcher, so its LazyLoader has never been active in this
+# process)
 lc0=$(now_ms)
 qs ipc call launcher toggle >/dev/null
 launcher_cold=$(( $(now_ms) - lc0 ))
@@ -62,10 +73,6 @@ qs ipc call launcher hide >/dev/null
 po0=$(now_ms)
 qs ipc call shell ping >/dev/null
 ipc_overhead=$(( $(now_ms) - po0 ))
-
-# ---- 2. idle RSS (settle first)
-sleep 5
-rss_kb=$(awk '/VmRSS/ {print $2}' "/proc/$qspid/status")
 
 # ---- 3. idle CPU over 60s
 read -r ut0 st0 < <(awk '{print $14, $15}' "/proc/$qspid/stat")

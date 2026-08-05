@@ -125,13 +125,17 @@ class FileChooser(dbus.service.Object):
         super().__init__(connection, OBJECT_PATH)
         self._connection = connection
         self._pending = {}
+        # Dialogs handed to the gtk backend are pending too: they hold an
+        # unanswered D-Bus reply just like ours, so they must pin this service
+        # against the idle exit even though they have no _pending entry.
+        self._delegated = 0
         self._idle_source = None
         self._arm_idle_exit()
 
     # ------------------------------------------------------------- lifecycle
     def _arm_idle_exit(self):
         self._cancel_idle_exit()
-        if self._pending:
+        if self._pending or self._delegated:
             return
         self._idle_source = GLib.timeout_add_seconds(IDLE_EXIT_SEC, self._idle_exit)
 
@@ -142,7 +146,7 @@ class FileChooser(dbus.service.Object):
 
     def _idle_exit(self):
         self._idle_source = None
-        if not self._pending:
+        if not self._pending and not self._delegated:
             loop.quit()
         return False
 
@@ -157,6 +161,26 @@ class FileChooser(dbus.service.Object):
         only covers a backend that will not *start*, not one that starts and
         then cannot reach its UI.
         """
+        # Count the delegated dialog before anything can fail, and count it
+        # back down on every way out — reply, D-Bus error (including the
+        # 1800s call timeout), or the call never getting off the ground —
+        # so the idle exit cannot fire mid-dialog and cannot be starved
+        # forever afterwards.
+        self._delegated += 1
+        self._cancel_idle_exit()
+
+        def finish():
+            self._delegated -= 1
+            self._arm_idle_exit()
+
+        def on_reply(response, results):
+            finish()
+            reply_cb(response, results)
+
+        def on_error(error):
+            finish()
+            error_cb(error)
+
         try:
             proxy = self._connection.get_object(
                 "org.freedesktop.impl.portal.desktop.gtk", OBJECT_PATH
@@ -165,12 +189,13 @@ class FileChooser(dbus.service.Object):
             log("shell unreachable — delegating %s to the gtk backend" % method)
             getattr(iface, method)(
                 *args,
-                reply_handler=lambda response, results: reply_cb(response, results),
-                error_handler=error_cb,
+                reply_handler=on_reply,
+                error_handler=on_error,
                 timeout=ANSWER_TIMEOUT_SEC,
             )
         except Exception as error:
             log("gtk fallback failed too: %s" % error)
+            finish()
             reply_cb(dbus.UInt32(RESPONSE_OTHER), dbus.Dictionary({}, signature="sv"))
 
     def _teardown(self, handle):

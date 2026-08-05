@@ -244,28 +244,42 @@ def rpc_request(proc, request_id, method, params=None, timeout=8):
   payload = {"id": request_id, "method": method, "params": params or {}}
   proc.stdin.write(json.dumps(payload) + "\n")
   proc.stdin.flush()
+  # The pipe is read raw (os.read on the fd) rather than through
+  # proc.stdout.readline(): readline is buffered, so when the server writes
+  # two lines in one burst a single readline drains both from the pipe and the
+  # second becomes invisible to select(), which then spins this loop into a
+  # timeout with the reply already in hand. Leftover bytes are kept on the
+  # proc object so the next request sees them.
+  fd = proc.stdout.fileno()
+  buffer = getattr(proc, "_rpc_buffer", b"")
   deadline = time.time() + timeout
-  while time.time() < deadline:
-    ready, _, _ = select.select([proc.stdout], [], [], 0.25)
-    if not ready:
-      continue
-    line = proc.stdout.readline()
-    if not line:
-      break
-    try:
-      message = json.loads(line)
-    except Exception:
-      continue
-    if message.get("id") == request_id:
-      # Added on top of the upstream port: the app server answers an
-      # unauthenticated rate-limit read with a JSON-RPC error, which upstream
-      # reads straight past ("result" is absent, so limits end up empty and
-      # nothing says why). Raising here lets the caller report it.
-      error = message.get("error")
-      if isinstance(error, dict):
-        raise RuntimeError(str(error.get("message") or method))
-      return message
-  raise TimeoutError(method)
+  try:
+    while time.time() < deadline:
+      while b"\n" in buffer:
+        raw, buffer = buffer.split(b"\n", 1)
+        try:
+          message = json.loads(raw.decode("utf-8", "replace"))
+        except Exception:
+          continue
+        if message.get("id") == request_id:
+          # Added on top of the upstream port: the app server answers an
+          # unauthenticated rate-limit read with a JSON-RPC error, which upstream
+          # reads straight past ("result" is absent, so limits end up empty and
+          # nothing says why). Raising here lets the caller report it.
+          error = message.get("error")
+          if isinstance(error, dict):
+            raise RuntimeError(str(error.get("message") or method))
+          return message
+      ready, _, _ = select.select([fd], [], [], 0.25)
+      if not ready:
+        continue
+      chunk = os.read(fd, 65536)
+      if not chunk:
+        break
+      buffer += chunk
+    raise TimeoutError(method)
+  finally:
+    proc._rpc_buffer = buffer
 
 
 def fetch_codex_rpc():

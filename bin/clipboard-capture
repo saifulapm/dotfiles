@@ -59,8 +59,13 @@ if [[ ${1:-} == "watch" ]]; then
     setpriv --pdeathsig TERM wl-paste --type image/png --watch "$SELF" image/png &
     pids+=("$!")
 
-    wait
-    exit 0
+    # First child death ends the watch run. A bare `wait` would idle until
+    # BOTH watchers were gone, leaving one capture type silently unrecorded —
+    # the shell's supervision (Clipboard.qml) restarts this script only when
+    # it exits, so exiting is what heals: the EXIT trap takes the survivor
+    # down and the restarted run brings both watchers back.
+    wait -n
+    exit 1
 fi
 
 # ---------------------------------------------------------------- privacy gate

@@ -87,8 +87,10 @@ temperature_stats() {
                 [[ -r $input ]] || continue
                 file=$input
                 label=$(sensor_label "$input" "CPU")
-                emit_temperature "$file" "$label"
-                return
+                # Only a value emit_temperature accepted ends the scan; a
+                # readable-but-garbage input falls through to the next
+                # candidate instead of silently suppressing the key.
+                emit_temperature "$file" "$label" && return
             done
             ;;
         esac
@@ -98,8 +100,7 @@ temperature_stats() {
         [[ -r $zone/type && -r $zone/temp ]] || continue
         case "$(<"$zone/type")" in
         *cpu* | *CPU* | *soc* | *pkg*)
-            emit_temperature "$zone/temp" "CPU"
-            return
+            emit_temperature "$zone/temp" "CPU" && return
             ;;
         esac
     done
@@ -123,14 +124,12 @@ temperature_stats() {
         done
     done
     if [[ -n $hottest_file ]]; then
-        emit_temperature "$hottest_file" "$hottest_label"
-        return
+        emit_temperature "$hottest_file" "$hottest_label" && return
     fi
 
     for zone in "$thermal_path"/thermal_zone*; do
         [[ -r $zone/type && -r $zone/temp ]] || continue
-        emit_temperature "$zone/temp" "$(<"$zone/type")"
-        return
+        emit_temperature "$zone/temp" "$(<"$zone/type")" && return
     done
 }
 

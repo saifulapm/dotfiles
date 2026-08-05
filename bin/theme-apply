@@ -84,8 +84,11 @@ for (const key of Object.keys(tokens)) {
   tokens[key] = v
 }
 
-// Derived tokens — same construction rules as Services/Theme.qml.
-if (!tokens["text.on-accent"] && tokens["accent.accent"]) {
+// Derived tokens — same construction rules as Services/Theme.qml. The guard
+// reads the RAW theme tokens: THEME_DEFAULTS pre-populates the merged map, so
+// checking `tokens` would never derive and every theme would silently inherit
+// tokyo-night's near-black default onto its own accent.
+if (themeTokens["text.on-accent"] === undefined && tokens["accent.accent"]) {
   tokens["text.on-accent"] = ensureContrast(
     tokens["surface.0"] || "#16161e", tokens["accent.accent"], 4.5)
 }
