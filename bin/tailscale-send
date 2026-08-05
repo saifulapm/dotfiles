@@ -44,6 +44,14 @@ if ((${#files[@]} == 0)); then
   # opened, which is indistinguishable here from someone deciding not to send.
   picked=$(file-select --title "Send to $name" --multiple) || status=$?
 
+  # 3 is file-select's answer timeout: the dialog sat unanswered until it gave
+  # up and closed itself. Unlike a cancel, the user never decided, so say why
+  # nothing was sent instead of exiting silently.
+  if ((${status:-0} == 3)); then
+    notify "Nothing sent to $name" "The file chooser closed after waiting too long"
+    exit 1
+  fi
+
   if ((${status:-0} > 1)); then
     notify -u critical "Could not send to $name" "The file chooser did not open"
     exit 1

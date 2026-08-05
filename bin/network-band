@@ -59,9 +59,12 @@ nm_get() {
     LC_ALL=C nmcli -e no -g "$@" 2>/dev/null
 }
 
+# The prefix match accepts states like "connected (externally)", the same
+# variance bin/network-qr handles; an exact match would report "no connected
+# Wi-Fi device" for an externally-activated one.
 wifi_device() {
     nm_get DEVICE,TYPE,STATE device status |
-        awk -F: '$2 == "wifi" && $3 == "connected" { print $1; exit }'
+        awk -F: '$2 == "wifi" && $3 ~ /^connected/ { print $1; exit }'
 }
 
 wifi_profile() {

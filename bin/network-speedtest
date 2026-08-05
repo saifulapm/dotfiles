@@ -70,12 +70,18 @@ fi
 
 traffic_pids=()
 
+# Each worker runs in its own process group (set -m below), so worker and curl
+# are signalled together by their group id. Killing them separately raced the
+# worker's fork: a curl spawned after the pkill scan survived as an orphan and
+# kept downloading. STOP first freezes the worker so it cannot fork past the
+# TERM, which is then delivered to the whole group before CONT releases it.
 cleanup() {
     local pid
     for pid in "${traffic_pids[@]}"; do
         [[ -n $pid ]] || continue
-        pkill -TERM -P "$pid" 2>/dev/null || true
-        kill "$pid" 2>/dev/null || true
+        kill -STOP -- "-$pid" 2>/dev/null || true
+        kill -TERM -- "-$pid" 2>/dev/null || true
+        kill -CONT -- "-$pid" 2>/dev/null || true
     done
     for pid in "${traffic_pids[@]}"; do
         [[ -n $pid ]] || continue
@@ -113,10 +119,14 @@ traffic_worker() {
     fi
 }
 
+# Job control puts every background worker in a process group of its own,
+# which is what lets cleanup take out a worker and its current curl as a unit.
+set -m
 for ((i = 0; i < parallel; i++)); do
     traffic_worker $fast_urls &
     traffic_pids+=("$!")
 done
+set +m
 
 read -r rx_before tx_before < <(counters)
 

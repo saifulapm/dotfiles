@@ -99,12 +99,19 @@ split_servers() {
     done
 }
 
+# Profiles this failed to modify, reported (and turned into a nonzero exit)
+# only after reapply_active_connections has run: under set -e a bare failing
+# modify would abort the loop mid-way AND skip the reapply, leaving the
+# profiles that did change stored but not in effect.
+modify_failures=()
+
 set_connection_dns() {
-    local v4=${1:-} v6=${2:-} ignore=no uuid type
+    local v4=${1:-} v6=${2:-} ignore=no uuid type name
 
     [[ -n ${v4}${v6} ]] && ignore=yes
 
-    while IFS=: read -r uuid type; do
+    # NAME is queried last so read's tail assignment keeps one containing ':'.
+    while IFS=: read -r uuid type name; do
         [[ -n $uuid ]] || continue
         dns_connection_type "$type" || continue
 
@@ -113,8 +120,8 @@ set_connection_dns() {
             ipv4.dns "$v4" \
             ipv6.ignore-auto-dns "$ignore" \
             ipv6.dns "$v6" \
-            >/dev/null
-    done < <(nm_get UUID,TYPE connection show)
+            >/dev/null || modify_failures+=("${name:-$uuid}")
+    done < <(nm_get UUID,TYPE,NAME connection show)
 }
 
 # A modified profile only publishes its DNS on reapply; without this the change
@@ -123,8 +130,10 @@ set_connection_dns() {
 reapply_active_connections() {
     local device type state
 
+    # Prefix match: nmcli reports externally-activated devices as
+    # "connected (externally)", the same variance bin/network-qr handles.
     while IFS=: read -r device type state; do
-        [[ -n $device && $state == connected ]] || continue
+        [[ -n $device && $state == connected* ]] || continue
         case "$type" in
         wifi | ethernet)
             nmcli device reapply "$device" >/dev/null 2>&1 || true
@@ -168,3 +177,8 @@ Custom | custom)
 esac
 
 reapply_active_connections
+
+if ((${#modify_failures[@]} > 0)); then
+    echo "Error: DNS not changed on ${#modify_failures[@]} profile(s): ${modify_failures[*]}" >&2
+    exit 1
+fi

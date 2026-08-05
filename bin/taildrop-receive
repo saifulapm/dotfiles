@@ -3,15 +3,20 @@
 # arrive, and say so.
 #
 # Taildrop on Linux does not write received files anywhere: tailscaled parks
-# them in its own inbox until somebody runs `tailscale file get`. `--wait`
-# blocks until at least one file is pending and then moves the lot, so the
-# whole receiver is a loop around one blocking call — no timer, no polling,
-# nothing running between transfers. Run by taildrop-receive.service.
+# them in its own inbox until somebody runs `tailscale file get`. The receiver
+# blocks in a LocalAPI long-poll until at least one file is pending — the same
+# wait `tailscale file get --wait` performs internally, but moving nothing —
+# then drains the inbox with a non-blocking get. No timer, no polling, nothing
+# running between transfers. Run by taildrop-receive.service.
 #
 # `--verbose` only prints a summary ("moved 3/3 files"), never the names, so
 # the target directory is listed either side of the get and the difference is
 # what the notification names. `--conflict=rename` means an arriving duplicate
-# always shows up as a new name, so the diff never misses one.
+# always shows up as a new name, so the diff never misses one. Waiting apart
+# from moving is what keeps that diff honest: the before-listing is taken in
+# the instant between the wait ending and the drain starting, so a browser
+# download landing in the same directory during a days-long wait is not
+# announced as a Taildrop arrival.
 #
 # Everything that can go wrong here is a state, not a crash: no CLI, no
 # operator, logged out, tailscaled down. Each backs off (60 s, then 2, 5 and 10
@@ -112,6 +117,28 @@ snapshot() {
   find "$target_dir" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | LC_ALL=C sort
 }
 
+# Block until the inbox holds at least one file, moving nothing. The LocalAPI
+# files listing long-polls when asked to (`waitsec`); the request is held open
+# server-side, so an idle receiver costs one held connection, not a poll loop.
+# Returns 0 with files pending, 1 when the API cannot be read — the drain get
+# that follows then fails with the prose classify() knows how to read.
+wait_for_files() { # -> 0 pending, 1 error
+  local body t0
+  while :; do
+    t0=$SECONDS
+    body=$(curl -s --max-time 610 --unix-socket "$socket" \
+      'http://local-tailscaled.sock/localapi/v0/files/?waitsec=600' 2>/dev/null) || return 1
+    case $body in
+    "["*) return 0 ;;
+    null | "") ;;
+    *) return 1 ;;
+    esac
+    # A tailscaled that ignored waitsec would answer instantly; never let the
+    # blocking wait degrade into a busy loop against one.
+    ((SECONDS - t0 >= 1)) || nap 1
+  done
+}
+
 # What the target directory gained since the given listing. Succeeds when
 # something arrived, and says so on the way past.
 report_arrivals() { # before-listing
@@ -205,15 +232,14 @@ while :; do
     continue
   fi
 
-  before=$(snapshot)
-
-  # Coming back from a refusal, the same get WITHOUT --wait is the retry: it
+  # Coming back from a refusal, a get WITHOUT the wait is the retry: it
   # returns either way, so it re-tests the permission and collects anything
   # already queued instead of vanishing into a blocking read. Without this a
   # recovery is invisible — the blocking call succeeds and then simply does not
   # return, leaving the journal and the panel saying "denied" until, some day, a
   # file arrives.
   if ((backoff_index > 0)); then
+    before=$(snapshot)
     out=$(tailscale file get --verbose --conflict=rename "$target_dir" 2>&1)
     rc=$?
     if ((rc != 0)); then
@@ -223,7 +249,7 @@ while :; do
       continue
     fi
     backoff_index=0
-    report_arrivals "$before" && before=$(snapshot)
+    report_arrivals "$before"
   fi
 
   # Announce the blocked state before blocking in it: from here until a file
@@ -233,9 +259,16 @@ while :; do
   set_state waiting "waiting for files in ${target_dir/#$HOME/\~}" && state_write 0
 
   started=$SECONDS
+  # A wait that cannot reach the API falls straight through to the get, whose
+  # stderr carries the reason in prose classify() can act on.
+  wait_for_files || :
+
+  # List the directory in the instant between the wait ending and the drain
+  # moving files, so the diff names only what the drain moved.
+  before=$(snapshot)
   # Combined: on the way out `--verbose` prints a "moved N/M files" summary on
   # stdout, and every refusal is prose on stderr. Both are wanted.
-  out=$(tailscale file get --wait --verbose --conflict=rename "$target_dir" 2>&1)
+  out=$(tailscale file get --verbose --conflict=rename "$target_dir" 2>&1)
   rc=$?
 
   if ((rc != 0)); then
@@ -250,10 +283,10 @@ while :; do
     continue
   fi
 
-  # `--wait` blocks on an empty inbox, so a return with nothing new is either a
-  # file that landed under a name that already existed (impossible with
-  # --conflict=rename) or a wakeup we do not understand. Tolerate a few, then
-  # slow down rather than spin.
+  # The wait blocks on an empty inbox, so getting here with nothing new is
+  # either a file somebody else's `tailscale file get` collected first or a
+  # wakeup we do not understand. Tolerate a few, then slow down rather than
+  # spin.
   if ((SECONDS - started < 2)); then
     ((quick_cycles++))
     if ((quick_cycles >= 3)); then

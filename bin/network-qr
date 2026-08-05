@@ -49,15 +49,29 @@ uuid=$(nmcli --get-values GENERAL.CON-UUID device show "$interface" | head -n 1)
 
 # --show-secrets on a connection the calling user owns needs no root; on a
 # system connection NetworkManager asks polkit, and the shell's agent prompts.
-mapfile -t fields < <(nmcli --show-secrets --escape no --get-values \
+#
+# --terse rather than --get-values, because a property of an absent section
+# (an open network has no 802-11-wireless-security section at all) emits no
+# line, which would shift every later value up one position. Terse output
+# labels each line with its property name, so the values are matched by name
+# and an absent one simply leaves its default. The name is everything before
+# the first ':'; with --escape no the value keeps any ':' of its own verbatim.
+ssid=""
+key_management=""
+password=""
+hidden=no
+wep_key=""
+while IFS= read -r field_line; do
+    case "$field_line" in
+    802-11-wireless.ssid:*) ssid=${field_line#*:} ;;
+    802-11-wireless-security.key-mgmt:*) key_management=${field_line#*:} ;;
+    802-11-wireless-security.psk:*) password=${field_line#*:} ;;
+    802-11-wireless.hidden:*) hidden=${field_line#*:} ;;
+    802-11-wireless-security.wep-key0:*) wep_key=${field_line#*:} ;;
+    esac
+done < <(nmcli --show-secrets --escape no --terse --fields \
     802-11-wireless.ssid,802-11-wireless-security.key-mgmt,802-11-wireless-security.psk,802-11-wireless.hidden,802-11-wireless-security.wep-key0 \
     connection show uuid "$uuid")
-
-ssid=${fields[0]:-}
-key_management=${fields[1]:-}
-password=${fields[2]:-}
-hidden=${fields[3]:-no}
-wep_key=${fields[4]:-}
 
 [[ $key_management != *eap* && $key_management != *ieee8021x* ]] || {
     echo "Enterprise Wi-Fi cannot be shared with a password QR code" >&2
