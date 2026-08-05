@@ -143,6 +143,11 @@ ShellRoot {
         themesLoader.item.toggle();
     }
 
+    function toggleWallpaper() {
+        wallpaperLoader.active = true;
+        wallpaperLoader.item.toggle();
+    }
+
     function toggleEmojis() {
         emojisLoader.active = true;
         emojisLoader.item.toggle();
@@ -470,6 +475,35 @@ ShellRoot {
         function hide(): string {
             if (themesLoader.active)
                 themesLoader.item.hide();
+            return "ok";
+        }
+    }
+
+    LazyLoader {
+        id: wallpaperLoader
+        active: false
+        component: ImagePicker {
+            theme: shell.theme
+        }
+    }
+
+    IpcHandler {
+        target: "wallpaper"
+
+        function toggle(): string {
+            shell.toggleWallpaper();
+            return "ok";
+        }
+
+        function show(): string {
+            wallpaperLoader.active = true;
+            wallpaperLoader.item.show();
+            return "ok";
+        }
+
+        function hide(): string {
+            if (wallpaperLoader.active)
+                wallpaperLoader.item.hide();
             return "ok";
         }
     }

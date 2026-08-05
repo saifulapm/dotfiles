@@ -427,6 +427,9 @@ binds {
     // left: Mod+V is toggle-window-floating and Mod+Shift+V is
     // switch-focus-between-floating-and-tiling, both niri defaults we keep.
     Mod+Ctrl+V hotkey-overlay-title="Clipboard History" { spawn "qs" "ipc" "call" "clipboard" "toggle"; }
+    // Omarchy has no keybind for their background switcher at all (menu only);
+    // Mod+Ctrl+B was the free key next to the other picker binds.
+    Mod+Ctrl+B hotkey-overlay-title="Pick a Wallpaper" { spawn "qs" "ipc" "call" "wallpaper" "toggle"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "ipc" "call" "lock" "lock"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.

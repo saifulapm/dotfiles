@@ -36,6 +36,14 @@ var TREE = {
         "description": "Switch the desktop theme",
         "call": "themes"
     },
+    // Omarchy's style.background, one row further out: theirs is a single
+    // leaf that opens the picker, ours also carries their bg-next cycle.
+    "background": {
+        "icon": "󰸉",
+        "label": "Background",
+        "aliases": ["wallpaper", "wallpapers", "backgrounds", "image"],
+        "description": "Change the desktop wallpaper"
+    },
     "capture": {
         "icon": "󰄀",
         "label": "Capture",
@@ -116,6 +124,22 @@ var TREE = {
         "description": "Screenshot the whole focused screen",
         "when": "command -v niri",
         "action": "niri msg action screenshot-screen"
+    },
+
+    // ------------------------------------------------------------ background
+    "background.choose": {
+        "icon": "󰸉",
+        "label": "Choose",
+        "aliases": ["background-choose", "pick", "picker"],
+        "description": "Pick a wallpaper from this theme and your own",
+        "call": "wallpaper"
+    },
+    "background.next": {
+        "icon": "󰒭",
+        "label": "Next",
+        "aliases": ["background-next", "cycle", "shuffle"],
+        "description": "Advance to the next wallpaper",
+        "action": "\"$HOME/.dotfiles/bin/background-next\""
     },
 
     // -------------------------------------------------------------- reminder

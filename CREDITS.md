@@ -148,6 +148,23 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   entries are absent; their reveal snaps open where ours slides; and a
   standalone indicator named directly in a bar array collapses when off instead
   of reserving an empty slot.
+- **Image picker design** from `shell/plugins/image-picker/ImagePicker.qml` and
+  `bin/omarchy-theme-bg-switcher`: the full-screen scrim over a skewed
+  filmstrip, the selection blown up to a wide preview with the rest of the set
+  fanned out around it as parallelogram slices (their expanded/slice sizes,
+  their negative spacing and skew offset, the mask-plus-outline Shape pair,
+  their dim wash over everything unselected and the thick accent outline on the
+  selection), the z-order and the nearby window that keeps only the visited
+  images decoded, the outlined title-case label under the strip, and their
+  keyboard model (←/→ and Tab/Shift+Tab step over matches only,
+  type-to-filter with Backspace and Ctrl+U edits, Escape clearing the filter
+  before it closes, Enter or a click on the preview applying). Their picker is
+  a generic selector driven over IPC by `omarchy-menu-images`, which blocks on
+  a selection file — ours is summoned directly and applies through
+  `bin/background-next --set`, so the selection-file/done-file handshake, the
+  preload path and the request serials are not ported. Neither picker previews
+  as you move: the wallpaper changes only when a selection is applied, so
+  Escape has nothing to restore.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -274,6 +291,29 @@ Direct file-level copies (source path → destination path):
   (their CLI parses no richer time input either), and the CLI argument list
   that carries the message only when one was typed. Their `module.exports`
   tail was dropped and whitespace restyled to house 4-space qmlformat.
+- omarchy `shell/plugins/image-picker/ImagePickerModel.js` →
+  `shell/Modules/Background/ImagePickerModel.js`: near-verbatim port of the
+  picker's whole non-visual half — the row parser with the basename dedup that
+  is what merges two directories into one strip, `nameForPath`/`labelForPath`
+  (basename, extension dropped, `-`/`_` to spaces, title case), the
+  case-insensitive substring filter over both forms of the name, and the
+  filtered-position math the carousel lays itself out with. Their
+  `module.exports` tail was dropped, `Util.editsFilter`/`editedFilter` were
+  folded in next to the filter they edit, and whitespace follows house 4-space
+  qmlformat.
+- omarchy `bin/omarchy-theme-bg-next` + `bin/omarchy-theme-bg-set` +
+  `shell/plugins/image-picker/list.sh` → `bin/background-next`: direct port of
+  the enumeration and the cycle — the merge of the active theme's backgrounds
+  with a user directory, `list.sh`'s image extensions and sort, and their
+  wrap-around step with an unknown current landing on the first image (which is
+  what makes re-applying a theme advance its wallpaper). Their user directory is
+  per-theme under `~/.config/omarchy/backgrounds/<theme>`; ours is the single
+  `~/Pictures/Wallpapers`. Their current background is a symlink poked into the
+  running shell over IPC — ours is the regular state file the shell already
+  watches, written atomically (a repointed symlink is invisible to inotify).
+  `list.sh`'s thumbnail cache is not ported: those thumbnails are rendered by
+  ImageMagick, which is not installed here, so the picker decodes the originals
+  at thumbnail size instead.
 - omarchy `shell/plugins/panels/clock/Model.js` → `shell/Modules/Bar/widgets/ClockModel.js`:
   near-verbatim port of the date/format math (format ring, ISO week, year/life
   progress parsing and percentages, six-row month grid). Vertical-bar formats and

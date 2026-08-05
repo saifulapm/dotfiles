@@ -3,7 +3,12 @@
 // Included configs never auto-enable border/focus-ring, so listing both
 // here is safe — whichever one config.kdl enables picks up these colors.
 layout {
-    background-color "{{surface.1}}"
+    // Transparent so the wallpaper shows through: the shell's background
+    // layer is placed within niri's backdrop (see the layer-rule in
+    // config.kdl), and an opaque workspace background would cover it
+    // everywhere except the overview. With no wallpaper set, the overview
+    // backdrop-color below is what shows.
+    background-color "transparent"
 
     focus-ring {
         active-color "{{accent.accent}}"

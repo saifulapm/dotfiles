@@ -44,4 +44,10 @@ mv "$state.tmp" "$state"
 printf '%s\n' "$1" >"$name_file.tmp"
 mv "$name_file.tmp" "$name_file"
 
+# Wallpaper: bin/background-next owns the candidate list and the cycle, and
+# reads the theme name written just above — so switching themes lands on the
+# new theme's first image and re-applying the active one advances to its next,
+# omarchy-style. No candidates just means no wallpaper change.
+"$root/bin/background-next"
+
 exec "$root/bin/theme-apply"

@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# background-next — the wallpaper cycle, and the only place that knows how
+# wallpapers are enumerated. Shared by bin/theme-set (which advances on every
+# re-apply of the active theme) and by the shell's picker.
+#
+#   background-next             advance to the next candidate
+#   background-next --list      print the candidates, one path per line
+#   background-next --current   print the active wallpaper
+#   background-next --set PATH  make PATH the active wallpaper
+#
+# Candidates are omarchy-theme-bg-next's merged sources adapted to our layout
+# (CREDITS.md): the active theme's backgrounds first, then the user's own
+# ~/Pictures/Wallpapers. Neither directory is ever created. Same-named files
+# collide the way their picker collides them — first listed wins.
+#
+# The active wallpaper is a REGULAR file written atomically (tmp + same-dir
+# mv); the shell's Background module watches it. Never a symlink: repointing
+# one is invisible to the inotify watch (see bin/theme-set).
+set -euo pipefail
+
+state_dir="$HOME/.local/state/qshell"
+state="$state_dir/background"
+name_file="$state_dir/theme.name"
+
+theme_name=""
+[[ -f $name_file ]] && theme_name="$(<"$name_file")"
+
+dirs=()
+[[ -n $theme_name ]] && dirs+=("$HOME/ref/omarchy/themes/$theme_name/backgrounds")
+dirs+=("$HOME/Pictures/Wallpapers")
+
+# list.sh's extensions and per-directory sort, minus its thumbnail cache:
+# thumbnails there are pre-rendered by ImageMagick, which is not installed
+# here — the picker decodes the originals at thumbnail size instead.
+list() {
+  local dir
+  for dir in "${dirs[@]}"; do
+    [[ -d $dir ]] || continue
+    find -L "$dir" -maxdepth 1 -type f \
+      \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' \
+      -o -iname '*.bmp' -o -iname '*.webp' \) \
+      -print0 2>/dev/null | sort -z | tr '\0' '\n'
+  done | awk -F/ '!seen[$NF]++'
+}
+
+apply() {
+  local path="$1"
+  if [[ ! -f $path ]]; then
+    echo "background-next: no such image: $path" >&2
+    exit 1
+  fi
+  mkdir -p "$state_dir"
+  printf '%s\n' "$path" >"$state.tmp"
+  mv "$state.tmp" "$state"
+}
+
+case "${1-}" in
+"--list")
+  list
+  exit 0
+  ;;
+"--current")
+  [[ -f $state ]] && cat "$state"
+  exit 0
+  ;;
+"--set")
+  if [[ $# -ne 2 ]]; then
+    echo "usage: background-next --set <path>" >&2
+    exit 1
+  fi
+  apply "$2"
+  exit 0
+  ;;
+"") ;;
+*)
+  echo "usage: background-next [--list | --current | --set <path>]" >&2
+  exit 1
+  ;;
+esac
+
+mapfile -t bgs < <(list)
+# No wallpaper for this theme is not an error: leave whatever is showing.
+((${#bgs[@]})) || exit 0
+
+current=""
+[[ -f $state ]] && current="$(<"$state")"
+
+# Unknown current (a fresh theme) starts at the first image; a known one
+# advances, so re-applying the active theme walks the set.
+next="${bgs[0]}"
+for i in "${!bgs[@]}"; do
+  if [[ ${bgs[$i]} == "$current" ]]; then
+    next="${bgs[$(((i + 1) % ${#bgs[@]}))]}"
+    break
+  fi
+done
+
+apply "$next"

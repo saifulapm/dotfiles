@@ -137,6 +137,9 @@ Scope {
         case "themes":
             shellRoot.toggleThemes();
             break;
+        case "wallpaper":
+            shellRoot.toggleWallpaper();
+            break;
         case "emojis":
             shellRoot.toggleEmojis();
             break;
