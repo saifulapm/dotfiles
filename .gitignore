@@ -1,2 +1,3 @@
 # machine-specific, auto-populated by quickshell at startup
 shell/.qmlls.ini
+bench/.last-qs.log
