@@ -1,14 +1,17 @@
 import QtQuick
 import "../components"
+import "DropboxModel.js" as Format
 
-// iCloud panel — ours, in the Dropbox panel's visual language (omarchy's
-// design; CREDITS.md): a hero of the mark over a rotating phrase, then a
-// MOUNT section (the on/off switch, and the folder behind it) and an ACCOUNT
-// section (the remote, its reachability, and — when a probe has failed — the
-// re-auth row). Where the Dropbox panel's login row runs the CLI's own flow,
-// re-authenticating an iCloud session is interactive Apple 2FA that no shell
-// process can drive, so the row is a copyable command instead: the tailscale
-// panel's notice-row precedent, tap to copy.
+// rclone-remote panel — ours, in the Dropbox panel's visual language
+// (omarchy's design; CREDITS.md), grown out of the iCloud panel: a hero of
+// the instance's mark over a rotating phrase, then a MOUNT section (the
+// on/off switch, and the folder behind it), a STORAGE section exactly when
+// the backend's `rclone about` answered with quota (dropbox does;
+// iclouddrive cannot), and an ACCOUNT section (the remote, its reachability,
+// and — when a probe has failed — the re-auth row). Re-authenticating an
+// rclone session is interactive (Apple 2FA, Dropbox browser OAuth) and no
+// shell process can drive it, so the row is a copyable command: the
+// tailscale panel's notice-row precedent, tap to copy.
 //
 // The cursor model is the dropbox panel's simplified one: j/k (and the
 // arrows) walk the actionable rows, Enter activates whatever is under the
@@ -18,27 +21,36 @@ import "../components"
 BarPanel {
     id: panel
 
-    required property var icloud
+    required property var service
 
     panelTitle: ""
     cardWidth: 380
 
     // ------------------------------------------------------------- phrases
     property int phraseIndex: 0
-    readonly property var activePhrases: ["Courting Cupertino", "Ferrying folders", "Drizzling data", "Raining files", "Syncing the orchard", "Picking apples", "Minding memories", "Whispering to Apple", "Seeding the cloud", "Polishing pixels"]
+    readonly property var activePhrases: {
+        const fromConfig = panel.service.config ? panel.service.config.phrases : undefined;
+        if (fromConfig && fromConfig.length > 0)
+            return fromConfig;
+        return ["Ferrying folders", "Drizzling data", "Raining files", "Seeding the cloud", "Minding memories", "Shuffling shards", "Polishing pixels", "Braiding bytes"];
+    }
     readonly property string heroPhraseText: activePhrases[phraseIndex % activePhrases.length]
 
-    readonly property string mountHint: icloud.mountActive ? "Unmount the iCloud folder" : "Mount iCloud at " + icloud.mountPoint
+    readonly property string mountHint: service.mountActive ? "Unmount the " + service.label + " folder" : "Mount " + service.label + " at " + service.mountPoint
 
     readonly property string reachabilityText: {
-        if (panel.icloud.checking)
+        if (panel.service.checking)
             return "Checking…";
-        if (panel.icloud.reachState === 1)
+        if (panel.service.reachState === 1)
             return "Reachable";
-        if (panel.icloud.reachState === -1)
+        if (panel.service.reachState === -1)
             return "Unreachable";
         return "Not checked";
     }
+
+    // Quota, when the last probe carried it (`rclone about` support).
+    readonly property bool quotaVisible: panel.service.quotaSupported && panel.service.quotaTotal > 0 && panel.service.quotaUsed >= 0
+    readonly property real quotaFraction: panel.quotaVisible ? Math.max(0, Math.min(1, panel.service.quotaUsed / panel.service.quotaTotal)) : 0
 
     // -------------------------------------------------------------- cursor
     // The actionable rows, top to bottom, as they currently exist: the mount
@@ -46,9 +58,9 @@ BarPanel {
     // re-auth row only while a failed probe holds it up.
     readonly property var cursorRows: {
         const rows = ["mount"];
-        if (panel.icloud.mounted)
+        if (panel.service.mounted)
             rows.push("open");
-        if (panel.icloud.lastProbeFailed)
+        if (panel.service.lastProbeFailed)
             rows.push("reauth");
         return rows;
     }
@@ -90,14 +102,14 @@ BarPanel {
         if (row === "mount")
             panel.toggleMount();
         else if (row === "open")
-            panel.icloud.openFolder();
+            panel.service.openFolder();
         else if (row === "reauth")
-            panel.icloud.copyReauthCommand();
+            panel.service.copyReauthCommand();
     }
 
     function toggleMount() {
-        if (!panel.icloud.busy)
-            panel.icloud.toggleMount();
+        if (!panel.service.busy)
+            panel.service.toggleMount();
     }
 
     onCursorRowsChanged: {
@@ -121,17 +133,17 @@ BarPanel {
             panel.activateCursor();
             break;
         case Qt.Key_R:
-            panel.icloud.probe();
+            panel.service.probe();
             break;
         case Qt.Key_M:
             panel.toggleMount();
             break;
         case Qt.Key_O:
-            panel.icloud.openFolder();
+            panel.service.openFolder();
             break;
         case Qt.Key_C:
-            if (panel.icloud.lastProbeFailed)
-                panel.icloud.copyReauthCommand();
+            if (panel.service.lastProbeFailed)
+                panel.service.copyReauthCommand();
             break;
         default:
             return;
@@ -145,14 +157,14 @@ BarPanel {
     onPanelOpened: {
         panel.cursorActive = false;
         panel.cursorIndex = 0;
-        panel.icloud.refreshLocal();
-        panel.icloud.probe();
+        panel.service.refreshLocal();
+        panel.service.probe();
     }
 
     Timer {
         id: phraseTimer
         interval: 2800
-        running: panel.opened && panel.icloud.mountActive
+        running: panel.opened && panel.service.mountActive
         repeat: true
         onTriggered: phraseSwap.restart()
     }
@@ -192,13 +204,15 @@ BarPanel {
             width: parent.width
             implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight)
 
-            ICloudIcon {
+            RcloneRemoteMark {
                 id: heroIcon
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 iconSize: panel.theme.fontPx(1.6)
-                color: panel.icloud.mountActive ? panel.theme.textPrimary : panel.theme.textMuted
-                opacity: panel.icloud.mountActive ? 1.0 : 0.5
+                glyph: panel.service.config ? String(panel.service.config.glyph || "") : ""
+                drawnMark: panel.service.config ? String(panel.service.config.drawnMark || "") : ""
+                color: panel.service.mountActive ? panel.theme.textPrimary : panel.theme.textMuted
+                opacity: panel.service.mountActive ? 1.0 : 0.5
             }
 
             Column {
@@ -212,7 +226,7 @@ BarPanel {
 
                 Text {
                     width: parent.width
-                    text: "iCloud"
+                    text: panel.service.label
                     color: panel.theme.textPrimary
                     font.family: panel.theme.fontUi
                     font.pixelSize: panel.theme.fontPx(1.083)
@@ -223,7 +237,7 @@ BarPanel {
                 Text {
                     id: heroMeta
                     width: parent.width
-                    text: panel.icloud.mountActive ? panel.heroPhraseText : "Not mounted"
+                    text: panel.service.mountActive ? panel.heroPhraseText : "Not mounted"
                     color: panel.theme.textMuted
                     font.family: panel.theme.fontUi
                     font.pixelSize: panel.theme.fontPx(0.833)
@@ -234,10 +248,10 @@ BarPanel {
 
         // -------------------------------------------------- action/error
         Text {
-            visible: panel.icloud.actionStatus !== "" || panel.icloud.lastError !== ""
+            visible: panel.service.actionStatus !== "" || panel.service.lastError !== ""
             width: parent.width
-            text: panel.icloud.actionStatus !== "" ? panel.icloud.actionStatus : panel.icloud.lastError
-            color: panel.icloud.lastError !== "" && panel.icloud.actionStatus === "" ? panel.theme.error : panel.theme.textMuted
+            text: panel.service.actionStatus !== "" ? panel.service.actionStatus : panel.service.lastError
+            color: panel.service.lastError !== "" && panel.service.actionStatus === "" ? panel.theme.error : panel.theme.textMuted
             font.family: panel.theme.fontUi
             font.pixelSize: panel.theme.fontPx(0.833)
             wrapMode: Text.WordWrap
@@ -284,7 +298,7 @@ BarPanel {
 
                     Text {
                         width: parent.width
-                        text: panel.icloud.mountActive ? "Mounted" : "Unmounted"
+                        text: panel.service.mountActive ? "Mounted" : "Unmounted"
                         color: panel.theme.textPrimary
                         font.family: panel.theme.fontUi
                         font.pixelSize: panel.theme.fontPx(0.917)
@@ -293,7 +307,7 @@ BarPanel {
 
                     Text {
                         width: parent.width
-                        text: panel.icloud.mountPoint === "" ? "~/iCloud" : panel.icloud.mountPoint
+                        text: panel.service.mountPoint === "" ? "—" : panel.service.mountPoint
                         color: panel.theme.textMuted
                         font.family: panel.theme.fontMono
                         font.pixelSize: panel.theme.fontPx(0.75)
@@ -307,8 +321,8 @@ BarPanel {
                     id: mountSwitch
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    checked: panel.icloud.mountActive
-                    busy: panel.icloud.busy
+                    checked: panel.service.mountActive
+                    busy: panel.service.busy
                     hasCursor: false
                     hint: panel.mountHint
                     onHovered: panel.setCursorOn("mount")
@@ -320,7 +334,7 @@ BarPanel {
         CursorSurface {
             id: openRow
 
-            visible: panel.icloud.mounted
+            visible: panel.service.mounted
             width: parent.width
             implicitHeight: visible ? openInner.implicitHeight + panel.theme.space(3) : 0
             hasCursor: panel.hasCursorOn("open")
@@ -330,7 +344,7 @@ BarPanel {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onEntered: panel.setCursorOn("open")
-                onClicked: panel.icloud.openFolder()
+                onClicked: panel.service.openFolder()
             }
 
             Item {
@@ -367,6 +381,40 @@ BarPanel {
             }
         }
 
+        // --------------------------------------------------------- storage
+        // Only for backends whose `about` answered with numbers — the
+        // dropbox panel's "Stored" line over a fill bar. Omitted entirely
+        // (header too) when the backend cannot say.
+        SectionHeader {
+            visible: panel.quotaVisible
+            text: "STORAGE"
+        }
+
+        Column {
+            visible: panel.quotaVisible
+            width: parent.width
+            spacing: panel.theme.space(1.5)
+
+            InfoPair {
+                label: "Stored"
+                value: Format.usageText(panel.service.quotaUsed, panel.service.quotaTotal, true) + " (" + Format.formatPercent(panel.quotaFraction * 100) + ")"
+            }
+
+            Rectangle {
+                width: parent.width
+                height: panel.theme.space(1)
+                radius: height / 2
+                color: panel.theme.surface3
+
+                Rectangle {
+                    width: parent.width * panel.quotaFraction
+                    height: parent.height
+                    radius: parent.radius
+                    color: panel.theme.accent
+                }
+            }
+        }
+
         // --------------------------------------------------------- account
         SectionHeader {
             text: "ACCOUNT"
@@ -374,23 +422,24 @@ BarPanel {
 
         InfoPair {
             label: "Remote"
-            value: panel.icloud.remote === "" ? "—" : panel.icloud.remote + ": · " + panel.icloud.remoteType
+            value: panel.service.remote === "" ? "—" : panel.service.remote + ": · " + panel.service.remoteType
         }
 
         InfoPair {
             label: "Reachability"
             value: panel.reachabilityText
-            valueColor: panel.icloud.reachState === -1 && !panel.icloud.checking ? panel.theme.error : panel.theme.textPrimary
+            valueColor: panel.service.reachState === -1 && !panel.service.checking ? panel.theme.error : panel.theme.textPrimary
         }
 
-        // The re-auth row: a sentence about the one thing the shell cannot fix
-        // by itself, over the command that fixes it. Tapping copies the
-        // command — `rclone config reconnect` walks Apple 2FA interactively,
-        // so no button here could ever run it.
+        // The re-auth row: a sentence about the one thing the shell cannot
+        // fix by itself, over the command that fixes it. Tapping copies the
+        // command — `rclone config reconnect` re-authenticates interactively
+        // (Apple 2FA, Dropbox browser OAuth), so no button here could ever
+        // run it.
         CursorSurface {
             id: reauthRow
 
-            visible: panel.icloud.lastProbeFailed
+            visible: panel.service.lastProbeFailed
             width: parent.width
             implicitHeight: visible ? reauthColumn.implicitHeight + panel.theme.space(3) : 0
             hasCursor: panel.hasCursorOn("reauth")
@@ -401,7 +450,7 @@ BarPanel {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onEntered: panel.setCursorOn("reauth")
-                onClicked: panel.icloud.copyReauthCommand()
+                onClicked: panel.service.copyReauthCommand()
             }
 
             Hint {
@@ -422,7 +471,7 @@ BarPanel {
 
                 Text {
                     width: parent.width
-                    text: "iCloud did not answer — the Apple session may have expired. Re-authenticate in a terminal (interactive 2FA):"
+                    text: panel.service.label + " did not answer — the session may have expired. Re-authenticate in a terminal (interactive):"
                     color: panel.theme.textMuted
                     font.family: panel.theme.fontUi
                     font.pixelSize: panel.theme.fontPx(0.833)
@@ -431,7 +480,7 @@ BarPanel {
 
                 Text {
                     width: parent.width
-                    text: panel.icloud.reauthCommand
+                    text: panel.service.reauthCommand
                     color: panel.theme.textPrimary
                     font.family: panel.theme.fontMono
                     font.pixelSize: panel.theme.fontPx(0.833)
@@ -439,9 +488,9 @@ BarPanel {
                 }
 
                 Text {
-                    visible: panel.icloud.probeError !== ""
+                    visible: panel.service.probeError !== ""
                     width: parent.width
-                    text: panel.icloud.elideStatus(panel.icloud.probeError)
+                    text: panel.service.elideStatus(panel.service.probeError)
                     color: panel.theme.textMuted
                     font.family: panel.theme.fontMono
                     font.pixelSize: panel.theme.fontPx(0.75)

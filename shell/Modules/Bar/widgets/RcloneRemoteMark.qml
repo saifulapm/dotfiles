@@ -1,38 +1,55 @@
 import QtQuick
 import "../components"
 
-// The iCloud mark. Typeset rather than drawn: md-apple_icloud (U+F0038) sits
-// in the Material Design range, the one range that actually renders under our
-// Symbols Nerd Font fallback — verified by ink, not by fc-list (an offscreen
-// render of the glyph next to a FontAwesome control showed real coverage where
-// the control drew nothing). So unlike the Dropbox and Tailscale marks there
-// is nothing to draw with Shapes here.
+// The mark of an rclone-remote widget, chosen by the instance: typeset when
+// the instance names a glyph (iCloud's md-apple_icloud U+F0038 — the Material
+// Design range is the one that renders under our Symbols Nerd Font fallback,
+// verified by ink), or drawn when it names `drawnMark: "dropbox"` — the
+// five-tile Dropbox mark (DropboxIcon.qml, omarchy's QtQuick.Shapes drawing)
+// shared with the daemon-backed dropbox widget rather than redrawn here. The
+// drawn mark sits behind a Loader so an instance that typesets never pays for
+// a Shape and its render layer.
 //
 // The "!" badge is TailscaleIcon's: a corner disc ringed with the bar's own
 // background so it reads as a hole punched in the mark, raised while the last
-// network probe failed — an expired Apple session is the usual reason, and
-// the panel carries the command that fixes it.
+// network probe failed — an expired session being the usual reason, and the
+// panel carries the command that fixes it.
 Item {
     id: root
 
     property real iconSize: 13
     property color color: "white"
+    property string glyph: ""
+    property string drawnMark: ""
     property bool warning: false
     property color badgeColor: "red"
     property color badgeBorderColor: "black"
     property color badgeTextColor: "black"
     property string fontFamily: ""
 
-    width: iconSize
-    height: iconSize
-    implicitWidth: iconSize
+    readonly property bool drawn: glyph === "" && drawnMark === "dropbox"
+
+    width: implicitWidth
+    height: implicitHeight
+    // The Dropbox tiles are wider than tall, as DropboxIcon sizes itself.
+    implicitWidth: drawn ? iconSize * 1.18 : iconSize
     implicitHeight: iconSize
 
     OpticalGlyph {
+        visible: !root.drawn
         anchors.centerIn: parent
-        text: "󰀸" // md-apple_icloud
+        text: root.glyph
         color: root.color
         pixelSize: Math.round(root.iconSize)
+    }
+
+    Loader {
+        active: root.drawn
+        anchors.fill: parent
+        sourceComponent: DropboxIcon {
+            iconSize: root.iconSize
+            color: root.color
+        }
     }
 
     Rectangle {

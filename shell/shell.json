@@ -25,6 +25,7 @@
       "ai",
       "kb",
       "icloud",
+      "dropbox-rclone",
       "dropbox",
       "tailscale",
       "mic",

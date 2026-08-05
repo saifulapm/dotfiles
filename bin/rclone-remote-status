@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# rclone-remote-status — one snapshot of an rclone remote's local state (and,
+# in full mode, its reachability and quota) as a single JSON object. Grown out
+# of bin/icloud-status, generalized so one helper serves every rclone-backed
+# bar widget; the shape still follows bin/dropbox-status: the shell asks one
+# cheap question at startup and only pays for the expensive one when someone
+# is looking.
+#
+#   rclone-remote-status --remote NAME --type BACKEND \
+#                        [--mountpoint PATH] [--legacy-unit UNIT] [--local]
+#
+#   --local   local facts only, NO network:
+#             {installed, configured, remote, remoteType, mounted,
+#              mountPoint, mountUnit, local: true}
+#   (default) adds one network probe:
+#             {…, local: false, reachable, error,
+#              quotaSupported, usedBytes, totalBytes, freeBytes}
+#
+# The probe is `rclone about --json` first — one API call answering both
+# reachability and quota on backends that support it (dropbox does). A backend
+# that answers "doesn't support about" (iclouddrive; rclone knows its
+# backend's features without network) falls back to a root listing capped at
+# one API call (`rclone lsf <remote>: --max-depth 1`): reachability alone, no
+# numbers. Sessions expire; when they do the probe fails and the fix is the
+# interactive `rclone config reconnect <remote>:` (Apple 2FA, Dropbox browser
+# OAuth) that only a human can run — the shell surfaces it, never runs it.
+#
+# The remote is found by name-and-type first, else the first remote of --type,
+# from `rclone listremotes --long` — a pure local-config read; this script
+# never opens rclone.conf itself. The mount unit is
+# qshell-rclone-<remote, lowercased>; while --legacy-unit names a unit that is
+# still ACTIVE (the pre-generalization qshell-icloud-mount), that unit is
+# reported instead, so an existing mount is adopted rather than stranded —
+# unmount stops it, and the next mount starts under the new name.
+#
+# Always exits 0 with valid JSON (a caller error exits 2 with usage). An error
+# never masquerades as empty data: a failed probe is {reachable: false,
+# error: "<why>"}, and a listremotes that itself failed is {configured: false,
+# error: "<why>"} rather than a silent "no remotes".
+set -euo pipefail
+
+remote_arg=""
+type_arg=""
+mount_point=""
+legacy_unit=""
+mode="full"
+
+while (($# > 0)); do
+  case "$1" in
+  --remote)
+    remote_arg="${2:-}"
+    shift 2
+    ;;
+  --type)
+    type_arg="${2:-}"
+    shift 2
+    ;;
+  --mountpoint)
+    mount_point="${2:-}"
+    shift 2
+    ;;
+  --legacy-unit)
+    legacy_unit="${2:-}"
+    shift 2
+    ;;
+  --local)
+    mode="local"
+    shift
+    ;;
+  *)
+    echo "unknown argument: $1" >&2
+    exit 2
+    ;;
+  esac
+done
+
+if [[ -z $remote_arg || -z $type_arg ]]; then
+  echo "usage: rclone-remote-status --remote NAME --type BACKEND [--mountpoint PATH] [--legacy-unit UNIT] [--local]" >&2
+  exit 2
+fi
+
+case "$mount_point" in
+"") mount_point="$HOME/$remote_arg" ;;
+"~") mount_point="$HOME" ;;
+"~/"*) mount_point="$HOME/${mount_point#\~/}" ;;
+esac
+
+installed=false
+configured=false
+remote=""
+remote_type=""
+mounted=false
+error=""
+
+if command -v rclone >/dev/null 2>&1; then
+  installed=true
+  # listremotes reads only the local config file — no network. --long carries
+  # the backend type, so a remote is found by what it is, not just its name.
+  rc=0
+  remotes="$(rclone listremotes --long 2>&1)" || rc=$?
+  if ((rc != 0)); then
+    error="rclone listremotes failed: $(head -n 1 <<<"$remotes")"
+    remotes=""
+  fi
+  fallback=""
+  while IFS= read -r line; do
+    [[ -z $line ]] && continue
+    name="${line%%:*}"
+    type="$(awk '{print $2}' <<<"$line")"
+    [[ $type == "$type_arg" ]] || continue
+    if [[ $name == "$remote_arg" ]]; then
+      remote="$name"
+      remote_type="$type"
+    elif [[ -z $fallback ]]; then
+      fallback="$name"
+    fi
+  done <<<"$remotes"
+  if [[ -z $remote && -n $fallback ]]; then
+    remote="$fallback"
+    remote_type="$type_arg"
+  fi
+  [[ -n $remote ]] && configured=true
+fi
+
+# Unit names come from the resolved remote so two instances can never share
+# one; anything a unit name cannot carry becomes a dash.
+unit_base="$(tr '[:upper:]' '[:lower:]' <<<"${remote:-$remote_arg}" | tr -c 'a-z0-9\n' '-')"
+mount_unit="qshell-rclone-${unit_base}"
+if [[ -n $legacy_unit ]] && systemctl --user --quiet is-active "$legacy_unit" 2>/dev/null; then
+  mount_unit="$legacy_unit"
+fi
+
+if mountpoint -q "$mount_point" 2>/dev/null; then
+  mounted=true
+fi
+
+reachable=false
+quota_supported=false
+used_bytes=-1
+total_bytes=-1
+free_bytes=-1
+if [[ $mode == "full" && $configured == true ]]; then
+  about_err_file="$(mktemp)"
+  trap 'rm -f "$about_err_file"' EXIT
+  rc=0
+  about_json="$(timeout 15 rclone about "${remote}:" --json 2>"$about_err_file")" || rc=$?
+  about_err="$(cat "$about_err_file")"
+  if ((rc == 0)) && jq -e . >/dev/null 2>&1 <<<"$about_json"; then
+    reachable=true
+    quota_supported=true
+    used_bytes="$(jq -r '.used // -1' <<<"$about_json")"
+    total_bytes="$(jq -r '.total // -1' <<<"$about_json")"
+    free_bytes="$(jq -r '.free // -1' <<<"$about_json")"
+  elif ((rc == 124)); then
+    error="Timed out after 15 s"
+  elif [[ ${about_err,,} == *"doesn't support about"* ]]; then
+    # The backend has no quota to report; a root listing capped at one API
+    # call answers the reachability question alone.
+    rc=0
+    probe_err="$(timeout 15 rclone lsf "${remote}:" --max-depth 1 2>&1 >/dev/null)" || rc=$?
+    if ((rc == 0)); then
+      reachable=true
+    elif ((rc == 124)); then
+      error="Timed out after 15 s"
+    else
+      first_line="$(head -n 1 <<<"$probe_err")"
+      error="${first_line:-rclone exited $rc}"
+    fi
+  else
+    first_line="$(head -n 1 <<<"$about_err")"
+    error="${first_line:-rclone exited $rc}"
+  fi
+fi
+
+jq -cn \
+  --argjson installed "$installed" \
+  --argjson configured "$configured" \
+  --arg remote "$remote" \
+  --arg remoteType "$remote_type" \
+  --argjson mounted "$mounted" \
+  --arg mountPoint "$mount_point" \
+  --arg mountUnit "$mount_unit" \
+  --argjson local "$([[ $mode == "local" ]] && echo true || echo false)" \
+  --argjson reachable "$reachable" \
+  --argjson quotaSupported "$quota_supported" \
+  --argjson usedBytes "$used_bytes" \
+  --argjson totalBytes "$total_bytes" \
+  --argjson freeBytes "$free_bytes" \
+  --arg error "$error" \
+  '{
+    ok: true,
+    installed: $installed,
+    configured: $configured,
+    remote: $remote,
+    remoteType: $remoteType,
+    mounted: $mounted,
+    mountPoint: $mountPoint,
+    mountUnit: $mountUnit,
+    local: $local,
+    error: $error
+  } + (if $local then {} else {
+    reachable: $reachable,
+    quotaSupported: $quotaSupported,
+    usedBytes: $usedBytes,
+    totalBytes: $totalBytes,
+    freeBytes: $freeBytes
+  } end)'

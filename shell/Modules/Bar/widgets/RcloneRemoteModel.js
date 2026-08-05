@@ -1,6 +1,6 @@
-// The iCloud status envelope — ours, in DropboxModel.js's shape: a tolerant
-// parse of bin/icloud-status's one JSON object, where a parse failure stays
-// distinguishable from an honest empty answer.
+// The rclone-remote status envelope — ours, in DropboxModel.js's shape: a
+// tolerant parse of bin/rclone-remote-status's one JSON object, where a parse
+// failure stays distinguishable from an honest empty answer.
 
 function parseStatus(raw) {
     var text = String(raw || "").trim();
@@ -14,7 +14,7 @@ function parseStatus(raw) {
     } catch (e) {
         var failed = defaultStatus();
         failed.ok = false;
-        failed.lastError = "Failed to parse iCloud status";
+        failed.lastError = "Failed to parse rclone remote status";
         return failed;
     }
 }
@@ -28,7 +28,7 @@ function defaultStatus() {
         remoteType: "",
         mounted: false,
         mountPoint: "",
-        mountUnit: "qshell-icloud-mount",
+        mountUnit: "",
         local: true,
         error: ""
     };

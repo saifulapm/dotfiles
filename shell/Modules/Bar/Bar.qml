@@ -471,6 +471,7 @@ Scope {
             "monitor": monitorComponent,
             "dropbox": dropboxComponent,
             "icloud": icloudComponent,
+            "dropbox-rclone": dropboxRcloneComponent,
             "tailscale": tailscaleComponent,
             "spacer": spacerComponent
         })
@@ -1763,10 +1764,42 @@ Scope {
         }
     }
 
+    // Two ids, one component: RcloneRemote is the shared rclone-backed cloud
+    // widget, and each id carries its per-instance defaults (an inline
+    // shell.json settings entry may override them). Distinct ids because
+    // `bar open <id>` summons the first matching slot and this map is
+    // one-id-one-component — "icloud" keeps its summon address, and
+    // "dropbox" already belongs to the daemon-backed widget (the NUC's),
+    // so the rclone instance is "dropbox-rclone".
     Component {
         id: icloudComponent
-        ICloud {
+        RcloneRemote {
             theme: barRoot.theme
+            defaults: ({
+                    "remote": "iCloud",
+                    "remoteType": "iclouddrive",
+                    "label": "iCloud",
+                    "mountPoint": "~/iCloud",
+                    "legacyUnit": "qshell-icloud-mount",
+                    "glyph": "󰀸" // md-apple_icloud
+                    ,
+                    "phrases": ["Courting Cupertino", "Ferrying folders", "Drizzling data", "Raining files", "Syncing the orchard", "Picking apples", "Minding memories", "Whispering to Apple", "Seeding the cloud", "Polishing pixels"]
+                })
+        }
+    }
+
+    Component {
+        id: dropboxRcloneComponent
+        RcloneRemote {
+            theme: barRoot.theme
+            defaults: ({
+                    "remote": "Dropbox",
+                    "remoteType": "dropbox",
+                    "label": "Dropbox",
+                    "mountPoint": "~/Dropbox",
+                    "drawnMark": "dropbox",
+                    "phrases": ["Filing files", "Distributing data", "Shuffling folders", "Boxing bytes", "Sorting stuff", "Syncing secrets", "Packing packets", "Moving memories", "Wrangling revisions", "Cataloging chaos"]
+                })
         }
     }
 

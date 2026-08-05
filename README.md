@@ -35,8 +35,12 @@ fetches the fonts (pinned externals) and bootstraps the default theme.
 - `tailscale up` — interactive browser auth (the apply prints this loudly;
   the bar's tailscale widget has the same login flow).
 - First login for each agent CLI: `claude`, `codex`, `copilot`.
-- `rclone config` — the iCloud remote's session secrets live only in
-  `~/.config/rclone/rclone.conf`, never in this repo.
+- `rclone config` — once per remote, per machine: the iCloud remote
+  (interactive Apple 2FA) and, on the Macs, a Dropbox remote (interactive
+  browser OAuth; no aarch64 Dropbox client exists, rclone is the access
+  path there). Session secrets live only in `~/.config/rclone/rclone.conf`,
+  never in this repo. The bar's rclone widgets stay hidden until their
+  remote exists — configuring it is all it takes.
 - Dropbox linking, NUC only: `dropbox start` prints the login URL (the
   daemon and CLI install themselves; the Macs get nothing — no aarch64
   Dropbox exists).
