@@ -35,6 +35,25 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   KNOWN/OTHER NETWORKS sections with inline passphrase entry and
   forget-on-hover, the centered QR and speed-test overlays, and the same single
   cursor model shared by mouse and keyboard.
+- **Power plugin design** from `shell/plugins/panels/power/` (`Panel.qml`,
+  `Model.js`): the hero of battery glyph, bold title and rotating status phrase
+  beside the percentage at display size, over a charge bar that animates its
+  width and pulses while current is flowing in; their two phrase lists and the
+  2.8 s fade-out/swap/fade-in rotation with its snap back to full opacity when
+  the state stops rotating; the label/value fact pairs (battery size, charge
+  cycles, time left / time to full, discharge / charge rate) with the charge
+  threshold taking over those labels when a charge limit is holding; their
+  charge-threshold detection itself (pending-charge, fully-charged below 99 %,
+  or charging with the rate collapsed or an eight-hour estimate); the battery
+  glyph ladders; the 5 s refresh that runs only while the panel is open and
+  keeps the last good sample when a run comes back empty; and the
+  keyboard-cursor profile picker where the first arrow press parks the cursor
+  rather than moving it. What UPower publishes is read from UPower rather than
+  from their `omarchy-battery-status` helper; their profile list comes from
+  `powerprofilesctl`, ours from quickshell's PowerProfiles service, so their
+  `parseProfiles` and `omarchy-powerprofiles-set` are not ported. Their panel
+  fetches system stats and never displays them — ours shows them as a SYSTEM
+  section.
 - **Weather plugin design** from `shell/plugins/panels/weather/`: the two-source
   fetch (wttr.in for the full report, Open-Meteo for the fast day/night-aware
   current conditions and daily forecast, with coordinates driving Open-Meteo
@@ -233,6 +252,26 @@ Direct file-level copies (source path → destination path):
   (the FontAwesome range does not render under our Nerd Font fallback),
   `signalStrength` is normalised here because quickshell reports 0..1, and
   whitespace follows house 4-space qmlformat.
+- omarchy `shell/plugins/panels/power/Model.js` →
+  `shell/Modules/Bar/widgets/PowerModel.js`: near-verbatim port of the
+  cursor-index clamping, the key/tab/value reader, the profile glyphs, the
+  charge fraction, the charge-threshold test, the battery glyph ladders and the
+  mode label. Their `parseProfiles` is not ported (our profile list comes from
+  quickshell, not `powerprofilesctl`); the duration/watt/capacity formatters are
+  ours, formatting what UPower gives in place of the strings their
+  `omarchy-battery-status` awk produced.
+- omarchy `bin/omarchy-system-stats` → `bin/system-stats`: port of both stat
+  sources — the `/proc/meminfo` used/total in GB and the `/proc/loadavg` read,
+  plus their `key<TAB>value` output contract. CPU busy comes from sampling
+  `/proc/stat` twice 200 ms apart (what their `--bar-widget` mode has the shell
+  do) rather than from `top -bn1`, whose first iteration reports the average
+  since boot. Added on top, so the panel needs one process per sample: a
+  temperature reading (a CPU/SoC sensor when the machine has one, otherwise the
+  warmest labelled hwmon reading with its label, because Apple silicon exposes
+  no CPU sensor), the battery facts UPower does not publish (`cycle_count` and
+  the charge-control thresholds, from the same sysfs files
+  `omarchy-battery-status` reads, plus kernel health), and whether
+  `powerprofilesctl` exists.
 - omarchy `shell/plugins/panels/weather/Model.js` →
   `shell/Modules/Bar/widgets/WeatherModel.js`: near-verbatim port of the whole
   weather model — the wttr.in location query, the Open-Meteo geocoding parse and
