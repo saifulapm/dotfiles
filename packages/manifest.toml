@@ -143,6 +143,18 @@ arch = "all"
 why = "The screen recorder behind bin/screenrecord and the bar's screen-recording indicator (omarchy uses gpu-screen-recorder, which is Arch/AUR-only and NVIDIA/AMD-oriented; wf-recorder is the wlroots-native equivalent niri supports). Installed by hand 2026-08-06. Note: Fedora's ffmpeg-free ships no libx264, so wf-recorder's own default falls back to CPU libvpx-vp9, which cannot keep up at 2560x1600 — bin/screenrecord asks for libopenh264 (present here) and retries on wf-recorder's default if a machine lacks it. ffmpeg-free also ships no AAC encoder, so audio recordings are Opus in MP4 rather than upstream's AAC. There is no ffmpeg/ffprobe CLI on this box either, so upstream's post-processing pass (warmup-GOP trim, loudnorm, preview thumbnail) is not ported"
 
 [[pkg]]
+name = "tesseract"
+category = "optional"
+arch = "all"
+why = "OCR engine behind bin/screenshot-ocr (Mod+Ctrl+Print, the capture menu's Extract Text row — hidden while tesseract is absent). Port of the pre-qshell dotfiles-linux flow: slurp region → grim → tesseract → clipboard. English only by default; other languages are one tesseract-langpack-* away"
+
+[[pkg]]
+name = "tesseract-langpack-eng"
+category = "optional"
+arch = "all"
+why = "English traineddata for tesseract — the engine ships with no language at all, and bin/screenshot-ocr's default is `-l eng`"
+
+[[pkg]]
 name = "wlsunset"
 category = "core"
 arch = "all"
@@ -452,6 +464,11 @@ why  = "pi coding agent — its session logs are swept by bin/codex-usage-scan (
 # vim-minimal, which Fedora minimal always ships — vim-enhanced (`vim`) is
 # deliberately NOT installed; bash history shows `vim` failing and the user
 # falling back to `vi` for one quick edit, which is exactly what vi is for.
+
+[[tool]]
+name = "satty"
+via  = "home/.chezmoiscripts/run_after_07-satty.sh (github.com/gabm/Satty release binary, pinned v0.22.0, aarch64 AND x86_64) → ~/.local/bin/satty"
+why  = "Screenshot annotation — bin/screenshot-annotate opens the clipboard image (Mod+Shift+A) or a fresh slurp region (Shift+Print) in it, and the capture menu's annotate rows hide without it. The flow is the pre-qshell dotfiles-linux one, kept on the same tool. Fedora does not package satty, but upstream ships binaries for both our arches, so unlike voxtype the install is scripted. Links GTK4 (already present here via the portal chain; a machine where it fails to start wants `dnf install gtk4`)"
 
 [[tool]]
 name = "voxtype"

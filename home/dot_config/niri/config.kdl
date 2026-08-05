@@ -720,6 +720,13 @@ binds {
     Print { screenshot; }
     Ctrl+Print { screenshot-screen; }
     Alt+Print { screenshot-window; }
+    // The annotate/OCR flow from the pre-qshell dotfiles-linux (satty on the
+    // capture, slurp + tesseract for text). niri's own captures above leave
+    // the shot on the clipboard, which is what Mod+Shift+A reads.
+    Shift+Print hotkey-overlay-title="Screenshot Region + Annotate" { spawn "sh" "-c" "screenshot-annotate --region"; }
+    Mod+Shift+A hotkey-overlay-title="Annotate Last Capture" { spawn "sh" "-c" "screenshot-annotate"; }
+    // Omarchy: SUPER+CTRL+PRINT — OCR, the same slot.
+    Mod+Ctrl+Print hotkey-overlay-title="Extract Text (OCR)" { spawn "sh" "-c" "screenshot-ocr"; }
     // Omarchy: ALT+PRINT — taken by screenshot-window above. Stops a running
     // recording, else opens the capture menu's Screenrecord submenu.
     Mod+Print hotkey-overlay-title="Screen Recording" { spawn "sh" "-c" "screenrecord --stop-recording || qs ipc call menu open screenrecording"; }

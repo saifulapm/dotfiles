@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# screenshot-ocr — select a region with slurp, OCR it with tesseract, copy
+# the recognized text to the clipboard.
+#
+# Port of the pre-qshell dotfiles-linux script, minus its wayfreeze screen
+# freeze (not packaged for Fedora) — slurp draws over the live screen, which
+# is how bin/screenrecord's region pick already works.
+#
+# Set OCR_LANGS to override (e.g. "eng+deu"); needs the matching
+# tesseract-langpack-* packages.
+set -euo pipefail
+
+notify() {
+  notify-send -a qshell -t "${2:-2000}" "OCR" "$1" >/dev/null 2>&1 || true
+}
+
+if ! command -v tesseract >/dev/null 2>&1; then
+  notify "tesseract is not installed" 3000
+  exit 1
+fi
+
+region="$(slurp 2>/dev/null)" || exit 0
+[[ -z $region ]] && exit 0
+
+text="$(grim -g "$region" - | tesseract stdin stdout \
+  --oem 1 --psm 6 -l "${OCR_LANGS:-eng}" --dpi 300 \
+  -c preserve_interword_spaces=1 2>/dev/null)" || {
+  notify "tesseract failed" 3000
+  exit 1
+}
+
+if [[ -z ${text//[[:space:]]/} ]]; then
+  notify "No text recognized"
+  exit 0
+fi
+
+printf '%s' "$text" | wl-copy
+notify "Copied text to clipboard"

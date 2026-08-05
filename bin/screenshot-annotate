@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# screenshot-annotate — open a capture in satty for annotation.
+#
+#   screenshot-annotate            annotate the image on the CLIPBOARD (niri's
+#                                  Print / Ctrl+Print / Alt+Print captures all
+#                                  leave one there)
+#   screenshot-annotate --region   slurp a region and grim it straight into
+#                                  satty — the raw capture is saved to the
+#                                  screenshots dir and copied first, so
+#                                  closing satty without saving loses nothing
+#
+# Port of bin/screenshot-edit from the pre-qshell dotfiles-linux: the same
+# satty flow (read the capture, save the annotated copy beside the raw one,
+# re-copy it to the clipboard on exit), grown a --region mode so one gesture
+# goes select → shoot → annotate. satty's own toolbar does the saving;
+# --early-exit closes it after Save or Copy.
+set -euo pipefail
+
+notify() {
+  notify-send -a qshell -t 3000 "Screenshot" "$1" >/dev/null 2>&1 || true
+}
+
+if ! command -v satty >/dev/null 2>&1; then
+  notify "satty is not installed — chezmoi apply fetches it"
+  exit 1
+fi
+
+out_dir="$HOME/Pictures/Screenshots"
+mkdir -p "$out_dir"
+stamp="$(date '+%Y-%m-%d %H-%M-%S')"
+annotated="$out_dir/Screenshot from $stamp-annotated.png"
+
+case "${1:-}" in
+--region)
+  region="$(slurp 2>/dev/null)" || exit 0
+  [[ -z $region ]] && exit 0
+  raw="$out_dir/Screenshot from $stamp.png"
+  grim -g "$region" "$raw"
+  wl-copy --type image/png <"$raw"
+  exec satty -f "$raw" -o "$annotated" --copy-command wl-copy --early-exit
+  ;;
+"")
+  types="$(wl-paste --list-types 2>/dev/null || true)"
+  if [[ $types != *image/png* ]]; then
+    notify "No image on the clipboard — take a screenshot first"
+    exit 0
+  fi
+  wl-paste --type image/png | satty -f - -o "$annotated" --copy-command wl-copy --early-exit
+  ;;
+*)
+  echo "usage: screenshot-annotate [--region]" >&2
+  exit 2
+  ;;
+esac

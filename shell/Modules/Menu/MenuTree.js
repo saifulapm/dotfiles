@@ -125,6 +125,34 @@ var TREE = {
         "when": "command -v niri",
         "action": "niri msg action screenshot-screen"
     },
+    // The annotate and OCR rows are ports of the pre-qshell dotfiles-linux
+    // capture flow (satty on the capture, slurp + tesseract for text), not
+    // omarchy's — their screenshot script is hyprshot/tensaku-shaped and
+    // Hyprland-bound. Each row hides until its tool exists.
+    "capture.annotate-region": {
+        "icon": "󰽉",
+        "label": "Region → Annotate",
+        "aliases": ["annotate", "edit", "markup", "satty", "draw", "slurp"],
+        "description": "Pick an area and open the shot in satty",
+        "when": "command -v satty && command -v slurp",
+        "action": "screenshot-annotate --region"
+    },
+    "capture.annotate": {
+        "icon": "󱇣",
+        "label": "Annotate Last Capture",
+        "aliases": ["annotate", "edit", "clipboard", "satty", "markup"],
+        "description": "Open the clipboard image in satty",
+        "when": "command -v satty",
+        "action": "screenshot-annotate"
+    },
+    "capture.ocr": {
+        "icon": "󱄺",
+        "label": "Extract Text (OCR)",
+        "aliases": ["ocr", "text", "read", "recognize", "extract"],
+        "description": "Pick an area and copy its text",
+        "when": "command -v tesseract",
+        "action": "screenshot-ocr"
+    },
     // Omarchy's trigger.capture.screenrecord submenu, one row per audio
     // variant with Stop declared first and guarded by a `pgrep` test, exactly
     // as theirs is. Two differences, both from wf-recorder: their single smart
