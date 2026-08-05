@@ -4,8 +4,9 @@
 # hashes this file, so editing it re-runs installation on every machine at the
 # next `chezmoi apply`.
 #
-# Every dnf invocation uses --setopt=install_weak_deps=False (also set globally
-# in /etc/dnf/dnf.conf).
+# Every dnf invocation uses --setopt=install_weak_deps=False, and the install
+# script enforces install_weak_deps=False in /etc/dnf/dnf.conf itself (it was
+# originally a hand-run append that no fresh machine would have had).
 #
 # Fields:
 #   name     — dnf package name
@@ -202,6 +203,48 @@ arch = "all"
 why = "Dotfiles manager — the restore path for this whole repo"
 
 [[pkg]]
+name = "git"
+category = "core"
+arch = "all"
+why = "The repo itself is a git checkout with a core.hooksPath pre-commit hook; chezmoi clones the restore URL through it. Installed by hand during first setup (bash history line 27) and never recorded until 2026-08-06 — a fresh minimal machine does not ship it (chezmoi would fall back to its builtin git for the clone, and every later git operation would then be missing)"
+
+[[pkg]]
+name = "curl"
+category = "core"
+arch = "all"
+why = "Full curl (Fedora minimal ships curl-minimal). The weather widget, bin/network-speedtest, the get.chezmoi.io bootstrap and the agent-CLI installers all shell out to it. Installed by hand during first setup, recorded 2026-08-06"
+
+[[pkg]]
+name = "dnf5-plugins"
+category = "core"
+arch = "all"
+why = "Provides `dnf copr`, which the install script needs to enable the quickshell and mise COPRs — Fedora minimal does not ship it. The script also self-bootstraps it before the copr loop (chicken-and-egg); this entry keeps the inventory honest"
+
+[[pkg]]
+name = "chromium"
+category = "core"
+arch = "all"
+why = "The browser. Installed by hand 2026-08-05 (and with weak deps, predating the global dnf.conf policy), recorded 2026-08-06. Everything that opens a URL (menu rows, tailscale login dance, xdg-open) lands here"
+
+[[pkg]]
+name = "btop"
+category = "optional"
+arch = "all"
+why = "Terminal system monitor the user actually reaches for (bash history shows regular use). Installed by hand 2026-08-05, recorded 2026-08-06"
+
+[[pkg]]
+name = "rclone"
+category = "optional"
+arch = "all"
+why = "Cloud storage sync — an iCloud remote is configured on the MacBook (rclone config, 2026-08-06). Originally installed via rclone.org's install.sh (an rpm-unowned /usr/bin/rclone); this entry moves it to the Fedora package, which will overwrite that unowned binary on the next install run. NOTE: ~/.config/rclone/rclone.conf holds live iCloud session secrets and is deliberately NOT in this repo — a fresh machine must re-run `rclone config` (interactive Apple auth; not scriptable). Services/Sync.qml is transport-agnostic and is NOT yet pointed at an rclone-synced folder (shell.json has no sync block)"
+
+[[pkg]]
+name = "ripgrep"
+category = "shell"
+arch = "all"
+why = "bin/codex-usage-scan sweeps pi agent session logs with `rg --json`; without it that sweep silently contributes nothing (found 2026-08-06 — rg had never been installed, so the pi share of Codex usage was always missing). Generally useful besides"
+
+[[pkg]]
 name = "age"
 category = "core"
 arch = "all"
@@ -370,6 +413,36 @@ why  = "Bar/OSD/terminal icon glyphs; not packaged in Fedora. Symbols-only (~2 M
 name = "maple-mono"
 via  = "chezmoi external → ~/.local/share/fonts/maple-mono (github.com/subframe7536/maple-font v7.9 MapleMono-TTF.zip, pinned + sha256)"
 why  = "The coding font — terminal, Emacs, and everything else resolving `monospace`, which home/dot_config/fontconfig/conf.d/50-qshell.conf pins to it. User decision 2026-08-06, and deliberately NOT switchable from the Font menu (that picker moves the UI font only). Fedora packages no Maple Mono. The plain TTF build (1.8 MB, ligatures on) rather than MapleMono-NF (21 MB): icon glyphs already come from the symbols-only Nerd Font above, so the patched build would buy nothing. MapleMonoNL-* is the same font without ligatures if that is ever wanted; the -CN builds add Chinese and are ~160 MB"
+
+# Agent CLIs — all installed by run_onchange_after_04-agent-clis.sh (guarded,
+# user-local, no root). Their logins are interactive and deliberately not
+# scripted: each CLI asks on first run, and the model-usage widget shows a
+# provider only once it has actually produced numbers.
+
+[[tool]]
+name = "claude"
+via  = "curl -fsSL https://claude.ai/install.sh | bash → ~/.local/bin/claude"
+why  = "Claude Code CLI — the main coding agent, and the bar's model-usage widget reads its OAuth usage endpoint through ~/.claude/.credentials.json (bin/claude-usage-scan sweeps its local sessions)"
+
+[[tool]]
+name = "codex"
+via  = "curl -fsSL https://chatgpt.com/codex/install.sh | sh → ~/.local/bin/codex"
+why  = "OpenAI Codex CLI — second provider in the model-usage widget (bin/codex-usage-scan drives its app-server JSON-RPC for rate limits and sweeps its session JSONL)"
+
+[[tool]]
+name = "copilot"
+via  = "curl -fsSL https://gh.io/copilot-install | bash → ~/.local/bin/copilot"
+why  = "GitHub Copilot CLI — third provider in the model-usage widget (bin/copilot-usage-scan reads its session-store.db and quota endpoint)"
+
+[[tool]]
+name = "pi"
+via  = "curl -fsSL https://pi.dev/install.sh | sh → the mise-managed node's bin (needs node first; script order guarantees it)"
+why  = "pi coding agent — its session logs are swept by bin/codex-usage-scan (with ripgrep) into the Codex provider's local usage numbers. Was entirely unrecorded until 2026-08-06"
+
+# Editor note: the editor is Emacs (emacs-pgtk above). `vi` comes from
+# vim-minimal, which Fedora minimal always ships — vim-enhanced (`vim`) is
+# deliberately NOT installed; bash history shows `vim` failing and the user
+# falling back to `vi` for one quick edit, which is exactly what vi is for.
 
 [[tool]]
 name = "voxtype"

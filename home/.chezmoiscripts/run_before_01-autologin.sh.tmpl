@@ -1,6 +1,8 @@
 #!/bin/bash
 # TTY autologin on tty1 (decision 2026-08-05: no greeter). Idempotent; only
-# touches /etc when the drop-in is missing or stale.
+# touches /etc when the drop-in is missing or stale, and takes effect at the
+# NEXT boot — getty@tty1 is deliberately not restarted, because on a fresh
+# machine the user is sitting on tty1 running this very apply.
 set -euo pipefail
 
 conf=/etc/systemd/system/getty@tty1.service.d/autologin.conf
@@ -10,16 +12,37 @@ if [ -f "$conf" ] && grep -qF -- "--autologin {{ .chezmoi.username }}" "$conf"; 
   exit 0
 fi
 
-if ! sudo -v; then
-  echo "autologin: sudo unavailable — skipping (rerun 'chezmoi apply' in a terminal)" >&2
-  exit 0
-fi
+# Root, by whichever route this run can actually reach (same ladder as
+# 03-portal-backend): cached sudo, then interactive sudo when a terminal
+# exists — the fresh-machine TTY path — then pkexec, which draws the shell's
+# own polkit dialog on screen, so a background `chezmoi apply` (agent, keybind,
+# timer) can still land this with the user's on-screen approval.
+run_root() {
+  if sudo -n true 2>/dev/null; then
+    sudo "$@"
+  elif [ -t 0 ] && sudo -v 2>/dev/null; then
+    sudo "$@"
+  elif command -v pkexec >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+    echo "autologin: asking for authorization on screen…" >&2
+    timeout 180 pkexec "$@"
+  else
+    return 1
+  fi
+}
 
-sudo mkdir -p "$(dirname "$conf")"
-sudo tee "$conf" >/dev/null <<EOF
+# Stage the drop-in as the user, install it with ONE root call (a pkexec
+# route prompts once per call, so mkdir/write/reload are combined).
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+cat >"$tmp" <<EOF
 [Service]
 ExecStart=
 $want
 EOF
-sudo systemctl daemon-reload
-echo "autologin: configured for {{ .chezmoi.username }} on tty1"
+chmod 0644 "$tmp"
+
+if ! run_root /bin/sh -c "install -D -m 0644 '$tmp' '$conf' && systemctl daemon-reload"; then
+  echo "autologin: not authorized — skipping (rerun 'chezmoi apply' in a terminal)" >&2
+  exit 0
+fi
+echo "autologin: configured for {{ .chezmoi.username }} on tty1 (takes effect next boot)"

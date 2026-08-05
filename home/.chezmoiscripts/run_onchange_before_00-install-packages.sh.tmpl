@@ -10,10 +10,50 @@ root="{{ .chezmoi.workingTree }}"
 manifest="$root/packages/manifest.toml"
 arch="$(uname -m)"
 
+# Root policy, and which run gets which path:
+#   * The fresh-machine bootstrap and any interactive `chezmoi apply` have a
+#     controlling terminal, so bare sudo prompts there and everything below
+#     runs — that is the path the restore one-liner takes from a TTY.
+#   * Background runs (agents, keybinds, timers) have no terminal; sudo cannot
+#     prompt at all, so this script skips LOUDLY instead of hanging.
+#     Deliberate: a full dnf transaction should not be approvable by a single
+#     polkit click with no diff on screen, so there is no pkexec fallback here
+#     (03-portal-backend does use pkexec — one file, a reviewable dialog).
 if ! sudo -v; then
   echo "install-packages: sudo unavailable — skipping (rerun 'chezmoi apply' in a terminal)" >&2
   exit 0
 fi
+
+# Weak deps off, globally and permanently. The per-command --setopt below
+# still applies as belt and braces, but the config file is what makes one-off
+# `sudo dnf install` invocations honour the policy too. Idempotent, and also
+# repairs a duplicated line (this machine had two from a hand-run append).
+if [ "$(grep -c '^install_weak_deps=False$' /etc/dnf/dnf.conf 2>/dev/null || true)" != 1 ]; then
+  sudo python3 - <<'PY'
+conf = "/etc/dnf/dnf.conf"
+try:
+    lines = open(conf).read().splitlines()
+except FileNotFoundError:
+    lines = ["[main]"]
+lines = [l for l in lines if l.strip() != "install_weak_deps=False"]
+out, inserted = [], False
+for l in lines:
+    out.append(l)
+    if l.strip() == "[main]" and not inserted:
+        out.append("install_weak_deps=False")
+        inserted = True
+if not inserted:
+    out += ["[main]", "install_weak_deps=False"]
+open(conf, "w").write("\n".join(out) + "\n")
+PY
+  echo "install-packages: enforced install_weak_deps=False in /etc/dnf/dnf.conf"
+fi
+
+# `dnf copr` lives in dnf5-plugins, which Fedora minimal does not ship — the
+# copr loop below dies without it. (Also declared in the manifest for the
+# inventory's sake; installed here first because of the chicken-and-egg.)
+rpm -q dnf5-plugins >/dev/null 2>&1 \
+  || sudo dnf install --setopt=install_weak_deps=False -y dnf5-plugins
 
 mapfile -t coprs < <(python3 - "$manifest" <<'PY'
 import sys, tomllib
@@ -38,3 +78,14 @@ for copr in "${coprs[@]}"; do
 done
 
 sudo dnf install --setopt=install_weak_deps=False -y "${pkgs[@]}"
+
+# Packages this desktop must not have: they shadow the shell's own lock,
+# keyring-agent and bar. Fedora minimal ships none of them (verified
+# 2026-08-06), but if something dragged one in, say so rather than let it
+# fight the shell. Removal stays a user decision — the brief forbids
+# unapproved `dnf remove`.
+unwanted="$(rpm -q --qf '%{NAME}\n' waybar swaylock gnome-keyring 2>/dev/null | grep -vF 'not installed' || true)"
+if [ -n "$unwanted" ]; then
+  echo "install-packages: WARNING — conflicting packages present: ${unwanted//$'\n'/ }" >&2
+  echo "install-packages: remove with: sudo dnf remove ${unwanted//$'\n'/ }" >&2
+fi

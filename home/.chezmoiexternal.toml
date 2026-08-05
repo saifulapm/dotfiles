@@ -7,6 +7,7 @@
 [".local/share/fonts/nerd-symbols"]
     type = "archive"
     url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.0/NerdFontsSymbolsOnly.tar.xz"
+    checksum.sha256 = "b7ef2283462b435f1fe91d729dc412d5dbe34269dd2c7f4e1d803e4105c8d883"
     refreshPeriod = "0"
     include = ["*.ttf"]
 
