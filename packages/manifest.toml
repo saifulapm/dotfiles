@@ -109,7 +109,7 @@ why = "What `sans-serif` resolves to. NOT the desktop's font — Maple Mono draw
 name = "google-noto-sans-bengali-vf-fonts"
 category = "core"
 arch = "all"
-why = "Bangla coverage. NOTHING installed here covered lang=bn (verified `fc-list :lang=bn` empty on 2026-08-06), so every Bangla character typed through fcitx5-m17n rendered as a tofu box everywhere — terminal included, since neither Maple Mono nor Adwaita Sans carries Bengali. Appended to the sans/serif/mono chains by the repo's fontconfig policy so it only ever draws the codepoints the chosen family cannot"
+why = "Bangla DISPLAY coverage. NOTHING installed here covered lang=bn (verified `fc-list :lang=bn` empty on 2026-08-06), so every Bangla codepoint rendered as a tofu box everywhere — terminal included, since neither Maple Mono nor Adwaita Sans carries Bengali. Still wanted after the fcitx removal above: reading Bangla and typing it are separate problems, and Bangla arrives from web pages, filenames and messages whether or not there is an input method. 165 KB. Appended to the sans/serif/mono chains by the repo's fontconfig policy so it only ever draws the codepoints the chosen family cannot"
 
 [[pkg]]
 name = "google-noto-serif-vf-fonts"
@@ -327,23 +327,14 @@ category = "optional"
 arch = "all"
 why = "Interim launcher until Modules/Launcher is built; also a theme fan-out target (was a niri weak dep; claimed intentionally)"
 
-[[pkg]]
-name = "fcitx5"
-category = "optional"
-arch = "all"
-why = "Input method framework for Bangla — packages install, but configuration is deferred until explicitly approved"
-
-[[pkg]]
-name = "fcitx5-m17n"
-category = "optional"
-arch = "all"
-why = "m17n engine for fcitx5 — provides Bangla input methods (Avro phonetic, Probhat) via m17n-db"
-
-[[pkg]]
-name = "m17n-db"
-category = "optional"
-arch = "all"
-why = "Input method database required by fcitx5-m17n for Bangla layouts"
+# Removed 2026-08-06 by user decision ("I no need bangla input"): fcitx5,
+# fcitx5-m17n and m17n-db, plus the fcitx5-data/fcitx5-libs/m17n-lib/xcb-imdkit
+# dependencies dnf then had no use for — 8 packages, 22 MiB. They had been
+# installed since the first manifest but never configured (no ~/.config/fcitx5,
+# no autostart, no user unit, and no GTK_IM_MODULE/QT_IM_MODULE/XMODIFIERS
+# anywhere in this repo), so nothing depended on them. There is no input-method
+# framework on this desktop now; adding one back means an entry here plus the
+# environment variables, which is why this note stays instead of a silent gap.
 
 # ------------------------------------------------------------------ non-dnf tools
 # Installed by chezmoi scripts / declared externals, recorded here so the
