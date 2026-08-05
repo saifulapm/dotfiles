@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# icloud-status — one snapshot of the local rclone/iCloud state, as a single
+# JSON object. Ours (no omarchy equivalent); the shape follows bin/dropbox-status:
+# the shell asks one cheap question at startup and only pays for the expensive
+# one when someone is looking.
+#
+#   icloud-status --local   local facts only, NO network:
+#                           {installed, configured, remote, remoteType,
+#                            mounted, mountPoint, local: true}
+#   icloud-status           adds one reachability probe against Apple:
+#                           {…, reachable, error, local: false}
+#
+# The probe is a root listing capped at one API call (`rclone lsf <remote>:
+# --max-depth 1`) because the iclouddrive backend supports no `rclone about` —
+# there are no quota numbers to fetch, reachability is all there is to ask.
+# iCloud sessions expire; when they do the probe fails and the fix is the
+# interactive `rclone config reconnect <remote>:` (Apple 2FA), which only a
+# human can run — the shell surfaces it, never runs it.
+#
+# Always exits 0 with valid JSON. An error never masquerades as empty data:
+# a failed probe is {reachable: false, error: "<why>"}, and a listremotes that
+# itself failed is {configured: false, error: "<why>"} rather than a silent
+# "no remotes".
+set -euo pipefail
+
+mode="full"
+[[ "${1:-}" == "--local" ]] && mode="local"
+
+mount_point="$HOME/iCloud"
+mount_unit="qshell-icloud-mount"
+
+installed=false
+configured=false
+remote=""
+remote_type=""
+mounted=false
+error=""
+
+if command -v rclone >/dev/null 2>&1; then
+  installed=true
+  # listremotes reads only the local config file — no network. --long carries
+  # the backend type, so the remote is found by what it is, not just its name.
+  rc=0
+  remotes="$(rclone listremotes --long 2>&1)" || rc=$?
+  if ((rc != 0)); then
+    error="rclone listremotes failed: $(head -n 1 <<<"$remotes")"
+    remotes=""
+  fi
+  # Prefer the remote literally named iCloud, else the first iclouddrive one.
+  fallback=""
+  while IFS= read -r line; do
+    [[ -z $line ]] && continue
+    name="${line%%:*}"
+    type="$(awk '{print $2}' <<<"$line")"
+    if [[ $type == "iclouddrive" ]]; then
+      if [[ $name == "iCloud" ]]; then
+        remote="$name"
+        remote_type="$type"
+      elif [[ -z $fallback ]]; then
+        fallback="$name"
+      fi
+    fi
+  done <<<"$remotes"
+  if [[ -z $remote && -n $fallback ]]; then
+    remote="$fallback"
+    remote_type="iclouddrive"
+  fi
+  [[ -n $remote ]] && configured=true
+fi
+
+if mountpoint -q "$mount_point" 2>/dev/null; then
+  mounted=true
+fi
+
+reachable=false
+if [[ $mode == "full" && $configured == true ]]; then
+  # One API call against Apple. stderr is the interesting stream; the listing
+  # itself is discarded (2>&1 first, so the capture takes stderr only).
+  rc=0
+  probe_err="$(timeout 15 rclone lsf "${remote}:" --max-depth 1 2>&1 >/dev/null)" || rc=$?
+  if ((rc == 0)); then
+    reachable=true
+  elif ((rc == 124)); then
+    error="Timed out after 15 s"
+  else
+    first_line="$(head -n 1 <<<"$probe_err")"
+    error="${first_line:-rclone exited $rc}"
+  fi
+fi
+
+jq -cn \
+  --argjson installed "$installed" \
+  --argjson configured "$configured" \
+  --arg remote "$remote" \
+  --arg remoteType "$remote_type" \
+  --argjson mounted "$mounted" \
+  --arg mountPoint "$mount_point" \
+  --arg mountUnit "$mount_unit" \
+  --argjson local "$([[ $mode == "local" ]] && echo true || echo false)" \
+  --argjson reachable "$reachable" \
+  --arg error "$error" \
+  '{
+    ok: true,
+    installed: $installed,
+    configured: $configured,
+    remote: $remote,
+    remoteType: $remoteType,
+    mounted: $mounted,
+    mountPoint: $mountPoint,
+    mountUnit: $mountUnit,
+    local: $local,
+    error: $error
+  } + (if $local then {} else {reachable: $reachable} end)'

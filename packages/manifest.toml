@@ -236,7 +236,13 @@ why = "Terminal system monitor the user actually reaches for (bash history shows
 name = "rclone"
 category = "optional"
 arch = "all"
-why = "Cloud storage sync — an iCloud remote is configured on the MacBook (rclone config, 2026-08-06). Originally installed via rclone.org's install.sh (an rpm-unowned /usr/bin/rclone); this entry moves it to the Fedora package, which will overwrite that unowned binary on the next install run. NOTE: ~/.config/rclone/rclone.conf holds live iCloud session secrets and is deliberately NOT in this repo — a fresh machine must re-run `rclone config` (interactive Apple auth; not scriptable). Services/Sync.qml is transport-agnostic and is NOT yet pointed at an rclone-synced folder (shell.json has no sync block)"
+why = "Cloud storage sync — an iCloud remote is configured on the MacBook (rclone config, 2026-08-06), and the bar's icloud widget (shell/Modules/Bar/widgets/ICloud*.qml + bin/icloud-status) is built on it: reachability probe, and `rclone mount` as the transient qshell-icloud-mount user unit. Originally installed via rclone.org's install.sh (an rpm-unowned /usr/bin/rclone); this entry moves it to the Fedora package, which will overwrite that unowned binary on the next install run. NOTE: ~/.config/rclone/rclone.conf holds live iCloud session secrets and is deliberately NOT in this repo — a fresh machine must re-run `rclone config` (interactive Apple auth; not scriptable). Services/Sync.qml is transport-agnostic and is NOT yet pointed at an rclone-synced folder (shell.json has no sync block)"
+
+[[pkg]]
+name = "fuse3"
+category = "optional"
+arch = "all"
+why = "FUSE userspace (fusermount3) — the icloud widget's mount path is `rclone mount`, which needs it to attach ~/iCloud. Already present on the MacBook (pulled in 2026-08-06); recorded so a minimal machine gets a working mount toggle rather than a widget whose main action dies"
 
 [[pkg]]
 name = "ripgrep"

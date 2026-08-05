@@ -470,6 +470,7 @@ Scope {
             "weather": weatherComponent,
             "monitor": monitorComponent,
             "dropbox": dropboxComponent,
+            "icloud": icloudComponent,
             "tailscale": tailscaleComponent,
             "spacer": spacerComponent
         })
@@ -1758,6 +1759,13 @@ Scope {
     Component {
         id: dropboxComponent
         Dropbox {
+            theme: barRoot.theme
+        }
+    }
+
+    Component {
+        id: icloudComponent
+        ICloud {
             theme: barRoot.theme
         }
     }

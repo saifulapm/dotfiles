@@ -220,6 +220,27 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   split off the presence probe so the periodic refresh stays cheap, the
   "Stored" row opens the Dropbox folder (`o`), and files open with `xdg-open`
   rather than `uwsm-app -- nautilus --select`.
+- **iCloud widget (ours, in the Dropbox plugin's visual language).** omarchy
+  has no iCloud plugin; `shell/Modules/Bar/widgets/ICloud*.qml` +
+  `bin/icloud-status` are ours, written in the design language of the Dropbox
+  port above (which is omarchy's design): the mark carrying the state by
+  color and opacity, the hero over a rotating phrase with the 180/260 ms
+  cross-fade, the optimistic toggle that flips on the click, the presence
+  gate that keeps the widget invisible without a backend, the JSON status
+  helper split into a cheap local mode and an expensive full one, and the
+  simplified j/k/Enter cursor model. The rclone-specific deviations: the
+  backend is rclone's `iclouddrive` remote, whose `about` is unsupported —
+  there are no quota numbers, so no storage bar, and the one network call is
+  a reachability probe (root listing, panel open and explicit refresh only,
+  where the dropbox widget keeps upstream's visible-widget poll); the mount
+  is a transient systemd user unit (`systemd-run --user --collect`, the
+  `bin/reminder` precedent) rather than a vendor daemon, with `mountpoint -q`
+  as the arbiter; there is no recent-files walk (every listing is a paid
+  Apple API call); the mark is typeset (`md-apple_icloud`, the MD range being
+  the one that renders here) rather than drawn; and re-authentication is
+  interactive Apple 2FA no shell process can drive, so a failed probe raises
+  a copyable `rclone config reconnect` command row — the tailscale panel's
+  notice-row precedent — instead of a login flow.
 - **Tailscale plugin design** from `shell/plugins/panels/tailscale/` (`Panel.qml`,
   `Service.qml`, `TailscaleIcon.qml`, and their `README.md` as the intent doc):
   the mark drawn as a 3×3 dot grid with the six inactive dots faded, carrying
