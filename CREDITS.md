@@ -650,15 +650,44 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   `hyprland_active_border`, colors and angle verbatim; the template-function
   layer in `bin/theme-apply` mirrors their pre-computed `{{ shell_gradient X }}`
   / `{{ hypr_gradient X }}` sed entries.
-- **Font switcher** from `bin/omarchy-font-set` + `bin/omarchy-font-list` +
-  `shell/Commons/Style.qml`: fontconfig as the source of truth, the user
-  `fonts.conf` with a `prepend_first`/`binding="strong"` edit on the
-  `monospace` alias (file shape verbatim), `fc-list :spacing=100` with their
-  emoji/signwriting filter for the family list, and resolving the alias in the
-  shell with `fc-match -f "%{family[0]}" monospace` behind a `FileView` on
-  fonts.conf. Ours instead of theirs: the shell follows the change live rather
-  than restarting itself, a theme's own `font.mono` wins over the alias, and
-  the alias is consulted only once a user fonts.conf exists.
+- **Font switcher — deliberately NOT ported.** `bin/omarchy-font-set`,
+  `bin/omarchy-font-list` and their `style.font` menu provider let a user swap
+  the monospace family at runtime. This desktop has no equivalent and no menu
+  row: the family is fixed at Maple Mono in
+  `home/dot_config/fontconfig/conf.d/50-qshell.conf`, by the user's decision on
+  2026-08-06 (a port of their picker, and then a variant that switched the UI
+  font while pinning the coding font, both existed briefly and were removed in
+  favour of one family everywhere). What IS theirs and survives: fontconfig as
+  the single source of truth rather than per-application font settings, and
+  `shell/Commons/Style.qml`'s trick of resolving the alias with
+  `fc-match -f "%{family[0]}" monospace` instead of handing Qt the literal
+  alias — Qt caches a family name on first resolution, so the alias would
+  freeze at whatever it meant when the shell started. Ours on top: a `FileView`
+  on the policy file re-runs that resolution, so editing the family lands
+  without a restart, and a theme's own `font.ui`/`font.mono` token still wins
+  over the alias.
+  Worth recording because it cost real debugging: their user config edits the
+  `monospace` alias with `prepend_first`/`binding="strong"`, and that construct
+  is only safe on `monospace`. Applied to `sans-serif` on Fedora it poisons the
+  whole session — `/etc/fonts/conf.d/49-sansserif.conf` appends `sans-serif` to
+  every pattern that carries no generic name, so a strongly-bound family on
+  that alias is injected into every font request and outranks the family the
+  application actually asked for. Symptom: `fc-match "Maple Mono"` answering
+  "Adwaita Sans", and foot warning that its configured font was not monospace.
+- **Fontconfig policy** from `default/fontconfig/conf.avail/50-omarchy.conf` →
+  `home/dot_config/fontconfig/conf.d/50-qshell.conf`: the shape is theirs — a
+  `mode="assign"` match per generic alias, generic-name assignment for a font
+  fontconfig does not otherwise know, the web/CSS alias block (`system-ui`,
+  `ui-monospace`, `-apple-system`, `BlinkMacSystemFont`), the untargeted
+  last-resort family for Chromium and Electron (which resolve a missing glyph
+  one character at a time with no `lang` on the pattern, so a lang-targeted rule
+  never fires for them), and an `<alias><accept>` fallback list per generic so
+  emoji is reachable from each. The families are ours: Maple Mono, Adwaita Sans,
+  Noto Serif. Their Arabic/Urdu Naskh-vs-Nastaliq pair becomes a Bangla rule,
+  which is the script this machine actually types. Ours as well: the symbols
+  font on the monospace accept-list (their coding font is Nerd Font patched, so
+  they need no such fallback) and `binding="weak"` on the generic assigns, for
+  the reason above.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).

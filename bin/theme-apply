@@ -41,27 +41,30 @@ const themeTokens = parseToml(fs.readFileSync(STATE, "utf8"))
 const tokens = Object.assign({}, THEME_DEFAULTS, themeTokens)
 
 // Same font precedence Services/Theme.qml applies, so the shell and the
-// templated terminal configs never disagree: a theme that names font.mono
-// wins; one that stays quiet follows the fontconfig `monospace` alias, but
-// only once bin/font-set has actually written it. With no user fonts.conf
-// the builtin default stands — retyping the desktop in fontconfig's own pick
-// is not something applying a theme should do.
-const USER_FONTCONF = path.join(HOME, ".config/fontconfig/fonts.conf")
-if (themeTokens["font.mono"] === undefined && fs.existsSync(USER_FONTCONF)) {
+// templated app configs never disagree: a theme that names the token wins; one
+// that stays quiet follows the fontconfig `monospace` alias. Both tokens read
+// that one alias — this desktop draws in a single family — and it is asked for
+// by name here because a template hands a concrete family to foot/fuzzel/GTK,
+// not an alias each would resolve for itself.
+{
+  let resolved = ""
   try {
-    const resolved = execSync("fc-match -f '%{family[0]}' monospace").toString().trim()
-    if (resolved) tokens["font.mono"] = resolved
-  } catch (e) { /* no fontconfig; keep the builtin default */ }
+    resolved = execSync("fc-match -f '%{family[0]}' monospace").toString().trim()
+  } catch (e) { /* no fontconfig; keep the builtin defaults */ }
+  if (resolved) {
+    for (const token of ["font.ui", "font.mono"]) {
+      if (themeTokens[token] === undefined) tokens[token] = resolved
+    }
+  }
 }
 
-// The shell watches two optional files that may not exist yet
-// (~/.config/qshell/theme-override.toml and the fontconfig alias
-// bin/font-set writes), and a FileView cannot arm its watch on a path whose
-// parent directory is missing — the file's first appearance would then need a
-// shell restart to be noticed. Guarantee the directories instead: this runs
-// on every theme change and at bootstrap.
-// Same story for the fontconfig directory the shell watches for bin/font-set.
-for (const dir of [".config/qshell", ".config/fontconfig"]) {
+// The shell watches two files that may not exist yet on a fresh checkout
+// (~/.config/qshell/theme-override.toml and the chezmoi-managed fontconfig
+// policy), and a FileView cannot arm its watch on a path whose parent
+// directory is missing — the file's first appearance would then need a shell
+// restart to be noticed. Guarantee the directories instead: this runs on every
+// theme change and at bootstrap.
+for (const dir of [".config/qshell", ".config/fontconfig/conf.d"]) {
   fs.mkdirSync(path.join(HOME, dir), { recursive: true })
 }
 

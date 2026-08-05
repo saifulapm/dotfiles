@@ -182,7 +182,14 @@ Rectangle {
                     color: root.theme.notifications.text
                     font.family: root.theme.fontUi
                     font.pixelSize: root.theme.fontPx(1.167)
-                    font.bold: true
+                    // Upstream sets `font.bold` here. Title and body are the
+                    // same pixel size (theirs too), so weight is the only
+                    // thing separating them, and a full 700 makes the title a
+                    // slab against the regular-weight body. Maple Mono ships a
+                    // real SemiBold face, so this is a face swap rather than a
+                    // synthesised weight, and it is what every panel in this
+                    // shell already uses for a heading.
+                    font.weight: Font.DemiBold
                     wrapMode: Text.WordWrap
                     elide: Text.ElideRight
                     maximumLineCount: 2

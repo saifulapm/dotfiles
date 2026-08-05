@@ -97,7 +97,25 @@ why = "PipeWire session manager — no audio routing without it (was a niri weak
 name = "jetbrains-mono-fonts"
 category = "core"
 arch = "all"
-why = "Base mono font; the Nerd Font glyph variant is not packaged in Fedora and comes via chezmoi external (see [[tool]] nerd-font)"
+why = "SUPERSEDED by Maple Mono, which draws the whole desktop (see [[tool]] maple-mono, pinned as `monospace` by home/dot_config/fontconfig/conf.d/50-qshell.conf, 2026-08-06). Kept installed as a known-good monospace fallback if the Maple external ever fails to fetch on a fresh machine; nothing in the repo names it any more"
+
+[[pkg]]
+name = "adwaita-sans-fonts"
+category = "core"
+arch = "all"
+why = "What `sans-serif` resolves to. NOT the desktop's font — Maple Mono draws the shell, the terminal and GTK chrome — but web pages and documents ask for a proportional face by name, and answering those with a monospace font would be a bug. GNOME's build of Inter; already on disk as a dependency, named here so the fontconfig policy can point at something guaranteed present"
+
+[[pkg]]
+name = "google-noto-sans-bengali-vf-fonts"
+category = "core"
+arch = "all"
+why = "Bangla coverage. NOTHING installed here covered lang=bn (verified `fc-list :lang=bn` empty on 2026-08-06), so every Bangla character typed through fcitx5-m17n rendered as a tofu box everywhere — terminal included, since neither Maple Mono nor Adwaita Sans carries Bengali. Appended to the sans/serif/mono chains by the repo's fontconfig policy so it only ever draws the codepoints the chosen family cannot"
+
+[[pkg]]
+name = "google-noto-serif-vf-fonts"
+category = "core"
+arch = "all"
+why = "The only serif face on the machine. Without it Fedora ships default-fonts-core-sans and no serif at all, so `serif` fell through a charset scan and resolved to Adwaita MONO (verified 2026-08-06) — anything asking for a serif got a monospace font. The fontconfig policy points serif here"
 
 [[pkg]]
 name = "brightnessctl"
@@ -352,9 +370,14 @@ via  = "rustup component add rust-analyzer"
 why  = "Rust language server for eglot"
 
 [[tool]]
-name = "nerd-font-jetbrains-mono"
-via  = "chezmoi external → ~/.local/share/fonts (upstream nerd-fonts release tarball)"
-why  = "Bar/terminal glyphs; not packaged in Fedora"
+name = "nerd-font-symbols"
+via  = "chezmoi external → ~/.local/share/fonts/nerd-symbols (nerd-fonts v3.5.0 NerdFontsSymbolsOnly.tar.xz, pinned)"
+why  = "Bar/OSD/terminal icon glyphs; not packaged in Fedora. Symbols-only (~2 MB) rather than a patched family, so the text font is a separate decision. NOTE: only the Material Design range (U+F0001+) actually renders under this font — the FontAwesome, Codicon and Devicon ranges do not, which is why every glyph in the shell is an MD codepoint"
+
+[[tool]]
+name = "maple-mono"
+via  = "chezmoi external → ~/.local/share/fonts/maple-mono (github.com/subframe7536/maple-font v7.9 MapleMono-TTF.zip, pinned + sha256)"
+why  = "The coding font — terminal, Emacs, and everything else resolving `monospace`, which home/dot_config/fontconfig/conf.d/50-qshell.conf pins to it. User decision 2026-08-06, and deliberately NOT switchable from the Font menu (that picker moves the UI font only). Fedora packages no Maple Mono. The plain TTF build (1.8 MB, ligatures on) rather than MapleMono-NF (21 MB): icon glyphs already come from the symbols-only Nerd Font above, so the patched build would buy nothing. MapleMonoNL-* is the same font without ligatures if that is ever wanted; the -CN builds add Chinese and are ~160 MB"
 
 [[tool]]
 name = "voxtype"

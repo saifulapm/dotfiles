@@ -19,8 +19,19 @@
 # only picks which Adwaita they are painted onto, and follows the theme's own
 # mode so a light theme takes GTK apps light with it.
 #
-# Read at application start: apps already running keep the old polarity until
-# they are restarted.
+# The font is here for the same reason. GTK3 does read gtk-font-name from
+# gsettings, but that key is one value for the whole session and is not ours to
+# own; carrying it here puts GTK app chrome on the same family the shell and
+# the terminal draw with, instead of the GNOME default. It is the resolved
+# family, not the `monospace` alias — GTK wants a family plus a size.
+#
+# This only moves GTK's own UI. The `sans-serif` generic is deliberately left
+# pointing at a real proportional face (see the fontconfig policy), so web
+# pages and documents still get one.
+#
+# Read at application start: apps already running keep the old polarity and the
+# old font until they are restarted.
 [Settings]
 gtk-theme-name=Adwaita
 gtk-application-prefer-dark-theme={{gtk.prefer-dark}}
+gtk-font-name={{font.ui}} {{font.size}}

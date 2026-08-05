@@ -184,19 +184,27 @@ QtObject {
     readonly property int borderWidth: Math.round(num("shape.border-width"))
     readonly property real spaceUnit: num("space.unit")
     readonly property real density: num("space.density")
-    readonly property string fontUi: String(tok("font.ui"))
     // The concrete family the fontconfig `monospace` alias resolves to right
-    // now — what `bin/font-set` writes and what every app asking for
-    // "monospace" gets. Re-resolved whenever fonts.conf changes.
+    // now — Maple Mono, pinned by the repo's fontconfig policy
+    // (home/dot_config/fontconfig/conf.d/50-qshell.conf).
+    //
+    // ONE FAMILY DRAWS THE WHOLE SHELL, which is omarchy's design too (their
+    // Style.fontFamily is the literal string "monospace"): `fontUi` and
+    // `fontMono` are the same value unless a theme overrides one. There is no
+    // font picker — user decision 2026-08-06, after trying the split.
+    //
+    // Resolving the alias rather than handing Qt the literal "monospace"
+    // matters: Qt resolves a family name once and caches it, so the alias
+    // would freeze at whatever it meant when the shell started.
     property string resolvedMono: String(builtin["font.mono"])
-    // PRECEDENCE (ours, not omarchy's — their family is system-wide, full
-    // stop): a theme that names font.mono wins, because a theme pinning its
-    // typeface is a deliberate choice. A theme that stays quiet — which is
-    // every ported one — follows the system alias, so `font-set` moves it.
-    // And the alias only speaks once the user's fonts.conf exists: on a
-    // machine where font-set has never run, `monospace` resolves to whatever
-    // fontconfig picked (Noto Sans Mono here), and silently retyping the
-    // desktop in it is not a decision this service gets to make.
+
+    // PRECEDENCE: a theme that names the token wins, because a theme pinning
+    // its typeface is a deliberate choice. A theme that stays quiet — which is
+    // every ported one — follows the system alias.
+    readonly property string fontUi: {
+        const v = rawTok("font.ui");
+        return v !== undefined ? String(v) : resolvedMono;
+    }
     readonly property string fontMono: {
         const v = rawTok("font.mono");
         return v !== undefined ? String(v) : resolvedMono;
@@ -366,11 +374,15 @@ QtObject {
     }
 
     // ------------------------------------------------------ font resolution
-    // Theirs (Commons/Style.qml): ask fc-match what `monospace` is, and ask
-    // again whenever the fontconfig file changes, so `font-set` lands live
+    // Theirs (Commons/Style.qml): ask fc-match what the generic alias is, and
+    // ask again whenever the policy file changes, so editing it lands live
     // instead of needing the shell restart their script performs.
-    property Process fcMatch: Process {
-        id: fcMatch
+    function resolveFonts() {
+        fcMatchMono.running = true;
+    }
+
+    property Process fcMatchMono: Process {
+        id: fcMatchMono
         command: ["fc-match", "-f", "%{family[0]}", "monospace"]
         stdout: StdioCollector {
             waitForEnd: true
@@ -384,14 +396,16 @@ QtObject {
 
     property FileView fontconfigFile: FileView {
         id: fontconfigFile
-        path: Quickshell.env("HOME") + "/.config/fontconfig/fonts.conf"
+        path: Quickshell.env("HOME") + "/.config/fontconfig/conf.d/50-qshell.conf"
         watchChanges: true
         printErrors: false
-        onLoaded: fcMatch.running = true
+        onLoaded: root.resolveFonts()
         onFileChanged: reload()
-        // Deleting the file (or never having written one) hands the default
-        // back to the builtin token rather than to fontconfig's own pick.
-        onLoadFailed: root.resolvedMono = String(root.builtin["font.mono"])
+        // The policy file is chezmoi-managed and normally present, but a
+        // checkout that has not been applied yet has to ask fc-match anyway or
+        // the shell would sit on the builtin token instead of the family the
+        // rest of the desktop draws with.
+        onLoadFailed: root.resolveFonts()
     }
 
     // FileView stays unloaded until something reads it, and nothing reads a

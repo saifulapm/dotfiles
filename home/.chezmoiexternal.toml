@@ -9,3 +9,16 @@
     url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.0/NerdFontsSymbolsOnly.tar.xz"
     refreshPeriod = "0"
     include = ["*.ttf"]
+
+# The coding font. Fedora does not package Maple Mono, so it comes from the
+# upstream release, pinned and checksummed. This is the plain TTF build, not
+# MapleMono-NF: icon glyphs already come from the symbols-only font above, so
+# there is no reason to carry the 21 MB patched build for the same result.
+# Ligatures are on — that is the "NL" suffix's absence. `monospace` is pinned
+# to this family by dot_config/fontconfig/conf.d/50-qshell.conf.
+[".local/share/fonts/maple-mono"]
+    type = "archive"
+    url = "https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-TTF.zip"
+    checksum.sha256 = "3a35f8f0669bef3dded9df208cc4526a6f7573210e134816e9084a8981271d75"
+    refreshPeriod = "0"
+    include = ["*.ttf"]
