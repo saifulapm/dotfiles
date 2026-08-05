@@ -1,12 +1,21 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
+import Quickshell.Wayland
 import "widgets"
+import "BarModel.js" as BarModel
 
 // The bar, styled 100% after omarchy's: theme background surface, foreground
 // text (colors.toml `foreground`, i.e. our ansi.white — not bright), zero
 // spacing between widgets (each owns its margins), 8 px section insets,
 // chrome-less buttons, red attention color, 420 ms color transitions on
-// theme swap, and the clock pinned dead-center with neighbors flanking it.
+// theme swap, and a configurable center anchor pinned dead-center.
+//
+// The interaction machinery below is omarchy's too (CREDITS.md): press-drag a
+// widget to reorder it, press-drag the empty center to move the bar to another
+// screen edge, double-click it to toggle transparency (with an auto-contrast
+// foreground sampled from the wallpaper behind the bar), an accent pill under
+// the widget whose panel is open, and Tab to walk between panels.
 //
 // Widgets live in the registry below and are instantiated only when named in
 // the config's bar.left / bar.center / bar.right arrays. Unknown ids render
@@ -18,6 +27,9 @@ Scope {
     required property var theme
     required property var niri
     property var config: ({})
+
+    readonly property string statePath: Quickshell.env("HOME") + "/.local/state/qshell"
+    readonly property string binDir: Quickshell.env("HOME") + "/.dotfiles/bin/"
 
     // Layout entries are either plain widget-id strings ("clock") or inline
     // settings objects ({"id": "clock", "format": …}), omarchy-style. Both
@@ -40,36 +52,49 @@ Scope {
             right: (Array.isArray(config.right) ? config.right : []).map(normalizeEntry)
         })
 
+    // Only top/bottom this pass — a vertical bar is a later piece of work, so
+    // BarModel folds a stored "left"/"right" back onto "top".
+    readonly property string position: BarModel.normalizePosition(config.position)
+    // Which center widget is pinned dead-center. Omarchy's centerAnchor,
+    // configurable here instead of hardcoded to the clock; an id that is not
+    // in the center section falls back to centering the whole group.
+    readonly property string centerAnchorId: String(config.centerAnchor === undefined || config.centerAnchor === null ? "clock" : config.centerAnchor)
+
     // Repeater models hold only the id strings, and keep their identity while
     // the id sequence is unchanged — so a settings write (which replaces the
     // whole config object) updates live widgets in place instead of
     // recreating them. Recreating would destroy the very panel the settings
-    // were just edited from. The center split (omarchy's centerAnchor: the
-    // clock pinned dead-center, neighbors flanking it) is computed in the
-    // same pass — deriving it from separate reactive properties left a
-    // transient evaluation where the flanking rows still contained the
-    // clock, instantiating it twice.
+    // were just edited from. The center split (the anchor pinned dead-center,
+    // neighbors flanking it) is computed in the same pass — deriving it from
+    // separate reactive properties left a transient evaluation where the
+    // flanking rows still contained the anchor, instantiating it twice.
     property var modelLeft: []
     property var modelRight: []
     property var modelCenterBefore: []
     property var modelCenterAfter: []
     property int centerAnchorIndex: -1
+    property string centerAnchorWidget: ""
 
     onLayoutOfChanged: syncModels()
-    Component.onCompleted: syncModels()
+    onCenterAnchorIdChanged: syncModels()
+    Component.onCompleted: {
+        syncModels();
+        applyTransparency();
+    }
 
     function sameIds(a, b) {
-        return a.join("\u001f") === b.join("\u001f");
+        return a.join("") === b.join("");
     }
 
     function syncModels() {
         const leftIds = layoutOf.left.map(e => e.id);
         const centerIds = layoutOf.center.map(e => e.id);
         const rightIds = layoutOf.right.map(e => e.id);
-        const anchor = centerIds.indexOf("clock");
+        const anchor = centerIds.indexOf(centerAnchorId);
         const before = anchor >= 0 ? centerIds.slice(0, anchor) : [];
         const after = anchor >= 0 ? centerIds.slice(anchor + 1) : centerIds;
         centerAnchorIndex = anchor;
+        centerAnchorWidget = anchor >= 0 ? centerIds[anchor] : "";
         if (!sameIds(leftIds, modelLeft))
             modelLeft = leftIds;
         if (!sameIds(rightIds, modelRight))
@@ -78,6 +103,266 @@ Scope {
             modelCenterBefore = before;
         if (!sameIds(after, modelCenterAfter))
             modelCenterAfter = after;
+    }
+
+    // --------------------------------------------------------- bar palette
+    // Omarchy bar palette: background = theme background, text = theme
+    // foreground (our ansi.white), attention = red. 420 ms InOutCubic
+    // transitions carry theme swaps — but not the auto-contrast swap, which
+    // has to land in the same frame as the transparency it belongs to.
+    readonly property color barBackground: theme.surface1
+    readonly property color themeForeground: theme.col("ansi.white")
+    // The other candidate for a transparent bar's text: the bar's own
+    // background color, which is by construction the opposite polarity of the
+    // foreground and so reads over a wallpaper the foreground disappears into.
+    readonly property color themeContrastForeground: theme.surface1
+    property color transparentForeground: themeForeground
+    property bool useTransparentForeground: false
+    property bool foregroundAnimationEnabled: true
+    readonly property color barForeground: useTransparentForeground ? transparentForeground : themeForeground
+
+    // ------------------------------------------------------- transparency
+    // bar.transparent in shell.json, toggled by double-clicking empty bar
+    // space. `transparent` only follows once a foreground has been sampled,
+    // so the bar never spends a frame with unreadable text over the wallpaper.
+    readonly property bool requestedTransparent: config.transparent === true
+    property bool transparent: false
+
+    onRequestedTransparentChanged: applyTransparency()
+    onThemeForegroundChanged: scheduleForegroundRefresh()
+    onThemeContrastForegroundChanged: scheduleForegroundRefresh()
+    onPositionChanged: scheduleForegroundRefresh()
+
+    function applyTransparency() {
+        if (!requestedTransparent) {
+            foregroundAnimationEnabled = false;
+            useTransparentForeground = false;
+            transparent = false;
+            transparentForeground = themeForeground;
+            restoreForegroundAnimation();
+            return;
+        }
+        scheduleForegroundRefresh();
+    }
+
+    // Two frames of snapped color, then animations back on: a sampled
+    // foreground must not crossfade through the color it was replacing.
+    function restoreForegroundAnimation() {
+        Qt.callLater(() => Qt.callLater(() => barRoot.foregroundAnimationEnabled = true));
+    }
+
+    function scheduleForegroundRefresh() {
+        if (!requestedTransparent) {
+            transparentForeground = themeForeground;
+            return;
+        }
+        foregroundTimer.restart();
+    }
+
+    function colorHex(value) {
+        const c = typeof value === "string" ? Qt.color(value) : value;
+        const channel = v => {
+            const s = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16);
+            return s.length < 2 ? "0" + s : s;
+        };
+        return "#" + channel(c.r) + channel(c.g) + channel(c.b);
+    }
+
+    function refreshTransparentForeground() {
+        if (!requestedTransparent || foregroundProc.running)
+            return;
+        const first = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
+        foregroundProc.command = [barRoot.binDir + "bar-text-color", barRoot.position, String(barRoot.theme.barHeight), colorHex(barRoot.themeForeground), colorHex(barRoot.themeContrastForeground)].concat(first ? ["--screen", Math.round(first.width) + "x" + Math.round(first.height)] : []);
+        foregroundProc.running = true;
+    }
+
+    Timer {
+        id: foregroundTimer
+        interval: 120
+        onTriggered: barRoot.refreshTransparentForeground()
+    }
+
+    Process {
+        id: foregroundProc
+        stdout: SplitParser {
+            onRead: line => {
+                const value = String(line || "").trim();
+                if (!/^#[0-9A-Fa-f]{6}$/.test(value))
+                    return;
+                barRoot.foregroundAnimationEnabled = false;
+                barRoot.transparentForeground = value;
+                if (barRoot.requestedTransparent) {
+                    barRoot.useTransparentForeground = true;
+                    barRoot.transparent = true;
+                }
+                barRoot.restoreForegroundAnimation();
+            }
+        }
+    }
+
+    // The wallpaper the sample is taken from. Theirs watches the state dir for
+    // their `current` symlink; ours watches the file whose content IS the
+    // wallpaper path (Modules/Background writes it).
+    FileView {
+        path: barRoot.statePath + "/background"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: {
+            reload();
+            barRoot.scheduleForegroundRefresh();
+        }
+        onLoaded: barRoot.scheduleForegroundRefresh()
+        Component.onCompleted: reload()
+    }
+
+    // ---------------------------------------------------------- bar hiding
+    // Presence of the `bar-off` flag = bar hidden, so the bar can be taken off
+    // screen without killing the shell (omarchy's omarchy-toggle-bar). The
+    // watcher covers the file AND its directory, so an external touch/rm of
+    // the flag moves the bar too.
+    property bool barHidden: false
+
+    function setBarHidden(hidden) {
+        barHidden = hidden;
+        Quickshell.execDetached(["bash", "-c", hidden ? "mkdir -p " + statePath + " && touch " + statePath + "/bar-off" : "rm -f " + statePath + "/bar-off"]);
+    }
+
+    FileView {
+        path: barRoot.statePath + "/bar-off"
+        watchChanges: true
+        printErrors: false
+        onLoaded: barRoot.barHidden = true
+        onLoadFailed: barRoot.barHidden = false
+        onFileChanged: reload()
+        // Neither loaded nor loadFailed fires until something reads the view.
+        Component.onCompleted: reload()
+    }
+
+    IpcHandler {
+        target: "bar"
+
+        // NOTE: `qs ipc call bar show` prints the target listing — the
+        // quickshell CLI parses a bare `show` as its own subcommand. Use
+        // `qs ipc call bar -- show`.
+        function show(): string {
+            barRoot.setBarHidden(false);
+            return "ok";
+        }
+
+        function hide(): string {
+            barRoot.setBarHidden(true);
+            return "ok";
+        }
+
+        function toggle(): string {
+            barRoot.setBarHidden(!barRoot.barHidden);
+            return barRoot.barHidden ? "hidden" : "shown";
+        }
+
+        function status(): string {
+            return JSON.stringify({
+                hidden: barRoot.barHidden,
+                position: barRoot.position,
+                transparent: barRoot.transparent,
+                requestedTransparent: barRoot.requestedTransparent,
+                foreground: barRoot.colorHex(barRoot.barForeground),
+                centerAnchor: barRoot.centerAnchorId,
+                anchored: barRoot.centerAnchorIndex >= 0
+            });
+        }
+    }
+
+    // ------------------------------------------------- persisted mutations
+    function toggleTransparency() {
+        shell.updateBarConfig({
+            transparent: !requestedTransparent
+        });
+    }
+
+    function setPosition(value) {
+        shell.updateBarConfig({
+            position: BarModel.normalizePosition(value)
+        });
+    }
+
+    function moveWidget(fromSection, widgetId, toSection, beforeId) {
+        return shell.moveBarEntry(fromSection, widgetId, toSection, beforeId);
+    }
+
+    // ------------------------------------------------------- drag-to-reorder
+    // Shared by every bar surface: one drag at a time, and the ghost windows
+    // below read this state to draw it.
+    property var dragSource: null
+    property var dragWindow: null
+    property var dragScreen: null
+    property url dragImageUrl: ""
+    property var dropTarget: null
+    property bool dropAfter: false
+    property var dropMarkerGeometry: null
+    property real dragScreenX: 0
+    property real dragScreenY: 0
+    property real dragOffsetX: 0
+    property real dragOffsetY: 0
+
+    function clearDrag() {
+        dragSource = null;
+        dragWindow = null;
+        dragScreen = null;
+        dragImageUrl = "";
+        dropTarget = null;
+        dropAfter = false;
+        dropMarkerGeometry = null;
+        dragScreenX = 0;
+        dragScreenY = 0;
+        dragOffsetX = 0;
+        dragOffsetY = 0;
+    }
+
+    function captureDragGhost(slot) {
+        const item = slot ? slot.activeItem : null;
+        dragImageUrl = "";
+        if (!item || typeof item.grabToImage !== "function")
+            return;
+        const w = Math.max(1, Math.ceil(item.width || item.implicitWidth || slot.width || 1));
+        const h = Math.max(1, Math.ceil(item.height || item.implicitHeight || slot.height || 1));
+        item.grabToImage(result => {
+            if (barRoot.dragSource !== slot || !result || !result.url)
+                return;
+            barRoot.dragImageUrl = result.url;
+        }, Qt.size(w, h));
+    }
+
+    // ---------------------------------------------------------- bar move
+    property bool barMoveActive: false
+    property string barMoveCandidate: ""
+    property var barMoveScreen: null
+
+    function beginBarMove(screen) {
+        barMoveScreen = screen;
+        barMoveCandidate = position;
+        barMoveActive = true;
+    }
+
+    function updateBarMove(screenPoint) {
+        if (!barMoveActive || !barMoveScreen)
+            return;
+        // Their nearestScreenEdge, constrained: with no vertical bar yet, a
+        // left/right result folds onto the nearer horizontal edge.
+        barMoveCandidate = BarModel.horizontalEdge(screenPoint, barMoveScreen.width, barMoveScreen.height);
+    }
+
+    function clearBarMove() {
+        barMoveActive = false;
+        barMoveCandidate = "";
+        barMoveScreen = null;
+    }
+
+    function finishBarMove() {
+        const edge = barMoveCandidate;
+        const changed = barMoveActive && edge && edge !== position;
+        clearBarMove();
+        if (changed)
+            setPosition(edge);
     }
 
     // ------------------------------------------------------ widget registry
@@ -123,27 +408,34 @@ Scope {
             // what else is on the bar — the tray suppresses the SNI item of
             // any app that has a dedicated widget in the layout.
             readonly property var layoutConfig: barRoot.layoutOf
+            // Which edge the bar is on, for panels anchoring under (or over)
+            // their widget.
+            readonly property string position: barRoot.position
 
             // Cold-start metric consumed by bin/bench: ms from process launch
             // to this bar window finishing construction.
             Component.onCompleted: console.info("bench:first-bar", Date.now() - Quickshell.launchTime.getTime(), "ms")
 
             screen: modelData
+            visible: !barRoot.barHidden
             anchors {
-                top: String(barRoot.config.position) !== "bottom"
-                bottom: String(barRoot.config.position) === "bottom"
+                top: barRoot.position !== "bottom"
+                bottom: barRoot.position === "bottom"
                 left: true
                 right: true
             }
             implicitHeight: barRoot.theme.barHeight
 
-            // Omarchy bar palette: background = theme background, text =
-            // theme foreground (our ansi.white), attention = red. 420 ms
-            // InOutCubic transitions carry theme swaps.
-            property color barBackground: barRoot.theme.surface1
-            property color barForeground: barRoot.theme.col("ansi.white")
+            property color barBackground: barRoot.barBackground
+            property color barForeground: barRoot.barForeground
 
-            color: barBackground
+            // A transparent bar needs a non-opaque surface format, or the
+            // compositor draws it black instead of showing the desktop.
+            color: barRoot.transparent ? "transparent" : barBackground
+            surfaceFormat.opaque: false
+            WlrLayershell.namespace: "qshell-bar"
+            WlrLayershell.layer: WlrLayer.Top
+
             Behavior on barBackground {
                 ColorAnimation {
                     duration: 420
@@ -151,10 +443,229 @@ Scope {
                 }
             }
             Behavior on barForeground {
+                enabled: barRoot.foregroundAnimationEnabled
                 ColorAnimation {
                     duration: 420
                     easing.type: Easing.InOutCubic
                 }
+            }
+
+            // ------------------------------------------------- registries
+            // Every clickable inside this bar surface (BarButton registers
+            // itself), and every widget slot. Both are omarchy's: the first
+            // is how a left click survives the drag MouseArea covering the
+            // widgets, the second is what drop targeting and panel
+            // navigation walk.
+            property var clickTargets: []
+            property var moduleSlots: []
+
+            function registerClickTarget(target) {
+                if (!target || clickTargets.indexOf(target) !== -1)
+                    return;
+                const next = clickTargets.slice();
+                next.push(target);
+                clickTargets = next;
+            }
+
+            function unregisterClickTarget(target) {
+                clickTargets = clickTargets.filter(item => item !== target);
+            }
+
+            function registerModuleSlot(slot) {
+                if (!slot || moduleSlots.indexOf(slot) !== -1)
+                    return;
+                const next = moduleSlots.slice();
+                next.push(slot);
+                moduleSlots = next;
+            }
+
+            function unregisterModuleSlot(slot) {
+                moduleSlots = moduleSlots.filter(item => item !== slot);
+            }
+
+            // A target only takes a click while it is on screen and enabled —
+            // our stand-in for their interactive/pressable/concealed trio
+            // (a collapsed indicator sets enabled:false and opacity 0).
+            function moduleTargetClickable(target) {
+                return !!target && target.visible !== false && target.opacity !== 0 && target.enabled !== false && typeof target.triggerPress === "function";
+            }
+
+            // Reverse registration order approximates topmost-first: a nested
+            // button registers after the widget that contains it.
+            function moduleClickTargetAt(slot, localX, localY) {
+                for (let i = clickTargets.length - 1; i >= 0; i--) {
+                    const target = clickTargets[i];
+                    if (!moduleTargetClickable(target))
+                        continue;
+                    let p;
+                    try {
+                        p = slot.mapToItem(target, localX, localY);
+                    } catch (e) {
+                        continue;
+                    }
+                    if (p.x >= 0 && p.x <= target.width && p.y >= 0 && p.y <= target.height)
+                        return target;
+                }
+                if (moduleTargetClickable(slot.activeItem))
+                    return slot.activeItem;
+                return null;
+            }
+
+            function pressModuleClickTarget(slot, button, localX, localY) {
+                const target = moduleClickTargetAt(slot, localX, localY);
+                if (!target)
+                    return false;
+                target.triggerPress(button);
+                return true;
+            }
+
+            // ------------------------------------------------ drop geometry
+            // The bar window spans the output horizontally but sits at one
+            // edge, so a scene point inside it is offset from the screen point
+            // the full-screen ghost overlay draws in.
+            function windowScreenPoint(scenePoint) {
+                let y = scenePoint.y;
+                if (barRoot.position === "bottom")
+                    y += Math.max(0, panel.screen.height - panel.height);
+                return {
+                    x: scenePoint.x,
+                    y: y
+                };
+            }
+
+            function slotScenePoint(slot) {
+                try {
+                    return slot.mapToItem(null, 0, 0);
+                } catch (e) {
+                    return {
+                        x: slot.x,
+                        y: slot.y
+                    };
+                }
+            }
+
+            function dropMarkerRect(slot, after) {
+                if (!slot)
+                    return null;
+                const p = windowScreenPoint(slotScenePoint(slot));
+                const thickness = 3; // omarchy's Style.spacing.xs
+                return {
+                    x: p.x + (after ? slot.width : 0) - thickness / 2,
+                    y: p.y,
+                    width: thickness,
+                    height: slot.height
+                };
+            }
+
+            function moduleDropAtScene(scenePoint, sourceSlot) {
+                // A drop outside the bar surface is a cancelled drag, not a
+                // move to the far end of the bar.
+                if (scenePoint.x < 0 || scenePoint.x > panel.width || scenePoint.y < 0 || scenePoint.y > panel.height)
+                    return null;
+
+                const candidates = [];
+                for (let i = 0; i < moduleSlots.length; i++) {
+                    const slot = moduleSlots[i];
+                    if (!slot || slot === sourceSlot || !slot.visible || slot.width <= 0 || slot.height <= 0)
+                        continue;
+                    const p = slotScenePoint(slot);
+                    candidates.push({
+                        slot: slot,
+                        x: p.x,
+                        width: slot.width
+                    });
+                }
+                return BarModel.nearestDropTarget(candidates, scenePoint);
+            }
+
+            function visibleModuleSlot(section, widgetId, sourceSlot) {
+                for (let i = 0; i < moduleSlots.length; i++) {
+                    const slot = moduleSlots[i];
+                    if (!slot || slot === sourceSlot || slot.section !== section || slot.widgetId !== widgetId)
+                        continue;
+                    if (!slot.visible || slot.width <= 0 || slot.height <= 0)
+                        continue;
+                    return slot;
+                }
+                return null;
+            }
+
+            // The id the moved widget lands in front of when it is dropped on
+            // the far edge of a target: the next one that is actually drawn,
+            // so a hidden neighbour cannot swallow the move.
+            function nextVisibleModuleName(section, afterId, sourceSlot) {
+                const entries = barRoot.layoutOf[section] || [];
+                let found = false;
+                for (let i = 0; i < entries.length; i++) {
+                    const id = entries[i].id;
+                    if (!found) {
+                        found = id === afterId;
+                        continue;
+                    }
+                    if (visibleModuleSlot(section, id, sourceSlot))
+                        return id;
+                }
+                return "";
+            }
+
+            function dropAtTarget(sourceSlot, targetSlot, after) {
+                if (!sourceSlot || !targetSlot)
+                    return false;
+                const beforeId = after ? nextVisibleModuleName(targetSlot.section, targetSlot.widgetId, sourceSlot) : targetSlot.widgetId;
+                if (sourceSlot.section === targetSlot.section && sourceSlot.widgetId === beforeId)
+                    return false;
+                return barRoot.moveWidget(sourceSlot.section, sourceSlot.widgetId, targetSlot.section, beforeId);
+            }
+
+            // ------------------------------------------- panel navigation
+            // Panel-owning widgets of one section, in layout order.
+            function panelNavigationSlots(section) {
+                const entries = barRoot.layoutOf[section] || [];
+                const slots = [];
+                for (let i = 0; i < entries.length; i++) {
+                    const id = entries[i].id;
+                    for (let j = 0; j < moduleSlots.length; j++) {
+                        const slot = moduleSlots[j];
+                        if (!slot || slot.section !== section || slot.widgetId !== id)
+                            continue;
+                        const item = slot.activeItem;
+                        if (!item || item.visible !== true || !slot.visible || slot.width <= 0 || slot.height <= 0)
+                            continue;
+                        if (typeof item.openPanel !== "function")
+                            continue;
+                        slots.push(slot);
+                        break;
+                    }
+                }
+                return slots;
+            }
+
+            function switchPanelFrom(owner, direction) {
+                if (!owner)
+                    return false;
+                let currentSlot = null;
+                for (let i = 0; i < moduleSlots.length; i++) {
+                    if (moduleSlots[i] && moduleSlots[i].activeItem === owner) {
+                        currentSlot = moduleSlots[i];
+                        break;
+                    }
+                }
+                if (!currentSlot)
+                    return false;
+
+                const slots = panelNavigationSlots(currentSlot.section);
+                if (slots.length < 2)
+                    return false;
+                const currentIndex = slots.indexOf(currentSlot);
+                if (currentIndex < 0)
+                    return false;
+
+                const step = direction < 0 ? -1 : 1;
+                const nextSlot = slots[(currentIndex + step + slots.length) % slots.length];
+                if (!nextSlot || !nextSlot.activeItem || nextSlot.activeItem === owner)
+                    return false;
+                nextSlot.activeItem.openPanel();
+                return true;
             }
 
             // ------------------------------------------- indicator reveal
@@ -186,13 +697,12 @@ Scope {
                 onTriggered: panel.centerSectionRevealHeld = panel.centerSectionHovered
             }
 
-            // Declared first so it sits under every widget; a HoverHandler
-            // observes without consuming, so nothing above it is affected.
-            Item {
+            // Declared first so it sits under every widget: presses on empty
+            // bar space reach it, presses on a widget are taken by that
+            // widget's own slot area above.
+            CenterGestureArea {
                 anchors.fill: parent
-                HoverHandler {
-                    onHoveredChanged: panel.setCenterSectionHovered(hovered)
-                }
+                barWindow: panel
             }
 
             // One widget panel open at a time per screen.
@@ -217,6 +727,11 @@ Scope {
             property bool tooltipShown: false
 
             function showTooltip(target, text) {
+                // No tooltips mid-gesture: the pointer is carrying a widget
+                // (or the bar) and a hover bubble on top of the ghost reads
+                // as a stuck artifact.
+                if (barRoot.dragSource || barRoot.barMoveActive)
+                    return;
                 tooltipTarget = target;
                 tooltipText = text;
                 tooltipTimer.restart();
@@ -225,6 +740,12 @@ Scope {
             function hideTooltip(target) {
                 if (tooltipTarget !== target)
                     return;
+                tooltipTimer.stop();
+                tooltipShown = false;
+                tooltipTarget = null;
+            }
+
+            function clearTooltip() {
                 tooltipTimer.stop();
                 tooltipShown = false;
                 tooltipTarget = null;
@@ -259,7 +780,7 @@ Scope {
                             return;
                         let localX = target.width / 2 - tooltipWindow.implicitWidth / 2;
                         let localY = target.height + 6;
-                        if (String(barRoot.config.position) === "bottom")
+                        if (barRoot.position === "bottom")
                             localY = -tooltipWindow.implicitHeight - 6;
                         const point = panel.contentItem.mapFromItem(target, localX, localY);
                         tooltipAnchor.rect.x = Math.round(point.x);
@@ -272,7 +793,7 @@ Scope {
                     implicitWidth: tooltipLabel.implicitWidth + 20
                     implicitHeight: tooltipLabel.implicitHeight + 14
                     radius: barRoot.theme.radiusBase
-                    color: barRoot.theme.alpha(panel.barBackground, 0.97)
+                    color: barRoot.theme.alpha(barRoot.barBackground, 0.97)
                     border.width: 1
                     border.color: panel.barForeground
 
@@ -299,17 +820,20 @@ Scope {
                     model: barRoot.modelLeft
                     WidgetSlot {
                         section: "left"
+                        barWindow: panel
                     }
                 }
             }
 
-            // Center anchor (the clock) is pinned to the true center.
+            // Center anchor (by default the clock) is pinned to the true
+            // center; the flanking rows hang off it.
             WidgetSlot {
                 id: centerAnchorSlot
                 visible: barRoot.centerAnchorIndex >= 0
-                modelData: "clock"
+                modelData: barRoot.centerAnchorWidget
                 index: barRoot.centerAnchorIndex
                 section: "center"
+                barWindow: panel
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
@@ -325,6 +849,7 @@ Scope {
                     model: barRoot.modelCenterBefore
                     WidgetSlot {
                         section: "center"
+                        barWindow: panel
                     }
                 }
             }
@@ -339,6 +864,7 @@ Scope {
                     model: barRoot.modelCenterAfter
                     WidgetSlot {
                         section: "center"
+                        barWindow: panel
                         indexOffset: barRoot.centerAnchorIndex >= 0 ? barRoot.centerAnchorIndex + 1 : 0
                     }
                 }
@@ -354,15 +880,241 @@ Scope {
                     model: barRoot.modelRight
                     WidgetSlot {
                         section: "right"
+                        barWindow: panel
                     }
                 }
             }
         }
     }
 
-    component WidgetSlot: Loader {
+    // ------------------------------------------------------- ghost overlays
+    // Both ghosts are full-screen Overlay windows with an EMPTY input mask —
+    // quickshell turns that into true clickthrough, so they can sit under the
+    // cursor without stealing the gesture's pointer grab.
+    Variants {
+        model: Quickshell.screens
+
+        delegate: PanelWindow {
+            id: ghostWindow
+
+            required property var modelData
+
+            readonly property bool screenMatches: barRoot.dragScreen === modelData || (barRoot.dragScreen && modelData && barRoot.dragScreen.name === modelData.name)
+            readonly property bool active: barRoot.dragSource !== null && barRoot.dragScreen !== null && screenMatches
+            readonly property var sourceItem: barRoot.dragSource ? barRoot.dragSource.activeItem : null
+            readonly property int ghostPadding: 1
+            readonly property int ghostWidth: sourceItem ? Math.max(1, Math.ceil(sourceItem.width)) : 1
+            readonly property int ghostHeight: sourceItem ? Math.max(1, Math.ceil(sourceItem.height)) : 1
+
+            screen: modelData
+            visible: active && sourceItem !== null
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.namespace: "qshell-bar-drag-ghost"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            anchors {
+                top: true
+                bottom: true
+                left: true
+                right: true
+            }
+            mask: Region {}
+
+            Item {
+                visible: ghostWindow.visible
+                x: Math.round(barRoot.dragScreenX - barRoot.dragOffsetX - ghostWindow.ghostPadding)
+                y: Math.round(barRoot.dragScreenY - barRoot.dragOffsetY - ghostWindow.ghostPadding)
+                width: ghostWindow.ghostWidth + ghostWindow.ghostPadding * 2
+                height: ghostWindow.ghostHeight + ghostWindow.ghostPadding * 2
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: barRoot.transparent ? "transparent" : barRoot.barBackground
+                    border.width: 1
+                    border.color: barRoot.barForeground
+                    radius: Math.min(barRoot.theme.radiusBase, height / 2)
+                    opacity: barRoot.transparent ? 0.45 : 0.94
+                }
+
+                Image {
+                    anchors.fill: parent
+                    anchors.margins: ghostWindow.ghostPadding
+                    source: barRoot.dragImageUrl
+                    fillMode: Image.Stretch
+                    smooth: true
+                    opacity: 0.84
+                }
+            }
+
+            // The drop marker: an accent pill at the slot boundary the widget
+            // would land on.
+            Rectangle {
+                readonly property var targetRect: barRoot.dropMarkerGeometry
+
+                visible: ghostWindow.active && targetRect !== null
+                x: targetRect ? Math.round(targetRect.x) : 0
+                y: targetRect ? Math.round(targetRect.y) : 0
+                width: targetRect ? targetRect.width : 0
+                height: targetRect ? targetRect.height : 0
+                color: barRoot.theme.accent
+                radius: Math.min(width, height) / 2
+            }
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+
+        delegate: PanelWindow {
+            id: moveGhostWindow
+
+            required property var modelData
+
+            readonly property bool screenMatches: barRoot.barMoveScreen === modelData || (barRoot.barMoveScreen && modelData && barRoot.barMoveScreen.name === modelData.name)
+
+            screen: modelData
+            visible: barRoot.barMoveActive && screenMatches
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.namespace: "qshell-bar-move-ghost"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            anchors {
+                top: true
+                bottom: true
+                left: true
+                right: true
+            }
+            mask: Region {}
+
+            // One fixed-geometry slab per edge, crossfaded on candidate
+            // changes. Resizing a single slab between edges repaints
+            // mid-transition and flickers; fading between static ones does
+            // not. (Two slabs, not their four: no vertical bar yet.)
+            Repeater {
+                model: ["top", "bottom"]
+
+                Rectangle {
+                    required property string modelData
+
+                    x: 0
+                    y: modelData === "bottom" ? parent.height - height : 0
+                    width: parent.width
+                    height: barRoot.theme.barHeight
+                    color: barRoot.transparent ? "transparent" : barRoot.barBackground
+                    border.width: 1
+                    border.color: barRoot.barForeground
+                    visible: opacity > 0
+                    opacity: barRoot.barMoveCandidate === modelData ? (barRoot.transparent ? 0.45 : 0.7) : 0
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: 140
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --------------------------------------------------------- gesture area
+    // Press-drag the empty bar space to move the bar to another screen edge;
+    // double-click it to toggle transparency. Omarchy's CenterGestureArea.
+    component CenterGestureArea: MouseArea {
+        id: gestureArea
+
+        required property var barWindow
+
+        property bool dragging: false
+        property bool suppressClick: false
+        property real pressedX: 0
+        property real pressedY: 0
+        readonly property real dragThreshold: 4
+
+        acceptedButtons: Qt.LeftButton
+        cursorShape: dragging ? Qt.ClosedHandCursor : Qt.ArrowCursor
+        pressAndHoldInterval: 200
+
+        function startDrag(x, y) {
+            if (dragging)
+                return;
+            dragging = true;
+            barWindow.clearTooltip();
+            barRoot.beginBarMove(barWindow.screen);
+            barRoot.updateBarMove(barWindow.windowScreenPoint(gestureArea.mapToItem(null, x, y)));
+        }
+
+        HoverHandler {
+            onHoveredChanged: gestureArea.barWindow.setCenterSectionHovered(hovered)
+        }
+
+        onPressed: mouse => {
+            dragging = false;
+            suppressClick = false;
+            pressedX = mouse.x;
+            pressedY = mouse.y;
+        }
+
+        onPressAndHold: mouse => startDrag(mouse.x, mouse.y)
+
+        onPositionChanged: mouse => {
+            if (!(mouse.buttons & Qt.LeftButton))
+                return;
+            if (!dragging) {
+                if (Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY) < dragThreshold)
+                    return;
+                startDrag(mouse.x, mouse.y);
+                return;
+            }
+            barRoot.updateBarMove(barWindow.windowScreenPoint(gestureArea.mapToItem(null, mouse.x, mouse.y)));
+        }
+
+        onReleased: mouse => {
+            if (!dragging)
+                return;
+            dragging = false;
+            suppressClick = true;
+            barRoot.finishBarMove();
+            mouse.accepted = true;
+        }
+
+        onCanceled: {
+            dragging = false;
+            suppressClick = false;
+            barRoot.clearBarMove();
+        }
+
+        onClicked: mouse => {
+            if (suppressClick) {
+                suppressClick = false;
+                mouse.accepted = true;
+            }
+        }
+
+        onDoubleClicked: mouse => {
+            if (suppressClick) {
+                suppressClick = false;
+                return;
+            }
+            if (mouse.button === Qt.LeftButton) {
+                barRoot.toggleTransparency();
+                mouse.accepted = true;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ the slot
+    // One widget's place on the bar: it owns the widget's Loader, the
+    // press/drag area over it, the open-panel pill, and the drag-source
+    // treatment. Omarchy's ModuleSlot.
+    component WidgetSlot: Item {
+        id: slot
+
         required property var modelData
         required property int index
+        required property var barWindow
         property string section: "center"
         // The flanking center rows repeat over slices of the center model;
         // the offset maps a slice-local index back to the section index.
@@ -377,31 +1129,211 @@ Scope {
                     id: widgetId
                 });
         }
-        readonly property var known: barRoot.registry[widgetId]
+        // Looked up on demand rather than cached in a property: when the
+        // configured center anchor changes, the slot's id and a cached
+        // component would be dirtied in an undefined order, and the loader
+        // could mount (and warn about) the previous id's component.
+        function componentFor(id) {
+            return barRoot.registry[id];
+        }
+        readonly property var activeItem: slotLoader.item
+        readonly property bool dragSource: barRoot.dragSource === slot
+        readonly property bool panelOpen: barWindow.activePanel !== null && barWindow.activePanel.anchorItem === activeItem
+        // A widget can say how long the open-panel pill should be, so it
+        // tracks what the widget paints rather than the slot it fills.
+        readonly property real panelIndicatorExtent: {
+            const hint = activeItem && "openPanelIndicatorWidth" in activeItem ? activeItem.openPanelIndicatorWidth : undefined;
+            if (hint !== undefined && hint !== null && hint > 0)
+                return Math.round(hint);
+            return Math.max(10, Math.round(slot.width * 0.55));
+        }
+
         anchors.top: parent ? parent.top : undefined
         anchors.bottom: parent ? parent.bottom : undefined
-        width: item ? item.implicitWidth : 0
-        sourceComponent: known !== undefined ? known : missingComponent
-        onEntryChanged: {
-            if (item && "settings" in item)
-                item.settings = entry;
+        // A widget that hides itself takes no space (omarchy's rule — ours
+        // used to keep the fixedWidth of a hidden button as a dead gap).
+        width: activeItem && activeItem.visible ? activeItem.implicitWidth : 0
+        z: slotPointer.dragging ? 100 : 0
+
+        Component.onCompleted: barWindow.registerModuleSlot(slot)
+        Component.onDestruction: {
+            if (barRoot.dragSource === slot)
+                barRoot.clearDrag();
+            barWindow.unregisterModuleSlot(slot);
         }
-        onLoaded: {
-            if ("screenName" in item)
-                item.screenName = panel.screen.name;
-            if ("bar" in item)
-                item.bar = panel;
-            if ("settings" in item)
-                item.settings = entry;
-            if (known === undefined) {
-                item.missingId = widgetId;
-                console.warn("Bar: unknown widget id in config:", widgetId);
+
+        // The lifted widget leaves a hint of itself behind.
+        Rectangle {
+            visible: slot.dragSource
+            anchors.fill: parent
+            anchors.margins: 1
+            color: barRoot.transparent ? "transparent" : barRoot.barBackground
+            border.width: 1
+            border.color: barRoot.barForeground
+            radius: Math.min(barRoot.theme.radiusBase, height / 2)
+            opacity: barRoot.transparent ? 0.22 : 0.32
+        }
+
+        Loader {
+            id: slotLoader
+            anchors.fill: parent
+            // The center-anchor slot exists even when the configured anchor id
+            // is not in the center section; without this it would mount a
+            // second copy of a widget that is already in a flanking row.
+            active: slot.widgetId !== ""
+            opacity: slot.dragSource ? 0.22 : 1.0
+            sourceComponent: slot.componentFor(slot.widgetId) !== undefined ? slot.componentFor(slot.widgetId) : missingComponent
+            onLoaded: {
+                if ("screenName" in item)
+                    item.screenName = slot.barWindow.screen.name;
+                if ("bar" in item)
+                    item.bar = slot.barWindow;
+                if ("settings" in item)
+                    item.settings = slot.entry;
+                if (slot.componentFor(slot.widgetId) === undefined) {
+                    item.missingId = slot.widgetId;
+                    console.warn("Bar: unknown widget id in config:", slot.widgetId);
+                }
+                // Dev hook (like QSHELL_DEV): auto-open a widget's panel so
+                // headless sessions can verify panel rendering. Delayed by a
+                // timer rather than Qt.callLater — in the frame the bar is
+                // built in, a widget's panel LazyLoader still has no item and
+                // openPanel() throws on it.
+                if (Quickshell.env("QSHELL_TEST_PANEL") === slot.widgetId)
+                    testPanelTimer.start();
             }
-            // Dev hook (like QSHELL_DEV): auto-open a widget's panel so
-            // headless sessions can verify panel rendering.
-            if (Quickshell.env("QSHELL_TEST_PANEL") === widgetId && typeof item.openPanel === "function") {
-                const target = item;
-                Qt.callLater(() => target.openPanel());
+        }
+
+        onEntryChanged: {
+            if (slotLoader.item && "settings" in slotLoader.item)
+                slotLoader.item.settings = entry;
+        }
+
+        Timer {
+            id: testPanelTimer
+            interval: 400
+            onTriggered: {
+                if (slot.activeItem && typeof slot.activeItem.openPanel === "function")
+                    slot.activeItem.openPanel();
+            }
+        }
+
+        // The open-panel pill: an accent bar on the widget's inner edge — the
+        // one facing the desktop — so it underlines a top bar and overlines a
+        // bottom one. It reads as pointing at the panel that opened.
+        Rectangle {
+            readonly property int inset: 2
+
+            visible: opacity > 0
+            opacity: slot.panelOpen && !slot.dragSource ? 0.9 : 0
+            color: barRoot.theme.accent
+            width: slot.panelIndicatorExtent
+            height: 2
+            radius: Math.min(width, height) / 2
+            x: Math.round((parent.width - width) / 2)
+            y: barRoot.position === "top" ? parent.height - height - inset : inset
+            z: 50
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 120
+                    easing.type: Easing.OutCubic
+                }
+            }
+        }
+
+        // Press-drag to reorder. Declared last so it is above the widget: it
+        // takes the left press before any handler under it, which is why a
+        // click that did not become a drag is dispatched back through the
+        // bar's click-target registry. Right and middle buttons are not
+        // accepted here and reach the widget's own handlers untouched.
+        //
+        // drag.target is deliberately unset: the slot is owned by a Row, and
+        // mutating slot.x can leave stale offsets that overlap neighbours
+        // after a small aborted drag.
+        MouseArea {
+            id: slotPointer
+
+            property bool dragging: false
+            property bool suppressClick: false
+            property real pressedX: 0
+            property real pressedY: 0
+            readonly property real dragThreshold: 4
+
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            enabled: slot.visible && slot.width > 0 && slot.height > 0
+            propagateComposedEvents: true
+
+            onPressed: mouse => {
+                dragging = false;
+                suppressClick = false;
+                pressedX = mouse.x;
+                pressedY = mouse.y;
+                barRoot.clearDrag();
+            }
+
+            onPositionChanged: mouse => {
+                if (!(mouse.buttons & Qt.LeftButton))
+                    return;
+                if (Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY) >= dragThreshold) {
+                    if (!dragging) {
+                        barRoot.dragWindow = slot.barWindow;
+                        barRoot.dragScreen = slot.barWindow.screen;
+                        barRoot.dragOffsetX = pressedX;
+                        barRoot.dragOffsetY = pressedY;
+                        barRoot.captureDragGhost(slot);
+                        barRoot.dragSource = slot;
+                    }
+                    dragging = true;
+                    slot.barWindow.clearTooltip();
+                }
+
+                if (dragging) {
+                    const scenePoint = slot.mapToItem(null, mouse.x, mouse.y);
+                    const screenPoint = slot.barWindow.windowScreenPoint(scenePoint);
+                    barRoot.dragScreenX = screenPoint.x;
+                    barRoot.dragScreenY = screenPoint.y;
+
+                    const drop = slot.barWindow.moduleDropAtScene(scenePoint, slot);
+                    barRoot.dropTarget = drop ? drop.slot : null;
+                    barRoot.dropAfter = drop ? drop.after : false;
+                    barRoot.dropMarkerGeometry = drop ? slot.barWindow.dropMarkerRect(drop.slot, drop.after) : null;
+                }
+            }
+
+            onReleased: mouse => {
+                const wasDragging = dragging;
+                const targetSlot = barRoot.dropTarget;
+                const afterTarget = barRoot.dropAfter;
+
+                if (wasDragging)
+                    suppressClick = true;
+                dragging = false;
+                barRoot.clearDrag();
+
+                if (wasDragging && targetSlot) {
+                    slot.barWindow.dropAtTarget(slot, targetSlot, afterTarget);
+                    mouse.accepted = true;
+                } else if (!wasDragging) {
+                    mouse.accepted = false;
+                }
+            }
+
+            onCanceled: {
+                dragging = false;
+                suppressClick = false;
+                barRoot.clearDrag();
+            }
+
+            onClicked: mouse => {
+                if (suppressClick) {
+                    suppressClick = false;
+                    mouse.accepted = true;
+                    return;
+                }
+                if (!slot.barWindow.pressModuleClickTarget(slot, mouse.button, mouse.x, mouse.y))
+                    mouse.accepted = false;
             }
         }
     }

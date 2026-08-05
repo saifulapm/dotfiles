@@ -16,6 +16,9 @@ BarButton {
     readonly property var formatRing: Model.clockFormatRing(format, formatAlt, Model.clockFormats())
 
     tooltipText: Qt.formatDateTime(clock.date, "dddd d MMMM yyyy")
+    // The open-panel pill tracks the label, not the padded slot (omarchy's
+    // clock does the same).
+    readonly property real openPanelIndicatorWidth: labelWidth
 
     // Qt has no ISO week specifier, so a format's 'ww' token is substituted
     // with the computed ISO week before Qt formats the rest.

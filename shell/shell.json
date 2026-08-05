@@ -6,6 +6,8 @@
   },
   "bar": {
     "position": "top",
+    "transparent": false,
+    "centerAnchor": "clock",
     "left": ["launcher", "workspaces", "window"],
     "center": ["indicators", "clock", "weather", "update"],
     "right": ["tray", "media", "ai", "kb", "mic", "bluetooth", "tailscale", "network", "audio", "monitor", "battery"]

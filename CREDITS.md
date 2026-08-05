@@ -493,6 +493,40 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   muted-or-high), and a volume above 100% shows a full bar over a truthful
   readout, which is what their model does with a value clamped at `max`
   beside a caller-supplied `progressText`.
+- **Bar interaction machinery** from `shell/plugins/bar/Bar.qml` +
+  `BarModel.js` + `bin/omarchy-bar-text-color` + `bin/omarchy-toggle-bar`: the
+  whole gesture layer of their bar. Drag-to-reorder — the 4 px press threshold
+  that separates a click from a drag, the `grabToImage` ghost drawn on a
+  per-screen clickthrough overlay (empty input mask) offset by where inside the
+  widget the press landed, `nearestDropTarget`'s nearest-edge math over every
+  drawn slot (so the empty space around a centered group is a drop zone, not a
+  dead zone), the accent drop marker at that boundary, their
+  `moveModuleInConfig` splice with its same-section index correction, and the
+  rule that a widget lifted from a slot leaves a dimmed outline behind. The
+  click-target registry that makes it possible — every button registering with
+  the bar so a press that did not become a drag is dispatched back to whichever
+  registered target is under the pointer, which is also what keeps a button
+  nested inside a widget clickable — plus their deliberate omission of
+  `drag.target` (a positioner owns the slot, and moving it leaves stale
+  offsets). The bar-move gesture on empty bar space (press-and-hold or 4 px of
+  travel, their `nearestScreenEdge` diagonal split, a crossfaded fixed-geometry
+  slab per candidate edge rather than one resized slab, and the release that
+  persists `bar.position`), and the double-click on that same space toggling
+  `bar.transparent`. Transparency itself: their two-candidate auto-contrast
+  (bar text vs the bar's background color, whichever wins the WCAG ratio
+  against the strip of wallpaper the bar covers), the 120 ms debounce, the
+  re-sample on wallpaper/theme/position change, and their trick of snapping the
+  colour with animations disabled for two frames so the sampled foreground
+  never crossfades. The open-panel pill (their geometry: 2 px thick, 55 % of
+  the slot or a widget-supplied extent, 2 px inset on the bar's inner edge,
+  0.9 opacity, 120 ms fade). Cross-panel Tab/Shift+Tab over
+  `panelNavigationSlots`, their configurable `centerAnchor`, their `bar-off`
+  flag file as the bar-hide switch, and the rule that a widget which hides
+  itself takes no space. Adapted: only the top and bottom edges exist here
+  (a vertical bar is later work, so their left/right edge result folds onto the
+  nearer horizontal one), their `interactive`/`pressable`/`concealed` trio
+  collapses onto `enabled` + opacity, tooltips are suppressed for the duration
+  of a gesture, and panels follow the bar to the bottom edge.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -722,6 +756,25 @@ Direct file-level copies (source path → destination path):
   `list.sh`'s thumbnail cache is not ported: those thumbnails are rendered by
   ImageMagick, which is not installed here, so the picker decodes the originals
   at thumbnail size instead.
+- omarchy `shell/plugins/bar/BarModel.js` → `shell/Modules/Bar/BarModel.js`:
+  near-verbatim port of the pure half — `entryId`/`entryIndex` over the
+  string-or-object layout entries, `normalizePosition`, `nearestScreenEdge`,
+  `nearestDropTarget`, and `moveModuleInConfig` (renamed `moveEntry`, and
+  taking our `bar` section map instead of their `bar.layout`). Dropped: their
+  tray pinning, custom-module path resolution, `inlineSettingsDelta` (our bar
+  patches settings in place by another route) and `pickDrawnSlot` (our centre
+  anchor mounts its widget once, not twice). Added: `horizontalEdge`, which
+  folds their left/right edge result onto the nearer horizontal edge.
+- omarchy `bin/omarchy-bar-text-color` → `bin/bar-text-color`: port of the
+  sampler — the cover-fit-then-crop of the wallpaper down to the strip the bar
+  covers, the mean pixel, the WCAG luminance/contrast pair, the
+  better-contrast-wins decision, and the rule that every failure prints the
+  theme foreground so the bar is never left unstyled. Adapted: written in
+  Python because nothing in the ImageMagick family is installed here (GdkPixbuf
+  does the decode and scale, with a `grim -t ppm` screenshot of the bar region
+  as the fallback that always works), the wallpaper path is read from our state
+  file rather than resolved through a symlink, and the screen size comes from
+  `niri msg --json outputs` instead of hyprctl.
 - omarchy `shell/plugins/panels/dropbox/status.py` → `bin/dropbox-status`:
   direct copy — the `~/.dropbox/info.json` account read, their plan→quota
   table, the `dropbox-cli status` invocation and its stopped-daemon sniffing,

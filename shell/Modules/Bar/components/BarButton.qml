@@ -34,6 +34,44 @@ Item {
     signal tapped(int button)
     signal wheelMoved(int delta)
 
+    // ------------------------------------------------- click-target registry
+    // The bar's drag-to-reorder MouseArea covers every widget, so it takes the
+    // left press before any handler under it sees one. Omarchy solves this
+    // with a registry (CREDITS.md): every clickable registers with the bar,
+    // and a press that did not turn into a drag is dispatched back to whichever
+    // registered target sits under the pointer — which is also what lets a
+    // button nested inside a widget (a workspace pip, a tray icon, a revealed
+    // indicator) stay clickable. Right and middle clicks are not accepted by
+    // that MouseArea and reach the TapHandlers below directly.
+    function triggerPress(pressedButton) {
+        if (button.bar)
+            button.bar.hideTooltip(button);
+        button.tapped(pressedButton);
+    }
+
+    property var registeredBar: null
+
+    function syncClickRegistration() {
+        if (registeredBar && registeredBar.unregisterClickTarget)
+            registeredBar.unregisterClickTarget(button);
+        registeredBar = button.bar;
+        if (registeredBar && registeredBar.registerClickTarget)
+            registeredBar.registerClickTarget(button);
+    }
+
+    onBarChanged: syncClickRegistration()
+    Component.onCompleted: syncClickRegistration()
+    Component.onDestruction: {
+        if (registeredBar && registeredBar.unregisterClickTarget)
+            registeredBar.unregisterClickTarget(button);
+    }
+    // A button that stops being visible or interactive must not leave its
+    // tooltip on screen (omarchy's WidgetButton does the same).
+    onVisibleChanged: if (!visible && bar)
+        bar.hideTooltip(button)
+    onEnabledChanged: if (!enabled && bar)
+        bar.hideTooltip(button)
+
     default property alias content: contentRow.data
 
     implicitWidth: fixedWidth > 0 ? fixedWidth : Math.max(12, contentRow.implicitWidth + horizontalMargin * 2)
@@ -53,6 +91,11 @@ Item {
     // color, with omarchy's 160 ms transition.
     readonly property color contentColor: active && useActiveColor ? theme.error : barFg
     readonly property color barFg: bar ? bar.barForeground : theme.textPrimary
+
+    // Width of the painted content, for bar chrome that wants to line up with
+    // what the widget draws rather than with the slot it sits in (omarchy's
+    // WidgetButton.labelWidth — the open-panel pill reads it).
+    readonly property real labelWidth: contentRow.implicitWidth
 
     // Live hover state, for widgets that hang behavior off it (the indicator
     // container holds its reveal open while a revealed item is hovered).

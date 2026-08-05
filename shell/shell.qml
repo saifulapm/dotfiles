@@ -17,6 +17,7 @@ import qs.Modules.Polkit
 import qs.Modules.Reminders
 import qs.Modules.ThemeSwitcher
 import qs.Modules.Background
+import "Modules/Bar/BarModel.js" as BarModel
 
 // Single long-running ShellRoot. One process: panels are summoned by IPC
 // into this instance, never by spawning a second `qs`.
@@ -132,9 +133,55 @@ ShellRoot {
         }
         if (!dirty)
             return false;
+        return writeConfig(copy);
+    }
+
+    // Persist a patch onto shell.json's `bar` block — the bar's own gestures
+    // write `position` (drag the bar to another screen edge) and `transparent`
+    // (double-click the empty center). Same guarantees as updateEntryInline:
+    // a config broken on disk is never overwritten, the change lands in memory
+    // first, and the file write is atomic.
+    function updateBarConfig(patch) {
+        if (!configWritable) {
+            console.warn("shell.json is broken on disk — refusing to overwrite it with bar settings");
+            return false;
+        }
+        const copy = JSON.parse(JSON.stringify(config));
+        if (!copy.bar || typeof copy.bar !== "object")
+            copy.bar = {};
+        let dirty = false;
+        for (const key in patch) {
+            if (JSON.stringify(copy.bar[key]) === JSON.stringify(patch[key]))
+                continue;
+            copy.bar[key] = patch[key];
+            dirty = true;
+        }
+        if (!dirty)
+            return false;
+        return writeConfig(copy);
+    }
+
+    // Move a bar layout entry between (or within) sections and persist —
+    // omarchy's moveModuleInConfig, driven by the bar's drag-to-reorder.
+    // `beforeId` names the entry the moved one lands in front of; an empty or
+    // unknown one appends to the target section.
+    function moveBarEntry(fromSection, widgetId, toSection, beforeId) {
+        if (!configWritable) {
+            console.warn("shell.json is broken on disk — refusing to overwrite it with a bar layout move");
+            return false;
+        }
+        const copy = JSON.parse(JSON.stringify(config));
+        if (!copy.bar || typeof copy.bar !== "object")
+            return false;
+        if (!BarModel.moveEntry(copy.bar, fromSection, widgetId, toSection, beforeId))
+            return false;
+        return writeConfig(copy);
+    }
+
+    // Applied in memory first so the UI reflects the write immediately; the
+    // FileView round trip re-delivers the same content.
+    function writeConfig(copy) {
         copy.version = 1;
-        // Applied in memory first so the UI reflects the write immediately;
-        // the FileView round trip re-delivers the same content.
         config = copy;
         configFile.setText(JSON.stringify(copy, null, 2) + "\n");
         return true;

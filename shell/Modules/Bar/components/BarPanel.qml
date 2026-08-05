@@ -29,6 +29,16 @@ PanelWindow {
         keyCatcher.forceActiveFocus();
     }
 
+    // Open the panel of the adjacent panel-owning widget in the same bar
+    // section (omarchy's switchPanelFrom). Returns false when this widget is
+    // the only one in its section that owns a panel.
+    function switchPanel(direction) {
+        const bar = anchorItem && anchorItem.bar ? anchorItem.bar : null;
+        if (!bar || typeof bar.switchPanelFrom !== "function")
+            return false;
+        return bar.switchPanelFrom(anchorItem, direction);
+    }
+
     function open() {
         const bar = anchorItem && anchorItem.bar ? anchorItem.bar : null;
         if (bar && bar.requestPanel)
@@ -57,6 +67,11 @@ PanelWindow {
         else
             open();
     }
+
+    // The bar can be moved to the bottom edge, and the card has to follow:
+    // hanging off the top of the screen would leave it detached from the
+    // widget it belongs to.
+    readonly property bool barAtBottom: anchorItem && anchorItem.bar && anchorItem.bar.position === "bottom"
 
     // Card x: centered under the anchor, clamped to the screen with an 8 px
     // inset. The bar window spans the full output, so bar coords are screen
@@ -100,9 +115,9 @@ PanelWindow {
         id: card
 
         x: Math.max(8, Math.min(panelWindow.anchorCenterX - width / 2, panelWindow.width - width - 8))
-        y: panelWindow.theme.barHeight + 6
+        y: panelWindow.barAtBottom ? panelWindow.height - panelWindow.theme.barHeight - 6 - height : panelWindow.theme.barHeight + 6
         width: panelWindow.cardWidth
-        height: Math.min(cardContent.implicitHeight + panelWindow.theme.space(8), panelWindow.height - y - panelWindow.theme.space(4))
+        height: Math.min(cardContent.implicitHeight + panelWindow.theme.space(8), panelWindow.height - panelWindow.theme.barHeight - 6 - panelWindow.theme.space(4))
         radius: panelWindow.theme.radius(1.5)
         color: panelWindow.theme.surface1
         border.width: panelWindow.theme.borderWidth
@@ -132,9 +147,18 @@ PanelWindow {
             // event. An Escape nobody claimed closes the card.
             Keys.onPressed: event => {
                 panelWindow.contentKey(event);
-                if (!event.accepted && event.key === Qt.Key_Escape) {
+                if (event.accepted)
+                    return;
+                if (event.key === Qt.Key_Escape) {
                     panelWindow.close();
                     event.accepted = true;
+                } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                    // Omarchy's cross-panel switching (CREDITS.md): Tab walks
+                    // to the next panel-owning widget in the same bar section,
+                    // Shift+Tab to the previous one, wrapping at the ends.
+                    const back = event.key === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier);
+                    if (panelWindow.switchPanel(back ? -1 : 1))
+                        event.accepted = true;
                 }
             }
 
