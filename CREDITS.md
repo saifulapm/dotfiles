@@ -50,13 +50,25 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   rows scaled to the busiest day with today picked out, the TOKENS BY MODEL
   rows as a share bar filling the row behind the label, their top-four cut, and
   their model-id prettifier and token-count abbreviations. Their plan/tier
-  label rules come with it (`default_claude_max_20x` → "Max 20x"). Not ported:
-  their Codex provider, their multi-device sync layer, their `stats-cache.json`
-  and `history.jsonl` readers (ours reads `bin/claude-usage-scan` instead), and
-  their 15-minute background poll — this shell does not poll, so the panel
-  refreshes when it opens and from a refresh button they do not have. Their
-  plugin has no plan table driving limits: the plan is a label and the numbers
-  are Anthropic's, so our `plan` widget setting only overrides that label.
+  label rules come with it (`default_claude_max_20x` → "Max 20x"). Both of
+  their providers are ported, with their `Main.qml` multi-provider layer: each
+  provider publishing the same six rate-limit properties, the rule that a
+  provider earns a place only by being switched on AND having actually
+  produced numbers (so a CLI that was installed and never run shows no tab of
+  zeroes, and a machine that has run neither shows no widget at all), the
+  per-provider `enabled` setting, the selection that follows the provider
+  rather than its slot, the provider switch row, and their bar button's
+  left-opens / right-refreshes / middle-steps-provider split. Their window
+  label sniffing (`windowIsLong`, `windowSpanMs`, `windowTitle`) is what
+  reconciles Claude spelling its windows out ("Session (5-hour)") with Codex
+  abbreviating them ("5h window", "30m window"). Their SVG provider marks are
+  copied verbatim, including the light/dark swap of the Codex mark. Not
+  ported: their multi-device sync layer, their `stats-cache.json` and
+  `history.jsonl` readers (ours reads the scanners instead), and their
+  background polls — this shell does not poll, so the panel refreshes when it
+  opens and from a refresh button they do not have. Their plugin has no plan
+  table driving limits: the plan is a label and the numbers come from the
+  provider, so our `plan` widget setting only overrides that label.
 - **Monitor plugin design** from `shell/plugins/panels/monitor/` (`Panel.qml`,
   `Model.js`): the hero naming the current brightness mood over a "Display"
   title, their brightness mood-name ladder itself, the live brightness slider
@@ -303,9 +315,33 @@ Direct file-level copies (source path → destination path):
   `bindingWindow`, `resetMsFor`, `formatDuration`, `formatTier`,
   `formatTokenCount`, `modelWordCase`/`friendlyModelName` and their `dayName`.
   Their `windowIsLong`/`windowSpanMs`/`windowTitle` label sniffing is not
-  ported: it exists to reconcile Claude's and Codex's differently-worded
-  labels, and with one provider the two windows are named where they are
-  parsed. `formatPlanSetting` is ours, for the `plan` widget setting.
+  ported verbatim along with `limitWindow`/`limitWindows`, `heroMeta`,
+  `modelRows`, `weekPeak` and `providerHasData` (their `Main.qml` gate).
+  `windowSubtitle` and `formatPlanSetting` are ours — the first splits the
+  parenthetical off a window label so the panel can set it beside the title,
+  the second renders the `plan` widget setting.
+- omarchy `shell/plugins/model-usage/providers/Claude.qml` and
+  `providers/Codex.qml` → `shell/Modules/Bar/widgets/AiClaude.qml` and
+  `AiCodex.qml`: their two provider objects and the property contract the
+  panel reads them through, including Codex's `refreshLimits()` being
+  `refresh()` (one scanner run answers both) and its scanner-output parse.
+  Their per-provider background timers are dropped — this shell does not poll.
+- omarchy `shell/plugins/model-usage/scripts/codex_usage_scanner.py` →
+  `bin/codex-usage-scan`: direct copy — both local sources (the pi agent
+  sessions swept with ripgrep, the native Codex session JSONL with its
+  last-turn-only token accounting and its cache/reasoning double-count
+  correction) and the `codex app-server` JSON-RPC handshake that reads the
+  account and its rate-limit windows. Three additions, each marked in the
+  file: a JSON-RPC error response now raises instead of being read past (an
+  unauthenticated limits read answers with an error, which upstream silently
+  turns into "no limits"), a codex that is installed but not logged in reports
+  "Waiting for auth" instead of nothing, and a 43200-minute window is labelled
+  "Monthly (30-day)" rather than "720h window" — the ChatGPT free plan reports
+  one, and upstream's label would have been read back as a session window by
+  their own title sniffing.
+- omarchy `shell/plugins/model-usage/assets/{claude,codex,codex-light}.svg` →
+  `shell/Modules/Bar/widgets/assets/`: verbatim, byte-for-byte — the provider
+  marks shown in the panel hero.
 - omarchy `shell/plugins/panels/monitor/Model.js` →
   `shell/Modules/Bar/widgets/MonitorModel.js`: partial port — their brightness
   clamp, scale normalisation and brightness mood-name ladder are verbatim.

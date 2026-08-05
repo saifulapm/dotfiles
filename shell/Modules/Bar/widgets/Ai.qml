@@ -1,137 +1,98 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import "../components"
 import "AiModel.js" as Model
 
-// Claude Code usage — omarchy's model-usage plugin. The widget owns the state
-// so the bar glyph can carry the alarm: when the window closest to its limit
-// is at 90% or more the glyph turns the attention colour, which is their
-// `alarming`.
+// Model usage — omarchy's model-usage plugin, both providers. This is their
+// Main.qml's job: hold every provider, and let through only the ones that are
+// switched on AND have actually produced numbers. A machine that installed a
+// CLI and never ran it gets no tab full of zeroes, and a machine that has run
+// neither shows no widget at all.
 //
-// Rate limits are Anthropic's own numbers, read from the OAuth usage endpoint
-// with the token in ~/.claude/.credentials.json (the same request their
-// provider makes, over XMLHttpRequest so the bearer token never appears in a
-// process command line). Local usage is bin/claude-usage-scan.
+// The bar glyph carries the alarm: when the selected provider's fullest
+// window — the one that stops the next prompt — is at 90% or more, the glyph
+// turns the attention colour. That is their `alarming`.
 //
-// DELIBERATE difference from upstream: they poll every 15 minutes in the
-// background. This shell does not poll — everything refreshes when the panel
-// is opened, plus the manual refresh button in it. The consequence is that
-// the bar alarm reflects the last reading rather than the live one.
+// Left click opens the panel, right click refreshes, middle click steps to
+// the next provider, exactly as their bar button does.
 BarIcon {
     id: rootItem
 
-    glyph: "󰚩" // md-robot
+    glyph: "󱚣" // md-robot_excited, their model-usage glyph
 
-    // ---------------------------------------------------------- credentials
-    property var credentials: ({
-            accessToken: "",
-            expiresAtMs: 0,
-            subscriptionType: "",
-            rateLimitTier: ""
-        })
+    // Each provider can be switched off through the widget's inline
+    // shell.json entry: {"id": "ai", "providers": {"codex": {"enabled": false}}}
+    function providerEnabled(id) {
+        const providers = setting("providers", null);
+        if (!providers || !providers[id])
+            return true;
+        return providers[id].enabled !== false;
+    }
 
-    // The plan is a label, not a limit: the percentages below are Anthropic's
-    // own, so a `plan` in the widget's inline shell.json entry only overrides
-    // what the hero calls the subscription (useful when the credentials file
-    // carries no tier). Accepts pro / max5x / max20x / team.
-    readonly property string planSetting: Model.formatPlanSetting(setting("plan", ""))
-    readonly property string tierLabel: planSetting || Model.formatTier(credentials.subscriptionType, credentials.rateLimitTier)
+    readonly property var allProviders: [claudeProvider, codexProvider]
+    readonly property var providers: allProviders.filter(p => p.enabled && Model.providerHasData(p))
 
-    readonly property bool tokenUsable: credentials.accessToken !== "" && (credentials.expiresAtMs <= 0 || credentials.expiresAtMs > Date.now())
+    // The selection follows the provider, not the slot it happens to sit in:
+    // a provider whose first scan lands while the panel is open would
+    // otherwise shift the list underneath you.
+    property string selectedProviderId: ""
+    readonly property int providerIndex: {
+        for (let i = 0; i < providers.length; i++) {
+            if (providers[i].providerId === selectedProviderId)
+                return i;
+        }
+        return 0;
+    }
+    readonly property var provider: providers.length > 0 ? providers[providerIndex] : null
 
-    // ---------------------------------------------------------- limit state
-    property var limitWindows: []
-    property bool probing: false
-    property string limitStatus: ""
-    property double lastProbeAtMs: 0
-
-    readonly property var headline: Model.bindingWindow(limitWindows)
+    readonly property var limits: Model.limitWindows(provider)
+    readonly property var headline: Model.bindingWindow(limits)
     readonly property bool alarming: !!headline && headline.percent >= 0.9
+    readonly property bool refreshing: allProviders.some(p => p.refreshing)
 
-    // ----------------------------------------------------------- local stats
-    property var stats: null
-    property bool scanning: false
-
-    active: alarming
-    tooltipText: {
-        if (!headline)
-            return "Claude usage";
-        return "Claude · " + headline.title.toLowerCase() + " " + Math.round(headline.percent * 100) + "%";
+    function selectProvider(index) {
+        if (providers.length === 0)
+            return;
+        const wrapped = ((index % providers.length) + providers.length) % providers.length;
+        selectedProviderId = providers[wrapped].providerId;
     }
 
     function refresh() {
-        probeLimits();
-        if (!scanProc.running) {
-            scanning = true;
-            scanProc.running = true;
+        for (let i = 0; i < allProviders.length; i++) {
+            if (allProviders[i].enabled)
+                allProviders[i].refresh(true);
         }
     }
 
-    function probeLimits() {
-        if (probing)
-            return;
-        credentialsFile.reload();
-        if (!tokenUsable) {
-            limitStatus = credentials.accessToken === "" ? "Waiting for auth" : "Claude session expired";
-            limitWindows = [];
-            return;
-        }
-
-        probing = true;
-        lastProbeAtMs = Date.now();
-        const xhr = new XMLHttpRequest();
-        xhr.open("GET", "https://api.anthropic.com/api/oauth/usage");
-        xhr.setRequestHeader("Authorization", "Bearer " + credentials.accessToken);
-        xhr.setRequestHeader("anthropic-beta", "oauth-2025-04-20");
-        xhr.setRequestHeader("Accept", "application/json");
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE)
-                return;
-            rootItem.probing = false;
-
-            if (xhr.status >= 200 && xhr.status < 300) {
-                const windows = Model.parseUsagePayload(xhr.responseText);
-                if (windows) {
-                    rootItem.limitWindows = windows;
-                    rootItem.limitStatus = "";
-                    return;
-                }
-            }
-
-            // Keep the last good windows on screen; only say what went wrong.
-            // Status 0 is a transport failure — no route, no DNS, no server.
-            rootItem.limitStatus = xhr.status === 0 ? "Couldn't reach Anthropic's usage endpoint." : (xhr.status === 429 ? "Anthropic is rate limiting usage checks right now." : "Anthropic's usage endpoint returned status " + xhr.status + ".");
-        };
-        xhr.send();
+    // Nothing to report, nothing in the bar.
+    visible: providers.length > 0
+    active: alarming
+    tooltipText: {
+        if (!provider)
+            return "Model usage";
+        if (!headline)
+            return provider.providerName;
+        return provider.providerName + " · " + headline.title.toLowerCase() + " " + Math.round(headline.percent * 100) + "%";
     }
 
-    FileView {
-        id: credentialsFile
-        path: Quickshell.env("HOME") + "/.claude/.credentials.json"
-        watchChanges: true
-        printErrors: false
-        onFileChanged: reload()
-        onLoaded: rootItem.credentials = Model.parseCredentials(text())
-        onLoadFailed: rootItem.credentials = Model.parseCredentials("")
-        Component.onCompleted: reload()
+    AiClaude {
+        id: claudeProvider
+        enabled: rootItem.providerEnabled("claude")
+        settings: rootItem.settings
     }
 
-    Process {
-        id: scanProc
-        command: [Quickshell.env("HOME") + "/.dotfiles/bin/claude-usage-scan"]
-        stdout: StdioCollector {
-            waitForEnd: true
-            onStreamFinished: {
-                rootItem.scanning = false;
-                try {
-                    rootItem.stats = JSON.parse(text);
-                } catch (e) {
-                    console.warn("Ai: usage scanner parse failed:", e);
-                }
-            }
-        }
+    AiCodex {
+        id: codexProvider
+        enabled: rootItem.providerEnabled("codex")
+        settings: rootItem.settings
+        darkSurface: rootItem.theme.mode !== "light"
     }
+
+    // Both providers are scanned once at startup so the bar knows whether it
+    // has anything to show at all — that is the gate above, and without it a
+    // machine with usage would show no widget until its panel was opened.
+    // Everything after that is refresh-on-open; this shell does not poll.
+    Component.onCompleted: refresh()
 
     function openPanel() {
         panelLoader.active = true;
@@ -142,8 +103,10 @@ BarIcon {
     }
 
     onTapped: button => {
-        if (button === Qt.MiddleButton)
+        if (button === Qt.RightButton)
             refresh();
+        else if (button === Qt.MiddleButton)
+            selectProvider(providerIndex + 1);
         else
             openPanel();
     }

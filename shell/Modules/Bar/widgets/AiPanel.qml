@@ -2,14 +2,14 @@ import QtQuick
 import "../components"
 import "AiModel.js" as Model
 
-// Claude Code usage panel — port of omarchy's model-usage Panel.qml in our
-// tokens: a hero naming the tool and the plan it is paid for, the LIMITS
-// section with a meter and a reset countdown per window, then the local
-// numbers (today, tokens by day, tokens by model) from bin/claude-usage-scan.
+// Model-usage panel — port of omarchy's model-usage Panel.qml in our tokens:
+// a hero of the provider's mark, its name and the plan it is paid for, the
+// provider switch when more than one has numbers, the status card when a
+// provider has something to say, the LIMITS meters with their reset
+// countdowns, then the local numbers (today, tokens by day, tokens by model).
 //
 // Their panel refreshes on a background interval; ours refreshes when it opens
-// and when the refresh button is pressed, in line with this shell's
-// no-polling rule.
+// and from the refresh button, in line with this shell's no-polling rule.
 BarPanel {
     id: panel
 
@@ -18,8 +18,15 @@ BarPanel {
     panelTitle: ""
     cardWidth: 380
 
-    // Countdowns read this instead of Date.now() so the panel keeps telling
-    // the truth while it sits open.
+    readonly property var provider: usage.provider
+    readonly property var limits: usage.limits
+    readonly property var models: Model.modelRows(provider)
+    readonly property var days: provider ? (provider.recentDays || []) : []
+    readonly property real peak: Math.max(1, Model.weekPeak(provider))
+
+    // Countdowns and the "today" row read this instead of Date.now() so the
+    // panel keeps telling the truth while it sits open — including across
+    // midnight.
     property double nowMs: Date.now()
 
     onPanelOpened: nowMs = Date.now()
@@ -33,9 +40,15 @@ BarPanel {
         onTriggered: panel.nowMs = Date.now()
     }
 
-    // r refreshes, as their key catcher does.
+    // Their key model: left/right switch provider, r refreshes.
     onContentKey: event => {
-        if (event.key === Qt.Key_R) {
+        if (event.key === Qt.Key_Left) {
+            panel.usage.selectProvider(panel.usage.providerIndex - 1);
+            event.accepted = true;
+        } else if (event.key === Qt.Key_Right) {
+            panel.usage.selectProvider(panel.usage.providerIndex + 1);
+            event.accepted = true;
+        } else if (event.key === Qt.Key_R) {
             panel.usage.refresh();
             event.accepted = true;
         }
@@ -45,27 +58,26 @@ BarPanel {
         return Model.formatTokenCount(n);
     }
 
-    function modelTotal(m) {
-        return m.inputTokens + m.outputTokens + m.cacheReadInputTokens + m.cacheCreationInputTokens;
-    }
-
     // ------------------------------------------------------------- hero row
     Item {
         width: parent.width
-        height: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, refreshButton.height)
+        height: Math.max(heroMark.height, heroLabels.implicitHeight, refreshButton.height)
 
-        OpticalGlyph {
-            id: heroIcon
+        Image {
+            id: heroMark
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            text: "󰚩"
-            color: panel.usage.alarming ? panel.theme.error : panel.theme.textPrimary
-            pixelSize: 28
+            source: panel.provider ? panel.provider.markSource : ""
+            width: 26
+            height: 26
+            sourceSize.width: 52
+            sourceSize.height: 52
+            fillMode: Image.PreserveAspectFit
         }
 
         Column {
             id: heroLabels
-            anchors.left: heroIcon.right
+            anchors.left: heroMark.right
             anchors.leftMargin: panel.theme.space(3)
             anchors.right: refreshButton.left
             anchors.rightMargin: panel.theme.space(2)
@@ -74,8 +86,8 @@ BarPanel {
 
             Text {
                 width: parent.width
-                text: "Claude Code"
-                color: panel.theme.textPrimary
+                text: panel.provider ? panel.provider.providerName : "Model usage"
+                color: panel.usage.alarming ? panel.theme.error : panel.theme.textPrimary
                 font.family: panel.theme.fontUi
                 font.pixelSize: panel.theme.fontPx(1.083)
                 font.weight: Font.DemiBold
@@ -84,12 +96,8 @@ BarPanel {
 
             Text {
                 width: parent.width
-                text: {
-                    if (panel.usage.limitStatus !== "")
-                        return panel.usage.limitStatus.toUpperCase();
-                    return (panel.usage.tierLabel || "Subscription").toUpperCase();
-                }
-                color: panel.usage.limitStatus !== "" ? panel.theme.warn : panel.theme.textMuted
+                text: Model.heroMeta(panel.provider).toUpperCase()
+                color: panel.provider && String(panel.provider.usageStatusText || "") !== "" ? panel.theme.warn : panel.theme.textMuted
                 font.family: panel.theme.fontUi
                 font.pixelSize: panel.theme.fontPx(0.75)
                 font.weight: Font.DemiBold
@@ -117,7 +125,7 @@ BarPanel {
                 pixelSize: 14
 
                 RotationAnimator on rotation {
-                    running: panel.usage.probing || panel.usage.scanning
+                    running: panel.usage.refreshing
                     from: 0
                     to: 360
                     duration: 900
@@ -136,16 +144,90 @@ BarPanel {
         }
     }
 
+    // ------------------------------------------------------ provider switch
+    Row {
+        id: providerSwitch
+
+        readonly property real cellWidth: panel.usage.providers.length > 0 ? (width - spacing * (panel.usage.providers.length - 1)) / panel.usage.providers.length : 0
+
+        visible: panel.usage.providers.length > 1
+        width: parent.width
+        spacing: panel.theme.space(1.5)
+
+        Repeater {
+            model: panel.usage.providers
+
+            Rectangle {
+                id: providerTab
+
+                required property var modelData
+                required property int index
+
+                readonly property bool selected: index === panel.usage.providerIndex
+
+                width: providerSwitch.cellWidth
+                implicitHeight: tabLabel.implicitHeight + panel.theme.space(3)
+                radius: panel.theme.radius(0.75)
+                color: selected ? panel.theme.alpha(panel.theme.accent, 0.25) : (tabHover.hovered ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2)
+                border.width: panel.theme.borderWidth
+                border.color: selected ? panel.theme.accent : panel.theme.surface3
+
+                Text {
+                    id: tabLabel
+                    anchors.centerIn: parent
+                    text: providerTab.modelData.providerName
+                    color: providerTab.selected ? panel.theme.accent : panel.theme.textPrimary
+                    font.family: panel.theme.fontUi
+                    font.pixelSize: panel.theme.fontPx(0.833)
+                }
+
+                HoverHandler {
+                    id: tabHover
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                TapHandler {
+                    onTapped: panel.usage.selectProvider(providerTab.index)
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------- status
+    Rectangle {
+        visible: !!panel.provider && String(panel.provider.usageStatusText || "") !== ""
+        width: parent.width
+        implicitHeight: statusText.implicitHeight + panel.theme.space(4)
+        radius: panel.theme.radius(0.75)
+        color: panel.theme.alpha(panel.theme.warn, 0.10)
+        border.width: panel.theme.borderWidth
+        border.color: panel.theme.alpha(panel.theme.warn, 0.35)
+
+        Text {
+            id: statusText
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: panel.theme.space(2.5)
+            anchors.rightMargin: panel.theme.space(2.5)
+            text: panel.provider ? String(panel.provider.authHelpText || "") : ""
+            color: panel.theme.textMuted
+            font.family: panel.theme.fontUi
+            font.pixelSize: panel.theme.fontPx(0.833)
+            wrapMode: Text.WordWrap
+        }
+    }
+
     // -------------------------------------------------------------- limits
     Rectangle {
-        visible: panel.usage.limitWindows.length > 0
+        visible: panel.limits.length > 0
         width: parent.width
         height: 1
         color: panel.theme.surface3
     }
 
     Column {
-        visible: panel.usage.limitWindows.length > 0
+        visible: panel.limits.length > 0
         width: parent.width
         spacing: panel.theme.space(2.5)
 
@@ -154,7 +236,7 @@ BarPanel {
         }
 
         Repeater {
-            model: panel.usage.limitWindows
+            model: panel.limits
 
             Column {
                 id: limitRow
@@ -185,6 +267,7 @@ BarPanel {
 
                         Text {
                             anchors.baseline: limitTitle.baseline
+                            visible: text !== ""
                             text: limitRow.modelData.subtitle
                             color: panel.theme.textMuted
                             font.family: panel.theme.fontUi
@@ -243,16 +326,6 @@ BarPanel {
         }
     }
 
-    Text {
-        visible: panel.usage.limitWindows.length === 0
-        width: parent.width
-        text: panel.usage.limitStatus !== "" ? panel.usage.limitStatus + " Local Claude Code stats are still shown." : "Reading Anthropic's usage limits…"
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
-        wrapMode: Text.WordWrap
-    }
-
     Rectangle {
         width: parent.width
         height: 1
@@ -261,31 +334,31 @@ BarPanel {
 
     // --------------------------------------------------------------- today
     Text {
-        visible: panel.usage.stats === null
-        text: "Scanning ~/.claude sessions…"
+        visible: !!panel.provider && !panel.provider.ready
+        text: "Scanning sessions…"
         color: panel.theme.textMuted
         font.family: panel.theme.fontUi
         font.pixelSize: panel.theme.fontPx(0.917)
     }
 
     Row {
-        visible: panel.usage.stats !== null
+        visible: !!panel.provider && panel.provider.ready
         width: parent.width
         spacing: panel.theme.space(4)
 
         Repeater {
-            model: panel.usage.stats === null ? [] : [
+            model: panel.provider === null ? [] : [
                 {
                     label: "prompts today",
-                    value: String(panel.usage.stats.todayPrompts)
+                    value: String(panel.provider.todayPrompts)
                 },
                 {
                     label: "sessions",
-                    value: String(panel.usage.stats.todaySessions)
+                    value: String(panel.provider.todaySessions)
                 },
                 {
                     label: "tokens today",
-                    value: panel.fmt(panel.usage.stats.todayTotalTokens)
+                    value: panel.fmt(panel.provider.todayTotalTokens)
                 }
             ]
 
@@ -313,7 +386,7 @@ BarPanel {
 
     // ------------------------------------------------------- tokens by day
     Column {
-        visible: panel.usage.stats !== null
+        visible: panel.days.length > 0
         width: parent.width
         spacing: panel.theme.space(1)
 
@@ -322,20 +395,16 @@ BarPanel {
         }
 
         Repeater {
-            model: panel.usage.stats === null ? [] : panel.usage.stats.dailyActivity
+            model: panel.days
 
             Item {
                 id: dayRow
 
                 required property var modelData
 
-                readonly property real peak: {
-                    let max = 1;
-                    for (const d of panel.usage.stats.dailyActivity)
-                        max = Math.max(max, d.messageCount);
-                    return max;
-                }
-                readonly property bool isToday: modelData.date === Qt.formatDate(new Date(panel.nowMs), "yyyy-MM-dd")
+                // By date, not by position: a scanner can hand us a window
+                // that stops short of today.
+                readonly property bool isToday: String(modelData.date || "") === Qt.formatDate(new Date(panel.nowMs), "yyyy-MM-dd")
 
                 width: parent.width
                 height: dayLabel.implicitHeight + panel.theme.space(1)
@@ -368,7 +437,7 @@ BarPanel {
                         anchors.verticalCenter: parent.verticalCenter
                         height: parent.height
                         radius: parent.radius
-                        width: parent.width * Math.max(0, Math.min(1, dayRow.modelData.messageCount / dayRow.peak))
+                        width: parent.width * Math.max(0, Math.min(1, Number(dayRow.modelData.messageCount || 0) / panel.peak))
                         color: dayRow.isToday ? panel.theme.accent : panel.theme.alpha(panel.theme.accent, 0.55)
 
                         Behavior on width {
@@ -386,7 +455,7 @@ BarPanel {
                     anchors.verticalCenter: parent.verticalCenter
                     width: panel.theme.space(12)
                     horizontalAlignment: Text.AlignRight
-                    text: panel.fmt(dayRow.modelData.messageCount)
+                    text: panel.fmt(Number(dayRow.modelData.messageCount || 0))
                     color: dayRow.isToday ? panel.theme.textPrimary : panel.theme.textMuted
                     font.family: panel.theme.fontMono
                     font.pixelSize: panel.theme.fontPx(0.75)
@@ -397,7 +466,7 @@ BarPanel {
 
     // ----------------------------------------------------- tokens by model
     Column {
-        visible: panel.modelRows.length > 0
+        visible: panel.models.length > 0
         width: parent.width
         spacing: panel.theme.space(1)
 
@@ -406,7 +475,7 @@ BarPanel {
         }
 
         Repeater {
-            model: panel.modelRows
+            model: panel.models
 
             // The share bar fills the row behind the label instead of
             // stacking under it, which keeps the dashboard on one screen.
@@ -466,27 +535,6 @@ BarPanel {
                 }
             }
         }
-    }
-
-    // Top four models by total tokens, each scaled to the heaviest — the same
-    // scale-to-peak the day chart uses.
-    readonly property var modelRows: {
-        if (usage.stats === null)
-            return [];
-        const usageByModel = usage.stats.modelUsage || {};
-        const rows = [];
-        for (const id in usageByModel) {
-            rows.push({
-                name: Model.friendlyModelName(id),
-                total: modelTotal(usageByModel[id])
-            });
-        }
-        rows.sort((a, b) => b.total - a.total);
-        const top = rows.slice(0, 4);
-        const peak = Math.max(1, top.length > 0 ? top[0].total : 1);
-        for (let i = 0; i < top.length; i++)
-            top[i].share = top[i].total / peak;
-        return top;
     }
 
     component SectionHeader: Text {
