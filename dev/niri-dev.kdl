@@ -1,0 +1,6 @@
+// Nested dev compositor. `just dev` runs niri with this config; niri detects
+// it is nested inside a Wayland session and opens as a regular window (winit
+// backend), picking a free WAYLAND_DISPLAY. The spawned shell inherits it, so
+// the shell under test renders inside the window — the live session is never
+// touched.
+spawn-at-startup "sh" "-c" "QSHELL_DEV=1 qs -p ~/.dotfiles/shell"

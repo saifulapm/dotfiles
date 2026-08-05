@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "bar": {
+    "position": "top",
+    "left": ["workspaces", "window"],
+    "center": ["clock"],
+    "right": []
+  }
+}

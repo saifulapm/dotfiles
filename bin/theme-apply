@@ -1,0 +1,111 @@
+#!/usr/bin/env -S mise exec -- node
+// Renders templates/ from the active theme and re-themes running foot
+// terminals via OSC escapes (pattern from omarchy, CREDITS.md).
+// Contrast math is shared with the shell: shell/Commons/color.js is the
+// single source of truth, evaluated here directly.
+"use strict"
+const fs = require("fs")
+const os = require("os")
+const path = require("path")
+const { execSync } = require("child_process")
+
+const ROOT = path.resolve(__dirname, "..")
+const HOME = os.homedir()
+const STATE = path.join(HOME, ".local/state/qshell/theme.toml")
+
+// Indirect eval: runs in global scope, so color.js's function declarations
+// become globals despite this module's "use strict".
+;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/color.js"), "utf8"))
+;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/defaults.js"), "utf8"))
+
+// Same limited walker as Services/Theme.qml — sections, key = value,
+// quoted keys, strings/numbers/bare words, inline comments.
+function parseToml(raw) {
+  const out = {}
+  let section = ""
+  for (const lineRaw of String(raw).split("\n")) {
+    const line = lineRaw.trim()
+    if (!line || line.startsWith("#")) continue
+    const sec = line.match(/^\[([A-Za-z0-9_.-]+)\]\s*(#.*)?$/)
+    if (sec) { section = sec[1]; continue }
+    const kv = line.match(/^(?:"([^"]+)"|([A-Za-z0-9_-]+))\s*=\s*(?:"([^"]*)"|(-?\d+(?:\.\d+)?)|([A-Za-z][A-Za-z0-9_-]*))\s*(#.*)?$/)
+    if (!kv || !section) continue
+    const key = kv[1] !== undefined ? kv[1] : kv[2]
+    out[section + "." + key] = kv[3] !== undefined ? kv[3] : (kv[4] !== undefined ? kv[4] : kv[5])
+  }
+  return out
+}
+
+const tokens = Object.assign({}, THEME_DEFAULTS,
+  parseToml(fs.readFileSync(STATE, "utf8")))
+
+// Derived tokens — same construction rules as Services/Theme.qml.
+if (!tokens["text.on-accent"] && tokens["accent.accent"]) {
+  tokens["text.on-accent"] = ensureContrast(
+    tokens["surface.0"] || "#16161e", tokens["accent.accent"], 4.5)
+}
+
+let missing = []
+function render(tmpl) {
+  return tmpl.replace(/\{\{([A-Za-z0-9_.-]+)(?:\|(hexa?))?\}\}/g, (m, key, filter) => {
+    const v = tokens[key]
+    if (v === undefined) { missing.push(key); return m }
+    if (filter === "hex") return String(v).replace(/^#/, "")
+    if (filter === "hexa") return String(v).replace(/^#/, "") + "ff"
+    return String(v)
+  })
+}
+
+function writeAtomic(dest, content) {
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
+  const tmp = dest + ".tmp"
+  fs.writeFileSync(tmp, content)
+  fs.renameSync(tmp, dest)
+}
+
+const OUTPUTS = {
+  "foot.ini.tmpl": [path.join(HOME, ".config/foot/foot.ini")],
+  "foot-theme.ini.tmpl": [path.join(HOME, ".config/foot/theme.ini")],
+  "gtk.css.tmpl": [
+    path.join(HOME, ".config/gtk-3.0/gtk.css"),
+    path.join(HOME, ".config/gtk-4.0/gtk.css")
+  ],
+  "fuzzel.ini.tmpl": [path.join(HOME, ".config/fuzzel/fuzzel.ini")]
+}
+
+for (const [tmplName, dests] of Object.entries(OUTPUTS)) {
+  const tmplPath = path.join(ROOT, "templates", tmplName)
+  if (!fs.existsSync(tmplPath)) continue
+  const rendered = render(fs.readFileSync(tmplPath, "utf8"))
+  for (const dest of dests) writeAtomic(dest, rendered)
+}
+if (missing.length) console.warn("theme-apply: tokens missing from theme:",
+  [...new Set(missing)].join(", "))
+
+// ---- live foot retheme via OSC (written to each foot child's pty) ----
+const ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+  "bright-black", "bright-red", "bright-green", "bright-yellow",
+  "bright-blue", "bright-magenta", "bright-cyan", "bright-white"]
+let osc = ""
+if (tokens["text.primary"]) osc += `\x1b]10;${tokens["text.primary"]}\x1b\\`
+if (tokens["surface.0"]) osc += `\x1b]11;${tokens["surface.0"]}\x1b\\`
+ANSI.forEach((name, i) => {
+  const v = tokens["ansi." + name]
+  if (v) osc += `\x1b]4;${i};${v}\x1b\\`
+})
+
+if (osc) {
+  let ptys = []
+  try {
+    ptys = execSync(
+      `for fp in $(pgrep -x foot); do for cp in $(pgrep -P $fp); do ` +
+      `readlink /proc/$cp/fd/1 2>/dev/null; done; done | grep ^/dev/pts/ | sort -u`,
+      { shell: "/bin/bash" }).toString().trim().split("\n").filter(Boolean)
+  } catch (e) { /* no foot running */ }
+  for (const pty of ptys) {
+    try { fs.writeFileSync(pty, osc) } catch (e) { /* pty vanished */ }
+  }
+  if (ptys.length) console.log(`theme-apply: rethemed ${ptys.length} foot pty(s)`)
+}
+
+console.log("theme-apply: done")

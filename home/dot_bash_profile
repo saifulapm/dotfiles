@@ -1,0 +1,15 @@
+# .bash_profile (managed by chezmoi)
+
+# Get the aliases and functions
+if [ -f ~/.bashrc ]; then
+    . ~/.bashrc
+fi
+
+# User specific environment and startup programs
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
+# Start niri on tty1 login (autologin lands here; see
+# .chezmoiscripts/run_onchange_before_01-autologin.sh.tmpl)
+if [ -z "${WAYLAND_DISPLAY:-}" ] && [ "$(tty)" = "/dev/tty1" ]; then
+    exec niri-session
+fi

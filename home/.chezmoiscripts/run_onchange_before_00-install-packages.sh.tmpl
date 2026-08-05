@@ -1,0 +1,40 @@
+#!/bin/bash
+# Installs everything declared in packages/manifest.toml. Re-runs on any
+# manifest edit (chezmoi keys run_onchange to this template's rendered
+# content, which embeds the manifest hash below).
+#
+# manifest hash: {{ include "../packages/manifest.toml" | sha256sum }}
+set -euo pipefail
+
+root="{{ .chezmoi.workingTree }}"
+manifest="$root/packages/manifest.toml"
+arch="$(uname -m)"
+
+if ! sudo -v; then
+  echo "install-packages: sudo unavailable — skipping (rerun 'chezmoi apply' in a terminal)" >&2
+  exit 0
+fi
+
+mapfile -t coprs < <(python3 - "$manifest" <<'PY'
+import sys, tomllib
+m = tomllib.load(open(sys.argv[1], "rb"))
+for c in m.get("copr", []):
+    print(c["name"])
+PY
+)
+
+mapfile -t pkgs < <(python3 - "$manifest" "$arch" <<'PY'
+import sys, tomllib
+m = tomllib.load(open(sys.argv[1], "rb"))
+arch = sys.argv[2]
+for p in m.get("pkg", []):
+    if p.get("arch", "all") in ("all", arch):
+        print(p["name"])
+PY
+)
+
+for copr in "${coprs[@]}"; do
+  sudo dnf copr enable -y "$copr"
+done
+
+sudo dnf install --setopt=install_weak_deps=False -y "${pkgs[@]}"

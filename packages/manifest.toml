@@ -1,0 +1,261 @@
+# packages/manifest.toml — the single source of truth for what is installed and why.
+#
+# The chezmoi script .chezmoiscripts/run_onchange_before_install-packages.sh.tmpl
+# hashes this file, so editing it re-runs installation on every machine at the
+# next `chezmoi apply`.
+#
+# Every dnf invocation uses --setopt=install_weak_deps=False (also set globally
+# in /etc/dnf/dnf.conf).
+#
+# Fields:
+#   name     — dnf package name
+#   category — core | shell | dev | optional
+#   arch     — all | aarch64 | x86_64   (install only on matching machines)
+#   why      — one-line justification; a package with no honest justification
+#              does not get installed.
+
+# ------------------------------------------------------------------ repos
+
+[[copr]]
+name = "errornointernet/quickshell"
+why  = "Quickshell is not in Fedora; this COPR publishes working aarch64 + x86_64 builds for F43/F44 (verified 2026-08-05)"
+
+[[copr]]
+name = "jdxcode/mise"
+why  = "mise is not in Fedora; author's COPR builds aarch64 + x86_64 for F43/F44 (verified 2026-08-05) — one repo mechanism for the install script"
+
+# ------------------------------------------------------------------ core
+# The machine is usable as a desktop without anything below `dev`.
+
+[[pkg]]
+name = "foot"
+category = "core"
+arch = "all"
+why = "Terminal. Lightest maintained Wayland-native terminal; retheme-able live via OSC sequences"
+
+[[pkg]]
+name = "wl-clipboard"
+category = "core"
+arch = "all"
+why = "wl-copy/wl-paste — Wayland clipboard CLI; required by cliphist and shell scripts"
+
+[[pkg]]
+name = "cliphist"
+category = "core"
+arch = "all"
+why = "Clipboard history store (fed by wl-paste --watch, event-driven); queried by the launcher"
+
+[[pkg]]
+name = "grim"
+category = "core"
+arch = "all"
+why = "Wayland screenshot capture"
+
+[[pkg]]
+name = "slurp"
+category = "core"
+arch = "all"
+why = "Region selection for grim (screenshot area picking)"
+
+[[pkg]]
+name = "niri"
+category = "core"
+arch = "all"
+why = "The compositor. Hard-requires xwayland-satellite (auto-spawned by niri >= 25.08 when an X11 client connects), so that is not listed separately"
+
+[[pkg]]
+name = "xdg-desktop-portal-gnome"
+category = "core"
+arch = "all"
+why = "Screencast/screenshot portal backend for niri (was a niri weak dep; claimed intentionally)"
+
+[[pkg]]
+name = "xdg-desktop-portal-gtk"
+category = "core"
+arch = "all"
+why = "Portal fallback: file choosers, settings for GTK apps (was a niri weak dep; claimed intentionally)"
+
+[[pkg]]
+name = "wireplumber"
+category = "core"
+arch = "all"
+why = "PipeWire session manager — no audio routing without it (was a niri weak dep; claimed intentionally)"
+
+[[pkg]]
+name = "jetbrains-mono-fonts"
+category = "core"
+arch = "all"
+why = "Base mono font; the Nerd Font glyph variant is not packaged in Fedora and comes via chezmoi external (see [[tool]] nerd-font)"
+
+[[pkg]]
+name = "brightnessctl"
+category = "core"
+arch = "aarch64"
+why = "One-shot backlight get/set for the OSD path (keybind → shell IPC → brightnessctl); laptops/HDMI-less Macs only — the NUC has no backlight"
+
+[[pkg]]
+name = "chezmoi"
+category = "core"
+arch = "all"
+why = "Dotfiles manager — the restore path for this whole repo"
+
+[[pkg]]
+name = "age"
+category = "core"
+arch = "all"
+why = "chezmoi encryption backend for SSH keys and tokens"
+
+# ------------------------------------------------------------------ shell
+
+[[pkg]]
+name = "quickshell"
+category = "shell"
+arch = "all"
+why = "The shell runtime (from COPR errornointernet/quickshell); pulls its own Qt6 runtime deps"
+
+# ------------------------------------------------------------------ dev
+
+[[pkg]]
+name = "php-cli"
+category = "dev"
+arch = "all"
+why = "PHP for Laravel (system PHP per decision 2026-08-05); pulls php-common with ctype/curl/fileinfo/openssl/session/tokenizer"
+
+[[pkg]]
+name = "php-mbstring"
+category = "dev"
+arch = "all"
+why = "Laravel requirement (mbstring extension)"
+
+[[pkg]]
+name = "php-xml"
+category = "dev"
+arch = "all"
+why = "Laravel requirement (dom + xml extensions)"
+
+[[pkg]]
+name = "php-pdo"
+category = "dev"
+arch = "all"
+why = "Laravel database layer; includes pdo_sqlite (Laravel's default driver)"
+
+[[pkg]]
+name = "php-intl"
+category = "dev"
+arch = "all"
+why = "Number/date localization — used by common Laravel packages; cheap to include, annoying to discover missing"
+
+[[pkg]]
+name = "php-process"
+category = "dev"
+arch = "all"
+why = "posix/pcntl — required by Laravel Horizon/queue workers and artisan serve signal handling"
+
+[[pkg]]
+name = "composer"
+category = "dev"
+arch = "all"
+why = "PHP dependency manager — non-negotiable for Laravel"
+
+[[pkg]]
+name = "mise"
+category = "dev"
+arch = "all"
+why = "Node version manager (decision 2026-08-05); pnpm comes via corepack, never Bun. May later pin Go per-project too"
+
+[[pkg]]
+name = "rustup"
+category = "dev"
+arch = "all"
+why = "Rust toolchain manager; rust-analyzer installed as a rustup component (see [[tool]])"
+
+[[pkg]]
+name = "golang"
+category = "dev"
+arch = "all"
+why = "Go toolchain, single system version (learning Go; per-project pinning via mise if ever needed)"
+
+[[pkg]]
+name = "gopls"
+category = "dev"
+arch = "all"
+why = "Go language server for eglot"
+
+[[pkg]]
+name = "emacs-pgtk"
+category = "dev"
+arch = "all"
+why = "The editor. Pure-GTK Wayland-native build with native compilation (links libgccjit) — stock Fedora 44, no COPR needed (verified 2026-08-05)"
+
+[[pkg]]
+name = "podman"
+category = "dev"
+arch = "all"
+why = "Containers for Laravel/Node work; 16K-page-size validation on Asahi is a scheduled step before dev setup is called done"
+
+[[pkg]]
+name = "just"
+category = "dev"
+arch = "all"
+why = "Task runner for the repo justfile (dev/fmt/bench/apply)"
+
+[[pkg]]
+name = "qt6-qtdeclarative-devel"
+category = "dev"
+arch = "all"
+why = "Ships qmlls (eglot) and qmlformat (pre-commit hook) — the only package providing them on Fedora"
+
+# ------------------------------------------------------------------ optional
+
+[[pkg]]
+name = "fuzzel"
+category = "optional"
+arch = "all"
+why = "Interim launcher until Modules/Launcher is built; also a theme fan-out target (was a niri weak dep; claimed intentionally)"
+
+[[pkg]]
+name = "fcitx5"
+category = "optional"
+arch = "all"
+why = "Input method framework for Bangla — packages install, but configuration is deferred until explicitly approved"
+
+[[pkg]]
+name = "fcitx5-m17n"
+category = "optional"
+arch = "all"
+why = "m17n engine for fcitx5 — provides Bangla input methods (Avro phonetic, Probhat) via m17n-db"
+
+[[pkg]]
+name = "m17n-db"
+category = "optional"
+arch = "all"
+why = "Input method database required by fcitx5-m17n for Bangla layouts"
+
+# ------------------------------------------------------------------ non-dnf tools
+# Installed by chezmoi scripts / declared externals, recorded here so the
+# manifest stays the complete inventory.
+
+[[tool]]
+name = "node"
+via  = "mise use -g node@lts"
+why  = "Node runtime, version-managed per decision 2026-08-05"
+
+[[tool]]
+name = "pnpm"
+via  = "corepack enable pnpm"
+why  = "The package manager. Never Bun"
+
+[[tool]]
+name = "shopify-cli"
+via  = "pnpm add -g @shopify/cli"
+why  = "Shopify apps + themes; Node-based — aarch64 compatibility to be verified at install time"
+
+[[tool]]
+name = "rust-analyzer"
+via  = "rustup component add rust-analyzer"
+why  = "Rust language server for eglot"
+
+[[tool]]
+name = "nerd-font-jetbrains-mono"
+via  = "chezmoi external → ~/.local/share/fonts (upstream nerd-fonts release tarball)"
+why  = "Bar/terminal glyphs; not packaged in Fedora"

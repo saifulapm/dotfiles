@@ -1,0 +1,62 @@
+# Tokyo Night — the reference theme. One file is one theme.
+# Missing keys fall back to the shell's builtin defaults.
+
+[meta]
+name = "Tokyo Night"
+mode = "dark"
+
+[surface]
+"0" = "#16161e"
+"1" = "#1a1b26"
+"2" = "#24283b"
+"3" = "#2f3549"
+
+[text]
+primary = "#c0caf5"
+muted = "#58618c"
+inverse = "#15161e"
+on-accent = "#15161e"
+
+[accent]
+accent = "#7aa2f7"
+error = "#f7768e"
+warn = "#e0af68"
+ok = "#9ece6a"
+
+[ansi]
+black = "#15161e"
+red = "#f7768e"
+green = "#9ece6a"
+yellow = "#e0af68"
+blue = "#7aa2f7"
+magenta = "#bb9af7"
+cyan = "#7dcfff"
+white = "#a9b1d6"
+bright-black = "#414868"
+bright-red = "#ff7a93"
+bright-green = "#b9f27c"
+bright-yellow = "#ff9e64"
+bright-blue = "#7da6ff"
+bright-magenta = "#bb9af7"
+bright-cyan = "#0db9d7"
+bright-white = "#c0caf5"
+
+[shape]
+radius = 8
+border-width = 1
+
+[space]
+unit = 4
+density = 1.0
+
+[font]
+ui = "sans-serif"
+mono = "JetBrains Mono"
+size = 12
+
+[motion]
+duration = 150
+easing = "standard"
+
+[bar]
+height = 26

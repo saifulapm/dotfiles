@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# theme-set <name> — activate a theme from themes/ and fan it out.
+#
+# The active theme is a REGULAR file written atomically (cp + same-dir mv).
+# Never a symlink: repointing a symlink is invisible to the shell's inotify
+# watch (the watch stays bound to the old target's inode).
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+state_dir="$HOME/.local/state/qshell"
+state="$state_dir/theme.toml"
+
+if [[ $# -ne 1 ]]; then
+  echo "usage: theme-set <name>" >&2
+  echo "available:" >&2
+  for f in "$root"/themes/*.toml; do echo "  $(basename "${f%.toml}")" >&2; done
+  exit 1
+fi
+
+src="$root/themes/$1.toml"
+if [[ ! -f $src ]]; then
+  echo "theme-set: no such theme: $1 (looked at $src)" >&2
+  exit 1
+fi
+
+mkdir -p "$state_dir"
+cp "$src" "$state.tmp"
+mv "$state.tmp" "$state"
+
+exec "$root/bin/theme-apply"

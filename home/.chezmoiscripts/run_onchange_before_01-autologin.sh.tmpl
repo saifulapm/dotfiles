@@ -1,0 +1,25 @@
+#!/bin/bash
+# TTY autologin on tty1 (decision 2026-08-05: no greeter). Idempotent; only
+# touches /etc when the drop-in is missing or stale.
+set -euo pipefail
+
+conf=/etc/systemd/system/getty@tty1.service.d/autologin.conf
+want='ExecStart=-/sbin/agetty -o "-p -f -- \\u" --noclear --autologin {{ .chezmoi.username }} %I $TERM'
+
+if [ -f "$conf" ] && grep -qF -- "--autologin {{ .chezmoi.username }}" "$conf"; then
+  exit 0
+fi
+
+if ! sudo -v; then
+  echo "autologin: sudo unavailable — skipping (rerun 'chezmoi apply' in a terminal)" >&2
+  exit 0
+fi
+
+sudo mkdir -p "$(dirname "$conf")"
+sudo tee "$conf" >/dev/null <<EOF
+[Service]
+ExecStart=
+$want
+EOF
+sudo systemctl daemon-reload
+echo "autologin: configured for {{ .chezmoi.username }} on tty1"

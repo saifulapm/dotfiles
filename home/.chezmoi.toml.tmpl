@@ -1,0 +1,17 @@
+{{- $machine := promptChoiceOnce . "machine" "Which machine is this" (list "macbook-m2" "mac-mini-m2" "nuc") -}}
+# The repo lives at ~/.dotfiles on every machine; restore with:
+#   sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply --source ~/.dotfiles <repo-url>
+sourceDir = "~/.dotfiles"
+
+# Symlink mode: non-templated files are symlinked into the repo, so editing
+# the live config edits the repo directly — no apply loop.
+mode = "symlink"
+
+encryption = "age"
+
+[data]
+    machine = {{ $machine | quote }}
+
+[age]
+    identity = "~/.config/chezmoi/key.txt"
+    recipient = "age1y05rw7sm72al7vnxqd54th9rj7s0v8ynpuw07lhgtwz547823dyqusaaqr"
