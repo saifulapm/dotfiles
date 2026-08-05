@@ -438,6 +438,27 @@ binds {
     // because clicking a toast already invokes its default action.
     Mod+Alt+Comma hotkey-overlay-title="Dismiss Last Notification" { spawn "qs" "ipc" "call" "notifs" "dismissOne"; }
     Mod+Shift+Alt+Comma hotkey-overlay-title="Show Notification History" { spawn "qs" "ipc" "call" "notifs" "showHistory"; }
+    Mod+Shift+Comma hotkey-overlay-title="Dismiss All Notifications" { spawn "qs" "ipc" "call" "notifs" "dismissAll"; }
+    Mod+Ctrl+Comma hotkey-overlay-title="Toggle Do Not Disturb" { spawn "qs" "ipc" "call" "notifs" "toggleDnd"; }
+
+    // The rest of omarchy's utility chords (2026-08-06 parity audit), each on
+    // the nearest free key where the upstream chord is a niri default we keep.
+    // Omarchy: SUPER+CTRL+C — Mod+Ctrl+C is niri's center-visible-columns, so
+    // the capture menu takes Shift.
+    Mod+Shift+C hotkey-overlay-title="Capture Menu" { spawn "qs" "ipc" "call" "menu" "open" "capture"; }
+    Mod+Ctrl+O hotkey-overlay-title="Toggles Menu" { spawn "qs" "ipc" "call" "menu" "open" "toggle"; }
+    // Omarchy: SUPER+ESCAPE — taken by niri's toggle-keyboard-shortcuts-inhibit;
+    // the power key opens the system menu instead, which is also their bind.
+    XF86PowerOff hotkey-overlay-title="System Menu" { spawn "qs" "ipc" "call" "menu" "open" "system"; }
+    Mod+Shift+Space hotkey-overlay-title="Toggle the Bar" { spawn "qs" "ipc" "call" "bar" "toggle"; }
+    // Omarchy: SUPER+CTRL+I — taken by niri's move-column-to-workspace-up.
+    Mod+Ctrl+Alt+I hotkey-overlay-title="Toggle Idle Locking" { spawn "qs" "ipc" "call" "idle" "toggle"; }
+    Mod+Ctrl+N hotkey-overlay-title="Toggle Night Light" { spawn "qs" "ipc" "call" "nightlight" "toggle"; }
+    // Omarchy's reminder family hangs off SUPER+CTRL+R; Mod+Ctrl+R and
+    // Mod+Ctrl+Shift+R are niri's window-height defaults, so ours take Alt.
+    Mod+Alt+R hotkey-overlay-title="Set a Reminder" { spawn "qs" "ipc" "call" "reminders" "toggle"; }
+    Mod+Ctrl+Alt+R hotkey-overlay-title="Show Reminders" { spawn "reminder" "show"; }
+    Mod+Alt+Shift+R hotkey-overlay-title="Clear Reminders" { spawn "reminder" "clear"; }
 
     // Voice dictation (voxtype), state shown by the bar's dictation indicator.
     // Omarchy's own toggle chord is SUPER+CTRL+X; Ctrl+X is free here.
@@ -468,6 +489,9 @@ binds {
 
     // Media keys route through the shell's MPRIS service (no playerctl).
     XF86AudioPlay        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "playPause"; }
+    // Omarchy's Alt variants of the play key step tracks.
+    Alt+XF86AudioPlay       allow-when-locked=true { spawn "qs" "ipc" "call" "media" "next"; }
+    Alt+Shift+XF86AudioPlay allow-when-locked=true { spawn "qs" "ipc" "call" "media" "previous"; }
     XF86AudioStop        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "stop"; }
     XF86AudioPrev        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "previous"; }
     XF86AudioNext        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "next"; }
@@ -696,6 +720,9 @@ binds {
     Print { screenshot; }
     Ctrl+Print { screenshot-screen; }
     Alt+Print { screenshot-window; }
+    // Omarchy: ALT+PRINT — taken by screenshot-window above. Stops a running
+    // recording, else opens the capture menu's Screenrecord submenu.
+    Mod+Print hotkey-overlay-title="Screen Recording" { spawn "sh" "-c" "screenrecord --stop-recording || qs ipc call menu open screenrecording"; }
 
     // Applications such as remote-desktop clients and software KVM switches may
     // request that niri stops processing the keyboard shortcuts defined here
