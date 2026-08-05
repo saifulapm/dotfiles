@@ -35,6 +35,26 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   KNOWN/OTHER NETWORKS sections with inline passphrase entry and
   forget-on-hover, the centered QR and speed-test overlays, and the same single
   cursor model shared by mouse and keyboard.
+- **Monitor plugin design** from `shell/plugins/panels/monitor/` (`Panel.qml`,
+  `Model.js`): the hero naming the current brightness mood over a "Display"
+  title, their brightness mood-name ladder itself, the live brightness slider
+  with its 180 ms debounce and the rule that the value just written wins over
+  anything a later probe reports (theirs bounced to zero without it), the
+  right-aligned percentage that follows the knob while dragging, the SCALE
+  preset row naming the focused output when more than one is connected, the
+  per-display enable rows with their focused marker, check mark and
+  last-display-enabled guard, the 5 s refresh that runs only while the panel is
+  open with a re-probe after every action, and their section cursor model
+  (j/k walks rows and falls through between sections, h/l adjusts the slider or
+  walks the pills, Enter activates, hover moves the cursor). Their scale math
+  (`cleanScale` / `availableScales` / `matchingScaleIndex`) is deliberately NOT
+  ported — it encodes Hyprland's rule that a scale must divide the mode evenly
+  in 1/120ths, which niri does not have, and applying it here misreported both
+  the presets and the live scale. Their TEXT SIZE section is not ported (it
+  drives an omarchy CLI that rewrites their shell's font override; ours lives in
+  the theme). Their brightness helper, `hyprctl` monitor keywords and OSD summon
+  are replaced by `brightnessctl` and `niri msg output`, which also gives us a
+  VRR toggle they have no equivalent for.
 - **Power plugin design** from `shell/plugins/panels/power/` (`Panel.qml`,
   `Model.js`): the hero of battery glyph, bold title and rotating status phrase
   beside the percentage at display size, over a charge bar that animates its
@@ -252,6 +272,14 @@ Direct file-level copies (source path → destination path):
   (the FontAwesome range does not render under our Nerd Font fallback),
   `signalStrength` is normalised here because quickshell reports 0..1, and
   whitespace follows house 4-space qmlformat.
+- omarchy `shell/plugins/panels/monitor/Model.js` →
+  `shell/Modules/Bar/widgets/MonitorModel.js`: partial port — their brightness
+  clamp, scale normalisation and brightness mood-name ladder are verbatim.
+  `cleanScale`, `availableScales` and their `matchingScaleIndex` are not ported
+  (Hyprland's 1/120-divisor rule, which niri does not share); ours matches a
+  preset by value. `parseDisplays` is replaced by `parseState`, which reads the
+  panel's one probe: `niri msg --json outputs`, the focused output,
+  `brightnessctl -lm` and a wlsunset check, split on marker lines.
 - omarchy `shell/plugins/panels/power/Model.js` →
   `shell/Modules/Bar/widgets/PowerModel.js`: near-verbatim port of the
   cursor-index clamping, the key/tab/value reader, the profile glyphs, the
