@@ -20,6 +20,20 @@ BarPanel {
             adapter.discovering = false;
     }
 
+    // Writing adapter.enabled flips the cached property immediately, but the
+    // BlueZ power-up settles asynchronously — a StartDiscovery sent right
+    // behind the write is refused with NotReady and never retried. Start the
+    // scan when the adapter actually reports powered (state, unlike enabled,
+    // tracks BlueZ's own PowerState).
+    Connections {
+        target: panel.adapter
+        enabled: panel.opened
+        function onStateChanged() {
+            if (panel.adapter.state === BluetoothAdapterState.Enabled)
+                panel.adapter.discovering = true;
+        }
+    }
+
     readonly property var deviceList: {
         const list = Bluetooth.devices.values.slice();
         list.sort((a, b) => {

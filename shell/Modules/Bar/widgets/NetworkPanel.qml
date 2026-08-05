@@ -598,16 +598,22 @@ BarPanel {
             bandProc.command = [panel.binDir + "network-band"];
             bandProc.running = true;
         }
+        // Sync before raising `scanning`: syncWifiNetworks clears the flag,
+        // so the other order lowered it in the same call stack and the
+        // "scanning" header could never appear.
+        panel.syncWifiNetworks();
         if (panel.wifiDevice) {
-            if (scanWifi === true) {
+            // Gated on `opened`: action callbacks (timeouts, connect
+            // completions) land after the panel closes too, and must not
+            // re-arm continuous background scanning.
+            if (scanWifi === true && panel.opened) {
                 panel.scanning = true;
                 panel.wifiDevice.scannerEnabled = false;
                 scanRestart.start();
             } else {
-                panel.wifiDevice.scannerEnabled = true;
+                panel.wifiDevice.scannerEnabled = panel.opened;
             }
         }
-        panel.syncWifiNetworks();
     }
 
     // -------------------------------------------------------------- cursor
@@ -1176,8 +1182,10 @@ BarPanel {
         id: scanRestart
         interval: 100
         onTriggered: {
+            // The panel can close inside this window; onPanelClosed already
+            // disarmed the scanner and this must not re-arm it.
             if (panel.wifiDevice)
-                panel.wifiDevice.scannerEnabled = true;
+                panel.wifiDevice.scannerEnabled = panel.opened;
             scanDone.start();
         }
     }

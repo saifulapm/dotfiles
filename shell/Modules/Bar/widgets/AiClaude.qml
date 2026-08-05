@@ -88,10 +88,29 @@ Item {
     }
 
     // The cheap half of a refresh: Anthropic's numbers without the disk walk.
+    // The credentials read is asynchronous, so the probe itself only runs once
+    // the FileView reports loaded (or failed) — probing right after reload()
+    // would see the empty default token on the shell-start refresh and leave
+    // the bar's rate-limit alarm dead until the panel is first opened.
+    property bool probeQueued: false
+
     function refreshLimits() {
         if (!enabled || probing)
             return;
+        probeQueued = true;
         credentialsFile.reload();
+    }
+
+    function runQueuedProbe() {
+        if (!probeQueued)
+            return;
+        probeQueued = false;
+        probeLimits();
+    }
+
+    function probeLimits() {
+        if (!enabled || probing)
+            return;
         if (!tokenUsable) {
             usageStatusText = credentials.accessToken === "" ? "Waiting for auth" : "Claude session expired";
             clearLimits();
@@ -153,8 +172,14 @@ Item {
         watchChanges: true
         printErrors: false
         onFileChanged: reload()
-        onLoaded: provider.credentials = Model.parseCredentials(text())
-        onLoadFailed: provider.credentials = Model.parseCredentials("")
+        onLoaded: {
+            provider.credentials = Model.parseCredentials(text());
+            provider.runQueuedProbe();
+        }
+        onLoadFailed: {
+            provider.credentials = Model.parseCredentials("");
+            provider.runQueuedProbe();
+        }
         Component.onCompleted: reload()
     }
 

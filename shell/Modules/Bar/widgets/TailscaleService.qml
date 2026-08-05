@@ -298,6 +298,7 @@ QtObject {
             refreshing = true;
             statusProcess.command = cmd(["tailscale", "status", "--json"]);
             statusProcess.running = true;
+            _statusLaunchMs = Date.now();
             launched = true;
         }
         if (full) {
@@ -306,6 +307,7 @@ QtObject {
                 _exitNodeListError = "";
                 exitNodeListProcess.command = cmd(["tailscale", "exit-node", "list"]);
                 exitNodeListProcess.running = true;
+                _exitNodeLaunchMs = Date.now();
                 launched = true;
             }
             const now = Date.now();
@@ -316,6 +318,7 @@ QtObject {
                 _lastAccountsRefreshMs = now;
                 accountsProcess.command = cmd(["tailscale", "switch", "--list", "--json"]);
                 accountsProcess.running = true;
+                _accountsLaunchMs = now;
                 launched = true;
             }
             // The receive service is asked about on panel open and nowhere
@@ -336,9 +339,14 @@ QtObject {
         // Arm on the launch that needs watching and leave it alone after that.
         // Restarting it every refresh pushes the deadline out ahead of a hung
         // process forever once the refresh interval is shorter than the
-        // timeout, and refreshIntervalSec goes down to five seconds.
-        if (launched && !pollWatchdog.running)
+        // timeout, and refreshIntervalSec goes down to five seconds. Each
+        // launch records its own timestamp, so the watchdog only reaps what
+        // has actually used up its window — never a fresh read that happened
+        // to start late in someone else's.
+        if (launched && !pollWatchdog.running) {
+            pollWatchdog.interval = pollWatchdog.windowMs;
             pollWatchdog.start();
+        }
     }
 
     function elideStatus(text) {
@@ -628,17 +636,35 @@ QtObject {
     // never exits — tailscale can hang on a network that is coming and going —
     // silently stops the panel refreshing at all, and it stays stopped. Reap
     // anything still running well inside the refresh interval so the next tick
-    // starts clean.
+    // starts clean. Deadlines are per process launch: a read started late in
+    // the window keeps its remainder (the timer re-arms for it) instead of
+    // being killed with the batch and flashing a false "Disconnected".
+    property double _statusLaunchMs: 0
+    property double _exitNodeLaunchMs: 0
+    property double _accountsLaunchMs: 0
+
     readonly property Timer pollWatchdog: Timer {
-        interval: 15000
+        readonly property int windowMs: 15000
+        interval: windowMs
         repeat: false
         onTriggered: {
-            if (root.statusProcess.running)
-                root.statusProcess.running = false;
-            if (root.exitNodeListProcess.running)
-                root.exitNodeListProcess.running = false;
-            if (root.accountsProcess.running)
-                root.accountsProcess.running = false;
+            const now = Date.now();
+            const reads = [[root.statusProcess, root._statusLaunchMs], [root.exitNodeListProcess, root._exitNodeLaunchMs], [root.accountsProcess, root._accountsLaunchMs]];
+            let nextMs = 0;
+            for (let i = 0; i < reads.length; i++) {
+                const proc = reads[i][0];
+                if (!proc.running)
+                    continue;
+                const remaining = windowMs - (now - reads[i][1]);
+                if (remaining <= 0)
+                    proc.running = false;
+                else if (nextMs === 0 || remaining < nextMs)
+                    nextMs = remaining;
+            }
+            if (nextMs > 0) {
+                interval = nextMs;
+                restart();
+            }
         }
     }
 

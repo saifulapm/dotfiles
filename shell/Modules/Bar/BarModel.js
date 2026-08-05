@@ -109,11 +109,22 @@ function nearestDropTarget(candidates, point, vertical) {
     return best;
 }
 
+// Resolve an entry reference that is either a section index (number) or an id
+// string. Ids are not unique — two spacers are legal — so the drag path
+// addresses entries by index; id strings resolve first-match for callers that
+// have nothing better. An out-of-range index is "unknown" (-1), same as an
+// unknown id.
+function resolveEntryIndex(entries, ref) {
+    if (typeof ref === "number")
+        return Number.isInteger(ref) && ref >= 0 && ref < entries.length ? ref : -1;
+    return entryIndex(entries, ref);
+}
+
 // Move one entry between (or within) the section arrays of a bar config, in
-// place. Port of their moveModuleInConfig: `beforeId` names the entry the moved
-// one lands in front of, and an empty/unknown one appends. Returns false when
-// nothing actually moved, so the caller can skip the write.
-function moveEntry(bar, fromSection, fromId, toSection, beforeId) {
+// place. Port of their moveModuleInConfig: `beforeRef` names the entry the
+// moved one lands in front of, and an empty/unknown one appends. Returns false
+// when nothing actually moved, so the caller can skip the write.
+function moveEntry(bar, fromSection, fromRef, toSection, beforeRef) {
     if (!isPlainObject(bar))
         return false;
     if (!Array.isArray(bar[fromSection]))
@@ -123,11 +134,12 @@ function moveEntry(bar, fromSection, fromId, toSection, beforeId) {
 
     const fromEntries = bar[fromSection];
     const toEntries = bar[toSection];
-    const fromIndex = entryIndex(fromEntries, fromId);
+    const fromIndex = resolveEntryIndex(fromEntries, fromRef);
     if (fromIndex < 0)
         return false;
 
-    let toIndex = beforeId ? entryIndex(toEntries, beforeId) : toEntries.length;
+    // Index 0 is a real target, so "append" is only an omitted/empty ref.
+    let toIndex = beforeRef === undefined || beforeRef === null || beforeRef === "" ? toEntries.length : resolveEntryIndex(toEntries, beforeRef);
     if (toIndex < 0)
         toIndex = toEntries.length;
 

@@ -28,6 +28,10 @@ BarPanel {
     property int suggestionIndex: 0
     property string geocodePendingQuery: ""
     property string geocodeActiveQuery: ""
+    // The query the current suggestions were geocoded FOR. Enter must not
+    // commit a highlighted suggestion left over from an older query while the
+    // newer text is still inside the debounce/fetch window.
+    property string suggestionsQuery: ""
 
     function startEditingLocation() {
         editingLocation = true;
@@ -48,7 +52,8 @@ BarPanel {
     }
 
     function commitLocation() {
-        const location = Model.locationCommit(locationField.text, locationSuggestions, suggestionIndex);
+        const suggestions = locationField.text.trim() === suggestionsQuery ? locationSuggestions : [];
+        const location = Model.locationCommit(locationField.text, suggestions, suggestionIndex);
         if (location.name === "") {
             clearLocation();
             return;
@@ -104,6 +109,7 @@ BarPanel {
             waitForEnd: true
             onStreamFinished: {
                 panel.locationSuggestions = panel.editingLocation ? Model.parseGeocodingResults(text) : [];
+                panel.suggestionsQuery = panel.editingLocation ? panel.geocodeActiveQuery : "";
                 panel.suggestionIndex = 0;
                 if (panel.geocodePendingQuery !== panel.geocodeActiveQuery)
                     Qt.callLater(panel.startGeocode);

@@ -95,7 +95,9 @@ Scope {
     }
 
     function sameIds(a, b) {
-        return a.join("") === b.join("");
+        // Element-wise: no join separator is safe against ids that could
+        // themselves contain it.
+        return a.length === b.length && a.every((id, i) => id === b[i]);
     }
 
     function syncModels() {
@@ -185,9 +187,18 @@ Scope {
         return "#" + channel(c.r) + channel(c.g) + channel(c.b);
     }
 
+    property bool foregroundRefreshPending: false
+
     function refreshTransparentForeground() {
-        if (!requestedTransparent || foregroundProc.running)
+        if (!requestedTransparent)
             return;
+        if (foregroundProc.running) {
+            // The in-flight sample bakes the wallpaper and theme colors of its
+            // launch into argv, so a refresh landing mid-run must re-fire when
+            // it exits or the bar keeps a stale contrast color.
+            foregroundRefreshPending = true;
+            return;
+        }
         const first = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
         // The sampled strip is the one the bar actually covers, which on a
         // vertical bar is a column down the left or right edge.
@@ -215,6 +226,12 @@ Scope {
                     barRoot.transparent = true;
                 }
                 barRoot.restoreForegroundAnimation();
+            }
+        }
+        onExited: {
+            if (barRoot.foregroundRefreshPending) {
+                barRoot.foregroundRefreshPending = false;
+                barRoot.refreshTransparentForeground();
             }
         }
     }
@@ -291,6 +308,45 @@ Scope {
                 anchored: barRoot.centerAnchorIndex >= 0
             });
         }
+
+        // Omarchy's summonBarWidget: any process (a niri bind) can open a
+        // widget's panel — `qs ipc call bar open audio`. First bar that
+        // carries the widget wins, which is per-screen-identical layouts in
+        // practice.
+        function open(widgetId: string): string {
+            for (const b of barRoot.screenBars)
+                if (b.summonWidget(widgetId))
+                    return "ok";
+            return "no widget with a panel: " + widgetId;
+        }
+
+        // Omarchy's hideBarWidget, generalized: closes whatever panel is
+        // open on any screen.
+        function closePanel(): string {
+            let closed = false;
+            for (const b of barRoot.screenBars) {
+                if (b.activePanel) {
+                    b.activePanel.close();
+                    closed = true;
+                }
+            }
+            return closed ? "ok" : "no panel open";
+        }
+    }
+
+    // The per-screen bar windows, registered so the IPC verbs above can
+    // reach their slot lists.
+    property var screenBars: []
+
+    function registerScreenBar(b) {
+        if (b && screenBars.indexOf(b) === -1)
+            screenBars.push(b);
+    }
+
+    function unregisterScreenBar(b) {
+        const i = screenBars.indexOf(b);
+        if (i >= 0)
+            screenBars.splice(i, 1);
     }
 
     // ------------------------------------------------- persisted mutations
@@ -306,8 +362,10 @@ Scope {
         });
     }
 
-    function moveWidget(fromSection, widgetId, toSection, beforeId) {
-        return shell.moveBarEntry(fromSection, widgetId, toSection, beforeId);
+    // `fromRef`/`beforeRef` are section indices here (ids are not unique);
+    // BarModel.moveEntry also still accepts id strings for other callers.
+    function moveWidget(fromSection, fromRef, toSection, beforeRef) {
+        return shell.moveBarEntry(fromSection, fromRef, toSection, beforeRef);
     }
 
     // ------------------------------------------------------- drag-to-reorder
@@ -514,6 +572,26 @@ Scope {
                 moduleSlots = moduleSlots.filter(item => item !== slot);
             }
 
+            // The IPC summon path (bar open <widgetId>). Same eligibility
+            // rules as panelNavigationSlots: a drawn slot whose widget
+            // exposes openPanel().
+            function summonWidget(widgetId) {
+                for (let i = 0; i < moduleSlots.length; i++) {
+                    const slot = moduleSlots[i];
+                    if (!slot || slot.widgetId !== widgetId)
+                        continue;
+                    const item = slot.activeItem;
+                    if (!item || item.visible !== true || typeof item.openPanel !== "function")
+                        continue;
+                    item.openPanel();
+                    return true;
+                }
+                return false;
+            }
+
+            Component.onCompleted: barRoot.registerScreenBar(panel)
+            Component.onDestruction: barRoot.unregisterScreenBar(panel)
+
             // A target only takes a click while it is on screen and enabled —
             // our stand-in for their interactive/pressable/concealed trio
             // (a collapsed indicator sets enabled:false and opacity 0).
@@ -624,10 +702,10 @@ Scope {
                 return BarModel.nearestDropTarget(candidates, scenePoint, barRoot.vertical);
             }
 
-            function visibleModuleSlot(section, widgetId, sourceSlot) {
+            function visibleModuleSlotAt(section, sectionIndex, sourceSlot) {
                 for (let i = 0; i < moduleSlots.length; i++) {
                     const slot = moduleSlots[i];
-                    if (!slot || slot === sourceSlot || slot.section !== section || slot.widgetId !== widgetId)
+                    if (!slot || slot === sourceSlot || slot.section !== section || slot.index + slot.indexOffset !== sectionIndex)
                         continue;
                     if (!slot.visible || slot.width <= 0 || slot.height <= 0)
                         continue;
@@ -636,31 +714,31 @@ Scope {
                 return null;
             }
 
-            // The id the moved widget lands in front of when it is dropped on
-            // the far edge of a target: the next one that is actually drawn,
-            // so a hidden neighbour cannot swallow the move.
-            function nextVisibleModuleName(section, afterId, sourceSlot) {
+            // The section index the moved widget lands in front of when it is
+            // dropped on the far edge of a target: the next one that is
+            // actually drawn, so a hidden neighbour cannot swallow the move.
+            // -1 appends.
+            function nextVisibleModuleIndex(section, afterIndex, sourceSlot) {
                 const entries = barRoot.layoutOf[section] || [];
-                let found = false;
-                for (let i = 0; i < entries.length; i++) {
-                    const id = entries[i].id;
-                    if (!found) {
-                        found = id === afterId;
-                        continue;
-                    }
-                    if (visibleModuleSlot(section, id, sourceSlot))
-                        return id;
+                for (let i = afterIndex + 1; i < entries.length; i++) {
+                    if (visibleModuleSlotAt(section, i, sourceSlot))
+                        return i;
                 }
-                return "";
+                return -1;
             }
 
             function dropAtTarget(sourceSlot, targetSlot, after) {
                 if (!sourceSlot || !targetSlot)
                     return false;
-                const beforeId = after ? nextVisibleModuleName(targetSlot.section, targetSlot.widgetId, sourceSlot) : targetSlot.widgetId;
-                if (sourceSlot.section === targetSlot.section && sourceSlot.widgetId === beforeId)
+                // Entries are addressed by section index, not id: ids are not
+                // unique (two spacers), and an id lookup would move the first
+                // instance instead of the dragged one.
+                const sourceIndex = sourceSlot.index + sourceSlot.indexOffset;
+                const targetIndex = targetSlot.index + targetSlot.indexOffset;
+                const beforeIndex = after ? nextVisibleModuleIndex(targetSlot.section, targetIndex, sourceSlot) : targetIndex;
+                if (sourceSlot.section === targetSlot.section && sourceIndex === beforeIndex)
                     return false;
-                return barRoot.moveWidget(sourceSlot.section, sourceSlot.widgetId, targetSlot.section, beforeId);
+                return barRoot.moveWidget(sourceSlot.section, sourceIndex, targetSlot.section, beforeIndex);
             }
 
             // ------------------------------------------- panel navigation

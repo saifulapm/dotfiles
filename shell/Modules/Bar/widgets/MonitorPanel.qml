@@ -143,11 +143,36 @@ BarPanel {
         flushBrightness();
     }
 
+    // One write at a time through a real Process: a detached spawn gives no
+    // exit signal, and clearing pendingBrightness before the write lands lets
+    // a racing probe adopt the pre-write hardware value and snap the slider
+    // back.
     function flushBrightness() {
-        for (const device in pendingBrightness) {
-            Quickshell.execDetached(["brightnessctl", "--class=backlight", "-d", device, "-q", "set", pendingBrightness[device] + "%"]);
+        if (brightnessProc.running)
+            return;
+        const devices = Object.keys(pendingBrightness);
+        if (devices.length === 0)
+            return;
+        const device = devices[0];
+        brightnessProc.device = device;
+        brightnessProc.writtenPercent = pendingBrightness[device];
+        brightnessProc.command = ["brightnessctl", "--class=backlight", "-d", device, "-q", "set", pendingBrightness[device] + "%"];
+        brightnessProc.running = true;
+    }
+
+    Process {
+        id: brightnessProc
+        property string device: ""
+        property int writtenPercent: -1
+        onExited: {
+            // Only clear if the slider has not moved on to a newer value.
+            if (panel.pendingBrightness[device] === writtenPercent) {
+                const pending = Object.assign({}, panel.pendingBrightness);
+                delete pending[device];
+                panel.pendingBrightness = pending;
+            }
+            panel.flushBrightness();
         }
-        pendingBrightness = ({});
     }
 
     Timer {

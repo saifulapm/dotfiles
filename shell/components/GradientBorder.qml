@@ -41,28 +41,55 @@ Item {
 
             readonly property var line: Gradient.endpoints(root.width, root.height, root.parsed.angle)
 
+            // One stop per color in the token, evenly spaced (theirs). Built
+            // imperatively: the stop count follows the parsed spec, and a
+            // static GradientStop pair would silently drop the middle colors
+            // of a 3+-color token.
+            readonly property var stopColors: root.parsed.colors
+            onStopColorsChanged: rebuildStops()
+            Component.onCompleted: rebuildStops()
+
+            function rebuildStops() {
+                const colors = stopColors || [];
+                // Snapshot into a JS array: the stops property is a live view
+                // of the list, so held across the reassignment below it would
+                // enumerate the NEW stops and the cleanup would destroy them.
+                const old = [];
+                for (let i = 0; i < ringGradient.stops.length; i++)
+                    old.push(ringGradient.stops[i]);
+                const next = [];
+                for (let i = 0; i < colors.length; i++)
+                    next.push(stopComponent.createObject(ringGradient));
+                ringGradient.stops = next;
+                // Positions/colors are set once the stops are in the list:
+                // appending alone does not emit the gradient's update signal,
+                // a stop property change on a listed stop does.
+                for (let i = 0; i < colors.length; i++) {
+                    next[i].position = Gradient.stopPosition(colors.length, i);
+                    next[i].color = Gradient.qmlColor(colors[i]);
+                }
+                // Replaced stops stay parented to the gradient until told
+                // otherwise.
+                for (let i = 0; i < old.length; i++)
+                    old[i].destroy();
+            }
+
+            Component {
+                id: stopComponent
+                GradientStop {}
+            }
+
             ShapePath {
                 fillRule: ShapePath.OddEvenFill
                 strokeWidth: 0
                 strokeColor: "transparent"
 
                 fillGradient: LinearGradient {
+                    id: ringGradient
                     x1: ring.line.x1
                     y1: ring.line.y1
                     x2: ring.line.x2
                     y2: ring.line.y2
-
-                    // One stop per color in the token, evenly spaced (theirs).
-                    // Two is all any ported theme carries, but the grammar
-                    // does not cap it.
-                    GradientStop {
-                        position: 0
-                        color: Gradient.qmlColor(root.parsed.colors[0])
-                    }
-                    GradientStop {
-                        position: 1
-                        color: Gradient.qmlColor(root.parsed.colors[root.parsed.colors.length - 1])
-                    }
                 }
 
                 PathRectangle {

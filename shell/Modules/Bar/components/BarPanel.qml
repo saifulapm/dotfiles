@@ -40,10 +40,17 @@ PanelWindow {
         return bar.switchPanelFrom(anchorItem, direction);
     }
 
+    // The bar this panel was requested from, kept so it can be handed back
+    // even after anchorItem is gone: a destroyed activePanel emits no change
+    // signal, so the bar would keep hover reveal suppressed forever.
+    property var grantingBar: null
+
     function open() {
         const bar = anchorItem && anchorItem.bar ? anchorItem.bar : null;
-        if (bar && bar.requestPanel)
+        if (bar && bar.requestPanel) {
             bar.requestPanel(panelWindow);
+            grantingBar = bar;
+        }
         opened = true;
         updateAnchor();
         // Re-measure once the bar layout settles — mapToItem is not
@@ -52,15 +59,25 @@ PanelWindow {
         panelOpened();
     }
 
+    function releaseBar() {
+        const bar = grantingBar;
+        grantingBar = null;
+        if (bar && bar.releasePanel)
+            bar.releasePanel(panelWindow);
+    }
+
     function close() {
         if (!opened)
             return;
-        const bar = anchorItem && anchorItem.bar ? anchorItem.bar : null;
-        if (bar && bar.releasePanel)
-            bar.releasePanel(panelWindow);
+        releaseBar();
         opened = false;
         panelClosed();
     }
+
+    // A panel can die open — a config edit replaces its section's id list and
+    // the Repeater tears the widget (and this LazyLoader child) down.
+    Component.onDestruction: if (opened)
+        releaseBar()
 
     function toggle() {
         if (opened)
