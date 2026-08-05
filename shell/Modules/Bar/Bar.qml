@@ -37,6 +37,10 @@ Scope {
 
             required property var modelData
 
+            // Cold-start metric consumed by bin/bench: ms from process launch
+            // to this bar window finishing construction.
+            Component.onCompleted: console.info("bench:first-bar", Date.now() - Quickshell.launchTime.getTime(), "ms")
+
             screen: modelData
             anchors {
                 top: String(barRoot.config.position) !== "bottom"

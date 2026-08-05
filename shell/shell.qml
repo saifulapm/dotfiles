@@ -5,6 +5,10 @@ import Quickshell.Io
 import qs.Services
 import qs.Modules.Bar
 import qs.Modules.Lock
+import qs.Modules.Launcher
+import qs.Modules.Notifications
+import qs.Modules.Osd
+import qs.Modules.Polkit
 
 // Single long-running ShellRoot. One process: panels are summoned by IPC
 // into this instance, never by spawning a second `qs`.
@@ -17,6 +21,10 @@ ShellRoot {
 
     property Theme theme: Theme {}
     property Niri niri: Niri {}
+    // Eager by necessity: must own org.freedesktop.Notifications from startup.
+    // The popup UI below stays lazy.
+    property Notifs notifs: Notifs {}
+    property Audio audio: Audio {}
 
     // Hardcoded fallback: a broken or missing shell.json still renders this
     // usable bar. The on-disk shell.json fully replaces it when valid — no
@@ -83,6 +91,121 @@ ShellRoot {
         function onLockedChanged() {
             if (!lockLoader.item.locked)
                 Qt.callLater(() => lockLoader.active = false);
+        }
+    }
+
+    // Popup UI loads on the first notification and stays; window is visible
+    // only while toasts exist.
+    Loader {
+        active: shell.notifs.everNotified
+        sourceComponent: Popups {
+            theme: shell.theme
+            notifs: shell.notifs
+        }
+    }
+
+    IpcHandler {
+        target: "notifs"
+
+        function dnd(): string {
+            shell.notifs.dnd = !shell.notifs.dnd;
+            return shell.notifs.dnd ? "dnd on" : "dnd off";
+        }
+
+        function dismissAll(): string {
+            shell.notifs.dismissAll();
+            return "ok";
+        }
+
+        function count(): int {
+            return shell.notifs.active.length;
+        }
+    }
+
+    Osd {
+        id: osd
+        theme: shell.theme
+        audio: shell.audio
+    }
+
+    Polkit {
+        id: polkit
+        theme: shell.theme
+    }
+
+    IpcHandler {
+        target: "polkit"
+
+        function status(): string {
+            return JSON.stringify({
+                registered: polkit.agent.isRegistered,
+                active: polkit.active
+            });
+        }
+
+        function cancel(): string {
+            polkit.cancel();
+            return "ok";
+        }
+    }
+
+    IpcHandler {
+        target: "osd"
+
+        function brightnessUp(): string {
+            osd.brightnessAdjust(1);
+            return "ok";
+        }
+
+        function brightnessDown(): string {
+            osd.brightnessAdjust(-1);
+            return "ok";
+        }
+
+        function status(): string {
+            return JSON.stringify({
+                armed: osd.armed,
+                showing: osd.showing,
+                everShown: osd.everShown,
+                kind: osd.kind,
+                level: osd.level,
+                audioReady: shell.audio.ready,
+                sinkNull: shell.audio.sink === null,
+                volume: shell.audio.volume,
+                sourceNull: shell.audio.source === null,
+                sourceAudioNull: shell.audio.source !== null && shell.audio.source.audio === null,
+                micMuted: shell.audio.micMuted
+            });
+        }
+    }
+
+    LazyLoader {
+        id: launcherLoader
+        active: false
+        component: Launcher {
+            theme: shell.theme
+        }
+    }
+
+    IpcHandler {
+        target: "launcher"
+
+        function toggle(): string {
+            launcherLoader.active = true;
+            launcherLoader.item.toggle();
+            return "ok";
+        }
+
+        function show(): string {
+            launcherLoader.active = true;
+            launcherLoader.item.show();
+            return "ok";
+        }
+
+        function hide(): string {
+            if (launcherLoader.active)
+                launcherLoader.item.hide();
+            return "ok";
         }
     }
 

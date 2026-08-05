@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# just bench — measures the four numbers the shell is accountable for:
+#   1. cold start: process launch -> bar window constructed (shell-reported)
+#      plus launch -> IPC responsive (externally observed)
+#   2. idle RSS
+#   3. idle CPU% over 60s
+#   4. launcher open latency, cold (first LazyLoader load) and warm
+# Restarts the running shell; leaves it running when done.
+set -euo pipefail
+
+results_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bench"
+mkdir -p "$results_dir"
+out="$results_dir/$(date +%Y%m%d-%H%M%S)-$(uname -m).txt"
+log=$(mktemp)
+trap 'rm -f "$log"' EXIT
+
+now_ms() { date +%s%N | cut -c1-13; }
+
+echo "bench: restarting shell..."
+pkill -x qs 2>/dev/null || true
+sleep 1
+
+t0=$(now_ms)
+qs -v >"$log" 2>&1 &
+disown
+
+# ---- 1. cold start
+first_bar=""
+for _ in $(seq 1 150); do
+  first_bar=$(grep -m1 -oP 'bench:first-bar \K\d+' "$log" || true)
+  [ -n "$first_bar" ] && break
+  sleep 0.05
+done
+[ -n "$first_bar" ] || { echo "bench: no first-bar line within 7.5s" >&2; exit 1; }
+
+ipc_ready=""
+for _ in $(seq 1 100); do
+  if qs ipc call shell ping >/dev/null 2>&1; then
+    ipc_ready=$(( $(now_ms) - t0 ))
+    break
+  fi
+  sleep 0.05
+done
+
+qspid=$(pgrep -x qs | head -1)
+
+# ---- 4a. launcher cold latency (before anything settles it stays honest:
+# LazyLoader has never been active in this process)
+lc0=$(now_ms)
+qs ipc call launcher toggle >/dev/null
+launcher_cold=$(( $(now_ms) - lc0 ))
+qs ipc call launcher hide >/dev/null
+sleep 0.3
+
+# warm
+lw0=$(now_ms)
+qs ipc call launcher toggle >/dev/null
+launcher_warm=$(( $(now_ms) - lw0 ))
+qs ipc call launcher hide >/dev/null
+
+# IPC round-trip overhead baked into the launcher numbers
+po0=$(now_ms)
+qs ipc call shell ping >/dev/null
+ipc_overhead=$(( $(now_ms) - po0 ))
+
+# ---- 2. idle RSS (settle first)
+sleep 5
+rss_kb=$(awk '/VmRSS/ {print $2}' "/proc/$qspid/status")
+
+# ---- 3. idle CPU over 60s
+read -r ut0 st0 < <(awk '{print $14, $15}' "/proc/$qspid/stat")
+sleep 60
+read -r ut1 st1 < <(awk '{print $14, $15}' "/proc/$qspid/stat")
+ticks=$(( ut1 - ut0 + st1 - st0 ))
+hz=$(getconf CLK_TCK)
+cpu_pct=$(python3 -c "print(f'{$ticks / $hz / 60 * 100:.3f}')")
+
+{
+  echo "date:            $(date -Iseconds)"
+  echo "machine:         $(uname -m) $(uname -r)"
+  echo "shell pid:       $qspid"
+  echo "cold start:      ${first_bar} ms to bar constructed (shell-reported)"
+  echo "ipc ready:       ${ipc_ready:-n/a} ms from spawn (external)"
+  echo "idle rss:        $(( rss_kb / 1024 )) MiB (${rss_kb} kB)"
+  echo "idle cpu (60s):  ${cpu_pct}%"
+  echo "launcher cold:   ${launcher_cold} ms (incl. ~${ipc_overhead} ms qs-ipc overhead)"
+  echo "launcher warm:   ${launcher_warm} ms (incl. ~${ipc_overhead} ms qs-ipc overhead)"
+} | tee "$out"
+
+echo "saved: $out"

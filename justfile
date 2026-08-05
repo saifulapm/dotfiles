@@ -13,9 +13,9 @@ dev:
 fmt:
     find {{ shell_dir }} -name '*.qml' -exec {{ qt6_bin }}/qmlformat -i {} +
 
-# benchmarks: cold start, idle RSS, idle CPU, launcher latency (built in step 8)
+# benchmarks: cold start, idle RSS, 60s idle CPU, launcher latency
 bench:
-    @echo "bench: not implemented yet (step 8)"
+    bash {{ justfile_directory() }}/bin/bench
 
 # apply dotfiles
 apply:
