@@ -7,6 +7,9 @@ import "../components"
 BarIcon {
     id: rootItem
 
+    // The ShellRoot, for the night light service the panel switches.
+    required property var shell
+
     glyph: Quickshell.screens.length > 1 ? "󰍺" : "󰍹"
     tooltipText: Quickshell.screens.length + " display" + (Quickshell.screens.length === 1 ? "" : "s")
 
@@ -27,6 +30,7 @@ BarIcon {
         active: false
         component: MonitorPanel {
             theme: rootItem.theme
+            nightlight: rootItem.shell ? rootItem.shell.nightlight : null
         }
     }
 }

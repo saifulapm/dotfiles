@@ -38,6 +38,10 @@ ShellRoot {
     property Idle idle: Idle {
         shellRoot: shell
     }
+    // Eager, but only as a flag-file watcher: it starts wlsunset when the
+    // persisted state says night light was left on, and costs one file watch
+    // otherwise.
+    property Nightlight nightlight: Nightlight {}
     // Cross-machine snapshot sync. Inert until shell.json's root `sync` block
     // points it at a shared directory, so it costs one /etc/hostname read
     // until then.

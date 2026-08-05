@@ -111,6 +111,18 @@ category = "core"
 arch = "all"
 why = "Renders the Wi-Fi share QR matrix for the network panel (bin/network-qr pipes it through `qrencode --type ASCII`); the panel hides its share button when this is missing, so the feature is dead without it"
 
+[[pkg]]
+name = "power-profiles-daemon"
+category = "core"
+arch = "all"
+why = "D-Bus power-profile switching (power-saver/balanced/performance) behind the power panel's profile row; quickshell's PowerProfiles service is dead air without the daemon"
+
+[[pkg]]
+name = "wlsunset"
+category = "core"
+arch = "all"
+why = "Wayland gamma/night-light daemon driven by the shell's nightlight service and indicator (omarchy uses hyprsunset; wlsunset is the compositor-neutral equivalent for niri)"
+
 # NOT installed, listed for the record: the network panel's speed test needs
 # nothing beyond curl (bin/network-speedtest measures /proc/net/dev deltas
 # while curl saturates fast.com's endpoints), and `iw` is used only when it

@@ -265,12 +265,33 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   ported with it: ON lit and OFF dimmed to 0.45, both glyphs and both tooltip
   strings per indicator, and state carried by opacity rather than by the bar's
   attention color. The stay-awake, do-not-disturb and reminder indicators are
-  ports of `shell/plugins/bar/indicators/StayAwake.qml`, `Dnd.qml` and
-  `Reminder.qml` (their glyphs, their tooltip wording, their click rules). We
-  ship no dictation, screen-recording or night-light indicators, so those
+  ports of `shell/plugins/bar/indicators/StayAwake.qml`, `Dnd.qml`,
+  `Reminder.qml` and `NightLight.qml` (their glyphs, their tooltip wording —
+  the night light one names what a click does, not what is on — and their
+  click rules). We ship no dictation or screen-recording indicators, so those
   entries are absent; their reveal snaps open where ours slides; and a
   standalone indicator named directly in a bar array collapses when off instead
   of reserving an empty slot.
+- **Night light service design** from `shell/plugins/services/nightlight/`
+  (`Service.qml`, `NightlightModel.js`): night light as a two-state switch
+  rather than a schedule — their 4000 K night and 6500 K day temperatures,
+  their rule that "on" means the screen is below the 6000 K identity point,
+  their pending-write queue so a fast double toggle cannot race, and their
+  `status`/`enable`/`disable`/`toggle` IPC verbs. The daemon underneath is
+  different: theirs drives hyprsunset through `hyprctl hyprsunset temperature`
+  and reads the current value back, so hyprsunset holds the state and their
+  service is stateless between calls. We drive wlsunset, which has no control
+  channel — it holds wlr-gamma-control until it exits — so here the running
+  daemon is the "on" state: on starts one `wlsunset -t 4000 -T 4001` (pinning
+  the high temperature one kelvin above the low one is what makes a
+  sun-following daemon hold still; equal values are rejected), and off
+  terminates it and lets the compositor restore the ramps, so their
+  day-temperature write has no counterpart. Their state therefore lives in the
+  daemon and is re-probed; ours is a flag file at
+  `~/.local/state/qshell/nightlight` read by a `FileView`, so `touch`/`rm`
+  toggles night light as the indicator does. Their `bin/omarchy-toggle-nightlight`
+  CLI, which duplicates the temperatures for callers outside the shell, has no
+  port — the flag file and the IPC verbs are that entry point.
 - **Image picker design** from `shell/plugins/image-picker/ImagePicker.qml` and
   `bin/omarchy-theme-bg-switcher`: the full-screen scrim over a skewed
   filmstrip, the selection blown up to a wide preview with the rest of the set

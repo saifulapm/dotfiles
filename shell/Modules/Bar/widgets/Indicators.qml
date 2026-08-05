@@ -31,8 +31,8 @@ Item {
     property var settings: ({})
 
     // Default order, upstream's minus the indicators we do not ship
-    // (dictation, screen recording, night light).
-    readonly property var defaultItems: ["reminder", "dnd", "stayawake"]
+    // (dictation, screen recording).
+    readonly property var defaultItems: ["reminder", "dnd", "nightlight", "stayawake"]
 
     function setting(name, fallback) {
         const value = settings ? settings[name] : undefined;
@@ -254,6 +254,7 @@ Item {
     readonly property var indicatorRegistry: ({
             "dnd": dndComponent,
             "reminder": reminderComponent,
+            "nightlight": nightLightComponent,
             "stayawake": stayAwakeComponent
         })
 
@@ -273,6 +274,16 @@ Item {
             theme: root.theme
             bar: root.bar
             shell: root.shell
+            indicatorHost: root
+        }
+    }
+
+    Component {
+        id: nightLightComponent
+        NightLight {
+            theme: root.theme
+            bar: root.bar
+            nightlight: root.shell.nightlight
             indicatorHost: root
         }
     }

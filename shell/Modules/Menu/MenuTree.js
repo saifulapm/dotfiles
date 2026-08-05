@@ -174,6 +174,15 @@ var TREE = {
         "state": "dnd",
         "call": "dnd"
     },
+    "toggle.nightlight": {
+        "icon": "󰔎",
+        "label": "Night Light",
+        "aliases": ["nightlight", "night-light", "warm", "wlsunset", "gamma"],
+        "description": "Warm the screen to 4000 K",
+        "when": "command -v wlsunset",
+        "state": "nightlight",
+        "call": "nightlight"
+    },
     "toggle.keyboard-layout": {
         "icon": "󰌌",
         "label": "Keyboard Layout",

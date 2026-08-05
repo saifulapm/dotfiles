@@ -20,10 +20,17 @@ BarPanel {
     panelTitle: ""
     cardWidth: 380
 
+    // The shell's night light service (Services/Nightlight.qml).
+    property var nightlight: null
+
     property var outputs: []
     property string focused: ""
     property var backlights: []
     property bool nightLightAvailable: false
+    readonly property bool nightLightOn: nightlight ? nightlight.enabled : false
+    // wlsunset installed, a service to drive it, and a compositor that has not
+    // already refused gamma control on this hardware.
+    readonly property bool nightLightUsable: nightLightAvailable && !!nightlight
 
     // Live brightness per backlight device, keyed by device name. Set locally
     // on every move so the slider is never fighting the probe.
@@ -167,6 +174,11 @@ BarPanel {
         settleTimer.restart();
     }
 
+    function setNightLight(on) {
+        if (nightLightUsable)
+            nightlight.setNightlight(on);
+    }
+
     // ------------------------------------------------------- cursor model
     // Their sections, with the display list only present when there is one:
     // j/k walks rows and falls through between sections, h/l adjusts the
@@ -184,6 +196,8 @@ BarPanel {
         list.push("scale");
         if (focusedOutput && focusedOutput.vrr_supported)
             list.push("vrr");
+        if (nightLightUsable)
+            list.push("nightlight");
         if (outputs.length > 1)
             list.push("displays");
         return list;
@@ -194,7 +208,7 @@ BarPanel {
             return brightnessRows.length;
         if (section === "scale")
             return scaleValues.length;
-        if (section === "vrr")
+        if (section === "vrr" || section === "nightlight")
             return 1;
         if (section === "displays")
             return outputs.length;
@@ -203,7 +217,7 @@ BarPanel {
 
     // The scale pills sit side by side, so j/k treats them as one row.
     function sectionIsSingleRow(section) {
-        return section === "scale" || section === "vrr";
+        return section === "scale" || section === "vrr" || section === "nightlight";
     }
 
     function moveCursor(delta) {
@@ -256,6 +270,8 @@ BarPanel {
             setScale(focusedOutput.name, scaleValues[selectedIndex]);
         else if (focusSection === "vrr" && focusedOutput)
             setVrr(focusedOutput.name, !focusedOutput.vrr_enabled);
+        else if (focusSection === "nightlight")
+            setNightLight(!nightLightOn);
         else if (focusSection === "displays") {
             const out = outputs[selectedIndex];
             if (out)
@@ -584,19 +600,33 @@ BarPanel {
             Pill {
                 width: nightLightRow.cellWidth
                 label: "Off"
-                selectable: false
-                isActive: true
+                selectable: panel.nightLightUsable
+                isActive: !panel.nightLightOn
+                hasCursor: panel.cursorActive && panel.focusSection === "nightlight" && panel.selectedIndex === 0
+                onHovered: panel.takeCursor("nightlight", 0)
+                onActivated: panel.setNightLight(false)
             }
 
             Pill {
                 width: nightLightRow.cellWidth
                 label: "On"
-                selectable: false
+                selectable: panel.nightLightUsable
+                isActive: panel.nightLightOn
+                hasCursor: panel.cursorActive && panel.focusSection === "nightlight" && panel.selectedIndex === 0
+                onHovered: panel.takeCursor("nightlight", 0)
+                onActivated: panel.setNightLight(true)
             }
         }
 
         Hint {
-            text: panel.nightLightAvailable ? "wlsunset is installed but night light is not wired up yet." : "wlsunset is not installed, so night light cannot be switched."
+            visible: text !== ""
+            text: {
+                if (!panel.nightLightAvailable)
+                    return "wlsunset is not installed, so night light cannot be switched.";
+                if (panel.nightlight && !panel.nightlight.gammaSupported)
+                    return "This display reports no gamma table, so wlsunset runs but the colors do not change.";
+                return "";
+            }
         }
     }
 

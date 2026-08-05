@@ -99,6 +99,7 @@ Scope {
             "dnd": dndComponent,
             "reminder": reminderComponent,
             "stayawake": stayAwakeComponent,
+            "nightlight": nightLightComponent,
             "ai": aiComponent,
             "weather": weatherComponent,
             "monitor": monitorComponent,
@@ -522,6 +523,14 @@ Scope {
     }
 
     Component {
+        id: nightLightComponent
+        NightLight {
+            theme: barRoot.theme
+            nightlight: barRoot.shell.nightlight
+        }
+    }
+
+    Component {
         id: reminderComponent
         Reminder {
             theme: barRoot.theme
@@ -547,6 +556,7 @@ Scope {
         id: monitorComponent
         MonitorWidget {
             theme: barRoot.theme
+            shell: barRoot.shell
         }
     }
 

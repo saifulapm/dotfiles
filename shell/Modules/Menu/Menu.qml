@@ -155,6 +155,9 @@ Scope {
         case "dnd":
             shellRoot.notifs.dnd = !shellRoot.notifs.dnd;
             break;
+        case "nightlight":
+            shellRoot.nightlight.toggle();
+            break;
         default:
             console.warn("Menu: unknown call:", name);
         }
@@ -165,6 +168,8 @@ Scope {
         switch (name) {
         case "dnd":
             return !!shellRoot.notifs.dnd;
+        case "nightlight":
+            return !!shellRoot.nightlight.enabled;
         default:
             return false;
         }
