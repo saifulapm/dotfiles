@@ -285,9 +285,28 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   a generic selector driven over IPC by `omarchy-menu-images`, which blocks on
   a selection file — ours is summoned directly and applies through
   `bin/background-next --set`, so the selection-file/done-file handshake, the
-  preload path and the request serials are not ported. Neither picker previews
-  as you move: the wallpaper changes only when a selection is applied, so
-  Escape has nothing to restore.
+  preload path and the request serials are not ported. The wallpaper picker
+  does not preview as you move, and neither does theirs: the wallpaper changes
+  only when a selection is applied, so Escape has nothing to restore.
+- **Theme switcher as an image picker** from `bin/omarchy-theme-switcher`:
+  their theme switcher is not its own UI at all — it builds a directory of
+  per-theme preview images and hands it to the same image selector the
+  wallpaper switcher uses (`omarchy-menu-images --print-name --show-labels
+  --filterable --lazy-thumbnails --selected <current>`), so the two pickers are
+  one component with two callers. Ours is that too: one tile per theme in the
+  shared filmstrip, labelled with their title-cased basename, filterable by
+  typing, opened pre-selected on the active theme. `bin/theme-list` resolves a
+  tile image with their `find_preview` order — a `preview.*` file in the
+  theme's directory, else the first sorted image in its `backgrounds/`. Their
+  cache is not ported: they symlink previews into a cache directory keyed by a
+  two-tier mtime signature because their menu is a separate process reading a
+  directory, while ours is a field on the theme list the shell already reads,
+  and their `--preload` warms a picker we summon directly. A theme with no
+  preview image is theirs by omission — their strip just has no tile for it —
+  where ours paints the theme's own surface holding its accent ramp. The live
+  full-shell token preview as the selection moves is ours, not theirs
+  (`Services/Theme.qml` `preview()`/`endPreview()`); it is why our switcher's
+  Escape has something to restore where the wallpaper picker's does not.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -494,15 +513,16 @@ Direct file-level copies (source path → destination path):
   that carries the message only when one was typed. Their `module.exports`
   tail was dropped and whitespace restyled to house 4-space qmlformat.
 - omarchy `shell/plugins/image-picker/ImagePickerModel.js` →
-  `shell/Modules/Background/ImagePickerModel.js`: near-verbatim port of the
-  picker's whole non-visual half — the row parser with the basename dedup that
-  is what merges two directories into one strip, `nameForPath`/`labelForPath`
-  (basename, extension dropped, `-`/`_` to spaces, title case), the
-  case-insensitive substring filter over both forms of the name, and the
-  filtered-position math the carousel lays itself out with. Their
-  `module.exports` tail was dropped, `Util.editsFilter`/`editedFilter` were
-  folded in next to the filter they edit, and whitespace follows house 4-space
-  qmlformat.
+  `shell/components/PickerModel.js`: near-verbatim port of the picker's whole
+  non-visual half — the row parser with the basename dedup that is what merges
+  two directories into one strip, `nameForPath`/`labelForPath` (basename,
+  extension dropped, `-`/`_` to spaces, title case), the case-insensitive
+  substring filter over both forms of the name, and the filtered-position math
+  the carousel lays itself out with. Their `module.exports` tail was dropped,
+  `Util.editsFilter`/`editedFilter` were folded in next to the filter they
+  edit, and whitespace follows house 4-space qmlformat. The filter reads the
+  `key`/`label` the row parser precomputes rather than re-deriving them from a
+  file path, because the theme switcher's tiles are named themes, not files.
 - omarchy `bin/omarchy-theme-bg-next` + `bin/omarchy-theme-bg-set` +
   `shell/plugins/image-picker/list.sh` → `bin/background-next`: direct port of
   the enumeration and the cycle — the merge of the active theme's backgrounds

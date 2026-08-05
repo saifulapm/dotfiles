@@ -1,9 +1,10 @@
 #!/usr/bin/env -S mise exec -- node
 // theme-list [--json]
 // Plain: one theme name per line (same as theme-set with no args, minus marker).
-// --json: array of { name, title, mode, current, tokens } where tokens is the
-// flat "section.key" map the shell's Theme.qml consumes — this feeds the
-// theme switcher's live preview without QML ever parsing TOML files.
+// --json: array of { name, title, mode, current, preview, tokens } where tokens
+// is the flat "section.key" map the shell's Theme.qml consumes — this feeds the
+// theme switcher's live preview without QML ever parsing TOML files — and
+// preview is the tile image for the switcher's filmstrip (may be "").
 "use strict"
 const fs = require("fs")
 const os = require("os")
@@ -29,6 +30,46 @@ function parseToml(raw) {
   return out
 }
 
+// omarchy-theme-switcher's find_preview, per theme directory: a preview file
+// in the theme root wins in this extension order, otherwise the first sorted
+// image in its backgrounds/. Their theme is a directory; ours is a single
+// .toml, so the images come from a directory beside it if one exists (a user
+// theme) and from the reference clone otherwise — the same place
+// bin/background-next takes wallpapers from. Their user-themes-first order.
+// No directory at all just means no preview; the shell draws a swatch tile.
+const PREVIEW_NAMES = ["preview.png", "preview.jpg", "preview.jpeg", "preview.webp", "preview.gif", "preview.bmp"]
+const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"]
+
+function listFiles(dir) {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true })
+      .filter(e => e.isFile() || e.isSymbolicLink())
+      .map(e => e.name)
+  } catch (e) { return [] }
+}
+
+function findPreview(themeDir) {
+  const files = listFiles(themeDir)
+  for (const wanted of PREVIEW_NAMES) {
+    const hit = files.find(f => f.toLowerCase() === wanted)
+    if (hit) return path.join(themeDir, hit)
+  }
+
+  const backgrounds = path.join(themeDir, "backgrounds")
+  const images = listFiles(backgrounds)
+    .filter(f => IMAGE_EXTS.includes(path.extname(f).toLowerCase()))
+    .sort()
+  return images.length > 0 ? path.join(backgrounds, images[0]) : ""
+}
+
+function previewFor(name) {
+  for (const dir of [path.join(THEMES, name), path.join(os.homedir(), "ref/omarchy/themes", name)]) {
+    const preview = findPreview(dir)
+    if (preview) return preview
+  }
+  return ""
+}
+
 let current = ""
 try { current = fs.readFileSync(NAME_FILE, "utf8").trim() } catch (e) {}
 
@@ -47,6 +88,7 @@ const list = names.map(name => {
     title: tokens["meta.name"] || name,
     mode: tokens["meta.mode"] === "light" ? "light" : "dark",
     current: name === current,
+    preview: previewFor(name),
     tokens
   }
 })
