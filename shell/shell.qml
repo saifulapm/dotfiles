@@ -5,6 +5,7 @@ import Quickshell.Services.Mpris
 
 import qs.Services
 import qs.Modules.Bar
+import qs.Modules.Clipboard
 import qs.Modules.Emojis
 import qs.Modules.Lock
 import qs.Modules.Launcher
@@ -138,6 +139,10 @@ ShellRoot {
     function toggleEmojis() {
         emojisLoader.active = true;
         emojisLoader.item.toggle();
+    }
+
+    function toggleClipboard() {
+        clipboard.toggle();
     }
 
     function lockSession() {
@@ -364,6 +369,33 @@ ShellRoot {
         function hide(): string {
             if (emojisLoader.active)
                 emojisLoader.item.hide();
+            return "ok";
+        }
+    }
+
+    // Eager by necessity, like Notifs: the capture watcher has to be running
+    // before anything is copied, or there is no history to pick from. Its
+    // picker window stays lazy inside the module.
+    Clipboard {
+        id: clipboard
+        theme: shell.theme
+    }
+
+    IpcHandler {
+        target: "clipboard"
+
+        function toggle(): string {
+            shell.toggleClipboard();
+            return "ok";
+        }
+
+        function show(): string {
+            clipboard.show();
+            return "ok";
+        }
+
+        function hide(): string {
+            clipboard.hide();
             return "ok";
         }
     }

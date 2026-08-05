@@ -43,7 +43,13 @@ why = "wl-copy/wl-paste — Wayland clipboard CLI; required by cliphist and shel
 name = "cliphist"
 category = "core"
 arch = "all"
-why = "Clipboard history store (fed by wl-paste --watch, event-driven); queried by the launcher"
+why = "SUPERSEDED by Modules/Clipboard — the shell now owns the history store itself (bin/clipboard-capture + ~/.local/state/qshell/clipboard). Nothing in the repo calls cliphist any more; kept installed pending the user's removal decision, like fuzzel"
+
+[[pkg]]
+name = "jq"
+category = "core"
+arch = "all"
+why = "JSON writer for bin/clipboard-capture — clipboard payloads are arbitrary bytes and hand-rolling the string escaping in bash is a correctness bug waiting to happen. Only place in the repo that needs it (the network helpers deliberately use grep/awk instead)"
 
 [[pkg]]
 name = "grim"

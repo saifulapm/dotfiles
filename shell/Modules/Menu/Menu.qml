@@ -140,6 +140,9 @@ Scope {
         case "emojis":
             shellRoot.toggleEmojis();
             break;
+        case "clipboard":
+            shellRoot.toggleClipboard();
+            break;
         case "lock":
             shellRoot.lockSession();
             break;

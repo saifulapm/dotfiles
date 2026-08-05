@@ -423,6 +423,10 @@ binds {
     // SUPER+PERIOD alternative is unavailable here: Mod+Period is niri's
     // expel-window-from-column.
     Mod+Ctrl+E hotkey-overlay-title="Pick an Emoji" { spawn "qs" "ipc" "call" "emojis" "toggle"; }
+    // Omarchy's own clipboard bind (SUPER+CTRL+V), which is also the only key
+    // left: Mod+V is toggle-window-floating and Mod+Shift+V is
+    // switch-focus-between-floating-and-tiling, both niri defaults we keep.
+    Mod+Ctrl+V hotkey-overlay-title="Clipboard History" { spawn "qs" "ipc" "call" "clipboard" "toggle"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "ipc" "call" "lock" "lock"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.

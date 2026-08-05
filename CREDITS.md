@@ -76,6 +76,22 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   `wtype -M shift -k Insert` paste into the focused window, with the offer
   killed afterwards; no key-injection tool is installed here, so ours does a
   plain persistent `wl-copy` and confirms with a notification instead.
+- **Clipboard manager design** from `shell/plugins/clipboard/Clipboard.qml`: the
+  always-loaded capture half (the shell supervises the `wl-paste --watch`
+  process itself and brings it back a second after it dies, because a dead
+  watcher fails silently — copying still works and nothing is ever recorded),
+  the picker as a query line over a split of entry list and full-entry preview,
+  the row shapes (image thumbnail plus "Screenshot from <day> <time>", file
+  drops shown as a file name, both dimmed against real text), and the keyboard
+  model (Delete removes the row under the cursor, Shift+Delete asks before
+  clearing everything, Home/End, PageUp/PageDown by six, Escape clearing the
+  query before it closes, the first press parking the cursor instead of
+  stepping). Their Enter pastes into the focused window via
+  `wtype -M shift -k Insert` and their Alt+Enter opens the entry in a browser or
+  editor; no key-injection tool is installed here, so Enter copies and confirms
+  with a notification (as the emoji picker does) and the open action is not
+  ported. Their history-index helper scripts are not needed as a result — the
+  picker copies through `wl-copy` directly.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -160,6 +176,26 @@ Direct file-level copies (source path → destination path):
   tokenizing and no ranking (results keep the file's Unicode-group order) and
   the scan capped at 1000 hits. Only whitespace changed, to house 4-space
   qmlformat.
+- omarchy `shell/plugins/clipboard/capture.sh` → `bin/clipboard-capture`: direct
+  port of the emitter — the sensitive-selection gate (`CLIPBOARD_STATE` plus the
+  `x-kde-passwordManagerHint` mime, so password managers never reach the
+  history), the content-addressed image spill to a state directory keyed by
+  sha256, the mime→extension mapping, the image-before-text probe order of the
+  argument-less snapshot mode, and the two JSON entry shapes. Added on top: a
+  `watch` mode that owns both `wl-paste --watch` children (upstream runs them as
+  two separate Processes from QML, ours is one supervised process), each JSON
+  line written under `flock` because the two watchers now share one stdout, and
+  a TERM/INT/HUP trap that takes the children down — bash skips the EXIT trap on
+  a signal.
+- omarchy `shell/plugins/clipboard/ClipboardHistory.js` →
+  `shell/Modules/Clipboard/ClipboardHistory.js`: near-verbatim port of the whole
+  history model — entry normalisation, the `text:`/`image:` dedup key,
+  most-recent-first rebuild with the cap applied as it goes (so re-copying moves
+  an entry to the top rather than duplicating it), `file://` URI decoding that
+  turns a file-manager copy into a named file row, the preview/full-text
+  projections, and the plain case-insensitive substring filter in `displayRows`.
+  Their `module.exports` tail was dropped and whitespace restyled to house
+  4-space qmlformat.
 - omarchy `shell/plugins/panels/clock/Model.js` → `shell/Modules/Bar/widgets/ClockModel.js`:
   near-verbatim port of the date/format math (format ring, ISO week, year/life
   progress parsing and percentages, six-row month grid). Vertical-bar formats and

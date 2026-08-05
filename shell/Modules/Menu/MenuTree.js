@@ -50,6 +50,16 @@ var TREE = {
         "description": "Search an emoji and copy it to the clipboard",
         "call": "emojis"
     },
+    // Omarchy's menu has no row for the clipboard picker at all — theirs is
+    // keybind-only (SUPER+CTRL+V), and their only clipboard row is a Share
+    // action. Ours sits beside Emoji, the other copy-something-out picker.
+    "clipboard": {
+        "icon": "󰅌",
+        "label": "Clipboard",
+        "aliases": ["clip", "history", "paste", "copy"],
+        "description": "Pick something copied earlier and copy it again",
+        "call": "clipboard"
+    },
     "toggle": {
         "icon": "󰔎",
         "label": "Toggle",
