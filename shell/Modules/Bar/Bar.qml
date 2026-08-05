@@ -497,8 +497,12 @@ Scope {
             readonly property int barSize: barRoot.barSize
 
             // Cold-start metric consumed by bin/bench: ms from process launch
-            // to this bar window finishing construction.
-            Component.onCompleted: console.info("bench:first-bar", Date.now() - Quickshell.launchTime.getTime(), "ms")
+            // to this bar window finishing construction. Registration rides
+            // the same handler — a delegate can only declare one.
+            Component.onCompleted: {
+                console.info("bench:first-bar", Date.now() - Quickshell.launchTime.getTime(), "ms");
+                barRoot.registerScreenBar(panel);
+            }
 
             screen: modelData
             visible: !barRoot.barHidden
@@ -589,7 +593,6 @@ Scope {
                 return false;
             }
 
-            Component.onCompleted: barRoot.registerScreenBar(panel)
             Component.onDestruction: barRoot.unregisterScreenBar(panel)
 
             // A target only takes a click while it is on screen and enabled —
