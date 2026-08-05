@@ -83,19 +83,30 @@ image)
     paste_key
     ;;
 text)
-    entry_text | wl-copy --type text/plain
-    $copy_only && exit 0
-
+    # Snapshot the entry BEFORE the wl-copy: the copy itself wakes the
+    # shell's clipboard watcher, which rewrites history.json with this entry
+    # moved to index 0 — well within the sleep below — so re-reading `.[$i]`
+    # afterwards resolved a DIFFERENT entry whenever the pick was not already
+    # the head. Worst case the length/multiline split read one entry and the
+    # typed bytes another, typing multi-line text into a terminal — the exact
+    # hazard the split exists to prevent. A temp file (mktemp is 0600)
+    # preserves trailing newlines a shell variable would strip.
+    snap=$(mktemp)
+    trap 'rm -f "$snap"' EXIT
+    entry_text >"$snap" || exit 1
     length=$(jq -r --argjson i "$index" '.[$i].text | length' "$history_path")
     multiline=$(jq -r --argjson i "$index" 'if (.[$i].text | test("\n")) then "yes" else "no" end' "$history_path")
+
+    wl-copy --type text/plain <"$snap"
+    $copy_only && exit 0
 
     # The picker's layer surface has to hand the keyboard back first.
     sleep 0.15
 
     if [[ $multiline == "no" && $length -le $type_limit ]]; then
-        entry_text | wtype - 2>/dev/null || paste_key
+        wtype - <"$snap" 2>/dev/null || paste_key
     else
-        entry_text | wl-copy --primary --type text/plain
+        wl-copy --primary --type text/plain <"$snap"
         paste_key
     fi
     ;;

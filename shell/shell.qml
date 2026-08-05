@@ -47,6 +47,7 @@ ShellRoot {
     // persisted state says night light was left on, and costs one file watch
     // otherwise.
     property Nightlight nightlight: Nightlight {}
+    property Battery batteryService: Battery {}
     // Cross-machine snapshot sync. Inert until shell.json's root `sync` block
     // points it at a shared directory, so it costs one /etc/hostname read
     // until then.
@@ -744,7 +745,12 @@ ShellRoot {
         }
 
         function reloadConfig(): string {
-            shell.applyConfig("");
+            // Re-read shell.json from disk. This must NOT be applyConfig(""):
+            // that took the empty-text fallback branch, replacing the live
+            // config with the hardcoded fallback AND leaving configWritable
+            // true — the next widget-settings write would then have clobbered
+            // the user's shell.json with the fallback layout.
+            configFile.reload();
             return "ok";
         }
     }

@@ -47,6 +47,10 @@ Scope {
     onQueryChanged: selectedIndex = 0
 
     function show() {
+        // The loader stays active across open/close, so the TextInput and its
+        // text survive too — clearing only `query` left stale text on screen
+        // over an unfiltered list, and the next keystroke appended to it.
+        searchField.text = "";
         query = "";
         selectedIndex = 0;
         open = true;
