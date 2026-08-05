@@ -1,0 +1,10 @@
+# Declares the shell's file chooser as a portal backend. Installed to
+# /usr/share/xdg-desktop-portal/portals/ by
+# home/.chezmoiscripts/run_onchange_before_03-portal-backend.sh — that
+# directory is compiled into xdg-desktop-portal (it reads exactly one dir, and
+# XDG_DESKTOP_PORTAL_DIR replaces rather than extends it), which is why this is
+# the one part of the shell that needs root to install.
+[portal]
+DBusName=org.freedesktop.impl.portal.desktop.qshell
+Interfaces=org.freedesktop.impl.portal.FileChooser;
+UseIn=niri

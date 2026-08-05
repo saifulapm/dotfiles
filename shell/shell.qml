@@ -7,6 +7,7 @@ import qs.Services
 import qs.Modules.Bar
 import qs.Modules.Clipboard
 import qs.Modules.Emojis
+import qs.Modules.FilePicker
 import qs.Modules.Lock
 import qs.Modules.Launcher
 import qs.Modules.Menu
@@ -380,6 +381,42 @@ ShellRoot {
         active: false
         component: Emojis {
             theme: shell.theme
+        }
+    }
+
+    // The shell's file chooser. Lazy: nothing exists until something asks for
+    // a file — which, thanks to bin/qshell-portal registering it as the
+    // xdg-desktop-portal FileChooser backend, is any app on the desktop and
+    // not just our own scripts.
+    LazyLoader {
+        id: filePickerLoader
+        active: false
+        component: FilePicker {
+            theme: shell.theme
+        }
+    }
+
+    IpcHandler {
+        target: "filepicker"
+
+        // Called by bin/qshell-portal with the flattened portal request; the
+        // answer goes back over the FIFO named in it, not through this reply.
+        function pick(request: string): string {
+            filePickerLoader.active = true;
+            return filePickerLoader.item.pick(request);
+        }
+
+        // The portal withdrew a request (its app went away).
+        function cancelToken(token: string): string {
+            if (!filePickerLoader.active)
+                return "unknown";
+            return filePickerLoader.item.cancelToken(token);
+        }
+
+        function status(): string {
+            if (!filePickerLoader.active)
+                return "idle";
+            return filePickerLoader.item.opened ? "open:" + filePickerLoader.item.queue.length : "idle";
         }
     }
 

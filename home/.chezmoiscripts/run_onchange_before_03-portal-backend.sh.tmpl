@@ -1,0 +1,36 @@
+#!/bin/bash
+# Registers the shell's file chooser as an xdg-desktop-portal backend.
+#
+# Everything else about the picker lives in $HOME: the D-Bus activation file
+# under ~/.local/share/dbus-1/services, the preference in
+# ~/.config/xdg-desktop-portal/niri-portals.conf, the service and the QML. Only
+# the .portal declaration has to be root-owned — xdg-desktop-portal reads
+# exactly one portals directory, compiled in as
+# /usr/share/xdg-desktop-portal/portals, and XDG_DESKTOP_PORTAL_DIR replaces
+# that directory rather than adding to it (which would hide the gnome and gtk
+# backends along with everything they carry).
+#
+# Idempotent, and re-runs when the file below changes.
+#
+# portal file hash: {{ include "../packages/qshell.portal" | sha256sum }}
+set -euo pipefail
+
+src="{{ .chezmoi.homeDir }}/.dotfiles/packages/qshell.portal"
+dest=/usr/share/xdg-desktop-portal/portals/qshell.portal
+
+[ -f "$src" ] || exit 0
+
+if [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+  exit 0
+fi
+
+if ! sudo -v 2>/dev/null; then
+  echo "portal backend: sudo unavailable — skipping (rerun 'chezmoi apply' in a terminal)" >&2
+  echo "portal backend: file dialogs keep using the gtk backend until then" >&2
+  exit 0
+fi
+
+sudo install -D -m 0644 "$src" "$dest"
+# The frontend caches the backend list at startup.
+systemctl --user restart xdg-desktop-portal.service 2>/dev/null || true
+echo "portal backend: installed $dest"

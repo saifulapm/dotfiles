@@ -1,0 +1,6 @@
+# D-Bus activation for the shell's file chooser portal backend
+# (bin/qshell-portal). xdg-desktop-portal starts it on the first FileChooser
+# request and it exits once idle, so nothing runs while no dialog is open.
+[D-BUS Service]
+Name=org.freedesktop.impl.portal.desktop.qshell
+Exec={{ .chezmoi.homeDir }}/.dotfiles/bin/qshell-portal

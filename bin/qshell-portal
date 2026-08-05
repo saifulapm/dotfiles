@@ -1,0 +1,464 @@
+#!/usr/bin/python3
+"""qshell-portal — an xdg-desktop-portal FileChooser backend drawn by the shell.
+
+This is what makes every portal-using app (Firefox, Electron apps, anything
+flatpaked, and our own bin/file-select) open the shell's themed file picker
+instead of the GTK one.
+
+    app ──▶ xdg-desktop-portal ──▶ org.freedesktop.impl.portal.FileChooser
+                                              (this service)
+                                                    │  qs ipc call filepicker
+                                                    ▼
+                                       shell/Modules/FilePicker/
+
+D-Bus activated, so it only runs while a dialog is up: xdg-desktop-portal
+starts it on the first request and it exits again once it has been idle.
+
+The answer comes back over a FIFO rather than a second D-Bus call. The picker
+lives in the shell process, which cannot block, and quickshell's IPC is
+request/response — so the request carries the path of a FIFO this service is
+already watching, and the shell writes one JSON line into it when the user
+decides. A GLib watch turns that line into the D-Bus reply, which is why every
+portal method here is answered asynchronously.
+
+Registration (see home/.chezmoiscripts/run_onchange_before_03-portal-backend.sh):
+  * /usr/share/xdg-desktop-portal/portals/qshell.portal declares the backend —
+    that directory is compiled into xdg-desktop-portal and is the one thing
+    here that needs root;
+  * ~/.local/share/dbus-1/services/…qshell.service makes it activatable;
+  * ~/.config/xdg-desktop-portal/niri-portals.conf prefers it for FileChooser,
+    with gtk still listed behind it as the fallback.
+"""
+
+import json
+import os
+import subprocess
+import sys
+import uuid
+
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+import gi
+
+gi.require_version("GLib", "2.0")
+from gi.repository import GLib
+
+BUS_NAME = "org.freedesktop.impl.portal.desktop.qshell"
+OBJECT_PATH = "/org/freedesktop/portal/desktop"
+FILECHOOSER_IFACE = "org.freedesktop.impl.portal.FileChooser"
+REQUEST_IFACE = "org.freedesktop.impl.portal.Request"
+PROPERTIES_IFACE = "org.freedesktop.DBus.Properties"
+
+# Portal response codes.
+RESPONSE_OK = 0
+RESPONSE_CANCELLED = 1
+RESPONSE_OTHER = 2
+
+# A dialog nobody ever answers must not pin this service — and the app on the
+# other end is blocked until we reply.
+ANSWER_TIMEOUT_SEC = 1800
+# Nothing to draw and nothing pending: let D-Bus activation start us again.
+IDLE_EXIT_SEC = 30
+
+
+def log(message):
+    print("qshell-portal: %s" % message, file=sys.stderr, flush=True)
+
+
+def unpack_path(value):
+    """current_folder / current_file / files arrive as NUL-terminated ay."""
+    if value is None:
+        return ""
+    try:
+        raw = bytes(bytearray(value))
+    except Exception:
+        return ""
+    return raw.split(b"\0", 1)[0].decode("utf-8", "replace")
+
+
+def unpack_filters(filters):
+    """a(sa(us)) → [{name, globs, mimes}]; type 0 is a glob, 1 is a mime type."""
+    out = []
+    for entry in filters or []:
+        try:
+            name = str(entry[0])
+            globs, mimes = [], []
+            for kind, pattern in entry[1]:
+                if int(kind) == 0:
+                    globs.append(str(pattern))
+                else:
+                    mimes.append(str(pattern))
+            out.append({"name": name, "globs": globs, "mimes": mimes})
+        except Exception:
+            continue
+    return out
+
+
+def filter_index(filters, current):
+    if not current:
+        return 0
+    try:
+        name = str(current[0])
+    except Exception:
+        return 0
+    for index, entry in enumerate(filters):
+        if entry["name"] == name:
+            return index
+    return 0
+
+
+class Request(dbus.service.Object):
+    """The frontend's handle on a pending dialog: it calls Close() to drop it."""
+
+    def __init__(self, connection, path, on_close):
+        super().__init__(connection, path)
+        self._on_close = on_close
+
+    @dbus.service.method(REQUEST_IFACE, in_signature="", out_signature="")
+    def Close(self):
+        self._on_close()
+
+
+class FileChooser(dbus.service.Object):
+    def __init__(self, connection):
+        super().__init__(connection, OBJECT_PATH)
+        self._connection = connection
+        self._pending = {}
+        self._idle_source = None
+        self._arm_idle_exit()
+
+    # ------------------------------------------------------------- lifecycle
+    def _arm_idle_exit(self):
+        self._cancel_idle_exit()
+        if self._pending:
+            return
+        self._idle_source = GLib.timeout_add_seconds(IDLE_EXIT_SEC, self._idle_exit)
+
+    def _cancel_idle_exit(self):
+        if self._idle_source is not None:
+            GLib.source_remove(self._idle_source)
+            self._idle_source = None
+
+    def _idle_exit(self):
+        self._idle_source = None
+        if not self._pending:
+            loop.quit()
+        return False
+
+    # -------------------------------------------------------------- plumbing
+    def _delegate_to_gtk(self, method, args, reply_cb, error_cb):
+        """Hand the request to the gtk backend instead.
+
+        The shell is the only thing that can draw our picker, so if it is not
+        running — crashed, restarting, or simply not this session — a dialog
+        must not just fail: every app's Open and Save depends on this call.
+        portals.conf lists gtk behind us for the same reason, but that fallback
+        only covers a backend that will not *start*, not one that starts and
+        then cannot reach its UI.
+        """
+        try:
+            proxy = self._connection.get_object(
+                "org.freedesktop.impl.portal.desktop.gtk", OBJECT_PATH
+            )
+            iface = dbus.Interface(proxy, FILECHOOSER_IFACE)
+            log("shell unreachable — delegating %s to the gtk backend" % method)
+            getattr(iface, method)(
+                *args,
+                reply_handler=lambda response, results: reply_cb(response, results),
+                error_handler=error_cb,
+                timeout=ANSWER_TIMEOUT_SEC,
+            )
+        except Exception as error:
+            log("gtk fallback failed too: %s" % error)
+            reply_cb(dbus.UInt32(RESPONSE_OTHER), dbus.Dictionary({}, signature="sv"))
+
+    def _teardown(self, handle):
+        """Drop a pending request without answering it."""
+        state = self._pending.pop(handle, None)
+        if state is None:
+            return
+        state["done"] = True
+        if state["watch"] is not None:
+            GLib.source_remove(state["watch"])
+        if state["timeout"] is not None:
+            GLib.source_remove(state["timeout"])
+        for key in ("read_fd", "write_fd"):
+            try:
+                os.close(state[key])
+            except OSError:
+                pass
+        try:
+            os.unlink(state["fifo"])
+        except OSError:
+            pass
+        if state["request_object"] is not None:
+            try:
+                state["request_object"].remove_from_connection()
+            except Exception:
+                pass
+
+    def _open_dialog(self, handle, title, options, mode, reply_cb, error_cb, finalize, fallback):
+        """Ask the shell to draw a picker and answer `reply_cb` when it does."""
+        token = uuid.uuid4().hex
+        runtime = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
+        directory = os.path.join(runtime, "qshell-portal")
+        os.makedirs(directory, mode=0o700, exist_ok=True)
+        fifo_path = os.path.join(directory, "%s.fifo" % token)
+
+        try:
+            os.mkfifo(fifo_path, 0o600)
+        except FileExistsError:
+            pass
+
+        # The read end is opened non-blocking so this never stalls the loop,
+        # and the write end is held open here as well: a FIFO whose only writer
+        # has not arrived yet reports HUP immediately, which would look exactly
+        # like an answer.
+        read_fd = os.open(fifo_path, os.O_RDONLY | os.O_NONBLOCK)
+        write_fd = os.open(fifo_path, os.O_WRONLY | os.O_NONBLOCK)
+
+        filters = unpack_filters(options.get("filters"))
+        request = {
+            "token": token,
+            "fifo": fifo_path,
+            "title": str(title or ""),
+            "mode": mode,
+            "multiple": bool(options.get("multiple", False)),
+            "directory": bool(options.get("directory", False)) or mode == "folder",
+            "path": unpack_path(options.get("current_folder")),
+            "name": str(options.get("current_name", "")),
+            "acceptLabel": str(options.get("accept_label", "")),
+            "filters": filters,
+            "filterIndex": filter_index(filters, options.get("current_filter")),
+        }
+        if not request["path"]:
+            current_file = unpack_path(options.get("current_file"))
+            if current_file:
+                request["path"] = os.path.dirname(current_file)
+                if not request["name"]:
+                    request["name"] = os.path.basename(current_file)
+
+        state = {
+            "buffer": b"",
+            "done": False,
+            "read_fd": read_fd,
+            "write_fd": write_fd,
+            "fifo": fifo_path,
+            "token": token,
+            "handle": handle,
+            "reply": reply_cb,
+            "error": error_cb,
+            "finalize": finalize,
+            "watch": None,
+            "timeout": None,
+            "request_object": None,
+        }
+        self._pending[handle] = state
+        self._cancel_idle_exit()
+
+        state["request_object"] = Request(
+            self._connection, handle, lambda: self._settle(handle, RESPONSE_CANCELLED, [])
+        )
+        state["watch"] = GLib.io_add_watch(
+            read_fd, GLib.PRIORITY_DEFAULT, GLib.IO_IN, self._on_readable, handle
+        )
+        state["timeout"] = GLib.timeout_add_seconds(
+            ANSWER_TIMEOUT_SEC, lambda: self._settle(handle, RESPONSE_CANCELLED, []) or False
+        )
+
+        try:
+            subprocess.run(
+                [qs_binary(), "ipc", "call", "filepicker", "pick", json.dumps(request)],
+                check=True,
+                capture_output=True,
+                timeout=10,
+            )
+        except Exception as error:
+            log("could not reach the shell's picker: %s" % error)
+            self._teardown(handle)
+            self._arm_idle_exit()
+            self._delegate_to_gtk(fallback[0], fallback[1], reply_cb, error_cb)
+
+    def _on_readable(self, fd, condition, handle):
+        state = self._pending.get(handle)
+        if state is None:
+            return False
+        try:
+            chunk = os.read(fd, 65536)
+        except BlockingIOError:
+            return True
+        except OSError as error:
+            log("answer read failed: %s" % error)
+            self._settle(handle, RESPONSE_OTHER, [])
+            return False
+        if not chunk:
+            return True
+        state["buffer"] += chunk
+        if b"\n" not in state["buffer"]:
+            return True
+
+        line = state["buffer"].split(b"\n", 1)[0]
+        try:
+            answer = json.loads(line.decode("utf-8", "replace"))
+        except ValueError as error:
+            log("unparseable answer: %s" % error)
+            self._settle(handle, RESPONSE_OTHER, [])
+            return False
+
+        response = int(answer.get("response", RESPONSE_CANCELLED))
+        paths = [str(p) for p in answer.get("paths", [])]
+        self._settle(handle, response, paths)
+        return False
+
+    def _settle(self, handle, response, paths):
+        state = self._pending.pop(handle, None)
+        if state is None or state["done"]:
+            return
+        state["done"] = True
+
+        if state["watch"] is not None:
+            GLib.source_remove(state["watch"])
+        if state["timeout"] is not None:
+            GLib.source_remove(state["timeout"])
+        for key in ("read_fd", "write_fd"):
+            try:
+                os.close(state[key])
+            except OSError:
+                pass
+        try:
+            os.unlink(state["fifo"])
+        except OSError:
+            pass
+        if state["request_object"] is not None:
+            try:
+                state["request_object"].remove_from_connection()
+            except Exception:
+                pass
+        # The picker may still be showing this request — it is not showing it
+        # for anyone any more.
+        if response != RESPONSE_OK:
+            try:
+                subprocess.run(
+                    [qs_binary(), "ipc", "call", "filepicker", "cancelToken", state["token"]],
+                    check=False,
+                    capture_output=True,
+                    timeout=5,
+                )
+            except Exception:
+                pass
+
+        results = state["finalize"](response, paths)
+        state["reply"](dbus.UInt32(response if response == RESPONSE_OK else response), results)
+        self._arm_idle_exit()
+
+    # --------------------------------------------------------------- methods
+    @dbus.service.method(
+        FILECHOOSER_IFACE,
+        in_signature="osssa{sv}",
+        out_signature="ua{sv}",
+        async_callbacks=("reply_cb", "error_cb"),
+    )
+    def OpenFile(self, handle, app_id, parent_window, title, options, reply_cb, error_cb):
+        def finalize(response, paths):
+            if response != RESPONSE_OK:
+                return dbus.Dictionary({}, signature="sv")
+            return dbus.Dictionary(
+                {"uris": dbus.Array([path_to_uri(p) for p in paths], signature="s")},
+                signature="sv",
+            )
+
+        self._open_dialog(
+            handle, title, options, "open", reply_cb, error_cb, finalize,
+            ("OpenFile", (handle, app_id, parent_window, title, options)),
+        )
+
+    @dbus.service.method(
+        FILECHOOSER_IFACE,
+        in_signature="osssa{sv}",
+        out_signature="ua{sv}",
+        async_callbacks=("reply_cb", "error_cb"),
+    )
+    def SaveFile(self, handle, app_id, parent_window, title, options, reply_cb, error_cb):
+        def finalize(response, paths):
+            if response != RESPONSE_OK:
+                return dbus.Dictionary({}, signature="sv")
+            return dbus.Dictionary(
+                {"uris": dbus.Array([path_to_uri(p) for p in paths], signature="s")},
+                signature="sv",
+            )
+
+        self._open_dialog(
+            handle, title, options, "save", reply_cb, error_cb, finalize,
+            ("SaveFile", (handle, app_id, parent_window, title, options)),
+        )
+
+    @dbus.service.method(
+        FILECHOOSER_IFACE,
+        in_signature="osssa{sv}",
+        out_signature="ua{sv}",
+        async_callbacks=("reply_cb", "error_cb"),
+    )
+    def SaveFiles(self, handle, app_id, parent_window, title, options, reply_cb, error_cb):
+        # A folder is chosen, and every name the app handed over is written
+        # into it — SaveFiles is the "export these N files somewhere" call.
+        names = [unpack_path(name) for name in options.get("files", [])]
+
+        def finalize(response, paths):
+            if response != RESPONSE_OK or not paths:
+                return dbus.Dictionary({}, signature="sv")
+            folder = paths[0]
+            uris = [path_to_uri(os.path.join(folder, os.path.basename(n))) for n in names if n]
+            return dbus.Dictionary({"uris": dbus.Array(uris, signature="s")}, signature="sv")
+
+        self._open_dialog(
+            handle, title, options, "folder", reply_cb, error_cb, finalize,
+            ("SaveFiles", (handle, app_id, parent_window, title, options)),
+        )
+
+    # ------------------------------------------------------------ properties
+    @dbus.service.method(PROPERTIES_IFACE, in_signature="ss", out_signature="v")
+    def Get(self, interface, prop):
+        if interface == FILECHOOSER_IFACE and prop == "version":
+            return dbus.UInt32(3)
+        raise dbus.exceptions.DBusException(
+            "org.freedesktop.DBus.Error.UnknownProperty", "No such property %s" % prop
+        )
+
+    @dbus.service.method(PROPERTIES_IFACE, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        if interface == FILECHOOSER_IFACE:
+            return dbus.Dictionary({"version": dbus.UInt32(3)}, signature="sv")
+        return dbus.Dictionary({}, signature="sv")
+
+
+def path_to_uri(path):
+    return GLib.filename_to_uri(os.path.abspath(str(path)), None)
+
+
+_qs_binary = None
+
+
+def qs_binary():
+    global _qs_binary
+    if _qs_binary is None:
+        for candidate in ("/usr/bin/qs", "/usr/local/bin/qs"):
+            if os.path.exists(candidate):
+                _qs_binary = candidate
+                break
+        else:
+            _qs_binary = "qs"
+    return _qs_binary
+
+
+if __name__ == "__main__":
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    connection = dbus.SessionBus()
+    name = dbus.service.BusName(BUS_NAME, connection, do_not_queue=True)
+    chooser = FileChooser(connection)
+    loop = GLib.MainLoop()
+    log("ready")
+    try:
+        loop.run()
+    except KeyboardInterrupt:
+        pass

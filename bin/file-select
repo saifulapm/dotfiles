@@ -4,11 +4,10 @@
 # name in its two error messages differs. bin/tailscale-send is its one caller
 # here, for the tailscale panel's Taildrop send.
 #
-# NOTE: this needs a portal backend that implements FileChooser. The gnome
-# backend advertises it but delegates the work to nautilus, so on a machine
-# without nautilus the request is answered as cancelled and no dialog is ever
-# drawn — see home/dot_config/xdg-desktop-portal/niri-portals.conf, which pins
-# FileChooser to the gtk backend for exactly that reason.
+# The dialog this opens is the shell's own: bin/qshell-portal registers
+# shell/Modules/FilePicker as the FileChooser backend, so this goes out to
+# xdg-desktop-portal and comes back drawn in the current theme. With that
+# backend unregistered it falls through to gtk, which works too.
 
 # Python rather than bash, alone among the commands here, because the portal
 # answers a request with a Response signal addressed to the connection that
