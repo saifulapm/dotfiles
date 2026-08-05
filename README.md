@@ -37,6 +37,9 @@ fetches the fonts (pinned externals) and bootstraps the default theme.
 - First login for each agent CLI: `claude`, `codex`, `copilot`.
 - `rclone config` — the iCloud remote's session secrets live only in
   `~/.config/rclone/rclone.conf`, never in this repo.
+- Dropbox linking, NUC only: `dropbox start` prints the login URL (the
+  daemon and CLI install themselves; the Macs get nothing — no aarch64
+  Dropbox exists).
 - voxtype (dictation): manual binary download from
   github.com/peteonrails/voxtype/releases into `~/.local/bin`, then
   `voxtype setup --download --model base.en && voxtype setup systemd`.
