@@ -205,6 +205,15 @@ QtObject {
         Component.onCompleted: reload()
     }
 
+    // A FileView cannot arm its watch when the state dir itself is missing,
+    // and nothing re-arms it later — reload() after a guaranteed mkdir is
+    // the re-arm (same defence as Theme.qml and Idle.qml).
+    readonly property Process stateDirProc: Process {
+        command: ["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/qshell"]
+        onExited: root.stateFlag.reload()
+        Component.onCompleted: running = true
+    }
+
     readonly property IpcHandler ipc: IpcHandler {
         target: "nightlight"
 

@@ -144,8 +144,9 @@ QtObject {
             finishRun();
             return;
         }
+        // The scan is chained off onSaved: setText writes on a worker thread,
+        // so scheduling the scan any earlier can read the previous snapshot.
         snapshotFile.setText(JSON.stringify(localSnapshot(), null, 2) + "\n");
-        Qt.callLater(root.startScan);
     }
 
     function startScan() {
@@ -279,6 +280,11 @@ QtObject {
         watchChanges: false
         atomicWrites: true
         printErrors: false
+        onSaved: root.startScan()
+        onSaveFailed: {
+            root.statusText = "Usage sync write failed";
+            root.finishRun();
+        }
     }
 
     property Timer debounce: Timer {

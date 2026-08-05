@@ -264,6 +264,16 @@ QtObject {
         Component.onCompleted: reload()
     }
 
+    // A FileView cannot arm its watch when the state dir itself is missing,
+    // and nothing re-arms it later — reload() after a guaranteed mkdir is
+    // the re-arm (same defence as Theme.qml; each service defends itself
+    // because service construction order is undefined).
+    readonly property Process stateDirProc: Process {
+        command: ["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/qshell"]
+        onExited: root.stayAwakeFlag.reload()
+        Component.onCompleted: running = true
+    }
+
     readonly property Process stayAwakeWriter: Process {
         onExited: {
             if (root.hasPendingPersist) {

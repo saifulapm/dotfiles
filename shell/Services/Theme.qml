@@ -158,7 +158,7 @@ QtObject {
     // Derived when the theme omits it: contrast-guaranteed against the accent
     // (noctalia's construction rule, via Commons/color.js).
     readonly property color textOnAccent: {
-        const v = values["text.on-accent"];
+        const v = rawTok("text.on-accent");
         if (v !== undefined && /^#[0-9A-Fa-f]{6}$/.test(String(v)))
             return String(v);
         return ColorMath.ensureContrast(col("surface.0"), col("accent.accent"), 4.5);
@@ -408,9 +408,18 @@ QtObject {
         onLoadFailed: root.resolveFonts()
     }
 
+    // QFileSystemWatcher arms against nothing when ~/.local/state/qshell does
+    // not exist yet and never recovers, so the dir is created up front and the
+    // watcher re-armed (only reload() re-runs the arming) once it exists.
+    property Process stateDirProc: Process {
+        command: ["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/qshell"]
+        onExited: root.themeFile.reload()
+    }
+
     // FileView stays unloaded until something reads it, and nothing reads a
     // file that is usually absent — without this neither signal ever fires.
     Component.onCompleted: {
+        stateDirProc.running = true;
         overrideFile.reload();
         fontconfigFile.reload();
     }

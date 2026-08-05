@@ -73,11 +73,22 @@ QtObject {
         });
     }
 
+    // Requests staged while the socket is down. Writing straight after
+    // `connected = true` would race the async dial — quickshell's Socket
+    // silently discards write() until the connection is up — so disconnected
+    // requests queue here and drain from onConnectionStateChanged.
+    property var pendingRequests: []
+
     function request(obj) {
-        if (!requestSocket.connected)
-            requestSocket.connected = true;
-        requestSocket.write(JSON.stringify(obj) + "\n");
-        requestSocket.flush();
+        const line = JSON.stringify(obj) + "\n";
+        if (requestSocket.connected) {
+            requestSocket.write(line);
+            requestSocket.flush();
+            return;
+        }
+        if (pendingRequests.length < 16)
+            pendingRequests.push(line);
+        requestSocket.connected = true;
     }
 
     function handleEvent(ev) {
@@ -163,13 +174,27 @@ QtObject {
         }
     }
 
+    // quickshell's Socket never re-dials on its own (`connected: true` is a
+    // constant binding), and niri drops event-stream clients that read too
+    // slowly — without this timer one drop freezes workspace/window state
+    // for the rest of the session.
+    property Timer eventReconnect: Timer {
+        interval: 1000
+        onTriggered: root.eventSocket.connected = true
+    }
+
     property Socket eventSocket: Socket {
         path: Quickshell.env("NIRI_SOCKET")
         connected: true
         onConnectionStateChanged: {
             if (connected) {
+                // niri replays full WorkspacesChanged/WindowsChanged/
+                // KeyboardLayoutsChanged state on every new subscription, so
+                // a reconnect self-corrects anything missed while down.
                 write("\"EventStream\"\n");
                 flush();
+            } else {
+                root.eventReconnect.restart();
             }
         }
         parser: SplitParser {
@@ -189,6 +214,16 @@ QtObject {
     property Socket requestSocket: Socket {
         path: Quickshell.env("NIRI_SOCKET")
         connected: true
+        onConnectionStateChanged: {
+            if (!connected)
+                return;
+            const queued = root.pendingRequests;
+            root.pendingRequests = [];
+            for (const line of queued)
+                write(line);
+            if (queued.length > 0)
+                flush();
+        }
         parser: SplitParser {
             onRead: line => {
                 try {
