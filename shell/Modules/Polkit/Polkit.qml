@@ -38,7 +38,19 @@ Scope {
             color: "transparent"
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "qshell-polkit"
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+
+            // Asking for exclusive keyboard focus in the layer surface's
+            // FIRST commit does not get it: the dialog rendered, the field
+            // held active focus, and every keystroke went somewhere else —
+            // there was not even a caret. Mapping with None and flipping to
+            // Exclusive one tick later is what actually takes the keyboard,
+            // and is what every other overlay here does by accident (they are
+            // all built closed and then opened). Verified on screen: without
+            // the flip the password field never blinks a caret, with it the
+            // caret is there.
+            property bool wantsKeyboard: false
+            WlrLayershell.keyboardFocus: wantsKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+            Component.onCompleted: Qt.callLater(() => wantsKeyboard = true)
 
             Rectangle {
                 anchors.fill: parent
@@ -68,7 +80,7 @@ Scope {
                         font.family: polkitRoot.theme.fontUi
                         font.pixelSize: polkitRoot.theme.fontPx(1.1)
                         font.weight: Font.DemiBold
-                        text: polkitRoot.active ? polkitRoot.agent.flow.message : ""
+                        text: polkitRoot.agent.flow ? polkitRoot.agent.flow.message : ""
                     }
 
                     Text {
@@ -77,7 +89,7 @@ Scope {
                         color: polkitRoot.theme.textMuted
                         font.family: polkitRoot.theme.fontMono
                         font.pixelSize: polkitRoot.theme.fontPx(0.833)
-                        text: polkitRoot.active ? polkitRoot.agent.flow.actionId : ""
+                        text: polkitRoot.agent.flow ? polkitRoot.agent.flow.actionId : ""
                     }
 
                     Rectangle {
@@ -86,7 +98,7 @@ Scope {
                         radius: polkitRoot.theme.radius(1)
                         color: polkitRoot.theme.surface2
                         border.width: polkitRoot.theme.borderWidth
-                        border.color: polkitRoot.active && polkitRoot.agent.flow.supplementaryIsError ? polkitRoot.theme.error : polkitRoot.theme.surface3
+                        border.color: polkitRoot.agent.flow && polkitRoot.agent.flow.supplementaryIsError ? polkitRoot.theme.error : polkitRoot.theme.surface3
 
                         TextInput {
                             id: responseInput
@@ -94,13 +106,24 @@ Scope {
                             anchors.leftMargin: polkitRoot.theme.space(3)
                             anchors.rightMargin: polkitRoot.theme.space(3)
                             verticalAlignment: TextInput.AlignVCenter
-                            echoMode: polkitRoot.active && polkitRoot.agent.flow.responseVisible ? TextInput.Normal : TextInput.Password
+                            echoMode: polkitRoot.agent.flow && polkitRoot.agent.flow.responseVisible ? TextInput.Normal : TextInput.Password
                             passwordCharacter: "•"
                             color: polkitRoot.theme.textPrimary
                             font.family: polkitRoot.theme.fontMono
                             font.pixelSize: polkitRoot.theme.fontPx(1.0)
                             focus: true
-                            enabled: polkitRoot.active && polkitRoot.agent.flow.isResponseRequired
+                            enabled: !!polkitRoot.agent.flow && polkitRoot.agent.flow.isResponseRequired
+
+                            // `focus: true` cannot attach to a disabled item,
+                            // and this one is disabled whenever PAM is not
+                            // asking — at mount time before the first prompt,
+                            // and again between a rejected answer and the
+                            // re-prompt. Re-claim it every time it becomes
+                            // answerable.
+                            onEnabledChanged: if (enabled)
+                                Qt.callLater(() => responseInput.forceActiveFocus())
+                            Component.onCompleted: if (enabled)
+                                Qt.callLater(() => responseInput.forceActiveFocus())
 
                             onAccepted: {
                                 if (polkitRoot.active)
@@ -116,7 +139,7 @@ Scope {
                                 color: polkitRoot.theme.textMuted
                                 font.family: polkitRoot.theme.fontUi
                                 font.pixelSize: polkitRoot.theme.fontPx(1.0)
-                                text: polkitRoot.active && polkitRoot.agent.flow.inputPrompt !== "" ? polkitRoot.agent.flow.inputPrompt : "password"
+                                text: polkitRoot.agent.flow && polkitRoot.agent.flow.inputPrompt !== "" ? polkitRoot.agent.flow.inputPrompt : "password"
                             }
                         }
                     }
@@ -125,10 +148,10 @@ Scope {
                         width: parent.width
                         wrapMode: Text.Wrap
                         visible: text !== ""
-                        color: polkitRoot.active && polkitRoot.agent.flow.supplementaryIsError ? polkitRoot.theme.error : polkitRoot.theme.textMuted
+                        color: polkitRoot.agent.flow && polkitRoot.agent.flow.supplementaryIsError ? polkitRoot.theme.error : polkitRoot.theme.textMuted
                         font.family: polkitRoot.theme.fontUi
                         font.pixelSize: polkitRoot.theme.fontPx(0.917)
-                        text: polkitRoot.active ? polkitRoot.agent.flow.supplementaryMessage : ""
+                        text: polkitRoot.agent.flow ? polkitRoot.agent.flow.supplementaryMessage : ""
                     }
 
                     Row {
