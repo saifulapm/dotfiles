@@ -6,7 +6,12 @@ set -euo pipefail
 
 units=(qshell-updates.timer taildrop-receive.service)
 
-if command -v systemctl >/dev/null && systemctl --user is-system-running >/dev/null 2>&1; then
+# is-system-running exits nonzero for "degraded" (= any ONE user unit has
+# failed), which is not "no user session" — treating it that way silently
+# skipped enabling these units on a machine with one unrelated failed unit
+# (found 2026-08-06: a failed xdg-desktop-portal-gtk.service was enough).
+state="$(systemctl --user is-system-running 2>/dev/null || true)"
+if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
   systemctl --user daemon-reload
   systemctl --user enable --now "${units[@]}"
   echo "user units: ${units[*]} enabled"

@@ -166,11 +166,19 @@ const OUTPUTS = {
   "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")]
 }
 
+let gtkSettingsChanged = false
 for (const [tmplName, dests] of Object.entries(OUTPUTS)) {
   const tmplPath = path.join(ROOT, "templates", tmplName)
   if (!fs.existsSync(tmplPath)) continue
   const rendered = render(fs.readFileSync(tmplPath, "utf8"))
-  for (const dest of dests) writeAtomic(dest, rendered)
+  for (const dest of dests) {
+    if (tmplName === "gtk-settings.ini.tmpl") {
+      let old = null
+      try { old = fs.readFileSync(dest, "utf8") } catch (e) { /* first render */ }
+      if (old !== rendered) gtkSettingsChanged = true
+    }
+    writeAtomic(dest, rendered)
+  }
 }
 if (missing.length) console.warn("theme-apply: tokens missing from theme:",
   [...new Set(missing)].join(", "))
@@ -190,12 +198,21 @@ try {
 } catch (e) { /* gsettings absent or no session bus */ }
 
 // The portal's GTK backend draws the file dialog we fall back to, and it reads
-// settings.ini once at startup — so it has to be restarted to follow a theme
-// switch. try-restart leaves it alone when it is not running, and it is
-// D-Bus activated, so this costs nothing at idle.
-try {
-  execSync("systemctl --user try-restart xdg-desktop-portal-gtk.service", { stdio: "ignore" })
-} catch (e) { /* no systemd user session */ }
+// settings.ini once at startup — so it has to be restarted to follow a
+// POLARITY flip. Only then: restarting on every apply let a burst of theme
+// switches trip systemd's start limit ("start-limit-hit"), which left the
+// service failed and every fallback file dialog dead until a manual
+// reset-failed (found 2026-08-06 in the user journal). Same-mode theme
+// switches don't change settings.ini, so they skip this entirely; the
+// reset-failed first heals a unit a previous burst already tripped.
+if (gtkSettingsChanged) {
+  try {
+    execSync("systemctl --user reset-failed xdg-desktop-portal-gtk.service", { stdio: "ignore" })
+  } catch (e) { /* not failed, or no systemd user session */ }
+  try {
+    execSync("systemctl --user try-restart xdg-desktop-portal-gtk.service", { stdio: "ignore" })
+  } catch (e) { /* no systemd user session */ }
+}
 
 // ---- live foot retheme via OSC (written to each foot child's pty) ----
 const ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
