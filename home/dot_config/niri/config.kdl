@@ -700,3 +700,10 @@ binds {
 // switch. Last so its settings override the fallbacks above. Optional so a
 // fresh machine boots before the first theme-apply run.
 include optional=true "~/.local/state/qshell/niri-theme.kdl"
+
+// The shell's wallpaper joins the overview backdrop instead of zooming
+// with workspaces.
+layer-rule {
+    match namespace="^qshell-background$"
+    place-within-backdrop true
+}

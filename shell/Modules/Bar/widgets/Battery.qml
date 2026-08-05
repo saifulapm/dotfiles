@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Services.UPower
 import "../components"
 
@@ -39,9 +40,26 @@ BarButton {
         return pct + "% · " + state;
     }
 
+    function openPanel() {
+        panelLoader.active = true;
+        panelLoader.item.anchorItem = rootItem;
+        panelLoader.item.toggle();
+    }
+
     onTapped: button => {
-        if (button === Qt.RightButton)
+        if (button === Qt.RightButton) {
             rootItem.showPercentage = !rootItem.showPercentage;
+        } else if (button === Qt.LeftButton) {
+            openPanel();
+        }
+    }
+
+    LazyLoader {
+        id: panelLoader
+        active: false
+        component: PowerPanel {
+            theme: rootItem.theme
+        }
     }
 
     OpticalGlyph {

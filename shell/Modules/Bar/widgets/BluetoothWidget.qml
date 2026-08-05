@@ -29,10 +29,27 @@ BarIcon {
         return connectedDevices.map(d => d.name + (d.batteryAvailable ? " · " + Math.round(d.battery * 100) + "%" : "")).join("\n");
     }
 
+    function openPanel() {
+        panelLoader.active = true;
+        panelLoader.item.anchorItem = rootItem;
+        panelLoader.item.toggle();
+    }
+
     onTapped: button => {
-        if (button === Qt.RightButton && rootItem.adapter)
+        if (button === Qt.RightButton && rootItem.adapter) {
             rootItem.adapter.enabled = !rootItem.adapter.enabled;
-        else
+        } else if (button === Qt.MiddleButton) {
             Quickshell.execDetached(["foot", "--app-id=qshell-float", "-e", "bluetoothctl"]);
+        } else {
+            openPanel();
+        }
+    }
+
+    LazyLoader {
+        id: panelLoader
+        active: false
+        component: BluetoothPanel {
+            theme: rootItem.theme
+        }
     }
 }
