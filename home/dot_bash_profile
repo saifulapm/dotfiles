@@ -9,7 +9,10 @@ fi
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 # Start niri on tty1 login (autologin lands here; see
-# .chezmoiscripts/run_onchange_before_01-autologin.sh.tmpl)
-if [ -z "${WAYLAND_DISPLAY:-}" ] && [ "$(tty)" = "/dev/tty1" ]; then
+# .chezmoiscripts/run_before_01-autologin.sh.tmpl). The interactive guard is
+# load-bearing: niri-session re-execs itself through a non-interactive login
+# shell that sources this file again, and without it the exec recurses forever.
+if [[ $- == *i* ]] && [ -z "${WAYLAND_DISPLAY:-}" ] && [ "$(tty)" = "/dev/tty1" ] \
+   && ! systemctl --user -q is-active niri.service 2>/dev/null; then
     exec niri-session
 fi
