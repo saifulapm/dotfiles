@@ -7,6 +7,7 @@ import qs.Services
 import qs.Modules.Bar
 import qs.Modules.Lock
 import qs.Modules.Launcher
+import qs.Modules.Menu
 import qs.Modules.Notifications
 import qs.Modules.Osd
 import qs.Modules.Polkit
@@ -116,10 +117,26 @@ ShellRoot {
         return true;
     }
 
-    // Shared entry point for the bar's launcher button and the IPC target.
+    // Shared entry points for the bar's buttons, the command menu and the IPC
+    // targets. Each one wakes its LazyLoader on first use.
     function toggleLauncher() {
         launcherLoader.active = true;
         launcherLoader.item.toggle();
+    }
+
+    function toggleMenu() {
+        menuLoader.active = true;
+        menuLoader.item.toggle();
+    }
+
+    function toggleThemes() {
+        themesLoader.active = true;
+        themesLoader.item.toggle();
+    }
+
+    function lockSession() {
+        lockLoader.active = true;
+        lockLoader.item.lock();
     }
 
     FileView {
@@ -280,6 +297,43 @@ ShellRoot {
     }
 
     LazyLoader {
+        id: menuLoader
+        active: false
+        component: Menu {
+            theme: shell.theme
+            shellRoot: shell
+        }
+    }
+
+    IpcHandler {
+        target: "menu"
+
+        function toggle(): string {
+            shell.toggleMenu();
+            return "ok";
+        }
+
+        function show(): string {
+            menuLoader.active = true;
+            menuLoader.item.show();
+            return "ok";
+        }
+
+        function hide(): string {
+            if (menuLoader.active)
+                menuLoader.item.hide();
+            return "ok";
+        }
+
+        // Jump straight to a submenu (or fire a leaf) by id or alias:
+        // `qs ipc call menu open system`, `… open screenshot`.
+        function open(route: string): string {
+            menuLoader.active = true;
+            return menuLoader.item.openRoute(route);
+        }
+    }
+
+    LazyLoader {
         id: themesLoader
         active: false
         component: ThemeSwitcher {
@@ -291,8 +345,7 @@ ShellRoot {
         target: "theme"
 
         function toggle(): string {
-            themesLoader.active = true;
-            themesLoader.item.toggle();
+            shell.toggleThemes();
             return "ok";
         }
 
@@ -313,8 +366,7 @@ ShellRoot {
         target: "lock"
 
         function lock(): string {
-            lockLoader.active = true;
-            lockLoader.item.lock();
+            shell.lockSession();
             return "ok";
         }
 

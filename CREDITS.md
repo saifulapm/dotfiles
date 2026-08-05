@@ -48,6 +48,24 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   dropped (we ship no Dropbox widget), and their in-house `QsMenuOpener` menu
   rendering is not used — our tray items open the application's own menu through
   `display()`.
+- **Menu framework and filter semantics** from `shell/plugins/menu/` (`Menu.qml`,
+  `MenuModel.js`) and the tree format of `default/omarchy/omarchy-menu.jsonc`:
+  the hierarchical tree keyed by dotted ids with the kind inferred from the
+  entry's own fields, submenu rows with a chevron and the "<title>…" header
+  ("Go…" at the root), the type-to-filter pass over the WHOLE subtree below the
+  current menu with their ranking (label exact / prefix / substring, then id and
+  aliases, then whole-word description matches, submenus favoured on a tie, then
+  depth and declaration order) and their split of matches into rows that live
+  here and drilldown rows under a divider carrying the breadcrumb of where they
+  actually live, the `when` guards batched into one bash run per open with
+  submenus hidden when nothing under them survived, the `checked` ✓ marker,
+  alias routes for summoning a submenu (or firing a leaf) directly, and the
+  keyboard model (Enter/Right to enter, Left/Backspace-on-empty to go up,
+  Escape clearing the query before it closes). Their JSONC parsing and user
+  extension file, provider-backed rows and desktop-app rows are not ported —
+  our tree is a JS object in `Modules/Menu/MenuTree.js` and our Apps row hands
+  off to the launcher — and rows the shell owns itself (launcher, theme
+  switcher, DND, lock) run in-process instead of shelling out.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
