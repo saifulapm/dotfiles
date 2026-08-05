@@ -30,8 +30,11 @@ ShellRoot {
     property Theme theme: Theme {}
     property Niri niri: Niri {}
     // Eager by necessity: must own org.freedesktop.Notifications from startup.
-    // The popup UI below stays lazy.
-    property Notifs notifs: Notifs {}
+    // The popup UI below stays lazy. `niri` is what click-to-focus resolves a
+    // notification's sender against.
+    property Notifs notifs: Notifs {
+        niri: shell.niri
+    }
     property Audio audio: Audio {}
     // Eager like Notifs, and for the same kind of reason: an idle monitor
     // that is not armed is not an idle monitor. It costs one wayland object
@@ -226,30 +229,14 @@ ShellRoot {
     }
 
     // Popup UI loads on the first notification and stays; window is visible
-    // only while toasts exist.
+    // only while toasts exist. The `notifs` IPC target lives with the service
+    // itself (Services/Notifs.qml), next to the models it drives.
     Loader {
         active: shell.notifs.everNotified
         sourceComponent: Popups {
             theme: shell.theme
             notifs: shell.notifs
-        }
-    }
-
-    IpcHandler {
-        target: "notifs"
-
-        function dnd(): string {
-            shell.notifs.dnd = !shell.notifs.dnd;
-            return shell.notifs.dnd ? "dnd on" : "dnd off";
-        }
-
-        function dismissAll(): string {
-            shell.notifs.dismissAll();
-            return "ok";
-        }
-
-        function count(): int {
-            return shell.notifs.active.length;
+            barPosition: shell.config.bar && shell.config.bar.position ? String(shell.config.bar.position) : "top"
         }
     }
 

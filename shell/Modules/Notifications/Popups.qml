@@ -1,167 +1,149 @@
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
-import Quickshell.Services.Notifications
-import Quickshell.Widgets
+import Quickshell.Wayland
+import "NotificationLogic.js" as Logic
 
-// Toast stack, top-right. Window exists only while this component is loaded
-// (shell.qml gates the Loader on the first notification) and is visible only
-// while there is something to show.
+// Toast stack, top-right, one window per output. Ported from the popup half
+// of omarchy's notifications Service.qml (CREDITS.md): a full-screen overlay
+// surface per screen whose size never changes (adding or removing a toast
+// only changes the content inside, so the compositor can never scale a stale
+// buffer), click-through everywhere except over the toast column, and a slot
+// delegate that owns the lifetime tick while the card stays presentational.
+//
+// The window exists only while this component is loaded (shell.qml gates the
+// Loader on the first notification) and is visible only while there is
+// something to show.
 Scope {
     id: popupsRoot
 
     required property var theme
     required property var notifs
+    // Bar edge and size, so the stack clears the bar when the bar is on the
+    // top or right edge — and does not move when it is not.
+    property string barPosition: "top"
+    property int barSize: theme.barHeight
 
-    PanelWindow {
-        visible: popupsRoot.notifs.active.length > 0 && !popupsRoot.notifs.dnd
-        anchors {
-            top: true
-            right: true
-        }
-        margins {
-            top: popupsRoot.theme.space(2)
-            right: popupsRoot.theme.space(2)
-        }
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        implicitWidth: 380
-        implicitHeight: Math.max(1, toastColumn.implicitHeight)
+    readonly property int gap: theme.space(2)
+    readonly property var placement: Logic.popupPlacement(barPosition, barSize + gap, gap)
 
-        Column {
-            id: toastColumn
-            width: parent.width
-            spacing: popupsRoot.theme.space(2)
+    Variants {
+        model: Quickshell.screens
 
-            Repeater {
-                model: popupsRoot.notifs.active
+        PanelWindow {
+            id: popupWindow
 
-                delegate: Rectangle {
-                    id: toast
+            required property var modelData
+            screen: modelData
+            visible: popupsRoot.notifs.popupModel.count > 0
 
-                    required property var modelData
-                    readonly property bool critical: modelData.urgency === NotificationUrgency.Critical
+            WlrLayershell.namespace: "qshell-notifications"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            exclusionMode: ExclusionMode.Ignore
+            color: "transparent"
 
-                    width: toastColumn.width
-                    implicitHeight: content.implicitHeight + popupsRoot.theme.space(6)
-                    radius: popupsRoot.theme.radius(1)
-                    color: popupsRoot.theme.surface2
-                    border.width: popupsRoot.theme.borderWidth
-                    border.color: critical ? popupsRoot.theme.error : popupsRoot.theme.surface3
+            anchors {
+                top: true
+                bottom: true
+                left: true
+                right: true
+            }
 
-                    opacity: 0
-                    Component.onCompleted: opacity = 1
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: popupsRoot.theme.time(1)
-                            easing.type: popupsRoot.theme.easing
-                        }
-                    }
+            // Keep the surface click-through except over the toast column, so
+            // the rest of the (invisible) full-screen overlay never eats input.
+            mask: Region {
+                item: popupColumn
+            }
 
-                    // Auto-expire: per-notification one-shot, paused on hover.
-                    // Critical notifications never expire on their own.
-                    Timer {
-                        interval: toast.modelData.expireTimeout > 0 ? toast.modelData.expireTimeout : 5000
-                        running: !toast.critical && !toastHover.hovered
-                        onTriggered: toast.modelData.expire()
-                    }
+            ColumnLayout {
+                id: popupColumn
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.topMargin: popupsRoot.placement.margins.top
+                anchors.rightMargin: popupsRoot.placement.margins.right
+                spacing: popupsRoot.theme.space(2)
 
-                    HoverHandler {
-                        id: toastHover
-                    }
+                Repeater {
+                    model: popupsRoot.notifs.popupModel
 
-                    TapHandler {
-                        onTapped: toast.modelData.dismiss()
-                    }
+                    // The delegate is a slot Item owning the lifetime timer;
+                    // the visuals live in NotificationCard.
+                    delegate: Item {
+                        id: cardSlot
 
-                    Row {
-                        id: content
-                        x: popupsRoot.theme.space(3)
-                        y: popupsRoot.theme.space(3)
-                        width: parent.width - popupsRoot.theme.space(6)
-                        spacing: popupsRoot.theme.space(3)
+                        required property int index
+                        required property string app
+                        required property string appIcon
+                        required property string summary
+                        required property string body
+                        required property string image
+                        required property string glyph
+                        required property int urgency
+                        required property double expireTimeout
+                        required property double timestamp
+                        required property int originalId
 
-                        IconImage {
-                            visible: source.toString() !== ""
-                            implicitSize: popupsRoot.theme.space(9)
-                            source: {
-                                const n = toast.modelData;
-                                if (n.image !== "")
-                                    return n.image;
-                                if (n.appIcon !== "")
-                                    return Quickshell.iconPath(n.appIcon, true);
-                                return "";
+                        // The card sizes itself; the slot tracks it so the
+                        // column fits whichever card is widest.
+                        Layout.preferredWidth: card.implicitWidth
+                        Layout.alignment: Qt.AlignRight
+                        implicitHeight: card.implicitHeight
+
+                        readonly property real lifetime: popupsRoot.notifs.durationFor(urgency, expireTimeout)
+                        property real remainingLifetime: 1.0
+                        // Hovering a toast holds it on screen.
+                        readonly property bool ticking: lifetime > 0 && !card.hovered
+
+                        Timer {
+                            interval: 50
+                            repeat: true
+                            running: cardSlot.ticking
+                            onTriggered: {
+                                if (cardSlot.lifetime <= 0)
+                                    return;
+                                cardSlot.remainingLifetime -= 50.0 / cardSlot.lifetime;
+                                if (cardSlot.remainingLifetime <= 0) {
+                                    cardSlot.remainingLifetime = 0;
+                                    popupsRoot.notifs.expirePopup(cardSlot.index);
+                                }
                             }
                         }
 
-                        Column {
-                            width: parent.width - x
-                            spacing: popupsRoot.theme.space(1)
+                        NotificationCard {
+                            id: card
+                            anchors.right: parent.right
+                            theme: popupsRoot.theme
+                            app: cardSlot.app
+                            appIcon: cardSlot.appIcon
+                            summary: cardSlot.summary
+                            body: cardSlot.body
+                            image: cardSlot.image
+                            glyph: cardSlot.glyph
+                            urgency: cardSlot.urgency
+                            timestamp: cardSlot.timestamp
+                            // A replayed history row has no live notification
+                            // behind it, so it renders without buttons.
+                            actions: {
+                                const ref = popupsRoot.notifs.liveRefs[cardSlot.originalId];
+                                return ref && ref.actions ? ref.actions : [];
+                            }
+                            progress: cardSlot.remainingLifetime
+                            showCountdown: cardSlot.lifetime > 0
 
-                            Text {
-                                width: parent.width
-                                elide: Text.ElideRight
-                                color: popupsRoot.theme.textMuted
-                                font.family: popupsRoot.theme.fontUi
-                                font.pixelSize: popupsRoot.theme.fontPx(0.833)
-                                text: toast.modelData.appName
-                                visible: text !== ""
+                            onCloseRequested: popupsRoot.notifs.dismissPopup(cardSlot.index)
+                            onCardClicked: popupsRoot.notifs.invokePopupDefault(cardSlot.index)
+                            onActionInvoked: action => {
+                                action.invoke();
+                                popupsRoot.notifs.dismissPopup(cardSlot.index);
                             }
 
-                            Text {
-                                width: parent.width
-                                elide: Text.ElideRight
-                                color: popupsRoot.theme.textPrimary
-                                font.family: popupsRoot.theme.fontUi
-                                font.pixelSize: popupsRoot.theme.fontPx(1.0)
-                                font.weight: Font.DemiBold
-                                text: toast.modelData.summary
-                            }
-
-                            Text {
-                                width: parent.width
-                                visible: text !== ""
-                                maximumLineCount: 3
-                                wrapMode: Text.Wrap
-                                elide: Text.ElideRight
-                                color: popupsRoot.theme.textMuted
-                                font.family: popupsRoot.theme.fontUi
-                                font.pixelSize: popupsRoot.theme.fontPx(0.917)
-                                textFormat: Text.PlainText
-                                text: toast.modelData.body
-                            }
-
-                            Row {
-                                visible: toast.modelData.actions.length > 0
-                                spacing: popupsRoot.theme.space(2)
-
-                                Repeater {
-                                    model: toast.modelData.actions
-
-                                    delegate: Rectangle {
-                                        required property var modelData
-
-                                        implicitWidth: actionLabel.implicitWidth + popupsRoot.theme.space(4)
-                                        implicitHeight: actionLabel.implicitHeight + popupsRoot.theme.space(2)
-                                        radius: popupsRoot.theme.radius(0.5)
-                                        color: actionHover.hovered ? popupsRoot.theme.alpha(popupsRoot.theme.accent, 0.3) : popupsRoot.theme.alpha(popupsRoot.theme.accent, 0.15)
-
-                                        HoverHandler {
-                                            id: actionHover
-                                        }
-
-                                        TapHandler {
-                                            onTapped: parent.modelData.invoke()
-                                        }
-
-                                        Text {
-                                            id: actionLabel
-                                            anchors.centerIn: parent
-                                            color: popupsRoot.theme.accent
-                                            font.family: popupsRoot.theme.fontUi
-                                            font.pixelSize: popupsRoot.theme.fontPx(0.917)
-                                            text: parent.modelData.text
-                                        }
-                                    }
+                            opacity: 0
+                            Component.onCompleted: opacity = 1
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: popupsRoot.theme.time(1)
+                                    easing.type: popupsRoot.theme.easing
                                 }
                             }
                         }

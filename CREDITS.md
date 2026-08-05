@@ -373,6 +373,60 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   full-shell token preview as the selection moves is ours, not theirs
   (`Services/Theme.qml` `preview()`/`endPreview()`); it is why our switcher's
   Escape has something to restore where the wallpaper picker's does not.
+- **Notification service and card design** from
+  `shell/plugins/notifications/` (`Service.qml`,
+  `components/NotificationCard.qml`): the whole non-visual half — the three
+  models (on-screen popups, pending, past) and the rule that DND suppresses
+  only the toast while the record still lands in pending; their DND bypass
+  list (our own action toasts, plus a bare-CLI `notify-send` at critical
+  urgency, because chat apps brand themselves and abuse critical to force
+  visibility); the ephemeral senders that never enter history at all, and the
+  freedesktop `transient` hint beside them; the urgency timeout policy
+  (critical never expires, low floors at 5 s, everything else at 8 s, all
+  capped at 30 s, with the sender's own timeout honoured in between); the
+  replace-by-id removal that keeps one row per libnotify id; expire-vs-dismiss
+  semantics on removal and the "user saw it" move from pending to past; the
+  live-notification map held outside the models (a QObject in a model role
+  becomes a dangling pointer once the server frees it); the /tmp image cache
+  with its queue, its rewrite of the history row once `cp` lands and its
+  delete-with-the-row; the history file with its debounced write, its
+  duplicate-tolerant parse, the guard against a second `onLoaded` doubling
+  every row and the first-run `onLoadFailed` branch; the 15-minute past sweep;
+  the history replay with its "No recent notifications" answer; and their IPC
+  surface (`invokeLast`, `dismissOne`, `dismiss`, `clear`, `clearPending`,
+  `markAllSeen`, `showHistory`, `dismissAll`, `setDnd`/`toggleDnd`/`isDnd`,
+  `ping`). Their card ports whole: the fixed 380 px width, the icon slot
+  preferring the notification's own image over the app icon and hiding itself
+  when neither resolves, the Nerd Font glyph fallback in that slot with the
+  compact inline variant for a single-line toast, the collapse of a redundant
+  icon when the summary already opens with a glyph, bold summary over dimmed
+  body with their line caps, their body sanitising (inline `<img>` stripped,
+  the origin prefix Chromium and its forks prepend removed), left-click
+  invoking the `default` action and right-click closing, and the popup
+  container itself: one fixed-size full-screen overlay surface per output
+  masked to the toast column (adding or removing a toast never resizes the
+  surface, so the compositor cannot scale a stale buffer), with the lifetime
+  tick living in a slot delegate so the card stays presentational and hovering
+  a toast holds it. Deviations, all deliberate: click-to-focus resolves the
+  sender against `Services/Niri.qml`'s own window map and fires one niri
+  `FocusWindow` action where they shell out to
+  `omarchy-hyprland-focus-app`; DND and history persist through the state file
+  rather than their `PersistentProperties` + file pair, since the file already
+  spans QML reloads as well as restarts; a replacement notification is routed
+  through ingress again from the live object's change signals, because
+  Quickshell answers `replaces_id` by mutating the notification in place
+  without re-emitting, which leaves upstream's model row showing the original
+  text forever; an `image://icon/<name>` source is asked of the icon theme
+  first, since Quickshell's icon provider answers an unknown name with a
+  placeholder texture instead of the `Image.Error` their slot tests for; the
+  countdown their card computes (a decaying `remainingLifetime`, an urgency
+  `accentColor`) but never draws is drawn here as a rail along the bottom
+  edge, and that same urgency colour marks a critical card's border, which is
+  otherwise the accent for everything; and action buttons are ours — their
+  card renders none and leans entirely on click-the-card, which is kept too.
+  Not ported: their history panel (they have none either — the models exist
+  for the IPC and the replay), and the bar-position clearance is our bar's
+  since ours reads it from `shell.json`.
 - **Theme palettes** from `themes/*/colors.toml`: all files in `themes/` except
   `tokyo-night.toml` are generated ports of omarchy's theme colors via
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
@@ -689,3 +743,19 @@ Direct file-level copies (source path → destination path):
   near-verbatim port of the date/format math (format ring, ISO week, year/life
   progress parsing and percentages, six-row month grid). Vertical-bar formats and
   the node test exports were dropped; whitespace restyled to house 4-space qmlformat.
+- omarchy `shell/plugins/notifications/NotificationLogic.js` →
+  `shell/Modules/Notifications/NotificationLogic.js`: near-verbatim port of the
+  module's whole non-visual logic — the Chromium-family test and the body
+  sanitiser built on it, the "summary already opens with a glyph" test with its
+  surrogate-pair-aware two-space rule, the DND bypass and ephemeral-sender
+  rules, the glyph hint reader, the compact-glyph test, the snapshot and
+  history-row shapes, the dedupe-by-libnotify-id used both on load and on
+  replay, the history parse with its `entries` back-compat and duplicate
+  reporting, the recent-history selection, the popup placement, and the image
+  extension guess. Adapted: the two sender identities are ours (`qshell` for
+  this shell's own action toasts, where theirs is `omarchy-action`) and the
+  glyph hint is `qshell-glyph`; their `dumpRows` was dropped (the service dumps
+  its own models, as theirs does); whitespace follows house 4-space qmlformat.
+  Added at the end, not theirs: `normalizeAppToken` / `focusCandidates` /
+  `appIdScore` / `matchWindowId`, which are what click-to-focus needs on niri —
+  upstream hands the app name to a Hyprland helper script instead.

@@ -49,6 +49,18 @@ QtObject {
         });
     }
 
+    // Wire shape verified against ~/ref/niri/niri-ipc/src/lib.rs
+    // (Action::FocusWindow { id: u64 }).
+    function focusWindow(id) {
+        request({
+            Action: {
+                FocusWindow: {
+                    id: id
+                }
+            }
+        });
+    }
+
     function focusWorkspace(id) {
         request({
             Action: {
