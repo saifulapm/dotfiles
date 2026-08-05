@@ -22,6 +22,13 @@ Scope {
         source = path;
     }
 
+    // Per-segment percent-encoding: a raw '#' or '?' in the path would parse
+    // as URL fragment/query and truncate it (same treatment as
+    // FilePickerModel.pathToUrl).
+    function fileUrl(path) {
+        return path ? "file://" + String(path).split("/").map(encodeURIComponent).join("/") : "";
+    }
+
     FileView {
         path: Quickshell.env("HOME") + "/.local/state/qshell/background"
         watchChanges: true
@@ -73,7 +80,7 @@ Scope {
             Image {
                 id: oldImage
                 anchors.fill: parent
-                source: backgroundRoot.previousSource !== "" ? "file://" + backgroundRoot.previousSource : ""
+                source: backgroundRoot.fileUrl(backgroundRoot.previousSource)
                 fillMode: Image.PreserveAspectCrop
                 cache: false
                 asynchronous: true
@@ -82,7 +89,7 @@ Scope {
             Image {
                 id: newImage
                 anchors.fill: parent
-                source: backgroundRoot.source !== "" ? "file://" + backgroundRoot.source : ""
+                source: backgroundRoot.fileUrl(backgroundRoot.source)
                 fillMode: Image.PreserveAspectCrop
                 cache: false
                 asynchronous: true

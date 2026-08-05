@@ -98,7 +98,22 @@ Scope {
         const t = themes[index];
         if (!t)
             return;
-        Quickshell.execDetached([binDir + "/theme-set", t.name]);
+        applyProc.command = [binDir + "/theme-set", t.name];
+        applyProc.running = true;
+    }
+
+    // A Process rather than execDetached so a failed theme-set is seen: the
+    // handover relies on theme-set rewriting the state file to clear the
+    // preview, and when it fails nothing else would — the shell would stay
+    // rendered in a theme that was never applied.
+    Process {
+        id: applyProc
+        onExited: exitCode => {
+            if (exitCode !== 0) {
+                console.warn("ThemeSwitcher: theme-set failed with exit code", exitCode);
+                switcherRoot.theme.endPreview();
+            }
+        }
     }
 
     Process {

@@ -171,12 +171,29 @@ Scope {
         }
     }
 
+    // Setting running=true on an already-running Process queues at most one
+    // re-run, so N rapid keypresses would apply fewer than N steps. The
+    // delta accumulates here instead, and each process exit flushes whatever
+    // is still owed as one combined step.
+    property int pendingBrightnessSteps: 0
+
     function brightnessAdjust(direction) {
-        brightnessProc.command = ["brightnessctl", "--class=backlight", "-m", "set", direction > 0 ? "+10%" : "10%-"];
+        pendingBrightnessSteps += direction > 0 ? 1 : -1;
+        flushBrightness();
+    }
+
+    function flushBrightness() {
+        if (brightnessProc.running || pendingBrightnessSteps === 0)
+            return;
+        const steps = pendingBrightnessSteps;
+        pendingBrightnessSteps = 0;
+        const magnitude = Math.abs(steps) * 10 + "%";
+        brightnessProc.command = ["brightnessctl", "--class=backlight", "-m", "set", steps > 0 ? "+" + magnitude : magnitude + "-"];
         brightnessProc.running = true;
     }
 
     property Process brightnessProc: Process {
+        onExited: osdRoot.flushBrightness()
         stdout: StdioCollector {
             onStreamFinished: {
                 // machine-readable: device,class,current,percent%,max

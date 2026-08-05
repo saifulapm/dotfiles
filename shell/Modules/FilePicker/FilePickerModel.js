@@ -162,6 +162,13 @@ function matchesFilter(name, filter) {
         var mime = String(mimes[i] || "");
         var slash = mime.indexOf("/");
         var group = slash > 0 ? mime.substring(0, slash) : mime;
+        // Filter criteria are OR'd, and a mime outside the mapped groups
+        // (application/zip, application/json, ...) is one the extension
+        // table can never judge — it must count as a match, or a filter the
+        // shell cannot evaluate would blank the whole dialog (against the
+        // portal spec's intent).
+        if (group !== "image" && group !== "video" && group !== "audio" && group !== "text" && mime !== "application/pdf")
+            return true;
         var kind = EXTENSION_KINDS[extensionOf(name)];
         if (!kind)
             continue;

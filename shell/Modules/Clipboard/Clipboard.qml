@@ -20,7 +20,9 @@ import "ClipboardHistory.js" as ClipboardHistory
 //     summoned.
 //
 // Selection is upstream's: Enter copies the entry AND puts it into the focused
-// window, Shift+Enter only copies. Both go through `bin/clipboard-paste`, our
+// window, Shift+Enter only copies, Alt+Enter opens it (bin/clipboard-open —
+// URL to browser, text to editor, image to viewer). The first two go
+// through `bin/clipboard-paste`, our
 // merge of their omarchy-clipboard-paste-text and -paste-file, which takes the
 // history index rather than the content — clipboard entries have no business
 // on argv. The delivery differs from their bare `wtype -M shift -k Insert`,
@@ -41,6 +43,12 @@ Scope {
     property bool clearConfirmOpen: false
     property int clearConfirmIndex: 1
     property var history: []
+    // The watcher starts eagerly and wl-paste fires once on start, so its
+    // first entry can beat the async FileView load of history.json. Merging
+    // that entry into the still-empty history and saving would truncate the
+    // on-disk store — buffer until the load (or its failure) has settled.
+    property bool historyLoaded: false
+    property var pendingEntries: []
     // Set while the shell is tearing down, so the watcher's dying breath does
     // not arm the restart timer.
     property bool shuttingDown: false
@@ -87,6 +95,15 @@ Scope {
     // -------------------------------------------------------------- store
     function loadHistory(raw) {
         history = ClipboardHistory.parseHistory(raw);
+        if (!historyLoaded) {
+            historyLoaded = true;
+            const buffered = pendingEntries;
+            pendingEntries = [];
+            for (let i = 0; i < buffered.length; i++)
+                history = ClipboardHistory.addEntry(history, buffered[i], historyLimit);
+            if (buffered.length > 0)
+                saveHistory();
+        }
         if (opened)
             rebuildDisplay();
     }
@@ -99,6 +116,10 @@ Scope {
         const entry = ClipboardHistory.parseEntryJson(line);
         if (!entry)
             return;
+        if (!historyLoaded) {
+            pendingEntries.push(entry);
+            return;
+        }
         history = ClipboardHistory.addEntry(history, entry, historyLimit);
         saveHistory();
         if (opened)
@@ -220,6 +241,18 @@ Scope {
         hide();
         if (row.entryType === "image" || row.fullText)
             Quickshell.execDetached([binDir + "clipboard-paste", "--history-index", String(row.historyIndex)]);
+    }
+
+    // Alt+Enter: open the entry instead of pasting it — upstream's third
+    // Enter (their omarchy-clipboard-open), URL to browser, text to a scratch
+    // file in an editor, image to the viewer.
+    function openIndex(index) {
+        if (index < 0 || index >= displayModel.count)
+            return;
+        const row = displayModel.get(index);
+        hide();
+        if (row.entryType === "image" || row.fullText)
+            Quickshell.execDetached([binDir + "clipboard-open", "--history-index", String(row.historyIndex)]);
     }
 
     // Shift+Enter: copy only, upstream's second Enter. The toast is ours —
@@ -423,7 +456,9 @@ Scope {
                         } else if (event.key === Qt.Key_End) {
                             clipboardRoot.selectAbsolute(displayModel.count - 1);
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            if (clipboardRoot.cursorActive && shift)
+                            if (clipboardRoot.cursorActive && (event.modifiers & Qt.AltModifier))
+                                clipboardRoot.openIndex(clipboardRoot.selectedIndex);
+                            else if (clipboardRoot.cursorActive && shift)
                                 clipboardRoot.copyIndex(clipboardRoot.selectedIndex);
                             else if (clipboardRoot.cursorActive)
                                 clipboardRoot.activateIndex(clipboardRoot.selectedIndex);

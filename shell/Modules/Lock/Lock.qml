@@ -26,6 +26,14 @@ Scope {
     property bool lockRequested: false
     property bool pendingSessionLock: false
     property bool authenticatingPassword: false
+    // Armed by pamMessage when a prompt wants an answer, consumed by
+    // respondToPasswordPrompt: PamContext never clears responseRequired after
+    // respond(), so gating on responseRequired alone wrote the password twice
+    // per prompt (once per connected signal).
+    property bool promptPending: false
+    // error and completed(PamResult.Error) both arrive for a single PAM
+    // error; count one user-visible failure per submitted attempt.
+    property bool failureCounted: false
     property bool fingerprintAuthenticating: false
     property bool passwordPamConfigured: false
     property bool fingerprintConfigured: false
@@ -130,6 +138,7 @@ Scope {
     function resetAuthenticationState() {
         enteredPassword = "";
         pendingPassword = "";
+        promptPending = false;
         failureMessage = "";
         failedAttempts = 0;
         authenticatingPassword = false;
@@ -209,23 +218,30 @@ Scope {
         runWake();
         pendingPassword = password;
         failureMessage = "";
+        promptPending = false;
+        failureCounted = false;
         authenticatingPassword = true;
         if (!pam.start()) {
             handlePasswordFailure(PamResult.Error);
             return;
         }
-        Qt.callLater(respondToPasswordPrompt);
     }
 
     function respondToPasswordPrompt() {
         if (!authenticatingPassword || !pam.active || !pam.responseRequired)
             return;
+        if (!promptPending)
+            return;
+        promptPending = false;
         pam.respond(pendingPassword);
     }
 
     function handlePasswordFailure(result) {
         if (!lockRequested)
             return;
+        if (failureCounted)
+            return;
+        failureCounted = true;
         authenticatingPassword = false;
         enteredPassword = "";
         pendingPassword = "";
@@ -387,12 +403,16 @@ Scope {
         config: "qshell-lock"
         configDirectory: "pam.d"
 
-        onResponseRequiredChanged: {
-            if (responseRequired)
+        // pamMessage is the ONE responder path: it fires exactly once per
+        // prompt, while responseRequiredChanged fires only on transitions —
+        // respond() never resets the flag, so a second prompt in the same
+        // conversation would not re-fire it.
+        onPamMessage: {
+            if (pam.responseRequired) {
+                lockRoot.promptPending = true;
                 lockRoot.respondToPasswordPrompt();
+            }
         }
-
-        onPamMessage: lockRoot.respondToPasswordPrompt()
 
         onCompleted: result => {
             lockRoot.authenticatingPassword = false;

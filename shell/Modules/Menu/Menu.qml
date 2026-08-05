@@ -336,6 +336,15 @@ Scope {
             shellChecked = ({});
             return;
         }
+        if (guardProc.running) {
+            // Reopened while the previous batch is still collecting: wiping
+            // `collected` under the live SplitParser would make onExited
+            // commit a truncated tail as the guard answers. Kill the stale
+            // run and start this script cleanly once it has exited.
+            guardProc.pendingScript = script;
+            guardProc.running = false;
+            return;
+        }
         guardProc.collected = "";
         guardProc.command = ["bash", "-lc", script];
         guardProc.running = true;
@@ -344,10 +353,19 @@ Scope {
     Process {
         id: guardProc
         property string collected: ""
+        property string pendingScript: ""
         stdout: SplitParser {
             onRead: data => guardProc.collected += data + "\n"
         }
         onExited: {
+            if (guardProc.pendingScript) {
+                const script = guardProc.pendingScript;
+                guardProc.pendingScript = "";
+                guardProc.collected = "";
+                guardProc.command = ["bash", "-lc", script];
+                guardProc.running = true;
+                return;
+            }
             const nextWhen = {};
             const nextChecked = {};
             const lines = guardProc.collected.split("\n");

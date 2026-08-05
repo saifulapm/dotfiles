@@ -83,6 +83,7 @@ QtObject {
     // error instead.
     property var liveRefs: ({})
     property var imageCacheQueue: []
+    property var deleteImageQueue: []
     property bool historyLoaded: false
 
     // ------------------------------------------------------- timeout policy
@@ -112,8 +113,19 @@ QtObject {
         return Logic.shouldBypassDnd(notification, NotificationUrgency.Critical);
     }
 
+    // The server's notification ids restart at 1 every shell run, but history
+    // rows persist across runs — a raw id as the model key would let a new
+    // session's notification delete an unrelated persisted row that happened
+    // to share it. Fold a per-session epoch into the key at ingress: the same
+    // server id still maps to the same key within a session (replace-by-id
+    // keeps working), while keys from different sessions cannot collide, and
+    // old on-disk rows keep their small numeric ids which are equally safe.
+    readonly property double sessionEpoch: Date.now()
+
     function snapshotOf(notification) {
-        return Logic.snapshotOf(notification, Date.now());
+        const snapshot = Logic.snapshotOf(notification, Date.now());
+        snapshot.originalId = sessionEpoch + snapshot.originalId;
+        return snapshot;
     }
 
     // --------------------------------------------------------- ingress
@@ -537,6 +549,10 @@ QtObject {
         return rewrite(pendingModel) || rewrite(pastModel);
     }
 
+    // Deletions queue up: a Process that is already running silently ignores
+    // running=true, so the synchronous loops in clearPending/clearPast/
+    // prunePast would otherwise drop every file between the first and the
+    // last. One rm takes the whole accumulated batch.
     function maybeDeleteCachedImage(image) {
         const path = String(image || "");
         if (!path || path.indexOf("file://") !== 0)
@@ -544,7 +560,15 @@ QtObject {
         const local = decodeURIComponent(path.substring(7));
         if (local.indexOf(imageCacheDir) !== 0)
             return;
-        deleteImageProc.command = ["rm", "-f", local];
+        deleteImageQueue = deleteImageQueue.concat([local]);
+        runNextImageDeleteJob();
+    }
+
+    function runNextImageDeleteJob() {
+        if (deleteImageProc.running || deleteImageQueue.length === 0)
+            return;
+        deleteImageProc.command = ["rm", "-f"].concat(deleteImageQueue);
+        deleteImageQueue = [];
         deleteImageProc.running = true;
     }
 
@@ -570,9 +594,21 @@ QtObject {
 
     property Process deleteImageProc: Process {
         running: false
+        onExited: root.runNextImageDeleteJob()
     }
 
     // --------------------------------------------------- history persistence
+    property Process corruptBackupProc: Process {
+        command: ["cp", "-f", root.historyPath, root.historyPath + ".corrupt"]
+        running: false
+        onExited: exitCode => {
+            if (exitCode === 0)
+                root.historyLoaded = true;
+            else
+                console.warn("Notifs: could not back up corrupt history; keeping persistence off this session");
+        }
+    }
+
     property FileView historyFile: FileView {
         path: root.historyPath
         watchChanges: false
@@ -636,8 +672,12 @@ QtObject {
             return;
         }
         if (parsed.error) {
+            // Do NOT mark historyLoaded yet: the debounced save would
+            // overwrite the corrupt-but-recoverable file with empty models.
+            // Snapshot it aside first; persistence resumes only once the
+            // copy is safely on disk.
             console.warn("Notifs: history parse failed:", parsed.errorMessage || "");
-            historyLoaded = true;
+            corruptBackupProc.running = true;
             return;
         }
 

@@ -195,6 +195,9 @@ Scope {
 
         onCountChanged: pickerRoot.rebuild()
         onFolderChanged: pickerRoot.rebuild()
+        // The restore target may only appear once the async listing has
+        // fully arrived, and Ready is also the moment to give up on it.
+        onStatusChanged: pickerRoot.tryRestoreCursor()
     }
 
     onQueryChanged: rebuild()
@@ -232,6 +235,7 @@ Scope {
             cursor = Math.max(0, rows.length - 1);
         if (cursor < 0)
             cursor = 0;
+        tryRestoreCursor();
     }
 
     // ----------------------------------------------------------- navigation
@@ -248,9 +252,30 @@ Scope {
         const from = currentPath;
         enter(parent);
         // Land the cursor on the folder we just left, the way every file
-        // manager does — rebuilt asynchronously, so after the model settles.
-        cursorRestore.target = Model.baseName(from);
-        cursorRestore.restart();
+        // manager does. The listing arrives asynchronously, so the restore
+        // rides the model's own signals (rebuild/status) rather than a fixed
+        // timer that a large or slow directory would outlive.
+        cursorRestoreTarget = Model.baseName(from);
+    }
+
+    property string cursorRestoreTarget: ""
+
+    function tryRestoreCursor() {
+        if (!cursorRestoreTarget)
+            return;
+        for (let i = 0; i < entries.length; i++) {
+            // Directories only: mid-transition rebuilds can still hold the
+            // departed folder's rows, where a file may share the name.
+            if (entries[i].isDir && entries[i].name === cursorRestoreTarget) {
+                cursorRestoreTarget = "";
+                moveTo(i);
+                return;
+            }
+        }
+        // Listing complete and the folder is not in it (hidden or filtered
+        // away): stop looking so a later rebuild cannot mis-match.
+        if (folder.status === FolderListModel.Ready)
+            cursorRestoreTarget = "";
     }
 
     function move(delta) {
@@ -349,20 +374,6 @@ Scope {
         if (multiple && selectionCount > 0)
             return true;
         return currentEntry !== null && currentEntry.isDir === false;
-    }
-
-    Timer {
-        id: cursorRestore
-        property string target: ""
-        interval: 60
-        onTriggered: {
-            for (let i = 0; i < pickerRoot.entries.length; i++) {
-                if (pickerRoot.entries[i].name === cursorRestore.target) {
-                    pickerRoot.moveTo(i);
-                    return;
-                }
-            }
-        }
     }
 
     // ---------------------------------------------------------------- window

@@ -27,6 +27,28 @@ Scope {
     readonly property int gap: theme.space(2)
     readonly property var placement: Logic.popupPlacement(barPosition, barSize + gap, gap)
 
+    // Hover is per-notification, not per-delegate: every output renders its
+    // own copy of a toast, and hovering any one of them must hold the expiry
+    // on all of them — otherwise another screen's countdown removes the row
+    // out from under the cursor. Keyed by originalId with a hover count; the
+    // revision counter is what bindings actually depend on, since mutating a
+    // plain JS map emits no change signal.
+    property var hoverHolds: ({})
+    property int hoverHoldsRevision: 0
+
+    function setHoverHold(originalId, hovering) {
+        const next = (hoverHolds[originalId] || 0) + (hovering ? 1 : -1);
+        if (next > 0)
+            hoverHolds[originalId] = next;
+        else
+            delete hoverHolds[originalId];
+        hoverHoldsRevision++;
+    }
+
+    function hoverHeld(originalId) {
+        return hoverHoldsRevision !== -1 && (hoverHolds[originalId] || 0) > 0;
+    }
+
     Variants {
         model: Quickshell.screens
 
@@ -82,7 +104,9 @@ Scope {
                         required property int urgency
                         required property double expireTimeout
                         required property double timestamp
-                        required property int originalId
+                        // double: the model key folds a ms-epoch session
+                        // stamp into the server id, which overflows int.
+                        required property double originalId
 
                         // The card sizes itself; the slot tracks it so the
                         // column fits whichever card is widest.
@@ -92,8 +116,13 @@ Scope {
 
                         readonly property real lifetime: popupsRoot.notifs.durationFor(urgency, expireTimeout)
                         property real remainingLifetime: 1.0
-                        // Hovering a toast holds it on screen.
-                        readonly property bool ticking: lifetime > 0 && !card.hovered
+                        // Hovering this toast on ANY screen holds it here too.
+                        readonly property bool ticking: lifetime > 0 && !popupsRoot.hoverHeld(cardSlot.originalId)
+
+                        Component.onDestruction: {
+                            if (card.hovered)
+                                popupsRoot.setHoverHold(cardSlot.originalId, false);
+                        }
 
                         Timer {
                             interval: 50
@@ -113,6 +142,7 @@ Scope {
                         NotificationCard {
                             id: card
                             anchors.right: parent.right
+                            onHoveredChanged: popupsRoot.setHoverHold(cardSlot.originalId, card.hovered)
                             theme: popupsRoot.theme
                             app: cardSlot.app
                             appIcon: cardSlot.appIcon
