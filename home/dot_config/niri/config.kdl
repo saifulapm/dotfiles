@@ -434,6 +434,11 @@ binds {
     // Omarchy has no keybind for their background switcher at all (menu only);
     // Mod+Ctrl+B was the free key next to the other picker binds.
     Mod+Ctrl+B hotkey-overlay-title="Pick a Wallpaper" { spawn "qs" "ipc" "call" "wallpaper" "toggle"; }
+    // Omarchy: SUPER+CTRL+B summons their bluetooth panel — that chord is the
+    // wallpaper picker above (established first, kept), so bluetooth takes
+    // the Shift variant. Same toggle semantics as theirs, on the ported
+    // `bluetooth` IPC target.
+    Mod+Ctrl+Shift+B hotkey-overlay-title="Bluetooth Panel" { spawn "qs" "ipc" "call" "bluetooth" "toggle"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "ipc" "call" "lock" "lock"; }
     // Omarchy's notification binds all hang off comma (dismiss last on
     // SUPER+comma, history on SUPER+SHIFT+ALT+comma). Mod+Comma is niri's

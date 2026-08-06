@@ -332,7 +332,12 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   held only while a switch is pending (their
   `omarchy-audio-output-set-default` persistence helper is not ported — this
   shell has no audio-restore layer), and their `QtQuick.Controls` ScrollBar
-  has no counterpart (this shell hand-rolls its controls).
+  has no counterpart (this shell hand-rolls its controls). Their
+  SUPER+CTRL+B panel bind lands on Mod+Ctrl+Shift+B here (2026-08-06):
+  Mod+Ctrl+B was already this config's wallpaper-picker key — established
+  before the bluetooth panel arrived, and omarchy's own background switcher
+  has no bind to conflict with — so bluetooth takes the Shift variant with
+  their toggle semantics on the ported `bluetooth` IPC target.
 - **Bluetooth escape hatch** from `bin/omarchy-restart-bluetooth` and its menu
   row (`update.hardware.bluetooth`, under their Update → Hardware submenu
   titled "Restart"), ported as `bin/bluetooth-restart` + the menu's
