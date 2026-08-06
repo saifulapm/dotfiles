@@ -213,6 +213,35 @@ try {
   execSync("gsettings set org.gnome.desktop.interface gtk-theme Adwaita", { stdio: "ignore" })
 } catch (e) { /* gsettings absent or no session bus */ }
 
+// ---- Browser theme color (enterprise policy) ----
+// Port of the Arch dotfiles-linux / omarchy mechanism: BrowserThemeColor
+// tints the frame from the theme's base surface (the Arch per-theme
+// chromium.theme files were exactly surface.1 — catppuccin's was #1e1e2e),
+// and BrowserColorScheme=device follows the color-scheme flip above.
+// run_after_14-chromium-policy.sh preps the dirs once (user-owned); on an
+// unprepped machine or one without the browser, the write fails into the
+// catch and the theme change proceeds untinted. Plain writeFileSync, not
+// writeAtomic: its mkdirSync would EACCES on /etc before failing cleanly.
+const browserPolicy = JSON.stringify({
+  BrowserThemeColor: String(tokens["surface.1"] || "#1c2027"),
+  BrowserColorScheme: "device"
+})
+for (const [dir, refresh] of [
+  ["/etc/chromium/policies/managed", "chromium-browser"],
+  ["/etc/opt/chrome/policies/managed", "google-chrome"]
+]) {
+  const dest = path.join(dir, "color.json")
+  try {
+    let old = null
+    try { old = fs.readFileSync(dest, "utf8") } catch (e) { /* first write */ }
+    if (old === browserPolicy) continue
+    fs.writeFileSync(dest, browserPolicy)
+    // Poke a running instance; skips quietly when the browser is not up.
+    execSync(`sh -c 'pgrep -f ${refresh} >/dev/null && ${refresh} --refresh-platform-policy --no-startup-window >/dev/null 2>&1 &'`,
+      { stdio: "ignore" })
+  } catch (e) { /* policy dir unprepped or browser absent */ }
+}
+
 // The portal's GTK backend draws the file dialog we fall back to, and it reads
 // settings.ini once at startup — so it has to be restarted to follow a
 // POLARITY flip. Only then: restarting on every apply let a burst of theme

@@ -922,3 +922,8 @@ why  = "The user's own fork with built-in treesitter — NOT Fedora's kakoune pa
 name = "oma-apps"
 via  = "run_after_13-oma-apps.sh — clone omacom-io/{omacalc,omawrite,omacut}, sed the two omarchy theme-path literals in src/backend.cpp to ~/.local/state/qshell/oma-theme.toml, qmake6 + make, install to ~/.local/bin"
 why  = "Omarchy's Qt Quick calculator, writing app and video trimmer (user decision 2026-08-07, all three). MIT-licensed. They watch a 5-key colors.toml (mode/background/foreground/accent/selection) and re-tint live; templates/oma-theme.toml.tmpl emits exactly that file from the active theme on every theme-apply, so they follow this desktop's theme system natively. omacut needs the ffmpeg CLI (ffmpeg-free above)"
+
+[[tool]]
+name = "chromium-config"
+via  = "home/dot_config/environment.d/60-chromium.conf (CHROMIUM_USER_FLAGS — Fedora's wrapper reads the env var, NOT Arch's chromium-flags.conf) + run_after_14-chromium-policy.sh (one-time sudo: /etc/chromium/policies/managed created + chowned to the user) + bin/theme-apply's browser-policy block"
+why  = "Chromium configured like the Arch dotfiles-linux setup: native Wayland with per-surface fractional scaling (this MacBook is 1.5×), sRGB pin, AI features off — and omarchy-style live theming: theme-apply writes {BrowserThemeColor: surface.1, BrowserColorScheme: device} to the policy dir on every theme change and pokes running browsers with --refresh-platform-policy; device scheme follows the gsettings color-scheme flip theme-apply already does. Chrome's /etc/opt/chrome dir is prepped too when google-chrome exists (NUC)"
