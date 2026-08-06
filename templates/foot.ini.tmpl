@@ -1,6 +1,27 @@
+# Rendered to ~/.config/foot/foot.ini by bin/theme-apply — do not edit there.
+# Only deviations from foot 1.27 defaults live here; everything else (TERM=foot,
+# key bindings, url mode, selection→primary — bin/emoji-insert relies on that
+# primary paste) is deliberately stock. See foot.ini(5).
 [main]
 font={{font.mono}}:pixelsize={{font.size}}
 include=~/.config/foot/theme.ini
 
+# Server-mode windows default to app-id "footclient"; pin one id so niri rules
+# and the shell's icon lookup see the same window either way it was launched.
+app-id=foot
+
+# The old Arch config's inset, plus foot's default centering mode (writing a
+# pad value without it would drop back to top-left anchoring).
+pad=14x14 center-when-maximized-and-fullscreen
+
+# Linear-space blending — how macOS composites text, and why its bright-on-dark
+# glyphs read heavier. Costs a 16-bit surface; if scrolling ever feels slow,
+# tweak.surface-bit-depth=8-bit keeps the look at 8-bit cost.
+gamma-correct-blending=yes
+
 [scrollback]
 lines=10000
+
+[mouse]
+# macOS behavior: the pointer gets out of the way while typing.
+hide-when-typing=yes
