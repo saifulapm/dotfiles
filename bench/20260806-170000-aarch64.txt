@@ -1,0 +1,34 @@
+date:            2026-08-06T17:00:00+06:00 (perf session, hand-collected multi-run)
+machine:         aarch64 7.1.5-400.asahi.fc44.aarch64+16k
+conditions:      load avg ~2 (agent session resident) — same handicap as omarchy runs
+method:          4 cold runs; PSS from /proc/<pid>/smaps_rollup; wakeups =
+                 voluntary ctx switches/s sampled per-second over 60s
+
+cold start:      323 / 346 / 347 / 345 ms to bar constructed (median 345.5)
+ipc ready:       503 / 517 / 512 / 540 ms from spawn (median 514.5)
+idle rss:        209.6 - 211.9 MiB (settle 8-10s, before any panel open)
+idle pss:        172.2 - 174.4 MiB
+idle cpu (60s):  0.050% (settled, post-exercise) / 0.250% (first minute after launch)
+idle wakeups:    0.6/s main thread settled; ~7/s during first minute (service ramp)
+threads:         16-19   fds: 78-82
+children:        clipboard-capture watch (+2 wl-paste), voxtype status --follow
+                 (all pdeathsig-covered incl. voxtype via bin/voxtype-status exec)
+launcher cold:   50 ms (incl. ~46 ms qs-ipc overhead)
+launcher warm:   32 ms (incl. ~46 ms qs-ipc overhead)
+bar panels open: 30-91 ms incl. overhead (clock 46, weather 65, ai 46, bluetooth 38,
+                 network 91, audio 53, monitor 59, battery 46)
+
+-- long-running exercise (2 rounds: 8 bar panels + 8 overlays x20 each,
+   61 notifications, 30 OSDs, 4 theme switches per round; 10 min idle after each)
+pss baseline:        172.2 MiB
+pss after round 1:   315.2 MiB   (+143.0 one-time: all lazy loaders + pixmap cache)
+pss after 10m idle:  303.7 MiB   (~11.5 returned)
+pss after round 2:   307.4 MiB   (+3.7 -> growth is one-time residency, NOT a leak)
+pss after 10m idle:  301.4 MiB
+fds/threads:         stable (78-86 / 16-20); no stray processes after kill
+
+-- frame timing (QSG_RENDER_TIMING=1; bar toggle, panel opens, launcher,
+   theme switch x2, OSD spam; 110 frames observed)
+actual work (sync+render): median 0 ms, p99 19 ms, max 26 ms
+frames over 8.3 ms: 4/110 (3.6%)   over 16.6 ms: 2/110 (1.8%)
+(swap median 15 ms = vsync wait, not work)
