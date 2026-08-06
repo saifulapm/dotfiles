@@ -34,8 +34,11 @@ Item {
     property var bar: null
     property var settings: ({})
 
-    // Upstream's default order, with our notification bell beside dnd.
-    readonly property var defaultItems: ["screenrecording", "dictation", "reminder", "notifs", "dnd", "nightlight", "stayawake"]
+    // Upstream's default order. The notification bell is registered below
+    // but not a default: it lives standalone on the bar's right edge
+    // (shell.json), always visible as the history center's entry point —
+    // add "notifs" to this widget's `items` to host it here instead.
+    readonly property var defaultItems: ["screenrecording", "dictation", "reminder", "dnd", "nightlight", "stayawake"]
 
     function setting(name, fallback) {
         const value = settings ? settings[name] : undefined;

@@ -19,7 +19,11 @@
     ],
     "center": [
       "indicators",
-      "clock",
+      {
+        "id": "clock",
+        "birthYear": 1991,
+        "lifeExpectancy": 90
+      },
       "weather",
       "update"
     ],
@@ -37,7 +41,8 @@
       "network",
       "audio",
       "monitor",
-      "battery"
+      "battery",
+      "notifs"
     ]
   }
 }

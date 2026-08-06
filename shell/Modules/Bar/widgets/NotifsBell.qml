@@ -22,6 +22,14 @@ BarIndicator {
     activeTooltip: unseen + " unseen notification" + (unseen === 1 ? "" : "s")
     inactiveTooltip: "Notification History"
 
+    // A standalone bell stays on the bar — it is the center's entry point,
+    // not a pure status light like dnd: dimmed to the inactive-reveal
+    // opacity while caught up, fully lit with the badge while unseen
+    // notifications wait. Hosted copies keep the container's block rules.
+    visible: indicatorBlock === "single" ? true : belongsInBlock
+    opacity: !visible ? 0 : (effectiveActive ? 1 : (indicatorBlock === "single" || inactiveRevealed ? 0.45 : 0))
+    enabled: visible && (indicatorBlock === "single" || effectiveActive || inactiveRevealed)
+
     onTapped: rootItem.openPanel()
 
     function openPanel() {
@@ -47,9 +55,12 @@ BarIndicator {
 
     // Unseen count in the glyph's corner — TailscaleIcon's badge recipe: a
     // pill in the accent color, ringed and printed in the bar background so
-    // it reads as punched out of the bell.
+    // it reads as punched out of the bell. Reparented onto the button itself
+    // (the PanelHint trick): children land in BarButton's content Row by
+    // default, and a Row rejects horizontally-anchored items.
     Rectangle {
         id: badge
+        parent: rootItem
 
         readonly property string label: rootItem.unseen > 9 ? "9+" : String(rootItem.unseen)
 

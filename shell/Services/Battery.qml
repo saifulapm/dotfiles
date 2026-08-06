@@ -48,9 +48,13 @@ QtObject {
 
     function evaluateWarning() {
         // Plugging in (or the state otherwise leaving discharge) re-arms
-        // every rung; the discharge latch never re-fires on its own.
+        // every rung; the discharge latch never re-fires on its own. Written
+        // only when it really changes — this handler also fires while the
+        // UPower device tears down at shutdown, and an idempotent no-op is
+        // the safest thing to do from a dying object graph.
         if (!discharging) {
-            persisted.warnedFloor = 101;
+            if (persisted.warnedFloor !== 101)
+                persisted.warnedFloor = 101;
             return;
         }
         if (level < 0)
