@@ -28,6 +28,13 @@ PanelWindow {
     signal closeRequested
     signal passwordToggleRequested
 
+    // The bar's one-panel-at-a-time slot calls close() on whatever holds it;
+    // this card registers there (NetworkPanel.showWifiQr) so the shell's
+    // close-every-panel sweep can drop its keyboard grab too.
+    function close() {
+        root.closeRequested();
+    }
+
     visible: opened
     // The window is instantiated hidden, so the content's `focus: true` is
     // evaluated before the surface is mapped and Escape would land nowhere.

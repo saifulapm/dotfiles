@@ -25,6 +25,13 @@ PanelWindow {
     signal closeRequested
     signal runAgainRequested
 
+    // The bar's one-panel-at-a-time slot calls close() on whatever holds it;
+    // this card registers there (NetworkPanel.showSpeedTest) so the shell's
+    // close-every-panel sweep can drop its keyboard grab too.
+    function close() {
+        root.closeRequested();
+    }
+
     readonly property real downloadValue: toMbps(downloadMbps)
     readonly property real uploadValue: toMbps(uploadMbps)
     readonly property bool failed: error !== ""

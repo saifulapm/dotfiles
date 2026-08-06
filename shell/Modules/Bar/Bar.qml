@@ -327,20 +327,29 @@ Scope {
         // Omarchy's hideBarWidget, generalized: closes whatever panel is
         // open on any screen.
         function closePanel(): string {
-            let closed = false;
-            for (const b of barRoot.screenBars) {
-                if (b.activePanel) {
-                    b.activePanel.close();
-                    closed = true;
-                }
-            }
-            return closed ? "ok" : "no panel open";
+            return barRoot.closeAllPanels() ? "ok" : "no panel open";
         }
     }
 
     // The per-screen bar windows, registered so the IPC verbs above can
     // reach their slot lists.
     property var screenBars: []
+
+    // Close every open widget panel on every screen. Besides the IPC verb,
+    // the shell root calls this before mapping any typeable overlay (menu,
+    // launcher, …): an open panel holds an Exclusive keyboard grab, and niri
+    // leaves the grab with the earlier surface — the overlay would render but
+    // never see a key.
+    function closeAllPanels() {
+        let closed = false;
+        for (const b of screenBars) {
+            if (b.activePanel) {
+                b.activePanel.close();
+                closed = true;
+            }
+        }
+        return closed;
+    }
 
     function registerScreenBar(b) {
         if (b && screenBars.indexOf(b) === -1)

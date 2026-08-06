@@ -446,6 +446,22 @@ BarPanel {
     property bool qrencodePresent: false
     readonly property bool qrVisible: qrLoading || qrSize > 0 || qrError !== ""
 
+    // The share and speed-test cards outlive the compact panel (their show
+    // functions close it), so they take its place in the bar's
+    // one-panel-at-a-time slot: the shell's close-every-panel sweep (run
+    // before a typeable overlay maps) reaches their keyboard grab there.
+    function grabOverlaySlot(overlay) {
+        const bar = panel.anchorItem && panel.anchorItem.bar ? panel.anchorItem.bar : null;
+        if (bar && bar.requestPanel)
+            bar.requestPanel(overlay);
+    }
+
+    function releaseOverlaySlot(overlay) {
+        const bar = panel.anchorItem && panel.anchorItem.bar ? panel.anchorItem.bar : null;
+        if (bar && bar.releasePanel && bar.activePanel === overlay)
+            bar.releasePanel(overlay);
+    }
+
     function showWifiQr() {
         if (qrProc.running) {
             // A dismissal's SIGTERM is still in flight; Process.running stays
@@ -464,9 +480,11 @@ BarPanel {
 
         // Leave the compact panel behind while the centered share card is up.
         panel.close();
+        panel.grabOverlaySlot(qrOverlay);
     }
 
     function hideWifiQr() {
+        panel.releaseOverlaySlot(qrOverlay);
         panel.pendingQrShow = false;
         if (qrProc.running) {
             panel.qrExpectedStop = true;
@@ -515,11 +533,13 @@ BarPanel {
         if (!panel.speedTestModalOpen) {
             panel.speedTestModalOpen = true;
             panel.close();
+            panel.grabOverlaySlot(speedTestOverlay);
         }
         panel.runSpeedTest();
     }
 
     function hideSpeedTest() {
+        panel.releaseOverlaySlot(speedTestOverlay);
         panel.speedTestModalOpen = false;
         panel.pendingSpeedRun = false;
         speedTestPhaseTimer.stop();
@@ -1250,6 +1270,7 @@ BarPanel {
 
     // ------------------------------------------------------------ overlays
     NetworkQrPanel {
+        id: qrOverlay
         theme: panel.theme
         qrRows: panel.qrRows
         qrSize: panel.qrSize
@@ -1266,6 +1287,7 @@ BarPanel {
     }
 
     NetworkSpeedTestPanel {
+        id: speedTestOverlay
         theme: panel.theme
         running: panel.speedTestRunning
         phase: panel.speedTestPhase
