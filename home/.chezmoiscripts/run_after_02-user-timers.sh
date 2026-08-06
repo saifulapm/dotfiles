@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Enable user units shipped in dot_config/systemd/user. Runs on every apply
-# (enable --now on an enabled unit is a cheap no-op); no sudo needed (user
-# manager). Was run_onchange, but a run that skipped — no user session, or
-# the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service qshell.service
+# Enable user units shipped in dot_config/systemd/user, plus packaged ones we
+# opt into (foot-server.socket, from the foot rpm: socket activation per
+# foot(1) — enable ONLY the socket; the first footclient connect starts the
+# server, and a crashed server restarts on the next connect). Runs on every
+# apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
+# (user manager). Was run_onchange, but a run that skipped — no user session,
+# or the old degraded-state bug below — was recorded as done and never retried.
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket qshell.service
 set -euo pipefail
 
-units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service)
+units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently
