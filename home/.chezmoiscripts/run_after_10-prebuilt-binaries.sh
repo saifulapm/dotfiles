@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tools Fedora does not package whose upstreams ship linux binaries for both
 # our arches (asset names verified against the GitHub API 2026-08-07):
-# watchexec, hurl, aichat, cloudflared, stripe. Everything lands in
-# ~/.local/bin; guarded per binary; warn-don't-abort.
+# watchexec, hurl, aichat, cloudflared, stripe, ouch, yek, usql.
+# Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
 #
 # GitHub's unauthenticated API allows 60 requests/hour per IP — five here, and
 # only on a run where something is actually missing (fully-guarded runs make
@@ -32,8 +32,9 @@ fetch_tar() {
   ( cd "$tmp" \
     && curl -fsSL -o archive "$url" \
     && case "$url" in
-         *.tar.xz) tar -xJf archive ;;
-         *)        tar -xzf archive ;;
+         *.tar.xz)  tar -xJf archive ;;
+         *.tar.bz2) tar -xjf archive ;;
+         *)         tar -xzf archive ;;
        esac \
     && found="$(find . -type f -name "$3" | head -1)" \
     && [ -n "$found" ] \
@@ -85,6 +86,14 @@ if ! command -v yek >/dev/null 2>&1; then
   # bodo-run/yek redirects to mohsen1/yek; the API follows it with -L only,
   # so the current repo name is used directly.
   fetch_tar mohsen1/yek "yek-${arch}-unknown-linux-gnu\\.tar\\.gz$" yek yek
+fi
+
+# usql (universal SQL CLI, config in ~/.config/usql) — go-style arch names;
+# deliberately NOT the usql_static variant (regular build has the common
+# drivers at half the size)
+if ! command -v usql >/dev/null 2>&1; then
+  goarch="arm64"; [ "$arch" = "x86_64" ] && goarch="amd64"
+  fetch_tar xo/usql "usql-.*-linux-${goarch}\\.tar\\.bz2$" usql usql
 fi
 
 exit 0

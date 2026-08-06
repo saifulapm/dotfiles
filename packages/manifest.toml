@@ -349,6 +349,12 @@ arch = "all"
 why = "Node version manager (decision 2026-08-05); pnpm comes via corepack, never Bun. May later pin Go per-project too"
 
 [[pkg]]
+name = "bzip2"
+category = "dev"
+arch = "all"
+why = "tar -xjf in run_after_10-prebuilt-binaries.sh spawns the bzip2 binary for usql's .tar.bz2 release assets"
+
+[[pkg]]
 name = "rustup"
 category = "dev"
 arch = "all"
@@ -890,7 +896,7 @@ why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-
 
 [[tool]]
 name = "prebuilt-binaries"
-via  = "run_after_10-prebuilt-binaries.sh — GitHub release binaries into ~/.local/bin: watchexec, hurl, aichat, cloudflared, stripe, ouch, yek (last two added 2026-08-07 for the yazi/aichat config port — their cargo builds need libclang and openssl-devel, so release binaries are the mechanism; yek's repo is mohsen1/yek, bodo-run/yek is a redirect)"
+via  = "run_after_10-prebuilt-binaries.sh — GitHub release binaries into ~/.local/bin: watchexec, hurl, aichat, cloudflared, stripe, ouch, yek (added 2026-08-07 for the yazi/aichat config port — their cargo builds need libclang and openssl-devel, so release binaries are the mechanism; yek's repo is mohsen1/yek, bodo-run/yek is a redirect), usql (added 2026-08-07 for the mac config port — the regular not _static variant: common drivers at half the size; linux-arm64 asset verified against the GitHub API. dprint deliberately NOT here: it is already a pnpm global via run_after_08)"
 why  = "Fedora packages none of these; all five ship both aarch64 and x86_64 linux release assets (asset names verified against the GitHub API 2026-08-07). Chosen over cargo builds for the heavy ones (hurl needs libxml, aichat a full TLS stack)"
 
 [[tool]]
