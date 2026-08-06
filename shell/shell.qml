@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Services.Mpris
 
 import qs.Services
 import qs.Modules.Bar
@@ -48,6 +47,15 @@ ShellRoot {
     // otherwise.
     property Nightlight nightlight: Nightlight {}
     property Battery batteryService: Battery {}
+    // MPRIS media layer (omarchy's media service plugin): sticky preferred
+    // player, playing-order ledger, PipeWire stream correlation, source
+    // cycling with playback transfer, media OSDs, and the `media` IPC target
+    // niri's XF86 keys call. Eager like upstream's keepLoaded service — the
+    // keybinds and the bar widget both need it standing; PipeWire is already
+    // resident (Audio), so the cost is one MPRIS D-Bus subscription.
+    property Media media: Media {
+        osd: osd
+    }
     // Cross-machine snapshot sync. Inert until shell.json's root `sync` block
     // points it at a shared directory, so it costs one /etc/hostname read
     // until then.
@@ -698,44 +706,8 @@ ShellRoot {
         }
     }
 
-    // Media keys land here (niri binds spawn `qs ipc call media …`). The
-    // Mpris singleton is lazy — it only touches D-Bus on the first call.
-    IpcHandler {
-        target: "media"
-
-        function activePlayer(): var {
-            const all = Mpris.players.values;
-            return all.find(p => p.isPlaying) || all[0] || null;
-        }
-
-        function playPause(): string {
-            const p = activePlayer();
-            if (p && p.canTogglePlaying)
-                p.togglePlaying();
-            return p ? "ok" : "no player";
-        }
-
-        function stop(): string {
-            const p = activePlayer();
-            if (p)
-                p.stop();
-            return p ? "ok" : "no player";
-        }
-
-        function next(): string {
-            const p = activePlayer();
-            if (p && p.canGoNext)
-                p.next();
-            return p ? "ok" : "no player";
-        }
-
-        function previous(): string {
-            const p = activePlayer();
-            if (p && p.canGoPrevious)
-                p.previous();
-            return p ? "ok" : "no player";
-        }
-    }
+    // The `media` IPC target (niri's XF86 media keys) lives inside
+    // Services/Media.qml, beside the player selection it drives.
 
     IpcHandler {
         target: "shell"

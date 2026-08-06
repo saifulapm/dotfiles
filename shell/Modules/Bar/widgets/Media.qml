@@ -1,43 +1,55 @@
 import QtQuick
-import Quickshell.Services.Mpris
+import Quickshell
 import "../components"
 
-// MPRIS now-playing, omarchy media-widget style: play/pause glyph (dimmed
-// darker when paused) + title, elided at 180 px. Left click play/pause,
-// middle click next, wheel prev/next. Hidden without a player.
+// MPRIS now-playing — full port of omarchy's media bar widget
+// (shell/plugins/services/media/BarWidget.qml, CREDITS.md) over our media
+// service: play/pause glyph dimmed darker while paused, the "title · artist"
+// label auto-scrolling inside a clip when it outgrows `maxLabelWidth` (an
+// inline shell.json setting, their default 180), left click play/pause,
+// middle click next, wheel prev/next, and the right-click popup card with
+// album art, transport controls and the SOURCES list (MediaPanel.qml).
+// Hidden without media; glyph only on a vertical bar, as theirs.
 BarButton {
     id: rootItem
 
-    readonly property var player: {
-        const all = Mpris.players.values;
-        return all.find(p => p.isPlaying) || all[0] || null;
-    }
+    // The shared media service at the shell root, reached through the
+    // injected bar (null for the first frames, before the bar lands).
+    readonly property var media: bar && bar.shell ? bar.shell.media : null
+    readonly property var player: media ? media.activePlayer : null
+    readonly property bool hasMedia: media ? media.hasMedia : false
     readonly property bool playing: player !== null && player.isPlaying
+    readonly property string title: media ? media.title : ""
+    readonly property string artist: media ? media.artist : ""
+    readonly property real maxLabelWidth: Number(setting("maxLabelWidth", 180))
 
-    visible: player !== null
-    tooltipText: {
-        if (!player)
-            return "";
-        const artist = player.trackArtist;
-        return player.trackTitle + (artist ? " — " + artist : "");
+    visible: hasMedia
+    tooltipText: hasMedia ? title + (artist ? " — " + artist : "") : ""
+
+    function openPanel() {
+        panelLoader.active = true;
+        panelLoader.item.anchorItem = rootItem;
+        panelLoader.item.toggle();
     }
 
     onTapped: button => {
         if (!rootItem.player)
             return;
-        if (button === Qt.MiddleButton && rootItem.player.canGoNext)
-            rootItem.player.next();
-        else if (rootItem.player.canTogglePlaying)
-            rootItem.player.togglePlaying();
+        if (button === Qt.MiddleButton)
+            rootItem.media.runAction("next", false);
+        else if (button === Qt.RightButton)
+            rootItem.openPanel();
+        else
+            rootItem.media.runAction("playPause", false);
     }
 
     onWheelMoved: delta => {
         if (!rootItem.player)
             return;
-        if (delta > 0 && rootItem.player.canGoPrevious)
-            rootItem.player.previous();
-        else if (delta < 0 && rootItem.player.canGoNext)
-            rootItem.player.next();
+        if (delta > 0)
+            rootItem.media.runAction("previous", false);
+        else if (delta < 0)
+            rootItem.media.runAction("next", false);
     }
 
     OpticalGlyph {
@@ -47,18 +59,53 @@ BarButton {
         pixelSize: 13
     }
 
-    Text {
+    // Their marquee: the label lives in a clip sized to the smaller of its
+    // own width and maxLabelWidth, and glides through when it doesn't fit.
+    Item {
+        id: scrollClip
+
         anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(implicitWidth, 180)
-        elide: Text.ElideRight
-        // Glyph only on a vertical bar — theirs hides the scrolling title
-        // there for the same reason the window title goes away entirely.
-        visible: !rootItem.vertical && rootItem.player !== null && rootItem.player.trackTitle !== ""
-        text: rootItem.player ? rootItem.player.trackTitle : ""
-        color: rootItem.contentColor
-        opacity: 0.85
-        font.family: rootItem.theme.fontMono
-        font.pixelSize: rootItem.theme.fontPx(0.917)
-        renderType: Text.NativeRendering
+        width: Math.min(rootItem.maxLabelWidth, labelText.implicitWidth)
+        height: labelText.implicitHeight
+        clip: true
+        visible: !rootItem.vertical && rootItem.title !== ""
+
+        Text {
+            id: labelText
+
+            anchors.verticalCenter: parent.verticalCenter
+            text: rootItem.title + (rootItem.artist ? "  ·  " + rootItem.artist : "")
+            color: rootItem.contentColor
+            opacity: 0.85
+            font.family: rootItem.theme.fontMono
+            font.pixelSize: rootItem.theme.fontPx(0.917)
+            renderType: Text.NativeRendering
+
+            property bool needsScroll: implicitWidth > scrollClip.width
+
+            // A label that stops needing to scroll (track change, panel
+            // open) must not stay frozen mid-glide off screen.
+            onNeedsScrollChanged: if (!needsScroll)
+                x = 0
+
+            NumberAnimation on x {
+                id: scrollAnim
+                running: labelText.needsScroll && !(panelLoader.active && panelLoader.item && panelLoader.item.opened) && !rootItem.vertical
+                loops: Animation.Infinite
+                duration: Math.max(6000, labelText.implicitWidth * 25)
+                from: scrollClip.width
+                to: -labelText.implicitWidth
+                easing.type: Easing.Linear
+            }
+        }
+    }
+
+    LazyLoader {
+        id: panelLoader
+        active: false
+        component: MediaPanel {
+            theme: rootItem.theme
+            media: rootItem.media
+        }
     }
 }

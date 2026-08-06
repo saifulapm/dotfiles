@@ -683,6 +683,48 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   muted-or-high), and a volume above 100% shows a full bar over a truthful
   readout, which is what their model does with a value clamped at `max`
   beside a caller-supplied `progressText`.
+- **Media service layer** from `shell/plugins/services/media/` (`Service.qml`,
+  `BarWidget.qml`), ported as `shell/Services/Media.qml` +
+  `shell/Modules/Bar/widgets/Media.qml` + `MediaPanel.qml`: the whole player
+  model — playerctld ranked below real players at every decision rather than
+  filtered out (the proxy is still a working fallback when it is all that
+  answers); the playing-order ledger (`playerStartedAt`/`playSerial`) where a
+  player keeps the serial it was first seen playing at only while it keeps
+  playing, so "oldest playing" means longest continuously audible; the sticky
+  preferred player that follows the player itself (`playerKey`) across list
+  churn and dies with it, winning outright only while it is actually playing;
+  `selectActivePlayer`'s full preference ladder (playing preferred → oldest
+  audibly-playing → oldest playing → stream-backed preferred → any
+  stream-backed → preferred → track metadata → controllability → identity,
+  real players over the proxy at each rung); the PipeWire correlation that
+  counts a player as audible only when a real playback stream's label matches
+  its app label (their `streamLabelKey` normalisation with the ALSA prefix
+  strips); source cycling over `orderedCycleSourcePlayers` with optional
+  playback transfer that pauses the old source only after the new one actually
+  started; `canHandleAction`/`playerForAction`'s rule that pause-shaped verbs
+  target whatever is audibly playing first; the media OSD choreography, with
+  next/previous waiting up to ten 120 ms beats for the track metadata to
+  change so the OSD names the track that arrived; and the bar widget — the
+  play/pause glyph dimmed darker while paused, the `title · artist` label
+  auto-scrolling inside a clip when it outgrows the `maxLabelWidth` inline
+  setting, glyph-only on a vertical bar, left/middle/wheel mapped to
+  play-pause/next/prev-next, and the right-click card of album art (their 󰝚
+  fallback), title/artist/album, transport row and the SOURCES list where a
+  row click makes that player the sticky preference. Adapted: their OSD
+  summon (`shell.summon("omarchy.osd", …)`) is a direct call into our Osd
+  module with the same icon-name/message payload; the playback-stream list
+  excludes asahi-audio's `effect_output.*`/`audio_effect.*` nodes (the
+  convolver is a real Stream/Output/Audio node that would otherwise pass the
+  class test and complain in the log for as long as a tracker holds it);
+  their play-order resync Instantiator-of-Connections is a reactive snapshot
+  binding over the same two inputs; their PopupCard becomes our BarPanel
+  (scrim dismissal, Escape, Tab panel-switching) with a j/k/Enter cursor over
+  the sources and h/l/Space transport keys the popup upstream does not have,
+  since a panel here holds exclusive keyboard focus; the `media` IPC target
+  keeps our pre-existing niri verb surface (XF86 keys) on top of their
+  status/play/pause/source verbs, including a `stop` verb upstream does not
+  ship; and `PwNode.type` is resolved through `PwNodeType.toString` before
+  their string tests see it.
 - **Bar interaction machinery** from `shell/plugins/bar/Bar.qml` +
   `BarModel.js` + `bin/omarchy-bar-text-color` + `bin/omarchy-toggle-bar`: the
   whole gesture layer of their bar. Drag-to-reorder — the 4 px press threshold
@@ -1175,6 +1217,19 @@ Direct file-level copies (source path → destination path):
   per-side border specs) with our motion token animating the state change, and
   their unused `failedAttempts` view property was dropped — the count is
   rendered through `failureMessage`, as it is upstream.
+- omarchy `shell/plugins/services/media/MediaModel.js` →
+  `shell/Services/MediaModel.js`: direct copy of the player and stream math —
+  the playerctld proxy test, the metadata/controllability capability tests,
+  `canHandleAction`'s per-verb capability map, the cycle eligibility rule, the
+  playback-stream class test, the stream-label normalisation with its
+  PipeWire-ALSA prefix strips, the player app-label derivation from the D-Bus
+  name, the bidirectional substring match between the two, the stable
+  `playerKey`, the `\u001f`-joined track signature and its change test, and
+  the OSD label/message builders. Two changes: `isPlaybackStream` takes the
+  node's resolved type name as a second argument (quickshell exposes
+  `PwNode.type` as a numeric flags enum — the AudioModel.js precedent), and
+  whitespace follows house 4-space style. The `module.exports` tail is kept
+  so the matching rules can be exercised under node.
 - omarchy `shell/plugins/osd/OsdModel.js` → `shell/Modules/Osd/OsdModel.js`:
   near-verbatim port of the icon table and the payload model — every name
   alias, the literal-glyph passthrough for names it doesn't know, the
