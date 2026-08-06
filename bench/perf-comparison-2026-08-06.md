@@ -355,3 +355,117 @@ Adopted in S1: omarchy's async plugin loading with a pending-payload queue
 replayed on Loader resolution (their shell.qml `summon` /
 `pendingPayloads` / `deliverIfLoaded`), generalized here into SurfaceLoader's
 summon/deliver/replay with per-surface queues.
+
+## 7. S2+S3 results (2026-08-06, structural sessions 2–3)
+
+Same box, same handicap (agent session resident), same methodology. Day-of
+baseline re-measured minutes before S2 under identical load. Commits:
+S2 = 9c3b09e, S3 = c29c2d8.
+
+### S2 — per-screen services hoisted to bar-root singletons
+
+Every daemon-backed widget owned its service object, so each screen's copy
+duplicated the full stack (§3.9). The services now live at the bar root —
+Bar.qml's Scope is ONE instance however many screens its `Variants` fans out
+to — created lazily by the first widget that asks (config presence still
+gates existence) and injected into every screen's widget by the registry
+components. Weather's fetch stack became `WeatherService.qml` (3 curl
+Processes, 3 Timers, the legacy-location FileView); the voxtype follower
+became `DictationService.qml`.
+
+Instantiations per service (temporary `console.info` in
+`Component.onCompleted`, counted from the startup log):
+
+| service (per-instance stack) | before | after |
+|---|---|---|
+| TailscaleService (11 Process + 6 Timer + 1 FileView) | 1 × screens | **1** |
+| DropboxService (3 Process + 5 Timer) | 1 × screens | **1** |
+| RcloneRemoteService (2 Process + 2 Timer) | 2 × screens | **2** (one per remote — icloud + dropbox-rclone are different remotes, correctly not merged) |
+| Weather fetch stack (3 Process + 3 Timer + 1 FileView) | 1 × screens | **1** |
+| Dictation voxtype follower (1 long-lived child) | 1 × screens, **2** while recording (the Indicators active block mounts a second copy) | **1** always |
+
+This is a 1-screen box, so the counts are flat here; the fix is structural —
+creation happens in the Scope, outside the per-screen delegate, so M screens
+now share one instance where they multiplied before. Wins realized on this
+box regardless: the transient second voxtype follower while recording is
+gone, and tailscale/dropbox polling now actually stops during `bar hide`
+(the old gate keyed on Item.visible, which a hidden *window* never touches;
+the new gate is the report's Q8 pattern: ANY bar visible && widget still in
+the layout).
+
+Design decisions (documented per plan):
+- **Settings = the config's own inline entry.** A shared service binds
+  `settings` to `inlineEntryFor(id)` rather than one widget's copy — every
+  screen renders the same entry, so first-widget-wins and config-wins name
+  the same object, and the config outlives widgets. `updateEntryInline`
+  applies in memory before persisting, so panel settings writes still land
+  in the service synchronously. One divergence: with a broken-on-disk
+  shell.json (configWritable false) a settings edit no longer half-applies
+  to the local widget — it is refused whole, which is the honest behavior.
+- **Services survive their widgets.** A screen unplugging must not kill the
+  daemon conversation the remaining screens render; removing the id from
+  the layout stops the polling instead (the gate above).
+
+Verification: all four daemon panels live through the shared services
+(tailscale tailnet card, weather Dhaka report + bar temp, icloud
+reachability probe, dropbox-rclone quota 2.49/2.55 GB), dropbox
+empty-state card via QSHELL_TEST_PANEL, bar hide/show cycles clean,
+children (1 voxtype follower + clipboard watcher) and fds (81) identical to
+baseline, log clean.
+
+### S3 — workspace delegates stable, windows map in place
+
+`Workspaces.qml` now feeds its Repeater the id sequence only, held back by
+the sameIds guard (Bar.qml's syncModels rule); each live delegate re-resolves
+its workspace object from the fresh `niri.workspaces` per event. `Niri.qml`'s
+windows map is mutated in place with a `windowsRevision` counter as the
+change signal — `focusedTitle`/`focusedAppId` reference the revision, and
+imperative event-time readers (Notifs' click-to-focus) read the live map.
+
+| churn metric (instrumented both sides, same drive) | before | after |
+|---|---|---|
+| delegate creations, 10 × focus-workspace round trips | 20 (N per change) | **0** |
+| delegate creations, 20 rapid cycles | 40-equivalent | **0**, no visual glitch |
+| windows-map replacements, open + 5 OSC-0 title changes + close | 8 | **0** |
+| windows-map replacements, ambient (startup + first minutes, live terminal titles) | 78 | 2 (the WindowsChanged snapshots) |
+
+Membership changes still rebuild, as they must: occupying the trailing empty
+workspace (2→3) created 3 delegates, the shrink back created 2 — a plain
+array model rebuilds wholesale on identity change, which is exactly the
+Bar.qml precedent and only fires when the id sequence really changed. The
+bar's ActiveWindow title tracked all five OSC-0 changes live
+(screenshot-verified) with zero map replacements; focused dot / index /
+empty dimming all render as before.
+
+### Bench (medians not taken — single runs, all within S1's run spread)
+
+| metric | §6 after S1 | day-of baseline | after S2 | after S3 |
+|---|---|---|---|---|
+| spawn → bar constructed | 187 ms | 200 ms | 195 ms | **184 ms** |
+| spawn → IPC ready (external) | 376 ms | 369 ms | 397 ms | 386 ms |
+| idle RSS | 192 MiB | 199 MiB | 195 MiB | 196 MiB |
+| launcher cold / warm | 50 / 52 ms | 57 / 45 ms | 53 / 85 ms | 55 / 53 ms |
+
+No regression; the deltas are run-to-run noise (S1's IPC spread was
+321–399 ms). Raw logs: `bench/20260806-191504` (baseline), `-192509` (S2),
+`-193117` (S3).
+
+### Not deduplicated, and why
+
+- **RcloneRemoteService ×2** — one per remote (icloud, dropbox-rclone), not
+  per screen; merging them would merge two different backends.
+- **The small per-widget FileView watchers** (SystemUpdate, ScreenRecording,
+  Reminder, AiClaude's credentials watch — the rest of §3.9's "~7 inotify
+  watchers"): each is one inotify fd and a few lines of trivially-shared
+  state, none spawns recurring processes, and their refresh processes are
+  event-driven one-shots. A service/view split per widget would cost more
+  code than the fd it saves on a multi-monitor box; revisit only if a real
+  multi-screen setup shows measurable cost.
+- **Bar.qml's own two FileViews** (wallpaper sample, bar-off flag) were
+  already Scope-level singletons.
+- **The startup fallback→real-config slot rebuild** (4 instead of 2
+  workspace delegate creations at startup, both before and after S3): the
+  bar's section Repeaters rebuild every WidgetSlot when shell.json lands
+  because modelLeft's id sequence really changes
+  (fallback has no launcher). That is a one-time cost of the
+  broken-config-safe startup, not steady-state churn — left alone.
