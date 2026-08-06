@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# composer through the project's PHP (bin/php beside this shim): Fedora's
+# /usr/bin/composer hardcodes '#!/usr/bin/php', which would pin composer's
+# platform checks to the system PHP no matter what .php-version says.
+exec "$(dirname "$(readlink -f "$0")")/php" /usr/bin/composer "$@"

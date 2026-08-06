@@ -337,6 +337,199 @@ arch = "all"
 why = "posix/pcntl — required by Laravel Horizon/queue workers and artisan serve signal handling"
 
 [[pkg]]
+name = "php-mysqlnd"
+category = "dev"
+arch = "all"
+why = "pdo_mysql for the system PHP — without it Laravel cannot reach the on-demand MySQL container (gap found 2026-08-07)"
+
+[[pkg]]
+name = "php-pgsql"
+category = "dev"
+arch = "all"
+why = "pdo_pgsql for the system PHP (on-demand PostgreSQL container)"
+
+[[pkg]]
+name = "php-gd"
+category = "dev"
+arch = "all"
+why = "Image manipulation — intervention/image and friends assume it"
+
+[[pkg]]
+name = "php-bcmath"
+category = "dev"
+arch = "all"
+why = "Arbitrary-precision math — common Laravel package requirement"
+
+# Remi SCL collections: parallel-installable PHP 8.2/8.3/8.4 beside the
+# system 8.5 (multi-version decision 2026-08-07; ~/.dotfiles/bin/php picks
+# per project via .php-version). The remi-release rpm that provides these is
+# bootstrapped by 00-install-packages (not a copr). Each phpXX meta pulls
+# cli/common/fpm/mbstring/opcache/xml; the rest are listed explicitly
+# because install_weak_deps=False skips anything softer than Requires.
+
+[[pkg]]
+name = "php82"
+category = "dev"
+arch = "all"
+why = "PHP 8.2 SCL meta (legacy client projects) — /usr/bin/php82"
+
+[[pkg]]
+name = "php82-php-pdo"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: pdo + pdo_sqlite"
+
+[[pkg]]
+name = "php82-php-mysqlnd"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: pdo_mysql"
+
+[[pkg]]
+name = "php82-php-pgsql"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: pdo_pgsql"
+
+[[pkg]]
+name = "php82-php-intl"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: intl"
+
+[[pkg]]
+name = "php82-php-gd"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: gd"
+
+[[pkg]]
+name = "php82-php-bcmath"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: bcmath"
+
+[[pkg]]
+name = "php82-php-pecl-zip"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: ZipArchive (composer artifact handling)"
+
+[[pkg]]
+name = "php82-php-process"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: posix/pcntl (queue workers)"
+
+[[pkg]]
+name = "php83"
+category = "dev"
+arch = "all"
+why = "PHP 8.3 SCL meta (current Laravel projects) — /usr/bin/php83"
+
+[[pkg]]
+name = "php83-php-pdo"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: pdo + pdo_sqlite"
+
+[[pkg]]
+name = "php83-php-mysqlnd"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: pdo_mysql"
+
+[[pkg]]
+name = "php83-php-pgsql"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: pdo_pgsql"
+
+[[pkg]]
+name = "php83-php-intl"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: intl"
+
+[[pkg]]
+name = "php83-php-gd"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: gd"
+
+[[pkg]]
+name = "php83-php-bcmath"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: bcmath"
+
+[[pkg]]
+name = "php83-php-pecl-zip"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: ZipArchive"
+
+[[pkg]]
+name = "php83-php-process"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: posix/pcntl"
+
+[[pkg]]
+name = "php84"
+category = "dev"
+arch = "all"
+why = "PHP 8.4 SCL meta (current Laravel projects) — /usr/bin/php84"
+
+[[pkg]]
+name = "php84-php-pdo"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: pdo + pdo_sqlite"
+
+[[pkg]]
+name = "php84-php-mysqlnd"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: pdo_mysql"
+
+[[pkg]]
+name = "php84-php-pgsql"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: pdo_pgsql"
+
+[[pkg]]
+name = "php84-php-intl"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: intl"
+
+[[pkg]]
+name = "php84-php-gd"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: gd"
+
+[[pkg]]
+name = "php84-php-bcmath"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: bcmath"
+
+[[pkg]]
+name = "php84-php-pecl-zip"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: ZipArchive"
+
+[[pkg]]
+name = "php84-php-process"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: posix/pcntl"
+
+[[pkg]]
 name = "composer"
 category = "dev"
 arch = "all"
@@ -893,6 +1086,21 @@ why  = "Deno runtime from the mac list; mise already manages node, one mechanism
 name = "cargo-cli-tools"
 via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, argc, dufs, hop-kak, kak-popup, dedoc; kakoune-lsp from git (no crates.io release, no aarch64 linux binary — checked 2026-08-07)"
 why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/argc/dufs are mac-list CLI; kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
+
+[[tool]]
+name = "php-multiversion"
+via  = "Remi SCL php82/php83/php84 (00-install-packages bootstraps remi-release) + ~/.dotfiles/bin/php and bin/composer shims that walk up from $PWD for .php-version"
+why  = "Herd-style per-project PHP (user decision 2026-08-07): native aarch64 rpms over mise source builds (no compiling, prebuilt pecl extensions); system 8.5 stays the default; composer needs the shim because Fedora hardcodes #!/usr/bin/php"
+
+[[tool]]
+name = "dev-services"
+via  = "run_after_16-dev-services.sh — podman quadlets (~/.config/containers/systemd) + systemd-socket-proxyd pairs: mysql:8.4@3306, postgres:18@5432, redis:7@6379, mailpit@1025+8025 (container backend = standard port + 30000)"
+why  = "Herd/DBngin replacement that never idles (user constraint 2026-08-07: no always-on DBs): the socket holds the port at ~0 RAM, the first connection starts the container, 10 min idle stops it; data persists in named volumes; another engine version = copy a unit pair onto the next port (mysql80@3307, postgres16@5433)"
+
+[[tool]]
+name = "laravel-installer"
+via  = "composer global require laravel/installer (run_after_08-cli-tools.sh); lands in ~/.config/composer/vendor/bin, already on PATH"
+why  = "laravel new <app> scaffolder (user decision 2026-08-07, Herd workflow parity)"
 
 [[tool]]
 name = "prebuilt-binaries"

@@ -26,6 +26,12 @@ set -gx GOBIN "$XDG_DATA_HOME/go/bin"
 # pnpm
 set -gx PNPM_HOME "$HOME/.local/share/pnpm"
 
+# composer — XDG-homed, and pinned: without COMPOSER_HOME composer silently
+# prefers a legacy ~/.composer if one exists (a bash script once created it
+# and split the global tree off the PATH below). environment.d/55-composer
+# carries the same pin for non-shell contexts.
+set -gx COMPOSER_HOME "$XDG_CONFIG_HOME/composer"
+
 # PATH — fish_add_path prepends and dedups; safe to re-run every shell.
 fish_add_path -g "$HOME/.local/bin"
 fish_add_path -g "$HOME/.cargo/bin"

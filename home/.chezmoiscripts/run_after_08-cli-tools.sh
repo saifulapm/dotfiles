@@ -50,6 +50,13 @@ if command -v mise >/dev/null 2>&1 && ! mise which deno >/dev/null 2>&1; then
     || warn "mise deno install failed"
 fi
 
+# ─── laravel installer (composer global — `laravel new`, Herd parity) ────────
+if command -v composer >/dev/null 2>&1 && [ ! -e "$HOME/.config/composer/vendor/bin/laravel" ]; then
+  composer global require --quiet laravel/installer >/dev/null 2>&1 \
+    && echo "cli-tools: laravel installer installed (composer global)" \
+    || warn "composer global require laravel/installer failed"
+fi
+
 # ─── php-cs-fixer (composer global) ──────────────────────────────────────────
 if command -v composer >/dev/null 2>&1 && ! command -v php-cs-fixer >/dev/null 2>&1; then
   if composer global require --quiet friendsofphp/php-cs-fixer >/dev/null 2>&1; then

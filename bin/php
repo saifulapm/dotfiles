@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Herd-style per-project PHP (decision 2026-08-07): the nearest .php-version
+# walking up from $PWD picks the Remi SCL binary (/usr/bin/php83 for "8.3");
+# no file, or the system series, means /usr/bin/php. Every '#!/usr/bin/env
+# php' script (artisan, pint, vendor bins) and bin/composer route through
+# here, so the whole toolchain follows the project's version.
+set -u
+
+ver=""
+dir="$PWD"
+while :; do
+  if [ -f "$dir/.php-version" ]; then
+    read -r ver <"$dir/.php-version" || true
+    break
+  fi
+  [ "$dir" = / ] && break
+  dir="$(dirname "$dir")"
+done
+
+# "8.3" or "8.3.14" → php83. Unversioned or unparsable → system php.
+mm="$(grep -oE '^[0-9]+\.[0-9]+' <<<"$ver" || true)"
+if [ -n "$mm" ]; then
+  scl="/usr/bin/php${mm//./}"
+  if [ -x "$scl" ]; then
+    exec "$scl" "$@"
+  fi
+  # System series has no SCL binary — check it matches before falling back.
+  sys="$(/usr/bin/php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+  [ "$sys" != "$mm" ] \
+    && echo "php shim: $dir/.php-version wants $mm but /usr/bin/php${mm//./} is not installed — using system $sys (chezmoi apply installs the Remi SCLs)" >&2
+fi
+exec /usr/bin/php "$@"

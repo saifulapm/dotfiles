@@ -86,6 +86,16 @@ for copr in "${coprs[@]}"; do
   sudo dnf copr enable -y "$copr"
 done
 
+# Remi's repo: parallel-installable PHP SCL collections (php82/83/84 beside
+# the system 8.5 — multi-version decision 2026-08-07, aarch64 packages
+# verified against rpms.remirepo.net the same day). A release rpm, not a
+# copr, hence its own bootstrap. The default-enabled 'remi' repo carries the
+# SCLs; the remi-php8X repos stay disabled on purpose — enabling one REPLACES
+# the system php.
+rpm -q remi-release >/dev/null 2>&1 \
+  || sudo dnf install --setopt=install_weak_deps=False -y \
+       "https://rpms.remirepo.net/fedora/remi-release-$(rpm -E %fedora).rpm"
+
 sudo dnf install --setopt=install_weak_deps=False -y "${pkgs[@]}"
 
 # Packages this desktop must not have: they shadow the shell's own lock,
