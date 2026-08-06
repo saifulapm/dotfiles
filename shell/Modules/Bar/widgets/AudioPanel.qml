@@ -567,60 +567,16 @@ BarPanel {
 
                 // Master switch: checked while anything is still audible, so
                 // muting everything reads as switching audio off.
-                Rectangle {
+                PanelSwitch {
                     id: muteSwitch
-
-                    readonly property bool checked: panel.anyAudible
-
+                    theme: panel.theme
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    implicitWidth: panel.theme.space(10)
-                    implicitHeight: panel.theme.space(5.5)
-                    radius: height / 2
-                    color: checked ? panel.theme.accent : panel.theme.surface3
-                    border.width: panel.theme.borderWidth
-                    border.color: panel.headerHasCursor ? panel.theme.accent : "transparent"
-
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: panel.theme.time(0.5)
-                        }
-                    }
-
-                    Rectangle {
-                        id: knob
-                        y: (parent.height - height) / 2
-                        x: muteSwitch.checked ? parent.width - width - (parent.height - height) / 2 : (parent.height - height) / 2
-                        width: parent.height - panel.theme.space(1.5)
-                        height: width
-                        radius: width / 2
-                        color: muteSwitch.checked ? panel.theme.textOnAccent : panel.theme.textMuted
-
-                        Behavior on x {
-                            NumberAnimation {
-                                duration: panel.theme.time(0.5)
-                                easing.type: panel.theme.easing
-                            }
-                        }
-                    }
-
-                    HoverHandler {
-                        id: muteHover
-                        cursorShape: Qt.PointingHandCursor
-                        onHoveredChanged: if (hovered)
-                            panel.setCursor("header", -1)
-                    }
-
-                    TapHandler {
-                        onTapped: panel.toggleAllMuted()
-                    }
-                }
-
-                PanelHint {
-                    theme: panel.theme
-                    visible: muteHover.hovered
-                    anchor: muteSwitch
-                    text: panel.toggleHint
+                    checked: panel.anyAudible
+                    hasCursor: panel.headerHasCursor
+                    hint: panel.toggleHint
+                    onHovered: panel.setCursor("header", -1)
+                    onToggled: panel.toggleAllMuted()
                 }
             }
 
@@ -643,6 +599,7 @@ BarPanel {
 
                 CursorSurface {
                     id: outputSliderRow
+                    theme: panel.theme
 
                     width: parent.width
                     implicitHeight: outputSlider.implicitHeight + panel.theme.space(1)
@@ -710,6 +667,7 @@ BarPanel {
 
                 CursorSurface {
                     id: inputSliderRow
+                    theme: panel.theme
 
                     width: parent.width
                     visible: panel.hasInput
@@ -819,21 +777,11 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- components
-    // The single highlight surface: `current` is the active device (filled),
-    // `hasCursor` is where mouse or keyboard sits (outlined).
-    component CursorSurface: Rectangle {
-        property bool hasCursor: false
-        property bool current: false
-
-        radius: panel.theme.radius(0.75)
-        color: current ? panel.theme.alpha(panel.theme.accent, 0.18) : (hasCursor ? panel.theme.alpha(panel.theme.textPrimary, 0.06) : "transparent")
-        border.width: panel.theme.borderWidth
-        border.color: hasCursor ? panel.theme.alpha(panel.theme.accent, 0.6) : "transparent"
-    }
-
     // Output/input device row — click switches the PipeWire default.
     component DeviceRow: CursorSurface {
         id: deviceRow
+
+        theme: panel.theme
 
         property var node: null
         property int rowIndex: 0
@@ -891,6 +839,8 @@ BarPanel {
     // Per-application playback stream: name, own volume, own mute.
     component StreamRow: CursorSurface {
         id: streamRow
+
+        theme: panel.theme
 
         property var node: null
         property int rowIndex: 0

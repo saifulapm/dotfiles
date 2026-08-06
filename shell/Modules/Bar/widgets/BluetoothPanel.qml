@@ -701,8 +701,9 @@ BarPanel {
             // Their compact on/off switch on the trailing edge of the hero,
             // and the header's only cursor target — status text alone; the
             // switch owns toggling, mouse and keyboard alike.
-            ToggleSwitch {
+            PanelSwitch {
                 id: powerSwitch
+                theme: panel.theme
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 visible: panel.adapter !== null
@@ -869,6 +870,8 @@ BarPanel {
     // by the panel so it survives rows moving between sections.
     component DeviceRow: CursorSurface {
         id: row
+
+        theme: panel.theme
 
         required property var dev
         required property int rowIndex
@@ -1076,77 +1079,6 @@ BarPanel {
             visible: forgetMouse.containsMouse
             anchor: forgetButton
             text: "Forget"
-        }
-    }
-
-    // The single highlight surface: `current` is the active choice (filled),
-    // `hasCursor` is where mouse or keyboard sits (outlined).
-    component CursorSurface: Rectangle {
-        property bool hasCursor: false
-        property bool current: false
-
-        radius: panel.theme.radius(0.75)
-        color: current ? panel.theme.alpha(panel.theme.accent, 0.18) : (hasCursor ? panel.theme.alpha(panel.theme.textPrimary, 0.06) : "transparent")
-        border.width: panel.theme.borderWidth
-        border.color: hasCursor ? panel.theme.alpha(panel.theme.accent, 0.6) : "transparent"
-    }
-
-    // Their ToggleSwitch, as ported for the network and tailscale panels.
-    component ToggleSwitch: Rectangle {
-        id: toggle
-
-        property bool checked: false
-        property bool hasCursor: false
-        property string hint: ""
-
-        signal hovered
-        signal toggled
-
-        implicitWidth: panel.theme.space(10)
-        implicitHeight: panel.theme.space(5.5)
-        radius: height / 2
-        color: checked ? panel.theme.accent : panel.theme.surface3
-        border.width: panel.theme.borderWidth
-        border.color: toggle.hasCursor ? panel.theme.accent : "transparent"
-
-        Behavior on color {
-            ColorAnimation {
-                duration: panel.theme.time(0.5)
-            }
-        }
-
-        Rectangle {
-            y: (parent.height - height) / 2
-            x: toggle.checked ? parent.width - width - (parent.height - height) / 2 : (parent.height - height) / 2
-            width: parent.height - panel.theme.space(1.5)
-            height: width
-            radius: width / 2
-            color: toggle.checked ? panel.theme.textOnAccent : panel.theme.textMuted
-
-            Behavior on x {
-                NumberAnimation {
-                    duration: panel.theme.time(0.5)
-                    easing.type: panel.theme.easing
-                }
-            }
-        }
-
-        HoverHandler {
-            id: toggleHover
-            cursorShape: Qt.PointingHandCursor
-            onHoveredChanged: if (hovered)
-                toggle.hovered()
-        }
-
-        TapHandler {
-            onTapped: toggle.toggled()
-        }
-
-        PanelHint {
-            theme: panel.theme
-            visible: toggleHover.hovered && toggle.hint !== ""
-            anchor: toggle
-            text: toggle.hint
         }
     }
 }

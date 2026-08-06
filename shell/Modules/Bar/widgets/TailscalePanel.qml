@@ -672,8 +672,9 @@ BarPanel {
                 // Their compact on/off switch on the trailing edge of the hero,
                 // and the header's only cursor target. The service flips
                 // `active` optimistically, so the knob throws on the click.
-                ToggleSwitch {
+                PanelSwitch {
                     id: powerSwitch
+                    theme: panel.theme
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     visible: panel.tailscale.installed
@@ -770,12 +771,18 @@ BarPanel {
                 }
 
                 InfoPair {
+                    theme: panel.theme
+
+                    onCopyRequested: value => panel.tailscale.copyToClipboard(value)
                     width: parent.width
                     label: "Status"
                     value: panel.tailscale.statusText
                 }
 
                 InfoPair {
+                    theme: panel.theme
+
+                    onCopyRequested: value => panel.tailscale.copyToClipboard(value)
                     width: parent.width
                     visible: panel.tailscale.selfDnsName !== ""
                     label: "Tailnet name"
@@ -784,6 +791,9 @@ BarPanel {
                 }
 
                 InfoPair {
+                    theme: panel.theme
+
+                    onCopyRequested: value => panel.tailscale.copyToClipboard(value)
                     width: parent.width
                     visible: panel.tailscale.selfIp !== ""
                     label: "Address"
@@ -796,12 +806,17 @@ BarPanel {
                 // runs `tailscale file get`. taildrop-receive.service is what
                 // runs it here, so the panel says whether it is up.
                 InfoPair {
+                    theme: panel.theme
+                    onCopyRequested: value => panel.tailscale.copyToClipboard(value)
                     width: parent.width
                     label: "Auto-receive"
                     value: panel.tailscale.receiveSummary
                 }
 
                 InfoPair {
+                    theme: panel.theme
+
+                    onCopyRequested: value => panel.tailscale.copyToClipboard(value)
                     width: parent.width
                     visible: panel.tailscale.receivePending > 0
                     label: "Inbox"
@@ -990,71 +1005,8 @@ BarPanel {
     }
 
     // ----------------------------------------------------------- components
-    component CursorSurface: Rectangle {
-        property bool hasCursor: false
-        property bool current: false
-
-        radius: panel.theme.radius(0.75)
-        color: current ? panel.theme.alpha(panel.theme.accent, 0.18) : (hasCursor ? panel.theme.alpha(panel.theme.textPrimary, 0.06) : "transparent")
-        border.width: panel.theme.borderWidth
-        border.color: hasCursor ? panel.theme.alpha(panel.theme.accent, 0.6) : "transparent"
-    }
-
     // A label on the left and a value on the right; the value copies itself
     // when it has something worth copying.
-    component InfoPair: Item {
-        id: infoPair
-
-        property string label: ""
-        property string value: ""
-        property string copyValue: ""
-
-        implicitHeight: visible ? Math.max(infoLabel.implicitHeight, infoValue.implicitHeight) : 0
-
-        HoverHandler {
-            id: infoHover
-            enabled: infoPair.copyValue !== ""
-            cursorShape: Qt.PointingHandCursor
-        }
-
-        TapHandler {
-            enabled: infoPair.copyValue !== ""
-            onTapped: panel.tailscale.copyToClipboard(infoPair.copyValue)
-        }
-
-        PanelHint {
-            theme: panel.theme
-            visible: infoHover.hovered
-            anchor: infoPair
-            text: "Copy"
-        }
-
-        Text {
-            id: infoLabel
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: infoPair.label
-            color: panel.theme.textPrimary
-            opacity: 0.6
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
-        }
-
-        Text {
-            id: infoValue
-            anchors.right: parent.right
-            anchors.left: infoLabel.right
-            anchors.leftMargin: panel.theme.space(2)
-            anchors.verticalCenter: parent.verticalCenter
-            horizontalAlignment: Text.AlignRight
-            elide: Text.ElideRight
-            text: infoPair.value
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.833)
-        }
-    }
-
     // Ours: a sentence about something the shell cannot fix by itself, over the
     // command that fixes it. Tapping copies the command — this shell has no
     // terminal to hand it to, and typing a `--operator=` line back out of a
@@ -1120,6 +1072,8 @@ BarPanel {
 
     component AuthRow: CursorSurface {
         id: authRow
+
+        theme: panel.theme
 
         hasCursor: panel.cursorActive && panel.focusSection === "auth"
         implicitHeight: authInner.implicitHeight + panel.theme.space(3)
@@ -1187,6 +1141,8 @@ BarPanel {
 
     component AccountRow: CursorSurface {
         id: accountRow
+
+        theme: panel.theme
 
         property var account: null
         property int rowIndex: 0
@@ -1268,6 +1224,8 @@ BarPanel {
 
     component ExitNodeRow: CursorSurface {
         id: exitNodeRow
+
+        theme: panel.theme
 
         property var peer: null
         property int rowIndex: 0
@@ -1352,6 +1310,8 @@ BarPanel {
 
     component MullvadRegionRow: CursorSurface {
         id: regionRow
+
+        theme: panel.theme
 
         property var peer: null
         property int rowIndex: 0
@@ -1438,6 +1398,8 @@ BarPanel {
     component PeerRow: CursorSurface {
         id: peerRow
 
+        theme: panel.theme
+
         property var peer: null
         property int rowIndex: 0
         readonly property string peerName: peer ? String(peer.DisplayName || peer.HostName || "Unknown") : "Unknown"
@@ -1481,8 +1443,11 @@ BarPanel {
                 pixelSize: panel.theme.fontPx(1.083)
             }
 
-            GlyphAction {
+            GlyphButton {
                 id: copyButton
+                theme: panel.theme
+
+                glyphSize: panel.theme.fontPx(1.0)
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 glyph: "󰆏"
@@ -1491,8 +1456,11 @@ BarPanel {
                 onActivated: peerRow.menuOpen ? panel.closeCopyMenu() : panel.openCopyMenu(peerRow.rowIndex)
             }
 
-            GlyphAction {
+            GlyphButton {
                 id: sendButton
+                theme: panel.theme
+
+                glyphSize: panel.theme.fontPx(1.0)
                 anchors.right: copyButton.left
                 anchors.rightMargin: panel.theme.space(1)
                 anchors.verticalCenter: parent.verticalCenter
@@ -1571,6 +1539,8 @@ BarPanel {
     component CopyChoice: CursorSurface {
         id: copyChoice
 
+        theme: panel.theme
+
         property string label: ""
         property bool selected: false
 
@@ -1609,112 +1579,6 @@ BarPanel {
             text: "󰆏"
             color: panel.theme.textPrimary
             pixelSize: panel.theme.fontPx(0.917)
-        }
-    }
-
-    // Their PanelActionButton: a bordered square holding one glyph. The house
-    // PanelButton draws its label in the UI font, which carries no Nerd Font
-    // coverage — glyphs have to go through OpticalGlyph.
-    component GlyphAction: Rectangle {
-        id: glyphAction
-
-        property string glyph: ""
-        property string hint: ""
-
-        // Item.enabled itself, not a shadowing property of the same name:
-        // disabling the item disables its handlers with it.
-        signal activated
-
-        implicitWidth: panel.theme.space(8)
-        implicitHeight: panel.theme.space(7)
-        radius: panel.theme.radius(0.75)
-        color: glyphHover.hovered && glyphAction.enabled ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: panel.theme.surface3
-        opacity: glyphAction.enabled ? 1 : 0.45
-
-        OpticalGlyph {
-            anchors.centerIn: parent
-            text: glyphAction.glyph
-            color: panel.theme.textPrimary
-            pixelSize: panel.theme.fontPx(1.0)
-        }
-
-        HoverHandler {
-            id: glyphHover
-            cursorShape: glyphAction.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-        }
-
-        TapHandler {
-            onTapped: glyphAction.activated()
-        }
-
-        PanelHint {
-            theme: panel.theme
-            visible: glyphHover.hovered && glyphAction.hint !== ""
-            anchor: glyphAction
-            text: glyphAction.hint
-        }
-    }
-
-    // Their ToggleSwitch, as ported for the network and dropbox panels.
-    component ToggleSwitch: Rectangle {
-        id: toggle
-
-        property bool checked: false
-        property bool hasCursor: false
-        property bool busy: false
-        property string hint: ""
-
-        signal hovered
-        signal toggled
-
-        implicitWidth: panel.theme.space(10)
-        implicitHeight: panel.theme.space(5.5)
-        radius: height / 2
-        color: checked ? panel.theme.accent : panel.theme.surface3
-        border.width: panel.theme.borderWidth
-        border.color: toggle.hasCursor ? panel.theme.accent : "transparent"
-        opacity: toggle.busy ? 0.6 : 1
-
-        Behavior on color {
-            ColorAnimation {
-                duration: panel.theme.time(0.5)
-            }
-        }
-
-        Rectangle {
-            y: (parent.height - height) / 2
-            x: toggle.checked ? parent.width - width - (parent.height - height) / 2 : (parent.height - height) / 2
-            width: parent.height - panel.theme.space(1.5)
-            height: width
-            radius: width / 2
-            color: toggle.checked ? panel.theme.textOnAccent : panel.theme.textMuted
-
-            Behavior on x {
-                NumberAnimation {
-                    duration: panel.theme.time(0.5)
-                    easing.type: panel.theme.easing
-                }
-            }
-        }
-
-        HoverHandler {
-            id: toggleHover
-            cursorShape: Qt.PointingHandCursor
-            onHoveredChanged: if (hovered)
-                toggle.hovered()
-        }
-
-        TapHandler {
-            onTapped: toggle.toggled()
-        }
-
-        PanelHint {
-            theme: panel.theme
-            visible: toggleHover.hovered && toggle.hint !== ""
-            anchor: toggle
-            text: toggle.hint
         }
     }
 

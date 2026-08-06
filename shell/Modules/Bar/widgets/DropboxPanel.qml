@@ -269,8 +269,9 @@ BarPanel {
                 // Their compact on/off switch on the trailing edge of the hero,
                 // and the header's only cursor target. The service flips
                 // `active` optimistically, so the knob throws on the click.
-                ToggleSwitch {
+                PanelSwitch {
                     id: powerSwitch
+                    theme: panel.theme
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     visible: panel.dropbox.installed
@@ -341,6 +342,7 @@ BarPanel {
             // --------------------------------------------------------- login
             CursorSurface {
                 id: loginButton
+                theme: panel.theme
 
                 visible: !panel.dropbox.authenticated
                 width: parent.width
@@ -411,8 +413,9 @@ BarPanel {
 
                     // Their PanelActionButton and its key glyph (already a
                     // Material Design codepoint, so it renders as-is).
-                    GlyphAction {
+                    GlyphButton {
                         id: loginAction
+                        theme: panel.theme
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         glyph: "󰌋"
@@ -443,7 +446,8 @@ BarPanel {
                     onTapped: panel.dropbox.openFolder()
                 }
 
-                Hint {
+                PanelHint {
+                    theme: panel.theme
                     visible: storedHover.hovered
                     anchor: storedRow
                     text: "Open " + (panel.dropbox.accountPath || "the Dropbox folder")
@@ -532,17 +536,10 @@ BarPanel {
     }
 
     // ----------------------------------------------------------- components
-    component CursorSurface: Rectangle {
-        property bool hasCursor: false
-
-        radius: panel.theme.radius(0.75)
-        color: hasCursor ? panel.theme.alpha(panel.theme.textPrimary, 0.06) : "transparent"
-        border.width: panel.theme.borderWidth
-        border.color: hasCursor ? panel.theme.alpha(panel.theme.accent, 0.6) : "transparent"
-    }
-
     component FileRow: CursorSurface {
         id: fileRow
+
+        theme: panel.theme
 
         property var file: null
         property int rowIndex: 0
@@ -600,132 +597,6 @@ BarPanel {
                 font.pixelSize: panel.theme.fontPx(0.75)
                 elide: Text.ElideRight
             }
-        }
-    }
-
-    // Their PanelActionButton: a bordered square holding one glyph. The house
-    // PanelButton draws its label in the UI font, which carries no Nerd Font
-    // coverage — glyphs have to go through OpticalGlyph.
-    component GlyphAction: Rectangle {
-        id: glyphAction
-
-        property string glyph: ""
-        property bool enabled: true
-
-        signal activated
-
-        implicitWidth: panel.theme.space(8)
-        implicitHeight: panel.theme.space(7)
-        radius: panel.theme.radius(0.75)
-        color: glyphHover.hovered && glyphAction.enabled ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: panel.theme.surface3
-        opacity: glyphAction.enabled ? 1 : 0.45
-
-        OpticalGlyph {
-            anchors.centerIn: parent
-            text: glyphAction.glyph
-            color: panel.theme.textPrimary
-            pixelSize: panel.theme.fontPx(1.083)
-        }
-
-        HoverHandler {
-            id: glyphHover
-            cursorShape: glyphAction.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-        }
-
-        TapHandler {
-            enabled: glyphAction.enabled
-            onTapped: glyphAction.activated()
-        }
-    }
-
-    // Their ToggleSwitch, as ported for the network panel.
-    component ToggleSwitch: Rectangle {
-        id: toggle
-
-        property bool checked: false
-        property bool hasCursor: false
-        property bool busy: false
-        property string hint: ""
-
-        signal hovered
-        signal toggled
-
-        implicitWidth: panel.theme.space(10)
-        implicitHeight: panel.theme.space(5.5)
-        radius: height / 2
-        color: checked ? panel.theme.accent : panel.theme.surface3
-        border.width: panel.theme.borderWidth
-        border.color: toggle.hasCursor ? panel.theme.accent : "transparent"
-        opacity: toggle.busy ? 0.6 : 1
-
-        Behavior on color {
-            ColorAnimation {
-                duration: panel.theme.time(0.5)
-            }
-        }
-
-        Rectangle {
-            y: (parent.height - height) / 2
-            x: toggle.checked ? parent.width - width - (parent.height - height) / 2 : (parent.height - height) / 2
-            width: parent.height - panel.theme.space(1.5)
-            height: width
-            radius: width / 2
-            color: toggle.checked ? panel.theme.textOnAccent : panel.theme.textMuted
-
-            Behavior on x {
-                NumberAnimation {
-                    duration: panel.theme.time(0.5)
-                    easing.type: panel.theme.easing
-                }
-            }
-        }
-
-        HoverHandler {
-            id: toggleHover
-            cursorShape: Qt.PointingHandCursor
-            onHoveredChanged: if (hovered)
-                toggle.hovered()
-        }
-
-        TapHandler {
-            onTapped: toggle.toggled()
-        }
-
-        Hint {
-            visible: toggleHover.hovered && toggle.hint !== ""
-            anchor: toggle
-            text: toggle.hint
-        }
-    }
-
-    // Their PanelToolTip, kept inside the card (NetworkPanel's).
-    component Hint: Rectangle {
-        id: hintBox
-
-        property Item anchor: null
-        property string text: ""
-
-        parent: hintBox.anchor
-        anchors.right: hintBox.anchor ? hintBox.anchor.right : undefined
-        anchors.top: hintBox.anchor ? hintBox.anchor.bottom : undefined
-        anchors.topMargin: panel.theme.space(1)
-        width: hintLabel.implicitWidth + panel.theme.space(3)
-        height: hintLabel.implicitHeight + panel.theme.space(2)
-        radius: panel.theme.radius(0.75)
-        color: panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: panel.theme.surface3
-        z: 10
-
-        Text {
-            id: hintLabel
-            anchors.centerIn: parent
-            text: hintBox.text
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
         }
     }
 }

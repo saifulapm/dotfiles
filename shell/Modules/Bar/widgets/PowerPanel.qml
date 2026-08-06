@@ -330,16 +330,31 @@ BarPanel {
             spacing: panel.theme.space(1)
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 label: "Battery size"
                 value: panel.sizeText
             }
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 label: "Charge cycles"
                 value: panel.systemInfo.cycles || "—"
             }
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 label: "Health"
                 value: {
                     if (panel.present && panel.device.healthSupported)
@@ -354,16 +369,31 @@ BarPanel {
             spacing: panel.theme.space(1)
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 label: panel.chargeThresholdActive ? "Charge limit" : (panel.discharging ? "Time left" : "Time to full")
                 value: panel.chargeThresholdActive ? (panel.systemInfo.threshold || "-") : (panel.batteryFlowIdle ? "-" : (panel.timeText || "—"))
             }
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 label: panel.chargeThresholdActive ? "Battery state" : (panel.discharging ? "Discharging" : "Charging")
                 value: panel.chargeThresholdActive ? "Holding" : (panel.batteryFull ? "-" : (panel.rateText || "—"))
             }
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 visible: !panel.chargeThresholdActive && panel.systemInfo.threshold !== undefined
                 label: "Charge limit"
                 value: panel.systemInfo.threshold || "—"
@@ -391,11 +421,21 @@ BarPanel {
             spacing: panel.theme.space(1)
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 label: "CPU"
                 value: panel.systemInfo.cpu || "—"
             }
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 label: "Load"
                 value: panel.systemInfo.load || "—"
             }
@@ -406,11 +446,21 @@ BarPanel {
             spacing: panel.theme.space(1)
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 label: "Memory"
                 value: panel.systemInfo.memory || "—"
             }
 
             InfoPair {
+                theme: panel.theme
+
+                labelColor: panel.theme.textMuted
+
+                labelOpacity: 1
                 label: panel.systemInfo.temperature_label || "Temperature"
                 value: panel.systemInfo.temperature || "—"
             }
@@ -510,35 +560,5 @@ BarPanel {
         font.pixelSize: panel.theme.fontPx(0.75)
         font.weight: Font.DemiBold
         font.letterSpacing: 1.2
-    }
-
-    component InfoPair: Item {
-        id: pair
-
-        property string label: ""
-        property string value: ""
-
-        width: parent ? parent.width : 0
-        implicitHeight: Math.max(pairLabel.implicitHeight, pairValue.implicitHeight)
-
-        Text {
-            id: pairLabel
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: pair.label
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
-        }
-
-        Text {
-            id: pairValue
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: pair.value
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.833)
-        }
     }
 }

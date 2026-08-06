@@ -1368,7 +1368,8 @@ BarPanel {
                         onActivated: panel.showSpeedTest()
                     }
 
-                    ToggleSwitch {
+                    PanelSwitch {
+                        theme: panel.theme
                         anchors.verticalCenter: parent.verticalCenter
                         visible: panel.canToggleWifi
                         checked: Networking.wifiEnabled
@@ -1516,7 +1517,8 @@ BarPanel {
                             font.weight: Font.DemiBold
                         }
 
-                        ToggleSwitch {
+                        PanelSwitch {
+                            theme: panel.theme
                             anchors.verticalCenter: parent.verticalCenter
                             compact: true
                             checked: !panel.bandPinned
@@ -1809,7 +1811,6 @@ BarPanel {
         }
 
         PanelHint {
-
             theme: panel.theme
             visible: cellHover.hovered && (cell.hint !== "" || cell.copyable)
             anchor: cell
@@ -1850,21 +1851,11 @@ BarPanel {
         }
     }
 
-    // The single highlight surface: `current` is the active choice (filled),
-    // `hasCursor` is where mouse or keyboard sits (outlined).
-    component CursorSurface: Rectangle {
-        property bool hasCursor: false
-        property bool current: false
-
-        radius: panel.theme.radius(0.75)
-        color: current ? panel.theme.alpha(panel.theme.accent, 0.18) : (hasCursor ? panel.theme.alpha(panel.theme.textPrimary, 0.06) : "transparent")
-        border.width: panel.theme.borderWidth
-        border.color: hasCursor ? panel.theme.alpha(panel.theme.accent, 0.6) : "transparent"
-    }
-
     // Hero icon action (QR, speed test).
     component HeroAction: CursorSurface {
         id: heroAction
+
+        theme: panel.theme
 
         property string glyph: ""
         property string hint: ""
@@ -1895,7 +1886,6 @@ BarPanel {
         }
 
         PanelHint {
-
             theme: panel.theme
             visible: heroHover.hovered
             anchor: heroAction
@@ -1905,71 +1895,11 @@ BarPanel {
 
     // Their ToggleSwitch: a track with a knob, cursor-aware, with the busy
     // state dimming it while a change is in flight.
-    component ToggleSwitch: Rectangle {
-        id: toggle
-
-        property bool checked: false
-        property bool hasCursor: false
-        property bool busy: false
-        property bool compact: false
-        property string hint: ""
-
-        signal hovered
-        signal toggled
-
-        implicitWidth: compact ? panel.theme.space(7) : panel.theme.space(10)
-        implicitHeight: compact ? panel.theme.space(4) : panel.theme.space(5.5)
-        radius: height / 2
-        color: checked ? panel.theme.accent : panel.theme.surface3
-        border.width: panel.theme.borderWidth
-        border.color: toggle.hasCursor ? panel.theme.accent : "transparent"
-        opacity: toggle.busy ? 0.6 : 1
-
-        Behavior on color {
-            ColorAnimation {
-                duration: panel.theme.time(0.5)
-            }
-        }
-
-        Rectangle {
-            y: (parent.height - height) / 2
-            x: toggle.checked ? parent.width - width - (parent.height - height) / 2 : (parent.height - height) / 2
-            width: parent.height - panel.theme.space(1.5)
-            height: width
-            radius: width / 2
-            color: toggle.checked ? panel.theme.textOnAccent : panel.theme.textMuted
-
-            Behavior on x {
-                NumberAnimation {
-                    duration: panel.theme.time(0.5)
-                    easing.type: panel.theme.easing
-                }
-            }
-        }
-
-        HoverHandler {
-            id: toggleHover
-            cursorShape: Qt.PointingHandCursor
-            onHoveredChanged: if (hovered)
-                toggle.hovered()
-        }
-
-        TapHandler {
-            onTapped: toggle.toggled()
-        }
-
-        PanelHint {
-
-            theme: panel.theme
-            visible: toggleHover.hovered && toggle.hint !== ""
-            anchor: toggle
-            text: toggle.hint
-        }
-    }
-
     // A band or DNS choice.
     component Pill: CursorSurface {
         id: pill
+
+        theme: panel.theme
 
         property string label: ""
         property string hint: ""
@@ -2004,7 +1934,6 @@ BarPanel {
         }
 
         PanelHint {
-
             theme: panel.theme
             visible: pillHover.hovered && pill.hint !== ""
             anchor: pill
@@ -2074,6 +2003,8 @@ BarPanel {
     // yet. Clicking a connected row disconnects.
     component NetworkRow: CursorSurface {
         id: row
+
+        theme: panel.theme
 
         required property var net
         required property int rowIndex
@@ -2250,7 +2181,6 @@ BarPanel {
                 }
 
                 PanelHint {
-
                     theme: panel.theme
                     visible: forgetMouse.containsMouse && row.canForget
                     anchor: rightAction
