@@ -1,0 +1,20 @@
+# Global mise config — chezmoi-managed, the source of truth for tool versions.
+# Change versions HERE and `chezmoi apply`; don't `mise use -g` (that rewrites
+# this file at runtime and fights chezmoi). Bootstrap scripts install with
+# `mise install <tool>`, which reads this file without editing it.
+
+[tools]
+node = "lts"     # resolves to the current LTS major at install time
+deno = "latest"
+
+[settings]
+# Let mise honor .nvmrc / .node-version / package.json devEngines in project
+# repos — disabled by default since mise 2025, and Laravel/React repos carry
+# these instead of mise.toml.
+idiomatic_version_file_enable_tools = ["node"]
+
+[settings.node]
+# Run `corepack enable` after every node install, so the pnpm shim survives
+# an lts major bump instead of silently vanishing. Node ≥ 25 stops bundling
+# corepack — revisit this mechanism when lts resolves to 26 (Oct 2026).
+corepack = true

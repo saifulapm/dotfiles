@@ -16,9 +16,10 @@ export PATH="$PNPM_HOME/bin:$HOME/.cargo/bin:$PATH"
 warn() { echo "dev-toolchain: $*" >&2; }
 
 if command -v mise >/dev/null 2>&1; then
-  # node, version-managed, global default in ~/.config/mise/config.toml
+  # node: version declared in the chezmoi-managed ~/.config/mise/config.toml
+  # (node = "lts"); `mise install` reads that file without rewriting it
   if ! mise which node >/dev/null 2>&1; then
-    mise use -g node@lts && echo "dev-toolchain: node installed via mise" \
+    mise install node && echo "dev-toolchain: node installed via mise" \
       || warn "node install failed (offline?) — theme bootstrap will degrade; rerun 'chezmoi apply'"
   fi
   # pnpm via corepack (shims land next to the mise-managed node)

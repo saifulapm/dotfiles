@@ -774,8 +774,8 @@ why = "Qt Multimedia — omacut's .pro declares QT += multimedia (video preview)
 
 [[tool]]
 name = "node"
-via  = "mise use -g node@lts"
-why  = "Node runtime, version-managed per decision 2026-08-05"
+via  = "mise install node — version pinned as node = \"lts\" in the chezmoi-managed ~/.config/mise/config.toml (run_after_03-dev-toolchain.sh)"
+why  = "Node runtime, version-managed per decision 2026-08-05; .nvmrc/.node-version detection enabled there too (mise disables idiomatic version files by default)"
 
 [[tool]]
 name = "pnpm"
@@ -880,7 +880,7 @@ why  = "fish is the login shell (user decision 2026-08-07). The fish config port
 
 [[tool]]
 name = "deno"
-via  = "mise use -g deno@latest (run_after_08-cli-tools.sh)"
+via  = "mise install deno — pinned as deno = \"latest\" in the chezmoi-managed ~/.config/mise/config.toml (run_after_08-cli-tools.sh)"
 why  = "Deno runtime from the mac list; mise already manages node, one mechanism for both"
 
 [[tool]]

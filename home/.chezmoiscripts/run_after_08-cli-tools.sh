@@ -42,9 +42,10 @@ else
   warn "pnpm not available (mise/node missing?) — pnpm globals skipped"
 fi
 
-# ─── deno (mise, same mechanism as node) ─────────────────────────────────────
+# ─── deno (mise, same mechanism as node; version declared in the ────────────
+# ─── chezmoi-managed ~/.config/mise/config.toml) ─────────────────────────────
 if command -v mise >/dev/null 2>&1 && ! mise which deno >/dev/null 2>&1; then
-  mise use -g deno@latest >/dev/null 2>&1 \
+  mise install deno >/dev/null 2>&1 \
     && echo "cli-tools: deno installed via mise" \
     || warn "mise deno install failed"
 fi
