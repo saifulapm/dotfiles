@@ -35,7 +35,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline.sh",
+    "command": "~/.claude/statusline.py",
     "refreshInterval": 10
   },
   "model": "claude-fable-5[1m]",
