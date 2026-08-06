@@ -1,0 +1,41 @@
+theme = "kanagawa"
+
+[editor]
+scroll-lines = 1
+cursorline = true
+auto-save = false
+completion-trigger-len = 1
+true-color = true
+color-modes = true
+auto-pairs = true
+rulers = [150]
+idle-timeout = 50
+
+[editor.statusline]
+left = ["mode", "file-type", "file-base-name", "file-modification-indicator"]
+center = []
+right = ["spinner", "diagnostics", "workspace-diagnostics", "version-control", "position", "total-line-numbers"]
+separator = "│"
+
+[editor.indent-guides]
+render = true
+character = "┊" # Some characters that work well: "▏", "┆", "┊", "⸽"
+skip-levels = 1
+
+[editor.lsp]
+display-messages = false
+display-inlay-hints = false
+
+[editor.cursor-shape]
+insert = "bar"
+normal = "block"
+select = "underline"
+
+[editor.file-picker]
+hidden = false
+
+[editor.gutters]
+layout = ["diff", "diagnostics", "line-numbers", "spacer"]
+
+[editor.gutters.line-numbers]
+min-width = 1

@@ -1,0 +1,6 @@
+#!/bin/sh
+# The kak-lsp config (autoload/tools/lsp.kak) launches eslint by this name —
+# on the mac it was a node wrapper around a hand-built ~/.vscode-eslint
+# checkout. Here the server comes from the vscode-langservers-extracted pnpm
+# package under its own binary name; this shim keeps the config portable.
+exec vscode-eslint-language-server "$@"

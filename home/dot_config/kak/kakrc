@@ -1,0 +1,36 @@
+# ---------------------
+# Global Options
+# ---------------------
+set-option global tabstop 2
+set-option global indentwidth 2
+set-option global autoreload true
+set-option global startup_info_version 20250603
+set-option global matching_pairs ( ) { } [ ] < > \" \" « » ‹ ›
+set-option global ui_options terminal_set_title=yes terminal_title=Saiful terminal_synchronized=yes
+# set-option global modelinefmt '%val{bufname} %val{cursor_line}:%val{cursor_char_column} %val{buf_line_count} {{context_info}} {{mode_info}} - %val{client}@[%val{session}]'
+
+# Performance tuning
+set-option global idle_timeout 150
+set-option global writemethod replace
+set-option global scrolloff 5,3
+
+add-highlighter global/line_numbers number-lines -hlcursor -separator " " -min-digits 4
+add-highlighter global/show-matching show-matching -previous
+add-highlighter global/show-whitespaces show-whitespaces -only-trailing
+
+# Tree-sitter rainbow brackets
+hook global WinSetOption filetype=.+ %{
+    try %{ add-highlighter window/rainbow tree-sitter-rainbow }
+}
+hook global WinSetOption filetype= %{
+    try %{ remove-highlighter window/rainbow }
+}
+
+# ---------------
+# Colorscheme
+# ---------------
+colorscheme gruvbox
+# colorscheme tokyonight_storm
+
+# eval %sh{kak-claude init}
+# eval %sh{ kak-pi init }

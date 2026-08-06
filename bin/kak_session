@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Parse arguments for -s server_name
+server_name=""
+args=()
+while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "-s" && -n "$2" ]]; then
+        server_name="$2"
+        args+=("$1" "$2")
+        shift 2
+    else
+        args+=("$1")
+        shift
+    fi
+done
+
+# If no server_name provided, use current directory basename
+if [[ -z "$server_name" ]]; then
+    server_name=$(basename "$PWD")
+fi
+
+socket_file=$(kak -l | grep "^$server_name$")
+
+if [[ -z "$socket_file" ]]; then
+    # Create new kakoune daemon for server_name
+    setsid kak -d -s "$server_name" &
+    # Wait for the daemon to start
+    for i in {1..10}; do
+        sleep 0.2
+        socket_file=$(kak -l | grep "^$server_name$")
+        if [[ -n "$socket_file" ]]; then
+            break
+        fi
+    done
+fi
+
+# Run kakoune client with the server_name and any other arguments
+kak -c "$server_name" "${args[@]}"
