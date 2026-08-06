@@ -600,7 +600,7 @@ BarPanel {
 
     PhraseRotator {
         theme: panel.theme
-        target: heroMeta
+        target: hero.metaItem
         running: panel.opened && panel.tailscale.active
         onAdvance: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
     }
@@ -626,16 +626,19 @@ BarPanel {
             spacing: panel.theme.space(3)
 
             // ---------------------------------------------------------- hero
-            Item {
+            PanelHero {
                 id: hero
 
+                theme: panel.theme
                 width: parent.width
-                implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight)
+                title: panel.tailscale.installed && panel.tailscale.selfName !== "" ? panel.tailscale.selfName : "Tailscale"
+                meta: panel.tailscale.active ? panel.heroPhraseText : "Tailscale is disconnected"
+                metaFamily: panel.theme.fontUi
+                metaWeight: Font.Normal
+                metaLetterSpacing: 0
+                metaPixelSize: panel.theme.fontPx(0.833)
 
-                TailscaleIcon {
-                    id: heroIcon
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
+                icon: TailscaleIcon {
                     iconSize: panel.theme.fontPx(1.6)
                     color: panel.tailscale.active ? panel.theme.textPrimary : panel.theme.textMuted
                     opacity: panel.tailscale.active ? 1.0 : 0.5
@@ -650,10 +653,8 @@ BarPanel {
                 // Their compact on/off switch on the trailing edge of the hero,
                 // and the header's only cursor target. The service flips
                 // `active` optimistically, so the knob throws on the click.
-                PanelSwitch {
-                    id: powerSwitch
+                trailing: PanelSwitch {
                     theme: panel.theme
-                    anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     visible: panel.tailscale.installed
                     checked: panel.tailscale.active
@@ -662,37 +663,6 @@ BarPanel {
                     hint: panel.toggleHint
                     onHovered: panel.setHeaderCursor()
                     onToggled: panel.tailscale.toggleTailscale()
-                }
-
-                Column {
-                    id: heroLabels
-
-                    anchors.left: heroIcon.right
-                    anchors.leftMargin: panel.theme.space(3)
-                    anchors.right: powerSwitch.visible ? powerSwitch.left : parent.right
-                    anchors.rightMargin: panel.theme.space(3)
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: panel.theme.space(0.5)
-
-                    Text {
-                        width: parent.width
-                        text: panel.tailscale.installed && panel.tailscale.selfName !== "" ? panel.tailscale.selfName : "Tailscale"
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(1.083)
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        id: heroMeta
-                        width: parent.width
-                        text: panel.tailscale.active ? panel.heroPhraseText : "Tailscale is disconnected"
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.833)
-                        elide: Text.ElideRight
-                    }
                 }
             }
 

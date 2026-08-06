@@ -123,7 +123,7 @@ BarPanel {
     // organism rather than a hard cut.
     PhraseRotator {
         theme: panel.theme
-        target: heroStatus
+        target: hero.metaItem
         running: panel.opened && panel.rotatingPhrases
         onAdvance: {
             const n = panel.activePhrases.length;
@@ -171,54 +171,23 @@ BarPanel {
     }
 
     // ------------------------------------------------------------- hero row
-    Item {
-        width: parent.width
-        height: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, heroPercent.implicitHeight)
+    PanelHero {
+        id: hero
 
-        OpticalGlyph {
-            id: heroIcon
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
+        theme: panel.theme
+        width: parent.width
+        labelRightMargin: panel.theme.space(2)
+        title: "Battery"
+        meta: panel.heroStatusText.toUpperCase()
+        metaFamily: panel.theme.fontUi
+
+        icon: OpticalGlyph {
             text: panel.batteryIcon || "󰂑"
             color: panel.theme.textPrimary
             pixelSize: panel.theme.fontPx(2.333)
         }
 
-        Column {
-            id: heroLabels
-            anchors.left: heroIcon.right
-            anchors.leftMargin: panel.theme.space(3)
-            anchors.right: heroPercent.left
-            anchors.rightMargin: panel.theme.space(2)
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: panel.theme.space(0.5)
-
-            Text {
-                width: parent.width
-                text: "Battery"
-                color: panel.theme.textPrimary
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(1.083)
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
-            }
-
-            Text {
-                id: heroStatus
-                width: parent.width
-                text: panel.heroStatusText.toUpperCase()
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.75)
-                font.weight: Font.DemiBold
-                font.letterSpacing: 1.2
-                elide: Text.ElideRight
-            }
-        }
-
-        Text {
-            id: heroPercent
-            anchors.right: parent.right
+        trailing: Text {
             anchors.verticalCenter: parent.verticalCenter
             text: panel.present ? panel.pct + "%" : "—"
             color: panel.theme.textPrimary

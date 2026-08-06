@@ -1238,7 +1238,7 @@ BarPanel {
 
     PhraseRotator {
         theme: panel.theme
-        target: heroMeta
+        target: hero.metaItem
         running: panel.opened && (panel.info.type === "ethernet" || (panel.info.type === "wifi" && !!panel.connectedWifiNetwork))
         onAdvance: panel.connectionPhraseIndex = (panel.connectionPhraseIndex + 1) % panel.connectionPhrases.length
     }
@@ -1302,29 +1302,40 @@ BarPanel {
             spacing: panel.theme.space(3)
 
             // -------------------------------------------------------- hero
-            Item {
+            PanelHero {
                 id: hero
 
-                width: parent.width
-                implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, heroActions.implicitHeight)
+                readonly property string heroTitle: {
+                    if (panel.info.type === "wifi")
+                        return panel.info.ssid || "Wi-Fi";
+                    if (panel.info.type === "ethernet")
+                        return "Ethernet";
+                    return panel.info.iface || (panel.kind === "disconnected" ? "Disconnected" : "No connection");
+                }
+                // Link detail rides inline after the name —
+                // "Ethernet (2.5gbit)" — rather than in a pill.
+                readonly property string heroDetail: Model.headerDetail(panel.info)
 
-                OpticalGlyph {
-                    id: heroIcon
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
+                theme: panel.theme
+                width: parent.width
+                title: heroDetail !== "" ? heroTitle + " (" + heroDetail + ")" : heroTitle
+                meta: {
+                    if (panel.info.type === "wifi")
+                        return panel.connectedWifiNetwork ? panel.connectionPhrase.toUpperCase() : (panel.kind === "disconnected" ? "NOT CONNECTED" : "");
+                    if (panel.info.type === "ethernet")
+                        return panel.connectionPhrase.toUpperCase();
+                    return panel.kind === "disconnected" ? "NOT CONNECTED" : "";
+                }
+                metaVisible: meta !== ""
+
+                icon: OpticalGlyph {
                     text: panel.kind === "ethernet" ? "󰈀" : panel.kind === "wifi" ? Model.wifiIconFor(Model.signalPercent(panel.connectedWifiNetwork)) : "󰤮"
                     color: panel.theme.textPrimary
                     opacity: panel.networkManagerAvailable ? 1 : 0.5
                     pixelSize: panel.theme.fontPx(1.6)
                 }
 
-                Row {
-                    id: heroActions
-
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: panel.theme.space(2)
-
+                trailing: [
                     HeroAction {
                         visible: panel.canShareWifi
                         glyph: "󰐲"
@@ -1332,8 +1343,7 @@ BarPanel {
                         hasCursor: panel.qrHeaderHasCursor
                         onHovered: panel.setHeaderCursor(panel.qrHeaderIndex)
                         onActivated: panel.showWifiQr()
-                    }
-
+                    },
                     HeroAction {
                         visible: panel.canRunSpeedTest
                         glyph: "󰓅"
@@ -1341,8 +1351,7 @@ BarPanel {
                         hasCursor: panel.speedHeaderHasCursor
                         onHovered: panel.setHeaderCursor(panel.speedHeaderIndex)
                         onActivated: panel.showSpeedTest()
-                    }
-
+                    },
                     PanelSwitch {
                         theme: panel.theme
                         anchors.verticalCenter: parent.verticalCenter
@@ -1353,59 +1362,7 @@ BarPanel {
                         onHovered: panel.setHeaderCursor(panel.toggleHeaderIndex)
                         onToggled: panel.toggleWifi()
                     }
-                }
-
-                Column {
-                    id: heroLabels
-
-                    anchors.left: heroIcon.right
-                    anchors.leftMargin: panel.theme.space(3)
-                    anchors.right: heroActions.left
-                    anchors.rightMargin: panel.theme.space(3)
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: panel.theme.space(0.5)
-
-                    Text {
-                        readonly property string title: {
-                            if (panel.info.type === "wifi")
-                                return panel.info.ssid || "Wi-Fi";
-                            if (panel.info.type === "ethernet")
-                                return "Ethernet";
-                            return panel.info.iface || (panel.kind === "disconnected" ? "Disconnected" : "No connection");
-                        }
-                        // Link detail rides inline after the name —
-                        // "Ethernet (2.5gbit)" — rather than in a pill.
-                        readonly property string detail: Model.headerDetail(panel.info)
-
-                        width: parent.width
-                        text: detail !== "" ? title + " (" + detail + ")" : title
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(1.083)
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        id: heroMeta
-
-                        width: parent.width
-                        text: {
-                            if (panel.info.type === "wifi")
-                                return panel.connectedWifiNetwork ? panel.connectionPhrase.toUpperCase() : (panel.kind === "disconnected" ? "NOT CONNECTED" : "");
-                            if (panel.info.type === "ethernet")
-                                return panel.connectionPhrase.toUpperCase();
-                            return panel.kind === "disconnected" ? "NOT CONNECTED" : "";
-                        }
-                        visible: text !== ""
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.75)
-                        font.letterSpacing: 1.2
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideRight
-                    }
-                }
+                ]
             }
 
             // ------------------------------------------------------- stats

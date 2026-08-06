@@ -584,7 +584,7 @@ BarPanel {
 
     PhraseRotator {
         theme: panel.theme
-        target: heroMeta
+        target: hero.metaItem
         running: panel.opened && panel.rotatingPhrases
         onAdvance: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
     }
@@ -650,16 +650,15 @@ BarPanel {
         spacing: panel.theme.space(3)
 
         // ---------------------------------------------------------- hero
-        Item {
+        PanelHero {
             id: hero
 
+            theme: panel.theme
             width: parent.width
-            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight)
+            title: "Bluetooth"
+            meta: panel.heroStatusText.toUpperCase()
 
-            OpticalGlyph {
-                id: heroIcon
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
+            icon: OpticalGlyph {
                 text: panel.icon
                 color: panel.theme.textPrimary
                 opacity: panel.adapter && panel.adapter.enabled ? 1.0 : 0.5
@@ -669,10 +668,8 @@ BarPanel {
             // Their compact on/off switch on the trailing edge of the hero,
             // and the header's only cursor target — status text alone; the
             // switch owns toggling, mouse and keyboard alike.
-            PanelSwitch {
-                id: powerSwitch
+            trailing: PanelSwitch {
                 theme: panel.theme
-                anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 visible: panel.adapter !== null
                 checked: panel.adapter !== null && panel.adapter.enabled
@@ -680,39 +677,6 @@ BarPanel {
                 hint: panel.toggleHint
                 onHovered: panel.setHeaderCursor()
                 onToggled: panel.toggleBluetooth()
-            }
-
-            Column {
-                id: heroLabels
-
-                anchors.left: heroIcon.right
-                anchors.leftMargin: panel.theme.space(3)
-                anchors.right: powerSwitch.visible ? powerSwitch.left : parent.right
-                anchors.rightMargin: panel.theme.space(3)
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: panel.theme.space(0.5)
-
-                Text {
-                    width: parent.width
-                    text: "Bluetooth"
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(1.083)
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
-                }
-
-                Text {
-                    id: heroMeta
-                    width: parent.width
-                    text: panel.heroStatusText.toUpperCase()
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
-                    font.letterSpacing: 1.2
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
-                }
             }
         }
 

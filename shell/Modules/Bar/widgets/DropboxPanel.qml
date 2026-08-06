@@ -202,7 +202,7 @@ BarPanel {
 
     PhraseRotator {
         theme: panel.theme
-        target: heroMeta
+        target: hero.metaItem
         running: panel.opened && panel.dropbox.authenticated && panel.dropbox.active
         onAdvance: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
     }
@@ -228,17 +228,20 @@ BarPanel {
             spacing: panel.theme.space(3)
 
             // ---------------------------------------------------------- hero
-            Item {
+            PanelHero {
                 id: hero
 
                 visible: panel.dropbox.authenticated
+                theme: panel.theme
                 width: parent.width
-                implicitHeight: visible ? Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight) : 0
+                title: "Dropbox"
+                meta: panel.dropbox.active ? panel.heroPhraseText : "Syncing paused"
+                metaFamily: panel.theme.fontUi
+                metaWeight: Font.Normal
+                metaLetterSpacing: 0
+                metaPixelSize: panel.theme.fontPx(0.833)
 
-                DropboxIcon {
-                    id: heroIcon
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
+                icon: DropboxIcon {
                     iconSize: panel.theme.fontPx(1.6)
                     color: panel.dropbox.authenticated && panel.dropbox.active ? panel.theme.textPrimary : panel.theme.textMuted
                     opacity: panel.dropbox.active ? 1.0 : 0.5
@@ -247,10 +250,8 @@ BarPanel {
                 // Their compact on/off switch on the trailing edge of the hero,
                 // and the header's only cursor target. The service flips
                 // `active` optimistically, so the knob throws on the click.
-                PanelSwitch {
-                    id: powerSwitch
+                trailing: PanelSwitch {
                     theme: panel.theme
-                    anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     visible: panel.dropbox.installed
                     checked: panel.dropbox.active
@@ -259,37 +260,6 @@ BarPanel {
                     hint: panel.toggleHint
                     onHovered: panel.setHeaderCursor()
                     onToggled: panel.toggleRunning()
-                }
-
-                Column {
-                    id: heroLabels
-
-                    anchors.left: heroIcon.right
-                    anchors.leftMargin: panel.theme.space(3)
-                    anchors.right: powerSwitch.visible ? powerSwitch.left : parent.right
-                    anchors.rightMargin: panel.theme.space(3)
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: panel.theme.space(0.5)
-
-                    Text {
-                        width: parent.width
-                        text: "Dropbox"
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(1.083)
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        id: heroMeta
-                        width: parent.width
-                        text: panel.dropbox.active ? panel.heroPhraseText : "Syncing paused"
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.833)
-                        elide: Text.ElideRight
-                    }
                 }
             }
 

@@ -519,58 +519,24 @@ BarPanel {
             spacing: panel.theme.space(3)
 
             // ------------------------------------------------------- hero
-            Item {
-                id: hero
-
+            PanelHero {
+                theme: panel.theme
                 width: parent.width
-                implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, muteSwitch.implicitHeight)
+                title: "Audio"
+                meta: panel.heroSubtitle.toUpperCase()
+                metaWeight: Font.Normal
 
-                OpticalGlyph {
-                    id: heroIcon
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
+                icon: OpticalGlyph {
                     text: panel.outputIcon()
                     color: panel.theme.textPrimary
                     opacity: panel.outputMuted ? 0.5 : 1
                     pixelSize: panel.theme.fontPx(1.6)
                 }
 
-                Column {
-                    id: heroLabels
-                    anchors.left: heroIcon.right
-                    anchors.leftMargin: panel.theme.space(3)
-                    anchors.right: muteSwitch.left
-                    anchors.rightMargin: panel.theme.space(3)
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: panel.theme.space(0.5)
-
-                    Text {
-                        width: parent.width
-                        text: "Audio"
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(1.083)
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        width: parent.width
-                        text: panel.heroSubtitle.toUpperCase()
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.75)
-                        font.letterSpacing: 1.2
-                        elide: Text.ElideRight
-                    }
-                }
-
                 // Master switch: checked while anything is still audible, so
                 // muting everything reads as switching audio off.
-                PanelSwitch {
-                    id: muteSwitch
+                trailing: PanelSwitch {
                     theme: panel.theme
-                    anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     checked: panel.anyAudible
                     hasCursor: panel.headerHasCursor

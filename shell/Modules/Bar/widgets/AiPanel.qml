@@ -59,15 +59,18 @@ BarPanel {
     }
 
     // ------------------------------------------------------------- hero row
-    Item {
+    PanelHero {
+        theme: panel.theme
         width: parent.width
-        height: Math.max(heroMark.height, heroLabels.implicitHeight, refreshButton.height)
+        labelRightMargin: panel.theme.space(2)
+        title: panel.provider ? panel.provider.providerName : "Model usage"
+        titleColor: panel.usage.alarming ? panel.theme.error : panel.theme.textPrimary
+        meta: Model.heroMeta(panel.provider).toUpperCase()
+        metaColor: panel.provider && String(panel.provider.usageStatusText || "") !== "" ? panel.theme.warn : panel.theme.textMuted
 
         // Providers with a brand asset draw it; the rest fall back to a glyph.
-        Item {
+        icon: Item {
             id: heroMark
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
             width: panel.theme.space(6.5)
             height: panel.theme.space(6.5)
 
@@ -92,41 +95,9 @@ BarPanel {
             }
         }
 
-        Column {
-            id: heroLabels
-            anchors.left: heroMark.right
-            anchors.leftMargin: panel.theme.space(3)
-            anchors.right: refreshButton.left
-            anchors.rightMargin: panel.theme.space(2)
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: panel.theme.space(0.5)
-
-            Text {
-                width: parent.width
-                text: panel.provider ? panel.provider.providerName : "Model usage"
-                color: panel.usage.alarming ? panel.theme.error : panel.theme.textPrimary
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(1.083)
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
-            }
-
-            Text {
-                width: parent.width
-                text: Model.heroMeta(panel.provider).toUpperCase()
-                color: panel.provider && String(panel.provider.usageStatusText || "") !== "" ? panel.theme.warn : panel.theme.textMuted
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.75)
-                font.weight: Font.DemiBold
-                font.letterSpacing: 1.2
-                elide: Text.ElideRight
-            }
-        }
-
         // Their refresh is a background interval; here it is a button (and r).
-        Rectangle {
+        trailing: Rectangle {
             id: refreshButton
-            anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             width: panel.theme.space(8)
             height: width

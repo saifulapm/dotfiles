@@ -163,16 +163,16 @@ BarPanel {
         // The hero is the whole mount surface (user redesign, 2026-08-06):
         // the mark, the name over the mount path, a folder button, and the
         // switch on the trailing edge — no MOUNT section repeating any of it.
-        Item {
-            id: hero
-
+        PanelHero {
+            theme: panel.theme
             width: parent.width
-            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight, folderAction.implicitHeight)
+            title: panel.service.label
+            meta: panel.service.mountPoint === "" ? "—" : panel.service.mountPoint
+            metaWeight: Font.Normal
+            metaLetterSpacing: 0
+            metaElide: Text.ElideMiddle
 
-            RcloneRemoteMark {
-                id: heroIcon
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
+            icon: RcloneRemoteMark {
                 iconSize: panel.theme.fontPx(1.6)
                 glyph: panel.service.config ? String(panel.service.config.glyph || "") : ""
                 drawnMark: panel.service.config ? String(panel.service.config.drawnMark || "") : ""
@@ -180,66 +180,32 @@ BarPanel {
                 opacity: panel.service.mountActive ? 1.0 : 0.5
             }
 
-            // The service flips `mountActive` optimistically, so the knob
-            // throws on the click rather than when the FUSE mount settles.
-            PanelSwitch {
-                id: powerSwitch
-                theme: panel.theme
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                checked: panel.service.mountActive
-                busy: panel.service.busy
-                hasCursor: panel.hasCursorOn("mount")
-                hint: panel.mountHint
-                onHovered: panel.setCursorOn("mount")
-                onToggled: panel.toggleMount()
-            }
-
-            // Open folder, as just the folder — dimmed while there is no
-            // mounted folder to open.
-            GlyphButton {
-                id: folderAction
-                theme: panel.theme
-                anchors.right: powerSwitch.left
-                anchors.rightMargin: panel.theme.space(2)
-                anchors.verticalCenter: parent.verticalCenter
-                glyph: "󰉋" // md-folder
-                enabled: panel.service.mounted
-                hasCursor: panel.hasCursorOn("open")
-                hint: "Open folder"
-                onHovered: panel.setCursorOn("open")
-                onActivated: panel.service.openFolder()
-            }
-
-            Column {
-                id: heroLabels
-
-                anchors.left: heroIcon.right
-                anchors.leftMargin: panel.theme.space(3)
-                anchors.right: folderAction.left
-                anchors.rightMargin: panel.theme.space(3)
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: panel.theme.space(0.5)
-
-                Text {
-                    width: parent.width
-                    text: panel.service.label
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(1.083)
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
+            trailing: [
+                // Open folder, as just the folder — dimmed while there is no
+                // mounted folder to open.
+                GlyphButton {
+                    theme: panel.theme
+                    anchors.verticalCenter: parent.verticalCenter
+                    glyph: "󰉋" // md-folder
+                    enabled: panel.service.mounted
+                    hasCursor: panel.hasCursorOn("open")
+                    hint: "Open folder"
+                    onHovered: panel.setCursorOn("open")
+                    onActivated: panel.service.openFolder()
+                },
+                // The service flips `mountActive` optimistically, so the knob
+                // throws on the click rather than when the FUSE mount settles.
+                PanelSwitch {
+                    theme: panel.theme
+                    anchors.verticalCenter: parent.verticalCenter
+                    checked: panel.service.mountActive
+                    busy: panel.service.busy
+                    hasCursor: panel.hasCursorOn("mount")
+                    hint: panel.mountHint
+                    onHovered: panel.setCursorOn("mount")
+                    onToggled: panel.toggleMount()
                 }
-
-                Text {
-                    width: parent.width
-                    text: panel.service.mountPoint === "" ? "—" : panel.service.mountPoint
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
-                    elide: Text.ElideMiddle
-                }
-            }
+            ]
         }
 
         // -------------------------------------------------- action/error
