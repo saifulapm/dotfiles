@@ -544,6 +544,14 @@ BarPanel {
             panel.adapter.discovering = false;
     }
 
+    // A panel torn down while open (bar reconfig, widget leaving the
+    // layout) never emits panelClosed — without this, BlueZ would be left
+    // scanning forever with no panel around to stop it.
+    Component.onDestruction: {
+        if (panel.adapter && panel.adapter.discovering)
+            panel.adapter.discovering = false;
+    }
+
     // BlueZ rejects StartDiscovery while the adapter is still powering up,
     // and discovery can also time out on its own. While the panel is open,
     // keep nudging it back on so an enabled adapter is always scanning.
@@ -1031,7 +1039,7 @@ BarPanel {
         implicitWidth: panel.theme.space(8)
         implicitHeight: panel.theme.space(7)
         radius: panel.theme.radius(0.75)
-        color: forgetHover.hovered ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
+        color: forgetMouse.containsMouse ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
         border.width: panel.theme.borderWidth
         border.color: forgetButton.hasCursor ? panel.theme.alpha(panel.theme.accent, 0.6) : panel.theme.surface3
 
@@ -1042,18 +1050,22 @@ BarPanel {
             pixelSize: panel.theme.fontPx(1.0)
         }
 
-        HoverHandler {
-            id: forgetHover
+        // A MouseArea rather than a TapHandler: the row underneath has its
+        // own full-fill MouseArea, and a TapHandler's passive grab lets the
+        // press fall through — one click on 󰅙 would forget AND connect.
+        // The MouseArea takes the exclusive grab and swallows the click, as
+        // upstream's PanelActionButton and our NetworkPanel's forgetMouse do.
+        MouseArea {
+            id: forgetMouse
+            anchors.fill: parent
+            hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onHoveredChanged: forgetButton.hovered(hovered)
-        }
-
-        TapHandler {
-            onTapped: forgetButton.activated()
+            onContainsMouseChanged: forgetButton.hovered(containsMouse)
+            onClicked: forgetButton.activated()
         }
 
         Hint {
-            visible: forgetHover.hovered
+            visible: forgetMouse.containsMouse
             anchor: forgetButton
             text: "Forget"
         }

@@ -10,7 +10,7 @@ BarIcon {
     id: rootItem
 
     readonly property var adapter: Bluetooth.defaultAdapter
-    readonly property var connectedDevices: Bluetooth.devices.values.filter(d => d.connected)
+    readonly property var connectedDevices: Bluetooth.devices ? Bluetooth.devices.values.filter(d => d.connected) : []
 
     glyph: {
         if (!rootItem.adapter || !rootItem.adapter.enabled)

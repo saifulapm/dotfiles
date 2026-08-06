@@ -1342,6 +1342,13 @@ Direct file-level copies (source path → destination path):
   power-on wait, trust-before-connect, pair as pair → trust → connect,
   forget as disconnect → remove, and every timeout. Only the program name in
   the usage line differs.
+- omarchy `config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf`
+  → `home/dot_config/wireplumber/wireplumber.conf.d/` (2026-08-06): verbatim —
+  the WirePlumber rule that auto-connects A2DP profiles on BlueZ cards, which
+  is what makes the `bluez_output.*` sink the ported audio auto-switch polls
+  for actually appear after a connect. Their `bt-agent.service` (auto-accept
+  pairing agent, needs the bluez-tools package) is NOT ported — package
+  install pending a user decision.
 - omarchy `shell/plugins/polkit/PolkitModel.js` →
   `shell/Modules/Polkit/PolkitModel.js`: direct copy — `authorizationLabel`
   and its needed-or-required match, `fingerprintConfiguredFromPamConfig` with
