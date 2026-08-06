@@ -616,40 +616,25 @@ BarPanel {
                     }
                 }
 
-                // Their PanelToolTip, kept inside the card: our bar tooltips
-                // belong to the bar window, which this panel is not.
-                Rectangle {
+                PanelHint {
+                    theme: panel.theme
                     visible: muteHover.hovered
-                    anchors.right: muteSwitch.right
-                    anchors.top: muteSwitch.bottom
-                    anchors.topMargin: panel.theme.space(1)
-                    width: hintText.implicitWidth + panel.theme.space(3)
-                    height: hintText.implicitHeight + panel.theme.space(2)
-                    radius: panel.theme.radius(0.75)
-                    color: panel.theme.surface2
-                    border.width: panel.theme.borderWidth
-                    border.color: panel.theme.surface3
-                    z: 10
-
-                    Text {
-                        id: hintText
-                        anchors.centerIn: parent
-                        text: panel.toggleHint
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.833)
-                    }
+                    anchor: muteSwitch
+                    text: panel.toggleHint
                 }
             }
 
             // ----------------------------------------------------- output
-            Separator {}
+            Separator {
+                theme: panel.theme
+            }
 
             Column {
                 width: parent.width
                 spacing: panel.theme.space(1.5)
 
                 SectionHeader {
+                    theme: panel.theme
                     width: parent.width
                     label: "OUTPUT"
                     value: Math.round((outputSlider.dragging ? outputSlider.liveValue : panel.outputVolume) * 100) + "%"
@@ -706,6 +691,7 @@ BarPanel {
 
             // ------------------------------------------------------ input
             Separator {
+                theme: panel.theme
                 visible: panel.sectionVisible("input")
             }
 
@@ -715,6 +701,7 @@ BarPanel {
                 visible: panel.sectionVisible("input")
 
                 SectionHeader {
+                    theme: panel.theme
                     width: parent.width
                     label: "INPUT"
                     value: panel.hasInput ? Math.round((inputSlider.dragging ? inputSlider.liveValue : panel.inputVolume) * 100) + "%" : "—"
@@ -800,6 +787,7 @@ BarPanel {
 
             // ---------------------------------------------------- streams
             Separator {
+                theme: panel.theme
                 visible: panel.displayStreams.length > 0
             }
 
@@ -809,6 +797,7 @@ BarPanel {
                 visible: panel.displayStreams.length > 0
 
                 SectionHeader {
+                    theme: panel.theme
                     width: parent.width
                     label: "SOURCES"
                 }
@@ -830,47 +819,6 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- components
-    component Separator: Rectangle {
-        width: sections.width
-        height: 1
-        color: panel.theme.surface3
-    }
-
-    component SectionHeader: Item {
-        id: header
-
-        property string label: ""
-        property string value: ""
-        property bool dimmed: false
-
-        implicitHeight: Math.max(headerLabel.implicitHeight, headerValue.implicitHeight) + panel.theme.space(1)
-
-        Text {
-            id: headerLabel
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: header.label
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.75)
-            font.letterSpacing: 1.2
-            font.weight: Font.DemiBold
-        }
-
-        Text {
-            id: headerValue
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: header.value
-            visible: text !== ""
-            opacity: header.dimmed ? 0.5 : 1
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.75)
-            font.weight: Font.DemiBold
-        }
-    }
-
     // The single highlight surface: `current` is the active device (filled),
     // `hasCursor` is where mouse or keyboard sits (outlined).
     component CursorSurface: Rectangle {

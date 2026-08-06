@@ -1474,6 +1474,7 @@ BarPanel {
 
             // -------------------------------------------------------- band
             Separator {
+                theme: panel.theme
                 visible: panel.canSelectBand
             }
 
@@ -1492,6 +1493,7 @@ BarPanel {
 
                     SectionHeader {
                         id: bandHeader
+                        theme: panel.theme
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         label: panel.bandSectionTitle
@@ -1606,16 +1608,21 @@ BarPanel {
             }
 
             // --------------------------------------------------------- dns
-            Separator {}
+            Separator {
+                theme: panel.theme
+            }
 
             Column {
                 width: parent.width
                 spacing: panel.theme.space(1.5)
 
                 SectionHeader {
+                    theme: panel.theme
                     width: parent.width
                     label: "DNS PROVIDER"
                     value: panel.pendingDnsProvider !== "" ? "APPLYING…" : ""
+                    valueColor: panel.theme.textMuted
+                    valueSpacing: 1.2
                 }
 
                 Row {
@@ -1685,6 +1692,7 @@ BarPanel {
 
             // -------------------------------------------------------- wifi
             Separator {
+                theme: panel.theme
                 visible: panel.wifiStationAvailable
             }
 
@@ -1694,6 +1702,7 @@ BarPanel {
                 visible: panel.wifiStationAvailable
 
                 SectionHeader {
+                    theme: panel.theme
                     width: parent.width
                     visible: panel.scanning
                     label: "SCANNING WI-FI…"
@@ -1712,6 +1721,7 @@ BarPanel {
                         spacing: panel.theme.space(1)
 
                         SectionHeader {
+                            theme: panel.theme
                             width: parent.width
                             visible: parent.sectionTitle !== ""
                             height: visible ? implicitHeight : 0
@@ -1738,46 +1748,6 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- components
-    component Separator: Rectangle {
-        width: sections.width
-        height: 1
-        color: panel.theme.surface3
-    }
-
-    component SectionHeader: Item {
-        id: header
-
-        property string label: ""
-        property string value: ""
-
-        implicitHeight: Math.max(headerLabel.implicitHeight, headerValue.implicitHeight) + panel.theme.space(1)
-
-        Text {
-            id: headerLabel
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: header.label
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.75)
-            font.letterSpacing: 1.2
-            font.weight: Font.DemiBold
-        }
-
-        Text {
-            id: headerValue
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: header.value
-            visible: text !== ""
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.75)
-            font.letterSpacing: 1.2
-            font.weight: Font.DemiBold
-        }
-    }
-
     // A pair of label/value pairs on one line, which is how their GridLayout
     // reads at this width: two columns, value right-aligned in each.
     component StatRow: Item {
@@ -1838,7 +1808,9 @@ BarPanel {
             enabled: cell.hint !== "" || cell.copyable
         }
 
-        Hint {
+        PanelHint {
+
+            theme: panel.theme
             visible: cellHover.hovered && (cell.hint !== "" || cell.copyable)
             anchor: cell
             text: cell.hint !== "" ? cell.hint : "Click to copy"
@@ -1922,7 +1894,9 @@ BarPanel {
             onTapped: heroAction.activated()
         }
 
-        Hint {
+        PanelHint {
+
+            theme: panel.theme
             visible: heroHover.hovered
             anchor: heroAction
             text: heroAction.hint
@@ -1984,40 +1958,12 @@ BarPanel {
             onTapped: toggle.toggled()
         }
 
-        Hint {
+        PanelHint {
+
+            theme: panel.theme
             visible: toggleHover.hovered && toggle.hint !== ""
             anchor: toggle
             text: toggle.hint
-        }
-    }
-
-    // Their PanelToolTip, kept inside the card: our bar tooltips belong to the
-    // bar window, which this panel is not.
-    component Hint: Rectangle {
-        id: hintBox
-
-        property Item anchor: null
-        property string text: ""
-
-        parent: hintBox.anchor
-        anchors.right: hintBox.anchor ? hintBox.anchor.right : undefined
-        anchors.top: hintBox.anchor ? hintBox.anchor.bottom : undefined
-        anchors.topMargin: panel.theme.space(1)
-        width: hintLabel.implicitWidth + panel.theme.space(3)
-        height: hintLabel.implicitHeight + panel.theme.space(2)
-        radius: panel.theme.radius(0.75)
-        color: panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: panel.theme.surface3
-        z: 10
-
-        Text {
-            id: hintLabel
-            anchors.centerIn: parent
-            text: hintBox.text
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
         }
     }
 
@@ -2057,7 +2003,9 @@ BarPanel {
             onTapped: pill.activated()
         }
 
-        Hint {
+        PanelHint {
+
+            theme: panel.theme
             visible: pillHover.hovered && pill.hint !== ""
             anchor: pill
             text: pill.hint
@@ -2301,7 +2249,9 @@ BarPanel {
                     enabled: row.canForget
                 }
 
-                Hint {
+                PanelHint {
+
+                    theme: panel.theme
                     visible: forgetMouse.containsMouse && row.canForget
                     anchor: rightAction
                     text: "Forget network"

@@ -764,6 +764,7 @@ BarPanel {
                 spacing: panel.theme.space(1.5)
 
                 SectionHeader {
+                    theme: panel.theme
                     width: parent.width
                     label: "THIS DEVICE"
                 }
@@ -817,6 +818,7 @@ BarPanel {
 
             // --------------------------------------------------- connections
             Separator {
+                theme: panel.theme
                 visible: panel.showConnections
             }
 
@@ -826,6 +828,7 @@ BarPanel {
                 spacing: panel.theme.space(1.5)
 
                 SectionHeader {
+                    theme: panel.theme
                     width: parent.width
                     label: "CONNECTIONS"
                 }
@@ -851,6 +854,7 @@ BarPanel {
 
             // ---------------------------------------------------- exit nodes
             Separator {
+                theme: panel.theme
                 visible: panel.showExitNodes
             }
 
@@ -860,6 +864,7 @@ BarPanel {
                 spacing: panel.theme.space(1.5)
 
                 SectionHeader {
+                    theme: panel.theme
                     width: parent.width
                     label: "EXIT NODES"
                 }
@@ -935,6 +940,7 @@ BarPanel {
 
             // ------------------------------------------------------ machines
             Separator {
+                theme: panel.theme
                 visible: panel.tailscale.installed && panel.tailscale.active
             }
 
@@ -944,6 +950,7 @@ BarPanel {
                 spacing: panel.theme.space(1.5)
 
                 SectionHeader {
+                    theme: panel.theme
                     width: parent.width
                     label: "MACHINES"
                 }
@@ -983,32 +990,6 @@ BarPanel {
     }
 
     // ----------------------------------------------------------- components
-    component Separator: Rectangle {
-        width: sections.width
-        height: 1
-        color: panel.theme.surface3
-    }
-
-    component SectionHeader: Item {
-        id: sectionHeader
-
-        property string label: ""
-
-        implicitHeight: sectionLabel.implicitHeight + panel.theme.space(1)
-
-        Text {
-            id: sectionLabel
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: sectionHeader.label
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.75)
-            font.letterSpacing: 1.2
-            font.weight: Font.DemiBold
-        }
-    }
-
     component CursorSurface: Rectangle {
         property bool hasCursor: false
         property bool current: false
@@ -1041,7 +1022,8 @@ BarPanel {
             onTapped: panel.tailscale.copyToClipboard(infoPair.copyValue)
         }
 
-        Hint {
+        PanelHint {
+            theme: panel.theme
             visible: infoHover.hovered
             anchor: infoPair
             text: "Copy"
@@ -1098,7 +1080,8 @@ BarPanel {
             onTapped: panel.tailscale.copyToClipboard(noticeRow.command)
         }
 
-        Hint {
+        PanelHint {
+            theme: panel.theme
             visible: noticeHover.hovered
             anchor: noticeRow
             text: "Copy command"
@@ -1359,7 +1342,8 @@ BarPanel {
             }
         }
 
-        Hint {
+        PanelHint {
+            theme: panel.theme
             visible: exitNodeRow.actionTooltip !== "" && exitNodeMouse.containsMouse
             anchor: exitNodeRow
             text: exitNodeRow.actionTooltip
@@ -1443,7 +1427,8 @@ BarPanel {
             }
         }
 
-        Hint {
+        PanelHint {
+            theme: panel.theme
             visible: regionMouse.containsMouse
             anchor: regionRow
             text: regionRow.actionTooltip
@@ -1664,7 +1649,8 @@ BarPanel {
             onTapped: glyphAction.activated()
         }
 
-        Hint {
+        PanelHint {
+            theme: panel.theme
             visible: glyphHover.hovered && glyphAction.hint !== ""
             anchor: glyphAction
             text: glyphAction.hint
@@ -1724,39 +1710,11 @@ BarPanel {
             onTapped: toggle.toggled()
         }
 
-        Hint {
+        PanelHint {
+            theme: panel.theme
             visible: toggleHover.hovered && toggle.hint !== ""
             anchor: toggle
             text: toggle.hint
-        }
-    }
-
-    // Their PanelToolTip, kept inside the card (NetworkPanel's).
-    component Hint: Rectangle {
-        id: hintBox
-
-        property Item anchor: null
-        property string text: ""
-
-        parent: hintBox.anchor
-        anchors.right: hintBox.anchor ? hintBox.anchor.right : undefined
-        anchors.top: hintBox.anchor ? hintBox.anchor.bottom : undefined
-        anchors.topMargin: panel.theme.space(1)
-        width: hintLabel.implicitWidth + panel.theme.space(3)
-        height: hintLabel.implicitHeight + panel.theme.space(2)
-        radius: panel.theme.radius(0.75)
-        color: panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: panel.theme.surface3
-        z: 10
-
-        Text {
-            id: hintLabel
-            anchors.centerIn: parent
-            text: hintBox.text
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
         }
     }
 

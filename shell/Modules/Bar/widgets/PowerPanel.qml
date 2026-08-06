@@ -497,26 +497,10 @@ BarPanel {
 
     // power-profiles-daemon owns the profile D-Bus service; without it the
     // buttons above are inert, so say why rather than letting them look broken.
-    Row {
+    InfoNote {
+        theme: panel.theme
         visible: !panel.profilesAvailable
-        width: parent.width
-        spacing: panel.theme.space(1.5)
-
-        OpticalGlyph {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "󰋽"
-            color: panel.theme.warn
-            pixelSize: panel.theme.fontPx(0.917)
-        }
-
-        Text {
-            width: parent.width - panel.theme.space(4)
-            text: "power-profiles-daemon is not installed — profiles cannot be switched."
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
-            wrapMode: Text.WordWrap
-        }
+        text: "power-profiles-daemon is not installed — profiles cannot be switched."
     }
 
     // ---------------------------------------------------------- components

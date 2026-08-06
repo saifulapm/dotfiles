@@ -747,7 +747,9 @@ BarPanel {
             }
         }
 
-        Separator {}
+        Separator {
+            theme: panel.theme
+        }
 
         // ------------------------------------------------------ connected
         // Fixed above the scroll area, as theirs is: what is connected stays
@@ -760,6 +762,7 @@ BarPanel {
             spacing: panel.theme.space(1.5)
 
             SectionHeader {
+                theme: panel.theme
                 width: parent.width
                 label: "CONNECTED"
             }
@@ -781,6 +784,7 @@ BarPanel {
         }
 
         Separator {
+            theme: panel.theme
             visible: panel.connectedDevices.length > 0 && panel.scrollRows.length > 0
         }
 
@@ -824,11 +828,13 @@ BarPanel {
                     spacing: panel.theme.space(1.5)
 
                     Separator {
+                        theme: panel.theme
                         visible: index > 0 && sectionTitle !== ""
                         height: visible ? 1 : 0
                     }
 
                     SectionHeader {
+                        theme: panel.theme
                         visible: sectionTitle !== ""
                         height: visible ? implicitHeight : 0
                         width: parent.width
@@ -946,7 +952,8 @@ BarPanel {
             }
         }
 
-        Hint {
+        PanelHint {
+            theme: panel.theme
             visible: row.actionTooltip !== "" && rowMouse.containsMouse && !panel.actionFocused
             anchor: row
             text: row.actionTooltip
@@ -1064,36 +1071,11 @@ BarPanel {
             onClicked: forgetButton.activated()
         }
 
-        Hint {
+        PanelHint {
+            theme: panel.theme
             visible: forgetMouse.containsMouse
             anchor: forgetButton
             text: "Forget"
-        }
-    }
-
-    component Separator: Rectangle {
-        width: sections.width
-        height: 1
-        color: panel.theme.surface3
-    }
-
-    component SectionHeader: Item {
-        id: sectionHeader
-
-        property string label: ""
-
-        implicitHeight: sectionLabel.implicitHeight + panel.theme.space(1)
-
-        Text {
-            id: sectionLabel
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: sectionHeader.label
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.75)
-            font.letterSpacing: 1.2
-            font.weight: Font.DemiBold
         }
     }
 
@@ -1160,40 +1142,11 @@ BarPanel {
             onTapped: toggle.toggled()
         }
 
-        Hint {
+        PanelHint {
+            theme: panel.theme
             visible: toggleHover.hovered && toggle.hint !== ""
             anchor: toggle
             text: toggle.hint
-        }
-    }
-
-    // Their PanelToolTip, kept inside the card: our bar tooltips belong to
-    // the bar window, which this panel is not.
-    component Hint: Rectangle {
-        id: hintBox
-
-        property Item anchor: null
-        property string text: ""
-
-        parent: hintBox.anchor
-        anchors.right: hintBox.anchor ? hintBox.anchor.right : undefined
-        anchors.top: hintBox.anchor ? hintBox.anchor.bottom : undefined
-        anchors.topMargin: panel.theme.space(1)
-        width: hintLabel.implicitWidth + panel.theme.space(3)
-        height: hintLabel.implicitHeight + panel.theme.space(2)
-        radius: panel.theme.radius(0.75)
-        color: panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: panel.theme.surface3
-        z: 10
-
-        Text {
-            id: hintLabel
-            anchors.centerIn: parent
-            text: hintBox.text
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
         }
     }
 }

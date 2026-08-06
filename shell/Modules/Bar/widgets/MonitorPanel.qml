@@ -593,7 +593,9 @@ BarPanel {
             }
         }
 
-        Hint {
+        InfoNote {
+
+            theme: panel.theme
             visible: !(panel.focusedOutput && panel.focusedOutput.vrr_supported)
             text: "This display does not report variable refresh rate support."
         }
@@ -643,7 +645,9 @@ BarPanel {
             }
         }
 
-        Hint {
+        InfoNote {
+
+            theme: panel.theme
             visible: text !== ""
             text: {
                 if (!panel.nightLightAvailable)
@@ -765,31 +769,6 @@ BarPanel {
         font.pixelSize: panel.theme.fontPx(0.75)
         font.weight: Font.DemiBold
         font.letterSpacing: 1.2
-    }
-
-    component Hint: Row {
-        id: hint
-
-        property string text: ""
-
-        width: parent.width
-        spacing: panel.theme.space(1.5)
-
-        OpticalGlyph {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "󰋽"
-            color: panel.theme.warn
-            pixelSize: panel.theme.fontPx(0.917)
-        }
-
-        Text {
-            width: hint.width - panel.theme.space(4)
-            text: hint.text
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
-            wrapMode: Text.WordWrap
-        }
     }
 
     component Pill: Rectangle {

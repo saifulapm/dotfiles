@@ -215,10 +215,12 @@ BarPanel {
 
         // --------------------------------------------------------- sources
         Separator {
+            theme: panel.theme
             visible: panel.sourcePlayers.length > 1
         }
 
         SectionHeader {
+            theme: panel.theme
             visible: panel.sourcePlayers.length > 1
             width: parent.width
             label: "SOURCES"
@@ -351,32 +353,6 @@ BarPanel {
         TapHandler {
             enabled: transportButton.enabled
             onTapped: transportButton.clicked()
-        }
-    }
-
-    component Separator: Rectangle {
-        width: sections.width
-        height: 1
-        color: panel.theme.surface3
-    }
-
-    component SectionHeader: Item {
-        id: sectionHeader
-
-        property string label: ""
-
-        implicitHeight: sectionLabel.implicitHeight + panel.theme.space(1)
-
-        Text {
-            id: sectionLabel
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: sectionHeader.label
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.75)
-            font.letterSpacing: 1.2
-            font.weight: Font.DemiBold
         }
     }
 }
