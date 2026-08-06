@@ -23,3 +23,13 @@
     checksum.sha256 = "3a35f8f0669bef3dded9df208cc4526a6f7573210e134816e9084a8981271d75"
     refreshPeriod = "0"
     include = ["*.ttf"]
+
+# forgit — interactive git with fzf. The mac loads it through sheldon (zsh);
+# here fish sources its fish port from this checkout (conf.d/30-forgit.fish).
+# Pinned to 26.01.0, the same rev the mac's sheldon plugins.toml pins.
+[".local/share/forgit"]
+    type = "archive"
+    url = "https://github.com/wfxr/forgit/archive/refs/tags/26.01.0.tar.gz"
+    checksum.sha256 = "7cd2a0a2f892e4110853521eb77a7fad174463827d93f9f9b4ae49c30b6e52c7"
+    refreshPeriod = "0"
+    stripComponents = 1
