@@ -35,6 +35,15 @@ fi
 
 mkdir -p "$state_dir"
 
+# Serialize concurrent theme changes (omarchy's rule): the sequence below is
+# ordered — name write, peek, IPC push, theme.toml write, wallpaper write —
+# and two interleaved runs can resolve one run's peek against the other's
+# theme name, leaving the last palette and the last wallpaper disagreeing.
+# Released before the slow app fan-out so another selection queues only
+# behind the critical section.
+exec 9>"$state_dir/theme-set.lock"
+flock 9
+
 # The synchronized switch, omarchy's sequencing: hand the running shell the
 # wallpaper pair and the palette in ONE IPC call, before any watched file
 # changes. The shell latches its theme file-watch off, starts the slanted-wipe
@@ -57,10 +66,7 @@ mv "$name_file.tmp" "$name_file"
 
 next_bg="$("$root/bin/background-next" --peek || true)"
 
-synced=0
-if timeout 2 qs ipc call background themeTransition "$old_bg" "$next_bg" "$(base64 -w 0 "$src")" >/dev/null 2>&1; then
-  synced=1
-else
+if ! timeout 2 qs ipc call background themeTransition "$old_bg" "$next_bg" "$(base64 -w 0 "$src")" >/dev/null 2>&1; then
   # Degradation path — shell dead, absent, or predating the IPC surface. The
   # palette will land through the theme.toml file watch (or the next shell
   # start), the wallpaper through the state file, in no particular order; the
@@ -74,9 +80,14 @@ fi
 cp "$src" "$state.tmp"
 mv "$state.tmp" "$state"
 
-# No candidates just means no wallpaper change.
+# No candidates just means no wallpaper change. Never abort here: the shell
+# has already accepted the transition, and the app fan-out below must still
+# run even if the peeked path vanished in between.
 if [[ -n $next_bg ]]; then
-  "$root/bin/background-next" --set "$next_bg"
+  "$root/bin/background-next" --set "$next_bg" || true
 fi
+
+# Critical section over — release before the slower fan-out.
+flock -u 9
 
 exec "$root/bin/theme-apply"

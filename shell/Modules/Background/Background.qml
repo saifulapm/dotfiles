@@ -94,6 +94,10 @@ Scope {
         revealProgress = 1;
         backgroundVersion += 1;
         revealStartedVersion = -1;
+        // A clear landing between setPendingTheme and the reveal frame would
+        // otherwise leave the palette waiting on the 300 ms fallback timer:
+        // no reveal is coming, so apply it now.
+        applyPendingTheme();
     }
 
     // The incoming palette rides with the transition and is applied on the
@@ -242,8 +246,14 @@ Scope {
             }
             exclusionMode: ExclusionMode.Ignore
             color: backgroundRoot.theme.surface1
+            // Keep render updates enabled: upstream observed the background
+            // layer losing its committed buffer while parked with updates
+            // disabled, leaving a black desktop until restart. The wallpaper
+            // is static, so correctness wins over a render-loop optimization.
+            updatesEnabled: true
             WlrLayershell.layer: WlrLayer.Background
             WlrLayershell.namespace: "qshell-background"
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
             // Each screen readies its own mask and asks to start; the version
             // gate in startReveal makes the first ready screen start the
