@@ -159,7 +159,7 @@ PanelWindow {
         color: panelWindow.theme.panel.background
         // A gradient border is drawn by the Shape ring below instead; the
         // Rectangle's own border would paint its first stop underneath it.
-        border.width: cardBorder.active ? 0 : panelWindow.theme.borderWidth
+        border.width: cardBorder.active ? 0 : panelWindow.theme.panel.borderWidth
         border.color: panelWindow.theme.panel.border
         clip: true
 
@@ -231,7 +231,7 @@ PanelWindow {
             anchors.fill: parent
             z: 100
             spec: panelWindow.theme.panel.borderSpec
-            borderWidth: panelWindow.theme.borderWidth
+            borderWidth: panelWindow.theme.panel.borderWidth
             cornerRadius: card.radius
         }
     }

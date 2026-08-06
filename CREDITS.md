@@ -742,7 +742,13 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   watch; their lid helper reads `/proc/acpi/button/lid/*/state`, which Asahi
   does not have, so logind's `LidClosed` property answers behind it; their
   FontAwesome padlock is md-lock (only the MD range renders here); the
-  fingerprint glyph and corner radius follow our tokens. Kept ours
+  fingerprint glyph and corner radius follow our tokens, and the card's
+  whole geometry (2026-08-06) rides our spacing token the way theirs rides
+  Style.space — their px values divided by our 4 px space unit, so a
+  density change moves the card as their [spacing] scale would — with the
+  content inset by the border width (their BorderSurface rule) and the
+  border width itself resolved from the [polkit] section's border-width
+  key through the per-surface machinery. Kept ours
   underneath: the keyboard-focus rule (a layer surface that asks for
   exclusive keyboard focus in its first commit never gets the keyboard from
   niri — map with None, flip to Exclusive one tick later), the

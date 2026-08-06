@@ -64,12 +64,18 @@ Scope {
     // clamshell gate skips pam_fprintd — the password field takes over.
     readonly property bool fingerprintMode: devFingerprint ? (dialogVisible && !laptopClosed) : (fingerprintConfigured && !laptopClosed && dialogVisible && !responseRequired && !submitted && !errorFlash)
 
-    // Their design constants (Style.space is px-equivalent at default scale;
-    // the LockView precedent keeps them literal).
-    readonly property int fieldHeight: 42
-    readonly property int contentMargin: theme.space(4)
-    readonly property int edgeMargin: 10
-    readonly property int borderThickness: Math.max(1, theme.borderWidth)
+    // Their design constants through our spacing token: upstream sizes this
+    // card in Style.space(px) — px times the theme's scale — and our
+    // theme.space(n) is n space units of 4 px, so px/4 is the multiplier
+    // that renders identically at default density and moves with a theme's
+    // density the way theirs moves with [spacing] scale. fieldHeight is
+    // their space(42); contentMargin their panelPadding default (space(18),
+    // ours was space(16) — a real drop); edgeMargin their gapsOut*2 screen
+    // clamp (10 at their defaults).
+    readonly property int fieldHeight: theme.space(10.5)
+    readonly property int contentMargin: theme.space(4.5)
+    readonly property int edgeMargin: theme.space(2.5)
+    readonly property int borderThickness: theme.polkit.borderWidth
 
     function refreshLidState() {
         if (!laptopClosedProc.running)
@@ -362,7 +368,8 @@ Scope {
             // square that just frames the centered sensor glyph (theirs:
             // cardWidth = cardHeight).
             readonly property int cardHeight: height > 0 ? Math.min(polkitRoot.fieldHeight + polkitRoot.contentMargin * 2, height - polkitRoot.edgeMargin * 2) : polkitRoot.fieldHeight + polkitRoot.contentMargin * 2
-            readonly property int cardWidth: polkitRoot.fingerprintMode ? cardHeight : Math.min(312, Math.max(260, width - polkitRoot.edgeMargin * 2))
+            // Their 260–312 px clamp, scaled: space(65)..space(78).
+            readonly property int cardWidth: polkitRoot.fingerprintMode ? cardHeight : Math.min(polkitRoot.theme.space(78), Math.max(polkitRoot.theme.space(65), width - polkitRoot.edgeMargin * 2))
 
             function refocus() {
                 // In fingerprint mode there is no field to type into — park
@@ -443,11 +450,13 @@ Scope {
                     id: cardRow
                     visible: !polkitRoot.fingerprintMode
                     anchors.fill: parent
-                    anchors.margins: polkitRoot.contentMargin
-                    spacing: 14
+                    // Their BorderSurface insets content by border + padding,
+                    // so the field never sits under a wide border ring.
+                    anchors.margins: polkitRoot.contentMargin + polkitRoot.borderThickness
+                    spacing: polkitRoot.theme.space(3.5)
 
                     Item {
-                        width: 26
+                        width: polkitRoot.theme.space(6.5)
                         height: polkitRoot.fieldHeight
 
                         // Their padlock is FontAwesome U+F023, which does not
@@ -463,7 +472,7 @@ Scope {
                     }
 
                     Item {
-                        width: parent.width - 40
+                        width: parent.width - polkitRoot.theme.space(10)
                         height: polkitRoot.fieldHeight
 
                         TextInput {
@@ -510,8 +519,8 @@ Scope {
                         }
 
                         Rectangle {
-                            width: 2
-                            height: 24
+                            width: Math.max(1, polkitRoot.theme.space(0.5))
+                            height: polkitRoot.theme.space(6)
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
                             color: polkitRoot.errorFlash ? polkitRoot.theme.polkit.textError : polkitRoot.theme.polkit.text
@@ -544,11 +553,11 @@ Scope {
             // needed to run '/usr/bin/x' as the super user" reduced to
             // "Authorize running '/usr/bin/x'", floating above the card.
             Rectangle {
-                width: Math.min(justificationText.implicitWidth + 24, panel.width - polkitRoot.edgeMargin * 2)
-                height: 28
+                width: Math.min(justificationText.implicitWidth + polkitRoot.theme.space(6), panel.width - polkitRoot.edgeMargin * 2)
+                height: polkitRoot.theme.space(7)
                 anchors.horizontalCenter: card.horizontalCenter
                 anchors.bottom: card.top
-                anchors.bottomMargin: 10
+                anchors.bottomMargin: polkitRoot.theme.space(2.5)
                 radius: polkitRoot.theme.radius(1)
                 color: polkitRoot.theme.polkit.background
                 visible: justificationText.text.length > 0
@@ -556,8 +565,8 @@ Scope {
                 Text {
                     id: justificationText
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
+                    anchors.leftMargin: polkitRoot.theme.space(3)
+                    anchors.rightMargin: polkitRoot.theme.space(3)
                     text: PolkitModel.authorizationLabel(polkitRoot.currentMessage)
                     color: polkitRoot.theme.polkit.text
                     font.family: polkitRoot.theme.fontUi

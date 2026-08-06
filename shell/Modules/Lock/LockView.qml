@@ -35,7 +35,7 @@ Item {
     readonly property int avatarSize: 96
     readonly property int fieldWidth: 381
     readonly property int fieldHeight: 67
-    readonly property int outlineThickness: 3
+    readonly property int outlineThickness: theme.lock.borderWidth
     readonly property int fieldFontSize: theme.fontPx(1.5)
     readonly property int passwordDotFontSize: theme.fontPx(1.773)
     readonly property int passwordDotLetterSpacing: Math.round(theme.fontPx(1.333) * 0.19)

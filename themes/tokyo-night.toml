@@ -102,27 +102,33 @@ active = "accent.accent"
 #                    (also carries the base keys height / width-vertical above)
 #   [panel]          bar-widget flyout cards. background [surface.1] + -alpha,
 #                    text [text.primary], border [border.active] + -alpha —
-#                    gradient-or-solid, drawn as a gradient ring when it is one
+#                    gradient-or-solid, drawn as a gradient ring when it is one,
+#                    border-width [shape.border-width]
 #   [tooltip]        background [surface.1] + -alpha [0.97],
 #                    text [ansi.white], border [ansi.white] + -alpha
 #   [notifications]  background [surface.2] + -alpha, text [text.primary],
 #                    text-muted [text.muted], border [accent.accent] + -alpha,
 #                    border-error [accent.error] + -alpha,
-#                    countdown [accent.accent]
+#                    countdown [accent.accent],
+#                    border-width [shape.border-width, floored at half a
+#                    space unit]
 #   [lock]           background [surface.1] + -alpha [0.8], text [text.primary],
 #                    placeholder [text.primary @ 0.66], text-error [accent.error],
 #                    border-active [border.active] (gradient-or-solid, drawn as
 #                    a gradient ring when it is one), border-error [accent.error],
 #                    border-alpha [1.0] (shared by both border states — they are
 #                    mutually exclusive in time), selection [accent.accent] +
-#                    -alpha [0.45]
+#                    -alpha [0.45], border-width [3 — the field outline, not
+#                    the base token]
 #   [polkit]         the authentication dialog. background [surface.1] +
 #                    -alpha, text [text.primary], text-error [accent.error],
 #                    accent [accent.accent] (padlock/fingerprint glyphs),
 #                    border [border.active] + -alpha (gradient-or-solid, drawn
 #                    as a gradient ring when it is one), border-error
 #                    [accent.error] (shares border-alpha, as [lock]'s border
-#                    states do), scrim [surface.0] + -alpha [0.5]
+#                    states do), scrim [surface.0] + -alpha [0.5],
+#                    border-width [shape.border-width, floored at 1 — shared
+#                    by both border states]
 #   [menu]           background [surface.1] + -alpha, text [text.primary],
 #                    border [surface.3] + -alpha, scrim [surface.0] + -alpha [0.5],
 #                    selected-background [accent.accent] + -alpha [0.15],
@@ -132,7 +138,12 @@ active = "accent.accent"
 #
 # [bar], [panel], [tooltip], [notifications], [lock] and [polkit] are wired to
 # their surfaces. [menu] and [osd] are defined and resolvable but the Menu and
-# OSD modules still read base tokens — porting them is follow-up work.
+# OSD modules still read base tokens — porting them is follow-up work; their
+# border-width keys ([menu: shape.border-width], [osd: same, floored at half
+# a space unit]) and [tooltip]'s (fallback 1, the bubble's hairline) sit in
+# the same boat. border-width is one uniform number per surface: omarchy's
+# CSS-style side lists and border-width-top/right/bottom/left overrides are
+# deliberately not ported until something draws an uneven border.
 #
 # The same sections are accepted in ~/.config/qshell/theme-override.toml, a
 # machine-level file layered over whatever theme is active (see CREDITS.md).

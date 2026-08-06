@@ -91,7 +91,7 @@ Rectangle {
     implicitHeight: mainColumn.implicitHeight + border.width * 2
     radius: theme.radius(1)
     color: theme.notifications.background
-    border.width: Math.max(theme.borderWidth, theme.space(0.5))
+    border.width: theme.notifications.borderWidth
     border.color: urgency === 2 ? theme.notifications.borderError : theme.notifications.border
     clip: true
 

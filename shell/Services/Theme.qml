@@ -155,6 +155,22 @@ QtObject {
         return Qt.rgba(c.r, c.g, c.b, c.a * a);
     }
 
+    // Per-surface border width: [section] border-width wins, else the
+    // fallback the caller passes — the base shape.border-width token for most
+    // surfaces, a surface's own design constant where it never read the base
+    // token (lock's field outline, the tooltip hairline). ONE uniform number
+    // per surface: upstream also accepts CSS-style side lists ("T R B L")
+    // and border-width-top/right/bottom/left overrides, which are
+    // deliberately not ported — no consumer here draws an uneven border, and
+    // GradientBorder's ring is uniform by construction.
+    function sWidth(section, key, fallback) {
+        const v = rawTok(section + "." + key);
+        if (v === undefined)
+            return fallback;
+        const n = Number(deref(v));
+        return isFinite(n) && n >= 0 ? Math.round(n) : fallback;
+    }
+
     // ------------------------------------------------------------- tokens
     readonly property string mode: String(tok("meta.mode")) === "light" ? "light" : "dark"
     readonly property color surface0: col("surface.0")
@@ -253,11 +269,17 @@ QtObject {
         // having to restate it.
         readonly property string borderSpec: root.sSpec("panel", "border", root.borderActiveSpec)
         readonly property color border: root.sComposed("panel", "border", root.borderActive, 1.0)
+        // Omarchy's popups.border-width (declared in their shell.toml.tpl).
+        readonly property int borderWidth: root.sWidth("panel", "border-width", root.borderWidth)
     }
     readonly property QtObject tooltip: QtObject {
         readonly property color background: root.sComposed("tooltip", "background", root.surface1, 0.97)
         readonly property color text: root.sCol("tooltip", "text", root.col("ansi.white"))
         readonly property color border: root.sComposed("tooltip", "border", root.col("ansi.white"), 1.0)
+        // Resolvable but not yet consumed — the bar's tooltip bubble still
+        // draws its hairline (1), which is also this key's fallback. Same
+        // boundary as the [menu]/[osd] color keys below.
+        readonly property int borderWidth: root.sWidth("tooltip", "border-width", 1)
     }
     readonly property QtObject notifications: QtObject {
         readonly property color background: root.sComposed("notifications", "background", root.surface2, 1.0)
@@ -266,6 +288,10 @@ QtObject {
         readonly property color border: root.sComposed("notifications", "border", root.accent, 1.0)
         readonly property color borderError: root.sComposed("notifications", "border-error", root.error, 1.0)
         readonly property color countdown: root.sCol("notifications", "countdown", root.accent)
+        // Declared in omarchy's shell.toml.tpl. The fallback keeps the
+        // card's existing rule: the base width, floored at half a space
+        // unit so a hairline theme still draws a visible card edge.
+        readonly property int borderWidth: root.sWidth("notifications", "border-width", Math.max(root.borderWidth, root.space(0.5)))
     }
     // border / border-active / border-error share one alpha companion: the
     // three states are mutually exclusive in time, so one is enough (theirs).
@@ -278,6 +304,9 @@ QtObject {
         readonly property color borderActive: root.sComposed("lock", "border-active", root.borderActive, root.sAlpha("lock", "border", 1.0))
         readonly property color borderError: root.sComposed("lock", "border-error", root.error, root.sAlpha("lock", "border", 1.0))
         readonly property color selection: root.sComposed("lock", "selection", root.accent, 0.45)
+        // Fallback 3 is the ported field outline — upstream LockView's own
+        // literal, never the base token.
+        readonly property int borderWidth: root.sWidth("lock", "border-width", 3)
     }
     // Omarchy's [polkit] contract (their Commons/Color.qml): the dialog card,
     // its scrim and the justification pill. border / border-error share one
@@ -295,6 +324,8 @@ QtObject {
         readonly property color border: root.sComposed("polkit", "border", root.borderActive, 1.0)
         readonly property color borderError: root.sComposed("polkit", "border-error", root.error, root.sAlpha("polkit", "border", 1.0))
         readonly property color scrim: root.sComposed("polkit", "scrim", root.surface0, 0.5)
+        // Shared by the border and border-error states, as their alpha is.
+        readonly property int borderWidth: root.sWidth("polkit", "border-width", Math.max(1, root.borderWidth))
     }
     // Defined for themes to target; the Menu and OSD modules themselves still
     // read base tokens (see the migration note in themes/tokyo-night.toml).
@@ -305,11 +336,13 @@ QtObject {
         readonly property color scrim: root.sComposed("menu", "scrim", root.surface0, 0.5)
         readonly property color selectedBackground: root.sComposed("menu", "selected-background", root.accent, 0.15)
         readonly property color selectedText: root.sCol("menu", "selected-text", root.accent)
+        readonly property int borderWidth: root.sWidth("menu", "border-width", root.borderWidth)
     }
     readonly property QtObject osd: QtObject {
         readonly property color background: root.sComposed("osd", "background", root.surface1, 1.0)
         readonly property color text: root.sCol("osd", "text", root.textPrimary)
         readonly property color border: root.sComposed("osd", "border", root.surface3, 1.0)
+        readonly property int borderWidth: root.sWidth("osd", "border-width", Math.max(root.borderWidth, root.space(0.5)))
     }
 
     // ------------------------------------------------------------ helpers

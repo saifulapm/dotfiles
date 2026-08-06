@@ -11,9 +11,12 @@ import "../Commons/gradient.js" as Gradient
 // is translucent, and covering it would be visible.
 //
 // This is omarchy's Border.qml/BorderGeometry.js idea reduced to the one case
-// we need: a uniform width on all four sides. Their per-side widths and the
-// hand-rolled arc path builder that goes with them are not ported — nothing
-// in our schema asks for an uneven border.
+// we need: a uniform width on all four sides. Callers feed `borderWidth` from
+// their surface's `border-width` key (Theme.sWidth — [panel], [lock],
+// [polkit], …), which is also a single uniform number. Their per-side widths
+// (CSS-style "T R B L" lists, border-width-top/right/bottom/left keys) and
+// the hand-rolled arc path builder that goes with them are not ported —
+// no consumer here draws an uneven border.
 //
 // Anchor it over the Rectangle it belongs to and give it the same radius; set
 // that Rectangle's own border.width to 0 while `active` is true.
