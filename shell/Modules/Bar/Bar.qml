@@ -310,11 +310,15 @@ Scope {
         }
 
         // Omarchy's summonBarWidget: any process (a niri bind) can open a
-        // widget's panel — `qs ipc call bar open audio`. First bar that
-        // carries the widget wins, which is per-screen-identical layouts in
-        // practice.
+        // widget's panel — `qs ipc call bar open audio`. The bar on the
+        // niri-focused output gets first refusal (upstream summons on the
+        // focused monitor); any other bar carrying the widget follows, so a
+        // widget absent from the focused screen still opens where it lives.
         function open(widgetId: string): string {
-            for (const b of barRoot.screenBars)
+            const focusedWs = barRoot.niri.workspaces.find(w => w.is_focused);
+            const focusedOutput = focusedWs ? focusedWs.output : "";
+            const bars = barRoot.screenBars.slice().sort((a, b) => Number(b.screen && b.screen.name === focusedOutput) - Number(a.screen && a.screen.name === focusedOutput));
+            for (const b of bars)
                 if (b.summonWidget(widgetId))
                     return "ok";
             return "no widget with a panel: " + widgetId;
