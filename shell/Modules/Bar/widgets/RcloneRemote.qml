@@ -51,9 +51,11 @@ BarButton {
     // never before the local probe has answered.
     visible: service.probed && service.installed && service.configured
 
-    readonly property RcloneRemoteService service: RcloneRemoteService {
-        config: rootItem.config
-    }
+    // The shared service, injected by the bar's registry — ONE instance per
+    // widget id (per remote, not per screen; S2). Its config is bound where
+    // it is created, at the bar root, to the same defaults-plus-inline-entry
+    // merge `config` above computes for the mark.
+    required property RcloneRemoteService service
 
     tooltipText: {
         if (service.lastProbeFailed)

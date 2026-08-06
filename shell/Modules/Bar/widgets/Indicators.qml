@@ -27,6 +27,10 @@ Item {
 
     required property var theme
     required property var shell
+    // The bar root, for the shared services the indicators need (dictation's
+    // voxtype follower). Reached through the components below, so a service
+    // is only created when its indicator actually mounts.
+    required property var serviceHost
     property var bar: null
     property var settings: ({})
 
@@ -350,6 +354,7 @@ Item {
         Dictation {
             theme: root.theme
             bar: root.bar
+            dictation: root.serviceHost.dictationService()
             indicatorHost: root
         }
     }

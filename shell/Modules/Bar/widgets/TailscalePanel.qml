@@ -24,7 +24,8 @@ import "TailscaleModel.js" as Model
 BarPanel {
     id: panel
 
-    // TailscaleService, owned by the bar widget.
+    // TailscaleService — the bar root's shared instance, injected by the
+    // widget that opened this panel.
     required property var tailscale
     // The bar widget itself, for persisting inline settings.
     required property var widget

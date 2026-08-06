@@ -30,12 +30,11 @@ BarButton {
     // has answered.
     visible: dropbox.probed && dropbox.installed
 
-    readonly property DropboxService dropbox: DropboxService {
-        settings: rootItem.settings
-        // The refresh cadence is scoped to a widget that is actually on
-        // screen; nothing ticks when the bar is not there to show it.
-        pollingAllowed: rootItem.visible && rootItem.bar !== null
-    }
+    // The shared service, injected by the bar's registry — ONE instance
+    // however many screens carry this widget (S2). Its settings and its
+    // pollingAllowed gate (any bar visible, widget still in the layout) are
+    // bound where it is created, at the bar root.
+    required property DropboxService dropbox
 
     readonly property string statusLine: {
         const text = String(dropbox.statusText || "").split("\n")[0].trim();

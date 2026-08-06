@@ -486,6 +486,129 @@ Scope {
             setPosition(edge);
     }
 
+    // ----------------------------------------------------- shared services
+    // The daemon-backed widgets used to own their service objects, which made
+    // every screen duplicate the whole Process/Timer/FileView stack behind
+    // them. The services live here now — this Scope is one instance however
+    // many screens the Variants below fan out to — and every screen's widget
+    // is injected with the same object (the registry components pass it in,
+    // the way `audio` has always arrived from the shell). A service is
+    // created by the first widget that asks, so one only exists while its id
+    // is somewhere in the bar layout; it deliberately survives its widgets,
+    // because a screen unplugging must not kill the daemon conversation the
+    // remaining screens are rendering.
+    property var sharedServices: ({})
+
+    function sharedService(key, component, props) {
+        if (!sharedServices[key])
+            sharedServices[key] = component.createObject(barRoot, props || {});
+        return sharedServices[key];
+    }
+
+    // The config's own inline entry for a widget id. The shared services bind
+    // their `settings` to this rather than to any one widget's copy: every
+    // screen renders the same entry, so "first widget wins" and "config wins"
+    // name the same object — and the config outlives any widget. A panel's
+    // settings write still lands synchronously: updateEntryInline applies the
+    // new config in memory before persisting it.
+    function inlineEntryFor(id) {
+        for (const section of ["left", "center", "right"]) {
+            const entry = layoutOf[section].find(e => e.id === id);
+            if (entry !== undefined)
+                return entry;
+        }
+        return ({
+                id: id
+            });
+    }
+
+    function widgetConfigured(id) {
+        return ["left", "center", "right"].some(section => layoutOf[section].some(e => e.id === id));
+    }
+
+    // The per-widget pollingAllowed gate, restated for one service serving N
+    // screens: poll while ANY bar is on screen (every bar window shares
+    // !barHidden) and the widget is still in the layout — removing it from
+    // the config must stop the cadence, since the service outlives widgets.
+    function servicePollingGate(id) {
+        return !barHidden && widgetConfigured(id);
+    }
+
+    function tailscaleService() {
+        return sharedService("tailscale", tailscaleServiceComponent, {
+            settings: Qt.binding(() => barRoot.inlineEntryFor("tailscale")),
+            pollingAllowed: Qt.binding(() => barRoot.servicePollingGate("tailscale"))
+        });
+    }
+
+    function dropboxService() {
+        return sharedService("dropbox", dropboxServiceComponent, {
+            settings: Qt.binding(() => barRoot.inlineEntryFor("dropbox")),
+            pollingAllowed: Qt.binding(() => barRoot.servicePollingGate("dropbox"))
+        });
+    }
+
+    // Keyed by widget id, not by type: "icloud" and "dropbox-rclone" are two
+    // remotes, so they keep two services — one per remote, not per screen.
+    function rcloneService(id, defaults) {
+        return sharedService(id, rcloneServiceComponent, {
+            config: Qt.binding(() => barRoot.mergedEntryConfig(id, defaults))
+        });
+    }
+
+    // Per-instance defaults merged under the inline entry — the same merge
+    // the widget draws its mark from.
+    function mergedEntryConfig(id, defaults) {
+        const merged = {};
+        for (const key in defaults)
+            merged[key] = defaults[key];
+        const entry = inlineEntryFor(id);
+        for (const key in entry) {
+            if (key !== "id")
+                merged[key] = entry[key];
+        }
+        return merged;
+    }
+
+    function weatherService() {
+        return sharedService("weather", weatherServiceComponent, {
+            shellRoot: barRoot.shell,
+            settings: Qt.binding(() => barRoot.inlineEntryFor("weather")),
+            pollingAllowed: Qt.binding(() => barRoot.servicePollingGate("weather"))
+        });
+    }
+
+    // No gate: the voxtype follower is event-driven (one line per state
+    // transition, nothing polls), so it runs for the life of the shell.
+    function dictationService() {
+        return sharedService("dictation", dictationServiceComponent, {});
+    }
+
+    Component {
+        id: tailscaleServiceComponent
+        TailscaleService {}
+    }
+
+    Component {
+        id: dropboxServiceComponent
+        DropboxService {}
+    }
+
+    Component {
+        id: rcloneServiceComponent
+        RcloneRemoteService {}
+    }
+
+    Component {
+        id: weatherServiceComponent
+        WeatherService {}
+    }
+
+    Component {
+        id: dictationServiceComponent
+        DictationService {}
+    }
+
     // ------------------------------------------------------ widget registry
     readonly property var registry: ({
             "launcher": launcherComponent,
@@ -1727,6 +1850,7 @@ Scope {
         Indicators {
             theme: barRoot.theme
             shell: barRoot.shell
+            serviceHost: barRoot
         }
     }
 
@@ -1742,6 +1866,7 @@ Scope {
         id: dictationComponent
         Dictation {
             theme: barRoot.theme
+            dictation: barRoot.dictationService()
         }
     }
 
@@ -1788,6 +1913,7 @@ Scope {
         id: weatherComponent
         Weather {
             theme: barRoot.theme
+            weather: barRoot.weatherService()
         }
     }
 
@@ -1803,6 +1929,7 @@ Scope {
         id: dropboxComponent
         Dropbox {
             theme: barRoot.theme
+            dropbox: barRoot.dropboxService()
         }
     }
 
@@ -1812,21 +1939,35 @@ Scope {
     // `bar open <id>` summons the first matching slot and this map is
     // one-id-one-component — "icloud" keeps its summon address, and
     // "dropbox" already belongs to the daemon-backed widget (the NUC's),
-    // so the rclone instance is "dropbox-rclone".
+    // so the rclone instance is "dropbox-rclone". The defaults live on
+    // barRoot rather than inline in the component blocks so the shared
+    // service and the widget mark are guaranteed the same object.
+    readonly property var icloudDefaults: ({
+            "remote": "iCloud",
+            "remoteType": "iclouddrive",
+            "label": "iCloud",
+            "mountPoint": "~/iCloud",
+            "legacyUnit": "qshell-icloud-mount",
+            "glyph": "󰀸" // md-apple_icloud
+            ,
+            "phrases": ["Courting Cupertino", "Ferrying folders", "Drizzling data", "Raining files", "Syncing the orchard", "Picking apples", "Minding memories", "Whispering to Apple", "Seeding the cloud", "Polishing pixels"]
+        })
+
+    readonly property var dropboxRcloneDefaults: ({
+            "remote": "Dropbox",
+            "remoteType": "dropbox",
+            "label": "Dropbox",
+            "mountPoint": "~/Dropbox",
+            "drawnMark": "dropbox",
+            "phrases": ["Filing files", "Distributing data", "Shuffling folders", "Boxing bytes", "Sorting stuff", "Syncing secrets", "Packing packets", "Moving memories", "Wrangling revisions", "Cataloging chaos"]
+        })
+
     Component {
         id: icloudComponent
         RcloneRemote {
             theme: barRoot.theme
-            defaults: ({
-                    "remote": "iCloud",
-                    "remoteType": "iclouddrive",
-                    "label": "iCloud",
-                    "mountPoint": "~/iCloud",
-                    "legacyUnit": "qshell-icloud-mount",
-                    "glyph": "󰀸" // md-apple_icloud
-                    ,
-                    "phrases": ["Courting Cupertino", "Ferrying folders", "Drizzling data", "Raining files", "Syncing the orchard", "Picking apples", "Minding memories", "Whispering to Apple", "Seeding the cloud", "Polishing pixels"]
-                })
+            defaults: barRoot.icloudDefaults
+            service: barRoot.rcloneService("icloud", barRoot.icloudDefaults)
         }
     }
 
@@ -1834,14 +1975,8 @@ Scope {
         id: dropboxRcloneComponent
         RcloneRemote {
             theme: barRoot.theme
-            defaults: ({
-                    "remote": "Dropbox",
-                    "remoteType": "dropbox",
-                    "label": "Dropbox",
-                    "mountPoint": "~/Dropbox",
-                    "drawnMark": "dropbox",
-                    "phrases": ["Filing files", "Distributing data", "Shuffling folders", "Boxing bytes", "Sorting stuff", "Syncing secrets", "Packing packets", "Moving memories", "Wrangling revisions", "Cataloging chaos"]
-                })
+            defaults: barRoot.dropboxRcloneDefaults
+            service: barRoot.rcloneService("dropbox-rclone", barRoot.dropboxRcloneDefaults)
         }
     }
 
@@ -1849,6 +1984,7 @@ Scope {
         id: tailscaleComponent
         Tailscale {
             theme: barRoot.theme
+            tailscale: barRoot.tailscaleService()
         }
     }
 

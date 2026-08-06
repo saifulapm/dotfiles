@@ -30,12 +30,11 @@ BarButton {
     // has answered.
     visible: tailscale.probed && tailscale.installed
 
-    readonly property TailscaleService tailscale: TailscaleService {
-        settings: rootItem.settings
-        // The refresh cadence is scoped to a widget that is actually on
-        // screen; nothing ticks when the bar is not there to show it.
-        pollingAllowed: rootItem.visible && rootItem.bar !== null
-    }
+    // The shared service, injected by the bar's registry — ONE instance
+    // however many screens carry this widget (S2). Its settings and its
+    // pollingAllowed gate (any bar visible, widget still in the layout) are
+    // bound where it is created, at the bar root.
+    required property TailscaleService tailscale
 
     tooltipText: {
         const base = "Tailscale — " + (tailscale.statusText === "" ? "Unknown" : tailscale.statusText);
