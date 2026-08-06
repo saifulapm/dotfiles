@@ -76,7 +76,7 @@ QtObject {
 
     // ---------------------------------------------------- per-surface tokens
     // A theme (or the machine override) may carry optional sections that
-    // restyle ONE surface — [lock], [bar], [panel], [tooltip],
+    // restyle ONE surface — [lock], [polkit], [bar], [panel], [tooltip],
     // [notifications], [menu], [osd] — without touching the base tokens every
     // other surface reads. Anything a section omits falls back to the base
     // token the surface would otherwise have used, so a section is always a
@@ -269,6 +269,19 @@ QtObject {
         readonly property color borderActive: root.sComposed("lock", "border-active", root.borderActive, root.sAlpha("lock", "border", 1.0))
         readonly property color borderError: root.sComposed("lock", "border-error", root.error, root.sAlpha("lock", "border", 1.0))
         readonly property color selection: root.sComposed("lock", "selection", root.accent, 0.45)
+    }
+    // Omarchy's [polkit] contract (their Commons/Color.qml): the dialog card,
+    // its scrim and the justification pill. border / border-error share one
+    // alpha companion, exactly as [lock]'s border states do.
+    readonly property QtObject polkit: QtObject {
+        readonly property color background: root.sComposed("polkit", "background", root.surface1, 1.0)
+        readonly property color text: root.sCol("polkit", "text", root.textPrimary)
+        readonly property color textError: root.sCol("polkit", "text-error", root.error)
+        readonly property color accent: root.sCol("polkit", "accent", root.accent)
+        readonly property string borderSpec: root.sSpec("polkit", "border", root.borderActiveSpec)
+        readonly property color border: root.sComposed("polkit", "border", root.borderActive, 1.0)
+        readonly property color borderError: root.sComposed("polkit", "border-error", root.error, root.sAlpha("polkit", "border", 1.0))
+        readonly property color scrim: root.sComposed("polkit", "scrim", root.surface0, 0.5)
     }
     // Defined for themes to target; the Menu and OSD modules themselves still
     // read base tokens (see the migration note in themes/tokyo-night.toml).

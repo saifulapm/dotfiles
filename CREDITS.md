@@ -653,6 +653,47 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   custom config directory, hence the tracked symlinks to the system files),
   our `locked` property and our `devUnlock` escape hatch are unchanged
   underneath it.
+- **Polkit dialog design** from `shell/plugins/polkit/` (`PolkitAgent.qml`,
+  `PolkitModel.js`): the whole face — one compact centered card holding a
+  padlock glyph and the password field and nothing else (no title, no action
+  id, no buttons; Escape cancels, Enter submits, any click refocuses), with
+  the justification pill floating above it (polkit's boilerplate
+  "Authentication is needed to run '/usr/bin/x' as the super user" reduced to
+  "Authorize running '/usr/bin/x'" by their `authorizationLabel`, the full
+  message standing in when it doesn't match); their `[polkit]` theme section
+  as the colour contract (background, text, text-error, accent, border,
+  border-error, scrim, with border / border-error sharing one alpha companion
+  because the states are mutually exclusive in time), resolved against our
+  tokens through the per-surface machinery; the failure choreography — the
+  card shake (their exact three-step offset sequence −8/+8/0 at 35/50/55 ms),
+  the border swapping to border-error, the placeholder flashing "Wrong" at
+  full opacity for 1.2 s with the field read-only, and typing clearing the
+  failure; the closing / submitted state machine (a cancelled or satisfied
+  dialog lingers 300 ms so it never blinks, "Checking..." while PAM decides,
+  a re-prompt re-arming the field); their card sizing rules (the 42 px field
+  in the padded card, width clamped 260–312, height clamped to the screen);
+  the snapshot-from-flow pattern (`resetSnapshot` / `syncFromFlow` /
+  `beginFlow` — the view renders snapshot properties, never the flow object);
+  and fingerprint mode — `fingerprintConfiguredFromPamConfig` parsing the
+  polkit PAM auth stack for pam_fprintd, the card collapsing to a square that
+  frames only the centered fingerprint glyph while PAM waits on the reader,
+  the password field taking over the moment a response is required, and the
+  lid-closed fallback that skips fingerprint while the clamshell is shut.
+  Adaptations: the PAM probe assembles Fedora's split stack (the vendor file
+  in `/usr/lib/pam.d` overridden by `/etc/pam.d`, plus one level of `auth
+  include`/`substack` — pam_fprintd lands in system-auth here, which their
+  single-file read would miss) and runs per request instead of their file
+  watch; their lid helper reads `/proc/acpi/button/lid/*/state`, which Asahi
+  does not have, so logind's `LidClosed` property answers behind it; their
+  FontAwesome padlock is md-lock (only the MD range renders here); the
+  fingerprint glyph and corner radius follow our tokens. Kept ours
+  underneath: the keyboard-focus rule (a layer surface that asks for
+  exclusive keyboard focus in its first commit never gets the keyboard from
+  niri — map with None, flip to Exclusive one tick later), the
+  Loader-gated window over the eager agent, the `Connections` anchored on
+  `agent.flow` itself rather than a derived active flag (cancelling dies
+  with null-property TypeErrors otherwise), and the `polkit status`/`cancel`
+  IPC verbs — cancel now routed through their closing choreography.
 - **On-screen display** from `shell/plugins/osd/Osd.qml`: the whole pill —
   the card measured out of its own columns rather than fixed widths so the
   padding is identical on every side whatever it carries, the icon column
@@ -1256,3 +1297,10 @@ Direct file-level copies (source path → destination path):
   power-on wait, trust-before-connect, pair as pair → trust → connect,
   forget as disconnect → remove, and every timeout. Only the program name in
   the usage line differs.
+- omarchy `shell/plugins/polkit/PolkitModel.js` →
+  `shell/Modules/Polkit/PolkitModel.js`: direct copy — `authorizationLabel`
+  and its needed-or-required match, `fingerprintConfiguredFromPamConfig` with
+  its comment-and-auth-line walk, and `promptLooksFingerprint`, which is
+  exported and unused upstream and stays that way here. Whitespace follows
+  house 4-space style; the `module.exports` tail is kept so the parses can be
+  exercised under node.

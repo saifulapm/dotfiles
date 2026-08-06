@@ -116,6 +116,13 @@ active = "accent.accent"
 #                    border-alpha [1.0] (shared by both border states — they are
 #                    mutually exclusive in time), selection [accent.accent] +
 #                    -alpha [0.45]
+#   [polkit]         the authentication dialog. background [surface.1] +
+#                    -alpha, text [text.primary], text-error [accent.error],
+#                    accent [accent.accent] (padlock/fingerprint glyphs),
+#                    border [border.active] + -alpha (gradient-or-solid, drawn
+#                    as a gradient ring when it is one), border-error
+#                    [accent.error] (shares border-alpha, as [lock]'s border
+#                    states do), scrim [surface.0] + -alpha [0.5]
 #   [menu]           background [surface.1] + -alpha, text [text.primary],
 #                    border [surface.3] + -alpha, scrim [surface.0] + -alpha [0.5],
 #                    selected-background [accent.accent] + -alpha [0.15],
@@ -123,9 +130,9 @@ active = "accent.accent"
 #   [osd]            background [surface.1] + -alpha, text [text.primary],
 #                    border [surface.3] + -alpha
 #
-# [bar], [panel], [tooltip], [notifications] and [lock] are wired to their
-# surfaces. [menu] and [osd] are defined and resolvable but the Menu and OSD
-# modules still read base tokens — porting them is follow-up work.
+# [bar], [panel], [tooltip], [notifications], [lock] and [polkit] are wired to
+# their surfaces. [menu] and [osd] are defined and resolvable but the Menu and
+# OSD modules still read base tokens — porting them is follow-up work.
 #
 # The same sections are accepted in ~/.config/qshell/theme-override.toml, a
 # machine-level file layered over whatever theme is active (see CREDITS.md).
