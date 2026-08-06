@@ -598,33 +598,11 @@ BarPanel {
         }
     }
 
-    Timer {
-        id: phraseTimer
-        interval: 2800
+    PhraseRotator {
+        theme: panel.theme
+        target: heroMeta
         running: panel.opened && panel.tailscale.active
-        repeat: true
-        onTriggered: phraseSwap.restart()
-    }
-
-    SequentialAnimation {
-        id: phraseSwap
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 0.0
-            duration: 180
-            easing.type: Easing.OutQuad
-        }
-        ScriptAction {
-            script: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
-        }
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 1.0
-            duration: 260
-            easing.type: Easing.InQuad
-        }
+        onAdvance: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
     }
 
     // -------------------------------------------------------------- content
@@ -908,7 +886,9 @@ BarPanel {
                         spacing: panel.theme.space(1)
                         topPadding: panel.theme.space(1)
 
-                        TextField {
+                        PanelTextField {
+
+                            theme: panel.theme
                             width: parent.width
                             placeholder: "Search regions"
                             focusWhen: panel.mullvadPickerOpen
@@ -1579,66 +1559,6 @@ BarPanel {
             text: "󰆏"
             color: panel.theme.textPrimary
             pixelSize: panel.theme.fontPx(0.917)
-        }
-    }
-
-    // NetworkPanel's field, with their region picker's arrow keys added: a
-    // focused TextInput swallows every printable key, so j/k cannot move the
-    // list from inside the box (upstream reads them too, and cannot either).
-    component TextField: Rectangle {
-        id: field
-
-        property string placeholder: ""
-        property bool focusWhen: false
-        property alias text: input.text
-
-        signal textEdited(string text)
-        signal moveRequested(int delta)
-        signal accepted
-        signal cancelled
-
-        implicitHeight: panel.theme.space(8)
-        radius: panel.theme.radius(0.75)
-        color: panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: input.activeFocus ? panel.theme.accent : panel.theme.surface3
-
-        onFocusWhenChanged: if (focusWhen)
-            Qt.callLater(function () {
-                input.forceActiveFocus();
-            })
-
-        Component.onCompleted: if (focusWhen)
-            Qt.callLater(function () {
-                input.forceActiveFocus();
-            })
-
-        TextInput {
-            id: input
-
-            anchors.fill: parent
-            anchors.leftMargin: panel.theme.space(2.5)
-            anchors.rightMargin: panel.theme.space(2.5)
-            verticalAlignment: TextInput.AlignVCenter
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.917)
-            clip: true
-
-            onTextChanged: field.textEdited(text)
-            onAccepted: field.accepted()
-            Keys.onEscapePressed: field.cancelled()
-            Keys.onDownPressed: field.moveRequested(1)
-            Keys.onUpPressed: field.moveRequested(-1)
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: input.text === ""
-                text: field.placeholder
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
-            }
         }
     }
 }

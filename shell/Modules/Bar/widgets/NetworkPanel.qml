@@ -1236,36 +1236,11 @@ BarPanel {
         }
     }
 
-    Timer {
-        id: connectionPhraseTimer
-        interval: 2800
-        repeat: true
+    PhraseRotator {
+        theme: panel.theme
+        target: heroMeta
         running: panel.opened && (panel.info.type === "ethernet" || (panel.info.type === "wifi" && !!panel.connectedWifiNetwork))
-        onTriggered: phraseSwap.restart()
-    }
-
-    SequentialAnimation {
-        id: phraseSwap
-
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 0
-            duration: 180
-            easing.type: Easing.OutQuad
-        }
-
-        ScriptAction {
-            script: panel.connectionPhraseIndex = (panel.connectionPhraseIndex + 1) % panel.connectionPhrases.length
-        }
-
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 1
-            duration: 260
-            easing.type: Easing.InQuad
-        }
+        onAdvance: panel.connectionPhraseIndex = (panel.connectionPhraseIndex + 1) % panel.connectionPhrases.length
     }
 
     // ------------------------------------------------------------ overlays
@@ -1667,8 +1642,10 @@ BarPanel {
                     spacing: panel.theme.space(1.5)
                     visible: panel.dnsCustomOpen
 
-                    TextField {
+                    PanelTextField {
                         id: dnsField
+
+                        theme: panel.theme
 
                         width: parent.width - dnsApply.width - panel.theme.space(1.5)
                         placeholder: "1.1.1.1 9.9.9.9"
@@ -1941,63 +1918,6 @@ BarPanel {
         }
     }
 
-    // Bordered single-line input, shared by the passphrase and DNS fields.
-    component TextField: Rectangle {
-        id: field
-
-        property string placeholder: ""
-        property bool password: false
-        property bool focusWhen: false
-        property alias text: input.text
-
-        signal textEdited(string text)
-        signal accepted
-        signal cancelled
-
-        implicitHeight: panel.theme.space(8)
-        radius: panel.theme.radius(0.75)
-        color: panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: input.activeFocus ? panel.theme.accent : panel.theme.surface3
-
-        onFocusWhenChanged: if (focusWhen)
-            Qt.callLater(function () {
-                input.forceActiveFocus();
-            })
-
-        Component.onCompleted: if (focusWhen)
-            Qt.callLater(function () {
-                input.forceActiveFocus();
-            })
-
-        TextInput {
-            id: input
-
-            anchors.fill: parent
-            anchors.leftMargin: panel.theme.space(2.5)
-            anchors.rightMargin: panel.theme.space(2.5)
-            verticalAlignment: TextInput.AlignVCenter
-            echoMode: field.password ? TextInput.Password : TextInput.Normal
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.917)
-            clip: true
-
-            onTextChanged: field.textEdited(text)
-            onAccepted: field.accepted()
-            Keys.onEscapePressed: field.cancelled()
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: input.text === ""
-                text: field.placeholder
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
-            }
-        }
-    }
-
     // A single Wi-Fi network. Collapses to one line normally; expands inline
     // into a passphrase prompt when a protected network has no credentials
     // yet. Clicking a connected row disconnects.
@@ -2237,8 +2157,10 @@ BarPanel {
             visible: row.isPasswordOpen
             implicitHeight: (idField.visible ? idField.implicitHeight + panel.theme.space(1.5) : 0) + pwField.implicitHeight + panel.theme.space(2)
 
-            TextField {
+            PanelTextField {
                 id: idField
+
+                theme: panel.theme
 
                 anchors.left: parent.left
                 anchors.right: connectButton.left
@@ -2255,8 +2177,10 @@ BarPanel {
                 onCancelled: panel.cancelPasswordPrompt()
             }
 
-            TextField {
+            PanelTextField {
                 id: pwField
+
+                theme: panel.theme
 
                 function forceFocus() {
                     focusWhen = false;

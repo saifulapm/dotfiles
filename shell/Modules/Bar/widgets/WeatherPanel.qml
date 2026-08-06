@@ -233,8 +233,16 @@ BarPanel {
                     anchors.right: parent.right
                     spacing: panel.theme.space(1.5)
 
-                    TextField {
+                    PanelTextField {
                         id: locationField
+
+                        theme: panel.theme
+
+                        implicitHeight: panel.theme.space(7)
+
+                        inputMargin: panel.theme.space(2)
+
+                        inputFont: panel.theme.fontUi
                         width: panel.theme.space(42)
                         enabled: !panel.weather.savingLocation
                         placeholder: "Search city"
@@ -243,7 +251,7 @@ BarPanel {
                             geocodeDebounce.restart()
                         onAccepted: panel.commitLocation()
                         onCancelled: panel.cancelEditingLocation()
-                        onStepped: delta => {
+                        onMoveRequested: delta => {
                             const next = panel.suggestionIndex + delta;
                             if (next >= 0 && next < panel.locationSuggestions.length)
                                 panel.suggestionIndex = next;
@@ -470,62 +478,6 @@ BarPanel {
             color: panel.theme.textPrimary
             font.family: panel.theme.fontUi
             font.pixelSize: panel.theme.fontPx(1.083)
-        }
-    }
-
-    // Bordered single-line input for the location search.
-    component TextField: Rectangle {
-        id: field
-
-        property string placeholder: ""
-        property alias text: input.text
-
-        signal textEdited(string text)
-        signal accepted
-        signal cancelled
-        signal stepped(int delta)
-
-        function takeFocus() {
-            input.forceActiveFocus();
-        }
-
-        function selectAll() {
-            input.selectAll();
-        }
-
-        implicitHeight: panel.theme.space(7)
-        radius: panel.theme.radius(0.75)
-        color: panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: input.activeFocus ? panel.theme.accent : panel.theme.surface3
-        opacity: enabled ? 1 : 0.5
-
-        TextInput {
-            id: input
-
-            anchors.fill: parent
-            anchors.leftMargin: panel.theme.space(2)
-            anchors.rightMargin: panel.theme.space(2)
-            verticalAlignment: TextInput.AlignVCenter
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.917)
-            clip: true
-
-            onTextChanged: field.textEdited(text)
-            onAccepted: field.accepted()
-            Keys.onEscapePressed: field.cancelled()
-            Keys.onDownPressed: field.stepped(1)
-            Keys.onUpPressed: field.stepped(-1)
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: input.text === ""
-                text: field.placeholder
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
-            }
         }
     }
 }

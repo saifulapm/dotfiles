@@ -200,33 +200,11 @@ BarPanel {
         onTriggered: panel.nowMs = Date.now()
     }
 
-    Timer {
-        id: phraseTimer
-        interval: 2800
+    PhraseRotator {
+        theme: panel.theme
+        target: heroMeta
         running: panel.opened && panel.dropbox.authenticated && panel.dropbox.active
-        repeat: true
-        onTriggered: phraseSwap.restart()
-    }
-
-    SequentialAnimation {
-        id: phraseSwap
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 0.0
-            duration: 180
-            easing.type: Easing.OutQuad
-        }
-        ScriptAction {
-            script: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
-        }
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 1.0
-            duration: 260
-            easing.type: Easing.InQuad
-        }
+        onAdvance: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
     }
 
     // -------------------------------------------------------------- content

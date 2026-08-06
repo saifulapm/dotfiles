@@ -121,46 +121,14 @@ BarPanel {
 
     // The phrase swap is wrapped in a fade so the changeover reads as one
     // organism rather than a hard cut.
-    Timer {
-        interval: 2800
+    PhraseRotator {
+        theme: panel.theme
+        target: heroStatus
         running: panel.opened && panel.rotatingPhrases
-        repeat: true
-        onTriggered: phraseSwap.restart()
-    }
-
-    SequentialAnimation {
-        id: phraseSwap
-
-        PropertyAnimation {
-            target: heroStatus
-            property: "opacity"
-            to: 0.0
-            duration: 180
-            easing.type: Easing.OutQuad
-        }
-
-        ScriptAction {
-            script: {
-                const n = panel.activePhrases.length;
-                if (n > 0)
-                    panel.phraseIndex = (panel.phraseIndex + 1) % n;
-            }
-        }
-
-        PropertyAnimation {
-            target: heroStatus
-            property: "opacity"
-            to: 1.0
-            duration: 260
-            easing.type: Easing.InQuad
-        }
-    }
-
-    // Leaving a rotating state mid-swap must not leave the label dimmed.
-    onRotatingPhrasesChanged: {
-        if (!rotatingPhrases) {
-            phraseSwap.stop();
-            heroStatus.opacity = 1.0;
+        onAdvance: {
+            const n = panel.activePhrases.length;
+            if (n > 0)
+                panel.phraseIndex = (panel.phraseIndex + 1) % n;
         }
     }
 

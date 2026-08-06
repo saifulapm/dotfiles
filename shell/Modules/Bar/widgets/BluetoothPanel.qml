@@ -582,43 +582,11 @@ BarPanel {
         onTriggered: panel.switchPendingAudioOutput()
     }
 
-    Timer {
-        id: phraseTimer
-        interval: 2800
+    PhraseRotator {
+        theme: panel.theme
+        target: heroMeta
         running: panel.opened && panel.rotatingPhrases
-        repeat: true
-        onTriggered: phraseSwap.restart()
-    }
-
-    SequentialAnimation {
-        id: phraseSwap
-
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 0
-            duration: 180
-            easing.type: Easing.OutQuad
-        }
-
-        ScriptAction {
-            script: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
-        }
-
-        PropertyAnimation {
-            target: heroMeta
-            property: "opacity"
-            to: 1
-            duration: 260
-            easing.type: Easing.InQuad
-        }
-    }
-
-    onRotatingPhrasesChanged: {
-        if (!panel.rotatingPhrases) {
-            phraseSwap.stop();
-            heroMeta.opacity = 1.0;
-        }
+        onAdvance: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
     }
 
     // ------------------------------------------------------------ keyboard
