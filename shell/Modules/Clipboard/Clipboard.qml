@@ -357,8 +357,8 @@ Scope {
             // Upstream clamps the card to the screen; a small display gets the
             // margin back rather than a card hanging off the edge. The panel
             // measures 0 before it is first mapped, hence the guards.
-            readonly property int cardWidth: panel.width > 0 ? Math.min(760, panel.width - clipboardRoot.theme.space(8) * 2) : 760
-            readonly property int cardHeight: panel.height > 0 ? Math.min(520, panel.height - clipboardRoot.theme.space(8) * 2) : 520
+            readonly property int cardWidth: panel.width > 0 ? Math.min(clipboardRoot.theme.space(190), panel.width - clipboardRoot.theme.space(8) * 2) : clipboardRoot.theme.space(190)
+            readonly property int cardHeight: panel.height > 0 ? Math.min(clipboardRoot.theme.space(130), panel.height - clipboardRoot.theme.space(8) * 2) : clipboardRoot.theme.space(130)
 
             function positionAt(index) {
                 list.positionViewAtIndex(index, ListView.Contain);
@@ -643,7 +643,7 @@ Scope {
                                         anchors.left: parent.left
                                         anchors.top: parent.top
                                         anchors.bottom: parent.bottom
-                                        width: 1
+                                        width: clipboardRoot.theme.borderWidth
                                         color: clipboardRoot.theme.alpha(clipboardRoot.theme.textPrimary, 0.2)
                                     }
 

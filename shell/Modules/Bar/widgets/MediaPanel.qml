@@ -15,7 +15,6 @@ BarPanel {
     id: panel
 
     panelTitle: ""
-    cardWidth: 340
 
     // The shared media service, injected by the widget.
     property var media: null

@@ -13,8 +13,6 @@ import "ClockModel.js" as Model
 BarPanel {
     id: panel
 
-    cardWidth: 340
-
     // Injected by the clock widget: the widget itself (which owns settings
     // persistence) and its inline shell.json entry.
     property var host: null
@@ -391,7 +389,7 @@ BarPanel {
 
                 Behavior on width {
                     NumberAnimation {
-                        duration: 160
+                        duration: panel.theme.time(1)
                         easing.type: Easing.OutCubic
                     }
                 }
@@ -454,7 +452,7 @@ BarPanel {
 
                 Behavior on width {
                     NumberAnimation {
-                        duration: 160
+                        duration: panel.theme.time(1)
                         easing.type: Easing.OutCubic
                     }
                 }

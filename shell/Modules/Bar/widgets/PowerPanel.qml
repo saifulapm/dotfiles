@@ -19,7 +19,7 @@ BarPanel {
     id: panel
 
     panelTitle: ""
-    cardWidth: 380
+    cardWidth: theme.space(95)
 
     readonly property string binDir: Quickshell.env("HOME") + "/.dotfiles/bin/"
 
@@ -181,7 +181,7 @@ BarPanel {
             anchors.verticalCenter: parent.verticalCenter
             text: panel.batteryIcon || "󰂑"
             color: panel.theme.textPrimary
-            pixelSize: 28
+            pixelSize: panel.theme.fontPx(2.333)
         }
 
         Column {
@@ -250,7 +250,7 @@ BarPanel {
 
             Behavior on width {
                 NumberAnimation {
-                    duration: 320
+                    duration: panel.theme.time(2.13)
                     easing.type: Easing.OutCubic
                 }
             }
@@ -265,14 +265,14 @@ BarPanel {
                 NumberAnimation {
                     from: 1.0
                     to: 0.55
-                    duration: 950
+                    duration: panel.theme.time(6.33)
                     easing.type: Easing.InOutSine
                 }
 
                 NumberAnimation {
                     from: 0.55
                     to: 1.0
-                    duration: 950
+                    duration: panel.theme.time(6.33)
                     easing.type: Easing.InOutSine
                 }
             }
@@ -369,10 +369,8 @@ BarPanel {
         }
     }
 
-    Rectangle {
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
+    Separator {
+        theme: panel.theme
     }
 
     // -------------------------------------------------------------- system
@@ -435,10 +433,8 @@ BarPanel {
         }
     }
 
-    Rectangle {
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
+    Separator {
+        theme: panel.theme
     }
 
     // ------------------------------------------------------------ profiles
@@ -483,7 +479,7 @@ BarPanel {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: Model.profileIcon(profileCell.modelData)
                         color: profileCell.isActive ? panel.theme.accent : panel.theme.textPrimary
-                        pixelSize: 16
+                        pixelSize: panel.theme.fontPx(1.333)
                     }
 
                     Text {

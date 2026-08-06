@@ -44,8 +44,8 @@ Scope {
     // Upstream clamps the card to the screen; small displays get the margin
     // back rather than a card hanging off the edge. The panel measures 0
     // before it is first mapped, hence the guard.
-    readonly property int cardWidth: panel.width > 0 ? Math.min(480, panel.width - theme.space(8) * 2) : 480
-    readonly property int cardHeight: panel.height > 0 ? Math.min(520, panel.height - theme.space(8) * 2) : 520
+    readonly property int cardWidth: panel.width > 0 ? Math.min(theme.space(120), panel.width - theme.space(8) * 2) : theme.space(120)
+    readonly property int cardHeight: panel.height > 0 ? Math.min(theme.space(130), panel.height - theme.space(8) * 2) : theme.space(130)
     readonly property int columns: Math.max(1, Math.floor((cardWidth - cardMargin * 2) / cellSize))
 
     // ---------------------------------------------------------- open/close

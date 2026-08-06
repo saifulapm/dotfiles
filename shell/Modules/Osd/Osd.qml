@@ -367,7 +367,7 @@ Scope {
                             Behavior on width {
                                 enabled: osdRoot.opened
                                 NumberAnimation {
-                                    duration: 140
+                                    duration: osdRoot.theme.time(1)
                                     easing.type: Easing.OutCubic
                                 }
                             }

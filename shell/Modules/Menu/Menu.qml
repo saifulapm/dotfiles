@@ -36,13 +36,13 @@ Scope {
     property var checkedResults: ({})
 
     // ------------------------------------------------------------ geometry
-    readonly property int cardWidth: 480
+    readonly property int cardWidth: theme.space(120)
     readonly property int rowSpacing: theme.space(1)
     readonly property int rowHeight: filterText ? theme.space(14) : theme.space(11)
     readonly property int dividerHeight: theme.space(5)
     readonly property int headerHeight: theme.space(10)
     readonly property int cardMargin: theme.space(4)
-    readonly property int maxListHeight: 440
+    readonly property int maxListHeight: theme.space(110)
     // The starting menu sets the height ceiling: the first submenu move or
     // search keystroke freezes it, so drilling into a longer menu (or the
     // taller filtered rows) scrolls behind the fold instead of growing the
@@ -571,7 +571,7 @@ Scope {
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.left: parent.left
                                     anchors.right: parent.right
-                                    height: 1
+                                    height: menuRoot.theme.borderWidth
                                     color: menuRoot.theme.alpha(menuRoot.theme.textPrimary, 0.2)
                                 }
                             }

@@ -22,7 +22,7 @@ BarPanel {
     required property var dropbox
 
     panelTitle: ""
-    cardWidth: 380
+    cardWidth: theme.space(95)
 
     // Read instead of Date.now() so "3m ago" stays true while the card is open.
     property double nowMs: Date.now()

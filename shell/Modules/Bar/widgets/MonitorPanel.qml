@@ -18,7 +18,7 @@ BarPanel {
     id: panel
 
     panelTitle: ""
-    cardWidth: 380
+    cardWidth: theme.space(95)
 
     // The shell's night light service (Services/Nightlight.qml).
     property var nightlight: null
@@ -348,7 +348,7 @@ BarPanel {
             anchors.verticalCenter: parent.verticalCenter
             text: panel.outputs.length > 1 ? "󰍺" : "󰍹"
             color: panel.theme.textPrimary
-            pixelSize: 28
+            pixelSize: panel.theme.fontPx(2.333)
         }
 
         Column {
@@ -382,11 +382,9 @@ BarPanel {
         }
     }
 
-    Rectangle {
+    Separator {
+        theme: panel.theme
         visible: panel.brightnessRows.length > 0
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
     }
 
     // ---------------------------------------------------------- brightness
@@ -480,10 +478,8 @@ BarPanel {
         wrapMode: Text.WordWrap
     }
 
-    Rectangle {
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
+    Separator {
+        theme: panel.theme
     }
 
     // --------------------------------------------------------------- scale
@@ -546,10 +542,8 @@ BarPanel {
         }
     }
 
-    Rectangle {
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
+    Separator {
+        theme: panel.theme
     }
 
     // ----------------------------------------------------------------- vrr
@@ -601,10 +595,8 @@ BarPanel {
         }
     }
 
-    Rectangle {
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
+    Separator {
+        theme: panel.theme
     }
 
     // ---------------------------------------------------------- night light
@@ -659,11 +651,9 @@ BarPanel {
         }
     }
 
-    Rectangle {
+    Separator {
+        theme: panel.theme
         visible: panel.outputs.length > 0
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
     }
 
     // ------------------------------------------------------------ displays
@@ -708,7 +698,7 @@ BarPanel {
                         anchors.verticalCenter: parent.verticalCenter
                         text: "󰍹"
                         color: panel.theme.textPrimary
-                        pixelSize: 16
+                        pixelSize: panel.theme.fontPx(1.333)
                     }
 
                     Column {
@@ -736,7 +726,7 @@ BarPanel {
                         anchors.verticalCenter: parent.verticalCenter
                         text: outputRow.powered ? "󰄬" : ""
                         color: panel.theme.accent
-                        pixelSize: 16
+                        pixelSize: panel.theme.fontPx(1.333)
                     }
                 }
 

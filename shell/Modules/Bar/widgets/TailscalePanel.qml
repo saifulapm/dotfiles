@@ -31,7 +31,7 @@ BarPanel {
     required property var widget
 
     panelTitle: ""
-    cardWidth: 380
+    cardWidth: theme.space(95)
 
     // ------------------------------------------------------------- phrases
     property int phraseIndex: 0
@@ -1256,7 +1256,7 @@ BarPanel {
                     running: exitNodeRow.settingExitNode
                     from: 0
                     to: 360
-                    duration: 900
+                    duration: panel.theme.time(6)
                     loops: Animation.Infinite
                 }
 

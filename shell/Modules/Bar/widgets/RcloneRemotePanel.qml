@@ -25,7 +25,7 @@ BarPanel {
     required property var service
 
     panelTitle: ""
-    cardWidth: 380
+    cardWidth: theme.space(95)
 
     readonly property string mountHint: service.mountActive ? "Unmount the " + service.label + " folder" : "Mount " + service.label + " at " + service.mountPoint
 

@@ -55,10 +55,10 @@ Item {
 
     // Space to keep clear on each side of the field for the fingerprint icon
     // (icon width plus a gap) so the centered dots never run under it.
-    readonly property real fingerprintReserve: fingerprintConfigured ? Math.round(fingerprintIcon.implicitWidth + 12) : 0
+    readonly property real fingerprintReserve: fingerprintConfigured ? Math.round(fingerprintIcon.implicitWidth + theme.space(3)) : 0
     // Shrink the dots to fit once the password outgrows the field, so every
     // keystroke stays visible — otherwise long passwords clip with no feedback.
-    readonly property real passwordDotScale: dotMetrics.advanceWidth > 0 ? Math.min(1, (passwordInput.width - 4) / dotMetrics.advanceWidth) : 1
+    readonly property real passwordDotScale: dotMetrics.advanceWidth > 0 ? Math.min(1, (passwordInput.width - theme.space(1)) / dotMetrics.advanceWidth) : 1
     readonly property bool showPasswordCursor: inputEnabled && !authenticatingPassword && failureMessage.length === 0
     readonly property bool errorState: failureMessage.length > 0
 
@@ -259,7 +259,7 @@ Item {
                 cursorVisible: activeFocus && root.showPasswordCursor && text.length > 0
 
                 cursorDelegate: Rectangle {
-                    width: 2
+                    width: theme.space(0.5)
                     color: root.textColor
                     visible: passwordInput.cursorVisible
                 }

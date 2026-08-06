@@ -109,8 +109,8 @@ Scope {
         Rectangle {
             id: panel
             anchors.centerIn: parent
-            width: 560
-            height: 440
+            width: launcherRoot.theme.space(140)
+            height: launcherRoot.theme.space(110)
             radius: launcherRoot.theme.radius(1.5)
             color: launcherRoot.theme.surface1
             border.width: launcherRoot.theme.borderWidth

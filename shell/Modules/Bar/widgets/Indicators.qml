@@ -224,7 +224,7 @@ Item {
                 // Upstream's reveal snaps; ours slides, like our tray drawer.
                 Behavior on width {
                     NumberAnimation {
-                        duration: 180
+                        duration: root.theme.time(1.2)
                         easing.type: Easing.OutCubic
                     }
                 }
@@ -284,7 +284,7 @@ Item {
 
                 Behavior on height {
                     NumberAnimation {
-                        duration: 180
+                        duration: root.theme.time(1.2)
                         easing.type: Easing.OutCubic
                     }
                 }

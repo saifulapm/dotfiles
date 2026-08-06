@@ -5,6 +5,6 @@ import QtQuick
 Rectangle {
     required property var theme
     width: parent ? parent.width : 0
-    height: 1
+    height: theme.borderWidth
     color: theme.surface3
 }

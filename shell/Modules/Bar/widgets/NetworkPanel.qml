@@ -26,7 +26,7 @@ BarPanel {
     id: panel
 
     panelTitle: ""
-    cardWidth: 380
+    cardWidth: theme.space(95)
 
     readonly property string binDir: Quickshell.env("HOME") + "/.dotfiles/bin/"
 
@@ -1524,14 +1524,14 @@ BarPanel {
 
                     Behavior on height {
                         NumberAnimation {
-                            duration: 140
+                            duration: panel.theme.time(1)
                             easing.type: Easing.OutCubic
                         }
                     }
 
                     Behavior on opacity {
                         NumberAnimation {
-                            duration: 140
+                            duration: panel.theme.time(1)
                             easing.type: Easing.OutCubic
                         }
                     }
@@ -2051,7 +2051,7 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 text: row.net ? Model.wifiIconFor(row.net.signal) : ""
                 color: row.isConnected ? panel.theme.accent : panel.theme.textPrimary
-                pixelSize: 13
+                pixelSize: panel.theme.fontPx(1.083)
             }
 
             // Lock glyph for protected networks; a known disconnected network
@@ -2078,7 +2078,7 @@ BarPanel {
                     anchors.centerIn: parent
                     text: row.forgetVisible ? "󰅙" : "󰌾"
                     color: row.forgetVisible ? panel.theme.error : panel.theme.textMuted
-                    pixelSize: 11
+                    pixelSize: panel.theme.fontPx(0.917)
                 }
 
                 MouseArea {

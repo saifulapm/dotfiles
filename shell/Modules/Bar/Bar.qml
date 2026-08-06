@@ -830,7 +830,7 @@ Scope {
                 if (!slot)
                     return null;
                 const p = windowScreenPoint(slotScenePoint(slot));
-                const thickness = 3; // omarchy's Style.spacing.xs
+                const thickness = barRoot.theme.space(0.75); // omarchy's Style.spacing.xs
                 // The marker lies across the bar at the insertion boundary, so
                 // it is a vertical rule on a horizontal bar and a horizontal
                 // one on a vertical bar.
@@ -1102,7 +1102,7 @@ Scope {
                     // its own, so it takes the theme's foreground rather than
                     // the bar's wallpaper-sampled contrast color.
                     color: barRoot.theme.tooltip.background
-                    border.width: 1
+                    border.width: barRoot.theme.tooltip.borderWidth
                     border.color: barRoot.theme.tooltip.border
 
                     Text {
@@ -1333,7 +1333,7 @@ Scope {
                 Rectangle {
                     anchors.fill: parent
                     color: barRoot.transparent ? "transparent" : barRoot.barBackground
-                    border.width: 1
+                    border.width: barRoot.theme.borderWidth
                     border.color: barRoot.barForeground
                     radius: Math.min(barRoot.theme.radiusBase, height / 2)
                     opacity: barRoot.transparent ? 0.45 : 0.94
@@ -1345,7 +1345,7 @@ Scope {
                     source: barRoot.dragImageUrl
                     fillMode: Image.Stretch
                     smooth: true
-                    opacity: 0.84
+                    opacity: 0.85
                 }
             }
 
@@ -1409,7 +1409,7 @@ Scope {
                     width: edgeVertical ? edgeSize : parent.width
                     height: edgeVertical ? parent.height : edgeSize
                     color: barRoot.transparent ? "transparent" : barRoot.barBackground
-                    border.width: 1
+                    border.width: barRoot.theme.borderWidth
                     border.color: barRoot.barForeground
                     visible: opacity > 0
                     opacity: barRoot.barMoveCandidate === modelData ? (barRoot.transparent ? 0.45 : 0.7) : 0
@@ -1576,7 +1576,7 @@ Scope {
             anchors.fill: parent
             anchors.margins: 1
             color: barRoot.transparent ? "transparent" : barRoot.barBackground
-            border.width: 1
+            border.width: barRoot.theme.borderWidth
             border.color: barRoot.barForeground
             radius: Math.min(barRoot.theme.radiusBase, height / 2)
             opacity: barRoot.transparent ? 0.22 : 0.32

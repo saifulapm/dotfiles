@@ -14,7 +14,6 @@ BarPanel {
     readonly property var items: tray ? tray.manageItems : []
 
     panelTitle: "Tray icons"
-    cardWidth: 320
 
     Text {
         width: parent.width

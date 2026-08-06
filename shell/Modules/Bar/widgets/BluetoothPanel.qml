@@ -31,7 +31,7 @@ BarPanel {
     id: panel
 
     panelTitle: ""
-    cardWidth: 380
+    cardWidth: theme.space(95)
 
     readonly property string binDir: Quickshell.env("HOME") + "/.dotfiles/bin/"
 

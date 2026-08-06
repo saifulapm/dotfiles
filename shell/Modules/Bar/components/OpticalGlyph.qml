@@ -11,7 +11,7 @@ Item {
     property string text: ""
     property color color: "white"
     property string fontFamily: "Symbols Nerd Font"
-    property int pixelSize: 14
+    property int pixelSize: 13
     // Omarchy gates their bar glyphs' color transition on the bar's
     // foregroundAnimationEnabled (their WidgetButton Behavior) so the
     // transparency auto-contrast flip lands in ONE frame instead of

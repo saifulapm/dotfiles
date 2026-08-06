@@ -14,7 +14,7 @@ PanelWindow {
     // The bar widget this panel hangs under. Set by the widget before open().
     property Item anchorItem: null
     property bool opened: false
-    property real cardWidth: 340
+    property real cardWidth: theme.space(85)
     property string panelTitle: ""
 
     default property alias content: contentColumn.data
@@ -143,16 +143,16 @@ PanelWindow {
 
         x: {
             if (!panelWindow.barVertical)
-                return Math.max(8, Math.min(panelWindow.anchorCenterX - width / 2, panelWindow.width - width - 8));
-            return panelWindow.barPosition === "left" ? panelWindow.barExtent + 6 : panelWindow.width - panelWindow.barExtent - 6 - width;
+                return Math.max(panelWindow.theme.space(2), Math.min(panelWindow.anchorCenterX - width / 2, panelWindow.width - width - panelWindow.theme.space(2)));
+            return panelWindow.barPosition === "left" ? panelWindow.barExtent + panelWindow.theme.space(1.5) : panelWindow.width - panelWindow.barExtent - panelWindow.theme.space(1.5) - width;
         }
         y: {
             if (panelWindow.barVertical)
-                return Math.max(8, Math.min(panelWindow.anchorCenterY - height / 2, panelWindow.height - height - 8));
-            return panelWindow.barAtBottom ? panelWindow.height - panelWindow.barExtent - 6 - height : panelWindow.barExtent + 6;
+                return Math.max(panelWindow.theme.space(2), Math.min(panelWindow.anchorCenterY - height / 2, panelWindow.height - height - panelWindow.theme.space(2)));
+            return panelWindow.barAtBottom ? panelWindow.height - panelWindow.barExtent - panelWindow.theme.space(1.5) - height : panelWindow.barExtent + panelWindow.theme.space(1.5);
         }
         width: panelWindow.cardWidth
-        height: Math.min(cardContent.implicitHeight + panelWindow.theme.space(8), panelWindow.height - (panelWindow.barVertical ? 0 : panelWindow.barExtent) - 6 - panelWindow.theme.space(4))
+        height: Math.min(cardContent.implicitHeight + panelWindow.theme.space(8), panelWindow.height - (panelWindow.barVertical ? 0 : panelWindow.barExtent) - panelWindow.theme.space(1.5) - panelWindow.theme.space(4))
         radius: panelWindow.theme.radius(1.5)
         // The [panel] surface (omarchy's [popups]): a theme section restyles
         // every bar flyout card at once, and falls back to the base tokens.

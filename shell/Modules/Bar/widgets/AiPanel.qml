@@ -16,7 +16,7 @@ BarPanel {
     required property var usage
 
     panelTitle: ""
-    cardWidth: 380
+    cardWidth: theme.space(95)
 
     readonly property var provider: usage.provider
     readonly property var limits: usage.limits
@@ -68,8 +68,8 @@ BarPanel {
             id: heroMark
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            width: 26
-            height: 26
+            width: panel.theme.space(6.5)
+            height: panel.theme.space(6.5)
 
             readonly property string markUrl: panel.provider ? String(panel.provider.markSource || "") : ""
             readonly property string glyph: panel.provider ? String(panel.provider.markGlyph || "") : ""
@@ -78,8 +78,8 @@ BarPanel {
                 anchors.fill: parent
                 visible: heroMark.glyph === ""
                 source: heroMark.markUrl
-                sourceSize.width: 52
-                sourceSize.height: 52
+                sourceSize.width: heroMark.width * 2
+                sourceSize.height: heroMark.height * 2
                 fillMode: Image.PreserveAspectFit
             }
 
@@ -88,7 +88,7 @@ BarPanel {
                 visible: heroMark.glyph !== ""
                 text: heroMark.glyph
                 color: panel.usage.alarming ? panel.theme.error : panel.theme.textPrimary
-                pixelSize: 24
+                pixelSize: panel.theme.fontPx(2)
             }
         }
 
@@ -139,13 +139,13 @@ BarPanel {
                 anchors.centerIn: parent
                 text: "󰑐"
                 color: panel.theme.textMuted
-                pixelSize: 14
+                pixelSize: panel.theme.fontPx(1.167)
 
                 RotationAnimator on rotation {
                     running: panel.usage.refreshing
                     from: 0
                     to: 360
-                    duration: 900
+                    duration: panel.theme.time(6)
                     loops: Animation.Infinite
                 }
             }
@@ -236,11 +236,9 @@ BarPanel {
     }
 
     // -------------------------------------------------------------- limits
-    Rectangle {
+    Separator {
+        theme: panel.theme
         visible: panel.limits.length > 0
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
     }
 
     Column {
@@ -323,7 +321,7 @@ BarPanel {
 
                         Behavior on width {
                             NumberAnimation {
-                                duration: 160
+                                duration: panel.theme.time(1)
                                 easing.type: Easing.OutCubic
                             }
                         }
@@ -343,10 +341,8 @@ BarPanel {
         }
     }
 
-    Rectangle {
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
+    Separator {
+        theme: panel.theme
     }
 
     // --------------------------------------------------------------- today
@@ -459,7 +455,7 @@ BarPanel {
 
                         Behavior on width {
                             NumberAnimation {
-                                duration: 160
+                                duration: panel.theme.time(1)
                                 easing.type: Easing.OutCubic
                             }
                         }
@@ -520,7 +516,7 @@ BarPanel {
 
                     Behavior on width {
                         NumberAnimation {
-                            duration: 160
+                            duration: panel.theme.time(1)
                             easing.type: Easing.OutCubic
                         }
                     }

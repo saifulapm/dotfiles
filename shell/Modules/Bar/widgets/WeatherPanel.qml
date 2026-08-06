@@ -20,7 +20,7 @@ BarPanel {
     required property var weather
 
     panelTitle: ""
-    cardWidth: 430
+    cardWidth: theme.space(107.5)
 
     // ---------------------------------------------------------- edit state
     property bool editingLocation: false
@@ -153,7 +153,7 @@ BarPanel {
 
             Row {
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 1
+                spacing: panel.theme.space(0.25)
 
                 Text {
                     id: tempBig
@@ -277,7 +277,7 @@ BarPanel {
                                 running: panel.weather.savingLocation
                                 from: 0
                                 to: 360
-                                duration: 800
+                                duration: panel.theme.time(5.33)
                                 loops: Animation.Infinite
                             }
                         }
@@ -386,11 +386,9 @@ BarPanel {
         font.italic: true
     }
 
-    Rectangle {
+    Separator {
+        theme: panel.theme
         visible: panel.weather.forecastDays.length > 0
-        width: parent.width
-        height: 1
-        color: panel.theme.surface3
     }
 
     // ---------------------------------------------------------- forecast row
@@ -418,12 +416,12 @@ BarPanel {
                         anchors.verticalCenter: parent.verticalCenter
                         text: panel.weather.dayIcon(dayCell.modelData)
                         color: panel.theme.textPrimary
-                        pixelSize: 22
+                        pixelSize: panel.theme.fontPx(1.833)
                     }
 
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 1
+                        spacing: panel.theme.space(0.25)
 
                         Text {
                             text: panel.weather.dayName(dayCell.modelData.date).toUpperCase()

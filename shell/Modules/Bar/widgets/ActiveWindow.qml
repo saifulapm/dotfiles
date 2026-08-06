@@ -24,7 +24,7 @@ BarButton {
 
     Behavior on implicitWidth {
         NumberAnimation {
-            duration: 180
+            duration: rootItem.theme.time(1.2)
             easing.type: Easing.OutCubic
         }
     }

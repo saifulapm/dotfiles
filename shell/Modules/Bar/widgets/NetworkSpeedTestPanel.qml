@@ -369,7 +369,7 @@ PanelWindow {
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: dial.arcWidth * 2 + root.theme.space(2.5)
-                width: 3
+                width: panel.theme.space(0.75)
                 height: dial.diameter * 0.32
                 radius: width / 2
 

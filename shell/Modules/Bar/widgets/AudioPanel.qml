@@ -19,7 +19,7 @@ BarPanel {
     id: panel
 
     panelTitle: ""
-    cardWidth: 380
+    cardWidth: theme.space(95)
 
     // ------------------------------------------------------------- sources
     readonly property var sink: Pipewire.defaultAudioSink
@@ -810,7 +810,7 @@ BarPanel {
                 width: panel.theme.space(5)
                 text: deviceRow.glyph
                 color: deviceRow.isActive ? panel.theme.accent : panel.theme.textPrimary
-                pixelSize: 13
+                pixelSize: panel.theme.fontPx(1.083)
             }
 
             Text {
@@ -876,7 +876,7 @@ BarPanel {
                     text: streamRow.streamMuted ? "󰝟" : "󰕾"
                     color: panel.theme.textPrimary
                     opacity: streamRow.streamMuted ? 0.5 : 1
-                    pixelSize: 13
+                    pixelSize: panel.theme.fontPx(1.083)
 
                     TapHandler {
                         onTapped: panel.toggleMute(streamRow.node)
