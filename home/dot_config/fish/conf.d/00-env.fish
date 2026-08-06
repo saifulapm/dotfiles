@@ -32,6 +32,13 @@ fish_add_path -g "$HOME/.config/composer/vendor/bin"
 fish_add_path -g "$GOBIN" "$HOME/go/bin"
 fish_add_path -g "$HOME/.dotfiles/bin"
 
+# mise shims — node/pnpm/deno for NON-interactive contexts: fish scripts, and
+# the login-shell env that niri-session imports into the systemd user manager
+# (= what every niri-spawned app inherits; environment.d/50-mise.conf alone
+# gets overwritten by that import). Interactive shells layer `mise activate`
+# on top (config.fish); its per-directory paths land in front of the shims.
+fish_add_path -g "$XDG_DATA_HOME/mise/shims"
+
 # Project-local binaries before global ones (relative on purpose — resolved
 # against $PWD, same trick as the mac config). fish_add_path would absolutize
 # them, so plain PATH prepend.
