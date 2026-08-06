@@ -5,7 +5,9 @@
 #   2. idle RSS
 #   3. idle CPU% over 60s
 #   4. launcher open latency, cold (first LazyLoader load) and warm
-# Restarts the running shell; leaves it running when done.
+# Restarts the running shell. The session shell is qshell.service: it is
+# stopped for the measurement (its Restart=on-failure would double-spawn
+# against the bench instance otherwise) and handed back to systemd at the end.
 set -euo pipefail
 
 results_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bench"
@@ -21,7 +23,11 @@ log="$results_dir/.last-qs.log"
 now_ms() { date +%s%N | cut -c1-13; }
 
 echo "bench: restarting shell..."
+systemctl --user stop qshell.service 2>/dev/null || true
+# Sweep BOTH names: a crash-relaunched or hand-started instance runs under
+# comm "quickshell" (qs is a symlink) and pkill -x qs misses it.
 pkill -x qs 2>/dev/null || true
+pkill -x quickshell 2>/dev/null || true
 sleep 1
 
 t0=$(now_ms)
@@ -95,3 +101,13 @@ cpu_pct=$(python3 -c "print(f'{$ticks / $hz / 60 * 100:.3f}')")
 } | tee "$out"
 
 echo "saved: $out"
+
+# Hand the shell back to systemd supervision (no-op fallback: if the unit
+# is missing — nested dev checkout, other machine — the bench instance just
+# stays up, the old contract).
+if systemctl --user cat qshell.service >/dev/null 2>&1; then
+  echo "bench: handing shell back to qshell.service"
+  kill "$qspid" 2>/dev/null || true
+  sleep 0.5
+  systemctl --user start qshell.service
+fi

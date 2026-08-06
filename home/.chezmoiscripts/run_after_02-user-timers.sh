@@ -3,7 +3,7 @@
 # (enable --now on an enabled unit is a cheap no-op); no sudo needed (user
 # manager). Was run_onchange, but a run that skipped — no user session, or
 # the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service qshell.service
 set -euo pipefail
 
 units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service)
@@ -17,6 +17,15 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
   systemctl --user daemon-reload
   systemctl --user enable --now "${units[@]}"
   echo "user units: ${units[*]} enabled"
+  # The shell is Requisite=graphical-session.target, so `enable --now` with
+  # the others would fail the whole script on a TTY-only apply: enable it
+  # always, start it only when a graphical session is actually up (a no-op
+  # when it is already running).
+  systemctl --user enable qshell.service
+  if systemctl --user -q is-active graphical-session.target; then
+    systemctl --user start qshell.service
+  fi
+  echo "user units: qshell.service enabled"
 else
   echo "user units: no user systemd session, skipped" >&2
 fi

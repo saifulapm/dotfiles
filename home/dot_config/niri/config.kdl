@@ -274,8 +274,10 @@ layout {
 // which may be more convenient to use.
 // See the binds section below for more spawn examples.
 
-// This line starts waybar, a commonly used bar for Wayland compositors.
-spawn-at-startup "qs"
+// The shell (quickshell) is NOT spawned here: it runs as a supervised
+// systemd user service bound to the session (qshell.service, enabled by
+// chezmoi's run_after_02-user-timers.sh) — the wiki's Example-systemd-Setup
+// shape. Restart it with `systemctl --user restart qshell`.
 
 // To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
