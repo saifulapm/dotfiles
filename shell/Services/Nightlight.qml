@@ -36,19 +36,26 @@ import Quickshell.Io
 //
 // State persists as a flag file at ~/.local/state/qshell/nightlight, watched
 // like the stay-awake flag, so `touch`/`rm` from a terminal toggles night
-// light exactly as the bar indicator does.
+// light exactly as the bar indicator does. The file's CONTENT is the night
+// temperature: a bare kelvin number (`echo 3500 > .../nightlight`, or the
+// IPC `temperature` verb) restarts the daemon at that warmth, an empty file
+// keeps upstream's 4000 K. The temperature lives in the same file as the
+// on/off state because that file already survives shell restarts and is
+// already watched — a second store would need a second watcher and could
+// disagree with the first.
 QtObject {
     id: root
 
     // Upstream's temperatures (their Service.qml), which are also wlsunset's
     // own defaults.
-    readonly property int nightTemperature: 4000
+    readonly property int defaultNightTemperature: 4000
+    property int nightTemperature: defaultNightTemperature
     readonly property int dayTemperature: 6500
     // wlsunset refuses a high temperature that is not above the low one.
     readonly property int pinnedHighTemperature: nightTemperature + 1
 
     readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/qshell"
-    // Presence is the whole state — the contents are never read.
+    // Presence is on/off; the content, when numeric, is the temperature.
     readonly property string statePath: stateDir + "/nightlight"
 
     property bool enabled: false
@@ -105,6 +112,44 @@ QtObject {
     }
 
     // ------------------------------------------------------------- the state
+    // wlsunset's own sanity bounds, roughly candlelight to past-daylight.
+    function clampTemperature(value) {
+        const parsed = parseInt(String(value).trim(), 10);
+        if (!isFinite(parsed) || isNaN(parsed))
+            return -1;
+        return Math.max(1000, Math.min(10000, parsed));
+    }
+
+    // The flag file landed (created or rewritten): adopt its temperature,
+    // bouncing a running daemon when the warmth changed — wlsunset has no
+    // control channel, so a new temperature is a new process.
+    function adoptStateFile(raw) {
+        const text = String(raw || "").trim();
+        const parsed = text === "" ? -1 : clampTemperature(text);
+        const temp = parsed > 0 ? parsed : defaultNightTemperature;
+        if (temp !== nightTemperature) {
+            nightTemperature = temp;
+            if (daemon.running) {
+                logEvent("wlsunset", "retemperature " + temp + "K");
+                restartPending = true;
+                daemon.running = false;
+            }
+        }
+        applyNightlight(true, "state-file");
+    }
+
+    // Write the temperature into the flag file; the watcher applies it. A
+    // set while off turns night light on — the number only means anything
+    // with the daemon running, and the file's existence IS the on state.
+    function setTemperature(value) {
+        const temp = clampTemperature(value);
+        if (temp <= 0)
+            return -1;
+        tempWriter.command = ["bash", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s\n' \"$2\" > \"$1\"", "qshell-nightlight-temp", statePath, String(temp)];
+        tempWriter.running = true;
+        return temp;
+    }
+
     function applyNightlight(value, reason) {
         const on = !!value;
         const first = !stateLoaded;
@@ -131,7 +176,12 @@ QtObject {
             hasPendingPersist = true;
             return;
         }
-        stateWriter.command = ["bash", "-c", value ? "mkdir -p \"$(dirname \"$1\")\" && touch \"$1\"" : "rm -f \"$1\"", "qshell-nightlight", statePath];
+        // Re-enabling writes the remembered warmth back, so an off/on cycle
+        // does not silently reset a custom temperature to the default.
+        if (value && nightTemperature !== defaultNightTemperature)
+            stateWriter.command = ["bash", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s\n' \"$2\" > \"$1\"", "qshell-nightlight", statePath, String(nightTemperature)];
+        else
+            stateWriter.command = ["bash", "-c", value ? "mkdir -p \"$(dirname \"$1\")\" && touch \"$1\"" : "rm -f \"$1\"", "qshell-nightlight", statePath];
         stateWriter.running = true;
     }
 
@@ -172,10 +222,25 @@ QtObject {
             onRead: line => root.noteDaemonOutput(line)
         }
         onExited: (exitCode, exitStatus) => {
+            // A temperature change bounced the process on purpose; bring it
+            // back up at the new warmth once the old one is really gone.
+            if (root.restartPending) {
+                root.restartPending = false;
+                if (root.enabled) {
+                    daemon.running = true;
+                    return;
+                }
+            }
             if (root.enabled)
                 root.logEvent("wlsunset", "exited unexpectedly (" + exitCode + ")");
         }
     }
+
+    // Set while a running daemon is being stopped only to pick up a new
+    // temperature — the exit handler above restarts it.
+    property bool restartPending: false
+
+    readonly property Process tempWriter: Process {}
 
     readonly property Process sweeper: Process {
         command: ["pkill", "-x", "wlsunset"]
@@ -197,7 +262,7 @@ QtObject {
         path: root.statePath
         watchChanges: true
         printErrors: false
-        onLoaded: root.applyNightlight(true, "state-file")
+        onLoaded: root.adoptStateFile(text())
         onLoadFailed: root.applyNightlight(false, "state-file")
         onFileChanged: reload()
         // Without an explicit read the view stays unloaded and neither signal
@@ -234,6 +299,14 @@ QtObject {
 
         function toggle(): string {
             return root.toggle() ? "enabled" : "disabled";
+        }
+
+        // `nightlight temperature 3500` — writes the kelvin value into the
+        // state file (which also turns night light on; the number is
+        // meaningless with the daemon stopped). Bounds 1000-10000 K.
+        function temperature(value: string): string {
+            const applied = root.setTemperature(value);
+            return applied > 0 ? String(applied) + "K" : "invalid: " + value;
         }
     }
 }
