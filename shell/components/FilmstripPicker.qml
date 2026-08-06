@@ -146,7 +146,13 @@ Scope {
     }
 
     PanelWindow {
-        visible: pickerRoot.open
+        // Held through the fade-out; input drops instantly via the mask so
+        // the dying scrim can't eat a click (same pattern as BarPanel).
+        visible: pickerRoot.open || card.opacity > 0
+        mask: pickerRoot.open ? null : closedMask
+        Region {
+            id: closedMask
+        }
         anchors {
             top: true
             bottom: true
@@ -162,6 +168,13 @@ Scope {
         Rectangle {
             anchors.fill: parent
             color: pickerRoot.theme.alpha(pickerRoot.theme.surface0, 0.5)
+            opacity: pickerRoot.open ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: pickerRoot.theme.time(0.8)
+                    easing.type: pickerRoot.theme.easing
+                }
+            }
 
             MouseArea {
                 anchors.fill: parent
@@ -174,7 +187,27 @@ Scope {
             anchors.centerIn: parent
             width: Math.min(parent.width - pickerRoot.theme.space(20), pickerRoot.expandedWidth + 13 * (pickerRoot.sliceWidth + pickerRoot.sliceSpacing) + pickerRoot.theme.space(10))
             height: pickerRoot.expandedHeight + pickerRoot.topPad + pickerRoot.bottomChromeHeight
-            visible: pickerRoot.open && pickerRoot.loaded && pickerRoot.layoutSettled && pickerRoot.items.length > 0
+
+            // The overlays' shared entrance (Menu/Emojis/Launcher): fade +
+            // slight scale, gated behind the same layout-settled guard that
+            // used to hard-flip visible — the strip still never appears
+            // mid-arrangement, it just eases in once arranged.
+            readonly property bool shown: pickerRoot.open && pickerRoot.loaded && pickerRoot.layoutSettled && pickerRoot.items.length > 0
+            visible: opacity > 0
+            opacity: shown ? 1 : 0
+            scale: shown ? 1 : 0.96
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: pickerRoot.theme.time(0.8)
+                    easing.type: pickerRoot.theme.easing
+                }
+            }
+            Behavior on scale {
+                NumberAnimation {
+                    duration: pickerRoot.theme.time(0.8)
+                    easing.type: pickerRoot.theme.easing
+                }
+            }
 
             MouseArea {
                 // Swallow clicks so they don't fall through to the scrim.

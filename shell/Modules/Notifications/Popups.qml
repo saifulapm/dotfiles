@@ -186,12 +186,24 @@ Scope {
                                 popupsRoot.notifs.dismissPopup(cardSlot.index);
                             }
 
-                            opacity: 0
-                            Component.onCompleted: opacity = 1
+                            // Fade + slide in from the screen edge the
+                            // toasts hang off; a bare fade read as a blink.
+                            property bool entered: false
+                            Component.onCompleted: entered = true
+                            opacity: entered ? 1 : 0
                             Behavior on opacity {
                                 NumberAnimation {
                                     duration: popupsRoot.theme.time(1)
                                     easing.type: popupsRoot.theme.easing
+                                }
+                            }
+                            transform: Translate {
+                                x: card.entered ? 0 : popupsRoot.theme.space(3)
+                                Behavior on x {
+                                    NumberAnimation {
+                                        duration: popupsRoot.theme.time(1)
+                                        easing.type: popupsRoot.theme.easing
+                                    }
                                 }
                             }
                         }

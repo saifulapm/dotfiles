@@ -83,7 +83,13 @@ Scope {
     }
 
     PanelWindow {
-        visible: launcherRoot.open
+        // Held through the card's fade-out (see BarPanel.qml): input drops
+        // instantly via the mask so the dying scrim can't eat a click.
+        visible: launcherRoot.open || panel.opacity > 0
+        mask: launcherRoot.open ? null : closedMask
+        Region {
+            id: closedMask
+        }
         anchors {
             top: true
             bottom: true
@@ -109,6 +115,13 @@ Scope {
         Rectangle {
             anchors.fill: parent
             color: launcherRoot.theme.alpha(launcherRoot.theme.surface0, 0.5)
+            opacity: launcherRoot.open ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: launcherRoot.theme.time(0.8)
+                    easing.type: launcherRoot.theme.easing
+                }
+            }
 
             MouseArea {
                 anchors.fill: parent

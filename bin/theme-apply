@@ -127,7 +127,18 @@ const TEMPLATE_FNS = {
   },
   // The flat color a gradient degrades to, for configs with nowhere to put
   // one (theirs: gradient_start).
-  gradient_start: spec => firstColor(spec) || spec
+  gradient_start: spec => firstColor(spec) || spec,
+  // The compositor side of the theme's motion character. motion.duration is
+  // the shell's base animation duration (150 ms = reference speed); niri gets
+  // the same scale as one global slowdown factor, so a slow theme slows the
+  // compositor with the shell and a zero-motion theme turns niri animations
+  // off outright. Clamped: past 2× the springs read as broken, not dreamy.
+  niri_motion: v => {
+    const d = Number(v)
+    if (!isFinite(d) || d < 0) return "slowdown 1.0"
+    if (d === 0) return "off"
+    return "slowdown " + Math.min(2, Math.max(0.5, d / 150)).toFixed(2)
+  }
 }
 
 let missing = []

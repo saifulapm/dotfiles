@@ -364,7 +364,14 @@ Scope {
                 list.positionViewAtIndex(index, ListView.Contain);
             }
 
-            visible: clipboardRoot.opened
+            // Held through the card's fade-out (see BarPanel.qml): input
+            // drops instantly via the mask so the dying scrim can't eat a
+            // click.
+            visible: clipboardRoot.opened || card.opacity > 0
+            mask: clipboardRoot.opened ? null : closedMask
+            Region {
+                id: closedMask
+            }
             anchors {
                 top: true
                 bottom: true
@@ -393,6 +400,13 @@ Scope {
             Rectangle {
                 anchors.fill: parent
                 color: clipboardRoot.theme.alpha(clipboardRoot.theme.surface0, 0.5)
+                opacity: clipboardRoot.opened ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: clipboardRoot.theme.time(0.8)
+                        easing.type: clipboardRoot.theme.easing
+                    }
+                }
 
                 MouseArea {
                     anchors.fill: parent

@@ -120,7 +120,15 @@ PanelWindow {
         onTriggered: panelWindow.updateAnchor()
     }
 
-    visible: opened
+    // Held through the card's fade-out — `visible: opened` unmapped the
+    // window on the same frame close() ran, so the exit animation never
+    // reached the screen. Input drops instantly (mask below): a dying scrim
+    // must not eat the click that lands where it used to be.
+    visible: opened || card.opacity > 0
+    mask: opened ? null : closedMask
+    Region {
+        id: closedMask
+    }
     anchors {
         top: true
         bottom: true
@@ -180,6 +188,20 @@ PanelWindow {
             NumberAnimation {
                 duration: panelWindow.theme.time(0.8)
                 easing.type: panelWindow.theme.easing
+            }
+        }
+        // The fade alone read as a pop; the card now also slides away from
+        // its bar edge into place, whichever edge the bar is on. A transform
+        // keeps the animated offset out of the anchored x/y bindings above.
+        transform: Translate {
+            property real slide: panelWindow.opened ? 0 : panelWindow.theme.space(1.5)
+            x: !panelWindow.barVertical ? 0 : (panelWindow.barPosition === "left" ? -slide : slide)
+            y: panelWindow.barVertical ? 0 : (panelWindow.barAtBottom ? slide : -slide)
+            Behavior on slide {
+                NumberAnimation {
+                    duration: panelWindow.theme.time(0.8)
+                    easing.type: panelWindow.theme.easing
+                }
             }
         }
 

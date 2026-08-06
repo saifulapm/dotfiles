@@ -423,7 +423,13 @@ Scope {
     }
 
     PanelWindow {
-        visible: menuRoot.opened
+        // Held through the card's fade-out (see BarPanel.qml): input drops
+        // instantly via the mask so the dying scrim can't eat a click.
+        visible: menuRoot.opened || card.opacity > 0
+        mask: menuRoot.opened ? null : closedMask
+        Region {
+            id: closedMask
+        }
         anchors {
             top: true
             bottom: true
@@ -449,6 +455,13 @@ Scope {
         Rectangle {
             anchors.fill: parent
             color: menuRoot.theme.alpha(menuRoot.theme.surface0, 0.5)
+            opacity: menuRoot.opened ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: menuRoot.theme.time(0.8)
+                    easing.type: menuRoot.theme.easing
+                }
+            }
 
             MouseArea {
                 anchors.fill: parent

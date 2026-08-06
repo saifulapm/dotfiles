@@ -296,7 +296,9 @@ Scope {
         active: osdRoot.everShown
 
         sourceComponent: PanelWindow {
-            visible: osdRoot.opened
+            // Held through the fade-out: the surface is input-transparent
+            // (empty mask below), so keeping it mapped costs nothing.
+            visible: osdRoot.opened || card.opacity > 0
             anchors {
                 top: true
                 bottom: true
@@ -334,7 +336,24 @@ Scope {
                 border.width: osdRoot.cardBorder
                 border.color: osdRoot.theme.accent
                 radius: osdRoot.theme.radius(1)
+
+                // Fade + a small rise into place; the pill used to pop.
                 opacity: osdRoot.opened ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: osdRoot.theme.time(0.8)
+                        easing.type: osdRoot.theme.easing
+                    }
+                }
+                transform: Translate {
+                    y: osdRoot.opened ? 0 : osdRoot.theme.space(1.5)
+                    Behavior on y {
+                        NumberAnimation {
+                            duration: osdRoot.theme.time(0.8)
+                            easing.type: osdRoot.theme.easing
+                        }
+                    }
+                }
 
                 Row {
                     anchors.fill: parent

@@ -350,6 +350,26 @@ animations {
     workspace-switch {
         spring damping-ratio=1.0 stiffness=1200 epsilon=0.0001
     }
+
+    // Default is stiffness 800 — matched to the window springs above so the
+    // overview zoom snaps with the same character as everything else.
+    overview-open-close {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.0001
+    }
+
+    recent-windows-close {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.001
+    }
+
+    // Default is ease-out-quad; use the signature curve instead.
+    screenshot-ui-open {
+        duration-ms 200
+        curve "cubic-bezier" 0.23 1 0.32 1
+    }
+
+    // config-notification-open-close and exit-confirmation-open-close stay at
+    // their bouncy underdamped defaults on purpose — rare surfaces where the
+    // wobble reads as intentional, not as lag.
 }
 
 // Window rules let you adjust behavior for individual windows.

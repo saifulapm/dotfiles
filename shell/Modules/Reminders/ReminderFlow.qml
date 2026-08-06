@@ -101,7 +101,13 @@ Scope {
     PanelWindow {
         id: panel
 
-        visible: flowRoot.opened
+        // Held through the card's fade-out (see BarPanel.qml): input drops
+        // instantly via the mask so the dying scrim can't eat a click.
+        visible: flowRoot.opened || card.opacity > 0
+        mask: flowRoot.opened ? null : closedMask
+        Region {
+            id: closedMask
+        }
         anchors {
             top: true
             bottom: true
@@ -127,6 +133,13 @@ Scope {
         Rectangle {
             anchors.fill: parent
             color: flowRoot.theme.alpha(flowRoot.theme.surface0, 0.5)
+            opacity: flowRoot.opened ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: flowRoot.theme.time(0.8)
+                    easing.type: flowRoot.theme.easing
+                }
+            }
 
             MouseArea {
                 anchors.fill: parent

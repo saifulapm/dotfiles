@@ -380,7 +380,13 @@ Scope {
     PanelWindow {
         id: panel
 
-        visible: pickerRoot.opened
+        // Held through the card's fade-out (see BarPanel.qml): input drops
+        // instantly via the mask so the dying scrim can't eat a click.
+        visible: pickerRoot.opened || card.opacity > 0
+        mask: pickerRoot.opened ? null : closedMask
+        Region {
+            id: closedMask
+        }
         anchors {
             top: true
             bottom: true
@@ -406,6 +412,13 @@ Scope {
         Rectangle {
             anchors.fill: parent
             color: pickerRoot.theme.alpha(pickerRoot.theme.surface0, 0.5)
+            opacity: pickerRoot.opened ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: pickerRoot.theme.time(0.8)
+                    easing.type: pickerRoot.theme.easing
+                }
+            }
 
             MouseArea {
                 anchors.fill: parent

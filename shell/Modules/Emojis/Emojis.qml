@@ -189,7 +189,13 @@ Scope {
     PanelWindow {
         id: panel
 
-        visible: emojisRoot.opened
+        // Held through the card's fade-out (see BarPanel.qml): input drops
+        // instantly via the mask so the dying scrim can't eat a click.
+        visible: emojisRoot.opened || card.opacity > 0
+        mask: emojisRoot.opened ? null : closedMask
+        Region {
+            id: closedMask
+        }
         anchors {
             top: true
             bottom: true
@@ -215,6 +221,13 @@ Scope {
         Rectangle {
             anchors.fill: parent
             color: emojisRoot.theme.alpha(emojisRoot.theme.surface0, 0.5)
+            opacity: emojisRoot.opened ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: emojisRoot.theme.time(0.8)
+                    easing.type: emojisRoot.theme.easing
+                }
+            }
 
             MouseArea {
                 anchors.fill: parent
