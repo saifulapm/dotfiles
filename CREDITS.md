@@ -893,6 +893,13 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   `hyprland_active_border`, colors and angle verbatim; the template-function
   layer in `bin/theme-apply` mirrors their pre-computed `{{ shell_gradient X }}`
   / `{{ hypr_gradient X }}` sed entries.
+- **ScreenMoveRemap — deliberately NOT ported** (2026-08-06, upstream 2daeaa7,
+  `shell/Ui/ScreenMoveRemap.qml`): a workaround for Hyprland leaving an
+  already-mapped layer surface at its old global position when its monitor
+  moves within the layout; niri re-places layer surfaces on output layout
+  changes, so the unmap/remap dance has no bug to fix here. Revisit only if
+  the NUC's multi-monitor setup ever shows a bar or wallpaper stuck at a
+  stale offset after an output change.
 - **Font switcher — deliberately NOT ported.** `bin/omarchy-font-set`,
   `bin/omarchy-font-list` and their `style.font` menu provider let a user swap
   the monospace family at runtime. This desktop has no equivalent and no menu
