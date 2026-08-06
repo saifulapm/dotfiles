@@ -333,6 +333,19 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   `omarchy-audio-output-set-default` persistence helper is not ported — this
   shell has no audio-restore layer), and their `QtQuick.Controls` ScrollBar
   has no counterpart (this shell hand-rolls its controls).
+- **Bluetooth escape hatch** from `bin/omarchy-restart-bluetooth` and its menu
+  row (`update.hardware.bluetooth`, under their Update → Hardware submenu
+  titled "Restart"), ported as `bin/bluetooth-restart` + the menu's
+  `system.restart-bluetooth` row (2026-08-06). Theirs is `rfkill unblock
+  bluetooth` + `rfkill list` and nothing more; ours keeps that opening and
+  adds the restart their name and menu title promise — bounce
+  `bluetooth.service` (through pkexec: the system unit is the one step the
+  seated user's rfkill ACL does not cover), wait out the adapter's
+  re-registration, and power it on with a retry for the `org.bluez.Error.Busy`
+  beat right after bluetoothd returns. Their row opens a floating presentation
+  terminal; ours opens the same floating foot the update row uses. Placed
+  under our System submenu because our Update is a leaf and we ship none of
+  their other hardware-restart scripts.
 - **Menu framework and filter semantics** from `shell/plugins/menu/` (`Menu.qml`,
   `MenuModel.js`) and the tree format of `default/omarchy/omarchy-menu.jsonc`:
   the hierarchical tree keyed by dotted ids with the kind inferred from the

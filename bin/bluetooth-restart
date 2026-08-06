@@ -1,0 +1,72 @@
+#!/bin/bash
+# bluetooth-restart — unblock the radio and restart the bluetooth stack.
+#
+# Port of omarchy's bin/omarchy-restart-bluetooth (MIT, see CREDITS.md), the
+# escape hatch behind their Update → Hardware → Bluetooth menu row. Theirs is
+# rfkill unblock + rfkill list and nothing else; this adds the restart its
+# name (and their menu's "Restart" title) promises: bounce bluetoothd when it
+# is wedged, then wait for the adapter to come back. Meant to run in a visible
+# terminal (the menu row opens one), so it narrates what it does.
+#
+# Privilege split, measured on this box: /dev/rfkill carries a logind uaccess
+# ACL, so rfkill unblock works as the seated user; restarting the SYSTEM
+# bluetooth.service does not, so that one step goes through pkexec (absolute
+# paths — pkexec drops the environment) and draws the shell's polkit dialog.
+
+set -euo pipefail
+
+echo "Unblocking bluetooth..."
+/usr/bin/rfkill unblock bluetooth
+echo
+/usr/bin/rfkill list bluetooth
+echo
+
+# error≠empty: is-active exits nonzero for "inactive" AND for "cannot talk to
+# systemd" — tell them apart before deciding a restart is what's needed.
+state="$(/usr/bin/systemctl is-active bluetooth.service 2>/dev/null || true)"
+if [ -z "$state" ]; then
+    echo "cannot read bluetooth.service state from systemd" >&2
+    exit 1
+fi
+
+echo "bluetooth.service is ${state}; restarting (polkit will ask)..."
+if ! /usr/bin/pkexec /usr/bin/systemctl restart bluetooth.service; then
+    echo "restart refused or failed — radio unblocked, service left as it was" >&2
+    exit 1
+fi
+
+# bluetoothd re-registers on D-Bus a moment after the unit reports started;
+# give the adapter a few beats to reappear before reading the result. No
+# `| grep -q` here — grep exiting at the first match SIGPIPEs the left side
+# under pipefail — and `bluetoothctl show` exits 0 with empty output when no
+# adapter exists, so presence is "printed something", never an exit code.
+adapters=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    adapters="$(/usr/bin/bluetoothctl list 2>/dev/null || true)"
+    [ -n "$adapters" ] && break
+    sleep 0.5
+done
+
+echo
+if [ -z "$adapters" ]; then
+    echo "no bluetooth adapter visible after restart" >&2
+    exit 1
+fi
+
+# The point of restarting is working bluetooth: power the adapter on rather
+# than leaving it wherever the restart dropped it. Retried, because for a
+# beat after bluetoothd comes back the adapter answers org.bluez.Error.Busy
+# while it initializes (hit on the first live run of this script).
+powered=no
+for _ in 1 2 3 4 5 6; do
+    if /usr/bin/bluetoothctl power on >/dev/null 2>&1; then
+        powered=yes
+        break
+    fi
+    sleep 0.5
+done
+[ "$powered" = yes ] || echo "adapter still refusing power on — try the panel toggle" >&2
+echo
+/usr/bin/bluetoothctl show
+echo
+echo "Done."

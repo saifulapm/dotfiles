@@ -334,6 +334,19 @@ var TREE = {
         // start the replacement in a fresh session.
         "action": "pkill -x qs; sleep 0.5; exec setsid qs"
     },
+    // Omarchy files this under Update → Hardware (title "Restart") beside
+    // audio/wifi/trackpad rows we have no scripts for; our update is a leaf,
+    // so the one hardware escape hatch we ship sits here beside the other
+    // restart row. Runs in a visible terminal, as their
+    // omarchy-launch-floating-terminal-with-presentation row does.
+    "system.restart-bluetooth": {
+        "icon": "󰂯",
+        "label": "Restart Bluetooth",
+        "aliases": ["bluetooth", "rfkill", "unblock", "restart-bluetooth", "hardware"],
+        "description": "Unblock the radio and restart the bluetooth stack",
+        "when": "command -v rfkill && command -v foot",
+        "action": "foot --app-id=qshell-float -e bash -lc '\"$HOME/.dotfiles/bin/bluetooth-restart\"; read -r -p \"press enter to close\"'"
+    },
     "system.exit": {
         "icon": "󰍃",
         "label": "Exit niri",
