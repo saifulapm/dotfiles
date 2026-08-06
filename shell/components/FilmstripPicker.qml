@@ -4,6 +4,7 @@ import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
 import "PickerModel.js" as PickerModel
+import "FilterKeys.js" as FilterKeys
 
 // The filmstrip picker — port of omarchy's image-picker plugin (CREDITS.md):
 // a full-screen scrim over a skewed strip, the selection expanded to a wide
@@ -203,7 +204,7 @@ Scope {
                 } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Tab) {
                     pickerRoot.selectAdjacent(1);
                     event.accepted = true;
-                } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                } else if (FilterKeys.printable(event)) {
                     pickerRoot.updateFilter(pickerRoot.filterText + event.text);
                     event.accepted = true;
                 }

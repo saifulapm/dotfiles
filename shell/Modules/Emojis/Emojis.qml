@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../components"
 import "EmojiSearch.js" as EmojiSearch
+import "../../components/FilterKeys.js" as FilterKeys
 
 // Emoji picker: fullscreen overlay layer with a centered card, a query line
 // and a grid of glyphs. Ported from omarchy's emojis plugin (CREDITS.md) —
@@ -217,7 +218,7 @@ Scope {
                     // word, Ctrl+U the lot — upstream's Util.editsFilter.
                     if (!emojisRoot.filterText)
                         return;
-                    emojisRoot.setFilter(ctrl ? emojisRoot.filterText.replace(/\s+$/, "").replace(/\S+$/, "") : emojisRoot.filterText.slice(0, -1));
+                    emojisRoot.setFilter(FilterKeys.erased(emojisRoot.filterText, ctrl));
                 } else if (ctrl && event.key === Qt.Key_U) {
                     emojisRoot.setFilter("");
                 } else if (event.key === Qt.Key_Left) {
@@ -239,7 +240,7 @@ Scope {
                         emojisRoot.activateIndex(emojisRoot.selectedIndex);
                     else if (displayModel.count > 0)
                         emojisRoot.cursorActive = true;
-                } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                } else if (FilterKeys.printable(event)) {
                     emojisRoot.setFilter(emojisRoot.filterText + event.text);
                 } else {
                     return;

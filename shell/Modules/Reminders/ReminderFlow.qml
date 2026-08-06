@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import "../../components"
 import "ReminderFlowModel.js" as ReminderFlowModel
+import "../../components/FilterKeys.js" as FilterKeys
 
 // Reminder capture flow: a fullscreen overlay with one centered input line,
 // asked twice. Ported from omarchy's reminders plugin (CREDITS.md) — their
@@ -130,12 +131,12 @@ Scope {
                     // word, Ctrl+U the lot — upstream's Util.editsFilter.
                     if (!flowRoot.filterText)
                         return;
-                    flowRoot.setFilter(ctrl ? flowRoot.filterText.replace(/\s+$/, "").replace(/\S+$/, "") : flowRoot.filterText.slice(0, -1));
+                    flowRoot.setFilter(FilterKeys.erased(flowRoot.filterText, ctrl));
                 } else if (ctrl && event.key === Qt.Key_U) {
                     flowRoot.setFilter("");
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     flowRoot.submit();
-                } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                } else if (FilterKeys.printable(event)) {
                     flowRoot.setFilter(flowRoot.filterText + event.text);
                 } else {
                     return;

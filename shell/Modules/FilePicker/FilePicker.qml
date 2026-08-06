@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../components"
 import "FilePickerModel.js" as Model
+import "../../components/FilterKeys.js" as FilterKeys
 
 // The shell's own file chooser: a themed overlay in the launcher/emoji picker's
 // visual language, driven over IPC and answered through a FIFO.
@@ -405,7 +406,7 @@ Scope {
                         pickerRoot.cancel();
                 } else if (event.key === Qt.Key_Backspace) {
                     if (pickerRoot.query !== "")
-                        pickerRoot.query = ctrl ? pickerRoot.query.replace(/\s+$/, "").replace(/\S+$/, "") : pickerRoot.query.slice(0, -1);
+                        pickerRoot.query = FilterKeys.erased(pickerRoot.query, ctrl);
                     else
                         pickerRoot.goUp();
                 } else if (ctrl && event.key === Qt.Key_U) {
@@ -439,7 +440,7 @@ Scope {
                         pickerRoot.accept();
                     else
                         pickerRoot.activate();
-                } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                } else if (FilterKeys.printable(event)) {
                     pickerRoot.query = pickerRoot.query + event.text;
                     if (!pickerRoot.saving)
                         pickerRoot.cursor = 0;

@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../components"
 import "MenuModel.js" as MenuModel
+import "../../components/FilterKeys.js" as FilterKeys
 import "MenuTree.js" as MenuTree
 
 // Command menu: one hierarchical tree of everything the desktop can do,
@@ -467,7 +468,7 @@ Scope {
                     menuRoot.goBack();
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Right) {
                     menuRoot.activateIndex(menuRoot.selectedIndex);
-                } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                } else if (FilterKeys.printable(event)) {
                     menuRoot.setFilter(menuRoot.filterText + event.text);
                 } else {
                     return;

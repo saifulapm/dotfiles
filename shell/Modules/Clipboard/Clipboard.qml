@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../components"
 import "ClipboardHistory.js" as ClipboardHistory
+import "../../components/FilterKeys.js" as FilterKeys
 
 // Clipboard history: a persistent capture watcher plus an overlay picker.
 // Ported from omarchy's clipboard plugin (CREDITS.md) — their capture
@@ -414,7 +415,7 @@ Scope {
                         // a word, Ctrl+U the lot — upstream's editsFilter.
                         if (!clipboardRoot.filterText)
                             return;
-                        clipboardRoot.setFilter(ctrl ? clipboardRoot.filterText.replace(/\s+$/, "").replace(/\S+$/, "") : clipboardRoot.filterText.slice(0, -1));
+                        clipboardRoot.setFilter(FilterKeys.erased(clipboardRoot.filterText, ctrl));
                     } else if (ctrl && event.key === Qt.Key_U) {
                         clipboardRoot.setFilter("");
                     } else if (event.key === Qt.Key_Delete) {
@@ -443,7 +444,7 @@ Scope {
                             clipboardRoot.activateIndex(clipboardRoot.selectedIndex);
                         else if (displayModel.count > 0)
                             clipboardRoot.cursorActive = true;
-                    } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                    } else if (FilterKeys.printable(event)) {
                         clipboardRoot.setFilter(clipboardRoot.filterText + event.text);
                     } else {
                         return;
