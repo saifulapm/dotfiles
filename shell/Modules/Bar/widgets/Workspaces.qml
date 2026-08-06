@@ -57,6 +57,7 @@ Item {
                     text: "󱓻" // md-circle_medium, omarchy's focused marker
                     color: wsButton.contentColor
                     pixelSize: 13
+                    colorAnimationEnabled: !wsButton.bar || wsButton.bar.foregroundAnimationEnabled === true
                 }
 
                 Text {

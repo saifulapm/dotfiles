@@ -57,6 +57,7 @@ BarButton {
         text: rootItem.playing ? "󰏤" : "󰐊" // pause / play
         color: rootItem.playing ? rootItem.contentColor : Qt.darker(rootItem.contentColor, 1.5)
         pixelSize: 13
+        colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
     }
 
     // Their marquee: the label lives in a clip sized to the smaller of its

@@ -321,6 +321,7 @@ BarButton {
         text: rootItem.label
         color: rootItem.contentColor
         pixelSize: 13
+        colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
     }
 
     Text {

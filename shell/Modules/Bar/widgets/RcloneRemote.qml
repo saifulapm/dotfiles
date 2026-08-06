@@ -85,6 +85,7 @@ BarButton {
         glyph: String(rootItem.config.glyph || "")
         drawnMark: String(rootItem.config.drawnMark || "")
         color: rootItem.service.mountActive ? rootItem.barFg : Qt.darker(rootItem.barFg, 1.55)
+        colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
         opacity: rootItem.service.mountActive ? 1.0 : 0.6
         warning: rootItem.service.lastProbeFailed
         badgeColor: rootItem.theme.error

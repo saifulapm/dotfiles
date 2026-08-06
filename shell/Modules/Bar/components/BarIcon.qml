@@ -28,5 +28,7 @@ BarButton {
         text: icon.glyph
         color: icon.glyphColor !== undefined ? icon.glyphColor : icon.contentColor
         pixelSize: icon.status ? icon.theme.fontPx(0.833) : 13
+        // Upstream's `!root.bar || root.bar.foregroundAnimationEnabled`.
+        colorAnimationEnabled: !icon.bar || icon.bar.foregroundAnimationEnabled === true
     }
 }

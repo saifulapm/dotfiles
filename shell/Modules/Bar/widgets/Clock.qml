@@ -121,6 +121,7 @@ BarButton {
                 fontFamily: rootItem.theme.fontMono
                 pixelSize: modelData.length > 3 ? Math.round(rootItem.theme.fontPx(1.0) * 0.9) : rootItem.theme.fontPx(1.0)
                 color: rootItem.contentColor
+                colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
             }
         }
     }

@@ -35,12 +35,17 @@ Item {
     implicitWidth: drawn ? iconSize * 1.18 : iconSize
     implicitHeight: iconSize
 
+    // Passed through to the glyph so the bar widget can pin its mark to the
+    // bar's foregroundAnimationEnabled; the panel's hero keeps the default.
+    property bool colorAnimationEnabled: true
+
     OpticalGlyph {
         visible: !root.drawn
         anchors.centerIn: parent
         text: root.glyph
         color: root.color
         pixelSize: Math.round(root.iconSize)
+        colorAnimationEnabled: root.colorAnimationEnabled
     }
 
     Loader {

@@ -852,7 +852,11 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   against the strip of wallpaper the bar covers), the 120 ms debounce, the
   re-sample on wallpaper/theme/position change, and their trick of snapping the
   colour with animations disabled for two frames so the sampled foreground
-  never crossfades. The open-panel pill (their geometry: 2 px thick, 55 % of
+  never crossfades — a gate that (2026-08-06) also reaches every bar glyph's
+  own 160 ms colour transition through `OpticalGlyph.colorAnimationEnabled`,
+  their WidgetButton `Behavior` gate carried into our component since ours,
+  unlike their glyph item, owns its colour animation; non-bar consumers keep
+  the animated default. The open-panel pill (their geometry: 2 px thick, 55 % of
   the slot or a widget-supplied extent, 2 px inset on the bar's inner edge,
   0.9 opacity, 120 ms fade). Cross-panel Tab/Shift+Tab over
   `panelNavigationSlots`, their configurable `centerAnchor`, their `bar-off`

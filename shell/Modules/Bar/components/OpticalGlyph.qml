@@ -12,6 +12,12 @@ Item {
     property color color: "white"
     property string fontFamily: "Symbols Nerd Font"
     property int pixelSize: 14
+    // Omarchy gates their bar glyphs' color transition on the bar's
+    // foregroundAnimationEnabled (their WidgetButton Behavior) so the
+    // transparency auto-contrast flip lands in ONE frame instead of
+    // crossfading through unreadable in-betweens. Bar consumers wire this
+    // to that flag; everything else keeps the animated default.
+    property bool colorAnimationEnabled: true
 
     implicitWidth: glyph.implicitWidth
     implicitHeight: glyph.implicitHeight
@@ -40,6 +46,7 @@ Item {
 
         // Omarchy's 160 ms state-color transition.
         Behavior on color {
+            enabled: root.colorAnimationEnabled
             ColorAnimation {
                 duration: 160
             }

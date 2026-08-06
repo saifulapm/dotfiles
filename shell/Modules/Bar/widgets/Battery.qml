@@ -76,6 +76,7 @@ BarButton {
         }
         color: rootItem.contentColor
         pixelSize: 13
+        colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
     }
 
     Text {
