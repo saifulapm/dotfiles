@@ -3,10 +3,10 @@
 # (enable --now on an enabled unit is a cheap no-op); no sudo needed (user
 # manager). Was run_onchange, but a run that skipped — no user session, or
 # the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service
 set -euo pipefail
 
-units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer)
+units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently

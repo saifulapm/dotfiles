@@ -161,6 +161,12 @@ arch = "all"
 why = "Wayland gamma/night-light daemon driven by the shell's nightlight service and indicator (omarchy uses hyprsunset; wlsunset is the compositor-neutral equivalent for niri)"
 
 [[pkg]]
+name = "bluez-tools"
+category = "core"
+arch = "all"
+why = "Ships bt-agent, the auto-accept pairing agent behind the bluetooth panel's pair action (bt-agent.service, enabled by the 02-user-timers script). quickshell registers no BlueZ agent of its own, so without one a `pair` against any device that asks for a PIN or a confirmation waits forever on a passkey nobody can type. Installed 2026-08-06, user-authorized"
+
+[[pkg]]
 name = "tailscale"
 category = "core"
 arch = "all"

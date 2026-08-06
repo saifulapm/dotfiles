@@ -1346,9 +1346,18 @@ Direct file-level copies (source path → destination path):
   → `home/dot_config/wireplumber/wireplumber.conf.d/` (2026-08-06): verbatim —
   the WirePlumber rule that auto-connects A2DP profiles on BlueZ cards, which
   is what makes the `bluez_output.*` sink the ported audio auto-switch polls
-  for actually appear after a connect. Their `bt-agent.service` (auto-accept
-  pairing agent, needs the bluez-tools package) is NOT ported — package
-  install pending a user decision.
+  for actually appear after a connect.
+- omarchy `default/systemd/user/bt-agent.service` →
+  `home/dot_config/systemd/user/bt-agent.service` (2026-08-06, after the
+  user authorized installing bluez-tools): near-verbatim — the same
+  `bt-agent -c NoInputNoOutput` auto-accept agent, their bluetooth-hardware
+  condition, their skip-cleanly `ExecCondition` on bluetoothd and their
+  restart policy. The safety comment is rewritten for this shell: their
+  claim that the adapter is pairable only while their panel scans does not
+  describe ours (nothing here ever sets the adapter discoverable or
+  pairable — the panel's discovery is outbound scanning only), so the
+  comment states that exposure honestly instead. Enabled by the
+  02-user-timers unit list rather than their first-run installer script.
 - omarchy `shell/plugins/polkit/PolkitModel.js` →
   `shell/Modules/Polkit/PolkitModel.js`: direct copy — `authorizationLabel`
   and its needed-or-required match, `fingerprintConfiguredFromPamConfig` with
