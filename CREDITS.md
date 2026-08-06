@@ -107,7 +107,10 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   running; their marker-framed `bash` reader (`===<path>===` … `=== EOM ===`,
   `nullglob`) and its tolerant parse that drops snapshots it cannot read;
   their path expansion (`~`, `$HOME/`, relative-to-home, absolute), their
-  device-id sanitising and its hostname/`$HOST`/`$USER` fallback chain, their
+  device-id sanitising and its hostname/`$HOST`/`$USER` fallback chain (ours
+  consults `~/.config/qshell/machine` before any of those — every Asahi box
+  here answers "fedora" to hostname, and colliding ids collapse into one
+  device), their
   permissive reading of the enable flag, the dummy snapshot path that keeps
   the FileView valid while sync is off, and their status strings. Generalized
   in one respect: upstream hardcodes model-usage's single payload, while this

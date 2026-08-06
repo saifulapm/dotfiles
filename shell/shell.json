@@ -4,6 +4,10 @@
     "screensaver": 150,
     "lock": 300
   },
+  "sync": {
+    "enabled": true,
+    "dir": "~/.local/state/qshell/sync/model-usage"
+  },
   "bar": {
     "position": "top",
     "transparent": false,

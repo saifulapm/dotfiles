@@ -13,6 +13,12 @@
 #                bashrc.d/20-history.sh is the consumer: bash appends to its
 #                own file and reads the union.
 #
+#   model-usage  ~/.local/state/qshell/sync/model-usage/<machine>.json
+#                Same push-own / pull-others shape as history. The files are
+#                Services/Sync.qml's per-device snapshots (shell.json's sync
+#                block points there); the AI widget merges whatever the pull
+#                brings on its next publish cycle.
+#
 #   screenshots  ~/Pictures/Screenshots  <->  Dropbox:qshell-sync/screenshots
 #                `rclone bisync`, so pruning a screenshot on one machine
 #                deletes it everywhere. The first run (and recovery after an
@@ -89,6 +95,15 @@ else
   echo "qshell-sync: no local history file yet ($hist_dir/$machine.history), nothing to push"
 fi
 run_rclone "history pull" copy "$remote/history" "$hist_dir" --exclude "$machine.history" || true
+
+# -------------------------------------------------------------- model-usage
+# Services/Sync.qml's snapshots: same one-writer-per-device shape as history.
+usage_dir="$sync_dir/model-usage"
+mkdir -p "$usage_dir"
+if [[ -f "$usage_dir/$machine.json" ]]; then
+  run_rclone "model-usage push" copyto "$usage_dir/$machine.json" "$remote/model-usage/$machine.json" || true
+fi
+run_rclone "model-usage pull" copy "$remote/model-usage" "$usage_dir" --exclude "$machine.json" || true
 
 # -------------------------------------------------------------- screenshots
 # bisync needs both ends to exist, and demands --resync on its first run and

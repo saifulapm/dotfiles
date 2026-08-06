@@ -16,7 +16,10 @@ import Quickshell.Io
 //     "sync": { "enabled": true, "dir": "~/Sync/qshell", "deviceId": "macbook" }
 //
 // `dir` empty (the default) means sync is off, which is also upstream's
-// default. `deviceId` falls back to the hostname, then $HOST, then $USER.
+// default. `deviceId` falls back to ~/.config/qshell/machine (chezmoi's
+// machine prompt — every Asahi box here answers "fedora" to hostname, and
+// two machines sharing an id collapse into one device), then the hostname,
+// then $HOST, then $USER.
 //
 // Where upstream hardcodes model-usage's one payload, this takes named
 // sections: a module calls `publish("providers", {...})` and reads back
@@ -65,6 +68,7 @@ QtObject {
 
     property bool requestedWhileRunning: false
     property string detectedHostname: ""
+    property string detectedMachine: ""
 
     // ------------------------------------------------------------------ API
     // Stage a section and schedule a write. Called by whichever module owns
@@ -255,11 +259,12 @@ QtObject {
 
     // The id becomes a filename, so it is sanitised hard. Devices are keyed by
     // this, not by the file they arrived in: two machines sharing an id
-    // collapse into one.
+    // collapse into one — which is why the machine file outranks the
+    // hostname: every Asahi install here is named "fedora".
     function safeDeviceId(raw) {
         let value = String(raw || "").trim();
         if (value === "")
-            value = Quickshell.env("HOSTNAME") || detectedHostname || Quickshell.env("HOST") || Quickshell.env("USER") || "device";
+            value = detectedMachine || Quickshell.env("HOSTNAME") || detectedHostname || Quickshell.env("HOST") || Quickshell.env("USER") || "device";
         value = value.replace(/[^A-Za-z0-9_.-]+/g, "-").replace(/^[._-]+|[._-]+$/g, "");
         if (value === "")
             value = "device";
@@ -272,6 +277,17 @@ QtObject {
         watchChanges: false
         printErrors: false
         onLoaded: root.detectedHostname = String(text() || "").trim()
+        Component.onCompleted: reload()
+    }
+
+    // chezmoi's per-machine identity. Loads in milliseconds at startup —
+    // long before any module has numbers to publish — so the hostname
+    // fallback only ever fires on a machine that skipped `chezmoi apply`.
+    property FileView machineFile: FileView {
+        path: root.home + "/.config/qshell/machine"
+        watchChanges: false
+        printErrors: false
+        onLoaded: root.detectedMachine = String(text() || "").trim()
         Component.onCompleted: reload()
     }
 
