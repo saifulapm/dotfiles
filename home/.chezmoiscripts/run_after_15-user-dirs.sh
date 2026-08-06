@@ -10,4 +10,9 @@ set -euo pipefail
 
 mkdir -p "$HOME/Sites"
 
+# GOBIN (~/.config/go/env homes go there) — pre-created because fish_add_path
+# silently skips directories that don't exist yet, leaving GOBIN off PATH
+# until a login after the first `go install`.
+mkdir -p "$HOME/.local/share/go/bin"
+
 exit 0

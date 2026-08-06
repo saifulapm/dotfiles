@@ -17,7 +17,9 @@ set -gx XDG_CONFIG_HOME "$HOME/.config"
 set -gx XDG_DATA_HOME "$HOME/.local/share"
 set -gx XDG_STATE_HOME "$HOME/.local/state"
 
-# Go — XDG-homed like the mac (future `go install` lands in GOBIN)
+# Go — XDG-homed like the mac. Source of truth is ~/.config/go/env (go reads
+# it in every context — bash scripts, systemd); these exports agree with it
+# and just make shells explicit.
 set -gx GOPATH "$XDG_DATA_HOME/go"
 set -gx GOBIN "$XDG_DATA_HOME/go/bin"
 
@@ -29,7 +31,7 @@ fish_add_path -g "$HOME/.local/bin"
 fish_add_path -g "$HOME/.cargo/bin"
 fish_add_path -g "$PNPM_HOME" "$PNPM_HOME/bin"
 fish_add_path -g "$HOME/.config/composer/vendor/bin"
-fish_add_path -g "$GOBIN" "$HOME/go/bin"
+fish_add_path -g "$GOBIN"
 fish_add_path -g "$HOME/.dotfiles/bin"
 
 # mise shims — node/pnpm/deno for NON-interactive contexts: fish scripts, and
