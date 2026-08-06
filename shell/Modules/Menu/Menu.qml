@@ -104,12 +104,15 @@ Scope {
         const raw = String(input || "").toLowerCase().replace(/_/g, "-");
         if (!raw || raw === "go" || raw === "menu" || raw === "root")
             return "root";
+        // An exact id beats any alias (omarchy 0269fe0): an entry declared
+        // earlier must never capture a later entry's id through its aliases
+        // (capture.annotate's "clipboard" alias vs the clipboard picker).
+        if (entryFor(raw))
+            return raw;
         for (let i = 0; i < itemOrder.length; i++) {
             const entry = entryFor(itemOrder[i]);
             if (!entry)
                 continue;
-            if (entry.id.toLowerCase() === raw)
-                return entry.id;
             for (let j = 0; j < entry.aliases.length; j++) {
                 if (String(entry.aliases[j]).toLowerCase().replace(/_/g, "-") === raw)
                     return entry.id;
