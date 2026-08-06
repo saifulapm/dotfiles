@@ -288,6 +288,10 @@ QtObject {
         readonly property color textError: root.sCol("polkit", "text-error", root.error)
         readonly property color accent: root.sCol("polkit", "accent", root.accent)
         readonly property string borderSpec: root.sSpec("polkit", "border", root.borderActiveSpec)
+        // Error-state ring spec (omarchy switches the spec KEY on flash, so a
+        // theme may declare a gradient border-error). Empty when undeclared:
+        // the plain Rectangle border carries the solid error color instead.
+        readonly property string borderErrorSpec: root.sSpec("polkit", "border-error", "")
         readonly property color border: root.sComposed("polkit", "border", root.borderActive, 1.0)
         readonly property color borderError: root.sComposed("polkit", "border-error", root.error, root.sAlpha("polkit", "border", 1.0))
         readonly property color scrim: root.sComposed("polkit", "scrim", root.surface0, 0.5)

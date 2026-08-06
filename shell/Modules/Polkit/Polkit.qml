@@ -261,6 +261,10 @@ Scope {
     PolkitAgent {
         id: agentObj
 
+        // Own a namespaced object path instead of quickshell's default
+        // (omarchy's /org/omarchy/PolkitAgent).
+        path: "/org/qshell/PolkitAgent"
+
         onAuthenticationRequestStarted: polkitRoot.beginFlow()
         onIsActiveChanged: {
             if (isActive)
@@ -269,7 +273,9 @@ Scope {
                 polkitRoot.resetSnapshot();
         }
         onIsRegisteredChanged: {
-            if (!isRegistered)
+            if (isRegistered)
+                console.log("Polkit: agent registered");
+            else
                 console.warn("Polkit: agent is not registered; another agent may be running");
         }
     }
@@ -520,11 +526,13 @@ Scope {
 
                 // A gradient [polkit] border draws as a ring; the plain
                 // Rectangle border above stays in charge for solid themes.
+                // On flash the spec KEY switches to border-error (omarchy's
+                // rule), so a theme may gradient the error state too.
                 GradientBorder {
                     id: cardBorder
                     anchors.fill: parent
                     z: 100
-                    spec: polkitRoot.errorFlash ? "" : polkitRoot.theme.polkit.borderSpec
+                    spec: polkitRoot.errorFlash ? polkitRoot.theme.polkit.borderErrorSpec : polkitRoot.theme.polkit.borderSpec
                     borderWidth: polkitRoot.borderThickness
                     cornerRadius: card.radius
                 }
