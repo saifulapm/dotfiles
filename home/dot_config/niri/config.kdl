@@ -418,6 +418,10 @@ binds {
     Mod+T hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
     Mod+D hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Space hotkey-overlay-title="Open the Menu" { spawn "qs" "ipc" "call" "menu" "toggle"; }
+    // Omarchy's SUPER+ALT+SPACE apps-menu bind (b92510f). Our menu has no
+    // app rows — its Apps row hands off to the launcher, as Mod+D does — so
+    // this summons the launcher directly.
+    Mod+Alt+Space hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Shift+T hotkey-overlay-title="Switch Theme" { spawn "qs" "ipc" "call" "theme" "toggle"; }
     // Omarchy's own emoji bind (SUPER+CTRL+E). Their commented-out
     // SUPER+PERIOD alternative is unavailable here: Mod+Period is niri's
