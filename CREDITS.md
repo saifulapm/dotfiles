@@ -527,6 +527,44 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   toggles night light as the indicator does. Their `bin/omarchy-toggle-nightlight`
   CLI, which duplicates the temperatures for callers outside the shell, has no
   port — the flag file and the IPC verbs are that entry point.
+- **Background reveal** from `shell/plugins/background/Background.qml` and the
+  `set_theme_background` sequencing in `bin/omarchy-theme-set`, ported as the
+  rewritten `shell/Modules/Background/Background.qml` plus the synchronized
+  push in `bin/theme-set`: the slanted-wipe transition — the incoming
+  wallpaper drawn behind a parallelogram mask (a `QtQuick.Shapes` fill fed to
+  `MultiEffect` as a mask layer, their −0.18 slant, threshold and spread
+  values) that grows out from the screen's center over 420 ms InOutCubic,
+  the old image underneath until the sweep passes; the version-gated state
+  machine around it (`backgroundVersion` / `revealStartedVersion` /
+  `pendingThemeVersion`, the instant and force paths of
+  `transitionBackground`, `finishingTransition` with the settled image's
+  own ready-signal doing the cleanup so finishing never flashes the window
+  color); each screen readying its own mask (`maskReady` /
+  `maybeStartReveal` with its double-checked `Qt.callLater` hop) while the
+  first ready screen starts the shared animation, so a multi-monitor layout
+  reveals everywhere; the theme payload riding the transition and applied on
+  the reveal's first frame (`setPendingTheme` / `applyPendingTheme` in
+  `startReveal`) with their ~300 ms fallback timer so a reveal that never
+  starts still applies the theme; and their IPC surface
+  (refresh/set/setInstant/transition/themeTransition) merged into our
+  existing `background` target beside our clear/current. Adaptations: their
+  base64 pair (colors.toml + shell.toml) is our one theme.toml, applied
+  through `Services/Theme.qml`'s own loader, and the synchronization is a
+  `deferFileLoads` latch there rather than their pure-IPC apply — our file
+  watch on theme.toml stays armed as the degradation path, so a shell that
+  missed the push still rethemes from the file on its next start;
+  `finalPath` and their hardlinked background snapshots are dropped (they
+  exist because their theme switch swaps the theme directory out from under
+  the shown file; our theme files never move); `bin/theme-set` fires niri's
+  `do-screen-transition` only when the IPC push fails (on the synchronized
+  path the reveal is the transition, and freezing the screen would hide it);
+  and their desktop double-click gestures (wallpaper picker on left,
+  theme switcher on right) are deliberately NOT ported — this surface is
+  placed within niri's backdrop (`layer-rule place-within-backdrop`), and
+  niri excludes backdrop surfaces from every input-target lookup, in the
+  overview included (`surface_under` in niri's src/niri.rs), so a pointer
+  handler here could never fire; both pickers stay reachable through the
+  menu, their binds and the `wallpaper`/`theme` IPC targets.
 - **Image picker design** from `shell/plugins/image-picker/ImagePicker.qml` and
   `bin/omarchy-theme-bg-switcher`: the full-screen scrim over a skewed
   filmstrip, the selection blown up to a wide preview with the rest of the set

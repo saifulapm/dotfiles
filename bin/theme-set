@@ -33,21 +33,50 @@ if [[ ! -f $src ]]; then
   exit 1
 fi
 
-# Compositor-level crossfade: freeze the screen, apply everything underneath,
-# fade to the fully rethemed desktop in one motion. Best-effort — a dead or
-# absent niri must never block a theme change.
-timeout 1 niri msg action do-screen-transition --delay-ms 200 >/dev/null 2>&1 || true
-
 mkdir -p "$state_dir"
-cp "$src" "$state.tmp"
-mv "$state.tmp" "$state"
+
+# The synchronized switch, omarchy's sequencing: hand the running shell the
+# wallpaper pair and the palette in ONE IPC call, before any watched file
+# changes. The shell latches its theme file-watch off, starts the slanted-wipe
+# reveal, and applies the palette on the reveal's first frame — so the colors
+# and the wallpaper land together instead of in file-watch order. The state
+# files are still written below either way: they are what the next shell start
+# (and every non-shell consumer) reads.
+#
+# Wallpaper choice: bin/background-next owns the candidate list and the cycle,
+# and reads the theme name written here first — so switching themes lands on
+# the new theme's first image and re-applying the active one advances to its
+# next, omarchy-style. --peek chooses without writing; the write comes after
+# the IPC push so the shell's file watch sees a path it already transitioned
+# to and de-duplicates.
+old_bg=""
+[[ -f $state_dir/background ]] && old_bg="$(<"$state_dir/background")"
+
 printf '%s\n' "$1" >"$name_file.tmp"
 mv "$name_file.tmp" "$name_file"
 
-# Wallpaper: bin/background-next owns the candidate list and the cycle, and
-# reads the theme name written just above — so switching themes lands on the
-# new theme's first image and re-applying the active one advances to its next,
-# omarchy-style. No candidates just means no wallpaper change.
-"$root/bin/background-next"
+next_bg="$("$root/bin/background-next" --peek || true)"
+
+synced=0
+if timeout 2 qs ipc call background themeTransition "$old_bg" "$next_bg" "$(base64 -w 0 "$src")" >/dev/null 2>&1; then
+  synced=1
+else
+  # Degradation path — shell dead, absent, or predating the IPC surface. The
+  # palette will land through the theme.toml file watch (or the next shell
+  # start), the wallpaper through the state file, in no particular order; the
+  # compositor-level crossfade folds those uncoordinated flips into one
+  # motion. Never fired on the synchronized path: freezing the screen there
+  # would hide the reveal it is sequenced around. Best-effort — a dead or
+  # absent niri must never block a theme change.
+  timeout 1 niri msg action do-screen-transition --delay-ms 200 >/dev/null 2>&1 || true
+fi
+
+cp "$src" "$state.tmp"
+mv "$state.tmp" "$state"
+
+# No candidates just means no wallpaper change.
+if [[ -n $next_bg ]]; then
+  "$root/bin/background-next" --set "$next_bg"
+fi
 
 exec "$root/bin/theme-apply"

@@ -23,6 +23,15 @@ QtObject {
 
     property var values: builtin
 
+    // Latched by the Background module while a synchronized theme push is in
+    // flight: bin/theme-set hands the palette over IPC first (to be applied on
+    // the wallpaper reveal's first frame) and writes theme.toml right after,
+    // so without this the file watch would apply the same tokens a beat early.
+    // Always released by Background.applyPendingTheme — the reveal frame, or
+    // its 300 ms fallback timer — so a skipped load never outlives the switch,
+    // and the file remains the source of truth for the next shell start.
+    property bool deferFileLoads: false
+
     // Machine-level overrides from ~/.config/qshell/theme-override.toml.
     // Layered on top of whatever theme is active, so a per-machine tweak
     // survives theme switches (omarchy's ~/.config/omarchy/shell.toml).
@@ -367,7 +376,10 @@ QtObject {
         path: Quickshell.env("HOME") + "/.local/state/qshell/theme.toml"
         watchChanges: true
         printErrors: false
-        onLoaded: root.load(text())
+        onLoaded: {
+            if (!root.deferFileLoads)
+                root.load(text());
+        }
         onFileChanged: reload()
         onLoadFailed: root.values = root.builtin
     }

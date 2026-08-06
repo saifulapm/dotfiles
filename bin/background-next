@@ -4,9 +4,14 @@
 # re-apply of the active theme) and by the shell's picker.
 #
 #   background-next             advance to the next candidate
+#   background-next --peek      print what the advance would choose, change nothing
 #   background-next --list      print the candidates, one path per line
 #   background-next --current   print the active wallpaper
 #   background-next --set PATH  make PATH the active wallpaper
+#
+# --peek exists for bin/theme-set's synchronized switch: the shell needs the
+# chosen path in the IPC push BEFORE the state file changes, or the file
+# watch would start an uncoordinated transition first.
 #
 # Candidates are omarchy-theme-bg-next's merged sources adapted to our layout
 # (CREDITS.md): the active theme's backgrounds first, then the user's own
@@ -57,10 +62,14 @@ apply() {
   mv "$state.tmp" "$state"
 }
 
+peek=0
 case "${1-}" in
 "--list")
   list
   exit 0
+  ;;
+"--peek")
+  peek=1
   ;;
 "--current")
   [[ -f $state ]] && cat "$state"
@@ -97,5 +106,10 @@ for i in "${!bgs[@]}"; do
     break
   fi
 done
+
+if ((peek)); then
+  printf '%s\n' "$next"
+  exit 0
+fi
 
 apply "$next"
