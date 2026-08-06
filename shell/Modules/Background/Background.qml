@@ -260,6 +260,13 @@ Scope {
             // animation and the rest join it (their multi-monitor rule).
             property bool maskReady: false
 
+            // Decode wallpapers at display resolution (logical size × dpr):
+            // an unconstrained Image decodes the file at its native size,
+            // which for a 4K source is ~33 MiB of RGBA per frame — and three
+            // frames are up during a reveal.
+            readonly property int decodeWidth: Math.max(1, Math.ceil(width * (screen && screen.devicePixelRatio ? screen.devicePixelRatio : 1)))
+            readonly property int decodeHeight: Math.max(1, Math.ceil(height * (screen && screen.devicePixelRatio ? screen.devicePixelRatio : 1)))
+
             function maybeStartReveal() {
                 if (!backgroundRoot.incomingBackground || backgroundRoot.revealProgress !== 0 || maskReady)
                     return;
@@ -284,6 +291,8 @@ Scope {
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: true
+                sourceSize.width: wall.decodeWidth
+                sourceSize.height: wall.decodeHeight
                 onStatusChanged: {
                     if (status === Image.Ready && backgroundRoot.finishingTransition) {
                         backgroundRoot.incomingBackground = "";
@@ -301,7 +310,8 @@ Scope {
                 asynchronous: true
                 cache: false
                 smooth: true
-                mipmap: true
+                sourceSize.width: wall.decodeWidth
+                sourceSize.height: wall.decodeHeight
                 visible: backgroundRoot.oldBackground !== "" && backgroundRoot.revealProgress < 1
                 onStatusChanged: wall.maybeStartReveal()
             }
@@ -327,7 +337,8 @@ Scope {
                     asynchronous: true
                     cache: false
                     smooth: true
-                    mipmap: true
+                    sourceSize.width: wall.decodeWidth
+                    sourceSize.height: wall.decodeHeight
                     onStatusChanged: wall.maybeStartReveal()
                 }
             }
@@ -338,7 +349,10 @@ Scope {
                 id: revealMask
                 anchors.fill: parent
                 visible: false
-                layer.enabled: true
+                // The mask FBO is screen-sized; keep it allocated only for
+                // the 420 ms the reveal actually samples it (same gate as
+                // incomingLayer above).
+                layer.enabled: backgroundRoot.incomingBackground !== "" && backgroundRoot.revealProgress < 1
 
                 readonly property real slant: -0.18
                 readonly property real centerTop: width / 2 - slant * height / 2

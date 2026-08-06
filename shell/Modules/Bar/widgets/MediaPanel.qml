@@ -121,6 +121,12 @@ BarPanel {
                     anchors.margins: 1
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
+                    // Drawn at ~64 px; without a decode cap every distinct
+                    // cover of a listening session sits in the pixmap cache
+                    // at its native resolution, forever.
+                    sourceSize.width: 256
+                    sourceSize.height: 256
+                    cache: false
                     source: panel.artUrl
                     visible: panel.artUrl !== ""
                 }

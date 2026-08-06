@@ -96,8 +96,15 @@ Scope {
     }
 
     function requestSessionLock() {
-        if (!lockRequested || sessionLock.locked || sessionLock.secure)
+        if (!lockRequested || sessionLock.locked || sessionLock.secure) {
+            // A withdrawn lock request must stand the retry timer down too,
+            // or it keeps firing at 10 Hz for the rest of the session.
+            if (!lockRequested) {
+                pendingSessionLock = false;
+                pendingSessionLockTimer.stop();
+            }
             return;
+        }
         if (sessionLockStabilizeTimer.running)
             return;
         if (!hasRealScreen()) {

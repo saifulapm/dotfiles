@@ -308,12 +308,26 @@ BarButton {
         onTriggered: rootItem.refreshDailyForecast(null)
     }
 
+    // Stamp of the last timer-driven refresh, so re-arming (the bar coming
+    // back from `bar hide`) doesn't refetch data that is still fresh —
+    // triggeredOnStart fires on every re-arm.
+    property double lastAutoRefreshMs: 0
+
     Timer {
         interval: rootItem.refreshMinutes * 60 * 1000
-        running: true
+        // The refresh cadence is scoped to a bar that is actually on screen
+        // (Dropbox's pollingAllowed): nothing fetches while the bar is
+        // hidden. Panel open and middle click still refresh directly.
+        running: rootItem.bar !== null && rootItem.bar.visible === true
         repeat: true
         triggeredOnStart: true
-        onTriggered: rootItem.refresh()
+        onTriggered: {
+            const now = Date.now();
+            if (now - rootItem.lastAutoRefreshMs < interval * 0.9)
+                return;
+            rootItem.lastAutoRefreshMs = now;
+            rootItem.refresh();
+        }
     }
 
     OpticalGlyph {

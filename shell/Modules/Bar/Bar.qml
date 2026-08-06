@@ -260,15 +260,44 @@ Scope {
 
     function setBarHidden(hidden) {
         barHidden = hidden;
-        Quickshell.execDetached(["bash", "-c", hidden ? "mkdir -p " + statePath + " && touch " + statePath + "/bar-off" : "rm -f " + statePath + "/bar-off"]);
+        syncBarFlag();
+    }
+
+    // One serialized writer for the flag file: two detached fire-and-forget
+    // writes can land out of order (hide then show → touch after rm),
+    // stranding bar-off on disk so the next shell start comes up hidden. One
+    // write runs at a time; if the desired state moved while it was in
+    // flight, the exit handler writes again.
+    function syncBarFlag() {
+        if (barFlagProc.running)
+            return;
+        barFlagProc.desiredAtLaunch = barHidden;
+        barFlagProc.command = ["bash", "-c", barHidden ? "mkdir -p " + statePath + " && touch " + statePath + "/bar-off" : "rm -f " + statePath + "/bar-off"];
+        barFlagProc.running = true;
+    }
+
+    Process {
+        id: barFlagProc
+
+        property bool desiredAtLaunch: false
+
+        onExited: {
+            if (desiredAtLaunch !== barRoot.barHidden)
+                barRoot.syncBarFlag();
+        }
     }
 
     FileView {
         path: barRoot.statePath + "/bar-off"
         watchChanges: true
         printErrors: false
-        onLoaded: barRoot.barHidden = true
-        onLoadFailed: barRoot.barHidden = false
+        // Our own writes already updated barHidden; adopting the file mid-
+        // flight would resurrect the state the user just left. Only external
+        // touch/rm (never concurrent with our writer) moves the bar here.
+        onLoaded: if (!barFlagProc.running)
+            barRoot.barHidden = true
+        onLoadFailed: if (!barFlagProc.running)
+            barRoot.barHidden = false
         onFileChanged: reload()
         // Neither loaded nor loadFailed fires until something reads the view.
         Component.onCompleted: reload()

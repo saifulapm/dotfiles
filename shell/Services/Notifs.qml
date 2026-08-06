@@ -75,6 +75,13 @@ QtObject {
     readonly property int lowPopupDuration: 5000
     readonly property int normalPopupDuration: 8000
     readonly property int maxPopupDuration: 30000
+    // Critical stays up far longer than the cap above, but not forever — an
+    // immortal toast retains its live object and signal closures for the
+    // whole session.
+    readonly property int criticalPopupDuration: 5 * 60 * 1000
+    // A notification storm must not grow the toast stack without bound; past
+    // this the oldest toasts overflow off screen (see overflowPopup).
+    readonly property int popupCap: 10
 
     // Live Notification objects by originalId, kept OUT of the ListModels: a
     // QObject stored in a model role becomes a dangling C++ pointer once the
@@ -87,12 +94,13 @@ QtObject {
     property bool historyLoaded: false
 
     // ------------------------------------------------------- timeout policy
-    // Critical never expires on its own. Everything else takes the sender's
-    // requested timeout, floored at the per-urgency minimum and capped at 30s.
+    // Critical holds the screen for minutes, not seconds. Everything else
+    // takes the sender's requested timeout, floored at the per-urgency
+    // minimum and capped at 30s.
     function durationFor(urgency, expireTimeout) {
         switch (urgency) {
         case NotificationUrgency.Critical:
-            return 0;
+            return criticalPopupDuration;
         case NotificationUrgency.Low:
             return Math.min(maxPopupDuration, Math.max(lowPopupDuration, requestedDuration(expireTimeout)));
         default:
@@ -229,8 +237,34 @@ QtObject {
         Qt.callLater(function () {
             root.removeByOriginalId(root.popupModel, snapshot.originalId);
             root.popupModel.insert(0, snapshot);
+            while (root.popupModel.count > root.popupCap)
+                root.overflowPopup(root.popupModel.count - 1);
             root.everNotified = true;
         });
+    }
+
+    // Overflow removal: the toast leaves the screen and the server is told it
+    // expired (so the sender may re-post), but unlike expire/dismiss it is
+    // NOT marked seen — a real app's record stays in pending for review.
+    function overflowPopup(index) {
+        if (index < 0 || index >= popupModel.count)
+            return;
+        const entry = popupModel.get(index);
+        const originalId = entry ? entry.originalId : -1;
+        const ref = originalId >= 0 ? liveRefs[originalId] : null;
+        popupModel.remove(index);
+        if (!ref)
+            return;
+        try {
+            if (ref.tracked) {
+                if (typeof ref.expire === "function")
+                    ref.expire();
+                else
+                    ref.dismiss();
+            }
+        } catch (e) {
+            // Object already torn down by the server — nothing to close.
+        }
     }
 
     // Remove every row whose originalId matches. Chat apps reuse replaces_id
@@ -249,8 +283,12 @@ QtObject {
         Qt.callLater(function () {
             root.removeByOriginalId(root.pendingModel, snapshot.originalId);
             root.pendingModel.insert(0, snapshot);
-            while (root.pendingModel.count > root.historyCap)
+            while (root.pendingModel.count > root.historyCap) {
+                const evicted = root.pendingModel.get(root.pendingModel.count - 1);
+                if (evicted)
+                    root.maybeDeleteCachedImage(evicted.image);
                 root.pendingModel.remove(root.pendingModel.count - 1);
+            }
             root.scheduleHistorySave();
         });
     }
@@ -266,8 +304,12 @@ QtObject {
                 const snapshot = root.snapshotFromRow(entry);
                 root.pendingModel.remove(i);
                 root.pastModel.insert(0, snapshot);
-                while (root.pastModel.count > root.historyCap)
+                while (root.pastModel.count > root.historyCap) {
+                    const evicted = root.pastModel.get(root.pastModel.count - 1);
+                    if (evicted)
+                        root.maybeDeleteCachedImage(evicted.image);
                     root.pastModel.remove(root.pastModel.count - 1);
+                }
                 root.scheduleHistorySave();
                 return;
             }
@@ -300,8 +342,12 @@ QtObject {
                 root.pendingModel.remove(0);
                 root.pastModel.insert(0, snapshot);
             }
-            while (root.pastModel.count > root.historyCap)
+            while (root.pastModel.count > root.historyCap) {
+                const evicted = root.pastModel.get(root.pastModel.count - 1);
+                if (evicted)
+                    root.maybeDeleteCachedImage(evicted.image);
                 root.pastModel.remove(root.pastModel.count - 1);
+            }
             root.scheduleHistorySave();
         });
     }
