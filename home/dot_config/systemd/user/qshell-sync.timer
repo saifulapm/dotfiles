@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic qshell sync against the Dropbox hub
+
+[Timer]
+OnStartupSec=3min
+OnUnitActiveSec=15min
+RandomizedDelaySec=2min
+
+[Install]
+WantedBy=timers.target

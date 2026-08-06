@@ -1,0 +1,8 @@
+[Unit]
+Description=Sync shell history and screenshots through the Dropbox hub
+
+[Service]
+Type=oneshot
+ExecStart=%h/.dotfiles/bin/qshell-sync
+Nice=19
+IOSchedulingClass=idle

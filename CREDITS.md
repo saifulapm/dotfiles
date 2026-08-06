@@ -116,7 +116,15 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   Sections sit at the top level of the file beside `deviceId`/`updatedAt`, so
   a model-usage snapshot written here has the same shape as one written by
   their shell. Merging stays with each module, since what it means to combine
-  two payloads is not the transport's business.
+  two payloads is not the transport's business. The same one-writer-per-device
+  invariant, applied to real files instead of snapshots, is `bin/qshell-sync` +
+  `home/dot_bashrc.d/20-history.sh` (2026-08-06): per-machine bash history
+  files in a folder every machine reads whole. The code is ours and the
+  transport differs by design — omarchy's layer moves no bytes (their README
+  delegates to "a folder synced by Syncthing, Dropbox, rsync, …"), while ours
+  is the missing tool: rclone against a Dropbox hub on a systemd timer, with
+  `bisync` beside it for the screenshots folder, which is file sync omarchy
+  does not do at all.
 - **Monitor plugin design** from `shell/plugins/panels/monitor/` (`Panel.qml`,
   `Model.js`): the hero naming the current brightness mood over a "Display"
   title, their brightness mood-name ladder itself, the live brightness slider
