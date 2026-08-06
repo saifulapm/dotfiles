@@ -10,7 +10,9 @@ BarButton {
     id: rootItem
 
     required property var niri
-    property int maxWidth: 280
+    // Inline shell.json entry {"id": "window", "maxWidth": N} — omarchy's
+    // window widget reads the same key from its settings.
+    readonly property int maxWidth: Number(setting("maxWidth", 280))
 
     visible: niri.focusedTitle !== "" && !vertical
     tooltipText: label.truncated ? niri.focusedTitle : ""
