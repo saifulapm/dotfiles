@@ -12,6 +12,10 @@ BarButton {
 
     property string glyph: ""
     property bool status: false
+    // Per-glyph optical size compensation: Nerd Font ink heights vary by
+    // design (0.56–0.92em across the bar's set) — outliers scale toward the
+    // 0.83em Material Design standard so every icon reads the same size.
+    property real glyphScale: 1
     // Override for glyph color; empty tracks contentColor (active/normal).
     property var glyphColor: undefined
     // Rotates the glyph in place (the vertical tray's chevron rides this).
@@ -27,7 +31,8 @@ BarButton {
         rotation: icon.glyphRotation
         text: icon.glyph
         color: icon.glyphColor !== undefined ? icon.glyphColor : icon.contentColor
-        pixelSize: icon.status ? icon.theme.fontPx(0.833) : 13
+        pixelSize: Math.round((icon.status ? icon.theme.fontPx(0.833) : 13) * icon.glyphScale)
+        verticalInkCenter: true
         // Upstream's `!root.bar || root.bar.foregroundAnimationEnabled`.
         colorAnimationEnabled: !icon.bar || icon.bar.foregroundAnimationEnabled === true
     }

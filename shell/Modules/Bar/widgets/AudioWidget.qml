@@ -25,6 +25,9 @@ BarIcon {
         return "󰕿";     // volume-low
     }
 
+    // The volume ladder's ink tops out at 0.73em — visibly under the 0.83em
+    // neighbors without compensation.
+    glyphScale: 1.1
     visible: audio.ready
     dimmed: audio.muted
     tooltipText: audio.muted ? "Muted" : pct + "%"

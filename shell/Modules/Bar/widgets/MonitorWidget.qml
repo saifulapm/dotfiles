@@ -10,7 +10,11 @@ BarIcon {
     // The ShellRoot, for the night light service the panel switches.
     required property var shell
 
-    glyph: Quickshell.screens.length > 1 ? "󰍺" : "󰍹"
+    // md-desktop_mac (multi: md-monitor_multiple) — the plain md-monitor's
+    // thin outline read smaller than its solid neighbors; the desk base
+    // gives it the same visual weight, helped by a nudge of optical scale.
+    glyph: Quickshell.screens.length > 1 ? "󰍺" : "󰇄"
+    glyphScale: Quickshell.screens.length > 1 ? 1 : 1.1
     tooltipText: Quickshell.screens.length + " display" + (Quickshell.screens.length === 1 ? "" : "s")
 
     function openPanel() {

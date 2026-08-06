@@ -19,6 +19,11 @@ BarIndicator {
     active: unseen > 0
     activeGlyph: "󰂚" // md-bell
     inactiveGlyph: "󰂚"
+
+    // Standalone on the bar the bell sits among full icon-slot widgets and
+    // takes their size; hosted in the Indicators container it stays a
+    // status light like its siblings.
+    status: indicatorBlock !== "single"
     activeTooltip: unseen + " unseen notification" + (unseen === 1 ? "" : "s")
     inactiveTooltip: "Notification History"
 
@@ -69,9 +74,11 @@ BarIndicator {
         border.width: 1
         border.color: rootItem.bar ? rootItem.bar.barBackground : rootItem.theme.surface1
         anchors.right: parent.right
-        anchors.rightMargin: 2
+        // The full icon slot draws a bigger bell than the status slot, so
+        // the punched dot rides the glyph's corner in both.
+        anchors.rightMargin: rootItem.status ? 2 : 5
         anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: 5
+        anchors.verticalCenterOffset: rootItem.status ? 5 : 6
     }
 
     // Source-based: the panel compiles on first open, not with the bar (S1).

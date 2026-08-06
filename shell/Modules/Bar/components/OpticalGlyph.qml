@@ -19,6 +19,12 @@ Item {
     // to that flag; everything else keeps the animated default.
     property bool colorAnimationEnabled: true
 
+    // Slots holding a lone glyph can center the ink vertically too — the
+    // shared-baseline default only matters when a glyph sits beside text,
+    // and a short-ink glyph (the iCloud cloud is 0.56em against the 0.83em
+    // Material Design standard) otherwise sits visibly low in its slot.
+    property bool verticalInkCenter: false
+
     implicitWidth: glyph.implicitWidth
     implicitHeight: glyph.implicitHeight
 
@@ -37,6 +43,18 @@ Item {
             if (tight.width <= 0)
                 return 0;
             return Math.round(glyph.implicitWidth / 2 - (tight.x + tight.width / 2));
+        }
+        anchors.verticalCenterOffset: {
+            if (!root.verticalInkCenter)
+                return 0;
+            const tight = metrics.tightBoundingRect;
+            if (tight.height <= 0)
+                return 0;
+            // tightBoundingRect is baseline-relative (y is negative above
+            // the baseline), so the ink's position inside the item runs
+            // through baselineOffset.
+            const inkCenter = glyph.baselineOffset + tight.y + tight.height / 2;
+            return Math.round(glyph.implicitHeight / 2 - inkCenter);
         }
         text: root.text
         color: root.color

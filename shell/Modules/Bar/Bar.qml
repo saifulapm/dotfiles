@@ -2004,6 +2004,9 @@ Scope {
             "legacyUnit": "qshell-icloud-mount",
             "glyph": "󰀸" // md-apple_icloud
             ,
+            // The cloud's ink is 0.56em against the 0.83em MD standard —
+            // uncompensated it reads two sizes smaller than its neighbors.
+            "glyphScale": 1.3,
             "phrases": ["Courting Cupertino", "Ferrying folders", "Drizzling data", "Raining files", "Syncing the orchard", "Picking apples", "Minding memories", "Whispering to Apple", "Seeding the cloud", "Polishing pixels"]
         })
 

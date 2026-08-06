@@ -88,6 +88,7 @@ BarButton {
     // of its own (and a Row forbids the horizontal ones anyway).
     RcloneRemoteMark {
         iconSize: 13
+        glyphScale: Number(rootItem.config.glyphScale) > 0 ? Number(rootItem.config.glyphScale) : 1
         glyph: String(rootItem.config.glyph || "")
         drawnMark: String(rootItem.config.drawnMark || "")
         color: rootItem.service.mountActive ? rootItem.barFg : Qt.darker(rootItem.barFg, 1.55)

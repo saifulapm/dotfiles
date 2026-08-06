@@ -18,6 +18,8 @@ Item {
     id: root
 
     property real iconSize: 13
+    // Optical compensation for short-ink glyphs (BarIcon.glyphScale's twin).
+    property real glyphScale: 1
     property color color: "white"
     property string glyph: ""
     property string drawnMark: ""
@@ -44,7 +46,8 @@ Item {
         anchors.centerIn: parent
         text: root.glyph
         color: root.color
-        pixelSize: Math.round(root.iconSize)
+        pixelSize: Math.round(root.iconSize * root.glyphScale)
+        verticalInkCenter: true
         colorAnimationEnabled: root.colorAnimationEnabled
     }
 
