@@ -274,7 +274,9 @@ Scope {
         }
         onIsRegisteredChanged: {
             if (isRegistered)
-                console.log("Polkit: agent registered");
+                // console.info, not .log — .log is suppressed at the default
+                // log level and the line would never appear.
+                console.info("Polkit: agent registered");
             else
                 console.warn("Polkit: agent is not registered; another agent may be running");
         }
