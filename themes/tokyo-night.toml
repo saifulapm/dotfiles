@@ -137,8 +137,10 @@ active = "accent.accent"
 #                    border [surface.3] + -alpha
 #
 # [bar], [panel], [tooltip], [notifications], [lock] and [polkit] are wired to
-# their surfaces. [menu] and [osd] are defined and resolvable but the Menu and
-# OSD modules still read base tokens — porting them is follow-up work; their
+# their surfaces. [menu]'s scrim is wired too — the shared overlay scaffold
+# (components/OverlaySurface.qml) reads it for every fullscreen overlay's dim.
+# The remaining [menu] keys and [osd] are defined and resolvable but the Menu
+# and OSD modules still read base tokens — porting them is follow-up work; their
 # border-width keys ([menu: shape.border-width], [osd: same, floored at half
 # a space unit]) and [tooltip]'s (fallback 1, the bubble's hairline) sit in
 # the same boat. border-width is one uniform number per surface: omarchy's

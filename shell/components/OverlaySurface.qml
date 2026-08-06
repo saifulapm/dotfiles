@@ -86,7 +86,10 @@ PanelWindow {
 
     Rectangle {
         anchors.fill: parent
-        color: root.theme.alpha(root.theme.surface0, 0.5)
+        // The [menu] scrim token (same default composition: surface0 at
+        // 0.5): every overlay draws the menu visual language, so a theme
+        // that restyles the menu's scrim restyles them all together.
+        color: root.theme.menu.scrim
         opacity: root.opened ? 1 : 0
         Behavior on opacity {
             NumberAnimation {
