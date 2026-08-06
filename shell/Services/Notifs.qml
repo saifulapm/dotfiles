@@ -23,6 +23,10 @@ QtObject {
     // window map. Focus is simply a no-op when it is absent.
     property var niri: null
 
+    // The ShellRoot, injected by shell.qml: the history-center IPC verbs
+    // route through its toggle/show/hideNotifCenter to reach the bar.
+    property var shellRoot: null
+
     readonly property string home: Quickshell.env("HOME")
     // History and DND are persistent user state, not regeneratable cache, so
     // they live under XDG_STATE_HOME beside stay-awake / nightlight / reminders.
@@ -511,6 +515,31 @@ QtObject {
         dismissPopup(index);
     }
 
+    // Invoke a history entry's "default" action if its live notification
+    // still exists, else fall back to focusing the sender's window — the
+    // history center's Enter/click, mirroring invokePopupDefault without
+    // assuming a popup row.
+    function invokeEntryDefault(entry) {
+        if (!entry)
+            return false;
+        const ref = entry.originalId >= 0 ? liveRefs[entry.originalId] : null;
+        try {
+            if (ref && ref.actions) {
+                for (let i = 0; i < ref.actions.length; i++) {
+                    const action = ref.actions[i];
+                    if (action && action.identifier === "default") {
+                        action.invoke();
+                        return true;
+                    }
+                }
+            }
+        } catch (e) {
+            // Notification already torn down by the server — fall through.
+            console.warn("Notifs: invoking the default action failed:", e);
+        }
+        return focusApp(entry);
+    }
+
     // Focus the window that sent this notification. Upstream hands the app
     // name to omarchy-hyprland-focus-app; niri's window list is already in
     // this process, so the match happens in NotificationLogic and the result
@@ -835,6 +864,19 @@ QtObject {
 
         function showHistory(): string {
             return root.showRecentHistory();
+        }
+
+        // The history center (the review panel, not the toast replay above).
+        function toggle(): string {
+            return root.shellRoot ? String(root.shellRoot.toggleNotifCenter()) : "none";
+        }
+
+        function show(): string {
+            return root.shellRoot ? String(root.shellRoot.showNotifCenter()) : "none";
+        }
+
+        function hide(): string {
+            return root.shellRoot ? String(root.shellRoot.hideNotifCenter()) : "none";
         }
 
         // `clear` empties the past bucket (the "already seen" one).

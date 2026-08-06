@@ -34,8 +34,8 @@ Item {
     property var bar: null
     property var settings: ({})
 
-    // Upstream's default order.
-    readonly property var defaultItems: ["screenrecording", "dictation", "reminder", "dnd", "nightlight", "stayawake"]
+    // Upstream's default order, with our notification bell beside dnd.
+    readonly property var defaultItems: ["screenrecording", "dictation", "reminder", "notifs", "dnd", "nightlight", "stayawake"]
 
     function setting(name, fallback) {
         const value = settings ? settings[name] : undefined;
@@ -333,11 +333,39 @@ Item {
     readonly property var indicatorRegistry: ({
             "screenrecording": screenRecordingComponent,
             "dictation": dictationComponent,
+            "notifs": notifsBellComponent,
             "dnd": dndComponent,
             "reminder": reminderComponent,
             "nightlight": nightLightComponent,
             "stayawake": stayAwakeComponent
         })
+
+    // ------------------------------------------------ notification center
+    // The center's panel hangs off this container, not off the bell copy
+    // that opened it: the active-block copy is torn down the moment the
+    // last unseen entry clears, which must not close an open panel.
+    function openNotifsPanel(anchorBell) {
+        if (notifsPanelLoader.status === Loader.Null)
+            notifsPanelLoader.setSource("NotifsPanel.qml", {
+                theme: root.theme,
+                notifs: root.shell.notifs
+            });
+        notifsPanelLoader.item.anchorItem = anchorBell !== null && anchorBell !== undefined ? anchorBell : root;
+        notifsPanelLoader.item.toggle();
+    }
+
+    // The IPC summon path (Bar.summonNotifCenter): the container anchors the
+    // panel itself, so the center opens even with every indicator collapsed.
+    function summonNotifCenter() {
+        openNotifsPanel(null);
+        return true;
+    }
+
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
+        id: notifsPanelLoader
+        visible: false
+    }
 
     Component {
         id: screenRecordingComponent
@@ -355,6 +383,16 @@ Item {
             theme: root.theme
             bar: root.bar
             dictation: root.serviceHost.dictationService()
+            indicatorHost: root
+        }
+    }
+
+    Component {
+        id: notifsBellComponent
+        NotifsBell {
+            theme: root.theme
+            bar: root.bar
+            notifs: root.shell.notifs
             indicatorHost: root
         }
     }

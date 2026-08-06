@@ -28,6 +28,7 @@ ShellRoot {
     // notification's sender against.
     property Notifs notifs: Notifs {
         niri: shell.niri
+        shellRoot: shell
     }
     property Audio audio: Audio {}
     // Eager like Notifs, and for the same kind of reason: an idle monitor
@@ -369,6 +370,25 @@ ShellRoot {
             return menuLoader.item.openRoute(route);
         menuLoader.summon("openRoute", [route]);
         return "ok";
+    }
+
+    // The notification history center lives in the bar (a bell indicator's
+    // BarPanel), so these route through it; the `notifs` IPC verbs call them
+    // via the service's injected shellRoot.
+    function toggleNotifCenter() {
+        if (bar.closeNotifCenter())
+            return "closed";
+        return bar.summonNotifCenter() ? "ok" : "none";
+    }
+
+    function showNotifCenter() {
+        if (bar.notifCenterOpen())
+            return "ok";
+        return bar.summonNotifCenter() ? "ok" : "none";
+    }
+
+    function hideNotifCenter() {
+        return bar.closeNotifCenter() ? "ok" : "none";
     }
 
     function toggleThemes() {

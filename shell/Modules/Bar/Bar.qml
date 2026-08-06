@@ -364,6 +364,37 @@ Scope {
     // reach their slot lists.
     property var screenBars: []
 
+    // ---------------------------------------------- notification center
+    // Summon the history center on the niri-focused output first (the `bar
+    // open` ordering): a standalone bell widget answers, else an Indicators
+    // container hosting one.
+    function summonNotifCenter() {
+        const focusedWs = niri.workspaces.find(w => w.is_focused);
+        const focusedOutput = focusedWs ? focusedWs.output : "";
+        const bars = screenBars.slice().sort((a, b) => Number(b.screen && b.screen.name === focusedOutput) - Number(a.screen && a.screen.name === focusedOutput));
+        for (const b of bars)
+            if (b.summonNotifCenter())
+                return true;
+        return false;
+    }
+
+    // Close only the center, wherever it is open — `notifs hide` must not
+    // sweep unrelated widget panels the way closeAllPanels does.
+    function closeNotifCenter() {
+        let closed = false;
+        for (const b of screenBars) {
+            if (b.activePanel && b.activePanel.isNotifCenter === true) {
+                b.activePanel.close();
+                closed = true;
+            }
+        }
+        return closed;
+    }
+
+    function notifCenterOpen() {
+        return screenBars.some(b => b.activePanel && b.activePanel.isNotifCenter === true);
+    }
+
     // Close every open widget panel on every screen. Besides the IPC verb,
     // the shell root calls this before mapping any typeable overlay (menu,
     // launcher, …): an open panel holds an Exclusive keyboard grab, and niri
@@ -625,6 +656,7 @@ Scope {
             "tray": trayComponent,
             "update": updateComponent,
             "indicators": indicatorsComponent,
+            "notifs": notifsComponent,
             "dnd": dndComponent,
             "dictation": dictationComponent,
             "reminder": reminderComponent,
@@ -756,6 +788,20 @@ Scope {
                         continue;
                     item.openPanel();
                     return true;
+                }
+                return false;
+            }
+
+            // The notification-center summon: any widget exposing
+            // summonNotifCenter answers — a standalone bell (even collapsed,
+            // which summonWidget's visibility rule would skip) or the
+            // Indicators container hosting one.
+            function summonNotifCenter() {
+                for (let i = 0; i < moduleSlots.length; i++) {
+                    const slot = moduleSlots[i];
+                    const item = slot ? slot.activeItem : null;
+                    if (item && typeof item.summonNotifCenter === "function" && item.summonNotifCenter())
+                        return true;
                 }
                 return false;
             }
@@ -1851,6 +1897,14 @@ Scope {
             theme: barRoot.theme
             shell: barRoot.shell
             serviceHost: barRoot
+        }
+    }
+
+    Component {
+        id: notifsComponent
+        NotifsBell {
+            theme: barRoot.theme
+            notifs: barRoot.shell.notifs
         }
     }
 

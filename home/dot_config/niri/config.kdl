@@ -449,6 +449,9 @@ binds {
     Mod+Shift+Alt+Comma hotkey-overlay-title="Show Notification History" { spawn "qs" "ipc" "call" "notifs" "showHistory"; }
     Mod+Shift+Comma hotkey-overlay-title="Dismiss All Notifications" { spawn "qs" "ipc" "call" "notifs" "dismissAll"; }
     Mod+Ctrl+Comma hotkey-overlay-title="Toggle Do Not Disturb" { spawn "qs" "ipc" "call" "notifs" "toggleDnd"; }
+    // Ours: the review panel over the same history the replay bind pops as
+    // toasts — the last free chord in the comma family.
+    Mod+Ctrl+Alt+Comma hotkey-overlay-title="Notification Center" { spawn "qs" "ipc" "call" "notifs" "toggle"; }
 
     // The rest of omarchy's utility chords (2026-08-06 parity audit), each on
     // the nearest free key where the upstream chord is a niri default we keep.
