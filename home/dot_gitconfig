@@ -1,0 +1,50 @@
+[user]
+  name = "Saiful Islam"
+  email = "saiful.apm@gmail.com"
+[github]
+  # https://github.com/blog/180-local-github-config
+  user = "saifulapm"
+
+[filter "lfs"]
+  clean = git-lfs clean -- %f
+  smudge = git-lfs smudge -- %f
+  process = git-lfs filter-process
+  required = true
+
+[core]
+  excludesfile = ~/.gitignore
+  quotepath = false
+  # line endings: force LF during add, warn on conversion
+  autocrlf = input
+  safecrlf = warn
+  # No core.editor on purpose (the mac set vim): core.editor outranks
+  # $VISUAL/$EDITOR, and here the environment is the source of truth —
+  # kak outside Emacs, with-editor's emacsclient inside (00-env.fish).
+  pager = delta
+
+[init]
+  defaultBranch = main
+[credential "https://github.com"]
+	helper =
+	helper = !gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !gh auth git-credential
+
+[interactive]
+  diffFilter = delta --color-only --features=interactive
+
+[delta]
+  features = decorations
+
+[delta "interactive"]
+  keep-plus-minus-markers = false
+
+[delta "decorations"]
+  commit-decoration-style = blue ol
+  commit-style = raw
+  file-style = omit
+  hunk-header-decoration-style = blue box
+  hunk-header-file-style = red
+  hunk-header-line-number-style = "#067a00"
+  hunk-header-style = file line-number syntax
