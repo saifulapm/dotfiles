@@ -437,7 +437,10 @@ binds {
     Mod+Shift+Slash { show-hotkey-overlay; }
 
     // Suggested binds for running programs: terminal, app launcher, screen locker.
-    Mod+T hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
+    // footclient opens a window in the socket-activated foot server
+    // (foot-server.socket) — shared glyph caches, instant spawn. Plain foot
+    // is the fallback if the server socket is ever broken.
+    Mod+T hotkey-overlay-title="Open a Terminal: foot" { spawn-sh "footclient || foot"; }
     Mod+D hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Space hotkey-overlay-title="Open the Menu" { spawn "qs" "ipc" "call" "menu" "toggle"; }
     // Omarchy's SUPER+ALT+SPACE apps-menu bind (b92510f). Our menu has no
