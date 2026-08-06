@@ -11,14 +11,23 @@ QtObject {
     // Workspace objects as niri sends them: id, idx, name, output,
     // is_active, is_focused, is_urgent, active_window_id.
     property var workspaces: []
-    // window id -> { title, appId }
+    // window id -> { title, appId }. Mutated IN PLACE on per-window events —
+    // cloning the whole map per title change was steady GC pressure (S3) —
+    // so the property's own change signal only fires for the full
+    // WindowsChanged snapshot. windowsRevision is the change signal for
+    // mutations: anything DERIVING from the map must reference it (the two
+    // bindings below do); imperative readers at event time (Notifs'
+    // click-to-focus) just read the live map.
     property var windows: ({})
+    property int windowsRevision: 0
     property var focusedWindowId: null
     readonly property string focusedTitle: {
+        windowsRevision;
         const w = focusedWindowId !== null ? windows[focusedWindowId] : undefined;
         return w && w.title ? w.title : "";
     }
     readonly property string focusedAppId: {
+        windowsRevision;
         const w = focusedWindowId !== null ? windows[focusedWindowId] : undefined;
         return w && w.appId ? w.appId : "";
     }
@@ -136,27 +145,26 @@ QtObject {
                         focused = w.id;
                 }
                 windows = next;
+                windowsRevision++;
                 focusedWindowId = focused;
                 break;
             }
         case "WindowOpenedOrChanged":
             {
                 const w = p.window;
-                const next = Object.assign({}, windows);
-                next[w.id] = {
+                windows[w.id] = {
                     title: w.title || "",
                     appId: w.app_id || ""
                 };
-                windows = next;
+                windowsRevision++;
                 if (w.is_focused)
                     focusedWindowId = w.id;
                 break;
             }
         case "WindowClosed":
             {
-                const next = Object.assign({}, windows);
-                delete next[p.id];
-                windows = next;
+                delete windows[p.id];
+                windowsRevision++;
                 if (focusedWindowId === p.id)
                     focusedWindowId = null;
                 break;
