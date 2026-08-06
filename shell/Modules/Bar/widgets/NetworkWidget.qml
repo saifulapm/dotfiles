@@ -38,7 +38,10 @@ BarIcon {
     }
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("NetworkPanel.qml", {
+                theme: rootItem.theme
+            });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();
     }
@@ -53,11 +56,11 @@ BarIcon {
         }
     }
 
-    LazyLoader {
+    // Source-based so the panel's tree compiles on first open, not with the
+    // bar (S1). Invisible: BarButton's default property is a Row, and a Row
+    // skips invisible items — the loaded BarPanel is its own window anyway.
+    Loader {
         id: panelLoader
-        active: false
-        component: NetworkPanel {
-            theme: rootItem.theme
-        }
+        visible: false
     }
 }

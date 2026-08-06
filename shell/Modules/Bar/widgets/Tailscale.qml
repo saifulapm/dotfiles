@@ -62,7 +62,12 @@ BarButton {
     }
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("TailscalePanel.qml", {
+                theme: rootItem.theme,
+                tailscale: rootItem.tailscale,
+                widget: rootItem
+            });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();
     }
@@ -95,13 +100,9 @@ BarButton {
         fontFamily: rootItem.theme.fontUi
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-        active: false
-        component: TailscalePanel {
-            theme: rootItem.theme
-            tailscale: rootItem.tailscale
-            widget: rootItem
-        }
+        visible: false
     }
 }

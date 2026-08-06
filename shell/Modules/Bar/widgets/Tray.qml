@@ -141,7 +141,11 @@ Item {
     }
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("TrayPanel.qml", {
+                theme: rootItem.theme,
+                tray: rootItem
+            });
         panelLoader.item.anchorItem = chevronItem !== null ? chevronItem : rootItem;
         panelLoader.item.toggle();
     }
@@ -344,15 +348,10 @@ Item {
         }
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-
-        active: false
-
-        component: TrayPanel {
-            theme: rootItem.theme
-            tray: rootItem
-        }
+        visible: false
     }
 
     component TrayItem: BarButton {

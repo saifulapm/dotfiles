@@ -37,11 +37,14 @@ BarIcon {
 
     function summonPanel(mode) {
         if (mode === "close") {
-            if (panelLoader.active && panelLoader.item)
+            if (panelLoader.item)
                 panelLoader.item.close();
             return;
         }
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("BluetoothPanel.qml", {
+                theme: rootItem.theme
+            });
         panelLoader.item.anchorItem = rootItem;
         if (mode === "open")
             panelLoader.item.open();
@@ -105,11 +108,9 @@ BarIcon {
         }
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-        active: false
-        component: BluetoothPanel {
-            theme: rootItem.theme
-        }
+        visible: false
     }
 }

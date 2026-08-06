@@ -45,7 +45,11 @@ BarButton {
     tooltipText: statusLine === "" ? "Dropbox" : "Dropbox — " + statusLine
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("DropboxPanel.qml", {
+                theme: rootItem.theme,
+                dropbox: rootItem.dropbox
+            });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();
     }
@@ -67,12 +71,9 @@ BarButton {
         opacity: rootItem.dropbox.active ? 1.0 : 0.6
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-        active: false
-        component: DropboxPanel {
-            theme: rootItem.theme
-            dropbox: rootItem.dropbox
-        }
+        visible: false
     }
 }

@@ -30,7 +30,11 @@ BarIcon {
     tooltipText: audio.muted ? "Muted" : pct + "%"
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("AudioPanel.qml", {
+                theme: rootItem.theme,
+                media: rootItem.bar && rootItem.bar.shell ? rootItem.bar.shell.media : null
+            });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();
     }
@@ -44,12 +48,9 @@ BarIcon {
     }
     onWheelMoved: delta => rootItem.audio.setVolume(rootItem.audio.volume + (delta > 0 ? 0.05 : -0.05))
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-        active: false
-        component: AudioPanel {
-            theme: rootItem.theme
-            media: rootItem.bar && rootItem.bar.shell ? rootItem.bar.shell.media : null
-        }
+        visible: false
     }
 }

@@ -75,7 +75,12 @@ BarButton {
     }
 
     function openPanel() {
-        calendarLoader.active = true;
+        if (calendarLoader.status === Loader.Null)
+            calendarLoader.setSource("CalendarPanel.qml", {
+                theme: rootItem.theme,
+                host: rootItem,
+                settings: rootItem.settings
+            });
         calendarLoader.item.anchorItem = rootItem;
         calendarLoader.item.toggle();
     }
@@ -126,13 +131,18 @@ BarButton {
         }
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: calendarLoader
-        active: false
-        component: CalendarPanel {
-            theme: rootItem.theme
-            host: rootItem
-            settings: rootItem.settings
-        }
+        visible: false
+    }
+
+    // setSource props are set-once, but `settings` is reassigned every time
+    // a click cycles the format — keep the open calendar's copy live.
+    Binding {
+        target: calendarLoader.item
+        property: "settings"
+        value: rootItem.settings
+        when: calendarLoader.item !== null
     }
 }

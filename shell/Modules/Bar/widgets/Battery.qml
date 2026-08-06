@@ -47,7 +47,10 @@ BarButton {
     }
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("PowerPanel.qml", {
+                theme: rootItem.theme
+            });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();
     }
@@ -60,12 +63,10 @@ BarButton {
         }
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-        active: false
-        component: PowerPanel {
-            theme: rootItem.theme
-        }
+        visible: false
     }
 
     OpticalGlyph {

@@ -199,7 +199,11 @@ BarButton {
     tooltipText: current ? (reportDescription + " · feels like " + reportFeels) : ""
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("WeatherPanel.qml", {
+                theme: rootItem.theme,
+                weather: rootItem
+            });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();
         if (panelLoader.item.opened)
@@ -350,12 +354,9 @@ BarButton {
         renderType: Text.NativeRendering
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-        active: false
-        component: WeatherPanel {
-            theme: rootItem.theme
-            weather: rootItem
-        }
+        visible: false
     }
 }

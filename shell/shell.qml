@@ -4,18 +4,6 @@ import Quickshell.Io
 
 import qs.Services
 import qs.Modules.Bar
-import qs.Modules.Clipboard
-import qs.Modules.Emojis
-import qs.Modules.FilePicker
-import qs.Modules.Lock
-import qs.Modules.Launcher
-import qs.Modules.Menu
-import qs.Modules.Notifications
-import qs.Modules.Osd
-import qs.Modules.Polkit
-import qs.Modules.Reminders
-import qs.Modules.ThemeSwitcher
-import qs.Modules.Background
 import "Modules/Bar/BarModel.js" as BarModel
 
 // Single long-running ShellRoot. One process: panels are summoned by IPC
@@ -24,6 +12,12 @@ import "Modules/Bar/BarModel.js" as BarModel
 // Services are instantiated here once and passed down by property injection.
 // Relative-path singleton imports do NOT share state (omarchy, CREDITS.md) —
 // nothing in this tree may `pragma Singleton` a service.
+//
+// Everything that is not the bar or a service loads through a SurfaceLoader
+// below: the module is named only by URL, so its QML tree compiles when the
+// surface is first woken instead of before quickshell registers the first
+// IpcHandler. Only the Bar (the product's first paint) and the services it
+// depends on stay in the synchronous startup path.
 ShellRoot {
     id: shell
 
@@ -53,8 +47,10 @@ ShellRoot {
     // niri's XF86 keys call. Eager like upstream's keepLoaded service — the
     // keybinds and the bar widget both need it standing; PipeWire is already
     // resident (Audio), so the cost is one MPRIS D-Bus subscription.
+    // `osd` stays null until the OSD surface resolves (~a beat after start);
+    // Media null-guards every use.
     property Media media: Media {
-        osd: osd
+        osd: osdLoader.item
     }
     // Cross-machine snapshot sync. Inert until shell.json's root `sync` block
     // points it at a shared directory, so it costs one /etc/hostname read
@@ -80,6 +76,16 @@ ShellRoot {
     // clobber a config the user could still fix by hand. A missing file is
     // fine to create.
     property bool configWritable: true
+
+    readonly property string barPositionName: config.bar && config.bar.position ? String(config.bar.position) : "top"
+
+    // Surface URLs must be plain file:// — shell.qml itself loads through
+    // quickshell's URL interceptor, and a relative source resolved against
+    // that scheme breaks implicit same-directory type resolution inside the
+    // loaded file (Popups.qml could not see NotificationCard). The warm list
+    // below must use the same strings: the engine's compile cache is keyed
+    // by URL.
+    readonly property string moduleRoot: "file://" + Quickshell.shellDir
 
     function applyConfig(raw) {
         const text = String(raw || "").trim();
@@ -196,55 +202,168 @@ ShellRoot {
         return true;
     }
 
+    // A surface that loads entirely off the startup critical path. `wake()`
+    // starts resolving the URL; `summon()` wakes it and calls a method on it
+    // now or — the omarchy pendingPayloads pattern (their shell.qml, see
+    // CREDITS.md) — queues the call and replays it in arrival order once the
+    // tree lands, so IPC that races the load is never dropped. `deliver()`
+    // is for hide/cancel verbs: they reach a live or in-flight surface but
+    // never wake one that was not summoned.
+    component SurfaceLoader: Loader {
+        id: sl
+        property url surfaceSource
+        property var surfaceProps: ({})
+        property var pending: []
+        asynchronous: true
+
+        function wake() {
+            if (status === Loader.Null || status === Loader.Error)
+                setSource(surfaceSource, surfaceProps);
+        }
+
+        function summon(method, args) {
+            wake();
+            if (item !== null)
+                item[method].apply(item, args || []);
+            else
+                pending.push({
+                    method: method,
+                    args: args || []
+                });
+        }
+
+        function deliver(method, args) {
+            if (item !== null)
+                item[method].apply(item, args || []);
+            else if (status === Loader.Loading)
+                pending.push({
+                    method: method,
+                    args: args || []
+                });
+        }
+
+        function release() {
+            pending = [];
+            setSource("", {});
+        }
+
+        onLoaded: {
+            const queue = pending;
+            pending = [];
+            for (let i = 0; i < queue.length; i++) {
+                try {
+                    item[queue[i].method].apply(item, queue[i].args);
+                } catch (e) {
+                    console.warn("surface", surfaceSource, "replay of", queue[i].method, "failed:", e);
+                }
+            }
+        }
+
+        onStatusChanged: {
+            if (status === Loader.Error)
+                console.warn("surface failed to load:", surfaceSource);
+        }
+    }
+
+    // Startup staging: the always-on surfaces resolve asynchronously right
+    // after the root lands, in priority order — the clipboard capture watcher
+    // first (it must not miss early selections for long), then the wallpaper,
+    // OSD and polkit agent. None of them holds back IPC registration.
+    // Startup staging. The clipboard capture watcher resolves as soon as the
+    // root lands — it must not miss early selections (wl-paste re-fires on
+    // watch start, so only a selection made AND replaced inside this first
+    // beat could ever slip by). The other always-on surfaces wait one beat
+    // more so their incubation doesn't contend with the first IPC answers
+    // and the bar's first frames.
+    Component.onCompleted: clipboardLoader.wake()
+
+    Timer {
+        interval: 400
+        running: true
+        onTriggered: {
+            backgroundLoader.wake();
+            osdLoader.wake();
+            polkitLoader.wake();
+            if (shell.notifs.everNotified)
+                popupsLoader.wake();
+        }
+    }
+
+    // Once startup has settled, pre-compile the surfaces most likely to be
+    // summoned so their first open doesn't pay the type compilation that used
+    // to happen before the shell was even reachable. Compile only — nothing
+    // instantiates, so idle memory stays where it was.
+    property var warmedComponents: []
+    Timer {
+        interval: 3000
+        running: true
+        onTriggered: shell.warmedComponents = [shell.moduleRoot + "/Modules/Launcher/Launcher.qml", shell.moduleRoot + "/Modules/Menu/Menu.qml", shell.moduleRoot + "/Modules/Lock/Lock.qml"].map(url => Qt.createComponent(url, Component.Asynchronous))
+    }
+
+    // An open bar widget panel holds an Exclusive keyboard grab, and niri
+    // keeps the grab with the earlier surface — a typeable overlay mapped on
+    // top of one would render but never see a key. So every overlay entry
+    // point below drops the panels before its window maps.
+    function dismissBarPanels() {
+        bar.closeAllPanels();
+    }
+
     // Shared entry points for the bar's buttons, the command menu and the IPC
-    // targets. Each one wakes its LazyLoader on first use.
+    // targets. Each one wakes its surface on first use.
     function toggleLauncher() {
-        launcherLoader.active = true;
-        launcherLoader.item.toggle();
+        dismissBarPanels();
+        launcherLoader.summon("toggle");
     }
 
     function toggleMenu() {
-        menuLoader.active = true;
-        menuLoader.item.toggle();
+        dismissBarPanels();
+        menuLoader.summon("toggle");
     }
 
     // Open the menu straight at a submenu (or fire a leaf) by id or alias —
     // what the IPC `menu open <route>` does, for callers already inside the
     // shell (the screen-recording indicator opens `capture.screenrecord`).
+    // While the menu is still resolving the route is queued and this reports
+    // "ok" — the route outcome lands when the tree does.
     function openMenu(route) {
-        menuLoader.active = true;
-        return menuLoader.item.openRoute(route);
+        dismissBarPanels();
+        if (menuLoader.item !== null)
+            return menuLoader.item.openRoute(route);
+        menuLoader.summon("openRoute", [route]);
+        return "ok";
     }
 
     function toggleThemes() {
-        themesLoader.active = true;
-        themesLoader.item.toggle();
+        dismissBarPanels();
+        themesLoader.summon("toggle");
     }
 
     function toggleWallpaper() {
-        wallpaperLoader.active = true;
-        wallpaperLoader.item.toggle();
+        dismissBarPanels();
+        wallpaperLoader.summon("toggle");
     }
 
     function toggleEmojis() {
-        emojisLoader.active = true;
-        emojisLoader.item.toggle();
+        dismissBarPanels();
+        emojisLoader.summon("toggle");
     }
 
     function toggleClipboard() {
-        clipboard.toggle();
+        dismissBarPanels();
+        clipboardLoader.summon("toggle");
     }
 
     function toggleReminders() {
-        remindersLoader.active = true;
-        remindersLoader.item.toggle();
+        dismissBarPanels();
+        remindersLoader.summon("toggle");
     }
 
     // Returns false when the lock refused to arm (its PAM config is missing) —
     // the loader is dropped again rather than left holding a module that will
-    // never lock.
+    // never lock. The lock loader is synchronous: lockSession() must answer
+    // truthfully, so it blocks for the (first-use-only) load.
     function lockSession() {
-        lockLoader.active = true;
+        lockLoader.wake();
         if (lockLoader.item.lock())
             return true;
         releaseLockIfIdle();
@@ -254,7 +373,8 @@ ShellRoot {
     // Draw the lock screen without locking anything. Click or Escape dismisses
     // it, and the module unloads again straight after.
     function previewLock() {
-        lockLoader.active = true;
+        dismissBarPanels();
+        lockLoader.wake();
         lockLoader.item.showPreview();
     }
 
@@ -262,17 +382,17 @@ ShellRoot {
     // the same release for the paths that wake it without locking — a preview
     // that has been dismissed.
     function releaseLockIfIdle() {
-        if (!lockLoader.active)
-            return;
         const item = lockLoader.item;
-        if (item !== null && (item.locked || item.previewVisible))
+        if (item === null)
             return;
-        Qt.callLater(() => lockLoader.active = false);
+        if (item.locked || item.previewVisible)
+            return;
+        Qt.callLater(() => lockLoader.release());
     }
 
     // For anything that must not re-lock an already locked session (the idle
     // service's lock stage).
-    readonly property bool locked: lockLoader.active && lockLoader.item !== null && lockLoader.item.locked
+    readonly property bool locked: lockLoader.item !== null && lockLoader.item.locked
 
     FileView {
         id: configFile
@@ -288,29 +408,36 @@ ShellRoot {
         onSaveFailed: error => console.warn("shell.json write failed:", error)
     }
 
-    Background {
-        theme: shell.theme
+    SurfaceLoader {
+        id: backgroundLoader
+        surfaceSource: shell.moduleRoot + "/Modules/Background/Background.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     Bar {
+        id: bar
         shell: shell
         theme: shell.theme
         niri: shell.niri
         config: shell.config.bar && typeof shell.config.bar === "object" ? shell.config.bar : shell.fallbackConfig.bar
     }
 
-    // Lock is the only module allowed to stay loaded while active — it unloads
-    // itself after unlock. Nothing below instantiates at startup.
-    LazyLoader {
+    // Lock is the only module allowed to stay loaded while active — it
+    // releases itself after unlock. Synchronous (see lockSession); still off
+    // the startup path because nothing wakes it until a lock.
+    SurfaceLoader {
         id: lockLoader
-        active: false
-        component: Lock {
-            theme: shell.theme
-        }
+        asynchronous: false
+        surfaceSource: shell.moduleRoot + "/Modules/Lock/Lock.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     Connections {
-        target: lockLoader.active ? lockLoader.item : null
+        target: lockLoader.item
         function onLockedChanged() {
             if (!lockLoader.item.locked)
                 shell.releaseLockIfIdle();
@@ -324,48 +451,72 @@ ShellRoot {
     // Popup UI loads on the first notification and stays; window is visible
     // only while toasts exist. The `notifs` IPC target lives with the service
     // itself (Services/Notifs.qml), next to the models it drives.
-    Loader {
-        active: shell.notifs.everNotified
-        sourceComponent: Popups {
-            theme: shell.theme
-            notifs: shell.notifs
-            barPosition: shell.config.bar && shell.config.bar.position ? String(shell.config.bar.position) : "top"
+    SurfaceLoader {
+        id: popupsLoader
+        surfaceSource: shell.moduleRoot + "/Modules/Notifications/Popups.qml"
+        surfaceProps: ({
+                theme: shell.theme,
+                notifs: shell.notifs,
+                barPosition: shell.barPositionName
+            })
+    }
+
+    Connections {
+        target: shell.notifs
+        function onEverNotifiedChanged() {
+            popupsLoader.wake();
         }
     }
 
-    Osd {
-        id: osd
-        theme: shell.theme
-        audio: shell.audio
+    // setSource props are set-once; the bar can move edges at runtime, so the
+    // popup surface's copy is kept live by this binding.
+    Binding {
+        target: popupsLoader.item
+        property: "barPosition"
+        value: shell.barPositionName
+        when: popupsLoader.item !== null
     }
 
-    Polkit {
-        id: polkit
-        theme: shell.theme
+    SurfaceLoader {
+        id: osdLoader
+        surfaceSource: shell.moduleRoot + "/Modules/Osd/Osd.qml"
+        surfaceProps: ({
+                theme: shell.theme,
+                audio: shell.audio
+            })
+    }
+
+    SurfaceLoader {
+        id: polkitLoader
+        surfaceSource: shell.moduleRoot + "/Modules/Polkit/Polkit.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     IpcHandler {
         target: "polkit"
 
         function status(): string {
+            const p = polkitLoader.item;
             return JSON.stringify({
-                registered: polkit.agent.isRegistered,
-                active: polkit.active
+                registered: p !== null && p.agent.isRegistered,
+                active: p !== null && p.active
             });
         }
 
         function cancel(): string {
-            polkit.cancel();
+            polkitLoader.deliver("cancel");
             return "ok";
         }
     }
 
-    LazyLoader {
+    SurfaceLoader {
         id: launcherLoader
-        active: false
-        component: Launcher {
-            theme: shell.theme
-        }
+        surfaceSource: shell.moduleRoot + "/Modules/Launcher/Launcher.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     IpcHandler {
@@ -377,25 +528,24 @@ ShellRoot {
         }
 
         function show(): string {
-            launcherLoader.active = true;
-            launcherLoader.item.show();
+            shell.dismissBarPanels();
+            launcherLoader.summon("show");
             return "ok";
         }
 
         function hide(): string {
-            if (launcherLoader.active)
-                launcherLoader.item.hide();
+            launcherLoader.deliver("hide");
             return "ok";
         }
     }
 
-    LazyLoader {
+    SurfaceLoader {
         id: menuLoader
-        active: false
-        component: Menu {
-            theme: shell.theme
-            shellRoot: shell
-        }
+        surfaceSource: shell.moduleRoot + "/Modules/Menu/Menu.qml"
+        surfaceProps: ({
+                theme: shell.theme,
+                shellRoot: shell
+            })
     }
 
     IpcHandler {
@@ -407,14 +557,13 @@ ShellRoot {
         }
 
         function show(): string {
-            menuLoader.active = true;
-            menuLoader.item.show();
+            shell.dismissBarPanels();
+            menuLoader.summon("show");
             return "ok";
         }
 
         function hide(): string {
-            if (menuLoader.active)
-                menuLoader.item.hide();
+            menuLoader.deliver("hide");
             return "ok";
         }
 
@@ -425,24 +574,26 @@ ShellRoot {
         }
     }
 
-    LazyLoader {
+    SurfaceLoader {
         id: emojisLoader
-        active: false
-        component: Emojis {
-            theme: shell.theme
-        }
+        surfaceSource: shell.moduleRoot + "/Modules/Emojis/Emojis.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     // The shell's file chooser. Lazy: nothing exists until something asks for
     // a file — which, thanks to bin/qshell-portal registering it as the
     // xdg-desktop-portal FileChooser backend, is any app on the desktop and
-    // not just our own scripts.
-    LazyLoader {
+    // not just our own scripts. Synchronous: pick() answers the portal with
+    // the real result of queueing the request.
+    SurfaceLoader {
         id: filePickerLoader
-        active: false
-        component: FilePicker {
-            theme: shell.theme
-        }
+        asynchronous: false
+        surfaceSource: shell.moduleRoot + "/Modules/FilePicker/FilePicker.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     IpcHandler {
@@ -451,19 +602,20 @@ ShellRoot {
         // Called by bin/qshell-portal with the flattened portal request; the
         // answer goes back over the FIFO named in it, not through this reply.
         function pick(request: string): string {
-            filePickerLoader.active = true;
+            shell.dismissBarPanels();
+            filePickerLoader.wake();
             return filePickerLoader.item.pick(request);
         }
 
         // The portal withdrew a request (its app went away).
         function cancelToken(token: string): string {
-            if (!filePickerLoader.active)
+            if (filePickerLoader.item === null)
                 return "unknown";
             return filePickerLoader.item.cancelToken(token);
         }
 
         function status(): string {
-            if (!filePickerLoader.active)
+            if (filePickerLoader.item === null)
                 return "idle";
             return filePickerLoader.item.opened ? "open:" + filePickerLoader.item.queue.length : "idle";
         }
@@ -478,24 +630,27 @@ ShellRoot {
         }
 
         function show(): string {
-            emojisLoader.active = true;
-            emojisLoader.item.show();
+            shell.dismissBarPanels();
+            emojisLoader.summon("show");
             return "ok";
         }
 
         function hide(): string {
-            if (emojisLoader.active)
-                emojisLoader.item.hide();
+            emojisLoader.deliver("hide");
             return "ok";
         }
     }
 
-    // Eager by necessity, like Notifs: the capture watcher has to be running
-    // before anything is copied, or there is no history to pick from. Its
-    // picker window stays lazy inside the module.
-    Clipboard {
-        id: clipboard
-        theme: shell.theme
+    // The capture watcher must be running before anything is copied, or there
+    // is no history to pick from — so this surface wakes first in the startup
+    // staging above; the async load defers its wl-paste spawn by a beat, no
+    // more. Its picker window stays lazy inside the module.
+    SurfaceLoader {
+        id: clipboardLoader
+        surfaceSource: shell.moduleRoot + "/Modules/Clipboard/Clipboard.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     IpcHandler {
@@ -507,22 +662,23 @@ ShellRoot {
         }
 
         function show(): string {
-            clipboard.show();
+            shell.dismissBarPanels();
+            clipboardLoader.summon("show");
             return "ok";
         }
 
         function hide(): string {
-            clipboard.hide();
+            clipboardLoader.deliver("hide");
             return "ok";
         }
     }
 
-    LazyLoader {
+    SurfaceLoader {
         id: remindersLoader
-        active: false
-        component: ReminderFlow {
-            theme: shell.theme
-        }
+        surfaceSource: shell.moduleRoot + "/Modules/Reminders/ReminderFlow.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     IpcHandler {
@@ -534,24 +690,23 @@ ShellRoot {
         }
 
         function show(): string {
-            remindersLoader.active = true;
-            remindersLoader.item.show();
+            shell.dismissBarPanels();
+            remindersLoader.summon("show");
             return "ok";
         }
 
         function hide(): string {
-            if (remindersLoader.active)
-                remindersLoader.item.hide();
+            remindersLoader.deliver("hide");
             return "ok";
         }
     }
 
-    LazyLoader {
+    SurfaceLoader {
         id: themesLoader
-        active: false
-        component: ThemeSwitcher {
-            theme: shell.theme
-        }
+        surfaceSource: shell.moduleRoot + "/Modules/ThemeSwitcher/ThemeSwitcher.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     IpcHandler {
@@ -563,24 +718,23 @@ ShellRoot {
         }
 
         function show(): string {
-            themesLoader.active = true;
-            themesLoader.item.show();
+            shell.dismissBarPanels();
+            themesLoader.summon("show");
             return "ok";
         }
 
         function hide(): string {
-            if (themesLoader.active)
-                themesLoader.item.hide();
+            themesLoader.deliver("hide");
             return "ok";
         }
     }
 
-    LazyLoader {
+    SurfaceLoader {
         id: wallpaperLoader
-        active: false
-        component: ImagePicker {
-            theme: shell.theme
-        }
+        surfaceSource: shell.moduleRoot + "/Modules/Background/ImagePicker.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
     }
 
     IpcHandler {
@@ -592,14 +746,13 @@ ShellRoot {
         }
 
         function show(): string {
-            wallpaperLoader.active = true;
-            wallpaperLoader.item.show();
+            shell.dismissBarPanels();
+            wallpaperLoader.summon("show");
             return "ok";
         }
 
         function hide(): string {
-            if (wallpaperLoader.active)
-                wallpaperLoader.item.hide();
+            wallpaperLoader.deliver("hide");
             return "ok";
         }
     }
@@ -612,7 +765,7 @@ ShellRoot {
         }
 
         function status(): string {
-            return lockLoader.active && lockLoader.item.locked ? "locked" : "unlocked";
+            return shell.locked ? "locked" : "unlocked";
         }
 
         function isLocked(): string {
@@ -622,7 +775,7 @@ ShellRoot {
         // Everything the lock knows about itself, for diagnosing a lock that
         // did not arm (omarchy's `status`; ours keeps the older string verb).
         function state(): string {
-            if (!lockLoader.active)
+            if (lockLoader.item === null)
                 return JSON.stringify({
                     loaded: false,
                     locked: false
@@ -657,7 +810,7 @@ ShellRoot {
         }
 
         function hidePreview(): string {
-            if (lockLoader.active)
+            if (lockLoader.item !== null)
                 lockLoader.item.hidePreview();
             return "ok";
         }
@@ -666,7 +819,7 @@ ShellRoot {
         // session a mouse move does this, but nothing can move the mouse
         // headlessly in the nested dev session.
         function wake(): string {
-            if (!lockLoader.active)
+            if (lockLoader.item === null)
                 return "idle";
             lockLoader.item.runWake();
             return "ok";
@@ -680,7 +833,7 @@ ShellRoot {
         function devPassword(text: string): string {
             if (Quickshell.env("QSHELL_DEV") !== "1")
                 return "denied";
-            if (!lockLoader.active)
+            if (lockLoader.item === null)
                 return "idle";
             lockLoader.item.enteredPassword = text;
             return "ok";
@@ -689,7 +842,7 @@ ShellRoot {
         function devSubmit(): string {
             if (Quickshell.env("QSHELL_DEV") !== "1")
                 return "denied";
-            if (!lockLoader.active)
+            if (lockLoader.item === null)
                 return "idle";
             lockLoader.item.submitPassword(lockLoader.item.enteredPassword);
             return "ok";
@@ -700,7 +853,7 @@ ShellRoot {
         function devUnlock(): string {
             if (Quickshell.env("QSHELL_DEV") !== "1")
                 return "denied";
-            if (lockLoader.active)
+            if (lockLoader.item !== null)
                 lockLoader.item.forceUnlock();
             return "ok";
         }

@@ -119,7 +119,11 @@ BarIcon {
     Component.onCompleted: refresh()
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("AiPanel.qml", {
+                theme: rootItem.theme,
+                usage: rootItem
+            });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();
         if (panelLoader.item.opened)
@@ -135,12 +139,9 @@ BarIcon {
             openPanel();
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-        active: false
-        component: AiPanel {
-            theme: rootItem.theme
-            usage: rootItem
-        }
+        visible: false
     }
 }

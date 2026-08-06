@@ -27,7 +27,11 @@ BarButton {
     tooltipText: hasMedia ? title + (artist ? " — " + artist : "") : ""
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("MediaPanel.qml", {
+                theme: rootItem.theme,
+                media: rootItem.media
+            });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();
     }
@@ -91,7 +95,7 @@ BarButton {
 
             NumberAnimation on x {
                 id: scrollAnim
-                running: labelText.needsScroll && !(panelLoader.active && panelLoader.item && panelLoader.item.opened) && !rootItem.vertical
+                running: labelText.needsScroll && !(panelLoader.item && panelLoader.item.opened) && !rootItem.vertical
                 loops: Animation.Infinite
                 duration: Math.max(6000, labelText.implicitWidth * 25)
                 from: scrollClip.width
@@ -101,12 +105,9 @@ BarButton {
         }
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-        active: false
-        component: MediaPanel {
-            theme: rootItem.theme
-            media: rootItem.media
-        }
+        visible: false
     }
 }

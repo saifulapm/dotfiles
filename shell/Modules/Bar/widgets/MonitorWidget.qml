@@ -14,7 +14,11 @@ BarIcon {
     tooltipText: Quickshell.screens.length + " display" + (Quickshell.screens.length === 1 ? "" : "s")
 
     function openPanel() {
-        panelLoader.active = true;
+        if (panelLoader.status === Loader.Null)
+            panelLoader.setSource("MonitorPanel.qml", {
+                theme: rootItem.theme,
+                nightlight: rootItem.shell ? rootItem.shell.nightlight : null
+            });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();
     }
@@ -25,12 +29,9 @@ BarIcon {
         Quickshell.execDetached(["qs", "ipc", "call", "osd", delta > 0 ? "brightnessUp" : "brightnessDown"]);
     }
 
-    LazyLoader {
+    // Source-based: the panel compiles on first open, not with the bar (S1).
+    Loader {
         id: panelLoader
-        active: false
-        component: MonitorPanel {
-            theme: rootItem.theme
-            nightlight: rootItem.shell ? rootItem.shell.nightlight : null
-        }
+        visible: false
     }
 }
