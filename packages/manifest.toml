@@ -25,6 +25,18 @@ why  = "Quickshell is not in Fedora; this COPR publishes working aarch64 + x86_6
 name = "jdxcode/mise"
 why  = "mise is not in Fedora; author's COPR builds aarch64 + x86_64 for F43/F44 (verified 2026-08-05) — one repo mechanism for the install script"
 
+[[copr]]
+name = "atim/starship"
+why  = "starship is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (latest 1.24.2, verified 2026-08-07). The prompt for the fish shell setup"
+
+[[copr]]
+name = "atim/lazygit"
+why  = "lazygit is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (latest 0.47.1, verified 2026-08-07). Primary git TUI on the mac; the kak config opens it in a popup"
+
+[[copr]]
+name = "lihaohong/yazi"
+why  = "yazi is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (latest 26.5.6, verified 2026-08-07). File manager TUI; the kak config opens it in a popup"
+
 # ------------------------------------------------------------------ core
 # The machine is usable as a desktop without anything below `dev`.
 
@@ -402,6 +414,360 @@ why = "Ships qmlls (eglot) and qmlformat (pre-commit hook) — the only package 
 # framework on this desktop now; adding one back means an entry here plus the
 # environment variables, which is why this note stays instead of a silent gap.
 
+# ------------------------------------------------------------------ mac-parity CLI
+# Added 2026-08-07, user-approved group by group: the CLI environment from the
+# mac dotfiles run.sh + the Arch dotfiles-linux packages.txt, ported to Fedora.
+# Fedora-name gotchas are noted per entry. Tools Fedora does not package are in
+# the non-dnf section below (cargo / pnpm / prebuilt-binary scripts).
+
+[[pkg]]
+name = "fish"
+category = "shell"
+arch = "all"
+why = "The login shell (user decision 2026-08-07: upgrade from bash; fish over nushell for stable config + first-class starship/zoxide/fzf/mise integrations). run_after_12-fish-shell.sh sets it as the login shell; config port from the mac zsh setup is the follow-up work"
+
+[[pkg]]
+name = "starship"
+category = "shell"
+arch = "all"
+why = "Prompt (from COPR atim/starship) — same starship.toml as the mac config"
+
+[[pkg]]
+name = "zoxide"
+category = "shell"
+arch = "all"
+why = "Directory jumper (z) — daily driver on the mac"
+
+[[pkg]]
+name = "fzf"
+category = "shell"
+arch = "all"
+why = "Fuzzy finder — shell history/file widgets and the kak config's file-open popup pipe through it"
+
+[[pkg]]
+name = "bat"
+category = "shell"
+arch = "all"
+why = "cat with syntax highlighting; also the fzf preview command in the kak file-open popup"
+
+[[pkg]]
+name = "fd-find"
+category = "shell"
+arch = "all"
+why = "fd — find replacement (Fedora names the package fd-find, binary is fd)"
+
+[[pkg]]
+name = "eza"
+category = "shell"
+arch = "all"
+why = "ls replacement; mac aliases use it alongside lsd"
+
+[[pkg]]
+name = "lsd"
+category = "shell"
+arch = "all"
+why = "What the mac config's ll/lt/la aliases actually call (eza kept too, matching dotfiles-linux)"
+
+[[pkg]]
+name = "tree"
+category = "shell"
+arch = "all"
+why = "Directory trees; some scripts and habits expect it"
+
+[[pkg]]
+name = "tmux"
+category = "shell"
+arch = "all"
+why = "Terminal multiplexer — .tmux.conf comes over from the mac config"
+
+[[pkg]]
+name = "yq"
+category = "shell"
+arch = "all"
+why = "YAML sibling of jq; in both the mac and Arch lists"
+
+[[pkg]]
+name = "wget2-wget"
+category = "shell"
+arch = "all"
+why = "The wget CLI. Fedora 44 retired classic wget; this subpackage ships the wget-compatible entry point backed by wget2"
+
+[[pkg]]
+name = "mosh"
+category = "shell"
+arch = "all"
+why = "Roaming SSH for flaky links — in both the mac and Arch lists; pairs with the tailnet"
+
+[[pkg]]
+name = "du-dust"
+category = "shell"
+arch = "all"
+why = "dust — du replacement (Fedora names the package du-dust, binary is dust)"
+
+[[pkg]]
+name = "ncdu"
+category = "shell"
+arch = "all"
+why = "Interactive disk-usage browser, from the Arch list"
+
+[[pkg]]
+name = "fastfetch"
+category = "shell"
+arch = "all"
+why = "System info card, from the Arch list"
+
+[[pkg]]
+name = "trash-cli"
+category = "shell"
+arch = "all"
+why = "trash/trash-restore — mac habits use trash instead of rm; safety net"
+
+[[pkg]]
+name = "tokei"
+category = "shell"
+arch = "all"
+why = "Line-count statistics per language, from the mac list"
+
+[[pkg]]
+name = "yazi"
+category = "shell"
+arch = "all"
+why = "TUI file manager (from COPR lihaohong/yazi) — the kak config's file-browser popup runs it"
+
+[[pkg]]
+name = "glow"
+category = "shell"
+arch = "all"
+why = "Markdown renderer in the terminal, from both lists"
+
+[[pkg]]
+name = "tealdeer"
+category = "shell"
+arch = "all"
+why = "Rust tldr client. The mac installs tlrc, which Fedora does not package; tealdeer ships the same `tldr` command"
+
+[[pkg]]
+name = "pandoc-cli"
+category = "shell"
+arch = "all"
+why = "pandoc binary. Fedora retired the full Haskell pandoc stack; pandoc-cli is the statically-built CLI that remains"
+
+[[pkg]]
+name = "ShellCheck"
+category = "dev"
+arch = "all"
+why = "Shell script linter (capital S in the Fedora name); used across this repo's own bin/ scripts"
+
+[[pkg]]
+name = "aspell"
+category = "shell"
+arch = "all"
+why = "Spell checker from the mac list; enchant/hunspell already serve the GUI side on the Arch list — aspell is what terminal tools and Emacs ispell reach for"
+
+[[pkg]]
+name = "aspell-en"
+category = "shell"
+arch = "all"
+why = "English dictionary for aspell — the engine is empty without a language"
+
+[[pkg]]
+name = "gum"
+category = "shell"
+arch = "all"
+why = "Scriptable prompts/spinners — the zsh (soon fish) worktree helpers (gwp/gwd/try) build their confirm dialogs on it"
+
+[[pkg]]
+name = "navi"
+category = "shell"
+arch = "all"
+why = "Interactive cheat-sheet picker, from the mac list"
+
+[[pkg]]
+name = "pastel"
+category = "shell"
+arch = "all"
+why = "Color manipulation CLI, from the mac list — handy for the theme system work"
+
+[[pkg]]
+name = "asciinema"
+category = "shell"
+arch = "all"
+why = "Terminal session recorder, from the mac list"
+
+[[pkg]]
+name = "lynx"
+category = "shell"
+arch = "all"
+why = "Text-mode browser, from the mac list (quick doc reads inside the terminal)"
+
+[[pkg]]
+name = "gh"
+category = "dev"
+arch = "all"
+why = "GitHub CLI — PRs/issues/API, and the host for the gh extensions installed by run_after_08-cli-tools.sh"
+
+[[pkg]]
+name = "lazygit"
+category = "dev"
+arch = "all"
+why = "Git TUI (from COPR atim/lazygit) — primary on the mac; the kak config opens it in a popup"
+
+[[pkg]]
+name = "gitui"
+category = "dev"
+arch = "all"
+why = "Second git TUI, also popup-wired in the kak config; in both lists"
+
+[[pkg]]
+name = "git-delta"
+category = "dev"
+arch = "all"
+why = "Git pager — the mac .gitconfig sets delta as core.pager, which comes over with the config port"
+
+[[pkg]]
+name = "difftastic"
+category = "dev"
+arch = "all"
+why = "Structural (AST) diff viewer, used ad-hoc alongside delta"
+
+[[pkg]]
+name = "diff-so-fancy"
+category = "dev"
+arch = "all"
+why = "Third diff pager, kept for parity with both lists"
+
+[[pkg]]
+name = "git-lfs"
+category = "dev"
+arch = "all"
+why = "Large-file storage — some work repos need it; in both lists"
+
+[[pkg]]
+name = "cmake"
+category = "dev"
+arch = "all"
+why = "Build system for native projects and some cargo -sys crates"
+
+[[pkg]]
+name = "make"
+category = "dev"
+arch = "all"
+why = "GNU make — the kakoune fork build (run_after_11) and countless repos need it; Fedora minimal does not ship it"
+
+[[pkg]]
+name = "gcc-c++"
+category = "dev"
+arch = "all"
+why = "C++ compiler — the kakoune fork build is C++; was installed by hand during earlier setup, recorded 2026-08-07 so a fresh machine can run run_after_11"
+
+[[pkg]]
+name = "sccache"
+category = "dev"
+arch = "all"
+why = "Compilation cache for rust/C++ rebuilds, from the mac list"
+
+[[pkg]]
+name = "ctags"
+category = "dev"
+arch = "all"
+why = "Universal Ctags (Fedora's ctags IS universal-ctags) — symbol indexing for editors"
+
+[[pkg]]
+name = "pipx"
+category = "dev"
+arch = "all"
+why = "Python CLI tools in isolated venvs, from both lists"
+
+[[pkg]]
+name = "uv"
+category = "dev"
+arch = "all"
+why = "Fast Python package/project manager, from both lists"
+
+[[pkg]]
+name = "helix"
+category = "dev"
+arch = "all"
+why = "Terminal fallback editor (Emacs stays primary). CORRECTION 2026-08-07: Fedora 44 ships /usr/bin/hx after all (the /usr/bin/helix claim was the Arch package); the interim `hx` alias is gone from the fish config"
+
+[[pkg]]
+name = "helix-parsers"
+category = "dev"
+arch = "all"
+why = "Tree-sitter grammars + queries for helix — Fedora splits them out of the main package as a weak dep, which install_weak_deps=False skips, leaving every language with 'Highlight queries ✘' (found 2026-08-07 during the config port). The two custom grammars (kak, liquid) still build locally via hx --grammar"
+
+[[pkg]]
+name = "helix-themes"
+category = "dev"
+arch = "all"
+why = "Stock helix themes, same weak-dep split — config.toml sets theme = \"kanagawa\", which lives here"
+
+[[pkg]]
+name = "mpv"
+category = "optional"
+arch = "all"
+why = "Video player, from both lists (Fedora build rides ffmpeg-free codecs)"
+
+[[pkg]]
+name = "yt-dlp"
+category = "optional"
+arch = "all"
+why = "Video downloader, from both lists"
+
+[[pkg]]
+name = "imv"
+category = "optional"
+arch = "all"
+why = "Wayland image viewer, from the Arch list"
+
+[[pkg]]
+name = "ghostscript"
+category = "optional"
+arch = "all"
+why = "PostScript/PDF rendering — Emacs doc-view and imagemagick PDF ops shell out to gs"
+
+[[pkg]]
+name = "poppler-utils"
+category = "optional"
+arch = "all"
+why = "pdftotext/pdfinfo etc. (the CLI subpackage; the poppler library alone ships no tools)"
+
+[[pkg]]
+name = "evince"
+category = "optional"
+arch = "all"
+why = "PDF viewer — omarchy's choice and the Arch list's too; picked over zathura 2026-08-07 (user decision)"
+
+[[pkg]]
+name = "mediainfo"
+category = "optional"
+arch = "all"
+why = "Media metadata CLI — the yazi config's 'Media info' reveal opener pipes video/audio through it (user-approved 2026-08-07 with the yazi config port)"
+
+[[pkg]]
+name = "socat"
+category = "optional"
+arch = "all"
+why = "Socket relay — the yazi config's add-sub opener feeds subtitles to a running mpv via /tmp/mpv.sock (user-approved 2026-08-07 for this concrete use after declining the generic misc-utils group)"
+
+[[pkg]]
+name = "ffmpeg-free"
+category = "optional"
+arch = "all"
+why = "ffmpeg/ffprobe CLI (Fedora's patent-clean build) — omacut shells out to them for trimming, and having the CLI also unlocks wf-recorder post-processing later. The wf-recorder entry above predates this and describes the no-CLI state"
+
+[[pkg]]
+name = "qt6-qtbase-devel"
+category = "dev"
+arch = "all"
+why = "qmake6 + Qt headers — the oma apps (omacalc/omawrite/omacut) are qmake Qt Quick builds; qt6-qtdeclarative-devel above ships the QML side but not qmake"
+
+[[pkg]]
+name = "qt6-qtmultimedia-devel"
+category = "dev"
+arch = "all"
+why = "Qt Multimedia — omacut's .pro declares QT += multimedia (video preview); its build died with 'Unknown module(s) in QT: multimedia' on the first apply (2026-08-07). Pulls the runtime QML module too"
+
 # ------------------------------------------------------------------ non-dnf tools
 # Installed by chezmoi scripts / declared externals, recorded here so the
 # manifest stays the complete inventory.
@@ -504,3 +870,55 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     the `input` group and is inert here; the niri binds (Mod+Ctrl+X, F9 →
 #     `voxtype record toggle`) are what drive it instead, which is upstream's
 #     documented compositor-keybinding mode.
+
+# --- mac-parity non-dnf tools (added 2026-08-07, user-approved) ---
+
+[[tool]]
+name = "fish-login-shell"
+via  = "run_after_12-fish-shell.sh (sudo usermod --shell /usr/bin/fish; loud skip when sudo cannot prompt)"
+why  = "fish is the login shell (user decision 2026-08-07). The fish config port from the mac zsh setup is tracked as follow-up work"
+
+[[tool]]
+name = "deno"
+via  = "mise use -g deno@latest (run_after_08-cli-tools.sh)"
+why  = "Deno runtime from the mac list; mise already manages node, one mechanism for both"
+
+[[tool]]
+name = "cargo-cli-tools"
+via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, argc, dufs, hop-kak, kak-popup, dedoc; kakoune-lsp from git (no crates.io release, no aarch64 linux binary — checked 2026-08-07)"
+why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/argc/dufs are mac-list CLI; kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
+
+[[tool]]
+name = "prebuilt-binaries"
+via  = "run_after_10-prebuilt-binaries.sh — GitHub release binaries into ~/.local/bin: watchexec, hurl, aichat, cloudflared, stripe, ouch, yek (last two added 2026-08-07 for the yazi/aichat config port — their cargo builds need libclang and openssl-devel, so release binaries are the mechanism; yek's repo is mohsen1/yek, bodo-run/yek is a redirect)"
+why  = "Fedora packages none of these; all five ship both aarch64 and x86_64 linux release assets (asset names verified against the GitHub API 2026-08-07). Chosen over cargo builds for the heavy ones (hurl needs libxml, aichat a full TLS stack)"
+
+[[tool]]
+name = "pnpm-globals"
+via  = "run_after_08-cli-tools.sh — pnpm add -g: typescript, typescript-language-server, @vtsls/language-server, intelephense, @astrojs/language-server, @biomejs/biome, dprint, rustywind, @ast-grep/cli, prettier, vscode-langservers-extracted, @olrtg/emmet-language-server (last three added 2026-08-07 for the helix/kak config port; bin/eslint-language-server shims the kak-lsp name onto vscode-eslint-language-server)"
+why  = "The mac's language servers (eglot + kak-lsp point at them) plus the npm-shipped formatters/linters Fedora lacks (biome, dprint, rustywind, ast-grep). Lands in PNPM_HOME/bin, already on PATH"
+
+[[tool]]
+name = "php-cs-fixer"
+via  = "composer global require friendsofphp/php-cs-fixer + symlink into ~/.local/bin (run_after_08-cli-tools.sh)"
+why  = "PHP formatter the mac had via brew; composer global is the Fedora-native route (composer already installed)"
+
+[[tool]]
+name = "mcp-language-server"
+via  = "go install github.com/isaacphi/mcp-language-server@latest + symlink into ~/.local/bin (run_after_08-cli-tools.sh)"
+why  = "From the mac go.sh — bridges LSP servers to MCP agents"
+
+[[tool]]
+name = "gh-extensions"
+via  = "run_after_08-cli-tools.sh — gh extension install: github/gh-stack, fchimpan/gh-workflow-stats, agynio/gh-pr-review, dlvhdr/gh-dash (skipped loudly until `gh auth login` has been run)"
+why  = "The four extensions the mac run.sh documents: stacked PRs, workflow stats, inline review threads, PR dashboard"
+
+[[tool]]
+name = "kakoune"
+via  = "run_after_11-kakoune-fork.sh — clone github.com/saifulapm/kakoune into ~/.local/src/kakoune, make -C src, install to ~/.local (bin/kak + share/kak)"
+why  = "The user's own fork with built-in treesitter — NOT Fedora's kakoune package, which would fight it on PATH and lacks the treesitter integration the kak config's ts_* faces feed"
+
+[[tool]]
+name = "oma-apps"
+via  = "run_after_13-oma-apps.sh — clone omacom-io/{omacalc,omawrite,omacut}, sed the two omarchy theme-path literals in src/backend.cpp to ~/.local/state/qshell/oma-theme.toml, qmake6 + make, install to ~/.local/bin"
+why  = "Omarchy's Qt Quick calculator, writing app and video trimmer (user decision 2026-08-07, all three). MIT-licensed. They watch a 5-key colors.toml (mode/background/foreground/accent/selection) and re-tint live; templates/oma-theme.toml.tmpl emits exactly that file from the active theme on every theme-apply, so they follow this desktop's theme system natively. omacut needs the ffmpeg CLI (ffmpeg-free above)"

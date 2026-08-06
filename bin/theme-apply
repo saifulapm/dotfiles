@@ -177,7 +177,9 @@ const OUTPUTS = {
     path.join(HOME, ".config/gtk-3.0/settings.ini"),
     path.join(HOME, ".config/gtk-4.0/settings.ini")
   ],
-  "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")]
+  "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")],
+  "oma-theme.toml.tmpl": [path.join(HOME, ".local/state/qshell/oma-theme.toml")],
+  "yazi-theme.toml.tpl": [path.join(HOME, ".config/yazi/theme.toml")]
 }
 
 let gtkSettingsChanged = false
