@@ -53,38 +53,25 @@ BarIndicator {
         return true;
     }
 
-    // Unseen count in the glyph's corner — TailscaleIcon's badge recipe: a
-    // pill in the accent color, ringed and printed in the bar background so
-    // it reads as punched out of the bell. Reparented onto the button itself
-    // (the PanelHint trick): children land in BarButton's content Row by
-    // default, and a Row rejects horizontally-anchored items.
+    // Unseen dot in the glyph's corner (user preference over a count pill —
+    // the exact number rides the tooltip): an accent dot ringed in the bar
+    // background so it reads as punched out of the bell. Reparented onto
+    // the button itself (the PanelHint trick): children land in BarButton's
+    // content Row by default, and a Row rejects horizontally-anchored items.
     Rectangle {
-        id: badge
         parent: rootItem
 
-        readonly property string label: rootItem.unseen > 9 ? "9+" : String(rootItem.unseen)
-
         visible: rootItem.unseen > 0
-        width: Math.max(height, badgeLabel.implicitWidth + 3)
-        height: 8
-        radius: height / 2
+        width: 7
+        height: 7
+        radius: width / 2
         color: rootItem.theme.accent
         border.width: 1
         border.color: rootItem.bar ? rootItem.bar.barBackground : rootItem.theme.surface1
         anchors.right: parent.right
-        anchors.rightMargin: 1
+        anchors.rightMargin: 2
         anchors.verticalCenter: parent.verticalCenter
         anchors.verticalCenterOffset: 5
-
-        Text {
-            id: badgeLabel
-            anchors.centerIn: parent
-            text: badge.label
-            color: rootItem.bar ? rootItem.bar.barBackground : rootItem.theme.surface1
-            font.family: rootItem.theme.fontUi
-            font.pixelSize: 6
-            font.bold: true
-        }
     }
 
     // Source-based: the panel compiles on first open, not with the bar (S1).
