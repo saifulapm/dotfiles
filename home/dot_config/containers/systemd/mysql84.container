@@ -1,0 +1,26 @@
+# On-demand dev MySQL (managed by chezmoi) — started by mysql84-proxy.socket
+# on the first connection to 127.0.0.1:3306, stopped again when the proxy
+# idle-exits (StopWhenUnneeded). Data persists in the mysql84-data volume.
+# Adding another engine version = copy this + the proxy pair with a new port
+# (e.g. mysql80 on 3307→33307); only the version being connected-to runs.
+[Unit]
+Description=MySQL 8.4 (on-demand dev database)
+StopWhenUnneeded=true
+
+[Container]
+Image=docker.io/library/mysql:8.4
+ContainerName=dev-mysql84
+Volume=mysql84-data:/var/lib/mysql
+PublishPort=127.0.0.1:33306:3306
+Environment=MYSQL_ALLOW_EMPTY_PASSWORD=yes
+# Gate "started" on mysqld actually accepting connections, so the proxy
+# never forwards into a booting server (cold start ≈ seconds).
+Notify=healthy
+HealthCmd=mysqladmin ping -h127.0.0.1 --silent
+HealthInterval=30s
+HealthStartPeriod=90s
+HealthRetries=3
+
+[Service]
+# First-ever start may pull the image; healthy-gate needs headroom too.
+TimeoutStartSec=300

@@ -1,0 +1,10 @@
+# Herd-like on-demand Mailpit, SMTP side (managed by chezmoi). Laravel's
+# MAIL_HOST=127.0.0.1 MAIL_PORT=1025 wakes the catcher on first send.
+[Unit]
+Description=Mailpit on-demand SMTP socket (127.0.0.1:1025)
+
+[Socket]
+ListenStream=127.0.0.1:1025
+
+[Install]
+WantedBy=sockets.target

@@ -1,0 +1,9 @@
+# Socket-activated forwarder 1025 → the mailpit container's 31025 (managed
+# by chezmoi).
+[Unit]
+Description=Mailpit on-demand SMTP proxy
+Requires=mailpit.service
+After=mailpit.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=10min 127.0.0.1:31025

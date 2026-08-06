@@ -1,0 +1,10 @@
+# Herd-like on-demand Redis (managed by chezmoi) — see mysql84-proxy.socket
+# for the pattern.
+[Unit]
+Description=Redis 7 on-demand socket (127.0.0.1:6379)
+
+[Socket]
+ListenStream=127.0.0.1:6379
+
+[Install]
+WantedBy=sockets.target

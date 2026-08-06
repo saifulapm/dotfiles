@@ -1,0 +1,9 @@
+# Socket-activated forwarder 5432 → the postgres18 container's 35432
+# (managed by chezmoi).
+[Unit]
+Description=PostgreSQL 18 on-demand proxy
+Requires=postgres18.service
+After=postgres18.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=10min 127.0.0.1:35432

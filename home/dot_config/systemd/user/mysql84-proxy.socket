@@ -1,0 +1,11 @@
+# Herd-like on-demand MySQL (managed by chezmoi): this socket owns
+# 127.0.0.1:3306 at ~0 RAM. First connection starts mysql84-proxy.service
+# → mysql84.container; 10 min idle tears both down again.
+[Unit]
+Description=MySQL 8.4 on-demand socket (127.0.0.1:3306)
+
+[Socket]
+ListenStream=127.0.0.1:3306
+
+[Install]
+WantedBy=sockets.target

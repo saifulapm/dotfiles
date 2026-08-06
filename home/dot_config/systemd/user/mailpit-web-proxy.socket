@@ -1,0 +1,10 @@
+# Herd-like on-demand Mailpit, inbox UI side (managed by chezmoi). Opening
+# http://127.0.0.1:8025 wakes the catcher too.
+[Unit]
+Description=Mailpit on-demand web socket (127.0.0.1:8025)
+
+[Socket]
+ListenStream=127.0.0.1:8025
+
+[Install]
+WantedBy=sockets.target

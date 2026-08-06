@@ -1,0 +1,23 @@
+# On-demand dev Redis (managed by chezmoi) — redis7-proxy.socket on
+# 127.0.0.1:6379 wakes it, idle stops it. Starts in milliseconds, so no
+# health gate needed. redis:7 verified on the 16K Asahi kernel 2026-08-05.
+[Unit]
+Description=Redis 7 (on-demand dev cache/queue)
+StopWhenUnneeded=true
+
+[Container]
+Image=docker.io/library/redis:7
+ContainerName=dev-redis7
+Volume=redis7-data:/data
+PublishPort=127.0.0.1:36379:6379
+Exec=redis-server --appendonly yes
+# Instant starter, but the gate still closes the first-connection race
+# (proxyd forwarding before the listener inside is up).
+Notify=healthy
+HealthCmd=redis-cli ping
+HealthInterval=30s
+HealthStartPeriod=10s
+HealthRetries=3
+
+[Service]
+TimeoutStartSec=300

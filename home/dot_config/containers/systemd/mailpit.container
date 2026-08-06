@@ -1,0 +1,25 @@
+# On-demand dev mail catcher (managed by chezmoi) — woken by EITHER
+# mailpit-smtp-proxy.socket (127.0.0.1:1025, Laravel MAIL_PORT) or
+# mailpit-web-proxy.socket (127.0.0.1:8025, the inbox UI). Idle on both
+# stops it. Messages persist in the mailpit-data volume.
+[Unit]
+Description=Mailpit (on-demand dev SMTP catcher + inbox UI)
+StopWhenUnneeded=true
+
+[Container]
+Image=docker.io/axllent/mailpit:latest
+ContainerName=dev-mailpit
+Volume=mailpit-data:/data
+PublishPort=127.0.0.1:31025:1025
+PublishPort=127.0.0.1:38025:8025
+Environment=MP_DATABASE=/data/mailpit.db
+# Gate on the /livez endpoint (alpine wget in the image, verified) — closes
+# the first-request race seen on the initial curl.
+Notify=healthy
+HealthCmd=wget -q --spider http://127.0.0.1:8025/livez
+HealthInterval=30s
+HealthStartPeriod=15s
+HealthRetries=3
+
+[Service]
+TimeoutStartSec=300

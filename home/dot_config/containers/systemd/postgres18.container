@@ -1,0 +1,21 @@
+# On-demand dev PostgreSQL (managed by chezmoi) — same pattern as
+# mysql84.container: postgres18-proxy.socket on 127.0.0.1:5432 wakes it,
+# idle stops it. Another version = copy pair with port 5433→35433.
+[Unit]
+Description=PostgreSQL 18 (on-demand dev database)
+StopWhenUnneeded=true
+
+[Container]
+Image=docker.io/library/postgres:18
+ContainerName=dev-postgres18
+Volume=postgres18-data:/var/lib/postgresql
+PublishPort=127.0.0.1:35432:5432
+Environment=POSTGRES_HOST_AUTH_METHOD=trust
+Notify=healthy
+HealthCmd=pg_isready -U postgres -h 127.0.0.1
+HealthInterval=30s
+HealthStartPeriod=60s
+HealthRetries=3
+
+[Service]
+TimeoutStartSec=300

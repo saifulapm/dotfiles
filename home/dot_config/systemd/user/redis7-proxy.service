@@ -1,0 +1,9 @@
+# Socket-activated forwarder 6379 → the redis7 container's 36379 (managed
+# by chezmoi).
+[Unit]
+Description=Redis 7 on-demand proxy
+Requires=redis7.service
+After=redis7.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=10min 127.0.0.1:36379

@@ -1,0 +1,10 @@
+# Socket-activated forwarder 3306 → the mysql84 container's 33306 (managed
+# by chezmoi). When no connection has flowed for exit-idle-time, proxyd
+# exits and mysql84.service (StopWhenUnneeded) stops with it.
+[Unit]
+Description=MySQL 8.4 on-demand proxy
+Requires=mysql84.service
+After=mysql84.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=10min 127.0.0.1:33306
