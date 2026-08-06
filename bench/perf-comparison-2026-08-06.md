@@ -469,3 +469,161 @@ No regression; the deltas are run-to-run noise (S1's IPC spread was
   because modelLeft's id sequence really changes
   (fallback has no launcher). That is a one-time cost of the
   broken-config-safe startup, not steady-state churn — left alone.
+
+## 8. S4 results (2026-08-06, structural session 4)
+
+Residency policy for the heavyweight lazy surfaces. Same box, same handicap
+(agent session resident); the user was actively using the machine during part
+of the verification, noted where it mattered. Raw driver outputs in the
+session job dir; bench log `bench/20260806-201818-aarch64.txt`.
+
+### What was done
+
+1. **SurfaceLoader grew an `evictable` flag + one-shot grace timer.** An
+   evictable surface that has stayed closed for 45 s releases its whole tree
+   via the existing `release()` (`setSource("")`), dropping its item tree and
+   its QQuickPixmapCache references. The timer is armed only by an
+   open→closed transition, cancelled synchronously the moment the surface
+   reopens (the summon's `show()` flips `open`, whose change handler stops
+   the timer — single-threaded, no race window), and re-checks
+   `surfaceOpen` at expiry before releasing. It never runs while nothing is
+   loaded and never repeats — the no-polling rule holds.
+2. **Evictable: ThemeSwitcher, wallpaper ImagePicker (the two filmstrips,
+   ~40-70 MiB of latched 768 px decodes), Emojis, Menu.** NOT evictable:
+   Launcher (hot path), bar widget panels (§4 "not recommended"), Lock and
+   Polkit (self-managing), and the always-on surfaces.
+3. **Clipboard splits internally**: a module-level twin timer resets
+   `everOpened`, deactivating only the picker LazyLoader; the eager capture
+   watcher at module root is untouched and its wl-paste children run
+   uninterrupted.
+4. **Grace = 45 s**: comparing themes or walking wallpapers closes and
+   reopens within seconds to tens of seconds — inside the window, reopen is
+   free; a surface idle 45 s is a finished session. Measured firing
+   accuracy: all evictions landed at close +45.0-45.3 s.
+5. **Close-animation ordering resolved by inspection + margin**: all five
+   evictable surfaces bind their PanelWindow's `visible` directly to
+   `open`/`opened`, so the window unmaps synchronously on close — the card
+   fade Behaviors play inside an already-unmapped window and there is no
+   visible close animation to clip. 45 s is three orders of magnitude past
+   the ~100-300 ms animation class anyway.
+6. **A summon mid-teardown cannot race the dying tree**: release happens in
+   a timer callback; a later summon finds the loader Null and goes through
+   the normal wake + pending-payload path (S1's queue), starting a fresh
+   incubation. Verified live, below.
+
+### PSS cycle (fresh shell, open + browse all five, close, wait)
+
+Filmstrip "browsing" note: opening alone latches every tile within ±16 of
+the selection (19 theme tiles + ~33 wallpaper tiles), which is more than the
+prescribed 15-tile walk; keys cannot be injected headlessly on this box.
+
+| checkpoint | round 1 | round 2 (same shell, no restart) |
+|---|---|---|
+| baseline (settled, nothing open) | 149.7 MiB | 187.5 MiB |
+| all five open, browsed | 225.6 (+75.9) | 219.4 (+31.9) |
+| closed, during grace (+10 s) | 217.5 | 212.2 |
+| after evictions, settled | **187.8** | **190.6** |
+| retained vs own baseline | +38.1 | **+3.1** |
+
+All five evictions fired each round (log-instrumented), at close +45.0-45.3 s.
+Round 2 is the §2-style discriminator: per-cycle retention is **+3 MiB**, so
+the eviction reclaims everything reclaimable and round 1's +38 MiB residual
+is one-time process warmup, not leak: the engine compile cache for the five
+surface trees (retained BY DESIGN — it is why reopen is single-digit ms),
+the color-emoji glyph/font caches populated by the 1870-cell grid, QV4/JS
+steady state, and the allocator floor. Round 2's smaller open-delta (+32 vs
++76) shows QQuickPixmapCache serving re-referenced entries from its
+unreferenced pool — a free bonus inside the cache's own window.
+
+### Reopen latency after teardown (acceptance bar: ~50 ms class)
+
+External `qs ipc call <t> toggle` reply, cold-after-evict vs warm, carrying
+~53 ms qs-ipc client overhead that dominates both:
+
+| surface | cold reply | warm reply | in-process load, first ever | in-process load, reopen after evict |
+|---|---|---|---|---|
+| theme | 66 ms | 59 ms | 5 ms | **1-2 ms** |
+| wallpaper | 55 ms | 52 ms | 13 ms | **2-4 ms** |
+| emojis | 53 ms | 82 ms | 16 ms | **3-10 ms** |
+| menu | 56 ms | 55 ms | 5 ms | **2-3 ms** |
+
+The in-process number (Loader wake→Ready, temporary instrumentation) is the
+honest teardown cost: reopen instantiation is *faster* than the first-ever
+load — i.e. the S1 claim is confirmed by measurement: the URL-keyed compile
+cache survives instance teardown, and reopen cost is instantiation, not
+compilation. Filmstrip tiles then re-decode asynchronously off-thread
+(window is up and interactive immediately; screenshots confirmed full
+renders). Cold and warm are indistinguishable at the CLI.
+
+### Race tests
+
+- **Close → reopen 0.5 s later**: pending eviction cancelled — the theme
+  switcher's evict count stayed flat across 55 s held open
+  (screenshot-verified on screen), and the *next* close evicted normally at
+  +45 s. (A first attempt at this test was invalidated by the user live at
+  the machine: their click opening a bar panel landed on the picker's scrim,
+  which is a legitimate cancel — the "spurious" eviction that followed was
+  correct behavior for a closed surface.)
+- **Spam open/close ×10**: exactly one load (no double-load), exactly one
+  evict 45 s after the last close (timer restart, no accumulation), zero QML
+  errors.
+- **Summon at the teardown moment**: wallpaper toggle fired the instant its
+  evict line appeared (close +45.27 s, 20 ms poll): clean cold reload
+  through the pending queue, filmstrip rendered (screenshot), nothing
+  dropped, zero errors.
+- **toggle/hide/toggle fired concurrently at a cold loader**: queued and
+  replayed in arrival order, one load, zero errors.
+- CLI note: on the current quickshell, `qs ipc call <target> show` collides
+  with the `qs ipc show` subcommand and prints the handler listing instead
+  of calling — `toggle` used throughout; in-shell callers are unaffected.
+
+### Saturated-idle abuse round (§2-style: 8 panels ×20, 7 overlays ×20, 61 notifications incl. 10 replacing one id, 30 OSDs, 4 theme switches)
+
+| checkpoint | PSS |
+|---|---|
+| start (elevated by prior sweep + live user activity) | 254.4 MiB |
+| after 8 bar panels ×20 | 279.1 |
+| after 7 overlays ×20 | 284.2 |
+| after notifications + OSDs | 289.7 |
+| after 4 theme switches | 257.4 |
+| idle +1 min (evictions done) | 234.3 |
+| **idle +10 min (saturated idle)** | **234.1 MiB** |
+
+**Old §2 saturated idle: ~301.4 MiB → new: 234.1 MiB (−67 MiB, −22 %).**
+29 evictions fired during the exercise; the count stayed flat across the
+10-minute idle — grace timers do not refire with nothing loaded. fds/
+children unchanged (clipboard watcher + voxtype follower).
+
+### Regression sweep + bench
+
+- All IPC targets answer (shell, bar, osd, polkit, lock, notifs, media,
+  nightlight, idle, filepicker, clipboard, launcher, menu, theme, wallpaper,
+  emojis, reminders, background); launcher still warm (screenshot); first
+  notification pops its toast (screenshot); theme round trip everforest →
+  gruvbox → everforest with the wallpaper verified by screenshot both ways.
+- `just bench` after the change: **first-bar 133 ms, IPC-ready 297 ms, idle
+  RSS 201 MiB, launcher cold/warm 50/38 ms, idle CPU 0.13 %** — best
+  first-bar and IPC-ready readings of any session, comfortably inside the
+  S1-S3 spread (single run; treat as unregressed, not as a claimed win).
+- Log across every run: zero errors, zero warnings from the S4 code. Two
+  pre-existing warnings observed and attributed: the known Qt.atob
+  deprecation (theme transition), and a NetworkPanel.qml:2337 Text height
+  binding loop that fires only when a wifi row shows action-status text
+  (the user was connecting to a hotspot mid-test) — reproduced on neither
+  build with a plain panel open (stash test: stock 0, S4 0), untouched by
+  this change, left for a widget-layer fix.
+
+### Not reclaimable, and why
+
+After first saturation ~35-38 MiB stays: compiled-type/QML metadata for the
+five surfaces (deliberate — the compile cache is the reopen-latency win),
+color-emoji glyph atlas + font caches, JS-engine steady state, heap floor.
+None of it grows with use (round-2 delta +3.1 MiB; §2's own round-2 was
++3.7). The filmstrip pixel memory itself — the actual S4 target — is fully
+reclaimed on eviction.
+
+### Post-session state
+
+Shell restored (`qs` detached, session env), bar screenshot-verified,
+everforest + original wallpaper, single instance, no stray processes,
+temporary instrumentation removed before commit.

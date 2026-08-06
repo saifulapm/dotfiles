@@ -323,6 +323,30 @@ Scope {
     }
 
     // --------------------------------------------------------------- picker
+    // Residency: the picker tree (rows, thumbnails, the preview pane's
+    // decoded screenshots) releases once it has stayed closed for the grace
+    // period — dropping everOpened deactivates the LazyLoader below, and the
+    // next show() re-creates it through the exact first-open path. The
+    // capture watcher above is deliberately outside this: it must run for
+    // the shell's whole life. One-shot, armed only by a close, cancelled by
+    // a reopen.
+    Timer {
+        id: pickerReleaseTimer
+        interval: 45000
+        repeat: false
+        onTriggered: {
+            if (!clipboardRoot.opened)
+                clipboardRoot.everOpened = false;
+        }
+    }
+
+    onOpenedChanged: {
+        if (opened)
+            pickerReleaseTimer.stop();
+        else if (everOpened)
+            pickerReleaseTimer.restart();
+    }
+
     LazyLoader {
         id: pickerLoader
         active: clipboardRoot.everOpened

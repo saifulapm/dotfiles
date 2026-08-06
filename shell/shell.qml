@@ -214,7 +214,45 @@ ShellRoot {
         property url surfaceSource
         property var surfaceProps: ({})
         property var pending: []
+        // Residency policy: an evictable surface releases its whole tree —
+        // and with it its QQuickPixmapCache references — once it has stayed
+        // closed for the grace period. The grace window keeps browse flows
+        // warm (close → reopen inside it costs nothing); after teardown a
+        // summon is a cold instantiation again, which is fine because the
+        // engine's compile cache is URL-keyed and survives the instance.
+        // Only the heavyweight, rarely-used surfaces opt in — the launcher
+        // and the bar panels stay warm for latency.
+        property bool evictable: false
+        // 45 s: comparing themes or walking wallpapers closes and reopens
+        // within seconds to tens of seconds — well inside this — while a
+        // surface idle for 45 s is a finished session. Also orders of
+        // magnitude past any close animation, so teardown never clips one.
+        property int graceInterval: 45000
+        // Every evictable surface exposes its window state as `open` or
+        // `opened`; a surface that is gone counts as closed.
+        readonly property bool surfaceOpen: item !== null && (item.open === true || item.opened === true)
         asynchronous: true
+
+        // One-shot, armed only by a close, cancelled by a reopen — it never
+        // runs while nothing is loaded and never repeats.
+        Timer {
+            id: evictTimer
+            interval: sl.graceInterval
+            repeat: false
+            onTriggered: {
+                if (!sl.surfaceOpen && sl.item !== null)
+                    sl.release();
+            }
+        }
+
+        onSurfaceOpenChanged: {
+            if (!evictable)
+                return;
+            if (surfaceOpen)
+                evictTimer.stop();
+            else if (item !== null)
+                evictTimer.restart();
+        }
 
         function wake() {
             if (status === Loader.Null || status === Loader.Error)
@@ -541,6 +579,7 @@ ShellRoot {
 
     SurfaceLoader {
         id: menuLoader
+        evictable: true
         surfaceSource: shell.moduleRoot + "/Modules/Menu/Menu.qml"
         surfaceProps: ({
                 theme: shell.theme,
@@ -576,6 +615,7 @@ ShellRoot {
 
     SurfaceLoader {
         id: emojisLoader
+        evictable: true
         surfaceSource: shell.moduleRoot + "/Modules/Emojis/Emojis.qml"
         surfaceProps: ({
                 theme: shell.theme
@@ -701,8 +741,12 @@ ShellRoot {
         }
     }
 
+    // The two filmstrip pickers are the heaviest surfaces in the shell —
+    // each latches ~40-70 MiB of 768 px tile decodes once browsed — and the
+    // rarest-used, so both evict after the grace period.
     SurfaceLoader {
         id: themesLoader
+        evictable: true
         surfaceSource: shell.moduleRoot + "/Modules/ThemeSwitcher/ThemeSwitcher.qml"
         surfaceProps: ({
                 theme: shell.theme
@@ -731,6 +775,7 @@ ShellRoot {
 
     SurfaceLoader {
         id: wallpaperLoader
+        evictable: true
         surfaceSource: shell.moduleRoot + "/Modules/Background/ImagePicker.qml"
         surfaceProps: ({
                 theme: shell.theme
