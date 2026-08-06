@@ -43,14 +43,25 @@ Scope {
     readonly property int headerHeight: theme.space(10)
     readonly property int cardMargin: theme.space(4)
     readonly property int maxListHeight: 440
+    // The starting menu sets the height ceiling: the first submenu move or
+    // search keystroke freezes it, so drilling into a longer menu (or the
+    // taller filtered rows) scrolls behind the fold instead of growing the
+    // card — omarchy's cap-at-the-starting-menu rule.
+    property int frozenListHeight: -1
     // Rows are uniform (the detail line is shown on all of them or none), so
     // the card can size itself without measuring the delegates.
     readonly property int listHeight: {
         const count = Math.max(1, displayModel.count);
         const divider = searchDivider ? dividerHeight + rowSpacing : 0;
-        return Math.min(maxListHeight, count * rowHeight + (count - 1) * rowSpacing + divider);
+        const cap = frozenListHeight >= 0 ? Math.min(maxListHeight, frozenListHeight) : maxListHeight;
+        return Math.min(cap, count * rowHeight + (count - 1) * rowSpacing + divider);
     }
     property bool searchDivider: false
+
+    function freezeListHeight() {
+        if (opened && frozenListHeight < 0)
+            frozenListHeight = listHeight;
+    }
 
     function entryFor(id) {
         return MenuModel.item(items, id);
@@ -66,6 +77,7 @@ Scope {
         navStack = [];
         filterText = "";
         selectedIndex = 0;
+        frozenListHeight = -1;
         opened = true;
         evaluateGuards();
         rebuildDisplay();
@@ -74,6 +86,7 @@ Scope {
     function hide() {
         opened = false;
         filterText = "";
+        frozenListHeight = -1;
     }
 
     function toggle() {
@@ -116,8 +129,12 @@ Scope {
         if (entry && entry.kind === "link" && entry.target)
             id = entry.target;
         show();
-        if (entryFor(id))
-            setActiveMenu(id, false);
+        if (entryFor(id) && id !== activeMenu) {
+            // A routed open lands directly on this menu: it IS the starting
+            // menu, so assign it without freezing the height at root's.
+            activeMenu = id;
+            rebuildDisplay();
+        }
         return "ok";
     }
 
@@ -184,6 +201,7 @@ Scope {
 
     // ---------------------------------------------------------- navigation
     function setActiveMenu(id, pushHistory) {
+        freezeListHeight();
         if (!entryFor(id))
             id = "root";
         if (pushHistory && id !== activeMenu)
@@ -211,6 +229,7 @@ Scope {
     }
 
     function setFilter(next) {
+        freezeListHeight();
         filterText = next;
         selectedIndex = 0;
         rebuildDisplay();
