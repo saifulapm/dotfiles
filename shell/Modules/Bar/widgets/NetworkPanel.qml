@@ -2130,11 +2130,12 @@ BarPanel {
 
                 // Signal strength is carried by the icon and the right edge
                 // carries the lock, so the second line is action status only.
-                // It collapses to zero height when empty.
+                // The Column drops it from layout while invisible; binding
+                // height back to implicitHeight on top of that looped (the
+                // long-documented action-status binding loop).
                 Text {
                     width: parent.width
                     visible: row.statusText !== ""
-                    height: visible ? implicitHeight : 0
                     text: row.statusText
                     color: row.statusColor
                     font.family: panel.theme.fontUi
