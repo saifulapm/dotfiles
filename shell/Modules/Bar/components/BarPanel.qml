@@ -133,6 +133,18 @@ PanelWindow {
     WlrLayershell.namespace: "qshell-panel"
     WlrLayershell.keyboardFocus: opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+    // Blur only behind the card, never the fullscreen scrim: the region is
+    // shaped exactly like the card (ext-background-effect), so niri's cached
+    // wallpaper blur backs the glass fill while the rest of the overlay stays
+    // a plain dim.
+    BackgroundEffect.blurRegion: theme.blurActive && opened ? cardBlurRegion : null
+
+    Region {
+        id: cardBlurRegion
+        item: card
+        radius: card.radius
+    }
+
     MouseArea {
         anchors.fill: parent
         onClicked: panelWindow.close()

@@ -96,6 +96,16 @@ Scope {
         WlrLayershell.namespace: "qshell-launcher"
         WlrLayershell.keyboardFocus: launcherRoot.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+        // Card-shaped compositor blur behind the glass fill; the scrim
+        // around it stays a plain dim (see BarPanel.qml).
+        BackgroundEffect.blurRegion: launcherRoot.theme.blurActive && launcherRoot.open ? cardBlurRegion : null
+
+        Region {
+            id: cardBlurRegion
+            item: panel
+            radius: panel.radius
+        }
+
         Rectangle {
             anchors.fill: parent
             color: launcherRoot.theme.alpha(launcherRoot.theme.surface0, 0.5)
@@ -112,7 +122,7 @@ Scope {
             width: launcherRoot.theme.space(140)
             height: launcherRoot.theme.space(110)
             radius: launcherRoot.theme.radius(1.5)
-            color: launcherRoot.theme.surface1
+            color: launcherRoot.theme.glass(launcherRoot.theme.surface1)
             border.width: launcherRoot.theme.borderWidth
             border.color: launcherRoot.theme.surface3
 

@@ -776,6 +776,12 @@ binds {
 // fresh machine boots before the first theme-apply run.
 include optional=true "~/.local/state/qshell/niri-theme.kdl"
 
+// App-window blur, rendered by the shell's Blur service (`qs ipc call blur
+// toggle`, or the menu's Style > Blur row). Off by default: the fragment is
+// empty of rules until blur is enabled. After the theme include so its
+// opacity rules override the 0.985/0.96 pair above while frosted.
+include optional=true "~/.local/state/qshell/niri-blur.kdl"
+
 // The shell's wallpaper joins the overview backdrop instead of zooming
 // with workspaces.
 layer-rule {

@@ -728,6 +728,17 @@ Scope {
             WlrLayershell.namespace: "qshell-bar"
             WlrLayershell.layer: WlrLayer.Top
 
+            // Frost the whole strip while the Blur service is on: the fill is
+            // glass then (Theme.sGlass) and niri shows its cached wallpaper
+            // blur behind it. The user's transparent bar mode stays untouched
+            // — that mode is about seeing the desktop, not frosting it.
+            BackgroundEffect.blurRegion: barRoot.theme.blurActive && !barRoot.transparent ? barBlurRegion : null
+
+            Region {
+                id: barBlurRegion
+                item: panel.contentItem
+            }
+
             Behavior on barBackground {
                 ColorAnimation {
                     duration: 420

@@ -78,6 +78,17 @@ Scope {
                 item: popupColumn
             }
 
+            // Compositor blur per toast, never the column (its spacing gaps
+            // are fully transparent — a column-shaped region would float
+            // blurred rectangles between the cards). Each delegate pushes a
+            // card-shaped child region into this union; destruction
+            // deregisters it (PendingRegion watches its children).
+            BackgroundEffect.blurRegion: popupsRoot.theme.blurActive && popupsRoot.notifs.popupModel.count > 0 ? toastsBlurRegion : null
+
+            Region {
+                id: toastsBlurRegion
+            }
+
             ColumnLayout {
                 id: popupColumn
                 anchors.right: parent.right
@@ -123,6 +134,13 @@ Scope {
                             if (card.hovered)
                                 popupsRoot.setHoverHold(cardSlot.originalId, false);
                         }
+
+                        readonly property Region blurRegion: Region {
+                            item: card
+                            radius: card.radius
+                        }
+
+                        Component.onCompleted: toastsBlurRegion.regions.push(blurRegion)
 
                         Timer {
                             interval: 50

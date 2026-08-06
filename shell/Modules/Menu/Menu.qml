@@ -178,6 +178,9 @@ Scope {
         case "nightlight":
             shellRoot.nightlight.toggle();
             break;
+        case "blur":
+            shellRoot.blur.toggle();
+            break;
         default:
             console.warn("Menu: unknown call:", name);
         }
@@ -190,6 +193,8 @@ Scope {
             return !!shellRoot.notifs.dnd;
         case "nightlight":
             return !!shellRoot.nightlight.enabled;
+        case "blur":
+            return !!shellRoot.blur.enabled;
         default:
             return false;
         }
@@ -431,6 +436,16 @@ Scope {
         WlrLayershell.namespace: "qshell-menu"
         WlrLayershell.keyboardFocus: menuRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+        // Card-shaped compositor blur behind the glass fill; the scrim
+        // around it stays a plain dim (see BarPanel.qml).
+        BackgroundEffect.blurRegion: menuRoot.theme.blurActive && menuRoot.opened ? cardBlurRegion : null
+
+        Region {
+            id: cardBlurRegion
+            item: card
+            radius: card.radius
+        }
+
         Rectangle {
             anchors.fill: parent
             color: menuRoot.theme.alpha(menuRoot.theme.surface0, 0.5)
@@ -447,7 +462,7 @@ Scope {
             width: menuRoot.cardWidth
             height: menuRoot.cardMargin * 2 + menuRoot.headerHeight + menuRoot.theme.space(3) + menuRoot.listHeight
             radius: menuRoot.theme.radius(1.5)
-            color: menuRoot.theme.surface1
+            color: menuRoot.theme.glass(menuRoot.theme.surface1)
             border.width: menuRoot.theme.borderWidth
             border.color: menuRoot.theme.surface3
 

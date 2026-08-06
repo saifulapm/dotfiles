@@ -114,6 +114,16 @@ Scope {
         WlrLayershell.namespace: "qshell-reminders"
         WlrLayershell.keyboardFocus: flowRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+        // Card-shaped compositor blur behind the glass fill; the scrim
+        // around it stays a plain dim (see BarPanel.qml).
+        BackgroundEffect.blurRegion: flowRoot.theme.blurActive && flowRoot.opened ? cardBlurRegion : null
+
+        Region {
+            id: cardBlurRegion
+            item: card
+            radius: card.radius
+        }
+
         Rectangle {
             anchors.fill: parent
             color: flowRoot.theme.alpha(flowRoot.theme.surface0, 0.5)
@@ -130,7 +140,7 @@ Scope {
             width: flowRoot.cardWidth
             height: content.implicitHeight + flowRoot.cardMargin * 2
             radius: flowRoot.theme.radius(1.5)
-            color: flowRoot.theme.surface1
+            color: flowRoot.theme.glass(flowRoot.theme.surface1)
             border.width: flowRoot.theme.borderWidth
             border.color: flowRoot.theme.surface3
 

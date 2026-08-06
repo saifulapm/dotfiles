@@ -21,7 +21,12 @@ import "Modules/Bar/BarModel.js" as BarModel
 ShellRoot {
     id: shell
 
-    property Theme theme: Theme {}
+    property Theme theme: Theme {
+        blurActive: shell.blur.enabled
+    }
+    // Eager, but only as a flag-file watcher (nightlight's shape): blur is
+    // off by default and the disabled path must cost nothing but the watch.
+    property Blur blur: Blur {}
     property Niri niri: Niri {}
     // Eager by necessity: must own org.freedesktop.Notifications from startup.
     // The popup UI below stays lazy. `niri` is what click-to-focus resolves a

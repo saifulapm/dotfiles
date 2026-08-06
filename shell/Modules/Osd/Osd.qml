@@ -312,6 +312,16 @@ Scope {
             // the OSD never blocks clicks to the desktop below it.
             mask: Region {}
 
+            // Pill-shaped compositor blur behind the glass fill while the
+            // Blur service is on (see BarPanel.qml).
+            BackgroundEffect.blurRegion: osdRoot.theme.blurActive && osdRoot.opened ? pillBlurRegion : null
+
+            Region {
+                id: pillBlurRegion
+                item: card
+                radius: card.radius
+            }
+
             Rectangle {
                 id: card
 
@@ -320,7 +330,7 @@ Scope {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: osdRoot.theme.space(16.75)
-                color: osdRoot.theme.alpha(osdRoot.theme.surface1, 0.97)
+                color: osdRoot.theme.glass(osdRoot.theme.alpha(osdRoot.theme.surface1, 0.97))
                 border.width: osdRoot.cardBorder
                 border.color: osdRoot.theme.accent
                 radius: osdRoot.theme.radius(1)

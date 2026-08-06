@@ -143,12 +143,50 @@ QtObject {
         return isFinite(n) ? Math.max(0, Math.min(1, n)) : fallback;
     }
 
+    // ------------------------------------------------------------ blur glass
+    // True while the Blur service's flag is set (bound in shell.qml). Card
+    // fills drop to glass so the compositor blur behind them shows; every
+    // window that glasses its card also publishes a matching
+    // BackgroundEffect.blurRegion, so the two switch together.
+    property bool blurActive: false
+
+    // One shared glass opacity, theme-tunable as `[blur] alpha`.
+    readonly property real glassAlpha: {
+        const v = rawTok("blur.alpha");
+        const n = Number(v);
+        return v !== undefined && isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.8;
+    }
+
+    // Base-token card fills (surface1 cards and the like): unchanged while
+    // blur is off, glass while it is on. A color already more transparent
+    // than the glass value keeps its own alpha.
+    function glass(c) {
+        if (!blurActive)
+            return c;
+        const q = Qt.color(c);
+        return Qt.rgba(q.r, q.g, q.b, Math.min(q.a, glassAlpha));
+    }
+
     // X + X-alpha composed into one color (omarchy's composed()). Used where
     // an alpha companion is meaningful — card and scrim fills, borders — not
     // for plain text colors, which have no companion.
     function sComposed(section, key, colorFallback, alphaFallback) {
         const base = sCol(section, key, colorFallback);
         const a = sAlpha(section, key, alphaFallback);
+        if (a >= 0.999)
+            return base;
+        const c = Qt.color(base);
+        return Qt.rgba(c.r, c.g, c.b, c.a * a);
+    }
+
+    // sComposed for the card fills that sit on compositor blur. While blur is
+    // active the alpha is clamped to glass; `[section] background-blur-alpha`
+    // pins one surface's glass, `[blur] alpha` retunes them all.
+    function sGlass(section, key, colorFallback, alphaFallback) {
+        let a = sAlpha(section, key, alphaFallback);
+        if (blurActive)
+            a = Math.min(a, sAlpha(section, key + "-blur", glassAlpha));
+        const base = sCol(section, key, colorFallback);
         if (a >= 0.999)
             return base;
         const c = Qt.color(base);
@@ -255,14 +293,14 @@ QtObject {
     // token the surface used before per-surface overrides existed, so a theme
     // that ships no sections renders exactly as it did.
     readonly property QtObject bar: QtObject {
-        readonly property color background: root.sComposed("bar", "background", root.surface1, 1.0)
+        readonly property color background: root.sGlass("bar", "background", root.surface1, 1.0)
         readonly property color text: root.sCol("bar", "text", root.col("ansi.white"))
         // Widgets calling attention to themselves (recording, updates, urgent).
         readonly property color active: root.sCol("bar", "active", root.error)
     }
     // Bar widget flyout cards (omarchy's [popups]).
     readonly property QtObject panel: QtObject {
-        readonly property color background: root.sComposed("panel", "background", root.surface1, 1.0)
+        readonly property color background: root.sGlass("panel", "background", root.surface1, 1.0)
         readonly property color text: root.sCol("panel", "text", root.textPrimary)
         // Chains to the theme's active border, as omarchy's popups.border
         // does — so a card picks up a gradient theme without every theme
@@ -282,7 +320,7 @@ QtObject {
         readonly property int borderWidth: root.sWidth("tooltip", "border-width", 1)
     }
     readonly property QtObject notifications: QtObject {
-        readonly property color background: root.sComposed("notifications", "background", root.surface2, 1.0)
+        readonly property color background: root.sGlass("notifications", "background", root.surface2, 1.0)
         readonly property color text: root.sCol("notifications", "text", root.textPrimary)
         readonly property color textMuted: root.sCol("notifications", "text-muted", root.textMuted)
         readonly property color border: root.sComposed("notifications", "border", root.accent, 1.0)
@@ -312,7 +350,7 @@ QtObject {
     // its scrim and the justification pill. border / border-error share one
     // alpha companion, exactly as [lock]'s border states do.
     readonly property QtObject polkit: QtObject {
-        readonly property color background: root.sComposed("polkit", "background", root.surface1, 1.0)
+        readonly property color background: root.sGlass("polkit", "background", root.surface1, 1.0)
         readonly property color text: root.sCol("polkit", "text", root.textPrimary)
         readonly property color textError: root.sCol("polkit", "text-error", root.error)
         readonly property color accent: root.sCol("polkit", "accent", root.accent)
@@ -330,7 +368,7 @@ QtObject {
     // Defined for themes to target; the Menu and OSD modules themselves still
     // read base tokens (see the migration note in themes/tokyo-night.toml).
     readonly property QtObject menu: QtObject {
-        readonly property color background: root.sComposed("menu", "background", root.surface1, 1.0)
+        readonly property color background: root.sGlass("menu", "background", root.surface1, 1.0)
         readonly property color text: root.sCol("menu", "text", root.textPrimary)
         readonly property color border: root.sComposed("menu", "border", root.surface3, 1.0)
         readonly property color scrim: root.sComposed("menu", "scrim", root.surface0, 0.5)
@@ -339,7 +377,7 @@ QtObject {
         readonly property int borderWidth: root.sWidth("menu", "border-width", root.borderWidth)
     }
     readonly property QtObject osd: QtObject {
-        readonly property color background: root.sComposed("osd", "background", root.surface1, 1.0)
+        readonly property color background: root.sGlass("osd", "background", root.surface1, 1.0)
         readonly property color text: root.sCol("osd", "text", root.textPrimary)
         readonly property color border: root.sComposed("osd", "border", root.surface3, 1.0)
         readonly property int borderWidth: root.sWidth("osd", "border-width", Math.max(root.borderWidth, root.space(0.5)))

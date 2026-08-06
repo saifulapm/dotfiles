@@ -979,6 +979,11 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   with `SplitParser`, dispatch on the event's single key.
 - **LazyLoader + IPC popout pattern** from `DMSShell.qml` / `Services/PopoutService.qml`:
   every popout behind `active: false` loaders flipped by IPC handlers.
+- **Compositor-blur adoption pattern** from `Widgets/WindowBlur.qml` /
+  `Common/Theme.qml` (`blurLayersActive`): default-off setting, publish
+  `BackgroundEffect.blurRegion` shaped like the card only while enabled, and
+  drop surface fills to glass alphas when blur is active. Pattern only, no
+  code copied (`Services/Blur.qml`, `Theme.sGlass`/`glass`).
 
 ## noctalia (MIT) — github.com/noctalia-dev/noctalia-shell
 

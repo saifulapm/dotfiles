@@ -202,6 +202,16 @@ Scope {
         WlrLayershell.namespace: "qshell-emojis"
         WlrLayershell.keyboardFocus: emojisRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+        // Card-shaped compositor blur behind the glass fill; the scrim
+        // around it stays a plain dim (see BarPanel.qml).
+        BackgroundEffect.blurRegion: emojisRoot.theme.blurActive && emojisRoot.opened ? cardBlurRegion : null
+
+        Region {
+            id: cardBlurRegion
+            item: card
+            radius: card.radius
+        }
+
         Rectangle {
             anchors.fill: parent
             color: emojisRoot.theme.alpha(emojisRoot.theme.surface0, 0.5)
@@ -218,7 +228,7 @@ Scope {
             width: emojisRoot.cardWidth
             height: emojisRoot.cardHeight
             radius: emojisRoot.theme.radius(1.5)
-            color: emojisRoot.theme.surface1
+            color: emojisRoot.theme.glass(emojisRoot.theme.surface1)
             border.width: emojisRoot.theme.borderWidth
             border.color: emojisRoot.theme.surface3
 

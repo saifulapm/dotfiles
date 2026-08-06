@@ -388,6 +388,21 @@ Scope {
                 passwordInput.text = "";
             }
 
+            // Card-shaped compositor blur behind the glass fill; the scrim
+            // around it stays a plain dim (see BarPanel.qml).
+            BackgroundEffect.blurRegion: polkitRoot.theme.blurActive ? cardBlurRegion : null
+
+            Region {
+                id: cardBlurRegion
+                item: card
+                radius: card.radius
+
+                Region {
+                    item: justificationPill.visible ? justificationPill : null
+                    radius: justificationPill.radius
+                }
+            }
+
             Rectangle {
                 anchors.fill: parent
                 color: polkitRoot.theme.polkit.scrim
@@ -553,6 +568,7 @@ Scope {
             // needed to run '/usr/bin/x' as the super user" reduced to
             // "Authorize running '/usr/bin/x'", floating above the card.
             Rectangle {
+                id: justificationPill
                 width: Math.min(justificationText.implicitWidth + polkitRoot.theme.space(6), panel.width - polkitRoot.edgeMargin * 2)
                 height: polkitRoot.theme.space(7)
                 anchors.horizontalCenter: card.horizontalCenter

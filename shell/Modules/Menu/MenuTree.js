@@ -275,6 +275,14 @@ var TREE = {
         "state": "nightlight",
         "call": "nightlight"
     },
+    "toggle.blur": {
+        "icon": "󰂵",
+        "label": "Blur",
+        "aliases": ["blur", "glass", "frost", "transparency", "background-effect"],
+        "description": "Frost windows and shell cards over the wallpaper",
+        "state": "blur",
+        "call": "blur"
+    },
     "toggle.keyboard-layout": {
         "icon": "󰌌",
         "label": "Keyboard Layout",

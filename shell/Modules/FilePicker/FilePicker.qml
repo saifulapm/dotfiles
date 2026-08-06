@@ -393,6 +393,16 @@ Scope {
         WlrLayershell.namespace: "qshell-filepicker"
         WlrLayershell.keyboardFocus: pickerRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+        // Card-shaped compositor blur behind the glass fill; the scrim
+        // around it stays a plain dim (see BarPanel.qml).
+        BackgroundEffect.blurRegion: pickerRoot.theme.blurActive && pickerRoot.opened ? cardBlurRegion : null
+
+        Region {
+            id: cardBlurRegion
+            item: card
+            radius: card.radius
+        }
+
         Rectangle {
             anchors.fill: parent
             color: pickerRoot.theme.alpha(pickerRoot.theme.surface0, 0.5)
@@ -410,7 +420,7 @@ Scope {
             width: pickerRoot.cardWidth
             height: pickerRoot.cardHeight
             radius: pickerRoot.theme.radius(1.5)
-            color: pickerRoot.theme.surface1
+            color: pickerRoot.theme.glass(pickerRoot.theme.surface1)
             border.width: pickerRoot.theme.borderWidth
             border.color: pickerRoot.theme.surface3
 

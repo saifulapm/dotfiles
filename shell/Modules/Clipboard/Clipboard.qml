@@ -377,6 +377,16 @@ Scope {
             WlrLayershell.namespace: "qshell-clipboard"
             WlrLayershell.keyboardFocus: clipboardRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+            // Card-shaped compositor blur behind the glass fill; the scrim
+            // around it stays a plain dim (see BarPanel.qml).
+            BackgroundEffect.blurRegion: clipboardRoot.theme.blurActive && clipboardRoot.opened ? cardBlurRegion : null
+
+            Region {
+                id: cardBlurRegion
+                item: card
+                radius: card.radius
+            }
+
             onVisibleChanged: if (visible)
                 Qt.callLater(() => keyCatcher.forceActiveFocus())
 
@@ -396,7 +406,7 @@ Scope {
                 width: panel.cardWidth
                 height: panel.cardHeight
                 radius: clipboardRoot.theme.radius(1.5)
-                color: clipboardRoot.theme.surface1
+                color: clipboardRoot.theme.glass(clipboardRoot.theme.surface1)
                 border.width: clipboardRoot.theme.borderWidth
                 border.color: clipboardRoot.theme.surface3
 
