@@ -232,7 +232,10 @@ BarPanel {
                     required property var modelData
                     required property int index
 
-                    readonly property bool current: panel.media !== null && panel.media.playerKey(modelData) === panel.activeKey()
+                    // Guarded on the active player too (upstream's rule): a
+                    // degenerate player with no identity keys to "" and would
+                    // otherwise match an empty activeKey.
+                    readonly property bool current: panel.player !== null && modelData !== null && panel.media.playerKey(modelData) === panel.activeKey()
                     readonly property bool hasCursor: panel.cursorActive && panel.selectedIndex === index
                     readonly property string sourceTitle: modelData ? (modelData.trackTitle || modelData.identity || modelData.desktopEntry || "Media source") : "Media source"
                     readonly property string sourceDetail: modelData && modelData.trackArtist ? modelData.trackArtist : (modelData && modelData.identity ? modelData.identity : "")

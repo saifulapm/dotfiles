@@ -26,8 +26,14 @@ BarPanel {
     readonly property var source: Pipewire.defaultAudioSource
     readonly property var nodes: Pipewire.ready && Pipewire.nodes ? Pipewire.nodes.values : []
     readonly property var mprisPlayers: Mpris.players ? Mpris.players.values : []
-    // Mpris has no activePlayer in 0.3 — whatever is playing, else the first.
+    // The media service's ladder-selected player — upstream's audio panel
+    // reads the media service's activePlayer, so the "active stream"
+    // highlight agrees with the bar widget and the OSD. The naive
+    // whatever-is-playing pick remains as the no-service fallback.
+    property var media: null
     readonly property var activePlayer: {
+        if (media && media.activePlayer)
+            return media.activePlayer;
         const all = panel.mprisPlayers;
         return all.find(p => p.isPlaying) || all[0] || null;
     }

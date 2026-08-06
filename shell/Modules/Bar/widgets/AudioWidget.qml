@@ -49,6 +49,7 @@ BarIcon {
         active: false
         component: AudioPanel {
             theme: rootItem.theme
+            media: rootItem.bar && rootItem.bar.shell ? rootItem.bar.shell.media : null
         }
     }
 }
