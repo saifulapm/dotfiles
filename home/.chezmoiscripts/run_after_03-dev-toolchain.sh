@@ -48,8 +48,11 @@ if [ ! -x "$HOME/.cargo/bin/cargo" ]; then
   fi
 fi
 if [ -x "$HOME/.cargo/bin/rustup" ]; then
-  "$HOME/.cargo/bin/rustup" component add rust-analyzer >/dev/null 2>&1 \
-    || warn "rust-analyzer component add failed"
+  # rust-src alongside rust-analyzer: RA needs the stdlib sources for std
+  # completion/navigation (eglot uses RA; without rust-src std items resolve
+  # blind)
+  "$HOME/.cargo/bin/rustup" component add rust-analyzer rust-src >/dev/null 2>&1 \
+    || warn "rust-analyzer/rust-src component add failed"
 fi
 
 exit 0

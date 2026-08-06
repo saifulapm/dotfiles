@@ -20,3 +20,8 @@ bench:
 # apply dotfiles
 apply:
     chezmoi apply
+
+# update dev toolchains: mise-managed tools (node/deno) + rust via rustup
+update:
+    mise up
+    rustup update
