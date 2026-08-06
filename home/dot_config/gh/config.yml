@@ -1,0 +1,16 @@
+# gh config (managed by chezmoi) — port of the mac config, 2026-08-07.
+#
+# The mac's account aliases copied hosts.yml.{personal,work,project} variants
+# over hosts.yml — safe there because tokens lived in the macOS Keychain. On
+# this desktop there is no keyring (gnome-keyring is deliberately absent), so
+# gh stores oauth tokens INSIDE hosts.yml and the copy trick would wipe them.
+# The aliases now use gh's native multi-account switching instead; run
+# `gh auth login` once per account and the same alias names keep working.
+# Accounts (from the mac hosts variants): personal=saifulapm, work=Cool9977,
+# main=saiful408.
+git_protocol: ssh
+aliases:
+    personal: '!gh auth switch --user saifulapm && gh auth setup-git && gh auth status'
+    work: '!gh auth switch --user Cool9977 && gh auth setup-git && gh auth status'
+    main: '!gh auth switch --user saiful408 && gh auth setup-git && gh auth status'
+version: "1"
