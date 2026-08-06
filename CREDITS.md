@@ -289,6 +289,50 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   their panel never shows, the copy menu is an inline expansion of the machine
   row rather than a `QtQuick.Controls` popup, and any privileged refusal — not
   only the one wording their profile list produces — raises the authorize row.
+- **Bluetooth plugin design** from `shell/plugins/panels/bluetooth/`
+  (`Panel.qml`, `Model.js`, and `bin/omarchy-bluetooth-device` as the action
+  layer): the hero of state glyph, "Bluetooth" title and rotating phrase
+  ("Untangling wires", "Streaming vikings", …) with their 180/260 ms
+  cross-fade while the adapter is enabled, the compact on/off switch on the
+  hero's trailing edge as the header's only cursor target, and "No adapter" /
+  "Turned Off" standing in for the phrase when there is nothing to rotate
+  about; the three device buckets (connected / known / discovered) sorted by
+  label with address- and uuid-shaped names filtered out entirely, the
+  CONNECTED list pinned above a ListView that scrolls the PAIRED and
+  AVAILABLE sections as one flat model (their reasoning kept: the view owns
+  the scroll position, so j/k keeps the current row visible and a shortening
+  discovery list re-clamps without lurching under a hovering mouse), the
+  AVAILABLE section existing only while the adapter is discovering, and their
+  empty-state ladder; the per-address pending-action map that shows the
+  in-flight verb ("Connecting…", "Disconnecting…", "Forgetting…") on the row
+  and is reconciled against BlueZ's own reports when reality lands, with the
+  20 s give-up sweep; connect-or-pair by whether BlueZ remembers the device,
+  disconnect running the native call and the CLI belt-and-braces, forget
+  disconnecting first; the battery percentage standing in for a connected
+  row's status; THE audio-output auto-switch — a device that finishes
+  connecting schedules the default PipeWire sink onto its own sink node,
+  found by normalized BlueZ address (then label) in the node's text, retried
+  on a 500 ms timer up to eight times so a keyboard stops looking; the 1 s
+  discovery nudge while the panel is open (BlueZ refuses StartDiscovery
+  during power-up and times discovery out on its own); and their whole cursor
+  model — one highlight for mouse and keyboard, j/k across section
+  boundaries with the virtual header section above them, l/h onto and off
+  the row's forget button, Enter activating, Delete (or x) forgetting, b
+  toggling the adapter, hover moving the cursor, the first press parking it,
+  and the focused device followed by BlueZ address across list churn rather
+  than by row index. Their IPC verb set (open/close/show/hide/toggle/
+  toggleBluetooth) is ported onto a `bluetooth` target beside our
+  `bar open bluetooth` summon path. Adaptations: discovery is stopped when
+  the panel closes (theirs leaves BlueZ scanning; the pattern here is
+  probing only while a panel is open), the sink match excludes asahi-audio's
+  DSP nodes (`effect_output.*`, `audio_effect.*` — the default sink on the
+  Asahi Macs is the convolver chain, which must never win the match and
+  which quickshell complains about while tracked), the PipeWire preference
+  write is `Pipewire.preferredDefaultAudioSink` with a `PwObjectTracker`
+  held only while a switch is pending (their
+  `omarchy-audio-output-set-default` persistence helper is not ported — this
+  shell has no audio-restore layer), and their `QtQuick.Controls` ScrollBar
+  has no counterpart (this shell hand-rolls its controls).
 - **Menu framework and filter semantics** from `shell/plugins/menu/` (`Menu.qml`,
   `MenuModel.js`) and the tree format of `default/omarchy/omarchy-menu.jsonc`:
   the hierarchical tree keyed by dotted ids with the kind inferred from the
@@ -1141,3 +1185,19 @@ Direct file-level copies (source path → destination path):
   same four slots, because only the MD range renders under our Symbols Nerd
   Font fallback; `widestIcon` follows. Every other glyph in the table is
   already MD and is theirs unchanged.
+- omarchy `shell/plugins/panels/bluetooth/Model.js` →
+  `shell/Modules/Bar/widgets/BluetoothModel.js`: near-verbatim port of the
+  whole model — device labelling with the uuid/address-shaped-name filters,
+  the connected/known/discovered bucket split sorted by label, the
+  pending-action map helpers, the visible-section list, and the
+  PipeWire-node-to-device match (normalized BlueZ address, then device
+  label, against the node's name/description/properties text) behind the
+  audio output auto-switch. Their `module.exports` tail was dropped and
+  whitespace restyled to house 4-space qmlformat; every glyph the panel
+  draws is already in the Material Design range, so nothing needed
+  substituting.
+- omarchy `bin/omarchy-bluetooth-device` → `bin/bluetooth-device`: direct
+  copy of the sequencing — the action/address argument validation, the
+  power-on wait, trust-before-connect, pair as pair → trust → connect,
+  forget as disconnect → remove, and every timeout. Only the program name in
+  the usage line differs.

@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Port of omarchy-bluetooth-device (see CREDITS.md): the Bluetooth sequencing
+# behind the shell's bluetooth panel. bluetoothctl rather than the D-Bus API
+# because the useful actions are compounds — pairing wants trust and a
+# connect behind it, forgetting wants a disconnect first — and BlueZ refuses
+# half of them while the adapter is still powering up, so every step gets a
+# timeout and a shrug instead of hanging the shell.
+
+set -e
+
+usage() {
+  echo "Usage: bluetooth-device [pair|connect|disconnect|forget] <address>" >&2
+  exit 1
+}
+
+action=${1:-}
+address=${2:-}
+
+[[ $action == "pair" || $action == "connect" || $action == "disconnect" || $action == "forget" ]] || usage
+[[ $address =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]] || usage
+
+power_on() {
+  [[ $(timeout 2s bluetoothctl show 2>/dev/null) == *"Powered: yes"* ]] && return
+  bluetoothctl power on >/dev/null 2>&1 || true
+  sleep 0.5
+}
+
+trust_device() {
+  bluetoothctl trust "$address" >/dev/null 2>&1 || true
+}
+
+case "$action" in
+  pair)
+    power_on
+    timeout 20s bluetoothctl pair "$address" >/dev/null 2>&1 || true
+    trust_device
+    timeout 20s bluetoothctl connect "$address" >/dev/null 2>&1 || true
+    ;;
+  connect)
+    power_on
+    trust_device
+    timeout 20s bluetoothctl connect "$address" >/dev/null 2>&1 || true
+    ;;
+  disconnect)
+    timeout 10s bluetoothctl disconnect "$address" >/dev/null 2>&1 || true
+    ;;
+  forget)
+    power_on
+    timeout 10s bluetoothctl disconnect "$address" >/dev/null 2>&1 || true
+    timeout 10s bluetoothctl remove "$address" >/dev/null 2>&1 || true
+    ;;
+esac
