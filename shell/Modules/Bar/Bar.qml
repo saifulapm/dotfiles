@@ -579,6 +579,14 @@ Scope {
         });
     }
 
+    // No gate: the podman-events follower is event-driven (one line per
+    // container transition, nothing polls), so — like the dictation
+    // follower — it runs for the life of the shell. One instance, one
+    // follower, however many screens carry the widget.
+    function devServicesService() {
+        return sharedService("devservices", devServicesServiceComponent, {});
+    }
+
     // Keyed by widget id, not by type: "icloud" and "dropbox-rclone" are two
     // remotes, so they keep two services — one per remote, not per screen.
     function rcloneService(id, defaults) {
@@ -626,6 +634,11 @@ Scope {
     }
 
     Component {
+        id: devServicesServiceComponent
+        DevServicesService {}
+    }
+
+    Component {
         id: rcloneServiceComponent
         RcloneRemoteService {}
     }
@@ -667,6 +680,7 @@ Scope {
             "weather": weatherComponent,
             "monitor": monitorComponent,
             "dropbox": dropboxComponent,
+            "devservices": devservicesComponent,
             "icloud": icloudComponent,
             "dropbox-rclone": dropboxRcloneComponent,
             "tailscale": tailscaleComponent,
@@ -1995,6 +2009,14 @@ Scope {
         Dropbox {
             theme: barRoot.theme
             dropbox: barRoot.dropboxService()
+        }
+    }
+
+    Component {
+        id: devservicesComponent
+        DevServices {
+            theme: barRoot.theme
+            devservices: barRoot.devServicesService()
         }
     }
 
