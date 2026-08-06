@@ -115,7 +115,7 @@ BarPanel {
                 width: parent.width
                 text: Model.heroMeta(panel.provider).toUpperCase()
                 color: panel.provider && String(panel.provider.usageStatusText || "") !== "" ? panel.theme.warn : panel.theme.textMuted
-                font.family: panel.theme.fontUi
+                font.family: panel.theme.fontMono
                 font.pixelSize: panel.theme.fontPx(0.75)
                 font.weight: Font.DemiBold
                 font.letterSpacing: 1.2
@@ -247,7 +247,9 @@ BarPanel {
         spacing: panel.theme.space(2.5)
 
         SectionHeader {
-            text: "LIMITS"
+            theme: panel.theme
+            width: parent.width
+            label: "LIMITS"
         }
 
         Repeater {
@@ -404,7 +406,9 @@ BarPanel {
         spacing: panel.theme.space(1)
 
         SectionHeader {
-            text: "TOKENS BY DAY"
+            theme: panel.theme
+            width: parent.width
+            label: "TOKENS BY DAY"
         }
 
         Repeater {
@@ -484,7 +488,9 @@ BarPanel {
         spacing: panel.theme.space(1)
 
         SectionHeader {
-            text: "TOKENS BY MODEL"
+            theme: panel.theme
+            width: parent.width
+            label: "TOKENS BY MODEL"
         }
 
         Repeater {
@@ -569,13 +575,5 @@ BarPanel {
         font.family: panel.theme.fontUi
         font.pixelSize: panel.theme.fontPx(0.75)
         elide: Text.ElideRight
-    }
-
-    component SectionHeader: Text {
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.75)
-        font.weight: Font.DemiBold
-        font.letterSpacing: 1.2
     }
 }

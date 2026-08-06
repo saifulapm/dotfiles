@@ -375,7 +375,9 @@ BarPanel {
 
     // -------------------------------------------------------------- system
     SectionHeader {
-        text: "SYSTEM"
+        theme: panel.theme
+        width: parent.width
+        label: "SYSTEM"
     }
 
     Row {
@@ -439,7 +441,9 @@ BarPanel {
 
     // ------------------------------------------------------------ profiles
     SectionHeader {
-        text: "POWER PROFILE"
+        theme: panel.theme
+        width: parent.width
+        label: "POWER PROFILE"
     }
 
     Row {
@@ -518,11 +522,4 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- components
-    component SectionHeader: Text {
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.75)
-        font.weight: Font.DemiBold
-        font.letterSpacing: 1.2
-    }
 }

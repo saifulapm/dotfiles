@@ -470,13 +470,10 @@ BarPanel {
                 width: parent.width
                 spacing: panel.theme.space(1.5)
 
-                Text {
-                    text: "RECENT FILES"
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
-                    font.letterSpacing: 1.2
-                    font.weight: Font.DemiBold
+                SectionHeader {
+                    theme: panel.theme
+                    width: parent.width
+                    label: "RECENT FILES"
                 }
 
                 Text {

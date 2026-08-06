@@ -61,6 +61,9 @@ BarPanel {
     }
 
     readonly property int heroPercent: brightnessRows.length > 0 ? percentFor(brightnessRows[0].device) : -1
+    // Live "58%" for the BRIGHTNESS header when there is exactly one row —
+    // written by the row delegate, whose slider knows the drag-live value.
+    property string brightnessHeaderText: ""
 
     // ------------------------------------------------------------- probing
     function refresh() {
@@ -373,7 +376,7 @@ BarPanel {
                 width: parent.width
                 text: panel.heroPercent < 0 ? "FIXED BRIGHTNESS" : Model.brightnessName(panel.heroPercent).toUpperCase()
                 color: panel.theme.textMuted
-                font.family: panel.theme.fontUi
+                font.family: panel.theme.fontMono
                 font.pixelSize: panel.theme.fontPx(0.75)
                 font.weight: Font.DemiBold
                 font.letterSpacing: 1.2
@@ -394,7 +397,13 @@ BarPanel {
         spacing: panel.theme.space(2)
 
         SectionHeader {
-            text: "BRIGHTNESS"
+            theme: panel.theme
+            width: parent.width
+            label: "BRIGHTNESS"
+            // With a single backlight the per-row label line is one
+            // right-aligned number on an otherwise empty line — carry the
+            // value on the header instead, as the audio panel's OUTPUT does.
+            value: panel.brightnessRows.length === 1 ? panel.brightnessHeaderText : ""
         }
 
         Repeater {
@@ -407,20 +416,26 @@ BarPanel {
                 required property int index
 
                 readonly property bool hasCursor: panel.cursorActive && panel.focusSection === "brightness" && panel.selectedIndex === index
+                readonly property string percentText: Math.round(slider.dragging ? slider.liveValue : panel.percentFor(modelData.device)) + "%"
+
+                onPercentTextChanged: if (panel.brightnessRows.length === 1)
+                    panel.brightnessHeaderText = percentText
+                Component.onCompleted: if (panel.brightnessRows.length === 1)
+                    panel.brightnessHeaderText = percentText
 
                 width: parent.width
                 spacing: panel.theme.space(1)
 
+                // Only worth a line of its own when more than one output has
+                // a backlight; a single display's number rides the header.
                 Item {
+                    visible: panel.brightnessRows.length > 1
                     width: parent.width
                     height: rowLabel.implicitHeight
 
                     Text {
                         id: rowLabel
                         anchors.left: parent.left
-                        // Only worth naming the output when more than one has
-                        // a backlight of its own.
-                        visible: panel.brightnessRows.length > 1
                         text: brightnessRow.modelData.output
                         color: panel.theme.textMuted
                         font.family: panel.theme.fontUi
@@ -429,7 +444,7 @@ BarPanel {
 
                     Text {
                         anchors.right: parent.right
-                        text: Math.round(slider.dragging ? slider.liveValue : panel.percentFor(brightnessRow.modelData.device)) + "%"
+                        text: brightnessRow.percentText
                         color: panel.theme.textMuted
                         font.family: panel.theme.fontMono
                         font.pixelSize: panel.theme.fontPx(0.833)
@@ -493,8 +508,10 @@ BarPanel {
 
             SectionHeader {
                 id: scaleHeader
+                theme: panel.theme
+                width: parent.width
                 anchors.left: parent.left
-                text: "SCALE"
+                label: "SCALE"
             }
 
             // SCALE only applies to the focused output, so name it once there
@@ -552,7 +569,9 @@ BarPanel {
         spacing: panel.theme.space(2)
 
         SectionHeader {
-            text: "VARIABLE REFRESH RATE"
+            theme: panel.theme
+            width: parent.width
+            label: "VARIABLE REFRESH RATE"
         }
 
         Row {
@@ -605,7 +624,9 @@ BarPanel {
         spacing: panel.theme.space(2)
 
         SectionHeader {
-            text: "NIGHT LIGHT"
+            theme: panel.theme
+            width: parent.width
+            label: "NIGHT LIGHT"
         }
 
         Row {
@@ -662,7 +683,9 @@ BarPanel {
         spacing: panel.theme.space(2)
 
         SectionHeader {
-            text: "DISPLAYS"
+            theme: panel.theme
+            width: parent.width
+            label: "DISPLAYS"
         }
 
         Repeater {
@@ -753,14 +776,6 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- components
-    component SectionHeader: Text {
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.75)
-        font.weight: Font.DemiBold
-        font.letterSpacing: 1.2
-    }
-
     component Pill: Rectangle {
         id: pill
 

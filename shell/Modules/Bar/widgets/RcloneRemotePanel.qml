@@ -258,8 +258,10 @@ BarPanel {
         // dropbox panel's "Stored" line over a fill bar. Omitted entirely
         // (header too) when the backend cannot say.
         SectionHeader {
+            theme: panel.theme
+            width: parent.width
             visible: panel.quotaVisible
-            text: "STORAGE"
+            label: "STORAGE"
         }
 
         Column {
@@ -290,7 +292,9 @@ BarPanel {
 
         // --------------------------------------------------------- account
         SectionHeader {
-            text: "ACCOUNT"
+            theme: panel.theme
+            width: parent.width
+            label: "ACCOUNT"
         }
 
         InfoPair {
@@ -378,11 +382,4 @@ BarPanel {
     }
 
     // ----------------------------------------------------------- components
-    component SectionHeader: Text {
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontMono
-        font.pixelSize: panel.theme.fontPx(0.75)
-        font.letterSpacing: 1.2
-        font.weight: Font.DemiBold
-    }
 }
