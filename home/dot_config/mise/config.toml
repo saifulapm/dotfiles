@@ -13,6 +13,11 @@ deno = "latest"
 # these instead of mise.toml.
 idiomatic_version_file_enable_tools = ["node"]
 
+# All projects live under ~/Sites (created by run_after_15-user-dirs.sh) —
+# trust their mise configs automatically instead of prompting `mise trust`
+# per repo.
+trusted_config_paths = ["~/Sites"]
+
 [settings.node]
 # Run `corepack enable` after every node install, so the pnpm shim survives
 # an lts major bump instead of silently vanishing. Node ≥ 25 stops bundling
