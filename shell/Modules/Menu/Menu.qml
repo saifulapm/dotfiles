@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "../../components"
 import "MenuModel.js" as MenuModel
 import "MenuTree.js" as MenuTree
 
@@ -422,282 +423,212 @@ Scope {
         }
     }
 
-    PanelWindow {
-        // Held through the card's fade-out (see BarPanel.qml): input drops
-        // instantly via the mask so the dying scrim can't eat a click.
-        visible: menuRoot.opened || card.opacity > 0
-        mask: menuRoot.opened ? null : closedMask
-        Region {
-            id: closedMask
-        }
-        anchors {
-            top: true
-            bottom: true
-            left: true
-            right: true
-        }
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.namespace: "qshell-menu"
-        WlrLayershell.keyboardFocus: menuRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    OverlaySurface {
+        theme: menuRoot.theme
+        opened: menuRoot.opened
+        namespace: "qshell-menu"
+        cardWidth: menuRoot.cardWidth
+        cardHeight: menuRoot.cardMargin * 2 + menuRoot.headerHeight + menuRoot.theme.space(3) + menuRoot.listHeight
+        onDismissed: menuRoot.hide()
 
-        // Card-shaped compositor blur behind the glass fill; the scrim
-        // around it stays a plain dim (see BarPanel.qml).
-        BackgroundEffect.blurRegion: menuRoot.theme.blurActive && menuRoot.opened ? cardBlurRegion : null
-
-        Region {
-            id: cardBlurRegion
-            item: card
-            radius: card.radius
-        }
-
-        Rectangle {
+        Item {
+            id: keyCatcher
             anchors.fill: parent
-            color: menuRoot.theme.alpha(menuRoot.theme.surface0, 0.5)
-            opacity: menuRoot.opened ? 1 : 0
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: menuRoot.theme.time(0.8)
-                    easing.type: menuRoot.theme.easing
-                }
-            }
+            focus: true
 
-            MouseArea {
-                anchors.fill: parent
-                onClicked: menuRoot.hide()
-            }
-        }
+            // Type-to-filter owns the keyboard, so j/k only navigate while
+            // the query is empty (or with Ctrl held) — otherwise they are
+            // just letters, like every other printable key.
+            Keys.onPressed: event => {
+                const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
+                const vimNav = (event.key === Qt.Key_J || event.key === Qt.Key_K) && (ctrl || menuRoot.filterText === "");
 
-        Rectangle {
-            id: card
-            anchors.centerIn: parent
-            width: menuRoot.cardWidth
-            height: menuRoot.cardMargin * 2 + menuRoot.headerHeight + menuRoot.theme.space(3) + menuRoot.listHeight
-            radius: menuRoot.theme.radius(1.5)
-            color: menuRoot.theme.glass(menuRoot.theme.surface1)
-            border.width: menuRoot.theme.borderWidth
-            border.color: menuRoot.theme.surface3
-
-            opacity: menuRoot.opened ? 1 : 0
-            scale: menuRoot.opened ? 1 : 0.96
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: menuRoot.theme.time(0.8)
-                    easing.type: menuRoot.theme.easing
-                }
-            }
-            Behavior on scale {
-                NumberAnimation {
-                    duration: menuRoot.theme.time(0.8)
-                    easing.type: menuRoot.theme.easing
-                }
-            }
-
-            MouseArea {
-                // Swallow clicks so they don't fall through to the scrim.
-                anchors.fill: parent
-            }
-
-            Item {
-                id: keyCatcher
-                anchors.fill: parent
-                focus: true
-
-                // Type-to-filter owns the keyboard, so j/k only navigate while
-                // the query is empty (or with Ctrl held) — otherwise they are
-                // just letters, like every other printable key.
-                Keys.onPressed: event => {
-                    const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
-                    const vimNav = (event.key === Qt.Key_J || event.key === Qt.Key_K) && (ctrl || menuRoot.filterText === "");
-
-                    if (event.key === Qt.Key_Escape) {
-                        if (menuRoot.filterText)
-                            menuRoot.setFilter("");
-                        else if (!menuRoot.goBack())
-                            menuRoot.hide();
-                    } else if (event.key === Qt.Key_Backspace) {
-                        if (menuRoot.filterText)
-                            menuRoot.setFilter(menuRoot.filterText.slice(0, -1));
-                        else
-                            menuRoot.goBack();
-                    } else if (vimNav) {
-                        menuRoot.select(event.key === Qt.Key_J ? 1 : -1);
-                    } else if (event.key === Qt.Key_Down) {
-                        menuRoot.select(1);
-                    } else if (event.key === Qt.Key_Up) {
-                        menuRoot.select(-1);
-                    } else if (event.key === Qt.Key_PageDown) {
-                        menuRoot.select(6);
-                    } else if (event.key === Qt.Key_PageUp) {
-                        menuRoot.select(-6);
-                    } else if (event.key === Qt.Key_Left) {
+                if (event.key === Qt.Key_Escape) {
+                    if (menuRoot.filterText)
+                        menuRoot.setFilter("");
+                    else if (!menuRoot.goBack())
+                        menuRoot.hide();
+                } else if (event.key === Qt.Key_Backspace) {
+                    if (menuRoot.filterText)
+                        menuRoot.setFilter(menuRoot.filterText.slice(0, -1));
+                    else
                         menuRoot.goBack();
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Right) {
-                        menuRoot.activateIndex(menuRoot.selectedIndex);
-                    } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
-                        menuRoot.setFilter(menuRoot.filterText + event.text);
-                    } else {
-                        return;
+                } else if (vimNav) {
+                    menuRoot.select(event.key === Qt.Key_J ? 1 : -1);
+                } else if (event.key === Qt.Key_Down) {
+                    menuRoot.select(1);
+                } else if (event.key === Qt.Key_Up) {
+                    menuRoot.select(-1);
+                } else if (event.key === Qt.Key_PageDown) {
+                    menuRoot.select(6);
+                } else if (event.key === Qt.Key_PageUp) {
+                    menuRoot.select(-6);
+                } else if (event.key === Qt.Key_Left) {
+                    menuRoot.goBack();
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Right) {
+                    menuRoot.activateIndex(menuRoot.selectedIndex);
+                } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                    menuRoot.setFilter(menuRoot.filterText + event.text);
+                } else {
+                    return;
+                }
+                event.accepted = true;
+            }
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: menuRoot.cardMargin
+                spacing: menuRoot.theme.space(3)
+
+                // Header doubles as the query line: the current menu's
+                // title until you type, then what you typed.
+                Item {
+                    width: parent.width
+                    height: menuRoot.headerHeight
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideRight
+                        text: {
+                            if (menuRoot.filterText)
+                                return menuRoot.filterText;
+                            const entry = menuRoot.entryFor(menuRoot.activeMenu);
+                            return (entry ? entry.title || entry.label : "Go") + "…";
+                        }
+                        color: menuRoot.theme.textPrimary
+                        opacity: menuRoot.filterText ? 1 : 0.58
+                        font.family: menuRoot.theme.fontUi
+                        font.pixelSize: menuRoot.theme.fontPx(1.167)
+                        font.weight: Font.DemiBold
                     }
-                    event.accepted = true;
                 }
 
-                Column {
-                    anchors.fill: parent
-                    anchors.margins: menuRoot.cardMargin
-                    spacing: menuRoot.theme.space(3)
+                Item {
+                    width: parent.width
+                    height: menuRoot.listHeight
 
-                    // Header doubles as the query line: the current menu's
-                    // title until you type, then what you typed.
-                    Item {
-                        width: parent.width
-                        height: menuRoot.headerHeight
+                    ListView {
+                        id: list
+                        anchors.fill: parent
+                        clip: true
+                        model: displayModel
+                        spacing: menuRoot.rowSpacing
+                        currentIndex: menuRoot.selectedIndex
+                        boundsBehavior: Flickable.StopAtBounds
 
-                        Text {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            elide: Text.ElideRight
-                            text: {
-                                if (menuRoot.filterText)
-                                    return menuRoot.filterText;
-                                const entry = menuRoot.entryFor(menuRoot.activeMenu);
-                                return (entry ? entry.title || entry.label : "Go") + "…";
+                        section.property: "section"
+                        section.criteria: ViewSection.FullString
+                        section.delegate: Item {
+                            required property string section
+
+                            width: ListView.view.width
+                            height: section === "drilldown" ? menuRoot.dividerHeight : 0
+                            visible: section === "drilldown"
+
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: menuRoot.theme.borderWidth
+                                color: menuRoot.theme.alpha(menuRoot.theme.textPrimary, 0.2)
                             }
-                            color: menuRoot.theme.textPrimary
-                            opacity: menuRoot.filterText ? 1 : 0.58
-                            font.family: menuRoot.theme.fontUi
-                            font.pixelSize: menuRoot.theme.fontPx(1.167)
-                            font.weight: Font.DemiBold
                         }
-                    }
 
-                    Item {
-                        width: parent.width
-                        height: menuRoot.listHeight
+                        delegate: Rectangle {
+                            id: row
 
-                        ListView {
-                            id: list
-                            anchors.fill: parent
-                            clip: true
-                            model: displayModel
-                            spacing: menuRoot.rowSpacing
-                            currentIndex: menuRoot.selectedIndex
-                            boundsBehavior: Flickable.StopAtBounds
+                            required property int index
+                            required property string kind
+                            required property string icon
+                            required property string label
+                            required property string detail
 
-                            section.property: "section"
-                            section.criteria: ViewSection.FullString
-                            section.delegate: Item {
-                                required property string section
+                            readonly property bool hasCursor: row.index === menuRoot.selectedIndex
+                            readonly property bool isSubmenu: row.kind === "menu" || row.kind === "link"
 
-                                width: ListView.view.width
-                                height: section === "drilldown" ? menuRoot.dividerHeight : 0
-                                visible: section === "drilldown"
+                            width: list.width
+                            height: menuRoot.rowHeight
+                            radius: menuRoot.theme.radius(0.75)
+                            color: row.hasCursor ? menuRoot.theme.alpha(menuRoot.theme.accent, 0.18) : "transparent"
 
-                                Rectangle {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    height: menuRoot.theme.borderWidth
-                                    color: menuRoot.theme.alpha(menuRoot.theme.textPrimary, 0.2)
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onEntered: menuRoot.selectedIndex = row.index
+                                onClicked: {
+                                    menuRoot.selectedIndex = row.index;
+                                    menuRoot.activateIndex(row.index);
                                 }
                             }
 
-                            delegate: Rectangle {
-                                id: row
+                            Text {
+                                id: glyph
+                                anchors.left: parent.left
+                                anchors.leftMargin: menuRoot.theme.space(2)
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: menuRoot.theme.space(9)
+                                horizontalAlignment: Text.AlignHCenter
+                                text: row.icon
+                                color: menuRoot.theme.textPrimary
+                                font.family: "Symbols Nerd Font"
+                                font.pixelSize: menuRoot.theme.fontPx(1.333)
+                            }
 
-                                required property int index
-                                required property string kind
-                                required property string icon
-                                required property string label
-                                required property string detail
-
-                                readonly property bool hasCursor: row.index === menuRoot.selectedIndex
-                                readonly property bool isSubmenu: row.kind === "menu" || row.kind === "link"
-
-                                width: list.width
-                                height: menuRoot.rowHeight
-                                radius: menuRoot.theme.radius(0.75)
-                                color: row.hasCursor ? menuRoot.theme.alpha(menuRoot.theme.accent, 0.18) : "transparent"
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onEntered: menuRoot.selectedIndex = row.index
-                                    onClicked: {
-                                        menuRoot.selectedIndex = row.index;
-                                        menuRoot.activateIndex(row.index);
-                                    }
-                                }
+                            Column {
+                                anchors.left: glyph.right
+                                anchors.leftMargin: menuRoot.theme.space(2)
+                                anchors.right: chevron.left
+                                anchors.rightMargin: menuRoot.theme.space(2)
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: menuRoot.theme.space(0.5)
 
                                 Text {
-                                    id: glyph
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: menuRoot.theme.space(2)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: menuRoot.theme.space(9)
-                                    horizontalAlignment: Text.AlignHCenter
-                                    text: row.icon
-                                    color: menuRoot.theme.textPrimary
-                                    font.family: "Symbols Nerd Font"
-                                    font.pixelSize: menuRoot.theme.fontPx(1.333)
-                                }
-
-                                Column {
-                                    anchors.left: glyph.right
-                                    anchors.leftMargin: menuRoot.theme.space(2)
-                                    anchors.right: chevron.left
-                                    anchors.rightMargin: menuRoot.theme.space(2)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    spacing: menuRoot.theme.space(0.5)
-
-                                    Text {
-                                        width: parent.width
-                                        elide: Text.ElideRight
-                                        text: row.label
-                                        color: menuRoot.theme.textPrimary
-                                        font.family: menuRoot.theme.fontUi
-                                        font.pixelSize: menuRoot.theme.fontPx(1.0)
-                                    }
-
-                                    // While filtering, the second line says
-                                    // where the row actually lives.
-                                    Text {
-                                        width: parent.width
-                                        elide: Text.ElideRight
-                                        visible: menuRoot.filterText !== "" && row.detail !== ""
-                                        text: row.detail
-                                        color: menuRoot.theme.textMuted
-                                        font.family: menuRoot.theme.fontUi
-                                        font.pixelSize: menuRoot.theme.fontPx(0.833)
-                                    }
-                                }
-
-                                Text {
-                                    id: chevron
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: menuRoot.theme.space(3)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: row.isSubmenu ? "›" : ""
-                                    opacity: 0.45
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    text: row.label
                                     color: menuRoot.theme.textPrimary
                                     font.family: menuRoot.theme.fontUi
-                                    font.pixelSize: menuRoot.theme.fontPx(1.333)
+                                    font.pixelSize: menuRoot.theme.fontPx(1.0)
+                                }
+
+                                // While filtering, the second line says
+                                // where the row actually lives.
+                                Text {
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    visible: menuRoot.filterText !== "" && row.detail !== ""
+                                    text: row.detail
+                                    color: menuRoot.theme.textMuted
+                                    font.family: menuRoot.theme.fontUi
+                                    font.pixelSize: menuRoot.theme.fontPx(0.833)
                                 }
                             }
-                        }
 
-                        Text {
-                            anchors.centerIn: parent
-                            visible: displayModel.count === 0
-                            horizontalAlignment: Text.AlignHCenter
-                            text: menuRoot.filterText ? "No matches for “" + menuRoot.filterText + "”" : "Nothing here yet"
-                            color: menuRoot.theme.textMuted
-                            font.family: menuRoot.theme.fontUi
-                            font.pixelSize: menuRoot.theme.fontPx(1.0)
+                            Text {
+                                id: chevron
+                                anchors.right: parent.right
+                                anchors.rightMargin: menuRoot.theme.space(3)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: row.isSubmenu ? "›" : ""
+                                opacity: 0.45
+                                color: menuRoot.theme.textPrimary
+                                font.family: menuRoot.theme.fontUi
+                                font.pixelSize: menuRoot.theme.fontPx(1.333)
+                            }
                         }
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: displayModel.count === 0
+                        horizontalAlignment: Text.AlignHCenter
+                        text: menuRoot.filterText ? "No matches for “" + menuRoot.filterText + "”" : "Nothing here yet"
+                        color: menuRoot.theme.textMuted
+                        font.family: menuRoot.theme.fontUi
+                        font.pixelSize: menuRoot.theme.fontPx(1.0)
                     }
                 }
             }

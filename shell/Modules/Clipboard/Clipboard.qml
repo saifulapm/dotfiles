@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "../../components"
 import "ClipboardHistory.js" as ClipboardHistory
 
 // Clipboard history: a persistent capture watcher plus an overlay picker.
@@ -351,477 +352,406 @@ Scope {
         id: pickerLoader
         active: clipboardRoot.everOpened
 
-        component: PanelWindow {
+        component: OverlaySurface {
             id: panel
 
             // Upstream clamps the card to the screen; a small display gets the
             // margin back rather than a card hanging off the edge. The panel
             // measures 0 before it is first mapped, hence the guards.
-            readonly property int cardWidth: panel.width > 0 ? Math.min(clipboardRoot.theme.space(190), panel.width - clipboardRoot.theme.space(8) * 2) : clipboardRoot.theme.space(190)
-            readonly property int cardHeight: panel.height > 0 ? Math.min(clipboardRoot.theme.space(130), panel.height - clipboardRoot.theme.space(8) * 2) : clipboardRoot.theme.space(130)
+            readonly property int computedCardWidth: panel.width > 0 ? Math.min(clipboardRoot.theme.space(190), panel.width - clipboardRoot.theme.space(8) * 2) : clipboardRoot.theme.space(190)
+            readonly property int computedCardHeight: panel.height > 0 ? Math.min(clipboardRoot.theme.space(130), panel.height - clipboardRoot.theme.space(8) * 2) : clipboardRoot.theme.space(130)
 
             function positionAt(index) {
                 list.positionViewAtIndex(index, ListView.Contain);
             }
 
-            // Held through the card's fade-out (see BarPanel.qml): input
-            // drops instantly via the mask so the dying scrim can't eat a
-            // click.
-            visible: clipboardRoot.opened || card.opacity > 0
-            mask: clipboardRoot.opened ? null : closedMask
-            Region {
-                id: closedMask
-            }
-            anchors {
-                top: true
-                bottom: true
-                left: true
-                right: true
-            }
-            exclusionMode: ExclusionMode.Ignore
-            color: "transparent"
-            WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.namespace: "qshell-clipboard"
-            WlrLayershell.keyboardFocus: clipboardRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-
-            // Card-shaped compositor blur behind the glass fill; the scrim
-            // around it stays a plain dim (see BarPanel.qml).
-            BackgroundEffect.blurRegion: clipboardRoot.theme.blurActive && clipboardRoot.opened ? cardBlurRegion : null
-
-            Region {
-                id: cardBlurRegion
-                item: card
-                radius: card.radius
-            }
+            theme: clipboardRoot.theme
+            opened: clipboardRoot.opened
+            namespace: "qshell-clipboard"
+            cardWidth: computedCardWidth
+            cardHeight: computedCardHeight
+            onDismissed: clipboardRoot.hide()
 
             onVisibleChanged: if (visible)
                 Qt.callLater(() => keyCatcher.forceActiveFocus())
 
-            Rectangle {
+            Item {
+                id: keyCatcher
                 anchors.fill: parent
-                color: clipboardRoot.theme.alpha(clipboardRoot.theme.surface0, 0.5)
-                opacity: clipboardRoot.opened ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: clipboardRoot.theme.time(0.8)
-                        easing.type: clipboardRoot.theme.easing
-                    }
-                }
+                focus: true
 
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: clipboardRoot.hide()
-                }
-            }
+                // Typing owns the keyboard — every printable key is query
+                // text, so navigation lives on the arrows, the page keys
+                // and Delete.
+                Keys.onPressed: event => {
+                    const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
+                    const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
 
-            Rectangle {
-                id: card
-                anchors.centerIn: parent
-                width: panel.cardWidth
-                height: panel.cardHeight
-                radius: clipboardRoot.theme.radius(1.5)
-                color: clipboardRoot.theme.glass(clipboardRoot.theme.surface1)
-                border.width: clipboardRoot.theme.borderWidth
-                border.color: clipboardRoot.theme.surface3
-
-                opacity: clipboardRoot.opened ? 1 : 0
-                scale: clipboardRoot.opened ? 1 : 0.96
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: clipboardRoot.theme.time(0.8)
-                        easing.type: clipboardRoot.theme.easing
-                    }
-                }
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: clipboardRoot.theme.time(0.8)
-                        easing.type: clipboardRoot.theme.easing
-                    }
-                }
-
-                MouseArea {
-                    // Swallow clicks so they don't fall through to the scrim.
-                    anchors.fill: parent
-                }
-
-                Item {
-                    id: keyCatcher
-                    anchors.fill: parent
-                    focus: true
-
-                    // Typing owns the keyboard — every printable key is query
-                    // text, so navigation lives on the arrows, the page keys
-                    // and Delete.
-                    Keys.onPressed: event => {
-                        const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
-                        const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
-
-                        if (clipboardRoot.clearConfirmOpen) {
-                            if (event.key === Qt.Key_Escape)
+                    if (clipboardRoot.clearConfirmOpen) {
+                        if (event.key === Qt.Key_Escape)
+                            clipboardRoot.clearConfirmOpen = false;
+                        else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right || event.key === Qt.Key_Tab)
+                            clipboardRoot.clearConfirmIndex = clipboardRoot.clearConfirmIndex === 0 ? 1 : 0;
+                        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (clipboardRoot.clearConfirmIndex === 1)
+                                clipboardRoot.confirmClearHistory();
+                            else
                                 clipboardRoot.clearConfirmOpen = false;
-                            else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right || event.key === Qt.Key_Tab)
-                                clipboardRoot.clearConfirmIndex = clipboardRoot.clearConfirmIndex === 0 ? 1 : 0;
-                            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                if (clipboardRoot.clearConfirmIndex === 1)
-                                    clipboardRoot.confirmClearHistory();
-                                else
-                                    clipboardRoot.clearConfirmOpen = false;
-                            } else {
-                                return;
-                            }
-                            event.accepted = true;
-                            return;
-                        }
-
-                        if (event.key === Qt.Key_Escape) {
-                            if (clipboardRoot.filterText)
-                                clipboardRoot.setFilter("");
-                            else
-                                clipboardRoot.hide();
-                        } else if (event.key === Qt.Key_Backspace) {
-                            // Plain backspace drops a character, Ctrl+Backspace
-                            // a word, Ctrl+U the lot — upstream's editsFilter.
-                            if (!clipboardRoot.filterText)
-                                return;
-                            clipboardRoot.setFilter(ctrl ? clipboardRoot.filterText.replace(/\s+$/, "").replace(/\S+$/, "") : clipboardRoot.filterText.slice(0, -1));
-                        } else if (ctrl && event.key === Qt.Key_U) {
-                            clipboardRoot.setFilter("");
-                        } else if (event.key === Qt.Key_Delete) {
-                            if (shift)
-                                clipboardRoot.requestClearHistory();
-                            else
-                                clipboardRoot.removeDisplayIndex(clipboardRoot.selectedIndex);
-                        } else if (event.key === Qt.Key_Up) {
-                            clipboardRoot.select(-1);
-                        } else if (event.key === Qt.Key_Down) {
-                            clipboardRoot.select(1);
-                        } else if (event.key === Qt.Key_PageUp) {
-                            clipboardRoot.select(-6);
-                        } else if (event.key === Qt.Key_PageDown) {
-                            clipboardRoot.select(6);
-                        } else if (event.key === Qt.Key_Home) {
-                            clipboardRoot.selectAbsolute(0);
-                        } else if (event.key === Qt.Key_End) {
-                            clipboardRoot.selectAbsolute(displayModel.count - 1);
-                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            if (clipboardRoot.cursorActive && (event.modifiers & Qt.AltModifier))
-                                clipboardRoot.openIndex(clipboardRoot.selectedIndex);
-                            else if (clipboardRoot.cursorActive && shift)
-                                clipboardRoot.copyIndex(clipboardRoot.selectedIndex);
-                            else if (clipboardRoot.cursorActive)
-                                clipboardRoot.activateIndex(clipboardRoot.selectedIndex);
-                            else if (displayModel.count > 0)
-                                clipboardRoot.cursorActive = true;
-                        } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
-                            clipboardRoot.setFilter(clipboardRoot.filterText + event.text);
                         } else {
                             return;
                         }
                         event.accepted = true;
+                        return;
                     }
 
-                    Column {
-                        anchors.fill: parent
-                        anchors.margins: clipboardRoot.cardMargin
-                        spacing: clipboardRoot.contentSpacing
+                    if (event.key === Qt.Key_Escape) {
+                        if (clipboardRoot.filterText)
+                            clipboardRoot.setFilter("");
+                        else
+                            clipboardRoot.hide();
+                    } else if (event.key === Qt.Key_Backspace) {
+                        // Plain backspace drops a character, Ctrl+Backspace
+                        // a word, Ctrl+U the lot — upstream's editsFilter.
+                        if (!clipboardRoot.filterText)
+                            return;
+                        clipboardRoot.setFilter(ctrl ? clipboardRoot.filterText.replace(/\s+$/, "").replace(/\S+$/, "") : clipboardRoot.filterText.slice(0, -1));
+                    } else if (ctrl && event.key === Qt.Key_U) {
+                        clipboardRoot.setFilter("");
+                    } else if (event.key === Qt.Key_Delete) {
+                        if (shift)
+                            clipboardRoot.requestClearHistory();
+                        else
+                            clipboardRoot.removeDisplayIndex(clipboardRoot.selectedIndex);
+                    } else if (event.key === Qt.Key_Up) {
+                        clipboardRoot.select(-1);
+                    } else if (event.key === Qt.Key_Down) {
+                        clipboardRoot.select(1);
+                    } else if (event.key === Qt.Key_PageUp) {
+                        clipboardRoot.select(-6);
+                    } else if (event.key === Qt.Key_PageDown) {
+                        clipboardRoot.select(6);
+                    } else if (event.key === Qt.Key_Home) {
+                        clipboardRoot.selectAbsolute(0);
+                    } else if (event.key === Qt.Key_End) {
+                        clipboardRoot.selectAbsolute(displayModel.count - 1);
+                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        if (clipboardRoot.cursorActive && (event.modifiers & Qt.AltModifier))
+                            clipboardRoot.openIndex(clipboardRoot.selectedIndex);
+                        else if (clipboardRoot.cursorActive && shift)
+                            clipboardRoot.copyIndex(clipboardRoot.selectedIndex);
+                        else if (clipboardRoot.cursorActive)
+                            clipboardRoot.activateIndex(clipboardRoot.selectedIndex);
+                        else if (displayModel.count > 0)
+                            clipboardRoot.cursorActive = true;
+                    } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                        clipboardRoot.setFilter(clipboardRoot.filterText + event.text);
+                    } else {
+                        return;
+                    }
+                    event.accepted = true;
+                }
 
-                        // Query line in the launcher's search-field frame. Not
-                        // a TextInput: the list needs the arrow keys, so the
-                        // key catcher above owns every keystroke.
-                        Rectangle {
-                            id: queryField
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: clipboardRoot.cardMargin
+                    spacing: clipboardRoot.contentSpacing
+
+                    // Query line in the launcher's search-field frame. Not
+                    // a TextInput: the list needs the arrow keys, so the
+                    // key catcher above owns every keystroke.
+                    Rectangle {
+                        id: queryField
+                        width: parent.width
+                        height: clipboardRoot.headerHeight
+                        radius: clipboardRoot.theme.radius(1)
+                        color: clipboardRoot.theme.surface2
+                        border.width: clipboardRoot.theme.borderWidth
+                        border.color: clipboardRoot.filterText ? clipboardRoot.theme.accent : clipboardRoot.theme.surface3
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: countLabel.left
+                            anchors.leftMargin: clipboardRoot.theme.space(3)
+                            anchors.rightMargin: clipboardRoot.theme.space(2)
+                            anchors.verticalCenter: parent.verticalCenter
+                            elide: Text.ElideRight
+                            text: clipboardRoot.filterText || "search clipboard"
+                            color: clipboardRoot.filterText ? clipboardRoot.theme.textPrimary : clipboardRoot.theme.textMuted
+                            font.family: clipboardRoot.theme.fontUi
+                            font.pixelSize: clipboardRoot.theme.fontPx(1.1)
+                        }
+
+                        Text {
+                            id: countLabel
+                            anchors.right: parent.right
+                            anchors.rightMargin: clipboardRoot.theme.space(3)
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: displayModel.count + (clipboardRoot.filterText ? "/" + clipboardRoot.history.length : "")
+                            color: clipboardRoot.theme.textMuted
+                            font.family: clipboardRoot.theme.fontUi
+                            font.pixelSize: clipboardRoot.theme.fontPx(0.833)
+                        }
+                    }
+
+                    Item {
+                        id: body
+                        width: parent.width
+                        height: parent.height - y - clipboardRoot.contentSpacing - footer.height
+
+                        // Entries on the left, the selected one in full on
+                        // the right — upstream's split.
+                        Row {
+                            anchors.fill: parent
+                            spacing: 0
+
+                            Item {
+                                width: Math.round(parent.width * 0.45)
+                                height: parent.height
+                                clip: true
+
+                                ListView {
+                                    id: list
+                                    anchors.fill: parent
+                                    anchors.rightMargin: clipboardRoot.theme.space(3)
+                                    clip: true
+                                    model: displayModel
+                                    spacing: clipboardRoot.theme.space(1)
+                                    boundsBehavior: Flickable.StopAtBounds
+
+                                    delegate: Rectangle {
+                                        id: row
+
+                                        required property int index
+                                        required property string entryType
+                                        required property string previewText
+                                        required property string previewImage
+
+                                        readonly property bool hasCursor: clipboardRoot.cursorActive && row.index === clipboardRoot.selectedIndex
+
+                                        width: list.width
+                                        height: clipboardRoot.rowHeight
+                                        radius: clipboardRoot.theme.radius(0.75)
+                                        color: row.hasCursor ? clipboardRoot.theme.alpha(clipboardRoot.theme.accent, 0.18) : "transparent"
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onEntered: {
+                                                clipboardRoot.cursorActive = true;
+                                                clipboardRoot.selectedIndex = row.index;
+                                            }
+                                            onClicked: {
+                                                clipboardRoot.cursorActive = true;
+                                                clipboardRoot.selectedIndex = row.index;
+                                                clipboardRoot.activateIndex(row.index);
+                                            }
+                                        }
+
+                                        Image {
+                                            id: thumb
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: clipboardRoot.theme.space(2)
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            visible: row.previewImage.length > 0
+                                            width: visible ? clipboardRoot.rowHeight - clipboardRoot.theme.space(4) : 0
+                                            height: width
+                                            source: row.previewImage
+                                            fillMode: Image.PreserveAspectFit
+                                            asynchronous: true
+                                            smooth: true
+                                            // Decode at display size: the
+                                            // list must not hold full-size
+                                            // pixmaps for every screenshot.
+                                            sourceSize.width: 96
+                                            sourceSize.height: 96
+                                        }
+
+                                        Text {
+                                            anchors.left: thumb.visible ? thumb.right : parent.left
+                                            anchors.leftMargin: clipboardRoot.theme.space(2)
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: clipboardRoot.theme.space(2)
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            elide: Text.ElideRight
+                                            text: row.previewText
+                                            color: clipboardRoot.theme.textPrimary
+                                            // Images and file drops read as
+                                            // metadata, not as content.
+                                            opacity: row.entryType === "text" ? 1 : 0.72
+                                            font.family: clipboardRoot.theme.fontUi
+                                            font.pixelSize: clipboardRoot.theme.fontPx(1.0)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Item {
+                                id: previewPane
+                                width: parent.width - Math.round(parent.width * 0.45)
+                                height: parent.height
+                                clip: true
+
+                                readonly property var activeRow: displayModel.count > 0 && clipboardRoot.selectedIndex >= 0 && clipboardRoot.selectedIndex < displayModel.count ? displayModel.get(clipboardRoot.selectedIndex) : null
+
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.bottom
+                                    width: clipboardRoot.theme.borderWidth
+                                    color: clipboardRoot.theme.alpha(clipboardRoot.theme.textPrimary, 0.2)
+                                }
+
+                                Text {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: clipboardRoot.theme.space(4)
+                                    visible: previewPane.activeRow && !previewPane.activeRow.previewImage
+                                    text: previewPane.activeRow ? previewPane.activeRow.fullText : ""
+                                    color: clipboardRoot.theme.textPrimary
+                                    font.family: clipboardRoot.theme.fontMono
+                                    font.pixelSize: clipboardRoot.theme.fontPx(0.917)
+                                    wrapMode: Text.WrapAnywhere
+                                    elide: Text.ElideRight
+                                    verticalAlignment: Text.AlignTop
+                                }
+
+                                Image {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: clipboardRoot.theme.space(4)
+                                    visible: previewPane.activeRow && previewPane.activeRow.previewImage
+                                    source: previewPane.activeRow && previewPane.activeRow.previewImage ? previewPane.activeRow.previewImage : ""
+                                    fillMode: Image.PreserveAspectFit
+                                    horizontalAlignment: Image.AlignLeft
+                                    verticalAlignment: Image.AlignTop
+                                    asynchronous: true
+                                    smooth: true
+                                    sourceSize.width: width
+                                    sourceSize.height: height
+                                }
+                            }
+                        }
+
+                        Column {
+                            anchors.centerIn: parent
                             width: parent.width
-                            height: clipboardRoot.headerHeight
-                            radius: clipboardRoot.theme.radius(1)
-                            color: clipboardRoot.theme.surface2
-                            border.width: clipboardRoot.theme.borderWidth
-                            border.color: clipboardRoot.filterText ? clipboardRoot.theme.accent : clipboardRoot.theme.surface3
+                            spacing: clipboardRoot.theme.space(2)
+                            visible: displayModel.count === 0
 
                             Text {
-                                anchors.left: parent.left
-                                anchors.right: countLabel.left
-                                anchors.leftMargin: clipboardRoot.theme.space(3)
-                                anchors.rightMargin: clipboardRoot.theme.space(2)
-                                anchors.verticalCenter: parent.verticalCenter
-                                elide: Text.ElideRight
-                                text: clipboardRoot.filterText || "search clipboard"
-                                color: clipboardRoot.filterText ? clipboardRoot.theme.textPrimary : clipboardRoot.theme.textMuted
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: "󰅌"
+                                color: clipboardRoot.theme.textMuted
+                                font.family: "Symbols Nerd Font"
+                                font.pixelSize: clipboardRoot.theme.fontPx(3.0)
+                            }
+
+                            Text {
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: clipboardRoot.history.length === 0 ? "Clipboard is empty" : "No matches for “" + clipboardRoot.filterText + "”"
+                                color: clipboardRoot.theme.textMuted
+                                font.family: clipboardRoot.theme.fontUi
+                                font.pixelSize: clipboardRoot.theme.fontPx(1.0)
+                            }
+                        }
+                    }
+
+                    // Upstream has no footer; the two Enters and
+                    // Shift+Delete are all worth saying out loud.
+                    Text {
+                        id: footer
+                        width: parent.width
+                        elide: Text.ElideRight
+                        text: "enter paste   ·   shift+enter copy   ·   del remove   ·   shift+del clear all"
+                        color: clipboardRoot.theme.textMuted
+                        font.family: clipboardRoot.theme.fontUi
+                        font.pixelSize: clipboardRoot.theme.fontPx(0.75)
+                    }
+                }
+
+                // Clear-all confirmation, upstream's ConfirmDialog reduced
+                // to the two buttons it actually uses here.
+                Rectangle {
+                    anchors.fill: parent
+                    visible: clipboardRoot.clearConfirmOpen
+                    color: clipboardRoot.theme.alpha(clipboardRoot.theme.surface0, 0.75)
+                    radius: panel.cardRadius
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: clipboardRoot.clearConfirmOpen = false
+                    }
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: Math.min(parent.width - clipboardRoot.theme.space(8), clipboardRoot.theme.space(90))
+                        height: confirmColumn.implicitHeight + clipboardRoot.theme.space(8)
+                        radius: clipboardRoot.theme.radius(1.5)
+                        color: clipboardRoot.theme.surface2
+                        border.width: clipboardRoot.theme.borderWidth
+                        border.color: clipboardRoot.theme.surface3
+
+                        MouseArea {
+                            anchors.fill: parent
+                        }
+
+                        Column {
+                            id: confirmColumn
+                            anchors.centerIn: parent
+                            width: parent.width - clipboardRoot.theme.space(8)
+                            spacing: clipboardRoot.theme.space(4)
+
+                            Text {
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.WordWrap
+                                text: "Delete entire clipboard history?"
+                                color: clipboardRoot.theme.textPrimary
                                 font.family: clipboardRoot.theme.fontUi
                                 font.pixelSize: clipboardRoot.theme.fontPx(1.1)
                             }
 
-                            Text {
-                                id: countLabel
-                                anchors.right: parent.right
-                                anchors.rightMargin: clipboardRoot.theme.space(3)
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: displayModel.count + (clipboardRoot.filterText ? "/" + clipboardRoot.history.length : "")
-                                color: clipboardRoot.theme.textMuted
-                                font.family: clipboardRoot.theme.fontUi
-                                font.pixelSize: clipboardRoot.theme.fontPx(0.833)
-                            }
-                        }
-
-                        Item {
-                            id: body
-                            width: parent.width
-                            height: parent.height - y - clipboardRoot.contentSpacing - footer.height
-
-                            // Entries on the left, the selected one in full on
-                            // the right — upstream's split.
                             Row {
-                                anchors.fill: parent
-                                spacing: 0
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                spacing: clipboardRoot.theme.space(3)
 
-                                Item {
-                                    width: Math.round(parent.width * 0.45)
-                                    height: parent.height
-                                    clip: true
+                                Repeater {
+                                    model: ["Cancel", "Delete"]
 
-                                    ListView {
-                                        id: list
-                                        anchors.fill: parent
-                                        anchors.rightMargin: clipboardRoot.theme.space(3)
-                                        clip: true
-                                        model: displayModel
-                                        spacing: clipboardRoot.theme.space(1)
-                                        boundsBehavior: Flickable.StopAtBounds
+                                    delegate: Rectangle {
+                                        id: confirmButton
 
-                                        delegate: Rectangle {
-                                            id: row
+                                        required property int index
+                                        required property string modelData
 
-                                            required property int index
-                                            required property string entryType
-                                            required property string previewText
-                                            required property string previewImage
+                                        readonly property bool hasCursor: clipboardRoot.clearConfirmIndex === confirmButton.index
 
-                                            readonly property bool hasCursor: clipboardRoot.cursorActive && row.index === clipboardRoot.selectedIndex
+                                        width: clipboardRoot.theme.space(26)
+                                        height: clipboardRoot.theme.space(9)
+                                        radius: clipboardRoot.theme.radius(0.75)
+                                        color: confirmButton.hasCursor ? clipboardRoot.theme.alpha(confirmButton.index === 1 ? clipboardRoot.theme.error : clipboardRoot.theme.accent, 0.22) : "transparent"
+                                        border.width: clipboardRoot.theme.borderWidth
+                                        border.color: confirmButton.hasCursor ? (confirmButton.index === 1 ? clipboardRoot.theme.error : clipboardRoot.theme.accent) : clipboardRoot.theme.surface3
 
-                                            width: list.width
-                                            height: clipboardRoot.rowHeight
-                                            radius: clipboardRoot.theme.radius(0.75)
-                                            color: row.hasCursor ? clipboardRoot.theme.alpha(clipboardRoot.theme.accent, 0.18) : "transparent"
-
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onEntered: {
-                                                    clipboardRoot.cursorActive = true;
-                                                    clipboardRoot.selectedIndex = row.index;
-                                                }
-                                                onClicked: {
-                                                    clipboardRoot.cursorActive = true;
-                                                    clipboardRoot.selectedIndex = row.index;
-                                                    clipboardRoot.activateIndex(row.index);
-                                                }
-                                            }
-
-                                            Image {
-                                                id: thumb
-                                                anchors.left: parent.left
-                                                anchors.leftMargin: clipboardRoot.theme.space(2)
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                visible: row.previewImage.length > 0
-                                                width: visible ? clipboardRoot.rowHeight - clipboardRoot.theme.space(4) : 0
-                                                height: width
-                                                source: row.previewImage
-                                                fillMode: Image.PreserveAspectFit
-                                                asynchronous: true
-                                                smooth: true
-                                                // Decode at display size: the
-                                                // list must not hold full-size
-                                                // pixmaps for every screenshot.
-                                                sourceSize.width: 96
-                                                sourceSize.height: 96
-                                            }
-
-                                            Text {
-                                                anchors.left: thumb.visible ? thumb.right : parent.left
-                                                anchors.leftMargin: clipboardRoot.theme.space(2)
-                                                anchors.right: parent.right
-                                                anchors.rightMargin: clipboardRoot.theme.space(2)
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                elide: Text.ElideRight
-                                                text: row.previewText
-                                                color: clipboardRoot.theme.textPrimary
-                                                // Images and file drops read as
-                                                // metadata, not as content.
-                                                opacity: row.entryType === "text" ? 1 : 0.72
-                                                font.family: clipboardRoot.theme.fontUi
-                                                font.pixelSize: clipboardRoot.theme.fontPx(1.0)
-                                            }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: confirmButton.modelData
+                                            color: clipboardRoot.theme.textPrimary
+                                            font.family: clipboardRoot.theme.fontUi
+                                            font.pixelSize: clipboardRoot.theme.fontPx(1.0)
                                         }
-                                    }
-                                }
 
-                                Item {
-                                    id: previewPane
-                                    width: parent.width - Math.round(parent.width * 0.45)
-                                    height: parent.height
-                                    clip: true
-
-                                    readonly property var activeRow: displayModel.count > 0 && clipboardRoot.selectedIndex >= 0 && clipboardRoot.selectedIndex < displayModel.count ? displayModel.get(clipboardRoot.selectedIndex) : null
-
-                                    Rectangle {
-                                        anchors.left: parent.left
-                                        anchors.top: parent.top
-                                        anchors.bottom: parent.bottom
-                                        width: clipboardRoot.theme.borderWidth
-                                        color: clipboardRoot.theme.alpha(clipboardRoot.theme.textPrimary, 0.2)
-                                    }
-
-                                    Text {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: clipboardRoot.theme.space(4)
-                                        visible: previewPane.activeRow && !previewPane.activeRow.previewImage
-                                        text: previewPane.activeRow ? previewPane.activeRow.fullText : ""
-                                        color: clipboardRoot.theme.textPrimary
-                                        font.family: clipboardRoot.theme.fontMono
-                                        font.pixelSize: clipboardRoot.theme.fontPx(0.917)
-                                        wrapMode: Text.WrapAnywhere
-                                        elide: Text.ElideRight
-                                        verticalAlignment: Text.AlignTop
-                                    }
-
-                                    Image {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: clipboardRoot.theme.space(4)
-                                        visible: previewPane.activeRow && previewPane.activeRow.previewImage
-                                        source: previewPane.activeRow && previewPane.activeRow.previewImage ? previewPane.activeRow.previewImage : ""
-                                        fillMode: Image.PreserveAspectFit
-                                        horizontalAlignment: Image.AlignLeft
-                                        verticalAlignment: Image.AlignTop
-                                        asynchronous: true
-                                        smooth: true
-                                        sourceSize.width: width
-                                        sourceSize.height: height
-                                    }
-                                }
-                            }
-
-                            Column {
-                                anchors.centerIn: parent
-                                width: parent.width
-                                spacing: clipboardRoot.theme.space(2)
-                                visible: displayModel.count === 0
-
-                                Text {
-                                    width: parent.width
-                                    horizontalAlignment: Text.AlignHCenter
-                                    text: "󰅌"
-                                    color: clipboardRoot.theme.textMuted
-                                    font.family: "Symbols Nerd Font"
-                                    font.pixelSize: clipboardRoot.theme.fontPx(3.0)
-                                }
-
-                                Text {
-                                    width: parent.width
-                                    horizontalAlignment: Text.AlignHCenter
-                                    text: clipboardRoot.history.length === 0 ? "Clipboard is empty" : "No matches for “" + clipboardRoot.filterText + "”"
-                                    color: clipboardRoot.theme.textMuted
-                                    font.family: clipboardRoot.theme.fontUi
-                                    font.pixelSize: clipboardRoot.theme.fontPx(1.0)
-                                }
-                            }
-                        }
-
-                        // Upstream has no footer; the two Enters and
-                        // Shift+Delete are all worth saying out loud.
-                        Text {
-                            id: footer
-                            width: parent.width
-                            elide: Text.ElideRight
-                            text: "enter paste   ·   shift+enter copy   ·   del remove   ·   shift+del clear all"
-                            color: clipboardRoot.theme.textMuted
-                            font.family: clipboardRoot.theme.fontUi
-                            font.pixelSize: clipboardRoot.theme.fontPx(0.75)
-                        }
-                    }
-
-                    // Clear-all confirmation, upstream's ConfirmDialog reduced
-                    // to the two buttons it actually uses here.
-                    Rectangle {
-                        anchors.fill: parent
-                        visible: clipboardRoot.clearConfirmOpen
-                        color: clipboardRoot.theme.alpha(clipboardRoot.theme.surface0, 0.75)
-                        radius: card.radius
-
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: clipboardRoot.clearConfirmOpen = false
-                        }
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: Math.min(parent.width - clipboardRoot.theme.space(8), clipboardRoot.theme.space(90))
-                            height: confirmColumn.implicitHeight + clipboardRoot.theme.space(8)
-                            radius: clipboardRoot.theme.radius(1.5)
-                            color: clipboardRoot.theme.surface2
-                            border.width: clipboardRoot.theme.borderWidth
-                            border.color: clipboardRoot.theme.surface3
-
-                            MouseArea {
-                                anchors.fill: parent
-                            }
-
-                            Column {
-                                id: confirmColumn
-                                anchors.centerIn: parent
-                                width: parent.width - clipboardRoot.theme.space(8)
-                                spacing: clipboardRoot.theme.space(4)
-
-                                Text {
-                                    width: parent.width
-                                    horizontalAlignment: Text.AlignHCenter
-                                    wrapMode: Text.WordWrap
-                                    text: "Delete entire clipboard history?"
-                                    color: clipboardRoot.theme.textPrimary
-                                    font.family: clipboardRoot.theme.fontUi
-                                    font.pixelSize: clipboardRoot.theme.fontPx(1.1)
-                                }
-
-                                Row {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    spacing: clipboardRoot.theme.space(3)
-
-                                    Repeater {
-                                        model: ["Cancel", "Delete"]
-
-                                        delegate: Rectangle {
-                                            id: confirmButton
-
-                                            required property int index
-                                            required property string modelData
-
-                                            readonly property bool hasCursor: clipboardRoot.clearConfirmIndex === confirmButton.index
-
-                                            width: clipboardRoot.theme.space(26)
-                                            height: clipboardRoot.theme.space(9)
-                                            radius: clipboardRoot.theme.radius(0.75)
-                                            color: confirmButton.hasCursor ? clipboardRoot.theme.alpha(confirmButton.index === 1 ? clipboardRoot.theme.error : clipboardRoot.theme.accent, 0.22) : "transparent"
-                                            border.width: clipboardRoot.theme.borderWidth
-                                            border.color: confirmButton.hasCursor ? (confirmButton.index === 1 ? clipboardRoot.theme.error : clipboardRoot.theme.accent) : clipboardRoot.theme.surface3
-
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: confirmButton.modelData
-                                                color: clipboardRoot.theme.textPrimary
-                                                font.family: clipboardRoot.theme.fontUi
-                                                font.pixelSize: clipboardRoot.theme.fontPx(1.0)
-                                            }
-
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onEntered: clipboardRoot.clearConfirmIndex = confirmButton.index
-                                                onClicked: {
-                                                    if (confirmButton.index === 1)
-                                                        clipboardRoot.confirmClearHistory();
-                                                    else
-                                                        clipboardRoot.clearConfirmOpen = false;
-                                                }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onEntered: clipboardRoot.clearConfirmIndex = confirmButton.index
+                                            onClicked: {
+                                                if (confirmButton.index === 1)
+                                                    clipboardRoot.confirmClearHistory();
+                                                else
+                                                    clipboardRoot.clearConfirmOpen = false;
                                             }
                                         }
                                     }

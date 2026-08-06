@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../../components"
 import "ReminderFlowModel.js" as ReminderFlowModel
 
 // Reminder capture flow: a fullscreen overlay with one centered input line,
@@ -98,172 +99,102 @@ Scope {
         }
     }
 
-    PanelWindow {
+    OverlaySurface {
         id: panel
 
-        // Held through the card's fade-out (see BarPanel.qml): input drops
-        // instantly via the mask so the dying scrim can't eat a click.
-        visible: flowRoot.opened || card.opacity > 0
-        mask: flowRoot.opened ? null : closedMask
-        Region {
-            id: closedMask
-        }
-        anchors {
-            top: true
-            bottom: true
-            left: true
-            right: true
-        }
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.namespace: "qshell-reminders"
-        WlrLayershell.keyboardFocus: flowRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+        theme: flowRoot.theme
+        opened: flowRoot.opened
+        namespace: "qshell-reminders"
+        cardWidth: flowRoot.cardWidth
+        cardHeight: content.implicitHeight + flowRoot.cardMargin * 2
+        onDismissed: flowRoot.hide()
 
-        // Card-shaped compositor blur behind the glass fill; the scrim
-        // around it stays a plain dim (see BarPanel.qml).
-        BackgroundEffect.blurRegion: flowRoot.theme.blurActive && flowRoot.opened ? cardBlurRegion : null
-
-        Region {
-            id: cardBlurRegion
-            item: card
-            radius: card.radius
-        }
-
-        Rectangle {
+        Item {
+            id: keyCatcher
             anchors.fill: parent
-            color: flowRoot.theme.alpha(flowRoot.theme.surface0, 0.5)
-            opacity: flowRoot.opened ? 1 : 0
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: flowRoot.theme.time(0.8)
-                    easing.type: flowRoot.theme.easing
-                }
-            }
+            focus: true
 
-            MouseArea {
-                anchors.fill: parent
-                onClicked: flowRoot.hide()
-            }
-        }
+            // The line is not a TextInput: as in the other pickers, one
+            // catcher owns every keystroke so Enter and Escape keep their
+            // flow meaning.
+            Keys.onPressed: event => {
+                const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
 
-        Rectangle {
-            id: card
-            anchors.centerIn: parent
-            width: flowRoot.cardWidth
-            height: content.implicitHeight + flowRoot.cardMargin * 2
-            radius: flowRoot.theme.radius(1.5)
-            color: flowRoot.theme.glass(flowRoot.theme.surface1)
-            border.width: flowRoot.theme.borderWidth
-            border.color: flowRoot.theme.surface3
-
-            opacity: flowRoot.opened ? 1 : 0
-            scale: flowRoot.opened ? 1 : 0.96
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: flowRoot.theme.time(0.8)
-                    easing.type: flowRoot.theme.easing
-                }
-            }
-            Behavior on scale {
-                NumberAnimation {
-                    duration: flowRoot.theme.time(0.8)
-                    easing.type: flowRoot.theme.easing
-                }
-            }
-
-            MouseArea {
-                // Swallow clicks so they don't fall through to the scrim.
-                anchors.fill: parent
-            }
-
-            Item {
-                id: keyCatcher
-                anchors.fill: parent
-                focus: true
-
-                // The line is not a TextInput: as in the other pickers, one
-                // catcher owns every keystroke so Enter and Escape keep their
-                // flow meaning.
-                Keys.onPressed: event => {
-                    const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
-
-                    if (event.key === Qt.Key_Escape) {
-                        if (flowRoot.filterText)
-                            flowRoot.setFilter("");
-                        else
-                            flowRoot.hide();
-                    } else if (event.key === Qt.Key_Backspace) {
-                        // Plain backspace drops a character, Ctrl+Backspace a
-                        // word, Ctrl+U the lot — upstream's Util.editsFilter.
-                        if (!flowRoot.filterText)
-                            return;
-                        flowRoot.setFilter(ctrl ? flowRoot.filterText.replace(/\s+$/, "").replace(/\S+$/, "") : flowRoot.filterText.slice(0, -1));
-                    } else if (ctrl && event.key === Qt.Key_U) {
+                if (event.key === Qt.Key_Escape) {
+                    if (flowRoot.filterText)
                         flowRoot.setFilter("");
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        flowRoot.submit();
-                    } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
-                        flowRoot.setFilter(flowRoot.filterText + event.text);
-                    } else {
+                    else
+                        flowRoot.hide();
+                } else if (event.key === Qt.Key_Backspace) {
+                    // Plain backspace drops a character, Ctrl+Backspace a
+                    // word, Ctrl+U the lot — upstream's Util.editsFilter.
+                    if (!flowRoot.filterText)
                         return;
+                    flowRoot.setFilter(ctrl ? flowRoot.filterText.replace(/\s+$/, "").replace(/\S+$/, "") : flowRoot.filterText.slice(0, -1));
+                } else if (ctrl && event.key === Qt.Key_U) {
+                    flowRoot.setFilter("");
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    flowRoot.submit();
+                } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                    flowRoot.setFilter(flowRoot.filterText + event.text);
+                } else {
+                    return;
+                }
+                event.accepted = true;
+            }
+
+            Column {
+                id: content
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: flowRoot.cardMargin
+                spacing: flowRoot.contentSpacing
+
+                Row {
+                    width: parent.width
+                    spacing: flowRoot.theme.space(2)
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "󰢌" // md-reminder, as upstream's indicator
+                        color: flowRoot.theme.accent
+                        font.family: flowRoot.theme.fontMono
+                        font.pixelSize: flowRoot.theme.fontPx(1.0)
                     }
-                    event.accepted = true;
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: flowRoot.captionText
+                        color: flowRoot.theme.textMuted
+                        font.family: flowRoot.theme.fontUi
+                        font.pixelSize: flowRoot.theme.fontPx(0.833)
+                        font.capitalization: Font.AllUppercase
+                        font.letterSpacing: 1
+                    }
                 }
 
-                Column {
-                    id: content
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: flowRoot.cardMargin
-                    spacing: flowRoot.contentSpacing
+                Rectangle {
+                    width: parent.width
+                    height: flowRoot.headerHeight
+                    radius: flowRoot.theme.radius(1)
+                    color: flowRoot.theme.surface2
+                    border.width: flowRoot.theme.borderWidth
+                    border.color: flowRoot.filterText ? flowRoot.theme.accent : flowRoot.theme.surface3
 
-                    Row {
-                        width: parent.width
-                        spacing: flowRoot.theme.space(2)
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "󰢌" // md-reminder, as upstream's indicator
-                            color: flowRoot.theme.accent
-                            font.family: flowRoot.theme.fontMono
-                            font.pixelSize: flowRoot.theme.fontPx(1.0)
-                        }
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: flowRoot.captionText
-                            color: flowRoot.theme.textMuted
-                            font.family: flowRoot.theme.fontUi
-                            font.pixelSize: flowRoot.theme.fontPx(0.833)
-                            font.capitalization: Font.AllUppercase
-                            font.letterSpacing: 1
-                        }
-                    }
-
-                    Rectangle {
-                        width: parent.width
-                        height: flowRoot.headerHeight
-                        radius: flowRoot.theme.radius(1)
-                        color: flowRoot.theme.surface2
-                        border.width: flowRoot.theme.borderWidth
-                        border.color: flowRoot.filterText ? flowRoot.theme.accent : flowRoot.theme.surface3
-
-                        Text {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.leftMargin: flowRoot.theme.space(3)
-                            anchors.rightMargin: flowRoot.theme.space(3)
-                            anchors.verticalCenter: parent.verticalCenter
-                            elide: Text.ElideRight
-                            // Upstream's placeholder is the prompt with an
-                            // ellipsis, dimmed until something is typed.
-                            text: flowRoot.filterText || (flowRoot.promptText + "…")
-                            color: flowRoot.filterText ? flowRoot.theme.textPrimary : flowRoot.theme.textMuted
-                            font.family: flowRoot.theme.fontUi
-                            font.pixelSize: flowRoot.theme.fontPx(1.1)
-                        }
+                    Text {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: flowRoot.theme.space(3)
+                        anchors.rightMargin: flowRoot.theme.space(3)
+                        anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideRight
+                        // Upstream's placeholder is the prompt with an
+                        // ellipsis, dimmed until something is typed.
+                        text: flowRoot.filterText || (flowRoot.promptText + "…")
+                        color: flowRoot.filterText ? flowRoot.theme.textPrimary : flowRoot.theme.textMuted
+                        font.family: flowRoot.theme.fontUi
+                        font.pixelSize: flowRoot.theme.fontPx(1.1)
                     }
                 }
             }

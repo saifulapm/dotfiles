@@ -3,6 +3,7 @@ import Qt.labs.folderlistmodel
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "../../components"
 import "FilePickerModel.js" as Model
 
 // The shell's own file chooser: a themed overlay in the launcher/emoji picker's
@@ -377,436 +378,365 @@ Scope {
     }
 
     // ---------------------------------------------------------------- window
-    PanelWindow {
+    OverlaySurface {
         id: panel
 
-        // Held through the card's fade-out (see BarPanel.qml): input drops
-        // instantly via the mask so the dying scrim can't eat a click.
-        visible: pickerRoot.opened || card.opacity > 0
-        mask: pickerRoot.opened ? null : closedMask
-        Region {
-            id: closedMask
-        }
-        anchors {
-            top: true
-            bottom: true
-            left: true
-            right: true
-        }
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.namespace: "qshell-filepicker"
-        WlrLayershell.keyboardFocus: pickerRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+        theme: pickerRoot.theme
+        opened: pickerRoot.opened
+        namespace: "qshell-filepicker"
+        cardWidth: pickerRoot.cardWidth
+        cardHeight: pickerRoot.cardHeight
+        onDismissed: pickerRoot.cancel()
 
-        // Card-shaped compositor blur behind the glass fill; the scrim
-        // around it stays a plain dim (see BarPanel.qml).
-        BackgroundEffect.blurRegion: pickerRoot.theme.blurActive && pickerRoot.opened ? cardBlurRegion : null
+        Item {
+            id: keyCatcher
 
-        Region {
-            id: cardBlurRegion
-            item: card
-            radius: card.radius
-        }
-
-        Rectangle {
             anchors.fill: parent
-            color: pickerRoot.theme.alpha(pickerRoot.theme.surface0, 0.5)
-            opacity: pickerRoot.opened ? 1 : 0
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: pickerRoot.theme.time(0.8)
-                    easing.type: pickerRoot.theme.easing
-                }
-            }
+            focus: true
 
-            MouseArea {
-                anchors.fill: parent
-                onClicked: pickerRoot.cancel()
-            }
-        }
+            Keys.onPressed: event => {
+                const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
+                const alt = (event.modifiers & Qt.AltModifier) !== 0;
 
-        Rectangle {
-            id: card
-
-            anchors.centerIn: parent
-            width: pickerRoot.cardWidth
-            height: pickerRoot.cardHeight
-            radius: pickerRoot.theme.radius(1.5)
-            color: pickerRoot.theme.glass(pickerRoot.theme.surface1)
-            border.width: pickerRoot.theme.borderWidth
-            border.color: pickerRoot.theme.surface3
-
-            opacity: pickerRoot.opened ? 1 : 0
-            scale: pickerRoot.opened ? 1 : 0.96
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: pickerRoot.theme.time(0.8)
-                    easing.type: pickerRoot.theme.easing
-                }
-            }
-            Behavior on scale {
-                NumberAnimation {
-                    duration: pickerRoot.theme.time(0.8)
-                    easing.type: pickerRoot.theme.easing
-                }
-            }
-
-            MouseArea {
-                // Swallow clicks so they don't fall through to the scrim.
-                anchors.fill: parent
-            }
-
-            Item {
-                id: keyCatcher
-
-                anchors.fill: parent
-                focus: true
-
-                Keys.onPressed: event => {
-                    const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
-                    const alt = (event.modifiers & Qt.AltModifier) !== 0;
-
-                    if (event.key === Qt.Key_Escape) {
-                        if (!pickerRoot.saving && pickerRoot.query !== "")
-                            pickerRoot.query = "";
-                        else
-                            pickerRoot.cancel();
-                    } else if (event.key === Qt.Key_Backspace) {
-                        if (pickerRoot.query !== "")
-                            pickerRoot.query = ctrl ? pickerRoot.query.replace(/\s+$/, "").replace(/\S+$/, "") : pickerRoot.query.slice(0, -1);
-                        else
-                            pickerRoot.goUp();
-                    } else if (ctrl && event.key === Qt.Key_U) {
+                if (event.key === Qt.Key_Escape) {
+                    if (!pickerRoot.saving && pickerRoot.query !== "")
                         pickerRoot.query = "";
-                    } else if (ctrl && event.key === Qt.Key_H) {
-                        pickerRoot.showHidden = !pickerRoot.showHidden;
-                    } else if (event.key === Qt.Key_Up) {
-                        pickerRoot.move(-1);
-                    } else if (event.key === Qt.Key_Down) {
-                        pickerRoot.move(1);
-                    } else if (event.key === Qt.Key_PageUp) {
-                        pickerRoot.move(-Math.max(1, Math.floor(listView.height / pickerRoot.rowHeight)));
-                    } else if (event.key === Qt.Key_PageDown) {
-                        pickerRoot.move(Math.max(1, Math.floor(listView.height / pickerRoot.rowHeight)));
-                    } else if (event.key === Qt.Key_Home) {
-                        pickerRoot.moveTo(0);
-                    } else if (event.key === Qt.Key_End) {
-                        pickerRoot.moveTo(pickerRoot.entries.length - 1);
-                    } else if (event.key === Qt.Key_Left || (alt && event.key === Qt.Key_Up)) {
+                    else
+                        pickerRoot.cancel();
+                } else if (event.key === Qt.Key_Backspace) {
+                    if (pickerRoot.query !== "")
+                        pickerRoot.query = ctrl ? pickerRoot.query.replace(/\s+$/, "").replace(/\S+$/, "") : pickerRoot.query.slice(0, -1);
+                    else
                         pickerRoot.goUp();
-                    } else if (event.key === Qt.Key_Right) {
-                        if (pickerRoot.currentEntry && pickerRoot.currentEntry.isDir)
-                            pickerRoot.enter(pickerRoot.currentEntry.path);
-                    } else if (event.key === Qt.Key_Tab) {
-                        if (pickerRoot.filters.length > 1)
-                            pickerRoot.filterIndex = (pickerRoot.filterIndex + 1) % pickerRoot.filters.length;
-                    } else if (ctrl && event.key === Qt.Key_Space) {
-                        pickerRoot.toggleSelection(pickerRoot.currentEntry);
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        if (ctrl)
-                            pickerRoot.accept();
-                        else
-                            pickerRoot.activate();
-                    } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
-                        pickerRoot.query = pickerRoot.query + event.text;
-                        if (!pickerRoot.saving)
-                            pickerRoot.cursor = 0;
-                    } else {
-                        return;
+                } else if (ctrl && event.key === Qt.Key_U) {
+                    pickerRoot.query = "";
+                } else if (ctrl && event.key === Qt.Key_H) {
+                    pickerRoot.showHidden = !pickerRoot.showHidden;
+                } else if (event.key === Qt.Key_Up) {
+                    pickerRoot.move(-1);
+                } else if (event.key === Qt.Key_Down) {
+                    pickerRoot.move(1);
+                } else if (event.key === Qt.Key_PageUp) {
+                    pickerRoot.move(-Math.max(1, Math.floor(listView.height / pickerRoot.rowHeight)));
+                } else if (event.key === Qt.Key_PageDown) {
+                    pickerRoot.move(Math.max(1, Math.floor(listView.height / pickerRoot.rowHeight)));
+                } else if (event.key === Qt.Key_Home) {
+                    pickerRoot.moveTo(0);
+                } else if (event.key === Qt.Key_End) {
+                    pickerRoot.moveTo(pickerRoot.entries.length - 1);
+                } else if (event.key === Qt.Key_Left || (alt && event.key === Qt.Key_Up)) {
+                    pickerRoot.goUp();
+                } else if (event.key === Qt.Key_Right) {
+                    if (pickerRoot.currentEntry && pickerRoot.currentEntry.isDir)
+                        pickerRoot.enter(pickerRoot.currentEntry.path);
+                } else if (event.key === Qt.Key_Tab) {
+                    if (pickerRoot.filters.length > 1)
+                        pickerRoot.filterIndex = (pickerRoot.filterIndex + 1) % pickerRoot.filters.length;
+                } else if (ctrl && event.key === Qt.Key_Space) {
+                    pickerRoot.toggleSelection(pickerRoot.currentEntry);
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    if (ctrl)
+                        pickerRoot.accept();
+                    else
+                        pickerRoot.activate();
+                } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                    pickerRoot.query = pickerRoot.query + event.text;
+                    if (!pickerRoot.saving)
+                        pickerRoot.cursor = 0;
+                } else {
+                    return;
+                }
+                event.accepted = true;
+            }
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: pickerRoot.cardMargin
+                spacing: pickerRoot.theme.space(3)
+
+                // ------------------------------------------------ header
+                Item {
+                    width: parent.width
+                    height: titleLabel.implicitHeight
+
+                    Text {
+                        id: titleLabel
+                        anchors.left: parent.left
+                        anchors.right: modeLabel.left
+                        anchors.rightMargin: pickerRoot.theme.space(3)
+                        text: pickerRoot.title
+                        color: pickerRoot.theme.textPrimary
+                        font.family: pickerRoot.theme.fontUi
+                        font.pixelSize: pickerRoot.theme.fontPx(1.083)
+                        font.weight: Font.DemiBold
+                        elide: Text.ElideRight
                     }
-                    event.accepted = true;
+
+                    Text {
+                        id: modeLabel
+                        anchors.right: parent.right
+                        anchors.verticalCenter: titleLabel.verticalCenter
+                        text: pickerRoot.queue.length > 1 ? pickerRoot.queue.length - 1 + " waiting" : (pickerRoot.multiple ? "MULTIPLE" : "")
+                        visible: text !== ""
+                        color: pickerRoot.theme.textMuted
+                        font.family: pickerRoot.theme.fontMono
+                        font.pixelSize: pickerRoot.theme.fontPx(0.75)
+                        font.letterSpacing: 1.2
+                    }
                 }
 
-                Column {
-                    anchors.fill: parent
-                    anchors.margins: pickerRoot.cardMargin
-                    spacing: pickerRoot.theme.space(3)
+                // -------------------------------------------- breadcrumb
+                Flickable {
+                    width: parent.width
+                    height: crumbRow.implicitHeight
+                    contentWidth: crumbRow.implicitWidth
+                    contentHeight: height
+                    interactive: contentWidth > width
+                    clip: true
 
-                    // ------------------------------------------------ header
-                    Item {
-                        width: parent.width
-                        height: titleLabel.implicitHeight
+                    Row {
+                        id: crumbRow
+                        spacing: 0
 
-                        Text {
-                            id: titleLabel
-                            anchors.left: parent.left
-                            anchors.right: modeLabel.left
-                            anchors.rightMargin: pickerRoot.theme.space(3)
-                            text: pickerRoot.title
-                            color: pickerRoot.theme.textPrimary
-                            font.family: pickerRoot.theme.fontUi
-                            font.pixelSize: pickerRoot.theme.fontPx(1.083)
-                            font.weight: Font.DemiBold
-                            elide: Text.ElideRight
-                        }
+                        Repeater {
+                            model: pickerRoot.crumbs
 
-                        Text {
-                            id: modeLabel
-                            anchors.right: parent.right
-                            anchors.verticalCenter: titleLabel.verticalCenter
-                            text: pickerRoot.queue.length > 1 ? pickerRoot.queue.length - 1 + " waiting" : (pickerRoot.multiple ? "MULTIPLE" : "")
-                            visible: text !== ""
-                            color: pickerRoot.theme.textMuted
-                            font.family: pickerRoot.theme.fontMono
-                            font.pixelSize: pickerRoot.theme.fontPx(0.75)
-                            font.letterSpacing: 1.2
-                        }
-                    }
-
-                    // -------------------------------------------- breadcrumb
-                    Flickable {
-                        width: parent.width
-                        height: crumbRow.implicitHeight
-                        contentWidth: crumbRow.implicitWidth
-                        contentHeight: height
-                        interactive: contentWidth > width
-                        clip: true
-
-                        Row {
-                            id: crumbRow
-                            spacing: 0
-
-                            Repeater {
-                                model: pickerRoot.crumbs
-
-                                Row {
-                                    required property var modelData
-                                    required property int index
-
-                                    spacing: 0
-
-                                    Text {
-                                        visible: index > 0
-                                        text: "  ›  "
-                                        color: pickerRoot.theme.textMuted
-                                        font.family: pickerRoot.theme.fontUi
-                                        font.pixelSize: pickerRoot.theme.fontPx(0.917)
-                                    }
-
-                                    Text {
-                                        text: modelData.label
-                                        color: index === pickerRoot.crumbs.length - 1 ? pickerRoot.theme.textPrimary : pickerRoot.theme.textMuted
-                                        font.family: pickerRoot.theme.fontUi
-                                        font.pixelSize: pickerRoot.theme.fontPx(0.917)
-
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: pickerRoot.enter(modelData.path)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // ------------------------------------- name/filter field
-                    Rectangle {
-                        width: parent.width
-                        height: pickerRoot.theme.space(10)
-                        radius: pickerRoot.theme.radius(1)
-                        color: pickerRoot.theme.surface2
-                        border.width: pickerRoot.theme.borderWidth
-                        border.color: pickerRoot.query !== "" ? pickerRoot.theme.accent : pickerRoot.theme.surface3
-
-                        Text {
-                            anchors.left: parent.left
-                            anchors.right: fieldHint.left
-                            anchors.leftMargin: pickerRoot.theme.space(3)
-                            anchors.rightMargin: pickerRoot.theme.space(2)
-                            anchors.verticalCenter: parent.verticalCenter
-                            elide: Text.ElideLeft
-                            text: pickerRoot.query !== "" ? pickerRoot.query : (pickerRoot.saving ? "file name" : "filter")
-                            color: pickerRoot.query !== "" ? pickerRoot.theme.textPrimary : pickerRoot.theme.textMuted
-                            font.family: pickerRoot.saving ? pickerRoot.theme.fontMono : pickerRoot.theme.fontUi
-                            font.pixelSize: pickerRoot.theme.fontPx(1.0)
-                        }
-
-                        Text {
-                            id: fieldHint
-                            anchors.right: parent.right
-                            anchors.rightMargin: pickerRoot.theme.space(3)
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: pickerRoot.activeFilter ? String(pickerRoot.activeFilter.name || "") + (pickerRoot.filters.length > 1 ? "  ⇥" : "") : ""
-                            visible: text !== ""
-                            color: pickerRoot.theme.textMuted
-                            font.family: pickerRoot.theme.fontUi
-                            font.pixelSize: pickerRoot.theme.fontPx(0.833)
-                        }
-                    }
-
-                    // -------------------------------------------------- list
-                    Rectangle {
-                        width: parent.width
-                        height: parent.height - y
-                        color: "transparent"
-
-                        ListView {
-                            id: listView
-
-                            anchors.fill: parent
-                            anchors.bottomMargin: footer.height + pickerRoot.theme.space(3)
-                            clip: true
-                            model: pickerRoot.entries
-                            currentIndex: pickerRoot.cursor
-                            boundsBehavior: Flickable.StopAtBounds
-
-                            delegate: Rectangle {
-                                id: row
-
+                            Row {
                                 required property var modelData
                                 required property int index
 
-                                width: listView.width
-                                height: pickerRoot.rowHeight
-                                radius: pickerRoot.theme.radius(0.75)
-                                color: index === pickerRoot.cursor ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.18) : (rowHover.hovered ? pickerRoot.theme.alpha(pickerRoot.theme.textPrimary, 0.06) : "transparent")
+                                spacing: 0
 
-                                readonly property bool picked: pickerRoot.selection[modelData.path] === true
-
-                                HoverHandler {
-                                    id: rowHover
-                                    cursorShape: Qt.PointingHandCursor
-                                    onHoveredChanged: if (hovered)
-                                        pickerRoot.moveTo(row.index)
-                                }
-
-                                TapHandler {
-                                    onTapped: {
-                                        pickerRoot.moveTo(row.index);
-                                        pickerRoot.activate();
-                                    }
+                                Text {
+                                    visible: index > 0
+                                    text: "  ›  "
+                                    color: pickerRoot.theme.textMuted
+                                    font.family: pickerRoot.theme.fontUi
+                                    font.pixelSize: pickerRoot.theme.fontPx(0.917)
                                 }
 
                                 Text {
-                                    id: rowGlyph
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: pickerRoot.theme.space(3)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: Model.glyphFor(row.modelData.name, row.modelData.isDir)
-                                    color: row.modelData.isDir ? pickerRoot.theme.accent : pickerRoot.theme.textPrimary
-                                    font.family: "Symbols Nerd Font"
-                                    font.pixelSize: pickerRoot.theme.fontPx(1.083)
-                                }
-
-                                Text {
-                                    id: rowTick
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: pickerRoot.theme.space(3)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    visible: pickerRoot.multiple
-                                    text: row.picked ? "󰄲" : "󰄱"
-                                    color: row.picked ? pickerRoot.theme.accent : pickerRoot.theme.textMuted
-                                    font.family: "Symbols Nerd Font"
-                                    font.pixelSize: pickerRoot.theme.fontPx(1.0)
+                                    text: modelData.label
+                                    color: index === pickerRoot.crumbs.length - 1 ? pickerRoot.theme.textPrimary : pickerRoot.theme.textMuted
+                                    font.family: pickerRoot.theme.fontUi
+                                    font.pixelSize: pickerRoot.theme.fontPx(0.917)
 
                                     MouseArea {
                                         anchors.fill: parent
-                                        anchors.margins: -pickerRoot.theme.space(1)
-                                        onClicked: {
-                                            pickerRoot.moveTo(row.index);
-                                            pickerRoot.toggleSelection(row.modelData);
-                                        }
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: pickerRoot.enter(modelData.path)
                                     }
-                                }
-
-                                Text {
-                                    id: rowTime
-                                    anchors.right: pickerRoot.multiple ? rowTick.left : parent.right
-                                    anchors.rightMargin: pickerRoot.theme.space(3)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: Model.formatTime(row.modelData.modified, pickerRoot.nowMs)
-                                    color: pickerRoot.theme.textMuted
-                                    font.family: pickerRoot.theme.fontMono
-                                    font.pixelSize: pickerRoot.theme.fontPx(0.75)
-                                }
-
-                                Text {
-                                    id: rowSize
-                                    anchors.right: rowTime.left
-                                    anchors.rightMargin: pickerRoot.theme.space(3)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    horizontalAlignment: Text.AlignRight
-                                    width: pickerRoot.theme.space(16)
-                                    text: row.modelData.isDir ? "" : Model.formatSize(row.modelData.size)
-                                    color: pickerRoot.theme.textMuted
-                                    font.family: pickerRoot.theme.fontMono
-                                    font.pixelSize: pickerRoot.theme.fontPx(0.75)
-                                }
-
-                                Text {
-                                    anchors.left: rowGlyph.right
-                                    anchors.leftMargin: pickerRoot.theme.space(3)
-                                    anchors.right: rowSize.left
-                                    anchors.rightMargin: pickerRoot.theme.space(3)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: row.modelData.name
-                                    color: pickerRoot.theme.textPrimary
-                                    font.family: pickerRoot.theme.fontUi
-                                    font.pixelSize: pickerRoot.theme.fontPx(0.917)
-                                    elide: Text.ElideRight
                                 }
                             }
                         }
+                    }
+                }
 
-                        Text {
-                            anchors.centerIn: listView
-                            visible: pickerRoot.entries.length === 0
-                            text: pickerRoot.query !== "" && !pickerRoot.saving ? "Nothing matches “" + pickerRoot.query + "”" : "Empty folder"
-                            color: pickerRoot.theme.textMuted
-                            font.family: pickerRoot.theme.fontUi
-                            font.pixelSize: pickerRoot.theme.fontPx(0.917)
-                        }
+                // ------------------------------------- name/filter field
+                Rectangle {
+                    width: parent.width
+                    height: pickerRoot.theme.space(10)
+                    radius: pickerRoot.theme.radius(1)
+                    color: pickerRoot.theme.surface2
+                    border.width: pickerRoot.theme.borderWidth
+                    border.color: pickerRoot.query !== "" ? pickerRoot.theme.accent : pickerRoot.theme.surface3
 
-                        // ---------------------------------------------- footer
-                        Item {
-                            id: footer
+                    Text {
+                        anchors.left: parent.left
+                        anchors.right: fieldHint.left
+                        anchors.leftMargin: pickerRoot.theme.space(3)
+                        anchors.rightMargin: pickerRoot.theme.space(2)
+                        anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideLeft
+                        text: pickerRoot.query !== "" ? pickerRoot.query : (pickerRoot.saving ? "file name" : "filter")
+                        color: pickerRoot.query !== "" ? pickerRoot.theme.textPrimary : pickerRoot.theme.textMuted
+                        font.family: pickerRoot.saving ? pickerRoot.theme.fontMono : pickerRoot.theme.fontUi
+                        font.pixelSize: pickerRoot.theme.fontPx(1.0)
+                    }
 
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            height: acceptButton.height
+                    Text {
+                        id: fieldHint
+                        anchors.right: parent.right
+                        anchors.rightMargin: pickerRoot.theme.space(3)
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: pickerRoot.activeFilter ? String(pickerRoot.activeFilter.name || "") + (pickerRoot.filters.length > 1 ? "  ⇥" : "") : ""
+                        visible: text !== ""
+                        color: pickerRoot.theme.textMuted
+                        font.family: pickerRoot.theme.fontUi
+                        font.pixelSize: pickerRoot.theme.fontPx(0.833)
+                    }
+                }
+
+                // -------------------------------------------------- list
+                Rectangle {
+                    width: parent.width
+                    height: parent.height - y
+                    color: "transparent"
+
+                    ListView {
+                        id: listView
+
+                        anchors.fill: parent
+                        anchors.bottomMargin: footer.height + pickerRoot.theme.space(3)
+                        clip: true
+                        model: pickerRoot.entries
+                        currentIndex: pickerRoot.cursor
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        delegate: Rectangle {
+                            id: row
+
+                            required property var modelData
+                            required property int index
+
+                            width: listView.width
+                            height: pickerRoot.rowHeight
+                            radius: pickerRoot.theme.radius(0.75)
+                            color: index === pickerRoot.cursor ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.18) : (rowHover.hovered ? pickerRoot.theme.alpha(pickerRoot.theme.textPrimary, 0.06) : "transparent")
+
+                            readonly property bool picked: pickerRoot.selection[modelData.path] === true
+
+                            HoverHandler {
+                                id: rowHover
+                                cursorShape: Qt.PointingHandCursor
+                                onHoveredChanged: if (hovered)
+                                    pickerRoot.moveTo(row.index)
+                            }
+
+                            TapHandler {
+                                onTapped: {
+                                    pickerRoot.moveTo(row.index);
+                                    pickerRoot.activate();
+                                }
+                            }
 
                             Text {
+                                id: rowGlyph
                                 anchors.left: parent.left
-                                anchors.right: buttons.left
+                                anchors.leftMargin: pickerRoot.theme.space(3)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: Model.glyphFor(row.modelData.name, row.modelData.isDir)
+                                color: row.modelData.isDir ? pickerRoot.theme.accent : pickerRoot.theme.textPrimary
+                                font.family: "Symbols Nerd Font"
+                                font.pixelSize: pickerRoot.theme.fontPx(1.083)
+                            }
+
+                            Text {
+                                id: rowTick
+                                anchors.right: parent.right
                                 anchors.rightMargin: pickerRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
-                                elide: Text.ElideRight
-                                text: {
-                                    if (pickerRoot.multiple && pickerRoot.selectionCount > 0)
-                                        return pickerRoot.selectionCount + " selected · ctrl+space toggles · ctrl+enter accepts";
-                                    if (pickerRoot.saving)
-                                        return "type the name · enter saves · ctrl+h hidden";
-                                    if (pickerRoot.multiple)
-                                        return "ctrl+space selects · ctrl+enter accepts · ctrl+h hidden";
-                                    return "type to filter · ← → walks folders · ctrl+h hidden";
+                                visible: pickerRoot.multiple
+                                text: row.picked ? "󰄲" : "󰄱"
+                                color: row.picked ? pickerRoot.theme.accent : pickerRoot.theme.textMuted
+                                font.family: "Symbols Nerd Font"
+                                font.pixelSize: pickerRoot.theme.fontPx(1.0)
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -pickerRoot.theme.space(1)
+                                    onClicked: {
+                                        pickerRoot.moveTo(row.index);
+                                        pickerRoot.toggleSelection(row.modelData);
+                                    }
                                 }
+                            }
+
+                            Text {
+                                id: rowTime
+                                anchors.right: pickerRoot.multiple ? rowTick.left : parent.right
+                                anchors.rightMargin: pickerRoot.theme.space(3)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: Model.formatTime(row.modelData.modified, pickerRoot.nowMs)
                                 color: pickerRoot.theme.textMuted
-                                font.family: pickerRoot.theme.fontUi
+                                font.family: pickerRoot.theme.fontMono
                                 font.pixelSize: pickerRoot.theme.fontPx(0.75)
                             }
 
-                            Row {
-                                id: buttons
-                                anchors.right: parent.right
+                            Text {
+                                id: rowSize
+                                anchors.right: rowTime.left
+                                anchors.rightMargin: pickerRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: pickerRoot.theme.space(2)
+                                horizontalAlignment: Text.AlignRight
+                                width: pickerRoot.theme.space(16)
+                                text: row.modelData.isDir ? "" : Model.formatSize(row.modelData.size)
+                                color: pickerRoot.theme.textMuted
+                                font.family: pickerRoot.theme.fontMono
+                                font.pixelSize: pickerRoot.theme.fontPx(0.75)
+                            }
 
-                                PickerButton {
-                                    label: "Cancel"
-                                    onActivated: pickerRoot.cancel()
-                                }
+                            Text {
+                                anchors.left: rowGlyph.right
+                                anchors.leftMargin: pickerRoot.theme.space(3)
+                                anchors.right: rowSize.left
+                                anchors.rightMargin: pickerRoot.theme.space(3)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: row.modelData.name
+                                color: pickerRoot.theme.textPrimary
+                                font.family: pickerRoot.theme.fontUi
+                                font.pixelSize: pickerRoot.theme.fontPx(0.917)
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
 
-                                PickerButton {
-                                    id: acceptButton
-                                    label: pickerRoot.acceptLabel
-                                    primary: true
-                                    enabled: pickerRoot.acceptable
-                                    onActivated: pickerRoot.accept()
-                                }
+                    Text {
+                        anchors.centerIn: listView
+                        visible: pickerRoot.entries.length === 0
+                        text: pickerRoot.query !== "" && !pickerRoot.saving ? "Nothing matches “" + pickerRoot.query + "”" : "Empty folder"
+                        color: pickerRoot.theme.textMuted
+                        font.family: pickerRoot.theme.fontUi
+                        font.pixelSize: pickerRoot.theme.fontPx(0.917)
+                    }
+
+                    // ---------------------------------------------- footer
+                    Item {
+                        id: footer
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: acceptButton.height
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: buttons.left
+                            anchors.rightMargin: pickerRoot.theme.space(3)
+                            anchors.verticalCenter: parent.verticalCenter
+                            elide: Text.ElideRight
+                            text: {
+                                if (pickerRoot.multiple && pickerRoot.selectionCount > 0)
+                                    return pickerRoot.selectionCount + " selected · ctrl+space toggles · ctrl+enter accepts";
+                                if (pickerRoot.saving)
+                                    return "type the name · enter saves · ctrl+h hidden";
+                                if (pickerRoot.multiple)
+                                    return "ctrl+space selects · ctrl+enter accepts · ctrl+h hidden";
+                                return "type to filter · ← → walks folders · ctrl+h hidden";
+                            }
+                            color: pickerRoot.theme.textMuted
+                            font.family: pickerRoot.theme.fontUi
+                            font.pixelSize: pickerRoot.theme.fontPx(0.75)
+                        }
+
+                        Row {
+                            id: buttons
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: pickerRoot.theme.space(2)
+
+                            PickerButton {
+                                label: "Cancel"
+                                onActivated: pickerRoot.cancel()
+                            }
+
+                            PickerButton {
+                                id: acceptButton
+                                label: pickerRoot.acceptLabel
+                                primary: true
+                                enabled: pickerRoot.acceptable
+                                onActivated: pickerRoot.accept()
                             }
                         }
                     }
