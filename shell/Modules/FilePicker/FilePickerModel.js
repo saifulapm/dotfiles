@@ -124,6 +124,10 @@ function glyphFor(name, isDir) {
     return kind ? KIND_GLYPHS[kind] : KIND_GLYPHS.binary;
 }
 
+function kindOf(name) {
+    return EXTENSION_KINDS[extensionOf(name)] || "";
+}
+
 // The portal hands filters over as shell globs. Anchored, case-insensitive:
 // the chooser's own matching is case-sensitive and upstream works around it by
 // sending both cases, which we do not need to reproduce.
@@ -239,6 +243,45 @@ function pathToUrl(path) {
     return "file://" + encoded.join("/");
 }
 
+// Location-entry convention (GTK's ctrl+L, readline): ctrl+L prefills the
+// current path, and typing a fresh start after it restarts from there —
+// "/a/b//etc" means /etc, "/a/b/~/x" means ~/x. The last restart wins.
+function rebaseTyped(input) {
+    var value = String(input || "");
+    var dbl = value.lastIndexOf("//");
+    if (dbl >= 0)
+        value = value.substring(dbl + 1);
+    var tilde = value.lastIndexOf("~");
+    if (tilde > 0 && value.charAt(tilde - 1) === "/")
+        value = value.substring(tilde);
+    return value;
+}
+
+// Collapse // and resolve . / .. — a typed path may contain any of them.
+// Absolute input only; returns the cleaned path and whether a trailing
+// slash marked it as "definitely a folder".
+function normalizePath(path) {
+    var value = String(path || "");
+    var trailing = value.length > 1 && value.charAt(value.length - 1) === "/";
+    var parts = value.split("/");
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+        var seg = parts[i];
+        if (seg === "" || seg === ".")
+            continue;
+        if (seg === "..") {
+            if (out.length > 0)
+                out.pop();
+            continue;
+        }
+        out.push(seg);
+    }
+    return {
+        path: "/" + out.join("/"),
+        trailing: trailing
+    };
+}
+
 function parentOf(path) {
     var value = String(path || "/");
     if (value === "/" || value === "")
@@ -307,20 +350,216 @@ function crumbsFor(path, home) {
     return crumbs;
 }
 
+// -------------------------------------------------------------------- sort
+// Sorting happens here, in JS, not in FolderListModel: flipping the model's
+// sortField re-lists asynchronously with no reliable completion signal,
+// while re-sorting the rows we already hold is synchronous and testable.
+// Folders stay above files in every order, like every file manager.
+
+function compareNames(a, b) {
+    var an = String(a.name).toLowerCase();
+    var bn = String(b.name).toLowerCase();
+    if (an < bn)
+        return -1;
+    if (an > bn)
+        return 1;
+    return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+}
+
+function sortEntries(rows, field, reversed) {
+    var out = rows.slice();
+    out.sort(function (a, b) {
+        if (a.isDir !== b.isDir)
+            return a.isDir ? -1 : 1;
+        var cmp;
+        if (field === "size")
+            // A folder's size column is blank; among folders size order
+            // falls back to name.
+            cmp = a.isDir ? compareNames(a, b) : (a.size - b.size) || compareNames(a, b);
+        else if (field === "time")
+            cmp = ((a.modified ? a.modified.getTime() : 0) - (b.modified ? b.modified.getTime() : 0)) || compareNames(a, b);
+        else
+            cmp = compareNames(a, b);
+        return reversed ? -cmp : cmp;
+    });
+    return out;
+}
+
+// ------------------------------------------------------------------ sidebar
+// The places column: Home + the XDG user dirs, the user's GTK bookmarks
+// (shared with every GTK app), and removable mounts.
+
+var PLACE_GLYPHS = {
+    Home: "󰋜",
+    Desktop: "󰍹",
+    Documents: "󰈙",
+    Downloads: "󰇚",
+    Music: "󰎈",
+    Pictures: "󰋩",
+    Videos: "󰕧"
+};
+var PIN_GLYPH = "󰐃";
+var MOUNT_GLYPH = "󰋊";
+
+// One `sh -c` probe per dialog open: which places exist, and what is
+// mounted. user-dirs.dirs is shell syntax by design (xdg-user-dirs sources
+// it), so sourcing it is the spec'd parse.
+function probeScript() {
+    return ['home=$HOME', 'conf="$home/.config/user-dirs.dirs"', '[ -r "$conf" ] && . "$conf" 2>/dev/null', 'printf "place\\t%s\\n" "$home"', 'for d in "${XDG_DESKTOP_DIR:-$home/Desktop}" "${XDG_DOCUMENTS_DIR:-$home/Documents}" "${XDG_DOWNLOAD_DIR:-$home/Downloads}" "${XDG_MUSIC_DIR:-$home/Music}" "${XDG_PICTURES_DIR:-$home/Pictures}" "${XDG_VIDEOS_DIR:-$home/Videos}"; do', '  [ -d "$d" ] && [ "$d" != "$home" ] && printf "place\\t%s\\n" "$d"', 'done', 'for d in /run/media/"$(id -un)"/* /media/*; do', '  [ -d "$d" ] && printf "mount\\t%s\\n" "$d"', 'done', 'true'].join("\n");
+}
+
+function parsePlaces(probeText, home) {
+    var places = [];
+    var mounts = [];
+    var seen = {};
+    var lines = String(probeText || "").split("\n");
+    for (var i = 0; i < lines.length; i++) {
+        var tab = lines[i].indexOf("\t");
+        if (tab === -1)
+            continue;
+        var kind = lines[i].substring(0, tab);
+        var path = lines[i].substring(tab + 1).replace(/\/+$/, "");
+        if (path === "" || seen[path])
+            continue;
+        seen[path] = true;
+        if (kind === "place")
+            places.push({
+                path: path,
+                label: path === home ? "Home" : baseName(path)
+            });
+        else if (kind === "mount")
+            mounts.push({
+                path: path,
+                label: baseName(path)
+            });
+    }
+    return {
+        places: places,
+        mounts: mounts
+    };
+}
+
+// GTK bookmark lines are `file:///percent%20encoded/path Optional Label`.
+function parseGtkBookmarks(text) {
+    var out = [];
+    var lines = String(text || "").split("\n");
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (line.indexOf("file://") !== 0)
+            continue;
+        var space = line.indexOf(" ");
+        var uri = space === -1 ? line : line.substring(0, space);
+        var label = space === -1 ? "" : line.substring(space + 1).trim();
+        var path;
+        try {
+            path = decodeURIComponent(uri.substring(7));
+        } catch (e) {
+            continue;
+        }
+        path = path.replace(/\/+$/, "");
+        if (path === "")
+            continue;
+        out.push({
+            path: path,
+            label: label !== "" ? label : baseName(path)
+        });
+    }
+    return out;
+}
+
+// The bookmarks file with `path` pinned if it was not, unpinned if it was.
+// Unmatched lines pass through byte-for-byte — this file belongs to GTK as
+// much as to us.
+function toggleBookmark(text, path) {
+    var target = String(path || "").replace(/\/+$/, "");
+    var lines = String(text || "").split("\n");
+    var kept = [];
+    var removed = false;
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (line === "")
+            continue;
+        var matched = false;
+        if (line.indexOf("file://") === 0) {
+            var space = line.indexOf(" ");
+            var uri = space === -1 ? line : line.substring(0, space);
+            try {
+                matched = decodeURIComponent(uri.substring(7)).replace(/\/+$/, "") === target;
+            } catch (e) {
+            }
+        }
+        if (matched) {
+            removed = true;
+            continue;
+        }
+        kept.push(lines[i]);
+    }
+    if (!removed && target !== "")
+        kept.push(pathToUrl(target));
+    return kept.length > 0 ? kept.join("\n") + "\n" : "";
+}
+
+// The sidebar flattened to one list: section headers between numbered rows,
+// ctrl+1..9 landing on the first nine rows top to bottom.
+function sidebarRows(places, pinned, mounts) {
+    var rows = [];
+    var slot = 0;
+    function pushSection(label, items, glyphOf) {
+        if (!items || items.length === 0)
+            return;
+        rows.push({
+            kind: "header",
+            label: label,
+            path: "",
+            glyph: "",
+            shortcut: 0
+        });
+        for (var i = 0; i < items.length; i++) {
+            slot += 1;
+            rows.push({
+                kind: "item",
+                label: items[i].label,
+                path: items[i].path,
+                glyph: glyphOf(items[i]),
+                shortcut: slot <= 9 ? slot : 0
+            });
+        }
+    }
+    pushSection("Places", places, function (item) {
+        return PLACE_GLYPHS[item.label] || FOLDER_GLYPH;
+    });
+    pushSection("Pinned", pinned, function () {
+        return PIN_GLYPH;
+    });
+    pushSection("Devices", mounts, function () {
+        return MOUNT_GLYPH;
+    });
+    return rows;
+}
+
 if (typeof module !== "undefined") {
     module.exports = {
         extensionOf: extensionOf,
         glyphFor: glyphFor,
+        kindOf: kindOf,
         globToRegExp: globToRegExp,
         matchesFilter: matchesFilter,
         matchesQuery: matchesQuery,
         formatSize: formatSize,
         formatTime: formatTime,
         pathToUrl: pathToUrl,
+        rebaseTyped: rebaseTyped,
+        normalizePath: normalizePath,
         parentOf: parentOf,
         joinPath: joinPath,
         baseName: baseName,
         crumbsFor: crumbsFor,
+        sortEntries: sortEntries,
+        probeScript: probeScript,
+        parsePlaces: parsePlaces,
+        parseGtkBookmarks: parseGtkBookmarks,
+        toggleBookmark: toggleBookmark,
+        sidebarRows: sidebarRows,
         FOLDER_GLYPH: FOLDER_GLYPH,
         FOLDER_UP_GLYPH: FOLDER_UP_GLYPH
     };

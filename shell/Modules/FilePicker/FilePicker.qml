@@ -69,22 +69,129 @@ Scope {
     property string currentPath: home
     // The filter while opening, the file name while saving.
     property string query: ""
+    // Which input printable keys edit: the query above, a typed path
+    // (ctrl+L), or a new folder's name (ctrl+shift+N / the button).
+    property string fieldMode: "query"
+    property string pathInput: ""
+    property string newFolderName: ""
+    // Where the previous pick ended, for requests that name no start path.
+    // In-memory on purpose: the picker's loader is never evicted, so this
+    // lives as long as the shell.
+    property string lastDir: ""
     property int cursor: 0
     property int filterIndex: 0
     property bool showHidden: false
-    // path -> true, for the multi-select case.
+    // "name" | "size" | "time" — applied in JS over the listed rows.
+    property string sortField: "name"
+    property bool sortReversed: false
+    // path -> true, for the multi-select case. Selection is keyed by full
+    // path on purpose: it survives navigating between directories, so one
+    // multi-select can gather files from several folders.
     property var selection: ({})
     property int selectionCount: 0
+    // Range selection: the anchor is the last explicitly chosen row (click,
+    // ctrl+space, keyboard move — not hover), and anchorSelection is the
+    // selection as it stood when the anchor was set. Shift-extending
+    // recomputes selection = anchorSelection ∪ range(anchor..cursor), which
+    // is what lets a shrinking range deselect what it no longer covers.
+    property int anchor: 0
+    property var anchorSelection: ({})
+    // Two-step save-over-existing: the first Enter arms, the second finishes.
+    property bool overwritePending: false
+    // Last hover scene position: rows sliding under a stationary pointer
+    // (wheel or keyboard scrolling) re-fire hover, and only a pointer that
+    // actually moved may steal the cursor.
+    property real hoverSceneX: -1
+    property real hoverSceneY: -1
+    // When a tap entered a folder: the second tap of a double-click lands on
+    // a fresh delegate (or a mid-transition phantom row) and must be
+    // swallowed, so double-click-a-folder descends once, not twice.
+    property double tapNavMs: 0
     property var entries: []
     property double nowMs: Date.now()
 
     readonly property var crumbs: Model.crumbsFor(currentPath, home)
     readonly property var currentEntry: cursor >= 0 && cursor < entries.length ? entries[cursor] : null
 
+    // What the field is showing right now, whichever input owns it.
+    readonly property string fieldText: fieldMode === "path" ? pathInput : (fieldMode === "newfolder" ? newFolderName : query)
+    readonly property string fieldPlaceholder: {
+        if (fieldMode === "path")
+            return "type a path";
+        if (fieldMode === "newfolder")
+            return "new folder name";
+        return saving ? "file name" : "filter";
+    }
+
+    // -------------------------------------------------------------- sidebar
+    // Places and mounts come from a per-open probe (they change under us);
+    // pins live in GTK's own bookmarks file so every GTK app shares them.
+    property var places: []
+    property var mounts: []
+    property string bookmarksText: ""
+    readonly property string bookmarksPath: home + "/.config/gtk-3.0/bookmarks"
+    readonly property var pinned: Model.parseGtkBookmarks(bookmarksText)
+    readonly property var sidebarRows: Model.sidebarRows(places, pinned, mounts)
+
+    function runProbe() {
+        if (placesProbe.running)
+            return;
+        placesProbe.command = ["sh", "-c", Model.probeScript()];
+        placesProbe.running = true;
+    }
+
+    function jumpToPlace(slot) {
+        for (let i = 0; i < sidebarRows.length; i++) {
+            if (sidebarRows[i].kind === "item" && sidebarRows[i].shortcut === slot) {
+                enter(sidebarRows[i].path);
+                return;
+            }
+        }
+    }
+
+    function togglePin() {
+        // One write at a time: a second toggle before the reload lands would
+        // compute from the pre-write text and undo the first.
+        if (pinWriter.running)
+            return;
+        const next = Model.toggleBookmark(bookmarksText, currentPath);
+        pinWriter.command = ["sh", "-c", 'mkdir -p "$(dirname "$1")" && printf %s "$2" > "$1"', "qshell-pin", bookmarksPath, next];
+        pinWriter.running = true;
+    }
+
+    readonly property Process placesProbe: Process {
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                const parsed = Model.parsePlaces(String(text || ""), pickerRoot.home);
+                pickerRoot.places = parsed.places;
+                pickerRoot.mounts = parsed.mounts;
+            }
+        }
+    }
+
+    readonly property Process pinWriter: Process {
+        onExited: pickerRoot.bookmarksFile.reload()
+    }
+
+    readonly property FileView bookmarksFile: FileView {
+        path: pickerRoot.bookmarksPath
+        watchChanges: true
+        printErrors: false
+        onLoaded: pickerRoot.bookmarksText = String(text() || "")
+        onFileChanged: reload()
+        Component.onCompleted: reload()
+    }
+
     // ------------------------------------------------------------- geometry
     readonly property int cardMargin: theme.space(4)
     readonly property int rowHeight: theme.space(9)
-    readonly property int cardWidth: panel.width > 0 ? Math.min(theme.space(230), panel.width - theme.space(16)) : theme.space(230)
+    readonly property int cardWidth: panel.width > 0 ? Math.min(theme.space(290), panel.width - theme.space(16)) : theme.space(290)
+    readonly property int sidebarWidth: theme.space(44)
+    // The details/preview pane rides open-file dialogs only; save and folder
+    // dialogs give the room back to the list.
+    readonly property bool previewable: !saving && !directoryMode
+    readonly property int previewWidth: theme.space(52)
     readonly property int cardHeight: panel.height > 0 ? Math.min(theme.space(160), panel.height - theme.space(16)) : theme.space(160)
 
     // --------------------------------------------------------------- opening
@@ -111,13 +218,23 @@ Scope {
             return;
         const req = request;
         const startPath = String(req.path || "");
-        currentPath = startPath !== "" ? startPath : home;
+        currentPath = startPath !== "" ? startPath : (lastDir !== "" ? lastDir : home);
         query = saving ? String(req.name || "") : "";
+        fieldMode = "query";
+        pathInput = "";
+        newFolderName = "";
         filterIndex = Number(req.filterIndex || 0);
         selection = ({});
         selectionCount = 0;
+        anchor = 0;
+        anchorSelection = ({});
+        overwritePending = false;
+        cursorRestoreTarget = "";
+        restoreAnyKind = false;
+        restoreDescend = false;
         cursor = 0;
         nowMs = Date.now();
+        runProbe();
         opened = true;
         rebuild();
     }
@@ -128,6 +245,8 @@ Scope {
         if (!req)
             return;
         const chosen = paths || [];
+        if (chosen.length > 0)
+            lastDir = currentPath;
         const answer = JSON.stringify(chosen.length > 0 ? {
             response: 0,
             paths: chosen
@@ -202,9 +321,29 @@ Scope {
         onStatusChanged: pickerRoot.tryRestoreCursor()
     }
 
-    onQueryChanged: rebuild()
+    onQueryChanged: {
+        overwritePending = false;
+        rebuild();
+    }
+    onCurrentPathChanged: overwritePending = false
     onFilterIndexChanged: rebuild()
     onShowHiddenChanged: rebuild()
+    onSortFieldChanged: rebuild()
+    onSortReversedChanged: rebuild()
+
+    // A header click: same column flips, a new column starts in its useful
+    // direction — names A→Z, but newest and largest first.
+    function setSort(field) {
+        if (sortField === field)
+            sortReversed = !sortReversed;
+        else {
+            sortField = field;
+            sortReversed = field !== "name";
+        }
+        // The change handlers re-sorted `entries` synchronously above; the
+        // anchor's old index now points at a different row.
+        snapAnchor(cursor);
+    }
 
     function rebuild() {
         if (!opened) {
@@ -232,7 +371,7 @@ Scope {
                 modified: folder.get(i, "fileModified")
             });
         }
-        entries = rows;
+        entries = Model.sortEntries(rows, sortField, sortReversed);
         if (cursor >= rows.length)
             cursor = Math.max(0, rows.length - 1);
         if (cursor < 0)
@@ -242,8 +381,15 @@ Scope {
 
     // ----------------------------------------------------------- navigation
     function enter(path) {
+        // Navigation invalidates any armed cursor restore (a slow listing's
+        // pending descend must not fire in a folder the user walked to) and
+        // the range anchor (an index into the old folder's rows).
+        cursorRestoreTarget = "";
+        restoreAnyKind = false;
+        restoreDescend = false;
         currentPath = String(path || home);
         cursor = 0;
+        snapAnchor(0);
         if (!saving)
             query = "";
         listView.positionViewAtBeginning();
@@ -261,30 +407,145 @@ Scope {
     }
 
     property string cursorRestoreTarget: ""
+    // ctrl+L extras: match files too, and descend when the target is a
+    // folder — a typed path has no stat, the landing tells us what it was.
+    property bool restoreAnyKind: false
+    property bool restoreDescend: false
 
     function tryRestoreCursor() {
         if (!cursorRestoreTarget)
             return;
+        // Any-kind matching waits for the finished listing: mid-transition
+        // rebuilds can still hold the departed folder's rows, where a file
+        // may share the name. (Directory matches were always safe.)
+        if (restoreAnyKind && folder.status !== FolderListModel.Ready)
+            return;
         for (let i = 0; i < entries.length; i++) {
-            // Directories only: mid-transition rebuilds can still hold the
-            // departed folder's rows, where a file may share the name.
-            if (entries[i].isDir && entries[i].name === cursorRestoreTarget) {
-                cursorRestoreTarget = "";
-                moveTo(i);
-                return;
-            }
-        }
-        // Listing complete and the folder is not in it (hidden or filtered
-        // away): stop looking so a later rebuild cannot mis-match.
-        if (folder.status === FolderListModel.Ready)
+            if (entries[i].name !== cursorRestoreTarget)
+                continue;
+            if (!entries[i].isDir && !restoreAnyKind)
+                continue;
+            const entry = entries[i];
+            const descend = restoreDescend && entry.isDir;
             cursorRestoreTarget = "";
+            restoreAnyKind = false;
+            restoreDescend = false;
+            if (descend)
+                enter(entry.path);
+            else
+                moveTo(i);
+            return;
+        }
+        // Listing complete and the target is not in it (hidden or filtered
+        // away): stop looking so a later rebuild cannot mis-match.
+        if (folder.status === FolderListModel.Ready) {
+            cursorRestoreTarget = "";
+            restoreAnyKind = false;
+            restoreDescend = false;
+        }
+    }
+
+    // ------------------------------------------------------ typed location
+    // ctrl+L: the field becomes a path. Enter with a trailing slash opens
+    // that folder outright; otherwise land in the parent and let the restore
+    // above descend into a folder or park the cursor on a file.
+    function commitPath() {
+        let p = Model.rebaseTyped(String(pathInput || "").trim());
+        fieldMode = "query";
+        pathInput = "";
+        if (p === "")
+            return;
+        if (p === "~")
+            p = home;
+        else if (p.indexOf("~/") === 0)
+            p = home + p.substring(1);
+        if (p.indexOf("/") !== 0)
+            p = Model.joinPath(currentPath, p);
+        const norm = Model.normalizePath(p);
+        p = norm.path;
+        if (p === "/") {
+            enter("/");
+            return;
+        }
+        if (norm.trailing) {
+            enter(p);
+            return;
+        }
+        const base = Model.baseName(p);
+        if (base.indexOf(".") === 0 && !showHidden)
+            showHidden = true;
+        const parentDir = Model.parentOf(p);
+        const sameDir = parentDir === currentPath;
+        enter(parentDir);
+        cursorRestoreTarget = base;
+        restoreAnyKind = true;
+        restoreDescend = true;
+        // Same folder: no model signal will fire, so restore by hand — and
+        // only then, because right after a folder switch the model may still
+        // hold the departed listing.
+        if (sameDir)
+            tryRestoreCursor();
+    }
+
+    // -------------------------------------------------------- new folder
+    function commitNewFolder() {
+        const name = String(newFolderName || "").trim().replace(/^\/+/, "");
+        fieldMode = "query";
+        newFolderName = "";
+        if (name === "")
+            return;
+        const target = Model.joinPath(currentPath, name);
+        folderMaker.pendingPath = target;
+        folderMaker.command = ["mkdir", "-p", "--", target];
+        folderMaker.running = true;
+    }
+
+    readonly property Process folderMaker: Process {
+        property string pendingPath: ""
+        onExited: exitCode => {
+            if (exitCode === 0 && pendingPath !== "")
+                pickerRoot.enter(pendingPath);
+            pendingPath = "";
+        }
+    }
+
+    // ------------------------------------------------------------- paste
+    readonly property Process pasteReader: Process {
+        command: ["wl-paste", "--no-newline", "--type", "text"]
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: pickerRoot.applyPaste(String(text || ""))
+        }
+    }
+
+    function requestPaste() {
+        if (!pasteReader.running)
+            pasteReader.running = true;
+    }
+
+    function applyPaste(text) {
+        const value = String(text || "").split("\n")[0].trim();
+        if (value === "")
+            return;
+        // A pasted absolute path into the filter clearly wants to go there.
+        if (fieldMode === "query" && !saving && (value.indexOf("/") === 0 || value.indexOf("~/") === 0)) {
+            fieldMode = "path";
+            pathInput = value;
+            return;
+        }
+        if (fieldMode === "path")
+            pathInput += value;
+        else if (fieldMode === "newfolder")
+            newFolderName += value;
+        else {
+            query += value;
+            if (!saving)
+                cursor = 0;
+        }
     }
 
     function move(delta) {
-        if (entries.length === 0)
-            return;
-        cursor = Math.max(0, Math.min(entries.length - 1, cursor + delta));
-        listView.positionViewAtIndex(cursor, ListView.Contain);
+        moveTo(cursor + delta);
     }
 
     function moveTo(index) {
@@ -292,10 +553,40 @@ Scope {
             return;
         cursor = Math.max(0, Math.min(entries.length - 1, index));
         listView.positionViewAtIndex(cursor, ListView.Contain);
+        snapAnchor(cursor);
+    }
+
+    // Hover only moves the cursor: no view jump, and no anchor — the row
+    // hovered on the way to a shift+click must not become the range start.
+    function hoverTo(index) {
+        if (index < 0 || index >= entries.length)
+            return;
+        cursor = index;
+    }
+
+    function snapAnchor(index) {
+        anchor = index;
+        const snap = {};
+        for (const key in selection)
+            snap[key] = true;
+        anchorSelection = snap;
+    }
+
+    // What multi-select can hold: files in file mode, folders in folder mode.
+    function selectable(entry) {
+        return multiple && entry && entry.isDir === directoryMode;
+    }
+
+    function setSelection(next) {
+        selection = next;
+        let n = 0;
+        for (const k in next)
+            n += 1;
+        selectionCount = n;
     }
 
     function toggleSelection(entry) {
-        if (!multiple || !entry || entry.isDir !== directoryMode)
+        if (!selectable(entry))
             return;
         const next = {};
         for (const key in selection)
@@ -304,11 +595,56 @@ Scope {
             delete next[entry.path];
         else
             next[entry.path] = true;
-        selection = next;
-        let n = 0;
-        for (const k in next)
-            n += 1;
-        selectionCount = n;
+        setSelection(next);
+    }
+
+    // Ctrl+space and ctrl+click: toggle, and re-anchor on the toggled row so
+    // a shift-extend that follows builds on the selection as toggled.
+    function toggleAt(index) {
+        if (index < 0 || index >= entries.length)
+            return;
+        cursor = index;
+        listView.positionViewAtIndex(cursor, ListView.Contain);
+        toggleSelection(entries[index]);
+        snapAnchor(index);
+    }
+
+    // Shift+click / shift+arrows: anchorSelection plus everything selectable
+    // between the anchor and here. Recomputing from the snapshot (not
+    // accumulating) is what deselects rows a reversed range walks away from.
+    function extendTo(index) {
+        if (!multiple) {
+            moveTo(index);
+            return;
+        }
+        if (entries.length === 0)
+            return;
+        cursor = Math.max(0, Math.min(entries.length - 1, index));
+        listView.positionViewAtIndex(cursor, ListView.Contain);
+        const next = {};
+        for (const key in anchorSelection)
+            next[key] = true;
+        const lo = Math.min(anchor, cursor);
+        const hi = Math.max(anchor, cursor);
+        for (let i = lo; i <= hi; i++) {
+            if (selectable(entries[i]))
+                next[entries[i].path] = true;
+        }
+        setSelection(next);
+    }
+
+    function selectAll() {
+        if (!multiple)
+            return;
+        const next = {};
+        for (const key in selection)
+            next[key] = true;
+        for (let i = 0; i < entries.length; i++) {
+            if (selectable(entries[i]))
+                next[entries[i].path] = true;
+        }
+        setSelection(next);
+        snapAnchor(cursor);
     }
 
     function selectedPaths() {
@@ -320,17 +656,21 @@ Scope {
     }
 
     // Enter: descend into a folder, otherwise take what is under the cursor.
+    // While saving, Enter belongs to the typed name — the cursor usually sits
+    // on some folder (they sort first), and descending would break the plain
+    // type-name-hit-enter flow. Navigation while saving is Right/Left, the
+    // mouse, or Enter with nothing typed yet.
     function activate() {
         const entry = currentEntry;
         if (saving) {
+            if (String(query || "").trim() === "" && entry && entry.isDir) {
+                enter(entry.path);
+                return;
+            }
             acceptSave();
             return;
         }
-        if (entry && entry.isDir && !directoryMode) {
-            enter(entry.path);
-            return;
-        }
-        if (entry && entry.isDir && directoryMode) {
+        if (entry && entry.isDir) {
             enter(entry.path);
             return;
         }
@@ -357,6 +697,19 @@ Scope {
         finish([entry.path]);
     }
 
+    // What the open folder holds under this exact name. Reads the raw model,
+    // not `entries`: the active filter may hide the very file being replaced.
+    // (A dotfile target with hidden files off stays invisible to this check —
+    // FolderListModel is the only filesystem view the shell has.)
+    function nameKindInFolder(name) {
+        const count = folder.count;
+        for (let i = 0; i < count; i++) {
+            if (String(folder.get(i, "fileName")) === name)
+                return folder.get(i, "fileIsDir") === true ? "dir" : "file";
+        }
+        return "";
+    }
+
     function acceptSave() {
         const name = String(query || "").trim();
         if (name === "")
@@ -364,6 +717,21 @@ Scope {
         if (name.indexOf("/") === 0) {
             finish([name]);
             return;
+        }
+        // A bare name is checked against the open folder: an existing folder
+        // under that name is navigation (the GTK chooser's behavior), an
+        // existing file arms the two-step overwrite.
+        if (name.indexOf("/") === -1) {
+            const kind = nameKindInFolder(name);
+            if (kind === "dir") {
+                query = "";
+                enter(Model.joinPath(currentPath, name));
+                return;
+            }
+            if (kind === "file" && !overwritePending) {
+                overwritePending = true;
+                return;
+            }
         }
         finish([Model.joinPath(currentPath, name)]);
     }
@@ -398,33 +766,75 @@ Scope {
             Keys.onPressed: event => {
                 const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
                 const alt = (event.modifiers & Qt.AltModifier) !== 0;
+                const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
+                // Shift-held vertical navigation extends the selection from
+                // the anchor; plain navigation just moves (and re-anchors).
+                const go = function (index) {
+                    if (shift && pickerRoot.multiple)
+                        pickerRoot.extendTo(index);
+                    else
+                        pickerRoot.moveTo(index);
+                };
+                const page = Math.max(1, Math.floor(listView.height / pickerRoot.rowHeight));
 
                 if (event.key === Qt.Key_Escape) {
-                    if (!pickerRoot.saving && pickerRoot.query !== "")
+                    if (pickerRoot.fieldMode !== "query") {
+                        pickerRoot.fieldMode = "query";
+                        pickerRoot.pathInput = "";
+                        pickerRoot.newFolderName = "";
+                    } else if (pickerRoot.overwritePending)
+                        pickerRoot.overwritePending = false;
+                    else if (!pickerRoot.saving && pickerRoot.query !== "")
                         pickerRoot.query = "";
                     else
                         pickerRoot.cancel();
                 } else if (event.key === Qt.Key_Backspace) {
-                    if (pickerRoot.query !== "")
+                    if (pickerRoot.fieldMode === "path")
+                        // Ctrl erases a path segment, not a word.
+                        pickerRoot.pathInput = ctrl ? pickerRoot.pathInput.replace(/\/+$/, "").replace(/[^/]*$/, "") : pickerRoot.pathInput.slice(0, -1);
+                    else if (pickerRoot.fieldMode === "newfolder")
+                        pickerRoot.newFolderName = FilterKeys.erased(pickerRoot.newFolderName, ctrl);
+                    else if (pickerRoot.query !== "")
                         pickerRoot.query = FilterKeys.erased(pickerRoot.query, ctrl);
                     else
                         pickerRoot.goUp();
                 } else if (ctrl && event.key === Qt.Key_U) {
-                    pickerRoot.query = "";
+                    if (pickerRoot.fieldMode === "path")
+                        pickerRoot.pathInput = "";
+                    else if (pickerRoot.fieldMode === "newfolder")
+                        pickerRoot.newFolderName = "";
+                    else
+                        pickerRoot.query = "";
+                } else if (ctrl && event.key === Qt.Key_L) {
+                    pickerRoot.fieldMode = "path";
+                    pickerRoot.pathInput = pickerRoot.currentPath === "/" ? "/" : pickerRoot.currentPath + "/";
+                } else if (ctrl && shift && event.key === Qt.Key_N) {
+                    if (pickerRoot.saving || pickerRoot.directoryMode) {
+                        pickerRoot.fieldMode = "newfolder";
+                        pickerRoot.newFolderName = "";
+                    }
+                } else if (ctrl && event.key === Qt.Key_V) {
+                    pickerRoot.requestPaste();
                 } else if (ctrl && event.key === Qt.Key_H) {
                     pickerRoot.showHidden = !pickerRoot.showHidden;
-                } else if (event.key === Qt.Key_Up) {
-                    pickerRoot.move(-1);
+                } else if (ctrl && event.key === Qt.Key_A) {
+                    pickerRoot.selectAll();
+                } else if (ctrl && event.key === Qt.Key_D) {
+                    pickerRoot.togglePin();
+                } else if (ctrl && event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
+                    pickerRoot.jumpToPlace(event.key - Qt.Key_1 + 1);
+                } else if (event.key === Qt.Key_Up && !alt) {
+                    go(pickerRoot.cursor - 1);
                 } else if (event.key === Qt.Key_Down) {
-                    pickerRoot.move(1);
+                    go(pickerRoot.cursor + 1);
                 } else if (event.key === Qt.Key_PageUp) {
-                    pickerRoot.move(-Math.max(1, Math.floor(listView.height / pickerRoot.rowHeight)));
+                    go(pickerRoot.cursor - page);
                 } else if (event.key === Qt.Key_PageDown) {
-                    pickerRoot.move(Math.max(1, Math.floor(listView.height / pickerRoot.rowHeight)));
+                    go(pickerRoot.cursor + page);
                 } else if (event.key === Qt.Key_Home) {
-                    pickerRoot.moveTo(0);
+                    go(0);
                 } else if (event.key === Qt.Key_End) {
-                    pickerRoot.moveTo(pickerRoot.entries.length - 1);
+                    go(pickerRoot.entries.length - 1);
                 } else if (event.key === Qt.Key_Left || (alt && event.key === Qt.Key_Up)) {
                     pickerRoot.goUp();
                 } else if (event.key === Qt.Key_Right) {
@@ -434,20 +844,36 @@ Scope {
                     if (pickerRoot.filters.length > 1)
                         pickerRoot.filterIndex = (pickerRoot.filterIndex + 1) % pickerRoot.filters.length;
                 } else if (ctrl && event.key === Qt.Key_Space) {
-                    pickerRoot.toggleSelection(pickerRoot.currentEntry);
+                    pickerRoot.toggleAt(pickerRoot.cursor);
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    if (ctrl)
+                    if (pickerRoot.fieldMode === "path")
+                        pickerRoot.commitPath();
+                    else if (pickerRoot.fieldMode === "newfolder")
+                        pickerRoot.commitNewFolder();
+                    else if (ctrl)
                         pickerRoot.accept();
                     else
                         pickerRoot.activate();
                 } else if (FilterKeys.printable(event)) {
-                    pickerRoot.query = pickerRoot.query + event.text;
-                    if (!pickerRoot.saving)
-                        pickerRoot.cursor = 0;
+                    if (pickerRoot.fieldMode === "path")
+                        pickerRoot.pathInput = pickerRoot.pathInput + event.text;
+                    else if (pickerRoot.fieldMode === "newfolder")
+                        pickerRoot.newFolderName = pickerRoot.newFolderName + event.text;
+                    else {
+                        pickerRoot.query = pickerRoot.query + event.text;
+                        if (!pickerRoot.saving)
+                            pickerRoot.cursor = 0;
+                    }
                 } else {
                     return;
                 }
                 event.accepted = true;
+            }
+
+            // Mouse side/back button walks up a directory, like a browser.
+            TapHandler {
+                acceptedButtons: Qt.BackButton
+                onTapped: pickerRoot.goUp()
             }
 
             Column {
@@ -541,7 +967,7 @@ Scope {
                     radius: pickerRoot.theme.radius(1)
                     color: pickerRoot.theme.surface2
                     border.width: pickerRoot.theme.borderWidth
-                    border.color: pickerRoot.query !== "" ? pickerRoot.theme.accent : pickerRoot.theme.surface3
+                    border.color: pickerRoot.overwritePending ? pickerRoot.theme.warn : (pickerRoot.fieldText !== "" || pickerRoot.fieldMode !== "query" ? pickerRoot.theme.accent : pickerRoot.theme.surface3)
 
                     Text {
                         anchors.left: parent.left
@@ -550,9 +976,9 @@ Scope {
                         anchors.rightMargin: pickerRoot.theme.space(2)
                         anchors.verticalCenter: parent.verticalCenter
                         elide: Text.ElideLeft
-                        text: pickerRoot.query !== "" ? pickerRoot.query : (pickerRoot.saving ? "file name" : "filter")
-                        color: pickerRoot.query !== "" ? pickerRoot.theme.textPrimary : pickerRoot.theme.textMuted
-                        font.family: pickerRoot.saving ? pickerRoot.theme.fontMono : pickerRoot.theme.fontUi
+                        text: pickerRoot.fieldText !== "" ? pickerRoot.fieldText : pickerRoot.fieldPlaceholder
+                        color: pickerRoot.fieldText !== "" ? pickerRoot.theme.textPrimary : pickerRoot.theme.textMuted
+                        font.family: pickerRoot.saving || pickerRoot.fieldMode !== "query" ? pickerRoot.theme.fontMono : pickerRoot.theme.fontUi
                         font.pixelSize: pickerRoot.theme.fontPx(1.0)
                     }
 
@@ -561,24 +987,194 @@ Scope {
                         anchors.right: parent.right
                         anchors.rightMargin: pickerRoot.theme.space(3)
                         anchors.verticalCenter: parent.verticalCenter
-                        text: pickerRoot.activeFilter ? String(pickerRoot.activeFilter.name || "") + (pickerRoot.filters.length > 1 ? "  ⇥" : "") : ""
+                        text: {
+                            if (pickerRoot.fieldMode === "path")
+                                return "⏎ go";
+                            if (pickerRoot.fieldMode === "newfolder")
+                                return "⏎ create";
+                            return pickerRoot.activeFilter ? String(pickerRoot.activeFilter.name || "") + (pickerRoot.filters.length > 1 ? "  ⇥" : "") : "";
+                        }
                         visible: text !== ""
                         color: pickerRoot.theme.textMuted
                         font.family: pickerRoot.theme.fontUi
                         font.pixelSize: pickerRoot.theme.fontPx(0.833)
+
+                        // Tab cycles filters; so does clicking the label.
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -pickerRoot.theme.space(1)
+                            visible: pickerRoot.filters.length > 1 && pickerRoot.fieldMode === "query"
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: pickerRoot.filterIndex = (pickerRoot.filterIndex + 1) % pickerRoot.filters.length
+                        }
                     }
                 }
 
-                // -------------------------------------------------- list
+                // -------------------------------------- sidebar + list
                 Rectangle {
                     width: parent.width
                     height: parent.height - y
                     color: "transparent"
 
                     ListView {
+                        id: sidebarList
+
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: footer.height + pickerRoot.theme.space(3)
+                        width: pickerRoot.sidebarWidth
+                        clip: true
+                        model: pickerRoot.sidebarRows
+                        boundsBehavior: Flickable.StopAtBounds
+                        spacing: pickerRoot.theme.space(0.5)
+
+                        delegate: Item {
+                            id: sideRow
+
+                            required property var modelData
+
+                            width: sidebarList.width
+                            height: pickerRoot.theme.space(8)
+
+                            Text {
+                                visible: sideRow.modelData.kind === "header"
+                                anchors.left: parent.left
+                                anchors.leftMargin: pickerRoot.theme.space(2)
+                                anchors.bottom: parent.bottom
+                                anchors.bottomMargin: pickerRoot.theme.space(1)
+                                text: sideRow.modelData.label
+                                color: pickerRoot.theme.textMuted
+                                font.family: pickerRoot.theme.fontMono
+                                font.pixelSize: pickerRoot.theme.fontPx(0.667)
+                                font.letterSpacing: 1.2
+                                font.capitalization: Font.AllUppercase
+                            }
+
+                            Rectangle {
+                                id: sideItem
+
+                                visible: sideRow.modelData.kind === "item"
+                                anchors.fill: parent
+                                radius: pickerRoot.theme.radius(0.75)
+                                readonly property bool active: pickerRoot.currentPath === sideRow.modelData.path
+                                color: active ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.18) : (sideHover.hovered ? pickerRoot.theme.alpha(pickerRoot.theme.textPrimary, 0.06) : "transparent")
+
+                                HoverHandler {
+                                    id: sideHover
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+
+                                TapHandler {
+                                    onTapped: pickerRoot.enter(sideRow.modelData.path)
+                                }
+
+                                Text {
+                                    id: sideGlyph
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: pickerRoot.theme.space(2)
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: sideRow.modelData.glyph
+                                    color: sideItem.active ? pickerRoot.theme.accent : pickerRoot.theme.textMuted
+                                    font.family: "Symbols Nerd Font"
+                                    font.pixelSize: pickerRoot.theme.fontPx(1.0)
+                                }
+
+                                Text {
+                                    id: sideDigit
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: pickerRoot.theme.space(2)
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: sideRow.modelData.shortcut > 0 ? String(sideRow.modelData.shortcut) : ""
+                                    visible: text !== ""
+                                    color: pickerRoot.theme.textMuted
+                                    font.family: pickerRoot.theme.fontMono
+                                    font.pixelSize: pickerRoot.theme.fontPx(0.667)
+                                }
+
+                                Text {
+                                    anchors.left: sideGlyph.right
+                                    anchors.leftMargin: pickerRoot.theme.space(2)
+                                    anchors.right: sideDigit.visible ? sideDigit.left : parent.right
+                                    anchors.rightMargin: pickerRoot.theme.space(2)
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: sideRow.modelData.label
+                                    color: pickerRoot.theme.textPrimary
+                                    font.family: pickerRoot.theme.fontUi
+                                    font.pixelSize: pickerRoot.theme.fontPx(0.833)
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        id: sidebarDivider
+
+                        anchors.left: sidebarList.right
+                        anchors.leftMargin: pickerRoot.theme.space(2)
+                        anchors.top: parent.top
+                        anchors.bottom: sidebarList.bottom
+                        width: pickerRoot.theme.borderWidth
+                        color: pickerRoot.theme.surface3
+                    }
+
+                    // ------------------------------------ column headers
+                    Item {
+                        id: listHeader
+
+                        anchors.left: sidebarDivider.right
+                        anchors.leftMargin: pickerRoot.theme.space(3)
+                        anchors.right: previewPane.left
+                        anchors.rightMargin: pickerRoot.theme.space(3)
+                        anchors.top: parent.top
+                        height: pickerRoot.theme.space(6)
+
+                        SortHeader {
+                            anchors.left: parent.left
+                            anchors.leftMargin: pickerRoot.theme.space(3)
+                            anchors.verticalCenter: parent.verticalCenter
+                            field: "name"
+                            label: "Name"
+                        }
+
+                        SortHeader {
+                            id: modifiedHeader
+                            anchors.right: parent.right
+                            // Mirrors the rows: the checkbox column sits to
+                            // the right of the time column while multi-select
+                            // is on.
+                            anchors.rightMargin: pickerRoot.theme.space(3) + (pickerRoot.multiple ? pickerRoot.theme.space(8) : 0)
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: pickerRoot.theme.space(20)
+                            horizontalAlignment: Text.AlignRight
+                            field: "time"
+                            label: "Modified"
+                        }
+
+                        SortHeader {
+                            anchors.right: modifiedHeader.left
+                            anchors.rightMargin: pickerRoot.theme.space(3)
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: pickerRoot.theme.space(16)
+                            horizontalAlignment: Text.AlignRight
+                            field: "size"
+                            label: "Size"
+                            visible: !pickerRoot.directoryMode
+                        }
+                    }
+
+                    ListView {
                         id: listView
 
-                        anchors.fill: parent
+                        anchors.left: sidebarDivider.right
+                        anchors.leftMargin: pickerRoot.theme.space(3)
+                        anchors.right: previewPane.left
+                        // The scrollbar's gutter.
+                        anchors.rightMargin: pickerRoot.theme.space(3)
+                        anchors.top: listHeader.bottom
+                        anchors.topMargin: pickerRoot.theme.space(1)
+                        anchors.bottom: parent.bottom
                         anchors.bottomMargin: footer.height + pickerRoot.theme.space(3)
                         clip: true
                         model: pickerRoot.entries
@@ -601,15 +1197,74 @@ Scope {
                             HoverHandler {
                                 id: rowHover
                                 cursorShape: Qt.PointingHandCursor
-                                onHoveredChanged: if (hovered)
-                                    pickerRoot.moveTo(row.index)
+                                // Follow the pointer, not the scroll: rows
+                                // sliding under a stationary mouse re-fire
+                                // hover with the same scene position, and
+                                // those must not steal the cursor.
+                                onPointChanged: {
+                                    if (!hovered)
+                                        return;
+                                    const sp = point.scenePosition;
+                                    if (sp.x === pickerRoot.hoverSceneX && sp.y === pickerRoot.hoverSceneY)
+                                        return;
+                                    pickerRoot.hoverSceneX = sp.x;
+                                    pickerRoot.hoverSceneY = sp.y;
+                                    if (pickerRoot.cursor !== row.index)
+                                        pickerRoot.hoverTo(row.index);
+                                }
+                            }
+
+                            // The click model every picker shares: one click
+                            // selects a file (or enters a folder — cheap and
+                            // reversible), a double click commits. A stray
+                            // click can no longer answer the dialog.
+                            TapHandler {
+                                acceptedModifiers: Qt.NoModifier
+                                onSingleTapped: {
+                                    const now = Date.now();
+                                    if (now - pickerRoot.tapNavMs < 350)
+                                        return;
+                                    const entry = row.modelData;
+                                    if (entry.isDir) {
+                                        pickerRoot.tapNavMs = now;
+                                        pickerRoot.enter(entry.path);
+                                        return;
+                                    }
+                                    pickerRoot.moveTo(row.index);
+                                    // Clicking an existing file while saving
+                                    // adopts its name, ready to overwrite.
+                                    if (pickerRoot.saving)
+                                        pickerRoot.query = entry.name;
+                                }
+                                onDoubleTapped: {
+                                    const entry = row.modelData;
+                                    if (entry.isDir)
+                                        return;
+                                    pickerRoot.moveTo(row.index);
+                                    if (pickerRoot.saving) {
+                                        pickerRoot.query = entry.name;
+                                        pickerRoot.acceptSave();
+                                        return;
+                                    }
+                                    // A double-clicked file that is part of
+                                    // the selection commits the selection;
+                                    // outside it, just that file.
+                                    if (pickerRoot.selection[entry.path] === true) {
+                                        pickerRoot.accept();
+                                        return;
+                                    }
+                                    pickerRoot.finish([entry.path]);
+                                }
                             }
 
                             TapHandler {
-                                onTapped: {
-                                    pickerRoot.moveTo(row.index);
-                                    pickerRoot.activate();
-                                }
+                                acceptedModifiers: Qt.ControlModifier
+                                onTapped: pickerRoot.toggleAt(row.index)
+                            }
+
+                            TapHandler {
+                                acceptedModifiers: Qt.ShiftModifier
+                                onTapped: pickerRoot.extendTo(row.index)
                             }
 
                             Text {
@@ -629,6 +1284,8 @@ Scope {
                                 anchors.rightMargin: pickerRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: pickerRoot.multiple
+                                width: pickerRoot.theme.space(5)
+                                horizontalAlignment: Text.AlignHCenter
                                 text: row.picked ? "󰄲" : "󰄱"
                                 color: row.picked ? pickerRoot.theme.accent : pickerRoot.theme.textMuted
                                 font.family: "Symbols Nerd Font"
@@ -637,10 +1294,7 @@ Scope {
                                 MouseArea {
                                     anchors.fill: parent
                                     anchors.margins: -pickerRoot.theme.space(1)
-                                    onClicked: {
-                                        pickerRoot.moveTo(row.index);
-                                        pickerRoot.toggleSelection(row.modelData);
-                                    }
+                                    onClicked: pickerRoot.toggleAt(row.index)
                                 }
                             }
 
@@ -649,6 +1303,8 @@ Scope {
                                 anchors.right: pickerRoot.multiple ? rowTick.left : parent.right
                                 anchors.rightMargin: pickerRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
+                                width: pickerRoot.theme.space(20)
+                                horizontalAlignment: Text.AlignRight
                                 text: Model.formatTime(row.modelData.modified, pickerRoot.nowMs)
                                 color: pickerRoot.theme.textMuted
                                 font.family: pickerRoot.theme.fontMono
@@ -683,6 +1339,144 @@ Scope {
                         }
                     }
 
+                    // ------------------------------------------ scrollbar
+                    // Hand-rolled (no QtQuick.Controls in this shell): a
+                    // thumb in the gutter right of the list, draggable, with
+                    // track clicks jumping straight there.
+                    MouseArea {
+                        id: scrollTrack
+
+                        anchors.top: listView.top
+                        anchors.bottom: listView.bottom
+                        anchors.left: listView.right
+                        width: pickerRoot.theme.space(3)
+                        visible: listView.contentHeight > listView.height
+                        hoverEnabled: true
+                        onPressed: mouse => jump(mouse.y)
+                        onPositionChanged: mouse => {
+                            if (pressed)
+                                jump(mouse.y);
+                        }
+
+                        function jump(y) {
+                            const frac = Math.max(0, Math.min(1, y / height));
+                            listView.contentY = frac * Math.max(0, listView.contentHeight - listView.height);
+                        }
+
+                        Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: pickerRoot.theme.space(1)
+                            radius: width / 2
+                            y: Math.max(0, Math.min(listView.visibleArea.yPosition * scrollTrack.height, scrollTrack.height - height))
+                            height: Math.max(pickerRoot.theme.space(6), listView.visibleArea.heightRatio * scrollTrack.height)
+                            color: pickerRoot.theme.alpha(pickerRoot.theme.textPrimary, scrollTrack.containsMouse || scrollTrack.pressed ? 0.4 : 0.18)
+                        }
+                    }
+
+                    // -------------------------------------------- preview
+                    Item {
+                        id: previewPane
+
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: footer.height + pickerRoot.theme.space(3)
+                        width: pickerRoot.previewable ? pickerRoot.previewWidth : 0
+                        visible: pickerRoot.previewable
+
+                        readonly property var entry: pickerRoot.currentEntry
+                        readonly property bool showsImage: entry !== null && !entry.isDir && Model.kindOf(entry.name) === "image"
+
+                        Rectangle {
+                            id: previewDivider
+
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: pickerRoot.theme.borderWidth
+                            color: pickerRoot.theme.surface3
+                        }
+
+                        Column {
+                            anchors.left: previewDivider.right
+                            anchors.leftMargin: pickerRoot.theme.space(3)
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            spacing: pickerRoot.theme.space(2)
+
+                            Rectangle {
+                                width: parent.width
+                                height: pickerRoot.theme.space(48)
+                                radius: pickerRoot.theme.radius(1)
+                                color: pickerRoot.theme.surface2
+
+                                Image {
+                                    id: previewImage
+
+                                    anchors.fill: parent
+                                    anchors.margins: pickerRoot.theme.space(1)
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    // Caps the decode, not the display — a
+                                    // 6000px photo must not decode at full
+                                    // size for a thumbnail.
+                                    sourceSize.width: 512
+                                    sourceSize.height: 512
+                                    source: previewPane.showsImage ? Model.pathToUrl(previewPane.entry.path) : ""
+                                    visible: previewPane.showsImage && status === Image.Ready
+                                }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: !previewImage.visible
+                                    text: previewPane.entry ? Model.glyphFor(previewPane.entry.name, previewPane.entry.isDir) : ""
+                                    color: previewPane.entry && previewPane.entry.isDir ? pickerRoot.theme.accent : pickerRoot.theme.textMuted
+                                    font.family: "Symbols Nerd Font"
+                                    font.pixelSize: pickerRoot.theme.fontPx(3)
+                                }
+                            }
+
+                            Text {
+                                width: parent.width
+                                text: previewPane.entry ? previewPane.entry.name : ""
+                                color: pickerRoot.theme.textPrimary
+                                font.family: pickerRoot.theme.fontUi
+                                font.pixelSize: pickerRoot.theme.fontPx(0.917)
+                                font.weight: Font.DemiBold
+                                wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                width: parent.width
+                                visible: text !== ""
+                                text: {
+                                    const e = previewPane.entry;
+                                    if (!e)
+                                        return "";
+                                    if (e.isDir)
+                                        return "Folder";
+                                    const ext = Model.extensionOf(e.name);
+                                    return (ext !== "" ? ext.toUpperCase() + " · " : "") + Model.formatSize(e.size);
+                                }
+                                color: pickerRoot.theme.textMuted
+                                font.family: pickerRoot.theme.fontMono
+                                font.pixelSize: pickerRoot.theme.fontPx(0.75)
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                width: parent.width
+                                visible: text !== ""
+                                text: previewPane.entry ? Model.formatTime(previewPane.entry.modified, pickerRoot.nowMs) : ""
+                                color: pickerRoot.theme.textMuted
+                                font.family: pickerRoot.theme.fontMono
+                                font.pixelSize: pickerRoot.theme.fontPx(0.75)
+                            }
+                        }
+                    }
+
                     Text {
                         anchors.centerIn: listView
                         visible: pickerRoot.entries.length === 0
@@ -708,15 +1502,21 @@ Scope {
                             anchors.verticalCenter: parent.verticalCenter
                             elide: Text.ElideRight
                             text: {
+                                if (pickerRoot.fieldMode === "path")
+                                    return "type a path · ~ and relative work · esc cancels";
+                                if (pickerRoot.fieldMode === "newfolder")
+                                    return "type the folder name · enter creates · esc cancels";
+                                if (pickerRoot.overwritePending)
+                                    return "“" + pickerRoot.query.trim() + "” exists — enter again replaces it, esc keeps it";
                                 if (pickerRoot.multiple && pickerRoot.selectionCount > 0)
-                                    return pickerRoot.selectionCount + " selected · ctrl+space toggles · ctrl+enter accepts";
+                                    return pickerRoot.selectionCount + " selected · shift extends · ctrl+enter accepts";
                                 if (pickerRoot.saving)
-                                    return "type the name · enter saves · ctrl+h hidden";
+                                    return "type the name · enter saves · ← → walks folders";
                                 if (pickerRoot.multiple)
-                                    return "ctrl+space selects · ctrl+enter accepts · ctrl+h hidden";
-                                return "type to filter · ← → walks folders · ctrl+h hidden";
+                                    return "ctrl/shift+click selects · ctrl+a all · ctrl+enter accepts";
+                                return "type to filter · ctrl+l path · ctrl+d pins · ctrl+h hidden";
                             }
-                            color: pickerRoot.theme.textMuted
+                            color: pickerRoot.overwritePending ? pickerRoot.theme.warn : pickerRoot.theme.textMuted
                             font.family: pickerRoot.theme.fontUi
                             font.pixelSize: pickerRoot.theme.fontPx(0.75)
                         }
@@ -728,13 +1528,22 @@ Scope {
                             spacing: pickerRoot.theme.space(2)
 
                             PickerButton {
+                                label: "New folder"
+                                visible: pickerRoot.saving || pickerRoot.directoryMode
+                                onActivated: {
+                                    pickerRoot.fieldMode = "newfolder";
+                                    pickerRoot.newFolderName = "";
+                                }
+                            }
+
+                            PickerButton {
                                 label: "Cancel"
                                 onActivated: pickerRoot.cancel()
                             }
 
                             PickerButton {
                                 id: acceptButton
-                                label: pickerRoot.acceptLabel
+                                label: pickerRoot.overwritePending ? "Overwrite" : pickerRoot.acceptLabel
                                 primary: true
                                 enabled: pickerRoot.acceptable
                                 onActivated: pickerRoot.accept()
@@ -743,6 +1552,30 @@ Scope {
                     }
                 }
             }
+        }
+    }
+
+    component SortHeader: Text {
+        id: sortHeader
+
+        property string field: ""
+        property string label: ""
+
+        readonly property bool active: pickerRoot.sortField === field
+
+        text: label + (active ? (pickerRoot.sortReversed ? "  ↓" : "  ↑") : "")
+        color: active || sortHover.hovered ? pickerRoot.theme.textPrimary : pickerRoot.theme.textMuted
+        font.family: pickerRoot.theme.fontUi
+        font.pixelSize: pickerRoot.theme.fontPx(0.75)
+        font.weight: active ? Font.DemiBold : Font.Normal
+
+        HoverHandler {
+            id: sortHover
+            cursorShape: Qt.PointingHandCursor
+        }
+
+        TapHandler {
+            onTapped: pickerRoot.setSort(sortHeader.field)
         }
     }
 
