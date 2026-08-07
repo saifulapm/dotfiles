@@ -636,6 +636,16 @@ ShellRoot {
         function open(route: string): string {
             return shell.openMenu(route);
         }
+
+        // Generic picker/prompt for scripts (omarchy's dmenu modes; built by
+        // bin/menu-select and bin/menu-input): payload JSON carries
+        // mode/prompt/options/selectionFile/doneFile, the caller polls for
+        // the done file.
+        function prompt(payload: string): string {
+            shell.dismissBarPanels();
+            menuLoader.summon("promptOpen", [payload]);
+            return "ok";
+        }
     }
 
     SurfaceLoader {

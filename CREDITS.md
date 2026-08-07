@@ -1470,3 +1470,16 @@ Direct file-level copies (source path → destination path):
   thumbnail, click-to-open-in-mpv) onto notify-send and our OSD IPC; loaded
   via --load-extension in CHROMIUM_USER_FLAGS instead of their
   chromium-flags.conf, hosts registered by run_after_21.
+- omarchy `bin/omarchy-menu-select` / `-menu-input` + the menu plugin's
+  dmenu modes and providers (`shell/plugins/menu/Menu.qml`) →
+  `bin/menu-select` / `bin/menu-input` + `Modules/Menu/Menu.qml`
+  (2026-08-07, user pick): their payload contract verbatim — mode/prompt/
+  options/selectionFile/doneFile, glyph-TAB-label options, the shell
+  guaranteeing the done marker on every dismissal — with jq building the
+  JSON instead of their perl, a 120s poll cap (their loop is infinite), and
+  cancel deleting the pre-created selection file so an empty typed answer
+  stays distinguishable. Providers are their registry shape (script emitting
+  label\tvalue\tcurrent, volatile per entry, actionFor per row); ours ships
+  power-profiles wired to bin/power-profile. omarchy-powerprofiles-set/-list
+  → bin/power-profile (near-verbatim: per-source state files, UPower
+  OnBattery autodetect, availability guards, ac→performance default).

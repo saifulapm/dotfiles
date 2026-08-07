@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# menu-input — prompt for a line of text with the shell menu, dmenu-style.
+#
+# Port of omarchy-menu-input (CREDITS.md): the menu's header doubles as the
+# input line, Enter answers with whatever was typed (possibly empty), any
+# dismissal cancels. Same file round-trip as menu-select.
+#
+#   menu-input [prompt]
+set -euo pipefail
+
+prompt="${1:-Input}"
+
+selection_file=$(mktemp)
+done_file=$(mktemp)
+rm -f "$done_file"
+trap 'rm -f "$selection_file" "$done_file"' EXIT
+
+payload=$(jq -cn --arg prompt "$prompt" --arg sel "$selection_file" --arg done "$done_file" \
+  '{mode: "input", prompt: $prompt, selectionFile: $sel, doneFile: $done}')
+
+qs ipc call menu -- prompt "$payload" >/dev/null
+
+for ((i = 0; i < 2400; i++)); do
+  [[ -e $done_file ]] && break
+  sleep 0.05
+done
+[[ -e $done_file ]] || exit 1
+
+# Empty input is a legitimate answer — only a missing selection file (never
+# written = cancelled) fails.
+if [[ -f $selection_file ]]; then
+  cat "$selection_file"
+else
+  exit 1
+fi

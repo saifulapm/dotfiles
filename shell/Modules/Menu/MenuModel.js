@@ -42,6 +42,9 @@ function normalizeItem(id, raw) {
         action: value.action || "",
         call: value.call || "",
         state: value.state || "",
+        // Runtime submenu: a provider name from Menu.qml's registry. The row
+        // keeps kind "menu" (it opens a list), the rows come from a script.
+        provider: value.provider || "",
         aliases: normalizeAliases(value.aliases),
         when: value.when || "",
         checked: value.checked || "",

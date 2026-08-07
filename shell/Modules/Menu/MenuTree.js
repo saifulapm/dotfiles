@@ -311,6 +311,17 @@ var TREE = {
         "when": "command -v niri",
         "action": "niri msg action switch-layout next"
     },
+    // Omarchy's power-profiles provider submenu: rows come from the daemon at
+    // open time (✓ marks the active profile), a pick saves per power source
+    // through bin/power-profile.
+    "toggle.profile": {
+        "icon": "󰐋",
+        "label": "Power Profile",
+        "aliases": ["profile", "performance", "powersave", "power-saver", "balanced"],
+        "description": "Pick the power profile for the current power source",
+        "when": "command -v powerprofilesctl",
+        "provider": "power-profiles"
+    },
 
     // ----------------------------------------------------------------- setup
     "setup.shell": {

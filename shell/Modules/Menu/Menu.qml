@@ -65,6 +65,133 @@ Scope {
             frozenListHeight = listHeight;
     }
 
+    // ---------------------------------------------- dmenu modes + providers
+    // Omarchy's generic picker/prompt: scripts summon the menu with a payload
+    // {mode: "select"|"input", prompt, options[], selectionFile, doneFile}
+    // (bin/menu-select / bin/menu-input build it) and poll for doneFile —
+    // which this side GUARANTEES on every exit path, else the caller hangs.
+    property var promptState: null
+
+    // Provider rows (their runtime submenus): a tree entry carrying
+    // `provider: "<name>"` runs the registry script on every entry —
+    // volatile, so the ✓ tracks reality — and shows its label\tvalue\tcurrent
+    // lines as action rows.
+    readonly property var providers: ({
+            "power-profiles": {
+                script: "current=$(powerprofilesctl get 2>/dev/null); power-profile list 2>/dev/null | while read -r p; do [ -z \"$p\" ] && continue; printf '%s\\t%s\\t%s\\n' \"$p\" \"$p\" \"$current\"; done",
+                icon: "󰐋",
+                actionFor: function (value) {
+                    return "power-profile autodetect " + "'" + String(value).replace(/'/g, "'\\''") + "'";
+                }
+            }
+        })
+    property var providerRows: null
+    property string providerLabel: ""
+
+    function promptOpen(payloadJson) {
+        let p = null;
+        try {
+            p = JSON.parse(String(payloadJson || "{}"));
+        } catch (e) {
+            return;
+        }
+        if (!p || (p.mode !== "select" && p.mode !== "input") || !p.doneFile)
+            return;
+        const options = [];
+        const raw = Array.isArray(p.options) ? p.options : [];
+        for (let i = 0; i < raw.length; i++) {
+            const s = String(raw[i]);
+            const tab = s.indexOf("\t");
+            options.push(tab >= 0 ? {
+                icon: s.substring(0, tab),
+                label: s.substring(tab + 1)
+            } : {
+                icon: "",
+                label: s
+            });
+        }
+        shellRoot.dismissBarPanels();
+        promptState = {
+            mode: p.mode,
+            prompt: String(p.prompt || (p.mode === "input" ? "Input" : "Select")),
+            options: options,
+            selectionFile: String(p.selectionFile || ""),
+            doneFile: String(p.doneFile)
+        };
+        providerRows = null;
+        activeMenu = "root";
+        navStack = [];
+        filterText = "";
+        selectedIndex = 0;
+        frozenListHeight = -1;
+        opened = true;
+        rebuildDisplay();
+    }
+
+    function finalizePrompt(text) {
+        if (!promptState)
+            return;
+        const state = promptState;
+        promptState = null;
+        // One bash sequence: the selection lands BEFORE the done marker, so
+        // the polling caller never reads a half-written answer. Cancel
+        // REMOVES the selection file — mktemp pre-creates it, and an empty
+        // typed answer must stay distinguishable from a dismissal.
+        if (text !== null && text !== undefined && state.selectionFile)
+            Quickshell.execDetached(["bash", "-c", "printf '%s' \"$2\" > \"$1\"; touch \"$3\"", "qshell-menu-prompt", state.selectionFile, String(text), state.doneFile]);
+        else
+            Quickshell.execDetached(["bash", "-c", "rm -f \"$1\"; touch \"$2\"", "qshell-menu-prompt", state.selectionFile, state.doneFile]);
+    }
+
+    function openProvider(entry) {
+        const def = providers[entry.provider];
+        if (!def)
+            return;
+        freezeListHeight();
+        providerLabel = entry.title || entry.label;
+        providerRows = [];
+        filterText = "";
+        selectedIndex = 0;
+        providerProc.icon = def.icon || entry.icon || "";
+        providerProc.actionForName = entry.provider;
+        providerProc.collected = "";
+        providerProc.command = ["bash", "-lc", def.script];
+        providerProc.running = true;
+        rebuildDisplay();
+    }
+
+    Process {
+        id: providerProc
+        property string collected: ""
+        property string icon: ""
+        property string actionForName: ""
+        stdout: SplitParser {
+            onRead: data => providerProc.collected += data + "\n"
+        }
+        onExited: {
+            const def = menuRoot.providers[actionForName];
+            if (!def || menuRoot.providerRows === null)
+                return;
+            const rows = [];
+            const lines = collected.split("\n");
+            for (let i = 0; i < lines.length; i++) {
+                const parts = lines[i].split("\t");
+                if (parts.length < 2 || !parts[0])
+                    continue;
+                rows.push({
+                    label: parts[0],
+                    value: parts[1],
+                    current: parts.length > 2 && parts[1] === parts[2],
+                    icon: icon,
+                    action: def.actionFor(parts[1])
+                });
+            }
+            menuRoot.providerRows = rows;
+            if (menuRoot.opened)
+                menuRoot.rebuildDisplay();
+        }
+    }
+
     function entryFor(id) {
         return MenuModel.item(items, id);
     }
@@ -86,6 +213,12 @@ Scope {
     }
 
     function hide() {
+        // Every dismissal answers a pending prompt as cancelled — scrim
+        // click, Escape, another overlay stealing the surface — or the
+        // caller polls its done file forever.
+        if (promptState)
+            finalizePrompt(null);
+        providerRows = null;
         opened = false;
         filterText = "";
         frozenListHeight = -1;
@@ -133,6 +266,13 @@ Scope {
         }
         if (entry && entry.kind === "link" && entry.target)
             id = entry.target;
+        if (entry && entry.provider) {
+            // Provider entries have no tree children — landing on them as a
+            // plain submenu would show an empty card.
+            show();
+            openProvider(entry);
+            return "ok";
+        }
         show();
         if (entryFor(id) && id !== activeMenu) {
             // A routed open lands directly on this menu: it IS the starting
@@ -223,6 +363,15 @@ Scope {
     }
 
     function goBack() {
+        if (promptState)
+            return false; // Backspace/Left never leaves a prompt half-open
+        if (providerRows !== null) {
+            providerRows = null;
+            filterText = "";
+            selectedIndex = 0;
+            rebuildDisplay();
+            return true;
+        }
         if (activeMenu === "root")
             return false;
 
@@ -254,10 +403,25 @@ Scope {
     }
 
     function activateIndex(index) {
+        if (promptState && promptState.mode === "input") {
+            finalizePrompt(filterText);
+            hide();
+            return;
+        }
         if (index < 0 || index >= displayModel.count)
             return;
         const row = displayModel.get(index);
+        if (row.kind === "prompt-option") {
+            finalizePrompt(row.label);
+            hide();
+            return;
+        }
         if (row.kind === "menu" || row.kind === "link") {
+            const entry = entryFor(row.itemId);
+            if (entry && entry.provider) {
+                openProvider(entry);
+                return;
+            }
             setActiveMenu(row.target || row.itemId, true);
             return;
         }
@@ -283,6 +447,58 @@ Scope {
 
         displayModel.clear();
         searchDivider = false;
+
+        // Prompt and provider views bypass the tree entirely: their rows are
+        // synthesized in the displayRow shape the delegate already reads.
+        if (promptState) {
+            if (promptState.mode === "select") {
+                const q = filterText.trim().toLowerCase();
+                for (let p = 0; p < promptState.options.length; p++) {
+                    const opt = promptState.options[p];
+                    if (q && opt.label.toLowerCase().indexOf(q) < 0)
+                        continue;
+                    displayModel.append({
+                        itemId: "prompt-" + p,
+                        kind: "prompt-option",
+                        icon: opt.icon,
+                        label: opt.label,
+                        target: "",
+                        detail: "",
+                        path: "",
+                        childCount: 0,
+                        action: "",
+                        call: "",
+                        score: 0,
+                        section: ""
+                    });
+                }
+            }
+            if (selectedIndex >= displayModel.count)
+                selectedIndex = Math.max(0, displayModel.count - 1);
+            return;
+        }
+        if (providerRows !== null) {
+            for (let v = 0; v < providerRows.length; v++) {
+                const row = providerRows[v];
+                displayModel.append({
+                    itemId: "provider-" + v,
+                    kind: "action",
+                    icon: row.icon,
+                    label: row.label + (row.current ? " ✓" : ""),
+                    target: "",
+                    detail: "",
+                    path: "",
+                    childCount: 0,
+                    action: row.action,
+                    call: "",
+                    score: 0,
+                    section: ""
+                });
+            }
+            if (selectedIndex >= displayModel.count)
+                selectedIndex = Math.max(0, displayModel.count - 1);
+            return;
+        }
 
         const active = entryFor(activeMenu) ? activeMenu : "root";
         activeMenu = active;
@@ -495,6 +711,10 @@ Scope {
                         text: {
                             if (menuRoot.filterText)
                                 return menuRoot.filterText;
+                            if (menuRoot.promptState)
+                                return menuRoot.promptState.prompt + "…";
+                            if (menuRoot.providerRows !== null)
+                                return menuRoot.providerLabel + "…";
                             const entry = menuRoot.entryFor(menuRoot.activeMenu);
                             return (entry ? entry.title || entry.label : "Go") + "…";
                         }
