@@ -446,6 +446,10 @@ window-rule {
 window-rule {
     match app-id="^omacalc$"
     open-floating true
+    // Compact portrait-calculator size — left to itself the app opens far
+    // too big (user call 2026-08-07).
+    default-column-width { fixed 360; }
+    default-window-height { fixed 540; }
 }
 
 // omarchy scrolls terminals 1.5× (input.lua: scroll_touchpad), multiplied
