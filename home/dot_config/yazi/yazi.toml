@@ -18,13 +18,19 @@ max_height = 2000
 
 [opener]
 play = [
-	{ run = 'mpv "$@"', orphan = true, for = "unix" },
+	# The IPC socket is what the add-sub opener below talks to (sub-add via
+	# socat). One socket = one controllable mpv; a second instance just runs
+	# without IPC.
+	{ run = 'mpv --input-ipc-server=/tmp/mpv.sock "$@"', orphan = true, for = "unix" },
 ]
 edit = [
 	{ run = '$EDITOR "$@"', block = true, for = "unix" },
 ]
 open = [
-	{ run = 'xdg-open "$@"', desc = "Open" },
+	{ run = 'xdg-open "$@"', desc = "Open (default app)" },
+]
+browser = [
+	{ run = 'chromium-browser "$@"', orphan = true, desc = "Open in Chromium", for = "unix" },
 ]
 add-sub = [
   { run  = ''' echo sub-add "'$0'" | socat - /tmp/mpv.sock ''', desc = "Add sub to MPV" },
@@ -47,13 +53,15 @@ rules = [
 	{ mime = "application/x-rar", use = "extract" },
 	{ mime = "application/gzip", use = "extract" },
 
-	{ mime = "text/*", use = "edit" },
-	{ mime = "video/*", use = [ "play", "reveal" ] },
+	# Multi-opener lists feed the native "Open with" menu on O (open
+	# --interactive); Enter/l always takes the first entry.
+	{ mime = "text/*", use = [ "edit", "open" ] },
+	{ mime = "video/*", use = [ "play", "reveal", "browser" ] },
 	{ mime = "audio/*", use = [ "play", "reveal" ] },
-	{ mime = "image/*", use = "open" },
+	{ mime = "image/*", use = [ "open", "browser", "reveal" ] },
 
-	# PDF opens with evince
-	{ mime = "application/pdf", use = "open" },
+	# PDF opens with evince (via mimeapps); Chromium as the alternate viewer
+	{ mime = "application/pdf", use = [ "open", "browser" ] },
 
 	# Common config files
 	{ url = "*.json", use = "edit" },
@@ -71,5 +79,5 @@ rules = [
 	{ url = "*.{ass,srt,ssa,sty,sup,vtt}", use = [ "add-sub", "edit" ] },
 
 	# Fallback
-	{ url = "*", use = "open" },
+	{ url = "*", use = [ "open", "edit", "reveal" ] },
 ]
