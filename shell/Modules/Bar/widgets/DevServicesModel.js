@@ -15,6 +15,11 @@
 // after 10 minutes as usual). Both mailpit proxies wake the same
 // mailpit.service, so its stop list carries the pair.
 
+// Row glyphs are the Devicons brand marks (nf-dev-mysql U+E704,
+// nf-dev-postgresql U+E76E, nf-dev-redis U+E76D) — the installed Symbols
+// Nerd Font maps the whole range (verified via fc-list :charset; the old
+// "Devicons do not render" note in the Dropbox widget predates this font).
+// Mailpit has no brand glyph anywhere in the font, so it wears md-email.
 var SERVICES = [
     {
         key: "mysql84",
@@ -23,6 +28,7 @@ var SERVICES = [
         startUnits: ["mysql84.service", "mysql84-proxy.service"],
         stopUnits: ["mysql84-proxy.service", "mysql84.service"],
         portLabel: "port 3306",
+        glyph: "",
         webUrl: ""
     },
     {
@@ -32,6 +38,7 @@ var SERVICES = [
         startUnits: ["postgres18.service", "postgres18-proxy.service"],
         stopUnits: ["postgres18-proxy.service", "postgres18.service"],
         portLabel: "port 5432",
+        glyph: "",
         webUrl: ""
     },
     {
@@ -41,6 +48,7 @@ var SERVICES = [
         startUnits: ["redis7.service", "redis7-proxy.service"],
         stopUnits: ["redis7-proxy.service", "redis7.service"],
         portLabel: "port 6379",
+        glyph: "",
         webUrl: ""
     },
     {
@@ -50,6 +58,7 @@ var SERVICES = [
         startUnits: ["mailpit.service", "mailpit-smtp-proxy.service"],
         stopUnits: ["mailpit-smtp-proxy.service", "mailpit-web-proxy.service", "mailpit.service"],
         portLabel: "smtp 1025 · web 8025",
+        glyph: "󰇮",
         webUrl: "http://localhost:8025"
     }
 ];

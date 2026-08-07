@@ -216,12 +216,19 @@ BarPanel {
             anchors.rightMargin: panel.theme.space(2.5)
             implicitHeight: Math.max(rowMark.implicitHeight, rowLabels.implicitHeight, webButton.implicitHeight)
 
-            DevServicesIcon {
+            // Each service's own brand mark (the catalog's glyph — Devicons
+            // for the databases, md-email for Mailpit), in a fixed-width
+            // slot so the label column lines up across rows whatever each
+            // glyph's ink width is.
+            OpticalGlyph {
                 id: rowMark
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                iconSize: panel.theme.fontPx(1.083)
+                width: panel.theme.space(5)
+                text: row.svc ? row.svc.glyph : ""
+                verticalInkCenter: true
                 color: row.isRunning || row.busy ? panel.theme.textPrimary : panel.theme.textMuted
+                pixelSize: panel.theme.fontPx(1.083)
             }
 
             Column {

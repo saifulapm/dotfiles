@@ -50,6 +50,7 @@ QtObject {
                 label: def.label,
                 container: def.container,
                 portLabel: def.portLabel,
+                glyph: def.glyph,
                 webUrl: def.webUrl,
                 running: root.runningContainers[def.container] === true,
                 pending: root.pendingByKey[def.key] || ""
