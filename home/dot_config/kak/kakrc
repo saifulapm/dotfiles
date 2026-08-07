@@ -29,8 +29,11 @@ hook global WinSetOption filetype= %{
 # ---------------
 # Colorscheme
 # ---------------
-colorscheme gruvbox
-# colorscheme tokyonight_storm
+# Follows the desktop theme: bin/theme-apply renders the palette to
+# ~/.config/kak/colors/qshell.kak on every theme change and re-issues
+# `colorscheme qshell` into running sessions over kak -p. Set a literal
+# scheme name here to opt out.
+colorscheme qshell
 
 # eval %sh{kak-claude init}
 # eval %sh{ kak-pi init }

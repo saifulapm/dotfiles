@@ -225,6 +225,7 @@ const OUTPUTS = {
   // state file is sourced by fish conf.d/40-gum-theme.fish at shell start.
   "btop-theme.tmpl": [path.join(HOME, ".config/btop/themes/qshell.theme")],
   "helix-theme.toml.tmpl": [path.join(HOME, ".config/helix/themes/qshell.toml")],
+  "kak-theme.kak.tmpl": [path.join(HOME, ".config/kak/colors/qshell.kak")],
   "claude-theme.json.tmpl": [path.join(HOME, ".claude/themes/qshell.json")],
   "gum-theme.fish.tmpl": [path.join(HOME, ".local/state/qshell/gum-theme.fish")]
 }
@@ -362,6 +363,12 @@ if (osc) {
   } catch (e) { /* unwritable config dir; theme file still rendered */ }
   try { execSync("pkill -SIGUSR2 -x btop", { stdio: "ignore" }) } catch (e) { /* none running */ }
   try { execSync("pkill -SIGUSR1 -x hx", { stdio: "ignore" }) } catch (e) { /* none running */ }
+  // kakoune has no reload signal, but `colorscheme` re-sources the file —
+  // pushed into every live session (kak_session daemons included) over -p.
+  try {
+    execSync("for s in $(kak -l 2>/dev/null); do echo 'colorscheme qshell' | kak -p \"$s\" 2>/dev/null || true; done",
+      { stdio: "ignore", shell: "/bin/bash" })
+  } catch (e) { /* kak absent or no sessions */ }
 }
 
 console.log("theme-apply: done")
