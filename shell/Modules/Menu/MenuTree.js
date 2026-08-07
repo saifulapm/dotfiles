@@ -326,13 +326,6 @@ var TREE = {
         "description": "Lock the session",
         "call": "lock"
     },
-    "system.suspend": {
-        "icon": "󰒲",
-        "label": "Suspend",
-        "aliases": ["sleep"],
-        "when": "command -v systemctl",
-        "action": "systemctl suspend"
-    },
     "system.relaunch": {
         "icon": "󰑐",
         "label": "Relaunch Shell",

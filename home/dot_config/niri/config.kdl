@@ -779,6 +779,16 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 }
 
+// Lid close = lock + all screens off, never suspend: Asahi never brings the
+// display back after resume, and agentic sessions must keep the network up.
+// niri already turns the internal panel off/on with the lid; the explicit
+// power calls cover docked external monitors. The logind half (lid/suspend
+// keys ignored, sleep targets masked) is run_after_18-no-suspend.sh.
+switch-events {
+    lid-close { spawn "sh" "-c" "qs ipc call lock lock; niri msg action power-off-monitors"; }
+    lid-open { spawn "niri" "msg" "action" "power-on-monitors"; }
+}
+
 // Theme colors + corner radius, rendered by bin/theme-apply on every theme
 // switch. Last so its settings override the fallbacks above. Optional so a
 // fresh machine boots before the first theme-apply run.
