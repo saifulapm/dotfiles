@@ -967,6 +967,33 @@ binds {
     // recording, else opens the capture menu's Screenrecord submenu.
     Mod+Print hotkey-overlay-title="Screen Recording" { spawn "sh" "-c" "screenrecord --stop-recording || qs ipc call menu open screenrecording"; }
 
+    // Dynamic cast target (niri >= 25.05): a screencast source that can be
+    // re-pointed mid-call. Share "niri Dynamic Cast Target" once in the
+    // portal dialog, then swap what the far end sees with these — no
+    // renegotiation, so the meeting never drops the stream.
+    //
+    // A fresh dynamic cast deliberately starts EMPTY and transparent (niri
+    // wiki, Screencasting § Dynamic screencast target — it refuses to inherit
+    // the last target so a new call cannot leak the previous one). A blank
+    // share is therefore the expected first state, not a fault: these binds
+    // are the only way to fill it, which is why the feature looked dead while
+    // nothing was bound to them. The red border from the theme include's
+    // is-window-cast-target rule is the confirmation something is live.
+    //
+    // Continues the Mod+Shift+number capture family above, which exists
+    // because Apple keyboards have no Print key; 8/9/0 were the free tail.
+    Mod+Shift+8 hotkey-overlay-title="Cast: Focused Window" { set-dynamic-cast-window; }
+    Mod+Shift+9 hotkey-overlay-title="Cast: Focused Monitor" { set-dynamic-cast-monitor; }
+    Mod+Shift+0 hotkey-overlay-title="Cast: Blank Target" { clear-dynamic-cast-target; }
+    // Click-to-pick variant of Mod+Shift+8, riding the same Mod+Ctrl+Shift+digit
+    // "variant of that digit" shape as Read Region Aloud above. Worth having
+    // because the plain bind takes whatever is FOCUSED at press time — and
+    // right after you click Share, that is the browser, so the obvious press
+    // casts the meeting window into itself. This one asks instead.
+    // jq -e exits non-zero on a cancelled pick (empty input), so Escape is a
+    // no-op rather than a set-target call with an empty --id.
+    Mod+Ctrl+Shift+8 hotkey-overlay-title="Cast: Pick a Window" { spawn-sh "id=$(niri msg --json pick-window | jq -e -r .id) && niri msg action set-dynamic-cast-window --id \"$id\""; }
+
     // Applications such as remote-desktop clients and software KVM switches may
     // request that niri stops processing the keyboard shortcuts defined here
     // so they may, for example, forward the key presses as-is to a remote machine.

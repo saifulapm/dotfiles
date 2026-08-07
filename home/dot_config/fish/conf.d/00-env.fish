@@ -47,7 +47,24 @@ set -gx COMPOSER_HOME "$XDG_CONFIG_HOME/composer"
 # systemd user units (niri docs, Miscellaneous § environment), and qshell — and
 # with it the launcher — runs as one. The login shell is the one place both
 # niri spawns and systemd services inherit from, via niri-session's import.
-set -gx GDK_BACKEND "wayland,x11,*"
+#
+# GDK_BACKEND is deliberately NOT set (was "wayland,x11,*" from the omarchy
+# parity list until 2026-08-08). The comma list is GTK3 syntax; GTK4 takes a
+# single backend name, so GTK4 apps matched no backend and fell through to
+# XWayland via DISPLAY=:0. That silently broke screen sharing: this env reaches
+# xdg-desktop-portal-gnome through niri-session's import-environment, the
+# portal saw a non-Wayland GdkDisplay and logged
+#
+#   GDK backend forced via env var, portal dialogs will not work properly.
+#   Non-compatible display server, exposing settings only.
+#
+# then exported ONLY org.freedesktop.impl.portal.Settings — no ScreenCast — so
+# every Chromium/Firefox share died at the portal with "ScreenCastPortal
+# failed: 3" long before any GPU work. Unset, GTK4 tries wayland then x11 on
+# its own, which is exactly what the old value meant to say, and the portal
+# exports all 15 interfaces including ScreenCast (verified 2026-08-08).
+# Nothing else here depends on it: Electron rides OZONE_PLATFORM below and the
+# Qt dialog theme rides QT_QPA_PLATFORMTHEME.
 set -gx QT_QPA_PLATFORM "wayland;xcb"
 set -gx QT_QPA_PLATFORMTHEME gtk3
 set -gx MOZ_ENABLE_WAYLAND 1

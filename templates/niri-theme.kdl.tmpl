@@ -48,6 +48,35 @@ window-rule {
     clip-to-geometry true
 }
 
+// Marks whichever window an ongoing screencast is pointed at, including the
+// dynamic cast target (Mod+Shift+8/9/0 in config.kdl) — without it a dynamic
+// cast gives no on-screen sign of what it currently shows. Lives here rather
+// than in config.kdl because the colour has to be a theme token: config.kdl's
+// own border colours are only the fallback, and this include overrides them
+// per theme. accent.error is the same token the urgent-* colours above use,
+// so "a screencast is watching this" reads like every other alarm state.
+// Both blocks listed for the same reason the layout ones are — an include
+// never enables border or focus-ring, so whichever config.kdl turns on picks
+// the colours up (today: border, focus-ring is off).
+//
+// Placement matters: window rules apply in order and later ones win, so this
+// must stay AFTER the unconditional radius rule above, and the whole include
+// sits after config.kdl's own window rules. Only borders are set, so the
+// radius and clip from that rule still apply.
+window-rule {
+    match is-window-cast-target=true
+
+    focus-ring {
+        active-color "{{accent.error}}"
+        inactive-color "{{accent.error}}b0"
+    }
+
+    border {
+        active-color "{{accent.error}}"
+        inactive-color "{{accent.error}}b0"
+    }
+}
+
 // Included sections merge, so this only sets the slowdown factor (or off) on
 // top of the animation blocks config.kdl defines: the theme's motion.duration
 // scaled against the 150 ms reference, same scale the shell's theme.time()
