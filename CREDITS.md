@@ -1459,3 +1459,14 @@ Direct file-level copies (source path → destination path):
   too), Emacs follows over an emacsclient poke (emacs.d reads the same
   file), and the Display panel carries the stepper omarchy puts in their
   monitor panel.
+- omarchy `default/chromium/extensions/{copy-url,yt-dlp,whatsapp-slim}` →
+  `chromium/extensions/` (2026-08-07, user pick): DIRECT COPIES, manifest
+  `key`-pinned IDs and all — which is why the native host names stay
+  com.omarchy.copy_url / com.omarchy.ytdlp: the extension code calls them by
+  that exact string and the host manifests' allowed_origins match the pinned
+  IDs from any install path. `bin/chromium-copy-url-host` and
+  `bin/chromium-ytdlp-host` port their host scripts (framing, the detached
+  --download worker, the throttled progress loop, the square-cropped toast
+  thumbnail, click-to-open-in-mpv) onto notify-send and our OSD IPC; loaded
+  via --load-extension in CHROMIUM_USER_FLAGS instead of their
+  chromium-flags.conf, hosts registered by run_after_21.

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# chromium-copy-url-host — native messaging host for the Copy URL extension.
+#
+# Port of omarchy-chromium-copy-url-host (CREDITS.md): the browser launches
+# this with a 4-byte little-endian length prefix + JSON {url} on stdin; the
+# URL goes to the Wayland clipboard and a toast confirms. The host keeps
+# omarchy's com.omarchy.copy_url name — the extension (direct copy) calls it
+# by that string. The browser starts us without the session PATH.
+set -euo pipefail
+
+export PATH="$HOME/.dotfiles/bin:/usr/local/bin:/usr/bin:$PATH"
+
+parse_url() {
+  jq -r '.url // empty' 2>/dev/null <<<"$1" || true
+}
+
+copy_url() {
+  local url="$1"
+
+  [[ -n $url ]] || return 1
+  printf '%s' "$url" | wl-copy --type text/plain
+  notify-send -a qshell -t 4000 "󰅍 URL copied to clipboard" >/dev/null 2>&1 || true
+}
+
+reply_copied() {
+  if [[ $1 == "true" ]]; then
+    printf '\x0f\x00\x00\x00{"copied":true}'
+  else
+    printf '\x10\x00\x00\x00{"copied":false}'
+  fi
+}
+
+main() {
+  local length payload url
+
+  length=$(head -c4 | od -An -v -tu4 --endian=little | tr -d ' ')
+  [[ -n ${length:-} ]] && ((length > 0)) || exit 0
+
+  payload=$(head -c "$length")
+  url=$(parse_url "$payload")
+
+  if copy_url "$url"; then
+    reply_copied true
+  else
+    reply_copied false
+  fi
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
+fi

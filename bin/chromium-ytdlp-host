@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# chromium-ytdlp-host — native messaging host for the yt-dlp extension.
+#
+# Port of omarchy-chromium-ytdlp-host (CREDITS.md): the extension sends
+# {url}; a detached worker runs yt-dlp into ~/Videos while the shell's OSD
+# draws one in-place progress bar (their omarchy-osd calls become our
+# `qs ipc call osd -- show` — the `--` dodges the qs CLI's own `show`
+# subcommand), and the finishing toast opens the file in mpv when clicked.
+# Keeps omarchy's com.omarchy.ytdlp name — the extension calls it by string.
+set -euo pipefail
+
+export PATH="$HOME/.dotfiles/bin:/usr/local/bin:/usr/bin:$PATH"
+
+DOWNLOAD_DIR="${QSHELL_YTDLP_DIR:-$HOME/Videos}"
+
+parse_url() {
+  jq -r '.url // empty' 2>/dev/null <<<"$1" || true
+}
+
+valid_url() {
+  [[ $1 =~ ^https?:// ]]
+}
+
+osd_progress() {
+  qs ipc call osd -- show "{\"icon\":\"󰇚\",\"value\":$1,\"progressText\":\"$1%\",\"duration\":8000}" >/dev/null 2>&1 || true
+}
+
+osd_close() {
+  qs ipc call osd close >/dev/null 2>&1 || true
+}
+
+download_url() {
+  local url="$1"
+
+  mkdir -p "$DOWNLOAD_DIR"
+
+  # Nothing shows until yt-dlp confirms there is actually a video here.
+  if ! yt-dlp --no-playlist --simulate --quiet --no-warnings "$url" >/dev/null 2>&1; then
+    notify-send -a qshell -u critical -t 6000 "󰅖 No video found for download" "$url" >/dev/null 2>&1 || true
+    exit 0
+  fi
+
+  osd_progress 0
+
+  # QSHELL_PROG carries the percent (drives the OSD); QSHELL_FILE prints only
+  # after a successful move, so a captured path == success.
+  local line rest pct intpct last="" er nowms lastms=0 title="" filepath=""
+  while IFS= read -r line; do
+    case $line in
+    QSHELL_PROG*)
+      pct=${line#QSHELL_PROG$'\t'}
+      intpct=${pct%%.*}
+      intpct=${intpct//[^0-9]/}
+      [[ -n $intpct && $intpct != "$last" ]] || continue
+      # ~4 redraws/sec — every update spawns a qs ipc client.
+      er=$EPOCHREALTIME
+      nowms=$((${er%[.,]*} * 1000 + 10#${er##*[.,]} / 1000))
+      ((nowms - lastms >= 250)) || continue
+      last=$intpct
+      lastms=$nowms
+      osd_progress "$intpct"
+      ;;
+    QSHELL_FILE*)
+      rest=${line#QSHELL_FILE$'\t'}
+      title=${rest%%$'\t'*}
+      filepath=${rest#*$'\t'}
+      ;;
+    esac
+  done < <(PYTHONUNBUFFERED=1 yt-dlp --no-playlist --restrict-filenames --no-simulate \
+    --quiet --no-warnings --progress --newline \
+    --progress-template $'download:QSHELL_PROG\t%(progress._percent_str)s' \
+    --paths "$DOWNLOAD_DIR" -o '%(title)s [%(id)s].%(ext)s' \
+    --print $'after_move:QSHELL_FILE\t%(title)s\t%(filepath)s' \
+    "$url" 2>&1)
+
+  osd_close
+
+  if [[ -n $filepath ]]; then
+    ((${#title} > 50)) && title="${title:0:50}…"
+
+    # Square, center-cropped thumbnail so the toast preview isn't stretched.
+    local preview
+    preview="$(mktemp --suffix=.jpg)"
+    ffmpeg -y -i "$filepath" -ss 00:00:00.1 -vframes 1 \
+      -vf "crop='min(iw,ih)':'min(iw,ih)',scale=256:256" -q:v 2 \
+      "$preview" -loglevel quiet 2>/dev/null || true
+
+    # -A default=Open blocks until the action is clicked (prints the key) or
+    # the toast times out; a click opens the video in mpv.
+    (
+      if [[ -n $(notify-send -a qshell -t 10000 -i "${preview:-$filepath}" -A default=Open "󰄬 Download complete" "$title" 2>/dev/null) ]]; then
+        mpv "$filepath" >/dev/null 2>&1 || true
+      fi
+      rm -f "$preview"
+    ) &
+  else
+    notify-send -a qshell -u critical -t 6000 "󰅖 Download failed" "$url" >/dev/null 2>&1 || true
+  fi
+
+  exit 0
+}
+
+main() {
+  local length payload url
+
+  # Detached worker half: actually runs yt-dlp and fires the notifications.
+  if [[ ${1:-} == "--download" ]]; then
+    download_url "$2"
+  fi
+
+  length=$(head -c4 | od -An -v -tu4 --endian=little | tr -d ' ')
+  [[ -n ${length:-} ]] && ((length > 0)) || exit 0
+
+  payload=$(head -c "$length")
+  url=$(parse_url "$payload")
+
+  if valid_url "$url"; then
+    setsid -f "${BASH_SOURCE[0]}" --download "$url" >/dev/null 2>&1
+    printf '\x12\x00\x00\x00{"download":true}'
+  else
+    printf '\x13\x00\x00\x00{"download":false}'
+  fi
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
+fi
