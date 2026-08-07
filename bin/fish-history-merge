@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""fish-history-merge <target> <source>... — union fish history files.
+
+The cross-machine half of fish history sync (bin/qshell-sync pulls the other
+machines' session files into a staging dir and calls this): rewrites <target>
+as the union of itself and every <source>, ordered by timestamp.
+
+Design constraints, in order:
+  * Blocks are opaque. A fish history entry is "- cmd: ..." plus its indented
+    lines (when:, paths:); entries are compared by the (cmd, when) pair and
+    the first block seen for a pair is kept verbatim. Nothing here parses
+    fish's escaping, so nothing here can corrupt it.
+  * No-op means NO WRITE. If the sources add nothing new, the target is left
+    untouched — a 15-minute timer must not churn the file's mtime, and every
+    skipped rewrite is a skipped race window.
+  * fish appends to the live file with no lock. The rewrite is guarded by an
+    mtime snapshot: if the target moved while the union was being built, the
+    build restarts (3 tries, then the round is surrendered to the next timer
+    tick rather than clobbering a fresh append).
+
+Running fish sessions see imports at their next `history merge` or shell
+start — the same freshness the bash side gets by reading other machines'
+files only at startup.
+"""
+
+import os
+import re
+import sys
+import tempfile
+
+WHEN_RE = re.compile(r"\s+when: (\d+)")
+
+
+def parse(path):
+    """Yield ((cmd, when), block_text) per entry; missing file yields nothing."""
+    try:
+        with open(path, encoding="utf-8", errors="surrogateescape") as f:
+            text = f.read()
+    except FileNotFoundError:
+        return []
+    entries = []
+    block = None
+    for line in text.splitlines(keepends=True):
+        if line.startswith("- cmd: "):
+            if block:
+                entries.append(block)
+            block = [line]
+        elif block is not None:
+            block.append(line)
+        # anything before the first "- cmd:" is a corrupt head — dropped
+    if block:
+        entries.append(block)
+    out = []
+    for lines in entries:
+        cmd = lines[0][len("- cmd: "):].rstrip("\n")
+        when = 0
+        for extra in lines[1:]:
+            m = WHEN_RE.match(extra)
+            if m:
+                when = int(m.group(1))
+                break
+        out.append(((cmd, when), "".join(lines)))
+    return out
+
+
+def mtime_ns(path):
+    try:
+        return os.stat(path).st_mtime_ns
+    except FileNotFoundError:
+        return None
+
+
+def main():
+    if len(sys.argv) < 3:
+        print(__doc__.strip().splitlines()[0], file=sys.stderr)
+        return 2
+    target, sources = sys.argv[1], sys.argv[2:]
+
+    for attempt in range(3):
+        snapshot = mtime_ns(target)
+
+        merged = {}
+        for path in [target, *sources]:
+            for key, block in parse(path):
+                merged.setdefault(key, block)
+
+        target_keys = {key for key, _ in parse(target)}
+        if set(merged) == target_keys:
+            return 0  # sources brought nothing new — leave the file alone
+
+        ordered = sorted(merged.items(), key=lambda kv: kv[0][1])
+        data = "".join(block for _, block in ordered)
+
+        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+        fd, tmp = tempfile.mkstemp(
+            dir=os.path.dirname(target) or ".", prefix=".fish-history-merge."
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", errors="surrogateescape") as f:
+                f.write(data)
+            if mtime_ns(target) != snapshot:
+                os.unlink(tmp)
+                continue  # fish appended mid-build — rebuild from the new file
+            os.replace(tmp, target)
+            return 0
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+
+    print("fish-history-merge: target kept moving; surrendered this round", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

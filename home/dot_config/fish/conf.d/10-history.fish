@@ -5,9 +5,10 @@
 # conflict across the sync. Session names must be [a-zA-Z0-9_], so the
 # machine slug's dashes become underscores (macbook-m2 → macbook_m2).
 #
-# NOT yet cross-machine-merged: fish's history format is its own (YAML-ish),
-# bin/qshell-sync currently moves only the bash-format files, and fish has no
-# native "read someone else's file" — follow-up work if wanted.
+# Cross-machine merged since 2026-08-08 (user pick): bin/qshell-sync pushes
+# this file, pulls the other machines' files into the sync staging dir, and
+# bin/fish-history-merge unions them into this session file offline. Running
+# sessions pick imports up at the next `history merge` or shell start.
 set -l machine (cat "$HOME/.config/qshell/machine" 2>/dev/null)
 test -n "$machine"; or set machine (uname -n)
 set -g fish_history (string replace -ra '[^a-zA-Z0-9_]' '_' "$machine")

@@ -13,6 +13,13 @@
 #                bashrc.d/20-history.sh is the consumer: bash appends to its
 #                own file and reads the union.
 #
+#   fish history ~/.local/share/fish/<machine_slug>_history
+#                Push-own / pull-others like bash history, then
+#                bin/fish-history-merge unions the pulled files into the
+#                local session file (fish cannot read foreign session files
+#                the way bash reads foreign HISTFILEs). See the section
+#                comment below for the convergence trade-off.
+#
 #   model-usage  ~/.local/state/qshell/sync/model-usage/<machine>.json
 #                Same push-own / pull-others shape as history. The files are
 #                Services/Sync.qml's per-device snapshots (shell.json's sync
@@ -112,6 +119,31 @@ else
   echo "qshell-sync: no local history file yet ($hist_dir/$machine.history), nothing to push"
 fi
 run_rclone "history pull" copy "$remote/history" "$hist_dir" --exclude "$machine.history" || true
+
+# ------------------------------------------------------------- fish history
+# Same push-own / pull-others shape, plus an import step bash never needed:
+# fish cannot read another session's file, so pulled files stage under the
+# sync dir (NOT ~/.local/share/fish — fish must never see them as sessions)
+# and bin/fish-history-merge unions them into the local session file. The
+# push runs FIRST, so the hub copy of this machine's file converges toward
+# the union one round late — accepted: identity is (cmd, when), the union is
+# monotone, and one writer per hub file still holds. Session slug mirrors
+# conf.d/10-history.fish: fish session names are [a-zA-Z0-9_] only.
+fish_slug="${machine//[^a-zA-Z0-9_]/_}"
+fish_local="$HOME/.local/share/fish/${fish_slug}_history"
+fish_stage="$sync_dir/fish-history"
+mkdir -p "$fish_stage"
+if [[ -f $fish_local ]]; then
+  run_rclone "fish-history push" copyto "$fish_local" "$remote/fish-history/${fish_slug}_history" || true
+fi
+run_rclone "fish-history pull" copy "$remote/fish-history" "$fish_stage" --exclude "${fish_slug}_history" || true
+shopt -s nullglob
+fish_remote_files=("$fish_stage"/*_history)
+shopt -u nullglob
+if ((${#fish_remote_files[@]} > 0)); then
+  merge_err="$("$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fish-history-merge" "$fish_local" "${fish_remote_files[@]}" 2>&1)" \
+    || failures+=("fish-history merge: ${merge_err:-merge failed}")
+fi
 
 # -------------------------------------------------------------- model-usage
 # Services/Sync.qml's snapshots: same one-writer-per-device shape as history.
