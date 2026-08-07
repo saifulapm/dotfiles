@@ -374,6 +374,12 @@ arch = "all"
 why = "PHP 8.2 SCL meta (legacy client projects) — /usr/bin/php82"
 
 [[pkg]]
+name = "php82-php-xml"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: dom+xml — Laravel hard requirement; the php82 meta does NOT pull it (found live 2026-08-07: composer/artisan die on missing DOMDocument)"
+
+[[pkg]]
 name = "php82-php-pdo"
 category = "dev"
 arch = "all"
@@ -428,6 +434,12 @@ arch = "all"
 why = "PHP 8.3 SCL meta (current Laravel projects) — /usr/bin/php83"
 
 [[pkg]]
+name = "php83-php-xml"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: dom+xml — Laravel hard requirement; the php83 meta does NOT pull it (found live 2026-08-07: composer/artisan die on missing DOMDocument)"
+
+[[pkg]]
 name = "php83-php-pdo"
 category = "dev"
 arch = "all"
@@ -480,6 +492,12 @@ name = "php84"
 category = "dev"
 arch = "all"
 why = "PHP 8.4 SCL meta (current Laravel projects) — /usr/bin/php84"
+
+[[pkg]]
+name = "php84-php-xml"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: dom+xml — Laravel hard requirement; the php84 meta does NOT pull it (found live 2026-08-07: composer/artisan die on missing DOMDocument)"
 
 [[pkg]]
 name = "php84-php-pdo"
