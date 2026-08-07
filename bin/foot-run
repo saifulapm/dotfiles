@@ -1,0 +1,7 @@
+#!/bin/sh
+# Spawn a command in a foot window, server-first: footclient opens it in the
+# socket-activated foot server (foot-server.socket — shared glyph caches,
+# instant spawn), plain foot only when the socket is broken. -N matters: it
+# returns 0 once the window exists instead of forwarding the app's exit
+# code, so an app quitting nonzero can't re-open itself in the fallback.
+footclient -N "$@" || exec foot "$@"

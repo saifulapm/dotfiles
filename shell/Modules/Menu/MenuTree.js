@@ -92,7 +92,7 @@ var TREE = {
         "aliases": ["upgrade", "packages", "dnf"],
         "description": "Install pending system packages",
         "when": "command -v foot",
-        "action": "foot --app-id=qshell-float -e bash -lc 'sudo dnf upgrade --refresh; rm -f ~/.local/state/qshell/updates; read -r -p \"done — press enter to close\"'"
+        "action": "foot-run --app-id=qshell-float -e bash -lc 'sudo dnf upgrade --refresh; rm -f ~/.local/state/qshell/updates; read -r -p \"done — press enter to close\"'"
     },
     "system": {
         "icon": "󰐥",
@@ -299,7 +299,7 @@ var TREE = {
         "aliases": ["bar", "widgets", "shell-json"],
         "description": "Edit shell.json in a terminal",
         "when": "command -v foot",
-        "action": "foot --app-id=qshell-float -e \"${EDITOR:-vi}\" \"$HOME/.dotfiles/shell/shell.json\""
+        "action": "foot-run --app-id=qshell-float -e \"${EDITOR:-vi}\" \"$HOME/.dotfiles/shell/shell.json\""
     },
     "setup.niri": {
         "icon": "󱂬",
@@ -307,7 +307,7 @@ var TREE = {
         "aliases": ["compositor", "keybinds", "keybindings", "kdl"],
         "description": "Edit the niri config in a terminal",
         "when": "command -v foot",
-        "action": "foot --app-id=qshell-float -e \"${EDITOR:-vi}\" \"$HOME/.dotfiles/home/dot_config/niri/config.kdl\""
+        "action": "foot-run --app-id=qshell-float -e \"${EDITOR:-vi}\" \"$HOME/.dotfiles/home/dot_config/niri/config.kdl\""
     },
     "setup.themes": {
         "icon": "󰸌",
@@ -315,7 +315,7 @@ var TREE = {
         "aliases": ["dotfiles", "tokens", "toml"],
         "description": "Open a terminal in the dotfiles theme directory",
         "when": "command -v foot",
-        "action": "foot --app-id=qshell-float --working-directory=\"$HOME/.dotfiles/themes\""
+        "action": "foot-run --app-id=qshell-float --working-directory=\"$HOME/.dotfiles/themes\""
     },
 
     // ---------------------------------------------------------------- system
@@ -346,7 +346,7 @@ var TREE = {
         "aliases": ["bluetooth", "rfkill", "unblock", "restart-bluetooth", "hardware"],
         "description": "Unblock the radio and restart the bluetooth stack",
         "when": "command -v rfkill && command -v foot",
-        "action": "foot --app-id=qshell-float -e bash -lc '\"$HOME/.dotfiles/bin/bluetooth-restart\"; read -r -p \"press enter to close\"'"
+        "action": "foot-run --app-id=qshell-float -e bash -lc '\"$HOME/.dotfiles/bin/bluetooth-restart\"; read -r -p \"press enter to close\"'"
     },
     "system.exit": {
         "icon": "󰍃",

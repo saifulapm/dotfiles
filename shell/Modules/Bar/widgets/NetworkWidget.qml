@@ -50,7 +50,7 @@ BarIcon {
         if (button === Qt.RightButton) {
             Networking.wifiEnabled = !Networking.wifiEnabled;
         } else if (button === Qt.MiddleButton) {
-            Quickshell.execDetached(["foot", "--app-id=qshell-float", "-e", "nmtui"]);
+            Quickshell.execDetached(["foot-run", "--app-id=qshell-float", "-e", "nmtui"]);
         } else {
             openPanel();
         }

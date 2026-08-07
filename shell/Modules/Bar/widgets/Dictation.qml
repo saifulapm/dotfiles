@@ -35,7 +35,7 @@ BarIndicator {
 
     onTapped: button => {
         if (button === Qt.RightButton)
-            Quickshell.execDetached(["foot", "--app-id=qshell-float", "-e", "voxtype", "configure"]);
+            Quickshell.execDetached(["foot-run", "--app-id=qshell-float", "-e", "voxtype", "configure"]);
         else
             Quickshell.execDetached(["voxtype", "record", "toggle"]);
     }

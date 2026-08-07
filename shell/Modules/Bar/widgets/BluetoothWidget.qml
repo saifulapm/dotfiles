@@ -60,7 +60,7 @@ BarIcon {
         if (button === Qt.RightButton) {
             rootItem.toggleBluetooth();
         } else if (button === Qt.MiddleButton) {
-            Quickshell.execDetached(["foot", "--app-id=qshell-float", "-e", "bluetoothctl"]);
+            Quickshell.execDetached(["foot-run", "--app-id=qshell-float", "-e", "bluetoothctl"]);
         } else {
             openPanel();
         }

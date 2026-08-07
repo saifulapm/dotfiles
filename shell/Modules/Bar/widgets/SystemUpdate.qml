@@ -18,7 +18,7 @@ BarIcon {
     visible: count > 0
     tooltipText: count + " update" + (count === 1 ? "" : "s") + " available"
 
-    onTapped: Quickshell.execDetached(["foot", "--app-id=qshell-float", "-e", "bash", "-lc", "sudo dnf upgrade --refresh; rm -f ~/.local/state/qshell/updates; read -r -p 'done — press enter to close'"])
+    onTapped: Quickshell.execDetached(["foot-run", "--app-id=qshell-float", "-e", "bash", "-lc", "sudo dnf upgrade --refresh; rm -f ~/.local/state/qshell/updates; read -r -p 'done — press enter to close'"])
 
     FileView {
         path: Quickshell.env("HOME") + "/.local/state/qshell/updates"
