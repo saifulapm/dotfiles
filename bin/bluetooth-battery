@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""Battery levels for Apple Bluetooth audio devices (AirPods, Beats).
+
+BlueZ only publishes `org.bluez.Battery1` when something feeds it: either the
+device exposes the GATT Battery Service, or a battery *provider* registers one
+on its behalf.  PipeWire is that provider for ordinary headsets — its HFP
+audio-gateway parses the Apple `AT+IPHONEACCEV` command and forwards the level.
+AirPods never send it.  Verified twice on AirPods Pro 2 (firmware 8A356, 2026-08-08)
+with `spa.bluez5.native` debug logging: the whole HFP service-level connection
+completes (BRSF, BAC, CIND, CMER, VGS, VGM, BIA, NREC) and no Apple command
+ever appears.  So the shell's `dev.batteryAvailable` is false for them, and no
+amount of BlueZ or PipeWire configuration changes that.
+
+Apple accessories report battery over AAP (Apple Accessory Protocol) instead:
+an L2CAP channel on PSM 0x1001, over the same ACL link the audio rides.  After
+a fixed handshake the device pushes a notification packet whenever a level
+changes — per pod and for the case, which is strictly more than the single
+figure HFP would have carried.  That is what this reads.
+
+The protocol constants below are the ones documented by the openly reverse-
+engineered Linux/Android implementations (librepods, OpenPods — CREDITS.md);
+no code is borrowed, and every byte was re-verified against this desk's AirPods.
+One caveat is recorded there too: the notification bitmask must be
+`ff ff ff ff`.  With librepods' `ff ff fe ff` the device answers with its whole
+state dump — capabilities, HID descriptors, paired hosts, device info — and
+silently withholds battery.
+
+Event-driven by construction (the repo forbids polling): connect, hand shake,
+then block in recv() forever, printing one JSON line per change.  Idle cost is
+a sleeping process on a blocked socket.  The shell starts one of these per
+connected device and terminates it when the device disconnects
+(Modules/Bar/widgets/BtBatteryService.qml), so the lifetime is owned by BlueZ's
+own connect/disconnect events.
+
+Usage: bluetooth-battery <address> [--once]
+
+  --once   print the first battery reading and exit (for probing by hand)
+
+Exit codes: 0 clean exit or device gone, 3 no AAP endpoint (not an Apple
+accessory, or not connected), 1 unexpected error.
+"""
+
+import errno
+import json
+import re
+import socket
+import sys
+import time
+
+PSM = 0x1001
+
+# Fixed AAP opening sequence.  The device stays mute until all three land.
+HANDSHAKE = bytes.fromhex("00000400010002000000000000000000")
+SET_SPECIFIC_FEATURES = bytes.fromhex("040004004d00ff00000000000000")
+# Enable every notification.  The trailing byte pair is a bitmask and battery
+# lives in the bit librepods' `fffffeff` clears — see the module docstring.
+REQUEST_NOTIFICATIONS = bytes.fromhex("040004000f00ffffffff")
+
+PACKET_PREFIX = bytes.fromhex("04000400")
+BATTERY_OPCODE = 0x0004
+
+# Battery component ids, as used by every published AAP implementation.  Left
+# and right are indistinguishable from the wire alone (both pods report the
+# same shape); if they ever read swapped, these two are the pair to flip.
+COMPONENTS = {0x01: "single", 0x02: "right", 0x04: "left", 0x08: "case"}
+
+# Status byte.  0x04 is what the case reports while it is out of range, and
+# what a pod reports while it sits in a closed case, so it means "no reading"
+# rather than "empty" — the level that comes with it is 0 and must be dropped.
+STATUS_CHARGING = 0x01
+STATUS_DISCONNECTED = 0x04
+
+ADDRESS_RE = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
+
+# Connect attempts.  A device BlueZ has only just marked connected can refuse
+# the channel for a moment, so a refusal is retried — but a device with no AAP
+# endpoint at all refuses every time, and this must give up quickly on those
+# rather than sit on a link that will never answer.
+RETRY_DELAYS = (1.0, 2.5)
+
+
+def parse_battery(packet):
+    """AAP battery notification -> {"left": {...}, ...} for present readings."""
+    body = packet[6:]
+    if not body:
+        return {}
+
+    count = body[0]
+    out = {}
+    for i in range(count):
+        record = body[1 + i * 5:6 + i * 5]
+        if len(record) < 5:
+            break
+        component = COMPONENTS.get(record[0])
+        level, status = record[2], record[3]
+        if component is None or status == STATUS_DISCONNECTED:
+            continue
+        if not 0 <= level <= 100:
+            continue
+        out[component] = {
+            "level": level,
+            "charging": status == STATUS_CHARGING,
+        }
+    return out
+
+
+def connect(address):
+    """L2CAP PSM 0x1001, with a short bounded retry ladder."""
+    last = None
+    for attempt, delay in enumerate((0.0,) + RETRY_DELAYS):
+        if delay:
+            time.sleep(delay)
+        sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_SEQPACKET,
+                             socket.BTPROTO_L2CAP)
+        sock.settimeout(10)
+        try:
+            sock.connect((address, PSM))
+            return sock
+        except OSError as exc:
+            sock.close()
+            last = exc
+    raise last
+
+
+def handshake(sock):
+    for payload in (HANDSHAKE, SET_SPECIFIC_FEATURES, REQUEST_NOTIFICATIONS):
+        sock.send(payload)
+        # The device tolerates back-to-back writes, but a beat between them
+        # costs nothing and matches how every working implementation drives it.
+        time.sleep(0.1)
+
+
+def main():
+    args = [a for a in sys.argv[1:] if a != "--once"]
+    once = "--once" in sys.argv[1:]
+
+    if len(args) != 1 or not ADDRESS_RE.match(args[0]):
+        sys.stderr.write("Usage: bluetooth-battery <address> [--once]\n")
+        return 1
+    address = args[0].upper()
+
+    try:
+        sock = connect(address)
+    except OSError as exc:
+        # Refused / unreachable: not an Apple accessory, or gone. Quiet exit 3,
+        # the same "not this machine's problem" contract the shell's other
+        # presence probes use.
+        if exc.errno in (errno.ECONNREFUSED, errno.EHOSTDOWN, errno.EHOSTUNREACH,
+                         errno.ETIMEDOUT, errno.ENOTCONN, errno.EINVAL):
+            return 3
+        sys.stderr.write("bluetooth-battery: connect failed: %s\n" % exc)
+        return 1
+
+    try:
+        handshake(sock)
+    except OSError as exc:
+        sys.stderr.write("bluetooth-battery: handshake failed: %s\n" % exc)
+        return 1
+
+    # Block indefinitely from here: every further line is a device push.
+    sock.settimeout(None)
+    last = None
+    while True:
+        try:
+            packet = sock.recv(1024)
+        except OSError:
+            # Link torn down — the device disconnected.
+            return 0
+        if not packet:
+            return 0
+        if len(packet) < 7 or not packet.startswith(PACKET_PREFIX):
+            continue
+        if packet[4] | (packet[5] << 8) != BATTERY_OPCODE:
+            continue
+
+        readings = parse_battery(packet)
+        if not readings:
+            continue
+        payload = {"address": address, "battery": readings}
+        line = json.dumps(payload, sort_keys=True)
+        # The device repeats itself; only changes are worth waking the shell.
+        if line != last:
+            last = line
+            print(line, flush=True)
+        if once:
+            return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except BrokenPipeError:
+        sys.exit(0)

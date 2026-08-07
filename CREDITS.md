@@ -1012,6 +1012,24 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
 
 - Used as API reference only; no code copied.
 
+## AAP / Apple Accessory Protocol (protocol reference) — librepods, OpenPods
+
+- `bin/bluetooth-battery` speaks the L2CAP PSM 0x1001 protocol Apple audio
+  accessories use to report battery, because AirPods never send the HFP command
+  (`AT+IPHONEACCEV`) that PipeWire's audio gateway forwards to BlueZ — see
+  `docs/airpods-battery-2026-08-08.md` for the packet-level proof. Protocol
+  facts only: the handshake / set-features / request-notifications byte strings
+  and the battery packet layout (component ids, level and status bytes), as
+  published by the openly reverse-engineered implementations librepods
+  (github.com/kavishdevar/librepods) and OpenPods
+  (github.com/adolfintel/OpenPods). No code from either is copied or adapted —
+  the reader is written against python3's stock `AF_BLUETOOTH`/`BTPROTO_L2CAP`
+  socket — and every constant was re-verified against this desk's AirPods Pro 2
+  (2026-08-08), which turned up one correction to the published sequences: with
+  librepods' `ff ff fe ff` notification bitmask the device answers with its
+  whole state (capabilities, HID descriptors, paired hosts, device info) and
+  silently withholds battery; `ff ff ff ff` is what makes it report.
+
 ---
 Direct file-level copies (source path → destination path):
 

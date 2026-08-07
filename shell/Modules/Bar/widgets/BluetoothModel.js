@@ -98,6 +98,47 @@ function deviceRow(d) {
     };
 }
 
+// AAP battery readings (bin/bluetooth-battery, held by BtBatteryService) as one
+// status line. Fixed slot order so the text never reshuffles between updates,
+// and a charging component carries the md-battery-charging glyph — AirPods
+// charge one pod at a time in the case, so per-component is the honest place
+// for it. "single" is what a lone pod (or a Beats-style one-piece) reports and
+// needs no label; the others are prefixed because two bare figures side by side
+// would not say which pod is which.
+var BATTERY_SLOTS = [{
+    key: "single",
+    label: ""
+}, {
+    key: "left",
+    label: "L"
+}, {
+    key: "right",
+    label: "R"
+}, {
+    key: "case",
+    label: "Case"
+}];
+
+function batteryText(readings) {
+    if (!readings)
+        return "";
+
+    var parts = [];
+    for (var i = 0; i < BATTERY_SLOTS.length; i++) {
+        var slot = BATTERY_SLOTS[i];
+        var entry = readings[slot.key];
+        if (!entry)
+            continue;
+
+        var level = Number(entry.level);
+        if (!isFinite(level))
+            continue;
+
+        parts.push((slot.label === "" ? "" : slot.label + " ") + Math.round(level) + "%" + (entry.charging ? " 󰂄" : ""));
+    }
+    return parts.join(" · ");
+}
+
 function deviceLists(devices) {
     var values = toArray(devices);
     var connected = [];

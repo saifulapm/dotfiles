@@ -587,6 +587,10 @@ Scope {
         return sharedService("devservices", devServicesServiceComponent, {});
     }
 
+    function btBatteryService() {
+        return sharedService("btbattery", btBatteryServiceComponent, {});
+    }
+
     // No gate: the dufs service watches one flag file and probes only on
     // startup, panel open and explicit refresh — nothing to scope to
     // visibility.
@@ -643,6 +647,11 @@ Scope {
     Component {
         id: devServicesServiceComponent
         DevServicesService {}
+    }
+
+    Component {
+        id: btBatteryServiceComponent
+        BtBatteryService {}
     }
 
     Component {
@@ -1890,6 +1899,7 @@ Scope {
         id: bluetoothComponent
         BluetoothWidget {
             theme: barRoot.theme
+            btbattery: barRoot.btBatteryService()
         }
     }
 

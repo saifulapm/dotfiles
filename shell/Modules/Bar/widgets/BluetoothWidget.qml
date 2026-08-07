@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Bluetooth
 import "../components"
+import "BluetoothModel.js" as Model
 
 // Bluetooth, omarchy glyphs. Left click opens the panel, right click toggles
 // the adapter, middle click opens bluetoothctl in a float.
@@ -11,6 +12,24 @@ BarIcon {
 
     readonly property var adapter: Bluetooth.defaultAdapter
     readonly property var connectedDevices: Bluetooth.devices ? Bluetooth.devices.values.filter(d => d.connected) : []
+
+    // The shared Apple-accessory battery reader, injected by the bar's registry
+    // — one instance however many screens carry this widget (S2). Nullable
+    // rather than required: the widget must still render on a machine where the
+    // service was never created.
+    property BtBatteryService btbattery: null
+
+    // BlueZ's own figure where a device publishes one, AAP where it does not
+    // (AirPods only ever appear in the second half — see BtBatteryService).
+    function batteryTextFor(device) {
+        if (!device)
+            return "";
+        const readings = rootItem.btbattery ? rootItem.btbattery.batteryFor(device.address) : null;
+        const aapText = Model.batteryText(readings);
+        if (aapText !== "")
+            return aapText;
+        return device.batteryAvailable ? Math.round(device.battery * 100) + "%" : "";
+    }
 
     glyph: {
         if (!rootItem.adapter || !rootItem.adapter.enabled)
@@ -27,7 +46,10 @@ BarIcon {
             return "Bluetooth off";
         if (connectedDevices.length === 0)
             return "No devices connected";
-        return connectedDevices.map(d => d.name + (d.batteryAvailable ? " · " + Math.round(d.battery * 100) + "%" : "")).join("\n");
+        return connectedDevices.map(d => {
+            const battery = rootItem.batteryTextFor(d);
+            return d.name + (battery === "" ? "" : " · " + battery);
+        }).join("\n");
     }
 
     function toggleBluetooth() {
@@ -43,7 +65,8 @@ BarIcon {
         }
         if (panelLoader.status === Loader.Null)
             panelLoader.setSource("BluetoothPanel.qml", {
-                theme: rootItem.theme
+                theme: rootItem.theme,
+                btbattery: rootItem.btbattery
             });
         panelLoader.item.anchorItem = rootItem;
         if (mode === "open")

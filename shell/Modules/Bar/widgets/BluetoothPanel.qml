@@ -35,6 +35,10 @@ BarPanel {
 
     readonly property string binDir: Quickshell.env("HOME") + "/.dotfiles/bin/"
 
+    // The shared Apple-accessory battery reader, handed over by the widget.
+    // Nullable: the panel renders the same without it, minus the per-pod line.
+    property BtBatteryService btbattery: null
+
     // ------------------------------------------------------------- sources
     readonly property var adapter: Bluetooth.defaultAdapter
     readonly property var devices: Bluetooth.devices ? Bluetooth.devices.values : []
@@ -853,6 +857,11 @@ BarPanel {
         readonly property bool forgetAvailable: (sectionName === "known" || sectionName === "connected") && !isDiscovered
         readonly property bool showForgetButton: forgetAvailable && (rowMouse.containsMouse || rowSelected)
 
+        // Per-pod levels read over AAP, live while the device is connected.
+        // Reading btbattery.byAddress through the service's accessor keeps this
+        // binding subscribed, so a level change repaints the row.
+        readonly property var aapBattery: panel.btbattery && dev && dev.address ? panel.btbattery.batteryFor(dev.address) : null
+
         readonly property string statusText: {
             if (!dev)
                 return "";
@@ -861,6 +870,12 @@ BarPanel {
             if (action === "disconnecting" || devState === BluetoothDeviceState.Disconnecting)
                 return "Disconnecting…";
             if (isConnected) {
+                // AAP first: it carries a figure per pod plus the case, where
+                // BlueZ's Battery1 would carry one number at best — and for
+                // AirPods carries nothing at all.
+                const aapText = Model.batteryText(aapBattery);
+                if (aapText !== "")
+                    return aapText;
                 if (dev.batteryAvailable)
                     return Math.round(dev.battery * 100) + "%";
                 return sectionName === "connected" ? "" : "Connected";
