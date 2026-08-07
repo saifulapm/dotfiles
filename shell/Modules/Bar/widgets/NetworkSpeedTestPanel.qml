@@ -36,6 +36,12 @@ PanelWindow {
     readonly property real uploadValue: toMbps(uploadMbps)
     readonly property bool failed: error !== ""
 
+    // The scrim below is a fixed near-black regardless of theme, so text and
+    // ticks on it need a fixed light palette, not the themed foreground.
+    readonly property color onScrim: "white"
+    readonly property color onScrimDim: Qt.rgba(1, 1, 1, 0.55)
+    readonly property color onScrimUrgent: "#ff6b6b"
+
     function toMbps(raw) {
         const value = parseFloat(raw);
         return isFinite(value) && value > 0 ? value : 0;
@@ -112,7 +118,7 @@ PanelWindow {
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.connectionName !== ""
                     text: root.connectionName.toUpperCase()
-                    color: root.theme.textMuted
+                    color: root.onScrimDim
                     font.family: root.theme.fontMono
                     font.pixelSize: root.theme.fontPx(0.833)
                     font.weight: Font.DemiBold
@@ -160,7 +166,7 @@ PanelWindow {
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.failed
                     text: root.error
-                    color: root.theme.error
+                    color: root.onScrimUrgent
                     font.family: root.theme.fontUi
                     font.pixelSize: root.theme.fontPx(0.917)
                     wrapMode: Text.Wrap
@@ -190,9 +196,9 @@ PanelWindow {
         readonly property int tickCount: 46
         readonly property real arcWidth: Math.max(3, root.theme.space(1))
         readonly property real arcRadius: diameter / 2 - arcWidth
-        readonly property color trackColor: root.theme.alpha(root.theme.textPrimary, 0.14)
-        readonly property color minorTickColor: root.theme.alpha(root.theme.textPrimary, 0.12)
-        readonly property color majorTickColor: root.theme.alpha(root.theme.textPrimary, 0.3)
+        readonly property color trackColor: Qt.rgba(1, 1, 1, 0.14)
+        readonly property color minorTickColor: Qt.rgba(1, 1, 1, 0.12)
+        readonly property color majorTickColor: Qt.rgba(1, 1, 1, 0.3)
         // The dial that isn't measuring yet sits dimmed until it gets a figure.
         readonly property bool engaged: live || value > 0
 
@@ -369,7 +375,7 @@ PanelWindow {
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: dial.arcWidth * 2 + root.theme.space(2.5)
-                width: panel.theme.space(0.75)
+                width: root.theme.space(0.75)
                 height: dial.diameter * 0.32
                 radius: width / 2
 
@@ -401,7 +407,7 @@ PanelWindow {
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: dial.reading < 10 ? dial.reading.toFixed(1) : Math.round(dial.reading).toString()
-                color: root.theme.textPrimary
+                color: root.onScrim
                 font.family: root.theme.fontMono
                 font.pixelSize: root.theme.fontPx(1.6)
                 font.weight: Font.DemiBold
@@ -410,7 +416,7 @@ PanelWindow {
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "Mbps"
-                color: root.theme.textMuted
+                color: root.onScrimDim
                 font.family: root.theme.fontUi
                 font.pixelSize: root.theme.fontPx(0.833)
             }
@@ -422,7 +428,7 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             text: dial.label
-            color: root.theme.textMuted
+            color: root.onScrimDim
             font.family: root.theme.fontMono
             font.pixelSize: root.theme.fontPx(0.833)
             font.weight: Font.DemiBold

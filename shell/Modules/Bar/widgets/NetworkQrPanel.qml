@@ -25,6 +25,12 @@ PanelWindow {
 
     readonly property bool showingQr: qrSize > 0 && !loading && error === ""
 
+    // The scrim below is a fixed near-black regardless of theme, so text on
+    // it needs a fixed light palette, not the themed foreground.
+    readonly property color onScrim: "white"
+    readonly property color onScrimDim: Qt.rgba(1, 1, 1, 0.55)
+    readonly property color onScrimUrgent: "#ff6b6b"
+
     signal closeRequested
     signal passwordToggleRequested
 
@@ -101,7 +107,7 @@ PanelWindow {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: (root.ssid || "Wi-Fi").toUpperCase()
-                    color: root.theme.textMuted
+                    color: root.onScrimDim
                     font.family: root.theme.fontMono
                     font.pixelSize: root.theme.fontPx(0.833)
                     font.weight: Font.DemiBold
@@ -123,7 +129,7 @@ PanelWindow {
                     visible: root.showingQr
                     width: root.qrSize * moduleSize
                     height: width
-                    color: "white"
+                    color: root.onScrim
                     radius: root.theme.radius(1)
 
                     Grid {
@@ -151,7 +157,7 @@ PanelWindow {
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.loading
                     text: "Generating QR code…"
-                    color: root.theme.textMuted
+                    color: root.onScrimDim
                     font.family: root.theme.fontUi
                     font.pixelSize: root.theme.fontPx(0.917)
                 }
@@ -160,7 +166,7 @@ PanelWindow {
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.error !== ""
                     text: root.error
-                    color: root.theme.error
+                    color: root.onScrimUrgent
                     font.family: root.theme.fontUi
                     font.pixelSize: root.theme.fontPx(0.917)
                     wrapMode: Text.Wrap
@@ -172,7 +178,7 @@ PanelWindow {
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.showingQr
                     text: "Scan to join this network"
-                    color: root.theme.textMuted
+                    color: root.onScrimDim
                     font.family: root.theme.fontUi
                     font.pixelSize: root.theme.fontPx(0.917)
                 }
@@ -183,7 +189,7 @@ PanelWindow {
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.showingQr && root.secured
                     text: root.passwordError !== "" ? root.passwordError : root.passwordVisible ? root.password : "Show password"
-                    color: root.passwordError !== "" ? root.theme.error : root.theme.textPrimary
+                    color: root.passwordError !== "" ? root.onScrimUrgent : root.onScrim
                     opacity: root.passwordVisible || root.passwordError !== "" ? 1 : 0.6
                     font.family: root.passwordVisible ? root.theme.fontMono : root.theme.fontUi
                     font.pixelSize: root.theme.fontPx(0.917)
