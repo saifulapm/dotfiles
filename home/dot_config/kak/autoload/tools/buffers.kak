@@ -249,7 +249,6 @@ declare-user-mode buffers
 
 map global buffers a 'ga'                             -docstring 'alternate ↔'
 map global buffers b ': info-buffers<ret>'            -docstring 'info'
-map global buffers c ': chat-buffer<ret>'             -docstring 'chat buffer'
 map global buffers d ': delete-buffer<ret>'           -docstring 'delete'
 map global buffers D ': delete-buffers<ret>'          -docstring 'delete all'
 map global buffers f ': buffer<space>'                -docstring 'find'

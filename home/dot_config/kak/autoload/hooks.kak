@@ -25,8 +25,6 @@ hook global RuntimeError "The lintcmd option is not set" %{
   evaluate-commands %sh{
     if [ $kak_opt_filetype == 'javascript' ] || [ $kak_opt_filetype == 'typescript' ] || [ $kak_opt_filetype == 'tsx' ]; then
       echo "menu $kak_js_linters"
-    elif [ $kak_opt_filetype == 'php' ]; then
-      echo "menu 'Eslint' aichat 'Biome' aider"
     fi
   }
 }

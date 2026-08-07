@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Tools Fedora does not package whose upstreams ship linux binaries for both
 # our arches (asset names verified against the GitHub API 2026-08-07):
-# watchexec, hurl, aichat, cloudflared, stripe, ouch, yek, usql.
+# watchexec, hurl, cloudflared, stripe, ouch, usql.
 # Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
 #
-# GitHub's unauthenticated API allows 60 requests/hour per IP — five here, and
+# GitHub's unauthenticated API allows 60 requests/hour per IP — six here, and
 # only on a run where something is actually missing (fully-guarded runs make
 # no requests at all).
 set -uo pipefail
@@ -53,10 +53,6 @@ if ! command -v hurl >/dev/null 2>&1; then
   fetch_tar Orange-OpenSource/hurl "hurl-.*-${arch}-unknown-linux-gnu\\.tar\\.gz$" hurl hurl
 fi
 
-if ! command -v aichat >/dev/null 2>&1; then
-  fetch_tar sigoden/aichat "aichat-.*-${arch}-unknown-linux-musl\\.tar\\.gz$" aichat aichat
-fi
-
 if ! command -v cloudflared >/dev/null 2>&1; then
   # cloudflared ships a bare binary, not a tarball, and names arches the
   # go way (arm64/amd64).
@@ -76,16 +72,10 @@ if ! command -v stripe >/dev/null 2>&1; then
   fetch_tar stripe/stripe-cli "stripe_.*_linux_${sarch}\\.tar\\.gz$" stripe stripe
 fi
 
-# ouch + yek (yazi extract opener / aichat git loader) — cargo builds need
-# libclang and openssl-devel, so the release binaries are the mechanism.
+# ouch (yazi extract opener) — the cargo build needs libclang, so the
+# release binary is the mechanism.
 if ! command -v ouch >/dev/null 2>&1; then
   fetch_tar ouch-org/ouch "ouch-${arch}-unknown-linux-gnu\\.tar\\.gz$" ouch ouch
-fi
-
-if ! command -v yek >/dev/null 2>&1; then
-  # bodo-run/yek redirects to mohsen1/yek; the API follows it with -L only,
-  # so the current repo name is used directly.
-  fetch_tar mohsen1/yek "yek-${arch}-unknown-linux-gnu\\.tar\\.gz$" yek yek
 fi
 
 # usql (universal SQL CLI, config in ~/.config/usql) — go-style arch names;

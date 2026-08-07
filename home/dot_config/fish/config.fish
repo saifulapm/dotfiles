@@ -35,10 +35,4 @@ if status is-interactive
     command -q starship; and starship init fish | source
     command -q zoxide; and zoxide init fish | source
     command -q tv; and tv init fish | source
-
-    # aichat: Alt-e turns the current command line into a natural-language
-    # query (port of the zsh zle widget from aichat.zsh)
-    if command -q aichat
-        bind \ee _aichat_fish
-    end
 end
