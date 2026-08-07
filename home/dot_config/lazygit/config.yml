@@ -1,0 +1,15 @@
+# lazygit config (managed by chezmoi) — user pick 2026-08-08. Kept to keys
+# verified against 0.47 docs: lazygit validates strictly and refuses to start
+# on unknown keys, so nothing speculative goes in here.
+gui:
+  # icon glyphs come from the symbols-only Nerd Font the whole desktop uses
+  nerdFontsVersion: "3"
+git:
+  paging:
+    colorArg: always
+    # same delta as git's own pager (reads [delta] from .gitconfig, so diffs
+    # here follow the ansi syntax-theme / theme retint too)
+    pager: delta --paging=never
+update:
+  # the binary comes from the atim/lazygit COPR; dnf owns updates
+  method: never

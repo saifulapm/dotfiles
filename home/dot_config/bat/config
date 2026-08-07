@@ -1,0 +1,8 @@
+# bat config (managed by chezmoi) — user pick 2026-08-08.
+#
+# ansi = the 16 terminal colors, so highlighting follows foot's live OSC
+# retint on every theme change with zero fan-out machinery (same trick as
+# delta's syntax-theme and kak's Default=default). Explicit --style flags in
+# callers (the kak fzf-preview popup passes its own) still win over this file.
+--theme="ansi"
+--style="numbers,changes,header"
