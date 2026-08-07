@@ -1194,6 +1194,12 @@ category = "dev"
 arch = "all"
 why = "Qt Multimedia — omacut's .pro declares QT += multimedia (video preview); its build died with 'Unknown module(s) in QT: multimedia' on the first apply (2026-08-07). Pulls the runtime QML module too"
 
+[[pkg]]
+name = "dua-cli"
+category = "core"
+arch = "all"
+why = "Interactive disk-usage TUI (omarchy's Disk Usage launcher, user-picked 2026-08-08): the tui-install entry 'Disk Usage' runs `dua i /` in a TUI.float foot window, exactly their applications/Disk Usage.desktop. The launcher entry exists on this machine already; it does nothing until this package lands"
+
 # ------------------------------------------------------------------ non-dnf tools
 # Installed by chezmoi scripts / declared externals, recorded here so the
 # manifest stays the complete inventory.

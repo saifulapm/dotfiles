@@ -67,3 +67,5 @@ text/x-c=kak.desktop
 text/x-c++=kak.desktop
 application/xml=kak.desktop
 text/xml=kak.desktop
+x-scheme-handler/zoommtg=webapp-zoom.desktop
+x-scheme-handler/zoomus=webapp-zoom.desktop
