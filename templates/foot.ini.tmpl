@@ -15,8 +15,11 @@ app-id=foot
 pad=14x14 center-when-maximized-and-fullscreen
 
 # Linear-space blending — how macOS composites text, and why its bright-on-dark
-# glyphs read heavier. Costs a 16-bit surface; if scrolling ever feels slow,
-# tweak.surface-bit-depth=8-bit keeps the look at 8-bit cost.
+# glyphs read heavier. Inert on niri today (foot logs "gamma-corrected-blending:
+# disabling" — it wants the Wayland color-management protocol, which niri lacks)
+# but kept so the look arrives the day niri implements it. Was briefly removed
+# 2026-08-07 as the suspected yazi held-j corruption; actual culprit was the
+# no-status plugin handing the bottom row to sixel previews (see yazi init.lua).
 gamma-correct-blending=yes
 
 [scrollback]

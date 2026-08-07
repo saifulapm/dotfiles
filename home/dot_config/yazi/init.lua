@@ -44,4 +44,13 @@ require("smart-enter"):setup({
 
 require("git"):setup()
 require("folder-rules"):setup()
-require("no-status"):setup()
+
+-- Blank status bar, but NOT the upstream no-status plugin: that one also
+-- grows the file area over the freed row (Tab.layout h+1), which hands the
+-- screen's bottom row to the preview pane — and a full-height sixel there
+-- (tall PDFs) makes foot scroll the whole alternate screen one line per DEC
+-- sixel semantics. The result was the held-j corruption: header row gone
+-- first, then every diff repaint one row off (debugged 2026-08-07; 100%
+-- repro parking the cursor on a tall PDF). Keeping the row empty preserves
+-- the minimal look and the sixel guard row.
+Status.redraw = function() return {} end
