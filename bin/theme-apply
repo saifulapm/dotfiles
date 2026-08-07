@@ -103,6 +103,9 @@ if (!tokens["border.active"]) tokens["border.active"] = tokens["accent.accent"]
 // calls below read the same decision.
 const mode = String(tokens["meta.mode"]) === "light" ? "light" : "dark"
 tokens["gtk.prefer-dark"] = mode === "light" ? "0" : "1"
+// zathura page recolor follows the same polarity: dark themes tint the
+// document into theme colors, light themes show pages as printed.
+tokens["zathura.recolor"] = mode === "light" ? "false" : "true"
 
 // Template functions — `{{ fn token }}`. Plain `{{token}}` substitution stays
 // what it was; these exist for the one thing it cannot express, which is a
@@ -180,7 +183,8 @@ const OUTPUTS = {
   "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")],
   "oma-theme.toml.tmpl": [path.join(HOME, ".local/state/qshell/oma-theme.toml")],
   "yazi-theme.toml.tpl": [path.join(HOME, ".config/yazi/theme.toml")],
-  "tmux-theme.tmpl": [path.join(HOME, ".config/tmux/theme.conf")]
+  "tmux-theme.tmpl": [path.join(HOME, ".config/tmux/theme.conf")],
+  "zathurarc.tmpl": [path.join(HOME, ".config/zathura/zathurarc")]
 }
 
 let gtkSettingsChanged = false

@@ -1,0 +1,45 @@
+# Rendered to ~/.config/zathura/zathurarc by bin/theme-apply — do not edit
+# there. zathura reads config only at startup; a theme switch reaches new
+# windows, not running ones.
+
+# --- behavior ---
+set selection-clipboard clipboard
+set adjust-open best-fit
+set window-title-basename true
+set statusbar-basename true
+set font "{{font.mono}} 11"
+
+# --- chrome in theme colors ---
+set default-bg "{{surface.0}}"
+set default-fg "{{text.primary}}"
+set statusbar-bg "{{surface.1}}"
+set statusbar-fg "{{text.primary}}"
+set inputbar-bg "{{surface.0}}"
+set inputbar-fg "{{text.primary}}"
+set completion-bg "{{surface.1}}"
+set completion-fg "{{text.primary}}"
+set completion-group-bg "{{surface.1}}"
+set completion-group-fg "{{accent.accent}}"
+set completion-highlight-bg "{{accent.accent}}"
+set completion-highlight-fg "{{text.on-accent}}"
+set index-bg "{{surface.0}}"
+set index-fg "{{text.primary}}"
+set index-active-bg "{{accent.accent}}"
+set index-active-fg "{{text.on-accent}}"
+set notification-bg "{{surface.2}}"
+set notification-fg "{{text.primary}}"
+set notification-error-bg "{{accent.error}}"
+set notification-error-fg "{{text.on-accent}}"
+set notification-warning-bg "{{ansi.yellow}}"
+set notification-warning-fg "{{surface.0}}"
+set highlight-color "{{accent.accent}}"
+set highlight-active-color "{{ansi.magenta}}"
+
+# --- the document itself in theme colors ---
+# recolor maps page white → theme background and black → theme foreground;
+# keephue preserves colored figures. Dark themes recolor by default, light
+# themes show pages as printed. Ctrl+r toggles live either way.
+set recolor {{zathura.recolor}}
+set recolor-lightcolor "{{surface.0}}"
+set recolor-darkcolor "{{text.primary}}"
+set recolor-keephue true

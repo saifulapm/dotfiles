@@ -432,12 +432,14 @@ window-rule {
 }
 
 // omarchy's floating-window tag (system.lua) also covers the media viewers:
-// mpv, imv and Evince open floating at the same 875×600. omacalc floats in
-// omarchy untagged — no forced geometry, it sizes itself.
+// mpv, imv and Evince open floating at the same 875×600 — zathura joins them
+// as the Evince replacement. omacalc floats in omarchy untagged — no forced
+// geometry, it sizes itself.
 window-rule {
     match app-id="^mpv$"
     match app-id="^imv$"
     match app-id=r#"^org\.gnome\.Evince$"#
+    match app-id=r#"^org\.pwmt\.zathura$"#
     open-floating true
     default-column-width { fixed 875; }
     default-window-height { fixed 600; }

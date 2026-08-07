@@ -1009,7 +1009,19 @@ why = "pdftotext/pdfinfo etc. (the CLI subpackage; the poppler library alone shi
 name = "evince"
 category = "optional"
 arch = "all"
-why = "PDF viewer — omarchy's choice and the Arch list's too; picked over zathura 2026-08-07 (user decision)"
+why = "PDF viewer, GTK fallback — omarchy's choice and the Arch list's too. Was the pick over zathura on the morning of 2026-08-07; reversed that evening (user decision): zathura is now the default, evince stays installed as the featureful fallback"
+
+[[pkg]]
+name = "zathura"
+category = "optional"
+arch = "all"
+why = "Default PDF viewer since 2026-08-07 evening (user decision, reversing the same day's evince pick) — minimal chrome, and theme-native: theme-apply renders zathurarc, recolor tints document pages into theme colors on dark themes"
+
+[[pkg]]
+name = "zathura-pdf-poppler"
+category = "optional"
+arch = "all"
+why = "zathura's PDF rendering backend — the zathura core ships no format support of its own"
 
 [[pkg]]
 name = "mediainfo"
