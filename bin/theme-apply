@@ -397,8 +397,19 @@ try {
   // (icon.resolved) so this flip and settings.ini agree. New GTK apps only,
   // like the gtk-theme flip above.
   const iconTheme = String(tokens["icon.resolved"])
-  if (/^[A-Za-z0-9._-]+$/.test(iconTheme))
+  // Flip only when the theme is actually on disk: naming a not-yet-installed
+  // theme breaks Qt icon lookup entirely — hicolor fallback included — for
+  // every process that resolves it, and installing the package later does not
+  // retrigger resolution (2026-08-07: Yaru-purple named 6h before the
+  // yaru-icon-theme rpm landed; every shell icon fell back to the checkerboard).
+  const iconThemeOnDisk = [
+    path.join(HOME, ".icons"), path.join(HOME, ".local/share/icons"),
+    "/usr/local/share/icons", "/usr/share/icons",
+  ].some((d) => fs.existsSync(path.join(d, iconTheme, "index.theme")))
+  if (/^[A-Za-z0-9._-]+$/.test(iconTheme) && iconThemeOnDisk)
     execSync(`gsettings set org.gnome.desktop.interface icon-theme "${iconTheme}"`, { stdio: "ignore" })
+  else if (!iconThemeOnDisk)
+    console.warn(`theme-apply: icon theme "${iconTheme}" not installed, keeping previous icon theme`)
 } catch (e) { /* gsettings absent or no session bus */ }
 
 // ---- Browser theme color (enterprise policy) ----

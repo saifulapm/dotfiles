@@ -22,7 +22,12 @@ set -euo pipefail
 slug=$(basename -- "$1" | tr -c 'a-zA-Z0-9' '-' | sed 's/^-*//; s/-*$//')
 [[ -n $slug ]] || slug=app
 
+# ExitType=cgroup: launchers like gtk-launch spawn the app and exit
+# immediately; under the default ExitType=main systemd would then stop the
+# unit and kill the whole cgroup — the just-spawned app dies before its
+# window maps. cgroup keeps the unit alive while ANY process remains.
 exec systemd-run --user --quiet --collect \
+  --property=ExitType=cgroup \
   --slice=app-graphical.slice \
   --unit="app-${slug}-${RANDOM}${RANDOM}" \
   -- "$@"
