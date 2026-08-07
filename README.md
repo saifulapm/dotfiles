@@ -6,7 +6,8 @@ aarch64) and an Intel NUC (Fedora minimal, x86_64).
 
 ## Restore
 
-The repo lives at github.com/saifulapm/dotfiles (private; the pre-2026-08
+The repo lives at github.com/saifulapm/dotfiles (public — never commit a
+secret; the pre-2026-08
 content survives on the `archive-pre-qshell` branch). Because the remote is
 SSH-only, a fresh machine needs `~/.ssh` restored FIRST — it lives in iCloud
 Drive: either `rclone config` an iCloud remote and
