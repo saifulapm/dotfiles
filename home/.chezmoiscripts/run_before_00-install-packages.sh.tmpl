@@ -112,6 +112,15 @@ rpm -q remi-release >/dev/null 2>&1 \
   || sudo dnf install --setopt=install_weak_deps=False -y \
        "https://rpms.remirepo.net/fedora/remi-release-$(rpm -E %fedora).rpm"
 
+# The default-enabled [remi] repo also ships composer, release-tagged .remi
+# so it outranks Fedora's on every upgrade — dnf then noisily fails the swap
+# against the installed Fedora composer ("cannot install both composer-…remi
+# and …@System", seen 2026-08-07) and would hand composer ownership to remi
+# the day the solver finds a path. remi is here ONLY for the SCL php8x
+# collections; composer stays Fedora's. Per-repo exclude via dnf5's override
+# dir (idempotent rewrite each apply), never the rpm-owned remi.repo.
+sudo dnf5 config-manager setopt --create-missing-dir remi.excludepkgs=composer
+
 # RPM Fusion (free): the full ffmpeg. Fedora's own ffmpeg-free strips the
 # H.264/H.265 encoders for patent reasons (Cisco's openh264 is the only
 # sanctioned path), so omacut's and omarchy's hardcoded libx264 invocations
