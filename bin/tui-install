@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# tui-install — create a desktop launcher for a terminal (TUI) app.
+#
+# Port of omarchy-tui-install (CREDITS.md): the launcher entry runs the
+# command in foot under app-id TUI.float or TUI.tile — the float id matches
+# a niri window rule (875×600 centered, the qshell-float treatment), tile
+# opens as a normal column. That app-id pairing IS the mechanism, exactly
+# theirs: desktop file and window rule are a matched set.
+#
+#   tui-install                                interactive
+#   tui-install <name> <command> [float|tile] [icon-name]
+set -euo pipefail
+
+APP_DIR="$HOME/.local/share/applications"
+
+safe_name() {
+  printf '%s\n' "$1" |
+    tr '[:upper:]' '[:lower:]' |
+    sed 's/[^[:alnum:]]\+/-/g; s/^-//; s/-$//'
+}
+
+if (($# < 2)); then
+  echo -e "Let's create a launcher entry for a terminal app.\n"
+  APP_NAME=$(gum input --prompt "Name> " --placeholder "Disk Usage")
+  APP_CMD=$(gum input --prompt "Command> " --placeholder "ncdu /")
+  APP_STYLE=$(gum choose --header "Window style?" "float" "tile")
+  APP_ICON=$(gum input --prompt "Icon name> " --placeholder "utilities-terminal (empty = default)")
+  INTERACTIVE=true
+else
+  APP_NAME="$1"
+  APP_CMD="$2"
+  APP_STYLE="${3:-float}"
+  APP_ICON="${4:-}"
+  INTERACTIVE=false
+fi
+
+[[ -n $APP_NAME && -n $APP_CMD ]] || { echo "You must set app name and command!" >&2; exit 1; }
+case $APP_STYLE in float | tile) ;; *) echo "Style must be float or tile." >&2; exit 1 ;; esac
+[[ -n $APP_ICON ]] || APP_ICON="utilities-terminal"
+
+mkdir -p "$APP_DIR"
+DESKTOP_FILE="$APP_DIR/tui-$(safe_name "$APP_NAME").desktop"
+cat >"$DESKTOP_FILE" <<EOF
+[Desktop Entry]
+Version=1.0
+Name=$APP_NAME
+Comment=$APP_NAME (terminal app)
+Exec=foot-run --app-id=TUI.$APP_STYLE $APP_CMD
+Terminal=false
+Type=Application
+Icon=$APP_ICON
+StartupNotify=true
+Categories=ConsoleOnly;
+X-Qshell-TUI=true
+EOF
+
+if [[ $INTERACTIVE == true ]]; then
+  echo -e "\nYou can now find $APP_NAME in the launcher (Super+D)."
+fi

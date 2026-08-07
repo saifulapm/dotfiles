@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# webapp-launch — open a URL as an app window, or focus its existing one.
+#
+# The launch half of omarchy-launch-webapp (CREDITS.md), chromium-only (the
+# manifest ships one browser) plus the launch-or-focus treatment their
+# webapp keybinds wrap around it. bin/launch-or-focus's word-bounded match
+# can't hold here: chromium stamps app windows `chrome-<host>__-Default`,
+# and `__` is word-characters — no \b exists before it. A prefix match on
+# the app_id is the reliable form.
+set -euo pipefail
+
+url="${1:-}"
+[[ -n $url ]] || { echo "Usage: webapp-launch <url>" >&2; exit 1; }
+[[ $url =~ ^[a-zA-Z][a-zA-Z0-9+.-]*: ]] || url="https://$url"
+
+host=$(sed -E 's|^[a-zA-Z][a-zA-Z0-9+.-]*://||; s|/.*$||; s|:.*$||' <<<"$url")
+
+id=$(niri msg --json windows 2>/dev/null | jq -r --arg p "chrome-$host" \
+  '[.[] | select((.app_id // "") | startswith($p))] | sort_by(.id) | last | .id // empty')
+
+if [[ -n $id ]]; then
+  exec niri msg action focus-window --id "$id" >/dev/null
+fi
+
+exec setsid -f chromium-browser --app="$url" >/dev/null 2>&1

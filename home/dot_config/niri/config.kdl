@@ -431,6 +431,17 @@ window-rule {
     default-window-height { fixed 600; }
 }
 
+// bin/tui-install's launcher entries (omarchy's TUI.float/TUI.tile app-id
+// convention): float gets the qshell-float treatment above, tile opens as a
+// normal column and needs no rule. Desktop file and window rule are a
+// matched pair — change one, change both.
+window-rule {
+    match app-id=r#"^TUI\.float$"#
+    open-floating true
+    default-column-width { fixed 875; }
+    default-window-height { fixed 600; }
+}
+
 // omarchy's floating-window tag (system.lua) also covers the media viewers:
 // mpv, imv and Evince open floating at the same 875×600 — zathura joins them
 // as the Evince replacement. omacalc floats in omarchy untagged — no forced

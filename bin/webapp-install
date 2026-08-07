@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# webapp-install — create a desktop launcher for a web app.
+#
+# Port of omarchy-webapp-install (CREDITS.md): gum prompts, the site's own
+# icon scraped in their preference order (apple-touch-icon link tag → the
+# well-known /apple-touch-icon.png → Google's favicon service), a .desktop
+# whose Exec goes through bin/webapp-launch (app window, focus-or-launch).
+#
+#   webapp-install                          interactive
+#   webapp-install <name> <url> [icon-ref]  scripted; icon-ref = URL, file
+#                                           path or icon-theme name (empty =
+#                                           scrape the site)
+set -euo pipefail
+
+ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+APP_DIR="$HOME/.local/share/applications"
+
+safe_icon_name() {
+  printf '%s\n' "$1" |
+    tr '[:upper:]' '[:lower:]' |
+    sed 's/[^[:alnum:]]\+/-/g; s/^-//; s/-$//'
+}
+
+refresh_icon_cache() {
+  gtk-update-icon-cache "$HOME/.local/share/icons/hicolor" &>/dev/null || true
+}
+
+download_icon() {
+  curl -fsSL --max-time 10 -o "$2" "$1" 2>/dev/null &&
+    [[ -s $2 && $(file -b --mime-type "$2") == image/* ]]
+}
+
+fetch_site_icon() {
+  local site_url="$1" dest="$2"
+  local origin page icon_url
+  origin=$(sed -E 's|^(https?://[^/]+).*|\1|' <<<"$site_url")
+
+  page=$(curl -fsSL --max-time 5 "$site_url" 2>/dev/null | head -c 100000 | tr '\n' ' ')
+  icon_url=$(grep -oiE "<link[^>]*rel=[\"'][^\"']*apple-touch-icon[^\"']*[\"'][^>]*>" <<<"$page" |
+    grep -oiE "href=[\"'][^\"']+" | head -1 | sed -E "s/^href=[\"']//")
+
+  case $icon_url in
+  http://* | https://*) ;;
+  //*) icon_url="https:$icon_url" ;;
+  /*) icon_url="$origin$icon_url" ;;
+  ?*) icon_url="$origin/$icon_url" ;;
+  esac
+
+  { [[ -n $icon_url ]] && download_icon "$icon_url" "$dest"; } ||
+    download_icon "$origin/apple-touch-icon.png" "$dest" ||
+    download_icon "https://www.google.com/s2/favicons?domain=${site_url}&sz=256" "$dest"
+}
+
+if (($# < 2)); then
+  echo -e "Let's create a web app you can start from the launcher.\n"
+  APP_NAME=$(gum input --prompt "Name> " --placeholder "My favorite web app")
+  APP_URL=$(gum input --prompt "URL> " --placeholder "https://example.com")
+  ICON_REF=""
+  INTERACTIVE=true
+else
+  APP_NAME="$1"
+  APP_URL="$2"
+  ICON_REF="${3:-}"
+  INTERACTIVE=false
+fi
+
+[[ -n $APP_NAME && -n $APP_URL ]] || { echo "You must set app name and app URL!" >&2; exit 1; }
+[[ $APP_URL =~ ^[a-zA-Z][a-zA-Z0-9+.-]*: ]] || APP_URL="https://$APP_URL"
+
+ICON_VALUE=$(safe_icon_name "$APP_NAME")
+mkdir -p "$ICON_DIR" "$APP_DIR"
+
+if [[ -z $ICON_REF ]]; then
+  if fetch_site_icon "$APP_URL" "$ICON_DIR/$ICON_VALUE.png"; then
+    refresh_icon_cache
+  elif [[ $INTERACTIVE == true ]]; then
+    ICON_REF=$(gum input --prompt "Icon URL/name> " --placeholder "No favicon found — PNG URL or icon-theme name")
+  else
+    echo "Error: failed to fetch the site icon (pass an icon-ref)." >&2
+    exit 1
+  fi
+fi
+
+if [[ -n $ICON_REF ]]; then
+  if [[ $ICON_REF =~ ^https?:// ]]; then
+    download_icon "$ICON_REF" "$ICON_DIR/$ICON_VALUE.png" || { echo "Error: failed to download icon." >&2; exit 1; }
+    refresh_icon_cache
+  elif [[ -f $ICON_REF ]]; then
+    ext="${ICON_REF##*.}"
+    [[ $ext == "$ICON_REF" ]] && ext="png"
+    cp "$ICON_REF" "$ICON_DIR/$ICON_VALUE.$ext"
+    refresh_icon_cache
+  else
+    # A name from the icon theme, used as-is.
+    ICON_VALUE="$ICON_REF"
+  fi
+fi
+
+DESKTOP_FILE="$APP_DIR/webapp-$ICON_VALUE.desktop"
+cat >"$DESKTOP_FILE" <<EOF
+[Desktop Entry]
+Version=1.0
+Name=$APP_NAME
+Comment=$APP_NAME
+Exec=webapp-launch $APP_URL
+Terminal=false
+Type=Application
+Icon=$ICON_VALUE
+StartupNotify=true
+Categories=Network;
+X-Qshell-WebApp=true
+EOF
+
+if [[ $INTERACTIVE == true ]]; then
+  echo -e "\nYou can now find $APP_NAME in the launcher (Super+D)."
+fi

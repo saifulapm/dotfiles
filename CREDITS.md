@@ -1434,3 +1434,16 @@ Direct file-level copies (source path → destination path):
   section (gsettings flip beside the existing polarity flip, their
   omarchy-theme-set-gnome pattern); their gray/grey variants exist in no
   Yaru package and map to the neutral pair.
+- omarchy `bin/omarchy-webapp-install` / `-webapp-remove` /
+  `-launch-webapp` / `bin/omarchy-tui-install` / `-tui-remove` →
+  `bin/webapp-install` / `webapp-remove` / `webapp-launch` / `tui-install` /
+  `tui-remove` (2026-08-07, gap item 7): their icon scrape chain verbatim
+  (apple-touch-icon link tag → well-known path → Google favicon service,
+  the mime sniff on the download), their gum prompt flow, their
+  TUI.float/TUI.tile app-id-to-window-rule pairing (the float rule reuses
+  qshell-float's 875×600). Ours: chromium-only launch (no default-browser
+  registry), launch-or-focus folded into webapp-launch as an app_id PREFIX
+  match — chromium stamps app windows `chrome-<host>__-Default` and `__` is
+  word characters, so the word-bounded launch-or-focus match can never hit
+  them — and an X-Qshell-WebApp/-TUI marker in the .desktop so the remove
+  pickers only ever offer entries these scripts created.

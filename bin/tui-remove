@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# tui-remove — delete a TUI launcher created by bin/tui-install.
+#
+# Port of omarchy-tui-remove (CREDITS.md): no argument = gum picker over the
+# entries carrying tui-install's X-Qshell-TUI marker.
+set -euo pipefail
+
+APP_DIR="$HOME/.local/share/applications"
+
+mapfile -t files < <(grep -l '^X-Qshell-TUI=true$' "$APP_DIR"/*.desktop 2>/dev/null || true)
+((${#files[@]} > 0)) || { echo "No TUI apps installed."; exit 0; }
+
+declare -A by_name=()
+names=()
+for f in "${files[@]}"; do
+  name=$(sed -n 's/^Name=//p' "$f" | head -1)
+  [[ -n $name ]] || name=$(basename "$f")
+  by_name["$name"]="$f"
+  names+=("$name")
+done
+
+if (($# > 0)); then
+  chosen=("$@")
+else
+  mapfile -t chosen < <(printf '%s\n' "${names[@]}" | gum choose --no-limit --header "Remove which TUI apps?")
+fi
+
+for name in "${chosen[@]}"; do
+  f="${by_name[$name]:-}"
+  [[ -n $f && -f $f ]] || { echo "No such TUI app: $name" >&2; continue; }
+  rm -f "$f"
+  echo "Removed $name"
+done

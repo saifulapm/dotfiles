@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# webapp-remove — delete a web-app launcher created by bin/webapp-install.
+#
+# Port of omarchy-webapp-remove (CREDITS.md): no argument = pick from the
+# installed set with gum; entries are recognized by the X-Qshell-WebApp
+# marker webapp-install writes, so a hand-made .desktop is never offered.
+set -euo pipefail
+
+APP_DIR="$HOME/.local/share/applications"
+ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+
+mapfile -t files < <(grep -l '^X-Qshell-WebApp=true$' "$APP_DIR"/*.desktop 2>/dev/null || true)
+((${#files[@]} > 0)) || { echo "No web apps installed."; exit 0; }
+
+declare -A by_name=()
+names=()
+for f in "${files[@]}"; do
+  name=$(sed -n 's/^Name=//p' "$f" | head -1)
+  [[ -n $name ]] || name=$(basename "$f")
+  by_name["$name"]="$f"
+  names+=("$name")
+done
+
+if (($# > 0)); then
+  chosen=("$@")
+else
+  mapfile -t chosen < <(printf '%s\n' "${names[@]}" | gum choose --no-limit --header "Remove which web apps?")
+fi
+
+for name in "${chosen[@]}"; do
+  f="${by_name[$name]:-}"
+  [[ -n $f && -f $f ]] || { echo "No such web app: $name" >&2; continue; }
+  icon=$(sed -n 's/^Icon=//p' "$f" | head -1)
+  rm -f "$f"
+  # Only icons webapp-install itself downloaded — a theme icon name has no
+  # file here and the glob simply misses.
+  [[ -n $icon ]] && rm -f "$ICON_DIR/$icon".{png,jpg,jpeg,webp,svg} 2>/dev/null || true
+  echo "Removed $name"
+done
+
+gtk-update-icon-cache "$HOME/.local/share/icons/hicolor" &>/dev/null || true

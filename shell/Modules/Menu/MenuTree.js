@@ -336,6 +336,42 @@ var TREE = {
         "when": "command -v fzf",
         "action": "foot-run --app-id=qshell-float -e timezone-set"
     },
+    // Omarchy's Install/Remove → Web App / TUI rows (their webapp-install /
+    // tui-install, ported as bin/ scripts). They write .desktop files only —
+    // no packages — so they sit here with the other Setup wizards rather
+    // than behind an Install root ours doesn't have.
+    "setup.webapp-add": {
+        "icon": "󰖟",
+        "label": "Add Web App",
+        "aliases": ["webapp", "webapps", "web-app", "site"],
+        "description": "Create a launcher entry that opens a site as an app window",
+        "when": "command -v gum",
+        "action": "foot-run --app-id=qshell-float -e bash -lc 'webapp-install; read -r -p \"press enter to close\"'"
+    },
+    "setup.webapp-remove": {
+        "icon": "󰖟",
+        "label": "Remove Web App",
+        "aliases": ["webapp-remove"],
+        "description": "Delete a web-app launcher entry",
+        "when": "grep -qs X-Qshell-WebApp=true \"$HOME\"/.local/share/applications/*.desktop",
+        "action": "foot-run --app-id=qshell-float -e bash -lc 'webapp-remove; read -r -p \"press enter to close\"'"
+    },
+    "setup.tui-add": {
+        "icon": "󰆍",
+        "label": "Add TUI App",
+        "aliases": ["tui", "terminal-app", "console"],
+        "description": "Create a launcher entry that runs a terminal app (float or tile)",
+        "when": "command -v gum",
+        "action": "foot-run --app-id=qshell-float -e bash -lc 'tui-install; read -r -p \"press enter to close\"'"
+    },
+    "setup.tui-remove": {
+        "icon": "󰆍",
+        "label": "Remove TUI App",
+        "aliases": ["tui-remove"],
+        "description": "Delete a TUI launcher entry",
+        "when": "grep -qs X-Qshell-TUI=true \"$HOME\"/.local/share/applications/*.desktop",
+        "action": "foot-run --app-id=qshell-float -e bash -lc 'tui-remove; read -r -p \"press enter to close\"'"
+    },
 
     // ---------------------------------------------------------------- system
     "system.lock": {
