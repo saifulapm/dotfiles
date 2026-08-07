@@ -1,0 +1,20 @@
+[Unit]
+Description=udiskie (removable-drive automounter)
+# omarchy autostarts udiskie from Hyprland (autostart.lua); here it is a
+# session service like the shell — starts with the session, stops with it.
+# Not Requisite: mounting works headless too, only the toasts need a session.
+PartOf=graphical-session.target
+After=graphical-session.target
+# Clean skip on a machine that has not run the dnf half of an apply yet —
+# enable succeeds, start is a no-op instead of a unit failure.
+ConditionPathExists=/usr/bin/udiskie
+
+[Service]
+# Defaults are exactly what we want: automount on, libnotify toasts (drawn by
+# the shell's notification server), no tray icon unless asked.
+ExecStart=/usr/bin/udiskie
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

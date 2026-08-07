@@ -262,6 +262,18 @@ arch = "all"
 why = "Terminal system monitor the user actually reaches for (bash history shows regular use). Installed by hand 2026-08-05, recorded 2026-08-06"
 
 [[pkg]]
+name = "udisks2"
+category = "core"
+arch = "all"
+why = "Disk-management daemon udiskie drives over D-Bus. Already present on this MacBook as a transitive dependency, but load-bearing for automount, so declared (the transitive path that dragged it in could vanish in a future image)"
+
+[[pkg]]
+name = "udiskie"
+category = "core"
+arch = "all"
+why = "Removable-drive automounter (omarchy gap item 4, user-picked 2026-08-07): before this, a plugged USB stick mounted nowhere. Runs as udiskie.service (dot_config/systemd/user, session-scoped like qshell.service, ConditionPathExists-gated so the unit no-ops until the dnf half of an apply lands); defaults only — automount on, libnotify toasts through the shell's notification server, no tray icon. omarchy autostarts the same tool from Hyprland"
+
+[[pkg]]
 name = "rclone"
 category = "optional"
 arch = "all"

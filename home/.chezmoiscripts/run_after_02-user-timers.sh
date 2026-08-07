@@ -6,13 +6,15 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket qshell.service emacs.service
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service qshell.service emacs.service
 set -euo pipefail
 
 # ssh-agent.socket: Fedora's packaged agent unit — socket activation, so
 # enabling costs nothing until the first ssh; SSH_AUTH_SOCK pointing at it
 # comes from environment.d/65-ssh-agent.conf.
-units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket)
+# udiskie.service is ConditionPathExists-gated on its binary, so enabling it
+# before the udiskie package lands is a clean no-op, not a failed unit.
+units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently
