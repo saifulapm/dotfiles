@@ -7,8 +7,7 @@
 # over the active theme, so foot (derived point size + line height) and GTK
 # (quantized text-scaling-factor) follow from one write. Survives theme
 # switches — the override outlives the theme, exactly like upstream's
-# ~/.config/omarchy/shell.toml. Emacs follows too when the emacs.d config
-# defines my/apply-desktop-text-size (poked over emacsclient, best-effort).
+# ~/.config/omarchy/shell.toml.
 #
 #   text-size            print the current state
 #   text-size <9-20>     set the size in px (shell token units)
@@ -100,14 +99,11 @@ apply() {
       "Text size changed" "Reopen foot windows to apply the new terminal size" 2>/dev/null)" || true
     [[ $new_id =~ ^[0-9]+$ ]] && printf '%s\n' "$new_id" >"$id_file"
   fi
-
-  command -v emacsclient >/dev/null 2>&1 \
-    && emacsclient -e "(when (fboundp 'my/apply-desktop-text-size) (my/apply-desktop-text-size))" >/dev/null 2>&1 || true
 }
 
 case "${1:-}" in
   -h | --help)
-    sed -n '4,19p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '4,18p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
     ;;
   --value)
