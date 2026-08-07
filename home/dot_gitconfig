@@ -24,6 +24,28 @@
 
 [init]
   defaultBranch = main
+
+# Modernization batch (user pick 2026-08-08) — behavior changes, not cosmetics:
+[push]
+  # `git push` on a new branch creates the upstream itself; the fish `push`
+  # alias dropped its hardcoded `-u origin main` the same day.
+  autoSetupRemote = true
+[pull]
+  rebase = true
+[rebase]
+  autoStash = true
+[fetch]
+  prune = true
+[rerere]
+  # replay recorded conflict resolutions — pays off with pull.rebase above
+  enabled = true
+[merge]
+  # zdiff3 adds the merge base to conflict hunks; kak/emacs both render it
+  conflictStyle = zdiff3
+[diff]
+  algorithm = histogram
+[branch]
+  sort = -committerdate
 [credential "https://github.com"]
 	helper =
 	helper = !gh auth git-credential
@@ -36,6 +58,10 @@
 
 [delta]
   features = decorations
+  navigate = true # n/N jump between files in a diff
+  # ansi = the 16 terminal colors, so diffs follow foot's live OSC retint on
+  # every theme change (same trick as bat's config and kak's Default=default)
+  syntax-theme = ansi
 
 [delta "interactive"]
   keep-plus-minus-markers = false

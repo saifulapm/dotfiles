@@ -39,7 +39,7 @@ alias force "git push --force"
 alias nuke "git clean -df && git reset --hard"
 alias pop "git stash pop"
 alias pull "git pull"
-alias push "git push -u origin main"
+alias push "git push" # push.autoSetupRemote (gitconfig) creates the upstream on new branches
 alias resolve "git add . && git commit --no-edit"
 alias stash "git stash -u"
 alias unstage "git restore --staged ."

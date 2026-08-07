@@ -391,6 +391,12 @@ category = "dev"
 arch = "all"
 why = "Arbitrary-precision math — common Laravel package requirement"
 
+[[pkg]]
+name = "php-pecl-pcov"
+category = "dev"
+arch = "all"
+why = "Code-coverage driver for Pest/PHPUnit --coverage (user pick 2026-08-08) — without one, coverage runs die with 'No code coverage driver available'. pcov over Xdebug deliberately: coverage-only, near-zero overhead, no step-debug daemon; Fedora packages it for the system PHP. Off outside coverage runs unless a project opts in (pcov.enabled)"
+
 # Remi SCL collections: parallel-installable PHP 8.2/8.3/8.4 beside the
 # system 8.5 (multi-version decision 2026-08-07; ~/.dotfiles/bin/php picks
 # per project via .php-version). The remi-release rpm that provides these is
@@ -460,6 +466,12 @@ arch = "all"
 why = "PHP 8.2: posix/pcntl (queue workers)"
 
 [[pkg]]
+name = "php82-php-pecl-pcov"
+category = "dev"
+arch = "all"
+why = "PHP 8.2: pcov coverage driver (Remi; same rationale as php-pecl-pcov)"
+
+[[pkg]]
 name = "php83"
 category = "dev"
 arch = "all"
@@ -520,6 +532,12 @@ arch = "all"
 why = "PHP 8.3: posix/pcntl"
 
 [[pkg]]
+name = "php83-php-pecl-pcov"
+category = "dev"
+arch = "all"
+why = "PHP 8.3: pcov coverage driver (Remi; same rationale as php-pecl-pcov)"
+
+[[pkg]]
 name = "php84"
 category = "dev"
 arch = "all"
@@ -578,6 +596,12 @@ name = "php84-php-process"
 category = "dev"
 arch = "all"
 why = "PHP 8.4: posix/pcntl"
+
+[[pkg]]
+name = "php84-php-pecl-pcov"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: pcov coverage driver (Remi; same rationale as php-pecl-pcov)"
 
 [[pkg]]
 name = "php84-php-fpm"
@@ -1347,7 +1371,7 @@ why  = "Fedora packages none of these; all ship both aarch64 and x86_64 linux re
 
 [[tool]]
 name = "pnpm-globals"
-via  = "run_after_08-cli-tools.sh — pnpm add -g: typescript, typescript-language-server, @vtsls/language-server, intelephense, @astrojs/language-server, @biomejs/biome, dprint, rustywind, @ast-grep/cli, prettier, vscode-langservers-extracted, @olrtg/emmet-language-server (prettier, vscode-langservers-extracted and @olrtg/emmet-language-server added 2026-08-07 for the helix/kak config port; bin/eslint-language-server shims the kak-lsp name onto vscode-eslint-language-server), agent-browser (added 2026-08-07 for the mac config port — see the note below)"
+via  = "run_after_08-cli-tools.sh — pnpm add -g: typescript, typescript-language-server, @vtsls/language-server, intelephense, @astrojs/language-server, @biomejs/biome, dprint, rustywind, @ast-grep/cli, prettier, vscode-langservers-extracted, @olrtg/emmet-language-server (prettier, vscode-langservers-extracted and @olrtg/emmet-language-server added 2026-08-07 for the helix/kak config port; bin/eslint-language-server shims the kak-lsp name onto vscode-eslint-language-server), agent-browser (added 2026-08-07 for the mac config port — see the note below), @tailwindcss/language-server (added 2026-08-08, user pick: Tailwind class completion/hover for the shadcn/React and Blade work — rustywind only sorts classes, it completes nothing)"
 why  = "The mac's language servers (eglot + kak-lsp point at them) plus the npm-shipped formatters/linters Fedora lacks (biome, dprint, rustywind, ast-grep), and — since 2026-08-07 — the agent-browser CLI justified in the note below. Lands in PNPM_HOME/bin, already on PATH"
 
 # agent-browser rides the array above rather than getting its own install

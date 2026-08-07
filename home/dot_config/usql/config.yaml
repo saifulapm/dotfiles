@@ -1,10 +1,15 @@
+# usql named connections (managed by chezmoi) — `usql mysql`, `usql pg`.
+#
+# These point at the on-demand dev services (podman quadlets behind
+# systemd-socket-proxyd, see dot_config/containers/systemd): connecting to the
+# standard port wakes the container, 10 min idle stops it. Auth matches the
+# quadlets' deliberate dev-only openness: mysql runs MYSQL_ALLOW_EMPTY_PASSWORD,
+# postgres runs POSTGRES_HOST_AUTH_METHOD=trust — nothing here is a secret.
+# Redis is NOT listed: usql speaks SQL databases only.
+#
+# Replaced the upstream sample entries (couchbase/clickhouse/oracle with
+# P4ssw0rd) that shipped with the mac config port — none of them pointed at
+# anything that exists on these machines (user pick 2026-08-08).
 connections:
-  my_couchbase_conn: couchbase://Administrator:P4ssw0rd@localhost
-  my_clickhouse_conn: clickhouse://clickhouse:P4ssw0rd@localhost
-  my_godror_conn:
-    protocol: godror
-    username: system
-    password: P4ssw0rd
-    hostname: localhost
-    port: 1521
-    database: free
+  mysql: mysql://root@127.0.0.1:3306
+  pg: postgres://postgres@127.0.0.1:5432?sslmode=disable
