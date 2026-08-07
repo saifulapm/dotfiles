@@ -10,11 +10,10 @@ import "DevServicesModel.js" as Model
 // Clicking a row toggles it: start warms the container AND its proxy service
 // (the proxy holds it up until the usual 10-minute idle exit), stop lowers
 // both; the sockets stay armed either way, so a stopped database still wakes
-// on its next connection. Mailpit's row carries a web-UI button — a MouseArea
-// layered over the full-row MouseArea (the BluetoothPanel ForgetButton
-// precedent: a TapHandler's passive grab would let the press fall through
-// and toggle the row too), and the web socket wakes mailpit by itself, so it
-// works while armed.
+// on its next connection. Mailpit's row carries a web-UI button while it is
+// running — a MouseArea layered over the full-row MouseArea (the
+// BluetoothPanel ForgetButton precedent: a TapHandler's passive grab would
+// let the press fall through and toggle the row too).
 //
 // The cursor model is the family's single-highlight one: j/k and the arrows
 // walk the rows, Enter toggles, o opens the selected row's web UI, r
@@ -196,10 +195,14 @@ BarPanel {
             onClicked: panel.devservices.toggleService(row.svc)
         }
 
+        // Raised over the row: the below-right default would land on the
+        // next row's controls (the Mailpit web button) and be painted over
+        // by them — a later sibling row stacks above this row's children.
         PanelHint {
             theme: panel.theme
             visible: rowMouse.containsMouse && !row.busy && !webMouse.containsMouse
             anchor: row
+            above: true
             text: row.isRunning ? "Stop" : "Start"
         }
 
@@ -255,7 +258,7 @@ BarPanel {
             Rectangle {
                 id: webButton
 
-                visible: row.hasWeb
+                visible: row.hasWeb && row.isRunning
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 implicitWidth: panel.theme.space(8)
@@ -288,7 +291,8 @@ BarPanel {
                     theme: panel.theme
                     visible: webMouse.containsMouse
                     anchor: webButton
-                    text: row.isRunning ? "Open web UI" : "Open web UI — wakes Mailpit"
+                    above: true
+                    text: "Open web UI"
                 }
             }
         }

@@ -175,10 +175,12 @@ QtObject {
             startService(svc.key);
     }
 
+    // Running services only: the web socket could wake mailpit by itself,
+    // but the affordance would read as "already up" — the row's Start is the
+    // deliberate warm-up.
     function openWeb(svc) {
-        if (!svc || svc.webUrl === "")
+        if (!svc || svc.webUrl === "" || !svc.running)
             return;
-        // The web socket wakes mailpit by itself — this works while armed.
         Quickshell.execDetached(["xdg-open", svc.webUrl]);
     }
 
