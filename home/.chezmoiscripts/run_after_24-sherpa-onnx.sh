@@ -30,6 +30,14 @@
 # streaming player (sherpa-onnx-offline-tts-play) speak almost immediately.
 # Revisit only if this laptop's ~1.5 GB free headroom shrinks.
 #
+# The third model is Bangla: Kokoro has no Bengali voice (en/es/fr/hi/it/pt-br/
+# zh only), so bin/screenshot-ocr routes Bengali-script selections to this one
+# by codepoint. vits-coqui-bn-custom_female is the least-bad of what exists —
+# picked by ear over vits-mimic3-bn-multi_low and Piper's bn_BD-google-medium.
+# Open-source Bangla TTS has a markedly lower ceiling than English; the models
+# that would beat it (AI4Bharat IndicF5, Indic Parler-TTS) are GB-scale torch
+# needing a reference clip per utterance, which is not a hotkey tool here.
+#
 # Failure warns instead of aborting, like every other install script here: a
 # flaky network must not stop a fresh-machine apply, and screenshot-ocr falls
 # back through piper → espeak-ng → flite on its own when this is absent.
@@ -37,7 +45,7 @@ set -uo pipefail
 
 VERSION="v1.13.4"
 dest="$HOME/.local/share/sherpa-onnx"
-models=(kokoro-multi-lang-v1_0 kitten-nano-en-v0_8-int8)
+models=(kokoro-multi-lang-v1_0 kitten-nano-en-v0_8-int8 vits-coqui-bn-custom_female)
 base="https://github.com/k2-fsa/sherpa-onnx/releases/download"
 
 warn() { echo "sherpa-onnx: $*" >&2; }

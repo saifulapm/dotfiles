@@ -49,9 +49,28 @@ FLITE_VOICE="${FLITE_VOICE:-slt}"
 # bin/mem-pressure-warn). Revisit if that headroom ever shrinks.
 # Override per-invocation, e.g. SHERPA_VOICE=16 or
 # SHERPA_MODEL=kitten-nano-en-v0_8-int8 (143 MB peak, the low-RAM fallback).
+#
+# BANGLA is a separate model because Kokoro has no Bengali voice at all — its
+# languages are en/es/fr/hi/it/pt-br/zh, so a Bangla selection fed to it comes
+# back as garbage rather than an error. speak() routes by script (see
+# pick_model_for_text), which is why this needs no second keybind.
+#
+# vits-coqui-bn-custom_female is the least-bad option, chosen by ear after
+# trying the alternatives 2026-08-08: vits-mimic3-bn-multi_low (rejected),
+# piper bn_BD-google-medium (16 Bangladeshi speakers — rejected, and it needs
+# ONNX metadata injection plus dropping 5 multi-codepoint phonemes sherpa's
+# token reader refuses). Meta's MMS ben exists only as a transformers.js
+# export whose signature (input_ids/attention_mask -> waveform) is not the one
+# sherpa's VITS wants (x/x_length/... -> y). The genuinely good Bangla models
+# (AI4Bharat IndicF5, Indic Parler-TTS) are GB-scale torch that need a
+# reference clip per utterance — not a hotkey tool on a 1.5 GB-free laptop.
+# Open-source Bangla TTS simply has a lower ceiling than English today.
 SHERPA_DIR="${SHERPA_DIR:-$HOME/.local/share/sherpa-onnx}"
 SHERPA_MODEL="${SHERPA_MODEL:-kokoro-multi-lang-v1_0}"
 SHERPA_VOICE="${SHERPA_VOICE:-3}"
+SHERPA_BN_MODEL="${SHERPA_BN_MODEL:-vits-coqui-bn-custom_female}"
+SHERPA_BN_VOICE="${SHERPA_BN_VOICE:-0}"
+TESSDATA_DIR="${TESSDATA_DIR:-$HOME/.local/share/tessdata}"
 export PIPER_VOICE FLITE_VOICE SHERPA_DIR SHERPA_MODEL SHERPA_VOICE
 
 pick_backend() {
@@ -73,18 +92,29 @@ pick_backend() {
 run_tts() {
   case "$TTS_BACKEND" in
   sherpa)
-    local m="$SHERPA_DIR/models/$SHERPA_MODEL" onnx flags
+    local m="$SHERPA_DIR/models/$SPEAK_MODEL" onnx flags
     onnx="$m/model.int8.onnx"
     [[ -f $onnx ]] || onnx="$m/model.onnx"
-    # Kokoro and Kitten take differently-named flags for the same four files.
-    if [[ $SHERPA_MODEL == kitten* ]]; then
+    # Each family takes differently-named flags for the same files. VITS (the
+    # Bangla voice) is the odd one: it has no voices.bin, and its extra inputs
+    # are optional per model — the coqui bn build is character-based with no
+    # espeak-ng-data at all, so those flags are added only when present.
+    case "$SPEAK_MODEL" in
+    kitten*)
       flags=(--kitten-model="$onnx" --kitten-voices="$m/voices.bin"
         --kitten-tokens="$m/tokens.txt" --kitten-data-dir="$m/espeak-ng-data")
-    else
+      ;;
+    vits-*)
+      flags=(--vits-model="$onnx" --vits-tokens="$m/tokens.txt")
+      [[ -d $m/espeak-ng-data ]] && flags+=(--vits-data-dir="$m/espeak-ng-data")
+      [[ -f $m/lexicon.txt ]] && flags+=(--vits-lexicon="$m/lexicon.txt")
+      ;;
+    *)
       flags=(--kokoro-model="$onnx" --kokoro-voices="$m/voices.bin"
         --kokoro-tokens="$m/tokens.txt" --kokoro-data-dir="$m/espeak-ng-data"
         --kokoro-lang=en)
-    fi
+      ;;
+    esac
     # -play streams audio as the model synthesizes it, so speech starts almost
     # at once instead of after the whole passage is rendered.
     #
@@ -99,7 +129,7 @@ run_tts() {
     # options separator, and a space is inaudible, so this is the fix.
     LD_LIBRARY_PATH="$SHERPA_DIR/lib" \
       "$SHERPA_DIR/bin/sherpa-onnx-offline-tts-play" "${flags[@]}" \
-      --num-threads=4 --sid="$SHERPA_VOICE" \
+      --num-threads=4 --sid="$SPEAK_VOICE" \
       --output-filename="$SPEAK_WAV" " $(cat "$1")" >/dev/null 2>&1
     ;;
   piper)
@@ -196,6 +226,38 @@ reflow() {
   '
 }
 
+# Route by script. Bengali is one contiguous Unicode block (U+0980–U+09FF),
+# so this needs no language ID model — just a codepoint count against Latin
+# letters, majority wins. Comparing against Latin rather than "all characters"
+# keeps digits and punctuation, which both scripts share, from casting a vote.
+#
+# Bengali matras are combining marks (category Mn), so \p{L} would undercount
+# them badly; the explicit range counts them and is the honest measure here.
+pick_model_for_text() {
+  local bn latin
+  # The `|| n=0` guards are load-bearing under `set -e -o pipefail`: grep exits
+  # 1 when it matches nothing, and matching nothing is the NORMAL case here —
+  # English text has no Bengali codepoints and Bangla text has no Latin
+  # letters. Without these, the first grep to come up empty aborts the whole
+  # script, which silently killed --speak for every selection.
+  bn=$(grep -oP '[\x{0980}-\x{09FF}]' <<<"$1" 2>/dev/null | wc -l) || bn=0
+  latin=$(grep -oP '[A-Za-z]' <<<"$1" 2>/dev/null | wc -l) || latin=0
+  if ((bn > latin)) && [[ -d $SHERPA_DIR/models/$SHERPA_BN_MODEL ]]; then
+    printf '%s\n%s\n' "$SHERPA_BN_MODEL" "$SHERPA_BN_VOICE"
+  else
+    printf '%s\n%s\n' "$SHERPA_MODEL" "$SHERPA_VOICE"
+  fi
+}
+
+# SPEAK_MODEL/VOICE are the RESOLVED pair for one utterance; SHERPA_MODEL and
+# SHERPA_VOICE stay the configured defaults. Keeping them apart matters because
+# resolving into SHERPA_MODEL would make the choice sticky — the first Bangla
+# read would overwrite the English default, and pick_model_for_text would then
+# hand English text to the Bangla voice on every later call in the same shell.
+SPEAK_MODEL="$SHERPA_MODEL"
+SPEAK_VOICE="$SHERPA_VOICE"
+export SPEAK_MODEL SPEAK_VOICE
+
 speak() {
   local text="$1"
   TTS_BACKEND="$(pick_backend)"
@@ -203,7 +265,10 @@ speak() {
     notify "No speech engine found (install flite, espeak-ng or piper)" 4000
     return 1
   fi
-  export TTS_BACKEND
+  # Resolve the model from the text itself, then export — run_tts reads these
+  # in the detached shell, so the choice has to be made before the fork.
+  { read -r SPEAK_MODEL; read -r SPEAK_VOICE; } < <(pick_model_for_text "$text")
+  export TTS_BACKEND SPEAK_MODEL SPEAK_VOICE
 
   stop_speech # a second press interrupts the previous read rather than overlapping
 
@@ -249,9 +314,22 @@ fi
 region="$(slurp 2>/dev/null)" || exit 0
 [[ -z $region ]] && exit 0
 
-text="$(grim -g "$region" - | tesseract stdin stdout \
-  --oem 1 --psm 6 -l "${OCR_LANGS:-eng}" --dpi 300 \
-  -c preserve_interword_spaces=1 2>/dev/null)" || {
+# Bangla lives in a USER-LOCAL tessdata dir, not /usr/share, so adding a
+# language never needs root: run_after_25 drops ben.traineddata there and
+# symlinks the system eng one beside it. --tessdata-dir replaces the search
+# path wholesale rather than extending it, which is why eng has to be present
+# in that directory too — and why this is gated on the directory existing.
+tess_args=(--oem 1 --psm 6 --dpi 300 -c preserve_interword_spaces=1)
+if [[ -f $TESSDATA_DIR/ben.traineddata && -f $TESSDATA_DIR/eng.traineddata ]]; then
+  tess_args+=(--tessdata-dir "$TESSDATA_DIR" -l "${OCR_LANGS:-eng+ben}")
+else
+  tess_args+=(-l "${OCR_LANGS:-eng}")
+fi
+
+# eng+ben, in that order, costs nothing measurable: both scripts still OCR at
+# 100% on rendered samples and English goes 0.09 s -> 0.13 s. Reversing it to
+# ben+eng triples the English case to 0.27 s, so the order is deliberate.
+text="$(grim -g "$region" - | tesseract stdin stdout "${tess_args[@]}" 2>/dev/null)" || {
   notify "tesseract failed" 3000
   exit 1
 }
