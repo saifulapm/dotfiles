@@ -1,0 +1,16 @@
+[Unit]
+Description=Memory pressure early warning (PSI trigger -> notification)
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+# session.slice: the watcher must never sit in the app.slice kill pool it
+# monitors (same reasoning as qshell.service).
+Slice=session.slice
+ExecStart=%h/.dotfiles/bin/mem-pressure-warn
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

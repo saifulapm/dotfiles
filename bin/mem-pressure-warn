@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""Early warning before systemd-oomd kills an app (mempressure.service).
+
+macOS shows "your system has run out of application memory" before anything
+dies; Linux kills silently. This closes that gap: kernel PSI triggers are
+registered on the session's app.slice memory.pressure (user-owned via cgroup
+delegation, the exact cgroup subtree oomd kills in) and the process sleeps in
+poll() until the kernel reports sustained stall time — event-driven, no
+timers, no polling. Two tiers:
+
+  warn  some >= 2.5s per 10s window  normal notification (memory getting tight)
+  crit  full >= 3.5s per 10s window  critical notification (save your work)
+
+Calibration (measured 2026-08-08 on the M2/8G MacBook, zstd zswap + NVMe):
+a 6 GB sequential thrash peaks near some 15%, so these tiers sit above what
+the machine absorbs comfortably and far below oomd's 95% kill line. The
+kernel EXTRAPOLATES partial windows — a violent burst (7 GB allocated in
+seconds) fires within ~1s, which is the early warning working as intended;
+crit sits higher than warn's percentage so bursts don't flash "save your
+work" for spikes that resolve themselves.
+
+oomd only kills at full avg10 >= 95% held 60s (slice.d/50-oomd-patient.conf),
+so crit fires with real runway left to close something.
+"""
+
+import os
+import select
+import subprocess
+import sys
+import time
+
+UID = os.getuid()
+PSI = f"/sys/fs/cgroup/user.slice/user-{UID}.slice/user@{UID}.service/app.slice/memory.pressure"
+
+# (name, trigger, cooldown seconds, urgency, title, body)
+TIERS = [
+    (
+        "warn",
+        b"some 2500000 10000000",
+        180,
+        "normal",
+        "Memory getting tight",
+        "The system is compressing and swapping heavily. "
+        "Consider closing something you're done with.",
+    ),
+    (
+        "crit",
+        b"full 3500000 10000000",
+        60,
+        "critical",
+        "Low memory — save your work",
+        "Memory is nearly exhausted. Close a heavy app now, "
+        "or the system will eventually pick one itself.",
+    ),
+]
+
+# app.slice appears with the first unit it hosts; on a fresh login it can
+# trail this service by a moment. Bounded wait, then give up quietly (next
+# login retries).
+for _ in range(30):
+    if os.path.exists(PSI):
+        break
+    time.sleep(2)
+else:
+    print(f"mem-pressure-warn: {PSI} never appeared, exiting", file=sys.stderr)
+    sys.exit(0)
+
+poller = select.poll()
+fds = {}
+for tier in TIERS:
+    # One fd per trigger: the kernel ties a PSI trigger to the fd it was
+    # written through, and wakes exactly that fd via POLLPRI at most once
+    # per window while the threshold holds.
+    fd = os.open(PSI, os.O_RDWR | os.O_NONBLOCK)
+    os.write(fd, tier[1])
+    poller.register(fd, select.POLLPRI | select.POLLERR)
+    fds[fd] = tier
+
+last = {}
+while True:
+    for fd, event in poller.poll():
+        if event & select.POLLERR:
+            # The watched cgroup went away (session teardown).
+            sys.exit(0)
+        name, _, cooldown, urgency, title, body = fds[fd]
+        now = time.monotonic()
+        if now - last.get(name, -cooldown) < cooldown:
+            continue
+        last[name] = now
+        try:
+            subprocess.run(
+                ["notify-send", "-a", "Memory", "-u", urgency, title, body],
+                check=False,
+            )
+        except OSError as err:
+            print(f"mem-pressure-warn: notify-send failed: {err}", file=sys.stderr)
+        print(f"mem-pressure-warn: {name} fired", flush=True)

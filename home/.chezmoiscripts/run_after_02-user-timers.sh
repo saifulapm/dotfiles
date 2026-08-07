@@ -6,7 +6,7 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service qshell.service emacs.service
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service qshell.service emacs.service mempressure.service
 set -euo pipefail
 
 # ssh-agent.socket: Fedora's packaged agent unit — socket activation, so
@@ -34,11 +34,13 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
   # the others would fail the whole script on a TTY-only apply: enable it
   # always, start it only when a graphical session is actually up (a no-op
   # when it is already running).
-  systemctl --user enable qshell.service
+  # mempressure.service (PSI early-warning, needs the notification daemon)
+  # shares qshell's Requisite gate and rides the same enable/start split.
+  systemctl --user enable qshell.service mempressure.service
   if systemctl --user -q is-active graphical-session.target; then
-    systemctl --user start qshell.service
+    systemctl --user start qshell.service mempressure.service
   fi
-  echo "user units: qshell.service enabled"
+  echo "user units: qshell.service mempressure.service enabled"
   # emacs.service (ours — shadows the emacs-pgtk rpm unit) has the same
   # Requisite=graphical-session.target gate: enable always, start only
   # inside a session. --no-block because a first start bootstraps every
