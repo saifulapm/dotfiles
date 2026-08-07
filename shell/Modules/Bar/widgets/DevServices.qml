@@ -9,9 +9,9 @@ import "DevServicesModel.js" as Model
 //
 // The mark is a drawn database cylinder that carries the whole state the way
 // the Dropbox mark does: full foreground while at least one container runs,
-// dimmed and darkened while everything is armed. A count badge rides its
-// corner while anything is up — the exact split lives in the tooltip and the
-// panel.
+// dimmed and darkened while everything is armed. The exact split lives in
+// the tooltip and the panel (a corner count badge existed briefly — removed
+// by user request 2026-08-07).
 //
 // Left click opens the panel, right click re-probes (`podman ps` — the
 // live state otherwise arrives entirely through the service's podman-events
@@ -63,37 +63,6 @@ BarButton {
         iconSize: 13
         color: rootItem.runningCount > 0 ? rootItem.barFg : Qt.darker(rootItem.barFg, 1.55)
         opacity: rootItem.runningCount > 0 ? 1.0 : 0.6
-    }
-
-    // Running-count badge in the mark's corner, ringed with the bar's own
-    // background so it reads as punched out of the cylinder (the NotifsBell
-    // dot's recipe). Reparented onto the button itself: children land in
-    // BarButton's content Row by default, and a Row rejects
-    // horizontally-anchored items.
-    Rectangle {
-        parent: rootItem
-
-        visible: rootItem.runningCount > 0
-        width: Math.max(height, badgeLabel.implicitWidth + 3)
-        height: 8
-        radius: height / 2
-        color: rootItem.theme.accent
-        border.width: 1
-        border.color: rootItem.bar ? rootItem.bar.barBackground : rootItem.theme.surface1
-        anchors.right: parent.right
-        anchors.rightMargin: 4
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: 5
-
-        Text {
-            id: badgeLabel
-            anchors.centerIn: parent
-            text: String(rootItem.runningCount)
-            color: rootItem.bar ? rootItem.bar.barBackground : rootItem.theme.surface1
-            font.family: rootItem.theme.fontMono
-            font.pixelSize: 7
-            font.bold: true
-        }
     }
 
     // Source-based: the panel compiles on first open, not with the bar (S1).
