@@ -15,7 +15,7 @@ set -uo pipefail
 prep() {
   local dir="$1"
   [ -w "$dir" ] && return 0
-  sudo mkdir -p "$dir" && sudo chown "$USER" "$dir"
+  sudo mkdir -p "$dir" && sudo chown "${USER:-$(id -un)}" "$dir"
 }
 
 # Only dirs for browsers actually present on this machine.

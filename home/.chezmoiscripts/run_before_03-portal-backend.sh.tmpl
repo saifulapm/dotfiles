@@ -16,7 +16,10 @@
 # portal file itself changed. Found 2026-08-06.)
 set -euo pipefail
 
-src="{{ .chezmoi.homeDir }}/.dotfiles/packages/qshell.portal"
+# workingTree, not a hardcoded ~/.dotfiles: with a non-default --source the
+# hardcoded path missed and the `[ -f ]` guard below made the portal
+# registration vanish silently (audit 2026-08-07).
+src="{{ .chezmoi.workingTree }}/packages/qshell.portal"
 dest=/usr/share/xdg-desktop-portal/portals/qshell.portal
 
 [ -f "$src" ] || exit 0

@@ -33,6 +33,15 @@ if ! sudo -v; then
   exit 0
 fi
 
+# This script's own interpreter: everything below — the dnf.conf edit and the
+# manifest parses — is python3, but dnf5 is C++ and drags no python in, so a
+# true minimal install can lack python3 entirely and the first heredoc would
+# abort the apply before a single package landed. Bootstrapped here exactly
+# like dnf5-plugins further down (and declared in the manifest for the
+# inventory's sake).
+rpm -q python3 >/dev/null 2>&1 \
+  || sudo dnf install --setopt=install_weak_deps=False -y python3
+
 # Weak deps off, globally and permanently. The per-command --setopt below
 # still applies as belt and braces, but the config file is what makes one-off
 # `sudo dnf install` invocations honour the policy too. Idempotent, and also
@@ -81,6 +90,13 @@ for p in m.get("pkg", []):
         print(p["name"])
 PY
 )
+
+# mapfile does not propagate the substituted python's exit status — a parse
+# failure would leave pkgs empty and hand dnf a bare `install` below. Refuse.
+if [ "${#pkgs[@]}" -eq 0 ]; then
+  echo "install-packages: manifest parse produced zero packages (python3/tomllib failure?) — aborting" >&2
+  exit 1
+fi
 
 for copr in "${coprs[@]}"; do
   sudo dnf copr enable -y "$copr"

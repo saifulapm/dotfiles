@@ -18,7 +18,12 @@ units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.
 state="$(systemctl --user is-system-running 2>/dev/null || true)"
 if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
   systemctl --user daemon-reload
-  systemctl --user enable --now "${units[@]}"
+  # Per unit, warn-don't-abort: one unit failing to start must not abort the
+  # apply (set -e) or keep the remaining units from being enabled.
+  for unit in "${units[@]}"; do
+    systemctl --user enable --now "$unit" 2>/dev/null \
+      || echo "user units: enable --now $unit failed — check systemctl --user status $unit" >&2
+  done
   echo "user units: ${units[*]} enabled"
   # The shell is Requisite=graphical-session.target, so `enable --now` with
   # the others would fail the whole script on a TTY-only apply: enable it

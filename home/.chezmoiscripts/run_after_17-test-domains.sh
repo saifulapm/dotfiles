@@ -116,20 +116,28 @@ fi
 
 # caddy's local CA, into the system trust store so browsers show a padlock.
 #
-# NOT `caddy trust` in the root call: that command reads and, if absent,
-# CREATES the CA in whatever HOME it is run under. As root it would either
-# mint a second CA in /root or — with HOME pointed at the user — leave
-# root-owned files in ~/.local/share/caddy that caddy-dev.service (a user
-# unit) could no longer write. So the CA is minted as the user below, and
-# root only copies the finished certificate.
+# The CA has to be MINTED as the user first — root only copies the finished
+# certificate (a root-side `caddy trust` would leave root-owned files under
+# ~/.local/share/caddy that the user unit could no longer write). And minting
+# means RUNNING caddy: `caddy trust` does not create a CA offline, it fetches
+# the root cert from the admin API of a running instance (verified v2.10.2 —
+# an earlier version of this script believed otherwise and the CA never
+# landed on a first apply, audit 2026-08-07). caddy-dev.service is
+# Type=notify, so the start below blocks until the config is loaded and the
+# local CA provisioned; StopWhenUnneeded then reaps the instance once we are
+# done with it.
 ca_src="$HOME/.local/share/caddy/pki/authorities/local/root.crt"
 ca_dst=/etc/pki/ca-trust/source/anchors/caddy-dev-local-ca.crt
 if command -v caddy >/dev/null 2>&1; then
-  if [ ! -f "$ca_src" ]; then
-    # Mints the CA under the user's own storage. The trust-store half of this
-    # command needs root and will fail here — that is fine and expected, the
-    # root call below is what installs it.
-    caddy trust >/dev/null 2>&1 || true
+  if [ ! -f "$ca_src" ] && systemctl --user daemon-reload 2>/dev/null; then
+    systemctl --user start caddy-dev.service 2>/dev/null \
+      || warn "could not start caddy-dev.service to mint the CA"
+    # Belt and braces: readiness should imply the CA exists, but give the
+    # filesystem a moment on a slow first start.
+    for _ in 1 2 3 4 5; do
+      [ -f "$ca_src" ] && break
+      sleep 1
+    done
   fi
   if [ -f "$ca_src" ] && stale "$ca_src" "$ca_dst"; then
     add "install -D -m 0644 '$ca_src' '$ca_dst'"

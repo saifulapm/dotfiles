@@ -57,6 +57,23 @@ if ! flock -n 9; then
   exit 0
 fi
 
+# Unconfigured is not an error either: on a fresh machine the timer's first
+# tick (OnStartupSec=3min) lands long before the documented manual
+# `rclone config` step, and without this guard that round raised a confusing
+# "Sync failed: didn't find section in config file" notification and left the
+# unit failed (audit 2026-08-07). Quiet skip; ok stays null (not false) so the
+# first real success never raises a phantom "Sync recovered" toast, and the
+# distinct errorKind names the state for anyone reading status.json.
+if ! rclone listremotes 2>/dev/null | grep -qx "${remote%%:*}:"; then
+  echo "qshell-sync: rclone remote ${remote%%:*}: not configured — skipped (run: rclone config)"
+  mkdir -p "$sync_dir"
+  tmp="$(mktemp "$status_file.XXXXXX")"
+  jq -cn --arg machine "$machine" --arg when "$(date -Is)" \
+    '{ok: null, machine: $machine, lastRun: $when, error: "rclone remote not configured", errorKind: "unconfigured", resynced: false}' >"$tmp"
+  mv "$tmp" "$status_file"
+  exit 0
+fi
+
 # Offline is not an error — the next round will catch up. Only a firm "none"
 # skips: "unknown" (connectivity checking disabled) must still try.
 if command -v nmcli >/dev/null 2>&1; then

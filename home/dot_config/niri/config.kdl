@@ -592,8 +592,9 @@ binds {
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
-    // For example, this is a standard bind to toggle the screen reader (orca).
-    Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
+    // The stock niri screen-reader bind (Super+Alt+S → orca) is pruned: orca
+    // is not installed here and a dead bind is worse than none (audit
+    // 2026-08-07). Reinstate alongside an `orca` manifest entry if needed.
 
     // Example volume keys mappings for PipeWire & WirePlumber.
     // The allow-when-locked=true property makes them work even when the session is locked.

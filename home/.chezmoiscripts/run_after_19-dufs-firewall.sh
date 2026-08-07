@@ -7,8 +7,14 @@
 # NUC's minimal install).
 set -uo pipefail
 
-command -v firewall-cmd >/dev/null 2>&1 || exit 0
-systemctl is-active --quiet firewalld 2>/dev/null || exit 0
+# Loud skips, like the rest of the suite: a machine without firewalld has
+# dufs's port open by definition (nothing filtering), but the operator should
+# know the assumed gate is absent. firewalld is in the manifest, so this
+# resolves itself once 00-install-packages has run and the service is up.
+command -v firewall-cmd >/dev/null 2>&1 \
+  || { echo "dufs-firewall: firewalld not installed (00-install-packages pending?) — nothing to open" >&2; exit 0; }
+systemctl is-active --quiet firewalld 2>/dev/null \
+  || { echo "dufs-firewall: firewalld installed but not running — port 5000 rule not added" >&2; exit 0; }
 
 # Runtime query is polkit-allowed for an active session ("yes"/"no" by exit
 # code) — good enough as the guard since this script is what sets both halves.

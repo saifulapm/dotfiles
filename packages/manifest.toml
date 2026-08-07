@@ -1,8 +1,9 @@
 # packages/manifest.toml — the single source of truth for what is installed and why.
 #
-# The chezmoi script .chezmoiscripts/run_onchange_before_install-packages.sh.tmpl
+# The chezmoi script .chezmoiscripts/run_before_00-install-packages.sh.tmpl
 # hashes this file, so editing it re-runs installation on every machine at the
-# next `chezmoi apply`.
+# next `chezmoi apply` (the hash is recorded only after dnf succeeds — a
+# sudo-less background apply stays pending, see the script header).
 #
 # Every dnf invocation uses --setopt=install_weak_deps=False, and the install
 # script enforces install_weak_deps=False in /etc/dnf/dnf.conf itself (it was
@@ -589,6 +590,36 @@ name = "bzip2"
 category = "dev"
 arch = "all"
 why = "tar -xjf in run_after_10-prebuilt-binaries.sh spawns the bzip2 binary for usql's .tar.bz2 release assets"
+
+[[pkg]]
+name = "NetworkManager-tui"
+category = "desktop"
+arch = "all"
+why = "nmtui — the network widget's middle-click drops into it (NetworkWidget.qml) for the wifi/VPN edits the panel does not cover. Was never declared, so under weak-deps-off the action opened a foot window that instantly closed (audit 2026-08-07)"
+
+[[pkg]]
+name = "xz"
+category = "dev"
+arch = "all"
+why = "tar -xJf in run_after_10-prebuilt-binaries.sh spawns the xz binary for watchexec's .tar.xz release asset — same class as bzip2 above; present transitively on most installs (dracut) but never guaranteed under weak-deps-off"
+
+[[pkg]]
+name = "python3"
+category = "core"
+arch = "all"
+why = "run_before_00's own manifest parser (tomllib, 3.11+) and the dropbox CLI on the NUC. dnf5 is C++ and drags no python in, so a minimal install can genuinely lack it; the install script bootstraps it before the first parse (chicken-and-egg, like dnf5-plugins) and this entry keeps the inventory honest"
+
+[[pkg]]
+name = "polkit"
+category = "core"
+arch = "all"
+why = "pkexec — the background-apply escalation route every root-ladder script (01/03/05/14/17/18/19) falls back to, and the daemon behind the shell's Polkit agent dialog. Present on any graphical Fedora but not guaranteed on minimal under weak-deps-off"
+
+[[pkg]]
+name = "firewalld"
+category = "core"
+arch = "all"
+why = "The firewall the dufs LAN gate assumes: run_after_19 opens TCP 5000 in it, and bin/dufs-serve's password-not-secret stance leans on the default zone dropping unsolicited ports. Fedora Workstation/Asahi ship it; a hand-rolled minimal install might not — declared so the NUC is never silently unfirewalled"
 
 [[pkg]]
 name = "rustup"
