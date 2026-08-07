@@ -269,6 +269,16 @@ BarPanel {
     property string passwordText: ""
     property string identityText: ""
 
+    // ConnectionFailReason values as a plain object, so the NetworkModel.js
+    // helpers stay pure JS.
+    readonly property var connectionFailReasons: ({
+            NoSecrets: ConnectionFailReason.NoSecrets,
+            WifiAuthTimeout: ConnectionFailReason.WifiAuthTimeout,
+            WifiNetworkLost: ConnectionFailReason.WifiNetworkLost,
+            WifiClientDisconnected: ConnectionFailReason.WifiClientDisconnected,
+            WifiClientFailed: ConnectionFailReason.WifiClientFailed
+        })
+
     readonly property bool busy: actionKind !== ""
 
     function isProtected(security) {
@@ -353,13 +363,7 @@ BarPanel {
             return;
         actionTimeout.stop();
         panel.failureSsid = panel.actionSsid;
-        panel.failureReason = Model.networkFailureReason(reason, {
-            NoSecrets: ConnectionFailReason.NoSecrets,
-            WifiAuthTimeout: ConnectionFailReason.WifiAuthTimeout,
-            WifiNetworkLost: ConnectionFailReason.WifiNetworkLost,
-            WifiClientDisconnected: ConnectionFailReason.WifiClientDisconnected,
-            WifiClientFailed: ConnectionFailReason.WifiClientFailed
-        });
+        panel.failureReason = Model.networkFailureReason(reason, panel.connectionFailReasons);
         panel.actionSsid = "";
         panel.actionKind = "";
         panel.refresh();
@@ -402,8 +406,19 @@ BarPanel {
         });
     }
 
+    // Disconnect from a row's SSID. Rows are primitive snapshots that can
+    // outlive their WifiNetwork, and disconnectNetwork()'s null fallback
+    // targets whatever is connected now, so a stale row must do nothing
+    // rather than hit an unrelated network. Callers that mean "drop the
+    // current connection" call disconnectNetwork().
+    function disconnectRow(ssid) {
+        const network = panel.networkForSsid(ssid);
+        if (network)
+            panel.disconnectNetwork(network);
+    }
+
     function forgetNetwork(row) {
-        panel.runNetworkAction("forget", row ? row.network : null, function (network) {
+        panel.runNetworkAction("forget", row ? panel.networkForSsid(row.ssid) : null, function (network) {
             network.forget();
         });
     }
@@ -785,8 +800,12 @@ BarPanel {
             panel.forgetNetwork(net);
             return;
         }
+        // Only act on a row that still resolves. disconnectNetwork() falls
+        // back to connectedWifiNetwork when handed null, so a row left stale
+        // by scan churn would otherwise tear down whatever is connected now
+        // instead.
         if (net.connected) {
-            panel.disconnectNetwork(net.network);
+            panel.disconnectRow(net.ssid);
             return;
         }
         if (panel.isProtected(net.security) && !net.known) {
@@ -1224,7 +1243,11 @@ BarPanel {
 
     Timer {
         id: actionTimeout
-        interval: 15000
+        // Must outlast NetworkManager's 25s supplicant timeout: a wrong saved
+        // PSK fails with WifiAuthTimeout at ~25s, and that failure has to
+        // land while the action is still tracked to show "Wrong password"
+        // and reopen the passphrase prompt.
+        interval: 30000
         onTriggered: {
             if (!panel.actionKind)
                 return;
@@ -1877,7 +1900,8 @@ BarPanel {
 
     // A single Wi-Fi network. Collapses to one line normally; expands inline
     // into a passphrase prompt when a protected network has no credentials
-    // yet. Clicking a connected row disconnects.
+    // yet, or when a connect fails because the saved passphrase is wrong.
+    // Clicking a connected row disconnects.
     component NetworkRow: CursorSurface {
         id: row
 
@@ -1940,27 +1964,31 @@ BarPanel {
             panel.ensureCursorVisible(row)
 
         Connections {
-            target: row.net ? row.net.network : null
+            target: row.net ? panel.networkForSsid(row.net.ssid) : null
 
             function onConnectionFailed(reason) {
-                panel.failNetworkAction(row.net.network, reason);
-                if (reason === ConnectionFailReason.NoSecrets)
+                // Background auto-connect retries fire this too; only reprompt
+                // for the connect started from this panel. Checked before
+                // failNetworkAction, which clears the action state.
+                const ours = panel.actionKind === "connect" && panel.actionSsid === (row.net.ssid || "");
+                panel.failNetworkAction(panel.networkForSsid(row.net.ssid), reason);
+                if (ours && Model.shouldRepromptPassphrase(reason, row.isSecured, panel.connectionFailReasons))
                     panel.openPasswordPrompt(row.net.ssid);
             }
 
             function onConnectedChanged() {
                 if (row.net)
-                    panel.checkActionCompletion(row.net.network);
+                    panel.checkActionCompletion(panel.networkForSsid(row.net.ssid));
             }
 
             function onKnownChanged() {
                 if (row.net)
-                    panel.checkActionCompletion(row.net.network);
+                    panel.checkActionCompletion(panel.networkForSsid(row.net.ssid));
             }
 
             function onStateChangingChanged() {
                 if (row.net)
-                    panel.checkActionCompletion(row.net.network);
+                    panel.checkActionCompletion(panel.networkForSsid(row.net.ssid));
             }
         }
 
@@ -1991,7 +2019,7 @@ BarPanel {
                     panel.setCursor("wifi", row.rowIndex);
                     panel.wifiActionFocused = false;
                     if (row.isConnected) {
-                        panel.disconnectNetwork(row.net.network);
+                        panel.disconnectRow(row.net.ssid);
                         return;
                     }
                     if (row.isSecured && !row.isKnown) {

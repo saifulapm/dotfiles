@@ -279,11 +279,15 @@ function formatPingLatency(ms, hasSamples) {
 }
 
 // -------------------------------------------------------------------- rows
+// Primitives only: rows become list-model data, so a WifiNetwork here would
+// put a live QObject wrapper in every delegate's var property. NetworkManager
+// churn (scans, AP removals) can destroy the object while a delegate is still
+// incubating, which segfaults quickshell in wrap_slowPath on the dangling
+// wrapper. Callers that need the object resolve it via networkForSsid().
 function wifiRow(network) {
     if (!network)
         return null;
     return {
-        network: network,
         connected: !!network.connected,
         known: !!network.known,
         ssid: network.name || "",
@@ -375,4 +379,16 @@ function networkFailureReason(reason, reasons) {
     if (reason === r.WifiClientFailed)
         return "Connection failed";
     return "Failed to connect";
+}
+
+// Whether a failed connect should reopen the passphrase prompt. NoSecrets
+// always means credentials are missing. An auth timeout on a protected
+// network means the saved passphrase is wrong (the same profile a first
+// failed attempt leaves behind as "known"), so the user needs a chance to
+// re-enter it — connectWithPsk overwrites the stored PSK on submit.
+function shouldRepromptPassphrase(reason, isProtected, reasons) {
+    const r = reasons || {};
+    if (reason === r.NoSecrets)
+        return true;
+    return !!isProtected && reason === r.WifiAuthTimeout;
 }
