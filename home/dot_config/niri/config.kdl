@@ -454,6 +454,19 @@ window-rule {
     default-window-height { fixed 540; }
 }
 
+// OAuth/sign-in popups (window.open) share the browser's app-id, so the
+// initial title is the only handle (observed live: "Sign in - Google
+// Accounts - Chromium"). Safe from false positives on the main window:
+// open-floating is evaluated once at open, and main windows open as
+// "New Tab"/session titles — navigating to a sign-in page later doesn't
+// re-trigger it. Floating popups keep their window.open size, no forced
+// geometry. (user ask 2026-08-07; not an omarchy port — omarchy force-
+// tiles chromium windows outright)
+window-rule {
+    match app-id="^chromium-browser$" title=r#"(?i)^(sign in|sign up|log in|login|authoriz|authenticat|continue with|verify)"#
+    open-floating true
+}
+
 // omarchy scrolls terminals 1.5× (input.lua: scroll_touchpad), multiplied
 // on top of the touchpad scroll-factor in the input section.
 window-rule {
@@ -503,6 +516,10 @@ binds {
     Mod+E hotkey-overlay-title="File Manager: yazi" { spawn "foot-run" "--app-id=qshell-float" "yazi"; }
     // omarchy: SUPER+SHIFT+N editor — $EDITOR (kak) in a foot window.
     Mod+Shift+N hotkey-overlay-title="Editor: kak" { spawn "foot-run" "kak"; }
+    // Emacs: raise the daemon's existing frame or make one — the same
+    // emacsclient invocation as the emacs.desktop override, so the key and
+    // the launcher entry behave identically (user ask 2026-08-07).
+    Mod+N hotkey-overlay-title="Editor: Emacs" { spawn "emacsclient" "--reuse-frame" "--alternate-editor="; }
     // omarchy: SUPER+ALT+RETURN tmux terminal — attach-or-create "main".
     Mod+Alt+Return hotkey-overlay-title="Terminal: tmux" { spawn "foot-run" "tmux" "new-session" "-A" "-s" "main"; }
     Mod+D hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
