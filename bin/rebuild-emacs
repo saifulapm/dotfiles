@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# rebuild-emacs — build Emacs 31 (master) into ~/.local with PGTK +
-# native-comp + tree-sitter, shadowing the emacs-pgtk rpm's 30.2 on PATH.
-# Fedora port of the Arch script of the same name: dnf's emacs-pgtk is
-# locked to stable, master is where the editor actually lives. Rerun any
-# time to roll forward to current master (run_after_20 only calls this
-# when ~/.local/bin/emacs is missing — an apply never surprise-rebuilds).
+# rebuild-emacs — build Emacs 31 (the emacs-31 release branch) into
+# ~/.local with PGTK + native-comp + tree-sitter, shadowing the emacs-pgtk
+# rpm's 30.2 on PATH. Fedora port of the Arch script of the same name:
+# dnf's emacs-pgtk is locked to stable. NOT master: the 31 branch cut has
+# already moved master on to 32.0.50 — building master here landed a
+# surprise Emacs 32 (2026-08-07); the user wants 31. Rerun any time to
+# roll forward to the branch tip (run_after_20 only calls this when
+# ~/.local/bin/emacs is missing — an apply never surprise-rebuilds).
 #
 # The systemd side: dot_config/systemd/user/emacs.service (chezmoi-managed)
 # points at /usr/bin/emacs; this script drops a machine-state override at
@@ -20,6 +22,7 @@ set -euo pipefail
 
 SRC="$HOME/.local/src/emacs"
 PREFIX="$HOME/.local"
+BRANCH="emacs-31"
 JOBS="$(($(nproc) - 1))"
 [ "$JOBS" -lt 1 ] && JOBS=1
 
@@ -43,12 +46,14 @@ fi
 # --- source -----------------------------------------------------------------
 if [ ! -d "$SRC/.git" ]; then
   mkdir -p "$(dirname "$SRC")"
-  echo "==> Cloning emacs upstream master (github mirror, faster than savannah)"
-  git clone --depth 1 https://github.com/emacs-mirror/emacs.git "$SRC"
+  echo "==> Cloning emacs upstream $BRANCH (github mirror, faster than savannah)"
+  git clone --depth 1 --branch "$BRANCH" https://github.com/emacs-mirror/emacs.git "$SRC"
 else
-  echo "==> Updating $SRC to origin/master"
-  git -C "$SRC" fetch --depth 1 origin master
-  git -C "$SRC" reset --hard origin/master
+  echo "==> Updating $SRC to origin/$BRANCH"
+  # FETCH_HEAD, not origin/$BRANCH: also handles a checkout that shallow-
+  # cloned a different branch (the original master clone jumping to 31).
+  git -C "$SRC" fetch --depth 1 origin "$BRANCH"
+  git -C "$SRC" reset --hard FETCH_HEAD
 fi
 
 cd "$SRC"
