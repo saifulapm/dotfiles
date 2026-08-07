@@ -1,0 +1,14 @@
+[Unit]
+Description=dufs file server (on-demand — the bar's dufs widget owns start/stop)
+
+[Service]
+ExecStart=%h/.dotfiles/bin/dufs-serve
+# The widget's whole read path: the flag file's content flips with the unit
+# and the shell's FileView watcher follows — no polling. Written, never
+# removed, so the watcher's read only ever fails (one log WARN) on a machine
+# that has never run dufs. (A power loss can strand an "on"; the widget's
+# is-active probes correct it.)
+ExecStartPost=/bin/sh -c 'mkdir -p %h/.local/state/qshell && printf on > %h/.local/state/qshell/dufs-on'
+ExecStopPost=/bin/sh -c 'printf off > %h/.local/state/qshell/dufs-on'
+
+# Deliberately no [Install]: nothing enables this — it runs only while asked.

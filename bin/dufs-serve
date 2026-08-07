@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# dufs-serve — the dufs file server behind the dufs.service user unit and the
+# bar's "dufs" widget. Serves $HOME over HTTP with basic auth on port 5000,
+# dotfiles hidden, upload+search allowed — the old Arch repo's contract, minus
+# always-on: the unit installs nowhere and runs only while the widget's
+# switch is on.
+#
+# The credentials live OUTSIDE the repo (it is public): a per-machine random
+# password is generated into ~/.local/state/dufs/auth (0600) on first use.
+# `dufs-serve ensure-auth` creates the file if missing and prints it — that
+# verb is how the widget panel reads the credentials.
+set -euo pipefail
+
+# The binary comes from cargo (run_after_09) and the user-manager PATH does
+# not always carry ~/.cargo/bin.
+PATH="$HOME/.cargo/bin:$PATH"
+
+auth_file="$HOME/.local/state/dufs/auth"
+
+ensure_auth() {
+  [ -f "$auth_file" ] && return
+  mkdir -p "${auth_file%/*}"
+  # od reads exactly 8 bytes — no SIGPIPE-under-pipefail like head-capped
+  # /dev/urandom pipelines.
+  pw="$(od -An -tx1 -N8 /dev/urandom | tr -d ' \n')"
+  (umask 077; printf 'DUFS_AUTH=%s:%s@/:rw\n' "$USER" "$pw" > "$auth_file")
+}
+
+case "${1:-serve}" in
+ensure-auth)
+  ensure_auth
+  cat "$auth_file"
+  ;;
+set-password)
+  # Explicit value, or a fresh random one when called bare. The widget's
+  # password controls come through here; a running server is restarted by
+  # the caller (dufs reads auth at process start only).
+  new="${2:-}"
+  [ -z "$new" ] && new="$(od -An -tx1 -N8 /dev/urandom | tr -d ' \n')"
+  case "$new" in
+  *[:@\ ]*)
+    echo "dufs-serve: password may not contain ':', '@' or spaces" >&2
+    exit 2
+    ;;
+  esac
+  mkdir -p "${auth_file%/*}"
+  (umask 077; printf 'DUFS_AUTH=%s:%s@/:rw\n' "$USER" "$new" > "$auth_file")
+  cat "$auth_file"
+  ;;
+serve)
+  ensure_auth
+  . "$auth_file"
+  exec dufs --bind 0.0.0.0 --port 5000 \
+    --auth "$DUFS_AUTH" \
+    --hidden '.*' \
+    --allow-upload --allow-search \
+    "$HOME"
+  ;;
+*)
+  echo "usage: dufs-serve [serve|ensure-auth]" >&2
+  exit 2
+  ;;
+esac

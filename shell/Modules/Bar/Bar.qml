@@ -587,6 +587,13 @@ Scope {
         return sharedService("devservices", devServicesServiceComponent, {});
     }
 
+    // No gate: the dufs service watches one flag file and probes only on
+    // startup, panel open and explicit refresh — nothing to scope to
+    // visibility.
+    function dufsService() {
+        return sharedService("dufs", dufsServiceComponent, {});
+    }
+
     // Keyed by widget id, not by type: "icloud" and "dropbox-rclone" are two
     // remotes, so they keep two services — one per remote, not per screen.
     function rcloneService(id, defaults) {
@@ -639,6 +646,11 @@ Scope {
     }
 
     Component {
+        id: dufsServiceComponent
+        DufsService {}
+    }
+
+    Component {
         id: rcloneServiceComponent
         RcloneRemoteService {}
     }
@@ -681,6 +693,7 @@ Scope {
             "monitor": monitorComponent,
             "dropbox": dropboxComponent,
             "devservices": devservicesComponent,
+            "dufs": dufsComponent,
             "icloud": icloudComponent,
             "dropbox-rclone": dropboxRcloneComponent,
             "tailscale": tailscaleComponent,
@@ -2017,6 +2030,14 @@ Scope {
         DevServices {
             theme: barRoot.theme
             devservices: barRoot.devServicesService()
+        }
+    }
+
+    Component {
+        id: dufsComponent
+        Dufs {
+            theme: barRoot.theme
+            dufs: barRoot.dufsService()
         }
     }
 
