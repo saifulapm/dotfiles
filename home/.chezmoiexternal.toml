@@ -24,6 +24,22 @@
     refreshPeriod = "0"
     include = ["*.ttf"]
 
+# Theme wallpapers: omarchy's per-theme backgrounds (the 22 themes in
+# themes/ are ports of theirs — colors credited in CREDITS.md), ~105 MB of
+# images that deliberately do NOT live in this repo's git history. Pinned to
+# the same commit as the ~/ref/omarchy research checkout on 2026-08-07.
+# stripComponents=2 drops "omarchy-<sha>/themes", so files land as
+# <theme>/backgrounds/<image> — the layout bin/background-next and
+# bin/theme-list read. User wallpapers go in ~/Pictures/Wallpapers instead;
+# this directory belongs to chezmoi.
+[".local/share/qshell/backgrounds"]
+    type = "archive"
+    url = "https://github.com/basecamp/omarchy/archive/fd1034f71b16aa45d5431ab41ed9e48c89fdac8e.tar.gz"
+    checksum.sha256 = "bf7491e56090813e180a569a1a53cd491472868e10adbb077ca40edfb1d34e9f"
+    refreshPeriod = "0"
+    stripComponents = 2
+    include = ["**/themes/*", "**/themes/*/backgrounds", "**/themes/*/backgrounds/*"]
+
 # forgit — interactive git with fzf. The mac loads it through sheldon (zsh);
 # here fish sources its fish port from this checkout (conf.d/30-forgit.fish).
 # Pinned to 26.01.0, the same rev the mac's sheldon plugins.toml pins.

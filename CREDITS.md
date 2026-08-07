@@ -971,6 +971,10 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
   Non-color tokens (shape/motion) in those files are ours. Muted/primary text
   colors may differ from the source where our contrast floor adjusted them.
+- **Theme wallpapers** from `themes/*/backgrounds/`: fetched verbatim as a
+  pinned chezmoi external (`home/.chezmoiexternal.toml`) into
+  `~/.local/share/qshell/backgrounds` — the images ship in omarchy's MIT repo
+  and are downloaded from there at apply time, never committed here.
 
 ## DankMaterialShell (MIT) — github.com/AvengeMedia/DankMaterialShell
 
