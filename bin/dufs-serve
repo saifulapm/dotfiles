@@ -7,7 +7,7 @@
 # Basic auth with the fixed password `developer` (user decision 2026-08-07,
 # replacing a per-machine random secret) — the repo is public, so this is a
 # deliberate convenience gate, not a secret: the unit is off unless started
-# on purpose, and LAN sits behind firewalld until port 5000 is opened.
+# on purpose (run_after_19 opens TCP 5000 in firewalld so LAN reaches it).
 set -euo pipefail
 
 # The binary comes from cargo (run_after_09) and the user-manager PATH does
