@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Omarchy's Qt Quick apps — omacalc (calculator), omawrite (writer), omacut
-# (video trimmer) — built from source (MIT, github.com/omacom-io) with ONE
-# patch: the two hardcoded omarchy theme-path literals in src/backend.cpp are
-# pointed at ~/.local/state/qshell/oma-theme.toml, which templates/
+# (video trimmer) — built from source (MIT, github.com/omacom-io) with TWO
+# patches: (1) the two hardcoded omarchy theme-path literals in src/backend.cpp
+# are pointed at ~/.local/state/qshell/oma-theme.toml, which templates/
 # oma-theme.toml.tmpl emits from the active theme on every theme-apply. Their
 # QFileSystemWatcher re-tints live, so the apps follow this desktop's theme
-# switcher natively (user decision 2026-08-07, all three).
+# switcher natively (user decision 2026-08-07, all three). (2) omacut's export
+# encoder libx264 → libopenh264: ffmpeg-free (the manifest's patent-clean
+# choice) ships no libx264, so exports died with 'Unknown encoder' (2026-08-07).
 #
 # Guarded per app; warn-don't-abort. Needs qmake6 (qt6-qtbase-devel) and the
 # QML dev stack (qt6-qtdeclarative-devel) from the manifest. omacut also wants
@@ -41,6 +43,15 @@ build_app() {
     -e 's|/.local/state/omarchy/current|/.local/state/qshell|g' \
     -e 's|/colors.toml|/oma-theme.toml|g' \
     "$src/src/backend.cpp" 2>/dev/null || true
+
+  # omacut only (the file exists in no other app): ffmpeg-free has no libx264,
+  # so the export encoder becomes libopenh264 — high profile, 8M soft ceiling
+  # (openh264 undershoots hard on static screencast content). -preset/-crf are
+  # libx264 private options that libopenh264 rejects, so they go too.
+  sed -i \
+    -e 's|"libx264" << "-preset" << "veryfast"|"libopenh264" << "-profile:v" << "high"|g' \
+    -e 's|"-crf" << "18"|"-b:v" << "8M"|g' \
+    "$src/src/ffmpeg.cpp" 2>/dev/null || true
 
   echo "oma-apps: building $app (first run only)"
   local build="$src/build"
