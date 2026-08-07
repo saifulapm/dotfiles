@@ -1132,8 +1132,8 @@ why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-
 
 [[tool]]
 name = "dufs-server"
-via  = "dufs.service user unit (home/dot_config/systemd/user, no [Install] — on-demand only) + bin/dufs-serve + the bar's dufs widget: $HOME over HTTP with basic auth on port 5000, dotfiles hidden, upload+search allowed; per-machine credentials generated into ~/.local/state/dufs/auth (0600) on first start — never in the repo (it is public)"
-why  = "The old Arch repo's phone-over-LAN file server (dufs serving $HOME behind basic auth) rebuilt under the no-always-on constraint (user request 2026-08-07): nothing enables the unit, it runs only while the widget's switch is on, and unit start/stop flips ~/.local/state/qshell/dufs-on so the widget's state watch never polls. HTTPS dropped with the mkcert dependency — the old cert was self-signed noise on a phone anyway; add mkcert back if that changes"
+via  = "dufs.service user unit (home/dot_config/systemd/user, no [Install] — on-demand only) + bin/dufs-serve + the bar's dufs widget: $HOME over HTTP with basic auth on port 5000, dotfiles hidden, upload+search allowed; sign-in = $USER with the FIXED password `developer` (user decision 2026-08-07, replacing a short-lived per-machine random ~/.local/state/dufs/auth mechanism)"
+why  = "The old Arch repo's phone-over-LAN file server (dufs serving $HOME behind basic auth) rebuilt under the no-always-on constraint (user request 2026-08-07): nothing enables the unit, it runs only while the widget's switch is on, and unit start/stop flips ~/.local/state/qshell/dufs-on so the widget's state watch never polls. The fixed password in a PUBLIC repo is a deliberate convenience gate, not a secret — off by default, LAN behind firewalld until port 5000 is opened. HTTPS dropped with the mkcert dependency — the old cert was self-signed noise on a phone anyway; add mkcert back if that changes"
 
 [[tool]]
 name = "php-multiversion"

@@ -174,7 +174,7 @@ BarPanel {
     // --------------------------------------------------------------- footer
     Text {
         width: parent.width
-        text: "Runs only while the switch is on. Serves your home folder over HTTP — dotfiles hidden, uploads allowed — behind these credentials, which live on this machine and never in the repo."
+        text: "Runs only while the switch is on. Serves your home folder over HTTP — dotfiles hidden, uploads allowed — behind the sign-in above."
         color: panel.theme.textMuted
         font.family: panel.theme.fontUi
         font.pixelSize: panel.theme.fontPx(0.75)

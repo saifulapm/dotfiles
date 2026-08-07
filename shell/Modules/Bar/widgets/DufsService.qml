@@ -4,16 +4,16 @@ import Quickshell.Io
 
 // Dufs service — ours, in the shape of DevServicesService: it owns everything
 // the widget and the panel read about the on-demand dufs file server
-// (bin/dufs-serve behind the dufs.service user unit — $HOME over HTTP with
-// basic auth on port 5000, per-machine credentials generated outside the
-// public repo). ONE instance however many screens carry the widget (S2).
+// (bin/dufs-serve behind the dufs.service user unit — $HOME over HTTP on
+// port 5000, basic auth with the fixed password `developer`). ONE instance
+// however many screens carry the widget (S2).
 //
 // State observation is event-driven, never polled: the unit's
 // ExecStartPost/ExecStopPost write "on"/"off" into
 // ~/.local/state/qshell/dufs-on and the FileView watcher follows the content.
 // One-shot probes cover what the flag cannot say: presence at startup
 // plus one stale-flag reconcile, and — on panel open only — the unit's own
-// word, the credentials, and the addresses the URLs are built from.
+// word and the addresses the URLs are built from.
 QtObject {
     id: root
 
@@ -33,8 +33,10 @@ QtObject {
     readonly property bool active: pending === "starting" ? true : (pending === "stopping" ? false : running)
 
     readonly property int port: 5000
-    property string authUser: ""
-    property string authPassword: ""
+    // Fixed sign-in (user decision 2026-08-07): whatever bin/dufs-serve
+    // bakes — $USER and `developer` — so there is nothing to probe.
+    readonly property string authUser: Quickshell.env("USER") || ""
+    readonly property string authPassword: "developer"
     property string lanIp: ""
     property string tailscaleIp: ""
     readonly property string localUrl: "http://127.0.0.1:" + port
@@ -46,10 +48,8 @@ QtObject {
     property string lastError: ""
 
     readonly property string flagPath: Quickshell.env("HOME") + "/.local/state/qshell/dufs-on"
-    readonly property string helperPath: Quickshell.env("HOME") + "/.dotfiles/bin/dufs-serve"
 
     property string _unitOutput: ""
-    property string _authOutput: ""
     property string _addrOutput: ""
     property string _controlError: ""
 
@@ -80,17 +80,11 @@ QtObject {
         }
     }
 
-    // Adds what only the panel shows: the credentials (created on first ask)
-    // and the LAN/tailscale addresses.
+    // Adds what only the panel shows: the LAN/tailscale addresses.
     function refreshDetails() {
         refresh();
         if (!probed || !installed)
             return;
-        if (!authProcess.running) {
-            _authOutput = "";
-            authProcess.command = cmd([helperPath, "ensure-auth"]);
-            authProcess.running = true;
-        }
         if (!addrProcess.running) {
             _addrOutput = "";
             addrProcess.command = cmd(["bash", "-c", "lan=$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \\([0-9.]*\\).*/\\1/p' | sed -n 1p); ts=$(tailscale ip -4 2>/dev/null | sed -n 1p); printf '%s\\n%s\\n' \"$lan\" \"$ts\""]);
@@ -102,12 +96,6 @@ QtObject {
         running = on;
         if ((pending === "starting" && on) || (pending === "stopping" && !on))
             pending = "";
-    }
-
-    function parseAuth(raw) {
-        const match = String(raw || "").match(/DUFS_AUTH=([^:]+):([0-9a-f]+)@/);
-        authUser = match ? match[1] : "";
-        authPassword = match ? match[2] : "";
     }
 
     function parseAddresses(raw) {
@@ -196,26 +184,6 @@ QtObject {
             root.refreshing = false;
             const out = String(unitStdout.text || root._unitOutput || "").trim().split("\n")[0];
             root.applyFlag(out === "active" || out === "activating");
-        }
-    }
-
-    readonly property Process authProcess: Process {
-        running: false
-        command: []
-        stdout: StdioCollector {
-            id: authStdout
-            waitForEnd: true
-            onStreamFinished: root._authOutput = text
-        }
-        onExited: exitCode => {
-            if (exitCode === 0) {
-                root.parseAuth(String(authStdout.text || root._authOutput || ""));
-                if (root.authUser !== "")
-                    root.lastError = "";
-            } else {
-                root.parseAuth("");
-                root.lastError = "Could not read the dufs credentials";
-            }
         }
     }
 
