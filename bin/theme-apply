@@ -179,7 +179,8 @@ const OUTPUTS = {
   ],
   "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")],
   "oma-theme.toml.tmpl": [path.join(HOME, ".local/state/qshell/oma-theme.toml")],
-  "yazi-theme.toml.tpl": [path.join(HOME, ".config/yazi/theme.toml")]
+  "yazi-theme.toml.tpl": [path.join(HOME, ".config/yazi/theme.toml")],
+  "tmux-theme.tmpl": [path.join(HOME, ".config/tmux/theme.conf")]
 }
 
 let gtkSettingsChanged = false
