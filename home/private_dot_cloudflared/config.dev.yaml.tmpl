@@ -1,0 +1,42 @@
+# cloudflared dev tunnel (managed by chezmoi) — port of the mac
+# ~/.cloudflared/config.dev.yaml, 2026-08-07. The cloudflared binary itself is
+# already installed by .chezmoiscripts/run_after_10-prebuilt-binaries.sh.
+#
+# THE CREDENTIALS ARE NOT IN THIS REPO, and must not be. The mac directory
+# holds two more files beside this one:
+#
+#   cert.pem                  the account-wide origin certificate — a PEM
+#                             PRIVATE KEY
+#   <tunnel-id>.json          the tunnel credentials (AccountTag +
+#                             TunnelSecret)
+#
+# Both are secrets and this is a git repo with a GitHub remote, so both are
+# deliberately skipped. Nothing in this repo is age-encrypted today, so there
+# is no encrypted path to put them on either. Restore them by hand, the same
+# way ~/.ssh is restored (see README, "What stays manual, honestly"):
+#
+#   rclone copy iCloud:.dotfiles/home/.cloudflared ~/.cloudflared \
+#     --include cert.pem --include '*.json'
+#   chmod 600 ~/.cloudflared/cert.pem ~/.cloudflared/*.json
+#
+# Until that is done, `cloudflared tunnel --config ~/.cloudflared/config.dev.yaml run`
+# exits on the missing credentials file. The routing below is the only part
+# this repo manages.
+#
+# Linux delta from the mac file: credentials-file pointed at /Users/saiful/…,
+# which does not exist here. chezmoi templates this machine's home directory in
+# — cloudflared does not expand `~` or environment variables in this field, so
+# it has to be a real absolute path.
+tunnel: 9340ed70-a135-4ed7-a5d8-d63371d366c9
+credentials-file: {{ .chezmoi.homeDir }}/.cloudflared/9340ed70-a135-4ed7-a5d8-d63371d366c9.json
+
+ingress:
+  - hostname: dev.ecommercestaff.com
+    service: http://localhost:8000
+  - hostname: vite.ecommercestaff.com
+    service: http://localhost:5173
+  - hostname: next.ecommercestaff.com
+    service: http://localhost:3000
+  - hostname: worker.ecommercestaff.com
+    service: http://localhost:8787
+  - service: http_status:404

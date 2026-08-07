@@ -44,6 +44,13 @@ fetches the fonts (pinned externals) and bootstraps the default theme.
 - Dropbox linking, NUC only: `dropbox start` prints the login URL (the
   daemon and CLI install themselves; the Macs get nothing — no aarch64
   Dropbox exists).
+- cloudflared tunnel credentials — `~/.cloudflared/config.dev.yaml` is
+  managed, but `cert.pem` (a PEM private key) and the tunnel's
+  `<uuid>.json` (AccountTag + TunnelSecret) are secrets and stay out of the
+  repo. Restore them like `~/.ssh`:
+  `rclone copy iCloud:.dotfiles/home/.cloudflared ~/.cloudflared --include
+  cert.pem --include '*.json'` then `chmod 600 ~/.cloudflared/cert.pem
+  ~/.cloudflared/*.json`. Without them the tunnel will not start.
 - voxtype (dictation): manual binary download from
   github.com/peteonrails/voxtype/releases into `~/.local/bin`, then
   `voxtype setup --download --model base.en && voxtype setup systemd`.
