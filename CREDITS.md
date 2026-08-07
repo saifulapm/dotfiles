@@ -1483,3 +1483,12 @@ Direct file-level copies (source path → destination path):
   power-profiles wired to bin/power-profile. omarchy-powerprofiles-set/-list
   → bin/power-profile (near-verbatim: per-source state files, UPower
   OnBattery autodetect, availability guards, ac→performance default).
+- omarchy `default/bash/fns/{ssh-port-forwarding,rsyncing,tmux}` → fish
+  functions `fip/dip/lip`, `rsw/lsw/dsw`, `tdl/tds/tdlm/tsl` (2026-08-08,
+  user pick): logic theirs — the ControlMaster-per-host rsw socket, the
+  detached inotifywait loop kept as a bash one-liner under setsid, the tmux
+  pane choreography with -P -F pane-id capture. Deviations: tdl's stray
+  `$opencode_pane` select lands on the editor as intended; tds's
+  nvim/hunk/opencode hardcodes became $EDITOR / watchexec-driven git diff /
+  claude (what this machine actually runs); app-run (same day) is the slice
+  half of the uwsm-app pattern their AppLibrary launches through.

@@ -262,6 +262,12 @@ arch = "all"
 why = "Terminal system monitor the user actually reaches for (bash history shows regular use). Installed by hand 2026-08-05, recorded 2026-08-06"
 
 [[pkg]]
+name = "inotify-tools"
+category = "optional"
+arch = "all"
+why = "inotifywait drives the rsw rsync-on-change watcher (fish functions rsw/lsw/dsw, ports of omarchy's bash fns — user-picked 2026-08-08). Without it rsw degrades to the initial one-shot rsync and the watch loop exits"
+
+[[pkg]]
 name = "yaru-icon-theme"
 category = "core"
 arch = "all"
