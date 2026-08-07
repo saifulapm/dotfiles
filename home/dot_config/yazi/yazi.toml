@@ -32,6 +32,9 @@ open = [
 browser = [
 	{ run = 'chromium-browser "$@"', orphan = true, desc = "Open in Chromium", for = "unix" },
 ]
+evince = [
+	{ run = 'evince "$@"', orphan = true, desc = "Open in Evince", for = "unix" },
+]
 add-sub = [
   { run  = ''' echo sub-add "'$0'" | socat - /tmp/mpv.sock ''', desc = "Add sub to MPV" },
 ]
@@ -60,8 +63,8 @@ rules = [
 	{ mime = "audio/*", use = [ "play", "reveal" ] },
 	{ mime = "image/*", use = [ "open", "browser", "reveal" ] },
 
-	# PDF opens with evince (via mimeapps); Chromium as the alternate viewer
-	{ mime = "application/pdf", use = [ "open", "browser" ] },
+	# PDF: default via mimeapps (zathura), with the fallbacks as explicit picks
+	{ mime = "application/pdf", use = [ "open", "evince", "browser" ] },
 
 	# Common config files
 	{ url = "*.json", use = "edit" },
