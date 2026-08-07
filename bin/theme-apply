@@ -38,7 +38,23 @@ function parseToml(raw) {
 }
 
 const themeTokens = parseToml(fs.readFileSync(STATE, "utf8"))
-const tokens = Object.assign({}, THEME_DEFAULTS, themeTokens)
+
+// Machine-level overrides, exactly as Services/Theme.qml layers them: the
+// same ~/.config/qshell/theme-override.toml wins over the active theme, so a
+// per-machine tweak (bin/text-size writes [font] size there) reaches the
+// TEMPLATED apps too, not just the shell — before this the shell scaled and
+// foot/GTK stayed put.
+let overrideTokens = {}
+try {
+  overrideTokens = parseToml(fs.readFileSync(path.join(HOME, ".config/qshell/theme-override.toml"), "utf8"))
+} catch (e) { /* no override file — the common case */ }
+
+const tokens = Object.assign({}, THEME_DEFAULTS, themeTokens, overrideTokens)
+
+// The theme's own base size, pre-override: the GTK settings.ini font pins to
+// this so text scaling flows through ONE channel (text-scaling-factor below)
+// instead of compounding with a scaled gtk-font-name.
+tokens["font.size-base"] = String(themeTokens["font.size"] !== undefined ? themeTokens["font.size"] : THEME_DEFAULTS["font.size"] || 12)
 
 // Same font precedence Services/Theme.qml applies, so the shell and the
 // templated app configs never disagree: a theme that names the token wins; one
@@ -53,10 +69,40 @@ const tokens = Object.assign({}, THEME_DEFAULTS, themeTokens)
   } catch (e) { /* no fontconfig; keep the builtin defaults */ }
   if (resolved) {
     for (const token of ["font.ui", "font.mono"]) {
-      if (themeTokens[token] === undefined) tokens[token] = resolved
+      if (themeTokens[token] === undefined && overrideTokens[token] === undefined)
+        tokens[token] = resolved
     }
   }
 }
+
+// ---- text-size derivations (omarchy-display-text-size port, CREDITS.md) ----
+// One knob: [font] size in the override file (bin/text-size writes it).
+// Anchors follow the foot metrics commit: token 12 == foot 12.5pt / 32px
+// line-height == GTK factor 1.0. Terminal sizes are derived here so the foot
+// template scales with the knob instead of hardcoding the pair.
+{
+  const base = Number(tokens["font.size-base"]) || 12
+  const size = Number(tokens["font.size"]) || base
+  const ratio = size / base
+  tokens["font.foot-pt"] = String(Math.round(12.5 * ratio * 10) / 10)
+  tokens["font.foot-line-height"] = String(Math.max(1, Math.round(32 * ratio)))
+
+  // GTK: the interface fonts are ours (set below), so the factor's
+  // quantization anchor is our own base — rounded so the effective interface
+  // font lands on a whole point size (omarchy's fix for GTK4 menus clipping
+  // ascenders on raw ratios). Always written: 1.0000 on reset IS the reset.
+  const factor = (Math.round(base * ratio) / base).toFixed(4)
+  try {
+    execSync(`gsettings set org.gnome.desktop.interface font-name "${tokens["font.ui"]} ${base}"`, { stdio: "ignore" })
+    execSync(`gsettings set org.gnome.desktop.interface monospace-font-name "${tokens["font.mono"]} ${base}"`, { stdio: "ignore" })
+    execSync(`gsettings set org.gnome.desktop.interface text-scaling-factor ${factor}`, { stdio: "ignore" })
+  } catch (e) { /* gsettings absent or no session bus */ }
+}
+
+// Per-theme GTK icon theme, resolved once — the settings.ini template and the
+// gsettings flip below must agree. (meta.mode read inline: `mode` is declared
+// further down, past this block's runtime.)
+tokens["icon.resolved"] = String(tokens["icon.theme"] || (String(tokens["meta.mode"]) === "light" ? "Yaru" : "Yaru-dark"))
 
 // The shell watches two files that may not exist yet on a fresh checkout
 // (~/.config/qshell/theme-override.toml and the chezmoi-managed fontconfig
@@ -261,9 +307,10 @@ try {
   // Per-theme GTK icon theme (omarchy gap item 6): themes carry icon.theme
   // (omarchy's icons.theme files, Yaru color variants — the Fedora
   // yaru-icon-theme rpm ships every variant in one package); themes without
-  // the token follow polarity on the neutral Yaru pair. New GTK apps only,
+  // the token follow polarity on the neutral Yaru pair. Resolved once up top
+  // (icon.resolved) so this flip and settings.ini agree. New GTK apps only,
   // like the gtk-theme flip above.
-  const iconTheme = String(tokens["icon.theme"] || (mode === "light" ? "Yaru" : "Yaru-dark"))
+  const iconTheme = String(tokens["icon.resolved"])
   if (/^[A-Za-z0-9._-]+$/.test(iconTheme))
     execSync(`gsettings set org.gnome.desktop.interface icon-theme "${iconTheme}"`, { stdio: "ignore" })
 } catch (e) { /* gsettings absent or no session bus */ }

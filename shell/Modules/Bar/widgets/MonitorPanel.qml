@@ -93,6 +93,8 @@ BarPanel {
         backlights = state.backlights;
         ddcOutputs = state.ddc || [];
         nightLightAvailable = state.nightLight;
+        if (state.textSize > 0)
+            textSize = state.textSize;
 
         // Adopt the hardware's values only for devices with no write in
         // flight — otherwise a probe landing mid-drag snaps the knob back.
@@ -118,7 +120,7 @@ BarPanel {
 
     Process {
         id: stateProc
-        command: ["bash", "-c", "echo '##outputs'; niri msg --json outputs; echo '##focused'; niri msg --json focused-output; echo '##backlights'; brightnessctl -lm --class=backlight 2>/dev/null; echo '##ddc'; if command -v ddcutil >/dev/null 2>&1; then niri msg --json outputs | jq -r 'keys[]' | while read -r o; do case \"$o\" in eDP*|LVDS*|DSI*) ;; *) p=$(brightness-display-ddc \"$o\" 2>/dev/null) && echo \"$o $p\";; esac; done; fi; echo '##nightlight'; command -v wlsunset >/dev/null && echo yes"]
+        command: ["bash", "-c", "echo '##outputs'; niri msg --json outputs; echo '##focused'; niri msg --json focused-output; echo '##backlights'; brightnessctl -lm --class=backlight 2>/dev/null; echo '##ddc'; if command -v ddcutil >/dev/null 2>&1; then niri msg --json outputs | jq -r 'keys[]' | while read -r o; do case \"$o\" in eDP*|LVDS*|DSI*) ;; *) p=$(brightness-display-ddc \"$o\" 2>/dev/null) && echo \"$o $p\";; esac; done; fi; echo '##textsize'; text-size --value 2>/dev/null; echo '##nightlight'; command -v wlsunset >/dev/null && echo yes"]
         stdout: StdioCollector {
             waitForEnd: true
             onStreamFinished: panel.applyState(text)
@@ -242,14 +244,36 @@ BarPanel {
 
     readonly property var scaleValues: scalePresets
 
+    // Sections that make no sense on this hardware are HIDDEN outright, not
+    // rendered disabled with an explanation (user call 2026-08-07): VRR only
+    // when the focused display reports support, night light only when
+    // wlsunset exists AND the display has a gamma table to move.
+    readonly property bool vrrShown: !!(focusedOutput && focusedOutput.vrr_supported)
+    readonly property bool nightLightShown: nightLightUsable && (!nightlight || nightlight.gammaSupported !== false)
+
+    // The desktop text-size knob (bin/text-size, omarchy's display-text-size).
+    readonly property int textSizeMin: 9
+    readonly property int textSizeMax: 20
+    property int textSize: 12
+
+    function stepTextSize(delta) {
+        const next = Math.max(textSizeMin, Math.min(textSizeMax, textSize + delta));
+        if (next === textSize)
+            return;
+        textSize = next;
+        Quickshell.execDetached(["text-size", String(next)]);
+        settleTimer.restart();
+    }
+
     readonly property var visibleSections: {
         const list = [];
         if (brightnessRows.length > 0)
             list.push("brightness");
         list.push("scale");
-        if (focusedOutput && focusedOutput.vrr_supported)
+        list.push("textsize");
+        if (vrrShown)
             list.push("vrr");
-        if (nightLightUsable)
+        if (nightLightShown)
             list.push("nightlight");
         if (outputs.length > 1)
             list.push("displays");
@@ -261,7 +285,7 @@ BarPanel {
             return brightnessRows.length;
         if (section === "scale")
             return scaleValues.length;
-        if (section === "vrr" || section === "nightlight")
+        if (section === "vrr" || section === "nightlight" || section === "textsize")
             return 1;
         if (section === "displays")
             return outputs.length;
@@ -270,7 +294,7 @@ BarPanel {
 
     // The scale pills sit side by side, so j/k treats them as one row.
     function sectionIsSingleRow(section) {
-        return section === "scale" || section === "vrr" || section === "nightlight";
+        return section === "scale" || section === "vrr" || section === "nightlight" || section === "textsize";
     }
 
     function moveCursor(delta) {
@@ -312,6 +336,10 @@ BarPanel {
             const row = brightnessRows[selectedIndex];
             if (row)
                 commitBrightness(row.device, percentFor(row.device) + delta * 5);
+            return;
+        }
+        if (focusSection === "textsize") {
+            stepTextSize(delta);
             return;
         }
         if (focusSection === "scale")
@@ -558,10 +586,73 @@ BarPanel {
         theme: panel.theme
     }
 
-    // ----------------------------------------------------------------- vrr
+    // ------------------------------------------------------------ text size
+    // The desktop-wide knob (omarchy's TEXT SIZE stepper): shell, foot, GTK
+    // and Emacs scale together through bin/text-size.
     Column {
         width: parent.width
         spacing: panel.theme.space(2)
+
+        Item {
+            width: parent.width
+            height: textSizeHeader.implicitHeight
+
+            SectionHeader {
+                id: textSizeHeader
+                theme: panel.theme
+                width: parent.width
+                anchors.left: parent.left
+                label: "TEXT SIZE"
+            }
+
+            Text {
+                anchors.right: parent.right
+                text: panel.textSize + " px"
+                color: panel.theme.textMuted
+                font.family: panel.theme.fontMono
+                font.pixelSize: panel.theme.fontPx(0.75)
+            }
+        }
+
+        Row {
+            id: textSizeRow
+
+            readonly property real cellWidth: (width - panel.theme.space(1.5)) / 2
+
+            width: parent.width
+            spacing: panel.theme.space(1.5)
+
+            Pill {
+                width: textSizeRow.cellWidth
+                label: "−"
+                selectable: panel.textSize > panel.textSizeMin
+                hasCursor: panel.cursorActive && panel.focusSection === "textsize"
+                onHovered: panel.takeCursor("textsize", 0)
+                onActivated: panel.stepTextSize(-1)
+            }
+
+            Pill {
+                width: textSizeRow.cellWidth
+                label: "+"
+                selectable: panel.textSize < panel.textSizeMax
+                onHovered: panel.takeCursor("textsize", 0)
+                onActivated: panel.stepTextSize(1)
+            }
+        }
+    }
+
+    Separator {
+        theme: panel.theme
+        visible: panel.vrrShown
+    }
+
+    // ----------------------------------------------------------------- vrr
+    // Hidden outright on displays that report no support (user call
+    // 2026-08-07 — no disabled pills with an excuse note).
+    Column {
+        width: parent.width
+        spacing: panel.theme.space(2)
+        visible: panel.vrrShown
 
         SectionHeader {
             theme: panel.theme
@@ -600,23 +691,20 @@ BarPanel {
                     panel.setVrr(panel.focusedOutput.name, true)
             }
         }
-
-        InfoNote {
-
-            theme: panel.theme
-            visible: !(panel.focusedOutput && panel.focusedOutput.vrr_supported)
-            text: "This display does not report variable refresh rate support."
-        }
     }
 
     Separator {
         theme: panel.theme
+        visible: panel.nightLightShown
     }
 
     // ---------------------------------------------------------- night light
+    // Same hide-when-unsupported rule: no wlsunset, or a display with no
+    // gamma table (this MacBook's panel), and the section is simply absent.
     Column {
         width: parent.width
         spacing: panel.theme.space(2)
+        visible: panel.nightLightShown
 
         SectionHeader {
             theme: panel.theme
@@ -650,19 +738,6 @@ BarPanel {
                 hasCursor: panel.cursorActive && panel.focusSection === "nightlight" && panel.selectedIndex === 0
                 onHovered: panel.takeCursor("nightlight", 0)
                 onActivated: panel.setNightLight(true)
-            }
-        }
-
-        InfoNote {
-
-            theme: panel.theme
-            visible: text !== ""
-            text: {
-                if (!panel.nightLightAvailable)
-                    return "wlsunset is not installed, so night light cannot be switched.";
-                if (panel.nightlight && !panel.nightlight.gammaSupported)
-                    return "This display reports no gamma table, so wlsunset runs but the colors do not change.";
-                return "";
             }
         }
     }

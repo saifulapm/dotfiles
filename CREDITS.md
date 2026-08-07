@@ -1447,3 +1447,15 @@ Direct file-level copies (source path → destination path):
   word characters, so the word-bounded launch-or-focus match can never hit
   them — and an X-Qshell-WebApp/-TUI marker in the .desktop so the remove
   pickers only ever offer entries these scripts created.
+- omarchy `bin/omarchy-display-text-size` → `bin/text-size` +
+  `bin/theme-apply`'s text-size derivations (2026-08-07, user ask): their
+  one-knob design — px size upserted into the USER OVERRIDE the shell
+  watches (ours: ~/.config/qshell/theme-override.toml `[font] size`), GTK
+  driven as a text-scaling-factor QUANTIZED so the interface font lands on
+  a whole point size, terminal point size derived from the same anchor
+  (ours: the foot 12.5pt/32px tuned pair scales as a unit), and the
+  foot-cannot-reload nudge with the replaces-id toast trick. Ours on top:
+  the derivations live in theme-apply (so plain theme switches re-derive
+  too), Emacs follows over an emacsclient poke (emacs.d reads the same
+  file), and the Display panel carries the stepper omarchy puts in their
+  monitor panel.

@@ -2,9 +2,9 @@
 # screenshot-ocr — select a region with slurp, OCR it with tesseract, copy
 # the recognized text to the clipboard.
 #
-# Port of the pre-qshell dotfiles-linux script, minus its wayfreeze screen
-# freeze (not packaged for Fedora) — slurp draws over the live screen, which
-# is how bin/screenrecord's region pick already works.
+# Port of the pre-qshell dotfiles-linux script. Its wayfreeze screen freeze
+# is back as of 2026-08-07 (cargo-built, presence-gated below) — without the
+# binary, slurp draws over the live screen as before.
 #
 # Set OCR_LANGS to override (e.g. "eng+deu"); needs the matching
 # tesseract-langpack-* packages.
@@ -17,6 +17,16 @@ notify() {
 if ! command -v tesseract >/dev/null 2>&1; then
   notify "tesseract is not installed" 3000
   exit 1
+fi
+
+# Freeze while picking (wayfreeze, presence-gated — see screenshot-annotate);
+# grim reads the frozen overlay, the EXIT trap covers every early return.
+freeze_pid=""
+if command -v wayfreeze >/dev/null 2>&1; then
+  wayfreeze --hide-cursor &
+  freeze_pid=$!
+  trap '[[ -n $freeze_pid ]] && kill "$freeze_pid" 2>/dev/null || true' EXIT
+  sleep 0.15
 fi
 
 region="$(slurp 2>/dev/null)" || exit 0

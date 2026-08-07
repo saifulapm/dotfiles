@@ -2,14 +2,15 @@
 # Only deviations from foot 1.27 defaults live here; everything else (TERM=foot,
 # url mode, mouse bindings) is deliberately stock. See foot.ini(5).
 [main]
-# The Arch config's tuned pair: 12.5pt glyphs in a 32px cell (~40% leading).
-# At this machine's 1.25 scale that lands within 2 physical px of the Emacs
-# look (12pt/16px glyphs, 33px line = natural height + 50% line-spacing, per
-# emacs.d setup-fonts). Points beat the old pixelsize={{font.size}}: they stay
-# proportional under any output scale. Size and line-height are a pair —
-# change one, retune the other.
-font={{font.mono}}:size=12.5
-line-height=32px
+# The Arch config's tuned pair — 12.5pt glyphs in a 32px cell (~40% leading),
+# within 2 physical px of the Emacs look at this machine's scale — is the
+# ANCHOR; both numbers now scale with the desktop text-size knob
+# (bin/text-size → theme-override [font] size → theme-apply's font.foot-*
+# derivations; token 12 renders exactly the tuned 12.5/32 pair). Points beat
+# pixelsize: they stay proportional under any output scale. foot cannot
+# reload config — running windows keep their size until reopened.
+font={{font.mono}}:size={{font.foot-pt}}
+line-height={{font.foot-line-height}}px
 include=~/.config/foot/theme.ini
 
 # Arch parity: selecting text copies it to the clipboard too (primary is still

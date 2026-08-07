@@ -65,9 +65,31 @@ QtObject {
     // False once the compositor has refused gamma control, which it does when
     // the display's CRTC reports no gamma table (this MacBook's Apple display
     // does exactly that: gamma_size 0, so wlsunset runs and changes nothing).
-    // Hardware does not change under us, so this never flips back.
+    // Hardware does not change under us, so this never flips back — and the
+    // discovery is PERSISTED (noGammaPath flag) so the Display panel can hide
+    // its night-light section from the first frame of every later shell run,
+    // not only after the next refusal (user call 2026-08-07: unsupported
+    // sections are hidden, never shown disabled).
     property bool gammaSupported: true
+    readonly property string noGammaPath: stateDir + "/nightlight-nogamma"
     property string lastEvent: "starting"
+
+    // One-shot startup read of the persisted discovery — a Process, not a
+    // FileView: a missing flag (every gamma-capable machine) must not log the
+    // missing-file WARN.
+    property Process noGammaProbe: Process {
+        running: true
+        command: ["bash", "-c", "test -e \"$1\" && echo no", "qshell-nogamma-probe", root.noGammaPath]
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                if (String(text).trim() === "no" && root.gammaSupported) {
+                    root.gammaSupported = false;
+                    root.logEvent("gamma-flag", "persisted no-gamma discovery loaded");
+                }
+            }
+        }
+    }
 
     property bool hasPendingPersist: false
     property bool pendingPersist: false
@@ -106,6 +128,9 @@ QtObject {
             if (gammaSupported) {
                 gammaSupported = false;
                 console.warn("Nightlight: the compositor refused gamma control —", text.trim());
+                // Remember across shell runs; the refusing line is the
+                // content for debuggability, existence is the signal.
+                Quickshell.execDetached(["bash", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s\n' \"$2\" > \"$1\"", "qshell-nogamma", noGammaPath, text.trim()]);
             }
             logEvent("gamma-failed", text.trim());
         }

@@ -32,11 +32,25 @@ annotated="$out_dir/Screenshot from $stamp-annotated.png"
 
 case "${1:-}" in
 --region)
+  # Freeze the screen while picking (omarchy's wayfreeze pattern; cargo tool,
+  # presence-gated): grim then captures THROUGH the frozen overlay, so the
+  # shot is the moment the pick started, hover states included. The EXIT trap
+  # guarantees a cancelled slurp can never strand a frozen desktop; the
+  # explicit kill before exec matters — exec replaces the shell and skips
+  # the trap.
+  freeze_pid=""
+  if command -v wayfreeze >/dev/null 2>&1; then
+    wayfreeze --hide-cursor &
+    freeze_pid=$!
+    trap '[[ -n $freeze_pid ]] && kill "$freeze_pid" 2>/dev/null || true' EXIT
+    sleep 0.15
+  fi
   region="$(slurp 2>/dev/null)" || exit 0
   [[ -z $region ]] && exit 0
   raw="$out_dir/Screenshot from $stamp.png"
   grim -g "$region" "$raw"
   wl-copy --type image/png <"$raw"
+  [[ -n $freeze_pid ]] && kill "$freeze_pid" 2>/dev/null
   exec satty -f "$raw" -o "$annotated" --copy-command wl-copy --early-exit
   ;;
 "")

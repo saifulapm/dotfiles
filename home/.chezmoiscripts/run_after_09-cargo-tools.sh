@@ -51,4 +51,14 @@ if ! command -v kak-lsp >/dev/null 2>&1; then
     || warn "cargo install kakoune-lsp (git) failed"
 fi
 
+# wayfreeze (user ask 2026-08-07): freezes the screen while slurp picks a
+# region — screenshot-annotate/-ocr and screenrecord gate on its presence.
+# No crates.io release, no packaged binary anywhere; git build only.
+if ! command -v wayfreeze >/dev/null 2>&1; then
+  echo "cargo-tools: building wayfreeze from git (first run only)"
+  cargo install --quiet --git https://github.com/Jappie3/wayfreeze --locked \
+    && echo "cargo-tools: installed wayfreeze" \
+    || warn "cargo install wayfreeze (git) failed"
+fi
+
 exit 0
