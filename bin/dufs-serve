@@ -32,9 +32,10 @@ ensure-auth)
   cat "$auth_file"
   ;;
 set-password)
-  # Explicit value, or a fresh random one when called bare. The widget's
-  # password controls come through here; a running server is restarted by
-  # the caller (dufs reads auth at process start only).
+  # Explicit value, or a fresh random one when called bare. CLI-only (the
+  # widget shows and copies, never edits — user decision 2026-08-07); a
+  # running server needs a restart afterwards, dufs reads auth at process
+  # start only.
   new="${2:-}"
   [ -z "$new" ] && new="$(od -An -tx1 -N8 /dev/urandom | tr -d ' \n')"
   case "$new" in

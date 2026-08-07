@@ -17,19 +17,7 @@ BarPanel {
     panelTitle: ""
     cardWidth: theme.space(85)
 
-    property bool editingPassword: false
-
-    function commitPassword() {
-        const value = passwordField.text.trim();
-        editingPassword = false;
-        if (value !== "")
-            dufs.setPassword(value);
-    }
-
     onContentKey: event => {
-        // A focused password field owns the keyboard.
-        if (panel.editingPassword)
-            return;
         switch (event.key) {
         case Qt.Key_Return:
         case Qt.Key_Enter:
@@ -51,10 +39,7 @@ BarPanel {
     // Probe-on-open: the unit's word squares a stranded flag with reality,
     // the credentials exist from the first ask, and the address rows follow
     // whatever network this machine is on right now.
-    onPanelOpened: {
-        panel.editingPassword = false;
-        panel.dufs.refreshDetails();
-    }
+    onPanelOpened: panel.dufs.refreshDetails()
 
     // -------------------------------------------------------------- content
     PanelHero {
@@ -183,52 +168,6 @@ BarPanel {
             copyValue: panel.dufs.authPassword
             valueColor: panel.theme.textPrimary
             onCopyRequested: copyValue => panel.dufs.copyToClipboard(copyValue, "the password")
-        }
-
-        // New password: the dice rolls a random one, the pencil opens the
-        // inline field. A running server is bounced so dufs reloads the file.
-        Item {
-            width: parent.width
-            implicitHeight: passwordActions.implicitHeight
-
-            Row {
-                id: passwordActions
-
-                anchors.right: parent.right
-                spacing: panel.theme.space(1.5)
-
-                GlyphButton {
-                    theme: panel.theme
-                    glyph: "󰑐" // md-refresh
-                    enabled: panel.dufs.installed
-                    hint: "New random password"
-                    onActivated: panel.dufs.setPassword("")
-                }
-
-                GlyphButton {
-                    theme: panel.theme
-                    glyph: "󰏫" // md-pencil
-                    enabled: panel.dufs.installed
-                    hint: "Type a password"
-                    onActivated: {
-                        panel.editingPassword = !panel.editingPassword;
-                        if (panel.editingPassword)
-                            passwordField.text = "";
-                    }
-                }
-            }
-        }
-
-        PanelTextField {
-            id: passwordField
-
-            theme: panel.theme
-            width: parent.width
-            visible: panel.editingPassword
-            placeholder: "New password — Enter saves, Esc cancels"
-            focusWhen: panel.editingPassword
-            onAccepted: panel.commitPassword()
-            onCancelled: panel.editingPassword = false
         }
     }
 

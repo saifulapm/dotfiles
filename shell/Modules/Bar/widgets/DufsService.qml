@@ -52,8 +52,6 @@ QtObject {
     property string _authOutput: ""
     property string _addrOutput: ""
     property string _controlError: ""
-    property string _passwordOutput: ""
-    property string _passwordError: ""
 
     // quickshell does not signal a Process child when the shell exits.
     function cmd(args) {
@@ -148,20 +146,6 @@ QtObject {
         Quickshell.execDetached(["wl-copy", "--type", "text/plain", text]);
         actionStatus = "Copied " + (label || "to the clipboard");
         actionStatusTimer.restart();
-    }
-
-    // Rewrites the auth file through bin/dufs-serve (a fresh random password
-    // when value is empty) and bounces a running server so dufs reloads it —
-    // auth is read at process start only, the nightlight bounce-on-change
-    // pattern.
-    function setPassword(value) {
-        if (!installed || passwordProcess.running)
-            return;
-        const pw = String(value || "").trim();
-        _passwordOutput = "";
-        _passwordError = "";
-        passwordProcess.command = cmd(pw === "" ? [helperPath, "set-password"] : [helperPath, "set-password", pw]);
-        passwordProcess.running = true;
     }
 
     // ------------------------------------------------------------ the clocks
@@ -264,55 +248,6 @@ QtObject {
                 root.refresh();
             } else {
                 root.lastError = "";
-            }
-        }
-    }
-
-    readonly property Process passwordProcess: Process {
-        running: false
-        command: []
-        stdout: StdioCollector {
-            id: passwordStdout
-            waitForEnd: true
-            onStreamFinished: root._passwordOutput = text
-        }
-        stderr: StdioCollector {
-            id: passwordStderr
-            waitForEnd: true
-            onStreamFinished: root._passwordError = text
-        }
-        onExited: exitCode => {
-            if (exitCode !== 0) {
-                root.lastError = root.elideStatus(root._passwordError || "Password update failed");
-                return;
-            }
-            root.parseAuth(String(passwordStdout.text || root._passwordOutput || ""));
-            root.lastError = "";
-            if (root.running && !root.restartProcess.running) {
-                root.pending = "starting";
-                root.pendingExpiry.restart();
-                root.restartProcess.command = root.cmd(["systemctl", "--user", "restart", "dufs.service"]);
-                root.restartProcess.running = true;
-                root.actionStatus = "Password updated — restarting the server";
-            } else {
-                root.actionStatus = "Password updated";
-            }
-            root.actionStatusTimer.restart();
-        }
-    }
-
-    readonly property Process restartProcess: Process {
-        running: false
-        command: []
-        stderr: StdioCollector {
-            id: restartStderr
-            waitForEnd: true
-        }
-        onExited: exitCode => {
-            if (exitCode !== 0) {
-                root.pending = "";
-                root.lastError = root.elideStatus(String(restartStderr.text || "") || "Restart failed");
-                root.refresh();
             }
         }
     }
