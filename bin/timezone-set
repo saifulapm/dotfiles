@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# timezone-set — pick a timezone interactively and apply it.
+#
+# Omarchy's Update → Timezone route (omarchy-menu-timezone) rebuilt on the
+# tools already here: fzf over timedatectl's canonical zone list. The apply
+# goes through timedated's D-Bus API, so polkit draws the shell's own auth
+# dialog when the session isn't allowed to set it silently — no sudo, no
+# terminal prompt.
+set -euo pipefail
+
+current=$(timedatectl show -p Timezone --value 2>/dev/null || echo "unknown")
+
+tz=$(timedatectl list-timezones | fzf \
+  --prompt="Timezone> " \
+  --header="Current: $current  (Enter applies, Esc cancels)" \
+  --query="" \
+  --reverse) || exit 0
+
+[[ -n $tz && $tz != "$current" ]] || exit 0
+
+if timedatectl set-timezone "$tz"; then
+  notify-send -a qshell -t 4000 "Timezone changed" "$tz — $(date '+%H:%M %Z')" >/dev/null 2>&1 || true
+else
+  notify-send -a qshell -t 4000 "Timezone unchanged" "Setting $tz was refused" >/dev/null 2>&1 || true
+  exit 1
+fi

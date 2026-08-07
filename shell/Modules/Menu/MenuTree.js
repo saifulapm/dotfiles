@@ -326,6 +326,16 @@ var TREE = {
         "when": "command -v foot",
         "action": "foot-run --app-id=qshell-float --working-directory=\"$HOME/.dotfiles/themes\""
     },
+    // Omarchy files this under Update → Timezone; ours lives in Setup with
+    // the other config wizards. fzf picker in a float, polkit guards apply.
+    "setup.timezone": {
+        "icon": "󰗕",
+        "label": "Timezone",
+        "aliases": ["tz", "time", "zone", "clock"],
+        "description": "Pick and apply a system timezone",
+        "when": "command -v fzf",
+        "action": "foot-run --app-id=qshell-float -e timezone-set"
+    },
 
     // ---------------------------------------------------------------- system
     "system.lock": {
