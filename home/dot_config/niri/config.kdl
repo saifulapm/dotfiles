@@ -467,6 +467,18 @@ window-rule {
     open-floating true
 }
 
+// Chromium's screen-share indicator strip ("… is sharing your screen") opens
+// as a real window and would take a whole tile in the scrolling layout.
+// omarchy shunts it to a silent special workspace; niri has none, so it
+// floats unfocused against the bottom edge instead — visible, out of the way,
+// and the column layout never moves. (omarchy gap item 8)
+window-rule {
+    match app-id="^chromium-browser$" title=r#"(?i)is sharing (your screen|a window|this tab)"#
+    open-floating true
+    open-focused false
+    default-floating-position x=0 y=8 relative-to="bottom"
+}
+
 // omarchy scrolls terminals 1.5× (input.lua: scroll_touchpad), multiplied
 // on top of the touchpad scroll-factor in the input section. Every foot
 // window carries it, whatever app-id the launcher stamped on it: plain foot,
