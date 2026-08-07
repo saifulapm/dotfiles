@@ -225,7 +225,6 @@ const OUTPUTS = {
   // state file is sourced by fish conf.d/40-gum-theme.fish at shell start.
   "btop-theme.tmpl": [path.join(HOME, ".config/btop/themes/qshell.theme")],
   "helix-theme.toml.tmpl": [path.join(HOME, ".config/helix/themes/qshell.toml")],
-  "kak-theme.kak.tmpl": [path.join(HOME, ".config/kak/colors/qshell.kak")],
   "claude-theme.json.tmpl": [path.join(HOME, ".claude/themes/qshell.json")],
   "gum-theme.fish.tmpl": [path.join(HOME, ".local/state/qshell/gum-theme.fish")]
 }
@@ -339,6 +338,19 @@ if (osc) {
     try { fs.writeFileSync(pty, osc) } catch (e) { /* pty vanished */ }
   }
   if (ptys.length) console.log(`theme-apply: rethemed ${ptys.length} foot pty(s)`)
+}
+
+// ---- kakoune theme: converted from the rendered helix theme ----
+// bin/helix-to-kak.js (the mac dotfiles converter, resurrected) is the
+// single source of the kak face mapping — kak mirrors helix exactly rather
+// than maintaining a second hand-mapped template (a first attempt kept
+// gruvbox's faces and the statusline came out visibly different).
+try {
+  const { convertTheme } = require(path.join(ROOT, "bin/helix-to-kak.js"))
+  convertTheme(path.join(HOME, ".config/helix/themes/qshell.toml"),
+               path.join(HOME, ".config/kak/colors/qshell.kak"))
+} catch (e) {
+  console.warn("theme-apply: helix→kak conversion failed:", e.message)
 }
 
 // ---- btop / helix / Claude Code live re-theme (omarchy gap item 6) ----
