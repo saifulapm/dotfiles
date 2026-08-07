@@ -7,11 +7,12 @@ import "DevServicesModel.js" as Model
 // quadlet containers behind systemd-socket-proxyd; the catalog and lifecycle
 // live in DevServicesModel.js) as a bar button in the dropbox widget's shape.
 //
-// The mark is a drawn database cylinder that carries the whole state the way
-// the Dropbox mark does: full foreground while at least one container runs,
-// dimmed and darkened while everything is armed. The exact split lives in
-// the tooltip and the panel (a corner count badge existed briefly — removed
-// by user request 2026-08-07).
+// The mark is the md-server rack glyph (U+F048B — user request 2026-08-07,
+// replacing the drawn cylinder, which the panel hero still wears via
+// DevServicesIcon). It carries the whole state the way the Dropbox mark
+// does: full foreground while at least one container runs, dimmed and
+// darkened while everything is armed. The exact split lives in the tooltip
+// and the panel.
 //
 // Left click opens the panel, right click re-probes (`podman ps` — the
 // live state otherwise arrives entirely through the service's podman-events
@@ -59,10 +60,13 @@ BarButton {
 
     // Sole child of BarButton's centered content row, so it needs no anchors
     // of its own (and a Row forbids the horizontal ones anyway).
-    DevServicesIcon {
-        iconSize: 13
+    OpticalGlyph {
+        text: "󰒋"
+        pixelSize: 13
+        verticalInkCenter: true
         color: rootItem.runningCount > 0 ? rootItem.barFg : Qt.darker(rootItem.barFg, 1.55)
         opacity: rootItem.runningCount > 0 ? 1.0 : 0.6
+        colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
     }
 
     // Source-based: the panel compiles on first open, not with the bar (S1).
