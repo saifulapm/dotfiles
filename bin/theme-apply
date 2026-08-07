@@ -153,20 +153,23 @@ tokens["gtk.prefer-dark"] = mode === "light" ? "0" : "1"
 // document into theme colors, light themes show pages as printed.
 tokens["zathura.recolor"] = mode === "light" ? "false" : "true"
 
+// Plain sRGB interpolation, matching omarchy's awk mix_color — shared by the
+// claude and emacs derived-shade blocks below.
+function mixHex(aHex, bHex, t) {
+  const a = hexToRgb(aHex), b = hexToRgb(bHex)
+  if (!a || !b) return aHex
+  return rgbToHex({
+    r: a.r + (b.r - a.r) * t,
+    g: a.g + (b.g - a.g) * t,
+    b: a.b + (b.b - a.b) * t
+  })
+}
+
 // Claude Code custom-theme shades (templates/claude-theme.json.tmpl) — the
 // omarchy claude.json.tpl carries `{{ mix a b N% }}` expressions; our engine
-// substitutes flat tokens, so the mixes are precomputed here instead. Plain
-// sRGB interpolation, matching their awk mix_color.
+// substitutes flat tokens, so the mixes are precomputed here instead.
 {
-  const mix = (aHex, bHex, t) => {
-    const a = hexToRgb(aHex), b = hexToRgb(bHex)
-    if (!a || !b) return aHex
-    return rgbToHex({
-      r: a.r + (b.r - a.r) * t,
-      g: a.g + (b.g - a.g) * t,
-      b: a.b + (b.b - a.b) * t
-    })
-  }
+  const mix = mixHex
   const bg = tokens["surface.0"] || "#16161e"
   const fg = tokens["text.primary"] || "#c0caf5"
   const accent = tokens["accent.accent"] || "#7aa2f7"
@@ -184,6 +187,85 @@ tokens["zathura.recolor"] = mode === "light" ? "false" : "true"
   tokens["claude.raised-bg"] = mix(bg, fg, 0.06)
   tokens["claude.raised-bg-hover"] = mix(bg, fg, 0.10)
   tokens["claude.rate-limit-empty"] = mix(bg, fg, 0.20)
+}
+
+// Emacs modus-palette shades (templates/emacs-theme.el.tmpl). The
+// qshell-dark/qshell-light themes in the emacs config (saifulapm/emacs.d,
+// themes/) are Modus derivatives: modus-themes keeps all ~200 semantic
+// mappings and full face coverage, and the rendered file supplies the ~130
+// NAMED colors those mappings resolve to. Every shade is blended from the
+// theme's own tokens so nothing leaves the theme's gamut: warmer/cooler hue
+// variants mix a quarter toward a neighboring ansi hue (the directions modus
+// itself leans — red-warmer toward orange, blue-warmer toward violet), faint
+// drops chroma in OKLCH with hue and lightness held, intense is the bright
+// ansi color, and the special-purpose backgrounds are bg tinted by their hue.
+{
+  const bg = tokens["surface.0"] || "#16161e"
+  const fg = tokens["text.primary"] || "#c0caf5"
+  const accent = tokens["accent.accent"] || "#7aa2f7"
+  const raised = tokens["surface.3"] || bg
+  const a = name => tokens["ansi." + name] || fg
+  const put = (key, v) => { tokens["emacs." + key] = v }
+  // chroma-only OKLCH adjustment; _gamutMap keeps the result in sRGB
+  const okChroma = (hex, mul) => {
+    const c = hexToRgb(hex)
+    if (!c) return hex
+    const o = _rgbToOklch(c)
+    return rgbToHex(_gamutMap({ L: o.L, C: o.C * mul, h: o.h }))
+  }
+
+  const NEIGHBORS = { // hue: [warmer-toward, cooler-toward]
+    red: ["yellow", "magenta"], green: ["yellow", "cyan"],
+    yellow: ["red", "green"], blue: ["magenta", "cyan"],
+    magenta: ["red", "blue"], cyan: ["blue", "green"]
+  }
+  for (const [hue, dirs] of Object.entries(NEIGHBORS)) {
+    put(hue + "-warmer", mixHex(a(hue), a(dirs[0]), 0.25))
+    put(hue + "-cooler", mixHex(a(hue), a(dirs[1]), 0.25))
+    put(hue + "-faint", okChroma(a(hue), 0.55))
+    put("bg-" + hue + "-intense", mixHex(bg, a(hue), 0.5))
+    put("bg-" + hue + "-subtle", mixHex(bg, a(hue), 0.3))
+    put("bg-" + hue + "-nuanced", mixHex(bg, a(hue), 0.15))
+    put("bg-graph-" + hue + "-1", mixHex(a(hue), bg, 0.45))
+  }
+  // diff blocks: bg tints stepped faint < base < refine < fringe, like modus
+  for (const [group, hue] of [["added", "green"], ["changed", "yellow"], ["removed", "red"]]) {
+    put("bg-" + group, mixHex(bg, a(hue), 0.2))
+    put("bg-" + group + "-faint", mixHex(bg, a(hue), 0.12))
+    put("bg-" + group + "-refine", mixHex(bg, a(hue), 0.3))
+    put("bg-" + group + "-fringe", mixHex(bg, a(hue), 0.5))
+    put("fg-" + group, mixHex(a(hue), fg, 0.4))
+  }
+  // modus's off-palette accent hues (org agenda dates, prose, mail levels),
+  // as in-theme blends muted by a chroma cut
+  put("rust", okChroma(mixHex(a("red"), a("yellow"), 0.4), 0.75))
+  put("gold", okChroma(mixHex(a("yellow"), a("red"), 0.25), 0.8))
+  put("olive", okChroma(mixHex(a("green"), a("yellow"), 0.4), 0.7))
+  put("slate", okChroma(mixHex(a("blue"), a("cyan"), 0.4), 0.55))
+  put("indigo", okChroma(mixHex(a("blue"), a("magenta"), 0.4), 0.8))
+  put("maroon", okChroma(mixHex(a("red"), a("magenta"), 0.4), 0.7))
+  put("pink", okChroma(mixHex(a("magenta"), a("red"), 0.25), 0.7))
+  // tinted bg/fg companion pairs
+  for (const [name, base] of [
+    ["clay", mixHex(a("red"), a("yellow"), 0.35)],
+    ["ochre", a("yellow")],
+    ["lavender", mixHex(a("magenta"), a("blue"), 0.3)],
+    ["sage", a("green")]
+  ]) {
+    put("bg-" + name, mixHex(bg, base, 0.22))
+    put("fg-" + name, mixHex(base, fg, 0.4))
+  }
+  put("fg-alt", mixHex(fg, accent, 0.35))
+  put("border", mixHex(raised, tokens["text.muted"] || fg, 0.5))
+  put("bg-completion", mixHex(bg, accent, 0.35))
+  put("bg-hover", mixHex(raised, accent, 0.2))
+  put("bg-hover-secondary", mixHex(raised, tokens["accent.warn"] || a("yellow"), 0.25))
+  put("bg-paren-match", mixHex(bg, a("cyan"), 0.4))
+  put("bg-paren-expression", mixHex(bg, a("magenta"), 0.25))
+  put("border-mode-line", mixHex(raised, fg, 0.25))
+  put("modeline-err", mixHex(tokens["accent.error"] || a("red"), fg, 0.35))
+  put("modeline-warning", mixHex(tokens["accent.warn"] || a("yellow"), fg, 0.35))
+  put("modeline-info", mixHex(a("cyan"), fg, 0.35))
 }
 
 // Template functions — `{{ fn token }}`. Plain `{{token}}` substitution stays
@@ -272,7 +354,11 @@ const OUTPUTS = {
   "btop-theme.tmpl": [path.join(HOME, ".config/btop/themes/qshell.theme")],
   "helix-theme.toml.tmpl": [path.join(HOME, ".config/helix/themes/qshell.toml")],
   "claude-theme.json.tmpl": [path.join(HOME, ".claude/themes/qshell.json")],
-  "gum-theme.fish.tmpl": [path.join(HOME, ".local/state/qshell/gum-theme.fish")]
+  "gum-theme.fish.tmpl": [path.join(HOME, ".local/state/qshell/gum-theme.fish")],
+  // emacs: rendered DATA, not a theme — the qshell-dark/qshell-light Modus
+  // derivatives in the emacs config (its own repo) load this file for their
+  // named colors, so the generated artifact stays out of that repo's tree.
+  "emacs-theme.el.tmpl": [path.join(HOME, ".local/state/qshell/emacs-theme.el")]
 }
 
 let gtkSettingsChanged = false
@@ -428,6 +514,16 @@ try {
     execSync("for s in $(kak -l 2>/dev/null); do echo 'colorscheme qshell' | kak -p \"$s\" 2>/dev/null || true; done",
       { stdio: "ignore", shell: "/bin/bash" })
   } catch (e) { /* kak absent or no sessions */ }
+  // emacs: the qshell themes re-read the rendered palette on every
+  // `load-theme`, and qshell-theme-refresh (emacs config) does exactly that —
+  // including the polarity flip, which the portal signal also covers but this
+  // poke is the only channel for same-polarity theme switches. fboundp-guarded
+  // so a daemon running an older config answers nil instead of erroring; the
+  // timeout keeps a wedged daemon from stalling the whole theme switch.
+  try {
+    execSync("emacsclient --eval \"(when (fboundp 'qshell-theme-refresh) (qshell-theme-refresh))\"",
+      { stdio: "ignore", timeout: 5000 })
+  } catch (e) { /* no emacs server */ }
 }
 
 console.log("theme-apply: done")

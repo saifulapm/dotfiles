@@ -975,6 +975,15 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   pinned chezmoi external (`home/.chezmoiexternal.toml`) into
   `~/.local/share/qshell/backgrounds` — the images ship in omarchy's MIT repo
   and are downloaded from there at apply time, never committed here.
+- **Emacs theming design** studied from the omarchy ecosystem's two packages
+  (no code ported from either): scottjones/omarchy-emacs renders a colors file
+  from theme tokens which a static theme consumes, and ovistoica/omarchy.el
+  derives full-coverage themes through the Modus machinery. Ours combines the
+  two ideas on our own plumbing — `templates/emacs-theme.el.tmpl` renders the
+  Modus *named-color* layer to `~/.local/state/qshell/emacs-theme.el`, and the
+  emacs config's qshell-dark/qshell-light themes (saifulapm/emacs.d) are Modus
+  derivatives that read it; theme-apply pokes `qshell-theme-refresh` over
+  emacsclient.
 
 ## DankMaterialShell (MIT) — github.com/AvengeMedia/DankMaterialShell
 
