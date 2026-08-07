@@ -88,6 +88,10 @@ BarButton {
     onTapped: button => {
         if (button === Qt.RightButton) {
             cycleFormat();
+        } else if (button === Qt.MiddleButton) {
+            // Omarchy's clock middle-click: the timezone selector (theirs is
+            // a menu route; ours is the fzf picker in a float).
+            Quickshell.execDetached(["foot-run", "--app-id=qshell-float", "-e", "timezone-set"]);
         } else if (button === Qt.LeftButton) {
             openPanel();
         }

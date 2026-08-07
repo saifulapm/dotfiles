@@ -1006,3 +1006,11 @@ layer-rule {
     match namespace="^qshell-background$"
     place-within-backdrop true
 }
+
+// Notification toasts never reach a screen-share (omarchy gap item 8):
+// "screencast" blocks portal casts only — grim screenshots still see them,
+// which the verification recipes in this repo depend on.
+layer-rule {
+    match namespace="^qshell-notifications$"
+    block-out-from "screencast"
+}

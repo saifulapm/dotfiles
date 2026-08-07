@@ -52,8 +52,21 @@ BarPanel {
                     device: device.device
                 });
         }
+        // External displays answer over DDC/CI instead (omarchy gap item 1):
+        // same row, pseudo-device "ddc:<connector>", writes routed through
+        // bin/brightness-display. A connector already carrying a backlight
+        // row never doubles up.
+        for (let i = 0; i < ddcOutputs.length; i++) {
+            const name = ddcOutputs[i].output;
+            if (!rows.some(r => r.output === name))
+                rows.push({
+                    output: name,
+                    device: "ddc:" + name
+                });
+        }
         return rows;
     }
+    property var ddcOutputs: []
 
     function percentFor(device) {
         const value = brightness[device];
@@ -78,6 +91,7 @@ BarPanel {
         outputs = state.outputs;
         focused = state.focused;
         backlights = state.backlights;
+        ddcOutputs = state.ddc || [];
         nightLightAvailable = state.nightLight;
 
         // Adopt the hardware's values only for devices with no write in
@@ -87,6 +101,12 @@ BarPanel {
             const b = state.backlights[i];
             if (pendingBrightness[b.device] === undefined)
                 next[b.device] = b.percent;
+        }
+        for (let i = 0; i < ddcOutputs.length; i++) {
+            const d = ddcOutputs[i];
+            const key = "ddc:" + d.output;
+            if (pendingBrightness[key] === undefined)
+                next[key] = d.percent;
         }
         brightness = next;
     }
@@ -98,7 +118,7 @@ BarPanel {
 
     Process {
         id: stateProc
-        command: ["bash", "-c", "echo '##outputs'; niri msg --json outputs; echo '##focused'; niri msg --json focused-output; echo '##backlights'; brightnessctl -lm --class=backlight 2>/dev/null; echo '##nightlight'; command -v wlsunset >/dev/null && echo yes"]
+        command: ["bash", "-c", "echo '##outputs'; niri msg --json outputs; echo '##focused'; niri msg --json focused-output; echo '##backlights'; brightnessctl -lm --class=backlight 2>/dev/null; echo '##ddc'; if command -v ddcutil >/dev/null 2>&1; then niri msg --json outputs | jq -r 'keys[]' | while read -r o; do case \"$o\" in eDP*|LVDS*|DSI*) ;; *) p=$(brightness-display-ddc \"$o\" 2>/dev/null) && echo \"$o $p\";; esac; done; fi; echo '##nightlight'; command -v wlsunset >/dev/null && echo yes"]
         stdout: StdioCollector {
             waitForEnd: true
             onStreamFinished: panel.applyState(text)
@@ -159,7 +179,12 @@ BarPanel {
         const device = devices[0];
         brightnessProc.device = device;
         brightnessProc.writtenPercent = pendingBrightness[device];
-        brightnessProc.command = ["brightnessctl", "--class=backlight", "-d", device, "-q", "set", pendingBrightness[device] + "%"];
+        // ddc:<connector> pseudo-devices write over DDC/CI through the same
+        // script the brightness keys use; real devices stay on brightnessctl.
+        if (device.indexOf("ddc:") === 0)
+            brightnessProc.command = ["brightness-display", "--no-osd", "--monitor", device.substring(4), pendingBrightness[device] + "%"];
+        else
+            brightnessProc.command = ["brightnessctl", "--class=backlight", "-d", device, "-q", "set", pendingBrightness[device] + "%"];
         brightnessProc.running = true;
     }
 

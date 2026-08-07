@@ -113,10 +113,28 @@ function parseState(raw) {
         });
     }
 
+    // "connector percent" lines from bin/brightness-display-ddc — external
+    // displays with working DDC/CI, probed only when ddcutil exists.
+    const ddc = [];
+    const ddcLines = sections.ddc || [];
+    for (let i = 0; i < ddcLines.length; i++) {
+        const parts = ddcLines[i].trim().split(/\s+/);
+        if (parts.length < 2)
+            continue;
+        const percent = parseInt(parts[1], 10);
+        if (!isFinite(percent))
+            continue;
+        ddc.push({
+            output: parts[0],
+            percent: percent
+        });
+    }
+
     return {
         outputs: outputs,
         focused: focused,
         backlights: backlights,
+        ddc: ddc,
         nightLight: (sections.nightlight || []).join("").trim() === "yes"
     };
 }
