@@ -643,7 +643,7 @@ why = "Go language server for eglot"
 name = "emacs-pgtk"
 category = "dev"
 arch = "all"
-why = "The editor. Pure-GTK Wayland-native build with native compilation (links libgccjit) — stock Fedora 44, no COPR needed (verified 2026-08-05)"
+why = "The editor. Pure-GTK Wayland-native build with native compilation (links libgccjit) — stock Fedora 44, no COPR needed (verified 2026-08-05). Runs as a session-tied daemon: dot_config/systemd/user/emacs.service shadows this rpm's default.target unit, which would start before niri-session's env import (no WAYLAND_DISPLAY for pgtk frames, sparse PATH handed to eglot's servers). Config is the separate saifulapm/emacs.d repo cloned to ~/.config/emacs by run_before_04 — never pulled by the apply, it's a living repo pushed from that checkout"
 
 [[pkg]]
 name = "podman"

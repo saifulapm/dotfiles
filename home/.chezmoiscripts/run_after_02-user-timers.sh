@@ -6,7 +6,7 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket qshell.service
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket qshell.service emacs.service
 set -euo pipefail
 
 units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket)
@@ -34,6 +34,18 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
     systemctl --user start qshell.service
   fi
   echo "user units: qshell.service enabled"
+  # emacs.service (ours — shadows the emacs-pgtk rpm unit) has the same
+  # Requisite=graphical-session.target gate: enable always, start only
+  # inside a session. --no-block because a first start bootstraps every
+  # :ensure package (minutes) and the apply must not hang on it;
+  # warn-don't-abort like the loop above.
+  systemctl --user enable emacs.service 2>/dev/null \
+    || echo "user units: enable emacs.service failed — check systemctl --user status emacs.service" >&2
+  if systemctl --user -q is-active graphical-session.target; then
+    systemctl --user start --no-block emacs.service 2>/dev/null \
+      || echo "user units: start emacs.service failed — check systemctl --user status emacs.service" >&2
+  fi
+  echo "user units: emacs.service enabled"
 else
   echo "user units: no user systemd session, skipped" >&2
 fi

@@ -54,6 +54,9 @@ after the first apply.
   accept GitHub's host key (the ssh config routes github.com via
   ssh.github.com:443; its `UseKeychain` line needs the synced
   `IgnoreUnknown UseKeychain` guard on Linux, which the iCloud copy carries).
+  `~/.config/emacs` is the same story — the apply clones saifulapm/emacs.d
+  over https; `git -C ~/.config/emacs remote set-url origin
+  git@github.com:saifulapm/emacs.d.git` before pushing from it.
 - `tailscale up` — interactive browser auth (the apply prints this loudly;
   the bar's tailscale widget has the same login flow).
 - `gh auth login` — once per account: saifulapm (personal), Cool9977 (work),

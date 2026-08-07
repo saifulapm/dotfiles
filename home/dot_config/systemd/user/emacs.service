@@ -1,0 +1,29 @@
+[Unit]
+Description=Emacs text editor (daemon)
+Documentation=info:emacs man:emacs(1) https://gnu.org/software/emacs/
+# Shadows the emacs-pgtk rpm's unit (/usr/lib/systemd/user/emacs.service),
+# whose WantedBy=default.target would start the daemon at user-manager
+# startup — before niri-session imports the login-shell environment, so no
+# WAYLAND_DISPLAY for pgtk client frames and none of the login PATH
+# (~/.local/bin, mise shims) in the env the long-lived daemon hands to
+# subprocesses. Session-tied instead — the qshell.service shape (niri wiki,
+# Example systemd Setup): starts only inside a graphical session, stops
+# with it. The Arch machine did the same via install.sh's NIRI_WANTS.
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/emacs --fg-daemon
+# Emacs exits 15 after SIGTERM (systemd's default KillSignal) — a clean
+# daemon shutdown, not a failure. Kept from the rpm unit.
+SuccessExitStatus=15
+# A first start on a fresh emacs.d clone installs every :ensure package
+# before init finishes (= before Type=notify reports ready); the default
+# 90s start timeout would kill the daemon mid-bootstrap.
+TimeoutStartSec=15min
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
