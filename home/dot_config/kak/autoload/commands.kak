@@ -35,6 +35,10 @@ define-command pastebin -docstring 'Upload selection to termbin.com' %{
 # ------------------------
 # Diff Utils
 # ------------------------
+declare-option -hidden str find_command fd
+declare-option -hidden str-list find_args --hidden --type=file --exclude=.git --color=never
+declare-option -hidden str find_completion %{ eval "$kak_quoted_opt_find_command" "$kak_quoted_opt_find_args" }
+
 define-command diff -docstring 'diff [<arguments>]: Generate a diff' -shell-script-candidates %opt{find_completion} -params 1.. %{
     fifo -name diff -- diff -u %arg{@}; set buffer filetype diff;
 }

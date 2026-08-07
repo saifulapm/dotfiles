@@ -96,6 +96,25 @@ rpm -q remi-release >/dev/null 2>&1 \
   || sudo dnf install --setopt=install_weak_deps=False -y \
        "https://rpms.remirepo.net/fedora/remi-release-$(rpm -E %fedora).rpm"
 
+# RPM Fusion (free): the full ffmpeg. Fedora's own ffmpeg-free strips the
+# H.264/H.265 encoders for patent reasons (Cisco's openh264 is the only
+# sanctioned path), so omacut's and omarchy's hardcoded libx264 invocations
+# die on it. User decision 2026-08-07: match the Arch setup, where stock
+# ffmpeg carries libx264, instead of patching every consumer. A release rpm
+# like remi above, hence the same bootstrap shape.
+rpm -q rpmfusion-free-release >/dev/null 2>&1 \
+  || sudo dnf install --setopt=install_weak_deps=False -y \
+       "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+
+# One-time migration on machines that already carry ffmpeg-free: the two
+# conflict, so the plain install below would abort with ffmpeg-free present.
+# swap replaces the whole -free lib stack (--allowerasing, per RPM Fusion's
+# own howto); dependents keep working — the rpmfusion libs provide the same
+# sonames.
+if rpm -q ffmpeg-free >/dev/null 2>&1; then
+  sudo dnf swap --setopt=install_weak_deps=False -y --allowerasing ffmpeg-free ffmpeg
+fi
+
 sudo dnf install --setopt=install_weak_deps=False -y "${pkgs[@]}"
 
 # Packages this desktop must not have: they shadow the shell's own lock,

@@ -993,10 +993,10 @@ arch = "all"
 why = "Socket relay — the yazi config's add-sub opener feeds subtitles to a running mpv via /tmp/mpv.sock (user-approved 2026-08-07 for this concrete use after declining the generic misc-utils group)"
 
 [[pkg]]
-name = "ffmpeg-free"
+name = "ffmpeg"
 category = "optional"
 arch = "all"
-why = "ffmpeg/ffprobe CLI (Fedora's patent-clean build) — omacut shells out to them for trimming, and having the CLI also unlocks wf-recorder post-processing later. The wf-recorder entry above predates this and describes the no-CLI state. NOTE: this build has no libx264 (H.264 encode is libopenh264, decode too — native h264 decoder is compiled out); run_after_13 patches omacut's export encoder accordingly"
+why = "ffmpeg/ffprobe CLI, RPM Fusion's full build with libx264/x265 — Fedora's ffmpeg-free strips those encoders for patent reasons and omacut's export died on 'Unknown encoder libx264' (user decision 2026-08-07: enable RPM Fusion free and swap, matching the Arch setup where stock ffmpeg carries libx264, rather than keep patching consumers to libopenh264). 00-install-packages bootstraps rpmfusion-free-release and one-time-swaps ffmpeg-free out on machines that have it. omacut shells out to ffmpeg/ffprobe for trimming; the CLI also unlocks wf-recorder post-processing later"
 
 [[pkg]]
 name = "qt6-qtbase-devel"
@@ -1198,8 +1198,8 @@ why  = "The user's own fork with built-in treesitter — NOT Fedora's kakoune pa
 
 [[tool]]
 name = "oma-apps"
-via  = "run_after_13-oma-apps.sh — clone omacom-io/{omacalc,omawrite,omacut}, sed the two omarchy theme-path literals in src/backend.cpp to ~/.local/state/qshell/oma-theme.toml + omacut's libx264 export encoder to libopenh264 in src/ffmpeg.cpp, qmake6 + make, install to ~/.local/bin"
-why  = "Omarchy's Qt Quick calculator, writing app and video trimmer (user decision 2026-08-07, all three). MIT-licensed. They watch a 5-key colors.toml (mode/background/foreground/accent/selection) and re-tint live; templates/oma-theme.toml.tmpl emits exactly that file from the active theme on every theme-apply, so they follow this desktop's theme system natively. omacut needs the ffmpeg CLI (ffmpeg-free above), which has no libx264 — hence the encoder patch"
+via  = "run_after_13-oma-apps.sh — clone omacom-io/{omacalc,omawrite,omacut}, sed the two omarchy theme-path literals in src/backend.cpp to ~/.local/state/qshell/oma-theme.toml, qmake6 + make, install to ~/.local/bin"
+why  = "Omarchy's Qt Quick calculator, writing app and video trimmer (user decision 2026-08-07, all three). MIT-licensed. They watch a 5-key colors.toml (mode/background/foreground/accent/selection) and re-tint live; templates/oma-theme.toml.tmpl emits exactly that file from the active theme on every theme-apply, so they follow this desktop's theme system natively. omacut's export hardcodes libx264, so it needs the RPM Fusion ffmpeg (entry above) — with that in place it builds unpatched beyond the theme sed"
 
 [[tool]]
 name = "chromium-config"
