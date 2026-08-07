@@ -1,10 +1,21 @@
 # Rendered to ~/.config/foot/foot.ini by bin/theme-apply — do not edit there.
 # Only deviations from foot 1.27 defaults live here; everything else (TERM=foot,
-# key bindings, url mode, selection→primary — bin/emoji-insert relies on that
-# primary paste) is deliberately stock. See foot.ini(5).
+# url mode, mouse bindings) is deliberately stock. See foot.ini(5).
 [main]
-font={{font.mono}}:pixelsize={{font.size}}
+# The Arch config's tuned pair: 12.5pt glyphs in a 32px cell (~40% leading).
+# At this machine's 1.25 scale that lands within 2 physical px of the Emacs
+# look (12pt/16px glyphs, 33px line = natural height + 50% line-spacing, per
+# emacs.d setup-fonts). Points beat the old pixelsize={{font.size}}: they stay
+# proportional under any output scale. Size and line-height are a pair —
+# change one, retune the other.
+font={{font.mono}}:size=12.5
+line-height=32px
 include=~/.config/foot/theme.ini
+
+# Arch parity: selecting text copies it to the clipboard too (primary is still
+# fed, so middle-click paste and anything reading the primary selection keep
+# working).
+selection-target=both
 
 # Server-mode windows default to app-id "footclient"; pin one id so niri rules
 # and the shell's icon lookup see the same window either way it was launched.
@@ -30,6 +41,14 @@ multiplier=7.0
 [mouse]
 # macOS behavior: the pointer gets out of the way while typing.
 hide-when-typing=yes
+
+[key-bindings]
+# Arch parity: Ctrl+Insert/Shift+Insert copy/paste the CLIPBOARD. Shift+Insert
+# is freed from its default primary-paste role (selection-target=both puts the
+# selection on the clipboard anyway); middle-click primary paste is untouched.
+clipboard-copy=Control+Shift+c Control+Insert
+clipboard-paste=Control+Shift+v Shift+Insert
+primary-paste=none
 
 [text-bindings]
 # omarchy's CSI-u escapes so TUIs (Claude Code, tmux) can tell Shift+Return
