@@ -40,13 +40,17 @@ FLITE_VOICE="${FLITE_VOICE:-slt}"
 # self-contained tree rather than on PATH, so nothing but this script needs
 # to know about its LD_LIBRARY_PATH.
 #
-# Defaults are Kokoro int8 and voice 3: int8 because the fp32 model is 3.5x
-# the RAM for no audible gain here, and this laptop runs ~1.5 GB free (see
-# bin/mem-pressure-warn). Measured on this box: 330 MB peak RSS, RTF 0.59.
+# Defaults are Kokoro fp32 and voice 3. fp32 rather than int8 is measured,
+# not assumed: on this M2, int8 is SLOWER than fp32 despite being a third of
+# the size — 3.44 s vs 1.92 s for the same sentence, three runs each, at the
+# cost of 177 MB (360 -> 537 MB peak RSS). ARM int8 kernels lose to the fp32
+# paths here, and quantization cannot improve fidelity, so fp32 is the strict
+# win as long as the RAM fits — which it does even with ~1.5 GB free (see
+# bin/mem-pressure-warn). Revisit if that headroom ever shrinks.
 # Override per-invocation, e.g. SHERPA_VOICE=16 or
-# SHERPA_MODEL=kitten-nano-en-v0_8-int8 (143 MB peak, RTF 0.16).
+# SHERPA_MODEL=kitten-nano-en-v0_8-int8 (143 MB peak, the low-RAM fallback).
 SHERPA_DIR="${SHERPA_DIR:-$HOME/.local/share/sherpa-onnx}"
-SHERPA_MODEL="${SHERPA_MODEL:-kokoro-int8-multi-lang-v1_0}"
+SHERPA_MODEL="${SHERPA_MODEL:-kokoro-multi-lang-v1_0}"
 SHERPA_VOICE="${SHERPA_VOICE:-3}"
 export PIPER_VOICE FLITE_VOICE SHERPA_DIR SHERPA_MODEL SHERPA_VOICE
 
@@ -96,7 +100,7 @@ run_tts() {
     LD_LIBRARY_PATH="$SHERPA_DIR/lib" \
       "$SHERPA_DIR/bin/sherpa-onnx-offline-tts-play" "${flags[@]}" \
       --num-threads=4 --sid="$SHERPA_VOICE" \
-      --output-filename="$1.wav" " $(cat "$1")" >/dev/null 2>&1
+      --output-filename="$SPEAK_WAV" " $(cat "$1")" >/dev/null 2>&1
     ;;
   piper)
     if command -v pw-play >/dev/null 2>&1; then
@@ -112,26 +116,65 @@ run_tts() {
   esac
 }
 
-# The trap, not a trailing rm, is what deletes the scratch file: --stop kills
-# this process group mid-read, so any cleanup placed after run_tts would never
-# be reached and every interrupted read would strand a file in /tmp.
+# Scratch files live at FIXED paths, not mktemp ones, and that is what makes
+# cleanup reliable. Only one read can be in flight at a time (speak() stops any
+# predecessor first), so a stable name is safe — and it means three independent
+# things can clean up: the reader's own trap, --stop, and the next --speak
+# overwriting them. An mktemp path can only be cleaned by whoever still knows
+# it, which is how the earlier version leaked two files per interrupted read:
+# the trap referenced a `local` that had already gone out of scope by the time
+# a signal unwound the function. XDG_RUNTIME_DIR is tmpfs and per-user, so even
+# a total failure to clean costs two files that vanish at logout.
+runtime="${XDG_RUNTIME_DIR:-/tmp}"
+pidfile="$runtime/screenshot-ocr-speak.pid"
+SPEAK_TXT="$runtime/screenshot-ocr-speak.txt"
+SPEAK_WAV="$runtime/screenshot-ocr-speak.wav"
+SPEAK_PID="$pidfile"
+export SPEAK_TXT SPEAK_WAV SPEAK_PID
+
+# SPEAK_* are exported globals rather than function locals precisely so they
+# are still in scope when a signal fires this trap mid-read.
+#
+# The pidfile is removed here too, and that is a correctness fix rather than
+# tidiness: a read that ends on its own would otherwise leave a pidfile naming
+# a dead process group, and PGIDs get reused. A later --stop would then signal
+# whatever unrelated process group inherited that number.
 speak_runner() {
-  local tmpf="$1"
-  # .wav too: the sherpa backend is handed "$tmpf.wav" as its sink.
-  trap 'rm -f "$tmpf" "$tmpf.wav"' EXIT INT TERM
-  run_tts "$tmpf"
+  # The READER records its own pid, rather than the parent recording $!.
+  # setsid forks whenever its caller is already a process group leader, and
+  # whether that is true depends on how the bind was spawned — so $! names the
+  # short-lived wrapper about half the time, and --stop then signals a pid that
+  # has already exited while the real reader plays on, unkillable. Inside the
+  # new session this shell IS the group leader, so $$ is exactly the PGID that
+  # `kill -- -PGID` needs.
+  echo "$$" >"$SPEAK_PID"
+  trap 'rm -f "$SPEAK_TXT" "$SPEAK_WAV" "$SPEAK_PID"' EXIT INT TERM
+  run_tts "$SPEAK_TXT"
 }
 
-pidfile="${XDG_RUNTIME_DIR:-/tmp}/screenshot-ocr-speak.pid"
-
 stop_speech() {
-  [[ -f $pidfile ]] || return 0
-  local pid
-  pid="$(cat "$pidfile" 2>/dev/null || true)"
-  # Negative PID = whole process group. setsid made the child a group leader,
-  # so its PID is its PGID and one signal takes down engine + player together.
-  [[ -n $pid ]] && { kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true; }
-  rm -f "$pidfile"
+  if [[ -f $pidfile ]]; then
+    local pid
+    pid="$(cat "$pidfile" 2>/dev/null || true)"
+    # Negative PID = whole process group. setsid made the child a group leader,
+    # so its PID is its PGID and one signal takes down engine + player together.
+    [[ -n $pid ]] && { kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true; }
+    # Reap before deleting, or the delete races the engine's dying write: a
+    # signalled sherpa still flushes its wav a few ms later and re-creates the
+    # file we just removed, stranding it until the next read. Bounded at ~2 s
+    # so a wedged engine cannot hang the bind.
+    # pgrep -g selects by process GROUP; ps -g is ambiguous (POSIX reads it as
+    # session), which is the wrong question to ask here.
+    if [[ -n $pid ]]; then
+      for _ in {1..40}; do
+        pgrep -g "$pid" >/dev/null 2>&1 || break
+        sleep 0.05
+      done
+    fi
+    rm -f "$pidfile"
+  fi
+  # Belt and braces: the reader's own trap should have done this already.
+  rm -f "$SPEAK_TXT" "$SPEAK_WAV"
 }
 
 # OCR emits one line per visual line, so a wrapped paragraph arrives as a
@@ -154,7 +197,7 @@ reflow() {
 }
 
 speak() {
-  local text="$1" tmp
+  local text="$1"
   TTS_BACKEND="$(pick_backend)"
   if [[ -z $TTS_BACKEND ]]; then
     notify "No speech engine found (install flite, espeak-ng or piper)" 4000
@@ -164,12 +207,13 @@ speak() {
 
   stop_speech # a second press interrupts the previous read rather than overlapping
 
-  tmp="$(mktemp)"
-  printf '%s\n' "$text" | reflow >"$tmp"
+  printf '%s\n' "$text" | reflow >"$SPEAK_TXT"
 
-  setsid bash -c "$(declare -f run_tts speak_runner); speak_runner \"\$1\"" _ "$tmp" \
+  # --fork makes the double-fork unconditional, so the reader is always a
+  # freshly-created session leader regardless of how this script was spawned.
+  # It writes its own pidfile (see speak_runner); $! here would be the wrapper.
+  setsid --fork bash -c "$(declare -f run_tts speak_runner); speak_runner" \
     >/dev/null 2>&1 &
-  echo "$!" >"$pidfile"
 }
 
 # --- entry point -------------------------------------------------------------

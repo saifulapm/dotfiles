@@ -18,13 +18,17 @@
 # speaker-ID and keyword-spotting tools this desktop has no use for; voxtype
 # already owns speech-to-text here.
 #
-# MODEL CHOICE: int8 throughout, deliberately. Measured on the M2 (2026-08-08)
-# with --num-threads=4:
-#   kokoro-int8-multi-lang-v1_0   330 MB peak RSS   RTF 0.59   (the default)
-#   kitten-nano-en-v0_8-int8      143 MB peak RSS   RTF 0.16   (fallback)
-# The fp32 Kokoro is 3.5x the download for no audible gain at this listening
-# distance. Both beat realtime, which is what makes the streaming player
-# (sherpa-onnx-offline-tts-play) start speaking almost immediately.
+# MODEL CHOICE: fp32 Kokoro, which is the opposite of what the size suggests.
+# Benchmarked on the M2 (2026-08-08, --num-threads=4, same sentence, 3 runs):
+#   kokoro-multi-lang-v1_0        537 MB peak RSS   1.92 s   (the default)
+#   kokoro-int8-multi-lang-v1_0   360 MB peak RSS   3.44 s   (dropped)
+#   kitten-nano-en-v0_8-int8      143 MB peak RSS            (low-RAM fallback)
+# int8 is 1.8x SLOWER here: ARM int8 kernels lose to the fp32 paths, and the
+# non-quantizable ops (softmax, LayerNorm) dominate what is left. Since
+# quantization cannot improve fidelity either, int8 bought nothing but a
+# smaller download and was dropped. All beat realtime, which is what lets the
+# streaming player (sherpa-onnx-offline-tts-play) speak almost immediately.
+# Revisit only if this laptop's ~1.5 GB free headroom shrinks.
 #
 # Failure warns instead of aborting, like every other install script here: a
 # flaky network must not stop a fresh-machine apply, and screenshot-ocr falls
@@ -33,7 +37,7 @@ set -uo pipefail
 
 VERSION="v1.13.4"
 dest="$HOME/.local/share/sherpa-onnx"
-models=(kokoro-int8-multi-lang-v1_0 kitten-nano-en-v0_8-int8)
+models=(kokoro-multi-lang-v1_0 kitten-nano-en-v0_8-int8)
 base="https://github.com/k2-fsa/sherpa-onnx/releases/download"
 
 warn() { echo "sherpa-onnx: $*" >&2; }
