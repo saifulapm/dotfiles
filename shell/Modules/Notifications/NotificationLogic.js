@@ -235,6 +235,86 @@ function recentHistoryRows(pending, past, limit, normalUrgency) {
     return out.slice(0, max);
 }
 
+// ---------------------------------------------------- popup persistence
+//
+// Each on-screen popup is mirrored to its own file under
+// ~/.local/state/qshell/notifications/ so toasts survive real shell restarts
+// (the server's keepOnReload only spans in-process reloads). The file exists
+// exactly as long as the popup is on screen: written when the toast appears,
+// deleted when it expires, is dismissed, overflows the cap, or its action is
+// invoked.
+
+function popupEntry(value, normalUrgency) {
+    var entry = historyEntry(value, normalUrgency);
+    var expire = Number((value || {}).expireTimeout || 0);
+    if (!isFinite(expire) || expire < 0)
+        expire = 0;
+    entry.expireTimeout = expire;
+    // Absolute expiry deadline, set only when a restore resets a surviving
+    // popup's display lifetime. Kept out of the entry entirely when unset so
+    // restored rows match the roles of freshly received ones.
+    var deadline = Number((value || {}).deadline || 0);
+    if (isFinite(deadline) && deadline > 0)
+        entry.deadline = deadline;
+    return entry;
+}
+
+function popupFileName(entry) {
+    var e = entry || {};
+    return String(e.timestamp || 0) + "-" + String(e.originalId || 0) + ".json";
+}
+
+function serializePopup(entry, normalUrgency) {
+    // Compact (single-line) on purpose: restore reads every file together
+    // and parses line by line, which only works when each file is one line.
+    return JSON.stringify(popupEntry(entry, normalUrgency));
+}
+
+// Parse the concatenation of every persisted popup file into entries,
+// newest-first. Deliberately NO dedupe: each file is a popup that was on
+// screen, and originalId already folds in the session epoch, so files from
+// different runs can never name the same notification. The one case that
+// leaves a genuine duplicate (a crash between a replacement's write and the
+// replaced file's delete) merely re-shows a superseded toast, which expires
+// or is dismissed and cleans itself up.
+function parsePopupFiles(raw, normalUrgency) {
+    var lines = String(raw || "").split("\n");
+    var entries = [];
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line)
+            continue;
+        try {
+            var value = JSON.parse(line);
+            if (value && typeof value === "object")
+                entries.push(popupEntry(value, normalUrgency));
+        } catch (e) {
+            // A torn write from a crash mid-save — skip the line, keep the rest.
+        }
+    }
+    entries.sort(function (a, b) {
+        return (b.timestamp || 0) - (a.timestamp || 0);
+    });
+    return entries;
+}
+
+// A persisted popup whose lifetime already ran out would have expired on
+// screen had the shell kept running, so it is not restored. That covers
+// critical toasts too: their lifetime is five minutes, not forever, so one
+// persisted longer ago than that is dropped. A restore-reset deadline
+// outranks the original timestamp: without it, a second restart would judge
+// a re-shown toast by a clock that no longer governs its display and drop
+// it while it is still on screen.
+function popupExpired(entry, duration, now) {
+    var deadline = Number((entry || {}).deadline || 0);
+    if (isFinite(deadline) && deadline > 0)
+        return Number(now) >= deadline;
+    var lifetime = Number(duration || 0);
+    if (!isFinite(lifetime) || lifetime <= 0)
+        return false;
+    return (Number(now) - Number((entry || {}).timestamp || 0)) >= lifetime;
+}
+
 // Toasts sit in the top-right corner. They only clear the bar when the bar
 // occupies the top or right edge, so a left/bottom bar does not pull the
 // popups away from where they are expected.
@@ -376,6 +456,11 @@ if (typeof module !== "undefined") {
         dedupeByOriginalId: dedupeByOriginalId,
         parseHistory: parseHistory,
         recentHistoryRows: recentHistoryRows,
+        popupEntry: popupEntry,
+        popupFileName: popupFileName,
+        serializePopup: serializePopup,
+        parsePopupFiles: parsePopupFiles,
+        popupExpired: popupExpired,
         popupPlacement: popupPlacement,
         imageExtension: imageExtension,
         normalizeAppToken: normalizeAppToken,
