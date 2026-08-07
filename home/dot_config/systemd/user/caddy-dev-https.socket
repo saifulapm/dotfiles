@@ -1,0 +1,15 @@
+# Herd-like on-demand HTTPS (managed by chezmoi): this socket owns
+# 127.0.0.1:443 at ~0 RAM, which is where dnsmasq's *.test → 127.0.0.1
+# answer sends the browser. First connection starts caddy-dev-https.service
+# → caddy-dev.service; 10 min idle tears both down again.
+#
+# A user unit may only bind 443 because run_after_17 sets
+# net.ipv4.ip_unprivileged_port_start=80.
+[Unit]
+Description=Caddy .test on-demand HTTPS socket (127.0.0.1:443)
+
+[Socket]
+ListenStream=127.0.0.1:443
+
+[Install]
+WantedBy=sockets.target

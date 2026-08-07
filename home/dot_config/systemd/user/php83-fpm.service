@@ -1,0 +1,14 @@
+# PHP 8.3 twin of php84-fpm.service (managed by chezmoi — see that file for
+# the reasoning behind Type=exec and the port probe). Idle unless a
+# sites/*.caddy override points a project's php_fastcgi at 127.0.0.1:9083.
+[Unit]
+Description=PHP 8.3 FPM (on-demand, .test sites)
+StopWhenUnneeded=true
+
+[Service]
+ExecStartPre=/usr/bin/mkdir -p %S/php-fpm
+
+Type=exec
+ExecStart=/opt/remi/php83/root/usr/sbin/php-fpm --nodaemonize --fpm-config %h/.config/php-fpm/php83-dev.conf
+ExecStartPost=/usr/bin/bash -c 'for i in $(seq 1 100); do (exec 3<>/dev/tcp/127.0.0.1/39083) 2>/dev/null && exit 0; sleep 0.05; done; echo "php83-fpm: 39083 never accepted a connection" >&2; exit 1'
+ExecReload=/usr/bin/kill -USR2 $MAINPID

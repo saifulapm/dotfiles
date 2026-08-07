@@ -1,0 +1,9 @@
+# Socket-activated forwarder 80 → caddy's 38080 (managed by chezmoi), where
+# the Caddyfile's http://*.test block answers with a redirect to https.
+[Unit]
+Description=Caddy .test on-demand HTTP proxy
+Requires=caddy-dev.service
+After=caddy-dev.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=10min 127.0.0.1:38080

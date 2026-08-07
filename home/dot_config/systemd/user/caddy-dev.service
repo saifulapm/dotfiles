@@ -1,0 +1,23 @@
+# The .test web server (managed by chezmoi), on demand and as the USER — no
+# root, no always-on daemon. Woken by EITHER caddy-dev-http.socket
+# (127.0.0.1:80) or caddy-dev-https.socket (127.0.0.1:443); when both proxies
+# have idled out, StopWhenUnneeded stops caddy too.
+#
+# Running as the user is what makes the whole thing work without sudo: caddy
+# writes its CA and certificates into ~/.local/share/caddy, and serves files
+# out of ~/Sites with the user's own permissions.
+[Unit]
+Description=Caddy (on-demand .test web server)
+StopWhenUnneeded=true
+
+[Service]
+# caddy signals readiness over sd_notify — unconditionally compiled in, so
+# unlike php-fpm this needs no port probe. The proxies' After= then cannot
+# forward into a half-loaded config.
+Type=notify
+ExecStart=/usr/bin/caddy run --config %h/.config/caddy/Caddyfile --adapter caddyfile
+ExecReload=/usr/bin/caddy reload --config %h/.config/caddy/Caddyfile --adapter caddyfile --force
+
+# First start on a fresh machine generates the local CA and the *.test
+# certificate; a few seconds of RSA/ECDSA work on a cold cache.
+TimeoutStartSec=120

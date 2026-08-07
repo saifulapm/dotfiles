@@ -1,0 +1,15 @@
+# On-demand HTTP (managed by chezmoi): owns 127.0.0.1:80 so that typing
+# app.test without a scheme — which every browser tries over plain HTTP
+# first — lands somewhere instead of refusing the connection. Caddy answers
+# with a 308 to https://app.test.
+#
+# A user unit may only bind 80 because run_after_17 sets
+# net.ipv4.ip_unprivileged_port_start=80.
+[Unit]
+Description=Caddy .test on-demand HTTP socket (127.0.0.1:80)
+
+[Socket]
+ListenStream=127.0.0.1:80
+
+[Install]
+WantedBy=sockets.target

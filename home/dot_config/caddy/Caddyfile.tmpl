@@ -1,0 +1,46 @@
+# Herd-style https://<project>.test (managed by chezmoi — a TEMPLATE, not a
+# symlink, because the site root has to be an absolute path).
+#
+# Nothing here listens on 80/443. caddy runs on the high ports below as an
+# on-demand USER service; caddy-dev-http.socket / caddy-dev-https.socket own
+# the real ports at ~0 RAM and wake it on the first connection (see
+# ~/.config/systemd/user/caddy-dev*). 10 minutes idle stops caddy again.
+{
+	http_port 38080
+	https_port 38443
+
+	# Write our OWN http->https redirect below instead of letting auto-HTTPS
+	# synthesise one: caddy builds that redirect from https_port, so it would
+	# send browsers to https://app.test:38443 — the port is an artifact of the
+	# socket-proxy layer and must never reach the client. With explicit
+	# redirects the Location header is built from {host}, which is whatever
+	# the browser asked for (app.test, no port).
+	auto_https disable_redirects
+}
+
+# Per-project overrides live in ~/.config/caddy/sites/*.caddy — a different
+# PHP version, extra directives, a non-Laravel root. An exact hostname beats
+# the wildcard in caddy's matcher regardless of import order, so a file
+# defining `app.test { ... }` simply wins for that host.
+import sites/*.caddy
+
+http://*.test {
+	redir https://{host}{uri} 308
+}
+
+*.test {
+	# caddy's own CA, not Let's Encrypt: .test is not a public domain, so an
+	# ACME challenge could never complete. run_after_17 puts the root cert in
+	# the system trust store, which is what makes the browser padlock green.
+	tls internal
+
+	# app.test -> ~/Sites/app/public. Labels count from the right, so
+	# labels.0 is "test" and labels.1 is the project.
+	root * {{ .chezmoi.homeDir }}/Sites/{labels.1}/public
+
+	# 9084 is another socket-proxy pair, not php-fpm itself: connecting here
+	# starts php84-fpm.service on 39084, and it stops when idle.
+	php_fastcgi 127.0.0.1:9084
+
+	file_server
+}

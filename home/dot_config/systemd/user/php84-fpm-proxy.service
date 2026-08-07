@@ -1,0 +1,10 @@
+# Socket-activated forwarder 9084 → php84-fpm's 39084 (managed by chezmoi).
+# When no request has flowed for exit-idle-time, proxyd exits and
+# php84-fpm.service (StopWhenUnneeded) stops with it.
+[Unit]
+Description=PHP 8.4 FPM on-demand proxy
+Requires=php84-fpm.service
+After=php84-fpm.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=10min 127.0.0.1:39084

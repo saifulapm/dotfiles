@@ -1,0 +1,23 @@
+; PHP 8.3 twin of php84-dev.conf (managed by chezmoi — see that file for why
+; each setting is what it is). Exists so a project whose .php-version pins
+; 8.3 can be served by pointing a sites/*.caddy override at 127.0.0.1:9083
+; instead of the default 9084. Nothing runs it until such a site is hit.
+[global]
+error_log = {{ .chezmoi.homeDir }}/.local/state/php-fpm/php83-dev.log
+daemonize = no
+
+[dev]
+listen = 127.0.0.1:39083
+
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 1
+pm.min_spare_servers = 1
+pm.max_spare_servers = 2
+pm.max_requests = 500
+
+clear_env = no
+catch_workers_output = yes
+
+php_admin_flag[display_errors] = on
+php_admin_value[error_reporting] = E_ALL

@@ -364,8 +364,9 @@ why = "Arbitrary-precision math — common Laravel package requirement"
 # system 8.5 (multi-version decision 2026-08-07; ~/.dotfiles/bin/php picks
 # per project via .php-version). The remi-release rpm that provides these is
 # bootstrapped by 00-install-packages (not a copr). Each phpXX meta pulls
-# cli/common/fpm/mbstring/opcache/xml; the rest are listed explicitly
-# because install_weak_deps=False skips anything softer than Requires.
+# cli/common/mbstring/opcache; the rest are listed explicitly because
+# install_weak_deps=False skips anything softer than Requires — fpm and xml
+# included (checked with rpm -qa 2026-08-07: neither arrives on its own).
 
 [[pkg]]
 name = "php82"
@@ -546,6 +547,30 @@ name = "php84-php-process"
 category = "dev"
 arch = "all"
 why = "PHP 8.4: posix/pcntl"
+
+[[pkg]]
+name = "php84-php-fpm"
+category = "dev"
+arch = "all"
+why = "FastCGI process manager behind the https://<app>.test sites — caddy's php_fastcgi talks to the socket-activated php84-fpm user unit. Default version for .test sites; NOT pulled by the php84 meta (verified absent 2026-08-07)"
+
+[[pkg]]
+name = "php83-php-fpm"
+category = "dev"
+arch = "all"
+why = "Same, for projects whose .php-version pins 8.3 — a per-site sites/*.caddy override points php_fastcgi at 127.0.0.1:9083 instead"
+
+[[pkg]]
+name = "caddy"
+category = "dev"
+arch = "all"
+why = "The .test web server (Herd's role): wildcard *.test vhost, php_fastcgi, and an internal CA so every project is https:// with no per-site setup. Chosen over nginx because the whole config is one 20-line Caddyfile and TLS is automatic. Runs on demand only — a user unit woken by a socket, stopped after 10 min idle"
+
+[[pkg]]
+name = "dnsmasq"
+category = "dev"
+arch = "all"
+why = "Resolves *.test → 127.0.0.1 with no /etc/hosts edit per project (Herd's trick). The one deliberate always-on service here: ~2 MB RSS, and DNS cannot be socket-activated on demand because resolved queries it at boot"
 
 [[pkg]]
 name = "composer"

@@ -1,0 +1,12 @@
+# Herd-like on-demand PHP 8.4 (managed by chezmoi): this socket owns
+# 127.0.0.1:9084 at ~0 RAM — the address caddy's php_fastcgi points at. First
+# connection starts php84-fpm-proxy.service → php84-fpm.service; 10 min idle
+# tears both down again.
+[Unit]
+Description=PHP 8.4 FPM on-demand socket (127.0.0.1:9084)
+
+[Socket]
+ListenStream=127.0.0.1:9084
+
+[Install]
+WantedBy=sockets.target

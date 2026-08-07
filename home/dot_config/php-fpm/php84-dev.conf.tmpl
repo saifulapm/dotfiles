@@ -1,0 +1,40 @@
+; Minimal user-level php-fpm for the .test sites (managed by chezmoi — a
+; TEMPLATE, not a symlink, because error_log has to be an absolute path).
+;
+; This is a dev pool run by the LOGGED-IN USER, not the system php-fpm: no
+; root, no /etc, no always-on daemon. php84-fpm.service starts it when the
+; php84-fpm-proxy socket sees a connection and stops it again when caddy has
+; been idle. Deliberately not derived from the Remi stock php-fpm.conf —
+; that one wants /run, /var/log and a root master process.
+[global]
+error_log = {{ .chezmoi.homeDir }}/.local/state/php-fpm/php84-dev.log
+
+; systemd runs the master in the foreground and owns the lifecycle.
+daemonize = no
+
+[dev]
+listen = 127.0.0.1:39084
+
+; Small on purpose: this serves one developer clicking around one site, and
+; every idle worker is ~30 MB of resident PHP on a laptop.
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 1
+pm.min_spare_servers = 1
+pm.max_spare_servers = 2
+
+; Long-lived workers leak in dev (xdebug, package churn); recycling is cheap.
+pm.max_requests = 500
+
+; Inherit the user's environment. Laravel reads PATH to shell out (node for
+; vite manifests, git for the version banner), and clear_env=yes — the
+; production default — hands the workers an empty one.
+clear_env = no
+
+; Worker stdout/stderr into the journal instead of a silent void, so
+; `journalctl --user -u php84-fpm` shows warnings and var_dump output.
+catch_workers_output = yes
+
+; Show real PHP errors in the browser; this pool never faces the internet.
+php_admin_flag[display_errors] = on
+php_admin_value[error_reporting] = E_ALL

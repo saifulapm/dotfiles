@@ -1,0 +1,37 @@
+# Per-project overrides for the .test setup (managed by chezmoi).
+#
+# This file is deliberately all comments. It exists so that the
+# `import sites/*.caddy` line in ../Caddyfile always matches at least one
+# file — caddy complains about a glob that matches nothing — and so the
+# override syntax is documented where you go looking for it.
+#
+# Drop a new <project>.caddy next to this one; the files here are yours, not
+# chezmoi's, so they are not tracked in the dotfiles repo. An exact hostname
+# always beats the wildcard *.test block, whatever the filenames sort to.
+#
+# Pin one project to PHP 8.3 (9083 is the 8.3 socket; 9084 is the default):
+#
+#   legacy.test {
+#   	tls internal
+#   	root * /home/saiful/Sites/legacy/public
+#   	php_fastcgi 127.0.0.1:9083
+#   	file_server
+#   }
+#
+# A project that is not a Laravel app — serve the repo root, no public/:
+#
+#   docs.test {
+#   	tls internal
+#   	root * /home/saiful/Sites/docs
+#   	file_server browse
+#   }
+#
+# Hand a hostname to a dev server that is already running (vite, node):
+#
+#   spa.test {
+#   	tls internal
+#   	reverse_proxy 127.0.0.1:5173
+#   }
+#
+# After editing: systemctl --user restart caddy-dev  (only if it is running;
+# otherwise the next request picks the change up on its own).

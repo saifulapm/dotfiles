@@ -1,0 +1,12 @@
+# Socket-activated forwarder 443 → caddy's 38443 (managed by chezmoi).
+#
+# This is a plain TCP splice, so TLS is untouched: the ClientHello with its
+# SNI reaches caddy byte for byte, caddy terminates the handshake itself and
+# picks the certificate. The proxy never sees plaintext and holds no key.
+[Unit]
+Description=Caddy .test on-demand HTTPS proxy
+Requires=caddy-dev.service
+After=caddy-dev.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=10min 127.0.0.1:38443

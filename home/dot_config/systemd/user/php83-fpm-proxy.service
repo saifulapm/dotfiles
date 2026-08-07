@@ -1,0 +1,8 @@
+# Socket-activated forwarder 9083 → php83-fpm's 39083 (managed by chezmoi).
+[Unit]
+Description=PHP 8.3 FPM on-demand proxy
+Requires=php83-fpm.service
+After=php83-fpm.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=10min 127.0.0.1:39083

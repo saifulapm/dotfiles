@@ -1,0 +1,42 @@
+# On-demand PHP 8.4 FastCGI for the .test sites (managed by chezmoi) —
+# started by php84-fpm-proxy.socket on the first connection to
+# 127.0.0.1:9084, stopped again when the proxy idle-exits
+# (StopWhenUnneeded). Same shape as the dev-database quadlets, minus podman:
+# php-fpm is a plain binary, so it needs no container.
+#
+# Adding a version = copy this + the proxy pair + a pool conf with new ports
+# (8.2 would be 9082 -> 39082); only the version being requested runs.
+[Unit]
+Description=PHP 8.4 FPM (on-demand, .test sites)
+StopWhenUnneeded=true
+
+# No ConditionPathExists guard on the php-fpm binary on purpose: a
+# condition-skipped unit counts as STARTED, so the proxy's Requires= would be
+# satisfied and a missing php84-php-fpm would surface as an unexplained
+# connection error in the browser. Letting the exec fail instead propagates
+# through Requires= and puts "No such file or directory" in the journal.
+
+[Service]
+# The pool's error_log directory, created before the master starts so a first
+# run cannot die on a missing path. Deliberately a plain mkdir and NOT
+# StateDirectory=php-fpm: when the state dir is absent and a CONFIGURATION
+# dir of the same name exists — which ~/.config/php-fpm is — systemd treats
+# it as a pre-v254 layout and silently symlinks ~/.local/state/php-fpm to
+# ~/.config/php-fpm. Observed live 2026-08-07; php-fpm then writes its log
+# into the chezmoi-managed config directory.
+ExecStartPre=/usr/bin/mkdir -p %S/php-fpm
+
+Type=exec
+ExecStart=/opt/remi/php84/root/usr/sbin/php-fpm --nodaemonize --fpm-config %h/.config/php-fpm/php84-dev.conf
+
+# Type=exec only means "the binary exec'd", which is a few milliseconds
+# before the pool is actually accepting on 39084 — and systemd-socket-proxyd
+# connects ONCE, with no retry, so that gap would surface as a dead first
+# request. Wait for the port instead. Deliberately not Type=notify: that
+# depends on php-fpm being built --with-fpm-systemd, which cannot be checked
+# from the source tree, and if the build lacks it the unit hangs until
+# TimeoutStartSec rather than failing honestly.
+ExecStartPost=/usr/bin/bash -c 'for i in $(seq 1 100); do (exec 3<>/dev/tcp/127.0.0.1/39084) 2>/dev/null && exit 0; sleep 0.05; done; echo "php84-fpm: 39084 never accepted a connection" >&2; exit 1'
+
+# Graceful pool reload (USR2) for a php.ini or pool change, no dropped requests.
+ExecReload=/usr/bin/kill -USR2 $MAINPID

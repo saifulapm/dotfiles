@@ -1,0 +1,11 @@
+# On-demand PHP 8.3 (managed by chezmoi): owns 127.0.0.1:9083 at ~0 RAM, for
+# projects a sites/*.caddy override pins to 8.3. First connection starts
+# php83-fpm-proxy.service → php83-fpm.service; 10 min idle stops both.
+[Unit]
+Description=PHP 8.3 FPM on-demand socket (127.0.0.1:9083)
+
+[Socket]
+ListenStream=127.0.0.1:9083
+
+[Install]
+WantedBy=sockets.target
