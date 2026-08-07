@@ -145,7 +145,11 @@ BarPanel {
     function setProfile(index) {
         if (!profilesAvailable || index < 0 || index >= profileValues.length)
             return;
+        // Immediate for the UI, then bin/power-profile persists the choice
+        // under the CURRENT power source (ac/battery) so plugging or
+        // unplugging restores it — omarchy's per-source profile memory.
         PowerProfiles.profile = profileValues[index];
+        Quickshell.execDetached(["power-profile", "autodetect", profileNames[index]]);
     }
 
     // Their keyboard model: the first arrow press parks the cursor, later

@@ -78,13 +78,20 @@ QtObject {
     readonly property Connections powerSourceWatch: Connections {
         target: UPower
         function onOnBatteryChanged() {
-            // In-process equivalent of their omarchy-powerprofiles-set
-            // autodetect path; PowerProfiles is quickshell's D-Bus client for
-            // the same daemon powerprofilesctl drives.
-            if (UPower.onBattery)
-                PowerProfiles.profile = PowerProfile.Balanced;
-            else
-                PowerProfiles.profile = PowerProfiles.hasPerformanceProfile ? PowerProfile.Performance : PowerProfile.Balanced;
+            // bin/power-profile owns the per-source MEMORY (omarchy's
+            // powerprofiles-set port): it restores whatever the user last
+            // chose for this source — the old in-process branch hardcoded
+            // balanced/performance and forgot every choice.
+            Quickshell.execDetached(["power-profile", "autodetect"]);
         }
+    }
+
+    // Boot restore, their powerprofiles-init: apply the saved profile for the
+    // current source once per shell start. Also heals raw powerprofilesctl
+    // drift — every OWN entry point saves through the same script.
+    readonly property Timer profileInit: Timer {
+        running: true
+        interval: 1500
+        onTriggered: Quickshell.execDetached(["power-profile", "autodetect"])
     }
 }

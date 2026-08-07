@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# power-profile — set and REMEMBER the power profile per power source.
+#
+# Port of omarchy-powerprofiles-set/-list (CREDITS.md): one saved profile for
+# AC and one for battery (~/.local/state/qshell/powerprofiles/{ac,battery}),
+# `autodetect` resolves the source the same way the shell does (UPower
+# OnBattery over D-Bus) so every entry point — PowerPanel buttons, the menu's
+# provider rows, the shell's source-change watcher — saves and restores under
+# the same key. No explicit profile = restore the saved one (defaults:
+# AC→performance when available, else balanced).
+#
+#   power-profile [autodetect|ac|battery] [power-saver|balanced|performance]
+#   power-profile list [--with-state]
+
+set -euo pipefail
+
+state_dir="$HOME/.local/state/qshell/powerprofiles"
+
+list_profiles() {
+  # powerprofilesctl's indented "  profile:" blocks, active marked with '*';
+  # tac so the order runs saver→performance like the panel row.
+  powerprofilesctl list 2>/dev/null |
+    awk -v with_state="${1:-}" '/^[[:space:]]*\*?[[:space:]]*[a-zA-Z0-9-]+:$/ {
+      active = ($1 == "*") ? 1 : 0
+      gsub(/^[*[:space:]]+|:$/, "")
+      print $0 (with_state ? "\t" active : "")
+    }' | tac
+}
+
+action="${1:-autodetect}"
+requested="${2:-}"
+
+if [[ $action == list ]]; then
+  list_profiles "${2:+1}"
+  exit 0
+fi
+
+case "$action" in
+autodetect)
+  if [[ $(busctl get-property org.freedesktop.UPower /org/freedesktop/UPower org.freedesktop.UPower OnBattery 2>/dev/null) == "b true" ]]; then
+    action=battery
+  else
+    action=ac
+  fi
+  ;;
+ac | battery) ;;
+*)
+  echo "Usage: power-profile [autodetect|ac|battery] [profile] | power-profile list" >&2
+  exit 1
+  ;;
+esac
+
+mapfile -t profiles < <(list_profiles)
+((${#profiles[@]} > 0)) || exit 0 # no power-profiles-daemon — quiet no-op
+
+profile_available() {
+  [[ " ${profiles[*]} " == *" $1 "* ]]
+}
+
+state_file="$state_dir/$action"
+profile=""
+
+if [[ -n $requested ]]; then
+  profile_available "$requested" || {
+    echo "Power profile is not available: $requested" >&2
+    exit 1
+  }
+  profile="$requested"
+elif [[ -r $state_file ]]; then
+  profile=$(<"$state_file")
+fi
+
+if [[ -z $profile ]] || ! profile_available "$profile"; then
+  if [[ $action == "ac" ]] && profile_available performance; then
+    profile=performance
+  else
+    profile=balanced
+  fi
+fi
+
+powerprofilesctl set "$profile"
+
+if [[ -n $requested ]]; then
+  mkdir -p "$state_dir"
+  printf '%s\n' "$requested" >"$state_file"
+fi
