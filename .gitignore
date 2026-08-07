@@ -1,3 +1,6 @@
 # machine-specific, auto-populated by quickshell at startup
 shell/.qmlls.ini
 bench/.last-qs.log
+
+# per-directory agent memory, auto-populated by claude code reviews
+**/.claude/
