@@ -152,6 +152,16 @@ Scope {
         providerRows = [];
         filterText = "";
         selectedIndex = 0;
+        if (providerProc.running) {
+            // Re-entered while the previous script is still collecting: the
+            // command change would be ignored and the stale run's tail would
+            // parse as THIS provider's rows. Kill the stale run and start
+            // this entry cleanly once it has exited — same as guardProc.
+            providerProc.pendingEntry = entry;
+            providerProc.running = false;
+            rebuildDisplay();
+            return;
+        }
         providerProc.icon = def.icon || entry.icon || "";
         providerProc.actionForName = entry.provider;
         providerProc.collected = "";
@@ -165,12 +175,32 @@ Scope {
         property string collected: ""
         property string icon: ""
         property string actionForName: ""
+        property var pendingEntry: null
         stdout: SplitParser {
             onRead: data => providerProc.collected += data + "\n"
         }
-        onExited: {
+        onExited: (exitCode, exitStatus) => {
+            if (providerProc.pendingEntry) {
+                // This exit is the kill from openProvider, not an answer:
+                // discard the partial output and start the pending entry —
+                // its per-provider state applies only now, with its own run.
+                const entry = providerProc.pendingEntry;
+                const pdef = menuRoot.providers[entry.provider];
+                providerProc.pendingEntry = null;
+                providerProc.icon = pdef.icon || entry.icon || "";
+                providerProc.actionForName = entry.provider;
+                providerProc.collected = "";
+                providerProc.command = ["bash", "-lc", pdef.script];
+                providerProc.running = true;
+                return;
+            }
             const def = menuRoot.providers[actionForName];
             if (!def || menuRoot.providerRows === null)
+                return;
+            // A script that failed has no complete answer: keep the empty
+            // loading view rather than committing whatever half-list it
+            // printed before dying (omarchy 3d033d1).
+            if (exitCode !== 0 || exitStatus !== 0)
                 return;
             const rows = [];
             const lines = collected.split("\n");
@@ -602,7 +632,7 @@ Scope {
         stdout: SplitParser {
             onRead: data => guardProc.collected += data + "\n"
         }
-        onExited: {
+        onExited: (exitCode, exitStatus) => {
             if (guardProc.pendingScript) {
                 const script = guardProc.pendingScript;
                 guardProc.pendingScript = "";
@@ -611,6 +641,11 @@ Scope {
                 guardProc.running = true;
                 return;
             }
+            // A batch that died answered nothing: keep the previous answers
+            // rather than un-hiding every row missing from a truncated set
+            // (omarchy 3d033d1).
+            if (exitCode !== 0 || exitStatus !== 0)
+                return;
             const nextWhen = {};
             const nextChecked = {};
             const lines = guardProc.collected.split("\n");

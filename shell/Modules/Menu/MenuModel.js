@@ -155,6 +155,12 @@ function isVisible(items, itemOrder, whenResults, entry, depth) {
         return false;
     if (entry.kind !== "menu" && entry.kind !== "link")
         return true;
+    // Provider entries keep kind "menu" (they open a list) but have no tree
+    // children — their rows come from a script at open time. Without this
+    // leaf treatment the empty-submenu sweep below hides them from their
+    // parent card.
+    if (entry.provider)
+        return true;
 
     var guard = depth || 0;
     if (guard >= 32)
