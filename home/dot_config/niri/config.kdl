@@ -670,18 +670,19 @@ binds {
     Shift+XF86AudioPause allow-when-locked=true { spawn "qs" "ipc" "call" "media" "sourceSwitch"; }
     Shift+XF86AudioPlay  allow-when-locked=true { spawn "qs" "ipc" "call" "media" "sourceSwitch"; }
 
-    // Example brightness key mappings for brightnessctl.
-    // You can use regular spawn with multiple arguments too (to avoid going through "sh"),
-    // but you need to manually put each argument in separate "" quotes.
-    XF86MonBrightnessUp allow-when-locked=true { spawn "qs" "ipc" "call" "osd" "brightnessUp"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "qs" "ipc" "call" "osd" "brightnessDown"; }
-    // omarchy's brightness extremes and precise ±1% steps, on the same
-    // backlight class the OSD service drives (direct brightnessctl calls, so
-    // no OSD popup for these).
-    Shift+XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "100%"; }
-    Shift+XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "1%"; }
-    Alt+XF86MonBrightnessUp     allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+1%"; }
-    Alt+XF86MonBrightnessDown   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "1%-"; }
+    // All brightness keys route through bin/brightness-display (omarchy gap
+    // item 1, their omarchy-brightness-display port): internal panels ride
+    // brightnessctl exactly as before, external connectors go DDC/CI — the
+    // Mac mini's HDMI monitor gains working brightness keys. The script
+    // raises the OSD itself (incl. the Shift/Alt variants that used to skip
+    // it); the old `osd brightnessUp/Down` IPC stays as a compat path.
+    XF86MonBrightnessUp allow-when-locked=true { spawn "brightness-display" "+5%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightness-display" "5%-"; }
+    // omarchy's brightness extremes and precise ±1% steps.
+    Shift+XF86MonBrightnessUp   allow-when-locked=true { spawn "brightness-display" "100%"; }
+    Shift+XF86MonBrightnessDown allow-when-locked=true { spawn "brightness-display" "1%"; }
+    Alt+XF86MonBrightnessUp     allow-when-locked=true { spawn "brightness-display" "+1%"; }
+    Alt+XF86MonBrightnessDown   allow-when-locked=true { spawn "brightness-display" "1%-"; }
     // Keyboard backlight — this MacBook's kbd_backlight LED (omarchy:
     // omarchy-brightness-keyboard). The cycle key (XF86KbdLightOnOff) is
     // unbound: no cycle script here.

@@ -262,6 +262,12 @@ arch = "all"
 why = "Terminal system monitor the user actually reaches for (bash history shows regular use). Installed by hand 2026-08-05, recorded 2026-08-06"
 
 [[pkg]]
+name = "ddcutil"
+category = "core"
+arch = "all"
+why = "DDC/CI brightness control for external monitors (omarchy gap item 1, user-picked 2026-08-07): bin/brightness-display routes non-internal connectors through bin/brightness-display-ddc (getvcp/setvcp 10, bus cached per connector), which is the only brightness path the Mac mini's HDMI display can have — no backlight device exists for it. The rpm ships udev rules granting i2c-dev access to seated users (60-ddcutil-i2c.rules, uaccess tag), so no group edit or /etc change is needed; if a display refuses DDC the script caches 'unavailable' for 60s and the keys degrade to no-ops. Untested against real DDC hardware until the Mac mini runs an apply — this MacBook's only display is the internal eDP panel"
+
+[[pkg]]
 name = "udisks2"
 category = "core"
 arch = "all"
