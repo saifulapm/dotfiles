@@ -15,6 +15,10 @@ Requisite=graphical-session.target
 
 [Service]
 Type=notify
+# /usr/bin/emacs is the emacs-pgtk rpm (30.2, the fallback). When
+# bin/rebuild-emacs has built Emacs 31 into ~/.local, its drop-in
+# (~/.config/systemd/user/emacs.service.d/50-local-build.conf) resets
+# ExecStart to that binary — machine state, deliberately not chezmoi-managed.
 ExecStart=/usr/bin/emacs --fg-daemon
 # Emacs exits 15 after SIGTERM (systemd's default KillSignal) — a clean
 # daemon shutdown, not a failure. Kept from the rpm unit.

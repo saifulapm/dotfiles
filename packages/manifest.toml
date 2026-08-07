@@ -643,7 +643,117 @@ why = "Go language server for eglot"
 name = "emacs-pgtk"
 category = "dev"
 arch = "all"
-why = "The editor. Pure-GTK Wayland-native build with native compilation (links libgccjit) — stock Fedora 44, no COPR needed (verified 2026-08-05). Runs as a session-tied daemon: dot_config/systemd/user/emacs.service shadows this rpm's default.target unit, which would start before niri-session's env import (no WAYLAND_DISPLAY for pgtk frames, sparse PATH handed to eglot's servers). Config is the separate saifulapm/emacs.d repo cloned to ~/.config/emacs by run_before_04 — never pulled by the apply, it's a living repo pushed from that checkout"
+why = "The /usr/bin fallback editor (30.2 stable) — the daemon actually runs the Emacs 31 master build from bin/rebuild-emacs in ~/.local (user ask 2026-08-07; run_after_20 builds it on a fresh box, a systemd drop-in retargets ExecStart — same two-tier shape as the Arch box's emacs-wayland + rebuild-emacs). Pure-GTK Wayland-native with native compilation (links libgccjit) — stock Fedora 44, no COPR needed (verified 2026-08-05). Runs as a session-tied daemon: dot_config/systemd/user/emacs.service shadows this rpm's default.target unit, which would start before niri-session's env import (no WAYLAND_DISPLAY for pgtk frames, sparse PATH handed to eglot's servers). Config is the separate saifulapm/emacs.d repo cloned to ~/.config/emacs by run_before_04 — never pulled by the apply, it's a living repo pushed from that checkout"
+
+# Emacs 31 build deps — bin/rebuild-emacs compiles master into ~/.local
+# (run_after_20 on a fresh box; manual reruns roll forward). systemd-devel
+# is load-bearing, not nice-to-have: emacs.service is Type=notify and a
+# build without libsystemd never reports ready — the daemon would be killed
+# at TimeoutStartSec. The image libs mirror what the emacs-pgtk rpm itself
+# builds against; skipping one silently drops that format from doc-view /
+# image-mode in the 31 build.
+
+[[pkg]]
+name = "autoconf"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: autogen.sh regenerates configure from a git checkout"
+
+[[pkg]]
+name = "texinfo"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: makeinfo, required when building from git (no pregenerated docs in the repo)"
+
+[[pkg]]
+name = "gtk3-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: the PGTK frontend — --with-pgtk configures against gtk+-3.0"
+
+[[pkg]]
+name = "gnutls-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: TLS for url.el/package.el — configure hard-requires it by default"
+
+[[pkg]]
+name = "libgccjit-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep AND runtime: --with-native-compilation links libgccjit, and .eln compilation at runtime needs the headers + driver too"
+
+[[pkg]]
+name = "libtree-sitter-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: --with-tree-sitter (Fedora's name for tree-sitter-devel; ships tree-sitter.pc)"
+
+[[pkg]]
+name = "systemd-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: libsystemd for sd_notify — the Type=notify unit is dead without it (daemon killed at start timeout)"
+
+[[pkg]]
+name = "ncurses-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: terminfo for emacsclient -t / -nw frames"
+
+[[pkg]]
+name = "harfbuzz-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: the shaper — without it PGTK falls back to unshapen font rendering"
+
+[[pkg]]
+name = "libxml2-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: libxml-parse-html-region (eww, notmuch HTML mail). Already on disk as a transitive dep — declared because rebuild-emacs needs it directly"
+
+[[pkg]]
+name = "sqlite-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: built-in sqlite3 support (multisession.el, org-roam-style packages)"
+
+[[pkg]]
+name = "giflib-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: GIF support in image-mode"
+
+[[pkg]]
+name = "libjpeg-turbo-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: JPEG support in image-mode"
+
+[[pkg]]
+name = "libpng-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: PNG support in image-mode"
+
+[[pkg]]
+name = "libtiff-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: TIFF support in image-mode (doc-view intermediate format)"
+
+[[pkg]]
+name = "libwebp-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: WebP support in image-mode"
+
+[[pkg]]
+name = "librsvg2-devel"
+category = "dev"
+arch = "all"
+why = "Emacs 31 build dep: SVG rendering — modern UI packages (kind-icon, svg-lib) draw with it"
 
 [[pkg]]
 name = "podman"

@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# rebuild-emacs — build Emacs 31 (master) into ~/.local with PGTK +
+# native-comp + tree-sitter, shadowing the emacs-pgtk rpm's 30.2 on PATH.
+# Fedora port of the Arch script of the same name: dnf's emacs-pgtk is
+# locked to stable, master is where the editor actually lives. Rerun any
+# time to roll forward to current master (run_after_20 only calls this
+# when ~/.local/bin/emacs is missing — an apply never surprise-rebuilds).
+#
+# The systemd side: dot_config/systemd/user/emacs.service (chezmoi-managed)
+# points at /usr/bin/emacs; this script drops a machine-state override at
+# ~/.config/systemd/user/emacs.service.d/50-local-build.conf resetting
+# ExecStart to ~/.local/bin/emacs, then restarts the daemon if it was up.
+# Fall back to the rpm with: rm -r ~/.config/systemd/user/emacs.service.d
+# && systemctl --user daemon-reload && systemctl --user restart emacs.
+#
+# IGC (MPS incremental GC): kept from the Arch script but effectively off —
+# Fedora packages no MPS; if /usr/include/mps.h ever appears it turns on.
+
+set -euo pipefail
+
+SRC="$HOME/.local/src/emacs"
+PREFIX="$HOME/.local"
+JOBS="$(($(nproc) - 1))"
+[ "$JOBS" -lt 1 ] && JOBS=1
+
+# --- deps (manifest: "Emacs 31 build deps" block) ---------------------------
+# libsystemd is load-bearing, not optional: the unit is Type=notify, and a
+# build without --with-libsystemd never signals ready — systemd would kill
+# the daemon at TimeoutStartSec.
+missing=()
+for c in git autoconf makeinfo pkg-config gcc make; do
+  command -v "$c" >/dev/null 2>&1 || missing+=("$c")
+done
+for m in gtk+-3.0 gnutls libsystemd tree-sitter harfbuzz; do
+  pkg-config --exists "$m" 2>/dev/null || missing+=("pkgconfig($m)")
+done
+[ -f /usr/include/libgccjit.h ] || missing+=(libgccjit-devel)
+if [ "${#missing[@]}" -gt 0 ]; then
+  echo "rebuild-emacs: missing build deps: ${missing[*]} — a terminal 'chezmoi apply' installs them (manifest)" >&2
+  exit 1
+fi
+
+# --- source -----------------------------------------------------------------
+if [ ! -d "$SRC/.git" ]; then
+  mkdir -p "$(dirname "$SRC")"
+  echo "==> Cloning emacs upstream master (github mirror, faster than savannah)"
+  git clone --depth 1 https://github.com/emacs-mirror/emacs.git "$SRC"
+else
+  echo "==> Updating $SRC to origin/master"
+  git -C "$SRC" fetch --depth 1 origin master
+  git -C "$SRC" reset --hard origin/master
+fi
+
+cd "$SRC"
+git clean -xdf
+
+mps_flag=(--with-mps=no)
+if [ -f /usr/include/mps.h ]; then
+  mps_flag=(--with-mps=yes)
+  echo "==> MPS detected -> building with IGC support"
+fi
+
+echo "==> ./autogen.sh"
+./autogen.sh
+
+echo "==> ./configure --prefix=$PREFIX"
+# Extra args (e.g. --with-imagemagick) pass through on the command line.
+./configure \
+  --prefix="$PREFIX" \
+  --with-pgtk \
+  --with-native-compilation=yes \
+  --with-tree-sitter \
+  --without-compress-install \
+  --disable-gc-mark-trace \
+  "${mps_flag[@]}" \
+  "$@"
+
+# `make uninstall` after configure removes files matching the new PREFIX,
+# wiping a previous ~/.local emacs before the new one drops in.
+echo "==> Removing previous ~/.local emacs (if any)"
+make uninstall >/dev/null 2>&1 || true
+
+echo "==> make -j$JOBS"
+make -j"$JOBS"
+
+echo "==> make install"
+make install
+
+# --- systemd drop-in --------------------------------------------------------
+dropin="$HOME/.config/systemd/user/emacs.service.d/50-local-build.conf"
+mkdir -p "$(dirname "$dropin")"
+printf '[Service]\nExecStart=\nExecStart=%%h/.local/bin/emacs --fg-daemon\n' > "$dropin"
+systemctl --user daemon-reload
+echo "==> Drop-in installed at $dropin"
+
+if systemctl --user is-active emacs.service >/dev/null 2>&1; then
+  echo "==> Restarting emacs.service onto the new build"
+  systemctl --user restart emacs.service
+fi
+
+echo
+echo "Done. Installed:"
+"$PREFIX/bin/emacs" --version | head -1
+echo "    -> $PREFIX/bin/emacs"
