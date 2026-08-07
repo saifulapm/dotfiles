@@ -47,3 +47,9 @@ border-width = 1
 [motion]
 duration = 120
 easing = "standard"
+
+# GTK icon theme for this theme (omarchy's themes/vantablack/icons.theme value — their gray/grey variant does not exist in the rpm, nearest neutral used;
+# consumed by bin/theme-apply's gsettings flip, Yaru variants from the
+# yaru-icon-theme rpm).
+[icon]
+theme = "Yaru-dark"

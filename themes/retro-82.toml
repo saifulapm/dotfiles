@@ -47,3 +47,9 @@ border-width = 1
 [motion]
 duration = 0
 easing = "snap"
+
+# GTK icon theme for this theme (omarchy's themes/retro-82/icons.theme value;
+# consumed by bin/theme-apply's gsettings flip, Yaru variants from the
+# yaru-icon-theme rpm).
+[icon]
+theme = "Yaru-wartybrown"

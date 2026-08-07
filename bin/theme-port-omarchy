@@ -179,6 +179,21 @@ function port(name) {
   kv("easing", ch.easing)
   lines.push("")
 
+  // Their icons.theme (a GTK icon-theme name, Yaru color variants) → our
+  // [icon].theme token, consumed by theme-apply's gsettings flip. Their
+  // gray/grey values name variants the yaru-icon-theme rpm doesn't ship —
+  // mapped to the nearest neutral that exists.
+  let iconTheme = ""
+  try {
+    iconTheme = fs.readFileSync(path.join(OMARCHY, name, "icons.theme"), "utf8").trim()
+  } catch (e) { /* theme ships no icon choice */ }
+  if (/gr[ae]y/.test(iconTheme)) iconTheme = c.mode === "light" ? "Yaru" : "Yaru-dark"
+  if (iconTheme) {
+    lines.push("[icon]")
+    kv("theme", iconTheme)
+    lines.push("")
+  }
+
   const dest = path.join(ROOT, "themes", name + ".toml")
   fs.writeFileSync(dest, lines.join("\n"))
   console.log(`ported ${name} (${c.mode}, radius ${ch.radius}, motion ${ch.motion}ms)`)

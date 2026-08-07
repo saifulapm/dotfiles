@@ -53,3 +53,9 @@ easing = "standard"
 # One token, gradient or solid: "#hex #hex angledeg" | "#hex".
 [border]
 active = "#798186ee #caccccee"
+
+# GTK icon theme for this theme (omarchy's themes/solitude/icons.theme value;
+# consumed by bin/theme-apply's gsettings flip, Yaru variants from the
+# yaru-icon-theme rpm).
+[icon]
+theme = "Yaru-sage-dark"

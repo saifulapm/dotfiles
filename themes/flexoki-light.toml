@@ -47,3 +47,9 @@ border-width = 1
 [motion]
 duration = 150
 easing = "standard"
+
+# GTK icon theme for this theme (omarchy's themes/flexoki-light/icons.theme value;
+# consumed by bin/theme-apply's gsettings flip, Yaru variants from the
+# yaru-icon-theme rpm).
+[icon]
+theme = "Yaru-blue"

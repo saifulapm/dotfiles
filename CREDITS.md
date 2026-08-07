@@ -1402,3 +1402,35 @@ Direct file-level copies (source path → destination path):
   exported and unused upstream and stays that way here. Whitespace follows
   house 4-space style; the `module.exports` tail is kept so the parses can be
   exercised under node.
+- omarchy `bin/omarchy-launch-or-focus` → `bin/launch-or-focus` (2026-08-07,
+  gap items 3+7): their word-bounded case-insensitive class/title match and
+  focus-else-launch flow, hyprctl/jq swapped for `niri msg --json windows`
+  and `focus-window --id`; newest id wins ties (their head -1 order is
+  hyprctl's), `setsid -f` for the detached launch, no uwsm wrapper.
+- omarchy `default/xcompose` + `install/user/xcompose.sh` →
+  `home/dot_XCompose` (2026-08-07, gap item 9): the emoji and typography
+  sequences verbatim, their include-chain inlined into one file, the
+  identity rows carrying the gitconfig name/email.
+- omarchy `bin/omarchy-brightness-display` → `bin/brightness-display` and
+  `bin/omarchy-brightness-display-ddc` → `bin/brightness-display-ddc`
+  (2026-08-07, gap item 1): the DDC script near-verbatim — detect/getvcp/
+  setvcp 10, the bus / unavailable / range caches with their windows, the
+  non-uniform sub-5% stepping — monitor names come from niri instead of
+  hyprctl (both are DRM connector names, so the detect parse is unchanged).
+  The wrapper drops their Apple-display (asdcontrol) and DPMS branches and
+  raises our OSD over `qs ipc call osd -- show`.
+- omarchy `default/themed/btop.theme.tpl`, `helix.toml.tpl`,
+  `claude.json.tpl`, `gum_env.lua.tpl` → `templates/btop-theme.tmpl`,
+  `helix-theme.toml.tmpl`, `claude-theme.json.tmpl`, `gum-theme.fish.tmpl`
+  (2026-08-07, gap item 6): structure and key coverage theirs, token names
+  mapped onto ours (terminal-family surface.0 background, foot's selection
+  pair, ansi palette); the gum Lua `hl.env()` rows became fish `set -gx`
+  lines sourced from conf.d/40-gum-theme.fish; claude.json's `{{ mix a b N% }}`
+  expressions are precomputed in bin/theme-apply as `claude.*` tokens (plain
+  sRGB interpolation, matching their awk `mix_color`). Reload pokes follow
+  their restart scripts: btop SIGUSR2, helix SIGUSR1 — aimed at comm `hx`,
+  Fedora's binary name, where their `pgrep -x helix` would miss. Per-theme
+  GTK icon themes port their `themes/*/icons.theme` values into an `[icon]`
+  section (gsettings flip beside the existing polarity flip, their
+  omarchy-theme-set-gnome pattern); their gray/grey variants exist in no
+  Yaru package and map to the neutral pair.

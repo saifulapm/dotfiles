@@ -72,7 +72,7 @@
     "mode": "hold"
   },
   "tui": "fullscreen",
-  "theme": "dark",
+  "theme": "custom:qshell",
   "skipDangerousModePermissionPrompt": true,
   "agentPushNotifEnabled": true,
   "skipWorkflowUsageWarning": true

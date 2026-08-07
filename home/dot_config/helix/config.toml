@@ -1,4 +1,8 @@
-theme = "kanagawa"
+# Follows the desktop theme: bin/theme-apply renders the palette to
+# ~/.config/helix/themes/qshell.toml on every theme change and pokes running
+# editors with SIGUSR1 (omarchy gap item 6). Set a stock theme name here to
+# opt out.
+theme = "qshell"
 
 [editor]
 scroll-lines = 1

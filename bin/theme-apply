@@ -107,6 +107,39 @@ tokens["gtk.prefer-dark"] = mode === "light" ? "0" : "1"
 // document into theme colors, light themes show pages as printed.
 tokens["zathura.recolor"] = mode === "light" ? "false" : "true"
 
+// Claude Code custom-theme shades (templates/claude-theme.json.tmpl) — the
+// omarchy claude.json.tpl carries `{{ mix a b N% }}` expressions; our engine
+// substitutes flat tokens, so the mixes are precomputed here instead. Plain
+// sRGB interpolation, matching their awk mix_color.
+{
+  const mix = (aHex, bHex, t) => {
+    const a = hexToRgb(aHex), b = hexToRgb(bHex)
+    if (!a || !b) return aHex
+    return rgbToHex({
+      r: a.r + (b.r - a.r) * t,
+      g: a.g + (b.g - a.g) * t,
+      b: a.b + (b.b - a.b) * t
+    })
+  }
+  const bg = tokens["surface.0"] || "#16161e"
+  const fg = tokens["text.primary"] || "#c0caf5"
+  const accent = tokens["accent.accent"] || "#7aa2f7"
+  tokens["claude.accent-shimmer"] = mix(accent, fg, 0.35)
+  tokens["claude.inactive"] = mix(fg, bg, 0.40)
+  tokens["claude.inactive-shimmer"] = mix(fg, bg, 0.25)
+  tokens["claude.permission-shimmer"] = mix(tokens["ansi.blue"] || accent, fg, 0.35)
+  tokens["claude.warning-shimmer"] = mix(tokens["ansi.yellow"] || accent, fg, 0.35)
+  tokens["claude.diff-added"] = mix(bg, tokens["ansi.green"] || fg, 0.15)
+  tokens["claude.diff-removed"] = mix(bg, tokens["ansi.red"] || fg, 0.15)
+  tokens["claude.diff-added-dimmed"] = mix(bg, tokens["ansi.green"] || fg, 0.08)
+  tokens["claude.diff-removed-dimmed"] = mix(bg, tokens["ansi.red"] || fg, 0.08)
+  tokens["claude.diff-added-word"] = mix(bg, tokens["ansi.green"] || fg, 0.32)
+  tokens["claude.diff-removed-word"] = mix(bg, tokens["ansi.red"] || fg, 0.32)
+  tokens["claude.raised-bg"] = mix(bg, fg, 0.06)
+  tokens["claude.raised-bg-hover"] = mix(bg, fg, 0.10)
+  tokens["claude.rate-limit-empty"] = mix(bg, fg, 0.20)
+}
+
 // Template functions — `{{ fn token }}`. Plain `{{token}}` substitution stays
 // what it was; these exist for the one thing it cannot express, which is a
 // token whose VALUE decides which config KEY gets written. Omarchy has the
@@ -184,7 +217,16 @@ const OUTPUTS = {
   "oma-theme.toml.tmpl": [path.join(HOME, ".local/state/qshell/oma-theme.toml")],
   "yazi-theme.toml.tpl": [path.join(HOME, ".config/yazi/theme.toml")],
   "tmux-theme.tmpl": [path.join(HOME, ".config/tmux/theme.conf")],
-  "zathurarc.tmpl": [path.join(HOME, ".config/zathura/zathurarc")]
+  "zathurarc.tmpl": [path.join(HOME, ".config/zathura/zathurarc")],
+  // omarchy gap item 6 (user-picked 2026-08-07): btop + helix render into
+  // their theme DIRS under the fixed name "qshell" (btop.conf and helix
+  // config.toml pin it); Claude Code hot-reloads ~/.claude/themes on change,
+  // settings.json pins theme "custom:qshell"; gum is env-var-styled, the
+  // state file is sourced by fish conf.d/40-gum-theme.fish at shell start.
+  "btop-theme.tmpl": [path.join(HOME, ".config/btop/themes/qshell.theme")],
+  "helix-theme.toml.tmpl": [path.join(HOME, ".config/helix/themes/qshell.toml")],
+  "claude-theme.json.tmpl": [path.join(HOME, ".claude/themes/qshell.json")],
+  "gum-theme.fish.tmpl": [path.join(HOME, ".local/state/qshell/gum-theme.fish")]
 }
 
 let gtkSettingsChanged = false
@@ -216,6 +258,14 @@ try {
   // prefer-dark flag in settings.ini), and naming it drops GTK to the light
   // default — measured, it was why every GTK app stayed light on a dark theme.
   execSync("gsettings set org.gnome.desktop.interface gtk-theme Adwaita", { stdio: "ignore" })
+  // Per-theme GTK icon theme (omarchy gap item 6): themes carry icon.theme
+  // (omarchy's icons.theme files, Yaru color variants — the Fedora
+  // yaru-icon-theme rpm ships every variant in one package); themes without
+  // the token follow polarity on the neutral Yaru pair. New GTK apps only,
+  // like the gtk-theme flip above.
+  const iconTheme = String(tokens["icon.theme"] || (mode === "light" ? "Yaru" : "Yaru-dark"))
+  if (/^[A-Za-z0-9._-]+$/.test(iconTheme))
+    execSync(`gsettings set org.gnome.desktop.interface icon-theme "${iconTheme}"`, { stdio: "ignore" })
 } catch (e) { /* gsettings absent or no session bus */ }
 
 // ---- Browser theme color (enterprise policy) ----
@@ -288,6 +338,30 @@ if (osc) {
     try { fs.writeFileSync(pty, osc) } catch (e) { /* pty vanished */ }
   }
   if (ptys.length) console.log(`theme-apply: rethemed ${ptys.length} foot pty(s)`)
+}
+
+// ---- btop / helix / Claude Code live re-theme (omarchy gap item 6) ----
+// btop.conf is deliberately UNMANAGED (btop rewrites it on every clean exit —
+// a chezmoi symlink would go permanently dirty); only the color_theme line is
+// pinned, everything else stays the user's. Then the pokes: btop re-reads its
+// config on SIGUSR2, helix on SIGUSR1 (Fedora's binary is hx, not helix —
+// omarchy-restart-helix's pgrep would miss every process here). Claude Code
+// needs no poke: it watches ~/.claude/themes and hot-reloads the file.
+{
+  const btopConf = path.join(HOME, ".config/btop/btop.conf")
+  const pin = 'color_theme = "qshell"'
+  try {
+    let conf = ""
+    try { conf = fs.readFileSync(btopConf, "utf8") } catch (e) { /* first run */ }
+    if (!conf.split("\n").includes(pin)) {
+      const next = /^color_theme\s*=/m.test(conf)
+        ? conf.replace(/^color_theme\s*=.*$/m, pin)
+        : pin + "\n" + conf
+      writeAtomic(btopConf, next)
+    }
+  } catch (e) { /* unwritable config dir; theme file still rendered */ }
+  try { execSync("pkill -SIGUSR2 -x btop", { stdio: "ignore" }) } catch (e) { /* none running */ }
+  try { execSync("pkill -SIGUSR1 -x hx", { stdio: "ignore" }) } catch (e) { /* none running */ }
 }
 
 console.log("theme-apply: done")

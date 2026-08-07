@@ -262,6 +262,12 @@ arch = "all"
 why = "Terminal system monitor the user actually reaches for (bash history shows regular use). Installed by hand 2026-08-05, recorded 2026-08-06"
 
 [[pkg]]
+name = "yaru-icon-theme"
+category = "core"
+arch = "all"
+why = "Per-theme GTK icon themes (omarchy gap item 6, user-picked 2026-08-07): every theme's [icon].theme token names a Yaru color variant (omarchy's icons.theme values), flipped by bin/theme-apply via gsettings. The Fedora rpm ships all color variants (blue/magenta/olive/purple/red/sage/wartybrown/yellow + -dark) in one package — verified in the filelist; omarchy's gray/grey values for vantablack/white don't exist anywhere and were mapped to Yaru-dark/Yaru. Before this the machine had NO icon theme at all (notification -i icons drew quickshell's checkerboard placeholder until an iconPath guard was added)"
+
+[[pkg]]
 name = "ddcutil"
 category = "core"
 arch = "all"
