@@ -536,7 +536,7 @@ binds {
     // (SUPER+SHIFT+RETURN and SUPER+SHIFT+B), Alt for a private window;
     // chromium-browser is Fedora's binary name, and CHROMIUM_USER_FLAGS
     // already carries the wayland flags.
-    Mod+Shift+Return hotkey-overlay-title="Open the Browser" { spawn "chromium-browser"; }
+    Mod+Shift+Return hotkey-overlay-title="Open the Browser" { spawn "app-run" "chromium-browser"; }
     // Focus-not-spawn variant: raises the newest existing browser window and
     // only launches when there is none (bin/launch-or-focus, omarchy's
     // launch-or-focus semantics). Mod+Shift+Return above stays a plain spawn

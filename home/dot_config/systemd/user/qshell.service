@@ -7,6 +7,11 @@ After=graphical-session.target
 Requisite=graphical-session.target
 
 [Service]
+# session.slice, beside niri's own unit: Fedora marks app.slice's members
+# eligible for systemd-oomd kills, and the shell (notification daemon,
+# polkit agent, lock screen) must never be in that pool — the apps it
+# launches are, individually, via bin/app-run's transient units.
+Slice=session.slice
 ExecStart=/usr/bin/qs
 # Quickshell ships its own crash-handler relaunch: the crashed MainPID
 # lingers as a launcher while a child under comm "quickshell" takes over, so

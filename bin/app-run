@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# app-run — launch a command as its own transient systemd unit under
+# app-graphical.slice.
+#
+# The slice half of omarchy's uwsm-app (CREDITS.md): apps launched by the
+# shell used to become children of qshell.service — one cgroup holding the
+# bar, the notification daemon, the polkit agent AND the browser, so
+# systemd-oomd (which kills per-CGROUP, and on Fedora already marks
+# app.slice's members eligible) would take the whole session down with a
+# leaking tab. Now every launch is its own unit: oomd kills the guilty app,
+# qshell.service sits in session.slice beside niri where oomd cannot reach,
+# and `systemd-cgls --user` shows each app separately.
+#
+#   app-run <command> [args...]
+#
+# Environment comes from the user manager (kept in sync by niri-session's
+# import-environment), not the caller — same as any user service.
+set -euo pipefail
+
+(($# > 0)) || { echo "Usage: app-run <command> [args...]" >&2; exit 1; }
+
+slug=$(basename -- "$1" | tr -c 'a-zA-Z0-9' '-' | sed 's/^-*//; s/-*$//')
+[[ -n $slug ]] || slug=app
+
+exec systemd-run --user --quiet --collect \
+  --slice=app-graphical.slice \
+  --unit="app-${slug}-${RANDOM}${RANDOM}" \
+  -- "$@"

@@ -71,7 +71,12 @@ Scope {
     function launch(entry) {
         if (!entry)
             return;
-        entry.execute();
+        // Through gtk-launch inside a transient app-graphical.slice unit
+        // (bin/app-run) rather than entry.execute(): execute() makes the app
+        // a child of qshell.service, putting the whole shell in systemd-oomd's
+        // kill pool with it (omarchy's uwsm-app -- gtk-launch pattern).
+        // gtk-launch owns the Exec parsing — field codes, Terminal entries.
+        Quickshell.execDetached(["app-run", "gtk-launch", entry.id]);
         hide();
     }
 

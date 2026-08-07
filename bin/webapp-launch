@@ -22,4 +22,6 @@ if [[ -n $id ]]; then
   exec niri msg action focus-window --id "$id" >/dev/null
 fi
 
-exec setsid -f chromium-browser --app="$url" >/dev/null 2>&1
+# Via app-run: its own transient unit under app-graphical.slice (a running
+# chromium adopts the app window and the unit exits — --collect reaps it).
+exec app-run chromium-browser --app="$url" >/dev/null 2>&1

@@ -31,4 +31,6 @@ if [[ -n $id ]]; then
   exec niri msg action focus-window --id "$id" >/dev/null
 fi
 
-exec setsid -f "$@" >/dev/null 2>&1
+# app-run detaches into a transient app-graphical.slice unit — the launched
+# app must not live in the caller's cgroup (bin/app-run's rationale).
+exec app-run "$@" >/dev/null 2>&1
