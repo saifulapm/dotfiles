@@ -3,7 +3,7 @@ Type=Application
 Name=File Manager
 GenericName=File Manager
 Comment=Browse files in yazi inside a foot window
-Exec=foot-run yazi %f
+Exec=foot-run --app-id=qshell-float yazi %f
 Icon=system-file-manager
 Terminal=false
 Categories=System;FileTools;FileManager;

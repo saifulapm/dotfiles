@@ -431,6 +431,23 @@ window-rule {
     default-window-height { fixed 600; }
 }
 
+// omarchy's floating-window tag (system.lua) also covers the media viewers:
+// mpv, imv and Evince open floating at the same 875×600. omacalc floats in
+// omarchy untagged — no forced geometry, it sizes itself.
+window-rule {
+    match app-id="^mpv$"
+    match app-id="^imv$"
+    match app-id=r#"^org\.gnome\.Evince$"#
+    open-floating true
+    default-column-width { fixed 875; }
+    default-window-height { fixed 600; }
+}
+
+window-rule {
+    match app-id="^omacalc$"
+    open-floating true
+}
+
 // omarchy scrolls terminals 1.5× (input.lua: scroll_touchpad), multiplied
 // on top of the touchpad scroll-factor in the input section.
 window-rule {
@@ -476,7 +493,8 @@ binds {
     Mod+Shift+Alt+B hotkey-overlay-title="Browser (Incognito)" { spawn "chromium-browser" "--incognito"; }
     // omarchy: SUPER+SHIFT+F file manager — taken by fullscreen-window here,
     // so the explorer key instead. Same yazi-in-foot as yazi.desktop.
-    Mod+E hotkey-overlay-title="File Manager: yazi" { spawn "foot-run" "yazi"; }
+    // Floating via the qshell-float rule, like btop and the shell's helpers.
+    Mod+E hotkey-overlay-title="File Manager: yazi" { spawn "foot-run" "--app-id=qshell-float" "yazi"; }
     // omarchy: SUPER+SHIFT+N editor — $EDITOR (kak) in a foot window.
     Mod+Shift+N hotkey-overlay-title="Editor: kak" { spawn "foot-run" "kak"; }
     // omarchy: SUPER+ALT+RETURN tmux terminal — attach-or-create "main".
