@@ -91,6 +91,27 @@ make -j"$JOBS"
 echo "==> make install"
 make install
 
+# --- desktop entries --------------------------------------------------------
+# make install drops upstream's launcher entries into $PREFIX/share/
+# applications — which for a ~/.local prefix IS ~/.local/share/applications:
+# its emacs.desktop clobbers the chezmoi-managed daemon-client override and
+# emacsclient.desktop adds a second 'Emacs (Client)' launcher row (user
+# report 2026-08-07). Drop all four and re-place the managed override by
+# straight copy — NOT a nested `chezmoi apply`, which deadlocks on the
+# state lock when this script runs under run_after_20 inside an apply.
+rm -f "$PREFIX/share/applications"/emacs{,client}{,-mail}.desktop
+repo="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+managed="$repo/home/dot_local/share/applications/emacs.desktop"
+if [ -f "$managed" ]; then
+  # The repo deploys files as symlinks into the source tree (chezmoi
+  # mode=symlink) — recreate the link, not a copy, or chezmoi diff/verify
+  # reports drift until the next apply.
+  ln -sfn "$managed" "$PREFIX/share/applications/emacs.desktop"
+  echo "==> Restored the daemon-client emacs.desktop override (symlink)"
+else
+  echo "rebuild-emacs: managed emacs.desktop not found at $managed — rerun chezmoi apply to restore it" >&2
+fi
+
 # --- systemd drop-in --------------------------------------------------------
 dropin="$HOME/.config/systemd/user/emacs.service.d/50-local-build.conf"
 mkdir -p "$(dirname "$dropin")"
