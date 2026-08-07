@@ -21,7 +21,15 @@ gamma-correct-blending=yes
 
 [scrollback]
 lines=10000
+# omarchy scroll feel: 7 lines per wheel notch instead of foot's 3.
+multiplier=7.0
 
 [mouse]
 # macOS behavior: the pointer gets out of the way while typing.
 hide-when-typing=yes
+
+[text-bindings]
+# omarchy's CSI-u escapes so TUIs (Claude Code, tmux) can tell Shift+Return
+# and Alt+Shift+Return apart from plain Return.
+\x1b[13;2u=Shift+Return
+\x1b[13;4u=Mod1+Shift+Return
