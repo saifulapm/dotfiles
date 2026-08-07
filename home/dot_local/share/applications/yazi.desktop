@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=File Manager
+GenericName=File Manager
+Comment=Browse files in yazi inside a foot window
+Exec=foot yazi %f
+Icon=system-file-manager
+Terminal=false
+Categories=System;FileTools;FileManager;
+MimeType=inode/directory;

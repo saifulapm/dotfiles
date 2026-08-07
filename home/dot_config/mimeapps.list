@@ -1,0 +1,69 @@
+# Default applications (xdg-mime). Modeled on omarchy's
+# default/applications/mimeapps.list, adapted to this setup: kak (not nvim)
+# for text, yazi-in-foot (not Nautilus) for directories, chromium-browser
+# (Fedora's desktop id) for the web. Without these pins xdg-open falls back to
+# the desktop-file cache, which resolved images to Chromium (observed
+# 2026-08-07) and would let any newly installed app steal pdf/video.
+# mailto: is deliberately unset — no mail app decision yet.
+
+[Default Applications]
+inode/directory=yazi.desktop
+
+image/png=imv.desktop
+image/jpeg=imv.desktop
+image/gif=imv.desktop
+image/webp=imv.desktop
+image/bmp=imv.desktop
+image/tiff=imv.desktop
+image/svg+xml=imv.desktop
+image/avif=imv.desktop
+image/heif=imv.desktop
+image/jxl=imv.desktop
+
+application/pdf=org.gnome.Evince.desktop
+
+x-scheme-handler/http=chromium-browser.desktop
+x-scheme-handler/https=chromium-browser.desktop
+x-scheme-handler/claude-cli=claude-code-url-handler.desktop
+
+video/mp4=mpv.desktop
+video/x-msvideo=mpv.desktop
+video/x-matroska=mpv.desktop
+video/x-flv=mpv.desktop
+video/x-ms-wmv=mpv.desktop
+video/mpeg=mpv.desktop
+video/ogg=mpv.desktop
+video/webm=mpv.desktop
+video/quicktime=mpv.desktop
+video/3gpp=mpv.desktop
+video/3gpp2=mpv.desktop
+video/x-ms-asf=mpv.desktop
+video/x-ogm+ogg=mpv.desktop
+video/x-theora+ogg=mpv.desktop
+application/ogg=mpv.desktop
+
+audio/mpeg=mpv.desktop
+audio/mp4=mpv.desktop
+audio/flac=mpv.desktop
+audio/ogg=mpv.desktop
+audio/wav=mpv.desktop
+audio/x-wav=mpv.desktop
+audio/opus=mpv.desktop
+audio/webm=mpv.desktop
+
+text/plain=kak.desktop
+text/markdown=kak.desktop
+text/x-makefile=kak.desktop
+text/x-c++hdr=kak.desktop
+text/x-c++src=kak.desktop
+text/x-chdr=kak.desktop
+text/x-csrc=kak.desktop
+text/x-java=kak.desktop
+text/x-pascal=kak.desktop
+text/x-tcl=kak.desktop
+text/x-tex=kak.desktop
+application/x-shellscript=kak.desktop
+text/x-c=kak.desktop
+text/x-c++=kak.desktop
+application/xml=kak.desktop
+text/xml=kak.desktop

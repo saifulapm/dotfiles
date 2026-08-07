@@ -1,0 +1,10 @@
+# Ported from omarchy's imv config, minus the binds whose tools aren't
+# installed here: Ctrl+p print (needs cups' lp), Ctrl+r rotate (needs
+# ImageMagick's mogrify), Ctrl+e edit (targets omarchy's Tensaku app).
+[binds]
+
+# Trash the current image and quit the viewer (recoverable from Trash)
+<Ctrl+x> = exec gio trash -- "$imv_current_file"; quit
+
+# Trash the current image and move to the next one
+<Ctrl+Shift+X> = exec gio trash -- "$imv_current_file"; close
