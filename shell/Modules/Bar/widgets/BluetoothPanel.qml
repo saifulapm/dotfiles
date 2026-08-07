@@ -127,18 +127,44 @@ BarPanel {
         const rows = [];
         for (let k = 0; k < panel.knownDevices.length; k++)
             rows.push({
-                dev: panel.knownDevices[k],
+                dev: Model.deviceRow(panel.knownDevices[k]),
                 section: "known",
                 indexInSection: k
             });
         if (panel.sectionVisible("discovered"))
             for (let d = 0; d < panel.discoveredDevices.length; d++)
                 rows.push({
-                    dev: panel.discoveredDevices[d],
+                    dev: Model.deviceRow(panel.discoveredDevices[d]),
                     section: "discovered",
                     indexInSection: d
                 });
         return rows;
+    }
+
+    // Connected devices render above the scroll area; same primitives-only
+    // projection so those delegates never hold Device QObject wrappers
+    // either. Reading each device's properties here keeps the binding live:
+    // any change (battery, state) rebuilds the rows.
+    readonly property var connectedRows: {
+        const rows = [];
+        for (let i = 0; i < panel.connectedDevices.length; i++)
+            rows.push(Model.deviceRow(panel.connectedDevices[i]));
+        return rows;
+    }
+
+    // Live BlueZ device behind a row. Rows carry primitives only, so click
+    // actions resolve the backend object here at action time rather than
+    // holding a wrapper that can dangle mid-incubation; a vanished device
+    // resolves to null and the action no-ops.
+    function deviceFor(row) {
+        if (!row || !row.dev || !row.dev.address)
+            return null;
+        const devs = panel.devices;
+        for (let i = 0; i < devs.length; i++) {
+            if (devs[i] && devs[i].address === row.dev.address)
+                return devs[i];
+        }
+        return null;
     }
 
     // Flat position of the keyboard cursor, or -1 while it sits on the hero
@@ -701,7 +727,7 @@ BarPanel {
             }
 
             Repeater {
-                model: panel.connectedDevices
+                model: panel.connectedRows
 
                 DeviceRow {
                     required property var modelData
@@ -871,19 +897,20 @@ BarPanel {
             }
 
             onClicked: mouse => {
-                if (!row.dev)
+                const dev = panel.deviceFor(row);
+                if (!dev)
                     return;
                 if (mouse.button === Qt.RightButton) {
                     if (row.isConnected)
-                        panel.disconnectDevice(row.dev);
+                        panel.disconnectDevice(dev);
                     else if (!row.isDiscovered)
-                        panel.forgetDevice(row.dev);
+                        panel.forgetDevice(dev);
                     return;
                 }
                 if (row.isConnected)
-                    panel.disconnectDevice(row.dev);
+                    panel.disconnectDevice(dev);
                 else
-                    panel.connectDevice(row.dev);
+                    panel.connectDevice(dev);
             }
         }
 
@@ -961,8 +988,9 @@ BarPanel {
                     panel.actionFocused = true;
                 }
                 onActivated: {
-                    if (row.dev)
-                        panel.forgetDevice(row.dev);
+                    const dev = panel.deviceFor(row);
+                    if (dev)
+                        panel.forgetDevice(dev);
                 }
             }
         }
