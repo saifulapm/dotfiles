@@ -1199,7 +1199,7 @@ why  = "The user's own fork with built-in treesitter — NOT Fedora's kakoune pa
 [[tool]]
 name = "oma-apps"
 via  = "run_after_13-oma-apps.sh — clone omacom-io/{omacalc,omawrite,omacut}, sed the two omarchy theme-path literals in src/backend.cpp to ~/.local/state/qshell/oma-theme.toml, qmake6 + make, install to ~/.local/bin"
-why  = "Omarchy's Qt Quick calculator, writing app and video trimmer (user decision 2026-08-07, all three). MIT-licensed. They watch a 5-key colors.toml (mode/background/foreground/accent/selection) and re-tint live; templates/oma-theme.toml.tmpl emits exactly that file from the active theme on every theme-apply, so they follow this desktop's theme system natively. omacut's export hardcodes libx264, so it needs the RPM Fusion ffmpeg (entry above) — with that in place it builds unpatched beyond the theme sed"
+why  = "Omarchy's Qt Quick calculator, writing app and video trimmer (user decision 2026-08-07, all three). MIT-licensed. omacalc and omawrite watch a 5-key colors.toml (mode/background/foreground/accent/selection) and re-tint live; templates/oma-theme.toml.tmpl emits exactly that file from the active theme on every theme-apply, so they follow this desktop's theme system natively. omacut has no theme-watch code at its pinned revision (verified 2026-08-07 — the sed is a harmless no-op there; re-check on upstream bumps). omacut's export hardcodes libx264, so it needs the RPM Fusion ffmpeg (entry above) — with that in place it builds fully unpatched"
 
 [[tool]]
 name = "chromium-config"
