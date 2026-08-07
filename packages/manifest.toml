@@ -1152,8 +1152,24 @@ why  = "Fedora packages none of these; all five ship both aarch64 and x86_64 lin
 
 [[tool]]
 name = "pnpm-globals"
-via  = "run_after_08-cli-tools.sh — pnpm add -g: typescript, typescript-language-server, @vtsls/language-server, intelephense, @astrojs/language-server, @biomejs/biome, dprint, rustywind, @ast-grep/cli, prettier, vscode-langservers-extracted, @olrtg/emmet-language-server (last three added 2026-08-07 for the helix/kak config port; bin/eslint-language-server shims the kak-lsp name onto vscode-eslint-language-server)"
-why  = "The mac's language servers (eglot + kak-lsp point at them) plus the npm-shipped formatters/linters Fedora lacks (biome, dprint, rustywind, ast-grep). Lands in PNPM_HOME/bin, already on PATH"
+via  = "run_after_08-cli-tools.sh — pnpm add -g: typescript, typescript-language-server, @vtsls/language-server, intelephense, @astrojs/language-server, @biomejs/biome, dprint, rustywind, @ast-grep/cli, prettier, vscode-langservers-extracted, @olrtg/emmet-language-server (prettier, vscode-langservers-extracted and @olrtg/emmet-language-server added 2026-08-07 for the helix/kak config port; bin/eslint-language-server shims the kak-lsp name onto vscode-eslint-language-server), agent-browser (added 2026-08-07 for the mac config port — see the note below)"
+why  = "The mac's language servers (eglot + kak-lsp point at them) plus the npm-shipped formatters/linters Fedora lacks (biome, dprint, rustywind, ast-grep), and — since 2026-08-07 — the agent-browser CLI justified in the note below. Lands in PNPM_HOME/bin, already on PATH"
+
+# agent-browser rides the array above rather than getting its own install
+# mechanism — it is a plain Node CLI and pnpm is already the package manager.
+# Recorded separately because it is neither a language server nor a formatter,
+# so the pnpm-globals justification above does not cover it:
+#
+#   agent-browser (npm `agent-browser`, 0.33.2 verified 2026-08-07) — browser
+#   automation CLI for coding agents. Config ported from the mac to
+#   home/dot_agent-browser/config.json, verbatim: {autoConnect, headed}. It
+#   holds no secret. `headed: true` wants a display, which this desktop has
+#   (niri/Wayland). The package declares no os or cpu restriction in its npm
+#   metadata, so it installs on aarch64 Linux exactly as it does on the mac.
+#   Nothing installs until the user's own `chezmoi apply` runs this script.
+#
+# mcporter arrived from the mac alongside it and was REJECTED by the user
+# (2026-08-07) — deliberately absent, not an oversight.
 
 [[tool]]
 name = "php-cs-fixer"

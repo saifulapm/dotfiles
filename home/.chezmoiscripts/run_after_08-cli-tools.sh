@@ -27,6 +27,10 @@ declare -A PNPM_PKGS=(
   [prettier]="prettier"
   [vscode-eslint-language-server]="vscode-langservers-extracted"
   [emmet-language-server]="@olrtg/emmet-language-server"
+  # Not a language server — the agent-side browser CLI from the mac (config in
+  # home/dot_agent-browser). A plain Node package: its npm metadata declares no
+  # os/cpu restriction, so aarch64 Linux is fine.
+  [agent-browser]="agent-browser"
 )
 
 if command -v mise >/dev/null 2>&1 && mise exec -- sh -c 'command -v pnpm' >/dev/null 2>&1; then
