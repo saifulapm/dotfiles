@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# launch-or-focus — focus an existing window matching a pattern, else launch.
+#
+# Port of omarchy-launch-or-focus (CREDITS.md) onto niri: the pattern is
+# tested word-bounded and case-insensitive against every window's app_id and
+# title (their hyprctl clients semantics); on a hit the newest matching
+# window is focused — highest id wins, the same tie-break the notification
+# click-to-focus path uses — otherwise the launch command runs detached.
+#
+#   launch-or-focus <pattern> [command...]
+#
+# With no command the pattern doubles as the executable (their default was
+# `uwsm-app -- $pattern`; we have no uwsm).
+set -euo pipefail
+
+if (($# == 0)); then
+  echo "Usage: launch-or-focus <window-pattern> [launch-command...]" >&2
+  exit 1
+fi
+
+pattern="$1"
+shift
+(($# > 0)) || set -- "$pattern"
+
+id=$(niri msg --json windows | jq -r --arg p "$pattern" \
+  '[.[] | select(((.app_id // "") | test("\\b" + $p + "\\b"; "i"))
+              or ((.title  // "") | test("\\b" + $p + "\\b"; "i")))]
+   | sort_by(.id) | last | .id // empty')
+
+if [[ -n $id ]]; then
+  exec niri msg action focus-window --id "$id" >/dev/null
+fi
+
+exec setsid -f "$@" >/dev/null 2>&1

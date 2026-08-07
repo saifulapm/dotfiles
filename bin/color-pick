@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# color-pick — pick a color from the screen and copy its hex value to the
+# clipboard.
+#
+# Omarchy reaches this through hyprpicker (Hyprland-only); niri ships the
+# picker in the compositor, so the whole feature is one IPC call. The JSON
+# form is the stable contract: `{"rgb":[r,g,b]}` with 0..1 floats, or `null`
+# when the pick is cancelled with Escape.
+set -euo pipefail
+
+out=$(niri msg --json pick-color) || exit 1
+
+# Cancelled picks answer null — exit quietly, nothing was chosen.
+[[ -z $out || $out == null ]] && exit 0
+
+read -r r g b < <(jq -r '.rgb | map(. * 255 + 0.5 | floor | if . > 255 then 255 else . end) | "\(.[0]) \(.[1]) \(.[2])"' <<<"$out")
+hex=$(printf '#%02x%02x%02x' "$r" "$g" "$b")
+
+wl-copy --trim-newline <<<"$hex"
+notify-send -a qshell -t 4000 "Color picked" "$hex copied to clipboard (rgb($r, $g, $b))" >/dev/null 2>&1 || true

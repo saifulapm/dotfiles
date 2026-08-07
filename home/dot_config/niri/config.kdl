@@ -468,9 +468,15 @@ window-rule {
 }
 
 // omarchy scrolls terminals 1.5× (input.lua: scroll_touchpad), multiplied
-// on top of the touchpad scroll-factor in the input section.
+// on top of the touchpad scroll-factor in the input section. Every foot
+// window carries it, whatever app-id the launcher stamped on it: plain foot,
+// the qshell-float helpers, the singleton tmux terminal, and TUI desktop
+// entries (bin/tui-install's TUI.float / TUI.tile).
 window-rule {
     match app-id="^foot$"
+    match app-id="^qshell-float$"
+    match app-id="^tmux-main$"
+    match app-id=r#"^TUI\.(float|tile)$"#
     scroll-factor 1.5
 }
 
@@ -508,7 +514,11 @@ binds {
     // chromium-browser is Fedora's binary name, and CHROMIUM_USER_FLAGS
     // already carries the wayland flags.
     Mod+Shift+Return hotkey-overlay-title="Open the Browser" { spawn "chromium-browser"; }
-    Mod+Shift+B hotkey-overlay-title=null { spawn "chromium-browser"; }
+    // Focus-not-spawn variant: raises the newest existing browser window and
+    // only launches when there is none (bin/launch-or-focus, omarchy's
+    // launch-or-focus semantics). Mod+Shift+Return above stays a plain spawn
+    // so a second window is always one keypress away.
+    Mod+Shift+B hotkey-overlay-title="Focus the Browser" { spawn "launch-or-focus" "chromium-browser" "chromium-browser"; }
     Mod+Shift+Alt+B hotkey-overlay-title="Browser (Incognito)" { spawn "chromium-browser" "--incognito"; }
     // omarchy: SUPER+SHIFT+F file manager — taken by fullscreen-window here,
     // so the explorer key instead. Same yazi-in-foot as yazi.desktop.
@@ -519,9 +529,16 @@ binds {
     // Emacs: raise the daemon's existing frame or make one — the same
     // emacsclient invocation as the emacs.desktop override, so the key and
     // the launcher entry behave identically (user ask 2026-08-07).
-    Mod+N hotkey-overlay-title="Editor: Emacs" { spawn "emacsclient" "--reuse-frame" "--alternate-editor="; }
+    // launch-or-focus first: emacsclient --reuse-frame reuses a FRAME inside
+    // Emacs but does not reliably raise the niri window under Wayland —
+    // focusing through the compositor does, and the emacsclient path still
+    // runs when no Emacs window exists yet.
+    Mod+N hotkey-overlay-title="Editor: Emacs" { spawn "launch-or-focus" "emacs" "emacsclient" "--reuse-frame" "--alternate-editor="; }
     // omarchy: SUPER+ALT+RETURN tmux terminal — attach-or-create "main".
-    Mod+Alt+Return hotkey-overlay-title="Terminal: tmux" { spawn "foot-run" "tmux" "new-session" "-A" "-s" "main"; }
+    // The "main" tmux session is a singleton by design (new-session -A), so
+    // the window is too: a distinct app-id lets launch-or-focus raise the
+    // existing terminal instead of stacking a second client on the session.
+    Mod+Alt+Return hotkey-overlay-title="Terminal: tmux" { spawn "launch-or-focus" "tmux-main" "foot-run" "--app-id=tmux-main" "tmux" "new-session" "-A" "-s" "main"; }
     Mod+D hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Space hotkey-overlay-title="Open the Menu" { spawn "qs" "ipc" "call" "menu" "toggle"; }
     // Omarchy's SUPER+ALT+SPACE apps-menu bind (b92510f). Our menu has no

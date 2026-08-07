@@ -153,6 +153,15 @@ var TREE = {
         "when": "command -v tesseract",
         "action": "screenshot-ocr"
     },
+    // Omarchy's trigger.capture.color runs hyprpicker; niri ships the picker
+    // in the compositor, so ours is one IPC call wrapped in bin/color-pick.
+    "capture.color": {
+        "icon": "󰈊",
+        "label": "Color Picker",
+        "aliases": ["color", "colour", "pick", "eyedropper", "picker"],
+        "description": "Pick a color from the screen and copy its hex value",
+        "action": "color-pick"
+    },
     // Omarchy's trigger.capture.screenrecord submenu, one row per audio
     // variant with Stop declared first and guarded by a `pgrep` test, exactly
     // as theirs is. Two differences, both from wf-recorder: their single smart
