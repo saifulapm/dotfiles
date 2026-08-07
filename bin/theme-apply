@@ -260,12 +260,22 @@ function mixHex(aHex, bHex, t) {
   put("bg-completion", mixHex(bg, accent, 0.35))
   put("bg-hover", mixHex(raised, accent, 0.2))
   put("bg-hover-secondary", mixHex(raised, tokens["accent.warn"] || a("yellow"), 0.25))
+  // hl-line is surface.2 accent-TINTED, not surface.2 itself: bg-inactive is
+  // surface.2, the user-level modus faint preset maps bg-region onto
+  // bg-inactive, and hl-line + region at the same value makes a selection
+  // invisible on the current line. Modus itself separates the pair by hue at
+  // equal lightness (bluish hl-line, neutral bg-inactive) — same move here,
+  // in the theme's own accent.
+  put("bg-hl-line", mixHex(tokens["surface.2"] || bg, accent, 0.22))
   put("bg-paren-match", mixHex(bg, a("cyan"), 0.4))
   put("bg-paren-expression", mixHex(bg, a("magenta"), 0.25))
   put("border-mode-line", mixHex(raised, fg, 0.25))
-  put("modeline-err", mixHex(tokens["accent.error"] || a("red"), fg, 0.35))
-  put("modeline-warning", mixHex(tokens["accent.warn"] || a("yellow"), fg, 0.35))
-  put("modeline-info", mixHex(a("cyan"), fg, 0.35))
+  // modeline status colors sit on bg-mode-line-active (surface.3); the fg
+  // blend alone bottomed out at 2.47:1 on rose-pine, so the shared contrast
+  // floor lifts them (lightness-only, hue kept) to stay legible everywhere.
+  put("modeline-err", ensureContrast(mixHex(tokens["accent.error"] || a("red"), fg, 0.35), raised, 3.0))
+  put("modeline-warning", ensureContrast(mixHex(tokens["accent.warn"] || a("yellow"), fg, 0.35), raised, 3.0))
+  put("modeline-info", ensureContrast(mixHex(a("cyan"), fg, 0.35), raised, 3.0))
 }
 
 // Template functions — `{{ fn token }}`. Plain `{{token}}` substitution stays
