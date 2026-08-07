@@ -17,6 +17,15 @@ set -gx XDG_CONFIG_HOME "$HOME/.config"
 set -gx XDG_DATA_HOME "$HOME/.local/share"
 set -gx XDG_STATE_HOME "$HOME/.local/state"
 
+# Helix runtime, for the kakoune fork's built-in tree-sitter: its Linux
+# candidate walk checks /usr/lib/helix/runtime but Fedora installs to lib64,
+# so without this every tree-sitter-enable fails "no grammar" (the mac build
+# rode a Homebrew fallback path instead). HELIX_RUNTIME is the fork's
+# first-priority override (src/main.cc helix_runtime_directory); the custom
+# kak/liquid grammars keep coming from ~/.config/helix/runtime, which the
+# fork merges in separately. Twin: environment.d/56-helix-runtime.conf.
+set -gx HELIX_RUNTIME /usr/lib64/helix/runtime
+
 # Go — XDG-homed like the mac. Source of truth is ~/.config/go/env (go reads
 # it in every context — bash scripts, systemd); these exports agree with it
 # and just make shells explicit.
