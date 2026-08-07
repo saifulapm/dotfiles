@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# transcode — re-encode a picture or video into something share-friendly.
+#
+# Port of omarchy-transcode (CREDITS.md) with ffmpeg carrying BOTH halves:
+# their picture branch runs imagemagick, which this box deliberately does not
+# ship — ffmpeg's scale/quality flags produce the same shrink-only resize.
+# Their omarchy-transcode-ascii is NOT ported for the same reason (it is
+# imagemagick through and through). Output lands beside the input as
+# <stem>-<resolution>.<format>, and the file URI is copied to the clipboard
+# so a paste into the browser or chat attaches it.
+#
+#   transcode [--path dir] [input] [format] [resolution]
+#
+# No input: fzf over ~/Pictures + ~/Videos (or --path). Missing format or
+# resolution: gum pickers. Formats — pictures: jpg, png; videos: mp4, gif.
+# Resolutions — pictures: high (3160w), medium (2160w), low (1080w);
+# videos: 4k, 1080p, 720p. All shrink-only: smaller inputs pass unscaled.
+set -euo pipefail
+
+notify() {
+  notify-send -a qshell -t "${2:-4000}" "Transcode" "$1" >/dev/null 2>&1 || true
+}
+
+media_type() {
+  case "$(file -b --mime-type "$1")" in
+  image/*) echo picture ;;
+  video/*) echo video ;;
+  *)
+    echo "Unsupported file type: $(file -b --mime-type "$1")" >&2
+    return 1
+    ;;
+  esac
+}
+
+transcode_picture() {
+  local input="$1" format="$2" resolution="$3" output="$4"
+  local width
+
+  case "$resolution" in
+  high) width=3160 ;;
+  medium) width=2160 ;;
+  low) width=1080 ;;
+  *) echo "Invalid picture resolution: $resolution" >&2; return 1 ;;
+  esac
+
+  # Shrink-only to $width, even height for the encoders; -q:v 3 tracks their
+  # -quality 85, metadata stripped like their -strip.
+  case "$format" in
+  jpg)
+    ffmpeg -hide_banner -loglevel error -y -i "$input" \
+      -vf "scale=min(iw\,$width):-2" -frames:v 1 -q:v 3 -map_metadata -1 "$output"
+    ;;
+  png)
+    ffmpeg -hide_banner -loglevel error -y -i "$input" \
+      -vf "scale=min(iw\,$width):-2" -frames:v 1 -compression_level 9 -map_metadata -1 "$output"
+    ;;
+  *) echo "Invalid picture format: $format" >&2; return 1 ;;
+  esac
+}
+
+transcode_video() {
+  local input="$1" format="$2" resolution="$3" output="$4"
+  local scale
+
+  case "$resolution" in
+  4k) scale='scale=-2:min(ih\,2160)' ;;
+  1080p) scale='scale=-2:min(ih\,1080)' ;;
+  720p) scale='scale=-2:min(ih\,720)' ;;
+  *) echo "Invalid video resolution: $resolution" >&2; return 1 ;;
+  esac
+
+  case "$format" in
+  mp4)
+    if [[ $resolution == "4k" ]]; then
+      ffmpeg -hide_banner -loglevel error -y -i "$input" -vf "$scale" \
+        -c:v libx265 -preset slow -crf 24 -c:a aac -b:a 192k -movflags +faststart "$output"
+    else
+      ffmpeg -hide_banner -loglevel error -y -i "$input" -vf "$scale" \
+        -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 192k -movflags +faststart "$output"
+    fi
+    ;;
+  gif)
+    ffmpeg -hide_banner -loglevel error -y -i "$input" \
+      -vf "fps=10,$scale:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" "$output"
+    ;;
+  *) echo "Invalid video format: $format" >&2; return 1 ;;
+  esac
+}
+
+search_path=""
+positional=()
+while (($# > 0)); do
+  case "$1" in
+  --path)
+    shift
+    (($# > 0)) || { echo "Missing value for --path" >&2; exit 2; }
+    search_path="$1"
+    ;;
+  -h | --help)
+    sed -n '4,17p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+    ;;
+  *)
+    positional+=("$1")
+    ;;
+  esac
+  shift
+done
+
+input="${positional[0]:-}"
+format="${positional[1]:-}"
+resolution="${positional[2]:-}"
+
+if [[ -z $input ]]; then
+  if [[ -n $search_path ]]; then
+    roots=("$search_path")
+  else
+    roots=()
+    [[ -d ~/Pictures ]] && roots+=("$HOME/Pictures")
+    [[ -d ~/Videos ]] && roots+=("$HOME/Videos")
+    ((${#roots[@]} > 0)) || roots=("$HOME")
+  fi
+  input=$(find "${roots[@]}" -maxdepth 4 -type f \
+    \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.heic' -o -iname '*.gif' -o -iname '*.bmp' \
+    -o -iname '*.mp4' -o -iname '*.mov' -o -iname '*.mkv' -o -iname '*.webm' -o -iname '*.avi' \) 2>/dev/null |
+    fzf --prompt="Transcode> " --reverse) || exit 0
+fi
+
+[[ -f $input ]] || { echo "No such file: $input" >&2; exit 1; }
+type=$(media_type "$input")
+
+if [[ -z $format ]]; then
+  if [[ $type == picture ]]; then
+    format=$(gum choose --header "Output format?" jpg png) || exit 0
+  else
+    format=$(gum choose --header "Output format?" mp4 gif) || exit 0
+  fi
+fi
+
+if [[ -z $resolution ]]; then
+  if [[ $type == picture ]]; then
+    resolution=$(gum choose --header "Resolution?" high medium low) || exit 0
+  else
+    resolution=$(gum choose --header "Resolution?" 1080p 720p 4k) || exit 0
+  fi
+fi
+
+dir=$(dirname -- "$input")
+base=$(basename -- "$input")
+output="$dir/${base%.*}-$resolution.$format"
+
+if [[ $type == picture ]]; then
+  transcode_picture "$input" "$format" "$resolution" "$output"
+else
+  echo "Transcoding video — this can take a while…"
+  transcode_video "$input" "$format" "$resolution" "$output"
+fi
+
+printf 'file://%s\n' "$(realpath -- "$output")" | wl-copy --type text/uri-list
+notify "$(basename -- "$output") ready — file URI on the clipboard"
+echo "Wrote: $output"

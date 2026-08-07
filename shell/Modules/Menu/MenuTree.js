@@ -153,6 +153,17 @@ var TREE = {
         "when": "command -v tesseract",
         "action": "screenshot-ocr"
     },
+    // Omarchy's trigger.transcode: re-encode a picture or video for sharing.
+    // Interactive halves (fzf file pick, gum format/resolution) run in a
+    // float; the finished file's URI lands on the clipboard.
+    "capture.transcode": {
+        "icon": "󰕧",
+        "label": "Transcode",
+        "aliases": ["convert", "reencode", "compress", "share"],
+        "description": "Re-encode a picture or video into a share-friendly file",
+        "when": "command -v ffmpeg && command -v fzf",
+        "action": "foot-run --app-id=qshell-float -e bash -lc 'transcode; read -r -p \"press enter to close\"'"
+    },
     // Omarchy's trigger.capture.color runs hyprpicker; niri ships the picker
     // in the compositor, so ours is one IPC call wrapped in bin/color-pick.
     "capture.color": {

@@ -77,3 +77,11 @@ desc = "Restore from trash"
 # [[manager.prepend_keymap]]
 # on  = "q"
 # run = "plugin confirm-quit"
+
+# Transcode the hovered picture/video for sharing (omarchy wires the same
+# helper into Nautilus's right-click; ours rides bin/transcode in a float —
+# format/resolution picked with gum, result URI lands on the clipboard).
+[[mgr.prepend_keymap]]
+on   = "T"
+run  = '''shell 'foot-run --app-id=qshell-float -e bash -lc "transcode \"$1\"; read -r -p \"press enter to close\""' '''
+desc = "Transcode for sharing"
