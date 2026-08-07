@@ -32,6 +32,19 @@ set -gx PNPM_HOME "$HOME/.local/share/pnpm"
 # carries the same pin for non-shell contexts.
 set -gx COMPOSER_HOME "$XDG_CONFIG_HOME/composer"
 
+# Wayland app environment (omarchy envs.lua parity — without it, non-Chromium
+# Electron apps silently fall back to XWayland and Qt apps skip the GTK dialog
+# theme). Set here, NOT in niri's environment{} block: that block never reaches
+# systemd user units (niri docs, Miscellaneous § environment), and qshell — and
+# with it the launcher — runs as one. The login shell is the one place both
+# niri spawns and systemd services inherit from, via niri-session's import.
+set -gx GDK_BACKEND "wayland,x11,*"
+set -gx QT_QPA_PLATFORM "wayland;xcb"
+set -gx QT_QPA_PLATFORMTHEME gtk3
+set -gx MOZ_ENABLE_WAYLAND 1
+set -gx ELECTRON_OZONE_PLATFORM_HINT wayland
+set -gx OZONE_PLATFORM wayland
+
 # PATH — fish_add_path prepends and dedups; safe to re-run every shell.
 fish_add_path -g "$HOME/.local/bin"
 fish_add_path -g "$HOME/.cargo/bin"

@@ -19,6 +19,12 @@ input {
             // If this section is empty, niri will fetch xkb settings
             // from org.freedesktop.locale1. You can control these using
             // localectl set-x11-keymap.
+
+            // omarchy's compose setup (input.lua: kb_options): CapsLock is
+            // the Compose key; plain CapsLock moves to pressing both Shifts
+            // at once (and clears itself the same way). Delete this line to
+            // fall back to the localectl defaults.
+            options "compose:caps,shift:both_capslock_cancel"
         }
 
         // Enable numlock on startup, omitting this setting disables it.
@@ -35,13 +41,18 @@ input {
     touchpad {
         // off
         tap
-        // dwt
+        // Palm-brush guard while typing — Hyprland ships this on (omarchy
+        // inherits it); niri's default is off.
+        dwt
         // dwtp
         // drag false
         // drag-lock
         natural-scroll
         // Mac-style whole-pad clicks (omarchy: clickfinger_behavior).
         click-method "clickfinger"
+        // omarchy: scroll_factor 0.4 — without it two-finger scrolling runs
+        // ~2.5× faster than the Arch setup did.
+        scroll-factor 0.4
         // accel-speed 0.2
         // accel-profile "flat"
         // scroll-method "two-finger"
@@ -371,13 +382,18 @@ window-rule {
     default-column-width {}
 }
 
-// Open the Firefox picture-in-picture player as floating by default.
+// Picture-in-picture players float pinned to the top-right — omarchy's
+// pip.lua geometry (600×338, 40 px off the right edge, ~4% down). The title
+// regex is omarchy's, unanchored: it catches Firefox ("Picture-in-Picture")
+// and Chromium ("Picture in picture") alike. niri can't pin across
+// workspaces or lock the aspect ratio; the opacity exemption lives in the
+// media rule after the global opacity pair below.
 window-rule {
-    // This app-id regular expression will work for both:
-    // - host Firefox (app-id is "firefox")
-    // - Flatpak Firefox (app-id is "org.mozilla.firefox")
-    match app-id=r#"firefox$"# title="^Picture-in-Picture$"
+    match title=r#"Picture.?in.?[Pp]icture"#
     open-floating true
+    default-column-width { fixed 600; }
+    default-window-height { fixed 338; }
+    default-floating-position x=40 y=43 relative-to="top-right"
 }
 
 // Example: block out two password managers from screen capture.
@@ -404,6 +420,33 @@ window-rule {
     opacity 0.96
 }
 
+// The shell's helper terminals (nmtui, bluetoothctl, voxtype configure, …)
+// launch as `foot --app-id=qshell-float` and expect omarchy's floating
+// treatment (system.lua: float + center + 875×600). niri opens floating
+// windows centered, so geometry is all that needs stating.
+window-rule {
+    match app-id="^qshell-float$"
+    open-floating true
+    default-column-width { fixed 875; }
+    default-window-height { fixed 600; }
+}
+
+// omarchy scrolls terminals 1.5× (input.lua: scroll_touchpad), multiplied
+// on top of the touchpad scroll-factor in the input section.
+window-rule {
+    match app-id="^foot$"
+    scroll-factor 1.5
+}
+
+// No transparency on media windows (omarchy system.lua's list) nor on PiP
+// players (pip.lua forces opacity 1). Deliberately the last opacity rule:
+// for a contested property, the latest matching rule wins.
+window-rule {
+    match app-id=r#"^(zoom|vlc|mpv|org\.kde\.kdenlive|com\.obsproject\.Studio|com\.github\.PintaProject\.Pinta|imv)$"#
+    match title=r#"Picture.?in.?[Pp]icture"#
+    opacity 1.0
+}
+
 binds {
     // Keys consist of modifiers separated by + signs, followed by an XKB key name
     // in the end. To find an XKB name for a particular key, you may use a program
@@ -424,6 +467,20 @@ binds {
     // (foot-server.socket) — shared glyph caches, instant spawn. Plain foot
     // is the fallback if the server socket is ever broken.
     Mod+T hotkey-overlay-title="Open a Terminal: foot" { spawn-sh "footclient || foot"; }
+    // omarchy's core app chords. Browser on both of their chords
+    // (SUPER+SHIFT+RETURN and SUPER+SHIFT+B), Alt for a private window;
+    // chromium-browser is Fedora's binary name, and CHROMIUM_USER_FLAGS
+    // already carries the wayland flags.
+    Mod+Shift+Return hotkey-overlay-title="Open the Browser" { spawn "chromium-browser"; }
+    Mod+Shift+B hotkey-overlay-title=null { spawn "chromium-browser"; }
+    Mod+Shift+Alt+B hotkey-overlay-title="Browser (Incognito)" { spawn "chromium-browser" "--incognito"; }
+    // omarchy: SUPER+SHIFT+F file manager — taken by fullscreen-window here,
+    // so the explorer key instead. Same yazi-in-foot as yazi.desktop.
+    Mod+E hotkey-overlay-title="File Manager: yazi" { spawn-sh "footclient yazi || foot yazi"; }
+    // omarchy: SUPER+SHIFT+N editor — $EDITOR (kak) in a foot window.
+    Mod+Shift+N hotkey-overlay-title="Editor: kak" { spawn-sh "footclient kak || foot kak"; }
+    // omarchy: SUPER+ALT+RETURN tmux terminal — attach-or-create "main".
+    Mod+Alt+Return hotkey-overlay-title="Terminal: tmux" { spawn-sh "footclient tmux new-session -A -s main || foot tmux new-session -A -s main"; }
     Mod+D hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Space hotkey-overlay-title="Open the Menu" { spawn "qs" "ipc" "call" "menu" "toggle"; }
     // Omarchy's SUPER+ALT+SPACE apps-menu bind (b92510f). Our menu has no
@@ -447,6 +504,24 @@ binds {
     // the Shift variant. Same toggle semantics as theirs, on the ported
     // `bluetooth` IPC target.
     Mod+Ctrl+Shift+B hotkey-overlay-title="Bluetooth Panel" { spawn "qs" "ipc" "call" "bluetooth" "toggle"; }
+    // The rest of omarchy's SUPER+CTRL panel chords, same letters, on the
+    // bar's summon-widget IPC (focused-output-first, like their
+    // summonBarWidget).
+    Mod+Ctrl+A hotkey-overlay-title="Audio Panel" { spawn "qs" "ipc" "call" "bar" "open" "audio"; }
+    Mod+Ctrl+W hotkey-overlay-title="Network Panel" { spawn "qs" "ipc" "call" "bar" "open" "network"; }
+    Mod+Ctrl+P hotkey-overlay-title="Power Panel" { spawn "qs" "ipc" "call" "bar" "open" "battery"; }
+    Mod+Ctrl+D hotkey-overlay-title="Display Panel" { spawn "qs" "ipc" "call" "bar" "open" "monitor"; }
+    Mod+Ctrl+Alt+D hotkey-overlay-title="Calendar" { spawn "qs" "ipc" "call" "bar" "open" "clock"; }
+    // omarchy: SUPER+SHIFT+CTRL+A agent — the bar's AI panel.
+    Mod+Shift+Ctrl+A hotkey-overlay-title="AI Panel" { spawn "qs" "ipc" "call" "bar" "open" "ai"; }
+    // omarchy: SUPER+CTRL+T btop, floating via the qshell-float rule.
+    Mod+Ctrl+T hotkey-overlay-title="System Monitor: btop" { spawn-sh "footclient --app-id=qshell-float btop || foot --app-id=qshell-float btop"; }
+    // omarchy: XF86Calculator → their calculator; ours is omacalc. (Their
+    // SUPER+SHIFT+EQUAL alternative is set-window-height here.)
+    XF86Calculator hotkey-overlay-title="Calculator" { spawn "omacalc"; }
+    // omarchy: SUPER+BACKSPACE toggles the focused window's transparency
+    // (against the 0.985/0.96 opacity rules below).
+    Mod+BackSpace hotkey-overlay-title="Toggle Window Opacity" { toggle-window-rule-opacity; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "ipc" "call" "lock" "lock"; }
     // Omarchy's notification binds all hang off comma (dismiss last on
     // SUPER+comma, history on SUPER+SHIFT+ALT+comma). Mod+Comma is niri's
@@ -506,6 +581,9 @@ binds {
     XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-"; }
     XF86AudioMute        allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
     XF86AudioMicMute     allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
+    // omarchy's precise ±1% steps on the Alt variants.
+    Alt+XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.01+ -l 1.0"; }
+    Alt+XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.01-"; }
 
     // Media keys route through the shell's MPRIS service (no playerctl).
     XF86AudioPlay        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "playPause"; }
@@ -515,12 +593,29 @@ binds {
     XF86AudioStop        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "stop"; }
     XF86AudioPrev        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "previous"; }
     XF86AudioNext        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "next"; }
+    // The dedicated pause key (omarchy binds it alongside play)…
+    XF86AudioPause       allow-when-locked=true { spawn "qs" "ipc" "call" "media" "playPause"; }
+    // …and their Shift variants rotate which player the media keys control.
+    Shift+XF86AudioPause allow-when-locked=true { spawn "qs" "ipc" "call" "media" "sourceSwitch"; }
+    Shift+XF86AudioPlay  allow-when-locked=true { spawn "qs" "ipc" "call" "media" "sourceSwitch"; }
 
     // Example brightness key mappings for brightnessctl.
     // You can use regular spawn with multiple arguments too (to avoid going through "sh"),
     // but you need to manually put each argument in separate "" quotes.
     XF86MonBrightnessUp allow-when-locked=true { spawn "qs" "ipc" "call" "osd" "brightnessUp"; }
     XF86MonBrightnessDown allow-when-locked=true { spawn "qs" "ipc" "call" "osd" "brightnessDown"; }
+    // omarchy's brightness extremes and precise ±1% steps, on the same
+    // backlight class the OSD service drives (direct brightnessctl calls, so
+    // no OSD popup for these).
+    Shift+XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "100%"; }
+    Shift+XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "1%"; }
+    Alt+XF86MonBrightnessUp     allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+1%"; }
+    Alt+XF86MonBrightnessDown   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "1%-"; }
+    // Keyboard backlight — this MacBook's kbd_backlight LED (omarchy:
+    // omarchy-brightness-keyboard). The cycle key (XF86KbdLightOnOff) is
+    // unbound: no cycle script here.
+    XF86KbdBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--device=kbd_backlight" "set" "+10%"; }
+    XF86KbdBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--device=kbd_backlight" "set" "10%-"; }
 
     // Open/close the Overview: a zoomed-out view of workspaces and windows.
     // You can also move the mouse into the top-left hot corner,
@@ -581,9 +676,12 @@ binds {
     // Mod+Shift+Ctrl+Left  { move-window-to-monitor-left; }
     // ...
 
-    // And you can also move a whole workspace to another monitor:
-    // Mod+Shift+Ctrl+Left  { move-workspace-to-monitor-left; }
-    // ...
+    // omarchy: SUPER+SHIFT+ALT+arrows move the whole workspace to another
+    // monitor (the same chord on numbers is the silent column move below).
+    Mod+Shift+Alt+Left  { move-workspace-to-monitor-left; }
+    Mod+Shift+Alt+Down  { move-workspace-to-monitor-down; }
+    Mod+Shift+Alt+Up    { move-workspace-to-monitor-up; }
+    Mod+Shift+Alt+Right { move-workspace-to-monitor-right; }
 
     Mod+Page_Down      { focus-workspace-down; }
     Mod+Page_Up        { focus-workspace-up; }
@@ -661,12 +759,29 @@ binds {
     Mod+Ctrl+7 { move-column-to-workspace 7; }
     Mod+Ctrl+8 { move-column-to-workspace 8; }
     Mod+Ctrl+9 { move-column-to-workspace 9; }
+    // omarchy runs workspaces 1..10; 0 is the tenth.
+    Mod+0      { focus-workspace 10; }
+    Mod+Ctrl+0 { move-column-to-workspace 10; }
+
+    // omarchy: SUPER+SHIFT+ALT+number moves the column without following it.
+    Mod+Shift+Alt+1 { move-column-to-workspace 1 focus=false; }
+    Mod+Shift+Alt+2 { move-column-to-workspace 2 focus=false; }
+    Mod+Shift+Alt+3 { move-column-to-workspace 3 focus=false; }
+    Mod+Shift+Alt+4 { move-column-to-workspace 4 focus=false; }
+    Mod+Shift+Alt+5 { move-column-to-workspace 5 focus=false; }
+    Mod+Shift+Alt+6 { move-column-to-workspace 6 focus=false; }
+    Mod+Shift+Alt+7 { move-column-to-workspace 7 focus=false; }
+    Mod+Shift+Alt+8 { move-column-to-workspace 8 focus=false; }
+    Mod+Shift+Alt+9 { move-column-to-workspace 9 focus=false; }
+    Mod+Shift+Alt+0 { move-column-to-workspace 10 focus=false; }
 
     // Alternatively, there are commands to move just a single window:
     // Mod+Ctrl+1 { move-window-to-workspace 1; }
 
     // Switches focus between the current and the previous workspace.
-    // Mod+Tab { focus-workspace-previous; }
+    // omarchy: SUPER+CTRL+TAB (plain Mod+Tab belongs to niri's built-in
+    // recent-windows switcher).
+    Mod+Ctrl+Tab { focus-workspace-previous; }
 
     // The following binds move the focused window in and out of a column.
     // If the window is alone, they will consume it into the nearby column to the side.
@@ -771,8 +886,10 @@ binds {
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
 
     // The quit action will show a confirmation dialog to avoid accidental exits.
+    // Ctrl+Alt+Delete used to quit too — dropped: in omarchy that chord
+    // merely closes all windows (and niri has no close-all action), so
+    // muscle memory would end the whole session.
     Mod+Shift+E { quit; }
-    Ctrl+Alt+Delete { quit; }
 
     // Powers off the monitors. To turn them back on, do any input like
     // moving the mouse or pressing any other key.
