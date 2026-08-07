@@ -2,9 +2,18 @@
 # screenshot-ocr — select a region with slurp, OCR it with tesseract, copy
 # the recognized text to the clipboard.
 #
+#   screenshot-ocr            OCR a region → clipboard
+#   screenshot-ocr --speak    OCR a region → clipboard, then read it aloud
+#   screenshot-ocr --stop     stop whatever is currently being read
+#
 # Port of the pre-qshell dotfiles-linux script. Its wayfreeze screen freeze
 # is back as of 2026-08-07 (cargo-built, presence-gated below) — without the
 # binary, slurp draws over the live screen as before.
+#
+# --speak exists because Orca is the wrong tool for "read me THAT bit": it is
+# an AT-SPI screen reader that walks widget trees, so it is blind to text in
+# images, video, canvas and PDFs, and it narrates chrome you did not ask for.
+# OCR + TTS reads exactly the pixels you drew a box around, in any app.
 #
 # Set OCR_LANGS to override (e.g. "eng+deu"); needs the matching
 # tesseract-langpack-* packages.
@@ -13,6 +22,170 @@ set -euo pipefail
 notify() {
   notify-send -a qshell -t "${2:-2000}" "OCR" "$1" >/dev/null 2>&1 || true
 }
+
+# --- speech ------------------------------------------------------------------
+# Backends in descending quality; the first one actually present wins, so
+# installing a better engine later upgrades this script with no edit here.
+#
+# piper is gated on its VOICE MODEL, not its binary, and deliberately so:
+# Fedora ships an unrelated `piper` (a GTK gaming-mouse config tool), and the
+# neural TTS of the same name is a pip package. A voice .onnx on disk is the
+# only unambiguous signal that the TTS one is what is installed.
+PIPER_VOICE="${PIPER_VOICE:-$HOME/.local/share/piper/en_US-amy-medium.onnx}"
+FLITE_VOICE="${FLITE_VOICE:-slt}"
+
+# sherpa-onnx (run_after_24-sherpa-onnx.sh) is the good one: one prebuilt
+# binary that runs Kokoro (82M-param neural, natural-sounding) and Kitten
+# (15M, tiny) from the same CLI, no Python and no venv. It lives in a
+# self-contained tree rather than on PATH, so nothing but this script needs
+# to know about its LD_LIBRARY_PATH.
+#
+# Defaults are Kokoro int8 and voice 3: int8 because the fp32 model is 3.5x
+# the RAM for no audible gain here, and this laptop runs ~1.5 GB free (see
+# bin/mem-pressure-warn). Measured on this box: 330 MB peak RSS, RTF 0.59.
+# Override per-invocation, e.g. SHERPA_VOICE=16 or
+# SHERPA_MODEL=kitten-nano-en-v0_8-int8 (143 MB peak, RTF 0.16).
+SHERPA_DIR="${SHERPA_DIR:-$HOME/.local/share/sherpa-onnx}"
+SHERPA_MODEL="${SHERPA_MODEL:-kokoro-int8-multi-lang-v1_0}"
+SHERPA_VOICE="${SHERPA_VOICE:-3}"
+export PIPER_VOICE FLITE_VOICE SHERPA_DIR SHERPA_MODEL SHERPA_VOICE
+
+pick_backend() {
+  if [[ -x $SHERPA_DIR/bin/sherpa-onnx-offline-tts-play &&
+    -d $SHERPA_DIR/models/$SHERPA_MODEL ]]; then
+    echo sherpa
+  elif [[ -f $PIPER_VOICE ]] && command -v piper >/dev/null 2>&1 &&
+    { command -v ffplay >/dev/null 2>&1 || command -v pw-play >/dev/null 2>&1; }; then
+    echo piper
+  elif command -v espeak-ng >/dev/null 2>&1; then
+    echo espeak-ng
+  elif command -v flite >/dev/null 2>&1; then
+    echo flite
+  fi
+}
+
+# Runs in a detached process group (see speak) so --stop can kill the engine
+# AND its player, not just the shell that launched them.
+run_tts() {
+  case "$TTS_BACKEND" in
+  sherpa)
+    local m="$SHERPA_DIR/models/$SHERPA_MODEL" onnx flags
+    onnx="$m/model.int8.onnx"
+    [[ -f $onnx ]] || onnx="$m/model.onnx"
+    # Kokoro and Kitten take differently-named flags for the same four files.
+    if [[ $SHERPA_MODEL == kitten* ]]; then
+      flags=(--kitten-model="$onnx" --kitten-voices="$m/voices.bin"
+        --kitten-tokens="$m/tokens.txt" --kitten-data-dir="$m/espeak-ng-data")
+    else
+      flags=(--kokoro-model="$onnx" --kokoro-voices="$m/voices.bin"
+        --kokoro-tokens="$m/tokens.txt" --kokoro-data-dir="$m/espeak-ng-data"
+        --kokoro-lang=en)
+    fi
+    # -play streams audio as the model synthesizes it, so speech starts almost
+    # at once instead of after the whole passage is rendered.
+    #
+    # --output-filename is NOT optional despite reading like it: with it unset
+    # the tool writes ./generated.wav into whatever directory niri happened to
+    # spawn the bind in. Pointed at the scratch file so the trap reaps it.
+    # The LEADING SPACE on the text is load-bearing, not a typo. sherpa's
+    # option parser inspects the positional argument too, so a passage that
+    # begins with "--" (a markdown rule, a diff hunk, a shell flag in a
+    # terminal capture — all routine OCR fodder) aborts with "Invalid option"
+    # and exit 255, giving silence rather than speech. It has no "--" end-of-
+    # options separator, and a space is inaudible, so this is the fix.
+    LD_LIBRARY_PATH="$SHERPA_DIR/lib" \
+      "$SHERPA_DIR/bin/sherpa-onnx-offline-tts-play" "${flags[@]}" \
+      --num-threads=4 --sid="$SHERPA_VOICE" \
+      --output-filename="$1.wav" " $(cat "$1")" >/dev/null 2>&1
+    ;;
+  piper)
+    if command -v pw-play >/dev/null 2>&1; then
+      piper --model "$PIPER_VOICE" --output-raw <"$1" |
+        pw-play --format s16 --rate 22050 --channels 1 -
+    else
+      piper --model "$PIPER_VOICE" --output-raw <"$1" |
+        ffplay -f s16le -ar 22050 -ac 1 -nodisp -autoexit -loglevel quiet -
+    fi
+    ;;
+  espeak-ng) espeak-ng -v en-us -s 175 -f "$1" ;;
+  flite) flite -voice "$FLITE_VOICE" -f "$1" ;;
+  esac
+}
+
+# The trap, not a trailing rm, is what deletes the scratch file: --stop kills
+# this process group mid-read, so any cleanup placed after run_tts would never
+# be reached and every interrupted read would strand a file in /tmp.
+speak_runner() {
+  local tmpf="$1"
+  # .wav too: the sherpa backend is handed "$tmpf.wav" as its sink.
+  trap 'rm -f "$tmpf" "$tmpf.wav"' EXIT INT TERM
+  run_tts "$tmpf"
+}
+
+pidfile="${XDG_RUNTIME_DIR:-/tmp}/screenshot-ocr-speak.pid"
+
+stop_speech() {
+  [[ -f $pidfile ]] || return 0
+  local pid
+  pid="$(cat "$pidfile" 2>/dev/null || true)"
+  # Negative PID = whole process group. setsid made the child a group leader,
+  # so its PID is its PGID and one signal takes down engine + player together.
+  [[ -n $pid ]] && { kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true; }
+  rm -f "$pidfile"
+}
+
+# OCR emits one line per visual line, so a wrapped paragraph arrives as a
+# stack of fragments. Fed to TTS verbatim that becomes a full stop at every
+# line end — a stilted, robotic read. Rejoin each paragraph into one line
+# (blank line = real break) and undo hyphenation split across lines.
+reflow() {
+  awk '
+    /^[[:space:]]*$/ { if (buf != "") { print buf; buf = "" } ; next }
+    {
+      line = $0
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      if (line == "") next
+      if (buf == "") buf = line
+      else if (buf ~ /[A-Za-z]-$/) { sub(/-$/, "", buf); buf = buf line }
+      else buf = buf " " line
+    }
+    END { if (buf != "") print buf }
+  '
+}
+
+speak() {
+  local text="$1" tmp
+  TTS_BACKEND="$(pick_backend)"
+  if [[ -z $TTS_BACKEND ]]; then
+    notify "No speech engine found (install flite, espeak-ng or piper)" 4000
+    return 1
+  fi
+  export TTS_BACKEND
+
+  stop_speech # a second press interrupts the previous read rather than overlapping
+
+  tmp="$(mktemp)"
+  printf '%s\n' "$text" | reflow >"$tmp"
+
+  setsid bash -c "$(declare -f run_tts speak_runner); speak_runner \"\$1\"" _ "$tmp" \
+    >/dev/null 2>&1 &
+  echo "$!" >"$pidfile"
+}
+
+# --- entry point -------------------------------------------------------------
+speak_mode=0
+case "${1:-}" in
+--stop)
+  stop_speech
+  exit 0
+  ;;
+--speak) speak_mode=1 ;;
+"") ;;
+*)
+  echo "usage: screenshot-ocr [--speak | --stop]" >&2
+  exit 2
+  ;;
+esac
 
 if ! command -v tesseract >/dev/null 2>&1; then
   notify "tesseract is not installed" 3000
@@ -45,4 +218,14 @@ if [[ -z ${text//[[:space:]]/} ]]; then
 fi
 
 printf '%s' "$text" | wl-copy
-notify "Copied text to clipboard"
+
+if ((speak_mode)); then
+  # Drop the freeze before speaking — otherwise the frozen overlay would sit
+  # over the screen for the whole read, since the EXIT trap only fires at exit.
+  [[ -n $freeze_pid ]] && kill "$freeze_pid" 2>/dev/null
+  freeze_pid=""
+  speak "$text"
+  notify "Reading aloud — press the stop bind to cancel"
+else
+  notify "Copied text to clipboard"
+fi

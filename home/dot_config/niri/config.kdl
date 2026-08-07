@@ -945,6 +945,10 @@ binds {
     Mod+Shift+A hotkey-overlay-title="Annotate Last Capture" { spawn "sh" "-c" "screenshot-annotate"; }
     // Omarchy: SUPER+CTRL+PRINT — OCR, the same slot.
     Mod+Ctrl+Print hotkey-overlay-title="Extract Text (OCR)" { spawn "sh" "-c" "screenshot-ocr"; }
+    // Read a region aloud (OCR → text-to-speech). Deliberately NOT Orca: a
+    // screen reader walks AT-SPI widget trees, so it cannot see text baked
+    // into images, video, canvas or PDFs — this reads the pixels themselves.
+    Mod+Ctrl+Shift+Print hotkey-overlay-title="Read Region Aloud" { spawn "sh" "-c" "screenshot-ocr --speak"; }
     // Apple keyboards have NO Print key, so every Print bind above is dead on
     // this hardware — the macOS-style Mod+Shift+number family from the
     // pre-qshell dotfiles-linux is the reachable set (Cmd+Shift+3/4/5 muscle
@@ -954,6 +958,11 @@ binds {
     Mod+Shift+5 hotkey-overlay-title="Screenshot: Focused Window" { screenshot-window; }
     Mod+Shift+6 hotkey-overlay-title="Screenshot: OCR Region" { spawn "sh" "-c" "screenshot-ocr"; }
     Mod+Shift+7 hotkey-overlay-title="Screenshot: Region + Annotate" { spawn "sh" "-c" "screenshot-annotate --region"; }
+    // Read-aloud rides the "6 = OCR" mnemonic with one extra modifier: same
+    // pick, spoken instead of copied. 8/9/0 are the dynamic-cast family below,
+    // so the Mod+Shift+number row is full — hence Mod+Ctrl+Shift here.
+    Mod+Ctrl+Shift+6 hotkey-overlay-title="Read Region Aloud" { spawn "sh" "-c" "screenshot-ocr --speak"; }
+    Mod+Ctrl+Shift+S hotkey-overlay-title="Stop Reading Aloud" { spawn "sh" "-c" "screenshot-ocr --stop"; }
     // Omarchy: ALT+PRINT — taken by screenshot-window above. Stops a running
     // recording, else opens the capture menu's Screenrecord submenu.
     Mod+Print hotkey-overlay-title="Screen Recording" { spawn "sh" "-c" "screenrecord --stop-recording || qs ipc call menu open screenrecording"; }
