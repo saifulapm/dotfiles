@@ -625,7 +625,7 @@ why = "The .test web server (Herd's role): wildcard *.test vhost, php_fastcgi, a
 name = "dnsmasq"
 category = "dev"
 arch = "all"
-why = "Resolves *.test → 127.0.0.1 with no /etc/hosts edit per project (Herd's trick). The one deliberate always-on service here: ~2 MB RSS, and DNS cannot be socket-activated on demand because resolved queries it at boot"
+why = "Resolves *.test → 127.0.0.1 with no /etc/hosts edit per project (Herd's trick). The one deliberate always-on service here: ~2 MB RSS, and DNS cannot be socket-activated on demand because resolved queries it at boot. PORT 53 NOT 5353 (fixed 2026-08-08): the config shipped on 127.0.0.1:5353 and the unit then failed every boot with 'Permission denied' — SELinux confines it as dnsmasq_t, which may name_bind dns_port_t (53) but not 5353, and the pre-ship bind test had run dnsmasq from an unconfined shell where the policy never applied, so it passed and proved nothing. Found 2026-08-08 during the daemon-trim audit via the AVC in the audit journal. resolved's stub owns only 127.0.0.53:53, so 127.0.0.1:53 was free all along; moving beat keeping 5353 because the latter meant hand-carrying a custom SELinux module on every machine"
 
 [[pkg]]
 name = "composer"

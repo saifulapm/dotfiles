@@ -32,7 +32,19 @@ http://*.test {
 	# caddy's own CA, not Let's Encrypt: .test is not a public domain, so an
 	# ACME challenge could never complete. run_after_17 puts the root cert in
 	# the system trust store, which is what makes the browser padlock green.
-	tls internal
+	#
+	# on_demand is NOT optional (fixed 2026-08-08): without it caddy mints ONE
+	# wildcard cert for *.test, and TLS clients refuse single-label wildcards —
+	# OpenSSL demands at least two labels after the `*` (so *.test fails like
+	# *.com would) and Chromium rejects a wildcard spanning a whole eTLD. curl
+	# against a project therefore died on SAN mismatch with the CA fully
+	# trusted. on_demand defers issuance to the TLS handshake and mints a
+	# per-hostname cert (tries.test, not *.test), which every client accepts.
+	# Only *.test SNI can reach this policy, so unbounded issuance is moot.
+	tls {
+		issuer internal
+		on_demand
+	}
 
 	# app.test -> ~/Sites/app/public. Labels count from the right, so
 	# labels.0 is "test" and labels.1 is the project.

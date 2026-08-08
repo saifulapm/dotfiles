@@ -2,7 +2,7 @@
 # Herd-style https://<project>.test (decision 2026-08-07). Three moving parts,
 # and only the first of them is ever running:
 #
-#   1. dnsmasq answers *.test with 127.0.0.1 on 127.0.0.1:5353, and a
+#   1. dnsmasq answers *.test with 127.0.0.1 on 127.0.0.1:53, and a
 #      systemd-resolved drop-in routes the `test` domain there. This is the
 #      one always-on piece — ~2 MB, and DNS cannot be socket-activated on
 #      demand because resolved needs an answer before anything connects.
@@ -53,14 +53,17 @@ cat >"$tmp/dnsmasq.conf" <<'EOF'
 # *.test → this machine, for the Herd-style dev domains (managed by chezmoi,
 # see run_after_17-test-domains.sh).
 #
-# Port 5353 rather than 53: systemd-resolved already owns 53, and this is a
-# stub that only ever answers `test`. Verified 2026-08-07 that binding
-# 127.0.0.1:5353 succeeds alongside avahi-daemon's 0.0.0.0:5353 mDNS socket
-# (both set SO_REUSEADDR) and that unicast queries reach the more specific
-# bind, i.e. dnsmasq and not avahi.
+# Port 53 on 127.0.0.1 — NOT 5353, which this config shipped with for a day
+# (fixed 2026-08-08). SELinux confines the systemd-started daemon as
+# dnsmasq_t, which may name_bind dns_port_t (53) but not 5353: the unit
+# failed EVERY boot with 'Permission denied' (AVC in the audit journal,
+# tcontext unreserved_port_t), while the 2026-08-07 verification of the 5353
+# bind had run dnsmasq from a shell — unconfined, so it proved nothing about
+# the unit. The conflict 5353 was dodging never existed: resolved's stub
+# binds 127.0.0.53:53 only, so 127.0.0.1:53 is free.
 address=/test/127.0.0.1
 listen-address=127.0.0.1
-port=5353
+port=53
 bind-interfaces
 
 # A resolver for one hardcoded answer has no business reading /etc/resolv.conf
@@ -70,12 +73,12 @@ no-hosts
 EOF
 
 cat >"$tmp/resolved.conf" <<'EOF'
-# Route the `test` domain to the dnsmasq stub on 5353 (managed by chezmoi,
-# see run_after_17-test-domains.sh). The ~ prefix makes this a ROUTING-only
-# domain: it sends *.test lookups to dnsmasq without making it a search
-# suffix or the default resolver for anything else.
+# Route the `test` domain to the dnsmasq stub on 127.0.0.1:53 (managed by
+# chezmoi, see run_after_17-test-domains.sh). The ~ prefix makes this a
+# ROUTING-only domain: it sends *.test lookups to dnsmasq without making it
+# a search suffix or the default resolver for anything else.
 [Resolve]
-DNS=127.0.0.1:5353
+DNS=127.0.0.1
 Domains=~test
 EOF
 
@@ -97,9 +100,14 @@ add() { root_sh="${root_sh}${1}"$'\n'; }
 stale() { ! cmp -s "$1" "$2"; }
 
 if command -v dnsmasq >/dev/null 2>&1; then
+  # is-active in the gate (audit 2026-08-08): with only cmp+is-enabled, a
+  # dnsmasq that enabled but FAILED to start (the SELinux port denial lived
+  # exactly here) passed every later gate and was never retried — resolved
+  # kept pointing at a dead 127.0.0.1 and *.test SERVFAILed forever.
   if stale "$tmp/dnsmasq.conf" /etc/dnsmasq.d/test-domains.conf \
     || stale "$tmp/resolved.conf" /etc/systemd/resolved.conf.d/test-domains.conf \
-    || ! systemctl is-enabled --quiet dnsmasq 2>/dev/null; then
+    || ! systemctl is-enabled --quiet dnsmasq 2>/dev/null \
+    || ! systemctl is-active --quiet dnsmasq 2>/dev/null; then
     add "install -D -m 0644 '$tmp/dnsmasq.conf' /etc/dnsmasq.d/test-domains.conf"
     add "install -D -m 0644 '$tmp/resolved.conf' /etc/systemd/resolved.conf.d/test-domains.conf"
     add "systemctl enable dnsmasq && systemctl restart dnsmasq"
@@ -150,7 +158,12 @@ else
 fi
 
 if [ -n "$root_sh" ]; then
-  if run_root /bin/sh -c "$root_sh"; then
+  # set -e seeded at call time, not in $root_sh (the emptiness check above
+  # must stay meaningful): without it the joined script returned only the
+  # LAST command's status, so a failed dnsmasq restart followed by a clean
+  # resolved restart printed the success line below (audit 2026-08-08).
+  if run_root /bin/sh -c "set -e
+$root_sh"; then
     echo "test-domains: /etc updated (dnsmasq + resolved routing, unprivileged ports, caddy CA)"
   else
     warn "not authorized — /etc parts skipped (rerun 'chezmoi apply' in a terminal)"
