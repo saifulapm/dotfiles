@@ -30,7 +30,10 @@ build_app() {
   [ -x "$bindir/$app" ] && return 0
 
   local src="$HOME/.local/src/$app"
-  if [ ! -d "$src/.git" ]; then
+  # rev-parse, not [ -d .git ] — a killed clone passes the directory test
+  # forever (same fix as 11-kakoune-fork, audit 2026-08-08).
+  if ! git -C "$src" rev-parse HEAD >/dev/null 2>&1; then
+    rm -rf "$src"
     git clone --depth 1 "https://github.com/omacom-io/$app" "$src" \
       || { warn "$app: clone failed"; return 1; }
   fi

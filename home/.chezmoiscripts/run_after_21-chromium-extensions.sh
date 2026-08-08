@@ -7,7 +7,11 @@
 # names keep omarchy's com.omarchy.* ids because the extension code (direct
 # copies) calls them by that exact string, and their manifests pin the
 # extension IDs with a `key`, so the allowed_origins match from any path.
-set -euo pipefail
+# Warn-don't-abort like every neighbour (audit 2026-08-08): this script sat
+# on set -e with nothing to justify it, so an unwritable json here would have
+# silently skipped 22-26 and 99 — the memory setup, both model downloads, the
+# daemon trim and the first-boot theme.
+set -uo pipefail
 
 src="${CHEZMOI_WORKING_TREE:-$HOME/.dotfiles}"
 dest="$HOME/.config/chromium/NativeMessagingHosts"
@@ -17,10 +21,12 @@ declare -A hosts=(
   [com.omarchy.ytdlp]="$src/bin/chromium-ytdlp-host"
 )
 
-mkdir -p "$dest"
+mkdir -p "$dest" \
+  || { echo "chromium-extensions: cannot create $dest — skipped" >&2; exit 0; }
 for name in "${!hosts[@]}"; do
   template="$src/chromium/native-messaging-hosts/$name.json"
   [ -f "$template" ] || { echo "chromium-extensions: missing $template, skipped" >&2; continue; }
-  sed "s|__HOST_PATH__|${hosts[$name]}|g" "$template" >"$dest/$name.json"
+  sed "s|__HOST_PATH__|${hosts[$name]}|g" "$template" >"$dest/$name.json" \
+    || echo "chromium-extensions: writing $name.json failed" >&2
 done
 echo "chromium-extensions: native messaging hosts registered (${!hosts[*]})"

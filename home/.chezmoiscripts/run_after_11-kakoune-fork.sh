@@ -15,7 +15,11 @@ for dep in g++ make git; do
 done
 
 src="$HOME/.local/src/kakoune"
-if [ ! -d "$src/.git" ]; then
+# rev-parse, not [ -d .git ]: git creates .git early in a clone, so a clone
+# killed mid-transfer satisfied the directory test forever and every later
+# apply failed the build on a half-tree (audit 2026-08-08).
+if ! git -C "$src" rev-parse HEAD >/dev/null 2>&1; then
+  rm -rf "$src"
   mkdir -p "$HOME/.local/src"
   git clone --depth 1 https://github.com/saifulapm/kakoune "$src" \
     || { warn "clone failed"; exit 0; }

@@ -9,6 +9,11 @@
 # rest of a fresh-machine apply — the annotate rows just stay hidden.
 set -uo pipefail
 
+# The guard below is a PATH lookup on a binary this script installs to
+# ~/.local/bin — which bash sessions do NOT have on PATH (only fish adds it).
+# Without this export, a TTY or timer apply re-downloaded satty every run.
+export PATH="$HOME/.local/bin:$PATH"
+
 command -v satty >/dev/null 2>&1 && exit 0
 
 VERSION="v0.22.0"

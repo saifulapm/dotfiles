@@ -12,8 +12,11 @@ Public also means the clone needs no credentials: on a fresh Fedora install,
 from a TTY, one command —
 
 ```sh
-sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply --source ~/.dotfiles https://github.com/saifulapm/dotfiles.git
+cd ~ && sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply --source ~/.dotfiles https://github.com/saifulapm/dotfiles.git
 ```
+
+(The `cd ~` is load-bearing: get.chezmoi.io drops its temporary binary into
+`$(pwd)/bin`, so running it elsewhere strands a stray `bin/` there.)
 
 That run asks which machine this is, then: installs every package in
 `packages/manifest.toml` (sudo prompts on the TTY; weak deps off in
@@ -30,12 +33,16 @@ the chromium policy, disables suspend everywhere, opens the dufs port,
 fetches fonts + the theme wallpapers (pinned externals) and bootstraps the
 default theme.
 
-Expect the first apply to take a while — it compiles kakoune, ~10 cargo
-crates and three Qt apps, and pre-pulls ~1.5 GB of container images. If
-anything fails mid-way (flaky network, declined sudo), **rerun
-`chezmoi apply` in a terminal** — every script is idempotent and guarded, so
-a second pass finishes exactly what the first one missed. That same rerun is
-also how the auth-gated steps land after the logins below.
+Expect the first apply to take a while — it compiles kakoune, **Emacs 31
+(from source, the longest single step)**, ~10 cargo crates and three Qt
+apps, and pre-pulls ~1.5 GB of container images. sudo's timestamp expires
+between the root-needing steps, so **the password prompt returns several
+times across the run** — the prompts surface mid build-output, so stay near
+the keyboard rather than leaving it unattended. If anything fails mid-way
+(flaky network, declined sudo), **rerun `chezmoi apply` in a terminal** —
+every script is idempotent and guarded, so a second pass finishes exactly
+what the first one missed. That same rerun is also how the auth-gated steps
+land after the logins below.
 
 **Reboot at the end** — autologin lands you in niri with the shell running.
 

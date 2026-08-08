@@ -44,20 +44,32 @@ if [ "${#missing[@]}" -gt 0 ]; then
 fi
 
 # --- source -----------------------------------------------------------------
-if [ ! -d "$SRC/.git" ]; then
+# rev-parse, not [ -d .git ]: a clone killed mid-transfer leaves .git present
+# but headless, which the old test accepted forever (audit 2026-08-08).
+if ! git -C "$SRC" rev-parse HEAD >/dev/null 2>&1; then
+  rm -rf "$SRC"
   mkdir -p "$(dirname "$SRC")"
   echo "==> Cloning emacs upstream $BRANCH (github mirror, faster than savannah)"
+  old_head=none
   git clone --depth 1 --branch "$BRANCH" https://github.com/emacs-mirror/emacs.git "$SRC"
 else
   echo "==> Updating $SRC to origin/$BRANCH"
   # FETCH_HEAD, not origin/$BRANCH: also handles a checkout that shallow-
   # cloned a different branch (the original master clone jumping to 31).
+  old_head="$(git -C "$SRC" rev-parse HEAD)"
   git -C "$SRC" fetch --depth 1 origin "$BRANCH"
   git -C "$SRC" reset --hard FETCH_HEAD
 fi
 
 cd "$SRC"
-git clean -xdf
+# Clean only when the tip moved (audit 2026-08-08): an OOM-killed make at 80%
+# — a real event on 8 GB machines — used to restart from zero on every rerun
+# because the unconditional clean threw the objects away. Same tip resumes
+# incrementally; a roll-forward still builds from a clean tree. A genuinely
+# wedged tree: git -C ~/.local/src/emacs clean -xdf, then rerun.
+if [ "$old_head" != "$(git rev-parse HEAD)" ]; then
+  git clean -xdf
+fi
 
 mps_flag=(--with-mps=no)
 if [ -f /usr/include/mps.h ]; then

@@ -98,8 +98,13 @@ if [ "${#pkgs[@]}" -eq 0 ]; then
   exit 1
 fi
 
+# Warn-don't-abort from here down (audit 2026-08-08): this script gates the
+# ENTIRE apply — a failing run_before blocks even the file phase — so a single
+# COPR outage or dead mirror must degrade, not brick the machine. Failures
+# leave the hash unwritten, and the next apply retries.
 for copr in "${coprs[@]}"; do
-  sudo dnf copr enable -y "$copr"
+  sudo dnf copr enable -y "$copr" \
+    || echo "install-packages: copr enable $copr failed — its packages will skip this pass" >&2
 done
 
 # Remi's repo: parallel-installable PHP SCL collections (php82/83/84 beside
@@ -110,7 +115,8 @@ done
 # the system php.
 rpm -q remi-release >/dev/null 2>&1 \
   || sudo dnf install --setopt=install_weak_deps=False -y \
-       "https://rpms.remirepo.net/fedora/remi-release-$(rpm -E %fedora).rpm"
+       "https://rpms.remirepo.net/fedora/remi-release-$(rpm -E %fedora).rpm" \
+  || echo "install-packages: remi-release install failed — php8x SCLs will skip this pass" >&2
 
 # The default-enabled [remi] repo also ships composer, release-tagged .remi
 # so it outranks Fedora's on every upgrade — dnf then noisily fails the swap
@@ -119,7 +125,8 @@ rpm -q remi-release >/dev/null 2>&1 \
 # the day the solver finds a path. remi is here ONLY for the SCL php8x
 # collections; composer stays Fedora's. Per-repo exclude via dnf5's override
 # dir (idempotent rewrite each apply), never the rpm-owned remi.repo.
-sudo dnf5 config-manager setopt --create-missing-dir remi.excludepkgs=composer
+sudo dnf5 config-manager setopt --create-missing-dir remi.excludepkgs=composer \
+  || echo "install-packages: remi composer exclude failed — watch for a composer takeover on upgrade" >&2
 
 # RPM Fusion (free): the full ffmpeg. Fedora's own ffmpeg-free strips the
 # H.264/H.265 encoders for patent reasons (Cisco's openh264 is the only
@@ -129,7 +136,8 @@ sudo dnf5 config-manager setopt --create-missing-dir remi.excludepkgs=composer
 # like remi above, hence the same bootstrap shape.
 rpm -q rpmfusion-free-release >/dev/null 2>&1 \
   || sudo dnf install --setopt=install_weak_deps=False -y \
-       "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+       "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
+  || echo "install-packages: rpmfusion-free install failed — full ffmpeg will skip this pass" >&2
 
 # One-time migration on machines that already carry ffmpeg-free: the two
 # conflict, so the plain install below would abort with ffmpeg-free present.
@@ -137,10 +145,27 @@ rpm -q rpmfusion-free-release >/dev/null 2>&1 \
 # own howto); dependents keep working — the rpmfusion libs provide the same
 # sonames.
 if rpm -q ffmpeg-free >/dev/null 2>&1; then
-  sudo dnf swap --setopt=install_weak_deps=False -y --allowerasing ffmpeg-free ffmpeg
+  sudo dnf swap --setopt=install_weak_deps=False -y --allowerasing ffmpeg-free ffmpeg \
+    || echo "install-packages: ffmpeg swap failed — the bulk install may conflict; retrying next apply" >&2
 fi
 
-sudo dnf install --setopt=install_weak_deps=False -y "${pkgs[@]}"
+# --skip-unavailable: without it the transaction is all-or-nothing, and one
+# stale name or one repo the loop above failed to enable turns a fresh
+# machine into a zero-package brick. The rpm -q sweep after names anything
+# that skipped, and leaves the hash unwritten so every apply retries until
+# the manifest and reality agree.
+sudo dnf install --setopt=install_weak_deps=False --skip-unavailable -y "${pkgs[@]}" \
+  || { echo "install-packages: dnf transaction failed — nothing recorded, rerun 'chezmoi apply' in a terminal" >&2; exit 0; }
+
+missing=()
+for p in "${pkgs[@]}"; do
+  rpm -q "$p" >/dev/null 2>&1 || missing+=("$p")
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+  echo "install-packages: NOT installed (unavailable this pass): ${missing[*]}" >&2
+  echo "install-packages: hash withheld — every apply retries until these land or the manifest drops them" >&2
+  exit 0
+fi
 
 # Packages this desktop must not have: they shadow the shell's own lock,
 # keyring-agent and bar. Fedora minimal ships none of them (verified

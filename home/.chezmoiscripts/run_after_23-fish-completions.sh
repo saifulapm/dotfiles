@@ -13,6 +13,11 @@
 # bash-only in the Fedora build — fish's shipped file covers it.
 set -uo pipefail
 
+# stripe lives in ~/.local/bin (run_after_10), which bash sessions do NOT
+# have on PATH — without this export the guard below never saw it on a fresh
+# machine and the completions were silently never generated.
+export PATH="$HOME/.local/bin:$PATH"
+
 warn() { echo "fish-completions: $*" >&2; }
 dest="$HOME/.config/fish/completions"
 mkdir -p "$dest"

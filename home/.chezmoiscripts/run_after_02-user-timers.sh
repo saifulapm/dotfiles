@@ -26,7 +26,11 @@ units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.
 # (found 2026-08-06: a failed xdg-desktop-portal-gtk.service was enough).
 state="$(systemctl --user is-system-running 2>/dev/null || true)"
 if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
-  systemctl --user daemon-reload
+  # Guarded like everything below (audit 2026-08-08): these three were bare
+  # under set -e, and a qshell crash-looped into start-limit aborted the
+  # apply here — silently skipping scripts 03-99 on every rerun.
+  systemctl --user daemon-reload \
+    || echo "user units: daemon-reload failed" >&2
   # Per unit, warn-don't-abort: one unit failing to start must not abort the
   # apply (set -e) or keep the remaining units from being enabled.
   for unit in "${units[@]}"; do
@@ -40,9 +44,11 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
   # when it is already running).
   # mempressure.service (PSI early-warning, needs the notification daemon)
   # shares qshell's Requisite gate and rides the same enable/start split.
-  systemctl --user enable qshell.service mempressure.service
+  systemctl --user enable qshell.service mempressure.service \
+    || echo "user units: enable qshell/mempressure failed — check systemctl --user status qshell.service mempressure.service" >&2
   if systemctl --user -q is-active graphical-session.target; then
-    systemctl --user start qshell.service mempressure.service
+    systemctl --user start qshell.service mempressure.service \
+      || echo "user units: start qshell/mempressure failed — check systemctl --user status qshell.service mempressure.service" >&2
   fi
   echo "user units: qshell.service mempressure.service enabled"
   # emacs.service (ours — shadows the emacs-pgtk rpm unit) has the same

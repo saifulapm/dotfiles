@@ -8,7 +8,19 @@ set -euo pipefail
 conf=/etc/systemd/system/getty@tty1.service.d/autologin.conf
 want='ExecStart=-/sbin/agetty -o "-p -f -- \\u" --noclear --autologin {{ .chezmoi.username }} %I $TERM'
 
-if [ -f "$conf" ] && grep -qF -- "--autologin {{ .chezmoi.username }}" "$conf"; then
+# Byte comparison against the staged file, not a substring probe (audit
+# 2026-08-08): the old `grep --autologin <user>` guard stayed satisfied
+# forever, so editing $want above would never have reached existing machines.
+stage="$(mktemp)"
+trap 'rm -f "$stage"' EXIT
+cat >"$stage" <<EOF
+[Service]
+ExecStart=
+$want
+EOF
+chmod 0644 "$stage"
+
+if cmp -s "$stage" "$conf"; then
   exit 0
 fi
 
@@ -30,18 +42,9 @@ run_root() {
   fi
 }
 
-# Stage the drop-in as the user, install it with ONE root call (a pkexec
-# route prompts once per call, so mkdir/write/reload are combined).
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
-cat >"$tmp" <<EOF
-[Service]
-ExecStart=
-$want
-EOF
-chmod 0644 "$tmp"
-
-if ! run_root /bin/sh -c "install -D -m 0644 '$tmp' '$conf' && systemctl daemon-reload"; then
+# Install the staged drop-in with ONE root call (a pkexec route prompts once
+# per call, so mkdir/write/reload are combined).
+if ! run_root /bin/sh -c "install -D -m 0644 '$stage' '$conf' && systemctl daemon-reload"; then
   echo "autologin: not authorized — skipping (rerun 'chezmoi apply' in a terminal)" >&2
   exit 0
 fi

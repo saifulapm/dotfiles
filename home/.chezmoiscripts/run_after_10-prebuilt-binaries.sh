@@ -5,21 +5,40 @@
 # ouch, usql, jj, witr, lazysql.
 # Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
 #
-# GitHub's unauthenticated API allows 60 requests/hour per IP — nine here, and
-# only on a run where something is actually missing (fully-guarded runs make
-# no requests at all).
+# GitHub's unauthenticated API allows 60 requests/hour per IP — ten here
+# (witr's man page is a second call to the same repo), and only on a run
+# where something is actually missing (fully-guarded runs make no requests).
 set -uo pipefail
 
 warn() { echo "prebuilt: $*" >&2; }
 bindir="$HOME/.local/bin"
 mkdir -p "$bindir"
 
+# The guards below are PATH lookups on binaries this script installs to
+# ~/.local/bin — which bash sessions do NOT have on PATH (only fish adds it).
+# Without this export, a TTY or timer apply re-downloaded all ten tools and
+# burned ten API calls per run, straight toward that 60/hr limit.
+export PATH="$bindir:$PATH"
+
+# Without jq every latest_asset call is a wasted API request that ends in a
+# misleading "no asset matched" warn — bail loudly instead (jq is in the
+# manifest; a sudo-less first pass may not have landed it yet).
+command -v jq >/dev/null 2>&1 \
+  || { warn "jq missing (packages not installed yet?) — skipping this pass"; exit 0; }
+
 arch="$(uname -m)"   # aarch64 | x86_64
 
 # latest_asset <owner/repo> <asset-regex> → download URL on stdout, or nothing
 latest_asset() {
-  curl -fsSL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
-    | jq -r --arg re "$2" '.assets[] | select(.name | test($re)) | .browser_download_url' \
+  local body
+  # An API failure (403 = the rate limit, most likely) must not masquerade as
+  # a regex miss — the old single pipe reported "no asset matched" for both,
+  # sending the debugging at upstream asset names instead of the limit.
+  if ! body="$(curl -fsSL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null)"; then
+    warn "$1: GitHub API request failed (rate limit is 60/hr unauthenticated) — retry next apply"
+    return 0
+  fi
+  jq -r --arg re "$2" '.assets[] | select(.name | test($re)) | .browser_download_url' <<<"$body" \
     | head -1
 }
 
@@ -39,7 +58,8 @@ fetch_tar() {
        esac \
     && found="$(find . -type f -name "$3" | head -1)" \
     && [ -n "$found" ] \
-    && install -m755 "$found" "$bindir/$4" )
+    && install -m755 "$found" "$bindir/$4.part" \
+    && mv "$bindir/$4.part" "$bindir/$4" )
   local rc=$?
   rm -rf "$tmp"
   [ $rc -eq 0 ] && echo "prebuilt: installed $4" || warn "$4 install failed"
@@ -60,7 +80,7 @@ if ! command -v cloudflared >/dev/null 2>&1; then
   goarch="arm64"; [ "$arch" = "x86_64" ] && goarch="amd64"
   url="$(latest_asset cloudflare/cloudflared "^cloudflared-linux-${goarch}$")"
   if [ -n "$url" ] && curl -fsSL -o "$bindir/cloudflared.tmp" "$url"; then
-    install -m755 "$bindir/cloudflared.tmp" "$bindir/cloudflared" && rm -f "$bindir/cloudflared.tmp"
+    chmod 755 "$bindir/cloudflared.tmp" && mv "$bindir/cloudflared.tmp" "$bindir/cloudflared"
     echo "prebuilt: installed cloudflared"
   else
     rm -f "$bindir/cloudflared.tmp"; warn "cloudflared install failed"
@@ -101,7 +121,7 @@ if ! command -v witr >/dev/null 2>&1; then
   goarch="arm64"; [ "$arch" = "x86_64" ] && goarch="amd64"
   url="$(latest_asset pranshuparmar/witr "^witr-linux-${goarch}$")"
   if [ -n "$url" ] && curl -fsSL -o "$bindir/witr.tmp" "$url"; then
-    install -m755 "$bindir/witr.tmp" "$bindir/witr" && rm -f "$bindir/witr.tmp"
+    chmod 755 "$bindir/witr.tmp" && mv "$bindir/witr.tmp" "$bindir/witr"
     manurl="$(latest_asset pranshuparmar/witr "^witr\\.1$")"
     if [ -n "$manurl" ]; then
       mkdir -p "$HOME/.local/share/man/man1"

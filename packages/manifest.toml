@@ -652,6 +652,12 @@ arch = "all"
 why = "nmtui — the network widget's middle-click drops into it (NetworkWidget.qml) for the wifi/VPN edits the panel does not cover. Was never declared, so under weak-deps-off the action opened a foot window that instantly closed (audit 2026-08-07)"
 
 [[pkg]]
+name = "upower"
+category = "desktop"
+arch = "all"
+why = "Quickshell.Services.UPower — Battery.qml, PowerPanel.qml and the battery warning ladder in Services/Battery.qml all import it. Present on the Asahi Remix image by luck, never declared, so a weak-deps-off minimal NUC could lack it (audit 2026-08-08: nothing installed requires it — dnf repoquery --whatrequires upower is empty). The battery widgets are presence-gated so nothing visibly broke on a desktop, but the manifest claims to be the complete inventory, and a future laptop install would have found the gap the hard way"
+
+[[pkg]]
 name = "xz"
 category = "dev"
 arch = "all"
@@ -1382,9 +1388,13 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     of silently restoring the always-on 486 MB daemon. That is not
 #     hypothetical — the unit was observed flipping back to `enabled` on
 #     2026-08-08 within two minutes of being disabled by hand, with no enable
-#     event in the journal and the unit file's mtime untouched (a concurrent
-#     agent session in this repo was the likely cause, unproven). The apply-time
-#     disable is what makes that self-healing.
+#     event in the journal and the unit file's mtime untouched. SOLVED
+#     (audit 2026-08-08): the culprit was run_after_04-agent-clis.sh itself,
+#     whose voxtype block ran `enable --now` whenever the unit was not
+#     enabled — chezmoi runs run_after scripts in lexical order, so 04
+#     re-enabled what 02 had just disabled on every apply. That block is now
+#     removed; 02 alone owns the unit state, and the apply-time disable
+#     remains as the backstop against any future flipper.
 #     Guarded on the unit existing, because voxtype is a hand install and is
 #     legitimately absent on a fresh machine. Disable only, never stop: the
 #     idle timer is what stops a running daemon, and unlike a blind `stop` it

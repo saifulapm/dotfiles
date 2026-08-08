@@ -14,3 +14,15 @@ case ":$PATH:" in
   *":$HOME/.dotfiles/bin:"*) ;;
   *) export PATH="$HOME/.dotfiles/bin:$PATH" ;;
 esac
+
+# ~/.local/bin + ~/.cargo/bin — nothing on Fedora 44 adds these for bash
+# (only fish's 00-env.fish did; audit 2026-08-08), so bash contexts missed
+# every prebuilt binary and cargo tool the apply installs.
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+case ":$PATH:" in
+  *":$HOME/.cargo/bin:"*) ;;
+  *) export PATH="$HOME/.cargo/bin:$PATH" ;;
+esac

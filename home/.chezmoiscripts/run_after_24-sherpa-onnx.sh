@@ -88,7 +88,14 @@ for m in "${models[@]}"; do
   if curl -fsSL -o "$tmp/$m.tar.bz2" "$base/tts-models/$m.tar.bz2" &&
     tar -xjf "$tmp/$m.tar.bz2" -C "$tmp" &&
     [ -d "$tmp/$m" ]; then
-    mv "$tmp/$m" "$dest/models/$m" && echo "sherpa-onnx: fetched model $m"
+    # Two-step move: $tmp is tmpfs and $dest is btrfs, so a direct mv is a
+    # non-atomic copy — a kill mid-copy left a partial model dir that the
+    # [ -d ] guard above then trusted forever. Copy to .part on the
+    # destination fs first; the final rename is atomic.
+    rm -rf "$dest/models/$m.part"
+    mv "$tmp/$m" "$dest/models/$m.part" &&
+      mv "$dest/models/$m.part" "$dest/models/$m" &&
+      echo "sherpa-onnx: fetched model $m"
   else
     warn "model $m failed to download"
   fi

@@ -14,9 +14,22 @@
 # next `chezmoi apply` retries.
 set -uo pipefail
 state="$HOME/.local/state/qshell/theme.toml"
+# Gate on theme-apply's OUTPUT, not just theme.toml (audit 2026-08-08):
+# theme-set writes theme.toml BEFORE exec-ing theme-apply, so a failed first
+# apply (node missing — 03 tolerates an offline mise install) used to satisfy
+# the old theme.toml-only gate and leave the desktop permanently unthemed,
+# with every rerun skipping here. niri-theme.kdl is the apply half's first
+# artifact; while it is missing, re-run the apply half directly — theme-set
+# would work too, but it would also reset a user-chosen theme back to the
+# default, and theme.toml existing means the choice already happened.
+applied="$HOME/.local/state/qshell/niri-theme.kdl"
 if [ ! -f "$state" ]; then
   if ! "${CHEZMOI_WORKING_TREE:?}/bin/theme-set" tokyo-night; then
     echo "bootstrap-theme: theme-set failed (node missing? offline?) — rerun 'chezmoi apply'" >&2
+  fi
+elif [ ! -f "$applied" ]; then
+  if ! "${CHEZMOI_WORKING_TREE:?}/bin/theme-apply"; then
+    echo "bootstrap-theme: theme-apply failed (node missing? offline?) — rerun 'chezmoi apply'" >&2
   fi
 fi
 exit 0

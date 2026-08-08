@@ -11,9 +11,12 @@
 # zswap (NUC — stock zram) just gets the swapfile.
 set -uo pipefail
 
-swap_kib=$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo)
+# Gate on the artifact this script creates being ACTIVE, not on total swap
+# (audit 2026-08-08): the old `SwapTotal < 15 GiB` test assumed Asahi's 8 G
+# swapfile underneath — on a NUC whose zram tops out below 7 G it never
+# settled, re-prompting for sudo on every apply while doing nothing.
 need_swap=0
-[ "$swap_kib" -lt $((15 * 1024 * 1024)) ] && need_swap=1
+swapon --show=NAME --noheadings | grep -qx /var/swap/swapfile2 || need_swap=1
 
 need_zstd=0
 if [ "$(cat /sys/module/zswap/parameters/enabled 2>/dev/null)" = "Y" ] &&

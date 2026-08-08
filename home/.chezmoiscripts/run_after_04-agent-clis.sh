@@ -49,16 +49,18 @@ if command -v voxtype >/dev/null 2>&1; then
   if [ ! -f "$HOME/.config/systemd/user/voxtype.service" ]; then
     voxtype setup systemd || warn "voxtype setup systemd failed"
   fi
-  if systemctl --user is-system-running >/dev/null 2>&1 \
-     && ! systemctl --user is-enabled voxtype.service >/dev/null 2>&1; then
-    systemctl --user enable --now voxtype.service 2>/dev/null \
-      || warn "could not enable voxtype.service"
-  fi
+  # NO enable here — deliberately (fixed 2026-08-08). This script runs after
+  # 02-user-timers in lexical order, and an enable block that lived here was
+  # re-enabling the daemon 02 had just disabled, on every single apply: the
+  # "unit flipping back to enabled within minutes, no journal trace" mystery
+  # the manifest blamed on a concurrent agent session was this script. 02
+  # owns the unit's state — disabled; started on demand by bin/voxtype-toggle
+  # on the keybind, reaped by voxtype-idle-stop.timer.
 else
   warn "voxtype not installed — dictation (Mod+Ctrl+X / F9) stays inert. To enable:"
   warn "  download the binary from github.com/peteonrails/voxtype/releases into ~/.local/bin,"
   warn "  then: voxtype setup --download --model base.en && voxtype setup systemd"
-  warn "  and:  systemctl --user enable --now voxtype"
+  warn "  then rerun 'chezmoi apply' — the keybind starts it on demand; never enable the unit"
 fi
 
 exit 0
