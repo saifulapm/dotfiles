@@ -1281,7 +1281,7 @@ why  = "Rust language server for eglot"
 [[tool]]
 name = "nerd-font-symbols"
 via  = "chezmoi external → ~/.local/share/fonts/nerd-symbols (nerd-fonts v3.5.0 NerdFontsSymbolsOnly.tar.xz, pinned)"
-why  = "Bar/OSD/terminal icon glyphs; not packaged in Fedora. Symbols-only (~2 MB) rather than a patched family, so the text font is a separate decision. NOTE: only the Material Design range (U+F0001+) actually renders under this font — the FontAwesome, Codicon and Devicon ranges do not, which is why every glyph in the shell is an MD codepoint"
+why  = "Bar/OSD/terminal icon glyphs; not packaged in Fedora. Symbols-only (~2 MB) rather than a patched family, so the text font is a separate decision. CORRECTION 2026-08-09: an earlier note here claimed only the Material Design range (U+F0001+) renders and that FontAwesome, Codicon and Devicon do not — that is FALSE. Querying the charset of SymbolsNerdFontMono-Regular.ttf directly (fc-query --format=%{charset}) shows all 29 ranges present, and a foot screenshot confirmed powerline, seti, devicon, codicon, FontAwesome, Material and IEC glyphs all drawing. Whatever the original observation was, it was not font coverage. The shell's convention of using only MD codepoints is therefore a free choice, not a constraint — no need to work around ranges that were never missing"
 
 [[tool]]
 name = "maple-mono"

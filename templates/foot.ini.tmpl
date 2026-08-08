@@ -9,7 +9,22 @@
 # derivations; token 12 renders exactly the tuned 12.5/32 pair). Points beat
 # pixelsize: they stay proportional under any output scale. foot cannot
 # reload config — running windows keep their size until reopened.
-font={{font.mono}}:size={{font.foot-pt}}
+#
+# The second entry is the icon font, named explicitly rather than left to
+# fontconfig. foot.ini(5): "the first font is the primary font. The remaining
+# fonts are fallback fonts... searched in the order they appear. If a glyph
+# cannot be found in any of the fallback fonts, the dynamic fallback list from
+# fontconfig (for the primary font) is searched." Both paths reach the same
+# file today — 50-qshell.conf puts Symbols Nerd Font Mono on the `monospace`
+# accept-list, and glyphs did render without this line (verified by screenshot
+# 2026-08-09: powerline, seti, devicon, codicon, FontAwesome, Material and IEC
+# all drew). Naming it here makes that deterministic instead of incidental:
+# the terminal stops depending on the generic-alias chain resolving the way it
+# happens to today, and a fontconfig edit cannot silently cost the icons.
+# Sized to match the text font so the icon cell lines up. Bold/italic inherit
+# this list automatically — foot.ini(5) again: with font-bold et al unset, the
+# bold/italic variants of "the regular font(s) specified in font" are used.
+font={{font.mono}}:size={{font.foot-pt}}, Symbols Nerd Font Mono:size={{font.foot-pt}}
 line-height={{font.foot-line-height}}px
 include=~/.config/foot/theme.ini
 
