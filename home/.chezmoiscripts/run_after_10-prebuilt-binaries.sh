@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Tools Fedora does not package whose upstreams ship linux binaries for both
 # our arches (asset names verified against the GitHub API 2026-08-07, jj and
-# witr 2026-08-08): watchexec, hurl, cloudflared, stripe, ouch, usql, jj, witr.
+# witr 2026-08-08, lazysql 2026-08-08): watchexec, hurl, cloudflared, stripe,
+# ouch, usql, jj, witr, lazysql.
 # Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
 #
-# GitHub's unauthenticated API allows 60 requests/hour per IP — eight here, and
+# GitHub's unauthenticated API allows 60 requests/hour per IP — nine here, and
 # only on a run where something is actually missing (fully-guarded runs make
 # no requests at all).
 set -uo pipefail
@@ -110,6 +111,18 @@ if ! command -v witr >/dev/null 2>&1; then
   else
     rm -f "$bindir/witr.tmp"; warn "witr install failed"
   fi
+fi
+
+# lazysql — TUI database client (mysql, postgres, sqlite3, sqlserver; the
+# provider names are exact, taken from the binary's own validator). Replaces
+# dbx, removed 2026-08-08 for the reason recorded in the manifest: it does the
+# same schema-browse-and-result-grid job as a 16 MB static Go binary in this
+# tier, where dbx was an RPM that pulled a 92 MiB browser engine for one app.
+# usql stays — same split as before, usql for scripted one-liners, lazysql for
+# poking at an unfamiliar schema. Arches are named the way stripe names them.
+if ! command -v lazysql >/dev/null 2>&1; then
+  larch="arm64"; [ "$arch" = "x86_64" ] && larch="x86_64"
+  fetch_tar jorgerojas26/lazysql "lazysql_Linux_${larch}\\.tar\\.gz$" lazysql lazysql
 fi
 
 exit 0

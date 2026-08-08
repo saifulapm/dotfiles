@@ -1,0 +1,42 @@
+# lazysql — TUI database client, installed by run_after_10-prebuilt-binaries.sh.
+# Replaces dbx (removed 2026-08-08).
+#
+# The two connections below are this box's on-demand dev databases, the ones
+# run_after_16-dev-services brings up as socket-activated podman containers.
+# Opening either from the picker is itself what wakes the container, so the
+# first connect after ~10 minutes idle takes several seconds while podman
+# starts it — measured here 2026-08-08 as longer than 30 s from cold, fast once
+# warm. That pause is the container starting, NOT lazysql hanging; a "stopped"
+# database is the normal state on this machine and must not be fixed by
+# enabling an always-on service.
+#
+# Credentials are absent on purpose and committed on purpose: mysql root has an
+# empty password and postgres trusts local connections, both deliberate,
+# dev-only and loopback-only. There is no secret in this file.
+#
+# sslmode=disable is REQUIRED on the postgres URL rather than cosmetic: lib/pq
+# defaults to sslmode=require and the dev container serves no TLS, so omitting
+# it fails the connection outright instead of falling back to plaintext.
+#
+# Provider strings are exact. The binary validates against precisely
+# "mysql, postgres, sqlite3, sqlserver" and rejects anything else, so
+# "postgresql" or "sqlite" here would be a startup error.
+#
+# Redis (127.0.0.1:6379) is deliberately absent — lazysql speaks SQL only, and
+# there is no Redis provider to point at it.
+#
+# Per-project SQLite files are deliberately not listed. lazysql reads a
+# .lazysql.toml placed beside a project's .git, found by walking up from the
+# working directory, which suits ~/Sites better than naming every database
+# here — but note that a local file REPLACES the [[database]] list rather than
+# merging with it, so a project file must repeat any of these it still wants.
+
+[[database]]
+Name = 'MySQL 8.4 (dev)'
+Provider = 'mysql'
+URL = 'mysql://root@127.0.0.1:3306/'
+
+[[database]]
+Name = 'PostgreSQL 18 (dev)'
+Provider = 'postgres'
+URL = 'postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable'
