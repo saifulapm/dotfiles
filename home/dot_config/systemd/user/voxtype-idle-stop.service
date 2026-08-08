@@ -1,0 +1,8 @@
+[Unit]
+Description=Stop the voxtype dictation daemon once it has been idle
+
+[Service]
+Type=oneshot
+ExecStart=%h/.dotfiles/bin/voxtype-idle-stop
+Nice=19
+IOSchedulingClass=idle

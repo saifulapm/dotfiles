@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# voxtype-toggle — start the dictation daemon on demand, then toggle recording.
+# What the niri binds (Mod+Ctrl+X, F9) spawn instead of `voxtype record toggle`.
+#
+# WHY: voxtype's daemon PRELOADS its whisper model at startup rather than
+# per utterance, so leaving it running costs the whole model resident. Measured
+# on this M2 (2026-08-08, fresh restart, idle VmRSS):
+#   base.en    162 MB  (151 anon)
+#   small.en   486 MB  (475 anon)   <- the model in use
+# which made voxtype the single largest process on a 7.3 GB laptop while doing
+# nothing at all. CPU is NOT the problem and never was: the idle daemon burned
+# 0.000 s over a 5 s sample and 0.41 s total across its whole uptime, all of it
+# the startup model load. This is purely about RAM.
+#
+# The memory is anonymous and therefore swappable rather than pinned — a daemon
+# left idle for hours was observed at 4.8 MB VmRSS with the model entirely
+# paged out, still working — so the kernel already reclaims it under pressure.
+# Stopping it outright is the deterministic version of that, and it is cheap
+# because a warm start is 0.20 s (see below).
+#
+# WHY A WRAPPER AND NOT SOCKET ACTIVATION: `voxtype record toggle` does not
+# start the daemon, it fails with "Voxtype daemon is not running", so the binds
+# alone cannot do this. And the mysql/postgres/redis on-demand pattern used
+# elsewhere on this machine does not apply: record start/stop is SIGUSR1 and
+# SIGUSR2 to the pidfile in $XDG_RUNTIME_DIR/voxtype, not a connection, and the
+# binary carries no LISTEN_FDS/sd_listen support to be activated on.
+#
+# voxtype.service is `systemctl --user disable`d so nothing starts it at login;
+# voxtype-idle-stop.timer stops it again after ~10 min idle. The bar is
+# unaffected either way: Dictation.qml is only `active` while recording or
+# transcribing, so a stopped daemon and an idle one look identical.
+set -uo pipefail
+
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/voxtype"
+state="$runtime/state"
+
+if [[ ! -e $state ]]; then
+  systemctl --user start voxtype.service
+
+  # The state file IS the readiness signal, and a precise one: measured here it
+  # appears at 0.20 s already containing "idle", 0.01 s before the daemon logs
+  # "ready for voice input". Polling it beats trusting `systemctl start` to
+  # return at the right moment — voxtype.service is Type=simple, so systemd
+  # calls it started once it has forked, long before the 466 MB model is
+  # loaded, and a toggle sent then is a silently lost keypress.
+  #
+  # 5 s ceiling: warm start is 0.20 s and a cold page cache only adds the model
+  # read. Past that something is actually wrong, and saying so beats hanging a
+  # keybind forever.
+  for _ in $(seq 1 100); do
+    [[ -e $state ]] && break
+    sleep 0.05
+  done
+
+  if [[ ! -e $state ]]; then
+    command -v notify-send >/dev/null &&
+      notify-send -u critical "Dictation" "voxtype daemon failed to start"
+    exit 1
+  fi
+fi
+
+exec voxtype record toggle

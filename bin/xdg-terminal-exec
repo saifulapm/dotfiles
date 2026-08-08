@@ -1,0 +1,22 @@
+#!/bin/sh
+# xdg-terminal-exec — the terminal GLib reaches for when a Terminal=true
+# desktop entry is launched.
+#
+# gtk-launch (Modules/Launcher runs every entry through `app-run gtk-launch`)
+# delegates Terminal=true to GLib, which picks a terminal from a HARDCODED
+# list — glib2 2.88: xdg-terminal-exec, ptyxis, gnome-terminal, mate-terminal,
+# xfce4-terminal, tilix, konsole, nxterm, color-xterm, rxvt, dtterm, xterm.
+# foot is on none of them and none of the twelve are installed, so packaged
+# TUI entries (btop, Helix) died with "Unable to find terminal required for
+# application" — silently, since execDetached drops the exit code.
+#
+# xdg-terminal-exec is FIRST on that list, so owning the name is the whole
+# fix. GLib invokes it as `xdg-terminal-exec <cmd> [args…]` with no -e/--
+# separator (the proposed XDG spec's calling convention), which is already
+# foot-run's shape. bin/ is on the systemd user manager's PATH, so the
+# gtk-launch inside app-run finds this.
+#
+# No --app-id: these tile as ordinary foot windows. bin/tui-install's entries
+# stamp TUI.float/TUI.tile because they own a matching niri window rule;
+# packaged entries get the plain `foot` id and its scroll-factor rule only.
+exec foot-run "$@"

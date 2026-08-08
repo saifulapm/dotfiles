@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodic idle check for the voxtype dictation daemon
+
+[Timer]
+# Two minutes is fine-grained without being costly: with the daemon stopped the
+# check is one stat() on a path that does not exist and exits immediately, and
+# the 10 min idle window it enforces is what actually decides when RAM comes
+# back. No persistence — this only matters while a session is running.
+OnStartupSec=2min
+OnUnitActiveSec=2min
+RandomizedDelaySec=20s
+
+[Install]
+WantedBy=timers.target

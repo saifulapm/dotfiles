@@ -1338,16 +1338,31 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     4 P-cores + 4 E-cores and whisper.cpp splits work evenly across them, so
 #     the E-cores set the pace; the default (commented `threads`, auto) is left
 #     alone as a result.
-#   * COST: the daemon PRELOADS the model at startup ("Model loaded, ready for
-#     voice input") rather than loading it per utterance, so this bump is a
-#     permanent resident cost, not a transient one. Measured idle VmRSS on a
-#     fresh restart: base.en 162 MB (151 anon), small.en 486 MB (475 anon) —
-#     +324 MB always resident. It is ordinary anonymous memory and therefore
-#     swappable, not pinned: a daemon left idle for hours was observed at
-#     4.8 MB VmRSS with the model entirely paged out, still working. So the
-#     real budget hit on this 8 GB machine is swap pressure, not RAM loss.
-#     Revert with `voxtype setup model --set base.en --restart` (base.en is
-#     still on disk); see bin/mem-pressure-warn for the tiers this sits under.
+#   * COST, and why the daemon is now ON DEMAND: it PRELOADS the model at
+#     startup ("Model loaded, ready for voice input") rather than loading it
+#     per utterance, so a running daemon costs the whole model resident.
+#     Measured idle VmRSS on a fresh restart: base.en 162 MB (151 anon),
+#     small.en 486 MB (475 anon). That made voxtype the single largest process
+#     on this 7.3 GB laptop while doing nothing. CPU was never the issue — the
+#     idle daemon used 0.000 s over a 5 s sample and 0.41 s across its entire
+#     uptime, all of it the startup load.
+#     So voxtype.service is `systemctl --user disable`d (nothing starts it at
+#     login) and bin/voxtype-toggle starts it on the keybind instead, with
+#     voxtype-idle-stop.timer stopping it after ~10 min idle — the same
+#     arrangement as this machine's on-demand database containers. Measured
+#     wrapper latency: 0.23 s cold (daemon down), 0.01 s warm. Full reasoning
+#     lives in bin/voxtype-toggle; the guard logic is in bin/voxtype-idle-stop
+#     and was tested against all four states (refuses to stop while recording
+#     or transcribing, refuses on young idle, stops on aged idle, no-ops with
+#     no daemon).
+#     Worth knowing before undoing this: the memory is ordinary anonymous
+#     memory and therefore swappable, not pinned — a daemon left idle for hours
+#     was observed at 4.8 MB VmRSS with the model entirely paged out and still
+#     working, so the kernel already reclaimed it under pressure. On-demand is
+#     the deterministic version of that, not the only thing standing between
+#     this machine and an OOM. See bin/mem-pressure-warn for the tiers.
+#     Revert the MODEL (independent of the above) with
+#     `voxtype setup model --set base.en --restart`; base.en is still on disk.
 #   * `[whisper] eager_processing = true` (with eager_chunk_secs/overlap) is
 #     the untried mitigation for the latency above: it transcribes chunks while
 #     recording is still running, so most of small.en's 4.5 s would overlap
@@ -1356,17 +1371,32 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     boundaries) rather than just performance.
 #   * `voxtype setup systemd` writes ~/.config/systemd/user/voxtype.service,
 #     which is NOT chezmoi-managed (unlike taildrop-receive.service) — a
-#     restore has to re-run that command, and the daemon only runs because
-#     `systemctl --user enable --now voxtype` was run once.
+#     restore has to re-run that command. It is then left DISABLED on purpose
+#     (see the on-demand note above), so a fresh machine needs, once:
+#       systemctl --user disable voxtype.service
+#       systemctl --user enable --now voxtype-idle-stop.timer
+#     Only the timer and its .service are chezmoi-managed; voxtype's own unit
+#     is not, which is why the disable cannot be expressed in the repo.
 #   * The daemon publishes its state to $XDG_RUNTIME_DIR/voxtype/state, which
 #     is what `voxtype status --follow` streams and therefore what
 #     bin/voxtype-status and the bar's dictation indicator read. Because the
 #     state is a file rather than a connection, the follower survives a daemon
-#     restart (verified).
+#     restart (verified) and a daemon STOP: voxtype removes the file and the
+#     follower reports "stopped", which DictationService.qml already models.
+#     The bar looks no different for it — Dictation.qml is only `active` while
+#     recording or transcribing, so stopped and idle render identically.
+#     That file's mtime is also what bin/voxtype-idle-stop ages: the daemon
+#     rewrites it on every transition, so "idle" plus mtime age is exactly
+#     "idle for N seconds", and no separate bookkeeping is needed.
 #   * voxtype's own evdev hotkey ([hotkey] key = SCROLLLOCK) needs the user in
 #     the `input` group and is inert here; the niri binds (Mod+Ctrl+X, F9 →
-#     `voxtype record toggle`) are what drive it instead, which is upstream's
-#     documented compositor-keybinding mode.
+#     bin/voxtype-toggle) are what drive it instead, which is upstream's
+#     documented compositor-keybinding mode. They spawn the wrapper rather than
+#     `voxtype record toggle` because that subcommand does NOT start a stopped
+#     daemon — it fails with "Voxtype daemon is not running". Socket activation
+#     (the mysql/postgres/redis pattern here) is impossible for the same
+#     reason it needs a wrapper at all: record start/stop is SIGUSR1/SIGUSR2 to
+#     the pidfile, not a connection, and the binary has no LISTEN_FDS support.
 
 # --- mac-parity non-dnf tools (added 2026-08-07, user-approved) ---
 

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# voxtype-idle-stop — stop the dictation daemon once it has sat idle, so its
+# preloaded whisper model (486 MB resident for small.en on this M2) is not
+# parked in RAM between dictations. Run every 2 min by voxtype-idle-stop.timer;
+# bin/voxtype-toggle starts it again on the next Mod+Ctrl+X / F9 for 0.20 s.
+#
+# Deliberately the same shape as this machine's on-demand database containers:
+# use wakes them, an idle window stops them. The reasoning for the whole
+# arrangement lives in bin/voxtype-toggle.
+set -uo pipefail
+
+# Ten minutes, matching the podman DB containers' idle window. Override with
+# VOXTYPE_IDLE_SECS to tune without editing the unit.
+idle_secs="${VOXTYPE_IDLE_SECS:-600}"
+
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/voxtype"
+state="$runtime/state"
+
+# No state file means no daemon: voxtype removes it on shutdown (verified).
+# This is the common case once the daemon has been stopped, and it is why a
+# two-minute timer is cheap enough to leave running all session.
+[[ -e $state ]] || exit 0
+
+# Only "idle" is safe to stop. "recording" and "transcribing" are work in
+# flight, and stopping mid-transcription discards the utterance the user just
+# spoke. The daemon rewrites this file on every transition, so its mtime is the
+# age of the CURRENT state — "idle" plus that age is exactly "idle for N".
+[[ "$(cat "$state" 2>/dev/null)" == "idle" ]] || exit 0
+
+changed="$(stat -c %Y "$state" 2>/dev/null)" || exit 0
+(($(date +%s) - changed >= idle_secs)) || exit 0
+
+# Racing a keypress here costs nothing worse than a restart: systemd serialises
+# the stop against voxtype-toggle's start, so the toggle waits out the 0.20 s
+# and proceeds. The window is milliseconds wide because recording moves the
+# state off "idle" before this check could pass again.
+systemctl --user stop voxtype.service

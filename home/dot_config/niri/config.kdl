@@ -654,8 +654,15 @@ binds {
     // hold-to-talk cannot be expressed. F9 is therefore a second toggle, which
     // is also why both binds set repeat=false — key repeat on a toggle would
     // flap the recorder while the key is held.
-    Mod+Ctrl+X repeat=false hotkey-overlay-title="Toggle Dictation" { spawn "voxtype" "record" "toggle"; }
-    F9 repeat=false hotkey-overlay-title="Toggle Dictation" { spawn "voxtype" "record" "toggle"; }
+    // These spawn bin/voxtype-toggle rather than `voxtype record toggle`
+    // because the daemon is no longer running when idle: it preloads its
+    // whisper model, which costs 486 MB resident for nothing, so it is
+    // disabled at login and stopped again after ~10 min idle by
+    // voxtype-idle-stop.timer. The wrapper starts it (0.20 s) and then
+    // toggles; `voxtype record toggle` on its own just errors when the daemon
+    // is down. Full reasoning in bin/voxtype-toggle.
+    Mod+Ctrl+X repeat=false hotkey-overlay-title="Toggle Dictation" { spawn "voxtype-toggle"; }
+    F9 repeat=false hotkey-overlay-title="Toggle Dictation" { spawn "voxtype-toggle"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
