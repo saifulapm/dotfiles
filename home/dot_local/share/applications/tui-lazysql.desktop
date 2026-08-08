@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=LazySQL
+GenericName=Database Client
+Comment=Browse MySQL, PostgreSQL and SQLite databases in lazysql inside a foot window
+Exec=foot-run --app-id=TUI.tile lazysql
+Terminal=false
+Type=Application
+Icon=office-database
+StartupNotify=true
+Categories=Development;Database;ConsoleOnly;
+Keywords=sql;mysql;postgres;postgresql;sqlite;database;db;lazysql;
+X-Qshell-TUI=true
