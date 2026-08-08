@@ -86,7 +86,11 @@ fish_add_path -g "$HOME/.dotfiles/bin"
 # on top (config.fish); its per-directory paths land in front of the shims.
 fish_add_path -g "$XDG_DATA_HOME/mise/shims"
 
-# Project-local binaries before global ones (relative on purpose — resolved
-# against $PWD, same trick as the mac config). fish_add_path would absolutize
-# them, so plain PATH prepend.
-set -gx PATH node_modules/.bin vendor/bin $PATH
+# Project-local binaries LAST, not first (audit 2026-08-08): the entries are
+# relative on purpose — resolved against $PWD — but ahead of the system paths
+# they let any untrusted clone shadow ls/git/php with a node_modules/.bin
+# dropper, and the `try` workflow exists precisely to cd into third-party
+# clones. Appended, they only resolve names nothing system-wide provides
+# (vite, pint, …), which is the convenience that was wanted. fish_add_path
+# would absolutize them, so plain PATH.
+set -gx PATH $PATH node_modules/.bin vendor/bin
