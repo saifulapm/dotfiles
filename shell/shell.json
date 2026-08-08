@@ -22,7 +22,7 @@
       {
         "id": "clock",
         "birthYear": 1991,
-        "lifeExpectancy": 90
+        "lifeExpectancy": 60
       },
       "weather",
       "update"
