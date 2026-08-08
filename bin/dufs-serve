@@ -4,10 +4,13 @@
 # upload+search allowed — the old Arch repo's contract, minus always-on: the
 # unit installs nowhere and runs only while the widget's switch is on.
 #
-# Basic auth with the fixed password `developer` (user decision 2026-08-07,
-# replacing a per-machine random secret) — the repo is public, so this is a
-# deliberate convenience gate, not a secret: the unit is off unless started
-# on purpose (run_after_19 opens TCP 5000 in firewalld so LAN reaches it).
+# Basic auth with a fixed password (user decision 2026-08-07, replacing a
+# per-machine random secret; value rotated 2026-08-08) — the repo is public,
+# so this is a deliberate convenience gate, not a secret: the unit is off
+# unless started on purpose (run_after_19 opens TCP 5000 in firewalld so LAN
+# reaches it). Remember the 2026-08-08 audit's caveat when flipping the
+# switch: --hidden only filters listings, so a password-holder can fetch any
+# $HOME path — including ~/.ssh — by direct URL.
 set -euo pipefail
 
 # The binary comes from cargo (run_after_09) and the user-manager PATH does
@@ -15,7 +18,7 @@ set -euo pipefail
 PATH="$HOME/.cargo/bin:$PATH"
 
 exec dufs --bind 0.0.0.0 --port 5000 \
-  --auth "$USER:developer@/:rw" \
+  --auth "$USER:developer123!@/:rw" \
   --hidden '.*' \
   --allow-upload --allow-search \
   "$HOME"
