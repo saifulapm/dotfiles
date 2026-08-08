@@ -1306,7 +1306,7 @@ why  = "Screenshot annotation — bin/screenshot-annotate opens the clipboard im
 
 [[tool]]
 name = "voxtype"
-via  = "upstream install (github.com/peteonrails/voxtype releases, voxtype.io/download) → ~/.local/bin/voxtype, then `voxtype setup --download --model base.en` and `voxtype setup systemd`"
+via  = "upstream install (github.com/peteonrails/voxtype releases, voxtype.io/download) → ~/.local/bin/voxtype, then `voxtype setup --download --model small.en` and `voxtype setup systemd`"
 why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows and what Mod+Ctrl+X / F9 drive"
 
 # Notes on the voxtype entry above (installed by hand 2026-08-06, v0.7.5):
@@ -1317,8 +1317,43 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     only upgrade channel.
 #   * `voxtype info variants` reports AVX2=false and no GPU on this Mac, so
 #     transcription is plain CPU whisper.cpp. The model itself
-#     (~/.local/share/voxtype/models/ggml-base.en.bin, 141 MB) is downloaded,
-#     not in this repo.
+#     (~/.local/share/voxtype/models/ggml-small.en.bin, 466 MB) is downloaded,
+#     not in this repo. It also reports "Install kind: source", and therefore
+#     "variant switching not applicable" — so `voxtype setup onnx --enable`
+#     cannot reach the ONNX engine on this binary and the Parakeet models
+#     (parakeet-tdt-0.6b-v3, better WER than whisper at 0.6B) are unavailable
+#     without a Cargo rebuild. Whisper is the only engine here.
+#   * MODEL CHOICE: small.en, upgraded from base.en 2026-08-08. Benchmarked on
+#     the M2 against three Kokoro-synthesised sentences (identical audio for
+#     both models, 2 runs each, ~6 s utterances):
+#       base.en    1.30 s/utterance   330 MB peak RSS
+#       small.en   4.52 s/utterance   770 MB peak RSS
+#     so it is ~3.5x SLOWER for the accuracy. The accuracy is real but narrow:
+#     both models transcribe plain English perfectly, and both render dates and
+#     numbers identically ("March 15th", "9.30", "17"). The whole difference is
+#     technical proper nouns, which is most of what gets dictated here —
+#     base.en wrote "restot Postger SQL" where small.en wrote "restock
+#     PostgreSQL". Thread tuning does NOT recover the latency: 4 threads 4.52 s,
+#     6 threads 4.19 s, 8 threads 4.78 s. 8 is worse than 4 because the M2 is
+#     4 P-cores + 4 E-cores and whisper.cpp splits work evenly across them, so
+#     the E-cores set the pace; the default (commented `threads`, auto) is left
+#     alone as a result.
+#   * COST: the daemon PRELOADS the model at startup ("Model loaded, ready for
+#     voice input") rather than loading it per utterance, so this bump is a
+#     permanent resident cost, not a transient one. Measured idle VmRSS on a
+#     fresh restart: base.en 162 MB (151 anon), small.en 486 MB (475 anon) —
+#     +324 MB always resident. It is ordinary anonymous memory and therefore
+#     swappable, not pinned: a daemon left idle for hours was observed at
+#     4.8 MB VmRSS with the model entirely paged out, still working. So the
+#     real budget hit on this 8 GB machine is swap pressure, not RAM loss.
+#     Revert with `voxtype setup model --set base.en --restart` (base.en is
+#     still on disk); see bin/mem-pressure-warn for the tiers this sits under.
+#   * `[whisper] eager_processing = true` (with eager_chunk_secs/overlap) is
+#     the untried mitigation for the latency above: it transcribes chunks while
+#     recording is still running, so most of small.en's 4.5 s would overlap
+#     with speaking. Not enabled — the model bump was the only change asked
+#     for, and eager processing changes transcription semantics (chunk
+#     boundaries) rather than just performance.
 #   * `voxtype setup systemd` writes ~/.config/systemd/user/voxtype.service,
 #     which is NOT chezmoi-managed (unlike taildrop-receive.service) — a
 #     restore has to re-run that command, and the daemon only runs because
