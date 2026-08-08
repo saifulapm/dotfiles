@@ -315,6 +315,24 @@ category = "core"
 arch = "all"
 why = "chezmoi encryption backend for SSH keys and tokens"
 
+[[pkg]]
+name = "pass"
+category = "core"
+arch = "all"
+why = "Password manager (user decision 2026-08-09, picked over KeePassXC and Bitwarden for minimalism). ~300 lines of bash over gpg + git: one GPG-encrypted file per entry and the store is its own git repo, so sync is a push rather than a synced binary blob — the .kdbx whole-database merge conflict simply has no analogue here, conflicts are per-entry and git resolves them. THE STORE IS A SEPARATE PRIVATE REPO at ~/.password-store and must never be moved into this one: gpg encrypts entry contents but NOT filenames, so committing it here would publish a complete index of every service in use to a public repo (github.com/saifulapm/dotfiles is PUBLIC — verified 2026-08-09). Ships fish completions, which is this shell. Autofill via browserpass on the desktop and Pass for iOS (App Store, git sync, iOS AutoFill) on the phone. Passkeys are deliberately NOT its job — those stay in iCloud Keychain and reach Chromium over the hybrid/QR transport, which needs only the Bluetooth this machine already has"
+
+[[pkg]]
+name = "browserpass"
+category = "core"
+arch = "all"
+why = "The native host behind the Browserpass Chromium extension — Ctrl+Shift+L, filter by domain, fill from the pass store. Fedora's package is ONLY /usr/bin/browserpass-native: no host manifest, no equivalent of upstream's `make hosts-chromium`, so run_after_21 writes the json from chromium/native-messaging-hosts/com.github.browserpass.native.json or the extension fails every lookup with 'host not found'. The extension itself is NOT repo-bundled — it comes from the Chrome Web Store precisely so it keeps auto-updating (3.12.0, 2026-05), unlike the --load-extension omarchy pair. Note browserpass only READS: new entries are made with `pass insert`, there is no save-password prompt, which is the accepted cost of this pick"
+
+[[pkg]]
+name = "pinentry-qt"
+category = "core"
+arch = "all"
+why = "Graphical passphrase prompt for gpg-agent — required by the pass setup, not cosmetic. Fedora's base pinentry package is curses-only, and browserpass is spawned by Chromium with no controlling tty, so without a GUI pinentry every browser autofill blocks on a prompt that can never be drawn and then times out with nothing on screen. pinentry-qt rather than pinentry-gnome3 because this is a niri session: gnome3's prompter goes through gcr and degrades back to curses when no GNOME session answers. Qt 6 is already on disk for quickshell, so this is nearly free. Selected in home/private_dot_gnupg/private_gpg-agent.conf.tmpl"
+
 # ------------------------------------------------------------------ shell
 
 [[pkg]]

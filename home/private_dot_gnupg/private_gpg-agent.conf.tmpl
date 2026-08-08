@@ -1,0 +1,29 @@
+# gpg-agent — the passphrase prompt and cache policy behind `pass`
+# (packages/manifest.toml: pass, browserpass, pinentry-qt).
+#
+# pinentry-program is the load-bearing line here. Fedora's base `pinentry`
+# package ships only pinentry-curses, which can draw a prompt in a terminal
+# and nowhere else. browserpass is spawned by Chromium with no controlling
+# tty, so under the default program a browser autofill blocks on a prompt
+# that can never appear and then times out — the single most common way an
+# otherwise-correct pass setup looks broken. pinentry-qt rather than
+# pinentry-gnome3 because this session is niri, not GNOME: gnome3's prompter
+# goes through gcr and degrades to curses when no GNOME session answers,
+# which is precisely the failure being avoided. Qt costs nothing on this
+# machine — quickshell already pulls Qt 6 in.
+#
+# Resolved through lookPath instead of hardcoded so the file written by a
+# background apply — which cannot sudo, so run_before_00 installed nothing —
+# still names a pinentry that EXISTS. gpg-agent pointed at a missing binary
+# does not fall back, it fails the operation, and that would break gpg for
+# everything rather than just for pass. The next terminal apply rewrites this
+# line to pinentry-qt.
+{{ if lookPath "pinentry-qt" }}pinentry-program {{ lookPath "pinentry-qt" }}{{ else }}pinentry-program /usr/bin/pinentry{{ end }}
+
+# 1 h idle, 8 h hard ceiling. Long enough that a working day is not a parade
+# of passphrase prompts; short enough that a walked-away-from laptop stops
+# handing out secrets. max-cache-ttl is measured from first entry rather than
+# last use, so the passphrase is re-asked at least once a day no matter how
+# continuously the agent is exercised.
+default-cache-ttl 3600
+max-cache-ttl 28800

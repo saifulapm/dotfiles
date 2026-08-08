@@ -1,0 +1,11 @@
+{
+  "name": "com.github.browserpass.native",
+  "description": "Browserpass native component for the Chromium extension",
+  "path": "__HOST_PATH__",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://naepdomgkenhinolocfifgehidddafch/",
+    "chrome-extension://pjmbgaakjkbhpopmakjoedenlfdmcdgm/",
+    "chrome-extension://klfoddkbhleoaabpmiigbmpbjfljimgb/"
+  ]
+}
