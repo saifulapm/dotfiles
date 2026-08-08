@@ -6,7 +6,8 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service qshell.service emacs.service mempressure.service
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer qshell.service emacs.service mempressure.service
+# Also DISABLES voxtype.service — see the block near the end of this file.
 set -euo pipefail
 
 # ssh-agent.socket: Fedora's packaged agent unit — socket activation, so
@@ -14,7 +15,10 @@ set -euo pipefail
 # comes from environment.d/65-ssh-agent.conf.
 # udiskie.service is ConditionPathExists-gated on its binary, so enabling it
 # before the udiskie package lands is a clean no-op, not a failed unit.
-units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service)
+# voxtype-idle-stop.timer stops the dictation daemon once it has sat idle; it
+# is safe to enable on a machine with no voxtype at all, since the script it
+# runs exits immediately when the daemon's runtime state file is absent.
+units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently
@@ -53,6 +57,28 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
       || echo "user units: start emacs.service failed — check systemctl --user status emacs.service" >&2
   fi
   echo "user units: emacs.service enabled"
+  # voxtype.service is the one unit here that must be OFF. Its daemon PRELOADS
+  # the whisper model rather than loading it per utterance — 486 MB resident
+  # for small.en, measured — so leaving it enabled parks half a gigabyte on a
+  # 7.3 GB laptop to do nothing (it burns no CPU idle; this is purely RAM).
+  # bin/voxtype-toggle, which the niri binds spawn, starts it on the keypress
+  # in ~0.2 s instead, and voxtype-idle-stop.timer above stops it again after
+  # 10 min idle. Numbers and reasoning in packages/manifest.toml.
+  #
+  # Guarded on the unit existing: voxtype is a hand install (`voxtype setup
+  # systemd` writes this unit, nothing in this repo does), so it is legitimately
+  # absent on a fresh machine and `disable` would otherwise warn every apply.
+  #
+  # DISABLE ONLY, never stop. `disable` is what keeps the next login from
+  # starting it; stopping a RUNNING one is the idle timer's job precisely
+  # because that script checks the daemon's state first and refuses to act
+  # mid-recording. A blind `systemctl stop` here would cut off a dictation in
+  # progress during an apply.
+  if systemctl --user cat voxtype.service >/dev/null 2>&1; then
+    systemctl --user disable voxtype.service >/dev/null 2>&1 \
+      || echo "user units: disable voxtype.service failed — check systemctl --user status voxtype.service" >&2
+    echo "user units: voxtype.service disabled (on-demand via bin/voxtype-toggle)"
+  fi
 else
   echo "user units: no user systemd session, skipped" >&2
 fi
