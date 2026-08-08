@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Tools Fedora does not package whose upstreams ship linux binaries for both
-# our arches (asset names verified against the GitHub API 2026-08-07):
-# watchexec, hurl, cloudflared, stripe, ouch, usql.
+# our arches (asset names verified against the GitHub API 2026-08-07, jj and
+# witr 2026-08-08): watchexec, hurl, cloudflared, stripe, ouch, usql, jj, witr.
 # Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
 #
-# GitHub's unauthenticated API allows 60 requests/hour per IP — six here, and
+# GitHub's unauthenticated API allows 60 requests/hour per IP — eight here, and
 # only on a run where something is actually missing (fully-guarded runs make
 # no requests at all).
 set -uo pipefail
@@ -84,6 +84,32 @@ fi
 if ! command -v usql >/dev/null 2>&1; then
   goarch="arm64"; [ "$arch" = "x86_64" ] && goarch="amd64"
   fetch_tar xo/usql "usql-.*-linux-${goarch}\\.tar\\.bz2$" usql usql
+fi
+
+# jj (Jujutsu) — git-compatible VCS, colocated by default since 0.39 so it
+# rides an existing .git without converting it. musl is the only linux build
+# upstream ships; it is fully static, which is what we want here anyway.
+if ! command -v jj >/dev/null 2>&1; then
+  fetch_tar jj-vcs/jj "jj-.*-${arch}-unknown-linux-musl\\.tar\\.gz$" jj jj
+fi
+
+# witr — "why is this running?": traces a process/port/container/file back to
+# whatever started it. Ships a bare binary with go-style arch names, plus a
+# man page we install alongside it (nothing else here has one to follow).
+if ! command -v witr >/dev/null 2>&1; then
+  goarch="arm64"; [ "$arch" = "x86_64" ] && goarch="amd64"
+  url="$(latest_asset pranshuparmar/witr "^witr-linux-${goarch}$")"
+  if [ -n "$url" ] && curl -fsSL -o "$bindir/witr.tmp" "$url"; then
+    install -m755 "$bindir/witr.tmp" "$bindir/witr" && rm -f "$bindir/witr.tmp"
+    manurl="$(latest_asset pranshuparmar/witr "^witr\\.1$")"
+    if [ -n "$manurl" ]; then
+      mkdir -p "$HOME/.local/share/man/man1"
+      curl -fsSL -o "$HOME/.local/share/man/man1/witr.1" "$manurl" || true
+    fi
+    echo "prebuilt: installed witr"
+  else
+    rm -f "$bindir/witr.tmp"; warn "witr install failed"
+  fi
 fi
 
 exit 0

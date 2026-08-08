@@ -1,0 +1,16 @@
+# jj (Jujutsu) — the only thing here is the commit identity.
+#
+# jj does NOT read git's user.name/user.email, not even inside a colocated repo
+# where it is driving the very .git that has them (verified 2026-08-08: with
+# ~/.gitconfig set, `jj config get user.email` was empty and a fresh change was
+# authored "(no email set)"). So the identity has to be restated, and it is
+# kept byte-identical to home/dot_gitconfig on purpose — a colocated repo hands
+# commits back and forth between the two tools, and a mismatch would split the
+# history's authorship in a way that only shows up later in a shortlog.
+#
+# Nothing else is configured deliberately. jj's defaults are sane, and this repo
+# does not build on jj: it is a hand-driven tool sitting on top of git, so the
+# less it is bent out of its documented shape the better.
+[user]
+name = "Saiful Islam"
+email = "saiful.apm@gmail.com"

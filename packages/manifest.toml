@@ -1150,7 +1150,13 @@ why = "Video player, from both lists (Fedora build rides ffmpeg-free codecs)"
 name = "yt-dlp"
 category = "optional"
 arch = "all"
-why = "Video downloader, from both lists"
+why = "Video downloader, from both lists. Also the search-and-resolve half of bin/music — mpv's ytdl hook calls it to turn a YouTube link into an audio stream"
+
+[[pkg]]
+name = "mpv-mpris"
+category = "optional"
+arch = "all"
+why = "The one package bin/radio and bin/music need (user-approved 2026-08-08). Drops mpris.so into /etc/mpv/scripts, which mpv auto-loads with no config, so every mpv publishes org.mpris.MediaPlayer2 — that is the whole bridge between a playing stream and the bar's media widget, its panel, the OSD and the XF86Audio* binds. Spotify has no aarch64 build and omarchy's music story is `pkg-add spotify`, so this replaces it"
 
 [[pkg]]
 name = "imv"
@@ -1366,8 +1372,24 @@ why  = "laravel new <app> scaffolder (user decision 2026-08-07, Herd workflow pa
 
 [[tool]]
 name = "prebuilt-binaries"
-via  = "run_after_10-prebuilt-binaries.sh — GitHub release binaries into ~/.local/bin: watchexec, hurl, cloudflared, stripe, ouch (added 2026-08-07 for the yazi config port — its cargo build needs libclang, so the release binary is the mechanism), usql (added 2026-08-07 for the mac config port — the regular not _static variant: common drivers at half the size; linux-arm64 asset verified against the GitHub API. dprint deliberately NOT here: it is already a pnpm global via run_after_08. aichat + yek removed 2026-08-07: aichat dropped from the port, yek existed only as its git document loader)"
-why  = "Fedora packages none of these; all ship both aarch64 and x86_64 linux release assets (asset names verified against the GitHub API 2026-08-07). Chosen over cargo builds for the heavy ones (hurl needs libxml)"
+via  = "run_after_10-prebuilt-binaries.sh — GitHub release binaries into ~/.local/bin: watchexec, hurl, cloudflared, stripe, ouch (added 2026-08-07 for the yazi config port — its cargo build needs libclang, so the release binary is the mechanism), usql (added 2026-08-07 for the mac config port — the regular not _static variant: common drivers at half the size; linux-arm64 asset verified against the GitHub API. dprint deliberately NOT here: it is already a pnpm global via run_after_08. aichat + yek removed 2026-08-07: aichat dropped from the port, yek existed only as its git document loader), jj + witr (added 2026-08-08, user picks off the new-tooling sweep — see the two notes below)"
+why  = "Fedora packages none of these; all ship both aarch64 and x86_64 linux release assets (asset names verified against the GitHub API 2026-08-07, jj/witr 2026-08-08). Chosen over cargo builds for the heavy ones (hurl needs libxml)"
+
+# jj (Jujutsu) v0.44.0 — git-compatible VCS. Taken as an ADDITION to git, not a
+# replacement: since 0.39 `jj git init --colocate` is the default, so it drives
+# an existing .git in place and lazygit/gitui/git keep working on the same repo.
+# Deliberately not in Fedora (checked 2026-08-08: no `jujutsu` package in f44).
+# musl is the only linux build upstream ships — statically linked, so it has no
+# glibc coupling to the host at all. Pre-1.0: upstream still warns about
+# backward-incompatible on-disk format changes, which is exactly why nothing in
+# this repo depends on it — it is a tool the user drives by hand.
+
+# witr v0.3.3 — "why is this running?": resolves a pid/port/container/file back
+# to the unit, service or shell that spawned it. Earns its place on THIS machine
+# specifically: the dev databases are socket-activated podman containers that
+# start and stop on their own (see dev-services), so "what just woke mysql" is a
+# question this box actually raises. Bare binary + a witr.1 man page, which is
+# why the install block is hand-rolled rather than using fetch_tar.
 
 [[tool]]
 name = "pnpm-globals"
@@ -1429,3 +1451,8 @@ why  = "Neural text-to-speech for `screenshot-ocr --speak` (Mod+Ctrl+Shift+6) �
 name = "tessdata-langs"
 via  = "run_after_25-tessdata.sh — ben.traineddata from github.com/tesseract-ocr/tessdata_best into ~/.local/share/tessdata, with the system eng.traineddata symlinked in beside it; bin/screenshot-ocr passes --tessdata-dir at that directory"
 why  = "Bangla OCR for the capture binds (user ask 2026-08-08). Fedora does package tesseract-langpack-ben, but every langpack needs root, which stops a fresh-machine apply to ask for a password — tesseract's --tessdata-dir gives the same result with no sudo and no rpm, and keeps the language set in this repo. The eng symlink is NOT optional: --tessdata-dir REPLACES the search path rather than extending it, so without eng beside ben, adding Bangla would silently break English OCR; screenshot-ocr therefore gates on both files and falls back to plain `-l eng` if either is missing. tessdata_best over tessdata_fast because Bengali is conjunct-heavy and a screen region is small enough that the slower model costs milliseconds. Measured 2026-08-08 on pango-rendered samples: eng+ben scored 100% on both scripts and took English OCR from 0.09 s to 0.13 s, while ben+eng tripled the English case to 0.27 s — hence the order eng+ben"
+
+[[tool]]
+name = "dbx"
+via  = "run_after_26-dbx.sh — the DBX-*.<arch>.rpm from the latest github.com/t8y2/dbx release, installed with sudo dnf (both arches published; aarch64 asset verified against the GitHub API 2026-08-08). Ships /usr/bin/dbx, /usr/share/applications/DBX.desktop and hicolor icons"
+why  = "GUI database client for 70+ engines (user pick 2026-08-08 off the new-tooling sweep). Fills the one real hole in this box's database story: run_after_16-dev-services brings up mysql/postgres/redis as socket-activated podman containers and usql (run_after_10) drives them from a shell, but there was nothing for the thing a GUI is actually better at — browsing an unfamiliar schema and eyeballing a result grid. NOT a replacement for usql; they are the two halves. An RPM rather than this repo's usual ~/.local/bin tarball because dbx is a Tauri app: the desktop entry and icons are the reason it appears in the launcher, and only the RPM carries them. THE COST, recorded because it is the largest dependency this repo pulls for a single app: libwebkit2gtk-4.1 and libappindicator3 were both missing here, so webkit2gtk4.1 + libappindicator-gtk3 + 6 transitive packages land as well — 35 MiB download, 124 MiB installed (measured 2026-08-08). Those are deliberately left OUT of this manifest as [[pkg]] entries so dnf keeps them marked dependencies-of-dbx rather than user-installed; declaring them would strand a browser engine on disk after any future `dnf remove dbx`. REJECTED alternative (weighed 2026-08-08, user chose the RPM knowing the number): the arm64-browser-static build, a 21 MB tarball of a dbx-web-bin server plus a static dist/ that would have run in the already-installed Chromium for zero new packages and no sudo, mirroring the dufs unit. Declined because the user wanted a native window, not a seventh thing served over localhost"
