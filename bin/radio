@@ -1,0 +1,324 @@
+#!/usr/bin/env bash
+# radio — internet radio through mpv, drawn by the bar's media widget.
+#
+# Ours, not omarchy's. Their tree has no radio at all — every "radio" in it is
+# a wifi transmitter (omarchy-network-band, omarchy-restart-wifi) — and their
+# entire music story is two scripts, omarchy-install-service-spotify and
+# omarchy-launch-spotify, that `pkg-add spotify` and launch the result.
+# Spotify has never shipped an aarch64 build, so that path does not exist on
+# this machine; this is the replacement.
+#
+# It is deliberately thin. mpv plays, mpv-mpris (/etc/mpv/scripts/mpris.so,
+# which mpv auto-loads with no config of ours) publishes
+# org.mpris.MediaPlayer2.mpv, and the shell's existing MPRIS layer
+# (shell/Services/Media.qml) does everything else. Radio adds NO shell code:
+# the bar widget, the panel's transport row and SOURCES list, the OSD, and
+# every XF86Audio* bind in niri already work, because to all of them mpv is
+# just another player.
+#
+# The metadata is the reason this beats bookmarking a URL. An ICY stream
+# announces its current song, mpv surfaces that as `media-title`, and
+# mpv-mpris forwards it as xesam:title — so the bar scrolls the track playing
+# right now, not a static station name.
+#
+# One stream at a time, under a FIXED systemd unit (qshell-radio.service)
+# rather than through bin/app-run. app-run randomises the unit name, which is
+# right for app launches and wrong for a singleton: a stable name lets `stop`
+# work even when the IPC socket has gone stale, and makes a second `radio`
+# call replace the first instead of stacking two streams. The slice is
+# app-graphical.slice either way, so systemd-oomd still kills a runaway stream
+# by itself instead of taking qshell.service down with it (bin/app-run's
+# header has the full story).
+#
+#   radio                      pick a saved station and play it
+#   radio <name>               play the first saved station matching <name>
+#   radio search [query]       search radio-browser.info, play a result
+#   radio play <url> [label]   play any stream URL (bin/music calls this)
+#   radio save [<name> <url>]  save a station — no args saves what is playing
+#   radio toggle               pause/resume, or open the picker when idle
+#   radio stop                 stop playback
+#   radio status               print the current station, exit 1 when idle
+#   radio list                 print the saved stations
+set -euo pipefail
+
+stations_file="${XDG_CONFIG_HOME:-$HOME/.config}/qshell/radio-stations"
+state_file="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/radio"
+socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/qshell-radio.sock"
+unit="qshell-radio"
+api="https://all.api.radio-browser.info/json/stations/search"
+
+notify() {
+  notify-send -a qshell "󰖖 $1" "${2:-}" >/dev/null 2>&1 || true
+}
+
+usage() {
+  sed -n '/^#   radio/,/^#   radio list/p' "$0" | sed 's/^#   /  /'
+}
+
+# ---------------------------------------------------------------- the player
+
+ipc() {
+  [[ -S $socket ]] || return 1
+  printf '%s\n' "$1" | socat -T2 - "UNIX-CONNECT:$socket" 2>/dev/null
+}
+
+# mpv does NOT unlink its IPC socket when it quits, so the socket file being
+# there proves nothing about whether anything is playing. Only a reply does —
+# every liveness question in this script goes through an actual round trip.
+ipc_get() {
+  local reply
+  reply=$(ipc "{\"command\":[\"get_property\",\"$1\"]}") || return 1
+  [[ $reply == *'"error":"success"'* ]] || return 1
+  jq -r '.data' <<<"$reply"
+}
+
+is_playing() { ipc_get mpv-version >/dev/null 2>&1; }
+
+stop_playback() {
+  local quiet="${1:-}"
+  if is_playing; then
+    ipc '{"command":["quit"]}' >/dev/null 2>&1 || true
+  fi
+  # The unit stop is the belt to the IPC quit's braces: it is what clears a
+  # hung mpv that has stopped answering its own socket.
+  systemctl --user stop "$unit" >/dev/null 2>&1 || true
+  systemctl --user reset-failed "$unit" >/dev/null 2>&1 || true
+  rm -f "$socket" "$state_file"
+  [[ $quiet == quiet ]] || notify "Stopped"
+}
+
+play_url() {
+  local url="$1" label="${2:-$1}" i
+
+  stop_playback quiet
+
+  mkdir -p "${state_file%/*}"
+  printf '%s\n%s\n' "$label" "$url" >"$state_file"
+
+  # --ytdl-format is inert for a direct stream (mpv only reaches for yt-dlp on
+  # a URL it cannot play natively) and is what makes bin/music's YouTube links
+  # arrive as audio alone, so it is set once here for both callers.
+  systemd-run --user --quiet --collect \
+    --unit="$unit" \
+    --slice=app-graphical.slice \
+    --description="Radio: $label" \
+    -- mpv \
+    --no-video \
+    --no-terminal \
+    --input-ipc-server="$socket" \
+    --ytdl-format=bestaudio/best \
+    --network-timeout=30 \
+    --stream-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=30 \
+    --msg-level=all=warn \
+    -- "$url"
+
+  for ((i = 0; i < 60; i++)); do
+    if is_playing; then
+      notify "$label"
+      return 0
+    fi
+    sleep 0.1
+  done
+
+  notify "Could not start" "$label"
+  return 1
+}
+
+# -------------------------------------------------------------- the stations
+
+read_stations() {
+  [[ -f $stations_file ]] || return 0
+  grep -v '^[[:space:]]*#' "$stations_file" | grep -v '^[[:space:]]*$' || true
+}
+
+station_url() {
+  local want="$1" name url
+  while IFS=$'\t' read -r name url; do
+    [[ -n ${url:-} ]] || continue
+    if [[ $name == "$want" ]]; then
+      printf '%s\n' "$url"
+      return 0
+    fi
+  done < <(read_stations)
+  return 1
+}
+
+# `radio jazz` should find "FIP Jazz" — first case-insensitive substring hit,
+# in file order, so the list doubles as a preference order.
+station_match() {
+  local want="${1,,}" name url
+  while IFS=$'\t' read -r name url; do
+    [[ -n ${url:-} ]] || continue
+    if [[ ${name,,} == *"$want"* ]]; then
+      printf '%s\t%s\n' "$name" "$url"
+      return 0
+    fi
+  done < <(read_stations)
+  return 1
+}
+
+pick_station() {
+  local names choice url
+  mapfile -t names < <(read_stations | cut -f1)
+  ((${#names[@]})) || {
+    echo "radio: no stations in $stations_file" >&2
+    return 1
+  }
+  # A cancelled menu-select exits non-zero; that is a dismissal, not a fault.
+  choice=$(printf '%s\n' "${names[@]}" | menu-select "Radio") || return 0
+  [[ -n $choice ]] || return 0
+  url=$(station_url "$choice") || {
+    echo "radio: no URL for '$choice'" >&2
+    return 1
+  }
+  play_url "$url" "$choice"
+}
+
+search_stations() {
+  local query="${1:-}" json rows labels choice name url bitrate cc suffix i
+
+  [[ -n $query ]] || query=$(menu-input "Search radio") || return 0
+  [[ -n $query ]] || return 0
+
+  notify "Searching…" "$query"
+  json=$(curl -fsSL --max-time 20 -A "qshell-radio/1.0" --get \
+    --data-urlencode "name=$query" \
+    "$api?limit=40&hidebroken=true&order=votes&reverse=true") || {
+    notify "Search failed" "$query"
+    return 1
+  }
+
+  # url_resolved is the station's post-redirect stream; name can carry tabs
+  # and stray whitespace, and a tab would split the TSV row apart.
+  mapfile -t rows < <(jq -r '
+    .[] | select((.url_resolved // "") != "")
+    | [ (.name | gsub("[\t\n\r]"; " ") | gsub("^ +| +$"; "")),
+        .url_resolved, (.bitrate // 0 | tostring), (.countrycode // "") ]
+    | @tsv' <<<"$json")
+
+  ((${#rows[@]})) || {
+    notify "No stations found" "$query"
+    return 1
+  }
+
+  labels=()
+  for i in "${!rows[@]}"; do
+    IFS=$'\t' read -r name url bitrate cc <<<"${rows[$i]}"
+    suffix=""
+    [[ $bitrate != 0 ]] && suffix+="  ·  ${bitrate}k"
+    [[ -n $cc ]] && suffix+="  ·  $cc"
+    labels+=("$name$suffix")
+  done
+
+  choice=$(printf '%s\n' "${labels[@]}" | menu-select "Stations: $query") || return 0
+  [[ -n $choice ]] || return 0
+
+  for i in "${!labels[@]}"; do
+    if [[ ${labels[$i]} == "$choice" ]]; then
+      IFS=$'\t' read -r name url bitrate cc <<<"${rows[$i]}"
+      play_url "$url" "$name"
+      return 0
+    fi
+  done
+  return 1
+}
+
+save_station() {
+  local name="${1:-}" url="${2:-}"
+
+  if [[ -z $name && -z $url ]]; then
+    [[ -f $state_file ]] || {
+      echo "radio: nothing playing to save" >&2
+      return 1
+    }
+    name=$(sed -n 1p "$state_file")
+    url=$(sed -n 2p "$state_file")
+  fi
+
+  [[ -n $name && -n $url ]] || {
+    echo "Usage: radio save [<name> <url>]" >&2
+    return 1
+  }
+
+  if station_url "$name" >/dev/null 2>&1; then
+    echo "radio: '$name' is already saved" >&2
+    return 1
+  fi
+
+  # chezmoi symlink mode: this appends straight into the repo's copy, so a
+  # saved station shows up in `git status` rather than drifting on one machine.
+  mkdir -p "${stations_file%/*}"
+  printf '%s\t%s\n' "$name" "$url" >>"$stations_file"
+  notify "Saved" "$name"
+}
+
+# ---------------------------------------------------------------- dispatch
+
+cmd="${1:-}"
+
+case "$cmd" in
+"")
+  pick_station
+  ;;
+play)
+  shift
+  (($# >= 1)) || {
+    echo "Usage: radio play <url> [label]" >&2
+    exit 1
+  }
+  play_url "$1" "${2:-$1}"
+  ;;
+search)
+  shift
+  search_stations "${1:-}"
+  ;;
+save)
+  shift
+  save_station "${1:-}" "${2:-}"
+  ;;
+stop)
+  stop_playback
+  ;;
+toggle)
+  if is_playing; then
+    ipc '{"command":["cycle","pause"]}' >/dev/null
+  else
+    pick_station
+  fi
+  ;;
+status)
+  is_playing || exit 1
+  label=""
+  url=""
+  if [[ -f $state_file ]]; then
+    label=$(sed -n 1p "$state_file")
+    url=$(sed -n 2p "$state_file")
+  fi
+  title=$(ipc_get media-title 2>/dev/null || true)
+  paused=$(ipc_get pause 2>/dev/null || true)
+  line="${label:-radio}"
+  # A stream announces its song a few seconds in; until the first ICY packet
+  # lands mpv reports the URL's last path segment instead ("groovesalad-128-
+  # mp3"), which is the station name spelled badly, not a track. Anything the
+  # URL already contains is not news, so it is dropped rather than shown.
+  if [[ -n $title && $title != "$line" ]] && [[ -z $url || $url != *"$title"* ]]; then
+    line+=" — $title"
+  fi
+  [[ $paused == true ]] && line="(paused) $line"
+  printf '%s\n' "$line"
+  ;;
+list)
+  read_stations | awk -F'\t' '{printf "%-32s %s\n", $1, $2}'
+  ;;
+-h | --help | help)
+  usage
+  ;;
+*)
+  match=$(station_match "$cmd") || {
+    echo "radio: no saved station matching '$cmd'" >&2
+    exit 1
+  }
+  IFS=$'\t' read -r name url <<<"$match"
+  play_url "$url" "$name"
+  ;;
+esac

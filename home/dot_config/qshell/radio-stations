@@ -1,0 +1,37 @@
+# radio-stations — the saved station list for bin/radio.
+#
+# One station per line, "Name<TAB>URL". Blank lines and #-comment lines are
+# ignored; everything else must carry a real tab. `radio save` appends here,
+# and because chezmoi runs in symlink mode this file IS the repo file — a
+# station saved on one machine is a diff you commit, not local drift.
+#
+# Every URL below was fetched and confirmed streaming on 2026-08-08. Stations
+# rot: when one goes quiet, `radio search <name>` finds a live replacement
+# from radio-browser.info and `radio save` records it.
+
+# ------------------------------------------------------------ Bangladesh
+Peoples Radio 91.6	https://s3.myradiostream.com:14498/listen.mp3
+Bangladesh Betar Dhaka	http://as1.digitalsynapsebd.com:8582/;
+Radio GoonGoon	https://audio.streamcast.xyz/listen/radiogoongoon/radio.mp3
+A2Z Radio	https://listen.radioking.com/radio/1743/stream/125
+
+# ------------------------------------------------------------ chilled / work
+# SomaFM is listener-supported and ad-free, and every channel sends ICY
+# metadata — which is what puts a live track name in the bar.
+SomaFM Groove Salad	https://ice1.somafm.com/groovesalad-128-mp3
+SomaFM Drone Zone	https://ice1.somafm.com/dronezone-128-mp3
+SomaFM Lush	https://ice1.somafm.com/lush-128-mp3
+SomaFM Beat Blender	https://ice1.somafm.com/beatblender-128-mp3
+SomaFM Secret Agent	https://ice1.somafm.com/secretagent-128-mp3
+SomaFM Indie Pop Rocks	https://ice1.somafm.com/indiepop-128-mp3
+
+# ------------------------------------------------------------ hand-picked
+Radio Paradise Main	https://stream.radioparadise.com/mp3-192
+Radio Paradise Mellow	https://stream.radioparadise.com/mellow-192
+Radio Paradise Rock	https://stream.radioparadise.com/rock-192
+Radio Paradise Global	https://stream.radioparadise.com/global-192
+KEXP Seattle	https://kexp-mp3-128.streamguys1.com/kexp128.mp3
+
+# ------------------------------------------------------------ jazz / eclectic
+FIP	https://icecast.radiofrance.fr/fip-midfi.mp3
+FIP Jazz	https://icecast.radiofrance.fr/fipjazz-midfi.mp3

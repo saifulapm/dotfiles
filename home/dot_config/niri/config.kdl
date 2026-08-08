@@ -597,6 +597,14 @@ binds {
     Mod+Shift+Ctrl+A hotkey-overlay-title="AI Panel" { spawn "qs" "ipc" "call" "bar" "open" "ai"; }
     // omarchy: SUPER+CTRL+T btop, floating via the qshell-float rule.
     Mod+Ctrl+T hotkey-overlay-title="System Monitor: btop" { spawn "foot-run" "--app-id=qshell-float" "btop"; }
+    // Ours: omarchy has no radio and no music picker at all — their music
+    // story is a Spotify package with no aarch64 build (bin/radio's header).
+    // Mod+Ctrl+M and its Shift variant were the free keys beside the other
+    // Mod+Ctrl pickers. Both open a menu-select; playback then lands in the
+    // bar's media widget like any MPRIS player, so the XF86Audio* binds
+    // below already control it.
+    Mod+Ctrl+M hotkey-overlay-title="Radio" { spawn "radio"; }
+    Mod+Ctrl+Shift+M hotkey-overlay-title="Play Music" { spawn "music"; }
     // omarchy: XF86Calculator → their calculator; ours is omacalc. (Their
     // SUPER+SHIFT+EQUAL alternative is set-window-height here.)
     XF86Calculator hotkey-overlay-title="Calculator" { spawn "omacalc"; }

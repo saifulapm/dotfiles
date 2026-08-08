@@ -70,6 +70,15 @@ var TREE = {
     },
     // Omarchy files this under their Trigger submenu, with the same three
     // rows; ours sits at the root next to the other pickers.
+    // Ours, with no upstream counterpart: omarchy ships no radio and no music
+    // picker — their whole music story is a Spotify package that has no
+    // aarch64 build (bin/radio's header). Sits with the other pickers.
+    "radio": {
+        "icon": "󰖖",
+        "label": "Radio",
+        "aliases": ["music", "radio", "stream", "listen", "song", "player", "station", "stations", "somafm", "youtube"],
+        "description": "Play internet radio, or a track from YouTube"
+    },
     "reminder": {
         "icon": "󰢌",
         "label": "Reminder",
@@ -252,6 +261,49 @@ var TREE = {
         "aliases": ["background-next", "cycle", "shuffle"],
         "description": "Advance to the next wallpaper",
         "action": "\"$HOME/.dotfiles/bin/background-next\""
+    },
+
+    // ----------------------------------------------------------------- radio
+    // Stop leads and hides while nothing plays, the way
+    // capture.screenrecord.stop does. `radio status` exits non-zero when idle,
+    // so the same command is both the guard here and the answer elsewhere.
+    "radio.stop": {
+        "icon": "󰓛",
+        "label": "Stop",
+        "aliases": ["stop", "off", "silence", "quit"],
+        "description": "Stop the stream that is playing",
+        "when": "\"$HOME/.dotfiles/bin/radio\" status",
+        "action": "\"$HOME/.dotfiles/bin/radio\" stop"
+    },
+    "radio.stations": {
+        "icon": "󰲰",
+        "label": "Stations",
+        "aliases": ["station", "saved", "presets", "list"],
+        "description": "Pick one of the saved stations",
+        "action": "\"$HOME/.dotfiles/bin/radio\""
+    },
+    "radio.music": {
+        "icon": "󰝚",
+        "label": "Play Music",
+        "aliases": ["song", "track", "youtube", "play", "search"],
+        "description": "Search YouTube for a track and play its audio",
+        "when": "command -v yt-dlp",
+        "action": "\"$HOME/.dotfiles/bin/music\""
+    },
+    "radio.search": {
+        "icon": "󰍉",
+        "label": "Search Stations",
+        "aliases": ["find", "browse", "radio-browser", "new", "country"],
+        "description": "Search radio-browser.info for a station anywhere",
+        "action": "\"$HOME/.dotfiles/bin/radio\" search"
+    },
+    "radio.save": {
+        "icon": "󰆓",
+        "label": "Save Current Station",
+        "aliases": ["save", "bookmark", "keep", "add"],
+        "description": "Append what is playing to the saved station list",
+        "when": "\"$HOME/.dotfiles/bin/radio\" status",
+        "action": "\"$HOME/.dotfiles/bin/radio\" save"
     },
 
     // -------------------------------------------------------------- reminder

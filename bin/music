@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# music — search YouTube for a track and play its audio, in the bar's media
+# widget.
+#
+# The on-demand half of bin/radio: radio answers "put something on", this
+# answers "play THIS song". yt-dlp resolves the search and hands mpv a stream,
+# mpv plays the audio track alone, and the playing itself is delegated to
+# `radio play` so the two share one process, one IPC socket and one systemd
+# unit. That sharing is the point — starting a song stops the radio rather
+# than talking over it, the media keys drive whichever is on, and the bar
+# cannot tell the difference because there is none.
+#
+# No account, no browser, no DRM, and nothing new installed: yt-dlp and mpv
+# are both already in packages/manifest.toml, which is why this is a search
+# box and a menu instead of a client. Ours entirely — omarchy has no
+# equivalent (see bin/radio's header).
+#
+# A bare URL is played as-is, so `music <youtube-url>` skips the search.
+#
+#   music                  prompt for a search, pick a result, play it
+#   music <query...>       search directly
+#   music <url>            play a URL's audio without searching
+set -euo pipefail
+
+results=12
+
+notify() {
+  notify-send -a qshell "󰝚 $1" "${2:-}" >/dev/null 2>&1 || true
+}
+
+query="$*"
+[[ -n $query ]] || query=$(menu-input "Play music") || exit 0
+[[ -n $query ]] || exit 0
+
+# A URL needs no search — mpv's ytdl hook resolves it, and `radio play` has
+# already asked for bestaudio.
+if [[ $query =~ ^https?:// ]]; then
+  exec radio play "$query" "$query"
+fi
+
+notify "Searching…" "$query"
+
+# --flat-playlist keeps this to one search request: yt-dlp returns the result
+# list without visiting each video, so a pick costs seconds rather than a
+# round trip per entry. The stream URL is resolved later, by mpv, for the one
+# track actually chosen.
+mapfile -t rows < <(
+  yt-dlp --flat-playlist --no-warnings --ignore-errors \
+    --print $'%(title)s\t%(duration)s\t%(url)s' \
+    "ytsearch${results}:${query}" 2>/dev/null || true
+)
+
+((${#rows[@]})) || {
+  notify "Nothing found" "$query"
+  exit 1
+}
+
+# labels and picks are filled in lockstep and indexed together — a row with no
+# URL is dropped from BOTH, so the chosen label never points at its neighbour.
+labels=()
+picks=()
+for i in "${!rows[@]}"; do
+  IFS=$'\t' read -r title duration url <<<"${rows[$i]}"
+  [[ -n ${url:-} ]] || continue
+  secs="${duration%%.*}"
+  if [[ $secs =~ ^[0-9]+$ ]]; then
+    labels+=("$(printf '%s  ·  %d:%02d' "$title" $((secs / 60)) $((secs % 60)))")
+  else
+    labels+=("$title")
+  fi
+  picks+=("$title"$'\t'"$url")
+done
+
+((${#labels[@]})) || {
+  notify "Nothing found" "$query"
+  exit 1
+}
+
+# A cancelled menu-select exits non-zero — a dismissal, not a fault.
+choice=$(printf '%s\n' "${labels[@]}" | menu-select "Play: $query") || exit 0
+[[ -n $choice ]] || exit 0
+
+for i in "${!labels[@]}"; do
+  if [[ ${labels[$i]} == "$choice" ]]; then
+    IFS=$'\t' read -r title url <<<"${picks[$i]}"
+    exec radio play "$url" "$title"
+  fi
+done
+
+exit 1
