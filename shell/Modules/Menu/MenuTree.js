@@ -16,18 +16,23 @@
 //   action       shell command, run detached through `bash -lc`
 //   call         handled inside the shell instead (see Menu.qml runCall)
 //   target       id of another menu to open (a link row)
+//   provider     submenu whose rows are produced at runtime, not declared here
+//                (see Menu.qml providers, and "apps")
 //   when         shell test; the row is hidden when it fails
 //   checked      shell test; appends ✓ when it succeeds
 //   state        in-shell boolean name that does the same (see Menu.qml stateValue)
 
 var TREE = {
     // ------------------------------------------------------------------ root
+    // Rows come from DesktopEntries at open time (Menu.qml mergeAppRows), as
+    // real children of this id — so an app is searched, ranked and escaped
+    // exactly like a menu row instead of handing off to the launcher overlay.
     "apps": {
         "icon": "󰀻",
         "label": "Apps",
         "aliases": ["app", "applications", "launcher", "run"],
         "description": "Launch an installed application",
-        "call": "launcher"
+        "provider": "apps"
     },
     "theme": {
         "icon": "󰸌",

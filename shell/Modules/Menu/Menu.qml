@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Widgets
 import "../../components"
 import "MenuModel.js" as MenuModel
 import "../../components/FilterKeys.js" as FilterKeys
@@ -27,9 +28,11 @@ Scope {
     property int selectedIndex: 0
     property var navStack: []
 
+    // The declared tree, plus the desktop-app rows merged into it (see
+    // mergeAppRows) — so unlike `built` these are reassigned, not bound.
     readonly property var built: MenuModel.buildItems(MenuTree.TREE)
-    readonly property var items: built.items
-    readonly property var itemOrder: built.itemOrder
+    property var items: built.items
+    property var itemOrder: built.itemOrder
 
     // id → true|false. `when` and `checked` are shell tests, evaluated in one
     // batched bash run per open; `state` rows resolve in-process instead.
@@ -87,6 +90,90 @@ Scope {
         })
     property var providerRows: null
     property string providerLabel: ""
+
+    // `apps` names a provider too, but it is not one of those: only the
+    // registry-backed names open the separate provider view.
+    function isScriptProvider(entry) {
+        return !!(entry && entry.provider && providers[entry.provider]);
+    }
+
+    // ------------------------------------------------------------ app rows
+    // Omarchy's QML-native apps provider: the rows come from DesktopEntries
+    // in-process and are merged into the tree as real children of `apps`, so
+    // an installed application is ranked in search, carries its breadcrumb and
+    // answers Backspace exactly like a declared row — where our old Apps entry
+    // handed off to the launcher overlay and stranded you there.
+    //
+    // Bound, not read once: the first touch of DesktopEntries only STARTS the
+    // .desktop scan, so an imperative read at open time sees an empty list and
+    // the Apps card comes up empty. The binding also covers a rescan — an app
+    // installed while the shell runs appears without a restart.
+    readonly property var desktopApps: DesktopEntries.applications.values
+
+    onDesktopAppsChanged: {
+        mergeAppRows();
+        if (opened)
+            rebuildDisplay();
+    }
+
+    // Re-run on every open too, for the case where the scan finished before
+    // this surface was ever loaded — then the change signal never fires here.
+    function mergeAppRows() {
+        const all = desktopApps || [];
+        const rows = [];
+
+        for (let i = 0; i < all.length; i++) {
+            const app = all[i];
+            const appId = String(app.id || "");
+            if (!appId || app.noDisplay)
+                continue;
+            const subtext = String(app.genericName || app.comment || "");
+            // .desktop Keywords are the "gimp for photoshop" half of a launcher
+            // search; as aliases they feed the tree's own ranking.
+            const aliases = subtext ? [subtext] : [];
+            const keywords = app.keywords || [];
+            for (let k = 0; k < keywords.length; k++)
+                aliases.push(String(keywords[k]));
+            rows.push({
+                id: "apps." + appId,
+                parent: "apps",
+                kind: "app",
+                icon: "",
+                appIcon: String(app.icon || ""),
+                appId: appId,
+                label: String(app.name || appId),
+                title: "",
+                target: "",
+                description: subtext,
+                action: "",
+                call: "",
+                state: "",
+                provider: "",
+                aliases: aliases,
+                when: "",
+                checked: "",
+                order: 0
+            });
+        }
+
+        // DesktopEntries hands its values back in no particular order, and
+        // reorders them when an application starts — the menu is alphabetical.
+        rows.sort((a, b) => a.label.toLowerCase().localeCompare(b.label.toLowerCase()) || a.id.localeCompare(b.id));
+
+        const merged = MenuModel.mergeAppRows(items, itemOrder, rows);
+        items = merged.items;
+        itemOrder = merged.itemOrder;
+    }
+
+    // Same path as the launcher: gtk-launch inside a transient
+    // app-graphical.slice unit (bin/app-run) rather than the entry's own
+    // execute(), which would make the app a child of qshell.service and put
+    // the whole shell in systemd-oomd's kill pool with it.
+    function launchApp(appId) {
+        if (!appId)
+            return;
+        Quickshell.execDetached(["app-run", "gtk-launch", String(appId)]);
+    }
 
     function promptOpen(payloadJson) {
         let p = null;
@@ -238,6 +325,7 @@ Scope {
         selectedIndex = 0;
         frozenListHeight = -1;
         opened = true;
+        mergeAppRows();
         evaluateGuards();
         rebuildDisplay();
     }
@@ -276,7 +364,10 @@ Scope {
             return raw;
         for (let i = 0; i < itemOrder.length; i++) {
             const entry = entryFor(itemOrder[i]);
-            if (!entry)
+            // App rows are never routable: their aliases carry .desktop
+            // Keywords and GenericName for search, so an installed application
+            // could otherwise shadow a route (htop ships `Keywords=system;`).
+            if (!entry || entry.kind === "app")
                 continue;
             for (let j = 0; j < entry.aliases.length; j++) {
                 if (String(entry.aliases[j]).toLowerCase().replace(/_/g, "-") === raw)
@@ -296,9 +387,9 @@ Scope {
         }
         if (entry && entry.kind === "link" && entry.target)
             id = entry.target;
-        if (entry && entry.provider) {
-            // Provider entries have no tree children — landing on them as a
-            // plain submenu would show an empty card.
+        if (isScriptProvider(entry)) {
+            // Script-provider entries have no tree children — landing on them
+            // as a plain submenu would show an empty card.
             show();
             openProvider(entry);
             return "ok";
@@ -323,9 +414,6 @@ Scope {
     // Rows the shell itself owns: no subprocess, no `qs ipc` round trip.
     function runCall(name) {
         switch (name) {
-        case "launcher":
-            shellRoot.toggleLauncher();
-            break;
         case "themes":
             shellRoot.toggleThemes();
             break;
@@ -448,11 +536,16 @@ Scope {
         }
         if (row.kind === "menu" || row.kind === "link") {
             const entry = entryFor(row.itemId);
-            if (entry && entry.provider) {
+            if (isScriptProvider(entry)) {
                 openProvider(entry);
                 return;
             }
             setActiveMenu(row.target || row.itemId, true);
+            return;
+        }
+        if (row.kind === "app") {
+            hide();
+            launchApp(row.appId);
             return;
         }
         hide();
@@ -491,6 +584,8 @@ Scope {
                         itemId: "prompt-" + p,
                         kind: "prompt-option",
                         icon: opt.icon,
+                        appIcon: "",
+                        appId: "",
                         label: opt.label,
                         target: "",
                         detail: "",
@@ -514,6 +609,8 @@ Scope {
                     itemId: "provider-" + v,
                     kind: "action",
                     icon: row.icon,
+                    appIcon: "",
+                    appId: "",
                     label: row.label + (row.current ? " ✓" : ""),
                     target: "",
                     detail: "",
@@ -798,11 +895,13 @@ Scope {
                             required property int index
                             required property string kind
                             required property string icon
+                            required property string appIcon
                             required property string label
                             required property string detail
 
                             readonly property bool hasCursor: row.index === menuRoot.selectedIndex
                             readonly property bool isSubmenu: row.kind === "menu" || row.kind === "link"
+                            readonly property bool isApp: row.kind === "app"
 
                             width: list.width
                             height: menuRoot.rowHeight
@@ -820,17 +919,31 @@ Scope {
                                 }
                             }
 
-                            Text {
+                            Item {
                                 id: glyph
                                 anchors.left: parent.left
                                 anchors.leftMargin: menuRoot.theme.space(2)
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: menuRoot.theme.space(9)
-                                horizontalAlignment: Text.AlignHCenter
-                                text: row.icon
-                                color: menuRoot.theme.textPrimary
-                                font.family: "Symbols Nerd Font"
-                                font.pixelSize: menuRoot.theme.fontPx(1.333)
+                                height: parent.height
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: !row.isApp
+                                    text: row.icon
+                                    color: menuRoot.theme.textPrimary
+                                    font.family: "Symbols Nerd Font"
+                                    font.pixelSize: menuRoot.theme.fontPx(1.333)
+                                }
+
+                                // App rows carry a themed icon name, not a
+                                // glyph — same source the launcher uses.
+                                IconImage {
+                                    anchors.centerIn: parent
+                                    visible: row.isApp
+                                    implicitSize: menuRoot.theme.space(6)
+                                    source: row.isApp ? Quickshell.iconPath(row.appIcon, "application-x-executable") : ""
+                                }
                             }
 
                             Column {

@@ -1,8 +1,8 @@
 // Tree, visibility and search semantics for the command menu. Near-verbatim
 // port of omarchy's plugins/menu/MenuModel.js (CREDITS.md), minus the parts
 // that only make sense for their shell: JSONC parsing and source merging (our
-// tree is a JS object in MenuTree.js), provider-backed rows, and desktop-app
-// rows (our Apps entry hands off to the launcher instead of listing apps).
+// tree is a JS object in MenuTree.js) and their script-provider row merge
+// (ours keeps provider rows in a separate view, in Menu.qml).
 //
 // Everything a caller needs to know about an item is derived here, never
 // stored: depth, breadcrumb path, child count, visibility and search rank.
@@ -76,6 +76,49 @@ function buildItems(tree) {
     return {
         items: items,
         itemOrder: order
+    };
+}
+
+// Swaps every app row for the current set, so installed applications are
+// ordinary tree items under `apps` — searchable, breadcrumbed and escapable
+// like every other row. Rows keep the order they arrive in; ids already
+// claimed (including duplicate desktop ids) are listed once.
+//
+// Returns fresh items/itemOrder for the caller to assign in one go, and never
+// writes into the maps it is handed: those live in QML `var` properties, where
+// an in-place write is occasionally dropped by the engine — omarchy's note,
+// their lost writes left an id in itemOrder with no item behind it and the
+// next merge then listed the same app twice.
+function mergeAppRows(items, itemOrder, appRows) {
+    var source = items || ({});
+    var order = Array.isArray(itemOrder) ? itemOrder : [];
+    var rows = Array.isArray(appRows) ? appRows : [];
+    var nextItems = ({});
+    var nextOrder = [];
+
+    for (var i = 0; i < order.length; i++) {
+        var id = order[i];
+        var existing = source[id];
+        // Orphans (an id with no item) are dropped rather than carried
+        // forward, so a single lost write cannot compound into a double row.
+        if (!existing || existing.kind === "app")
+            continue;
+        nextItems[id] = existing;
+        nextOrder.push(id);
+    }
+
+    for (var j = 0; j < rows.length; j++) {
+        var row = rows[j];
+        if (!row || !row.id || nextItems[row.id])
+            continue;
+        row.order = nextOrder.length;
+        nextItems[row.id] = row;
+        nextOrder.push(row.id);
+    }
+
+    return {
+        items: nextItems,
+        itemOrder: nextOrder
     };
 }
 
@@ -261,6 +304,10 @@ function searchScore(items, entry, query) {
 
     if (label === needle)
         score = entry.parent === "root" ? 2 : 0;
+    // An installed app whose name carries the query as a whole word ("code"
+    // for Visual Studio Code) beats an exactly-labeled menu row deeper in.
+    else if (entry.kind === "app" && label.split(/\s+/).indexOf(needle) >= 0)
+        score = 0;
     else if (label.indexOf(needle) === 0)
         score = 10;
     else if (label.indexOf(needle) >= 0)
@@ -274,6 +321,11 @@ function searchScore(items, entry, query) {
     // it carries everything under it.
     if (entry.kind === "menu" || entry.kind === "link")
         score -= 2;
+    // App rows are merged in after the whole tree, so they lose the order
+    // tiebreak below to any menu row that matched as well. Outrank those, but
+    // stay inside the tier so a better match still wins.
+    if (entry.kind === "app")
+        score -= 5;
 
     return score * 1000 + depthFor(items, entry.id) * 25 + entry.order;
 }
@@ -284,6 +336,10 @@ function displayRow(items, itemOrder, checkedResults, entry, detail, score, sect
         itemId: entry.id,
         kind: entry.kind,
         icon: entry.icon,
+        // App rows draw an image icon instead of the glyph, and launch by
+        // desktop id rather than by running a command string.
+        appIcon: entry.appIcon || "",
+        appId: entry.appId || "",
         label: labelFor(entry, checkedResults),
         target: target,
         detail: detail || "",

@@ -365,10 +365,20 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   alias routes for summoning a submenu (or firing a leaf) directly, and the
   keyboard model (Enter/Right to enter, Left/Backspace-on-empty to go up,
   Escape clearing the query before it closes). Their JSONC parsing and user
-  extension file, provider-backed rows and desktop-app rows are not ported —
-  our tree is a JS object in `Modules/Menu/MenuTree.js` and our Apps row hands
-  off to the launcher — and rows the shell owns itself (launcher, theme
-  switcher, DND, lock) run in-process instead of shelling out.
+  extension file are not ported — our tree is a JS object in
+  `Modules/Menu/MenuTree.js` — and rows the shell owns itself (theme switcher,
+  DND, lock) run in-process instead of shelling out. Their **desktop-app rows**
+  are ported: `mergeAppRows` (`MenuModel.js` + `Menu.qml`) swaps the whole app
+  set into the tree as `kind: "app"` children of `apps`, sourced from
+  DesktopEntries rather than a bash enumeration, so an installed application
+  is searched, ranked and escaped exactly like a declared row. With it come
+  their app-specific rules: .desktop Keywords and GenericName as aliases, app
+  rows excluded from alias routes (else `htop`'s `Keywords=system;` shadows the
+  System route), the whole-word label tier that puts an app above an
+  exactly-labeled menu row, and the merge returning fresh maps instead of
+  writing into the QML `var` properties in place. Their script-backed provider
+  rows stay a separate view here (ours never merge into the tree), and their
+  app uninstall flow is not ported.
 - **Emoji picker design** from `shell/plugins/emojis/Emojis.qml`: the flat
   grid of glyph cells with no group headers and no recents section, the query
   line that doubles as the card header, and their keyboard model (←/→ by one
