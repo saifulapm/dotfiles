@@ -29,7 +29,8 @@
       "Bash(pnpm typecheck:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr list:*)",
-      "Bash(gh release list:*)"
+      "Bash(gh release list:*)",
+      "Bash(redis-cli:*)"
     ],
     "defaultMode": "auto"
   },

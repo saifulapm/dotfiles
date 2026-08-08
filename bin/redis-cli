@@ -1,0 +1,32 @@
+#!/bin/sh
+# redis-cli — the official client, run out of the docker.io/library/redis:7-alpine
+# image already on this box, pointed at the on-demand dev container that
+# run_after_16-dev-services brings up on 127.0.0.1:6379.
+#
+# WHY A WRAPPER AND NOT A PACKAGE: Fedora 44 ships no redis package at all —
+# valkey replaced it. `valkey` (5.9 MB + librdmacm) would give valkey-cli, but
+# the only thing that restores the redis-cli NAME is valkey-compat-redis, and
+# that also installs /usr/bin/redis-server and a redis.service unit onto a
+# machine where a podman container already owns 6379. A dormant second Redis
+# server you must remember never to enable is a worse deal than this script.
+# The image is already on disk, so this costs zero packages and no sudo, and
+# the client version matches the server exactly.
+#
+# WHY NOT `podman exec`: the quadlet REMOVES the container when it stops, so an
+# idle Redis is not in `podman ps -a` and there is nothing to exec into. Only a
+# TCP connect on 6379 wakes it, which is precisely what --network=host makes
+# this do — the connect lands on the host's socket proxy. Consequence worth
+# knowing: the first call after ~10 minutes idle blocks for seconds while
+# podman starts the container. That is the design working, not a hang.
+#
+# WHY -t IS CONDITIONAL — the reason this is a script rather than an alias.
+# Measured 2026-08-08: `podman run -it` from a non-tty (any Claude Code agent
+# call, any pipe, any $(...) capture) warns on stderr AND returns "PONG\r"
+# instead of "PONG", so a hardcoded -it silently appends \r to every value
+# anything parses. Gating -t on stdout being a terminal keeps the interactive
+# REPL working while giving scripts and agents clean LF-terminated output.
+# -i stays unconditional so `redis-cli < commands.txt` still feeds stdin.
+[ -t 1 ] && tty=-t || tty=
+
+exec podman run --rm -i $tty --network=host \
+  docker.io/library/redis:7-alpine redis-cli -h 127.0.0.1 -p 6379 "$@"
