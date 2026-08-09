@@ -63,8 +63,8 @@ function findPreview(themeDir) {
 }
 
 function previewFor(name) {
-  // The external-fetched backgrounds (see bin/background-next) replace the
-  // dev-machine-only ~/ref/omarchy lookup.
+  // The fetched backgrounds (saifulapm/wallpapers, see bin/background-next)
+  // replace the dev-machine-only ~/ref/omarchy lookup.
   for (const dir of [path.join(THEMES, name), path.join(os.homedir(), ".local/share/qshell/backgrounds", name)]) {
     const preview = findPreview(dir)
     if (preview) return preview

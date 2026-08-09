@@ -981,10 +981,14 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   `bin/theme-port-omarchy` (surface/text/accent/ansi mapping documented there).
   Non-color tokens (shape/motion) in those files are ours. Muted/primary text
   colors may differ from the source where our contrast floor adjusted them.
-- **Theme wallpapers** from `themes/*/backgrounds/`: fetched verbatim as a
-  pinned chezmoi external (`home/.chezmoiexternal.toml`) into
-  `~/.local/share/qshell/backgrounds` — the images ship in omarchy's MIT repo
-  and are downloaded from there at apply time, never committed here.
+- **Theme wallpapers** from `themes/*/backgrounds/`: the images ship in
+  omarchy's MIT repo, and are mirrored verbatim (2026-08-09, from commit
+  `fd1034f`) into our own public `saifulapm/wallpapers` repo, which keeps
+  omarchy's LICENSE with its copyright notice and credits the source in its
+  README. `run_after_27-wallpapers.sh` fetches that mirror into
+  `~/.local/share/qshell/backgrounds` at apply time. Still never committed
+  here — the mirror exists so the set is ours to add to and remove from, and
+  so a machine stops pulling omarchy's whole source tree for its images.
 - **Emacs theming design** studied from the omarchy ecosystem's two packages
   (no code ported from either): scottjones/omarchy-emacs renders a colors file
   from theme tokens which a static theme consumes, and ovistoica/omarchy.el

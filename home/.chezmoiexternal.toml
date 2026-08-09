@@ -24,7 +24,7 @@
     refreshPeriod = "0"
     include = ["*.ttf"]
 
-# Theme wallpapers (~105 MB) are deliberately NOT an external — see
+# Theme wallpapers (~100 MB) are deliberately NOT an external — see
 # run_after_27-wallpapers.sh: externals download while chezmoi reads the
 # source state, so a single timeout on the largest fetch in the repo aborted
 # the entire first apply before anything else ran (audit 2026-08-08). Only

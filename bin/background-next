@@ -30,9 +30,9 @@ name_file="$state_dir/theme.name"
 theme_name=""
 [[ -f $name_file ]] && theme_name="$(<"$name_file")"
 
-# The theme backgrounds are a pinned chezmoi external (.chezmoiexternal.toml
-# fetches omarchy's themes/*/backgrounds into ~/.local/share/qshell/
-# backgrounds), so every machine has them after an apply — the old source,
+# The theme backgrounds come from our own saifulapm/wallpapers mirror, which
+# run_after_27-wallpapers.sh fetches into ~/.local/share/qshell/backgrounds,
+# so every machine has them after an apply — the old source,
 # the dev MacBook's read-only ~/ref/omarchy clone, existed on one machine
 # only and left every other first boot wallpaperless (audit 2026-08-07).
 dirs=()

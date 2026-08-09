@@ -30,8 +30,8 @@ three oma apps from source, **switches the login shell to fish**, sets up
 multi-PHP (php82/83/84 beside system 8.5), on-demand podman dev services
 (mysql/postgres/redis/mailpit) and `https://<project>.test` domains, applies
 the chromium policy, disables suspend everywhere, opens the dufs port,
-fetches fonts + the theme wallpapers (pinned externals) and bootstraps the
-default theme.
+fetches fonts (pinned externals) + the theme wallpapers (from our own
+saifulapm/wallpapers repo) and bootstraps the default theme.
 
 Expect the first apply to take a while — it compiles kakoune, **Emacs 31
 (from source, the longest single step)**, ~10 cargo crates and three Qt
@@ -109,8 +109,8 @@ after the first apply.
   `dot_bashrc.d/10-dev.sh` for bash contexts).
 - `packages/manifest.toml` — every package, justified, arch-aware. The single
   source of truth; the install script re-runs when it changes.
-- `themes/` — one TOML per theme (22, mostly ported from omarchy). Their
-  wallpapers arrive as a pinned external into
+- `themes/` — one TOML per theme (22, mostly ported from omarchy). The
+  matching wallpapers live in our own `saifulapm/wallpapers` repo and land in
   `~/.local/share/qshell/backgrounds` (plus your own `~/Pictures/Wallpapers`).
 - `templates/` — theme fan-out targets (foot, GTK, niri, yazi, tmux, oma).
 - `bench/` — measured numbers from `just bench`; performance is the product.
