@@ -705,8 +705,11 @@ function convertTheme(inputPath, outputPath) {
     // Generate Kakoune colorscheme
     const kakTheme = generateKakouneTheme(faces, themeName, helixTheme.palette);
 
-    // Write output
+    // Write output. mkdir first: only kakrc and autoload/ are chezmoi-managed,
+    // so ~/.config/kak/colors does not exist on a fresh machine and the write
+    // would ENOENT (fresh NUC 2026-08-10).
     if (outputPath) {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       fs.writeFileSync(outputPath, kakTheme);
       console.log(`✓ Converted theme saved to: ${outputPath}`);
     } else {
@@ -714,7 +717,14 @@ function convertTheme(inputPath, outputPath) {
     }
   } catch (error) {
     console.error(`Error: ${error.message}`);
-    process.exit(1);
+    // Only the CLI may exit. As bin/theme-apply's library this function runs
+    // INSIDE the host process, and the exit() that used to live here killed
+    // theme-apply mid-run — past theme-apply's own try/catch, which cannot
+    // catch an exit — so the whole first-boot theme bootstrap reported failure
+    // over one missing directory (fresh NUC 2026-08-10). Rethrow instead: the
+    // caller already warns and carries on.
+    if (require.main === module) process.exit(1);
+    throw error;
   }
 }
 
