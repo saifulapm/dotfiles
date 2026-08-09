@@ -1458,8 +1458,8 @@ why  = "Deno runtime from the mac list; mise already manages node, one mechanism
 
 [[tool]]
 name = "cargo-cli-tools"
-via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, argc, dufs, hop-kak, kak-popup, dedoc; from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07) and wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere)"
-why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/argc/dufs are mac-list CLI; kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
+via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc; from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07) and wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere)"
+why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/dufs are mac-list CLI (argc dropped 2026-08-10 — nothing in this repo ever called it); kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
 
 [[tool]]
 name = "dufs-server"

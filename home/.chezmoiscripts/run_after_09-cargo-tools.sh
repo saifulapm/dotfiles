@@ -23,7 +23,6 @@ declare -A CRATES=(
   [sd]="sd"
   [sk]="skim"
   [tv]="television"
-  [argc]="argc"
   [dufs]="dufs"
   [hop-kak]="hop-kak"
   [kak-popup]="kak-popup"
