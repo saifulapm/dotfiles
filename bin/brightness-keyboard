@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# brightness-keyboard — the keyboard backlight LED, in one place: the
+# brightness keys adjust it with an OSD, and the blank paths park it while the
+# screen is off. Port of omarchy-brightness-keyboard (CREDITS.md), sibling of
+# bin/brightness-display (that one owns panels and DDC monitors).
+#
+#   brightness-keyboard [--no-osd] up|down|cycle    adjust, raising the OSD
+#   brightness-keyboard off                         park the level and go dark
+#   brightness-keyboard restore                     put the parked level back
+#
+# Their step is 10% of the device's own range with a floor of one level, so a
+# keyboard with three levels still moves; the OSD reads the resulting percent.
+#
+# `off`/`restore` are what keep the keyboard from staying lit under a dark
+# panel — on a MacBook it is the only thing left glowing, which reads as a
+# machine that is still awake. Every blank path pairs them (Services/Idle.qml's
+# screensaver stage, Modules/Lock's blank timer, niri's lid switch) and each
+# has a wake half that restores.
+#
+# Two deviations from upstream:
+#
+#  * They park into brightnessctl's own --save slot. That slot is global and
+#    holds one value, so a second `off` arriving while the screen is already
+#    dark (idle blanks, then the lock's own timer blanks again) saves 0 over
+#    the real level and the light never comes back. The parked level lives in
+#    a runtime file here instead: the first `off` wins, later ones only
+#    re-assert 0, and an explicit adjust discards it — a level chosen at the
+#    lock screen is the one the user meant to keep.
+#  * No device is a silent no-op rather than their error exit: the Mac mini has
+#    no such LED and the idle path fires these on every blank.
+
+no_osd=0
+
+while (($# > 0)); do
+  case "$1" in
+  --no-osd)
+    no_osd=1
+    shift
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+# Vendors prefix theirs (`tpacpi::kbd_backlight`); this MacBook exposes a bare
+# `kbd_backlight`. Upstream's glob, which covers both.
+device=""
+for candidate in /sys/class/leds/*kbd_backlight*; do
+  if [[ -e $candidate ]]; then
+    device="$(basename "$candidate")"
+    break
+  fi
+done
+
+[[ -n $device ]] || exit 0
+
+parked="${XDG_RUNTIME_DIR:-/tmp}/qshell-kbd-backlight.parked"
+
+show_osd() {
+  ((no_osd)) && return 0
+  command -v qs >/dev/null 2>&1 || return 0
+  # `show` collides with a qs CLI subcommand — the `--` is load-bearing.
+  qs ipc call osd -- show "{\"icon\":\"keyboard\",\"value\":$1,\"progressText\":\"$1%\"}" >/dev/null 2>&1 || true
+}
+
+exec {lock_fd}>"${XDG_RUNTIME_DIR:-/tmp}/qshell-brightness-keyboard.lock"
+
+case "${1:-up}" in
+off)
+  # Blank and wake can arrive back to back; wait rather than drop, or the
+  # light is left in the wrong state until the next transition.
+  flock -w 2 "$lock_fd" || exit 0
+  if [[ ! -e $parked ]]; then
+    current="$(brightnessctl -d "$device" get)" || exit 1
+    printf '%s\n' "$current" >"$parked"
+  fi
+  brightnessctl -d "$device" set 0 >/dev/null || exit 1
+  exit 0
+  ;;
+restore)
+  flock -w 2 "$lock_fd" || exit 0
+  [[ -e $parked ]] || exit 0
+  saved="$(<"$parked")"
+  rm -f "$parked"
+  [[ $saved =~ ^[0-9]+$ ]] || exit 0
+  brightnessctl -d "$device" set "$saved" >/dev/null || exit 1
+  exit 0
+  ;;
+esac
+
+direction="${1:-up}"
+
+# Overlapping key repeats are dropped instead of queued, so a held key can't
+# glitch the OSD — bin/brightness-display's flock, same reasoning.
+flock -n "$lock_fd" || exit 0
+
+max="$(brightnessctl -d "$device" max)" || exit 1
+current="$(brightnessctl -d "$device" get)" || exit 1
+((max > 0)) || exit 1
+
+((step = max / 10))
+((step < 1)) && step=1
+
+case "$direction" in
+cycle)
+  ((next = current + step))
+  ((next > max)) && next=0
+  ;;
+up)
+  ((next = current + step))
+  ((next > max)) && next=max
+  ;;
+down)
+  ((next = current - step))
+  ((next < 0)) && next=0
+  ;;
+*)
+  echo "brightness-keyboard: unknown action '$direction'" >&2
+  exit 1
+  ;;
+esac
+
+brightnessctl -d "$device" set "$next" >/dev/null || exit 1
+# An explicit change outranks whatever a blank parked.
+rm -f "$parked"
+show_osd "$((next * 100 / max))"

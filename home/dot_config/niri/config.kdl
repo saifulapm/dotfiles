@@ -709,11 +709,14 @@ binds {
     Shift+XF86MonBrightnessDown allow-when-locked=true { spawn "brightness-display" "1%"; }
     Alt+XF86MonBrightnessUp     allow-when-locked=true { spawn "brightness-display" "+1%"; }
     Alt+XF86MonBrightnessDown   allow-when-locked=true { spawn "brightness-display" "1%-"; }
-    // Keyboard backlight — this MacBook's kbd_backlight LED (omarchy:
-    // omarchy-brightness-keyboard). The cycle key (XF86KbdLightOnOff) is
-    // unbound: no cycle script here.
-    XF86KbdBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--device=kbd_backlight" "set" "+10%"; }
-    XF86KbdBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--device=kbd_backlight" "set" "10%-"; }
+    // Keyboard backlight — this MacBook's kbd_backlight LED, through
+    // bin/brightness-keyboard (omarchy's omarchy-brightness-keyboard) so the
+    // keys raise the OSD the display keys already do, and so the blank paths
+    // can park the level with the same script. Upstream also binds the cycle
+    // key (XF86KbdLightOnOff); Apple keyboards have no such key, so the
+    // script's `cycle` verb stays unbound here.
+    XF86KbdBrightnessUp   allow-when-locked=true { spawn "brightness-keyboard" "up"; }
+    XF86KbdBrightnessDown allow-when-locked=true { spawn "brightness-keyboard" "down"; }
 
     // Open/close the Overview: a zoomed-out view of workspaces and windows.
     // You can also move the mouse into the top-left hot corner,
@@ -1033,11 +1036,13 @@ binds {
 // Lid close = lock + all screens off, never suspend: Asahi never brings the
 // display back after resume, and agentic sessions must keep the network up.
 // niri already turns the internal panel off/on with the lid; the explicit
-// power calls cover docked external monitors. The logind half (lid/suspend
+// power calls cover docked external monitors. The keyboard backlight goes
+// with them (bin/brightness-keyboard) — a lit keyboard under a closed lid is
+// the machine looking awake while it isn't. The logind half (lid/suspend
 // keys ignored, sleep targets masked) is run_after_18-no-suspend.sh.
 switch-events {
-    lid-close { spawn "sh" "-c" "qs ipc call lock lock; niri msg action power-off-monitors"; }
-    lid-open { spawn "niri" "msg" "action" "power-on-monitors"; }
+    lid-close { spawn "sh" "-c" "qs ipc call lock lock; niri msg action power-off-monitors; brightness-keyboard off"; }
+    lid-open { spawn "sh" "-c" "niri msg action power-on-monitors; brightness-keyboard restore"; }
 }
 
 // Theme colors + corner radius, rendered by bin/theme-apply on every theme

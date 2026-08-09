@@ -202,11 +202,18 @@ Scope {
         idleBlankTimer.restart();
     }
 
+    // The keyboard backlight follows the screen (Services/Idle.qml carries the
+    // same pair, and the note there): a lit keyboard over a dark panel reads as
+    // an awake machine. execDetached rather than a Process, because the
+    // `running` guards above would drop a second call and the light would be
+    // left in the wrong state — bin/brightness-keyboard does its own locking
+    // and is a no-op where no such LED exists.
     function runWake() {
         if (blanked) {
             blanked = false;
             if (!wakeProcess.running)
                 wakeProcess.running = true;
+            Quickshell.execDetached(["brightness-keyboard", "restore"]);
         }
         if (lockRequested)
             armBlankTimer();
@@ -216,6 +223,7 @@ Scope {
         blanked = true;
         if (!blankProcess.running)
             blankProcess.running = true;
+        Quickshell.execDetached(["brightness-keyboard", "off"]);
     }
 
     function submitPassword(value) {

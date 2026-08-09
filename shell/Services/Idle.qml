@@ -99,12 +99,18 @@ QtObject {
         Quickshell.execDetached(command);
     }
 
+    // The keyboard backlight goes dark with the screen and comes back with it.
+    // On a MacBook it is the only lit thing left once the panel is off, and it
+    // reads as "still awake". bin/brightness-keyboard parks the level so the
+    // wake half restores exactly what was set, and is a no-op on machines with
+    // no such LED; the lock screen's own blank timer drives the same pair.
     function powerOffMonitors() {
         if (monitorsPoweredOff)
             return;
         monitorsPoweredOff = true;
         logEvent("screensaver", "power-off-monitors");
         run(["niri", "msg", "action", "power-off-monitors"]);
+        run(["brightness-keyboard", "off"]);
     }
 
     function powerOnMonitors() {
@@ -113,6 +119,7 @@ QtObject {
         monitorsPoweredOff = false;
         logEvent("wake", "power-on-monitors");
         run(["niri", "msg", "action", "power-on-monitors"]);
+        run(["brightness-keyboard", "restore"]);
     }
 
     function lockNow(reason) {

@@ -1468,6 +1468,21 @@ Direct file-level copies (source path → destination path):
   hyprctl (both are DRM connector names, so the detect parse is unchanged).
   The wrapper drops their Apple-display (asdcontrol) and DPMS branches and
   raises our OSD over `qs ipc call osd -- show`.
+- omarchy `bin/omarchy-brightness-keyboard` → `bin/brightness-keyboard`
+  (2026-08-10): their `up|down|cycle|off|restore` interface, `--no-osd` flag,
+  `*kbd_backlight*` device glob and 10%-of-range step with its one-level
+  floor; the OSD goes over `qs ipc call osd -- show` with their `keyboard`
+  icon and percent. Their `off`/`restore` use brightnessctl's global `--save`
+  slot, which loses the level when a second `off` lands on an already-dark
+  keyboard (idle blanks, then the lock's own timer blanks again) — ours parks
+  it in `$XDG_RUNTIME_DIR` first-writer-wins and an explicit adjust discards
+  it. A machine with no such LED is a silent no-op instead of their error
+  exit, because our idle path fires this on every blank. The call sites are
+  theirs too: their lock blank runs `omarchy-brightness-keyboard off` and
+  their wake (`omarchy-system-wake`, run by both their lock and their idle
+  service) runs `restore` — ours adds the pair to the idle screensaver stage
+  as well, which upstream doesn't need because theirs raises a screensaver
+  window instead of powering the panel off.
 - omarchy `default/themed/btop.theme.tpl`, `helix.toml.tpl`,
   `claude.json.tpl`, `gum_env.lua.tpl` → `templates/btop-theme.tmpl`,
   `helix-theme.toml.tmpl`, `claude-theme.json.tmpl`, `gum-theme.fish.tmpl`
