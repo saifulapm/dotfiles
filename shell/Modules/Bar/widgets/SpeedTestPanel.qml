@@ -5,22 +5,38 @@ import Quickshell.Wayland
 import "../components"
 
 // Centered speed-test overlay — port of omarchy's SpeedTestPanel.qml: no card,
-// two dials (download left, upload right) floating on a darkened scrim, with
-// open 270° arcs, a faint tick ring, hubless needles and a digital readout.
-// The needles sweep to full scale and back when it opens, then track the live
-// readings from bin/network-speedtest. Esc or the scrim close it, Enter runs
-// it again.
+// two dials floating on a darkened scrim, with open 270° arcs, a faint tick
+// ring, hubless needles and a digital readout. The needles sweep to full scale
+// and back when it opens, then track the live readings the caller feeds in.
+// Esc or the scrim close it, Enter runs it again.
+//
+// Reading-source-agnostic, the way omarchy hoisted theirs into Ui/
+// SpeedTestOverlay.qml (2521b11): the network test drives it with
+// DOWNLOAD/UPLOAD in Mbps from bin/network-speedtest, the disk test with
+// READ/WRITE in MB/s from bin/disk-speedtest. Defaults are the network pair,
+// so its call site names only what differs.
 PanelWindow {
     id: root
 
     required property var theme
     property bool running: false
-    property string phase: ""     // "down" | "up" | ""
-    property string downloadMbps: ""
-    property string uploadMbps: ""
+    // Which dial is live, matched against firstPhase/secondPhase below.
+    property string phase: ""
+    property string firstReading: ""
+    property string secondReading: ""
     property string error: ""
-    property string connectionName: ""
+    // Names the thing under test above the dials — a Wi-Fi SSID, a disk model.
+    property string caption: ""
     property bool opened: false
+
+    // The measurement vocabulary: what the two dials are called, which phase
+    // token lights each one, and the unit under every readout.
+    property string firstLabel: "DOWNLOAD"
+    property string secondLabel: "UPLOAD"
+    property string firstPhase: "down"
+    property string secondPhase: "up"
+    property string unit: "Mbps"
+    property string surfaceNamespace: "qshell-network-speedtest"
 
     signal closeRequested
     signal runAgainRequested
@@ -32,8 +48,8 @@ PanelWindow {
         root.closeRequested();
     }
 
-    readonly property real downloadValue: toMbps(downloadMbps)
-    readonly property real uploadValue: toMbps(uploadMbps)
+    readonly property real firstValue: toNumber(firstReading)
+    readonly property real secondValue: toNumber(secondReading)
     readonly property bool failed: error !== ""
 
     // The scrim below is a fixed near-black regardless of theme, so text and
@@ -42,7 +58,7 @@ PanelWindow {
     readonly property color onScrimDim: Qt.rgba(1, 1, 1, 0.55)
     readonly property color onScrimUrgent: "#ff6b6b"
 
-    function toMbps(raw) {
+    function toNumber(raw) {
         const value = parseFloat(raw);
         return isFinite(value) && value > 0 ? value : 0;
     }
@@ -55,8 +71,8 @@ PanelWindow {
             if (!root.opened)
                 return;
             keyCatcher.forceActiveFocus();
-            downDial.ignite();
-            upDial.ignite();
+            firstDial.ignite();
+            secondDial.ignite();
         })
 
     anchors {
@@ -68,7 +84,7 @@ PanelWindow {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "qshell-network-speedtest"
+    WlrLayershell.namespace: root.surfaceNamespace
     WlrLayershell.keyboardFocus: opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     Rectangle {
@@ -116,8 +132,8 @@ PanelWindow {
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    visible: root.connectionName !== ""
-                    text: root.connectionName.toUpperCase()
+                    visible: root.caption !== ""
+                    text: root.caption.toUpperCase()
                     color: root.onScrimDim
                     font.family: root.theme.fontMono
                     font.pixelSize: root.theme.fontPx(0.833)
@@ -130,17 +146,17 @@ PanelWindow {
                     spacing: root.theme.space(12)
 
                     SpeedDial {
-                        id: downDial
-                        label: "DOWNLOAD"
-                        value: root.downloadValue
-                        live: root.running && root.phase === "down"
+                        id: firstDial
+                        label: root.firstLabel
+                        value: root.firstValue
+                        live: root.running && root.phase === root.firstPhase
                     }
 
                     SpeedDial {
-                        id: upDial
-                        label: "UPLOAD"
-                        value: root.uploadValue
-                        live: root.running && root.phase === "up"
+                        id: secondDial
+                        label: root.secondLabel
+                        value: root.secondValue
+                        live: root.running && root.phase === root.secondPhase
                     }
                 }
 
@@ -415,7 +431,7 @@ PanelWindow {
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "Mbps"
+                text: root.unit
                 color: root.onScrimDim
                 font.family: root.theme.fontUi
                 font.pixelSize: root.theme.fontPx(0.833)

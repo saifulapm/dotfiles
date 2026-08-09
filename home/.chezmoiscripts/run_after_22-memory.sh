@@ -15,8 +15,10 @@ set -uo pipefail
 # (audit 2026-08-08): the old `SwapTotal < 15 GiB` test assumed Asahi's 8 G
 # swapfile underneath — on a NUC whose zram tops out below 7 G it never
 # settled, re-prompting for sudo on every apply while doing nothing.
+# `grep -x >/dev/null`, never `grep -qx`: -q exits at the first match, which
+# SIGPIPEs swapon mid-write and makes pipefail report 141 for an active swapfile.
 need_swap=0
-swapon --show=NAME --noheadings | grep -qx /var/swap/swapfile2 || need_swap=1
+swapon --show=NAME --noheadings | grep -x /var/swap/swapfile2 >/dev/null || need_swap=1
 
 need_zstd=0
 if [ "$(cat /sys/module/zswap/parameters/enabled 2>/dev/null)" = "Y" ] &&
@@ -69,7 +71,7 @@ if [ "$need_swap" = 1 ]; then
     echo '/var/swap/swapfile2 swap swap sw 0 0' >>/etc/fstab
   # --fixpgsz fallback: btrfs mkswapfile stamps a 4 K-page signature, which
   # the Asahi 16 K kernel refuses — reinitialize for the running page size.
-  swapon --show=NAME --noheadings | grep -qx /var/swap/swapfile2 ||
+  swapon --show=NAME --noheadings | grep -x /var/swap/swapfile2 >/dev/null ||
     swapon /var/swap/swapfile2 2>/dev/null ||
     swapon --fixpgsz /var/swap/swapfile2
 fi

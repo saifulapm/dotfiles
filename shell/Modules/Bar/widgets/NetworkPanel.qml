@@ -1284,15 +1284,17 @@ BarPanel {
         onPasswordToggleRequested: panel.toggleQrPassword()
     }
 
-    NetworkSpeedTestPanel {
+    // The shared overlay's defaults are this pair (DOWNLOAD/UPLOAD, Mbps,
+    // down/up), so only the readings and the caption are named here.
+    SpeedTestPanel {
         id: speedTestOverlay
         theme: panel.theme
         running: panel.speedTestRunning
         phase: panel.speedTestPhase
-        downloadMbps: panel.speedTestDownloadMbps
-        uploadMbps: panel.speedTestUploadMbps
+        firstReading: panel.speedTestDownloadMbps
+        secondReading: panel.speedTestUploadMbps
         error: panel.speedTestError
-        connectionName: {
+        caption: {
             if (panel.info.type === "wifi")
                 return panel.info.ssid || "Wi-Fi";
             if (panel.info.type === "ethernet")

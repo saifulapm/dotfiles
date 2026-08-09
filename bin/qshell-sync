@@ -71,7 +71,9 @@ fi
 # unit failed (audit 2026-08-07). Quiet skip; ok stays null (not false) so the
 # first real success never raises a phantom "Sync recovered" toast, and the
 # distinct errorKind names the state for anyone reading status.json.
-if ! rclone listremotes 2>/dev/null | grep -qx "${remote%%:*}:"; then
+# `grep -x >/dev/null`, never `grep -qx`: -q exits at the first match, which
+# SIGPIPEs rclone mid-write and makes pipefail report 141 for a found remote.
+if ! rclone listremotes 2>/dev/null | grep -x "${remote%%:*}:" >/dev/null; then
   echo "qshell-sync: rclone remote ${remote%%:*}: not configured — skipped (run: rclone config)"
   mkdir -p "$sync_dir"
   tmp="$(mktemp "$status_file.XXXXXX")"

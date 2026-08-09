@@ -79,6 +79,20 @@ BarIcon {
         summonPanel("toggle");
     }
 
+    // Read by the bar to rank surfaces for the IPC verbs below: the copy with
+    // the panel already open answers before the focused output's copy.
+    readonly property bool panelOpen: panelLoader.item ? panelLoader.item.opened === true : false
+
+    // The IPC verbs' shared body — kept on the widget, not inside IpcHandler,
+    // where every declared function becomes a callable verb. Falls back to
+    // this copy when no surface answers (widget hidden on every bar, so no
+    // slot passes summonWidgetModeHere's visibility rule).
+    function summonRouted(mode) {
+        if (!rootItem.bar || !rootItem.bar.summonWidgetMode("bluetooth", mode))
+            rootItem.summonPanel(mode);
+        return "ok";
+    }
+
     onTapped: button => {
         if (button === Qt.RightButton) {
             rootItem.toggleBluetooth();
@@ -93,36 +107,34 @@ BarIcon {
     // plus toggleBluetooth so a keybind can flip the adapter without opening
     // anything. `bar open bluetooth` remains the layout-aware summon path;
     // this target is the direct one. The bar mounts one widget per screen and
-    // quickshell permits one handler per target, so only the first screen's
-    // copy registers it. NOTE: `qs ipc call bluetooth show` needs `--` before
-    // the verb — the CLI parses a bare `show` as its own subcommand.
+    // quickshell permits one handler per target, so registration is pinned to
+    // the first screen — but the verbs must NOT act on that copy, or a summon
+    // opens on screens[0] while the user is on another monitor (omarchy
+    // 667d2d2). They route through the bar, which ranks surfaces by open
+    // panel then niri focus. NOTE: `qs ipc call bluetooth show` needs `--`
+    // before the verb — the CLI parses a bare `show` as its own subcommand.
     IpcHandler {
         target: "bluetooth"
         enabled: rootItem.bar !== null && Quickshell.screens.length > 0 && rootItem.bar.screen === Quickshell.screens[0]
 
         function open(): string {
-            rootItem.summonPanel("open");
-            return "ok";
+            return rootItem.summonRouted("open");
         }
 
         function close(): string {
-            rootItem.summonPanel("close");
-            return "ok";
+            return rootItem.summonRouted("close");
         }
 
         function show(): string {
-            rootItem.summonPanel("open");
-            return "ok";
+            return rootItem.summonRouted("open");
         }
 
         function hide(): string {
-            rootItem.summonPanel("close");
-            return "ok";
+            return rootItem.summonRouted("close");
         }
 
         function toggle(): string {
-            rootItem.summonPanel("toggle");
-            return "ok";
+            return rootItem.summonRouted("toggle");
         }
 
         function toggleBluetooth(): string {

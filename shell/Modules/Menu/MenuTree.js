@@ -482,6 +482,17 @@ var TREE = {
         "when": "command -v rfkill && command -v foot",
         "action": "foot-run --app-id=qshell-float -e bash -lc '\"$HOME/.dotfiles/bin/bluetooth-restart\"; read -r -p \"press enter to close\"'"
     },
+    // Omarchy files this under Trigger > Tests (2521b11) beside their network
+    // speed test; ours sits with the other diagnostic row, since our network
+    // test is reached from the Network panel rather than the menu. The overlay
+    // starts measuring as soon as it opens, so the row is the whole gesture.
+    "system.disk-speedtest": {
+        "icon": "󰋊",
+        "label": "Disk Speed Test",
+        "aliases": ["disk", "speed", "benchmark", "ssd", "nvme", "throughput", "io"],
+        "description": "Measure live disk read and write speed",
+        "action": "qs ipc call diskspeedtest -- show"
+    },
     "system.exit": {
         "icon": "󰍃",
         "label": "Exit niri",

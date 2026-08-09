@@ -378,6 +378,24 @@ Scope {
         return false;
     }
 
+    // ------------------------------------------- per-widget IPC targets
+    // A widget is mounted once per screen but quickshell registers a single
+    // handler per target, so `qs ipc call bluetooth -- show` would otherwise
+    // act on whichever copy happened to register (screens[0]) and open on the
+    // wrong monitor. Rank surfaces instead: a copy that already has the panel
+    // open wins, so close/hide/toggle reach what the user can see; then the
+    // niri-focused output, where a keyboard summon belongs.
+    function summonWidgetMode(widgetId, mode) {
+        const focusedWs = niri.workspaces.find(w => w.is_focused);
+        const focusedOutput = focusedWs ? focusedWs.output : "";
+        const rank = b => (b.widgetPanelOpen(widgetId) ? 2 : 0) + (b.screen && b.screen.name === focusedOutput ? 1 : 0);
+        const bars = screenBars.slice().sort((a, b) => rank(b) - rank(a));
+        for (const b of bars)
+            if (b.summonWidgetModeHere(widgetId, mode))
+                return true;
+        return false;
+    }
+
     // Close only the center, wherever it is open — `notifs hide` must not
     // sweep unrelated widget panels the way closeAllPanels does.
     function closeNotifCenter() {
@@ -820,6 +838,44 @@ Scope {
 
             function unregisterModuleSlot(slot) {
                 moduleSlots = moduleSlots.filter(item => item !== slot);
+            }
+
+            // The per-widget IPC targets (`qs ipc call bluetooth -- show`)
+            // carry an explicit mode instead of openPanel's bare toggle. This
+            // acts on THIS surface; barRoot.summonWidgetMode picks which.
+            function summonWidgetModeHere(widgetId, mode) {
+                for (let i = 0; i < moduleSlots.length; i++) {
+                    const slot = moduleSlots[i];
+                    if (!slot || slot.widgetId !== widgetId)
+                        continue;
+                    const item = slot.activeItem;
+                    if (!item || item.visible !== true || typeof item.summonPanel !== "function")
+                        continue;
+                    item.summonPanel(mode);
+                    return true;
+                }
+                return false;
+            }
+
+            // Whether this surface's copy of the widget currently has its
+            // panel open — the tie-break that keeps close/hide/toggle on the
+            // panel the user can actually see.
+            function widgetPanelOpen(widgetId) {
+                for (let i = 0; i < moduleSlots.length; i++) {
+                    const slot = moduleSlots[i];
+                    if (!slot || slot.widgetId !== widgetId)
+                        continue;
+                    const item = slot.activeItem;
+                    if (item && item.panelOpen === true)
+                        return true;
+                }
+                return false;
+            }
+
+            // Widgets live in their own files and cannot see barRoot's id, so
+            // they reach the cross-surface router through their own surface.
+            function summonWidgetMode(widgetId, mode) {
+                return barRoot.summonWidgetMode(widgetId, mode);
             }
 
             // The IPC summon path (bar open <widgetId>). Same eligibility

@@ -96,8 +96,12 @@ fi
 # login` has been run once, this skips loudly on every apply.
 if command -v gh >/dev/null 2>&1; then
   if gh auth status >/dev/null 2>&1; then
+    # `grep -F >/dev/null`, never `grep -qF`: -q exits at the first match, which
+    # SIGPIPEs `gh extension list` mid-write, so pipefail reported 141 for an
+    # already-installed extension. Every apply then reinstalled all four and
+    # printed a false "installed" line (gh exits 0 on "already installed").
     for ext in github/gh-stack fchimpan/gh-workflow-stats agynio/gh-pr-review dlvhdr/gh-dash; do
-      gh extension list 2>/dev/null | grep -qF "$ext" && continue
+      gh extension list 2>/dev/null | grep -F "$ext" >/dev/null && continue
       gh extension install "$ext" >/dev/null 2>&1 \
         && echo "cli-tools: installed $ext (gh)" \
         || warn "gh extension install $ext failed"

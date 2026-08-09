@@ -776,6 +776,34 @@ ShellRoot {
         }
     }
 
+    // The disk speed test, reached from the menu (System > Disk Speed Test).
+    // Evictable: a run is a deliberate, occasional errand, and between them
+    // the surface is dead weight. show() starts a measurement, so `hide` uses
+    // deliver — it must never wake the surface just to stop nothing.
+    SurfaceLoader {
+        id: diskSpeedTestLoader
+        evictable: true
+        surfaceSource: shell.moduleRoot + "/Modules/DiskSpeedTest/DiskSpeedTest.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
+    }
+
+    IpcHandler {
+        target: "diskspeedtest"
+
+        function show(): string {
+            shell.dismissBarPanels();
+            diskSpeedTestLoader.summon("show");
+            return "ok";
+        }
+
+        function hide(): string {
+            diskSpeedTestLoader.deliver("hide");
+            return "ok";
+        }
+    }
+
     // The two filmstrip pickers are the heaviest surfaces in the shell —
     // each latches ~40-70 MiB of 768 px tile decodes once browsed — and the
     // rarest-used, so both evict after the grace period.

@@ -1164,6 +1164,14 @@ Direct file-level copies (source path → destination path):
   port (fast.com endpoints, eight parallel curl workers, per-second rates from
   the interface counters); the endpoint list is pulled out with grep instead of
   jq, and the counters come from `/proc/net/dev`.
+- omarchy `bin/omarchy-disk-speedtest` → `bin/disk-speedtest`: direct port
+  (four parallel `dd` workers over NOCOW scratch files, O_DIRECT both ways,
+  per-second MB/s from `/sys/class/block/<dev>/stat`, steady-state mean after a
+  one-second warm-up discard). Only the scratch paths and the default target
+  directory are renamed. Their `shell/Ui/SpeedTestOverlay.qml` hoist is mirrored
+  by generalizing our `NetworkSpeedTestPanel.qml` into `SpeedTestPanel.qml`,
+  which now takes its two dial labels, phase tokens and unit as properties —
+  the network test keeps them as defaults, the disk test overrides them.
 - omarchy `bin/omarchy-dns` → `bin/network-dns`: partial port — their
   `set_connection_dns` / `clear_connection_dns` / `reapply_active_dns_connections`
   nmcli mechanism and their provider-detection heuristic. Their
