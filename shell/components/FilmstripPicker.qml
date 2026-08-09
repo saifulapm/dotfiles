@@ -250,7 +250,12 @@ Scope {
                         id: maskShape
                         anchors.fill: parent
                         visible: false
-                        layer.enabled: true
+                        // Both this mask FBO and the content layer below are
+                        // gated on `nearby`: an off-strip slice is invisible,
+                        // but an enabled layer keeps its texture allocated
+                        // regardless — across a large filtered-out set that
+                        // idles real GPU memory for tiles nothing draws.
+                        layer.enabled: slice.nearby
 
                         Shape {
                             anchors.fill: parent
@@ -285,7 +290,7 @@ Scope {
 
                     Item {
                         anchors.fill: parent
-                        layer.enabled: true
+                        layer.enabled: slice.nearby
                         layer.smooth: true
                         layer.effect: MultiEffect {
                             maskEnabled: true
@@ -327,12 +332,15 @@ Scope {
                             anchors.fill: parent
                             source: slice.sourceActivated && slice.imagePath ? "file://" + slice.imagePath.split("/").map(encodeURIComponent).join("/") : ""
                             fillMode: Image.PreserveAspectCrop
-                            // Their rows carry ImageMagick-rendered
-                            // thumbnails, which they can afford to decode
-                            // synchronously; we have no `magick` here, so
-                            // these are the originals decoded off-thread
-                            // and downscaled to the widest size the strip
-                            // ever draws them at.
+                            // Both callers hand this a 768px cached
+                            // thumbnail (bin/wallpaper-thumbs — omarchy's
+                            // ImageMagick cache rebuilt on ffmpeg), so this
+                            // decode is cheap. The sourceSize cap stays for
+                            // the fallback rows where the helper had to echo
+                            // the original: Qt's PNG decode still fully
+                            // materializes a 4K source before downscaling
+                            // (~110 MiB transient across a browse, measured
+                            // 2026-08-09 — the reason the thumbnails exist).
                             sourceSize.width: pickerRoot.expandedWidth
                             asynchronous: true
                             cache: true

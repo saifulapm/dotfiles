@@ -94,4 +94,12 @@ if ! mv "$new" "$dest"; then
 fi
 
 echo "wallpapers: fetched ${head:0:7} from saifulapm/wallpapers"
+
+# Warm the picker thumbnail cache for the new set (the swap gave every file a
+# fresh mtime, so every cache key changed). Off the interactive path here so
+# the first theme-switcher or wallpaper-picker open never waits on ffmpeg;
+# if this is skipped or fails, the pickers generate on demand instead.
+find "$dest" -mindepth 3 -maxdepth 3 -type f 2>/dev/null |
+  "$HOME/.dotfiles/bin/wallpaper-thumbs" >/dev/null 2>&1 || true
+
 exit 0

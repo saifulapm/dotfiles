@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# wallpaper-thumbs — the picker thumbnail cache omarchy's list.sh keeps with
+# ImageMagick, rebuilt on ffmpeg (which IS installed here; magick is not).
+#
+# Reads wallpaper paths on stdin, one per line, and prints one line per input:
+# the path of a 768px-wide JPEG thumbnail, generated into the cache on first
+# sight, or the original path when the thumbnail cannot be made (missing
+# source, no ffmpeg, decode failure). Callers never need to distinguish.
+#
+# Why 768: the widest the filmstrip ever draws a tile
+# (FilmstripPicker.qml expandedWidth). Decoding the originals instead cost
+# ~110 MiB of transient RSS per theme-switcher browse (measured 2026-08-09):
+# Qt's PNG handler has no scaled-decode path, so a 5120x3414 wallpaper fully
+# materializes (~67 MiB RGBA) before its downscale. A cached thumbnail is
+# ~60 KiB and decodes in one step.
+#
+# Keyed by sha1(path:mtime:size), so an edited or refetched source gets a
+# fresh thumbnail and the stale key is simply never asked for again. The
+# backgrounds tree is wiped and refetched wholesale (run_after_27-wallpapers),
+# which strands the old keys — the >90-day prune below collects them; an
+# actively-used thumbnail it removes regenerates on the next picker open.
+set -uo pipefail
+
+cache="$HOME/.cache/qshell/wallpaper-thumbs"
+mkdir -p "$cache" 2>/dev/null || cache=""
+
+have_ffmpeg=1
+command -v ffmpeg >/dev/null 2>&1 || have_ffmpeg=0
+
+# Cheap enough to run every time: the directory holds tens of files.
+[ -n "$cache" ] && find "$cache" -type f -mtime +90 -delete 2>/dev/null
+
+while IFS= read -r src; do
+  [ -n "$src" ] || continue
+  if [ -z "$cache" ] || [ "$have_ffmpeg" -eq 0 ] || [ ! -f "$src" ]; then
+    printf '%s\n' "$src"
+    continue
+  fi
+  meta="$(stat -c '%Y:%s' "$src" 2>/dev/null)"
+  if [ -z "$meta" ]; then
+    printf '%s\n' "$src"
+    continue
+  fi
+  key="$(printf '%s:%s' "$src" "$meta" | sha1sum | cut -d' ' -f1)"
+  thumb="$cache/$key.jpg"
+  if [ ! -s "$thumb" ]; then
+    # -frames:v 1 makes an animated GIF/WebP contribute its first frame;
+    # 'min(768,iw)' never upscales a source already narrower than a tile.
+    if ! ffmpeg -v error -y -i "$src" -frames:v 1 \
+      -vf "scale='min(768,iw)':-2" -q:v 4 "$thumb" </dev/null 2>/dev/null \
+      || [ ! -s "$thumb" ]; then
+      rm -f "$thumb" 2>/dev/null
+      printf '%s\n' "$src"
+      continue
+    fi
+  fi
+  printf '%s\n' "$thumb"
+done

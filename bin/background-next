@@ -5,7 +5,9 @@
 #
 #   background-next             advance to the next candidate
 #   background-next --peek      print what the advance would choose, change nothing
-#   background-next --list      print the candidates, one path per line
+#   background-next --list      print the candidates, one per line as
+#                               path<TAB>thumbnail (thumbnail column omitted
+#                               only if bin/wallpaper-thumbs falls back)
 #   background-next --current   print the active wallpaper
 #   background-next --set PATH  make PATH the active wallpaper
 #
@@ -39,9 +41,10 @@ dirs=()
 [[ -n $theme_name ]] && dirs+=("$HOME/.local/share/qshell/backgrounds/$theme_name/backgrounds")
 dirs+=("$HOME/Pictures/Wallpapers")
 
-# list.sh's extensions and per-directory sort, minus its thumbnail cache:
-# thumbnails there are pre-rendered by ImageMagick, which is not installed
-# here — the picker decodes the originals at thumbnail size instead.
+# list.sh's extensions and per-directory sort. Their thumbnail cache lives in
+# bin/wallpaper-thumbs (ffmpeg here, ImageMagick there) and is attached only
+# in the --list branch below: the picker draws thumbnails, but the cycle and
+# --set always deal in original paths.
 list() {
   local dir
   for dir in "${dirs[@]}"; do
@@ -70,7 +73,14 @@ apply() {
 peek=0
 case "${1-}" in
 "--list")
-  list
+  # path<TAB>thumbnail — the shape PickerModel.loadRows already reads
+  # (omarchy's own row format): column 1 is what --set applies, column 2 is
+  # what the filmstrip decodes. wallpaper-thumbs echoes the original path
+  # for anything it cannot thumbnail, so column 2 always draws.
+  candidates="$(list)"
+  [[ -n $candidates ]] || exit 0
+  paste <(printf '%s\n' "$candidates") \
+    <(printf '%s\n' "$candidates" | "$(dirname "$0")/wallpaper-thumbs")
   exit 0
   ;;
 "--peek")

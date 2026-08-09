@@ -309,8 +309,13 @@ QtObject {
     function removeByOriginalId(model, originalId) {
         for (let i = model.count - 1; i >= 0; i--) {
             const row = model.get(i);
-            if (row && row.originalId === originalId)
+            if (row && row.originalId === originalId) {
+                // The replacement snapshot caches to its own file (the dest
+                // name carries the timestamp), so the replaced row's copy has
+                // no other referent — without this it stayed on disk forever.
+                maybeDeleteCachedImage(row.image);
                 model.remove(i);
+            }
         }
     }
 
@@ -697,8 +702,14 @@ QtObject {
         property double matchTimestamp: 0
 
         onExited: exitCode => {
-            if (exitCode === 0 && targetUri && root.rewriteCachedImage(targetUri, matchOriginalId, matchTimestamp))
-                root.scheduleHistorySave();
+            if (exitCode === 0 && targetUri) {
+                if (root.rewriteCachedImage(targetUri, matchOriginalId, matchTimestamp))
+                    root.scheduleHistorySave();
+                else
+                    // The row this copy was for is already gone (replaced or
+                    // dismissed while cp ran) — nothing references the file.
+                    root.maybeDeleteCachedImage(targetUri);
+            }
             targetUri = "";
             matchOriginalId = -1;
             matchTimestamp = 0;

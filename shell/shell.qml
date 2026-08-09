@@ -228,6 +228,12 @@ ShellRoot {
         // engine's compile cache is URL-keyed and survives the instance.
         // Only the heavyweight, rarely-used surfaces opt in — the launcher
         // and the bar panels stay warm for latency.
+        //
+        // Released is not returned: glibc keeps freed pages unless the
+        // MALLOC_*_THRESHOLD_ pins in qshell.service are in effect (measured
+        // 2026-08-09: destroying 109 MiB of picker pixmaps returned 0.6 MiB
+        // without them). Eviction alone caps growth — the arena is reused on
+        // the next summon — but only the malloc tuning makes RSS shrink.
         property bool evictable: false
         // 45 s: comparing themes or walking wallpapers closes and reopens
         // within seconds to tens of seconds — well inside this — while a
@@ -805,7 +811,8 @@ ShellRoot {
     }
 
     // The two filmstrip pickers are the heaviest surfaces in the shell —
-    // each latches ~40-70 MiB of 768 px tile decodes once browsed — and the
+    // a browse latches ~30 MiB of 768 px tile decodes (bin/wallpaper-thumbs
+    // keeps that from being ~110 MiB of raw 4K decode) — and the
     // rarest-used, so both evict after the grace period.
     SurfaceLoader {
         id: themesLoader

@@ -19,6 +19,23 @@ ExecStart=/usr/bin/qs
 # orphan-relaunch is what once drew a second stale bar. One supervisor:
 # disable the built-in one, systemd-coredump still records the stack trace.
 Environment=QS_DISABLE_CRASH_HANDLER=1
+# glibc keeps freed heap pages: destroying 109 MiB of evicted picker pixmaps
+# returned 0.6 MiB to the OS (measured 2026-08-09), because freeing a large
+# block silently raises the mmap/trim thresholds toward 32/64 MiB, after
+# which image-decode buffers land in arenas that never shrink. Setting the
+# thresholds pins them at 128 KiB — big transient decodes (a 4K PNG is
+# ~33-66 MiB raw) become individual mmaps, returned the moment they free —
+# and 2 arenas is plenty for a process whose allocation is one GUI thread
+# plus render threads. This is what makes the shell's 45 s surface eviction
+# (shell.qml SurfaceLoader) shrink RSS instead of just capping it.
+Environment=MALLOC_ARENA_MAX=2
+Environment=MALLOC_MMAP_THRESHOLD_=131072
+Environment=MALLOC_TRIM_THRESHOLD_=131072
+# One render thread for every window instead of one per window (the threaded
+# loop gave 18 threads with the bar's panels up — each with its own arenas
+# and scenegraph caches). Verified rendering fine on this compositor; drop
+# this line first if animations ever stutter.
+Environment=QSG_RENDER_LOOP=basic
 # The shell owns org.freedesktop.Notifications and the polkit agent — a crash
 # must bring it back without the pkill-and-relaunch dance (and without the
 # stale-second-bar failure mode a manual crash-relaunch once produced).
