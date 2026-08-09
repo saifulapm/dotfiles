@@ -33,10 +33,18 @@ on = [ "g", "r" ]
 run = 'shell -- ya emit cd "$(git rev-parse --show-toplevel)"'
 desc = "Go to the root of the repository"
 
-# [[manager.prepend_keymap]]
-# on  = "y"
-# run = [ 'shell -- for path in "$@"; do echo "file://$path"; done | wl-copy -t text/uri-list', "yank" ]
-# desc = "Copy the paths to the clipboard"
+# Yazi's builtin `y` fills yazi's own clipboard and nothing else, so `p`
+# pastes in here while every other application still sees an empty selection.
+# Both run: `yank` keeps the in-yazi paste exactly as it was, and the helper
+# mirrors the selection onto the Wayland clipboard — one image as PNG pixels,
+# several images as their bare paths (one per line, which is what makes
+# Claude Code's Ctrl+V attach them all — it ignores a file:// prefix),
+# anything else as file:// URIs for a file manager or upload dialog. The
+# helper runs first, while "$@" is still the selection.
+[[mgr.prepend_keymap]]
+on   = "y"
+run  = [ 'shell -- yazi-yank-clipboard "$@"', "yank" ]
+desc = "Yank, and mirror the selection onto the system clipboard"
 
 [[mgr.prepend_keymap]]
 on   = "T"

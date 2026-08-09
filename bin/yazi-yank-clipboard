@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# yazi-yank-clipboard — mirror a yazi yank onto the Wayland clipboard.
+#
+# yazi's `y` fills yazi's OWN clipboard and nothing else: `p` pastes inside
+# yazi, while wl-paste outside it still reports "Nothing is copied", so no
+# other application ever sees the selection. keymap.toml runs this alongside
+# the builtin `yank` rather than in place of it — the in-yazi paste keeps
+# working untouched, and the same keypress also lands the selection on the
+# system clipboard.
+#
+# A Wayland source serves ONE payload under a single --type, so the selection
+# decides which of three shapes it takes:
+#
+#   one image        ->  the decoded pixels, as image/png
+#   several images   ->  their absolute paths, newline-separated, as text
+#   anything else    ->  file:// URIs, as text/uri-list
+#
+# Why images are not just handed over as-is, and why the multi-image case is
+# paths rather than URIs — both measured against Claude Code on 2026-08-10,
+# which is the consumer that motivated this:
+#
+#   * Its Ctrl+V shells out to `wl-paste -l` and accepts
+#     image/(png|jpeg|jpg|gif|webp|bmp), but the read that follows only ever
+#     tries image/png and then image/bmp. An image/jpeg selection therefore
+#     passes detection and yields a 0-byte file — a silently empty paste. The
+#     widely-posted `wl-copy -t image/png < photo.jpg` trick is worse than it
+#     looks for the same reason: the clipboard then claims PNG while serving
+#     JPEG bytes. So a lone image is genuinely re-encoded, not relabelled.
+#     ffmpeg does the decode because this box ships no imagemagick, the same
+#     call bin/transcode makes.
+#
+#   * It also resolves a pasted PATH whose extension is an image and attaches
+#     the file ("Pasted path has image extension but content is not a
+#     supported image" is its failure branch). One path per line means one
+#     attachment per line, and paths containing spaces work. That is the only
+#     way to get several images across in one paste, since the clipboard
+#     holds exactly one payload. It does NOT understand a file:// prefix —
+#     that pastes as literal text — hence bare paths here.
+#
+# text/uri-list stays the default for everything else because that is what a
+# file-manager copy means: GIMP, Nautilus and browser upload dialogs paste
+# the actual file. wl-copy advertises text/plain off the same bytes, so a
+# terminal paste still gets the URI as text.
+#
+# Not -e: a failed convert or an unreadable file should fall through to a
+# working branch, never abort the yank half of the keybinding.
+set -uo pipefail
+
+(($# > 0)) || exit 0
+
+# RFC 3986 encoding, byte-wise under LC_ALL=C so multi-byte UTF-8 names are
+# escaped per byte rather than mangled. Bash applies an LC_ALL assignment
+# immediately, including a local one, and restores it on return. Literal
+# spaces are the reason this exists — ~/Pictures/Screenshots names them, and
+# an unencoded space terminates a URI early for strict parsers.
+uri_encode() {
+    local LC_ALL=C s=$1 out='' i c
+    for ((i = 0; i < ${#s}; i++)); do
+        c=${s:i:1}
+        case $c in
+        [a-zA-Z0-9/._~-]) out+=$c ;;
+        *)
+            printf -v c '%%%02X' "'$c"
+            out+=$c
+            ;;
+        esac
+    done
+    printf '%s' "$out"
+}
+
+# Both list builders assemble the payload first and only hand it over if it
+# is non-empty: piping straight into wl-copy would replace a perfectly good
+# clipboard with nothing at all the moment every path failed to resolve.
+# Paths and URIs are NUL-free, so unlike the image branch a shell variable
+# can carry them. No trailing newline — it would read as one more, empty
+# entry to whatever parses the list.
+copy_list() {
+    local type=$1 sep='' list='' p
+    shift
+    for p in "$@"; do
+        list+=$sep$p
+        sep=$'\n'
+    done
+    [[ -n $list ]] || exit 0
+    printf '%s' "$list" | wl-copy --type "$type"
+}
+
+# Resolve once, and note whether the selection is images all the way down.
+paths=()
+uris=()
+all_images=1
+for arg in "$@"; do
+    p=$(realpath -- "$arg" 2>/dev/null) || continue
+    paths+=("$p")
+    uris+=("file://$(uri_encode "$p")")
+    if ((all_images)); then
+        if [[ -f $p ]]; then
+            mime=$(file -bL --mime-type -- "$p" 2>/dev/null)
+        else
+            mime=''
+        fi
+        [[ $mime == image/* ]] || all_images=0
+    fi
+done
+
+((${#paths[@]})) || exit 0
+
+if ((all_images)); then
+    if ((${#paths[@]} == 1)); then
+        if [[ $(file -bL --mime-type -- "${paths[0]}") == image/png ]]; then
+            # Already the target format — hand over the bytes untouched
+            # rather than round-tripping them through a re-encode.
+            wl-copy --type image/png <"${paths[0]}" && exit 0
+        else
+            # A temp file, not a pipeline: a failed decode has to be
+            # detectable BEFORE wl-copy takes ownership, or an empty
+            # clipboard silently replaces whatever was there. The bytes also
+            # cannot pass through a shell variable — PNG contains NUL, which
+            # bash cannot hold. -frames:v 1 keeps an animated gif/webp to its
+            # first frame; image2 would otherwise concatenate every frame.
+            tmp=$(mktemp -t yazi-yank-XXXXXX.png) || exit 1
+            trap 'rm -f "$tmp"' EXIT
+            if ffmpeg -loglevel error -y -i "${paths[0]}" -frames:v 1 \
+                -f image2 -c:v png "$tmp" 2>/dev/null && [[ -s $tmp ]]; then
+                # wl-copy drains stdin before forking, so the temp file going
+                # away on EXIT does not strand the daemon now serving it.
+                wl-copy --type image/png <"$tmp" && exit 0
+            fi
+        fi
+        # Undecodable despite the mime — fall through to the URI branch.
+    else
+        copy_list text/plain "${paths[@]}"
+        exit 0
+    fi
+fi
+
+copy_list text/uri-list "${uris[@]}"
