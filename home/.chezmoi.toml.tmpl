@@ -1,4 +1,34 @@
-{{- $machine := promptChoiceOnce . "machine" "Which machine is this" (list "macbook-m2" "mac-mini-m2" "nuc") -}}
+{{- /* Machine identity — detected, not asked (2026-08-10).
+
+  This is not a preference: it is the sync fabric's device id. Shell history
+  is one file per machine inside the synced folder (dot_bashrc.d/20-history.sh,
+  fish conf.d/10-history.fish) and Services/Sync.qml names its snapshot the
+  same way, so two boxes answering the same id collapse into one device and
+  overwrite each other. The hostname cannot supply it — every Asahi install
+  here answers "fedora" — which is why a prompt existed at all.
+
+  Detection instead, because the hardware already says which box this is:
+  x86_64 is the NUC (the only one), and every Apple box publishes its exact
+  model in the device tree ("Apple Mac mini (M2, 2023)" / "Apple MacBook Pro
+  (13-inch, M2, 2022)" — apple,j473 / apple,j493). The prompt stays as the
+  fallback for hardware not listed here, so a fourth machine still installs;
+  it just no longer asks the three known ones a question they can answer
+  themselves. The strings are unchanged, so a machine that answered the
+  prompt before keeps its identity across a re-init. */ -}}
+{{- $machine := "" -}}
+{{- if eq .chezmoi.arch "amd64" -}}
+{{-   $machine = "nuc" -}}
+{{- else if stat "/proc/device-tree/model" -}}
+{{-   $model := lower (output "sh" "-c" "tr -d '\\0' < /proc/device-tree/model") -}}
+{{-   if contains "mac mini" $model -}}
+{{-     $machine = "mac-mini-m2" -}}
+{{-   else if contains "macbook" $model -}}
+{{-     $machine = "macbook-m2" -}}
+{{-   end -}}
+{{- end -}}
+{{- if not $machine -}}
+{{-   $machine = promptChoiceOnce . "machine" "Which machine is this" (list "macbook-m2" "mac-mini-m2" "nuc") -}}
+{{- end -}}
 # The repo lives at ~/.dotfiles on every machine; restore with:
 #   sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply --source ~/.dotfiles <repo-url>
 sourceDir = "~/.dotfiles"

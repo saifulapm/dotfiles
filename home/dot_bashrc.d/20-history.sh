@@ -4,9 +4,10 @@
 # machines can never conflict. bin/qshell-sync moves the folder through the
 # Dropbox hub on a timer; this file is the bash side of the contract.
 #
-# ~/.config/qshell/machine is written by chezmoi from the machine prompt —
-# the hostname is NOT unique across these boxes (every Asahi install answers
-# "fedora"), which is why it cannot be the file name.
+# ~/.config/qshell/machine is written by chezmoi, which detects the box from
+# its arch and device-tree model (.chezmoi.toml.tmpl) — the hostname is NOT
+# unique across these boxes (every Asahi install answers "fedora"), which is
+# why it cannot be the file name.
 
 _qshell_histdir="$HOME/.local/state/qshell/sync/history"
 _qshell_machine="$(cat "$HOME/.config/qshell/machine" 2>/dev/null)"

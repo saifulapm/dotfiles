@@ -17,9 +17,9 @@ import Quickshell.Io
 //
 // `dir` empty (the default) means sync is off, which is also upstream's
 // default. `deviceId` falls back to ~/.config/qshell/machine (chezmoi's
-// machine prompt — every Asahi box here answers "fedora" to hostname, and
-// two machines sharing an id collapse into one device), then the hostname,
-// then $HOST, then $USER.
+// detected machine id — every Asahi box here answers "fedora" to hostname,
+// and two machines sharing an id collapse into one device), then the
+// hostname, then $HOST, then $USER.
 //
 // Where upstream hardcodes model-usage's one payload, this takes named
 // sections: a module calls `publish("providers", {...})` and reads back
