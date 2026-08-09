@@ -106,6 +106,13 @@ output "eDP-1" {
     }
 }
 
+// The NUC's display. niri's auto-scale heuristic reads its DPI and picks a
+// fractional scale, which is wrong for this monitor at this viewing distance
+// — pin it to 1 (2026-08-10). Mode stays auto: only the scale was ever wrong.
+output "DP-3" {
+    scale 1
+}
+
 // Settings that influence how windows are positioned and sized.
 // Find more information on the wiki:
 // https://niri-wm.github.io/niri/Configuration:-Layout
