@@ -14,15 +14,15 @@
     "centerAnchor": "clock",
     "left": [
       "launcher",
-      "workspaces",
-      "window"
+      "window",
+      "workspaces"
     ],
     "center": [
       "indicators",
       {
         "id": "clock",
         "birthYear": 1991,
-        "lifeExpectancy": 60
+        "lifeExpectancy": 70
       },
       "weather",
       "update"

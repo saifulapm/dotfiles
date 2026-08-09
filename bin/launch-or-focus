@@ -2,10 +2,17 @@
 # launch-or-focus — focus an existing window matching a pattern, else launch.
 #
 # Port of omarchy-launch-or-focus (CREDITS.md) onto niri: the pattern is
-# tested word-bounded and case-insensitive against every window's app_id and
-# title (their hyprctl clients semantics); on a hit the newest matching
-# window is focused — highest id wins, the same tie-break the notification
-# click-to-focus path uses — otherwise the launch command runs detached.
+# tested word-bounded and case-insensitive against every window's app_id; on
+# a hit the newest matching window is focused — highest id wins, the same
+# tie-break the notification click-to-focus path uses — otherwise the launch
+# command runs detached.
+#
+# DELIBERATE deviation from upstream (2026-08-09): omarchy also tests the
+# TITLE (their hyprctl clients semantics), and that misfocuses — a terminal's
+# title carries whatever it is working on, so a foot running an agent in
+# ~/.config/emacs is titled "…emacs…", out-ids the real Emacs frame (newest
+# wins) and steals Mod+N; with the daemon frameless it even pre-empts the
+# launch half. app_id is the identity channel; every bind here passes one.
 #
 #   launch-or-focus <pattern> [command...]
 #
@@ -23,8 +30,7 @@ shift
 (($# > 0)) || set -- "$pattern"
 
 id=$(niri msg --json windows | jq -r --arg p "$pattern" \
-  '[.[] | select(((.app_id // "") | test("\\b" + $p + "\\b"; "i"))
-              or ((.title  // "") | test("\\b" + $p + "\\b"; "i")))]
+  '[.[] | select((.app_id // "") | test("\\b" + $p + "\\b"; "i"))]
    | sort_by(.id) | last | .id // empty')
 
 if [[ -n $id ]]; then
