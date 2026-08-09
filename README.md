@@ -71,14 +71,13 @@ after the first apply.
   `gh auth switch`. Then rerun `chezmoi apply` so the gh extensions install.
 - First login for each agent CLI: `claude`, `codex`, `copilot`.
 - `rclone config` — once per remote, per machine: the iCloud remote
-  (interactive Apple 2FA) and, on the Macs, a Dropbox remote (interactive
-  browser OAuth; no aarch64 Dropbox client exists, rclone is the access
-  path there). Session secrets live only in `~/.config/rclone/rclone.conf`,
-  never in this repo. The bar's rclone widgets stay hidden and qshell-sync
-  skips quietly until their remote exists — configuring it is all it takes.
-- Dropbox linking, NUC only: `dropbox start` prints the login URL (the
-  daemon and CLI install themselves; the Macs get nothing — no aarch64
-  Dropbox exists).
+  (interactive Apple 2FA) and the Dropbox remote (interactive browser
+  OAuth). rclone is the ONE Dropbox path on every machine (2026-08-10): the
+  proprietary daemon the NUC used to run is gone, so all three boxes are set
+  up the same way and no aarch64/x86_64 split remains. Session secrets live
+  only in `~/.config/rclone/rclone.conf`, never in this repo. The bar's
+  rclone widgets stay hidden and qshell-sync skips quietly until their remote
+  exists — configuring it is all it takes.
 - cloudflared tunnel credentials — `~/.cloudflared/config.dev.yaml` is
   managed, but `cert.pem` (a PEM private key) and the tunnel's
   `<uuid>.json` (AccountTag + TunnelSecret) are secrets and stay out of the

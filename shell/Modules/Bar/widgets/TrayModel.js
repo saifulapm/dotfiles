@@ -4,6 +4,11 @@
 //
 // Only the widget id differs — theirs is the plugin id "omarchy.dropbox", ours
 // is the registry id "dropbox".
+//
+// Since 2026-08-10 that widget is the rclone-backed one and no Dropbox daemon
+// is installed anywhere, so nothing publishes a Dropbox tray item to suppress.
+// The rule stays: it costs one string compare, and it is what keeps a desktop
+// client — should one ever be run by hand — off the bar twice.
 
 var DEDICATED_WIDGET_ID = "dropbox";
 

@@ -204,20 +204,25 @@ why = "The tailnet joining these three machines, and what the bar's `tailscale` 
 #     sudo dnf config-manager addrepo \
 #       --from-repofile=https://pkgs.tailscale.com/stable/fedora/tailscale.repo
 
-# Dropbox — DECIDED 2026-08-06 (user): installed on the NUC, headless, by
-# run_after_06-dropbox.sh (see [[tool]] dropbox below). The bar's `dropbox`
-# widget is in shell.json's right section and is presence-gated on the CLI,
-# so it renders only where the CLI exists. The two Macs get NOTHING and never
-# can: Dropbox ships no aarch64 Linux daemon at all (x86 emulation on the 16K
-# Asahi kernel is unreliable) — Dropbox access on the Macs, if ever wanted,
-# is an rclone `dropbox` remote like the iCloud one, not the real client.
+# Dropbox — REVERSED 2026-08-10 (user): there is no Dropbox package or tool
+# here at all any more. The proprietary daemon that ran on the NUC (the
+# dropboxd tarball in ~/.dropbox-dist, their python3 CLI, a script-written
+# user unit, all from run_after_06-dropbox.sh) is REMOVED, along with the
+# daemon-backed `dropbox` bar widget and bin/dropbox-status. The one Dropbox
+# path on every machine is now the rclone `Dropbox` remote behind the bar's
+# `dropbox` widget (see rclone below) — which is what the two Asahi Macs
+# always had, since Dropbox ships no aarch64 Linux daemon.
 #
-# The nautilus-dropbox rpm route was REJECTED, not overlooked: it lives in
-# RPM Fusion nonfree (a third-party repo nothing else here needs) and
-# hard-requires nautilus and its GNOME chain, all to obtain a wrapper the
-# headless tarball provides anyway. bin/dropbox-status probes `dropbox-cli`
-# (Arch's name, upstream omarchy's target) then `dropbox` (what the script
-# installs).
+# Why drop a working native client on the one box that could run it: three
+# machines that differ only in how they reach the same files is three setups
+# to remember, debug and document. rclone already carried iCloud and already
+# carried Dropbox for the Macs, and qshell-sync already moves shell history
+# and screenshots through the Dropbox remote — the daemon was the odd one
+# out, not the baseline. run_once_after_29-dropbox-daemon-remove.sh does the
+# uninstall (it deliberately does not touch ~/Dropbox: that is data).
+#
+# The nautilus-dropbox rpm route was REJECTED back then and stays rejected:
+# RPM Fusion nonfree, plus a hard nautilus/GNOME dependency chain.
 #
 # NOT installed, listed for the record: the network panel's speed test needs
 # nothing beyond curl (bin/network-speedtest measures /proc/net/dev deltas
@@ -295,7 +300,7 @@ why = "Removable-drive automounter (omarchy gap item 4, user-picked 2026-08-07):
 name = "rclone"
 category = "optional"
 arch = "all"
-why = "Cloud storage sync — the bar's generalized rclone-remote widget (shell/Modules/Bar/widgets/RcloneRemote*.qml + bin/rclone-remote-status) is built on it: one shared component instanced per remote, today 'icloud' (iclouddrive backend, configured on the MacBook 2026-08-06) and 'dropbox-rclone' (dropbox backend, for the Asahi Macs where no real Dropbox client can exist — the NUC keeps the daemon widget). Reachability + quota probe (`rclone about --json` where the backend supports it, root-listing fallback where not), and `rclone mount` as a transient qshell-rclone-<remote> user unit. Originally installed via rclone.org's install.sh (an rpm-unowned /usr/bin/rclone); this entry moves it to the Fedora package, which will overwrite that unowned binary on the next install run. NOTE: ~/.config/rclone/rclone.conf holds live session secrets and is deliberately NOT in this repo — each remote needs one interactive `rclone config` per machine (Apple 2FA for iCloud, browser OAuth for Dropbox; neither is scriptable), and an instance whose remote is not configured simply stays hidden. bin/qshell-sync (qshell-sync.timer, 15 min) also rides it: shell history and ~/Pictures/Screenshots move through the Dropbox remote as a hub — history as per-machine files via `rclone copy`, screenshots via `rclone bisync` — chosen over iclouddrive for the OAuth token that renews itself (iCloud sessions expire and would silently stall an unattended timer). Services/Sync.qml's model-usage snapshots ride the same script (shell.json's sync block points at ~/.local/state/qshell/sync/model-usage), so the AI panel's numbers merge across machines too"
+why = "Cloud storage sync — the bar's generalized rclone-remote widget (shell/Modules/Bar/widgets/RcloneRemote*.qml + bin/rclone-remote-status) is built on it: one shared component instanced per remote, today 'icloud' (iclouddrive backend, configured on the MacBook 2026-08-06) and 'dropbox' (dropbox backend). Since 2026-08-10 that Dropbox instance is the ONLY Dropbox on any machine — the NUC's proprietary daemon and the widget it fed were removed, so the instance took back the plain 'dropbox' id it had been avoiding. Reachability + quota probe (`rclone about --json` where the backend supports it, root-listing fallback where not), and `rclone mount` as a transient qshell-rclone-<remote> user unit. Originally installed via rclone.org's install.sh (an rpm-unowned /usr/bin/rclone); this entry moves it to the Fedora package, which will overwrite that unowned binary on the next install run. NOTE: ~/.config/rclone/rclone.conf holds live session secrets and is deliberately NOT in this repo — each remote needs one interactive `rclone config` per machine (Apple 2FA for iCloud, browser OAuth for Dropbox; neither is scriptable), and an instance whose remote is not configured simply stays hidden. bin/qshell-sync (qshell-sync.timer, 15 min) also rides it: shell history and ~/Pictures/Screenshots move through the Dropbox remote as a hub — history as per-machine files via `rclone copy`, screenshots via `rclone bisync` — chosen over iclouddrive for the OAuth token that renews itself (iCloud sessions expire and would silently stall an unattended timer). Services/Sync.qml's model-usage snapshots ride the same script (shell.json's sync block points at ~/.local/state/qshell/sync/model-usage), so the AI panel's numbers merge across machines too"
 
 [[pkg]]
 name = "fuse3"
@@ -685,7 +690,7 @@ why = "tar -xJf in run_after_10-prebuilt-binaries.sh spawns the xz binary for wa
 name = "python3"
 category = "core"
 arch = "all"
-why = "run_before_00's own manifest parser (tomllib, 3.11+) and the dropbox CLI on the NUC. dnf5 is C++ and drags no python in, so a minimal install can genuinely lack it; the install script bootstraps it before the first parse (chicken-and-egg, like dnf5-plugins) and this entry keeps the inventory honest"
+why = "run_before_00's own manifest parser (tomllib, 3.11+). dnf5 is C++ and drags no python in, so a minimal install can genuinely lack it; the install script bootstraps it before the first parse (chicken-and-egg, like dnf5-plugins) and this entry keeps the inventory honest"
 
 [[pkg]]
 name = "polkit"
@@ -1293,11 +1298,6 @@ why  = "Bar/OSD/terminal icon glyphs; not packaged in Fedora. Symbols-only (~2 M
 name = "maple-mono"
 via  = "chezmoi external → ~/.local/share/fonts/maple-mono (github.com/subframe7536/maple-font v7.9 MapleMono-TTF.zip, pinned + sha256)"
 why  = "The coding font — terminal, Emacs, and everything else resolving `monospace`, which home/dot_config/fontconfig/conf.d/50-qshell.conf pins to it. User decision 2026-08-06, and deliberately NOT switchable from the Font menu (that picker moves the UI font only). Fedora packages no Maple Mono. The plain TTF build (1.8 MB, ligatures on) rather than MapleMono-NF (21 MB): icon glyphs already come from the symbols-only Nerd Font above, so the patched build would buy nothing. MapleMonoNL-* is the same font without ligatures if that is ever wanted; the -CN builds add Chinese and are ~160 MB"
-
-[[tool]]
-name = "dropbox"
-via  = "run_after_06-dropbox.sh, x86_64 only: dropboxd tarball (dropbox.com/download?plat=lnx.x86_64) into ~/.dropbox-dist + their python3 dropbox.py CLI as ~/.local/bin/dropbox + a script-written user unit keeping the daemon up"
-why  = "Dropbox on the NUC (user decision 2026-08-06), feeding the bar's dropbox widget and panel. Headless on purpose: no RPM Fusion nonfree, no nautilus chain — the proprietary daemon and the official CLI are the whole requirement. The first link is interactive (dropbox start prints a login URL; the widget's login row does the same). No aarch64 build exists, so the Macs are excluded by the script's arch gate"
 
 # Agent CLIs — all installed by run_onchange_after_04-agent-clis.sh (guarded,
 # user-local, no root). Their logins are interactive and deliberately not

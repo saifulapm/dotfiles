@@ -590,13 +590,6 @@ Scope {
         });
     }
 
-    function dropboxService() {
-        return sharedService("dropbox", dropboxServiceComponent, {
-            settings: Qt.binding(() => barRoot.inlineEntryFor("dropbox")),
-            pollingAllowed: Qt.binding(() => barRoot.servicePollingGate("dropbox"))
-        });
-    }
-
     // No gate: the podman-events follower is event-driven (one line per
     // container transition, nothing polls), so — like the dictation
     // follower — it runs for the life of the shell. One instance, one
@@ -616,7 +609,7 @@ Scope {
         return sharedService("dufs", dufsServiceComponent, {});
     }
 
-    // Keyed by widget id, not by type: "icloud" and "dropbox-rclone" are two
+    // Keyed by widget id, not by type: "icloud" and "dropbox" are two
     // remotes, so they keep two services — one per remote, not per screen.
     function rcloneService(id, defaults) {
         return sharedService(id, rcloneServiceComponent, {
@@ -655,11 +648,6 @@ Scope {
     Component {
         id: tailscaleServiceComponent
         TailscaleService {}
-    }
-
-    Component {
-        id: dropboxServiceComponent
-        DropboxService {}
     }
 
     Component {
@@ -718,11 +706,10 @@ Scope {
             "ai": aiComponent,
             "weather": weatherComponent,
             "monitor": monitorComponent,
-            "dropbox": dropboxComponent,
             "devservices": devservicesComponent,
             "dufs": dufsComponent,
             "icloud": icloudComponent,
-            "dropbox-rclone": dropboxRcloneComponent,
+            "dropbox": dropboxComponent,
             "tailscale": tailscaleComponent,
             "spacer": spacerComponent
         })
@@ -2084,14 +2071,6 @@ Scope {
     }
 
     Component {
-        id: dropboxComponent
-        Dropbox {
-            theme: barRoot.theme
-            dropbox: barRoot.dropboxService()
-        }
-    }
-
-    Component {
         id: devservicesComponent
         DevServices {
             theme: barRoot.theme
@@ -2111,11 +2090,13 @@ Scope {
     // widget, and each id carries its per-instance defaults (an inline
     // shell.json settings entry may override them). Distinct ids because
     // `bar open <id>` summons the first matching slot and this map is
-    // one-id-one-component — "icloud" keeps its summon address, and
-    // "dropbox" already belongs to the daemon-backed widget (the NUC's),
-    // so the rclone instance is "dropbox-rclone". The defaults live on
-    // barRoot rather than inline in the component blocks so the shared
-    // service and the widget mark are guaranteed the same object.
+    // one-id-one-component. The Dropbox instance was "dropbox-rclone" while
+    // a second, daemon-backed `dropbox` widget existed for the NUC; that
+    // widget is gone (rclone is the one Dropbox path on every machine now,
+    // 2026-08-10) and the id it was avoiding is free, so this is plain
+    // "dropbox" again. The defaults live on barRoot rather than inline in the
+    // component blocks so the shared service and the widget mark are
+    // guaranteed the same object.
     readonly property var icloudDefaults: ({
             "remote": "iCloud",
             "remoteType": "iclouddrive",
@@ -2130,7 +2111,7 @@ Scope {
             "phrases": ["Courting Cupertino", "Ferrying folders", "Drizzling data", "Raining files", "Syncing the orchard", "Picking apples", "Minding memories", "Whispering to Apple", "Seeding the cloud", "Polishing pixels"]
         })
 
-    readonly property var dropboxRcloneDefaults: ({
+    readonly property var dropboxDefaults: ({
             "remote": "Dropbox",
             "remoteType": "dropbox",
             "label": "Dropbox",
@@ -2149,11 +2130,11 @@ Scope {
     }
 
     Component {
-        id: dropboxRcloneComponent
+        id: dropboxComponent
         RcloneRemote {
             theme: barRoot.theme
-            defaults: barRoot.dropboxRcloneDefaults
-            service: barRoot.rcloneService("dropbox-rclone", barRoot.dropboxRcloneDefaults)
+            defaults: barRoot.dropboxDefaults
+            service: barRoot.rcloneService("dropbox", barRoot.dropboxDefaults)
         }
     }
 

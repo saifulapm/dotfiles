@@ -5,7 +5,7 @@ import "../components"
 // rclone remote — ours, in the visual language of the Dropbox widget (which
 // is omarchy's design; CREDITS.md), grown out of the iCloud widget: one
 // shared component behind every rclone-backed cloud folder on the bar. Each
-// registry id ("icloud", "dropbox-rclone", …) mounts this component with its
+// registry id ("icloud", "dropbox", …) mounts this component with its
 // own `defaults` — remote name, backend type, label, mountpoint, mark —
 // which an inline shell.json settings entry may override key by key. The
 // mark carries the state the way the Dropbox mark does: full foreground

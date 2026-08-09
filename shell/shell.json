@@ -35,7 +35,6 @@
       "devservices",
       "dufs",
       "icloud",
-      "dropbox-rclone",
       "dropbox",
       "tailscale",
       "mic",

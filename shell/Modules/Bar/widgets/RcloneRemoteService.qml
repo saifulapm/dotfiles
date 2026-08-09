@@ -3,7 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "RcloneRemoteModel.js" as Model
 
-// rclone-remote service — ours, in the shape of DropboxService (CREDITS.md),
+// rclone-remote service — ours, in the shape of omarchy's dropbox Service.qml
+// (CREDITS.md; our port of it is gone — rclone is the one Dropbox path now),
 // grown out of the iCloud widget's service: it owns everything the widget and
 // the panel read, for ONE rclone remote named by the instance's `config`
 // (remote, remoteType, label, mountPoint, legacyUnit, glyph/drawnMark,
@@ -29,7 +30,7 @@ import "RcloneRemoteModel.js" as Model
 // keeps reporting an ACTIVE legacy-named unit (the pre-generalization
 // qshell-icloud-mount) until it stops, so an existing mount is adopted, not
 // stranded. The optimistic `_desired` / `mountActive` pair is
-// DropboxService's, so the switch throws on the click rather than when the
+// their dropbox service's, so the switch throws on the click rather than when the
 // FUSE mount settles.
 QtObject {
     id: root
@@ -103,7 +104,7 @@ QtObject {
     function run(localOnly) {
         if (statusProcess.running) {
             // A read asked for while another is still in flight is
-            // remembered, not dropped (DropboxService's pending-full rule).
+            // remembered, not dropped (their dropbox service's pending-full rule).
             if (localOnly)
                 _pendingLocal = true;
             else

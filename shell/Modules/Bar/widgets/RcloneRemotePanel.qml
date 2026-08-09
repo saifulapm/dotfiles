@@ -1,6 +1,6 @@
 import QtQuick
 import "../components"
-import "DropboxModel.js" as Format
+import "RcloneRemoteModel.js" as Format
 
 // rclone-remote panel — ours, in the Dropbox panel's visual language
 // (omarchy's design; CREDITS.md), grown out of the iCloud panel and reshaped

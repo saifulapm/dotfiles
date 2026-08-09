@@ -3,7 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "DevServicesModel.js" as Model
 
-// Dev-services service — ours, in the shape of DropboxService (CREDITS.md):
+// Dev-services service — ours, in the shape of omarchy's dropbox service
+// (CREDITS.md):
 // it owns everything the widget and the panel read about the on-demand dev
 // databases (podman quadlet containers behind systemd-socket-proxyd; the
 // catalog and lifecycle live in DevServicesModel.js). ONE instance however

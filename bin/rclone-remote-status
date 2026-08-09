@@ -2,9 +2,10 @@
 # rclone-remote-status — one snapshot of an rclone remote's local state (and,
 # in full mode, its reachability and quota) as a single JSON object. Grown out
 # of bin/icloud-status, generalized so one helper serves every rclone-backed
-# bar widget; the shape still follows bin/dropbox-status: the shell asks one
-# cheap question at startup and only pays for the expensive one when someone
-# is looking.
+# bar widget; the shape still follows the dropbox status helper this repo used
+# to carry (omarchy's status.py, deleted along with the daemon on 2026-08-10):
+# the shell asks one cheap question at startup and only pays for the expensive
+# one when someone is looking.
 #
 #   rclone-remote-status --remote NAME --type BACKEND \
 #                        [--mountpoint PATH] [--legacy-unit UNIT] [--local]

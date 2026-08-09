@@ -215,7 +215,14 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   app whose own bar widget is in the layout has its tray item suppressed, and
   gets it back the moment that widget leaves the layout.
 - **Dropbox plugin design** from `shell/plugins/panels/dropbox/` (`Panel.qml`,
-  `Service.qml`, `DropboxIcon.qml`): the drawn five-tile Dropbox mark carrying
+  `Service.qml`, `DropboxIcon.qml`). REMOVED 2026-08-10: our daemon-backed
+  port of it (`Dropbox.qml`, `DropboxService.qml`, `DropboxPanel.qml`,
+  `DropboxModel.js`, `bin/dropbox-status`) is gone with the daemon it drove —
+  rclone is the one Dropbox path on every machine now. What survives of the
+  port is `DropboxIcon.qml`, their drawn mark, which the rclone widget wears,
+  and the design language recorded here, which the rclone widget inherited
+  wholesale (next entry). Kept in full because that inheritance is only
+  legible against the original: the drawn five-tile Dropbox mark carrying
   the whole state (full foreground while an authenticated daemon syncs, dimmed
   and darkened while it is paused or logged out) instead of a glyph ladder, the
   bar button's left-opens / right-refreshes / middle-logs-in split, the hero of
@@ -241,15 +248,15 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   status helper split into a cheap local mode and an expensive full one, and
   the simplified j/k/Enter cursor model. It began life as an iCloud-only
   widget and was generalized (2026-08-06) into one component instanced per
-  rclone remote — today `icloud` (iclouddrive) and `dropbox-rclone` (dropbox,
-  the Asahi Macs' access path; the NUC keeps the daemon-backed dropbox
-  widget above) — each registry id carrying its own defaults, overridable
-  from the inline shell.json entry. The rclone-specific deviations from the
+  rclone remote — today `icloud` (iclouddrive) and `dropbox` (dropbox; it was
+  `dropbox-rclone` while the daemon-backed widget held that id, and took the
+  plain one back when that widget was removed on 2026-08-10) — each registry
+  id carrying its own defaults, overridable from the inline shell.json entry. The rclone-specific deviations from the
   Dropbox design: the one network call is `rclone about --json`, so the
   STORAGE section (the "Stored X of Y" idea above, drawn as a fill bar)
   appears exactly when the backend supports `about` (dropbox does) and falls
   back to a root-listing reachability probe when it does not (iclouddrive) —
-  panel open and explicit refresh only, where the dropbox widget keeps
+  panel open and explicit refresh only, where the dropbox widget kept
   upstream's visible-widget poll; the mount is a transient systemd user unit
   (`systemd-run --user --collect`, the `bin/reminder` precedent) rather than
   a vendor daemon, with `mountpoint -q` as the arbiter; there is no
@@ -1275,20 +1282,19 @@ Direct file-level copies (source path → destination path):
   file rather than resolved through a symlink, and the screen size comes from
   `niri msg --json outputs` instead of hyprctl.
 - omarchy `shell/plugins/panels/dropbox/status.py` → `bin/dropbox-status`:
-  direct copy — the `~/.dropbox/info.json` account read, their plan→quota
-  table, the `dropbox-cli status` invocation and its stopped-daemon sniffing,
-  and the single-pass folder walk that totals bytes while keeping the N most
-  recently modified files in a heap. Three additions, each marked in the file:
-  the CLI is looked up as `dropbox-cli` *or* `dropbox` (Fedora's
-  nautilus-dropbox installs the second name), the resolved name is reported
-  back as `cli` so the shell drives the same binary, and `--probe` answers the
-  presence question without walking the folder.
+  direct copy of their account read, plan→quota table, `dropbox-cli status`
+  sniffing and single-pass folder walk. DELETED 2026-08-10 with the daemon it
+  queried — nothing here speaks to a Dropbox client any more.
 - omarchy `shell/plugins/panels/dropbox/Model.js` → `shell/Modules/Bar/widgets/DropboxModel.js`:
   near-verbatim port — the status envelope and its defaults, the
   image/video/document extension tables behind the row glyphs, and the byte,
   percentage, usage-line, relative-time and file-meta formatting. Only
   whitespace changed (house 4-space qmlformat); their glyphs are already
   Material Design codepoints and survive our Nerd Font fallback as they are.
+  DELETED 2026-08-10 with the widget that read it; their `formatBytes`,
+  `formatPercent` and `usageText` live on verbatim in
+  `shell/Modules/Bar/widgets/RcloneRemoteModel.js`, which is what the rclone
+  panel's storage row was using them through.
 - omarchy `shell/plugins/panels/dropbox/DropboxIcon.qml` →
   `shell/Modules/Bar/widgets/DropboxIcon.qml`: verbatim — the five-tile mark
   drawn with `QtQuick.Shapes`, tile geometry and all. It replaces their login
