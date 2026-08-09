@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# qshell-relaunch — restart the shell from inside the shell (the menu's
+# "Relaunch Shell" row, Modules/Menu/MenuTree.js system.relaunch).
+#
+# The row used to be `pkill -x qs; sleep 0.5; exec setsid qs`, written when
+# the shell was a niri spawn-at-startup child and an orphaned bash really did
+# outlive it. Under qshell.service that command is a one-way trip, for two
+# independent reasons (both reproduced 2026-08-10, `qs ipc call menu open
+# restart-shell` → Result=success, ExecMainStatus=15, NRestarts=0, no qs):
+#
+#   * systemd counts SIGTERM as a CLEAN exit, so `pkill` retires the unit
+#     with Result=success and `Restart=on-failure` correctly declines to act;
+#   * the relauncher never gets to run anyway. Menu actions are
+#     Quickshell.execDetached children, and detaching does not leave the
+#     cgroup — `systemd-cgls --user-unit qshell.service` lists every helper
+#     the shell spawns. When the main process goes, KillMode=control-group
+#     SIGTERMs the rest of that cgroup, and `sleep 0.5` is in it.
+#
+# So: ask systemd instead. `--no-block` is the load-bearing flag — it queues
+# the job and returns, leaving the restart to the user manager, which is
+# outside the cgroup about to be torn down. A blocking `systemctl restart`
+# would be killed halfway through waiting for its own job.
+set -uo pipefail
+
+# Are WE inside the unit? The cgroup line is inherited from the qs that
+# spawned this script, so it answers "is the shell that asked for this the
+# service instance" — not merely "is the service running", which is also true
+# while a `just run` instance is being tested alongside it.
+cgroup="$(cat /proc/self/cgroup 2>/dev/null || true)"
+
+if [[ $cgroup == *qshell.service* ]]; then
+  exec systemctl --user restart --no-block qshell.service
+fi
+
+# A hand-run instance (`just run`, a dev checkout): no unit owns it, nothing
+# will bring it back, and the old dance is right — setsid so the replacement
+# does not sit in the dying process's session.
+pkill -x qs
+sleep 0.5
+exec setsid qs

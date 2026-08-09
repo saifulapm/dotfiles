@@ -465,9 +465,12 @@ var TREE = {
         "label": "Relaunch Shell",
         "aliases": ["restart-shell", "reload", "qs"],
         "description": "Restart this shell process",
-        // The bash child is orphaned by the pkill and survives it, so it can
-        // start the replacement in a fresh session.
-        "action": "pkill -x qs; sleep 0.5; exec setsid qs"
+        // bin/qshell-relaunch, not a pkill dance: menu actions run in the
+        // shell's own cgroup, so anything that kills the shell kills the
+        // relauncher with it (and SIGTERM retires the unit as a success, so
+        // Restart=on-failure stays out of it). The script hands the job to
+        // systemd, which is outside that cgroup.
+        "action": "qshell-relaunch"
     },
     // Omarchy files this under Update → Hardware (title "Restart") beside
     // audio/wifi/trackpad rows we have no scripts for; our update is a leaf,
