@@ -14,8 +14,8 @@
     "centerAnchor": "clock",
     "left": [
       "launcher",
-      "window",
-      "workspaces"
+      "workspaces",
+      "window"
     ],
     "center": [
       "indicators",
