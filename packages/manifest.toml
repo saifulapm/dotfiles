@@ -835,6 +835,12 @@ arch = "all"
 why = "Emacs 31 build dep: SVG rendering — modern UI packages (kind-icon, svg-lib) draw with it"
 
 [[pkg]]
+name = "enchant2-devel"
+category = "dev"
+arch = "all"
+why = "Jinx (the Emacs spell checker) is not a plain elisp package — it compiles its own jinx-mod.so against Enchant on first activation, so it needs enchant.h and enchant-2.pc, not just the runtime lib. Undeclared until 2026-08-09, when a fresh Jinx activation died with 'fatal error: enchant.h: No such file or directory': the runtime enchant2 was only ever on disk transitively and the -devel side was never pulled at all. Jinx misreports this as 'Jinx: pkgconf or pkg-config not found', which sends you hunting the wrong package — jinx.el wraps the `pkgconf --cflags --libs enchant-2` call in a bare condition-case, so a missing .pc file (no -devel) and a missing pkgconf binary print the same line; pkgconf itself was present the whole time. No dictionary needs declaring alongside it: enchant2 pulls libhunspell-1.7.so.0 from Fedora's hunspell, which hard-Requires hunspell-en-US, so US English lands even under this repo's global install_weak_deps=False (the en-GB/en-AU/en-CA dicts on this box came from libreoffice-langpack-en, and Jinx defaults to en_US regardless). Distinct from aspell/aspell-en further down — that pair serves terminal tools and Emacs's built-in ispell; Enchant is the separate engine Jinx talks to"
+
+[[pkg]]
 name = "podman"
 category = "dev"
 arch = "all"
