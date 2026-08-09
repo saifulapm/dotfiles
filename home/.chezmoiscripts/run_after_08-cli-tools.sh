@@ -10,6 +10,22 @@ set -uo pipefail
 export PNPM_HOME="${PNPM_HOME:-$HOME/.local/share/pnpm}"
 export PATH="$PNPM_HOME/bin:$HOME/.cargo/bin:$HOME/go/bin:$HOME/.local/bin:$PATH"
 
+# pnpm here is a COREPACK SHIM (node/…/bin/pnpm → corepack/dist/pnpm.js), and
+# that shim's second line is `COREPACK_ENABLE_DOWNLOAD_PROMPT ??= '1'`. Before
+# its first download corepack then asks "? Do you want to continue? [Y/n]" on
+# stderr and blocks reading stdin — whenever stdin is a TTY and CI is unset,
+# which is exactly a console `chezmoi apply`. Every pnpm call below sends
+# stderr to /dev/null, so on the fresh NUC (2026-08-10) that question was
+# INVISIBLE: the apply simply stopped dead after satty's line until a key was
+# pressed. Opting out of the prompt is the documented fix; it does not skip the
+# download, only the question.
+#
+# stdin closed for the same reason 03-dev-toolchain closes it: pnpm's
+# build-script approval prompt (and anything like it a future package manager
+# grows) can only hang an apply that hands it a TTY. Nothing here reads stdin.
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+exec </dev/null
+
 warn() { echo "cli-tools: $*" >&2; }
 
 # ─── pnpm globals ────────────────────────────────────────────────────────────

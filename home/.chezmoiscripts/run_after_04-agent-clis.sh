@@ -36,12 +36,29 @@ fi
 
 # pi installs into the mise-managed node's bin directory, so node must exist —
 # 03-dev-toolchain ran first (name order) and put it there.
+#
+# The installer runs UNDER `mise exec`, not bare (fixed 2026-08-10). Its
+# preflight is a plain `command -v node`, and a chezmoi run script inherits
+# only the PATH of whatever invoked `chezmoi apply` — no mise activation. Apply
+# from an interactive shell (the dev MacBook) and mise's node is already on
+# PATH, so this worked; apply from the fresh-install bootstrap (the NUC) and it
+# is not, so the installer offered to fetch its OWN standalone node, unpacked
+# ~200 MB into ~/.local/share/pi-node and installed pi under that — a second
+# node runtime this repo does not manage, on a PATH nothing adds, so the guard
+# below never saw the pi it had just installed and every apply reran it.
 if command -v mise >/dev/null 2>&1 && mise which node >/dev/null 2>&1; then
   if ! mise exec -- sh -c 'command -v pi' >/dev/null 2>&1; then
-    curl -fsSL https://pi.dev/install.sh | sh \
+    mise exec -- sh -c 'curl -fsSL https://pi.dev/install.sh | sh' \
       && echo "agent-clis: pi installed" \
       || warn "pi install failed"
   fi
+fi
+
+# Leftover from a pre-2026-08-10 apply (see above). Flagged, never deleted:
+# it is a user-writable data dir, and the reclaim is the user's call.
+if [ -d "$HOME/.local/share/pi-node" ]; then
+  warn "~/.local/share/pi-node is a stale standalone node from an older pi install —"
+  warn "  pi now lives next to the mise node; 'rm -rf ~/.local/share/pi-node' reclaims the space"
 fi
 
 if command -v voxtype >/dev/null 2>&1; then

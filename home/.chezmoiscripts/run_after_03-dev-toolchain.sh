@@ -13,6 +13,26 @@ set -uo pipefail
 export PNPM_HOME="${PNPM_HOME:-$HOME/.local/share/pnpm}"
 export PATH="$PNPM_HOME/bin:$HOME/.cargo/bin:$PATH"
 
+# Nothing below may ask a question: a fresh-machine apply is unattended (and
+# when it is not, its prompts are invisible under the redirects). Two of them
+# used to (fresh NUC 2026-08-10), and both are silenced here, not skipped:
+#
+#   1. corepack. pnpm IS a corepack shim, whose second line is
+#      `COREPACK_ENABLE_DOWNLOAD_PROMPT ??= '1'`; before its first download it
+#      then asks "? Do you want to continue? [Y/n]" and blocks on stdin
+#      whenever stdin is a TTY. =0 skips the question, not the download.
+#   2. pnpm's build-script approval. Since pnpm 10 a dependency with a
+#      postinstall is ignored unless approved, interactively — @shopify/cli
+#      brings esbuild, whose postinstall is what puts the real binary in
+#      place, so skipping it is not an option either. --allow-build approves
+#      that one package up front.
+#
+# stdin closed on top of both: an unattended apply must fail loudly, never
+# hang. Nothing here reads it (sudo and the pi installer, which do prompt, use
+# /dev/tty and live in other scripts).
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+exec </dev/null
+
 warn() { echo "dev-toolchain: $*" >&2; }
 
 if command -v mise >/dev/null 2>&1; then
@@ -30,7 +50,7 @@ if command -v mise >/dev/null 2>&1; then
   # Shopify CLI into PNPM_HOME/bin (already on PATH via dot_bashrc.d/10-dev.sh)
   if [ ! -x "$PNPM_HOME/bin/shopify" ] && mise exec -- sh -c 'command -v pnpm' >/dev/null 2>&1; then
     mkdir -p "$PNPM_HOME"
-    mise exec -- pnpm add -g @shopify/cli && echo "dev-toolchain: shopify CLI installed" \
+    mise exec -- pnpm add -g --allow-build=esbuild @shopify/cli && echo "dev-toolchain: shopify CLI installed" \
       || warn "shopify CLI install failed"
   fi
 else
