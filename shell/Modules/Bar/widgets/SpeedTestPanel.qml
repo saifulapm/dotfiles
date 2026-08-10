@@ -63,6 +63,48 @@ PanelWindow {
         return isFinite(value) && value > 0 ? value : 0;
     }
 
+    // Full-scale latch points for the dials, smallest first; the first stop is
+    // the base scale a fresh run starts from. The latch lives HERE rather than
+    // on each dial (omarchy 4d29cbb) so both needles always describe the same
+    // scale — per-dial, a 940 Mbps download and a 40 Mbps upload ended up on a
+    // 1000 dial and a 100 dial, where two needles at the same angle meant
+    // wildly different numbers.
+    property var scaleStops: [100, 250, 500, 1000, 2500, 5000, 10000]
+    property real fullScale: scaleStops[0]
+
+    // A fresh measurement re-ranges from the base scale. Without this, one
+    // unusually fast run would compress every later one for the lifetime of
+    // the shell process.
+    function resetScale() {
+        fullScale = scaleStops[0];
+    }
+
+    // Either reading ranges the whole cluster upward when it approaches the
+    // rim. Never shrinks mid-run; a fresh run just re-sweeps from zero.
+    function expandScale(value) {
+        for (let i = 0; i < scaleStops.length; i++) {
+            if (value <= scaleStops[i] * 0.92) {
+                if (scaleStops[i] > fullScale)
+                    fullScale = scaleStops[i];
+                return;
+            }
+        }
+        fullScale = scaleStops[scaleStops.length - 1];
+    }
+
+    onRunningChanged: if (running)
+        resetScale()
+    onScaleStopsChanged: resetScale()
+    onFirstValueChanged: expandScale(firstValue)
+    onSecondValueChanged: expandScale(secondValue)
+
+    Behavior on fullScale {
+        NumberAnimation {
+            duration: 400
+            easing.type: Easing.OutCubic
+        }
+    }
+
     visible: opened
     // The window is instantiated hidden, so re-acquire focus after mapping and
     // fire the ignition sweep once the surface is actually on screen.
@@ -222,8 +264,8 @@ PanelWindow {
         // The readout stays on the real figure while the ignition sweep drives
         // the needle -- a cluster sweeps its gauges, not its numerals.
         readonly property real reading: ignition.running ? value : shown
-        property real fullScale: 100
-        readonly property var scaleStops: [100, 250, 500, 1000, 2500, 5000, 10000]
+        // One scale for the whole cluster — the latch is on the panel.
+        readonly property real fullScale: root.fullScale
         readonly property real fraction: fullScale > 0 ? Math.max(0, Math.min(1, shown / fullScale)) : 0
         readonly property bool arcVisible: fraction > 0.004
 
@@ -247,35 +289,8 @@ PanelWindow {
             }
         }
 
-        Behavior on fullScale {
-            enabled: !ignition.running
-            NumberAnimation {
-                duration: 400
-                easing.type: Easing.OutCubic
-            }
-        }
-
-        // A fresh measurement re-ranges from the base scale. Without this, one
-        // unusually fast run would compress every later one for the lifetime
-        // of the shell process.
-        onLiveChanged: if (live)
-            fullScale = scaleStops[0]
-
-        onValueChanged: {
-            // Latch the scale upward to the next stop when a reading
-            // approaches the rim. Never shrink mid-run.
-            for (let i = 0; i < scaleStops.length; i++) {
-                if (value <= scaleStops[i] * 0.92) {
-                    if (scaleStops[i] > fullScale)
-                        fullScale = scaleStops[i];
-                    break;
-                }
-                if (i === scaleStops.length - 1)
-                    fullScale = scaleStops[i];
-            }
-            if (!ignition.running)
-                shown = value;
-        }
+        onValueChanged: if (!ignition.running)
+            shown = value
 
         function ignite() {
             ignition.restart();
