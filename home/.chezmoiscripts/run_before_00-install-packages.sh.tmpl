@@ -139,6 +139,21 @@ rpm -q rpmfusion-free-release >/dev/null 2>&1 \
        "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
   || echo "install-packages: rpmfusion-free install failed — full ffmpeg will skip this pass" >&2
 
+# RPM Fusion (nonfree), x86_64 only: the sole route to VAAPI on this NUC's
+# Raptor Lake iGPU. Nothing in Fedora or RPM Fusion free drives Gen12+ Intel —
+# libva-intel-driver in -free is the old i965 for pre-Skylake parts, and Mesa's
+# VA state tracker has no Intel backend at all — so intel-media-driver (iHD)
+# from nonfree is it (user decision 2026-08-11, after libva turned out to be
+# installed here with no driver behind it and every decode fell back to CPU).
+# Gated on arch because the Asahi laptop has no Intel iGPU and would be taking
+# on a whole extra repo for nothing. Same release-rpm bootstrap as -free above.
+if [ "$arch" = x86_64 ]; then
+  rpm -q rpmfusion-nonfree-release >/dev/null 2>&1 \
+    || sudo dnf install --setopt=install_weak_deps=False -y \
+         "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm" \
+    || echo "install-packages: rpmfusion-nonfree install failed — intel-media-driver will skip this pass" >&2
+fi
+
 # One-time migration on machines that already carry ffmpeg-free: the two
 # conflict, so the plain install below would abort with ffmpeg-free present.
 # swap replaces the whole -free lib stack (--allowerasing, per RPM Fusion's
