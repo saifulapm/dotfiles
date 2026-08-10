@@ -86,6 +86,21 @@ desc = "Restore from trash"
 # on  = "q"
 # run = "plugin confirm-quit"
 
+# Terminals can't be drag *sources* — foot only shows niri a grid of cells,
+# so there's nothing for the mouse to pick up. <C-n> hands the selection to
+# ripdrag instead: a small floating window of icons you drag into mpv, GIMP,
+# a browser, or another foot (foot is a drop *target* and pastes the path —
+# that's how images reach Claude Code). -x closes the window once the drag
+# lands, -a adds a drag-them-all button for multi-selections, -n stops a
+# stray click from opening the file, -b labels icons by basename (yazi
+# hands over absolute paths). GTK_THEME picks up the theme-apply-rendered
+# plain-GTK4 recolor (templates/gtk4-theme.css.tmpl) — scoped here because
+# globally it would stomp libadwaita apps.
+[[mgr.prepend_keymap]]
+on   = "<C-n>"
+run  = 'shell -- GTK_THEME=qshell ripdrag -x -a -n -b "$@" 2>/dev/null &'
+desc = "Drag selected files out (ripdrag)"
+
 # Transcode the hovered picture/video for sharing (omarchy wires the same
 # helper into Nautilus's right-click; ours rides bin/transcode in a float —
 # format/resolution picked with gum, result URI lands on the clipboard).
