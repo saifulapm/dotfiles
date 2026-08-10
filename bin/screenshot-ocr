@@ -134,8 +134,13 @@ run_tts() {
     ;;
   piper)
     if command -v pw-play >/dev/null 2>&1; then
+      # -a/--raw is load-bearing: without it pw-play hands even `-` to
+      # libsndfile, which sniffs stdin for a header, finds bare PCM and dies
+      # with "Format not recognised" / "open failed: Input/output error" —
+      # exit 1 and silence. --format/--rate/--channels do NOT imply raw mode.
+      # (pw-play 1.6.8, verified against this exact pipeline 2026-08-10.)
       piper --model "$PIPER_VOICE" --output-raw <"$1" |
-        pw-play --format s16 --rate 22050 --channels 1 -
+        pw-play -a --format s16 --rate 22050 --channels 1 -
     else
       piper --model "$PIPER_VOICE" --output-raw <"$1" |
         ffplay -f s16le -ar 22050 -ac 1 -nodisp -autoexit -loglevel quiet -
