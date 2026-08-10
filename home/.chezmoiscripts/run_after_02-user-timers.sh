@@ -21,7 +21,9 @@ set -euo pipefail
 # clipboard-serve.socket is loopback-only per-connection activation
 # (bin/clipboard-serve); enabling it needs no session — a request arriving
 # outside one just answers empty/500 and the socket stays healthy.
-units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket)
+# librepods.service carries ConditionPathExists on its hand-built binary, so
+# enabling it everywhere is safe — it only runs where someone built the tool.
+units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently

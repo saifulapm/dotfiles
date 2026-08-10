@@ -1,0 +1,260 @@
+diff --git a/linux/librepods-ctl.cpp b/linux/librepods-ctl.cpp
+index 71c32ce..458998d 100644
+--- a/linux/librepods-ctl.cpp
++++ b/linux/librepods-ctl.cpp
+@@ -11,7 +11,9 @@ int main(int argc, char *argv[]) {
+                             << "  noise:off           Disable noise control\n"
+                             << "  noise:anc           Enable Active Noise Cancellation\n"
+                             << "  noise:transparency  Enable Transparency mode\n"
+-                            << "  noise:adaptive      Enable Adaptive mode\n";
++                            << "  noise:adaptive      Enable Adaptive mode\n"
++                            << "  status              Print one JSON state line and exit\n"
++                            << "  subscribe           Print a JSON state line per change until killed\n";
+         return 1;
+     }
+ 
+@@ -23,9 +25,23 @@ int main(int argc, char *argv[]) {
+         return 1;
+     }
+ 
+-    socket.write(QByteArray(argv[1]));
++    const QByteArray cmd(argv[1]);
++    socket.write(cmd);
+     socket.flush();
+     socket.waitForBytesWritten(200);
++
++    if (cmd == "status" || cmd == "subscribe") {
++        QTextStream out(stdout);
++        // status: one reply line. subscribe: lines until the server goes away.
++        while (socket.waitForReadyRead(cmd == "subscribe" ? -1 : 2000)) {
++            out << socket.readAll();
++            out.flush();
++            if (cmd == "status")
++                break;
++        }
++        return 0;
++    }
++
+     socket.disconnectFromServer();
+     return 0;
+ }
+diff --git a/linux/main.cpp b/linux/main.cpp
+index 7b1826b..db2d6ad 100644
+--- a/linux/main.cpp
++++ b/linux/main.cpp
+@@ -1,6 +1,8 @@
+ #include <QSettings>
+ #include <QLocalServer>
+ #include <QLocalSocket>
++#include <QJsonDocument>
++#include <QJsonObject>
+ #include <QApplication>
+ #include <QQmlApplicationEngine>
+ #include <QQmlContext>
+@@ -135,6 +137,39 @@ public:
+     int retryAttempts() const { return m_retryAttempts; }
+     bool hideOnStart() const { return m_hideOnStart; }
+     DeviceInfo *deviceInfo() const { return m_deviceInfo; }
++
++    // One-line JSON snapshot for external consumers (bars, scripts) over the
++    // local control socket. The battery object deliberately matches the shape
++    // raw AAP readers print ({"address","battery":{left|right|case|single:
++    // {level,charging}}}) so a subscriber can drop in where one stood.
++    QByteArray statusJson() const
++    {
++        QJsonObject root;
++        root["address"] = m_deviceInfo->bluetoothAddress().toUpper();
++        root["connected"] = areAirpodsConnected();
++        QJsonObject battery;
++        const Battery *b = m_deviceInfo->getBattery();
++        const auto put = [&](Battery::Component c, const char *name) {
++            const Battery::BatteryState s = b->getState(c);
++            if (s.level == 0 || s.status == Battery::BatteryStatus::Disconnected)
++                return;
++            QJsonObject o;
++            o["level"] = int(s.level);
++            o["charging"] = (s.status == Battery::BatteryStatus::Charging);
++            battery[name] = o;
++        };
++        put(Battery::Component::Left, "left");
++        put(Battery::Component::Right, "right");
++        put(Battery::Component::Case, "case");
++        put(Battery::Component::Headset, "single");
++        root["battery"] = battery;
++        root["noise"] = m_deviceInfo->noiseControlModeInt();
++        QJsonObject ear;
++        ear["primaryInEar"] = m_deviceInfo->getEarDetection()->isPrimaryInEar();
++        ear["secondaryInEar"] = m_deviceInfo->getEarDetection()->isSecondaryInEar();
++        root["ear"] = ear;
++        return QJsonDocument(root).toJson(QJsonDocument::Compact);
++    }
+     QString phoneMacStatus() const { return m_phoneMacStatus; }
+     bool hearingAidEnabled() const { return m_deviceInfo->hearingAidEnabled(); }
+ 
+@@ -456,7 +491,8 @@ private slots:
+ 
+     void onOpenApp()
+     {
+-        QObject *rootObject = parent->rootObjects().first();
++        QObject *rootObject = (parent && !parent->rootObjects().isEmpty())
++            ? parent->rootObjects().first() : nullptr;
+         if (rootObject) {
+             QMetaObject::invokeMethod(rootObject, "reopen", Q_ARG(QVariant, "app"));
+         }
+@@ -468,7 +504,8 @@ private slots:
+ 
+     void onOpenSettings()
+     {
+-        QObject *rootObject = parent->rootObjects().first();
++        QObject *rootObject = (parent && !parent->rootObjects().isEmpty())
++            ? parent->rootObjects().first() : nullptr;
+         if (rootObject) {
+             QMetaObject::invokeMethod(rootObject, "reopen", Q_ARG(QVariant, "settings"));
+         }
+@@ -949,6 +986,8 @@ public:
+     }
+ 
+     void loadMainModule() {
++        if (!parent)
++            return;
+         parent->load(QUrl(QStringLiteral("qrc:/linux/Main.qml")));
+     }
+ 
+@@ -1034,31 +1073,47 @@ int main(int argc, char *argv[]) {
+ 
+     bool debugMode = false;
+     bool hideOnStart = false;
++    bool noUi = false;
+     for (int i = 1; i < argc; ++i) {
+         if (QString(argv[i]) == "--debug")
+             debugMode = true;
+ 
+         if (QString(argv[i]) == "--hide")
+             hideOnStart = true;
+-    }
+ 
+-    QQmlApplicationEngine engine;
++        // Headless: no tray icon, no window — the daemon, the local control
++        // socket and notifications only. For desktops whose own shell is the
++        // UI (status/subscribe consumers).
++        if (QString(argv[i]) == "--no-ui")
++            noUi = true;
++    }
++    if (noUi)
++        qputenv("LIBREPODS_NO_UI", "1");
++
++    // Headless (--no-ui) never loads QML, so don't pay for the engine: it is
++    // only constructed when a window can exist. AirPodsTrayApp tolerates the
++    // null parent — every use is guarded.
+     qmlRegisterType<Battery>("me.kavishdevar.Battery", 1, 0, "Battery");
+     qmlRegisterType<DeviceInfo>("me.kavishdevar.DeviceInfo", 1, 0, "DeviceInfo");
+-    AirPodsTrayApp *trayApp = new AirPodsTrayApp(debugMode, hideOnStart, &engine);
+-    engine.rootContext()->setContextProperty("airPodsTrayApp", trayApp);
++    QQmlApplicationEngine *engine = noUi ? nullptr : new QQmlApplicationEngine;
++    AirPodsTrayApp *trayApp = new AirPodsTrayApp(debugMode, hideOnStart, engine);
++    if (engine)
++        engine->rootContext()->setContextProperty("airPodsTrayApp", trayApp);
+ 
+     // Expose PHONE_MAC_ADDRESS environment variable to QML for placeholder in settings
+     {
+         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+         QString phoneMacEnv = env.value("PHONE_MAC_ADDRESS", "");
+-        engine.rootContext()->setContextProperty("PHONE_MAC_ADDRESS", phoneMacEnv);
++        if (engine)
++            engine->rootContext()->setContextProperty("PHONE_MAC_ADDRESS", phoneMacEnv);
+         // Initialize the visible status in the GUI
+         trayApp->updatePhoneMacStatus(phoneMacEnv.isEmpty() ? QStringLiteral("No phone MAC set") : phoneMacEnv);
+     }
+ 
+-    engine.addImageProvider("qrcode", new QRCodeImageProvider());
+-    trayApp->loadMainModule();
++    if (engine)
++        engine->addImageProvider("qrcode", new QRCodeImageProvider());
++    if (!noUi)
++        trayApp->loadMainModule();
+ 
+     QLocalServer server;
+     QLocalServer::removeServer("app_server");
+@@ -1074,19 +1129,30 @@ int main(int argc, char *argv[]) {
+     }
+     QObject::connect(&server, &QLocalServer::newConnection, [&]() {
+         QLocalSocket* socket = server.nextPendingConnection();
++        // The socket object must die with its connection: one-shot commands
++        // (every ctl invocation) would otherwise leak one QLocalSocket each,
++        // and a vanished subscriber's socket would keep buffering status
++        // pushes forever. deleteLater also tears down the subscribe
++        // connections contexted on the socket.
++        QObject::connect(socket, &QLocalSocket::disconnected, socket, &QObject::deleteLater);
+         // Handles Proper Connection
+-        QObject::connect(socket, &QLocalSocket::readyRead, [socket, &engine, &trayApp]() {
++        QObject::connect(socket, &QLocalSocket::readyRead, [socket, engine, trayApp]() {
+             QString msg = socket->readAll();
+             // Check if the message is "reopen", if so, trigger onOpenApp function
+             if (msg == "reopen") {
+-                LOG_INFO("Reopening app window");
+-                QObject *rootObject = engine.rootObjects().first();
+-                if (rootObject) {
+-                    QMetaObject::invokeMethod(rootObject, "reopen", Q_ARG(QVariant, "app"));
+-                }
+-                else
+-                {
+-                    trayApp->loadMainModule();
++                if (!engine) {
++                    LOG_INFO("Headless (--no-ui): no window to reopen");
++                } else {
++                    LOG_INFO("Reopening app window");
++                    QObject *rootObject = engine->rootObjects().isEmpty()
++                        ? nullptr : engine->rootObjects().first();
++                    if (rootObject) {
++                        QMetaObject::invokeMethod(rootObject, "reopen", Q_ARG(QVariant, "app"));
++                    }
++                    else
++                    {
++                        trayApp->loadMainModule();
++                    }
+                 }
+             }
+             else if (msg == "noise:off") {
+@@ -1101,6 +1167,26 @@ int main(int argc, char *argv[]) {
+             else if (msg == "noise:adaptive") {
+                 trayApp->setNoiseControlModeInt(3);
+             }
++            else if (msg == "status" || msg == "subscribe") {
++                const auto writeStatus = [socket, trayApp]() {
++                    socket->write(trayApp->statusJson() + "\n");
++                    socket->flush();
++                };
++                writeStatus();
++                if (msg == "subscribe") {
++                    // Keep the socket open and push a fresh line on every
++                    // state change. The socket is the context object, so the
++                    // connections die with it and a vanished subscriber costs
++                    // nothing.
++                    QObject::connect(trayApp->deviceInfo()->getBattery(),
++                                     &Battery::batteryStatusChanged, socket, writeStatus);
++                    QObject::connect(trayApp->deviceInfo(),
++                                     &DeviceInfo::noiseControlModeChanged, socket, writeStatus);
++                    QObject::connect(trayApp->deviceInfo()->getEarDetection(),
++                                     &EarDetection::statusChanged, socket, writeStatus);
++                    return;
++                }
++            }
+             else
+             {
+                 LOG_ERROR("Unknown message received: " << msg);
+diff --git a/linux/trayiconmanager.cpp b/linux/trayiconmanager.cpp
+index 738feec..8c537e9 100644
+--- a/linux/trayiconmanager.cpp
++++ b/linux/trayiconmanager.cpp
+@@ -24,7 +24,10 @@ TrayIconManager::TrayIconManager(QObject *parent) : QObject(parent)
+     trayIcon->setContextMenu(trayMenu);
+     connect(trayIcon, &QSystemTrayIcon::activated, this, &TrayIconManager::onTrayIconActivated);
+ 
+-    trayIcon->show();
++    // LIBREPODS_NO_UI (--no-ui): keep the object — it is also the
++    // notification path — but never show the icon.
++    if (!qEnvironmentVariableIsSet("LIBREPODS_NO_UI"))
++        trayIcon->show();
+ }
+ 
+ void TrayIconManager::showNotification(const QString &title, const QString &message)

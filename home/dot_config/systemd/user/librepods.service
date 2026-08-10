@@ -1,0 +1,23 @@
+[Unit]
+Description=LibrePods — AirPods AAP daemon (noise control, ear detection, battery)
+Documentation=https://github.com/librepods-org/librepods
+# Hand-built [[tool]] (see packages/manifest.toml, built with
+# packages/librepods-status-ipc.patch applied): skip cleanly on a machine
+# that has not built it yet, same shape as bt-agent's bluetoothd condition.
+ConditionPathExists=%h/.local/bin/librepods
+
+[Service]
+Type=simple
+ExecCondition=/usr/bin/systemctl is-active --quiet bluetooth.service
+# Owns the AirPods' AAP channel (L2CAP PSM 0x1001) for the whole session —
+# ONE process can hold it, which is why bin/bluetooth-battery defers to this
+# daemon's subscribe stream instead of opening the channel itself whenever
+# the control socket exists. --no-ui (our patch): headless — no tray icon,
+# no window; the bar's own airpods widget/panel is the UI, librepods-ctl
+# (noise:anc etc, status, subscribe) drives it from scripts.
+ExecStart=%h/.local/bin/librepods --no-ui
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
