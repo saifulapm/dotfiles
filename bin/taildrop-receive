@@ -169,7 +169,27 @@ notify_received() { # name...
     body=$(printf '%s\n' "${names[@]}")
   fi
   body+=$'\n'"in ${target_dir/#$HOME/\~}"
-  notify-send -a qshell "$glyph $title" "$body" >/dev/null 2>&1 || true
+
+  # Clicking the toast puts what just arrived on the clipboard. The command
+  # rides along as a hint rather than a libnotify action, so it survives into
+  # the popup file and still works on a toast restored after a shell restart
+  # (Services/Notifs.qml runExecAction) — which matters here, where the
+  # notification can outlive a `just run` or an update by minutes.
+  #
+  # bin/yazi-yank-clipboard is the shared "put these files on the clipboard"
+  # helper, so a Taildrop image and a yazi yank paste identically: images go
+  # over as bare paths (which readers that resolve paths turn into
+  # attachments), everything else as file:// URIs on text/uri-list. ALL the
+  # arrivals go on, not just the five the body lists.
+  local exec_cmd n
+  printf -v exec_cmd 'yazi-yank-clipboard'
+  for n in "${names[@]}"; do
+    printf -v exec_cmd '%s %q' "$exec_cmd" "$target_dir/$n"
+  done
+
+  notify-send -a qshell \
+    --hint=string:qshell-exec:"$exec_cmd" \
+    "$glyph $title" "$body" >/dev/null 2>&1 || true
 }
 
 # A sleep the TERM trap can interrupt without bash announcing the killed child.
