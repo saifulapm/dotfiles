@@ -1562,3 +1562,35 @@ Direct file-level copies (source path → destination path):
   nvim/hunk/opencode hardcodes became $EDITOR / watchexec-driven git diff /
   claude (what this machine actually runs); app-run (same day) is the slice
   half of the uwsm-app pattern their AppLibrary launches through.
+- omarchy `99293aa..0a83590` delta (2026-08-10, user pick — all seven items):
+  `0795ede` the invisible-helix-face fix (their `color0` is background, so
+  cursorline/ruler/picker-highlight/text.focus painted background on
+  background — ours had it identically, and their new `lighter_background`
+  token is exactly our `surface.2`; the fix reaches kakoune too, through
+  bin/helix-to-kak.js). `c4dda58` the clipboard display cap, verbatim
+  including the cut-on-a-line-break so a `file://` URI never truncates into a
+  bogus path. `5a58f79` carrying a toast's click action as a hint
+  (`omarchy-exec` → our `qshell-exec`) rather than a libnotify action, so a
+  popup restored after a shell restart still clicks through; ours launches it
+  via bin/app-run instead of their bare detach, because execDetached children
+  stay in qshell.service's cgroup. `4d29cbb` hoisting the dial scale latch off
+  the individual dial onto the panel so both needles describe one scale.
+  `1ded25f` is the shape, not the code: their recovery asks
+  `hyprctl monitors` for the LOCK state, niri exposes none over IPC, so
+  Modules/Lock/Lock.qml writes a marker naming the WAYLAND_DISPLAY it locked
+  and shell.qml re-arms from it at startup — niri hands over a dead client's
+  lock deliberately (`src/niri.rs`: "locking session (replacing existing dead
+  lock)"), which is what makes the recovery possible at all. `6ddc395` the ssh
+  wrapper — their argv walk for "destination and no remote command", the
+  `ssh -G` RemoteCommand check that fails closed, and the mouse/focus/alt-screen
+  disarm sequence, ported to fish (Ctrl-C stops the retry loop by way of ssh's
+  130 and an interrupted sleep, where their bash used a subshell process
+  group); the keepalive half went into the iCloud-synced ~/.ssh/config, which
+  already had ControlMaster and 60s keepalives, rather than into this repo.
+  `dd61d4a`+`ba7925a`+`f511cf8` herdr alongside tmux: the layout functions
+  `hdl/hds/hdlm/hsl` are their bash ones in fish (including the
+  ceil(sqrt(n))-column swarm tiling and the ratio-per-split arithmetic, with
+  the same $EDITOR/watchexec/claude substitutions our tmux twins already
+  make), but the config is written against `herdr --default-config` rather
+  than copied — theirs mirrors THEIR tmux.conf, ours mirrors ~/.tmux.conf,
+  which binds a different set.
