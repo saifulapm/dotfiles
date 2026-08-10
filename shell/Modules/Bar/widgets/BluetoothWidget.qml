@@ -39,8 +39,17 @@ BarIcon {
         return "󰂯";     // bluetooth
     }
 
-    visible: adapter !== null
+    // The hold keeps the widget mounted across a bluetoothd restart
+    // (Restart=on-failure brings it back inside a second); only an adapter
+    // that stays gone past the grace actually hides it.
+    visible: adapter !== null || adapterHold.running
     dimmed: !adapter || !adapter.enabled
+    onAdapterChanged: adapter === null ? adapterHold.restart() : adapterHold.stop()
+
+    Timer {
+        id: adapterHold
+        interval: 4000
+    }
     tooltipText: {
         if (!adapter || !adapter.enabled)
             return "Bluetooth off";

@@ -128,9 +128,25 @@ BarPanel {
         panel.clampCursor();
     }
 
+    // Dummy Output (auto_null) is what PipeWire parks the default on while
+    // the real devices are gone, so it does not count as a device here.
+    function realDeviceCount(list) {
+        return list.filter(n => n && String(n.name || "") !== "auto_null").length;
+    }
+
     function scheduleRefresh() {
-        if (panel.opened)
-            refreshTimer.restart();
+        if (!panel.opened)
+            return;
+        // Gains settle at 75ms as before. A shrinking device list gets held
+        // back: a wireplumber restart drops every sink and source and then
+        // rebuilds them within a second or two, and committing the shrink
+        // immediately renders the AirPods -> Dummy -> rebuilt cycle as
+        // flapping. If the devices are genuinely gone the hold expires and
+        // the honest shrink commits.
+        const shrinking = panel.realDeviceCount(panel.audioSinks) < panel.realDeviceCount(panel.displaySinks)
+            || panel.audioSources.length < panel.displaySources.length;
+        refreshTimer.interval = shrinking ? 1500 : 75;
+        refreshTimer.restart();
     }
 
     Timer {

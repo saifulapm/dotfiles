@@ -14,7 +14,25 @@ QtObject {
     readonly property real volume: sink && sink.audio ? sink.audio.volume : 0
     readonly property bool muted: sink && sink.audio ? sink.audio.muted : false
     readonly property bool micMuted: source && source.audio ? source.audio.muted : false
-    readonly property bool ready: Pipewire.ready && sink !== null
+
+    // Latched, not live: a wireplumber restart tears the whole graph down and
+    // rebuilds it inside a few seconds, and every widget bound to `ready`
+    // would blink out with it. Becoming ready propagates immediately; losing
+    // the sink only propagates if it stays lost past the hold.
+    readonly property bool readyNow: Pipewire.ready && sink !== null
+    property bool ready: false
+    onReadyNowChanged: {
+        if (readyNow) {
+            readyHold.stop();
+            ready = true;
+        } else {
+            readyHold.restart();
+        }
+    }
+    property Timer readyHold: Timer {
+        interval: 4000
+        onTriggered: root.ready = root.readyNow
+    }
 
     // An application holds the microphone: any live capture stream, minus the
     // asahi-audio effect chain's own streams and the shell's mic-meter node
