@@ -369,6 +369,12 @@ QtObject {
             body: row.body,
             image: row.image,
             glyph: row.glyph || "",
+            // Carried like every other role: this is the entry the history
+            // center hands to invokeEntryDefault, and a row that loses its
+            // exec here is a row whose click silently does nothing. It is
+            // also the pending→past migration in markAllSeen, so dropping it
+            // would disarm a notification just for being marked seen.
+            exec: row.exec || "",
             urgency: row.urgency,
             expireTimeout: row.expireTimeout || 0,
             timestamp: row.timestamp

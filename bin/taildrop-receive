@@ -187,7 +187,14 @@ notify_received() { # name...
     printf -v exec_cmd '%s %q' "$exec_cmd" "$target_dir/$n"
   done
 
-  notify-send -a qshell \
+  # -a Taildrop, NOT -a qshell: NotificationLogic.isEphemeralApp treats
+  # "qshell" as our own action feedback and keeps it out of the history
+  # buckets entirely, so the toast is the only chance to click it — a few
+  # seconds, and the copy action is gone with it. A file someone sent you is
+  # an event worth looking back at, not feedback, so it belongs in the
+  # notification centre, where the row stays clickable (NotifsPanel routes it
+  # through invokeEntryDefault, which runs the same command).
+  notify-send -a Taildrop \
     --hint=string:qshell-exec:"$exec_cmd" \
     "$glyph $title" "$body" >/dev/null 2>&1 || true
 }
