@@ -32,6 +32,30 @@ connected device and terminates it when the device disconnects
 (Modules/Bar/widgets/BtBatteryService.qml), so the lifetime is owned by BlueZ's
 own connect/disconnect events.
 
+LibrePods (2026-08-11): when the librepods daemon runs it owns the AAP channel
+— the AirPods accept ONE connection on PSM 0x1001, and whichever process gets
+there first starves the other.  So whenever the daemon's control socket exists
+this reader NEVER opens AAP itself, even before the daemon has reached the
+device: stealing the channel would lock the daemon out permanently, losing ANC
+control to gain nothing.  Instead it sends "subscribe" (our patch, shipped as
+packages/librepods-status-ipc.patch and upstreamable) and relays the daemon's
+push stream, re-shaped to exactly the JSON this script always printed — the
+shell's BtBatteryService cannot tell the difference.  A device the daemon
+never manages simply produces no lines, the same visible result as exit 3.
+
+The subtle part is the two transitions, both measured going wrong before they
+were written this way (2026-08-11).  Stream EOF does NOT mean "take AAP now":
+it is usually the daemon restarting (Restart=on-failure brings it back inside
+seconds), and a reader that grabs the channel in that window wins a race the
+daemon cannot win back — the device keeps serving the reader's connection and
+silently ignores the daemon's control writes, which read as "ANC switching is
+broken" with nothing in any log.  So EOF waits out a 15 s grace for the socket
+to return before falling back.  Symmetrically, once in the AAP path a 30 s
+idle beat checks whether the daemon has appeared (enabled later, first build
+on this machine) and HANDS THE CHANNEL OVER — closes AAP, resubscribes — so
+enabling librepods never requires reconnecting the AirPods or reloading the
+shell.  That beat is an existence check on a socket path, not a data poll.
+
 Usage: bluetooth-battery <address> [--once]
 
   --once   print the first battery reading and exit (for probing by hand)
@@ -42,7 +66,9 @@ accessory, or not connected), 1 unexpected error.
 
 import errno
 import json
+import os
 import re
+import select
 import socket
 import sys
 import time
@@ -104,6 +130,73 @@ def parse_battery(packet):
     return out
 
 
+def librepods_socket():
+    """The librepods daemon's control socket, or None while it is not running.
+
+    Qt's QLocalServer puts relative server names in the temp dir (measured:
+    /tmp/app_server even with XDG_RUNTIME_DIR set), but check the runtime dir
+    first in case a future Qt moves it where it belongs.
+    """
+    runtime = os.environ.get("XDG_RUNTIME_DIR", "")
+    for path in ((runtime + "/app_server") if runtime else "", "/tmp/app_server"):
+        if path and os.path.exists(path):
+            return path
+    return None
+
+
+def librepods_stream(path, address, once):
+    """Relay the daemon's subscribe stream as this script's own JSON shape.
+
+    Returns when the daemon goes away (stream EOF) so the caller can fall
+    back to the direct AAP path; raises OSError if the socket refuses, which
+    the caller treats the same way.
+    """
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(5)
+    sock.connect(path)
+    sock.send(b"subscribe")
+    sock.settimeout(None)
+
+    last = None
+    buf = b""
+    while True:
+        try:
+            chunk = sock.recv(4096)
+        except OSError:
+            return
+        if not chunk:
+            return
+        buf += chunk
+        while b"\n" in buf:
+            raw, buf = buf.split(b"\n", 1)
+            try:
+                parsed = json.loads(raw)
+            except ValueError:
+                continue
+            # The stream fires on ear/noise changes too; reducing to the
+            # battery shape before the dedupe keeps those from waking the
+            # shell with an unchanged reading.
+            if parsed.get("address") != address or not parsed.get("battery"):
+                continue
+            line = json.dumps({"address": address, "battery": parsed["battery"]},
+                              sort_keys=True)
+            if line != last:
+                last = line
+                print(line, flush=True)
+            if once:
+                return
+
+
+def wait_for_librepods(seconds):
+    """True if the daemon's socket (re)appears within `seconds`."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        time.sleep(3)
+        if librepods_socket():
+            return True
+    return False
+
+
 def connect(address):
     """L2CAP PSM 0x1001, with a short bounded retry ladder."""
     last = None
@@ -139,6 +232,30 @@ def main():
         return 1
     address = args[0].upper()
 
+    # librepods first, always, while its socket exists — see the module
+    # docstring for why this must not race it for the AAP channel, and why
+    # stream EOF waits before falling back.
+    while True:
+        daemon = librepods_socket()
+        if daemon:
+            try:
+                librepods_stream(daemon, address, once)
+                if once:
+                    return 0
+            except OSError:
+                pass
+            if wait_for_librepods(15):
+                continue
+
+        result = aap_session(address, once)
+        if result != "handover":
+            return result
+        # The daemon appeared while this reader held the channel: it was
+        # closed in aap_session, subscribe on the next pass.
+
+
+def aap_session(address, once):
+    """The original direct reader; returns an exit code, or "handover"."""
     try:
         sock = connect(address)
     except OSError as exc:
@@ -157,10 +274,17 @@ def main():
         sys.stderr.write("bluetooth-battery: handshake failed: %s\n" % exc)
         return 1
 
-    # Block indefinitely from here: every further line is a device push.
+    # Block from here: every further line is a device push. The 30 s select
+    # beat exists only to notice a daemon that started after this reader took
+    # the channel — see the module docstring.
     sock.settimeout(None)
     last = None
     while True:
+        if not select.select([sock], [], [], 30.0)[0]:
+            if librepods_socket():
+                sock.close()
+                return "handover"
+            continue
         try:
             packet = sock.recv(1024)
         except OSError:

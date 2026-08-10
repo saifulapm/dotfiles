@@ -27,6 +27,11 @@ import Quickshell.Bluetooth
 // an AAP endpoint refuses the channel and the helper exits 3 within a few
 // seconds. That is cheaper and more honest than guessing from a name the user
 // can rename.
+//
+// When the librepods daemon runs (librepods.service, [[tool]] librepods) it
+// owns the AAP channel, and the helper transparently relays that daemon's
+// subscribe stream instead of opening AAP itself — same JSON, same lifetime,
+// nothing here changes. See bin/bluetooth-battery's docstring.
 QtObject {
     id: root
 
