@@ -10,6 +10,7 @@ alias cd zd
 alias ll "lsd -l"
 alias lt "lsd --tree"
 alias ta "tmux attach"
+alias h herdr # bare `herdr` launches or attaches, so this is herdr's `ta`
 
 # Directories
 alias .. "cd .."

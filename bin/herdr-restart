@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# herdr-restart — reload a running herdr server's config (omarchy's
+# omarchy-restart-herdr, CREDITS.md).
+#
+# The config is a chezmoi symlink into ~/.dotfiles, so an edit is live on disk
+# immediately but the server keeps the copy it parsed at startup. This is the
+# poke. Nothing to do when no server is running: the next `herdr` reads the
+# file fresh.
+set -uo pipefail
+
+command -v herdr >/dev/null 2>&1 || { echo "herdr-restart: herdr is not installed" >&2; exit 1; }
+
+[[ $(herdr status server --json 2>/dev/null | jq -r '.running') == "true" ]] || exit 0
+
+reload=$(herdr server reload-config)
+
+# Diagnostics (unknown keys, bindings that failed to parse) and the error
+# message, if any, are the whole point of running this over `herdr` restart.
+jq -r '.result.diagnostics[]?, (.error.message | select(. != null))' <<<"$reload" >&2
+
+[[ $(jq -r '.result.status // "failed"' <<<"$reload") == "failed" ]] && exit 1
+exit 0

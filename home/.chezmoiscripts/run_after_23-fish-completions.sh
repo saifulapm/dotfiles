@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fish completions for tools that can only SELF-generate — stripe today.
+# fish completions for tools that can only SELF-generate — stripe and herdr.
 # Regenerated into ~/.config/fish/completions on every apply (that dir also
 # holds the chezmoi-symlinked static completions; chezmoi never deletes
 # unmanaged files, so the two coexist).
@@ -13,9 +13,9 @@
 # bash-only in the Fedora build — fish's shipped file covers it.
 set -uo pipefail
 
-# stripe lives in ~/.local/bin (run_after_10), which bash sessions do NOT
-# have on PATH — without this export the guard below never saw it on a fresh
-# machine and the completions were silently never generated.
+# stripe and herdr live in ~/.local/bin (run_after_10), which bash sessions do
+# NOT have on PATH — without this export the guards below never saw them on a
+# fresh machine and the completions were silently never generated.
 export PATH="$HOME/.local/bin:$PATH"
 
 warn() { echo "fish-completions: $*" >&2; }
@@ -33,6 +33,20 @@ if command -v stripe >/dev/null 2>&1; then
     warn "stripe completion generation failed"
   fi
   rm -rf "$tmp"
+fi
+
+# herdr writes to stdout, so no scratch dir — but do NOT redirect straight
+# into the destination: a failed run would leave a truncated file that fish
+# then sources on every prompt.
+if command -v herdr >/dev/null 2>&1; then
+  tmp="$(mktemp)"
+  if herdr completion fish >"$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+    mv -f "$tmp" "$dest/herdr.fish"
+    chmod 644 "$dest/herdr.fish"
+    echo "fish-completions: herdr.fish regenerated"
+  else
+    rm -f "$tmp"; warn "herdr completion generation failed"
+  fi
 fi
 
 exit 0

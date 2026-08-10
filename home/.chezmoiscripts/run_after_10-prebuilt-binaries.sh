@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tools Fedora does not package whose upstreams ship linux binaries for both
 # our arches (asset names verified against the GitHub API 2026-08-07, jj and
-# witr 2026-08-08, lazysql 2026-08-08): watchexec, hurl, cloudflared, stripe,
-# ouch, usql, jj, witr, lazysql.
+# witr 2026-08-08, lazysql 2026-08-08, herdr 2026-08-10): watchexec, hurl,
+# cloudflared, stripe, ouch, usql, jj, witr, lazysql, herdr.
 # Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
 #
 # GitHub's unauthenticated API allows 60 requests/hour per IP — ten here
@@ -143,6 +143,21 @@ fi
 if ! command -v lazysql >/dev/null 2>&1; then
   larch="arm64"; [ "$arch" = "x86_64" ] && larch="x86_64"
   fetch_tar jorgerojas26/lazysql "lazysql_Linux_${larch}\\.tar\\.gz$" lazysql lazysql
+fi
+
+# herdr — agent-aware multiplexer, shipped ALONGSIDE tmux, not replacing it
+# (omarchy dd61d4a did the same). Bare binary; upstream names the arches the
+# way uname does, so no translation table. Deliberately not via mise: a shim
+# there would shadow this client with a stale wire protocol, which is the
+# exact trap omarchy's migration 1786273938 backs out of.
+if ! command -v herdr >/dev/null 2>&1; then
+  url="$(latest_asset herdrdev/herdr "^herdr-linux-${arch}$")"
+  if [ -n "$url" ] && curl -fsSL -o "$bindir/herdr.tmp" "$url"; then
+    chmod 755 "$bindir/herdr.tmp" && mv "$bindir/herdr.tmp" "$bindir/herdr"
+    echo "prebuilt: installed herdr"
+  else
+    rm -f "$bindir/herdr.tmp"; warn "herdr install failed"
+  fi
 fi
 
 exit 0
