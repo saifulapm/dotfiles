@@ -1,0 +1,13 @@
+[Unit]
+Description=Clipboard HTTP endpoint (per-connection activation)
+# Loopback only, on purpose: the tailnet side is `tailscale serve --http=80
+# → 127.0.0.1:9411` (wired by run_after_05-tailscale.sh), which terminates
+# inside tailscaled — no port on any real interface, nothing for firewalld.
+# The handler and the callers are documented in bin/clipboard-serve.
+
+[Socket]
+ListenStream=127.0.0.1:9411
+Accept=yes
+
+[Install]
+WantedBy=sockets.target

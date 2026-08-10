@@ -1,0 +1,20 @@
+[Unit]
+Description=Push local clipboard changes to the other machines
+# Same session-service shape as qshell.service: needs the Wayland socket,
+# starts with the graphical session, stops with it, never outlives it.
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Slice=session.slice
+# wl-paste blocks on the Wayland data-device protocol and wakes only when
+# the selection actually changes — no polling. What gets pushed, to whom,
+# and the echo guard live in bin/clipboard-sync-push.
+ExecStart=/usr/bin/wl-paste --type text --watch %h/.dotfiles/bin/clipboard-sync-push
+Restart=on-failure
+RestartSec=5
+Nice=10
+
+[Install]
+WantedBy=graphical-session.target

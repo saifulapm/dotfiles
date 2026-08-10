@@ -1,0 +1,16 @@
+[Unit]
+Description=Clipboard HTTP request handler
+# Instances are per-connection and normally gone in milliseconds; never let
+# them pile up in systemctl output.
+CollectMode=inactive-or-failed
+
+[Service]
+ExecStart=%h/.dotfiles/bin/clipboard-serve
+StandardInput=socket
+StandardError=journal
+# Backstop for a client that connects and stalls mid-request; the handler's
+# own 10 s read timeouts give up first. The wl-copy that actually holds the
+# clipboard is NOT under this cap — the handler detaches it into its own
+# transient unit precisely so this instance can die freely.
+RuntimeMaxSec=30
+Nice=10

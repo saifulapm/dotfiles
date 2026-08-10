@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# clipboard-sync-push — one local copy, pushed to the other machines.
+#
+# clipboard-sync.service runs `wl-paste --type text --watch` over this
+# script, so it fires once per selection change with the new text on stdin
+# and posts it to every peer's clipboard-serve endpoint over the tailnet.
+# The receiving side (bin/clipboard-serve) records what it writes to the
+# shared .last file and skips bytes its clipboard already holds; this script
+# skips content matching that same file — between the two, a copy crosses
+# the wire exactly once and never echoes back.
+#
+# Peers are discovered from tailscale, not configured: every ONLINE Linux
+# node on the tailnet gets the copy. All these machines run the same
+# dotfiles setup — and the same local hostname, which tailscale dedupes to
+# fedora, fedora-1, … — so the node list IS the peer list, and self is
+# excluded for free (.Peer never contains the asking machine; a hostname
+# check could not tell these boxes apart anyway). A new machine joins the
+# sync the moment `chezmoi apply` + `tailscale up` finish there; an online
+# node without clipboard-serve just refuses the connection instantly. One
+# LocalAPI status call per copy, nothing polls.
+#
+# What never leaves the machine: empty selections, anything over 1 MiB, and
+# password-manager selections — the same two markers clipboard-capture
+# honours (wl-paste's CLIPBOARD_STATE=sensitive and the KDE hint).
+set -uo pipefail
+
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+last="$runtime/clipboard-sync.last"
+max_bytes=1048576
+
+tmp=$(mktemp -p "$runtime" clipboard-push.XXXXXX) || exit 0
+trap 'rm -f "$tmp"' EXIT
+cat >"$tmp"
+
+[[ -s $tmp ]] || exit 0
+(($(stat -c %s "$tmp") <= max_bytes)) || exit 0
+
+[[ ${CLIPBOARD_STATE:-} == sensitive ]] && exit 0
+types=$(wl-paste --list-types 2>/dev/null || true)
+grep -qx 'x-kde-passwordManagerHint' <<<"$types" && exit 0
+
+# The copy we just received from a peer — pushing it back out is the echo.
+cmp -s "$tmp" "$last" 2>/dev/null && exit 0
+cp "$tmp" "$last" 2>/dev/null || true
+
+peers=$(tailscale status --json 2>/dev/null \
+  | jq -r '.Peer[]? | select(.OS == "linux" and .Online) | .DNSName' 2>/dev/null) || peers=""
+
+for peer in $peers; do
+  # Fire-and-forget: a peer going down mid-push is normal (connect gives up
+  # at 1 s) and must never delay the watcher or say anything about it. The
+  # relay header tells the receiver this copy is reaching every peer
+  # already, so it must not re-broadcast it (bin/clipboard-serve explains
+  # the ping-pong this prevents — and why the iPhone's posts deliberately
+  # lack the header). DNSName arrives with a trailing dot; curl accepts it
+  # stripped.
+  curl -s -o /dev/null --connect-timeout 1 --max-time 5 \
+    -H 'Content-Type: text/plain; charset=utf-8' \
+    -H 'X-Clipboard-Relay: 1' \
+    --data-binary @"$tmp" "http://${peer%.}/" &
+done
+# The curls read the body file; the EXIT trap must not remove it under them.
+wait

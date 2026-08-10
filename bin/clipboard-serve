@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# clipboard-serve — answer one HTTP request against this machine's clipboard.
+#
+# Runs inetd-style: clipboard-serve.socket listens on 127.0.0.1:9411 with
+# Accept=yes, so systemd hands each connection to a fresh clipboard-serve@
+# instance with the socket as stdin/stdout, and nothing runs while nobody is
+# asking. The tailnet reaches the loopback port through `tailscale serve
+# --http=80` (wired by run_after_05-tailscale.sh): tailscaled terminates the
+# connection inside the WireGuard tunnel, so no port opens on any real
+# interface, firewalld needs nothing, and only this tailnet's own devices
+# can connect at all.
+#
+#   GET  /  → 200, body = the clipboard's exact bytes (empty when it holds
+#             no text)
+#   POST /  → body becomes the clipboard
+#
+# Callers: the iPhone shortcuts and the other machines' clipboard-sync
+# watchers — docs/clipboard-2026-08-10.md has both.
+set -uo pipefail
+
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+# Shared with bin/clipboard-sync-push: a relayed POST records its body here,
+# and the push watcher skips content that matches. A received copy fires the
+# local watcher like any other selection change, and this file is what keeps
+# it from being broadcast a second time. (The full relay/fanout rules sit at
+# the POST handler below.)
+last="$runtime/clipboard-sync.last"
+max_bytes=1048576
+
+respond() { # status-line body
+  local status=$1 body=$2
+  printf 'HTTP/1.1 %s\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' \
+    "$status" "${#body}" "$body"
+}
+
+# A client that connects and then says nothing must not park a handler
+# forever: every read gets 10 s, and clipboard-serve@.service caps the whole
+# instance at RuntimeMaxSec=30 as the backstop.
+read -r -t 10 method _target _proto || exit 0
+case $method in
+GET | POST) ;;
+*)
+  respond "405 Method Not Allowed" $'method not allowed\n'
+  exit 0
+  ;;
+esac
+
+length=""
+expect=""
+relay=""
+xff=""
+while IFS= read -r -t 10 header; do
+  header=${header%$'\r'}
+  [[ -n $header ]] || break
+  case ${header,,} in
+  content-length:*)
+    length=${header#*:}
+    length=${length//[[:space:]]/}
+    ;;
+  expect:*100-continue*) expect=1 ;;
+  x-clipboard-relay:*) relay=1 ;;
+  # tailscale serve fronts every connection from 127.0.0.1, but forwards the
+  # real caller's tailnet IP here — it only feeds the arrival toast's name.
+  x-forwarded-for:*)
+    xff=${header#*:}
+    xff=${xff//[[:space:]]/}
+    xff=${xff%%,*}
+    ;;
+  esac
+done
+
+if [[ $method == GET ]]; then
+  tmp=$(mktemp -p "$runtime" clipboard-serve.XXXXXX) || exit 1
+  trap 'rm -f "$tmp"' EXIT
+  # --no-newline: the body is the clipboard's bytes, not a printout of them.
+  # No text on the clipboard (or no Wayland session) is an empty 200, not an
+  # error — the pulling side just gets nothing.
+  wl-paste --no-newline --type text >"$tmp" 2>/dev/null || : >"$tmp"
+  printf 'HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %s\r\nConnection: close\r\n\r\n' \
+    "$(stat -c %s "$tmp")"
+  cat "$tmp"
+  exit 0
+fi
+
+[[ $length =~ ^[0-9]+$ ]] || {
+  respond "411 Length Required" $'content-length required\n'
+  exit 0
+}
+((length <= max_bytes)) || {
+  respond "413 Content Too Large" $'too large\n'
+  exit 0
+}
+((length > 0)) || {
+  respond "200 OK" $'empty, ignored\n'
+  exit 0
+}
+
+# curl sends Expect: 100-continue for bodies over 1 KiB and waits ~1 s for
+# the go-ahead before sending anyway; answering it removes the stall.
+[[ -z $expect ]] || printf 'HTTP/1.1 100 Continue\r\n\r\n'
+
+tmp=$(mktemp -p "$runtime" clipboard-serve.XXXXXX) || exit 1
+trap 'rm -f "$tmp" "$tmp.txt"' EXIT
+head -c "$length" >"$tmp"
+
+# iOS apps frequently put ONLY rich text on the clipboard (the Claude app
+# does), and even a Shortcut's pass-through-a-Text-action coercion has been
+# seen shipping the raw RTF source. Rather than depending on every shortcut
+# getting a workaround right, an RTF body is converted here — verified
+# against a real Claude-app payload (cp1252 escapes, em dashes, curly
+# quotes). On any failure the original bytes go through untouched: word
+# soup on the clipboard beats nothing at all. Conversion happens before the
+# preview/.last/compare steps so every consumer sees the plain text.
+if [[ $(head -c 6 "$tmp") == '{\rtf1' ]] && command -v pandoc >/dev/null 2>&1; then
+  if pandoc -f rtf -t plain --wrap=none <"$tmp" >"$tmp.txt" 2>/dev/null && [[ -s $tmp.txt ]]; then
+    mv "$tmp.txt" "$tmp"
+  else
+    rm -f "$tmp.txt"
+  fi
+fi
+
+# A post without the relay header came from a person (the iPhone shortcut),
+# not from the machines syncing among themselves — that one is worth a toast.
+# The preview is taken NOW because the success path hands $tmp to a transient
+# unit that unlinks it. -a qshell keeps it a popup only (the shell treats
+# qshell-app notifications as ephemeral feedback, never history) — the
+# clipboard picker already records the content itself, so the notification
+# centre has nothing to add.
+preview=""
+if [[ -z $relay ]]; then
+  # Whitespace collapsed to one line; iconv -c drops a torn multi-byte tail
+  # rather than shipping invalid UTF-8 into the notification daemon.
+  preview=$(head -c 200 "$tmp" | tr -s '[:space:]' ' ' | iconv -f utf-8 -t utf-8 -c 2>/dev/null)
+fi
+
+notify_arrival() {
+  local sender=""
+  command -v notify-send >/dev/null 2>&1 || return 0
+  [[ -z $xff ]] || sender=$(tailscale whois --json "$xff" 2>/dev/null \
+    | jq -r '.Node.ComputedName // empty' 2>/dev/null) || sender=""
+  notify-send -a qshell "󰅌 Clipboard from ${sender:-tailnet}" "$preview" >/dev/null 2>&1 || true
+}
+
+# Peer watchers mark their posts X-Clipboard-Relay: the sender is fanning
+# out to EVERY machine, so recording the bytes in .last suppresses this
+# machine's own re-broadcast — and with it the ping-pong two clipboards can
+# get into when copies land faster than their relays cross. A post WITHOUT
+# the mark (the iPhone shortcut) reached only this machine, so .last stays
+# untouched and the local watcher fans the copy out to the rest.
+[[ -z $relay ]] || cp "$tmp" "$last" 2>/dev/null || true
+# Skip the copy when the clipboard already holds these bytes — a relay of
+# something we sent, back at its origin. This check, not .last, is what
+# guarantees every relay chain terminates.
+if cmp -s "$tmp" <(wl-paste --no-newline --type text 2>/dev/null); then
+  # Still toast a phone post: the sender pressed a button and the content IS
+  # here — that it already was is not their problem.
+  [[ -n $relay ]] || notify_arrival
+  respond "200 OK" $'unchanged\n'
+  exit 0
+fi
+
+# wl-copy cannot run here directly: on Wayland the copying CLIENT answers
+# every later paste, so the process must outlive this handler — and an
+# Accept=yes instance kills its whole cgroup the moment the handler exits.
+# systemd-run detaches it: `wl-copy --foreground` is the transient unit's
+# main process, it exits on its own when the next copy replaces the
+# selection, and --collect reaps the unit either way. The sh wrapper opens
+# the body file and unlinks it before exec'ing wl-copy, so nothing is left
+# behind however long the unit ends up serving pastes — which is also why
+# the success path clears the rm trap instead of racing it.
+if systemd-run --user --quiet --collect \
+  sh -c 'exec 0<"$1"; rm -f -- "$1"; exec wl-copy --foreground --type text/plain' sh "$tmp"; then
+  trap - EXIT
+  [[ -n $relay ]] || notify_arrival
+  respond "200 OK" $'ok\n'
+else
+  respond "500 Internal Server Error" $'wl-copy failed\n'
+fi

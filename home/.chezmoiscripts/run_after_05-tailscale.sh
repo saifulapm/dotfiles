@@ -53,4 +53,26 @@ if [ "$state" != "Running" ]; then
     && notify-send -a qshell "Tailscale needs login" "Run: tailscale up — or use the bar widget's login row" 2>/dev/null || true
 fi
 
+# Clipboard endpoint (bin/clipboard-serve): publish loopback :9411 to the
+# tailnet as plain HTTP on :80 — tailscaled terminates it inside the tunnel,
+# so only tailnet devices can ever reach it and no real port opens. Plain
+# HTTP is deliberate: this tailnet has no cert domains enabled, and the path
+# is WireGuard-encrypted regardless. `--bg` writes the mapping into
+# tailscaled's profile where it survives reboots, so this acts once per
+# machine and is a no-op after. Captured into a variable, not piped to grep
+# (the pipefail+grep -q SIGPIPE class).
+if [ "$state" = "Running" ]; then
+  serve_now="$(tailscale serve status 2>/dev/null || true)"
+  case $serve_now in
+  *127.0.0.1:9411*) ;;
+  *)
+    if tailscale serve --bg --http=80 9411 >/dev/null 2>&1; then
+      echo "tailscale: clipboard endpoint published (tailnet :80 → 127.0.0.1:9411)"
+    else
+      echo "tailscale: clipboard endpoint NOT published — run: tailscale serve --bg --http=80 9411" >&2
+    fi
+    ;;
+  esac
+fi
+
 exit 0

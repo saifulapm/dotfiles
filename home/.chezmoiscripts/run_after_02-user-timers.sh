@@ -6,7 +6,7 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer qshell.service emacs.service mempressure.service
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket qshell.service emacs.service mempressure.service clipboard-sync.service
 # Also DISABLES voxtype.service — see the block near the end of this file.
 set -euo pipefail
 
@@ -18,7 +18,10 @@ set -euo pipefail
 # voxtype-idle-stop.timer stops the dictation daemon once it has sat idle; it
 # is safe to enable on a machine with no voxtype at all, since the script it
 # runs exits immediately when the daemon's runtime state file is absent.
-units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer)
+# clipboard-serve.socket is loopback-only per-connection activation
+# (bin/clipboard-serve); enabling it needs no session — a request arriving
+# outside one just answers empty/500 and the socket stays healthy.
+units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently
@@ -44,13 +47,15 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
   # when it is already running).
   # mempressure.service (PSI early-warning, needs the notification daemon)
   # shares qshell's Requisite gate and rides the same enable/start split.
-  systemctl --user enable qshell.service mempressure.service \
-    || echo "user units: enable qshell/mempressure failed — check systemctl --user status qshell.service mempressure.service" >&2
+  # clipboard-sync.service (wl-paste watcher pushing copies to the other
+  # machines) needs the Wayland socket, so it rides it too.
+  systemctl --user enable qshell.service mempressure.service clipboard-sync.service \
+    || echo "user units: enable qshell/mempressure/clipboard-sync failed — check systemctl --user status qshell.service mempressure.service clipboard-sync.service" >&2
   if systemctl --user -q is-active graphical-session.target; then
-    systemctl --user start qshell.service mempressure.service \
-      || echo "user units: start qshell/mempressure failed — check systemctl --user status qshell.service mempressure.service" >&2
+    systemctl --user start qshell.service mempressure.service clipboard-sync.service \
+      || echo "user units: start qshell/mempressure/clipboard-sync failed — check systemctl --user status qshell.service mempressure.service clipboard-sync.service" >&2
   fi
-  echo "user units: qshell.service mempressure.service enabled"
+  echo "user units: qshell.service mempressure.service clipboard-sync.service enabled"
   # emacs.service (ours — shadows the emacs-pgtk rpm unit) has the same
   # Requisite=graphical-session.target gate: enable always, start only
   # inside a session. --no-block because a first start bootstraps every
