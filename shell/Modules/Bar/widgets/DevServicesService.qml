@@ -11,11 +11,15 @@ import "DevServicesModel.js" as Model
 // many screens carry the widget (S2) — it is created at the bar root.
 //
 // State observation is event-driven, never polled: a long-lived
-// `podman events --format json` follower (one line per container transition,
-// filters verified — multiple `--filter container=` OR together) is the whole
-// cadence, DictationService's pattern. The only one-shot probes are the
-// startup presence check and the panel-open refresh — probe-on-open is the
-// family-sanctioned pattern (Dropbox, rclone remotes).
+// `busctl --user monitor` follower on systemd's JobRemoved signal is the
+// whole cadence, DictationService's pattern. Every transition here IS a
+// systemd job (socket wakes proxy, proxy's Requires= raises the container,
+// StopWhenUnneeded lowers it), so the bus sees all of them. A job says which
+// unit moved but not where to, so a recognized signal schedules the probe
+// rather than being applied — the probe stays the only thing that decides
+// state. The other one-shot probes are the startup presence check and the
+// panel-open refresh — probe-on-open is the family-sanctioned pattern
+// (Dropbox, rclone remotes).
 //
 // Actions are systemctl verbs on the USER units. Start raises the container
 // AND its proxy service (the proxy holds the container up until its usual
@@ -26,7 +30,15 @@ import "DevServicesModel.js" as Model
 // start blocks systemctl for up to ~30 s, and that must not swallow a click
 // on another row. Every child is wrapped in `setpriv --pdeathsig TERM`
 // (quickshell does not signal Process children when the shell exits, and the
-// events follower would otherwise outlive us indefinitely).
+// follower would otherwise outlive us indefinitely).
+//
+// That wrapper only started working when the follower stopped being podman.
+// PDEATHSIG is cleared across fork, and rootless podman re-execs itself into
+// a user namespace — so the process setpriv armed was never the one left
+// holding the stream, and a SIGKILLed shell leaked a 53 MB `podman events`
+// every time (five of them found running at once on 2026-08-10, from a
+// morning of dev-instance testing). busctl does not fork: verified by
+// SIGKILLing the shell and watching the follower go with it.
 QtObject {
     id: root
 
@@ -107,14 +119,18 @@ QtObject {
         }
     }
 
-    // One follower line. Any parseable event also proves the follower is
-    // healthy, so the restart budget refills.
+    // One follower line. A JobRemoved names the unit that moved but not what
+    // it moved to, so this schedules a probe rather than applying anything —
+    // see Model.parseUnitEvent for why that is the trade. Any recognized line
+    // also proves the follower is healthy, so the restart budget refills.
     function applyEvent(line) {
-        const ev = Model.parseEvent(line);
-        if (!ev)
+        const unit = Model.parseUnitEvent(line);
+        if (!unit)
             return;
         _eventRetries = 0;
-        setRunning(ev.container, ev.running);
+        // One wake runs jobs for the socket, the proxy and the container, so
+        // the signals arrive in a burst; coalesce them into a single probe.
+        eventProbeDebounce.restart();
     }
 
     function setRunning(container, on) {
@@ -229,6 +245,15 @@ QtObject {
         onTriggered: root.pendingByKey = ({})
     }
 
+    // Coalesces a burst of JobRemoved signals into one probe. Long enough to
+    // cover socket → proxy → container, short enough that a dot lights up
+    // while the user is still looking at it.
+    readonly property Timer eventProbeDebounce: Timer {
+        interval: 400
+        repeat: false
+        onTriggered: root.refresh()
+    }
+
     readonly property Timer eventsRestartTimer: Timer {
         interval: 3000
         repeat: false
@@ -272,14 +297,18 @@ QtObject {
         }
     }
 
-    // The whole event source: one line per container transition, parsed as
-    // it arrives. Started once the probe says the stack exists; restarted
-    // with a short delay if podman drops it, up to a small budget so a
-    // broken podman cannot turn the restart into a poll — any received
-    // event, or the next probe, refills the budget.
+    // The whole event source: every systemd job completion on the session
+    // bus, filtered down to ours as it arrives. Started once the probe says
+    // the stack exists; restarted with a short delay if it drops, up to a
+    // small budget so a broken bus cannot turn the restart into a poll — any
+    // recognized line, or the next probe, refills the budget.
+    //
+    // This was `podman events` until it was measured: 53.5 MB resident to
+    // watch four containers that are stopped almost always, against 5.6 MB
+    // here. Both are event-driven; only the runtime differs (Go vs C).
     readonly property Process eventsProcess: Process {
         running: false
-        command: ["setpriv", "--pdeathsig", "TERM", "--", "podman", "events", "--format", "json", "--filter", "container=dev-mysql84", "--filter", "container=dev-postgres18", "--filter", "container=dev-redis7", "--filter", "container=dev-mailpit", "--filter", "event=start", "--filter", "event=died", "--filter", "event=stop", "--filter", "event=remove"]
+        command: ["setpriv", "--pdeathsig", "TERM", "--", "busctl", "--user", "monitor", "--json=short", "--match", "type='signal',sender='org.freedesktop.systemd1',interface='org.freedesktop.systemd1.Manager',member='JobRemoved'"]
         stdout: SplitParser {
             onRead: line => root.applyEvent(line)
         }
@@ -287,7 +316,7 @@ QtObject {
             if (!root.available)
                 return;
             if (root._eventRetries >= 5) {
-                root.lastError = "podman events follower stopped — refresh to reconnect";
+                root.lastError = "systemd job follower stopped — refresh to reconnect";
                 return;
             }
             root._eventRetries += 1;

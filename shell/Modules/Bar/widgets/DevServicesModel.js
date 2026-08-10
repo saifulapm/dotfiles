@@ -88,37 +88,53 @@ function parseProbe(raw) {
     };
 }
 
-// One `podman events --format json` line → {container, running} or null.
-// `start` raises a container; `died`/`stop`/`remove` lower it (a quadlet
-// restart emits died → remove → start, which lands correctly in order). The
-// name-prefix check keeps the belt with the --filter braces.
-function parseEvent(line) {
+// Every unit a transition can name — container units and their proxies, since
+// a socket-activated wake runs jobs for both. The follower only has to
+// recognize one of them to know something moved.
+var WATCHED_UNITS = (function () {
+    var seen = {};
+    for (var i = 0; i < SERVICES.length; i++) {
+        var def = SERVICES[i];
+        var units = (def.startUnits || []).concat(def.stopUnits || []);
+        for (var j = 0; j < units.length; j++)
+            seen[units[j]] = true;
+    }
+    return seen;
+})();
+
+// One `busctl --user monitor --json=short` line → the unit name a systemd
+// JobRemoved names, when it is one of ours; null otherwise.
+//
+// This replaced a `podman events` follower, which reported container
+// transitions directly but cost 53 MB resident to do it — podman is Go, and
+// this shell watches four containers that are asleep almost all the time. The
+// same transitions are visible on the session bus for free, because every one
+// of them IS a systemd job: the socket wakes the proxy, the proxy's Requires=
+// raises the container, StopWhenUnneeded lowers it again. busctl is C and
+// costs 5.6 MB.
+//
+// The trade is deliberate: a JobRemoved says WHICH unit moved but not what it
+// moved to, so unlike a podman event this cannot be applied on its own — it
+// is a nudge to re-probe. That also makes it robust to the payload changing
+// shape, since the probe remains the only thing that decides state.
+function parseUnitEvent(line) {
     var text = String(line || "").trim();
     if (text === "")
         return null;
-    var ev;
+    var msg;
     try {
-        ev = JSON.parse(text);
+        msg = JSON.parse(text);
     } catch (e) {
         return null;
     }
-    if (!ev || ev.Type !== "container")
+    if (!msg || msg.member !== "JobRemoved")
         return null;
-    var name = String(ev.Name || "");
-    if (name.indexOf("dev-") !== 0)
+    var data = msg.payload && msg.payload.data;
+    if (!Array.isArray(data))
         return null;
-    var status = String(ev.Status || "");
-    if (status === "start")
-        return {
-            container: name,
-            running: true
-        };
-    if (status === "died" || status === "stop" || status === "remove")
-        return {
-            container: name,
-            running: false
-        };
-    return null;
+    // JobRemoved is (u id, o job, s unit, s result).
+    var unit = String(data[2] || "");
+    return WATCHED_UNITS[unit] === true ? unit : null;
 }
 
 function stateText(svc) {
@@ -148,8 +164,9 @@ function heroMeta(runningCount, total) {
 if (typeof module !== "undefined") {
     module.exports = {
         SERVICES: SERVICES,
+        WATCHED_UNITS: WATCHED_UNITS,
         parseProbe: parseProbe,
-        parseEvent: parseEvent,
+        parseUnitEvent: parseUnitEvent,
         stateText: stateText,
         summaryText: summaryText,
         heroMeta: heroMeta
