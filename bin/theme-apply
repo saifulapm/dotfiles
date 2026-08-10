@@ -149,6 +149,9 @@ if (!tokens["border.active"]) tokens["border.active"] = tokens["accent.accent"]
 // calls below read the same decision.
 const mode = String(tokens["meta.mode"]) === "light" ? "light" : "dark"
 tokens["gtk.prefer-dark"] = mode === "light" ? "0" : "1"
+// The builtin stylesheet the plain-GTK4 theme (gtk4-theme.css.tmpl) layers
+// itself on — the polarity decides which resource it @imports.
+tokens["gtk.default-stylesheet"] = mode === "light" ? "Default" : "Default-dark"
 // zathura page recolor follows the same polarity: dark themes tint the
 // document into theme colors, light themes show pages as printed.
 tokens["zathura.recolor"] = mode === "light" ? "false" : "true"
@@ -350,6 +353,14 @@ const OUTPUTS = {
   "gtk-settings.ini.tmpl": [
     path.join(HOME, ".config/gtk-3.0/settings.ini"),
     path.join(HOME, ".config/gtk-4.0/settings.ini")
+  ],
+  // Opt-in plain-GTK4 recolor, selected per launcher with GTK_THEME=qshell
+  // (yazi's ripdrag keybind). Both filenames: with prefer-dark set GTK loads
+  // gtk-dark.css and ignores gtk.css, on light themes the reverse — the
+  // rendered content already carries the right polarity either way.
+  "gtk4-theme.css.tmpl": [
+    path.join(HOME, ".local/share/themes/qshell/gtk-4.0/gtk.css"),
+    path.join(HOME, ".local/share/themes/qshell/gtk-4.0/gtk-dark.css")
   ],
   "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")],
   "oma-theme.toml.tmpl": [path.join(HOME, ".local/state/qshell/oma-theme.toml")],
