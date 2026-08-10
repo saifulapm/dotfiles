@@ -82,12 +82,12 @@
 "ui.bufferline.active" = { fg = "foreground", bg = "background", underline = { color = "color5", style = "line" } }
 
 "ui.text" = "foreground"
-"ui.text.focus" = { fg = "foreground", bg = "color0", modifiers = ["bold"] }
+"ui.text.focus" = { fg = "foreground", bg = "lighter_background", modifiers = ["bold"] }
 "ui.text.inactive" = { fg = "color8" }
 "ui.text.directory" = { fg = "color4" }
 
 "ui.virtual" = "color8"
-"ui.virtual.ruler" = { bg = "color0" }
+"ui.virtual.ruler" = { bg = "lighter_background" }
 "ui.virtual.indent-guide" = "color8"
 "ui.virtual.inlay-hint" = { fg = "color8" }
 "ui.virtual.jump-label" = { fg = "color1", modifiers = ["bold"] }
@@ -102,9 +102,9 @@
 "ui.cursor.primary.insert" = { fg = "background", bg = "color2" }
 "ui.cursor.primary.select" = { fg = "background", bg = "color5" }
 
-"ui.cursorline.primary" = { bg = "color0" }
+"ui.cursorline.primary" = { bg = "lighter_background" }
 
-"ui.highlight" = { bg = "color0", modifiers = ["bold"] }
+"ui.highlight" = { bg = "lighter_background", modifiers = ["bold"] }
 
 "ui.menu" = { fg = "foreground", bg = "background" }
 "ui.menu.selected" = { fg = "background", bg = "foreground", modifiers = ["bold"] }
@@ -123,6 +123,11 @@ hint = "color6"
 
 [palette]
 background = "{{surface.0}}"
+# The subtle shade behind the cursorline, the ruler, the picker highlight and
+# ui.text.focus. It has to be its own token: color0 is ANSI black, which is
+# background in every one of our themes, so those four faces used to paint
+# background on background and vanish (omarchy hit the same thing in 0795ede).
+lighter_background = "{{surface.2}}"
 foreground = "{{text.primary}}"
 cursor = "{{ansi.bright-white}}"
 selection_background = "{{surface.3}}"
