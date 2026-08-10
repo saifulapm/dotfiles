@@ -48,14 +48,22 @@
 #     in the terminal it was started from) still clears the indicator and still
 #     notifies.
 #
-# Codecs: Fedora's ffmpeg-free has no libx264, so wf-recorder falls back to
-# libvpx-vp9 — CPU VP9 at 2560x1600 is not a real-time encoder. libopenh264 is
-# present and is what we ask for; if a machine lacks it, the supervisor retries
-# once with wf-recorder's own default rather than failing the recording. The
-# audio codec is left alone for the same reason: ffmpeg-free ships no AAC
-# encoder (upstream's `-ac aac`; `-C aac` here makes wf-recorder exit silently
-# without writing a file), so audio recordings are Opus in MP4, which every
-# modern player handles but some old ones do not.
+# Codecs (rewritten 2026-08-11 — the original block worked around ffmpeg-free
+# constraints that stopped existing at the 2026-08-07 RPM Fusion swap):
+# hardware H.264 via VAAPI when a driver is present, libx264 otherwise.
+# Measured on the NUC's 4K DP-3, 5 s capture at 30 fps: h264_vaapi burned
+# 0.16 s of CPU to libx264's 22.4 s — software x264 at 4K30 saturates half
+# the i5-13420H, the iGPU does it for free. The gate is a VA driver FILE in
+# libva's search path, not just a render node: the Asahi laptop has
+# /dev/dri render nodes but no VAAPI driver, and its failure mode is not the
+# "Failed to find the given codec" line the old retry grepped for. Any codec
+# that dies before writing a byte now falls back to libx264, which RPM
+# Fusion ffmpeg provides fleet-wide (libopenh264, the old default, was only
+# ever the workaround for ffmpeg-free's missing libx264). The audio codec is
+# left alone: `-C aac` used to make wf-recorder exit silently without
+# writing a file when ffmpeg-free had no AAC encoder; the encoder exists
+# now, but the Opus-in-MP4 output has shipped since 08-06 and every modern
+# player handles it, so changing it buys nothing.
 set -euo pipefail
 
 self="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -69,7 +77,14 @@ glyph="󰻂" # md-record_circle, the indicator's glyph
 [[ -f $HOME/.config/user-dirs.dirs ]] && source "$HOME/.config/user-dirs.dirs"
 output_dir="${QSHELL_SCREENRECORD_DIR:-${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts}"
 
-codec="${QSHELL_SCREENRECORD_CODEC:-libopenh264}"
+codec="${QSHELL_SCREENRECORD_CODEC:-}"
+if [[ -z $codec ]]; then
+  if compgen -G '/usr/lib64/dri*/*_drv_video.so' >/dev/null && [[ -e /dev/dri/renderD128 ]]; then
+    codec=h264_vaapi
+  else
+    codec=libx264
+  fi
+fi
 bitrate="${QSHELL_SCREENRECORD_BITRATE:-8000000}"
 framerate="${QSHELL_SCREENRECORD_FRAMERATE:-30}"
 
@@ -157,15 +172,18 @@ supervise() {
   shift
   state_write "$file"
 
-  local status=0
-  wf-recorder -y -f "$file" -c "$codec" -p "b=$bitrate" -r "$framerate" "$@" \
+  local status=0 encoder_args=(-c "$codec" -p "b=$bitrate")
+  [[ $codec == *_vaapi ]] && encoder_args+=(-d /dev/dri/renderD128)
+  wf-recorder -y -f "$file" "${encoder_args[@]}" -r "$framerate" "$@" \
     >>"$log_file" 2>&1 || status=$?
 
-  # A machine without libopenh264 fails immediately and has written nothing;
-  # retry once on wf-recorder's own codec choice before giving up.
-  if ((status != 0)) && [[ ! -s $file ]] && grep -q "Failed to find the given codec" "$log_file"; then
+  # Nothing written and the recorder is gone: the codec never opened (absent
+  # encoder, a broken VAAPI stack, an env override naming something exotic).
+  # One retry on the encoder that exists everywhere, then give up honestly.
+  if ((status != 0)) && [[ ! -s $file ]] && [[ $codec != libx264 ]]; then
     status=0
-    wf-recorder -y -f "$file" -r "$framerate" "$@" >>"$log_file" 2>&1 || status=$?
+    wf-recorder -y -f "$file" -c libx264 -p "b=$bitrate" -r "$framerate" "$@" \
+      >>"$log_file" 2>&1 || status=$?
   fi
 
   state_clear
