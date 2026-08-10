@@ -3,61 +3,125 @@
 # terminal-multiplexing job; herdr is for driving a pack of coding agents,
 # which is the thing tmux has no vocabulary for.
 #
-# Written against `herdr --default-config` (0.8.0), not copied from omarchy's
-# config/herdr/config.toml: their file mirrors THEIR tmux.conf, and ours binds
-# a different set. Everything herdr already defaults to the way our
-# ~/.tmux.conf behaves is left alone — the overrides below are only where the
-# two genuinely disagree. `herdr config check` validates this file, and
-# bin/herdr-restart reloads it into a running server.
+# Port of omarchy config/herdr/config.toml (CREDITS.md), including the
+# ba7925a/f511cf8 follow-ups. Their comments describe THEIR tmux.conf, which
+# binds more than ours does — where ours never rebound a tmux default the two
+# agree anyway. The one place they genuinely diverge is pane focus: our
+# ~/.tmux.conf binds prefix+h/j/k/l to select-pane, and this file gives
+# prefix+h to split_horizontal and moves focus to ctrl+alt+arrows, the way
+# omarchy's tmux does. Kept as theirs on purpose — same keys on both
+# machines beats matching our own tmux.
 #
-# herdr WRITES to its own config (it injected `onboarding = false` here on
-# first launch), and chezmoi symlinks this file, so those writes land in the
-# repo — the same one-way-valve we want and already rely on for mimeapps.
-# Owning the key here just keeps it from being prepended above this header:
-# TOML puts bare keys before the first table, which is line 1.
+# `herdr config check` validates this file (it really does reject unknown
+# keys and unparseable bindings), and bin/herdr-restart reloads it into a
+# running server.
+#
+# One of their keys is commented out at the bottom: tab_bar_hostname exists
+# in neither the newest release NOR herdr's public main, so omarchy is running
+# ahead of the upstream repo and we cannot match it however we install. The
+# other seven that the 0.8.0 RELEASE binary rejects (move_tab_*, resize_pane_*,
+# pane_outer_borders) are live here, and are the reason run_after_09 builds
+# herdr from git instead of taking that binary — a release build would ignore
+# a third of this file while telling you so eight times per reload.
+#
+# herdr WRITES to its own config, and chezmoi symlinks this file, so those
+# writes land in the repo — the same one-way valve mimeapps already relies
+# on. `onboarding` below is one of them, owned here so it stops being
+# prepended above this header: TOML puts bare keys before the first table,
+# which is line 1.
 
 # The first-run tour has been taken.
 onboarding = false
 
 [theme]
-# Ride the terminal's own palette instead of one of herdr's 11 built-ins.
-# That is what keeps it themed: bin/theme-apply retints live foot windows over
-# OSC, so herdr follows all 22 of our themes for free and can never drift from
-# them the way a pinned built-in would.
+# tmux ran on the terminal's own palette (bg=default, fg=default, ANSI blue
+# accents). For us that is also what keeps herdr themed at all:
+# bin/theme-apply retints live foot windows over OSC, so herdr follows all 22
+# of our themes and can never drift the way a pinned built-in would.
 name = "terminal"
 
+[theme.custom]
+# The active tab is drawn as panel_bg text on an accent background, so
+# panel_bg has to be dark for it to read - same colors as status-left's
+# "#[fg=black,bg=blue]"
+panel_bg = "black"
+
 [terminal]
-# New panes open where the source pane is, matching the -c "#{pane_current_path}"
-# our tdl/tds/tsl layouts pass on every tmux split.
+# Matches -c "#{pane_current_path}" on every split, window, and session
 new_cwd = "follow"
 
 [keys]
-# The one binding our tmux moves off its default, and the only one that would
-# be unlearnable if it differed.
 prefix = "ctrl+space"
 
-# tmux detaches on prefix+d; herdr defaults that to prefix+q.
+# Config and help
+reload_config = "prefix+q"
+help = "prefix+?"
 detach = "prefix+d"
 
-# Deliberately NOT overridden, because herdr's defaults already match ours:
-#   focus_pane_left/down/up/right = prefix+h/j/k/l   (our tmux.conf binds the
-#                                     same four, so the vim nav carries over)
-#   new_tab prefix+c, next/previous_tab prefix+n/p, switch_tab prefix+1..9,
-#   close_pane prefix+x, zoom prefix+z               (all tmux defaults)
-# reload_config stays prefix+shift+r: tmux reloads on prefix+r, but that is
-# herdr's resize_mode, and losing resize to save one Shift is a bad trade.
+# Copy mode
+copy_mode = "prefix+["
+
+# Panes
+split_horizontal = ["prefix+h", "alt+enter"]
+split_vertical = ["prefix+v", "alt+shift+enter"]
+close_pane = ["prefix+x", "alt+esc"]
+zoom = "prefix+z"
+last_pane = "prefix+;"
+
+focus_pane_left = "ctrl+alt+left"
+focus_pane_down = "ctrl+alt+down"
+focus_pane_up = "ctrl+alt+up"
+focus_pane_right = "ctrl+alt+right"
+
+resize_mode = ["prefix+ctrl+left", "prefix+ctrl+down", "prefix+ctrl+up", "prefix+ctrl+right"]
+
+# Like resize-pane on C-M-S-arrows
+resize_pane_left = "ctrl+alt+shift+left"
+resize_pane_down = "ctrl+alt+shift+down"
+resize_pane_up = "ctrl+alt+shift+up"
+resize_pane_right = "ctrl+alt+shift+right"
+
+# No tmux equivalent; herdr's default prefix+shift+p is taken by previous session
+rename_pane = "prefix+shift+o"
+
+# Windows -> tabs
+new_tab = "prefix+c"
+rename_tab = "prefix+r"
+close_tab = "prefix+k"
+switch_tab = ["prefix+1..9", "alt+1..9"]
+previous_tab = ["prefix+p", "alt+left"]
+next_tab = ["prefix+n", "alt+right"]
+
+# Like swap-window -t -1/+1 on M-S-Left/Right
+move_tab_previous = "alt+shift+left"
+move_tab_next = "alt+shift+right"
+
+# Sessions -> workspaces
+new_workspace = "prefix+shift+c"
+rename_workspace = "prefix+shift+r"
+close_workspace = "prefix+shift+k"
+previous_workspace = ["prefix+shift+p", "alt+up"]
+next_workspace = ["prefix+shift+n", "alt+down"]
 
 [ui]
-# tmux hides its status bar when a session has one window (the window-linked
-# hook in ~/.tmux.conf); do the same with the tab row.
-hide_tab_bar_when_single_tab = true
+accent = "blue"
 
-# tmux drew single-line dividers between adjacent panes, and had no scrollbar
-# column beside them.
+# tmux drew single-line dividers between adjacent panes and no outer frame
 pane_gaps = false
+pane_outer_borders = false
+
+# tmux had no scrollbar column beside its panes
 pane_scrollbars = false
 
-# kill-window and kill-session never asked, and automatic-rename named windows
-# without prompting.
+# kill-window and kill-session never asked
 confirm_close = false
+
+# automatic-rename gave windows a name without prompting
 prompt_new_tab_name = false
+
+# set -g mouse on
+mouse_capture = true
+
+# tmux showed #h in status-right; the ZOOM flag shows there automatically.
+# Not in 0.8.0.
+# tab_bar_hostname = true

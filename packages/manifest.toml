@@ -1121,6 +1121,14 @@ category = "dev"
 arch = "all"
 why = "Build system for native projects and some cargo -sys crates"
 
+# zig is deliberately NOT a dnf package here. It IS needed — herdr vendors
+# libghostty-vt and its build.rs shells out to `zig build` — but Fedora ships
+# 0.16.0 and that vendored build.zig hard-refuses anything but 0.15.2 ("Your
+# Zig version v0.16.0 does not meet the required build version of v0.15.2",
+# tried 2026-08-10). It comes from mise instead, pinned to the exact patch in
+# ~/.config/mise/config.toml, which can hold an old version beside the
+# system's without either fighting the other.
+
 [[pkg]]
 name = "make"
 category = "dev"
@@ -1458,8 +1466,13 @@ why  = "Deno runtime from the mac list; mise already manages node, one mechanism
 
 [[tool]]
 name = "cargo-cli-tools"
-via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc; from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07) and wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere)"
+via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc; from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07), wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere) and herdr (user ask 2026-08-10)"
 why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/dufs are mac-list CLI (argc dropped 2026-08-10 — nothing in this repo ever called it); kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
+
+[[tool]]
+name = "herdr"
+via  = "run_after_09-cargo-tools.sh — `cargo install --git https://github.com/herdrdev/herdr --locked` with the mise zig 0.15.2 forced first on PATH (it vendors libghostty-vt, whose build.zig accepts no other zig; see the zig note in the dev section). Config at home/dot_config/herdr/config.toml, a port of omarchy's; bin/herdr-restart reloads a running server; fish fns hdl/hds/hdlm/hsl mirror the tmux tdl/tds/tdlm/tsl set; completions self-generate in run_after_23"
+why  = "Agent-aware multiplexer (user ask 2026-08-10, omarchy dd61d4a), ALONGSIDE tmux rather than replacing it: tmux keeps plain multiplexing, herdr adds what tmux has no vocabulary for — per-pane agent state in a sidebar and a socket API agents can drive. Built from git, not from the 0.8.0 release binary it also ships: 0.8.0 does not know move_tab_*, resize_pane_* or pane_outer_borders, so a release build would silently ignore part of the config. NOT via mise — a shim there shadows the client with a stale wire protocol, which omarchy's migration 1786273938 exists to undo"
 
 [[tool]]
 name = "dufs-server"
