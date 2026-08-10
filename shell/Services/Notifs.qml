@@ -528,13 +528,37 @@ QtObject {
         clearPast();
     }
 
-    // Invoke the libnotify "default" action on a popup, then dismiss it.
-    // Clients register the default action under the identifier "default";
-    // e.g. `notify-send -A default=Edit` makes click-the-card open an editor.
+    // Run a row's carried click command, if it has one. Our own toasts send
+    // the action as data (`--hint=string:qshell-exec:...`, see
+    // NotificationLogic.execFromHints) precisely so it survives into the popup
+    // files and the history — a restored row's liveRefs entry is a miss by
+    // construction, so a libnotify action would be dead on arrival, and the
+    // sender that registered it would still be blocked waiting for a click it
+    // can never be told about. Ported from omarchy 5a58f79.
+    //
+    // Launched through app-run, not execDetached alone: execDetached children
+    // stay in qshell.service's cgroup, so anything the click opens would die
+    // with the next shell restart (the same trap bin/qshell-relaunch documents).
+    function runExecAction(entry) {
+        const command = entry ? String(entry.exec || "") : "";
+        if (!command)
+            return false;
+        Quickshell.execDetached(["app-run", "bash", "-lc", command]);
+        return true;
+    }
+
+    // Invoke a popup's click action, then dismiss it. Our own toasts carry the
+    // command (runExecAction); third-party clients instead register a
+    // libnotify action under the identifier "default", e.g. `notify-send -A
+    // default=Edit` — that one only works while the sender is still live.
     function invokePopupDefault(index) {
         if (index < 0 || index >= popupModel.count)
             return;
         const entry = popupModel.get(index);
+        if (runExecAction(entry)) {
+            dismissPopup(index);
+            return;
+        }
         const ref = entry ? liveRefs[entry.originalId] : null;
         let invoked = false;
         try {
@@ -566,6 +590,8 @@ QtObject {
     function invokeEntryDefault(entry) {
         if (!entry)
             return false;
+        if (runExecAction(entry))
+            return true;
         const ref = entry.originalId >= 0 ? liveRefs[entry.originalId] : null;
         try {
             if (ref && ref.actions) {
@@ -949,6 +975,7 @@ QtObject {
                     body: r.body,
                     image: r.image,
                     glyph: r.glyph || "",
+                    exec: r.exec || "",
                     urgency: r.urgency,
                     expireTimeout: r.expireTimeout || 0,
                     timestamp: r.timestamp

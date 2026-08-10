@@ -64,15 +64,30 @@ function isEphemeralApp(appName) {
     return name === "notify-send" || name === "qshell";
 }
 
-function glyphFromHints(hints) {
+function stringHint(hints, name) {
     try {
         if (hints) {
-            var glyph = hints["qshell-glyph"];
-            if (glyph !== undefined && glyph !== null)
-                return String(glyph);
+            var value = hints[name];
+            if (value !== undefined && value !== null)
+                return String(value);
         }
     } catch (e) {}
     return "";
+}
+
+function glyphFromHints(hints) {
+    return stringHint(hints, "qshell-glyph");
+}
+
+// Shell command to run when the card is clicked, sent as
+// `--hint=string:qshell-exec:<command>`. Carrying the action as DATA is what
+// makes it survive: it travels with the row into the popup files and the
+// history, so a toast restored after a shell restart clicks through exactly
+// like a live one. A libnotify action cannot — its identifier only means
+// something to the server generation that handed it out, and the sender is
+// still blocked waiting on an id from a server that no longer exists.
+function execFromHints(hints) {
+    return stringHint(hints, "qshell-exec");
 }
 
 function shouldRenderCompactGlyph(glyph, iconSource, singleLineToast) {
@@ -95,6 +110,7 @@ function snapshotOf(notification, timestamp) {
         body: n.body || "",
         image: n.image || "",
         glyph: glyphFromHints(n.hints),
+        exec: execFromHints(n.hints),
         urgency: n.urgency,
         expireTimeout: expireTimeout,
         timestamp: timestamp === undefined ? Date.now() : timestamp
@@ -113,6 +129,7 @@ function historyEntry(value, normalUrgency) {
         body: e.body || "",
         image: e.image || "",
         glyph: e.glyph || "",
+        exec: e.exec || "",
         urgency: typeof e.urgency === "number" ? e.urgency : normalUrgency,
         expireTimeout: 0,
         timestamp: e.timestamp || 0

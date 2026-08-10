@@ -85,12 +85,20 @@ download_url() {
       -vf "crop='min(iw,ih)':'min(iw,ih)',scale=256:256" -q:v 2 \
       "$preview" -loglevel quiet 2>/dev/null || true
 
-    # -A default=Open blocks until the action is clicked (prints the key) or
-    # the toast times out; a click opens the video in mpv.
+    # The click action rides along as a hint instead of a libnotify action:
+    # -A default=Open would block this process until the click or the timeout,
+    # and a shell restart in between left it blocked forever (the dying server
+    # never emits NotificationClosed). As a hint the command is data — it
+    # survives into the popup file, so the toast stays clickable even after a
+    # restart, and nothing here waits. (Notifs.runExecAction, omarchy 5a58f79.)
+    notify-send -a qshell -t 10000 -i "${preview:-$filepath}" \
+      --hint=string:qshell-exec:"$(printf 'mpv %q' "$filepath")" \
+      "󰄬 Download complete" "$title" >/dev/null 2>&1 || true
+
+    # The shell copies /tmp images into its own cache asynchronously, so the
+    # preview has to outlive the toast's arrival — not its dismissal.
     (
-      if [[ -n $(notify-send -a qshell -t 10000 -i "${preview:-$filepath}" -A default=Open "󰄬 Download complete" "$title" 2>/dev/null) ]]; then
-        mpv "$filepath" >/dev/null 2>&1 || true
-      fi
+      sleep 30
       rm -f "$preview"
     ) &
   else
