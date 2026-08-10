@@ -549,8 +549,14 @@ Scope {
     property var sharedServices: ({})
 
     function sharedService(key, component, props) {
-        if (!sharedServices[key])
+        if (!sharedServices[key]) {
             sharedServices[key] = component.createObject(barRoot, props || {});
+            // createObject returns null on a component error and says nothing;
+            // a service that silently fails to exist reads as an invisible
+            // widget with no trail (cost a debugging session, 2026-08-11).
+            if (!sharedServices[key])
+                console.error("sharedService: creating", key, "failed:", component.errorString());
+        }
         return sharedServices[key];
     }
 
@@ -600,6 +606,10 @@ Scope {
 
     function btBatteryService() {
         return sharedService("btbattery", btBatteryServiceComponent, {});
+    }
+
+    function librePodsService() {
+        return sharedService("librepods", librePodsServiceComponent, {});
     }
 
     // No gate: the dufs service watches one flag file and probes only on
@@ -661,6 +671,11 @@ Scope {
     }
 
     Component {
+        id: librePodsServiceComponent
+        LibrePodsService {}
+    }
+
+    Component {
         id: dufsServiceComponent
         DufsService {}
     }
@@ -690,6 +705,7 @@ Scope {
             "mic": micComponent,
             "network": networkComponent,
             "bluetooth": bluetoothComponent,
+            "airpods": airpodsComponent,
             "battery": batteryComponent,
             "media": mediaComponent,
             "kb": kbComponent,
@@ -1943,6 +1959,14 @@ Scope {
         BluetoothWidget {
             theme: barRoot.theme
             btbattery: barRoot.btBatteryService()
+        }
+    }
+
+    Component {
+        id: airpodsComponent
+        AirPods {
+            theme: barRoot.theme
+            service: barRoot.librePodsService()
         }
     }
 
