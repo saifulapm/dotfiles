@@ -142,6 +142,32 @@ Scope {
         lastEventAt = new Date().toISOString();
     }
 
+    // ---------------------------------------------------------- lock marker
+    // niri keeps the session locked when a lock client dies without
+    // unlocking — it must, per ext-session-lock-v1 ("If the client dies while
+    // the session is locked the session remains locked"). So a shell crash
+    // here leaves the compositor blanked with nothing left to authenticate
+    // against, and qshell.service's Restart=on-failure brings up a fresh
+    // instance that holds no lock: an unauthenticatable session, TTY rescue
+    // only. niri does allow the recovery — src/niri.rs takes a new lock when
+    // the previous client is dead ("locking session (replacing existing dead
+    // lock)") — but it exposes no lock state over IPC, so the fresh instance
+    // has to be told. This file is how (omarchy 1ded25f solves the same
+    // problem by asking hyprctl).
+    //
+    // It holds the WAYLAND_DISPLAY it was written for, so a nested dev
+    // session that locks and gets killed can never make the real shell lock
+    // the real session on its next restart.
+    readonly property string lockMarkerPath: Quickshell.env("HOME") + "/.local/state/qshell/locked"
+
+    function writeLockMarker() {
+        Quickshell.execDetached(["bash", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s\\n' \"$2\" > \"$1\"", "--", lockMarkerPath, Quickshell.env("WAYLAND_DISPLAY") || ""]);
+    }
+
+    function clearLockMarker() {
+        Quickshell.execDetached(["rm", "-f", lockMarkerPath]);
+    }
+
     function resetAuthenticationState() {
         enteredPassword = "";
         pendingPassword = "";
@@ -164,6 +190,10 @@ Scope {
             return false;
         }
         resetAuthenticationState();
+        // Written before the compositor is asked, not after it confirms: a
+        // marker with no lock behind it costs one unnecessary password
+        // prompt, a lock with no marker behind it costs the whole session.
+        writeLockMarker();
         lockRequested = true;
         // Assume the monitors may already be off (the idle service's
         // screensaver stage runs before the lock stage), so the first key or
@@ -188,6 +218,7 @@ Scope {
         pendingSessionLockTimer.stop();
         resetAuthenticationState();
         idleBlankTimer.stop();
+        clearLockMarker();
         sessionLock.locked = false;
         logEvent("unlocked");
         runWake();

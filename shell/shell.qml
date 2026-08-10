@@ -325,7 +325,38 @@ ShellRoot {
     // beat could ever slip by). The other always-on surfaces wait one beat
     // more so their incubation doesn't contend with the first IPC answers
     // and the bar's first frames.
-    Component.onCompleted: clipboardLoader.wake()
+    Component.onCompleted: {
+        clipboardLoader.wake();
+        recoverLockIfStranded();
+    }
+
+    // A lock marker left behind by a shell that died while the session was
+    // locked (see Modules/Lock/Lock.qml). niri is still holding the session
+    // locked for a client that no longer exists, and will hand the lock to
+    // this instance instead — but nothing else can, so if this does not run
+    // the session cannot be authenticated at all. Deliberately the very first
+    // thing after the root lands: every beat before the lock surface maps is
+    // a beat of a blanked, unauthenticatable screen.
+    function recoverLockIfStranded() {
+        const marker = String(lockMarkerFile.text() || "").trim();
+        if (!marker)
+            return;
+        // The marker names the compositor it was written for, so a killed
+        // nested dev shell can never make the real session lock itself.
+        if (marker !== String(Quickshell.env("WAYLAND_DISPLAY") || ""))
+            return;
+        console.warn("shell: lock marker found — re-arming the lock the previous instance died holding");
+        lockSession();
+    }
+
+    // Blocking read (no watcher, no reload): recoverLockIfStranded needs the
+    // answer in the same tick the root completes.
+    FileView {
+        id: lockMarkerFile
+        path: Quickshell.env("HOME") + "/.local/state/qshell/locked"
+        blockLoading: true
+        printErrors: false
+    }
 
     Timer {
         interval: 400

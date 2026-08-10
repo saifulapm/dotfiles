@@ -22,6 +22,21 @@
 # would be killed halfway through waiting for its own job.
 set -uo pipefail
 
+force=0
+[[ ${1:-} == --force ]] && force=1
+
+# Restarting a LIVE lock client throws the session back to a blanked screen
+# and a fresh password prompt for no reason. The shell recovers from it now
+# (Modules/Lock/Lock.qml writes a marker, shell.qml re-arms the lock on the
+# next start), so this is a courtesy, not a safety net — hence --force.
+# Asking over IPC rather than reading the marker: the marker says "a lock was
+# requested", the shell says whether one is actually up right now.
+if ((!force)) && [[ $(timeout 2 qs ipc call lock isLocked 2>/dev/null) == "true" ]]; then
+  echo "qshell-relaunch: the session is locked — restarting would force a re-auth." >&2
+  echo "                 Unlock first, or pass --force." >&2
+  exit 1
+fi
+
 # Are WE inside the unit? The cgroup line is inherited from the qs that
 # spawned this script, so it answers "is the shell that asked for this the
 # service instance" — not merely "is the service running", which is also true
