@@ -108,10 +108,40 @@ arch = "all"
 why = "Portal backend for GTK apps: settings, and the FileChooser FALLBACK behind the shell's own picker — see home/dot_config/xdg-desktop-portal/niri-portals.conf. Load-bearing in two ways: bin/qshell-portal delegates to it when the shell is unreachable, and it is what the preference list falls back to if the qshell backend is not registered. The gnome backend cannot serve either role: it advertises FileChooser but delegates it to nautilus, which is not installed, so every request died with \"The name is not activatable\" and no dialog ever appeared (was a niri weak dep; claimed intentionally)"
 
 [[pkg]]
+name = "pipewire"
+category = "core"
+arch = "all"
+why = "The audio server itself — /usr/bin/pipewire and pipewire.service. Named here because NOTHING on Fedora hard-requires it: wireplumber's only PipeWire dependency is libpipewire-0.3.so.0, which pipewire-libs satisfies, and every other reference to the daemon is a Recommends. With install_weak_deps=False (enforced globally by run_before_00-install-packages.sh.tmpl) a minimal x86_64 install therefore lands wireplumber and pipewire-libs and no server, which is exactly what the NUC did: wireplumber.service inactive, `wpctl status` \"Could not connect to PipeWire\", no sound anywhere, and the bar's audio widget invisible because Services/Audio.qml derives `ready` from Pipewire.ready && sink !== null and AudioWidget.qml binds `visible` to it — correct behaviour reported as a missing widget. Invisible on the Asahi laptop, where the base spin and asahi-audio drag the daemon in regardless, which is why the fleet ran for months with only the session manager claimed (found 2026-08-10)"
+
+[[pkg]]
+name = "pipewire-pulseaudio"
+category = "core"
+arch = "all"
+why = "pipewire-pulse.service — the PulseAudio API served by PipeWire. Quickshell speaks native PipeWire, so the bar widget and the wpctl keybinds come back without this, but Chromium, Firefox, Electron apps and mpv all emit through libpulse and stay silent until it is present. Conflicts with the real pulseaudio, which is not installed and must not be"
+
+[[pkg]]
+name = "pipewire-alsa"
+category = "core"
+arch = "all"
+why = "Routes raw-ALSA clients through PipeWire instead of letting the first one to open hw:0 take the card exclusively and lock out everything else"
+
+[[pkg]]
+name = "pipewire-utils"
+category = "core"
+arch = "all"
+why = "pw-play and the pw-* diagnostics. Load-bearing for bin/screenshot-ocr, which pipes sherpa-onnx's synthesised PCM into `pw-play --format s16 --rate 22050 --channels 1 -` (its other branch wants ffplay, and there is no ffmpeg CLI on these machines) — without it Mod+Ctrl+Shift+6 OCRs happily and reads nothing aloud. CORRECTION 2026-08-11: ffplay exists since the 2026-08-07 RPM Fusion swap, so the parenthetical is stale — but the conclusion holds, screenshot-ocr prefers pw-play on its own merits and ffplay is only its fallback"
+
+[[pkg]]
 name = "wireplumber"
 category = "core"
 arch = "all"
 why = "PipeWire session manager — no audio routing without it (was a niri weak dep; claimed intentionally)"
+
+[[pkg]]
+name = "rtkit"
+category = "core"
+arch = "all"
+why = "Grants PipeWire's realtime scheduling over D-Bus — another weak-dep casualty like [[pkg]] pipewire, and the one whose absence SIGKILLed every native PipeWire client. Nothing hard-requires it, so with install_weak_deps=False it was missing at boot; xdg-desktop-portal then cached its Realtime properties as ZEROS ('name is not activatable', three journal lines at session start) and kept serving them, and libpipewire's module-rt trusts the portal over rtkit itself, clamps its own RLIMIT_RTTIME to the advertised 0, and still asks for SCHED_RR — so the kernel killed the thread on its first realtime tick. Cost: mpv ao=pipewire dead in ~1 s, wireplumber killed every ~6 s whenever it owned a Bluetooth stream, bluetoothd SEGVs in the teardown, AirPods dropping mid-song. Installing rtkit mid-session is NOT enough: the portal must start while rtkit is reachable (installed = D-Bus-activatable), or be restarted after. Named here so a fresh machine never reproduces the hunt (first sighting and root cause both 2026-08-11)"
 
 [[pkg]]
 name = "jetbrains-mono-fonts"
