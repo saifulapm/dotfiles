@@ -1121,13 +1121,13 @@ category = "dev"
 arch = "all"
 why = "Build system for native projects and some cargo -sys crates"
 
-# zig is deliberately NOT a dnf package here. It IS needed — herdr vendors
-# libghostty-vt and its build.rs shells out to `zig build` — but Fedora ships
-# 0.16.0 and that vendored build.zig hard-refuses anything but 0.15.2 ("Your
-# Zig version v0.16.0 does not meet the required build version of v0.15.2",
-# tried 2026-08-10). It comes from mise instead, pinned to the exact patch in
-# ~/.config/mise/config.toml, which can hold an old version beside the
-# system's without either fighting the other.
+# zig is deliberately absent, by dnf or by mise. It is ONLY a build dependency
+# of herdr (vendored libghostty-vt), and only if herdr is built from git — a
+# route tried and rejected 2026-08-10, because that vendored build.zig refuses
+# every version but 0.15.2 (Fedora's 0.16.0 fails outright: "Your Zig version
+# v0.16.0 does not meet the required build version of v0.15.2"), so it would
+# mean carrying a pinned old toolchain plus 267 crates of compile per machine
+# to gain eight config keys. herdr comes prebuilt from run_after_10 instead.
 
 [[pkg]]
 name = "make"
@@ -1471,8 +1471,8 @@ why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-
 
 [[tool]]
 name = "herdr"
-via  = "run_after_09-cargo-tools.sh — `cargo install --git https://github.com/herdrdev/herdr --locked` with the mise zig 0.15.2 forced first on PATH (it vendors libghostty-vt, whose build.zig accepts no other zig; see the zig note in the dev section). Config at home/dot_config/herdr/config.toml, a port of omarchy's; bin/herdr-restart reloads a running server; fish fns hdl/hds/hdlm/hsl mirror the tmux tdl/tds/tdlm/tsl set; completions self-generate in run_after_23"
-why  = "Agent-aware multiplexer (user ask 2026-08-10, omarchy dd61d4a), ALONGSIDE tmux rather than replacing it: tmux keeps plain multiplexing, herdr adds what tmux has no vocabulary for — per-pane agent state in a sidebar and a socket API agents can drive. Built from git, not from the 0.8.0 release binary it also ships: 0.8.0 does not know move_tab_*, resize_pane_* or pane_outer_borders, so a release build would silently ignore part of the config. NOT via mise — a shim there shadows the client with a stale wire protocol, which omarchy's migration 1786273938 exists to undo"
+via  = "run_after_10-prebuilt-binaries.sh — the herdr-linux-$(uname -m) release asset into ~/.local/bin. Config at home/dot_config/herdr/config.toml, a port of omarchy's; bin/herdr-restart reloads a running server; fish fns hdl/hds/hdlm/hsl mirror the tmux tdl/tds/tdlm/tsl set; completions self-generate in run_after_23"
+why  = "Agent-aware multiplexer (user ask 2026-08-10, omarchy dd61d4a), ALONGSIDE tmux rather than replacing it: tmux keeps plain multiplexing, herdr adds what tmux has no vocabulary for — per-pane agent state in a sidebar and a socket API agents can drive. The RELEASE, by decision 2026-08-10 after trying the alternative: omarchy builds from their own repo ahead of every tag, and a git build does understand eight more of their config keys (move_tab_*, resize_pane_*, pane_outer_borders, tab_bar_right) — but it needs zig 0.15.2 exactly (see the zig note in the dev section) and 267 crates per machine, which is not a trade eight cosmetic bindings win. The config comments those out and says why. NOT via mise either — a shim there shadows the client with a stale wire protocol, which omarchy's migration 1786273938 exists to undo"
 
 [[tool]]
 name = "dufs-server"

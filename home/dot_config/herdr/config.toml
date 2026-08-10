@@ -16,13 +16,15 @@
 # keys and unparseable bindings), and bin/herdr-restart reloads it into a
 # running server.
 #
-# One of their keys is commented out at the bottom: tab_bar_hostname exists
-# in neither the newest release NOR herdr's public main, so omarchy is running
-# ahead of the upstream repo and we cannot match it however we install. The
-# other seven that the 0.8.0 RELEASE binary rejects (move_tab_*, resize_pane_*,
-# pane_outer_borders) are live here, and are the reason run_after_09 builds
-# herdr from git instead of taking that binary — a release build would ignore
-# a third of this file while telling you so eight times per reload.
+# Eight of their settings are commented out where they belong rather than
+# dropped: move_tab_previous/next, the four resize_pane_*, pane_outer_borders,
+# and the tab-bar hostname. omarchy builds herdr from their own package repo,
+# ahead of every published release, and 0.8.0 — the newest tag, which is what
+# we install — knows none of the eight. Left active they would cost `herdr
+# config check` its whole value: it would exit 1 and every reload would print
+# eight "unknown config key" lines, which is how a real typo goes unnoticed.
+# Each carries the reason it is off, so re-enabling is uncommenting rather
+# than re-porting. The other 36 settings are omarchy's, verbatim.
 #
 # herdr WRITES to its own config, and chezmoi symlinks this file, so those
 # writes land in the repo — the same one-way valve mimeapps already relies
@@ -75,11 +77,12 @@ focus_pane_right = "ctrl+alt+right"
 
 resize_mode = ["prefix+ctrl+left", "prefix+ctrl+down", "prefix+ctrl+up", "prefix+ctrl+right"]
 
-# Like resize-pane on C-M-S-arrows
-resize_pane_left = "ctrl+alt+shift+left"
-resize_pane_down = "ctrl+alt+shift+down"
-resize_pane_up = "ctrl+alt+shift+up"
-resize_pane_right = "ctrl+alt+shift+right"
+# Like resize-pane on C-M-S-arrows. Unsupported by 0.8.0 — resize_mode above
+# is the only way to resize a pane until a release carries these.
+# resize_pane_left = "ctrl+alt+shift+left"
+# resize_pane_down = "ctrl+alt+shift+down"
+# resize_pane_up = "ctrl+alt+shift+up"
+# resize_pane_right = "ctrl+alt+shift+right"
 
 # No tmux equivalent; herdr's default prefix+shift+p is taken by previous session
 rename_pane = "prefix+shift+o"
@@ -92,9 +95,9 @@ switch_tab = ["prefix+1..9", "alt+1..9"]
 previous_tab = ["prefix+p", "alt+left"]
 next_tab = ["prefix+n", "alt+right"]
 
-# Like swap-window -t -1/+1 on M-S-Left/Right
-move_tab_previous = "alt+shift+left"
-move_tab_next = "alt+shift+right"
+# Like swap-window -t -1/+1 on M-S-Left/Right. Unsupported by 0.8.0.
+# move_tab_previous = "alt+shift+left"
+# move_tab_next = "alt+shift+right"
 
 # Sessions -> workspaces
 new_workspace = "prefix+shift+c"
@@ -106,9 +109,10 @@ next_workspace = ["prefix+shift+n", "alt+down"]
 [ui]
 accent = "blue"
 
-# tmux drew single-line dividers between adjacent panes and no outer frame
+# tmux drew single-line dividers between adjacent panes and no outer frame.
+# The outer frame stays: pane_outer_borders is unsupported by 0.8.0.
 pane_gaps = false
-pane_outer_borders = false
+# pane_outer_borders = false
 
 # tmux had no scrollbar column beside its panes
 pane_scrollbars = false
@@ -124,9 +128,10 @@ mouse_capture = true
 
 # tmux showed #h in status-right; the ZOOM flag shows there automatically
 #
-# omarchy writes this as `tab_bar_hostname = true`, which is the older boolean.
-# Upstream has since replaced it with an ordered list that can also carry a
-# clock, static text or a command's output — so this is their setting
-# expressed in the key our build has, not a deviation from it. zoom is listed
-# explicitly because the list replaces the default rather than adding to it.
-tab_bar_right = [{ type = "zoom" }, { type = "hostname" }]
+# omarchy writes this as `tab_bar_hostname = true`, an older boolean upstream
+# has since replaced with an ordered list (zoom / hostname / datetime / text /
+# command). 0.8.0 has NEITHER spelling, so the tab bar carries no hostname
+# here. The list form is what to uncomment if a release grows it — zoom has to
+# be named explicitly, because the list replaces the default rather than
+# adding to it.
+# tab_bar_right = [{ type = "zoom" }, { type = "hostname" }]

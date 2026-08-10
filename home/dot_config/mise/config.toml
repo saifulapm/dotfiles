@@ -6,13 +6,6 @@
 [tools]
 node = "lts"     # resolves to the current LTS major at install time
 deno = "latest"
-# Pinned to the exact patch on purpose, and only as herdr's build dependency
-# (run_after_09-cargo-tools.sh). herdr vendors libghostty-vt, whose build.zig
-# hard-refuses anything but 0.15.2 — "Your Zig version v0.16.0 does not meet
-# the required build version of v0.15.2" — so Fedora's zig package (0.16.0)
-# cannot build it and mise is what can hold the older one beside it. Nothing
-# here is written in Zig; bump this only when herdr's vendored VERSION moves.
-zig = "0.15.2"
 
 [settings]
 # Let mise honor .nvmrc / .node-version / package.json devEngines in project

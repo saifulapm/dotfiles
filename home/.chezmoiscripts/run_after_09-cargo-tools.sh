@@ -60,32 +60,12 @@ if ! command -v wayfreeze >/dev/null 2>&1; then
     || warn "cargo install wayfreeze (git) failed"
 fi
 
-# herdr (user ask 2026-08-10): agent multiplexer, alongside tmux. Built from
-# git rather than taken from its release binary — 0.8.0 is the newest tag and
-# does not know six of the pane/tab keys or pane_outer_borders that omarchy's
-# config uses, so a release build would ignore a third of the config we ship.
-#
-# The build needs zig 0.15.2 EXACTLY: herdr vendors libghostty-vt, whose
-# build.zig refuses any other version outright ("Your Zig version v0.16.0
-# does not meet the required build version of v0.15.2"). Fedora's zig is
-# 0.16.0, so this uses the mise-pinned one (~/.config/mise/config.toml) and
-# puts it FIRST on PATH — a system zig would otherwise win and fail the build.
-#
-# Gated rather than left to fail: the failure is a Rust panic inside build.rs
-# that only surfaces after 267 crates compile, which is a long way to go to
-# learn a toolchain is missing. Deliberately not installing herdr ITSELF via
-# mise — a shim there shadows the client with a stale wire protocol, the trap
-# omarchy's own migration (1786273938) backs out of.
-if ! command -v herdr >/dev/null 2>&1; then
-  zigdir="$HOME/.local/share/mise/installs/zig/0.15.2"
-  if [ ! -x "$zigdir/zig" ]; then
-    warn "zig 0.15.2 missing (mise install pending?) — skipping herdr, retry next apply"
-  else
-    echo "cargo-tools: building herdr from git (first run only — 267 crates, ~2 min)"
-    PATH="$zigdir:$PATH" cargo install --quiet --git https://github.com/herdrdev/herdr --locked \
-      && echo "cargo-tools: installed herdr" \
-      || warn "cargo install herdr (git) failed"
-  fi
-fi
+# herdr is NOT built here, though it can be: a git build understands seven
+# config keys the release does not. It needs zig 0.15.2 EXACTLY (it vendors
+# libghostty-vt, whose build.zig refuses every other version — Fedora's 0.16.0
+# included), which means pinning an old zig through mise purely as a build
+# dependency, plus 267 crates of compile on every fresh machine. Not worth it
+# for seven cosmetic bindings: run_after_10 takes the release binary and
+# home/dot_config/herdr/config.toml comments out what it cannot use.
 
 exit 0
