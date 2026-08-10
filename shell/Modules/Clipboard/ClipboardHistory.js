@@ -211,6 +211,28 @@ function fullText(entry) {
     return String(entry.text || "");
 }
 
+// The picker only ever searches and renders a prefix of an entry, so scan and
+// render just that much. Without this, one big paste costs hundreds of
+// megabytes of string work on EVERY keystroke — searchableText concatenates
+// and lowercases the whole thing, filePaths splits it into lines three times
+// per row, and the preview pane lays the winner out with WrapAnywhere — and
+// the shell stops answering while it happens. Nothing is lost: activating a
+// row pastes through `clipboard-paste --history-index`, which reads the full
+// entry back from the history file. (omarchy c4dda58, same cap.)
+var displayTextLimit = 8192;
+
+function cappedEntry(entry) {
+    if (!entry || entry.type !== "text" || entry.text.length <= displayTextLimit)
+        return entry;
+
+    // Cut on a line break so a file:// URI never truncates into a bogus path.
+    var cut = entry.text.lastIndexOf("\n", displayTextLimit);
+    return {
+        type: "text",
+        text: entry.text.slice(0, cut > 0 ? cut : displayTextLimit)
+    };
+}
+
 // The filter is a plain case-insensitive substring test over the entry's own
 // searchable text — no tokenizing and no ranking, so rows keep their
 // most-recent-first order.
@@ -227,7 +249,7 @@ function displayRows(history, query, limit) {
     var rows = [];
 
     for (var i = 0; i < values.length; i++) {
-        var entry = normalizeEntry(values[i]);
+        var entry = cappedEntry(normalizeEntry(values[i]));
         if (!entry)
             continue;
         if (needle && searchableText(entry).toLowerCase().indexOf(needle) < 0)
