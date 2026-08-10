@@ -34,6 +34,16 @@ set -uo pipefail
 runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/voxtype"
 state="$runtime/state"
 
+# voxtype is a hand-installed [[tool]] (see packages/manifest.toml), absent on
+# the NUC. Without this guard the systemctl start below no-ops against a unit
+# that does not exist and the bind hangs the full 5 s readiness ceiling before
+# complaining. Same guard voxtype-status already carries.
+if ! command -v voxtype >/dev/null 2>&1; then
+  command -v notify-send >/dev/null &&
+    notify-send -u critical "Dictation" "voxtype is not installed on this machine"
+  exit 0
+fi
+
 if [[ ! -e $state ]]; then
   systemctl --user start voxtype.service
 
