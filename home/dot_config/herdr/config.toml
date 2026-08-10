@@ -122,6 +122,11 @@ prompt_new_tab_name = false
 # set -g mouse on
 mouse_capture = true
 
-# tmux showed #h in status-right; the ZOOM flag shows there automatically.
-# Not in 0.8.0.
-# tab_bar_hostname = true
+# tmux showed #h in status-right; the ZOOM flag shows there automatically
+#
+# omarchy writes this as `tab_bar_hostname = true`, which is the older boolean.
+# Upstream has since replaced it with an ordered list that can also carry a
+# clock, static text or a command's output — so this is their setting
+# expressed in the key our build has, not a deviation from it. zoom is listed
+# explicitly because the list replaces the default rather than adding to it.
+tab_bar_right = [{ type = "zoom" }, { type = "hostname" }]
