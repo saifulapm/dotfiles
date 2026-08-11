@@ -761,7 +761,21 @@ Scope {
             }
 
             screen: modelData
-            visible: !barRoot.barHidden
+            // Hiding parks the bar just past its screen edge instead of
+            // unmapping it (omarchy 7633d8d). Unmapping frees the layer
+            // surface and the whole scene graph, so every reveal had to
+            // rebuild them — new surface, re-shaped glyphs, re-uploaded
+            // textures — which measures ~150ms against ~20ms to tear down.
+            // Parking keeps the surface alive, so showing is only a margin
+            // change.
+            visible: true
+            exclusionMode: barRoot.barHidden ? ExclusionMode.Ignore : ExclusionMode.Auto
+            margins {
+                top: barRoot.barHidden && barRoot.position === "top" ? -barRoot.barSize : 0
+                bottom: barRoot.barHidden && barRoot.position === "bottom" ? -barRoot.barSize : 0
+                left: barRoot.barHidden && barRoot.position === "left" ? -barRoot.barSize : 0
+                right: barRoot.barHidden && barRoot.position === "right" ? -barRoot.barSize : 0
+            }
             // Their anchor set: a bar spans the edge it sits on and is pinned
             // to it, so a vertical bar takes both top and bottom and only its
             // own side, and the free axis is left at 0 (the layer surface

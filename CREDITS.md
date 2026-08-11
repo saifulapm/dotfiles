@@ -1005,6 +1005,19 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   emacs config's qshell-dark/qshell-light themes (saifulapm/emacs.d) are Modus
   derivatives that read it; theme-apply pokes `qshell-theme-refresh` over
   emacsclient.
+- **Bluetooth power persistence** from `bin/omarchy-bluetooth-power` (c53190b):
+  BlueZ never persists Powered, so the rfkill soft block — which systemd-rfkill
+  saves and restores across boots — becomes the state and BlueZ follows it.
+  Ported near-verbatim as `bin/bluetooth-power`, with their panel details:
+  explicit on/off direction instead of a toggle (a second click during the
+  BlueZ catch-up window would undo the first) and all-controller `is-on`.
+- **Bar parked-while-hidden** from `shell/plugins/bar/Bar.qml` (7633d8d):
+  a hidden bar keeps its layer surface mapped, parked one bar-size past its
+  anchored edge with the exclusion zone released, so revealing is a margin
+  change (~10ms) instead of a full surface + scene-graph rebuild (~150ms+).
+- **Herdr launch bind** (507059e): SUPER+CTRL+RETURN attaches to the
+  persistent herdr session, mirrored as Mod+Ctrl+Return on our singleton
+  launch-or-focus shape (their keybindings menu deliberately not ported).
 
 ## DankMaterialShell (MIT) — github.com/AvengeMedia/DankMaterialShell
 

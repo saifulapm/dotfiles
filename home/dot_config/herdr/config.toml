@@ -128,10 +128,15 @@ mouse_capture = true
 
 # tmux showed #h in status-right; the ZOOM flag shows there automatically
 #
-# omarchy writes this as `tab_bar_hostname = true`, an older boolean upstream
-# has since replaced with an ordered list (zoom / hostname / datetime / text /
-# command). 0.8.0 has NEITHER spelling, so the tab bar carries no hostname
-# here. The list form is what to uncomment if a release grows it — zoom has to
-# be named explicitly, because the list replaces the default rather than
-# adding to it.
+# omarchy moved to this ordered-list spelling itself (c7c897c, 2026-08-10,
+# retiring its older `tab_bar_hostname = true` boolean), but it tracks herdr
+# git — the 0.8.0 release (latest as of 2026-08-11) understands NEITHER
+# spelling, so the tab bar carries no hostname here. Uncomment both keys below
+# when a release grows them — zoom has to be named explicitly, because the
+# list replaces the default rather than adding to it.
 # tab_bar_right = [{ type = "zoom" }, { type = "hostname" }]
+
+# set -g set-titles on / set -g set-titles-string '#h:#W', where tmux's #W was
+# the basename of the pane cwd. Resolves on the server, so remote sessions
+# name the remote host (omarchy 0b670cd — same git-only caveat as above).
+# window_title = "{hostname}: {workspace}"

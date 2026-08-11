@@ -506,6 +506,7 @@ window-rule {
     match app-id="^foot$"
     match app-id="^qshell-float$"
     match app-id="^tmux-main$"
+    match app-id="^herdr-main$"
     match app-id=r#"^TUI\.(float|tile)$"#
     scroll-factor 1.5
 }
@@ -569,6 +570,10 @@ binds {
     // the window is too: a distinct app-id lets launch-or-focus raise the
     // existing terminal instead of stacking a second client on the session.
     Mod+Alt+Return hotkey-overlay-title="Terminal: tmux" { spawn "launch-or-focus" "tmux-main" "foot-run" "--app-id=tmux-main" "tmux" "new-session" "-A" "-s" "main"; }
+    // omarchy: SUPER+CTRL+RETURN herdr (507059e) — same singleton shape as
+    // the tmux bind above; a bare `herdr` attaches to (or starts) its
+    // persistent server, herdr's own equivalent of new-session -A.
+    Mod+Ctrl+Return hotkey-overlay-title="Terminal: herdr" { spawn "launch-or-focus" "herdr-main" "foot-run" "--app-id=herdr-main" "herdr"; }
     Mod+D hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Space hotkey-overlay-title="Open the Menu" { spawn "qs" "ipc" "call" "menu" "toggle"; }
     // Omarchy's SUPER+ALT+SPACE apps-menu bind (b92510f). Our menu has no
