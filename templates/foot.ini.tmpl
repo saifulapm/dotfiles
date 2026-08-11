@@ -58,8 +58,21 @@ gamma-correct-blending=yes
 
 [scrollback]
 lines=10000
-# omarchy scroll feel: 7 lines per wheel notch instead of foot's 3.
-multiplier=7.0
+# Was omarchy's 7.0 (their config/foot/foot.ini) — a deliberate deviation, on
+# user ask 2026-08-11: 7 lines a notch overshoots constantly on this touchpad.
+# Back to foot 1.27's own default of 3.0, which is the one principled anchor
+# between "omarchy's number" and an arbitrary one.
+#
+# This is the last of THREE multiplied layers, so retune here first and only
+# here: niri's input.touchpad scroll-factor 0.4 damps the touchpad globally,
+# its window-rule scroll-factor 1.5 then re-boosts the foot-family app-ids
+# (both omarchy parity, both in niri/config.kdl), and foot multiplies what
+# survives. Changing this one leaves every other app's scrolling alone.
+#
+# foot has no config reload — SIGUSR1/SIGUSR2 only switch the colour theme
+# (foot(1)), which is all `theme-apply` uses them for. Open a NEW window to
+# see a change here; existing ones keep the value they launched with.
+multiplier=3.0
 
 [mouse]
 # macOS behavior: the pointer gets out of the way while typing.
