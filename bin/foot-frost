@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# The foot half of the blur toggle: flips the alpha include for windows yet
+# to open, and re-specs the background of every live one over OSC 11 (foot
+# implements URxvt's [NN]#rrggbb transparency extension). Both values come
+# from the theme-apply-rendered fragments — this script carries no color or
+# alpha of its own. Called by the shell's blur service (Services/Blur.qml);
+# harmless to run by hand.
+set -euo pipefail
+
+state="${XDG_STATE_HOME:-$HOME/.local/state}/qshell"
+
+case "${1:-}" in
+    on)  target=foot-alpha-frost.ini ;;
+    off) target=foot-alpha-solid.ini ;;
+    *)   echo "usage: foot-frost on|off" >&2; exit 2 ;;
+esac
+
+# Relative link within the state dir, same shape theme-apply bootstraps.
+ln -sfn "$target" "$state/foot-alpha.ini"
+
+# theme.ini's background is bare RRGGBB (the template's |hex filter).
+bg="$(sed -n 's/^background=//p' "$HOME/.config/foot/theme.ini" 2>/dev/null | head -n1)"
+[ -n "$bg" ] || exit 0
+
+spec="#$bg"
+if [ "$1" = on ]; then
+    alpha="$(sed -n 's/^alpha=//p' "$state/foot-alpha-frost.ini" 2>/dev/null | head -n1)"
+    pct="$(awk -v a="${alpha:-0.9}" 'BEGIN { printf "%d", a * 100 + 0.5 }')"
+    spec="[$pct]#$bg"
+fi
+
+# Same pty walk as theme-apply's OSC retheme: each foot's child's stdout.
+for fp in $(pgrep -x foot); do
+    for cp in $(pgrep -P "$fp"); do
+        readlink "/proc/$cp/fd/1" 2>/dev/null
+    done
+done | grep '^/dev/pts/' | sort -u | while read -r pty; do
+    printf '\033]11;%s\033\\' "$spec" > "$pty" 2>/dev/null || true
+done || true

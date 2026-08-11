@@ -20,6 +20,13 @@ import Quickshell.Io
 //    fragment (optional=true) and niri live-reloads included files, so a
 //    toggle needs no compositor restart.
 //
+//  * foot terminals. A whole-window fade dims glyphs with the background, so
+//    the foot family is excluded from the fragment's opacity pair (keeping
+//    the base 0.985/0.96 focus cue) and its frost is foot's own background-
+//    only alpha instead: bin/foot-frost, chained onto the fragment write,
+//    flips the theme-apply-rendered alpha include for future windows and
+//    re-specs live ones over OSC 11. Text stays crisp at any frost depth.
+//
 // Both paths ride niri's xray blur: the wallpaper is blurred once into a
 // cached texture and every blurred surface is then one textured quad, so the
 // enabled steady state costs nothing per frame. The non-xray mode (blurring
@@ -43,7 +50,11 @@ QtObject {
     // The app-window side of the switch. Opacity rules ride along because
     // blur behind a 98.5%-opaque window is invisible; these are the values
     // the frost was tuned at.
-    readonly property string fragmentOn: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Frosted app windows over niri's cached xray wallpaper blur. Global\n" + "// blur tuning stays at niri's defaults (passes 3, offset 3).\n" + "window-rule {\n" + "    background-effect {\n" + "        blur true\n" + "    }\n" + "}\n" + "\n" + "window-rule {\n" + "    opacity 0.95\n" + "}\n" + "\n" + "window-rule {\n" + "    match is-active=false\n" + "    opacity 0.9\n" + "}\n"
+    // The excludes are the foot family (the same set as config.kdl's scroll
+    // rule): those windows frost via their own background alpha, not a
+    // whole-window fade — see the header comment.
+    readonly property string footExcludes: "    exclude app-id=\"^foot$\"\n" + "    exclude app-id=\"^qshell-float$\"\n" + "    exclude app-id=\"^tmux-main$\"\n" + "    exclude app-id=r#\"^TUI\\.(float|tile)$\"#\n"
+    readonly property string fragmentOn: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Frosted app windows over niri's cached xray wallpaper blur. Global\n" + "// blur tuning stays at niri's defaults (passes 3, offset 3).\n" + "window-rule {\n" + "    background-effect {\n" + "        blur true\n" + "    }\n" + "}\n" + "\n" + "window-rule {\n" + "    opacity 0.95\n" + footExcludes + "}\n" + "\n" + "window-rule {\n" + "    match is-active=false\n" + "    opacity 0.9\n" + footExcludes + "}\n"
     readonly property string fragmentOff: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Blur is disabled; config.kdl includes this file optionally.\n"
 
     function logEvent(event, details) {
@@ -80,7 +91,11 @@ QtObject {
         if (fragmentWriter.running || fragmentQueue.length === 0)
             return;
         const on = fragmentQueue.shift();
-        fragmentWriter.command = ["bash", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s' \"$2\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\"", "qshell-blur-fragment", fragmentPath, on ? fragmentOn : fragmentOff];
+        // foot-frost rides the same write: the niri fragment and the foot
+        // alpha include must flip together or windows frost twice / not at
+        // all. Semicolon, not &&: a failed fragment write must not strand
+        // the foot side on the old state.
+        fragmentWriter.command = ["bash", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s' \"$2\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\"; foot-frost \"$3\"", "qshell-blur-fragment", fragmentPath, on ? fragmentOn : fragmentOff, on ? "on" : "off"];
         fragmentWriter.running = true;
     }
 

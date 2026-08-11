@@ -28,6 +28,13 @@ font={{font.mono}}:size={{font.foot-pt}}, Symbols Nerd Font Mono:size={{font.foo
 line-height={{font.foot-line-height}}px
 include=~/.config/foot/theme.ini
 
+# The frost half of the blur toggle: a symlink flipped between the
+# theme-apply-rendered frost/solid alpha fragments (bin/foot-frost, called
+# by the shell's blur service). Always present — theme-apply guarantees it —
+# because foot treats a missing include as fatal and falls back to stock
+# defaults wholesale.
+include=~/.local/state/qshell/foot-alpha.ini
+
 # Arch parity: selecting text copies it to the clipboard too (primary is still
 # fed, so middle-click paste and anything reading the primary selection keep
 # working).
