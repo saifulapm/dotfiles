@@ -93,10 +93,6 @@ after the first apply.
   `iCloud:.dotfiles/config/zed/settings.json` (zed itself was rejected for
   this desktop). Place it in `~/intelephense/licence.txt` for the language
   server to pick up premium features.
-- voxtype (dictation): manual binary download from
-  github.com/peteonrails/voxtype/releases into `~/.local/bin`, then
-  `voxtype setup --download --model base.en && voxtype setup systemd`.
-  The apply finishes the systemd wiring when the binary is present.
 - `~/.config/chezmoi/key.txt` (age key) — only needed if encrypted files are
   ever added to the repo; none exist today. Transport it out of band.
 

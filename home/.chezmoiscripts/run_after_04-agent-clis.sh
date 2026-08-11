@@ -4,9 +4,9 @@
 # user-local installs (no root), each guarded so re-runs no-op. Their LOGINS
 # are interactive and deliberately not scripted — each CLI asks on first run.
 #
-# voxtype (dictation) has no installer endpoint (voxtype.io/install.sh is a
-# 404, verified 2026-08-06) — it stays a manual download; this script only
-# finishes its systemd wiring when the binary is already present.
+# voxtype (dictation) used to be wired up at the end of this script because it
+# was a hand install. It is scripted now — binary, model and systemd unit —
+# in run_after_01-voxtype.sh, which runs before 02 owns the unit's state.
 #
 # Failures warn instead of aborting so a flaky network cannot stop the rest
 # of a fresh-machine apply.
@@ -59,25 +59,6 @@ fi
 if [ -d "$HOME/.local/share/pi-node" ]; then
   warn "~/.local/share/pi-node is a stale standalone node from an older pi install —"
   warn "  pi now lives next to the mise node; 'rm -rf ~/.local/share/pi-node' reclaims the space"
-fi
-
-if command -v voxtype >/dev/null 2>&1; then
-  # `voxtype setup systemd` writes the (not chezmoi-managed) user unit
-  if [ ! -f "$HOME/.config/systemd/user/voxtype.service" ]; then
-    voxtype setup systemd || warn "voxtype setup systemd failed"
-  fi
-  # NO enable here — deliberately (fixed 2026-08-08). This script runs after
-  # 02-user-timers in lexical order, and an enable block that lived here was
-  # re-enabling the daemon 02 had just disabled, on every single apply: the
-  # "unit flipping back to enabled within minutes, no journal trace" mystery
-  # the manifest blamed on a concurrent agent session was this script. 02
-  # owns the unit's state — disabled; started on demand by bin/voxtype-toggle
-  # on the keybind, reaped by voxtype-idle-stop.timer.
-else
-  warn "voxtype not installed — dictation (Mod+Ctrl+X / F9) stays inert. To enable:"
-  warn "  download the binary from github.com/peteonrails/voxtype/releases into ~/.local/bin,"
-  warn "  then: voxtype setup --download --model base.en && voxtype setup systemd"
-  warn "  then rerun 'chezmoi apply' — the keybind starts it on demand; never enable the unit"
 fi
 
 exit 0

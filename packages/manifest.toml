@@ -1450,15 +1450,41 @@ why  = "Screenshot annotation — bin/screenshot-annotate opens the clipboard im
 
 [[tool]]
 name = "voxtype"
-via  = "upstream install (github.com/peteonrails/voxtype releases, voxtype.io/download) → ~/.local/bin/voxtype, then `voxtype setup --download --model small.en` and `voxtype setup systemd`"
+via  = "home/.chezmoiscripts/run_after_01-voxtype.sh (github.com/peteonrails/voxtype release binary, pinned v0.7.5, per-arch + per-CPU-feature asset, sha256-verified) → ~/.local/bin/voxtype, then `voxtype setup --download --model small.en` and `voxtype setup systemd` from the same script"
 why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows and what Mod+Ctrl+X / F9 drive"
 
-# Notes on the voxtype entry above (installed by hand 2026-08-06, v0.7.5):
+# Notes on the voxtype entry above (v0.7.5, hand-installed on the M2
+# 2026-08-06, scripted for every machine 2026-08-11):
 #
 #   * Fedora does not package it — `dnf search voxtype` finds nothing — so it
 #     is a single user-local binary: an 11 MB stripped aarch64 ELF in
 #     ~/.local/bin, no rpm, no dnf update path. `voxtype check-update` is the
 #     only upgrade channel.
+#   * SCRIPTED SINCE 2026-08-11, and the NUC is why: it had never had the hand
+#     download, so every apply there printed the "voxtype not installed" nag
+#     and dictation stayed inert. The old note here (and in 04-agent-clis) read
+#     the missing voxtype.io/install.sh — a 404, rechecked 2026-08-11 — as "no
+#     scriptable install", but upstream publishes bare per-arch release
+#     binaries the same way satty does; there is just no tarball and no
+#     installer. run_after_01-voxtype.sh downloads the asset for the machine,
+#     checks it against upstream's SHA256SUMS.txt, pulls the model and writes
+#     the unit — guarded per step, so it no-ops on a machine that already has
+#     them and never overwrites a binary on disk.
+#     Version PINNED at v0.7.5 rather than resolved through the GitHub API
+#     like run_after_10's tools: v1.0.0-rc1 (2026-06-04) is the "latest"
+#     release and ships macos-universal ONLY, no linux asset at all, so a
+#     latest-resolving fetch would install nothing. Recheck when a 1.0 with
+#     linux binaries lands.
+#     Asset choice is per CPU, not just per arch: upstream builds whisper.cpp
+#     per feature level and ships no baseline x86_64 binary, so the script
+#     picks x86_64-avx512 / x86_64-avx2 from /proc/cpuinfo and warns (rather
+#     than installing a SIGILL) on a pre-AVX2 box. aarch64 has one CPU build.
+#     The -onnx assets are deliberately not used — that swaps the engine to
+#     Parakeet, a model decision rather than a packaging one.
+#   * `voxtype setup --download --model X` REWRITES config.toml's model= as
+#     part of downloading (verified 2026-08-11), so the script guards on the
+#     model FILE being absent, not on `setup check`. A machine where the model
+#     was switched by hand keeps that choice across applies.
 #   * `voxtype info variants` reports AVX2=false and no GPU on this Mac, so
 #     transcription is plain CPU whisper.cpp. The model itself
 #     (~/.local/share/voxtype/models/ggml-small.en.bin, 466 MB) is downloaded,
@@ -1515,7 +1541,16 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     boundaries) rather than just performance.
 #   * `voxtype setup systemd` writes ~/.config/systemd/user/voxtype.service,
 #     which is NOT chezmoi-managed (unlike taildrop-receive.service) — a
-#     restore has to re-run that command. It is then left DISABLED on purpose
+#     restore has to re-run that command, which is now what
+#     run_after_01-voxtype.sh does, guarded on the unit file being absent.
+#     That command also ENABLES the unit (symlink into
+#     graphical-session.target.wants) and STARTS the daemon — measured
+#     2026-08-11 by running it against a throwaway XDG_CONFIG_HOME, which
+#     still enabled and started the REAL unit because systemctl reads the real
+#     paths. So 01 disables and stops it immediately afterwards, in the one
+#     window where the daemon is known to be the one that command just started
+#     (that branch only runs when the machine had no unit at all). It is then
+#     left DISABLED on purpose
 #     (see the on-demand note above), and BOTH halves of that are automated in
 #     run_after_02-user-timers.sh: it enables voxtype-idle-stop.timer with the
 #     other user units and disables voxtype.service in a guarded block at the
@@ -1533,8 +1568,9 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     re-enabled what 02 had just disabled on every apply. That block is now
 #     removed; 02 alone owns the unit state, and the apply-time disable
 #     remains as the backstop against any future flipper.
-#     Guarded on the unit existing, because voxtype is a hand install and is
-#     legitimately absent on a fresh machine. Disable only, never stop: the
+#     Guarded on the unit existing, because 01's install can legitimately fail
+#     (no upstream build for the arch, flaky network) and leave the machine
+#     without one. Disable only, never stop: the
 #     idle timer is what stops a running daemon, and unlike a blind `stop` it
 #     checks state first and will not cut off a dictation in progress.
 #   * The daemon publishes its state to $XDG_RUNTIME_DIR/voxtype/state, which

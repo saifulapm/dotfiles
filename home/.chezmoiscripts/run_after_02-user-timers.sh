@@ -78,9 +78,13 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
   # in ~0.2 s instead, and voxtype-idle-stop.timer above stops it again after
   # 10 min idle. Numbers and reasoning in packages/manifest.toml.
   #
-  # Guarded on the unit existing: voxtype is a hand install (`voxtype setup
-  # systemd` writes this unit, nothing in this repo does), so it is legitimately
-  # absent on a fresh machine and `disable` would otherwise warn every apply.
+  # Guarded on the unit existing: the unit is written by `voxtype setup
+  # systemd`, which run_after_01-voxtype.sh runs just before this script on a
+  # fresh machine — but that install can legitimately fail (no upstream build
+  # for the arch, flaky network), and `disable` would then warn every apply.
+  # 01 leaves the unit disabled itself, since `setup systemd` enables AND
+  # starts it; this block is the steady-state backstop against anything
+  # flipping it back on later.
   #
   # DISABLE ONLY, never stop. `disable` is what keeps the next login from
   # starting it; stopping a RUNNING one is the idle timer's job precisely
