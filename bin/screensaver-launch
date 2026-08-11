@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# screensaver-launch — spawn the quotes screensaver fullscreen. Port of
+# omarchy's bin/omarchy-launch-screensaver (CREDITS.md), cut to our shape:
+# foot is THE terminal here so their four-terminal detection goes, and both
+# machines drive a single display, so their per-monitor focus/spawn/wait
+# choreography goes too — one foot on the focused output, fullscreened and
+# made opaque by the org.qshell.screensaver window-rule in the niri config.
+#
+# Exit status matters: the idle service falls back to powering the monitors
+# off when this returns nonzero, so a machine without ttfx keeps its old
+# screensaver-less behavior instead of idling with the desktop up.
+
+# The idle service spawns this from qshell.service, whose PATH does not
+# carry the cargo bin dir ttfx installs into.
+export PATH="$HOME/.cargo/bin:$PATH"
+
+command -v ttfx >/dev/null 2>&1 || exit 1
+command -v foot >/dev/null 2>&1 || exit 1
+
+# Already up — nothing to do
+pgrep -f '[o]rg.qshell.screensaver' >/dev/null && exit 0
+
+# The inner script's stderr goes to /dev/null, NOT the pty: anything a tool
+# in the loop prints to the terminal lands on the screensaver display.
+setsid -f foot --app-id=org.qshell.screensaver \
+  --config="${XDG_CONFIG_HOME:-$HOME/.config}/foot/screensaver.ini" \
+  bash -c "\"\$HOME/.dotfiles/bin/screensaver\" 2>/dev/null" >/dev/null 2>&1

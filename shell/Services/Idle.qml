@@ -23,16 +23,20 @@ import Quickshell.Wayland
 //
 // Two deliberate adaptations of upstream's semantics:
 //
-//  * Their first stage launches a screensaver window (omarchy-launch-screensaver)
-//    and their whole Hyprland openwindow/closewindow dance exists to know
-//    whether that window is still up. We ship no screensaver, so our first
-//    stage powers the monitors off via niri's DPMS action — there is no
-//    window to track, and the launch-grace/dismiss bookkeeping goes with it.
-//  * Because launching their screensaver itself reads as activity, upstream
-//    ignores the wake signal while the screensaver is up and lets the lock
-//    fire underneath it. Powering monitors off generates no input, so we take
-//    the plain swayidle-style rule instead: any activity cancels every pending
-//    stage and powers the monitors back on.
+//  * Their first stage launches a screensaver window and their whole Hyprland
+//    openwindow/closewindow dance exists to know whether that window is still
+//    up. Ours launches bin/screensaver-launch (the ttfx quotes screensaver)
+//    but keeps none of that bookkeeping: the screensaver polices itself (it
+//    exits on input or focus loss), and if the launcher fails — no ttfx on
+//    this machine — the stage falls back to powering the monitors off, which
+//    was this service's whole first stage before the screensaver existed.
+//  * Because launching their screensaver itself reads as activity on
+//    Hyprland, upstream ignores the wake signal while the screensaver is up.
+//    niri's ext-idle-notify only resets on real input, so we keep the plain
+//    swayidle-style rule: any activity cancels every pending stage, powers
+//    the monitors back on, and sweeps the screensaver windows (belt to the
+//    screensaver's own braces — its read loop only sees the keyboard, so a
+//    mouse-move wake reaches it through this sweep).
 QtObject {
     id: root
 
@@ -122,10 +126,27 @@ QtObject {
         run(["brightness-keyboard", "restore"]);
     }
 
+    function launchScreensaver() {
+        if (shellRoot.locked) {
+            logEvent("screensaver", "skipped-locked");
+            return;
+        }
+        logEvent("screensaver", "launch");
+        screensaverProcess.running = true;
+    }
+
+    function killScreensaver() {
+        // The bracketed pattern keeps pkill from matching its own cmdline.
+        run(["pkill", "-f", "[o]rg.qshell.screensaver"]);
+    }
+
     function lockNow(reason) {
         screensaverTimer.stop();
         lockTimer.stop();
         idledThisCycle = false;
+        // The lock surface steals focus, so the screensaver would notice and
+        // exit within a second anyway — the kill just skips the overlap.
+        killScreensaver();
         if (shellRoot.locked) {
             logEvent("lock-skipped", "already locked");
             return;
@@ -143,7 +164,7 @@ QtObject {
 
         if (screensaverStageEnabled) {
             if (screensaverDelaySeconds === 0)
-                powerOffMonitors();
+                launchScreensaver();
             else
                 screensaverTimer.restart();
         }
@@ -159,8 +180,10 @@ QtObject {
     function cancelIdleCycle(reason) {
         screensaverTimer.stop();
         lockTimer.stop();
-        if (idledThisCycle)
+        if (idledThisCycle) {
             logEvent("idle-cycle-cancel", reason || "requested");
+            killScreensaver();
+        }
         powerOnMonitors();
         idledThisCycle = false;
     }
@@ -244,7 +267,24 @@ QtObject {
     readonly property Timer screensaverTimer: Timer {
         interval: root.screensaverDelaySeconds * 1000
         repeat: false
-        onTriggered: root.powerOffMonitors()
+        onTriggered: {
+            if (root.idleEnabled && root.idledThisCycle)
+                root.launchScreensaver();
+        }
+    }
+
+    // Launch through a Process, not execDetached: the exit code is the
+    // fallback signal. screensaver-launch exits nonzero when ttfx (or foot)
+    // is missing, and this stage then does what it always did before the
+    // screensaver existed — power the monitors off.
+    readonly property Process screensaverProcess: Process {
+        command: [Quickshell.env("HOME") + "/.dotfiles/bin/screensaver-launch"]
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0 && root.idledThisCycle) {
+                root.logEvent("screensaver", "unavailable — monitors off");
+                root.powerOffMonitors();
+            }
+        }
     }
 
     readonly property Timer lockTimer: Timer {

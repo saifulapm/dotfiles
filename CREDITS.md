@@ -1018,6 +1018,19 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
 - **Herdr launch bind** (507059e): SUPER+CTRL+RETURN attaches to the
   persistent herdr session, mirrored as Mod+Ctrl+Return on our singleton
   launch-or-focus shape (their keybindings menu deliberately not ported).
+- **Screensaver design** from `bin/omarchy-screensaver` + `omarchy-launch-screensaver`
+  + `default/foot/screensaver.ini` (4e31b61 swapped their Python TTE for ttfx,
+  a parity-exact Rust port): a fullscreen terminal with a dedicated app-id
+  runs ttfx effects in a loop, exiting on input or focus loss; the pty-resize
+  wait and the black-background OSC are theirs verbatim. Ours draws random
+  motivational quotes instead of a branding file, holds each readable between
+  effects (zero-CPU sleep — ttfx exits when its effect completes), runs at
+  30fps not their 120, and asks niri for focus where they ask hyprctl. Their
+  per-monitor spawn choreography is dropped (single-display machines). The
+  idle chain follows their Service.qml: screensaver stage at 150s, lock at
+  300s, with our lock screen's own 5s blank timer taking display power-off —
+  and a fallback their design doesn't need: if ttfx is missing the stage
+  powers the monitors off, which was our whole stage 1 before this port.
 
 ## DankMaterialShell (MIT) — github.com/AvengeMedia/DankMaterialShell
 

@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# screensaver — motivational quotes, one at a time, animated by ttfx. Runs
+# inside the fullscreen terminal bin/screensaver-launch spawns. Port of
+# omarchy's bin/omarchy-screensaver (CREDITS.md; 4e31b61 swapped their Python
+# TTE for ttfx, a parity-exact Rust port), reshaped: their input is a fixed
+# branding file replayed forever; ours draws a random quote per cycle and
+# holds it readable between effects. ttfx exits when its effect completes and
+# the hold below is a 1s-tick read loop, so the idle cost of a running
+# screensaver is one wakeup per second — no render loop, no polling daemon.
+
+QUOTES="${XDG_CONFIG_HOME:-$HOME/.config}/qshell/screensaver-quotes.txt"
+HOLD_SECONDS=14
+
+exit_screensaver() {
+  pkill -x ttfx 2>/dev/null
+  pkill -f '[o]rg.qshell.screensaver' 2>/dev/null
+  exit 0
+}
+
+# Exit on signals and on input from the keyboard
+trap exit_screensaver SIGINT SIGTERM SIGHUP SIGQUIT
+
+printf '\033]11;rgb:00/00/00\007' # background to black regardless of theme
+printf '\033[?25l'                # hide the cursor (niri has no runtime cursor toggle)
+
+tty=$(tty 2>/dev/null)
+
+# Terminals allocate the pty at the default 80x24 and only resize it once the
+# compositor has told the window how big it is. ttfx measures the terminal
+# once, at startup, so starting it before the resize lands sizes an 80x24
+# canvas and paints it into the corner of a fullscreen window (upstream's
+# wait, same reasoning).
+wait_for_terminal_resize() {
+  local deadline=$((SECONDS + 2))
+  while ((SECONDS < deadline)) && [[ $(stty size 2>/dev/null) == "24 80" ]]; do
+    sleep 0.02
+  done
+}
+wait_for_terminal_resize
+
+# Their focus check asks hyprctl; ours asks niri. A niri session lock steals
+# focus without input, so this is also how the screensaver gets out of the
+# way when the lock stage fires underneath it.
+screensaver_in_focus() {
+  niri msg --json focused-window 2>/dev/null | grep -qF '"org.qshell.screensaver"'
+}
+
+# One quote per line, "text — author". Split the attribution onto its own
+# line, wrap to a readable measure, and center each line so ttfx's block
+# anchor yields centered typography rather than a ragged left edge.
+quote() {
+  shuf -n1 "$QUOTES" | sed 's/ — /\n\n— /' | fold -s -w 64 | awk '
+    { lines[NR] = $0; if (length($0) > w) w = length($0) }
+    END { for (i = 1; i <= NR; i++) printf "%*s%s\n", int((w - length(lines[i])) / 2), "", lines[i] }'
+}
+
+# Input watcher shared by the animation and the hold: a keypress or lost
+# focus tears everything down. read is blocking-with-timeout, so each pass
+# costs one wakeup per second.
+watch_for_exit() {
+  if read -rsn1 -t 1 || ! screensaver_in_focus; then
+    exit_screensaver
+  fi
+}
+
+while true; do
+  # 30fps, not upstream's 120: foot repaints what ttfx animates, and full-
+  # screen effects at 2560x1600 cost ~70% of a core at 60fps against ~35% at
+  # 30. The animation is a ~4s burst per cycle; the hold between is 0%.
+  quote | ttfx --frame-rate 30 --canvas-width 0 --canvas-height 0 --reuse-canvas \
+    --anchor-canvas c --anchor-text c --random-effect --no-eol --no-restore-cursor &
+
+  while pgrep -t "${tty#/dev/}" -x ttfx >/dev/null; do
+    watch_for_exit
+  done
+
+  hold=$((SECONDS + HOLD_SECONDS))
+  while ((SECONDS < hold)); do
+    watch_for_exit
+  done
+done
