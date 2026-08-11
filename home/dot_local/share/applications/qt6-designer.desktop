@@ -1,0 +1,23 @@
+# Shadows /usr/share/applications/qt6-designer.desktop (same desktop-file-id,
+# and ~/.local/share wins) to add one line: NoDisplay=true.
+#
+# qt6-designer is not something installed on purpose — it is a hard require of
+# qt6-qttools-devel, which the manifest keeps installed as librepods' build dep
+# (Qt6::LinguistTools). So Qt Designer and Qt Linguist turn up in the launcher
+# on every machine that installs the manifest. Hiding beats uninstalling: drop
+# qt6-qttools-devel and a librepods rebuild fails at cmake.
+#
+# Copied verbatim from the system entry so nothing else changes — the MimeType
+# stays, because NoDisplay only hides the entry from menus, it does not
+# unregister the handler (user decision 2026-08-11).
+[Desktop Entry]
+Name=Qt6 Designer
+GenericName=Interface Designer
+Comment=Design GUIs for Qt6 applications
+Exec=designer-qt6
+Icon=designer-qt6
+MimeType=application/x-designer;
+Terminal=false
+Type=Application
+Categories=Qt;Development;
+NoDisplay=true
