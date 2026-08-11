@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=X
+Comment=X
+Exec=webapp-launch https://x.com/
+Terminal=false
+Type=Application
+Icon=x
+StartupNotify=true
+Categories=Network;
+X-Qshell-WebApp=true

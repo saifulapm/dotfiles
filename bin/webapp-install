@@ -10,6 +10,17 @@
 #   webapp-install <name> <url> [icon-ref]  scripted; icon-ref = URL, file
 #                                           path or icon-theme name (empty =
 #                                           scrape the site)
+#
+# What this writes is machine-local. The baseline set that belongs on every
+# machine (ChatGPT, Discord, WhatsApp, X, YouTube, Zoom) is checked into the
+# chezmoi source instead — home/dot_local/share/applications/webapp-*.desktop
+# and their icons in home/dot_local/share/icons/hicolor/256x256/apps — so a
+# fresh machine gets them from `chezmoi apply`: offline, identical everywhere,
+# no favicon scraping at apply time (and webapp-zoom.desktop keeps its
+# zoom-handler Exec + scheme handlers, which this script does not generate;
+# mimeapps.list pins zoommtg/zoomus at it, so it has to exist on every
+# machine). To promote one made here, move the .desktop and its icon into
+# those two source dirs and apply (user decision 2026-08-11).
 set -euo pipefail
 
 ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"

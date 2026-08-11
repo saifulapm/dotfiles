@@ -4,6 +4,11 @@
 # Port of omarchy-webapp-remove (CREDITS.md): no argument = pick from the
 # installed set with gum; entries are recognized by the X-Qshell-WebApp
 # marker webapp-install writes, so a hand-made .desktop is never offered.
+#
+# The baseline web apps are chezmoi-managed symlinks into the source tree (see
+# webapp-install's header), so removing one here only clears this machine until
+# the next `chezmoi apply` puts it back. To drop it everywhere, delete the
+# .desktop and its icon from home/dot_local/share/{applications,icons/...}.
 set -euo pipefail
 
 APP_DIR="$HOME/.local/share/applications"

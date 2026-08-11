@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Discord
+Comment=Discord
+Exec=webapp-launch https://discord.com/channels/@me
+Terminal=false
+Type=Application
+Icon=discord
+StartupNotify=true
+Categories=Network;
+X-Qshell-WebApp=true

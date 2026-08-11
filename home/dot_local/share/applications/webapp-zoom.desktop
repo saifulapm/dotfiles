@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Name=Zoom
+Comment=Zoom
+Exec=zoom-handler %u
+Terminal=false
+Type=Application
+Icon=zoom
+StartupNotify=true
+Categories=Network;
+X-Qshell-WebApp=true
+MimeType=x-scheme-handler/zoommtg;x-scheme-handler/zoomus;

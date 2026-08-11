@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=WhatsApp
+Comment=WhatsApp
+Exec=webapp-launch https://web.whatsapp.com/
+Terminal=false
+Type=Application
+Icon=whatsapp
+StartupNotify=true
+Categories=Network;
+X-Qshell-WebApp=true

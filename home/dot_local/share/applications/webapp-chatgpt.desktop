@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=ChatGPT
+Comment=ChatGPT
+Exec=webapp-launch https://chatgpt.com/
+Terminal=false
+Type=Application
+Icon=chatgpt
+StartupNotify=true
+Categories=Network;
+X-Qshell-WebApp=true
