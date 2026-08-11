@@ -75,4 +75,32 @@ if [ "$state" = "Running" ]; then
   esac
 fi
 
+# Clipboard VIP route: every machine advertises 10.99.99.99/32 and the
+# control plane keeps the route pointed at an online one (HA subnet-router
+# failover — no tags, unlike Tailscale Services, whose tagged-host
+# requirement would break Taildrop per kb/1106). The phone's shortcuts
+# target http://10.99.99.99:9411/ and stop caring which machine is awake.
+# `tailscale set --advertise-routes` REPLACES the whole set, so the current
+# routes are merged in; the operator may set prefs, no root needed. The
+# route stays "pending" until approved once per machine in the admin
+# console (Machines → the machine → Edit route settings) — nothing breaks
+# while it waits. The local halves (VIP on lo, firewall) are run_after_20's.
+if [ "$state" = "Running" ]; then
+  vip_route="10.99.99.99/32"
+  current_routes="$(tailscale debug prefs 2>/dev/null \
+    | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin).get("AdvertiseRoutes") or []))' 2>/dev/null || true)"
+  case ",$current_routes," in
+  *",$vip_route,"*) ;;
+  *)
+    merged="$vip_route"
+    [ -n "$current_routes" ] && merged="$current_routes,$vip_route"
+    if tailscale set --advertise-routes="$merged" 2>/dev/null; then
+      echo "tailscale: clipboard VIP route advertised ($vip_route) — approve it once in the admin console (Machines → this machine → Edit route settings)"
+    else
+      echo "tailscale: clipboard VIP route NOT advertised — run: tailscale set --advertise-routes=$merged" >&2
+    fi
+    ;;
+  esac
+fi
+
 exit 0

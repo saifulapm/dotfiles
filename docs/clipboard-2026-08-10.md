@@ -20,6 +20,16 @@ it inside the OS.
   firewalld, unreachable from LAN/internet, encrypted in transit. Plain HTTP
   because this tailnet has no cert domains enabled — and the tunnel already
   encrypts.
+- **One stable URL for the phone** (added 2026-08-11): every machine also
+  advertises the virtual address `10.99.99.99/32` (run_after_05) and
+  answers it locally — the VIP sits on `lo` via `clipboard-vip.service`,
+  the socket listens wildcard, and a firewalld rich rule admits TCP 9411
+  from tailnet sources only (run_after_20). Tailscale's HA subnet-router
+  failover keeps the route pointed at an online machine (~15 s on a clean
+  shutdown), so `http://10.99.99.99:9411/` works as long as *any* machine
+  is up. Tailscale Services was the purpose-built alternative and was
+  rejected: service hosts must be tagged nodes, and Taildrop refuses
+  tagged devices (kb/1106) — it would have killed the Taildrop toast flow.
 - **`clipboard-sync.service`** — `wl-paste --watch` on text selections,
   session-scoped like qshell. Every local copy is POSTed to every peer
   `bin/clipboard-sync-push` discovers from `tailscale status`: all *online
@@ -48,8 +58,8 @@ Tailscale's VPN toggle must be on (the app can stay backgrounded).
 **"Send Clipboard"** (iPhone → machines):
 
 1. Shortcuts app → **+** → name it "Send Clipboard".
-2. Add **Get Contents of URL**: `http://fedora.taila27604.ts.net/` → *Show
-   More* → Method **POST** → Request Body **File** → pick the **Clipboard**
+2. Add **Get Contents of URL**: `http://10.99.99.99:9411/` → *Show More* →
+   Method **POST** → Request Body **File** → pick the **Clipboard**
    variable.
 3. Optional: **Show Notification** ("Sent ✓").
 4. To also send selected text without copying first: in the shortcut's info
@@ -65,9 +75,9 @@ Claude-app payload; on any pandoc failure the original bytes pass through
 untouched), so no shortcut needs a workaround.
 
 One POST is enough: the receiving machine fans it out to every other peer.
-The URL can name any machine that's likely to be on — each node has its own
-(`fedora`, `fedora-1`, … per `tailscale status`); pointing the shortcut at
-the main desktop is the sensible default.
+The VIP URL follows whoever is online, so the shortcuts never name a
+machine; the per-machine names (`http://fedora.taila27604.ts.net/`, …)
+still work too, if a specific box ever needs targeting.
 
 The receiving machine shows a toast — "󰅌 Clipboard from iphone172" with a
 content preview (`tailscale serve` forwards the sender's tailnet IP;
@@ -96,6 +106,9 @@ the whole setup:
 2. `tailscale up` — once logged in, the next `chezmoi apply` (or rerunning
    run_after_05 by hand) publishes the serve mapping. `tailscale serve
    status` should show `/ proxy http://127.0.0.1:9411`.
+3. Approve the machine's `10.99.99.99/32` route once in the admin console
+   (Machines → the machine → Edit route settings) so it can carry the
+   phone's VIP URL when the others are off. The apply prints a reminder.
 
 From that moment the machine both receives (its serve URL is live) and
 sends (the push watcher discovers online Linux peers per copy). The other

@@ -33,6 +33,23 @@ respond() { # status-line body
     "$status" "${#body}" "$body"
 }
 
+# The socket listens wildcard (see clipboard-serve.socket for the two fronts
+# it serves). firewalld's tailnet-source rich rule is the real gate; this is
+# the belt to that brace, coarse on purpose — 100.* covers the CGNAT range
+# without doing mask math in bash. systemd (Accept=yes) hands the peer in
+# REMOTE_ADDR, v4 addresses in v6-mapped form.
+peer=${REMOTE_ADDR:-}
+peer=${peer#::ffff:}
+# 10.99.99.99 appears as the peer when this machine talks to its own VIP —
+# the kernel picks the local address as the source for a local destination.
+case $peer in
+"" | 127.* | ::1 | 10.99.99.99 | 100.* | fd7a:115c:a1e0:*) ;;
+*)
+  respond "403 Forbidden" $'tailnet only\n'
+  exit 0
+  ;;
+esac
+
 # A client that connects and then says nothing must not park a handler
 # forever: every read gets 10 s, and clipboard-serve@.service caps the whole
 # instance at RuntimeMaxSec=30 as the backstop.
@@ -134,10 +151,18 @@ if [[ -z $relay ]]; then
 fi
 
 notify_arrival() {
-  local sender=""
+  local sender="" who
   command -v notify-send >/dev/null 2>&1 || return 0
-  [[ -z $xff ]] || sender=$(tailscale whois --json "$xff" 2>/dev/null \
-    | jq -r '.Node.ComputedName // empty' 2>/dev/null) || sender=""
+  # Via tailscale serve the caller rides in X-Forwarded-For; via the VIP the
+  # socket sees the phone itself, so the peer address is the caller.
+  who=${xff:-$peer}
+  case $who in
+  "" | 127.* | ::1 | 10.99.99.99) ;;
+  *)
+    sender=$(tailscale whois --json "$who" 2>/dev/null \
+      | jq -r '.Node.ComputedName // empty' 2>/dev/null) || sender=""
+    ;;
+  esac
   notify-send -a qshell "󰅌 Clipboard from ${sender:-tailnet}" "$preview" >/dev/null 2>&1 || true
 }
 

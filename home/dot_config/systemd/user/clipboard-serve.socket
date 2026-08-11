@@ -1,12 +1,17 @@
 [Unit]
 Description=Clipboard HTTP endpoint (per-connection activation)
-# Loopback only, on purpose: the tailnet side is `tailscale serve --http=80
-# → 127.0.0.1:9411` (wired by run_after_05-tailscale.sh), which terminates
-# inside tailscaled — no port on any real interface, nothing for firewalld.
-# The handler and the callers are documented in bin/clipboard-serve.
+# Wildcard, not loopback: the port answers on two fronts with two gates.
+# 127.0.0.1 backs `tailscale serve` — the per-machine tailnet URLs,
+# terminated inside tailscaled (run_after_05). 10.99.99.99 — the VIP that
+# clipboard-vip.service puts on lo — is the phone's one stable URL, kept
+# pointed at an online machine by HA subnet routing (run_after_20 + a route
+# approval in the admin console). The LAN side stays closed: the default
+# firewalld zone drops unsolicited ports, and run_after_20's rich rule
+# admits 9411 from tailnet sources (100.64.0.0/10) only.
+# bin/clipboard-serve re-checks the peer address as the belt to that brace.
 
 [Socket]
-ListenStream=127.0.0.1:9411
+ListenStream=9411
 Accept=yes
 
 [Install]
