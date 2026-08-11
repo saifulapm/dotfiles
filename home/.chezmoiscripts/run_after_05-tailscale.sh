@@ -61,18 +61,36 @@ fi
 # tailscaled's profile where it survives reboots, so this acts once per
 # machine and is a no-op after. Captured into a variable, not piped to grep
 # (the pipefail+grep -q SIGPIPE class).
+# Serve config is keyed by the node's DNS NAME at publish time — after a
+# rename in the admin console the stored mapping still says the old name
+# and every request under the new one gets tailscaled's own "404 page not
+# found" (found live 2026-08-11: the fedora→macbook/nuc renames silently
+# killed machine-to-machine sync). So the guard checks for the CURRENT
+# name, not just the port, and re-keys via reset when they disagree —
+# reset is safe here because the clipboard proxy is the only serve user
+# on these machines.
 if [ "$state" = "Running" ]; then
+  dnsname="$(tailscale status --json 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("Self",{}).get("DNSName","").rstrip("."))' 2>/dev/null || true)"
   serve_now="$(tailscale serve status 2>/dev/null || true)"
+  serve_ok=""
   case $serve_now in
-  *127.0.0.1:9411*) ;;
-  *)
+  *127.0.0.1:9411*)
+    case $serve_now in
+    *"$dnsname"*) [ -n "$dnsname" ] && serve_ok=1 ;;
+    esac
+    ;;
+  esac
+  if [ -z "$serve_ok" ]; then
+    case $serve_now in
+    *127.0.0.1:9411*) tailscale serve reset >/dev/null 2>&1 || true ;;
+    esac
     if tailscale serve --bg --http=80 9411 >/dev/null 2>&1; then
-      echo "tailscale: clipboard endpoint published (tailnet :80 → 127.0.0.1:9411)"
+      echo "tailscale: clipboard endpoint published (http://$dnsname → 127.0.0.1:9411)"
     else
       echo "tailscale: clipboard endpoint NOT published — run: tailscale serve --bg --http=80 9411" >&2
     fi
-    ;;
-  esac
+  fi
 fi
 
 # Clipboard VIP route: every machine advertises 10.99.99.99/32 and the
