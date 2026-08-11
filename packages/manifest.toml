@@ -186,6 +186,18 @@ arch = "all"
 why = "`xdotool type` for Wayland — how voxtype puts a finished transcript into the focused window (see [[tool]] voxtype). Without it voxtype falls back to the clipboard and dictation stops short of actually typing (`voxtype setup check` says so in as many words). Installed 2026-08-06; it is also this machine's only key-injection tool, so the emoji picker and clipboard manager can now paste into the focused window the way omarchy does, instead of only copying and notifying"
 
 [[pkg]]
+name = "wlrctl"
+category = "core"
+arch = "all"
+why = "Virtual mouse for Wayland — niri implements zwlr_virtual_pointer_manager_v1 (verified in the 26.04 binary, 2026-08-11), so this drives pointer move/click/scroll with no daemon and no uinput. The desktop skill's default pointer channel; wtype covers keyboard but cannot click. Also gives `toplevel waitfor/wait/find` — the wait-for-a-window primitive"
+
+[[pkg]]
+name = "ydotool"
+category = "core"
+arch = "all"
+why = "The one input action wlrctl's CLI cannot express: holding a button down across a move — drag-and-drop, sliders, marquee selection (`ydotool click 0x40` down / `0x80` up, `mousemove --absolute`). Kernel uinput, so it also reaches XWayland clients. Needs ydotoold running and a udev rule for /dev/uinput; the desktop skill falls back to wlrctl for everything else"
+
+[[pkg]]
 name = "power-profiles-daemon"
 category = "core"
 arch = "all"
