@@ -42,6 +42,25 @@ overview {
     backdrop-color "{{surface.0}}"
 }
 
+// The Alt-Tab switcher's selection highlight. niri's defaults are a flat
+// #999999 grey with square corners — the last surface in the session that
+// ignored the theme. accent.accent and accent.error are the same tokens
+// tab-indicator uses above, so "this one is selected" and "this one is
+// shouting" read identically wherever they appear. Padding and the open delay
+// are geometry and live in config.kdl.
+//
+// The radius is the window radius, not window radius + highlight padding, so
+// the corners are very slightly tighter than truly concentric. At padding 10
+// that is not visible, and the engine does no arithmetic — a template function
+// for a 10 px offset would cost more than it buys.
+recent-windows {
+    highlight {
+        active-color "{{accent.accent}}"
+        urgent-color "{{accent.error}}"
+        corner-radius {{shape.radius}}
+    }
+}
+
 // The theme's radius clips every window; the border/shadow follow it.
 window-rule {
     geometry-corner-radius {{shape.radius}}

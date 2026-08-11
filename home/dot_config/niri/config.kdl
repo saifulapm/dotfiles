@@ -289,6 +289,38 @@ hotkey-overlay {
     hide-not-bound
 }
 
+// The Alt-Tab / Mod-Tab window switcher. Geometry and feel only — the
+// highlight's colours and corner radius are theme tokens, so they live in the
+// theme include at the end of this file. Omarchy has no equivalent surface at
+// all (their ALT+TAB is bare Hyprland cycle_next + bring_to_top, no overlay),
+// so there is nothing to match here; these numbers only trim niri's defaults
+// down to the same tight character as the rest of the session.
+//
+// Binds are left alone deliberately: the defaults are already what we want
+// (Mod+Tab across all windows, Mod+grave within the focused app — the Mac
+// idiom, and nothing in binds{} below shadows either), and adding a `binds`
+// section here would clear ALL four default binds, not merge with them.
+recent-windows {
+    // 150 default. The delay exists so a quick tap-to-switch doesn't flash a
+    // fullscreen overlay; 100 keeps that guard while matching the springs.
+    open-delay-ms 100
+
+    highlight {
+        // 30 default, which puts an enormous halo around every tile. 10 makes
+        // the highlight hug the preview — the single biggest win for reading
+        // as minimal rather than as a modal dialog.
+        padding 10
+    }
+
+    previews {
+        // 480 default. Smaller tiles fit more windows per row, so the switcher
+        // stays one compact strip instead of filling the display. This is the
+        // binding constraint, not max-scale: 0.5 of a 1600 px panel is an
+        // 800 px cap, so max-height is what actually sizes the tiles here.
+        max-height 220
+    }
+}
+
 // Uncomment this line to ask the clients to omit their client-side decorations if possible.
 // If the client will specifically ask for CSD, the request will be honored.
 // Additionally, clients will be informed that they are tiled, removing some client-side rounded corners.
