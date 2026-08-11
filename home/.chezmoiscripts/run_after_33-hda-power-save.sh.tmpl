@@ -1,0 +1,65 @@
+#!/bin/bash
+# Turns off snd_hda_intel runtime power saving.
+#
+# Why this needs root at all: module parameters are read from /etc/modprobe.d
+# at module load, and there is no per-user equivalent. The reasoning for the
+# setting itself is in the file being installed, packages/hda-power-save.conf.
+#
+# Same shape as run_after_30-bluetooth-restart.sh.tmpl, for the same reasons:
+# runs on every apply with a src-vs-dest cmp as the real change gate, rather
+# than run_onchange, which records "done" on exit 0 and would therefore mark a
+# declined-authorization run as complete and never retry it.
+set -euo pipefail
+
+# workingTree, not a hardcoded ~/.dotfiles — a non-default --source makes the
+# hardcoded path miss and the [ -f ] guard below then skips silently.
+src="{{ .chezmoi.workingTree }}/packages/hda-power-save.conf"
+dest=/etc/modprobe.d/hda-power-save.conf
+
+[ -f "$src" ] || exit 0
+
+# Nothing to do on a machine with no Intel HDA controller.
+[ -d /sys/module/snd_hda_intel ] || exit 0
+
+if [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+  exit 0
+fi
+
+# Root by whichever route this run can reach: passwordless sudo, then sudo with
+# a controlling terminal, then pkexec against the shell's polkit agent for runs
+# with no tty (background agents, keybinds, systemd units).
+run_root() {
+  if sudo -n true 2>/dev/null; then
+    sudo "$@"
+  elif [ -t 0 ] && sudo -v 2>/dev/null; then
+    sudo "$@"
+  elif command -v pkexec >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+    echo "hda power save: asking for authorization on screen…" >&2
+    timeout 180 pkexec "$@"
+  else
+    return 1
+  fi
+}
+
+# Both root actions go through ONE run_root. Splitting them costs two polkit
+# prompts on any run that lands on the pkexec branch, because pkexec authorizes
+# per invocation and caches nothing between them the way sudo does.
+#
+# The second action is the live write: power_save is a writable module param,
+# so the running kernel takes the setting now and the modprobe.d file is only
+# what makes it survive a reboot. It does not disturb anything in flight —
+# it is read the next time a codec would have idled, and codecs already asleep
+# stay asleep until something opens a PCM. Best-effort on purpose: if only the
+# sysfs half fails, the persistent half is still installed and correct, so that
+# warns rather than failing the script.
+if ! run_root /bin/sh -c '
+  /usr/bin/install -D -m 0644 "$1" "$2" || exit 1
+  printf 0 > /sys/module/snd_hda_intel/parameters/power_save 2>/dev/null ||
+    echo "hda power save: live write failed — takes effect at reboot" >&2
+' _ "$src" "$dest"; then
+  echo "hda power save: not authorized — skipping (rerun 'chezmoi apply')" >&2
+  echo "hda power save: codecs keep suspending until then" >&2
+  exit 0
+fi
+
+echo "hda power save: installed $dest"
