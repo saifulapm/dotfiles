@@ -1,7 +1,8 @@
 {
   "version": 1,
   "idle": {
-    "screensaver": 300,
+    "screensaver": 150,
+    "blank": 300,
     "lock": 360
   },
   "sync": {

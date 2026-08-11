@@ -15,21 +15,26 @@ import Quickshell.Wayland
 //
 // Config lives in shell.json's root `idle` block:
 //
-//     "idle": { "screensaver": 150, "lock": 300 }
+//     "idle": { "screensaver": 150, "blank": 300, "lock": 360 }
 //
-// Seconds, upstream's defaults. A missing/invalid value falls back to the
-// default; 0 disables that stage; with both stages disabled the monitor
-// itself never arms.
+// Seconds. A missing/invalid value falls back to the default; 0 disables that
+// stage; with every stage disabled the monitor itself never arms.
 //
-// Two deliberate adaptations of upstream's semantics:
+// Three deliberate adaptations of upstream's semantics:
 //
 //  * Their first stage launches a screensaver window and their whole Hyprland
 //    openwindow/closewindow dance exists to know whether that window is still
 //    up. Ours launches bin/screensaver-launch (the ttfx quotes screensaver)
 //    but keeps none of that bookkeeping: the screensaver polices itself (it
-//    exits on input or focus loss), and if the launcher fails — no ttfx on
-//    this machine — the stage falls back to powering the monitors off, which
-//    was this service's whole first stage before the screensaver existed.
+//    exits on input or focus loss).
+//  * `blank` has no upstream counterpart. Powering the panel off was this
+//    service's whole first stage until the screensaver took that slot over
+//    (ce8bbac), which left the panel lit through the quotes right up to the
+//    lock. It is its own stage now rather than a retimed screensaver, so the
+//    two run in sequence: quotes first, dark panel after. Defaults to 0 (off)
+//    so the stage is opt-in and upstream's two-stage shape is the fallback.
+//    The screensaver keeps running behind the dark panel — it costs nothing
+//    on its 1s tick, and the wake path sweeps it either way.
 //  * Because launching their screensaver itself reads as activity on
 //    Hyprland, upstream ignores the wake signal while the screensaver is up.
 //    niri's ext-idle-notify only resets on real input, so we keep the plain
@@ -49,14 +54,18 @@ QtObject {
     // Presence is the whole state — the file's contents are never read.
     readonly property string stayAwakePath: stateDir + "/stay-awake"
 
-    // Upstream's defaults (their Service.qml).
+    // Upstream's defaults (their Service.qml); `blank` is ours and stays off
+    // unless shell.json asks for it.
     readonly property int defaultScreensaverSeconds: 150
+    readonly property int defaultBlankSeconds: 0
     readonly property int defaultLockSeconds: 300
 
     readonly property var idleConfig: shellRoot && shellRoot.config && shellRoot.config.idle && typeof shellRoot.config.idle === "object" ? shellRoot.config.idle : ({})
     readonly property int screensaverTimeoutSeconds: secondsFromConfig(idleConfig.screensaver, defaultScreensaverSeconds)
+    readonly property int blankTimeoutSeconds: secondsFromConfig(idleConfig.blank, defaultBlankSeconds)
     readonly property int lockTimeoutSeconds: secondsFromConfig(idleConfig.lock, defaultLockSeconds)
     readonly property bool screensaverStageEnabled: screensaverTimeoutSeconds > 0
+    readonly property bool blankStageEnabled: blankTimeoutSeconds > 0
     readonly property bool lockStageEnabled: lockTimeoutSeconds > 0
 
     // The monitor waits for whichever stage comes first; the rest are that
@@ -65,11 +74,14 @@ QtObject {
         const stages = [];
         if (screensaverStageEnabled)
             stages.push(screensaverTimeoutSeconds);
+        if (blankStageEnabled)
+            stages.push(blankTimeoutSeconds);
         if (lockStageEnabled)
             stages.push(lockTimeoutSeconds);
         return stages.length > 0 ? Math.min.apply(Math, stages) : 0;
     }
     readonly property int screensaverDelaySeconds: Math.max(0, screensaverTimeoutSeconds - firstIdleTimeoutSeconds)
+    readonly property int blankDelaySeconds: Math.max(0, blankTimeoutSeconds - firstIdleTimeoutSeconds)
     readonly property int lockDelaySeconds: Math.max(0, lockTimeoutSeconds - firstIdleTimeoutSeconds)
 
     // Stay-awake state, mirrored from the flag file.
@@ -112,7 +124,7 @@ QtObject {
         if (monitorsPoweredOff)
             return;
         monitorsPoweredOff = true;
-        logEvent("screensaver", "power-off-monitors");
+        logEvent("blank", "power-off-monitors");
         run(["niri", "msg", "action", "power-off-monitors"]);
         run(["brightness-keyboard", "off"]);
     }
@@ -142,6 +154,7 @@ QtObject {
 
     function lockNow(reason) {
         screensaverTimer.stop();
+        blankTimer.stop();
         lockTimer.stop();
         idledThisCycle = false;
         // The lock surface steals focus, so the screensaver would notice and
@@ -169,6 +182,13 @@ QtObject {
                 screensaverTimer.restart();
         }
 
+        if (blankStageEnabled) {
+            if (blankDelaySeconds === 0)
+                powerOffMonitors();
+            else
+                blankTimer.restart();
+        }
+
         if (lockStageEnabled) {
             if (lockDelaySeconds === 0)
                 lockNow("lock-timeout-immediate");
@@ -179,6 +199,7 @@ QtObject {
 
     function cancelIdleCycle(reason) {
         screensaverTimer.stop();
+        blankTimer.stop();
         lockTimer.stop();
         if (idledThisCycle) {
             logEvent("idle-cycle-cancel", reason || "requested");
@@ -243,12 +264,15 @@ QtObject {
             inIdleCycle: idledThisCycle,
             monitorsPoweredOff: monitorsPoweredOff,
             screensaver: screensaverTimeoutSeconds,
+            blank: blankTimeoutSeconds,
             lock: lockTimeoutSeconds,
             firstIdle: firstIdleTimeoutSeconds,
             screensaverDelay: screensaverDelaySeconds,
+            blankDelay: blankDelaySeconds,
             lockDelay: lockDelaySeconds,
             timers: {
                 screensaver: screensaverTimer.running,
+                blank: blankTimer.running,
                 lock: lockTimer.running
             },
             lastEvent: lastEvent
@@ -276,14 +300,29 @@ QtObject {
     // Launch through a Process, not execDetached: the exit code is the
     // fallback signal. screensaver-launch exits nonzero when ttfx (or foot)
     // is missing, and this stage then does what it always did before the
-    // screensaver existed — power the monitors off.
+    // screensaver existed — power the monitors off. Unless the blank stage is
+    // configured, which already owns the panel on its own deadline: blanking
+    // here too would drag that forward to the screensaver's time.
     readonly property Process screensaverProcess: Process {
         command: [Quickshell.env("HOME") + "/.dotfiles/bin/screensaver-launch"]
         onExited: (exitCode, exitStatus) => {
-            if (exitCode !== 0 && root.idledThisCycle) {
-                root.logEvent("screensaver", "unavailable — monitors off");
-                root.powerOffMonitors();
+            if (exitCode === 0 || !root.idledThisCycle)
+                return;
+            if (root.blankStageEnabled) {
+                root.logEvent("screensaver", "unavailable — blank stage holds the panel");
+                return;
             }
+            root.logEvent("screensaver", "unavailable — monitors off");
+            root.powerOffMonitors();
+        }
+    }
+
+    readonly property Timer blankTimer: Timer {
+        interval: root.blankDelaySeconds * 1000
+        repeat: false
+        onTriggered: {
+            if (root.idleEnabled && root.idledThisCycle)
+                root.powerOffMonitors();
         }
     }
 
