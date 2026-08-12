@@ -47,7 +47,18 @@ Scope {
     readonly property int dividerHeight: theme.space(5)
     readonly property int headerHeight: theme.space(10)
     readonly property int cardMargin: theme.space(4)
-    readonly property int maxListHeight: theme.space(110)
+    // The ceiling on the rows region — omarchy's, and their reason: "a card
+    // that swallows the whole screen reads as a page, not a menu". 64e20f8
+    // raised theirs from 60% of the screen to 70%.
+    //
+    // Ours was a flat theme.space(110) = 440 px. That is 41% of this laptop's
+    // 1066 and would be under a quarter of a 4K panel, so the root menu (9
+    // rows, 428 px) already sat one row from clipping and a filtered list —
+    // taller rows, frozen at the starting height — showed seven. A ceiling
+    // belongs to the display, not to a number of pixels, so it follows the
+    // surface, which is anchored to all four edges and therefore screen-sized.
+    // The fallback only applies before the window reports a height.
+    readonly property int maxListHeight: Math.round((menuSurface.height > 0 ? menuSurface.height : 1000) * 0.7)
     // The starting menu sets the height ceiling: the first submenu move or
     // search keystroke freezes it, so drilling into a longer menu (or the
     // taller filtered rows) scrolls behind the fold instead of growing the
@@ -773,6 +784,8 @@ Scope {
     }
 
     OverlaySurface {
+        id: menuSurface
+
         theme: menuRoot.theme
         opened: menuRoot.opened
         namespace: "qshell-menu"
