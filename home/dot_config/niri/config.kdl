@@ -649,6 +649,27 @@ binds {
     Mod+Ctrl+Alt+D hotkey-overlay-title="Calendar" { spawn "qs" "ipc" "call" "bar" "open" "clock"; }
     // omarchy: SUPER+SHIFT+CTRL+A agent — the bar's AI panel.
     Mod+Shift+Ctrl+A hotkey-overlay-title="AI Panel" { spawn "qs" "ipc" "call" "bar" "open" "ai"; }
+    // omarchy: SUPER+CTRL+number opens the bar's right-hand panels by
+    // position, so a chord keeps meaning the same icon after the bar is
+    // rearranged (their utilities.lua loop, `code:10`..`code:18`). The letters
+    // above name a panel; the numbers count them. Widgets with no panel of
+    // their own (the tray) are not counted, so the number matches the icon a
+    // user would point at.
+    //
+    // Ours count INWARD FROM THE RIGHT EDGE, not from the section's first
+    // entry: eight of this bar's right-hand widgets come and go, so counting
+    // from the left would start at the least-wanted end and renumber whenever
+    // one appeared (see Bar.qml panelWidgetIdAt). A bar with fewer panels than
+    // the number leaves that key doing nothing.
+    Mod+Ctrl+1 hotkey-overlay-title="Bar Panel 1 (from the right)" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "1"; }
+    Mod+Ctrl+2 hotkey-overlay-title="Bar Panel 2" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "2"; }
+    Mod+Ctrl+3 hotkey-overlay-title="Bar Panel 3" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "3"; }
+    Mod+Ctrl+4 hotkey-overlay-title="Bar Panel 4" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "4"; }
+    Mod+Ctrl+5 hotkey-overlay-title="Bar Panel 5" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "5"; }
+    Mod+Ctrl+6 hotkey-overlay-title="Bar Panel 6" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "6"; }
+    Mod+Ctrl+7 hotkey-overlay-title="Bar Panel 7" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "7"; }
+    Mod+Ctrl+8 hotkey-overlay-title="Bar Panel 8" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "8"; }
+    Mod+Ctrl+9 hotkey-overlay-title="Bar Panel 9" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "9"; }
     // omarchy: SUPER+CTRL+T btop, floating via the qshell-float rule.
     Mod+Ctrl+T hotkey-overlay-title="System Monitor: btop" { spawn "foot-run" "--app-id=qshell-float" "btop"; }
     // Ours: omarchy has no radio and no music picker at all — their music
@@ -905,18 +926,23 @@ binds {
     Mod+7 { focus-workspace 7; }
     Mod+8 { focus-workspace 8; }
     Mod+9 { focus-workspace 9; }
-    Mod+Ctrl+1 { move-column-to-workspace 1; }
-    Mod+Ctrl+2 { move-column-to-workspace 2; }
-    Mod+Ctrl+3 { move-column-to-workspace 3; }
-    Mod+Ctrl+4 { move-column-to-workspace 4; }
-    Mod+Ctrl+5 { move-column-to-workspace 5; }
-    Mod+Ctrl+6 { move-column-to-workspace 6; }
-    Mod+Ctrl+7 { move-column-to-workspace 7; }
-    Mod+Ctrl+8 { move-column-to-workspace 8; }
-    Mod+Ctrl+9 { move-column-to-workspace 9; }
+    // Alt rather than niri's stock Ctrl: omarchy binds SUPER+CTRL+number to
+    // the bar's right-hand panels (see the Mod+Ctrl+number block further
+    // down), which Hyprland leaves free and niri does not. Moving a column is
+    // the one that had somewhere free to go — Mod+Shift+number is already the
+    // macOS-style screenshot and cast family.
+    Mod+Alt+1 { move-column-to-workspace 1; }
+    Mod+Alt+2 { move-column-to-workspace 2; }
+    Mod+Alt+3 { move-column-to-workspace 3; }
+    Mod+Alt+4 { move-column-to-workspace 4; }
+    Mod+Alt+5 { move-column-to-workspace 5; }
+    Mod+Alt+6 { move-column-to-workspace 6; }
+    Mod+Alt+7 { move-column-to-workspace 7; }
+    Mod+Alt+8 { move-column-to-workspace 8; }
+    Mod+Alt+9 { move-column-to-workspace 9; }
     // omarchy runs workspaces 1..10; 0 is the tenth.
-    Mod+0      { focus-workspace 10; }
-    Mod+Ctrl+0 { move-column-to-workspace 10; }
+    Mod+0     { focus-workspace 10; }
+    Mod+Alt+0 { move-column-to-workspace 10; }
 
     // omarchy: SUPER+SHIFT+ALT+number moves the column without following it.
     Mod+Shift+Alt+1 { move-column-to-workspace 1 focus=false; }

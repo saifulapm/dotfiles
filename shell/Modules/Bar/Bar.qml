@@ -338,19 +338,23 @@ Scope {
             });
         }
 
-        // Omarchy's summonBarWidget: any process (a niri bind) can open a
-        // widget's panel — `qs ipc call bar open audio`. The bar on the
-        // niri-focused output gets first refusal (upstream summons on the
-        // focused monitor); any other bar carrying the widget follows, so a
-        // widget absent from the focused screen still opens where it lives.
+        // Open a widget's panel by id — `qs ipc call bar open audio`. Routing
+        // across screens is summonWidgetPanel's job, below.
         function open(widgetId: string): string {
-            const focusedWs = barRoot.niri.workspaces.find(w => w.is_focused);
-            const focusedOutput = focusedWs ? focusedWs.output : "";
-            const bars = barRoot.screenBars.slice().sort((a, b) => Number(b.screen && b.screen.name === focusedOutput) - Number(a.screen && a.screen.name === focusedOutput));
-            for (const b of bars)
-                if (b.summonWidget(widgetId))
-                    return "ok";
-            return "no widget with a panel: " + widgetId;
+            return barRoot.summonWidgetPanel(widgetId);
+        }
+
+        // Omarchy's togglePanelAt (5edc349): a section's panels answer to
+        // their position as well as their id, so a hotkey can mean "the
+        // second panel on the right" and keep meaning it after the bar is
+        // rearranged. Answers with the id it acted on, so a bind is
+        // debuggable from the shell.
+        function openAt(section: string, index: string): string {
+            const widgetId = barRoot.panelWidgetIdAt(section, index);
+            if (widgetId === "")
+                return "no panel at " + section + " " + index;
+            const result = barRoot.summonWidgetPanel(widgetId);
+            return result === "ok" ? widgetId : result;
         }
 
         // Omarchy's hideBarWidget, generalized: closes whatever panel is
@@ -364,15 +368,70 @@ Scope {
     // reach their slot lists.
     property var screenBars: []
 
+    // The bar on the niri-focused output gets first refusal (upstream summons
+    // on the focused monitor); any other bar carrying the widget follows, so a
+    // widget absent from the focused screen still opens where it lives.
+    function focusedFirstBars() {
+        const focusedWs = niri.workspaces.find(w => w.is_focused);
+        const focusedOutput = focusedWs ? focusedWs.output : "";
+        return screenBars.slice().sort((a, b) => Number(b.screen && b.screen.name === focusedOutput) - Number(a.screen && a.screen.name === focusedOutput));
+    }
+
+    // Omarchy's summonBarWidget: any process (a niri bind) can open a widget's
+    // panel — `qs ipc call bar open audio`.
+    function summonWidgetPanel(widgetId) {
+        for (const b of focusedFirstBars())
+            if (b.summonWidget(widgetId))
+                return "ok";
+        return "no widget with a panel: " + widgetId;
+    }
+
+    // Omarchy's panelWidgetIdAt: the Nth panel of a section, counted the way
+    // the bar reads — layout order, and only the panels actually on screen. A
+    // widget with no panel (the tray) and one hiding itself are passed over,
+    // so the number lands on the Nth panel ICON the user can see rather than
+    // the Nth layout entry. One-based, because it exists for hotkeys.
+    //
+    // DELIBERATE difference from upstream, which counts every section from its
+    // first layout entry: our right section carries seventeen widgets, and
+    // eight of them come and go (kb, devservices, dufs, icloud, dropbox,
+    // tailscale, mic, airpods). Counting from the left would both start at the
+    // least-wanted end and renumber the lot whenever one of those appeared.
+    // Each section is counted from its OUTER edge instead — 1 is the rightmost
+    // panel of the right section, the leftmost of the left — which puts the
+    // always-present widgets on the low numbers and holds still.
+    //
+    // Counting any one bar surface is enough: every monitor lays its bar out
+    // from the same config, and summoning the id routes through
+    // summonWidgetPanel, which opens the focused monitor's copy whichever
+    // surface was counted.
+    function panelWidgetIdAt(section, index) {
+        const name = String(section || "");
+        const position = Math.round(Number(index));
+        if (!(position >= 1))
+            return "";
+        for (const b of focusedFirstBars()) {
+            if (typeof b.panelNavigationSlots !== "function")
+                continue;
+            const slots = b.panelNavigationSlots(name);
+            if (slots.length === 0)
+                continue;
+            const slot = name === "right" ? slots[slots.length - position] : slots[position - 1];
+            if (slot && slot.widgetId)
+                return String(slot.widgetId);
+            // A section with fewer panels than this leaves the tail of the
+            // range doing nothing, rather than wrapping onto a neighbour.
+            return "";
+        }
+        return "";
+    }
+
     // ---------------------------------------------- notification center
     // Summon the history center on the niri-focused output first (the `bar
     // open` ordering): a standalone bell widget answers, else an Indicators
     // container hosting one.
     function summonNotifCenter() {
-        const focusedWs = niri.workspaces.find(w => w.is_focused);
-        const focusedOutput = focusedWs ? focusedWs.output : "";
-        const bars = screenBars.slice().sort((a, b) => Number(b.screen && b.screen.name === focusedOutput) - Number(a.screen && a.screen.name === focusedOutput));
-        for (const b of bars)
+        for (const b of focusedFirstBars())
             if (b.summonNotifCenter())
                 return true;
         return false;
