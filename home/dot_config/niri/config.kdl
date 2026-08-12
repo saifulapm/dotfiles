@@ -437,8 +437,11 @@ window-rule {
 window-rule {
     match title=r#"Picture.?in.?[Pp]icture"#
     open-floating true
-    default-column-width { fixed 600; }
-    default-window-height { fixed 338; }
+    // Proportions, not pixels: a fixed 600x338 was right on the MacBook's
+    // 1706-logical panel and toy-sized on the mini's 31" (3490 logical at
+    // 1.1). Same fraction of the screen reads the same everywhere.
+    default-column-width { proportion 0.35; }
+    default-window-height { proportion 0.32; }
     default-floating-position x=40 y=43 relative-to="top-right"
 }
 
@@ -473,8 +476,8 @@ window-rule {
 window-rule {
     match app-id="^qshell-float$"
     open-floating true
-    default-column-width { fixed 875; }
-    default-window-height { fixed 600; }
+    default-column-width { proportion 0.5; }
+    default-window-height { proportion 0.55; }
 }
 
 // bin/tui-install's launcher entries (omarchy's TUI.float/TUI.tile app-id
@@ -484,8 +487,8 @@ window-rule {
 window-rule {
     match app-id=r#"^TUI\.float$"#
     open-floating true
-    default-column-width { fixed 875; }
-    default-window-height { fixed 600; }
+    default-column-width { proportion 0.5; }
+    default-window-height { proportion 0.55; }
 }
 
 // omarchy's floating-window tag (system.lua) also covers the media viewers:
@@ -498,8 +501,8 @@ window-rule {
     match app-id=r#"^org\.gnome\.Evince$"#
     match app-id=r#"^org\.pwmt\.zathura$"#
     open-floating true
-    default-column-width { fixed 875; }
-    default-window-height { fixed 600; }
+    default-column-width { proportion 0.5; }
+    default-window-height { proportion 0.55; }
 }
 
 window-rule {
@@ -507,8 +510,8 @@ window-rule {
     open-floating true
     // Compact portrait-calculator size — left to itself the app opens far
     // too big (user call 2026-08-07).
-    default-column-width { fixed 360; }
-    default-window-height { fixed 540; }
+    default-column-width { proportion 0.2; }
+    default-window-height { proportion 0.5; }
 }
 
 // OAuth/sign-in popups (window.open) share the browser's app-id, so the
