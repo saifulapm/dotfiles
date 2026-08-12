@@ -222,6 +222,12 @@ arch = "all"
 why = "English traineddata for tesseract — the engine ships with no language at all, and bin/screenshot-ocr's default is `-l eng`"
 
 [[pkg]]
+name = "zbar"
+category = "optional"
+arch = "all"
+why = "Barcode/QR decoder behind bin/screenshot-qr (the capture menu's QR Code row — hidden while zbarimg is absent), port of omarchy's omarchy-capture-qr. Only the QR symbology is enabled at call time: dense screen content false-positives as EAN or Code 39 otherwise"
+
+[[pkg]]
 name = "wlsunset"
 category = "core"
 arch = "all"

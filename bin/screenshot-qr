@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# screenshot-qr — select a region with slurp, decode the QR code in it, copy
+# the payload to the clipboard.
+#
+# Port of omarchy's omarchy-capture-qr (CREDITS.md). Two differences, both
+# ours: the screen freeze is wayfreeze rather than `hyprpicker -r -z` (same
+# reason — grim has to see the frozen overlay, not live content shifting
+# during teardown), and notifications go through notify-send like the rest of
+# bin/screenshot-*.
+set -euo pipefail
+
+notify() {
+  notify-send -a qshell -t "${3:-2000}" ${2:+-u "$2"} "QR code" "$1" >/dev/null 2>&1 || true
+}
+
+if ! command -v zbarimg >/dev/null 2>&1; then
+  notify "zbar is not installed" critical 3000
+  exit 1
+fi
+
+# Freeze while picking (wayfreeze, presence-gated — see screenshot-ocr); the
+# EXIT trap covers every early return, including slurp's own cancel.
+freeze_pid=""
+if command -v wayfreeze >/dev/null 2>&1; then
+  wayfreeze --hide-cursor &
+  freeze_pid=$!
+  trap '[[ -n $freeze_pid ]] && kill "$freeze_pid" 2>/dev/null || true' EXIT
+  sleep 0.15
+fi
+
+region="$(slurp 2>/dev/null)" || exit 0
+[[ -z $region ]] && exit 0
+
+# Decode QR codes only. Leaving the other symbologies enabled lets dense screen
+# content false-positive as an EAN or Code 39 barcode and take over the
+# clipboard. zbarimg exits 4 when it finds nothing, which is not a failure
+# here, so the pipeline's status is read rather than trusted to `set -e`.
+result="$(grim -g "$region" - | zbarimg -q --raw -Sdisable -Sqrcode.enable - 2>/dev/null)" || result=""
+
+# --raw still terminates the payload with a newline; a QR's contents do not
+# include one, and it would be pasted along with the value.
+result="${result%$'\n'}"
+
+if [[ -z $result ]]; then
+  notify "No QR code found in the selected region" critical 3000
+  exit 1
+fi
+
+# QR codes routinely carry secrets, like the otpauth:// URIs behind 2FA setup
+# codes, so the decoded value goes to the clipboard and nowhere else. Printing
+# it or putting it in the notification body would leak it to the session
+# journal and to the notification history, and an unmarked copy would be
+# retained by clipboard history (bin/clipboard-capture honours the same
+# x-kde-passwordManagerHint wl-copy --sensitive sets). Pasting still works;
+# only the recorded copy is given up.
+printf '%s' "$result" | wl-copy --sensitive
+
+notify "Copied QR code contents to clipboard"

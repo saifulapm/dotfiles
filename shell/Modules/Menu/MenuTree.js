@@ -167,6 +167,17 @@ var TREE = {
         "when": "command -v tesseract",
         "action": "screenshot-ocr"
     },
+    // Omarchy's trigger.capture.qr. The decoded value only ever reaches the
+    // clipboard — never the notification body, never stdout — because QR codes
+    // routinely carry secrets (otpauth:// 2FA setup URIs).
+    "capture.qr": {
+        "icon": "󰐲",
+        "label": "QR Code",
+        "aliases": ["qr", "qrcode", "barcode", "scan", "decode"],
+        "description": "Pick an area and copy the QR code it contains",
+        "when": "command -v zbarimg",
+        "action": "screenshot-qr"
+    },
     // Omarchy's trigger.transcode: re-encode a picture or video for sharing.
     // Interactive halves (fzf file pick, gum format/resolution) run in a
     // float; the finished file's URI lands on the clipboard.
