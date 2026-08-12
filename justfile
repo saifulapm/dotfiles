@@ -25,3 +25,8 @@ apply:
 update:
     mise up
     rustup update
+
+# update EVERYTHING: dnf, dotfiles, prebuilts, source builds, toolchains,
+# cargo tools, gh extensions. `just update-all --emacs` adds the Emacs rebuild.
+update-all *args:
+    bash {{ justfile_directory() }}/bin/update-all {{ args }}

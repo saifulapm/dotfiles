@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# update-all — roll the whole machine forward: dnf, chezmoi-managed configs,
+# toolchains, cargo tools, prebuilt release binaries, and the source-built
+# tools the run_after scripts install once and then guard forever.
+#
+# The mechanism leans on chezmoi rather than duplicating install logic: every
+# run_after script already knows how to install its tool, but each one guards
+# on "binary exists" so an apply never surprise-rebuilds. This script decides
+# what is STALE, removes exactly those binaries (and advances their src
+# checkouts), then runs one `chezmoi apply` and lets the guards reinstall at
+# current versions. cargo tools are the exception: re-running `cargo install`
+# IS the staleness check (fast no-op when current), where rm+apply would
+# force a full rebuild even when nothing changed.
+#
+# `update-all --emacs` additionally rebuilds Emacs 31 from the branch tip
+# (bin/rebuild-emacs — the long one, native compilation throughout).
+#
+# Deliberately NOT here:
+#   * podman dev images (mysql/postgres/redis/mailpit) — a major-version pull
+#     can strand the data dirs; bump those by hand, deliberately.
+#   * librepods — hand-built with packages/librepods-status-ipc.patch (see
+#     the manifest); a reminder prints instead.
+#   * nirisnap upstream syncs — rebasing the port onto tobi's omasnap is a
+#     decision with conflicts to review (NIRI.md in the fork), not an update.
+#     The source-build check below rebuilds only when the FORK's main moved.
+set -uo pipefail
+
+WITH_EMACS=0
+[ "${1:-}" = "--emacs" ] && WITH_EMACS=1
+
+STATE="$HOME/.local/state/qshell/update-all"
+mkdir -p "$STATE"
+FAILURES=()
+
+say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
+warn() {
+  echo "update-all: $*" >&2
+  FAILURES+=("$*")
+}
+
+# ------------------------------------------------------------------ dotfiles
+# First, so a pushed manifest/script change takes effect in THIS run.
+say "dotfiles"
+if ! git -C "$HOME/.dotfiles" diff-index --quiet HEAD 2>/dev/null; then
+  echo "  tree is dirty — skipping the pull, applying what is here"
+elif ! git -C "$HOME/.dotfiles" pull --ff-only; then
+  warn "dotfiles pull failed (diverged from origin?)"
+fi
+
+# ----------------------------------------------------------------- dnf / rpm
+say "dnf packages"
+sudo dnf upgrade --refresh || warn "dnf upgrade failed"
+
+# ----------------------------------------------- prebuilt release binaries
+# Tag-file staleness: compare the repo's latest release tag against the one
+# recorded at the last refresh. First sighting records a baseline without
+# redownloading (the guards installed these recently enough). On a bump the
+# binary is removed; the apply below reinstalls it through run_after_10's
+# own asset logic — the tool→repo map here is the only duplication.
+say "release binaries"
+declare -A PREBUILT=(
+  [watchexec]=watchexec/watchexec
+  [hurl]=Orange-OpenSource/hurl
+  [cloudflared]=cloudflare/cloudflared
+  [stripe]=stripe/stripe-cli
+  [ouch]=ouch-org/ouch
+  [usql]=xo/usql
+  [jj]=jj-vcs/jj
+  [witr]=pranshuparmar/witr
+  [herdr]=herdrdev/herdr
+)
+latest_tag() {
+  gh api "repos/$1/releases/latest" --jq .tag_name 2>/dev/null \
+    || curl -fsSL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+       | grep -m1 '"tag_name"' | cut -d'"' -f4
+}
+for tool in "${!PREBUILT[@]}"; do
+  command -v "$tool" >/dev/null 2>&1 || continue # missing → apply installs anyway
+  tag="$(latest_tag "${PREBUILT[$tool]}")"
+  if [ -z "$tag" ]; then
+    echo "  $tool: release check failed — keeping current"
+    continue
+  fi
+  tagfile="$STATE/$tool.tag"
+  if [ ! -f "$tagfile" ]; then
+    printf '%s\n' "$tag" >"$tagfile"
+    echo "  $tool: baseline $tag recorded"
+  elif [ "$(cat "$tagfile")" != "$tag" ]; then
+    echo "  $tool: $(cat "$tagfile") → $tag — refreshing"
+    rm -f "$HOME/.local/bin/$tool"
+    printf '%s\n' "$tag" >"$tagfile"
+  else
+    echo "  $tool: current ($tag)"
+  fi
+done
+
+# ------------------------------------------------------------- source builds
+# Advance each shallow src checkout; when the remote moved, drop the binary
+# so the matching run_after script rebuilds it during the apply. Build dirs
+# are untracked, so the reset keeps them and the rebuilds stay incremental.
+say "source builds"
+update_src() { # <src-dir> <installed-binary> <label>
+  local src="$1" bin="$2" label="$3"
+  if ! git -C "$src" rev-parse HEAD >/dev/null 2>&1; then
+    echo "  $label: no checkout — the apply will clone and build"
+    rm -f "$bin"
+    return
+  fi
+  local branch
+  branch="$(git -C "$src" rev-parse --abbrev-ref HEAD)"
+  if ! git -C "$src" fetch -q --depth 1 origin "$branch"; then
+    warn "$label: fetch failed"
+    return
+  fi
+  if [ "$(git -C "$src" rev-parse HEAD)" = "$(git -C "$src" rev-parse FETCH_HEAD)" ]; then
+    echo "  $label: current ($(git -C "$src" rev-parse --short HEAD))"
+    return
+  fi
+  echo "  $label: $(git -C "$src" rev-parse --short HEAD) → $(git -C "$src" rev-parse --short FETCH_HEAD) — rebuilding on apply"
+  git -C "$src" reset -q --hard FETCH_HEAD
+  rm -f "$bin"
+}
+update_src "$HOME/.local/src/kakoune" "$HOME/.local/bin/kak" kakoune-fork
+update_src "$HOME/.local/src/nirisnap" "$HOME/.local/bin/omasnap" nirisnap
+update_src "$HOME/.local/src/omacalc" "$HOME/.local/bin/omacalc" omacalc
+update_src "$HOME/.local/src/omacut" "$HOME/.local/bin/omacut" omacut
+update_src "$HOME/.local/src/omawrite" "$HOME/.local/bin/omawrite" omawrite
+
+# -------------------------------------------------------------------- apply
+say "chezmoi apply (reinstalls everything removed above)"
+chezmoi apply || warn "chezmoi apply failed"
+
+# --------------------------------------------------------------- toolchains
+say "toolchains"
+mise up || warn "mise up failed"
+rustup update || warn "rustup update failed"
+
+# -------------------------------------------------------------- cargo tools
+# Mirrors run_after_09's set (keep the two in sync). cargo is the version
+# check: a re-run no-ops when the index (or git HEAD) has not moved and
+# rebuilds when it has — no guard removal needed.
+say "cargo tools"
+for crate in sd skim television dufs hop-kak kak-popup dedoc; do
+  cargo install --quiet "$crate" || warn "cargo update $crate failed"
+done
+cargo install --quiet --git https://github.com/kakoune-lsp/kakoune-lsp --locked \
+  || warn "cargo update kakoune-lsp failed"
+cargo install --quiet --git https://github.com/Jappie3/wayfreeze --locked \
+  || warn "cargo update wayfreeze failed"
+cargo install --quiet --git https://github.com/omacom-io/ttfx --locked \
+  || warn "cargo update ttfx failed"
+
+# ------------------------------------------------------------------- emacs
+if [ "$WITH_EMACS" = 1 ]; then
+  say "emacs 31 (branch tip rebuild)"
+  "$HOME/.dotfiles/bin/rebuild-emacs" || warn "emacs rebuild failed"
+else
+  echo
+  echo "  (skipping the Emacs 31 rebuild — pass --emacs to include it)"
+fi
+
+# ------------------------------------------------------------ small updaters
+say "gh extensions"
+gh extension upgrade --all || warn "gh extension upgrade failed"
+
+say "agent CLIs"
+if command -v claude >/dev/null 2>&1; then
+  claude update || warn "claude update failed"
+fi
+# codex ships no update verb worth scripting — rerun its installer by hand
+# when needed (run_after_04 has the URL).
+
+# ------------------------------------------------------------------ summary
+say "summary"
+echo "  librepods: hand-built with a patch — rebuild manually after upstream bumps (manifest has the recipe)"
+echo "  podman dev images: deliberately untouched (data-dir compatibility)"
+if [ "${#FAILURES[@]}" -gt 0 ]; then
+  printf '  FAILED: %s\n' "${FAILURES[@]}"
+  exit 1
+fi
+echo "  everything else: up to date"
