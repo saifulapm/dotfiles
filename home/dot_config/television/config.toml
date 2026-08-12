@@ -54,7 +54,13 @@ orientation = "landscape"
 # A list of builtin themes can be found in the `themes` directory of the television
 # repository. You may also create your own theme by creating a new file in a `themes`
 # directory in your configuration directory (see the `config.toml` location above).
-theme = "gruvbox-dark"
+#
+# "qshell" is OURS, not a builtin: themes/qshell.toml is rendered from the
+# active theme by bin/theme-apply (templates/tv-theme.toml.tmpl), the same
+# fixed-name convention btop and helix use. Theme::from_name checks
+# themes/<name>.toml before the builtins, so tv follows theme-set like every
+# other app instead of being pinned to one palette. (2026-08-12)
+theme = "qshell"
 
 # Feature-specific configurations
 # Each feature can have its own configuration section

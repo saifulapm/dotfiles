@@ -380,6 +380,10 @@ const OUTPUTS = {
   // state file is sourced by fish conf.d/40-gum-theme.fish at shell start.
   "btop-theme.tmpl": [path.join(HOME, ".config/btop/themes/qshell.theme")],
   "helix-theme.toml.tmpl": [path.join(HOME, ".config/helix/themes/qshell.toml")],
+  // television: same themes/<name>.toml convention as helix/btop, pinned by
+  // theme = "qshell" in its config.toml. No poke below — tv is spawned fresh
+  // by each ctrl-r/ctrl-t, so it picks the new palette up on next open.
+  "tv-theme.toml.tmpl": [path.join(HOME, ".config/television/themes/qshell.toml")],
   "claude-theme.json.tmpl": [path.join(HOME, ".claude/themes/qshell.json")],
   "gum-theme.fish.tmpl": [path.join(HOME, ".local/state/qshell/gum-theme.fish")],
   // emacs: rendered DATA, not a theme — the qshell-dark/qshell-light Modus
