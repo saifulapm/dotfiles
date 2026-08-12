@@ -34,6 +34,17 @@
 #                union-only, so a deletion made just before it can resurrect
 #                once. Said loudly when it happens.
 #
+#   notes        ~/.local/state/qshell/notes  <->  Dropbox:qshell-sync/notes
+#                The Notes panel's store (Modules/Notes): notes.json plus the
+#                pasted-image attachments dir. Same bisync shape as
+#                screenshots — notes are edited on every machine and a
+#                delete must propagate. The store's FileView watches the
+#                file, so a pulled change lands in an open panel by itself.
+#                last-capture.sha1 (the shift-shift dedupe) is machine-local
+#                state and stays out; attachments referencing files OUTSIDE
+#                the store (drops from ~/Downloads) never travel — only the
+#                store dir does.
+#
 # No mount involved anywhere: rclone talks to Dropbox directly, so this runs
 # whether or not any remote is mounted. Fired by qshell-sync.timer every 15
 # minutes and by hand; a flock keeps the two from overlapping.
@@ -172,6 +183,26 @@ if ((bisync_rc != 0)); then
   else
     first_line="$(head -n 1 <<<"$bisync_err")"
     failures+=("screenshots bisync: ${first_line:-rclone exited $bisync_rc}")
+  fi
+fi
+
+# -------------------------------------------------------------------- notes
+# Same bisync-with-self-service---resync shape as screenshots above.
+notes_dir="$state_dir/notes"
+mkdir -p "$notes_dir/attachments"
+notes_err=""
+notes_rc=0
+notes_err="$(rclone bisync "$notes_dir" "$remote/notes" --resilient --recover --exclude last-capture.sha1 2>&1 >/dev/null)" || notes_rc=$?
+if ((notes_rc != 0)); then
+  if grep -q -i -e "--resync" -e "cannot find prior" <<<"$notes_err"; then
+    resynced=true
+    run_rclone "notes resync" mkdir "$remote/notes" || true
+    if ! run_rclone "notes bisync --resync" bisync "$notes_dir" "$remote/notes" --resync --resilient --recover --exclude last-capture.sha1; then
+      : # recorded by run_rclone
+    fi
+  else
+    first_line="$(head -n 1 <<<"$notes_err")"
+    failures+=("notes bisync: ${first_line:-rclone exited $notes_rc}")
   fi
 fi
 
