@@ -1,0 +1,48 @@
+#!/bin/bash
+# Double-tap-Shift handler, spawned by qshell-dshift: Copper's "I see
+# something, just shift shift, and capture it" in Wayland terms. If the
+# primary selection holds text we have not already captured, it goes
+# straight into Notes with a toast — no panel. Otherwise the panel opens
+# for typing.
+#
+# The dedupe is load-bearing: a Wayland primary selection never expires, so
+# without it a selection made minutes ago would shadow the open-the-panel
+# half of this key forever. Capturing the same selection once and treating
+# the second shift-shift as "open" matches what the hand wants.
+set -uo pipefail
+
+# Never act under the session lock — the panel would open beneath it.
+[ "$(qs ipc call lock isLocked 2>/dev/null)" = "true" ] && exit 0
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/notes"
+hash_file="$state_dir/last-capture.sha1"
+mkdir -p "$state_dir"
+
+sel=""
+# Text types only: a primary selection can hold an image, and wl-paste
+# would happily print the binary into a note.
+if wl-paste --primary --list-types 2>/dev/null | grep -qi '^text'; then
+    sel="$(wl-paste --primary --no-newline 2>/dev/null || true)"
+    sel="${sel:0:10000}" # argv sanity for pathological selections
+fi
+
+if [ -n "${sel//[$'\t\r\n ']/}" ]; then
+    hash="$(printf %s "$sel" | sha1sum | cut -d' ' -f1)"
+    if [ ! -e "$hash_file" ] || [ "$hash" != "$(cat "$hash_file")" ]; then
+        # The hash and the toast are earned only by a successful add: with
+        # the shell down (restart window, early login) a recorded hash would
+        # permanently classify this selection as captured while no note
+        # exists (review 2026-08-13). Bash substring, not cut -c: character
+        # slicing must not split multibyte UTF-8 mid-sequence.
+        if qs ipc call notes add "$sel" >/dev/null 2>&1; then
+            printf %s "$hash" >"$hash_file"
+            preview="$(printf %s "$sel" | tr '\n\t' '  ')"
+            notify-send -a qshell -t 2000 -- "Noted" "${preview:0:60}"
+        fi
+        exit 0
+    fi
+fi
+
+# Toggle, not show: with nothing new to capture the key behaves exactly
+# like Ctrl+grave — shift-shift again puts the panel away.
+exec qs ipc call notes toggle >/dev/null

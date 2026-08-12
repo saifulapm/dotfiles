@@ -1,0 +1,18 @@
+[Unit]
+Description=qshell double-Shift capture watcher
+# Same session shape as qshell.service: starts only inside a graphical
+# session, stops with it, never outlives it.
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+# session.slice like the shell: a <1 MB watcher has no business in the
+# oomd-eligible app pool, and killing it silently disables a keybind.
+Slice=session.slice
+ExecStart=%h/.local/bin/qshell-dshift
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
