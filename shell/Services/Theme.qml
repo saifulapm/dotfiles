@@ -150,6 +150,10 @@ QtObject {
     // BackgroundEffect.blurRegion, so the two switch together.
     property bool blurActive: false
 
+    // The current wallpaper path (bound in shell.qml like blurActive): the
+    // CardFrost backdrops crop and blur it in-scene.
+    property string wallpaperPath: ""
+
     // One shared glass opacity, theme-tunable as `[blur] alpha`.
     readonly property real glassAlpha: {
         const v = rawTok("blur.alpha");

@@ -141,27 +141,24 @@ PanelWindow {
     WlrLayershell.namespace: "qshell-panel"
     WlrLayershell.keyboardFocus: opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    // Blur only behind the card, never the fullscreen scrim: the region is
-    // shaped exactly like the card (ext-background-effect), so niri's cached
-    // wallpaper blur backs the glass fill while the rest of the overlay stays
-    // a plain dim. Gated on the entrance being finished, not just on
-    // `opened`: compositor blur is binary — full strength the frame the
-    // region is published — so under a still-fading card it flashes raw
-    // blurred wallpaper, and the Region ignores the slide Translate, so the
-    // blur would sit at the final position while the card is still sliding
-    // in. Settled, the switch hides behind the glass fill; on close the
-    // `opened` term drops blur before the card thins enough to flash.
-    BackgroundEffect.blurRegion: theme.blurActive && opened && card.opacity === 1 ? cardBlurRegion : null
-
-    Region {
-        id: cardBlurRegion
-        item: card
-        radius: card.radius
-    }
-
     MouseArea {
         anchors.fill: parent
         onClicked: panelWindow.close()
+    }
+
+    // Card-shaped frost, never the fullscreen click-catcher: an in-scene
+    // blurred-wallpaper backdrop that rides the card's fade and slide, so
+    // the frost opens and closes with the card instead of popping in
+    // behind it (see components/CardFrost.qml for why the protocol blur
+    // can never do this).
+    CardFrost {
+        theme: panelWindow.theme
+        card: card
+        windowWidth: panelWindow.width
+        windowHeight: panelWindow.height
+        offsetX: cardSlide.x
+        offsetY: cardSlide.y
+        visible: panelWindow.theme.blurActive && card.opacity > 0
     }
 
     Rectangle {
@@ -200,6 +197,8 @@ PanelWindow {
         // its bar edge into place, whichever edge the bar is on. A transform
         // keeps the animated offset out of the anchored x/y bindings above.
         transform: Translate {
+            id: cardSlide
+
             property real slide: panelWindow.opened ? 0 : panelWindow.theme.space(1.5)
             x: !panelWindow.barVertical ? 0 : (panelWindow.barPosition === "left" ? -slide : slide)
             y: panelWindow.barVertical ? 0 : (panelWindow.barAtBottom ? slide : -slide)

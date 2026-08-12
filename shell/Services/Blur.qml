@@ -163,12 +163,35 @@ QtObject {
         Component.onCompleted: reload()
     }
 
+    // The wallpaper path, for the in-scene frost backdrops
+    // (components/CardFrost.qml): niri's xray blur shows only the blurred
+    // wallpaper, which the cards reproduce in-scene so the frost can ride
+    // their entrance animations. Same state file Background and Lock watch.
+    property string wallpaperPath: ""
+
+    readonly property FileView backgroundFile: FileView {
+        // Hardcoded $HOME, not stateDir's XDG_STATE_HOME fallback: every
+        // writer of this file (Background.qml, ImagePicker.qml) and its
+        // other reader (Lock.qml) spell the path this way, and a watcher
+        // must watch where its writer writes.
+        path: Quickshell.env("HOME") + "/.local/state/qshell/background"
+        watchChanges: true
+        printErrors: false
+        onLoaded: root.wallpaperPath = String(text() || "").trim()
+        onLoadFailed: root.wallpaperPath = ""
+        onFileChanged: reload()
+        Component.onCompleted: reload()
+    }
+
     // A FileView cannot arm its watch when the state dir itself is missing —
     // reload() after a guaranteed mkdir is the re-arm (same defence as
     // Theme.qml, Idle.qml and Nightlight.qml).
     readonly property Process stateDirProc: Process {
         command: ["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/qshell"]
-        onExited: root.stateFlag.reload()
+        onExited: {
+            root.stateFlag.reload();
+            root.backgroundFile.reload();
+        }
         Component.onCompleted: running = true
     }
 

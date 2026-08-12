@@ -23,6 +23,7 @@ ShellRoot {
 
     property Theme theme: Theme {
         blurActive: shell.blur.enabled
+        wallpaperPath: shell.blur.wallpaperPath
     }
     // Eager, but only as a flag-file watcher (nightlight's shape): blur is
     // off by default and the disabled path must cost nothing but the watch.

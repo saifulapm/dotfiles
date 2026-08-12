@@ -18,8 +18,10 @@ import Quickshell.Wayland
 // - Keyboard focus flips Exclusive/None with `opened`. Focus-timing quirks
 //   stay at the call site (Clipboard re-acquires focus in onVisibleChanged
 //   on this window; see the polkit None→Exclusive note in the audit).
-// - Compositor blur is card-shaped and only while blur is enabled and the
-//   surface is open; the scrim around it stays a plain dim.
+// - The frost is card-shaped and only while blur is enabled and the
+//   surface is open; the scrim around it stays a plain dim. It is an
+//   in-scene blurred wallpaper (CardFrost), not protocol blur, so it can
+//   ride the card's entrance and exit.
 //
 // Card content is the default property: children land inside the card and
 // anchor to it, exactly as they did in the private copies. The card itself
@@ -69,27 +71,8 @@ PanelWindow {
     WlrLayershell.namespace: root.namespace
     WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    // Card-shaped compositor blur behind the glass fill; the scrim around
-    // it stays a plain dim (see BarPanel.qml). Gated on the entrance being
-    // finished, not just on `opened`: compositor blur is binary — full
-    // strength the frame the region is published — so under a still-fading
-    // card it reads as a raw wallpaper flash, and the Region tracks the
-    // card's layout rect (render transforms excluded), so mid-scale the
-    // blur overhangs the smaller drawn card as a frosted ring. Once the
-    // card is settled the switch hides behind the glass fill; on close the
-    // `opened` term drops blur the same frame the fade-out starts, before
-    // the card thins enough to flash.
-    BackgroundEffect.blurRegion: root.blurable && root.theme.blurActive && root.opened && card.opacity === 1 && card.scale === 1 ? cardBlurRegion : null
-
     Region {
         id: closedMask
-    }
-
-    Region {
-        id: cardBlurRegion
-
-        item: card
-        radius: card.radius
     }
 
     Rectangle {
@@ -116,6 +99,21 @@ PanelWindow {
         id: scrimExtra
 
         anchors.fill: parent
+    }
+
+    // Card-shaped frost: an in-scene blurred-wallpaper backdrop that rides
+    // the card's fade and scale, so the frost opens and closes with the
+    // card instead of popping in behind it (see CardFrost.qml for why the
+    // protocol blur can never do this). The scrim around it stays a plain
+    // dim, and its tint is folded into the frost so the card area keeps
+    // the same dimming the protocol blur got from sitting under it.
+    CardFrost {
+        theme: root.theme
+        card: card
+        windowWidth: root.width
+        windowHeight: root.height
+        tint: root.theme.menu.scrim
+        visible: root.blurable && root.theme.blurActive && card.visible
     }
 
     Rectangle {

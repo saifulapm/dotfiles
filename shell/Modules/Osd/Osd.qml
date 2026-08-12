@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "../../components"
 import "OsdModel.js" as OsdModel
 
 // On-screen display: one pill at the bottom of the screen carrying a glyph
@@ -296,6 +297,8 @@ Scope {
         active: osdRoot.everShown
 
         sourceComponent: PanelWindow {
+            id: osdWindow
+
             // Held through the fade-out: the surface is input-transparent
             // (empty mask below), so keeping it mapped costs nothing.
             visible: osdRoot.opened || card.opacity > 0
@@ -314,17 +317,18 @@ Scope {
             // the OSD never blocks clicks to the desktop below it.
             mask: Region {}
 
-            // Pill-shaped compositor blur behind the glass fill while the
-            // Blur service is on. Engages only once the fade+rise entrance
-            // has finished (see BarPanel.qml): blur is binary and the Region
-            // ignores the rise Translate, so mid-entrance it flashes raw
-            // blurred wallpaper above the still-rising pill.
-            BackgroundEffect.blurRegion: osdRoot.theme.blurActive && osdRoot.opened && card.opacity === 1 ? pillBlurRegion : null
-
-            Region {
-                id: pillBlurRegion
-                item: card
-                radius: card.radius
+            // Pill-shaped frost while the Blur service is on: an in-scene
+            // blurred-wallpaper backdrop that rides the pill's fade and
+            // rise, so the frost appears and leaves with the pill instead
+            // of popping in behind it (see components/CardFrost.qml for
+            // why the protocol blur can never do this).
+            CardFrost {
+                theme: osdRoot.theme
+                card: card
+                windowWidth: osdWindow.width
+                windowHeight: osdWindow.height
+                offsetY: cardRise.y
+                visible: osdRoot.theme.blurActive && card.opacity > 0
             }
 
             Rectangle {
@@ -349,6 +353,8 @@ Scope {
                     }
                 }
                 transform: Translate {
+                    id: cardRise
+
                     y: osdRoot.opened ? 0 : osdRoot.theme.space(1.5)
                     Behavior on y {
                         NumberAnimation {
