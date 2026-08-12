@@ -247,6 +247,14 @@ BarPanel {
 
                         Text {
                             id: limitTitle
+                            // A model-scoped window is titled after its model,
+                            // and those names run long enough to reach the
+                            // percentage, so the title gives way first. The
+                            // subtitle keeps its full width — it is the shorter
+                            // of the two and eliding "7-day" says nothing.
+                            readonly property real available: limitValue.x - limitLabel.x - (limitSubtitle.visible ? limitSubtitle.implicitWidth + limitLabel.spacing : 0) - panel.theme.space(1.5)
+                            width: Math.max(0, Math.min(implicitWidth, available))
+                            elide: Text.ElideRight
                             text: limitRow.modelData.title
                             color: panel.theme.textPrimary
                             font.family: panel.theme.fontUi
@@ -254,6 +262,7 @@ BarPanel {
                         }
 
                         Text {
+                            id: limitSubtitle
                             anchors.baseline: limitTitle.baseline
                             visible: text !== ""
                             text: limitRow.modelData.subtitle
@@ -264,6 +273,7 @@ BarPanel {
                     }
 
                     Text {
+                        id: limitValue
                         anchors.right: parent.right
                         text: Math.round(limitRow.modelData.percent * 100) + "%"
                         color: limitRow.alarming ? panel.theme.error : panel.theme.textPrimary

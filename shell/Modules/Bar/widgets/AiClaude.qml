@@ -38,6 +38,14 @@ Item {
     property string secondaryRateLimitLabel: "Weekly (7-day)"
     property string secondaryRateLimitResetAt: ""
 
+    // Model-scoped windows from the payload's `limits` array — a weekly
+    // allowance only one model draws from. There is no fixed pair of
+    // properties for these: an account can hold any number, so they arrive as
+    // finished window records (title/subtitle/percent/resetAt) and AiModel's
+    // limitWindows() appends them to the two above. Empty on the other
+    // providers, which publish nothing of the kind.
+    property var extraLimits: []
+
     property string usageStatusText: ""
     property string authHelpText: "Run `claude auth login` to restore authoritative usage."
 
@@ -138,6 +146,7 @@ Item {
                     provider.secondaryRateLimitPercent = limits.secondaryRateLimitPercent;
                     provider.secondaryRateLimitLabel = limits.secondaryRateLimitLabel;
                     provider.secondaryRateLimitResetAt = limits.secondaryRateLimitResetAt;
+                    provider.extraLimits = limits.extraLimits || [];
                     provider.usageStatusText = "";
                     provider.finishRefresh();
                     return;
@@ -158,6 +167,7 @@ Item {
         rateLimitResetAt = "";
         secondaryRateLimitPercent = -1;
         secondaryRateLimitResetAt = "";
+        extraLimits = [];
     }
 
     function finishRefresh() {

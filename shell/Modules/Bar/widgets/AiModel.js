@@ -64,6 +64,68 @@ function usageBucket(payload, key) {
     return null;
 }
 
+// An entry's `kind` names its window the way the flat buckets' keys do
+// ("weekly_scoped", "five_hour_scoped"). Settled here rather than read back
+// out of the finished label, because a model name like "Opus 5 (1M context)"
+// would parse as a one-minute window. Capitalized the way windowTitle() spells
+// the flat ones, so "Fable Weekly" sits beside "Weekly" rather than under it.
+function claudeScopedWindow(kind) {
+    const text = String(kind || "").toLowerCase();
+    if (text.indexOf("month") >= 0)
+        return "Monthly";
+    if (text.indexOf("week") >= 0 || text.indexOf("day") >= 0)
+        return "Weekly";
+    if (text.indexOf("hour") >= 0 || text.indexOf("session") >= 0)
+        return "Session";
+    return "";
+}
+
+// Alongside the flat buckets, the payload carries a `limits` array, and that
+// array is the only place a model-scoped allowance shows up — a weekly window
+// only Fable draws from, say. The matching legacy keys (`seven_day_opus`,
+// `seven_day_sonnet`, …) stayed behind at null, so reading buckets alone drops
+// a limit the account is actually spending against — and drops it from
+// bindingWindow() too, which is what decides the bar's alarm. A model can hold
+// more than one scoped window, so only the pair of model and window tells them
+// apart, and both make the title and the key that keeps a repeat out.
+//
+// Records come out in the finished window shape rather than as a label to be
+// re-parsed, so limitWindows() passes them straight through.
+function parseClaudeScopedLimits(payload, percentScale) {
+    const entries = payload ? payload.limits : null;
+    if (!Array.isArray(entries))
+        return [];
+    const out = [];
+    const seen = {};
+    for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (!entry || typeof entry !== "object")
+            continue;
+        const model = entry.scope && typeof entry.scope === "object" ? entry.scope.model : null;
+        if (!model || typeof model !== "object")
+            continue;
+        // A display name is what the panel wants, but an entry carrying only
+        // an id still names a window worth showing.
+        const name = String(model.display_name || model.id || "").trim();
+        const kind = String(entry.kind || "").trim();
+        const key = JSON.stringify([name, kind]);
+        if (name === "" || seen[key] === true)
+            continue;
+        const percent = normalizeUtilization(entry.percent, percentScale);
+        if (percent < 0)
+            continue;
+        seen[key] = true;
+        const window = claudeScopedWindow(kind);
+        out.push({
+            title: window === "" ? name : name + " " + window,
+            subtitle: window === "Weekly" ? "7-day" : "",
+            percent: percent,
+            resetAt: normalizeResetAt(entry.resets_at)
+        });
+    }
+    return out;
+}
+
 // Their bucket preference: the OAuth-apps weekly bucket when present, the
 // plain seven-day one otherwise. Returns the provider-property shape so the
 // Claude provider can assign it straight across.
@@ -77,10 +139,20 @@ function parseClaudeUsagePayload(raw) {
 
     const weekly = usageBucket(payload, "seven_day_oauth_apps") || usageBucket(payload, "seven_day");
     const session = usageBucket(payload, "five_hour");
-    const percentScale = utilizationPayloadUsesPercentScale([weekly ? weekly.utilization : null, session ? session.utilization : null]);
+    // One payload speaks one convention, so the scoped entries settle the
+    // scale alongside the buckets rather than assuming their own.
+    const scaleSamples = [weekly ? weekly.utilization : null, session ? session.utilization : null];
+    if (Array.isArray(payload.limits)) {
+        for (let i = 0; i < payload.limits.length; i++) {
+            if (payload.limits[i] && typeof payload.limits[i] === "object")
+                scaleSamples.push(payload.limits[i].percent);
+        }
+    }
+    const percentScale = utilizationPayloadUsesPercentScale(scaleSamples);
     const sessionPercent = normalizeUtilization(session ? session.utilization : null, percentScale);
     const weeklyPercent = normalizeUtilization(weekly ? weekly.utilization : null, percentScale);
-    if (sessionPercent < 0 && weeklyPercent < 0)
+    const scoped = parseClaudeScopedLimits(payload, percentScale);
+    if (sessionPercent < 0 && weeklyPercent < 0 && scoped.length === 0)
         return null;
 
     return {
@@ -89,7 +161,8 @@ function parseClaudeUsagePayload(raw) {
         rateLimitResetAt: sessionPercent >= 0 ? normalizeResetAt(session ? session.resets_at : "") : "",
         secondaryRateLimitPercent: weeklyPercent,
         secondaryRateLimitLabel: "Weekly (7-day)",
-        secondaryRateLimitResetAt: weeklyPercent >= 0 ? normalizeResetAt(weekly ? weekly.resets_at : "") : ""
+        secondaryRateLimitResetAt: weeklyPercent >= 0 ? normalizeResetAt(weekly ? weekly.resets_at : "") : "",
+        extraLimits: scoped
     };
 }
 
@@ -177,6 +250,25 @@ function limitWindows(p) {
         out.push(limitWindow(p.rateLimitLabel, p.rateLimitPercent, p.rateLimitResetAt));
     if (p.secondaryRateLimitPercent >= 0)
         out.push(limitWindow(p.secondaryRateLimitLabel, p.secondaryRateLimitPercent, p.secondaryRateLimitResetAt));
+    // Windows a provider knows the shape of itself — Claude's model-scoped
+    // allowances, which have no fixed pair of properties to live in and are
+    // already titled by their collector. Appended rather than parsed, and
+    // counted by bindingWindow() like any other: a scoped weekly running ahead
+    // of the flat one IS what stops the next prompt.
+    const extra = p.extraLimits;
+    if (Array.isArray(extra)) {
+        for (let i = 0; i < extra.length; i++) {
+            const w = extra[i];
+            if (w && w.percent >= 0) {
+                out.push({
+                    title: String(w.title || "Limit"),
+                    subtitle: String(w.subtitle || ""),
+                    percent: Number(w.percent),
+                    resetAt: String(w.resetAt || "")
+                });
+            }
+        }
+    }
     return out;
 }
 
@@ -434,6 +526,10 @@ function displayProvider(provider, aggregate) {
         secondaryRateLimitPercent: provider.secondaryRateLimitPercent,
         secondaryRateLimitLabel: provider.secondaryRateLimitLabel,
         secondaryRateLimitResetAt: provider.secondaryRateLimitResetAt,
+        // Account-level like the two windows above, so always local: a scoped
+        // limit is Anthropic's own number for THIS account, not a count to
+        // merge across devices. Only Claude publishes any.
+        extraLimits: provider.extraLimits === undefined ? [] : provider.extraLimits,
         tierLabel: provider.tierLabel,
         usageStatusText: provider.usageStatusText,
         authHelpText: provider.authHelpText,
