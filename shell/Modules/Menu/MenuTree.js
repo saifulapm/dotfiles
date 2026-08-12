@@ -34,6 +34,16 @@ var TREE = {
         "description": "Launch an installed application",
         "provider": "apps"
     },
+    // Omarchy reaches bin/launch-agent by keybind only (SUPER+SHIFT+CTRL+A);
+    // that chord already opens the AI usage panel here, so this is the row
+    // that replaces it. Setup > Coding Agent picks which agent it starts.
+    "agent": {
+        "icon": "󰚩",
+        "label": "Agent",
+        "aliases": ["ai", "claude", "codex", "copilot", "coding", "assistant"],
+        "description": "Start the default coding agent in a terminal",
+        "action": "launch-agent"
+    },
     "theme": {
         "icon": "󰸌",
         "label": "Theme",
@@ -461,6 +471,44 @@ var TREE = {
         "description": "Delete a TUI launcher entry",
         "when": "grep -qs X-Qshell-TUI=true \"$HOME\"/.local/share/applications/*.desktop",
         "action": "foot-run --app-id=qshell-float -e bash -lc 'tui-remove; read -r -p \"press enter to close\"'"
+    },
+    // Omarchy's setup.default.agent radio: which agent bin/launch-agent
+    // starts. Each row is gated on the agent being installed — theirs offers
+    // every agent and installs the missing one through mise on selection,
+    // which is not a thing a menu row does here (see bin/default-agent).
+    "setup.agent": {
+        "icon": "󰚩",
+        "label": "Coding Agent",
+        "aliases": ["agent", "ai", "claude", "codex", "copilot", "default-agent"],
+        "description": "Choose the agent the Agent launcher starts"
+    },
+    "setup.agent.claude": {
+        "icon": "󰛄",
+        "label": "Claude Code",
+        "when": "command -v claude",
+        "checked": "[[ \"$(default-agent)\" == \"claude\" ]]",
+        "action": "default-agent claude"
+    },
+    "setup.agent.codex": {
+        "icon": "󰚩",
+        "label": "Codex",
+        "when": "command -v codex",
+        "checked": "[[ \"$(default-agent)\" == \"codex\" ]]",
+        "action": "default-agent codex"
+    },
+    "setup.agent.copilot": {
+        "icon": "󰊤",
+        "label": "GitHub Copilot",
+        "when": "command -v copilot",
+        "checked": "[[ \"$(default-agent)\" == \"copilot\" ]]",
+        "action": "default-agent copilot"
+    },
+    "setup.agent.pi": {
+        "icon": "󰚩",
+        "label": "Pi",
+        "when": "command -v pi",
+        "checked": "[[ \"$(default-agent)\" == \"pi\" ]]",
+        "action": "default-agent pi"
     },
 
     // ---------------------------------------------------------------- system
