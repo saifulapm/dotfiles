@@ -34,16 +34,13 @@ var TREE = {
         "description": "Launch an installed application",
         "provider": "apps"
     },
-    // Omarchy reaches bin/launch-agent by keybind only (SUPER+SHIFT+CTRL+A);
-    // that chord already opens the AI usage panel here, so this is the row
-    // that replaces it. Setup > Coding Agent picks which agent it starts.
-    "agent": {
-        "icon": "󰚩",
-        "label": "Agent",
-        "aliases": ["ai", "claude", "codex", "copilot", "coding", "assistant"],
-        "description": "Start the default coding agent in a terminal",
-        "action": "launch-agent"
-    },
+    // Omarchy's agent launcher (their SUPER+SHIFT+CTRL+A, our Agent row and
+    // Setup > Coding Agent radio) was ported and then REMOVED 2026-08-13: an
+    // agent launched through bin/app-run lands in a transient systemd unit,
+    // whose WorkingDirectory is $HOME whatever the launcher cd'd to, so every
+    // session opened on the home directory instead of a project. Agents get
+    // started from a terminal that is already in the right repo. The bar's AI
+    // usage panel (SUPER+SHIFT+CTRL+A here) is unrelated and stays.
     "theme": {
         "icon": "󰸌",
         "label": "Theme",
@@ -463,44 +460,8 @@ var TREE = {
         "when": "grep -qs X-Qshell-TUI=true \"$HOME\"/.local/share/applications/*.desktop",
         "action": "foot-run --app-id=qshell-float -e bash -lc 'tui-remove; read -r -p \"press enter to close\"'"
     },
-    // Omarchy's setup.default.agent radio: which agent bin/launch-agent
-    // starts. Each row is gated on the agent being installed — theirs offers
-    // every agent and installs the missing one through mise on selection,
-    // which is not a thing a menu row does here (see bin/default-agent).
-    "setup.agent": {
-        "icon": "󰚩",
-        "label": "Coding Agent",
-        "aliases": ["agent", "ai", "claude", "codex", "copilot", "default-agent"],
-        "description": "Choose the agent the Agent launcher starts"
-    },
-    "setup.agent.claude": {
-        "icon": "󰛄",
-        "label": "Claude Code",
-        "when": "command -v claude",
-        "checked": "[[ \"$(default-agent)\" == \"claude\" ]]",
-        "action": "default-agent claude"
-    },
-    "setup.agent.codex": {
-        "icon": "󰚩",
-        "label": "Codex",
-        "when": "command -v codex",
-        "checked": "[[ \"$(default-agent)\" == \"codex\" ]]",
-        "action": "default-agent codex"
-    },
-    "setup.agent.copilot": {
-        "icon": "󰊤",
-        "label": "GitHub Copilot",
-        "when": "command -v copilot",
-        "checked": "[[ \"$(default-agent)\" == \"copilot\" ]]",
-        "action": "default-agent copilot"
-    },
-    "setup.agent.pi": {
-        "icon": "󰚩",
-        "label": "Pi",
-        "when": "command -v pi",
-        "checked": "[[ \"$(default-agent)\" == \"pi\" ]]",
-        "action": "default-agent pi"
-    },
+    // Omarchy's setup.default.agent radio picked which agent their launcher
+    // started; it went with the launcher (see the note by the root rows).
 
     // ---------------------------------------------------------------- system
     "system.lock": {

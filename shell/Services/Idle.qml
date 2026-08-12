@@ -148,6 +148,12 @@ QtObject {
     }
 
     function killScreensaver() {
+        // ttfx first (omarchy 438f7b3): the pattern below matches the foot
+        // window, and the animator inside it can outlive the terminal it was
+        // drawing into — bin/screensaver's own exit trap only fires when the
+        // script gets to run its handler, which it may not if its foreground
+        // ttfx is what is still alive.
+        run(["pkill", "-x", "ttfx"]);
         // The bracketed pattern keeps pkill from matching its own cmdline.
         run(["pkill", "-f", "[o]rg.qshell.screensaver"]);
     }

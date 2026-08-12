@@ -19,6 +19,21 @@ ExecStart=/usr/bin/qs
 # orphan-relaunch is what once drew a second stale bar. One supervisor:
 # disable the built-in one, systemd-coredump still records the stack trace.
 Environment=QS_DISABLE_CRASH_HANDLER=1
+# Quickshell watches the QML it loaded and reloads on change, and
+# ~/.config/quickshell is a symlink onto ~/.dotfiles/shell — so a chezmoi
+# apply, a git pull or an editor writing a .qml reloads the running shell
+# against a half-written tree. A reload that fails raises the reload popup,
+# which is a second engine generation, and with more than one alive
+# EngineGeneration::currentGeneration() returns null: the next
+# bin/qshell-relaunch IPC kill then takes the QCoreApplication::exit(0)
+# branch and tears the QML graph down after the QGuiApplication is gone,
+# which aborts on the first GUI resource it touches (omarchy 0900855).
+# Nothing here has ever relied on that watcher — bin/qshell-relaunch is how
+# QML changes are picked up, and config/theme changes come in over IPC.
+Environment=QS_DISABLE_FILE_WATCHER=1
+# The popup goes with it: QML can still ask for a reload directly and leave
+# the same extra generation behind.
+Environment=QS_NO_RELOAD_POPUP=1
 # glibc keeps freed heap pages: destroying 109 MiB of evicted picker pixmaps
 # returned 0.6 MiB to the OS (measured 2026-08-09), because freeing a large
 # block silently raises the mmap/trim thresholds toward 32/64 MiB, after
