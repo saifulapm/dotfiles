@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell.Io
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import "../components"
@@ -169,6 +170,18 @@ BarPanel {
         id: inputPeak
         node: panel.opened ? panel.source : null
         enabled: panel.opened && panel.source !== null
+    }
+
+    // A Bluetooth mic is dead metal until something actually records:
+    // wireplumber only flips the headset from A2DP (mic off) into HFP when
+    // it sees a real capture stream, and the peak monitor's passive tap
+    // doesn't count. Feed it one for as long as the panel shows a bluez
+    // source, so the meter reads the live mic. The cost — playback drops to
+    // headset quality while the panel is open — is the Bluetooth trade,
+    // not ours; it recovers the moment the panel closes.
+    Process {
+        running: panel.opened && panel.source !== null && String(panel.source.name).indexOf("bluez_input") === 0
+        command: ["pw-record", "--target", panel.source ? String(panel.source.name) : "", "/dev/null"]
     }
 
     // ------------------------------------------------------------- writing
