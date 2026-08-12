@@ -70,8 +70,16 @@ PanelWindow {
     WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // Card-shaped compositor blur behind the glass fill; the scrim around
-    // it stays a plain dim (see BarPanel.qml).
-    BackgroundEffect.blurRegion: root.blurable && root.theme.blurActive && root.opened ? cardBlurRegion : null
+    // it stays a plain dim (see BarPanel.qml). Gated on the entrance being
+    // finished, not just on `opened`: compositor blur is binary — full
+    // strength the frame the region is published — so under a still-fading
+    // card it reads as a raw wallpaper flash, and the Region tracks the
+    // card's layout rect (render transforms excluded), so mid-scale the
+    // blur overhangs the smaller drawn card as a frosted ring. Once the
+    // card is settled the switch hides behind the glass fill; on close the
+    // `opened` term drops blur the same frame the fade-out starts, before
+    // the card thins enough to flash.
+    BackgroundEffect.blurRegion: root.blurable && root.theme.blurActive && root.opened && card.opacity === 1 && card.scale === 1 ? cardBlurRegion : null
 
     Region {
         id: closedMask

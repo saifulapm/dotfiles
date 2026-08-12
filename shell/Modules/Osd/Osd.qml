@@ -315,8 +315,11 @@ Scope {
             mask: Region {}
 
             // Pill-shaped compositor blur behind the glass fill while the
-            // Blur service is on (see BarPanel.qml).
-            BackgroundEffect.blurRegion: osdRoot.theme.blurActive && osdRoot.opened ? pillBlurRegion : null
+            // Blur service is on. Engages only once the fade+rise entrance
+            // has finished (see BarPanel.qml): blur is binary and the Region
+            // ignores the rise Translate, so mid-entrance it flashes raw
+            // blurred wallpaper above the still-rising pill.
+            BackgroundEffect.blurRegion: osdRoot.theme.blurActive && osdRoot.opened && card.opacity === 1 ? pillBlurRegion : null
 
             Region {
                 id: pillBlurRegion

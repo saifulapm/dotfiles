@@ -144,8 +144,14 @@ PanelWindow {
     // Blur only behind the card, never the fullscreen scrim: the region is
     // shaped exactly like the card (ext-background-effect), so niri's cached
     // wallpaper blur backs the glass fill while the rest of the overlay stays
-    // a plain dim.
-    BackgroundEffect.blurRegion: theme.blurActive && opened ? cardBlurRegion : null
+    // a plain dim. Gated on the entrance being finished, not just on
+    // `opened`: compositor blur is binary — full strength the frame the
+    // region is published — so under a still-fading card it flashes raw
+    // blurred wallpaper, and the Region ignores the slide Translate, so the
+    // blur would sit at the final position while the card is still sliding
+    // in. Settled, the switch hides behind the glass fill; on close the
+    // `opened` term drops blur before the card thins enough to flash.
+    BackgroundEffect.blurRegion: theme.blurActive && opened && card.opacity === 1 ? cardBlurRegion : null
 
     Region {
         id: cardBlurRegion
