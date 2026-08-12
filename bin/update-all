@@ -140,7 +140,7 @@ rustup update || warn "rustup update failed"
 # check: a re-run no-ops when the index (or git HEAD) has not moved and
 # rebuilds when it has — no guard removal needed.
 say "cargo tools"
-for crate in sd skim television dufs hop-kak kak-popup dedoc; do
+for crate in sd skim television dufs hop-kak kak-popup dedoc ripdrag; do
   cargo install --quiet "$crate" || warn "cargo update $crate failed"
 done
 cargo install --quiet --git https://github.com/kakoune-lsp/kakoune-lsp --locked \

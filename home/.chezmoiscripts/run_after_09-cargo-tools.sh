@@ -27,6 +27,7 @@ declare -A CRATES=(
   [hop-kak]="hop-kak"
   [kak-popup]="kak-popup"
   [dedoc]="dedoc"
+  [ripdrag]="ripdrag"
 )
 # ouch is NOT here: its cargo build needs libclang (libbzip3-sys bindgen) —
 # it comes prebuilt from run_after_10-prebuilt-binaries.sh instead

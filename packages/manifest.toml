@@ -1346,6 +1346,12 @@ arch = "all"
 why = "Qt Multimedia — omacut's .pro declares QT += multimedia (video preview); its build died with 'Unknown module(s) in QT: multimedia' on the first apply (2026-08-07). Pulls the runtime QML module too"
 
 [[pkg]]
+name = "gtk4-devel"
+category = "dev"
+arch = "all"
+why = "GTK4 headers + pkg-config files — cargo builds [[tool]] ripdrag (gtk4-sys), the yazi drag-out hand (keymap 0a093ca). The gtk4 runtime was already here; the commit that bound ripdrag shipped no provisioning, so every machine but the one that built it had a dead keybinding (found 2026-08-13)"
+
+[[pkg]]
 name = "wayland-devel"
 category = "dev"
 arch = "all"
@@ -1608,7 +1614,7 @@ why  = "Deno runtime from the mac list; mise already manages node, one mechanism
 
 [[tool]]
 name = "cargo-cli-tools"
-via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc; from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07), wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere) and ttfx (user ask 2026-08-11: omacom-io/ttfx, omarchy 4e31b61's Rust terminaltexteffects port driving bin/screensaver; the crates.io name is UNCLAIMED — checked 2026-08-11 — so always install by git URL, never by crate name). herdr moved to run_after_10 prebuilt (974fc11)"
+via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc, ripdrag (yazi <C-n> drag-out, needs [[pkg]] gtk4-devel to build); from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07), wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere) and ttfx (user ask 2026-08-11: omacom-io/ttfx, omarchy 4e31b61's Rust terminaltexteffects port driving bin/screensaver; the crates.io name is UNCLAIMED — checked 2026-08-11 — so always install by git URL, never by crate name). herdr moved to run_after_10 prebuilt (974fc11)"
 why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/dufs are mac-list CLI (argc dropped 2026-08-10 — nothing in this repo ever called it); kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
 
 [[tool]]
