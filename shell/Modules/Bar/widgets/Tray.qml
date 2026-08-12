@@ -150,6 +150,35 @@ Item {
         panelLoader.item.toggle();
     }
 
+    // A tray item's own DBusMenu, in TrayMenu.qml — see its header for why
+    // this cannot go through SystemTrayItem.display(). One popup serves every
+    // item: it moves to whichever icon was clicked.
+    function openMenuFor(item, anchor) {
+        if (!item || !item.hasMenu)
+            return;
+        if (menuLoader.status === Loader.Null)
+            menuLoader.setSource("TrayMenu.qml", {
+                theme: rootItem.theme
+            });
+        const menu = menuLoader.item;
+
+        // Clicking the icon whose menu is already up closes it, the way a
+        // second right-click on any menu does.
+        if (menu.opened && menu.trayItem === item) {
+            menu.close();
+            return;
+        }
+
+        // Reset before switching items: the root opener binds to
+        // trayItem.menu, so assigning a new item invalidates the old root's
+        // children immediately — before any nested opener referencing them
+        // would otherwise be torn down.
+        menu.resetMenu();
+        menu.trayItem = item;
+        menu.anchorItem = anchor !== null ? anchor : rootItem;
+        menu.open();
+    }
+
     implicitWidth: bar && bar.vertical === true ? barSize : (layout.item ? layout.item.implicitWidth : 0)
     implicitHeight: bar && bar.vertical === true ? (layout.item ? layout.item.implicitHeight : 0) : barSize
     // Stays mounted while only hidden items remain, so the chevron — and with
@@ -354,6 +383,12 @@ Item {
         visible: false
     }
 
+    // Same deal for the item menu, which most sessions never open at all.
+    Loader {
+        id: menuLoader
+        visible: false
+    }
+
     component TrayItem: BarButton {
         id: trayItemRoot
 
@@ -366,13 +401,10 @@ Item {
         tooltipText: rootItem.trayTooltip(modelData)
         visible: modelData.status !== Status.Passive
 
-        // The menu opens off the bar-facing edge of the item: below it on a
-        // horizontal bar, beside it on a vertical one.
+        // The menu opens off the bar-facing edge of this item, which is what
+        // BarPanel does with an anchorItem.
         function displayMenu() {
-            if (!modelData.hasMenu || !rootItem.bar)
-                return;
-            const point = trayItemRoot.mapToItem(rootItem.bar.contentItem, rootItem.vertical ? trayItemRoot.width : 0, rootItem.vertical ? 0 : trayItemRoot.height);
-            modelData.display(rootItem.bar, Math.round(point.x), Math.round(point.y));
+            rootItem.openMenuFor(modelData, trayItemRoot);
         }
 
         onTapped: button => {
