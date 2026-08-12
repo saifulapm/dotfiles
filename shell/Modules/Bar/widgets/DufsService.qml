@@ -34,9 +34,9 @@ QtObject {
 
     readonly property int port: 5000
     // Fixed sign-in (user decision 2026-08-07): whatever bin/dufs-serve
-    // bakes — $USER and `developer` — so there is nothing to probe.
+    // bakes — $USER and `developer123!` — so there is nothing to probe.
     readonly property string authUser: Quickshell.env("USER") || ""
-    readonly property string authPassword: "developer"
+    readonly property string authPassword: "developer123!"
     property string lanIp: ""
     property string tailscaleIp: ""
     readonly property string localUrl: "http://127.0.0.1:" + port
