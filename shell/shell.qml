@@ -304,6 +304,13 @@ ShellRoot {
                     console.warn("surface", surfaceSource, "replay of", queue[i].method, "failed:", e);
                 }
             }
+            // A load that settles CLOSED — a background `notes add`, a
+            // queued hide — must still start the eviction clock:
+            // surfaceOpen never transitions in that case, so the
+            // onSurfaceOpenChanged arming alone would leave the tree
+            // resident forever (review 2026-08-13).
+            if (evictable && !surfaceOpen)
+                evictTimer.restart();
         }
 
         onStatusChanged: {
@@ -362,6 +369,7 @@ ShellRoot {
             backgroundLoader.wake();
             osdLoader.wake();
             polkitLoader.wake();
+            notesEdgeLoader.wake();
             if (shell.notifs.everNotified)
                 popupsLoader.wake();
         }
@@ -375,7 +383,7 @@ ShellRoot {
     Timer {
         interval: 3000
         running: true
-        onTriggered: shell.warmedComponents = [shell.moduleRoot + "/Modules/Launcher/Launcher.qml", shell.moduleRoot + "/Modules/Menu/Menu.qml", shell.moduleRoot + "/Modules/Lock/Lock.qml"].map(url => Qt.createComponent(url, Component.Asynchronous))
+        onTriggered: shell.warmedComponents = [shell.moduleRoot + "/Modules/Launcher/Launcher.qml", shell.moduleRoot + "/Modules/Menu/Menu.qml", shell.moduleRoot + "/Modules/Lock/Lock.qml", shell.moduleRoot + "/Modules/Notes/Notes.qml"].map(url => Qt.createComponent(url, Component.Asynchronous))
     }
 
     // An open bar widget panel holds an Exclusive keyboard grab, and niri
@@ -453,6 +461,33 @@ ShellRoot {
     function toggleReminders() {
         dismissBarPanels();
         remindersLoader.summon("toggle");
+    }
+
+    function toggleNotes() {
+        dismissBarPanels();
+        notesLoader.summon("toggle");
+    }
+
+    // What the hot-edge strip calls on a right-edge hover: open, never toggle
+    // — hovering the edge with the panel already open must not close it.
+    function summonNotes() {
+        dismissBarPanels();
+        notesLoader.summon("show");
+    }
+
+    // A drop released on the hot strip itself (instead of on the panel it
+    // just summoned) stages like a drop on the panel would: first file into
+    // the capture input, extras committed directly, text into the input.
+    function notesDropPayload(urls, text) {
+        dismissBarPanels();
+        if (urls.length > 0) {
+            notesLoader.summon("stageAttachmentUrl", [urls[0]]);
+            for (let i = 1; i < urls.length; i++)
+                notesLoader.summon("addFileUrl", [urls[i]]);
+        } else if (text) {
+            notesLoader.summon("stageText", [text]);
+        }
+        notesLoader.summon("show");
     }
 
     // Returns false when the lock refused to arm (its PAM config is missing) —
@@ -806,6 +841,53 @@ ShellRoot {
 
         function hide(): string {
             remindersLoader.deliver("hide");
+            return "ok";
+        }
+    }
+
+    // Quick-capture notes (our Copper): a full-height panel over the right
+    // sixth of the screen, summoned by the hot-edge strip below, the `notes`
+    // IPC, or nothing at all — evictable, so between uses it costs zero. The
+    // strip is the only always-on part, staged with the other 400 ms wakes.
+    SurfaceLoader {
+        id: notesLoader
+        evictable: true
+        surfaceSource: shell.moduleRoot + "/Modules/Notes/Notes.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
+    }
+
+    SurfaceLoader {
+        id: notesEdgeLoader
+        surfaceSource: shell.moduleRoot + "/Modules/Notes/NotesEdge.qml"
+        surfaceProps: ({
+                shellRoot: shell
+            })
+    }
+
+    IpcHandler {
+        target: "notes"
+
+        function toggle(): string {
+            shell.toggleNotes();
+            return "ok";
+        }
+
+        function show(): string {
+            shell.summonNotes();
+            return "ok";
+        }
+
+        function hide(): string {
+            notesLoader.deliver("hide");
+            return "ok";
+        }
+
+        // Append without opening the panel: `qs ipc call notes add "text"` —
+        // for scripts and keybinds that capture without stealing the screen.
+        function add(text: string): string {
+            notesLoader.summon("addText", [text]);
             return "ok";
         }
     }
