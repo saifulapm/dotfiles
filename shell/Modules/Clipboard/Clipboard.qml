@@ -476,6 +476,7 @@ Scope {
                             anchors.rightMargin: clipboardRoot.theme.space(2)
                             anchors.verticalCenter: parent.verticalCenter
                             elide: Text.ElideRight
+                            textFormat: Text.PlainText
                             text: clipboardRoot.filterText || "search clipboard"
                             color: clipboardRoot.filterText ? clipboardRoot.theme.textPrimary : clipboardRoot.theme.textMuted
                             font.family: clipboardRoot.theme.fontUi
@@ -575,6 +576,14 @@ Scope {
                                             anchors.rightMargin: clipboardRoot.theme.space(2)
                                             anchors.verticalCenter: parent.verticalCenter
                                             elide: Text.ElideRight
+                                            // Never AutoText: copied HTML would
+                                            // render as rich text — links, real
+                                            // line breaks — and rich text
+                                            // ignores elide, so one such entry
+                                            // overflows its fixed-height row
+                                            // onto its neighbours.
+                                            textFormat: Text.PlainText
+                                            maximumLineCount: 1
                                             text: row.previewText
                                             color: clipboardRoot.theme.textPrimary
                                             // Images and file drops read as
@@ -607,6 +616,7 @@ Scope {
                                     anchors.fill: parent
                                     anchors.leftMargin: clipboardRoot.theme.space(4)
                                     visible: previewPane.activeRow && !previewPane.activeRow.previewImage
+                                    textFormat: Text.PlainText
                                     text: previewPane.activeRow ? previewPane.activeRow.fullText : ""
                                     color: clipboardRoot.theme.textPrimary
                                     font.family: clipboardRoot.theme.fontMono
@@ -650,6 +660,7 @@ Scope {
                             Text {
                                 width: parent.width
                                 horizontalAlignment: Text.AlignHCenter
+                                textFormat: Text.PlainText
                                 text: clipboardRoot.history.length === 0 ? "Clipboard is empty" : "No matches for “" + clipboardRoot.filterText + "”"
                                 color: clipboardRoot.theme.textMuted
                                 font.family: clipboardRoot.theme.fontUi
