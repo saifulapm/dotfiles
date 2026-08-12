@@ -84,7 +84,11 @@ PanelWindow {
         opacity: root.opened ? 1 : 0
         Behavior on opacity {
             NumberAnimation {
-                duration: root.theme.time(0.8)
+                // Asymmetric like omarchy's window animations: exits run
+                // faster than entrances, which is most of what reads as
+                // "snappy". The binding re-evaluates when the Behavior
+                // fires, so each direction gets its own duration.
+                duration: root.opened ? root.theme.time(0.5) : root.theme.time(0.35)
                 easing.type: root.theme.easing
             }
         }
@@ -132,13 +136,14 @@ PanelWindow {
         scale: root.cardShown ? 1 : 0.96
         Behavior on opacity {
             NumberAnimation {
-                duration: root.theme.time(0.8)
+                // Matches the scrim: quicker in, quicker still out.
+                duration: root.cardShown ? root.theme.time(0.5) : root.theme.time(0.35)
                 easing.type: root.theme.easing
             }
         }
         Behavior on scale {
             NumberAnimation {
-                duration: root.theme.time(0.8)
+                duration: root.cardShown ? root.theme.time(0.5) : root.theme.time(0.35)
                 easing.type: root.theme.easing
             }
         }
