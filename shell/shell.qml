@@ -25,8 +25,8 @@ ShellRoot {
         blurActive: shell.blur.enabled
         wallpaperPath: shell.blur.wallpaperPath
     }
-    // Eager, but only as a flag-file watcher (nightlight's shape): blur is
-    // off by default and the disabled path must cost nothing but the watch.
+    // Eager, but only as a flag-file watcher: blur is off by default and the
+    // disabled path must cost nothing but the watch.
     property Blur blur: Blur {}
     property Niri niri: Niri {}
     // Eager by necessity: must own org.freedesktop.Notifications from startup.
@@ -43,10 +43,6 @@ ShellRoot {
     property Idle idle: Idle {
         shellRoot: shell
     }
-    // Eager, but only as a flag-file watcher: it starts wlsunset when the
-    // persisted state says night light was left on, and costs one file watch
-    // otherwise.
-    property Nightlight nightlight: Nightlight {}
     property Battery batteryService: Battery {}
     // MPRIS media layer (omarchy's media service plugin): sticky preferred
     // player, playing-order ledger, PipeWire stream correlation, source

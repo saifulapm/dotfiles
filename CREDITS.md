@@ -146,8 +146,10 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   the presets and the live scale. Their TEXT SIZE section is not ported (it
   drives an omarchy CLI that rewrites their shell's font override; ours lives in
   the theme). Their brightness helper, `hyprctl` monitor keywords and OSD summon
-  are replaced by `brightnessctl` and `niri msg output`, which also gives us a
-  VRR toggle they have no equivalent for.
+  are replaced by `brightnessctl` and `niri msg output`. A VRR toggle was
+  carried here for a while — `niri msg output <name> vrr` has no upstream
+  equivalent — and was dropped 2026-08-12: no display on these machines
+  reports adaptive-sync support, so the section never rendered.
 - **Battery service** from `shell/plugins/services/battery/` (`Service.qml`,
   `BatteryModel.js`), ported 2026-08-06 as `shell/Services/Battery.qml`: the
   low-battery warning at 10% while discharging that fires once and re-arms
@@ -482,10 +484,11 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   ported with it: ON lit and OFF dimmed to 0.45, both glyphs and both tooltip
   strings per indicator, and state carried by opacity rather than by the bar's
   attention color. The stay-awake, do-not-disturb and reminder indicators are
-  ports of `shell/plugins/bar/indicators/StayAwake.qml`, `Dnd.qml`,
-  `Reminder.qml` and `NightLight.qml` (their glyphs, their tooltip wording —
-  the night light one names what a click does, not what is on — and their
-  click rules). Their reveal snaps open where ours slides; and a standalone
+  ports of `shell/plugins/bar/indicators/StayAwake.qml`, `Dnd.qml` and
+  `Reminder.qml` (their glyphs, their tooltip wording — which names what a
+  click does, not what is on — and their click rules). Their `NightLight.qml`
+  was ported with them and removed 2026-08-12 with the rest of night light.
+  Their reveal snaps open where ours slides; and a standalone
   indicator named directly in a bar array collapses when off instead of
   reserving an empty slot.
 - **Screen recording** from `shell/plugins/bar/indicators/ScreenRecording.qml`
@@ -543,25 +546,13 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   `default/hypr/bindings/voxtype.lua`: their SUPER+CTRL+X toggle verbatim, and
   their F9 push-to-talk as a second toggle, because niri has no release binds.
 - **Night light service design** from `shell/plugins/services/nightlight/`
-  (`Service.qml`, `NightlightModel.js`): night light as a two-state switch
-  rather than a schedule — their 4000 K night and 6500 K day temperatures,
-  their rule that "on" means the screen is below the 6000 K identity point,
-  their pending-write queue so a fast double toggle cannot race, and their
-  `status`/`enable`/`disable`/`toggle` IPC verbs. The daemon underneath is
-  different: theirs drives hyprsunset through `hyprctl hyprsunset temperature`
-  and reads the current value back, so hyprsunset holds the state and their
-  service is stateless between calls. We drive wlsunset, which has no control
-  channel — it holds wlr-gamma-control until it exits — so here the running
-  daemon is the "on" state: on starts one `wlsunset -t 4000 -T 4001` (pinning
-  the high temperature one kelvin above the low one is what makes a
-  sun-following daemon hold still; equal values are rejected), and off
-  terminates it and lets the compositor restore the ramps, so their
-  day-temperature write has no counterpart. Their state therefore lives in the
-  daemon and is re-probed; ours is a flag file at
-  `~/.local/state/qshell/nightlight` read by a `FileView`, so `touch`/`rm`
-  toggles night light as the indicator does. Their `bin/omarchy-toggle-nightlight`
-  CLI, which duplicates the temperatures for callers outside the shell, has no
-  port — the flag file and the IPC verbs are that entry point.
+  (`Service.qml`, `NightlightModel.js`) was ported as `Services/Nightlight.qml`
+  — night light as a two-state switch rather than a schedule, driving wlsunset
+  instead of their hyprsunset — and removed entirely 2026-08-12: none of these
+  displays hand out a gamma table, so the feature could never take effect on
+  the hardware it shipped on. The service, its indicator, the Style menu row,
+  the Mod+Ctrl+N bind, the panel section and the wlsunset dependency went with
+  it.
 - **Background reveal** from `shell/plugins/background/Background.qml` and the
   `set_theme_background` sequencing in `bin/omarchy-theme-set`, ported as the
   rewritten `shell/Modules/Background/Background.qml` plus the synchronized
@@ -1143,7 +1134,8 @@ Direct file-level copies (source path → destination path):
   (Hyprland's 1/120-divisor rule, which niri does not share); ours matches a
   preset by value. `parseDisplays` is replaced by `parseState`, which reads the
   panel's one probe: `niri msg --json outputs`, the focused output,
-  `brightnessctl -lm` and a wlsunset check, split on marker lines.
+  `brightnessctl -lm`, the DDC/CI sweep and the text size, split on marker
+  lines.
 - omarchy `shell/plugins/panels/power/Model.js` →
   `shell/Modules/Bar/widgets/PowerModel.js`: near-verbatim port of the
   cursor-index clamping, the key/tab/value reader, the profile glyphs, the

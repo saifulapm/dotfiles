@@ -29,7 +29,7 @@ QtObject {
 
     readonly property string home: Quickshell.env("HOME")
     // History and DND are persistent user state, not regeneratable cache, so
-    // they live under XDG_STATE_HOME beside stay-awake / nightlight / reminders.
+    // they live under XDG_STATE_HOME beside stay-awake / blur / reminders.
     readonly property string stateDir: home + "/.local/state/qshell/"
     readonly property string historyPath: stateDir + "notifications.json"
     // One file per on-screen popup, so live toasts survive a real shell
@@ -51,7 +51,7 @@ QtObject {
     // it survives a shell restart. Deliberately NOT PersistentProperties:
     // that only spans in-process QML reloads, and the state file we already
     // need for history spans those too (a reload re-reads it) as well as a
-    // real restart. Matches how stay-awake and nightlight persist.
+    // real restart. Matches how stay-awake and blur persist.
     property bool dnd: false
     // Guards the write-back while hydrating from disk.
     property bool hydrating: false

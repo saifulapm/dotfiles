@@ -113,6 +113,13 @@ output "DP-3" {
     scale 1
 }
 
+// The Mac mini's display (BenQ MA270U, 3840x2160 at 27" → 163 DPI). 1 is a
+// touch too small at this viewing distance and 1.25 gives up too much room —
+// 1.1 lands between them (2026-08-12). Mode stays auto.
+output "HDMI-A-1" {
+    scale 1.1
+}
+
 // Settings that influence how windows are positioned and sized.
 // Find more information on the wiki:
 // https://niri-wm.github.io/niri/Configuration:-Layout
@@ -712,7 +719,6 @@ binds {
     Mod+Shift+Space hotkey-overlay-title="Toggle the Bar" { spawn "qs" "ipc" "call" "bar" "toggle"; }
     // Omarchy: SUPER+CTRL+I — taken by niri's move-column-to-workspace-up.
     Mod+Ctrl+Alt+I hotkey-overlay-title="Toggle Idle Locking" { spawn "qs" "ipc" "call" "idle" "toggle"; }
-    Mod+Ctrl+N hotkey-overlay-title="Toggle Night Light" { spawn "qs" "ipc" "call" "nightlight" "toggle"; }
     // Omarchy's reminder family hangs off SUPER+CTRL+R; Mod+Ctrl+R and
     // Mod+Ctrl+Shift+R are niri's window-height defaults, so ours take Alt.
     Mod+Alt+R hotkey-overlay-title="Set a Reminder" { spawn "qs" "ipc" "call" "reminders" "toggle"; }

@@ -446,9 +446,6 @@ Scope {
         case "dnd":
             shellRoot.notifs.dnd = !shellRoot.notifs.dnd;
             break;
-        case "nightlight":
-            shellRoot.nightlight.toggle();
-            break;
         case "blur":
             shellRoot.blur.toggle();
             break;
@@ -462,8 +459,6 @@ Scope {
         switch (name) {
         case "dnd":
             return !!shellRoot.notifs.dnd;
-        case "nightlight":
-            return !!shellRoot.nightlight.enabled;
         case "blur":
             return !!shellRoot.blur.enabled;
         default:

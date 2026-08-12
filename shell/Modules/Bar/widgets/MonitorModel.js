@@ -64,7 +64,7 @@ function isInternalOutput(name) {
 
 // One state snapshot, as emitted by the panel's probe: marker lines
 // separating `niri msg --json outputs`, `niri msg --json focused-output`,
-// `brightnessctl -lm --class=backlight` and the wlsunset probe.
+// `brightnessctl -lm --class=backlight`, the DDC/CI probe and the text size.
 function parseState(raw) {
     const sections = {};
     let current = "";
@@ -138,8 +138,7 @@ function parseState(raw) {
         focused: focused,
         backlights: backlights,
         ddc: ddc,
-        textSize: isFinite(textSize) ? textSize : 0,
-        nightLight: (sections.nightlight || []).join("").trim() === "yes"
+        textSize: isFinite(textSize) ? textSize : 0
     };
 }
 

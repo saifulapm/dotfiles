@@ -34,8 +34,8 @@ import Quickshell.Io
 // here ever asks for it.
 //
 // State persists as a flag file at ~/.local/state/qshell/blur, watched like
-// nightlight/stay-awake, so `touch`/`rm` from a terminal toggles blur exactly
-// as the menu row does.
+// stay-awake, so `touch`/`rm` from a terminal toggles blur exactly as the
+// menu row does.
 QtObject {
     id: root
 
@@ -185,7 +185,7 @@ QtObject {
 
     // A FileView cannot arm its watch when the state dir itself is missing —
     // reload() after a guaranteed mkdir is the re-arm (same defence as
-    // Theme.qml, Idle.qml and Nightlight.qml).
+    // Theme.qml and Idle.qml).
     readonly property Process stateDirProc: Process {
         command: ["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/qshell"]
         onExited: {

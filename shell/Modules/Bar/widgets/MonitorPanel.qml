@@ -7,39 +7,32 @@ import "MonitorModel.js" as Model
 // Display panel — port of omarchy's monitor plugin on niri's IPC: a hero
 // naming the current brightness mood, a live brightness slider per output
 // that has a backlight, their scale presets filtered down to the ones this
-// mode can actually land on, a VRR toggle, and the per-output enable rows.
+// mode can actually land on, and the per-output enable rows.
 //
 // One probe process gathers everything (`niri msg --json outputs`, the
-// focused output, `brightnessctl -lm` and the wlsunset check), on their 5 s
-// cadence and only while the panel is open. Brightness writes are debounced
-// 180 ms like theirs, and the value we just wrote is authoritative — the
-// probe never gets to bounce the slider back mid-drag.
+// focused output and `brightnessctl -lm`), on their 5 s cadence and only
+// while the panel is open. Brightness writes are debounced 180 ms like
+// theirs, and the value we just wrote is authoritative — the probe never
+// gets to bounce the slider back mid-drag.
 BarPanel {
     id: panel
 
     panelTitle: ""
     cardWidth: theme.space(95)
 
-    // The shell's night light service (Services/Nightlight.qml).
-    property var nightlight: null
-
     property var outputs: []
     property string focused: ""
     property var backlights: []
-    property bool nightLightAvailable: false
-    readonly property bool nightLightOn: nightlight ? nightlight.enabled : false
-    // wlsunset installed, a service to drive it, and a compositor that has not
-    // already refused gamma control on this hardware.
-    readonly property bool nightLightUsable: nightLightAvailable && !!nightlight
 
     // Live brightness per backlight device, keyed by device name. Set locally
     // on every move so the slider is never fighting the probe.
     property var brightness: ({})
     property var pendingBrightness: ({})
 
-    // Their preset row, with 1.5 added: niri takes any fractional scale, and
-    // 1.5 is both its common step and this machine's own.
-    readonly property var scalePresets: ["1", "1.25", "1.5", "1.75", "2", "3"]
+    // Their preset row, plus the two fractional scales these machines
+    // actually run: niri takes any fractional scale, so a preset only has to
+    // be useful — 1.1 is the Mac mini's and 1.5 the MacBook's.
+    readonly property var scalePresets: ["1", "1.1", "1.25", "1.5", "1.75", "2", "3"]
     readonly property var focusedOutput: outputs.find(o => o && o.name === focused) || outputs[0] || null
 
     readonly property var brightnessRows: {
@@ -92,7 +85,6 @@ BarPanel {
         focused = state.focused;
         backlights = state.backlights;
         ddcOutputs = state.ddc || [];
-        nightLightAvailable = state.nightLight;
         if (state.textSize > 0)
             textSize = state.textSize;
 
@@ -120,7 +112,7 @@ BarPanel {
 
     Process {
         id: stateProc
-        command: ["bash", "-c", "echo '##outputs'; niri msg --json outputs; echo '##focused'; niri msg --json focused-output; echo '##backlights'; brightnessctl -lm --class=backlight 2>/dev/null; echo '##ddc'; if command -v ddcutil >/dev/null 2>&1; then niri msg --json outputs | jq -r 'keys[]' | while read -r o; do case \"$o\" in eDP*|LVDS*|DSI*) ;; *) p=$(brightness-display-ddc \"$o\" 2>/dev/null) && echo \"$o $p\";; esac; done; fi; echo '##textsize'; text-size --value 2>/dev/null; echo '##nightlight'; command -v wlsunset >/dev/null && echo yes"]
+        command: ["bash", "-c", "echo '##outputs'; niri msg --json outputs; echo '##focused'; niri msg --json focused-output; echo '##backlights'; brightnessctl -lm --class=backlight 2>/dev/null; echo '##ddc'; if command -v ddcutil >/dev/null 2>&1; then niri msg --json outputs | jq -r 'keys[]' | while read -r o; do case \"$o\" in eDP*|LVDS*|DSI*) ;; *) p=$(brightness-display-ddc \"$o\" 2>/dev/null) && echo \"$o $p\";; esac; done; fi; echo '##textsize'; text-size --value 2>/dev/null"]
         stdout: StdioCollector {
             waitForEnd: true
             onStreamFinished: panel.applyState(text)
@@ -224,16 +216,6 @@ BarPanel {
         settleTimer.restart();
     }
 
-    function setVrr(name, on) {
-        Quickshell.execDetached(["niri", "msg", "output", name, "vrr", on ? "on" : "off"]);
-        settleTimer.restart();
-    }
-
-    function setNightLight(on) {
-        if (nightLightUsable)
-            nightlight.setNightlight(on);
-    }
-
     // ------------------------------------------------------- cursor model
     // Their sections, with the display list only present when there is one:
     // j/k walks rows and falls through between sections, h/l adjusts the
@@ -243,13 +225,6 @@ BarPanel {
     property bool cursorActive: false
 
     readonly property var scaleValues: scalePresets
-
-    // Sections that make no sense on this hardware are HIDDEN outright, not
-    // rendered disabled with an explanation (user call 2026-08-07): VRR only
-    // when the focused display reports support, night light only when
-    // wlsunset exists AND the display has a gamma table to move.
-    readonly property bool vrrShown: !!(focusedOutput && focusedOutput.vrr_supported)
-    readonly property bool nightLightShown: nightLightUsable && (!nightlight || nightlight.gammaSupported !== false)
 
     // The desktop text-size knob (bin/text-size, omarchy's display-text-size).
     readonly property int textSizeMin: 9
@@ -271,10 +246,6 @@ BarPanel {
             list.push("brightness");
         list.push("scale");
         list.push("textsize");
-        if (vrrShown)
-            list.push("vrr");
-        if (nightLightShown)
-            list.push("nightlight");
         if (outputs.length > 1)
             list.push("displays");
         return list;
@@ -285,7 +256,7 @@ BarPanel {
             return brightnessRows.length;
         if (section === "scale")
             return scaleValues.length;
-        if (section === "vrr" || section === "nightlight" || section === "textsize")
+        if (section === "textsize")
             return 1;
         if (section === "displays")
             return outputs.length;
@@ -294,7 +265,7 @@ BarPanel {
 
     // The scale pills sit side by side, so j/k treats them as one row.
     function sectionIsSingleRow(section) {
-        return section === "scale" || section === "vrr" || section === "nightlight" || section === "textsize";
+        return section === "scale" || section === "textsize";
     }
 
     function moveCursor(delta) {
@@ -349,10 +320,6 @@ BarPanel {
     function activateCursor() {
         if (focusSection === "scale" && focusedOutput)
             setScale(focusedOutput.name, scaleValues[selectedIndex]);
-        else if (focusSection === "vrr" && focusedOutput)
-            setVrr(focusedOutput.name, !focusedOutput.vrr_enabled);
-        else if (focusSection === "nightlight")
-            setNightLight(!nightLightOn);
         else if (focusSection === "displays") {
             const out = outputs[selectedIndex];
             if (out)
@@ -637,107 +604,6 @@ BarPanel {
                 selectable: panel.textSize < panel.textSizeMax
                 onHovered: panel.takeCursor("textsize", 0)
                 onActivated: panel.stepTextSize(1)
-            }
-        }
-    }
-
-    Separator {
-        theme: panel.theme
-        visible: panel.vrrShown
-    }
-
-    // ----------------------------------------------------------------- vrr
-    // Hidden outright on displays that report no support (user call
-    // 2026-08-07 — no disabled pills with an excuse note).
-    Column {
-        width: parent.width
-        spacing: panel.theme.space(2)
-        visible: panel.vrrShown
-
-        SectionHeader {
-            theme: panel.theme
-            width: parent.width
-            label: "VARIABLE REFRESH RATE"
-        }
-
-        Row {
-            id: vrrRow
-
-            readonly property bool supported: !!(panel.focusedOutput && panel.focusedOutput.vrr_supported)
-            readonly property bool enabledNow: !!(panel.focusedOutput && panel.focusedOutput.vrr_enabled)
-            readonly property real cellWidth: (width - panel.theme.space(1.5)) / 2
-
-            width: parent.width
-            spacing: panel.theme.space(1.5)
-
-            Pill {
-                width: vrrRow.cellWidth
-                label: "Off"
-                selectable: vrrRow.supported
-                isActive: vrrRow.supported && !vrrRow.enabledNow
-                hasCursor: panel.cursorActive && panel.focusSection === "vrr" && panel.selectedIndex === 0
-                onHovered: panel.takeCursor("vrr", 0)
-                onActivated: if (panel.focusedOutput)
-                    panel.setVrr(panel.focusedOutput.name, false)
-            }
-
-            Pill {
-                width: vrrRow.cellWidth
-                label: "On"
-                selectable: vrrRow.supported
-                isActive: vrrRow.supported && vrrRow.enabledNow
-                onHovered: panel.takeCursor("vrr", 0)
-                onActivated: if (panel.focusedOutput)
-                    panel.setVrr(panel.focusedOutput.name, true)
-            }
-        }
-    }
-
-    Separator {
-        theme: panel.theme
-        visible: panel.nightLightShown
-    }
-
-    // ---------------------------------------------------------- night light
-    // Same hide-when-unsupported rule: no wlsunset, or a display with no
-    // gamma table (this MacBook's panel), and the section is simply absent.
-    Column {
-        width: parent.width
-        spacing: panel.theme.space(2)
-        visible: panel.nightLightShown
-
-        SectionHeader {
-            theme: panel.theme
-            width: parent.width
-            label: "NIGHT LIGHT"
-        }
-
-        Row {
-            id: nightLightRow
-
-            readonly property real cellWidth: (width - panel.theme.space(1.5)) / 2
-
-            width: parent.width
-            spacing: panel.theme.space(1.5)
-
-            Pill {
-                width: nightLightRow.cellWidth
-                label: "Off"
-                selectable: panel.nightLightUsable
-                isActive: !panel.nightLightOn
-                hasCursor: panel.cursorActive && panel.focusSection === "nightlight" && panel.selectedIndex === 0
-                onHovered: panel.takeCursor("nightlight", 0)
-                onActivated: panel.setNightLight(false)
-            }
-
-            Pill {
-                width: nightLightRow.cellWidth
-                label: "On"
-                selectable: panel.nightLightUsable
-                isActive: panel.nightLightOn
-                hasCursor: panel.cursorActive && panel.focusSection === "nightlight" && panel.selectedIndex === 0
-                onHovered: panel.takeCursor("nightlight", 0)
-                onActivated: panel.setNightLight(true)
             }
         }
     }

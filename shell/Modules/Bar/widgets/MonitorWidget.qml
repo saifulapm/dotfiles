@@ -7,9 +7,6 @@ import "../components"
 BarIcon {
     id: rootItem
 
-    // The ShellRoot, for the night light service the panel switches.
-    required property var shell
-
     // md-desktop_mac (multi: md-monitor_multiple) — the plain md-monitor's
     // thin outline read smaller than its solid neighbors; the desk base
     // gives it the same visual weight, helped by a nudge of optical scale.
@@ -20,8 +17,7 @@ BarIcon {
     function openPanel() {
         if (panelLoader.status === Loader.Null)
             panelLoader.setSource("MonitorPanel.qml", {
-                theme: rootItem.theme,
-                nightlight: rootItem.shell ? rootItem.shell.nightlight : null
+                theme: rootItem.theme
             });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();

@@ -38,7 +38,7 @@ Item {
     // but not a default: it lives standalone on the bar's right edge
     // (shell.json), always visible as the history center's entry point —
     // add "notifs" to this widget's `items` to host it here instead.
-    readonly property var defaultItems: ["screenrecording", "dictation", "reminder", "dnd", "nightlight", "stayawake"]
+    readonly property var defaultItems: ["screenrecording", "dictation", "reminder", "dnd", "stayawake"]
 
     function setting(name, fallback) {
         const value = settings ? settings[name] : undefined;
@@ -339,7 +339,6 @@ Item {
             "notifs": notifsBellComponent,
             "dnd": dndComponent,
             "reminder": reminderComponent,
-            "nightlight": nightLightComponent,
             "stayawake": stayAwakeComponent
         })
 
@@ -416,16 +415,6 @@ Item {
             theme: root.theme
             bar: root.bar
             shell: root.shell
-            indicatorHost: root
-        }
-    }
-
-    Component {
-        id: nightLightComponent
-        NightLight {
-            theme: root.theme
-            bar: root.bar
-            nightlight: root.shell.nightlight
             indicatorHost: root
         }
     }

@@ -228,12 +228,6 @@ arch = "all"
 why = "Barcode/QR decoder behind bin/screenshot-qr (the capture menu's QR Code row — hidden while zbarimg is absent), port of omarchy's omarchy-capture-qr. Only the QR symbology is enabled at call time: dense screen content false-positives as EAN or Code 39 otherwise"
 
 [[pkg]]
-name = "wlsunset"
-category = "core"
-arch = "all"
-why = "Wayland gamma/night-light daemon driven by the shell's nightlight service and indicator (omarchy uses hyprsunset; wlsunset is the compositor-neutral equivalent for niri)"
-
-[[pkg]]
 name = "bluez-tools"
 category = "core"
 arch = "all"
