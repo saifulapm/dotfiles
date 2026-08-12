@@ -4,6 +4,10 @@
 # name in its two error messages differs. bin/tailscale-send is its one caller
 # here, for the tailscale panel's Taildrop send.
 #
+#   file-select --title "Pick image" --extensions "png svg"
+#   file-select --title "Send with Tailscale" --multiple
+#   file-select --title "Share folder" --directory
+#
 # The dialog this opens is the shell's own: bin/qshell-portal registers
 # shell/Modules/FilePicker as the FileChooser backend, so this goes out to
 # xdg-desktop-portal and comes back drawn in the current theme. With that
@@ -45,6 +49,7 @@ def main():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--title", default="Select file")
     parser.add_argument("--multiple", action="store_true")
+    parser.add_argument("--directory", action="store_true")
     parser.add_argument("--extensions", default="")
     args, unknown = parser.parse_known_args()
 
@@ -86,7 +91,11 @@ def main():
         "multiple": GLib.Variant("b", args.multiple),
     }
 
-    if args.extensions:
+    if args.directory:
+        options["directory"] = GLib.Variant("b", True)
+
+    # Filters name file formats, which a directory chooser has no use for.
+    if args.extensions and not args.directory:
         # Glob matching in the chooser is case-sensitive, so cover both cases.
         exts = [ext.lstrip(".").lower() for ext in args.extensions.split()]
         patterns = [(0, "*." + ext) for ext in exts] + [(0, "*." + ext.upper()) for ext in exts]
