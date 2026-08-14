@@ -1,0 +1,22 @@
+[Unit]
+Description=Announce process crashes and offer an AI diagnosis
+# Needs the session bus to notify, and the shell to be the thing notified.
+After=graphical-session.target
+PartOf=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+# Set by bin/crash-capture-toggle. Checked here rather than by disabling the
+# unit, so the choice survives a logout without systemctl bookkeeping.
+ConditionPathExists=!%h/.local/state/qshell/crash-capture-off
+
+[Service]
+Type=simple
+ExecStart=%h/.dotfiles/bin/crash-watch
+# The whole point is to sit blocked on `journalctl -f` forever; anything that
+# ends that is worth starting again. The script does no work between crashes,
+# so a restart loop cannot spin.
+Restart=always
+RestartSec=5
+Nice=10
+
+[Install]
+WantedBy=graphical-session.target

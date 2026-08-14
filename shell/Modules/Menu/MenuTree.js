@@ -369,6 +369,18 @@ var TREE = {
         "state": "blur",
         "call": "blur"
     },
+    // systemd-coredump already journals every crash; crash-watch.service turns
+    // that into a toast whose click hands the facts to Claude Code with the
+    // diagnose-crash skill. The flag is a STOP file, so ✓ means "no flag".
+    "toggle.crash-capture": {
+        "icon": "󱚡",
+        "label": "Crash Capture",
+        "aliases": ["crash", "coredump", "core", "segfault", "diagnose"],
+        "description": "Notify when a program crashes, and offer an AI diagnosis",
+        "when": "command -v coredumpctl",
+        "checked": "test ! -e \"$HOME/.local/state/qshell/crash-capture-off\"",
+        "action": "crash-capture-toggle"
+    },
     "toggle.keyboard-layout": {
         "icon": "󰌌",
         "label": "Keyboard Layout",

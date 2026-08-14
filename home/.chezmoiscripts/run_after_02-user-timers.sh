@@ -6,7 +6,7 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket qshell.service emacs.service mempressure.service clipboard-sync.service
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service qshell.service emacs.service mempressure.service clipboard-sync.service
 # Also DISABLES voxtype.service — see the block near the end of this file.
 set -euo pipefail
 
@@ -23,7 +23,10 @@ set -euo pipefail
 # outside one just answers empty/500 and the socket stays healthy.
 # librepods.service carries ConditionPathExists on its hand-built binary, so
 # enabling it everywhere is safe — it only runs where someone built the tool.
-units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service)
+# crash-watch.service carries ConditionPathExists=! on its own off-switch and
+# ConditionEnvironment=WAYLAND_DISPLAY, so `enable --now` is a clean no-op on a
+# TTY-only apply or a machine where crash capture has been toggled off.
+units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently

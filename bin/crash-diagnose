@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# crash-diagnose — diagnose a crashed process with Claude Code.
+#
+#   crash-diagnose <pid> [comm] [exe] [signal]
+#
+# Clicked from a "Process crashed:" notification, or run by hand against any
+# PID in `coredumpctl list`. Port of omarchy's bin/omarchy-agent-crash
+# (CREDITS.md): the method lives in the diagnose-crash skill so it is edited in
+# one place, and this only gathers the facts and points at it.
+#
+# Deliberately NOT a revival of bin/launch-agent, which was removed in aa550d9
+# because bin/app-run's transient unit forces WorkingDirectory=$HOME and broke
+# `cd ~/Sites` for coding sessions. A crash diagnosis has no project directory
+# to land in — $HOME is the right cwd — so the reason that launcher went does
+# not apply here, and this stays a single-purpose invocation rather than
+# bringing back the agent selector and its menu.
+set -euo pipefail
+
+pid=${1:?usage: crash-diagnose <pid> [comm] [exe] [signal]}
+
+if [[ ! $pid =~ ^[0-9]+$ ]]; then
+  echo "Not a PID: $pid" >&2
+  echo "Usage: crash-diagnose <pid>   (see: coredumpctl list)" >&2
+  exit 1
+fi
+
+comm=${2:-unknown}
+exe=${3:-unknown}
+signal=${4:-unknown}
+
+skill="$HOME/.claude/skills/diagnose-crash/SKILL.md"
+
+# Looked up live so a hand-run PID still gets a timestamp. A rotated-away core
+# only costs the timestamp, so failure is tolerated.
+when=$(coredumpctl list "$pid" --no-pager --no-legend 2>/dev/null | tail -1 | cut -d' ' -f1-4) || true
+when=${when:-unknown}
+
+prompt=$(
+  cat <<PROMPT
+A process crashed on this machine and I want to know why.
+
+What systemd-coredump recorded:
+  process:  $comm
+  PID:      $pid
+  binary:   $exe
+  signal:   $signal
+  time:     $when
+
+Use the diagnose-crash skill: it covers how to investigate, what to report, and
+whose bug it is likely to be. If your harness has no skill mechanism, read the
+skill files directly and follow them instead:
+
+  $skill
+PROMPT
+)
+
+command -v claude >/dev/null 2>&1 || {
+  echo "claude is not installed (run_onchange_after_04-agent-clis.sh installs it)" >&2
+  exit 1
+}
+
+# bypassPermissions is what makes this useful unattended: the investigation is
+# a long run of coredumpctl / gdb / journalctl calls, and an agent that stops
+# to ask for each one diagnoses nothing. It is a loaded default and worth
+# knowing about — an agent started this way can run anything without asking.
+# Nothing here changes how `claude` behaves when you type it yourself.
+#
+# foot-run under app-run for the same reason every other launcher here uses it:
+# the window lands in its own transient unit under app-graphical.slice instead
+# of inside qshell.service's cgroup (see bin/app-run).
+exec app-run foot-run --app-id=crash-diagnose \
+  -e claude --permission-mode bypassPermissions -- "$prompt"

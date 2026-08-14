@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# crash-capture-toggle — turn the crash notifier on or off.
+#
+# Port of omarchy's bin/omarchy-toggle-crash-capture (CREDITS.md), on our state
+# dir rather than their omarchy-toggle helper.
+#
+# The flag is a STOP file: absent means enabled, so a fresh machine gets crash
+# capture without having to opt in. crash-watch.service carries the matching
+# ConditionPathExists=!, which is what makes the choice survive a logout —
+# stopping the unit here only settles this session.
+set -euo pipefail
+
+# nf-md-robot_dead, escaped so this file reads without a Nerd Font.
+readonly CRASH_GLYPH=$'\U000f16a1'
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell"
+flag="$state_dir/crash-capture-off"
+
+mkdir -p "$state_dir"
+
+if [ -e "$flag" ]; then
+  rm -f "$flag"
+  systemctl --user start crash-watch.service 2>/dev/null || true
+  notify-send -a qshell "$CRASH_GLYPH Crash capture enabled" >/dev/null 2>&1 || true
+else
+  : >"$flag"
+  systemctl --user stop crash-watch.service 2>/dev/null || true
+  notify-send -a qshell "$CRASH_GLYPH Crash capture disabled" >/dev/null 2>&1 || true
+fi

@@ -1023,6 +1023,30 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   and a fallback their design doesn't need: if ttfx is missing the stage
   powers the monitors off, which was our whole stage 1 before this port.
 
+- **Crash capture** from omarchy `bin/omarchy-crash-watch`,
+  `bin/omarchy-agent-crash`, `bin/omarchy-toggle-crash-capture`,
+  `default/systemd/user/omarchy-crash-watch.service` and the
+  `diagnose-crash` skill → our `bin/crash-watch`, `bin/crash-diagnose`,
+  `bin/crash-capture-toggle`, `crash-watch.service` and
+  `~/.claude/skills/diagnose-crash/`. Their design carries over whole: tail
+  systemd-coredump's journal `MESSAGE_ID` for structured `COREDUMP_*` fields,
+  own-UID only, per-program dedupe window, dedupe started only by a DELIVERED
+  toast, and a wait for the notification server to come back (a shell crash
+  takes the server down with it, and that is the crash most worth reporting).
+  Their `omarchy-notification-wait` is inlined — one caller. Deviations: the
+  filter that matters here is the executable's PATH, not its name (measured:
+  44 of 45 coredumps in a day were debug builds under `~/Sites`, so a
+  name-based list would mean naming every binary you ever build); the toast
+  goes out under its own app name so it lands in the notification centre, and
+  deliberately does NOT bypass Do Not Disturb the way theirs does; and the
+  click runs Claude Code directly rather than through an agent selector, since
+  `bin/launch-agent` was removed in aa550d9. The skill is theirs with the
+  Arch-specific parts adapted — Fedora's debuginfod, `dnf debuginfo-install`,
+  aarch64, systemd-oomd pressure kills — and their `reporting.md` reshaped:
+  theirs files upstream to a project the user consumes, ours has the top layer
+  sitting in this repo, so the useful split is "fix it here" vs "hand it to
+  the right project".
+
 ## DankMaterialShell (MIT) — github.com/AvengeMedia/DankMaterialShell
 
 - **niri event-stream pattern** from `quickshell/Services/NiriService.qml`:

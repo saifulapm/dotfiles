@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# crash-watch — announce process crashes and offer an AI diagnosis.
+#
+# Port of omarchy's bin/omarchy-crash-watch (CREDITS.md). systemd-coredump is
+# already this machine's core_pattern handler, and it journals every dump under
+# a known MESSAGE_ID with structured COREDUMP_* fields — richer than the core
+# filenames, and readable without touching the cores themselves.
+#
+# Runs as crash-watch.service. bin/crash-diagnose is what a click opens.
+set -uo pipefail
+
+# See systemd.journal-fields(7).
+readonly COREDUMP_MESSAGE_ID=fc2e22bc6ee647b6b90729ab34a250b1
+
+# nf-md-robot_dead, escaped so this file reads without a Nerd Font.
+readonly CRASH_GLYPH=$'\U000f16a1'
+
+# Crash loops dump core repeatedly, so announce each program at most once a
+# window.
+readonly dedupe_seconds=${QSHELL_CRASH_DEDUPE_SECONDS:-60}
+
+# Extended regex of process NAMES never worth announcing. Upstream's only
+# filter; kept, but it is not the one that matters here — see ignore_prefix.
+readonly ignore_pattern=${QSHELL_CRASH_IGNORE:-}
+
+# OURS, and the reason this service is usable on a development machine at all:
+# a crash in a binary you are actively building is not news. Measured before
+# writing this — of 45 coredumps in one day here, 44 were debug builds under
+# ~/Sites (43 of them one Rust binary mid-refactor) and exactly one was a real
+# event (/usr/bin/bash, SIGSEGV). Upstream filters on process name, which would
+# mean naming every binary you ever build; the path is what actually separates
+# "my own work in progress" from "something on this system broke".
+#
+# Set QSHELL_CRASH_IGNORE_PREFIX= (empty) to hear about your own builds too.
+readonly ignore_prefix=${QSHELL_CRASH_IGNORE_PREFIX-$HOME/Sites}
+
+declare -A last_notified
+
+# The shell owns org.freedesktop.Notifications, so a shell crash takes the
+# notification server down with it and a toast sent into that gap is lost. Wait
+# for the restarted shell to claim the name again: the crash least likely to be
+# delivered is the one most worth reporting. (Upstream splits this into
+# omarchy-notification-wait; it has one caller, so it lives here.)
+notification_server_ready() {
+  local attempts=$((10 * 10))
+  while ((attempts > 0)); do
+    if qs ipc call notifs status >/dev/null 2>&1 &&
+      busctl --user call org.freedesktop.Notifications /org/freedesktop/Notifications \
+        org.freedesktop.Notifications GetServerInformation >/dev/null 2>&1; then
+      return 0
+    fi
+    attempts=$((attempts - 1))
+    sleep 0.1
+  done
+  return 1
+}
+
+announce() {
+  local comm=$1 pid=$2 exe=$3 signal=$4 exec_command
+
+  exec_command=$(printf '%s/.dotfiles/bin/crash-diagnose %q %q %q %q' "$HOME" "$pid" "$comm" "$exe" "$signal")
+
+  notification_server_ready || return 1
+
+  # -a Crash, not -a qshell: NotificationLogic.isEphemeralApp keeps "qshell"
+  # and bare "notify-send" out of the history buckets entirely, and a crash you
+  # were away for is exactly the one you want to find later — the row stays
+  # clickable in the notification centre (same qshell-exec command runs).
+  #
+  # Deliberate deviation from upstream: they send this under the one app name
+  # shouldBypassDnd() lets through, so a crash interrupts Do Not Disturb. Ours
+  # does not. DND here is an explicit "not now", a crash is diagnosable just as
+  # well ten minutes later, and the history row means nothing is lost by
+  # waiting. Critical urgency still gives it the long on-screen life.
+  notify-send -a Crash --urgency=critical \
+    --hint=string:qshell-exec:"$exec_command" \
+    "$CRASH_GLYPH Process crashed: $comm" \
+    "Click to diagnose with AI" >/dev/null 2>&1
+}
+
+# -n 0 so a restart does not re-announce crashes already dealt with.
+journalctl -f -n 0 -o json "MESSAGE_ID=$COREDUMP_MESSAGE_ID" 2>/dev/null |
+  while IFS= read -r entry; do
+    IFS=$'\t' read -r uid comm pid exe signal < <(
+      jq -r '[(._UID // "-"),
+              (.COREDUMP_COMM // "-"),
+              (.COREDUMP_PID // "-"),
+              (.COREDUMP_EXE // "-"),
+              (.COREDUMP_SIGNAL_NAME // "-")] | @tsv' <<<"$entry" 2>/dev/null
+    )
+
+    [[ $pid =~ ^[0-9]+$ ]] || continue
+
+    # Only this user's crashes; a daemon dumping core is a sysadmin's problem.
+    [[ $uid =~ ^[0-9]+$ ]] || continue
+    ((uid == UID)) || continue
+
+    # comm is truncated to 15 characters, so prefer the executable's basename.
+    name=$comm
+    [[ $exe == /* ]] && name=${exe##*/}
+
+    [[ -n $ignore_prefix && $exe == "$ignore_prefix"/* ]] && continue
+    [[ -n $ignore_pattern && $name =~ $ignore_pattern ]] && continue
+
+    # Never announce our own machinery, or it notifies about itself.
+    [[ $name == crash-watch || $name == crash-diagnose ]] && continue
+
+    now=$EPOCHSECONDS
+    (((now - ${last_notified[$name]:-0}) < dedupe_seconds)) && continue
+
+    # Only a delivered toast starts the dedupe window. A failed send that
+    # counted would suppress the rest of a crash loop for a minute, and
+    # `journalctl -n 0` never replays what was missed.
+    announce "$name" "$pid" "$exe" "$signal" && last_notified[$name]=$now
+  done
