@@ -284,6 +284,23 @@ function bindingWindow(windows) {
     return best;
 }
 
+// Whether a window's allowance is still the one being drawn from (omarchy
+// c8fb5be). A percentage outlives the probe that measured it, but only until
+// its window rolls over: past the reset, the figure describes a period that
+// is over, and pinning a stale 78% on an allowance that is now untouched is
+// worse than showing nothing. A window with no reset time, or one that will
+// not parse, is kept — an unreadable timestamp is no reason to throw away a
+// real number.
+function limitWindowOpen(resetAt, nowMs) {
+    const raw = String(resetAt || "");
+    if (raw === "")
+        return true;
+    const ms = new Date(raw).getTime();
+    if (!isFinite(ms))
+        return true;
+    return ms > nowMs;
+}
+
 function resetMsFor(window, nowMs) {
     if (!window || !window.resetAt)
         return -1;

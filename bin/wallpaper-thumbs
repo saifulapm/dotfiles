@@ -44,12 +44,19 @@ while IFS= read -r src; do
   key="$(printf '%s:%s' "$src" "$meta" | sha1sum | cut -d' ' -f1)"
   thumb="$cache/$key.jpg"
   if [ ! -s "$thumb" ]; then
+    # Generated beside the target and renamed in (omarchy f075a78): a run
+    # killed mid-write — oomd, a closed picker — otherwise leaves a partial
+    # JPEG that is non-empty, so the -s test above accepts it forever and
+    # that wallpaper renders broken until the prune. rename(2) publishes
+    # whole files only, which also makes two concurrent runs harmless.
+    # A killed run's leftover .part is collected by the same prune.
+    tmp="$thumb.$$.part"
     # -frames:v 1 makes an animated GIF/WebP contribute its first frame;
     # 'min(768,iw)' never upscales a source already narrower than a tile.
     if ! ffmpeg -v error -y -i "$src" -frames:v 1 \
-      -vf "scale='min(768,iw)':-2" -q:v 4 "$thumb" </dev/null 2>/dev/null \
-      || [ ! -s "$thumb" ]; then
-      rm -f "$thumb" 2>/dev/null
+      -vf "scale='min(768,iw)':-2" -q:v 4 -f mjpeg "$tmp" </dev/null 2>/dev/null \
+      || [ ! -s "$tmp" ] || ! mv -f "$tmp" "$thumb" 2>/dev/null; then
+      rm -f "$tmp" "$thumb" 2>/dev/null
       printf '%s\n' "$src"
       continue
     fi

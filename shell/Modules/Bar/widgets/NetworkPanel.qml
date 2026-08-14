@@ -39,6 +39,43 @@ BarPanel {
     readonly property var connectedWifiNetwork: findConnectedWifiNetwork()
     property bool wifiStationAvailable: false
 
+    // ----------------------------------------------------- scanner ownership
+    //
+    // scannerEnabled lives on the shared WifiDevice and is not reference
+    // counted, so every write has to go through here (omarchy 5f74a99).
+    // Tracking the device this panel turned scanning on for keeps the release
+    // correct when the device is swapped out from under us — otherwise the
+    // old interface is left sweeping with nothing to hand the results to.
+    //
+    // Every sweep takes the radio off its operating channel, so a leaked
+    // scanner degrades the very link it is scanning from: upstream measured
+    // one sweep every 17s pushing gateway RTT from ~2ms to repeated 150ms
+    // spikes on an otherwise idle connection.
+    property var scannerDevice: null
+
+    function setScannerEnabled(enabled) {
+        // A closed panel has no network list to fill, so it never owns the
+        // scanner however it got here — refresh() is reached from action
+        // completions and timeouts that land long after a close.
+        const nextDevice = panel.opened ? panel.wifiDevice : null;
+
+        if (panel.scannerDevice && panel.scannerDevice !== nextDevice)
+            panel.scannerDevice.scannerEnabled = false;
+
+        panel.scannerDevice = nextDevice;
+
+        if (panel.scannerDevice)
+            panel.scannerDevice.scannerEnabled = enabled;
+    }
+
+    // A panel torn down while open (bar reload, widget leaving the layout)
+    // never emits panelClosed, and dies with `opened` still true — without
+    // this, NetworkManager keeps scanning for a panel that no longer exists.
+    Component.onDestruction: {
+        if (panel.scannerDevice)
+            panel.scannerDevice.scannerEnabled = false;
+    }
+
     // Prefer a connected device: a machine can expose several NICs of the same
     // type, and the first-enumerated one may be carrierless.
     function findDevice(type) {
@@ -643,10 +680,10 @@ BarPanel {
             // re-arm continuous background scanning.
             if (scanWifi === true && panel.opened) {
                 panel.scanning = true;
-                panel.wifiDevice.scannerEnabled = false;
+                panel.setScannerEnabled(false);
                 scanRestart.start();
             } else {
-                panel.wifiDevice.scannerEnabled = panel.opened;
+                panel.setScannerEnabled(true);
             }
         }
     }
@@ -731,8 +768,9 @@ BarPanel {
     }
 
     onWifiDeviceChanged: {
-        if (panel.wifiDevice)
-            panel.wifiDevice.scannerEnabled = panel.opened;
+        // Unconditional: the helper releases the device being replaced even
+        // when the new one is null (the adapter going away entirely).
+        panel.setScannerEnabled(true);
         panel.syncWifiNetworks();
     }
 
@@ -1023,8 +1061,11 @@ BarPanel {
         panel.internetPingPacketLoss = 0;
         panel.cancelPasswordPrompt();
         panel.dnsCustomOpen = false;
-        if (panel.wifiDevice)
-            panel.wifiDevice.scannerEnabled = false;
+        // Drop a restart this open armed: a close/reopen inside the 100ms
+        // window would otherwise reuse the running timer and re-enable the
+        // scanner immediately, undoing the deferral.
+        scanRestart.stop();
+        panel.setScannerEnabled(false);
     }
 
     // ------------------------------------------------------------ processes
@@ -1223,8 +1264,9 @@ BarPanel {
         onTriggered: {
             // The panel can close inside this window; onPanelClosed already
             // disarmed the scanner and this must not re-arm it.
-            if (panel.wifiDevice)
-                panel.wifiDevice.scannerEnabled = panel.opened;
+            if (!panel.opened)
+                return;
+            panel.setScannerEnabled(true);
             scanDone.start();
         }
     }

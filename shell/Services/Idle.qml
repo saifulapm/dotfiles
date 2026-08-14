@@ -153,9 +153,16 @@ QtObject {
         // drawing into — bin/screensaver's own exit trap only fires when the
         // script gets to run its handler, which it may not if its foreground
         // ttfx is what is still alive.
-        run(["pkill", "-x", "ttfx"]);
-        // The bracketed pattern keeps pkill from matching its own cmdline.
-        run(["pkill", "-f", "[o]rg.qshell.screensaver"]);
+        //
+        // One shell, not two run() calls: run() is execDetached, so separate
+        // launches race. ttfx also handles SIGTERM asynchronously (omarchy
+        // f6fd2e7) and restores the terminal on its way out, so the window
+        // teardown waits for it — briefly, since a ttfx that will not go
+        // must not keep the screensaver on screen.
+        //
+        // The bracketed pattern keeps pkill from matching its own cmdline
+        // (or this shell's, which carries the same argument).
+        run(["bash", "-c", "pkill -x ttfx; timeout 1s pidwait -x ttfx; pkill -f '[o]rg.qshell.screensaver'"]);
     }
 
     function lockNow(reason) {

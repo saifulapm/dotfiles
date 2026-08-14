@@ -313,7 +313,7 @@ QtObject {
                 // The replacement snapshot caches to its own file (the dest
                 // name carries the timestamp), so the replaced row's copy has
                 // no other referent — without this it stayed on disk forever.
-                maybeDeleteCachedImage(row.image);
+                maybeDeleteCachedImages(row);
                 model.remove(i);
             }
         }
@@ -326,7 +326,7 @@ QtObject {
             while (root.pendingModel.count > root.historyCap) {
                 const evicted = root.pendingModel.get(root.pendingModel.count - 1);
                 if (evicted)
-                    root.maybeDeleteCachedImage(evicted.image);
+                    root.maybeDeleteCachedImages(evicted);
                 root.pendingModel.remove(root.pendingModel.count - 1);
             }
             root.scheduleHistorySave();
@@ -347,7 +347,7 @@ QtObject {
                 while (root.pastModel.count > root.historyCap) {
                     const evicted = root.pastModel.get(root.pastModel.count - 1);
                     if (evicted)
-                        root.maybeDeleteCachedImage(evicted.image);
+                        root.maybeDeleteCachedImages(evicted);
                     root.pastModel.remove(root.pastModel.count - 1);
                 }
                 root.scheduleHistorySave();
@@ -391,7 +391,7 @@ QtObject {
             while (root.pastModel.count > root.historyCap) {
                 const evicted = root.pastModel.get(root.pastModel.count - 1);
                 if (evicted)
-                    root.maybeDeleteCachedImage(evicted.image);
+                    root.maybeDeleteCachedImages(evicted);
                 root.pastModel.remove(root.pastModel.count - 1);
             }
             root.scheduleHistorySave();
@@ -493,7 +493,7 @@ QtObject {
             return;
         const entry = pendingModel.get(index);
         if (entry)
-            maybeDeleteCachedImage(entry.image);
+            maybeDeleteCachedImages(entry);
         pendingModel.remove(index);
         scheduleHistorySave();
     }
@@ -503,7 +503,7 @@ QtObject {
             return;
         const entry = pastModel.get(index);
         if (entry)
-            maybeDeleteCachedImage(entry.image);
+            maybeDeleteCachedImages(entry);
         pastModel.remove(index);
         scheduleHistorySave();
     }
@@ -512,7 +512,7 @@ QtObject {
         for (let i = 0; i < pendingModel.count; i++) {
             const entry = pendingModel.get(i);
             if (entry)
-                maybeDeleteCachedImage(entry.image);
+                maybeDeleteCachedImages(entry);
         }
         pendingModel.clear();
         scheduleHistorySave();
@@ -522,7 +522,7 @@ QtObject {
         for (let i = 0; i < pastModel.count; i++) {
             const entry = pastModel.get(i);
             if (entry)
-                maybeDeleteCachedImage(entry.image);
+                maybeDeleteCachedImages(entry);
         }
         pastModel.clear();
         scheduleHistorySave();
@@ -645,23 +645,37 @@ QtObject {
     // long-lived cache dir on ingress and the history row is rewritten to the
     // cached path once cp finishes. The popup keeps the original path, so it
     // always renders even while the copy is in flight.
+    // Both roles, not just the big image: Chromium-family senders (every one
+    // of our web apps) pass the avatar as an appIcon file in a scoped /tmp
+    // directory they delete when the notification closes, so a history row
+    // that keeps the original path loses its avatar (omarchy b2207c3).
+    readonly property var cachedImageRoles: ["image", "appIcon"]
+
     function maybeCacheImage(snapshot) {
-        const image = String(snapshot.image || "");
-        if (!image)
+        for (let i = 0; i < cachedImageRoles.length; i++)
+            maybeCacheImageRole(snapshot, cachedImageRoles[i]);
+    }
+
+    function maybeCacheImageRole(snapshot, role) {
+        const value = String(snapshot[role] || "");
+        if (!value)
             return;
         // image:// URIs are decoded from raw bytes by Quickshell's image
         // provider and cannot be copied out from QML — history references
         // them by URI and they disappear with the notification.
-        if (image.indexOf("image://") === 0)
+        if (value.indexOf("image://") === 0)
             return;
-        if (image.indexOf("file:///tmp/") !== 0)
+        if (value.indexOf("file:///tmp/") !== 0)
             return;
 
-        const srcPath = decodeURIComponent(image.substring(7));
-        const destPath = imageCacheDir + snapshot.timestamp + "-" + snapshot.originalId + "." + Logic.imageExtension(srcPath);
+        const srcPath = decodeURIComponent(value.substring(7));
+        // Role in the name: one notification can carry both, and they would
+        // otherwise collide on the same cache path.
+        const destPath = imageCacheDir + snapshot.timestamp + "-" + snapshot.originalId + "-" + role + "." + Logic.imageExtension(srcPath);
 
         imageCacheQueue = imageCacheQueue.concat([
             {
+                role: role,
                 srcPath: srcPath,
                 destPath: destPath,
                 targetUri: "file://" + encodeURI(destPath),
@@ -681,16 +695,28 @@ QtObject {
         imageCacheProc.targetUri = job.targetUri;
         imageCacheProc.matchOriginalId = job.originalId;
         imageCacheProc.matchTimestamp = job.timestamp;
-        imageCacheProc.command = ["cp", "-f", job.srcPath, job.destPath];
+        imageCacheProc.matchRole = job.role;
+        // Not a bare `cp` (omarchy b2207c3): the path comes from the sender,
+        // and this queue is strictly serial — one job that never returns
+        // wedges every later notification's image. A FIFO would do it, and so
+        // would a file that keeps growing. So: read a bounded prefix under a
+        // timeout, reject anything that reaches the cap rather than caching a
+        // truncated image, and rename the result in so a killed job cannot
+        // publish a partial file.
+        //
+        // 16 MiB is far above any avatar or full-resolution screenshot that
+        // actually arrives here, so the cap only ever fires on something that
+        // has no business being a notification image.
+        imageCacheProc.command = ["bash", "-c", "src=$1; dst=$2; cap=16777216; tmp=$dst.part; " + "timeout 5s head -c $((cap + 1)) -- \"$src\" >\"$tmp\" 2>/dev/null || { rm -f \"$tmp\"; exit 1; }; " + "size=$(stat -c '%s' \"$tmp\" 2>/dev/null || echo 0); " + "[ \"$size\" -gt 0 ] && [ \"$size\" -le $cap ] || { rm -f \"$tmp\"; exit 1; }; " + "mv -f \"$tmp\" \"$dst\"", "notif-image-cache", job.srcPath, job.destPath];
         imageCacheProc.running = true;
     }
 
-    function rewriteCachedImage(targetUri, originalId, timestamp) {
+    function rewriteCachedImage(targetUri, originalId, timestamp, role) {
         function rewrite(model) {
             for (let i = 0; i < model.count; i++) {
                 const row = model.get(i);
                 if (row && row.originalId === originalId && row.timestamp === timestamp) {
-                    model.setProperty(i, "image", targetUri);
+                    model.setProperty(i, role, targetUri);
                     return true;
                 }
             }
@@ -715,6 +741,14 @@ QtObject {
         runNextImageDeleteJob();
     }
 
+    // A row can hold a cached copy in either role, so eviction sweeps both.
+    function maybeDeleteCachedImages(entry) {
+        if (!entry)
+            return;
+        for (let i = 0; i < cachedImageRoles.length; i++)
+            maybeDeleteCachedImage(entry[cachedImageRoles[i]]);
+    }
+
     function runNextImageDeleteJob() {
         if (deleteImageProc.running || deleteImageQueue.length === 0)
             return;
@@ -730,21 +764,30 @@ QtObject {
 
     property Process imageCacheProc: Process {
         property string targetUri: ""
-        property int matchOriginalId: -1
+        // double, not int: originalId carries the session epoch (Date.now()
+        // + the server id), which overflows a 32-bit QML int and truncates to
+        // a value no row can match — so rewriteCachedImage always missed and
+        // the else branch deleted the copy it had just made. Every image has
+        // been cached and immediately thrown away since the epoch-qualified
+        // ids landed. matchTimestamp below is a double for the same reason.
+        property double matchOriginalId: -1
         property double matchTimestamp: 0
+        property string matchRole: "image"
 
         onExited: exitCode => {
             if (exitCode === 0 && targetUri) {
-                if (root.rewriteCachedImage(targetUri, matchOriginalId, matchTimestamp))
+                if (root.rewriteCachedImage(targetUri, matchOriginalId, matchTimestamp, matchRole))
                     root.scheduleHistorySave();
                 else
                     // The row this copy was for is already gone (replaced or
-                    // dismissed while cp ran) — nothing references the file.
+                    // dismissed while the copy ran) — nothing references the
+                    // file.
                     root.maybeDeleteCachedImage(targetUri);
             }
             targetUri = "";
             matchOriginalId = -1;
             matchTimestamp = 0;
+            matchRole = "image";
             root.runNextImageCacheJob();
         }
     }
@@ -909,7 +952,7 @@ QtObject {
             const entry = pastModel.get(i);
             if (entry && entry.timestamp && entry.timestamp < cutoff) {
                 if (entry.image)
-                    maybeDeleteCachedImage(entry.image);
+                    maybeDeleteCachedImages(entry);
                 pastModel.remove(i);
                 removed = true;
             }

@@ -13,6 +13,11 @@ HOLD_SECONDS=14
 
 exit_screensaver() {
   pkill -x ttfx 2>/dev/null
+  # ttfx handles SIGTERM asynchronously (omarchy f6fd2e7): it restores the
+  # terminal on the way out, so tearing the window down in the same breath
+  # can kill the pty mid-restore. Wait for it, briefly — a ttfx that will
+  # not go still must not hold the exit open.
+  timeout 1s pidwait -x ttfx 2>/dev/null
   pkill -f '[o]rg.qshell.screensaver' 2>/dev/null
   exit 0
 }

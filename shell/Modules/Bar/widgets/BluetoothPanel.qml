@@ -21,10 +21,12 @@ import "BluetoothModel.js" as Model
 // sections as they connect and pair, so the cursor follows the focused
 // device's BlueZ address across list churn instead of trusting a row index.
 //
-// Deviations, all marked in place: discovery is stopped when the panel
-// closes (their panel leaves BlueZ scanning; the accepted pattern here is
-// discovering-only-while-open), their omarchy-audio-output-set-default
-// persistence helper is not ported, and the ListView scrolls bare (this
+// Deviations, all marked in place: the cross-monitor half of their discovery
+// ownership asks the bar whether any surface still has this panel open,
+// rather than passing the debt between sibling widget objects (we have no
+// equivalent of their moduleWidgets, and an open panel re-incurs the debt on
+// its own), their omarchy-audio-output-set-default persistence helper is not
+// ported, and the ListView scrolls bare (this
 // shell does not use QtQuick.Controls, so their ScrollBar attachment has no
 // counterpart).
 BarPanel {
@@ -560,6 +562,11 @@ BarPanel {
 
     // ----------------------------------------------------------- lifecycle
     onPanelOpened: {
+        // Adopt a scan that is already running — one leaked by a copy that
+        // could not finish its own stop, or handed over from another monitor
+        // — so this panel's close settles it either way.
+        if (panel.adapter !== null && panel.adapter.discovering)
+            panel.owesDiscoveryStop = true;
         if (panel.connectedDevices.length > 0) {
             panel.focusSection = "connected";
             panel.selectedIndex = 0;
@@ -576,17 +583,87 @@ BarPanel {
         panel.cursorActive = false;
     }
 
-    // Ours: their panel leaves BlueZ scanning after it closes; the accepted
-    // pattern here is discovering only while the panel is open.
-    onPanelClosed: {
-        if (panel.adapter)
-            panel.adapter.discovering = false;
+    // ------------------------------------------------- discovery ownership
+    //
+    // Discovery stops when the panel closes — but a bare write at close time
+    // does not do it (omarchy 457aec6). Quickshell only forwards a
+    // `discovering` write that DIFFERS from the last state BlueZ reported, so
+    // a stop issued while a just-fired StartDiscovery is still awaiting
+    // confirmation is swallowed: the property is already false locally, the
+    // write is a no-op, and the session — held by quickshell's D-Bus
+    // connection, not by this object — outlives the panel entirely. Closing
+    // the panel inside the first second left the radio in inquiry until the
+    // next shell restart, continuously starving A2DP audio on the same
+    // controller into stutters.
+    //
+    // So: track the StopDiscovery this panel owes BlueZ, and settle it from a
+    // timer bound to the CONFIRMED state. A confirmation landing at any point
+    // after close re-arms the stop, and a reopen inside the first interval
+    // keeps the scan running uninterrupted.
+    //
+    // Ownership, not state: BlueZ's Discovering also reflects sessions other
+    // clients hold, which are never this panel's to stop.
+    property bool owesDiscoveryStop: false
+
+    // The bar survives anchorItem going away, which is exactly when this is
+    // asked (a panel being torn down still owing a stop).
+    function anotherPanelOpen() {
+        const bar = (panel.anchorItem && panel.anchorItem.bar) ? panel.anchorItem.bar : panel.grantingBar;
+        if (!bar || typeof bar.anyWidgetPanelOpen !== "function")
+            return false;
+        // This copy is closed or dying by the time this is called, so any
+        // "open" answer is necessarily another surface's.
+        return bar.anyWidgetPanelOpen("bluetooth");
     }
 
-    // A panel torn down while open (bar reconfig, widget leaving the
-    // layout) never emits panelClosed — without this, BlueZ would be left
-    // scanning forever with no panel around to stop it.
+    Timer {
+        id: discoveryStop
+        interval: 1000
+        repeat: true
+        property int attempts: 0
+        running: !panel.opened && panel.owesDiscoveryStop && panel.adapter !== null && panel.adapter.discovering === true
+        onRunningChanged: if (running)
+            attempts = 0
+        onTriggered: {
+            // The scan now serves a panel still on screen elsewhere — its own
+            // open-time adoption may have seen nothing to adopt, so hand the
+            // debt over by dropping it here and letting that panel's retry
+            // timer re-incur it.
+            if (panel.anotherPanelOpen()) {
+                panel.owesDiscoveryStop = false;
+                return;
+            }
+            attempts += 1;
+            // Bounded, so a session another BlueZ client holds up cannot draw
+            // StopDiscovery calls forever.
+            if (attempts > 3) {
+                panel.owesDiscoveryStop = false;
+                return;
+            }
+            panel.adapter.discovering = false;
+        }
+    }
+
+    // The debt is settled the moment BlueZ reports discovery down — whether
+    // the stop above landed or the session ended some other way — so a stale
+    // claim never touches a scan another client starts later. While the panel
+    // is open, discoveryRetry re-incurs it as it restarts the scan.
+    Connections {
+        target: panel.adapter
+        function onDiscoveringChanged() {
+            if (panel.adapter && !panel.adapter.discovering)
+                panel.owesDiscoveryStop = false;
+        }
+    }
+
+    // A panel torn down while open (bar reconfig, widget leaving the layout)
+    // never emits panelClosed, so the timer above never gets its chance.
+    // Nothing here can wait for a BlueZ confirmation, so this is the one place
+    // the write still goes out directly — and only when no other panel is
+    // holding the scan up.
     Component.onDestruction: {
+        if (!panel.owesDiscoveryStop || panel.anotherPanelOpen())
+            return;
         if (panel.adapter && panel.adapter.discovering)
             panel.adapter.discovering = false;
     }
@@ -604,7 +681,10 @@ BarPanel {
         repeat: true
         triggeredOnStart: true
         running: panel.opened && panel.adapter !== null && panel.adapter.state === BluetoothAdapterState.Enabled && !panel.adapter.discovering
-        onTriggered: panel.adapter.discovering = true
+        onTriggered: {
+            panel.owesDiscoveryStop = true;
+            panel.adapter.discovering = true;
+        }
     }
 
     Timer {

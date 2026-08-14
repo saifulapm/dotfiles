@@ -455,6 +455,18 @@ Scope {
         return false;
     }
 
+    // Whether ANY surface currently has this widget's panel open. A widget is
+    // mounted once per screen, and several of them share one backend object
+    // (BlueZ's default adapter, the WifiDevice) — so a closing copy has to ask
+    // whether the resource it is about to release still has a panel on screen
+    // somewhere else.
+    function anyWidgetPanelOpen(widgetId) {
+        for (const b of screenBars)
+            if (b.widgetPanelOpen(widgetId))
+                return true;
+        return false;
+    }
+
     // Close only the center, wherever it is open — `notifs hide` must not
     // sweep unrelated widget panels the way closeAllPanels does.
     function closeNotifCenter() {
@@ -951,6 +963,10 @@ Scope {
             // they reach the cross-surface router through their own surface.
             function summonWidgetMode(widgetId, mode) {
                 return barRoot.summonWidgetMode(widgetId, mode);
+            }
+
+            function anyWidgetPanelOpen(widgetId) {
+                return barRoot.anyWidgetPanelOpen(widgetId);
             }
 
             // The IPC summon path (bar open <widgetId>). Same eligibility

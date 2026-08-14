@@ -120,8 +120,17 @@ Item {
         if (!enabled || probing)
             return;
         if (!tokenUsable) {
-            usageStatusText = credentials.accessToken === "" ? "Waiting for auth" : "Claude session expired";
-            clearLimits();
+            // Only the Claude Code CLI can mint a fresh token — this just
+            // reads the file it writes — so a machine left alone long enough
+            // finds the saved one lapsed. Keep the last windows that have not
+            // since reset rather than wiping the section (omarchy c8fb5be):
+            // the transport-failure path below already keeps them, and an
+            // expired sign-in is no better a reason to discard real numbers.
+            dropRolledOverLimits();
+            const expired = credentials.accessToken !== "";
+            usageStatusText = expired ? "Claude session expired" : "Waiting for auth";
+            if (expired)
+                authHelpText = "Claude Code's saved sign-in expired" + (hasLimits ? " — showing the last known limits." : ".") + " Start Claude Code, or run `claude auth login`, to refresh it.";
             finishRefresh();
             return;
         }
@@ -162,12 +171,27 @@ Item {
         xhr.send();
     }
 
-    function clearLimits() {
-        rateLimitPercent = -1;
-        rateLimitResetAt = "";
-        secondaryRateLimitPercent = -1;
-        secondaryRateLimitResetAt = "";
-        extraLimits = [];
+    readonly property bool hasLimits: rateLimitPercent >= 0 || secondaryRateLimitPercent >= 0 || (extraLimits && extraLimits.length > 0)
+
+    // Keeps whatever is still current and drops the rest, window by window:
+    // an account can hold a rolled-over session alongside a weekly that has
+    // not, and clearing both would throw away the live one.
+    function dropRolledOverLimits() {
+        const nowMs = Date.now();
+        if (!Model.limitWindowOpen(rateLimitResetAt, nowMs)) {
+            rateLimitPercent = -1;
+            rateLimitResetAt = "";
+        }
+        if (!Model.limitWindowOpen(secondaryRateLimitResetAt, nowMs)) {
+            secondaryRateLimitPercent = -1;
+            secondaryRateLimitResetAt = "";
+        }
+        const kept = [];
+        for (let i = 0; i < (extraLimits || []).length; i++) {
+            if (Model.limitWindowOpen(extraLimits[i].resetAt, nowMs))
+                kept.push(extraLimits[i]);
+        }
+        extraLimits = kept;
     }
 
     function finishRefresh() {
