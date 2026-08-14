@@ -468,8 +468,19 @@ ShellRoot {
         notesLoader.summon("toggle");
     }
 
-    // What the hot-edge strip calls on a right-edge hover: open, never toggle
-    // — hovering the edge with the panel already open must not close it.
+    // What the hot-edge strip calls on a right-edge hover. The strip stays
+    // reachable past the card's 10 px niri gap while the panel is open, so the
+    // same gesture that summoned it dismisses it: move away from the edge and
+    // back. The dwell timer behind this is what keeps a fling that merely
+    // grazes the strip from closing a panel mid-read.
+    function toggleNotesFromEdge() {
+        dismissBarPanels();
+        notesLoader.summon("toggle");
+    }
+
+    // Show, never toggle: a drag arriving at the edge must open the panel to
+    // be dropped on, and a drag that grazes the strip with the panel already
+    // open must not pull it out from under the drop.
     function summonNotes() {
         dismissBarPanels();
         notesLoader.summon("show");

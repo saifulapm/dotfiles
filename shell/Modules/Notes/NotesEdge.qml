@@ -7,10 +7,12 @@ import Quickshell.Wayland
 // unloaded) panel. Overlay layer — the reveal must work over fullscreen
 // windows too, and the strip costs one tiny mapped surface, no timers while
 // idle. The dwell delay keeps a fling that merely grazes the edge from
-// opening the panel; leaving the edge before it fires cancels it. The open
-// panel's input region stops 10 px short of the edge (the niri gap), so the
-// strip stays hot while it is open — harmless, because show() early-returns
-// on an already-open panel.
+// opening the panel; leaving the edge before it fires cancels it.
+//
+// The open panel's input region stops 10 px short of the edge (the niri gap),
+// so the strip stays hot while the panel is open — which is what lets the same
+// gesture dismiss it: move off the edge and back. onEntered fires once per
+// entry, so a pointer parked in the gap after the reveal cannot re-trigger.
 PanelWindow {
     id: root
 
@@ -42,7 +44,7 @@ PanelWindow {
         id: dwell
         interval: 150
         repeat: false
-        onTriggered: root.shellRoot.summonNotes()
+        onTriggered: root.shellRoot.toggleNotesFromEdge()
     }
 
     // A drag hitting the edge summons the panel too — pointer hover never
