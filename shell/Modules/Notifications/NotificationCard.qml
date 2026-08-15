@@ -173,6 +173,11 @@ Rectangle {
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
+                // Keep the first line clear of the hover-revealed close
+                // button. Their card has no action row under this column, so
+                // ours also loses this much width on the action buttons —
+                // harmless at the widths they run to.
+                Layout.rightMargin: root.theme.space(2.5)
                 spacing: root.theme.space(0.5)
 
                 Text {
@@ -276,6 +281,48 @@ Rectangle {
                 duration: root.theme.time(1)
                 easing.type: root.theme.easing
             }
+        }
+    }
+
+    // Hover-revealed close (omarchy 9b72edc). Right-click already closed a
+    // toast — and still does — but nothing on the card said so. Declared last
+    // so its MouseArea stacks above the full-card one and the click raises
+    // closeRequested instead of falling through to cardClicked.
+    Item {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: root.border.width + root.theme.space(0.75)
+        anchors.rightMargin: root.border.width + root.theme.space(0.75)
+        width: root.theme.space(4.5)
+        height: root.theme.space(4.5)
+        visible: opacity > 0
+        opacity: root.hovered ? 1 : 0
+
+        // Their 100ms fixed; time(1) instead so the theme's motion token
+        // still governs, and so this fades in step with the countdown rail
+        // above, which answers the same hover.
+        Behavior on opacity {
+            NumberAnimation {
+                duration: root.theme.time(1)
+                easing.type: root.theme.easing
+            }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            text: "✕"
+            color: closeArea.containsMouse ? root.theme.notifications.text : root.theme.notifications.textMuted
+            // Their caption × 1.44, kept as a derivation so the glyph tracks
+            // the text-size knob exactly as theirs does.
+            font.pixelSize: Math.round(root.theme.fontPx(0.833) * 1.44)
+        }
+
+        MouseArea {
+            id: closeArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.closeRequested()
         }
     }
 }
