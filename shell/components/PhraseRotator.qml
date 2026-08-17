@@ -42,7 +42,7 @@ Item {
             target: rotator.target
             property: "opacity"
             to: 1.0
-            duration: rotator.theme.time(1.73)
+            duration: rotator.theme.motion.slow
             easing.type: Easing.InQuad
         }
     }
