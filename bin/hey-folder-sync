@@ -89,7 +89,7 @@
 #
 # Usage:
 #   hey-folder-sync              the mapping and what would move, per box (dry run)
-#   hey-folder-sync --apply      do it; prints the number of files moved on stdout
+#   hey-folder-sync --apply      do it; prints "<moved> <boxes created>" on stdout
 #   hey-folder-sync --state      dump the recorded folder of every message
 #
 # Called by bin/mail-sync between two `notmuch new` runs — after the routing
@@ -435,7 +435,7 @@ move_one() {
 }
 
 apply() {
-    local moved=0 tagged=0 i msg folder line
+    local moved=0 created=0 tagged=0 i msg folder line
 
     # ── pass 1: folder -> tag, for messages that moved behind our back ──
     # First, so that pass 2 sees the tags this produced and agrees with them.
@@ -474,6 +474,28 @@ apply() {
     fi
     [ "$tagged" -gt 0 ] && log "retagged $tagged message(s) from external folder moves"
 
+    # ── an enabled box exists, empty or not ──
+    # Creating the maildir only when there is something to file would be the
+    # obvious economy and it is wrong, because it breaks the half of this that
+    # makes the phone an input device: a box with no mail in it yet would not
+    # exist on iCloud, so there would be nothing to drag a message INTO. You
+    # cannot file a mail as Reply Later from the phone until HEY/ReplyLater is
+    # a folder there. `Create Both` in .mbsyncrc turns each of these into a
+    # real IMAP folder on the next push, so "enabled" means "visible on the
+    # phone" from the moment the line is added — which is what somebody adding
+    # the line meant.
+    for i in "${!RULE_FOLDER[@]}"; do
+        enabled "${RULE_FOLDER[i]}" || continue
+        local box="$MAIL/$STORE/${RULE_FOLDER[i]}"
+        [ -d "$box/cur" ] && continue
+        if mkdir -p "$box"/{cur,new,tmp}; then
+            created=$((created + 1))
+            log "created empty box ${RULE_FOLDER[i]} — iCloud gets it on this push"
+        else
+            log "could not create $box"
+        fi
+    done
+
     # ── pass 2: tag -> folder ──
     # Rebuilt from scratch: pass 1 may have changed tags, and a claim computed
     # before it would place mail by the tags it used to have.
@@ -505,7 +527,12 @@ apply() {
     fi
     mv "$cur" "$STATE"
 
-    printf '%s\n' "$moved"
+    # Two numbers, because they mean different things to the caller: only a
+    # MOVE invalidates notmuch's index and needs a reindex, but a newly created
+    # box needs a push just as much — otherwise adding a line to foldersync.db
+    # leaves the folder invisible on the phone until whenever the next sync
+    # happens to be, which is not what pressing sync meant.
+    printf '%s %s\n' "$moved" "$created"
 }
 
 # Moving files while mbsync is mid-fetch is how a maildir gets corrupted, so

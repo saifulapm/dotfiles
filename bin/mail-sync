@@ -102,11 +102,22 @@ if [ -x "$FOLDER_SYNC" ]; then
     # HEY_SYNC_LOCKED: this process already holds the sync lock on fd 9, which
     # the child inherits. Without the marker the child would try to take it
     # again on a new descriptor and wait five minutes for itself.
-    moved="$(HEY_SYNC_LOCKED=1 "$FOLDER_SYNC" --apply 2>>"$LOG")"
-    case "$moved" in ''|*[!0-9]*) moved=0 ;; esac
+    # Two numbers back: messages moved, and boxes newly created. They are not
+    # the same question. Only a MOVE invalidates notmuch's index, so only a
+    # move needs the reindex; but a box created because a line was just added
+    # to foldersync.db needs the push just as much, or the folder stays
+    # invisible on the phone until the next sync happens along — and you cannot
+    # drag a mail into a folder that is not there.
+    read -r moved created <<<"$(HEY_SYNC_LOCKED=1 "$FOLDER_SYNC" --apply 2>>"$LOG")"
+    case "${moved:-}"   in ''|*[!0-9]*) moved=0 ;; esac
+    case "${created:-}" in ''|*[!0-9]*) created=0 ;; esac
+
     if [ "$moved" -gt 0 ]; then
         log "folder sync: moved $moved message(s) between IMAP folders"
         notmuch new --quiet >>"$LOG" 2>&1 || log "reindex after folder sync failed"
+    fi
+    [ "$created" -gt 0 ] && log "folder sync: created $created new box(es)"
+    if [ $((moved + created)) -gt 0 ]; then
         # Push straight away rather than waiting for the next arrival. A
         # stranger sitting in the server's INBOX for fifteen minutes is a
         # stranger who is still in the phone's inbox for fifteen minutes, and
