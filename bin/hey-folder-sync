@@ -1,0 +1,537 @@
+#!/usr/bin/env bash
+# hey-folder-sync — the tag <-> IMAP-folder bridge. This is what gives the
+# phone the HEY boxes.
+#
+# THE PROBLEM. A box in this setup is a notmuch tag, and IMAP cannot see tags.
+# So on the iPhone there are no boxes: every screened-in mail, every newsletter,
+# every receipt and — the part that actually hurts — every unscreened stranger
+# lands in one INBOX and lights up the lock screen. The Screener's entire
+# promise ("an unscreened stranger cannot buzz you") holds in Emacs and is
+# worth nothing on the device you carry.
+#
+# THE FIX, and note that it is not really about folders. iOS Mail only raises
+# notifications for INBOX. So: make INBOX mean the Imbox. Move everything that
+# is not screened-in mail OUT of INBOX into a HEY/* folder, and the phone
+# inherits the Screener for free — no app, no rules engine, no server support.
+# The folders are the mechanism; "INBOX = the Imbox" is the deliverable.
+#
+#   INBOX            tag:inbox and tag:screened            the ONLY thing that notifies
+#   HEY/Screener     tag:inbox and tag:unread and not tag:screened
+#   HEY/Feed         tag:thefeed
+#   HEY/PaperTrail   tag:/^ledger\//
+#   HEY/ReplyLater   tag:replylater
+#   HEY/SetAside     tag:setaside
+#   HEY/Bubbled      tag:bubble                            away until due — hidden is correct
+#   Archive          everything else                       the backlog, muted, screened-out
+#
+# TWO-WAY, because a one-way map is a trap: drag a mail into HEY/ReplyLater on
+# the phone and it must come back tagged `replylater`, or the folders are
+# read-only decoration and you learn not to touch them.
+#
+# ── how a move actually reaches iCloud ──────────────────────────────────────
+# mbsync has no cross-folder MOVE and never has (isync 1.5.1 verified). A local
+# move is therefore an append to the destination folder plus an expunge from
+# the source, and the message gets a NEW UID on the server. That is not a
+# workaround, it is the documented interface — mbsync(1), RECOMMENDATIONS:
+#
+#   "it is important that the MUA renames files when moving them between
+#    Maildir folders. [...] The general expectation is that a completely new
+#    filename is generated as if the message was new, but stripping the ,U=xxx
+#    infix is sufficient as well."
+#
+# So `move_file` below strips `,U=` and keeps everything else, which is the
+# cheaper of the two sanctioned forms and preserves the maildir info suffix
+# (`:2,S`) — i.e. read state survives the move, which is the whole reason to
+# be careful here. Verified end-to-end on a scratch database before any real
+# mail was touched: tags survive a move between maildirs, `maildir.
+# synchronize_flags` keeps working in the new folder, and `notmuch new` does
+# NOT re-apply new.tags (the Message-ID is already known, so the move is seen
+# as a rename, not an arrival).
+#
+# Failure modes, both self-healing, which is why this is safe to run on a
+# mailbox in daily use:
+#   * append fails  — mbsync recorded no far UID, so it retries every sync.
+#                     The local copy is untouched; nothing is lost.
+#   * expunge fails — the message exists in two folders on iCloud for one sync
+#                     window; the sync state remembers and it is expunged next
+#                     run.
+#
+# ── flapping, and the precedence rule that prevents it ──────────────────────
+# Both directions want to be authoritative, so without a rule they fight: the
+# forward pass moves a file, the phone moves it back, the forward pass moves it
+# again, forever. The rule, recorded here because it is the one decision in
+# this script that is not obvious:
+#
+#   A message whose FOLDER changed since the last run wins for TAGS.
+#   A message whose folder did NOT change is governed by its TAGS.
+#
+# i.e. an external move (phone, webmail, another client) is read as an
+# instruction and converted to tags FIRST; everything else is then placed by
+# the tag map. The two passes therefore never disagree within a run, and the
+# second pass always agrees with what the first just decided.
+#
+# The state that makes this possible is one line per message in
+# folder-state.tsv: "id:<message-id>\t<folder>", the folder as of the end of
+# the last run. A message we have never seen counts as "unchanged" — which is
+# what makes the very first run a pure forward pass and the bootstrap safe.
+#
+# ── the safety catch ────────────────────────────────────────────────────────
+# NOTHING moves until a box is named in foldersync.db. Install this script,
+# wire it into mail-sync, run it a hundred times: with an empty enable list it
+# reads the mailbox, writes the state file and moves not one byte. Boxes are
+# switched on one at a time, and each one is a separate deliberate act. That is
+# the point — a bug in here rewrites UIDs on 1900 messages on somebody's real
+# iCloud account, so the default has to be "do nothing".
+#
+# INBOX is the one exception: it is always live. It has to be, or mail that
+# LEAVES a box (you clear a Reply Later, a Bubble Up comes due) would be
+# stranded in a HEY folder with no rule able to bring it home.
+#
+# Usage:
+#   hey-folder-sync              the mapping and what would move, per box (dry run)
+#   hey-folder-sync --apply      do it; prints the number of files moved on stdout
+#   hey-folder-sync --state      dump the recorded folder of every message
+#
+# Called by bin/mail-sync between two `notmuch new` runs — after the routing
+# hook has settled the tags, before the reindex that teaches notmuch the new
+# filenames. It is deliberately NOT the post-new hook itself: this moves files
+# out from under notmuch's index, so it needs a `notmuch new` after it, and a
+# post-new hook cannot call `notmuch new` without recursing.
+
+set -uo pipefail
+
+MAIL="$(notmuch config get database.path 2>/dev/null)"
+STORE="${HEY_MAIL_STORE:-icloud}"          # the mbsync MaildirStore dir under $MAIL
+DB_DIR="${HEY_MAIL_DB_DIR:-$HOME/.local/share/hey-mail}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/hey-mail"
+STATE="$STATE_DIR/folder-state.tsv"
+LOG="$STATE_DIR/folder-sync.log"
+ENABLE_DB="$DB_DIR/foldersync.db"
+
+[ -n "$MAIL" ] && [ -d "$MAIL/$STORE" ] || {
+    printf 'hey-folder-sync: no maildir at %s/%s\n' "${MAIL:-<unset>}" "$STORE" >&2
+    exit 1
+}
+mkdir -p "$STATE_DIR" "$DB_DIR"
+
+log() { printf '%s folder-sync: %s\n' "$(date -Is)" "$*" >>"$LOG"; }
+
+# Same cap and reason as the post-new hook's: this runs on every push.
+if [ -f "$LOG" ] && [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+    tail -n 2000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+fi
+
+# ─────────────────────────── the map ───────────────────────────
+# Order IS the precedence. A message carries many tags at once — a receipt you
+# set aside is `ledger/shopify` and `setaside` and possibly `inbox` — and IMAP
+# gives it exactly one folder, so the first rule that claims it wins.
+#
+# Piles beat boxes, deliberately, and this is where we part company with HEY:
+# there, a Reply Later mail is still listed in the Imbox. Here it cannot be, so
+# it goes where you would go looking for it. The alternative — leave it in
+# INBOX — makes HEY/ReplyLater permanently empty and silently undoes every
+# drag-into-ReplyLater you make on the phone, which is worse than the
+# divergence.
+#
+# Bubbled is first for the reason Bubble Up exists: you asked not to see it
+# until Thursday, so it must not be in the phone's inbox on Wednesday. It is
+# the one box whose contents being invisible on the phone is the feature.
+#
+# The fallback (Archive) is what makes "INBOX = the Imbox" true rather than
+# aspirational. Without it INBOX keeps every already-read stranger you have
+# ever been sent — on this mailbox that is 1454 messages against 126 of actual
+# Imbox, so the phone's inbox would still be 92% noise and the whole exercise
+# would have bought nothing. Note what it is NOT: screened-out mail goes to
+# Archive too, not to Junk or Trash, because iCloud purges both after 30 days
+# and mbsync would then delete the local copy as well. This setup tags mail
+# `deleted`; it does not unlink it, and a folder map is not the place to start.
+RULE_FOLDER=()  RULE_QUERY=()  RULE_NAME=()
+rule() { RULE_FOLDER+=("$1"); RULE_NAME+=("$2"); RULE_QUERY+=("$3"); }
+
+rule "HEY/Bubbled"    "Bubbled Up"  'tag:bubble'
+rule "HEY/ReplyLater" "Reply Later" 'tag:replylater'
+rule "HEY/SetAside"   "Set Aside"   'tag:setaside'
+rule "HEY/Feed"       "The Feed"    'tag:thefeed'
+rule "HEY/PaperTrail" "Paper Trail" 'tag:/^ledger\//'
+rule "HEY/Screener"   "Screener"    'tag:inbox and tag:unread and not tag:screened'
+rule "INBOX"          "Imbox"       'tag:inbox and tag:screened'
+rule "Archive"        "Archived"    '*'
+
+# Folders a file may be moved OUT of. Everything else is off-limits and that is
+# a hard invariant, not a heuristic: `Sent Messages`, `Drafts`, `Junk` and
+# `Deleted Messages` are iCloud's own and the post-new hook derives tags FROM
+# them (step 1), so moving a file out would fight the router. `~/Mail/notes`
+# matters even more — that is where `H y` (note to yourself) delivers, it is
+# outside $STORE entirely, mbsync has never seen it, and a note that carries
+# `tag:inbox` must never be uploaded to Apple by a rule that only looked at its
+# tags. Restricting the source list is what guarantees that.
+MOVABLE=("INBOX" "Archive" "HEY/Bubbled" "HEY/ReplyLater" "HEY/SetAside"
+         "HEY/Feed" "HEY/PaperTrail" "HEY/Screener")
+
+# Folders whose membership is watched for external moves, i.e. every folder a
+# phone can plausibly drag a message into. Junk and Deleted Messages are here
+# and are NOT movable: swipe-to-junk on the phone should tag the message, and
+# then the message should stay exactly where the swipe put it.
+TRACKED=("${MOVABLE[@]}" "Junk" "Deleted Messages")
+
+# folder -> tag operations, applied when a message is found somewhere we did
+# not put it. This is the half that makes the phone an input device rather than
+# a read-only mirror.
+#
+# `unread` appears NOWHERE in this table, on purpose and without exception.
+# Read state is iCloud's truth, it round-trips through the maildir info suffix
+# and `maildir.synchronize_flags`, and the one thing worse than a phone that
+# cannot see your boxes is a laptop that silently marks your mail unread. The
+# same reasoning is why `screened` is left alone by everything except the INBOX
+# and Screener rules, where the drag says exactly that and nothing else.
+reverse_ops() {
+    case "$1" in
+        # Screened in. Clears every pile, because dragging back to the inbox is
+        # how you say "this is live again" and leaving `replylater` set would
+        # bounce it straight back out on the next pass.
+        "INBOX")           printf '+inbox +screened -archived -replylater -setaside -bubble -bubbled' ;;
+        # Un-screening a single message. It does NOT touch screened.db, so the
+        # sender's standing decision is unchanged and their next mail still
+        # goes wherever `H i`/`H f`/`H p` said. Making a drag rewrite a
+        # standing rule is a much bigger claim than a drag can carry.
+        "HEY/Screener")    printf '+inbox -screened -archived -replylater -setaside -bubble' ;;
+        "HEY/ReplyLater")  printf '+replylater -setaside -bubble -archived' ;;
+        "HEY/SetAside")    printf '+setaside -replylater -bubble -archived' ;;
+        "HEY/Feed")        printf '+thefeed +archived -inbox -replylater -setaside -bubble' ;;
+        # `unfiled` rather than a prompt: the phone cannot ask which vendor,
+        # and an uncategorised receipt in the Paper Trail beats a receipt that
+        # never got there. `H p` re-files it properly later.
+        "HEY/PaperTrail")  printf '+ledger/unfiled +archived -inbox -replylater -setaside -bubble' ;;
+        # Handled specially in the reverse pass — it also needs a due date
+        # written into bubble.db, or the mail is hidden with nothing to bring
+        # it back. See `bubble_from_folder`.
+        "HEY/Bubbled")     printf '+bubble -inbox -bubbled' ;;
+        "Archive")         printf '+archived -inbox -replylater -setaside -bubble' ;;
+        # Matches what `H o` writes, minus `-screened`: a swipe to junk is
+        # about this message, not about revoking a person's screening.
+        "Junk")            printf '+spam +deleted +archived -inbox' ;;
+        "Deleted Messages") printf '+deleted +archived -inbox' ;;
+        *) return 1 ;;
+    esac
+}
+
+# A HEY/Bubbled drag has no due date attached to it, and `+bubble -inbox` with
+# no bubble.db line is mail that disappears and never comes back — the single
+# worst thing this script could do. 24 hours is the answer: it is HEY's own
+# "Tomorrow" preset, it is the least surprising reading of "put this away", and
+# it is bounded. bubble.db is keyed by THREAD (hey-notmuch.el's `H z` writes it
+# that way and the post-new hook's sweep reads it that way), so the thread is
+# resolved here rather than the message id being written in.
+bubble_from_folder() {
+    local msg="$1" tid
+    tid="$(notmuch search --exclude=false --output=threads -- "$msg" 2>/dev/null | head -n1)"
+    tid="${tid#thread:}"
+    [ -n "$tid" ] || return 0
+    grep -q "^$tid " "$DB_DIR/bubble.db" 2>/dev/null && return 0
+    printf '%s %d\n' "$tid" "$(( $(date +%s) + 86400 ))" >>"$DB_DIR/bubble.db"
+    log "bubble: $tid due in 24h (dragged into HEY/Bubbled on another client)"
+}
+
+# ─────────────────── which boxes are switched on ───────────────────
+# One folder name per line. Missing or empty means the whole feature is inert,
+# which is the state it ships in.
+if [ ! -e "$ENABLE_DB" ]; then
+    cat >"$ENABLE_DB" <<'EOF'
+# Boxes that exist as IMAP folders on the phone. One per line, exactly as
+# hey-folder-sync names them; anything not listed here is never moved.
+#
+#   HEY/Screener  HEY/Feed  HEY/PaperTrail  HEY/ReplyLater  HEY/SetAside
+#   HEY/Bubbled   Archive
+#
+# INBOX is always live and does not need listing — mail leaving a box has to
+# have somewhere to come home to.
+#
+# Adding a line migrates that box on the next sync. Run `hey-folder-sync` with
+# no arguments first: it prints exactly how many messages that would move and
+# where they would come from. Removing a line stops NEW mail going there; it
+# does not drag back what is already filed.
+EOF
+    log "created $ENABLE_DB (nothing enabled)"
+fi
+
+enabled() {
+    [ "$1" = "INBOX" ] && return 0          # always live; see the header
+    grep -qxF "$1" "$ENABLE_DB" 2>/dev/null
+}
+
+# ─────────────────────────── query helpers ───────────────────────────
+# --exclude=false on EVERY query in this file. The notmuch config sets
+# search.exclude_tags=deleted;spam, so a plain search cannot see screened-out
+# mail — and screened-out mail is precisely what the Archive fallback exists to
+# get out of the phone's inbox. A query that silently cannot see two thirds of
+# what it is meant to file looks exactly like a query that found nothing to do.
+nm_count() { notmuch count --exclude=false -- "$@" 2>/dev/null || echo 0; }
+
+or_folders() {
+    local out="" f
+    for f in "$@"; do out="${out:+$out or }folder:\"$STORE/$f\""; done
+    printf '(%s)' "$out"
+}
+MOVABLE_Q="$(or_folders "${MOVABLE[@]}")"
+
+# The claim of rule N is its own query minus everything the rules above it
+# already took. Built once, used by both the dry run and the apply pass, so the
+# report cannot drift from the behaviour it is reporting on.
+#
+# `*` gets its own branch, and it has to. notmuch's "match everything" only
+# means that when it is the WHOLE query string — inside a compound one it is a
+# bare Xapian wildcard against an empty term and matches whatever it likes.
+# Measured on this mailbox: `*` counts 1968, `(*)` counts 0, and
+# `(*) and tag:inbox` counts 1661 against tag:inbox's own 1800. The first draft
+# of this script used `(*) and not (...)` for the Archive fallback and reported
+# 399 messages to move — a plausible-looking number that was simply wrong, and
+# the reason the per-source breakdown in the dry run came out identical for
+# every source folder. The fallback is expressed as what it actually means:
+# everything no earlier rule claimed.
+CLAIM=()
+build_claims() {
+    local i prior=""
+    for i in "${!RULE_FOLDER[@]}"; do
+        if [ "${RULE_QUERY[i]}" = '*' ]; then
+            CLAIM[i]="${prior:+not ($prior)}"
+            CLAIM[i]="${CLAIM[i]:-*}"
+        elif [ -n "$prior" ]; then
+            CLAIM[i]="(${RULE_QUERY[i]}) and not ($prior)"
+        else
+            CLAIM[i]="(${RULE_QUERY[i]})"
+        fi
+        prior="${prior:+$prior or }(${RULE_QUERY[i]})"
+    done
+}
+build_claims
+
+# What rule N would actually pick up: claimed, in a folder we are allowed to
+# move out of, and not already sitting in the target.
+move_query() {
+    local i="$1"
+    printf '%s and %s and not folder:"%s"' \
+        "${CLAIM[i]}" "$MOVABLE_Q" "$STORE/${RULE_FOLDER[i]}"
+}
+
+# ─────────────────────────── the state file ───────────────────────────
+# One `notmuch search` per tracked folder rather than one per message: a dozen
+# queries against the whole mailbox costs about as much as a dozen messages
+# would individually, and this runs on every push.
+current_state() {
+    local f
+    for f in "${TRACKED[@]}"; do
+        notmuch search --exclude=false --output=messages -- "folder:\"$STORE/$f\"" 2>/dev/null \
+            | sed "s|\$|\t$f|"
+    done
+}
+
+# ═══════════════════════════ dry run ═══════════════════════════
+dry_run() {
+    local i tot here move src n on
+    printf '\nHEY folder map — DRY RUN, nothing is moved\n'
+    printf 'store: %s/%s\n' "$MAIL" "$STORE"
+    printf 'enabled: INBOX (always)'
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        printf ' · %s' "$line"
+    done <"$ENABLE_DB"
+    printf '\n\n'
+
+    printf '  %-15s %-4s %-46s %7s %7s %7s\n' \
+        'TARGET' 'ON?' 'CLAIMS (earlier rules win)' 'total' 'in situ' 'TO MOVE'
+    printf '  %s\n' "$(printf '─%.0s' {1..92})"
+
+    local grand=0
+    for i in "${!RULE_FOLDER[@]}"; do
+        tot="$(nm_count "${CLAIM[i]}")"
+        here="$(nm_count "${CLAIM[i]} and folder:\"$STORE/${RULE_FOLDER[i]}\"")"
+        move="$(nm_count "$(move_query "$i")")"
+        enabled "${RULE_FOLDER[i]}" && on='yes' || on='--'
+        printf '  %-15s %-4s %-46.46s %7s %7s %7s\n' \
+            "${RULE_FOLDER[i]}" "$on" "${RULE_QUERY[i]}" "$tot" "$here" "$move"
+        grand=$((grand + move))
+    done
+    printf '  %s\n' "$(printf '─%.0s' {1..92})"
+    printf '  %-15s %-4s %-46s %7s %7s %7s\n' '' '' 'if every box were enabled' '' '' "$grand"
+
+    printf '\nwhere each move would come from:\n'
+    for i in "${!RULE_FOLDER[@]}"; do
+        move="$(nm_count "$(move_query "$i")")"
+        [ "$move" -gt 0 ] || continue
+        enabled "${RULE_FOLDER[i]}" && on='ENABLED — this WILL move on the next sync' \
+                                    || on='off — listed for review only'
+        printf '\n  %s  (%s)\n' "${RULE_FOLDER[i]}" "$on"
+        for src in "${MOVABLE[@]}"; do
+            [ "$src" = "${RULE_FOLDER[i]}" ] && continue
+            n="$(nm_count "$(move_query "$i") and folder:\"$STORE/$src\"")"
+            [ "$n" -gt 0 ] && printf '      %6s  from %s\n' "$n" "$src"
+        done
+    done
+
+    printf '\nleft alone (no rule may move a file out of these):\n'
+    for src in "Sent Messages" "Drafts" "Junk" "Deleted Messages"; do
+        printf '      %6s  %s\n' "$(nm_count "folder:\"$STORE/$src\"")" "$src"
+    done
+    printf '      %6s  outside %s entirely (notes to self — never uploaded)\n' \
+        "$(nm_count "not path:\"$STORE/**\"")" "$STORE"
+
+    local dups
+    dups=$(( $(notmuch search --exclude=false --output=files -- '*' 2>/dev/null | wc -l) \
+             - $(nm_count '*') ))
+    printf '\n  %s message(s) have more than one file on disk; those are skipped\n' "$dups"
+    printf '  and logged rather than guessed at — see move_one().\n\n'
+}
+
+# ═══════════════════════════ apply ═══════════════════════════
+
+# The rename mbsync documents. Everything except the `,U=<n>` infix is kept:
+# the unique part (so a second move of the same message is still recognisably
+# the same file), the info suffix (`:2,S` — read state), and the cur/new
+# subdirectory (a file in new/ is unread by maildir's own rules and must stay
+# that way).
+move_one() {
+    local msg="$1" dstfolder="$2" files=() f base uniq info sub dst
+    while IFS= read -r f; do
+        case "$f" in "$MAIL/$STORE/"*) files+=("$f") ;; esac
+    done < <(notmuch search --exclude=false --output=files -- "$msg" 2>/dev/null)
+
+    if [ "${#files[@]}" -ne 1 ]; then
+        log "skip $msg -> $dstfolder: ${#files[@]} files in $STORE (ambiguous)"
+        return 1
+    fi
+    f="${files[0]}"
+    [ -f "$f" ] || { log "skip $msg: $f is gone"; return 1; }
+
+    sub="$(basename "$(dirname "$f")")"           # cur or new
+    base="$(basename "$f")"
+    case "$base" in
+        *:2,*) info=":2,${base##*:2,}" ; uniq="${base%%:2,*}" ;;
+        *)     info=""                 ; uniq="$base" ;;
+    esac
+    uniq="${uniq%,U=*}"
+
+    dst="$MAIL/$STORE/$dstfolder/$sub/$uniq$info"
+    if [ -e "$dst" ]; then
+        log "skip $msg -> $dstfolder: $dst already exists"
+        return 1
+    fi
+    # The destination maildir has to exist before the rename, and creating it
+    # here rather than up front is what makes `Create Both` in .mbsyncrc do the
+    # rest: mbsync finds a new local folder and creates the matching one on
+    # iCloud. A box you never enable therefore never appears on the phone.
+    mkdir -p "$MAIL/$STORE/$dstfolder"/{cur,new,tmp} || return 1
+
+    # `mv -n` cannot clobber, and it reports success when it declines to move,
+    # so success is asserted rather than trusted. This is the one line in the
+    # script that touches somebody's actual mail; a miscounted move here would
+    # be written into the state file as fact and the next run would read the
+    # discrepancy as an external move and retag the message.
+    mv -n "$f" "$dst" 2>>"$LOG"
+    if [ -e "$dst" ] && [ ! -e "$f" ]; then
+        return 0
+    fi
+    log "FAILED mv $f -> $dst"
+    return 1
+}
+
+apply() {
+    local moved=0 tagged=0 i msg folder line
+
+    # ── pass 1: folder -> tag, for messages that moved behind our back ──
+    # First, so that pass 2 sees the tags this produced and agrees with them.
+    # An unknown message id is treated as unchanged, which is what makes the
+    # first ever run a pure forward pass instead of retagging the mailbox from
+    # its folder layout.
+    local cur="$STATE.new"
+    # A message that shows up under two tracked folders at once is dropped
+    # here, before anything can read it. That is not hypothetical: a move is an
+    # append plus an expunge, and if the expunge fails the next pull
+    # re-downloads the source copy, so for one sync window the message really
+    # is in both. Left in, whichever folder came last would be read as an
+    # instruction — a Bubble Up whose expunge failed would be silently
+    # un-bubbled by the very sync that was trying to file it. Dropped, it reads
+    # as unknown on the next run, unknown reads as "unchanged", and unchanged
+    # means the forward pass places it by its tags. That is the right answer
+    # while the duplicate resolves itself, and it is the same policy
+    # move_one() applies to files.
+    current_state | awk -F'\t' '{ line[NR] = $0; id[NR] = $1; n[$1]++ }
+                                END { for (i = 1; i <= NR; i++)
+                                          if (n[id[i]] == 1) print line[i] }' >"$cur"
+    if [ -s "$STATE" ]; then
+        while IFS=$'\t' read -r msg folder; do
+            [ -n "$msg" ] && [ -n "$folder" ] || continue
+            local ops
+            ops="$(reverse_ops "$folder")" || continue
+            # $ops is deliberately unquoted — it is a list of tag operations,
+            # not one argument.
+            # shellcheck disable=SC2086
+            notmuch tag $ops -- "$msg" 2>>"$LOG" && tagged=$((tagged + 1))
+            [ "$folder" = "HEY/Bubbled" ] && bubble_from_folder "$msg"
+            log "external move: $msg is now in $folder -> $ops"
+        done < <(awk -F'\t' 'NR==FNR { was[$1] = $2; next }
+                             ($1 in was) && was[$1] != $2 { print $1 "\t" $2 }' \
+                     "$STATE" "$cur")
+    fi
+    [ "$tagged" -gt 0 ] && log "retagged $tagged message(s) from external folder moves"
+
+    # ── pass 2: tag -> folder ──
+    # Rebuilt from scratch: pass 1 may have changed tags, and a claim computed
+    # before it would place mail by the tags it used to have.
+    declare -A newfolder=()
+    for i in "${!RULE_FOLDER[@]}"; do
+        enabled "${RULE_FOLDER[i]}" || continue
+        local n=0
+        while IFS= read -r msg; do
+            [ -n "$msg" ] || continue
+            if move_one "$msg" "${RULE_FOLDER[i]}"; then
+                newfolder["$msg"]="${RULE_FOLDER[i]}"
+                moved=$((moved + 1)); n=$((n + 1))
+            fi
+        done < <(notmuch search --exclude=false --output=messages -- "$(move_query "$i")" 2>/dev/null)
+        [ "$n" -gt 0 ] && log "moved $n message(s) -> ${RULE_FOLDER[i]}"
+    done
+
+    # ── the state file ──
+    # Written from what we INTENDED, not from a re-query: the files have moved
+    # but notmuch has not been told yet (that is the `notmuch new` mail-sync
+    # runs next), so asking the database now would record the old folders and
+    # every one of these moves would look external on the following run — the
+    # exact flap this state file exists to prevent.
+    if [ "${#newfolder[@]}" -gt 0 ]; then
+        awk -F'\t' -v OFS='\t' 'NR==FNR { to[$1]=$2; next }
+                                { print $1, ($1 in to ? to[$1] : $2) }' \
+            <(for msg in "${!newfolder[@]}"; do printf '%s\t%s\n' "$msg" "${newfolder[$msg]}"; done) \
+            "$cur" >"$STATE.merged" && mv "$STATE.merged" "$cur"
+    fi
+    mv "$cur" "$STATE"
+
+    printf '%s\n' "$moved"
+}
+
+# Moving files while mbsync is mid-fetch is how a maildir gets corrupted, so
+# --apply runs under the same lock every sync takes. It cannot simply grab it,
+# though: mail-sync already holds it when it calls this script, and flock is
+# per open-file-description — a second `exec 9>` here would be a fresh
+# description and would block on a lock this process already effectively owns.
+# Hence the marker. mail-sync sets it; a hand-run `hey-folder-sync --apply`
+# does not, and waits its turn instead.
+apply_locked() {
+    if [ -n "${HEY_SYNC_LOCKED:-}" ]; then
+        apply
+        return
+    fi
+    exec 9>"$STATE_DIR/sync.lock"
+    if ! flock -w 300 9; then
+        log "a sync has held the lock for 5 minutes — moved nothing"
+        printf '0\n'
+        return 0
+    fi
+    apply
+}
+
+case "${1:-}" in
+    --apply) apply_locked ;;
+    --state) [ -f "$STATE" ] && cat "$STATE" ;;
+    ''|--dry-run|-n) dry_run ;;
+    *) printf 'usage: %s [--apply|--dry-run|--state]\n' "${0##*/}" >&2; exit 2 ;;
+esac

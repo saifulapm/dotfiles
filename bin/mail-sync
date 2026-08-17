@@ -70,5 +70,51 @@ if ! notmuch new --quiet >>"$LOG" 2>&1; then
     exit 1
 fi
 
+# ── phone parity: tags -> IMAP folders ──────────────────────────────────────
+# Everything above this line is the mailbox as Emacs sees it. What follows is
+# the only part the iPhone can see, because IMAP has folders and no tags: mail
+# that is not screened-in Imbox mail is moved OUT of INBOX, which is what makes
+# the Screener's promise ("an unscreened stranger cannot buzz you") hold on a
+# device that only raises notifications for INBOX.
+#
+# HERE and not in the post-new hook, and the ordering is the whole reason:
+#
+#   notmuch new      the hook settles the TAGS (routing, sweeps, counts)
+#   folder sync      reads those tags and moves FILES; notmuch's index is now
+#                    stale, pointing at filenames that no longer exist
+#   notmuch new      teaches notmuch the new names — a rename, not an arrival,
+#                    so no new.tags and no second notification
+#   mbsync           pushes the moves up, but only if there were any
+#
+# A post-new hook cannot do this itself: it would have to call `notmuch new` to
+# repair the index it just invalidated, and that re-enters the hook. Leaving
+# the reindex to the next sync is worse still — for up to fifteen minutes
+# (the timer interval) Emacs would be unable to open a moved message.
+#
+# The second `notmuch new` deliberately runs the full hook rather than
+# --no-hooks: the folder sync's reverse pass converts folder moves made on the
+# phone into tags, so the bar counts published by the first pass can be out of
+# date by the time this line is reached. Re-running is cheap and cannot double
+# up on notifications — every step in the hook is scoped to `tag:new`, and
+# there is none left by now.
+FOLDER_SYNC="$(dirname "$(readlink -f "$0")")/hey-folder-sync"
+if [ -x "$FOLDER_SYNC" ]; then
+    # HEY_SYNC_LOCKED: this process already holds the sync lock on fd 9, which
+    # the child inherits. Without the marker the child would try to take it
+    # again on a new descriptor and wait five minutes for itself.
+    moved="$(HEY_SYNC_LOCKED=1 "$FOLDER_SYNC" --apply 2>>"$LOG")"
+    case "$moved" in ''|*[!0-9]*) moved=0 ;; esac
+    if [ "$moved" -gt 0 ]; then
+        log "folder sync: moved $moved message(s) between IMAP folders"
+        notmuch new --quiet >>"$LOG" 2>&1 || log "reindex after folder sync failed"
+        # Push straight away rather than waiting for the next arrival. A
+        # stranger sitting in the server's INBOX for fifteen minutes is a
+        # stranger who is still in the phone's inbox for fifteen minutes, and
+        # the point of all this was that they should not be there at all.
+        mbsync -c "$HOME/.mbsyncrc" icloud >>"$LOG" 2>&1 \
+            || log "mbsync push after folder sync exited nonzero — retried next sync"
+    fi
+fi
+
 log "done in $(( $(date +%s) - start ))s"
 exit 0

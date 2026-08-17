@@ -46,18 +46,38 @@ Account icloud
 # SubFolders Verbatim keeps iCloud's own names ("Sent Messages", "Deleted
 # Messages") as real directories instead of Maildir++ dot-folders. notmuch
 # indexes either shape, but verbatim is what makes `notmuch search
-# folder:"Sent Messages"` read like the mailbox actually looks — and it is
-# what a future tag->folder step (phone parity) would write into.
+# folder:"Sent Messages"` read like the mailbox actually looks — and it is what
+# the tag->folder step (phone parity, bin/hey-folder-sync) writes into: that
+# script creates ~/Mail/icloud/HEY/<Box>/{cur,new,tmp} and Create Both below
+# turns it into a real "HEY/Box" folder on iCloud. Verbatim is what makes the
+# on-disk path and the IMAP name the same string, so `folder:"icloud/HEY/Feed"`
+# in notmuch and HEY/Feed on the iPhone are provably the same folder.
 MaildirStore icloud-local
 Path ~/Mail/icloud/
 Inbox ~/Mail/icloud/INBOX
 SubFolders Verbatim
 
-# Create Both: folders made on either side appear on the other — required
-#   later if the tag->folder mapping lands, harmless before it.
+# Create Both: folders made on either side appear on the other. This is now
+#   load-bearing, not a precaution: bin/hey-folder-sync creates HEY/<Box>
+#   locally the first time a box has anything to file, and this line is the
+#   only thing that turns that into a folder the iPhone can see. iCloud creates
+#   the "HEY" parent implicitly from "HEY/Screener" — verified against the
+#   account, which uses "/" as its hierarchy delimiter.
 # Remove None: deliberately NOT `Remove Both`. A local indexing accident must
 #   never be able to delete a mailbox off the server. Folder removals stay a
 #   manual, deliberate act.
+# `Patterns *` covers the HEY folders with no edit needed — an IMAP4 `*`
+#   matches across the hierarchy delimiter (mbsync(1): "* matches anything and
+#   % matches anything up to the next hierarchy delimiter"), so HEY/Screener is
+#   already in scope. Worth stating, because the natural instinct on adding a
+#   folder tree is to add a pattern for it, and an extra line here is an extra
+#   chance to break the section with a stray blank one.
+# Expunge Both is what makes a MOVE work at all. mbsync has no cross-folder
+#   MOVE (isync 1.5.1); a local move is an append to the destination plus a
+#   disappearance from the source, and this line is what turns that
+#   disappearance into an actual expunge on iCloud rather than a message that
+#   sits in INBOX flagged deleted — i.e. still in the phone's inbox, which is
+#   the one thing phone parity exists to prevent.
 # Patterns excludes "Notes": that folder is Apple Notes, which iCloud happens
 # to store over IMAP. It is not email, notmuch would index every note as a
 # message, and they would land in the Screener as mail from yourself. Verified
