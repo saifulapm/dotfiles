@@ -1009,28 +1009,20 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
 - **Herdr launch bind** (507059e): SUPER+CTRL+RETURN attaches to the
   persistent herdr session, mirrored as Mod+Ctrl+Return on our singleton
   launch-or-focus shape (their keybindings menu deliberately not ported).
-- **Screensaver** from `omarchy-launch-screensaver` (4e31b61 swapped their
-  Python TTE for ttfx, a parity-exact Rust port; tobi then rewrote the whole
-  launcher as a native Rust Wayland client). We take the native one, forked as
-  `saifulapm/nirisaver` and installed by `run_after_35` — its NIRI.md carries
-  the diff, which is three commits: a second SHM buffer (upstream redraws only
-  after a `wl_buffer.release` that niri never sends, so it froze on the
-  fade-in's invisible first frame), cursor hiding through
-  `wl_pointer.set_cursor` instead of `hyprctl eval`, and `--quotes`/`--hold`.
-  The last is the only port-side one, and it is what carries our own design
-  across: random motivational quotes instead of a branding file, each laid out
-  with its attribution on its own line and held readable between effects,
-  where theirs replays one text forever. `bin/screensaver-launch` keeps its
-  old contract — nonzero means "no screensaver here", and the idle stage falls
-  back to powering the monitors off — but passes no flags at all: the quote
-  list, the hold and the effect choice are the fork's own configuration, read
-  from `~/.config/nirisaver/quotes.txt`, which this repo owns as
-  `home/dot_config/nirisaver/quotes.txt`. The idle chain still follows their
-  Service.qml: screensaver at 150s, lock at 300s, with our own `blank` stage
-  between them. Superseded with this port: their `bin/omarchy-screensaver`
-  loop, `default/foot/screensaver.ini`, the fullscreen window-rule, the
-  pty-resize wait and the black-background OSC — a layer-shell overlay needs
-  none of them.
+- **Screensaver — nothing left.** Their `bin/omarchy-screensaver` loop,
+  `default/foot/screensaver.ini`, the fullscreen window-rule, the pty-resize
+  wait and the black-background OSC were all in use here and are all gone
+  (2026-08-17). The screensaver is now `saifulapm/nirisaver`, written from
+  scratch as a wlr-layer-shell client and credited under its own heading
+  below; a terminal window running an animator over a pty needs every one of
+  those props and an overlay needs none of them. `bin/screensaver-launch`
+  keeps the contract that outlived them — nonzero means "no screensaver
+  here", and the idle stage falls back to powering the monitors off — and
+  passes no flags at all, because the quote list, the hold and the effect
+  choice are nirisaver's own configuration under `~/.config/nirisaver/`,
+  which this repo owns as `home/dot_config/nirisaver/`. The idle chain around
+  it is still theirs and still credited above: screensaver at 150s, lock at
+  300s, with our own `blank` stage between them.
 
 - **Crash capture** from omarchy `bin/omarchy-crash-watch`,
   `bin/omarchy-agent-crash`, `bin/omarchy-toggle-crash-capture`,
@@ -1120,6 +1112,20 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   default in place of upstream's `~/src/tries` (`TRY_PATH` still wins). It
   replaced a fish function of ours that did dated directories, `clone` and an
   fzf picker and nothing else — see `vendor/README.md` for the refresh drill.
+
+## ttfx (MIT) — github.com/omacom-io/ttfx
+
+- **The animation engine** behind `saifulapm/nirisaver`, our screensaver
+  (`run_after_35`, `bin/screensaver-launch`). Every effect it draws is ttfx's
+  — all thirty-seven of them — along with the seeded randomness, the canvas
+  and anchoring model, and the per-frame simulation clock. nirisaver links it
+  as a crate and calls `Effect::build` / `Effect::next_frame` directly rather
+  than spawning the binary and reading a pty, which is what keeps all of that
+  intact; what nirisaver adds around it is the layer surface, the glyph
+  rasterizer, the damage tracking and the quote layout. No ttfx source is
+  copied or adapted — it is a dependency, pinned by revision in nirisaver's
+  `Cargo.toml`. ttfx is itself a Rust port of ChrisBuilds'
+  terminaltexteffects (github.com/ChrisBuilds/terminaltexteffects).
 
 ## quickshell (LGPL/source reference) — github.com/quickshell-mirror/quickshell
 

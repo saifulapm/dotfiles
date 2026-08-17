@@ -22,8 +22,9 @@ import Quickshell.Wayland
 //
 // Only the stage timings live here. What the screensaver actually shows — the
 // quote list, how long each stays up, which effects, how fast — is nirisaver's
-// configuration, not the shell's: it reads ~/.config/nirisaver/quotes.txt
-// itself and bin/screensaver-launch passes it no flags at all.
+// configuration, not the shell's: it reads ~/.config/nirisaver/config.toml and
+// ~/.config/nirisaver/quotes.txt itself, and bin/screensaver-launch passes it
+// no flags at all.
 //
 // Three deliberate adaptations of upstream's semantics:
 //
@@ -154,16 +155,20 @@ QtObject {
     }
 
     function killScreensaver() {
-        // One process now, not a terminal with an animator inside it: the
-        // native screensaver owns its own overlay, and SIGTERM is a first-
-        // class dismissal for it — it fades out and exits rather than being
-        // torn off the screen. Nothing to wait for and nothing that can
-        // outlive it, so the two-stage ttfx teardown this used to need
+        // One process, not a terminal with an animator inside it: nirisaver
+        // owns its own overlay, and SIGTERM is a first-class dismissal for it
+        // — it fades out and exits rather than being torn off the screen.
+        // Nothing to wait for and nothing that can outlive it, so the
+        // two-stage teardown this used to need for the terminal animator
         // (omarchy 438f7b3, f6fd2e7) is gone with the terminal.
         //
-        // The bracketed pattern keeps pkill from matching its own cmdline
-        // (or this shell's, which carries the same argument).
-        run(["pkill", "-f", "[o]marchy-launch-screensaver"]);
+        // -x on the process name rather than -f on the command line, which
+        // the old bracketed pattern needed. "nirisaver" is also a directory
+        // name — ~/.local/src/nirisaver — so a -f match would sweep up the
+        // git clone or the cargo install that update-all runs against it if
+        // the idle cycle happened to fire mid-update. The name is exact and
+        // cannot collide.
+        run(["pkill", "-x", "nirisaver"]);
     }
 
     function lockNow(reason) {

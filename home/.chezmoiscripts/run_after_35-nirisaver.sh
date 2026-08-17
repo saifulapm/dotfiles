@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-# nirisaver (github.com/saifulapm/nirisaver) — tobi's native Rust screensaver
-# ported to niri, plus the quote rotation it reads out of
-# ~/.config/nirisaver/quotes.txt on its own (this repo owns that file; nothing
-# here passes it a flag). The binary keeps upstream's name, so this installs
-# ~/.local/bin/omarchy-launch-screensaver. Built once; guarded,
-# warn-don't-abort, same shape as its sibling run_after_29-nirisnap.
+# nirisaver (github.com/saifulapm/nirisaver) — the screensaver: a native
+# Wayland client that draws animated text on a wlr-layer-shell overlay, one
+# surface per output, and rotates the quotes in
+# ~/.config/nirisaver/quotes.txt (this repo owns that file; nothing here
+# passes it a flag). Built once; guarded, warn-don't-abort, same shape as its
+# sibling run_after_29-nirisnap.
 #
 # Needs only the rustup cargo from 03-dev-toolchain: no C toolchain, no Qt,
-# no system wayland headers — the crate generates its own protocol bindings.
+# no system wayland headers, not even a system font — the crate generates its
+# own protocol bindings and bundles the one it draws with.
 set -uo pipefail
 
 export PATH="$HOME/.cargo/bin:$PATH"
 
 warn() { echo "nirisaver: $*" >&2; }
 
-[ -x "$HOME/.local/bin/omarchy-launch-screensaver" ] && exit 0
+[ -x "$HOME/.local/bin/nirisaver" ] && exit 0
 
 command -v cargo >/dev/null 2>&1 || {
   warn "cargo missing (03-dev-toolchain skipped?) — skipping"
@@ -36,9 +37,9 @@ echo "nirisaver: building (first run only — this can take a while)"
 # forces a reinstall while leaving the build dir for an incremental rebuild.
 if (cd "$src" && CARGO_TARGET_DIR=build/rust cargo build --release --quiet); then
   mkdir -p "$HOME/.local/bin"
-  install -m755 "$src/build/rust/release/omarchy-launch-screensaver" \
-    "$HOME/.local/bin/omarchy-launch-screensaver" \
-    && echo "nirisaver: installed to ~/.local/bin/omarchy-launch-screensaver" \
+  install -m755 "$src/build/rust/release/nirisaver" \
+    "$HOME/.local/bin/nirisaver" \
+    && echo "nirisaver: installed to ~/.local/bin/nirisaver" \
     || warn "install failed"
 else
   warn "build failed — try by hand: cd $src && CARGO_TARGET_DIR=build/rust cargo build --release"

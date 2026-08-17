@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # screensaver-launch — put the screensaver on screen. A wrapper around
-# nirisaver's omarchy-launch-screensaver (a fork of tobi's native Rust
-# screensaver; see CREDITS.md), which draws straight onto a wlr-layer-shell
-# overlay: no terminal, no pty, no ttfx child process.
+# nirisaver (github.com/saifulapm/nirisaver, CREDITS.md), which draws straight
+# onto a wlr-layer-shell overlay: no terminal, no pty, no child process.
 #
 # Deliberately flagless. Everything about the screensaver — which quotes, how
 # long each stays up, how fast the effects run, which effects — is nirisaver's
-# to configure, and it reads ~/.config/nirisaver/quotes.txt on its own
-# (home/dot_config/nirisaver/quotes.txt here, so the list is version
-# controlled). Splitting those knobs across a shell.json block and a flag in
-# this file only made two places to look.
+# to configure, and it reads ~/.config/nirisaver/config.toml and
+# ~/.config/nirisaver/quotes.txt on its own (home/dot_config/nirisaver/ here,
+# so the list is version controlled). Splitting those knobs across a
+# shell.json block and a flag in this file only made two places to look.
 #
 # What is left is the launch itself, and the exit status. The idle service
 # falls back to powering the monitors off when this returns nonzero, so a
@@ -17,23 +16,19 @@
 # than idling with the desktop up.
 #
 # It replaced a foot window running bin/screensaver, which had to wait out the
-# pty resize, drive ttfx over a tty, poll niri for focus to notice the lock,
-# and repaint every animated cell through a terminal emulator.
+# pty resize, drive an animator over a tty, poll niri for focus to notice the
+# lock, and repaint every animated cell through a terminal emulator.
 
 # The idle service spawns this from qshell.service, whose PATH carries
 # neither ~/.local/bin nor the cargo bin dir.
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
-command -v omarchy-launch-screensaver >/dev/null 2>&1 || exit 1
+command -v nirisaver >/dev/null 2>&1 || exit 1
 
-# force: the toggle and lock guards it would otherwise consult are omarchy's,
-#   and neither exists here. Services/Idle.qml already skips this stage while
-#   the session is locked, which is the check that matters.
-#
 # Detached, and returning as soon as it is spawned, because the exit status
 # above is the contract: a launcher that blocked for the whole screensaver
 # would report its dismissal as a launch failure and blank the monitors on the
-# way back to the desktop. A second launch is harmless anyway — the binary
-# flocks $XDG_RUNTIME_DIR/omarchy-screensaver.lock and exits 0 quietly if
-# another instance holds it.
-setsid -f omarchy-launch-screensaver force >/dev/null 2>&1
+# way back to the desktop. A second launch is harmless anyway — nirisaver
+# flocks $XDG_RUNTIME_DIR/nirisaver.lock and exits 0 quietly if another
+# instance holds it.
+setsid -f nirisaver >/dev/null 2>&1
