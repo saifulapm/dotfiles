@@ -394,8 +394,8 @@ Scope {
     // the Nth layout entry. One-based, because it exists for hotkeys.
     //
     // DELIBERATE difference from upstream, which counts every section from its
-    // first layout entry: our right section carries seventeen widgets, and
-    // eight of them come and go (kb, devservices, dufs, icloud, dropbox,
+    // first layout entry: our right section carries twenty widgets, and
+    // nine of them come and go (kb, devservices, dufs, mail, icloud, dropbox,
     // tailscale, mic, airpods). Counting from the left would both start at the
     // least-wanted end and renumber the lot whenever one of those appeared.
     // Each section is counted from its OUTER edge instead — 1 is the rightmost
@@ -698,6 +698,14 @@ Scope {
         return sharedService("dufs", dufsServiceComponent, {});
     }
 
+    // No gate: the mail service watches the one state file the notmuch post-new
+    // hook publishes counts to, and starts a process only when a click asks for
+    // one (the presence probe, a sync, the emacsclient that opens a box). There
+    // is no cadence to scope to visibility.
+    function mailService() {
+        return sharedService("mail", mailServiceComponent, {});
+    }
+
     // No gate: the hub-sync service starts no process on its own — it only
     // watches bin/qshell-sync's status.json and re-stamps a relative clock,
     // so there is nothing to scope to visibility.
@@ -772,6 +780,11 @@ Scope {
     }
 
     Component {
+        id: mailServiceComponent
+        MailService {}
+    }
+
+    Component {
         id: rcloneServiceComponent
         RcloneRemoteService {}
     }
@@ -819,6 +832,7 @@ Scope {
             "monitor": monitorComponent,
             "devservices": devservicesComponent,
             "dufs": dufsComponent,
+            "mail": mailComponent,
             "sync": hubSyncComponent,
             "icloud": icloudComponent,
             "dropbox": dropboxComponent,
@@ -2224,6 +2238,14 @@ Scope {
         Dufs {
             theme: barRoot.theme
             dufs: barRoot.dufsService()
+        }
+    }
+
+    Component {
+        id: mailComponent
+        Mail {
+            theme: barRoot.theme
+            mail: barRoot.mailService()
         }
     }
 
