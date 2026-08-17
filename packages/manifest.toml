@@ -966,7 +966,41 @@ why = "libpulse headers, pkg_check_modules REQUIRED by [[tool]] librepods (its m
 name = "ruby"
 category = "dev"
 arch = "all"
-why = "Interpreter for vendor/try (tobi/try, the ~/Sites/tries picker behind the `try` fish function; user decision 2026-08-17). Nothing else here is Ruby and none is planned — no rubygems, no bundler, no rbenv: try.rb requires only io/console, time and set from the stdlib. ~21 MiB with ruby-libs, which is the whole price of the tool"
+why = "Interpreter for vendor/try (tobi/try, the ~/Sites/tries picker behind the `try` fish function; user decision 2026-08-17). Nothing else here is Ruby and none is planned, and there is still no bundler and no rbenv — but see the four packages below: `ruby` alone is not a working ruby. ~19 MiB of it is ruby-libs, and the whole set comes to ~21 MiB"
+
+# The four packages below are what turn `ruby` into a ruby that runs anything.
+# Fedora splits the interpreter from its dispatcher and from the default gems,
+# and every one of the splits is a WEAK dependency — which this repo's global
+# install_weak_deps=False drops. Installing `ruby` on its own therefore gave a
+# machine with no /usr/bin/ruby and no io/console, and vendor/try died on its
+# third line (found 2026-08-17, after claiming in the entry above that the
+# stdlib was enough; it is not — io/console and set are default gems now, not
+# stdlib). ~2.1 MiB for all of it, rubygem-psych included as a hard dep of
+# rubygems.
+
+[[pkg]]
+name = "rubypick"
+category = "dev"
+arch = "all"
+why = "Owns /usr/bin/ruby. The `ruby` package installs only /usr/bin/ruby-mri and leaves the unversioned name to this dispatcher, so without it nothing that says `ruby` — or carries a `#!/usr/bin/env ruby` shebang, vendor/try/try.rb included — resolves. 4.4 KiB"
+
+[[pkg]]
+name = "rubygems"
+category = "dev"
+arch = "all"
+why = "The gem machinery every default gem loads through. Not here to install gems — nothing does — but because requiring io/console goes through it: without rubygems, ruby-mri warns that RubyGems were not loaded and the require fails outright"
+
+[[pkg]]
+name = "ruby-default-gems"
+category = "dev"
+arch = "all"
+why = "The gemspecs for what used to be stdlib. Ruby 4.0 ships io/console, set and friends as default gems rather than plain library files, so this is what makes them findable"
+
+[[pkg]]
+name = "rubygem-io-console"
+category = "dev"
+arch = "all"
+why = "vendor/try/try.rb requires io/console on line 3 — it reads keys one at a time and needs the terminal size for its picker. Declared by name rather than left to ruby-default-gems: it is a separate arch package, and it is the one require the tool cannot start without"
 
 # ------------------------------------------------------------------ optional
 
