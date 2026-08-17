@@ -37,8 +37,31 @@ QtObject {
     property var ear: ({})
     property int noise: 0
 
+    // The three Pro controls and the ear-detection policy, all of which the
+    // daemon has always been able to drive — they reached the control socket
+    // in the same patch that added `status`/`subscribe`.
+    property bool conversationalAwareness: false
+    property bool oneBudANC: false
+    property int adaptiveNoise: 50
+    // 0 pause when one is out, 1 pause when both are, 2 never.
+    property int earDetectionBehavior: 0
+    // Upstream's AirPodsModel enum, off its model-number map.
+    property int model: 0
+    property string modelNumber: ""
+
     readonly property var noiseNames: ["Off", "ANC", "Transparency", "Adaptive"]
     readonly property string noiseName: noiseNames[noise] || "Off"
+
+    readonly property var earBehaviorNames: ["Pause when one is out", "Pause when both are out", "Never pause"]
+    readonly property string earBehaviorName: earBehaviorNames[earDetectionBehavior] || "Unknown"
+
+    // 5 and 6 are the Pro 2 pair (Lightning, USB-C) — the generation adaptive
+    // mode, conversational awareness and one-bud ANC arrived with, and the
+    // only one verified here (A2698). 0 is Unknown, the value before the
+    // metadata packet lands, and is deliberately permissive: better to offer
+    // a control that turns out to do nothing than to hide one that works.
+    // Coarse on purpose — refine it per model when there is a device to test.
+    readonly property bool proControls: model === 0 || model === 5 || model === 6
 
     readonly property bool leftInEar: ear.primaryInEar === true
     readonly property bool rightInEar: ear.secondaryInEar === true
@@ -48,12 +71,89 @@ QtObject {
     // must not share a connection (the daemon replies down the writer).
     // Optimistic: the cell highlights now, the device's ack arrives on the
     // stream and re-confirms (or corrects) it a beat later.
+    //
+    // "or corrects" needs a deadline, because a rejected mode is silent. The
+    // pods ignore every listening-mode packet while they are out of the ears,
+    // and a Pro 3 ignores noise:off always — in both cases ctl exits 0, the
+    // daemon's mode never changes, so no status line is ever pushed and
+    // nothing would have taken the optimistic highlight back off. Hold the
+    // guessed value over incoming reads until the daemon agrees, and give up
+    // after settleMs.
+    readonly property int settleMs: 4000
+    // The last values the daemon actually reported — where a guess that never
+    // lands has to fall back to. Mutated in place rather than reassigned:
+    // nothing binds to it, only the settle timer reads it.
+    property var reported: ({
+            noise: 0,
+            conversationalAwareness: false,
+            oneBudANC: false,
+            adaptiveNoise: 50,
+            earDetectionBehavior: 0
+        })
+    // One slot, not one per control: a second command while a guess is still
+    // in flight abandons the first, whose value the next push then corrects
+    // anyway. Two controls are never mid-flight in a way the user can see.
+    property string pendingField: ""
+    property var pendingValue: null
+
+    function send(verb, field, value) {
+        root[field] = value;
+        root.pendingField = field;
+        root.pendingValue = value;
+        settle.restart();
+        Quickshell.execDetached([root.ctl, verb]);
+    }
+
+    function clearPending() {
+        root.pendingField = "";
+        root.pendingValue = null;
+        settle.stop();
+    }
+
+    // Hold a guess over incoming reads until the daemon agrees with it; every
+    // other field on the same line applies immediately.
+    function adopt(parsed, key, field) {
+        if (parsed[key] === undefined)
+            return;
+        const value = parsed[key];
+        root.reported[field] = value;
+        if (root.pendingField !== field)
+            root[field] = value;
+        else if (value === root.pendingValue)
+            root.clearPending();
+    }
+
     function setNoise(mode) {
         const commands = ["noise:off", "noise:anc", "noise:transparency", "noise:adaptive"];
         if (mode < 0 || mode >= commands.length)
             return;
-        root.noise = mode;
-        Quickshell.execDetached([root.ctl, commands[mode]]);
+        root.send(commands[mode], "noise", mode);
+    }
+
+    function setConversationalAwareness(enabled) {
+        root.send(enabled ? "ca:on" : "ca:off", "conversationalAwareness", enabled === true);
+    }
+
+    function setOneBudANC(enabled) {
+        root.send(enabled ? "onebud:on" : "onebud:off", "oneBudANC", enabled === true);
+    }
+
+    // The daemon clamps too, but clamping here keeps the optimistic value and
+    // the value sent identical — otherwise a drag past the end would show 105.
+    function setAdaptiveNoise(level) {
+        const clamped = Math.max(0, Math.min(100, Math.round(level)));
+        root.send("adaptive:" + clamped, "adaptiveNoise", clamped);
+    }
+
+    function setEarDetectionBehavior(behavior) {
+        const verbs = ["ear:one", "ear:both", "ear:off"];
+        if (behavior < 0 || behavior >= verbs.length)
+            return;
+        root.send(verbs[behavior], "earDetectionBehavior", behavior);
+    }
+
+    function cycleEarDetection() {
+        root.setEarDetectionBehavior((root.earDetectionBehavior + 1) % 3);
     }
 
     function applyLine(line) {
@@ -72,18 +172,33 @@ QtObject {
         root.connected = parsed.connected === true;
         root.battery = parsed.battery || {};
         root.ear = parsed.ear || {};
-        if (typeof parsed.noise === "number")
-            root.noise = parsed.noise;
+        // Every line carries the whole state, so an unrelated change (battery,
+        // ear) would otherwise stomp a guess still in flight.
+        root.adopt(parsed, "noise", "noise");
+        root.adopt(parsed, "conversationalAwareness", "conversationalAwareness");
+        root.adopt(parsed, "oneBudANC", "oneBudANC");
+        root.adopt(parsed, "adaptiveNoise", "adaptiveNoise");
+        root.adopt(parsed, "earDetectionBehavior", "earDetectionBehavior");
+        // Not optimistic: the device reports these, nothing here sets them.
+        if (typeof parsed.model === "number")
+            root.model = parsed.model;
+        if (typeof parsed.modelNumber === "string")
+            root.modelNumber = parsed.modelNumber;
     }
 
     // ------------------------------------------------------------ lifetime
     property int attempts: 0
 
-    // Qt's QLocalServer puts relative names in the temp dir (measured
-    // /tmp/app_server even with XDG_RUNTIME_DIR set — same note in
-    // bin/bluetooth-battery, which checks both paths).
+    // $XDG_RUNTIME_DIR/librepods.sock — /run/user/<uid>, mode 0700. It used
+    // to be /tmp/app_server, because Qt resolves a QLocalServer name without
+    // a leading slash under the temp dir, which left the channel that drives
+    // the pods open to any local user. The daemon computes the same path in
+    // linux/ipcpath.hpp (our patch) and refuses to fall back to /tmp, so an
+    // empty runtime dir means no socket rather than an insecure one.
+    readonly property string socketPath: Quickshell.env("XDG_RUNTIME_DIR") + "/librepods.sock"
+
     property Socket stream: Socket {
-        path: "/tmp/app_server"
+        path: root.socketPath
         parser: SplitParser {
             onRead: line => root.applyLine(line)
         }
@@ -114,6 +229,18 @@ QtObject {
     property Timer retry: Timer {
         interval: 5000
         onTriggered: root.stream.connected = true
+    }
+
+    // The deadline on an optimistic value: the device never acked, so put the
+    // daemon's own figure back rather than leave a control showing a state the
+    // pods are not in.
+    property Timer settle: Timer {
+        interval: root.settleMs
+        onTriggered: {
+            if (root.pendingField !== "")
+                root[root.pendingField] = root.reported[root.pendingField];
+            root.clearPending();
+        }
     }
 
     // The event-driven revival: BlueZ device changes (the AirPods
