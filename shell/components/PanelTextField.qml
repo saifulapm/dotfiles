@@ -66,13 +66,13 @@ Rectangle {
         Keys.onDownPressed: field.moveRequested(1)
         Keys.onUpPressed: field.moveRequested(-1)
 
-        Text {
+        StyledText {
+            theme: field.theme
             anchors.verticalCenter: parent.verticalCenter
             visible: input.text === ""
             text: field.placeholder
-            color: field.theme.textMuted
-            font.family: field.theme.fontUi
-            font.pixelSize: field.theme.fontPx(0.917)
+            role: StyledText.Body
+            muted: true
         }
     }
 }

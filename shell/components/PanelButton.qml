@@ -19,13 +19,13 @@ Rectangle {
     border.color: selected ? theme.accent : theme.surface3
     opacity: enabled ? 1 : 0.45
 
-    Text {
+    StyledText {
         id: text
+        theme: button.theme
         anchors.centerIn: parent
         text: button.label
+        role: StyledText.Body
         color: button.selected ? button.theme.accent : button.theme.textPrimary
-        font.family: button.theme.fontUi
-        font.pixelSize: button.theme.fontPx(0.917)
     }
 
     HoverHandler {
