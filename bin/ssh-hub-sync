@@ -115,7 +115,12 @@ fi
 if [[ ! -f $identity ]]; then
   # Not a failure: a machine that has never been given the age key simply
   # cannot take part yet, and saying so is more useful than a red row.
-  echo "no age identity at $identity — copy it from a provisioned machine first"
+  #
+  # This is the one secret the hub cannot carry, because the hub's blob is
+  # encrypted TO it — so the message names the way across rather than leaving
+  # "copy it from somewhere" as an exercise. Taildrop is the fallback when the
+  # ssh that scp needs is itself what has not been set up yet.
+  echo "no age identity at $identity — pull it from a machine that has one: scp <machine>:$identity $identity && chmod 600 $identity (or push it with: tailscale file cp $identity <machine>:)"
   exit 2
 fi
 
