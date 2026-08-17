@@ -1,7 +1,7 @@
 .pragma library
 
 // Audio panel math — ported near-verbatim from omarchy's audio plugin
-// Model.js (CREDITS.md, direct copies). Pure JS: PipeWire nodes and MPRIS
+// Model.js (direct copies). Pure JS: PipeWire nodes and MPRIS
 // players come in from the QML, nothing here touches Qt.
 //
 // Deviations from the source: omarchy's parseSinkAvailability was dropped (it

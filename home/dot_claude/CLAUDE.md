@@ -17,8 +17,11 @@ Shopify apps + themes (Shopify CLI), Node, and learning Go/Rust/Elisp.
   belong in that source tree, not loose in $HOME.
 
 ## Dev layout on these machines
-- Projects live in ~/Sites. https://<dir>.test serves ~/Sites/<dir>/public
-  automatically (caddy + dnsmasq + local CA) — no per-site setup.
+- Projects live in ~/Sites. https://<dir>.test serves
+  ~/Sites/laravel/<dir>/public automatically (caddy + dnsmasq + local CA) — no
+  per-site setup. ONLY that subdirectory is wildcard-served; anything under
+  ~/Sites/github, ~/Sites/shopify_themes or ~/Sites/tries needs its own
+  ~/.config/caddy/sites/<name>.caddy override to get a hostname.
 - mysql:3306, postgres:5432, redis:6379, mailpit:1025 (UI :8025) are
   on-demand socket-activated podman containers: connecting wakes them, ~10 min
   idle stops them. A "stopped" DB container is NORMAL — never enable

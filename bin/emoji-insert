@@ -1,7 +1,7 @@
 #!/bin/bash
 # emoji-insert — put an emoji into the focused window.
 #
-# Port of omarchy's bin/omarchy-menu-emoji-insert (MIT, see CREDITS.md), with
+# Port of omarchy's bin/omarchy-menu-emoji-insert (MIT), with
 # their paste mechanism replaced after measuring it on this machine.
 #
 # Theirs copies to a transient `wl-copy --type text/plain --sensitive

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import "../components"
+import "../../../components"
 import "WeatherModel.js" as Model
 
 // Weather panel — full port of omarchy's weather Panel.qml in our tokens:
@@ -165,13 +166,13 @@ BarPanel {
                     font.weight: Font.DemiBold
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Heading
+
                     anchors.top: tempBig.top
                     anchors.topMargin: panel.theme.space(2)
                     text: panel.weather.current ? panel.weather.tempUnit : ""
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(1.333)
                 }
             }
         }
@@ -203,12 +204,13 @@ BarPanel {
                         pixelSize: panel.theme.fontPx(0.917)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Small
+                        muted: true
+
                         anchors.verticalCenter: parent.verticalCenter
                         text: (panel.weather.reportLocation || "").toUpperCase()
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.833)
                         font.letterSpacing: 1
                     }
                 }
@@ -328,16 +330,19 @@ BarPanel {
         Repeater {
             model: panel.locationSuggestions
 
-            Rectangle {
+            CursorSurface {
                 id: suggestion
 
                 required property var modelData
                 required property int index
 
+                theme: panel.theme
                 width: parent.width
                 height: suggestionRow.implicitHeight + panel.theme.space(3)
-                radius: panel.theme.radius(0.75)
-                color: index === panel.suggestionIndex ? panel.theme.alpha(panel.theme.accent, 0.18) : "transparent"
+                // Arrowing through the suggestions moves the choice itself,
+                // so the fill is the whole story.
+                bordered: false
+                current: index === panel.suggestionIndex
 
                 Row {
                     id: suggestionRow
@@ -346,20 +351,21 @@ BarPanel {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: panel.theme.space(2)
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+
                         text: suggestion.modelData.name
                         color: suggestion.index === panel.suggestionIndex ? panel.theme.accent : panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.917)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Small
+                        muted: true
+
                         anchors.verticalCenter: parent.verticalCenter
                         visible: text !== ""
                         text: suggestion.modelData.description
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.833)
                     }
                 }
 
@@ -377,12 +383,13 @@ BarPanel {
         }
     }
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Small
+        muted: true
+
         visible: !panel.weather.current
         text: "Fetching forecast…"
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
         font.italic: true
     }
 
@@ -423,29 +430,31 @@ BarPanel {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: panel.theme.space(0.25)
 
-                        Text {
+                        StyledText {
+                            theme: panel.theme
+                            role: StyledText.Caption
+                            muted: true
+
                             text: panel.weather.dayName(dayCell.modelData.date).toUpperCase()
-                            color: panel.theme.textMuted
-                            font.family: panel.theme.fontUi
-                            font.pixelSize: panel.theme.fontPx(0.75)
                             font.letterSpacing: 1
                         }
 
                         Row {
                             spacing: panel.theme.space(1.5)
 
-                            Text {
+                            StyledText {
+                                theme: panel.theme
+                                mono: true
+
                                 text: panel.weather.bareTempForDay(dayCell.modelData, "max")
-                                color: panel.theme.textPrimary
-                                font.family: panel.theme.fontMono
-                                font.pixelSize: panel.theme.fontPx(0.917)
                             }
 
-                            Text {
+                            StyledText {
+                                theme: panel.theme
+                                mono: true
+                                muted: true
+
                                 text: panel.weather.bareTempForDay(dayCell.modelData, "min")
-                                color: panel.theme.textMuted
-                                font.family: panel.theme.fontMono
-                                font.pixelSize: panel.theme.fontPx(0.917)
                             }
                         }
                     }
@@ -463,19 +472,20 @@ BarPanel {
 
         spacing: panel.theme.space(1)
 
-        Text {
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Caption
+            muted: true
+
             text: stat.caption
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.75)
             font.letterSpacing: 1
         }
 
-        Text {
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Title
+
             text: stat.value
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(1.083)
         }
     }
 }

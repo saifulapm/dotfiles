@@ -1,7 +1,7 @@
 // Gradient-or-solid border tokens. One token carries either a single color
 // ("#7aa2f7") or a gradient ("#26a269ee #2ec27eee 45deg") — omarchy's grammar
-// for hyprland_active_border, which is where the ported values come from
-// (CREDITS.md). Colors are #rgb / #rrggbb / #rrggbbaa or Hyprland's
+// for hyprland_active_border, which is where the ported values come from.
+// Colors are #rgb / #rrggbb / #rrggbbaa or Hyprland's
 // rgb()/rgba() spellings; the angle is the one token ending in "deg" and may
 // appear anywhere in the list.
 //

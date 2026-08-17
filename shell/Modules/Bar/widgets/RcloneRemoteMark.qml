@@ -1,5 +1,5 @@
 import QtQuick
-import "../components"
+import "../../../components"
 
 // The mark of an rclone-remote widget, chosen by the instance: typeset when
 // the instance names a glyph (iCloud's md-apple_icloud U+F0038 — the Material

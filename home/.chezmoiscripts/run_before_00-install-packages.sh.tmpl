@@ -154,6 +154,30 @@ if [ "$arch" = x86_64 ]; then
     || echo "install-packages: rpmfusion-nonfree install failed — intel-media-driver will skip this pass" >&2
 fi
 
+# Cloudflare: the WARP client (user decision 2026-08-17). Neither a copr nor a
+# release rpm — Cloudflare publishes a bare key and a .repo file — so the file
+# is written here rather than curl'd from their host, which keeps what we point
+# dnf at reviewable in this repo. $releasever is theirs, not a placeholder we
+# expand: they build per Fedora release, and 44/aarch64 was verified present
+# (cloudflare-warp-2026.6.880.0-1.fc44.aarch64.rpm) the day this landed.
+#
+# The key is imported explicitly because gpgcheck=1 with a remote gpgkey makes
+# dnf stop for an import confirmation that -y does not answer.
+if [ ! -f /etc/yum.repos.d/cloudflare-warp.repo ]; then
+  sudo rpm --import https://pkg.cloudflareclient.com/pubkey.gpg \
+    && sudo tee /etc/yum.repos.d/cloudflare-warp.repo >/dev/null <<'REPO'
+[cloudflare-warp-stable]
+name=cloudflare-warp-stable
+baseurl=https://pkg.cloudflareclient.com/rpm/$releasever
+enabled=1
+type=rpm
+gpgcheck=1
+gpgkey=https://pkg.cloudflareclient.com/pubkey.gpg
+REPO
+  [ -f /etc/yum.repos.d/cloudflare-warp.repo ] \
+    || echo "install-packages: cloudflare repo setup failed — cloudflare-warp will skip this pass" >&2
+fi
+
 # One-time migration on machines that already carry ffmpeg-free: the two
 # conflict, so the plain install below would abort with ffmpeg-free present.
 # swap replaces the whole -free lib stack (--allowerasing, per RPM Fusion's

@@ -86,10 +86,12 @@ PanelWindow {
             NumberAnimation {
                 // Asymmetric like omarchy's window animations: exits run
                 // faster than entrances, which is most of what reads as
-                // "snappy". The binding re-evaluates when the Behavior
-                // fires, so each direction gets its own duration.
-                duration: root.opened ? root.theme.time(0.5) : root.theme.time(0.35)
-                easing.type: root.theme.easing
+                // "snappy". That asymmetry is theme.motion's enter/exit pair
+                // — these two Behaviors are where those tokens came from.
+                // The binding re-evaluates when the Behavior fires, so each
+                // direction still picks its own duration.
+                duration: root.opened ? root.theme.motion.enter : root.theme.motion.exit
+                easing.type: root.theme.motion.easing
             }
         }
 
@@ -137,14 +139,14 @@ PanelWindow {
         Behavior on opacity {
             NumberAnimation {
                 // Matches the scrim: quicker in, quicker still out.
-                duration: root.cardShown ? root.theme.time(0.5) : root.theme.time(0.35)
-                easing.type: root.theme.easing
+                duration: root.cardShown ? root.theme.motion.enter : root.theme.motion.exit
+                easing.type: root.theme.motion.easing
             }
         }
         Behavior on scale {
             NumberAnimation {
-                duration: root.cardShown ? root.theme.time(0.5) : root.theme.time(0.35)
-                easing.type: root.theme.easing
+                duration: root.cardShown ? root.theme.motion.enter : root.theme.motion.exit
+                easing.type: root.theme.motion.easing
             }
         }
 

@@ -28,12 +28,11 @@ Rectangle {
     border.color: theme.surface3
     z: 10
 
-    Text {
+    StyledText {
         id: hintLabel
+        theme: hintBox.theme
         anchors.centerIn: parent
         text: hintBox.text
-        color: hintBox.theme.textPrimary
-        font.family: hintBox.theme.fontUi
-        font.pixelSize: hintBox.theme.fontPx(0.833)
+        role: StyledText.Small
     }
 }

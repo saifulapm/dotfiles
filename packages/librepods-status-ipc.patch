@@ -1,19 +1,88 @@
+diff --git a/linux/ipcpath.hpp b/linux/ipcpath.hpp
+new file mode 100644
+index 0000000..eb9bce1
+--- /dev/null
++++ b/linux/ipcpath.hpp
+@@ -0,0 +1,35 @@
++#pragma once
++
++#include <QtGlobal>
++#include <QByteArray>
++#include <QString>
++
++// Where the daemon's control socket lives, in ONE place because both binaries
++// need it. Two copies of a path string drift, and a drifted socket path fails
++// as "could not connect to librepods (is it running?)" — a message pointing
++// nowhere near the cause.
++//
++// Qt resolves a QLocalServer/QLocalSocket name that does NOT begin with '/'
++// against the temp dir. That is how this channel used to sit at a
++// world-visible /tmp/app_server, where any local user could open it and drive
++// the pods. A name beginning with '/' is taken as a full filesystem path
++// instead, so moving under $XDG_RUNTIME_DIR — /run/user/<uid>, mode 0700 on a
++// systemd session — is a path change and not a protocol change.
++//
++// Empty when XDG_RUNTIME_DIR is unset, and callers must treat that as fatal
++// rather than falling back to /tmp: a fallback would quietly restore the exact
++// thing being removed, and every context that matters here (the graphical
++// session, the shell process drawing the panel) has a runtime dir.
++namespace LibrePods
++{
++    namespace Ipc
++    {
++        inline QString socketPath()
++        {
++            const QByteArray runtimeDir = qgetenv("XDG_RUNTIME_DIR");
++            if (runtimeDir.isEmpty())
++                return QString();
++            return QString::fromLocal8Bit(runtimeDir) + QStringLiteral("/librepods.sock");
++        }
++    }
++}
 diff --git a/linux/librepods-ctl.cpp b/linux/librepods-ctl.cpp
-index 71c32ce..458998d 100644
+index 71c32ce..918f236 100644
 --- a/linux/librepods-ctl.cpp
 +++ b/linux/librepods-ctl.cpp
-@@ -11,7 +11,9 @@ int main(int argc, char *argv[]) {
+@@ -2,6 +2,8 @@
+ #include <QLocalSocket>
+ #include <QTextStream>
+ 
++#include "ipcpath.hpp"
++
+ int main(int argc, char *argv[]) {
+     QCoreApplication app(argc, argv);
+ 
+@@ -11,21 +13,50 @@ int main(int argc, char *argv[]) {
                              << "  noise:off           Disable noise control\n"
                              << "  noise:anc           Enable Active Noise Cancellation\n"
                              << "  noise:transparency  Enable Transparency mode\n"
 -                            << "  noise:adaptive      Enable Adaptive mode\n";
 +                            << "  noise:adaptive      Enable Adaptive mode\n"
++                            << "  ca:on|off           Conversational awareness (Pro)\n"
++                            << "  onebud:on|off       Keep ANC on with one pod in (Pro)\n"
++                            << "  adaptive:N          Adaptive noise level 0-100; only\n"
++                            << "                      applies while Adaptive is active\n"
++                            << "  ear:one|both|off    Pause playback when one pod is out,\n"
++                            << "                      when both are, or never\n"
 +                            << "  status              Print one JSON state line and exit\n"
 +                            << "  subscribe           Print a JSON state line per change until killed\n";
++        return 1;
++    }
++
++    // The one path both binaries compute, from ipcpath.hpp.
++    const QString ipcPath = LibrePods::Ipc::socketPath();
++    if (ipcPath.isEmpty()) {
++        QTextStream(stderr) << "XDG_RUNTIME_DIR is unset, so there is no socket path to use\n";
          return 1;
      }
  
-@@ -23,9 +25,23 @@ int main(int argc, char *argv[]) {
+     QLocalSocket socket;
+-    socket.connectToServer("app_server");
++    socket.connectToServer(ipcPath);
+ 
+     if (!socket.waitForConnected(500)) {
+-        QTextStream(stderr) << "Could not connect to librepods (is it running?)\n";
++        QTextStream(stderr) << "Could not connect to librepods at " << ipcPath << " (is it running?)\n";
          return 1;
      }
  
@@ -39,7 +108,7 @@ index 71c32ce..458998d 100644
      return 0;
  }
 diff --git a/linux/main.cpp b/linux/main.cpp
-index 7b1826b..db2d6ad 100644
+index 7b1826b..27878ba 100644
 --- a/linux/main.cpp
 +++ b/linux/main.cpp
 @@ -1,6 +1,8 @@
@@ -51,7 +120,15 @@ index 7b1826b..db2d6ad 100644
  #include <QApplication>
  #include <QQmlApplicationEngine>
  #include <QQmlContext>
-@@ -135,6 +137,39 @@ public:
+@@ -30,6 +32,7 @@
+ #include "ble/bleutils.h"
+ #include "QRCodeImageProvider.hpp"
+ #include "systemsleepmonitor.hpp"
++#include "ipcpath.hpp"
+ 
+ using namespace AirpodsTrayApp::Enums;
+ 
+@@ -135,6 +138,59 @@ public:
      int retryAttempts() const { return m_retryAttempts; }
      bool hideOnStart() const { return m_hideOnStart; }
      DeviceInfo *deviceInfo() const { return m_deviceInfo; }
@@ -86,12 +163,32 @@ index 7b1826b..db2d6ad 100644
 +        ear["primaryInEar"] = m_deviceInfo->getEarDetection()->isPrimaryInEar();
 +        ear["secondaryInEar"] = m_deviceInfo->getEarDetection()->isSecondaryInEar();
 +        root["ear"] = ear;
++        // The three Pro-only controls plus the host-side ear-detection policy.
++        // All four are capabilities this daemon already had — Main.qml drives
++        // every one of them — they simply never reached the control socket, so
++        // a shell that is not the Qt GUI could not see or set them.
++        root["conversationalAwareness"] = m_deviceInfo->conversationalAwareness();
++        root["oneBudANC"] = m_deviceInfo->oneBudANCMode();
++        root["adaptiveNoise"] = m_deviceInfo->adaptiveNoiseLevel();
++        // 0 pause-when-one-out, 1 pause-when-both-out, 2 never
++        // (MediaController::EarDetectionBehavior). Unlike the three above this
++        // is ours, not the pods': it is what the daemon does to playback, and
++        // it persists in the daemon's own settings.
++        root["earDetectionBehavior"] = earDetectionBehavior();
++        // Which pods these are, straight off upstream's own model-number map
++        // (enums.h, Apple's HT109525 list). A shell that knows the model can
++        // stop offering controls the hardware does not have; without it every
++        // panel has to assume the richest device and draw dead buttons.
++        // Unknown (0) until the metadata packet lands, so consumers should
++        // treat 0 as "assume everything" rather than "assume nothing".
++        root["model"] = int(m_deviceInfo->model());
++        root["modelNumber"] = m_deviceInfo->modelNumber();
 +        return QJsonDocument(root).toJson(QJsonDocument::Compact);
 +    }
      QString phoneMacStatus() const { return m_phoneMacStatus; }
      bool hearingAidEnabled() const { return m_deviceInfo->hearingAidEnabled(); }
  
-@@ -456,7 +491,8 @@ private slots:
+@@ -456,7 +512,8 @@ private slots:
  
      void onOpenApp()
      {
@@ -101,7 +198,7 @@ index 7b1826b..db2d6ad 100644
          if (rootObject) {
              QMetaObject::invokeMethod(rootObject, "reopen", Q_ARG(QVariant, "app"));
          }
-@@ -468,7 +504,8 @@ private slots:
+@@ -468,7 +525,8 @@ private slots:
  
      void onOpenSettings()
      {
@@ -111,7 +208,7 @@ index 7b1826b..db2d6ad 100644
          if (rootObject) {
              QMetaObject::invokeMethod(rootObject, "reopen", Q_ARG(QVariant, "settings"));
          }
-@@ -949,6 +986,8 @@ public:
+@@ -949,6 +1007,8 @@ public:
      }
  
      void loadMainModule() {
@@ -120,7 +217,37 @@ index 7b1826b..db2d6ad 100644
          parent->load(QUrl(QStringLiteral("qrc:/linux/Main.qml")));
      }
  
-@@ -1034,31 +1073,47 @@ int main(int argc, char *argv[]) {
+@@ -1010,14 +1070,26 @@ int main(int argc, char *argv[]) {
+         }
+     }
+ 
+-    QLocalServer::removeServer("app_server");
++    // $XDG_RUNTIME_DIR/librepods.sock, not the bare "app_server" Qt would
++    // have resolved under the world-visible temp dir — ipcpath.hpp carries
++    // the Qt rule that makes this a path change rather than a protocol one,
++    // and why an unset runtime dir is fatal here instead of a fall back.
++    // Declared once and reused by the listen and the teardown below.
++    const QString ipcPath = LibrePods::Ipc::socketPath();
++    if (ipcPath.isEmpty())
++    {
++        LOG_ERROR("XDG_RUNTIME_DIR is unset — refusing to fall back to a world-visible socket in /tmp");
++        return 1;
++    }
+ 
+-    QFile stale("/tmp/app_server");
++    QLocalServer::removeServer(ipcPath);
++
++    QFile stale(ipcPath);
+     if (stale.exists())
+         stale.remove();
+ 
+     QLocalSocket socket_check;
+-    socket_check.connectToServer("app_server");
++    socket_check.connectToServer(ipcPath);
+ 
+     if (socket_check.waitForConnected(300)) {
+         LOG_INFO("Another instance already running! Reopening window...");
+@@ -1034,59 +1106,86 @@ int main(int argc, char *argv[]) {
  
      bool debugMode = false;
      bool hideOnStart = false;
@@ -174,8 +301,20 @@ index 7b1826b..db2d6ad 100644
 +        trayApp->loadMainModule();
  
      QLocalServer server;
-     QLocalServer::removeServer("app_server");
-@@ -1074,19 +1129,30 @@ int main(int argc, char *argv[]) {
+-    QLocalServer::removeServer("app_server");
++    QLocalServer::removeServer(ipcPath);
+ 
+-    if (!server.listen("app_server"))
++    if (!server.listen(ipcPath))
+     {
+-        LOG_ERROR("Unable to start the listening server");
++        LOG_ERROR("Unable to start the listening server on " << ipcPath);
+         LOG_DEBUG("Server error: " << server.errorString());
+     }
+     else
+     {
+-        LOG_DEBUG("Server started, waiting for connections...");
++        LOG_DEBUG("Server started on " << ipcPath << ", waiting for connections...");
      }
      QObject::connect(&server, &QLocalServer::newConnection, [&]() {
          QLocalSocket* socket = server.nextPendingConnection();
@@ -215,10 +354,45 @@ index 7b1826b..db2d6ad 100644
                  }
              }
              else if (msg == "noise:off") {
-@@ -1101,6 +1167,26 @@ int main(int argc, char *argv[]) {
+@@ -1101,6 +1200,77 @@ int main(int argc, char *argv[]) {
              else if (msg == "noise:adaptive") {
                  trayApp->setNoiseControlModeInt(3);
              }
++            // Conversational awareness, one-bud ANC and the adaptive noise
++            // level: the setters are the ones the GUI's own switches call, so
++            // these verbs add plumbing, not behaviour.
++            else if (msg == "ca:on") {
++                trayApp->setConversationalAwareness(true);
++            }
++            else if (msg == "ca:off") {
++                trayApp->setConversationalAwareness(false);
++            }
++            else if (msg == "onebud:on") {
++                trayApp->setOneBudANCMode(true);
++            }
++            else if (msg == "onebud:off") {
++                trayApp->setOneBudANCMode(false);
++            }
++            else if (msg.startsWith("adaptive:")) {
++                bool ok = false;
++                const int level = msg.mid(9).trimmed().toInt(&ok);
++                if (!ok)
++                    LOG_ERROR("adaptive: wants a number 0-100, got: " << msg);
++                else
++                    // The setter clamps to 0-100 and is a no-op unless
++                    // adaptive mode is the active one, which is why the panel
++                    // only offers the slider there.
++                    trayApp->setAdaptiveNoiseLevel(level);
++            }
++            else if (msg == "ear:one") {
++                trayApp->setEarDetectionBehavior(MediaController::PauseWhenOneRemoved);
++            }
++            else if (msg == "ear:both") {
++                trayApp->setEarDetectionBehavior(MediaController::PauseWhenBothRemoved);
++            }
++            else if (msg == "ear:off") {
++                trayApp->setEarDetectionBehavior(MediaController::Disabled);
++            }
 +            else if (msg == "status" || msg == "subscribe") {
 +                const auto writeStatus = [socket, trayApp]() {
 +                    socket->write(trayApp->statusJson() + "\n");
@@ -236,12 +410,39 @@ index 7b1826b..db2d6ad 100644
 +                                     &DeviceInfo::noiseControlModeChanged, socket, writeStatus);
 +                    QObject::connect(trayApp->deviceInfo()->getEarDetection(),
 +                                     &EarDetection::statusChanged, socket, writeStatus);
++                    // The four fields added to statusJson need their own
++                    // change signals here, or a subscriber would only ever see
++                    // them move when something else happened to push a line.
++                    QObject::connect(trayApp->deviceInfo(),
++                                     &DeviceInfo::conversationalAwarenessChanged, socket, writeStatus);
++                    QObject::connect(trayApp->deviceInfo(),
++                                     &DeviceInfo::oneBudANCModeChanged, socket, writeStatus);
++                    QObject::connect(trayApp->deviceInfo(),
++                                     &DeviceInfo::adaptiveNoiseLevelChanged, socket, writeStatus);
++                    QObject::connect(trayApp,
++                                     &AirPodsTrayApp::earDetectionBehaviorChanged, socket, writeStatus);
++                    // The model arrives in a metadata packet after the
++                    // handshake, so a subscriber that connected first has to
++                    // be told when it lands.
++                    QObject::connect(trayApp->deviceInfo(),
++                                     &DeviceInfo::modelChanged, socket, writeStatus);
 +                    return;
 +                }
 +            }
              else
              {
                  LOG_ERROR("Unknown message received: " << msg);
+@@ -1127,8 +1297,8 @@ int main(int argc, char *argv[]) {
+             server.close();
+         }
+ 
+-        QLocalServer::removeServer("app_server");
+-        QFile stale("/tmp/app_server");
++        QLocalServer::removeServer(ipcPath);
++        QFile stale(ipcPath);
+         if (stale.exists())
+             stale.remove();
+     });
 diff --git a/linux/trayiconmanager.cpp b/linux/trayiconmanager.cpp
 index 738feec..8c537e9 100644
 --- a/linux/trayiconmanager.cpp

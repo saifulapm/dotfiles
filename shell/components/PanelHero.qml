@@ -73,24 +73,28 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: root.theme.space(0.5)
 
-        Text {
+        StyledText {
             id: titleText
 
+            theme: root.theme
             width: parent.width
-            color: root.theme.textPrimary
-            font.family: root.theme.fontUi
-            font.pixelSize: root.theme.fontPx(1.083)
+            role: StyledText.Title
             font.weight: Font.DemiBold
             elide: Text.ElideRight
         }
 
-        Text {
+        // The caption defaults to the mono UPPERCASE look; the
+        // phrase-flavoured panels (Tailscale, Dropbox, hub sync) restyle it
+        // to sentence-case through the meta* aliases above, which write these
+        // properties directly and so still win over the role.
+        StyledText {
             id: metaText
 
+            theme: root.theme
             width: parent.width
-            color: root.theme.textMuted
-            font.family: root.theme.fontMono
-            font.pixelSize: root.theme.fontPx(0.75)
+            role: StyledText.Caption
+            mono: true
+            muted: true
             font.letterSpacing: 1.2
             font.weight: Font.DemiBold
             elide: Text.ElideRight

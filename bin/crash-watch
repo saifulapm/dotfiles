@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # crash-watch — announce process crashes and offer an AI diagnosis.
 #
-# Port of omarchy's bin/omarchy-crash-watch (CREDITS.md). systemd-coredump is
+# Port of omarchy's bin/omarchy-crash-watch. systemd-coredump is
 # already this machine's core_pattern handler, and it journals every dump under
 # a known MESSAGE_ID with structured COREDUMP_* fields — richer than the core
 # filenames, and readable without touching the cores themselves.

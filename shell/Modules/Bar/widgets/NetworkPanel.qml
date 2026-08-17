@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Networking
 import "../components"
+import "../../../components"
 import "NetworkModel.js" as Model
 
 // Network panel — full port of omarchy's network plugin Panel.qml in our own
@@ -1506,12 +1507,14 @@ BarPanel {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: panel.theme.space(1.5)
 
-                        Text {
+                        StyledText {
+                            theme: panel.theme
+                            role: StyledText.Caption
+                            mono: true
+                            muted: true
+
                             anchors.verticalCenter: parent.verticalCenter
                             text: "AUTOMATIC"
-                            color: panel.theme.textMuted
-                            font.family: panel.theme.fontMono
-                            font.pixelSize: panel.theme.fontPx(0.75)
                             font.letterSpacing: 1.2
                             font.weight: Font.DemiBold
                         }
@@ -1549,14 +1552,14 @@ BarPanel {
                     Behavior on height {
                         NumberAnimation {
                             duration: panel.theme.time(1)
-                            easing.type: Easing.OutCubic
+                            easing.type: panel.theme.motion.easing
                         }
                     }
 
                     Behavior on opacity {
                         NumberAnimation {
                             duration: panel.theme.time(1)
-                            easing.type: Easing.OutCubic
+                            easing.type: panel.theme.motion.easing
                         }
                     }
 
@@ -1739,12 +1742,12 @@ BarPanel {
                     }
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    muted: true
+
                     visible: panel.wifiNetworks.length === 0
                     text: Networking.wifiEnabled ? "Scanning…" : "Wi-Fi is off"
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                 }
             }
         }
@@ -1818,18 +1821,21 @@ BarPanel {
             text: cell.hint !== "" ? cell.hint : "Click to copy"
         }
 
-        Text {
+        StyledText {
             id: cellLabel
+            theme: panel.theme
+            role: StyledText.Small
+            muted: true
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             text: cell.label
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
         }
 
-        Text {
+        StyledText {
             id: cellValue
+            theme: panel.theme
+            role: StyledText.Small
+            mono: true
             anchors.right: parent.right
             anchors.left: cellLabel.right
             anchors.leftMargin: panel.theme.space(1)
@@ -1838,8 +1844,6 @@ BarPanel {
             elide: Text.ElideRight
             text: cell.value
             color: cell.alert ? panel.theme.error : panel.theme.textPrimary
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.833)
 
             // Click an address to copy it, as their DetailValue does.
             MouseArea {
@@ -1911,15 +1915,16 @@ BarPanel {
 
         implicitHeight: panel.theme.space(7)
 
-        Text {
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Small
+
             anchors.centerIn: parent
             width: parent.width - panel.theme.space(2)
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
             text: pill.label
             color: pill.current || pill.selected ? panel.theme.accent : panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
             font.weight: pill.selected ? Font.DemiBold : Font.Normal
         }
 
@@ -2147,12 +2152,12 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 0
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+
                     width: parent.width
                     text: row.net ? (row.net.ssid || "Hidden") : ""
                     color: row.isConnected ? panel.theme.accent : panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     font.weight: row.isConnected ? Font.DemiBold : Font.Normal
                     elide: Text.ElideRight
                 }
@@ -2162,13 +2167,14 @@ BarPanel {
                 // The Column drops it from layout while invisible; binding
                 // height back to implicitHeight on top of that looped (the
                 // long-documented action-status binding loop).
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+
                     width: parent.width
                     visible: row.statusText !== ""
                     text: row.statusText
                     color: row.statusColor
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
             }
@@ -2246,12 +2252,13 @@ BarPanel {
                 border.width: panel.theme.borderWidth
                 border.color: row.isFailed ? panel.theme.error : panel.theme.surface3
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Small
+
                     anchors.centerIn: parent
                     text: row.isFailed ? (panel.failureReason || "Failed") : "Connecting…"
                     color: row.isFailed ? panel.theme.error : panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.833)
                 }
             }
 

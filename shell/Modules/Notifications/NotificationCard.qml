@@ -2,9 +2,10 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import "NotificationLogic.js" as Logic
+import "../../components"
 
 // Notification card — a full port of omarchy's
-// plugins/notifications/components/NotificationCard.qml (CREDITS.md) in our
+// plugins/notifications/components/NotificationCard.qml in our
 // theme tokens. Pure presentation: no service, Notification or ListModel
 // references, so the popup container owns lifetime and this only draws.
 Rectangle {
@@ -180,13 +181,14 @@ Rectangle {
                 Layout.rightMargin: root.theme.space(2.5)
                 spacing: root.theme.space(0.5)
 
-                Text {
+                StyledText {
+                    theme: root.theme
+                    role: StyledText.TitleLarge
+
                     Layout.fillWidth: true
                     visible: root.summary.length > 0
                     text: root.summary
                     color: root.theme.notifications.text
-                    font.family: root.theme.fontUi
-                    font.pixelSize: root.theme.fontPx(1.167)
                     // Upstream sets `font.bold` here. Title and body are the
                     // same pixel size (theirs too), so weight is the only
                     // thing separating them, and a full 700 makes the title a
@@ -200,15 +202,16 @@ Rectangle {
                     maximumLineCount: 2
                 }
 
-                Text {
+                StyledText {
+                    theme: root.theme
+                    role: StyledText.TitleLarge
+
                     Layout.fillWidth: true
                     Layout.topMargin: root.theme.space(0.5)
                     visible: root.sanitizedBody.length > 0
                     text: root.styledBody
                     textFormat: Text.StyledText
                     color: root.theme.notifications.textMuted
-                    font.family: root.theme.fontUi
-                    font.pixelSize: root.theme.fontPx(1.167)
                     wrapMode: Text.WordWrap
                     elide: Text.ElideRight
                     maximumLineCount: 3
@@ -246,12 +249,11 @@ Rectangle {
                                 onTapped: root.actionInvoked(actionButton.modelData)
                             }
 
-                            Text {
+                            StyledText {
                                 id: actionLabel
+                                theme: root.theme
                                 anchors.centerIn: parent
                                 color: root.theme.accent
-                                font.family: root.theme.fontUi
-                                font.pixelSize: root.theme.fontPx(0.917)
                                 text: actionButton.modelData.text
                             }
                         }

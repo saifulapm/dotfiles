@@ -7,7 +7,7 @@ import "EmojiSearch.js" as EmojiSearch
 import "../../components/FilterKeys.js" as FilterKeys
 
 // Emoji picker: fullscreen overlay layer with a centered card, a query line
-// and a grid of glyphs. Ported from omarchy's emojis plugin (CREDITS.md) —
+// and a grid of glyphs. Ported from omarchy's emojis plugin —
 // their flat grid (no group headers, no recents, no ranking), their key model
 // (←/→ by one, ↑/↓ by a row, PageUp/PageDown by a screen, Enter to take the
 // cursor's emoji, Escape clearing the query before it closes) and their
@@ -264,7 +264,10 @@ Scope {
                     border.width: emojisRoot.theme.borderWidth
                     border.color: emojisRoot.filterText ? emojisRoot.theme.accent : emojisRoot.theme.surface3
 
-                    Text {
+                    StyledText {
+                        theme: emojisRoot.theme
+                        role: StyledText.Title
+
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.leftMargin: emojisRoot.theme.space(3)
@@ -273,8 +276,6 @@ Scope {
                         elide: Text.ElideRight
                         text: emojisRoot.filterText || "search emojis"
                         color: emojisRoot.filterText ? emojisRoot.theme.textPrimary : emojisRoot.theme.textMuted
-                        font.family: emojisRoot.theme.fontUi
-                        font.pixelSize: emojisRoot.theme.fontPx(1.1)
                     }
                 }
 
@@ -291,18 +292,20 @@ Scope {
                         cellHeight: emojisRoot.cellSize
                         boundsBehavior: Flickable.StopAtBounds
 
-                        delegate: Rectangle {
+                        delegate: CursorSurface {
                             id: cell
 
                             required property int index
                             required property string emoji
 
-                            readonly property bool hasCursor: emojisRoot.cursorActive && cell.index === emojisRoot.selectedIndex
-
+                            theme: emojisRoot.theme
                             width: emojisRoot.cellSize
                             height: emojisRoot.cellSize
-                            radius: emojisRoot.theme.radius(0.75)
-                            color: cell.hasCursor ? emojisRoot.theme.alpha(emojisRoot.theme.accent, 0.18) : "transparent"
+                            // Hovering moves the selection, so the cursor and
+                            // the choice are one state: the accent fill says
+                            // it, and there is no outline to add.
+                            bordered: false
+                            current: emojisRoot.cursorActive && cell.index === emojisRoot.selectedIndex
 
                             Text {
                                 anchors.centerIn: parent
@@ -331,14 +334,15 @@ Scope {
                         }
                     }
 
-                    Text {
+                    StyledText {
+                        theme: emojisRoot.theme
+                        role: StyledText.BodyLarge
+                        muted: true
+
                         anchors.centerIn: parent
                         visible: displayModel.count === 0
                         horizontalAlignment: Text.AlignHCenter
                         text: emojisRoot.filterText ? "No matches for “" + emojisRoot.filterText + "”" : "No emojis loaded"
-                        color: emojisRoot.theme.textMuted
-                        font.family: emojisRoot.theme.fontUi
-                        font.pixelSize: emojisRoot.theme.fontPx(1.0)
                     }
                 }
             }

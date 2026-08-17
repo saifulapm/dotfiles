@@ -1,7 +1,7 @@
 #!/bin/bash
 # network-dns — show or set the DNS servers NetworkManager hands to resolved.
 #
-# Ported from omarchy's bin/omarchy-dns (MIT, see CREDITS.md), reduced to the
+# Ported from omarchy's bin/omarchy-dns (MIT), reduced to the
 # half of it that stays inside NetworkManager: `nmcli connection modify` on
 # every wifi/ethernet profile followed by `nmcli device reapply` on the active
 # devices, which is exactly their set_connection_dns +

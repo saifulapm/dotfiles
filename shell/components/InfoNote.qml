@@ -18,12 +18,12 @@ Row {
         pixelSize: note.theme.fontPx(0.917)
     }
 
-    Text {
+    StyledText {
+        theme: note.theme
         width: note.width - note.theme.space(4)
         text: note.text
-        color: note.theme.textMuted
-        font.family: note.theme.fontUi
-        font.pixelSize: note.theme.fontPx(0.833)
+        role: StyledText.Small
+        muted: true
         wrapMode: Text.WordWrap
     }
 }

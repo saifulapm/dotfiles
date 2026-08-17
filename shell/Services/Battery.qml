@@ -4,8 +4,8 @@ import Quickshell.Io
 import Quickshell.Services.UPower
 
 // Low-battery warnings + AC/battery power-profile switching — port of
-// omarchy's services/battery plugin (Service.qml + BatteryModel.js, MIT, see
-// CREDITS.md). Their 30-second check timer is not ported: the UPower display
+// omarchy's services/battery plugin (Service.qml + BatteryModel.js, MIT).
+// Their 30-second check timer is not ported: the UPower display
 // device pushes percentage/state changes on its own, so the warning logic
 // re-evaluates from property bindings instead — the event-driven shape the
 // no-polling rule asks for.

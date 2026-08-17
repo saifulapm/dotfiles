@@ -1,5 +1,5 @@
 // The rclone-remote status envelope — ours, in the shape of the Dropbox
-// plugin's model (CREDITS.md): a tolerant parse of bin/rclone-remote-status's
+// plugin's model: a tolerant parse of bin/rclone-remote-status's
 // one JSON object, where a parse failure stays distinguishable from an honest
 // empty answer.
 //

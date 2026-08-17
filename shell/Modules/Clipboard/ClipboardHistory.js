@@ -1,7 +1,7 @@
 // Clipboard history model.
 //
-// Direct port of omarchy's shell/plugins/clipboard/ClipboardHistory.js (MIT,
-// see CREDITS.md): the entry shapes ({type:"text",text} and
+// Direct port of omarchy's shell/plugins/clipboard/ClipboardHistory.js (MIT):
+// the entry shapes ({type:"text",text} and
 // {type:"image",mime,path,capturedAt}), the dedup key, most-recent-first
 // ordering with the cap applied while rebuilding, the file:// URI decoding
 // that turns a file-manager copy into a named file row, and the display-row

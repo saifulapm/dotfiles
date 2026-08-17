@@ -1,5 +1,5 @@
 // Power panel model — near-verbatim port of omarchy's
-// plugins/panels/power/Model.js (CREDITS.md). Their `parseProfiles` is not
+// plugins/panels/power/Model.js. Their `parseProfiles` is not
 // here: their profile list comes from `powerprofilesctl`, ours from
 // quickshell's PowerProfiles service. `parseKeyValue` reads our
 // `bin/system-stats` output, which uses their key<TAB>value contract.

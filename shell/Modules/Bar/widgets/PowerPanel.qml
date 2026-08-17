@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
 import "../components"
+import "../../../components"
 import "PowerModel.js" as Model
 
 // Power panel — full port of omarchy's power plugin Panel.qml in our tokens:
@@ -224,7 +225,7 @@ BarPanel {
             Behavior on width {
                 NumberAnimation {
                     duration: panel.theme.time(2.13)
-                    easing.type: Easing.OutCubic
+                    easing.type: panel.theme.motion.easing
                 }
             }
 
@@ -252,12 +253,12 @@ BarPanel {
         }
     }
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        muted: true
+
         visible: !panel.present
         text: "No battery — on mains power"
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.917)
     }
 
     // ------------------------------------------------------- battery facts
@@ -429,23 +430,22 @@ BarPanel {
         Repeater {
             model: panel.profileNames
 
-            Rectangle {
+            ChipSurface {
                 id: profileCell
 
                 required property string modelData
                 required property int index
 
                 readonly property bool isActive: panel.profilesAvailable && panel.activeProfileName === modelData
-                readonly property bool hasCursor: panel.cursorActive && panel.profileIndex === index
                 readonly property bool selectable: panel.profilesAvailable && (modelData !== "performance" || PowerProfiles.hasPerformanceProfile)
 
+                theme: panel.theme
                 width: profileRow.cellWidth
                 implicitHeight: profileContent.implicitHeight + panel.theme.space(3)
-                radius: panel.theme.radius(0.75)
-                color: isActive ? panel.theme.alpha(panel.theme.accent, 0.25) : (hasCursor || cellHover.hovered ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2)
-                border.width: panel.theme.borderWidth
-                border.color: isActive || hasCursor ? panel.theme.accent : panel.theme.surface3
-                opacity: selectable ? 1 : 0.45
+                chosen: profileCell.isActive
+                hasCursor: panel.cursorActive && panel.profileIndex === index
+                pointerOver: cellHover.hovered
+                interactive: profileCell.selectable
 
                 Column {
                     id: profileContent
@@ -459,12 +459,13 @@ BarPanel {
                         pixelSize: panel.theme.fontPx(1.333)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Small
+
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: profileCell.modelData === "power-saver" ? "Saver" : (profileCell.modelData.charAt(0).toUpperCase() + profileCell.modelData.slice(1))
                         color: profileCell.isActive ? panel.theme.accent : panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.833)
                     }
                 }
 

@@ -1,5 +1,5 @@
 // Search over emojis.json. Port of omarchy's plugins/emojis/EmojiSearch.js
-// (CREDITS.md) — their semantics exactly, and they are deliberately blunt:
+// — their semantics exactly, and they are deliberately blunt:
 //
 //   * every record is {e: "<emoji>", k: "<name and keywords, space separated>"}
 //   * the query is trimmed and lowercased, nothing else — no tokenizing

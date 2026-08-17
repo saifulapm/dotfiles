@@ -562,15 +562,10 @@ window-rule {
     opacity 1.0
 }
 
-// The screensaver terminal (omarchy system.lua's fullscreen rule): the idle
-// service spawns it at the screensaver stage, bin/screensaver runs inside.
-// After the media rule so its opacity 1.0 beats the global transparency pair
-// — a translucent screensaver would leak the desktop through the black.
-window-rule {
-    match app-id=r#"^org\.qshell\.screensaver$"#
-    open-fullscreen true
-    opacity 1.0
-}
+// No screensaver window-rule any more (2026-08-17). It used to fullscreen
+// and de-transparent the foot window bin/screensaver ran inside; the native
+// screensaver (nirisaver) draws on a wlr-layer-shell overlay of its own and
+// is not a window at all, so there is nothing here to match or size.
 
 binds {
     // Keys consist of modifiers separated by + signs, followed by an XKB key name

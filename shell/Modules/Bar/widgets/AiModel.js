@@ -1,6 +1,6 @@
 // Model-usage parsing and formatting — port of the limit and presentation
 // layer of omarchy's plugins/model-usage/ (`Main.qml`, `Panel.qml`,
-// `providers/Claude.qml`, CREDITS.md), lifted out of QML into one file that
+// `providers/Claude.qml`), lifted out of QML into one file that
 // both providers and the panel share.
 //
 // Providers publish the same six rate-limit properties omarchy's do

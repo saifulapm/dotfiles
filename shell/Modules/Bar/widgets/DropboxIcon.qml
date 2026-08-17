@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 
-// The Dropbox mark, ported from omarchy's DropboxIcon.qml (CREDITS.md): five
+// The Dropbox mark, ported from omarchy's DropboxIcon.qml: five
 // diamond tiles drawn with QtQuick.Shapes — four across two rows and one
 // centered below. Drawn rather than typeset, so it needs no brand glyph in the
 // icon font (the FontAwesome and Devicons ranges the upstream login row used

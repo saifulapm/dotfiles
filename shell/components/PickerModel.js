@@ -1,5 +1,5 @@
 // Port of omarchy's shell/plugins/image-picker/ImagePickerModel.js
-// (CREDITS.md) — the picker's whole non-visual half: row parsing with the
+// — the picker's whole non-visual half: row parsing with the
 // basename dedup that merges two directories, the basename → spaced → title
 // case label, the substring filter and the filtered-position math the
 // carousel lays itself out with.

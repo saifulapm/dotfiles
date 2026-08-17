@@ -1,27 +1,34 @@
 #!/usr/bin/env bash
-# screensaver-launch — spawn the quotes screensaver fullscreen. Port of
-# omarchy's bin/omarchy-launch-screensaver (CREDITS.md), cut to our shape:
-# foot is THE terminal here so their four-terminal detection goes, and both
-# machines drive a single display, so their per-monitor focus/spawn/wait
-# choreography goes too — one foot on the focused output, fullscreened and
-# made opaque by the org.qshell.screensaver window-rule in the niri config.
+# screensaver-launch — put the screensaver on screen. A wrapper around
+# nirisaver (github.com/saifulapm/nirisaver), which draws straight
+# onto a wlr-layer-shell overlay: no terminal, no pty, no child process.
 #
-# Exit status matters: the idle service falls back to powering the monitors
-# off when this returns nonzero, so a machine without ttfx keeps its old
-# screensaver-less behavior instead of idling with the desktop up.
+# Deliberately flagless. Everything about the screensaver — which quotes, how
+# long each stays up, how fast the effects run, which effects — is nirisaver's
+# to configure, and it reads ~/.config/nirisaver/config.toml and
+# ~/.config/nirisaver/quotes.txt on its own (home/dot_config/nirisaver/ here,
+# so the list is version controlled). Splitting those knobs across a
+# shell.json block and a flag in this file only made two places to look.
+#
+# What is left is the launch itself, and the exit status. The idle service
+# falls back to powering the monitors off when this returns nonzero, so a
+# machine without the binary keeps its old screensaver-less behavior rather
+# than idling with the desktop up.
+#
+# It replaced a foot window running bin/screensaver, which had to wait out the
+# pty resize, drive an animator over a tty, poll niri for focus to notice the
+# lock, and repaint every animated cell through a terminal emulator.
 
-# The idle service spawns this from qshell.service, whose PATH does not
-# carry the cargo bin dir ttfx installs into.
-export PATH="$HOME/.cargo/bin:$PATH"
+# The idle service spawns this from qshell.service, whose PATH carries
+# neither ~/.local/bin nor the cargo bin dir.
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
-command -v ttfx >/dev/null 2>&1 || exit 1
-command -v foot >/dev/null 2>&1 || exit 1
+command -v nirisaver >/dev/null 2>&1 || exit 1
 
-# Already up — nothing to do
-pgrep -f '[o]rg.qshell.screensaver' >/dev/null && exit 0
-
-# The inner script's stderr goes to /dev/null, NOT the pty: anything a tool
-# in the loop prints to the terminal lands on the screensaver display.
-setsid -f foot --app-id=org.qshell.screensaver \
-  --config="${XDG_CONFIG_HOME:-$HOME/.config}/foot/screensaver.ini" \
-  bash -c "\"\$HOME/.dotfiles/bin/screensaver\" 2>/dev/null" >/dev/null 2>&1
+# Detached, and returning as soon as it is spawned, because the exit status
+# above is the contract: a launcher that blocked for the whole screensaver
+# would report its dismissal as a launch failure and blank the monitors on the
+# way back to the desktop. A second launch is harmless anyway — nirisaver
+# flocks $XDG_RUNTIME_DIR/nirisaver.lock and exits 0 quietly if another
+# instance holds it.
+setsid -f nirisaver >/dev/null 2>&1

@@ -2,7 +2,7 @@
 # network-qr — Wi-Fi share helper for the shell.
 #
 # Direct port of omarchy's bin/omarchy-network-qr and bin/omarchy-network-password
-# (MIT, see CREDITS.md), merged into one command:
+# (MIT), merged into one command:
 #
 #   network-qr [interface]              print the QR matrix as 0/1 rows
 #   network-qr --password [interface]   print the active connection's password

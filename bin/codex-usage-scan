@@ -2,7 +2,7 @@
 """Scan Codex usage and emit compact stats as one JSON object.
 
 Direct port of omarchy shell/plugins/model-usage/scripts/codex_usage_scanner.py
-(CREDITS.md). Same two local sources (pi agent sessions via ripgrep, native
+. Same two local sources (pi agent sessions via ripgrep, native
 Codex session JSONL) and the same `codex app-server` JSON-RPC call for the
 rate-limit windows, emitting the same field names.
 """

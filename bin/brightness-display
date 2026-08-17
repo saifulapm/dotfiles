@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # brightness-display — show or adjust brightness on the focused display,
-# whatever kind it is. Port of omarchy-brightness-display (CREDITS.md):
+# whatever kind it is. Port of omarchy-brightness-display:
 # internal panels go through brightnessctl's backlight class, anything else
 # through DDC/CI (bin/brightness-display-ddc). This is what makes the Mac
 # mini's HDMI monitor adjustable at all — it has no backlight device.

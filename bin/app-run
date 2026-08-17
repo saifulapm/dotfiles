@@ -2,7 +2,7 @@
 # app-run — launch a command as its own transient systemd unit under
 # app-graphical.slice.
 #
-# The slice half of omarchy's uwsm-app (CREDITS.md): apps launched by the
+# The slice half of omarchy's uwsm-app: apps launched by the
 # shell used to become children of qshell.service — one cgroup holding the
 # bar, the notification daemon, the polkit agent AND the browser, so
 # systemd-oomd (which kills per-CGROUP, and on Fedora already marks

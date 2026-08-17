@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # webapp-launch — open a URL as an app window, or focus its existing one.
 #
-# The launch half of omarchy-launch-webapp (CREDITS.md), chromium-only (the
+# The launch half of omarchy-launch-webapp, chromium-only (the
 # manifest ships one browser) plus the launch-or-focus treatment their
 # webapp keybinds wrap around it. bin/launch-or-focus's word-bounded match
 # can't hold here: chromium stamps app windows `chrome-<host>__-Default`,

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S mise exec -- node
 // Renders templates/ from the active theme and re-themes running foot
-// terminals via OSC escapes (pattern from omarchy, CREDITS.md).
+// terminals via OSC escapes (pattern from omarchy).
 // Contrast math is shared with the shell: shell/Commons/color.js is the
 // single source of truth, evaluated here directly.
 "use strict"
@@ -75,7 +75,7 @@ tokens["font.size-base"] = String(themeTokens["font.size"] !== undefined ? theme
   }
 }
 
-// ---- text-size derivations (omarchy-display-text-size port, CREDITS.md) ----
+// ---- text-size derivations (omarchy-display-text-size port) ----
 // One knob: [font] size in the override file (bin/text-size writes it).
 // Anchors follow the foot metrics commit: token 12 == foot 12.5pt / 32px
 // line-height == GTK factor 1.0. Terminal sizes are derived here so the foot

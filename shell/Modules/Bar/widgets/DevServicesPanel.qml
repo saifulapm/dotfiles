@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "DevServicesModel.js" as Model
 
 // Dev-services panel — the on-demand database rows, in the family's visual
@@ -108,13 +109,14 @@ BarPanel {
     }
 
     // ---------------------------------------------------------------- error
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Small
+
         visible: panel.devservices.lastError !== ""
         width: parent.width
         text: panel.devservices.lastError
         color: panel.theme.error
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
         wrapMode: Text.WordWrap
     }
 
@@ -156,12 +158,13 @@ BarPanel {
     }
 
     // --------------------------------------------------------------- footer
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Caption
+        muted: true
+
         width: parent.width
         text: "First connection wakes a service; ten idle minutes stop it. The ports stay armed either way."
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.75)
         wrapMode: Text.WordWrap
     }
 
@@ -241,39 +244,39 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.25)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+
                     width: parent.width
                     text: row.svc ? row.svc.label : ""
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+
                     width: parent.width
                     text: Model.stateText(row.svc)
                     color: row.isRunning || row.busy ? panel.theme.textPrimary : panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
             }
 
             // Their PanelActionButton shape: a bordered square holding one
             // glyph (md-web renders under the Symbols Nerd Font fallback).
-            Rectangle {
+            ChipSurface {
                 id: webButton
 
                 visible: row.hasWeb && row.isRunning
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                theme: panel.theme
                 implicitWidth: panel.theme.space(8)
                 implicitHeight: panel.theme.space(7)
-                radius: panel.theme.radius(0.75)
-                color: webMouse.containsMouse ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
-                border.width: panel.theme.borderWidth
-                border.color: panel.theme.surface3
+                // An action, not a choice — `chosen` never fires.
+                pointerOver: webMouse.containsMouse
 
                 OpticalGlyph {
                     anchors.centerIn: parent

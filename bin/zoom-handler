@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # zoom-handler — open Zoom meeting links in the Zoom web client app window.
 #
-# Port of omarchy-webapp-handler-zoom (CREDITS.md): registered as the
+# Port of omarchy-webapp-handler-zoom: registered as the
 # x-scheme-handler for zoommtg:// and zoomus:// (webapp-zoom.desktop), so
 # "Open in app" links from zoom.us land in the web client instead of
 # prompting for a native client that isn't installed. Anything without a

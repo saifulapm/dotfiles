@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "widgets"
 import "BarModel.js" as BarModel
+import "../../components"
 
 // The bar, styled 100% after omarchy's: theme background surface, foreground
 // text (colors.toml `foreground`, i.e. our ansi.white — not bright), zero
@@ -11,7 +12,7 @@ import "BarModel.js" as BarModel
 // chrome-less buttons, red attention color, 420 ms color transitions on
 // theme swap, and a configurable center anchor pinned dead-center.
 //
-// The interaction machinery below is omarchy's too (CREDITS.md): press-drag a
+// The interaction machinery below is omarchy's too: press-drag a
 // widget to reorder it, press-drag the empty center to move the bar to any of
 // the four screen edges, double-click it to toggle transparency (with an
 // auto-contrast foreground sampled from the wallpaper behind the bar), an
@@ -667,6 +668,13 @@ Scope {
         });
     }
 
+    function warpService() {
+        return sharedService("warp", warpServiceComponent, {
+            settings: Qt.binding(() => barRoot.inlineEntryFor("warp")),
+            pollingAllowed: Qt.binding(() => barRoot.servicePollingGate("warp"))
+        });
+    }
+
     // No gate: the podman-events follower is event-driven (one line per
     // container transition, nothing polls), so — like the dictation
     // follower — it runs for the life of the shell. One instance, one
@@ -688,6 +696,13 @@ Scope {
     // visibility.
     function dufsService() {
         return sharedService("dufs", dufsServiceComponent, {});
+    }
+
+    // No gate: the hub-sync service starts no process on its own — it only
+    // watches bin/qshell-sync's status.json and re-stamps a relative clock,
+    // so there is nothing to scope to visibility.
+    function hubSyncService() {
+        return sharedService("sync", hubSyncServiceComponent, {});
     }
 
     // Keyed by widget id, not by type: "icloud" and "dropbox" are two
@@ -732,6 +747,11 @@ Scope {
     }
 
     Component {
+        id: warpServiceComponent
+        WarpService {}
+    }
+
+    Component {
         id: devServicesServiceComponent
         DevServicesService {}
     }
@@ -754,6 +774,11 @@ Scope {
     Component {
         id: rcloneServiceComponent
         RcloneRemoteService {}
+    }
+
+    Component {
+        id: hubSyncServiceComponent
+        HubSyncService {}
     }
 
     Component {
@@ -794,9 +819,11 @@ Scope {
             "monitor": monitorComponent,
             "devservices": devservicesComponent,
             "dufs": dufsComponent,
+            "sync": hubSyncComponent,
             "icloud": icloudComponent,
             "dropbox": dropboxComponent,
             "tailscale": tailscaleComponent,
+            "warp": warpComponent,
             "spacer": spacerComponent
         })
 
@@ -882,15 +909,15 @@ Scope {
 
             Behavior on barBackground {
                 ColorAnimation {
-                    duration: 420
-                    easing.type: Easing.InOutCubic
+                    duration: barRoot.theme.motion.crossfade
+                    easing.type: barRoot.theme.motion.easingSmooth
                 }
             }
             Behavior on barForeground {
                 enabled: barRoot.foregroundAnimationEnabled
                 ColorAnimation {
-                    duration: 420
-                    easing.type: Easing.InOutCubic
+                    duration: barRoot.theme.motion.crossfade
+                    easing.type: barRoot.theme.motion.easingSmooth
                 }
             }
 
@@ -1345,13 +1372,14 @@ Scope {
                     border.width: barRoot.theme.tooltip.borderWidth
                     border.color: barRoot.theme.tooltip.border
 
-                    Text {
+                    StyledText {
                         id: tooltipLabel
+                        theme: barRoot.theme
+                        role: StyledText.BodyLarge
+                        mono: true
                         anchors.centerIn: parent
                         text: panel.tooltipText
                         color: barRoot.theme.tooltip.text
-                        font.family: barRoot.theme.fontMono
-                        font.pixelSize: barRoot.theme.fontPx(1.0)
                         horizontalAlignment: Text.AlignHCenter
                     }
                 }
@@ -1656,8 +1684,8 @@ Scope {
 
                     Behavior on opacity {
                         NumberAnimation {
-                            duration: 140
-                            easing.type: Easing.OutCubic
+                            duration: barRoot.theme.motion.standard
+                            easing.type: barRoot.theme.motion.easing
                         }
                     }
                 }
@@ -1703,7 +1731,16 @@ Scope {
             pressedY = mouse.y;
         }
 
-        onPressAndHold: mouse => startDrag(mouse.x, mouse.y)
+        // A widget's slot area sits above us with propagateComposedEvents and
+        // no press-and-hold of its own, so its composed hold lands here while
+        // it keeps the grab: we would start a bar move and then get neither a
+        // release nor a cancel to end it, leaving the ghost up for the rest of
+        // the session. Only the area holding the press may start the drag.
+        onPressAndHold: mouse => {
+            if (!gestureArea.pressed)
+                return;
+            startDrag(mouse.x, mouse.y);
+        }
 
         onPositionChanged: mouse => {
             if (!(mouse.buttons & Qt.LeftButton))
@@ -1885,8 +1922,8 @@ Scope {
 
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 120
-                    easing.type: Easing.OutCubic
+                    duration: barRoot.theme.time(0.8)
+                    easing.type: barRoot.theme.motion.easing
                 }
             }
         }
@@ -2170,6 +2207,7 @@ Scope {
         id: monitorComponent
         MonitorWidget {
             theme: barRoot.theme
+            autoBrightness: barRoot.shell.autoBrightness
         }
     }
 
@@ -2186,6 +2224,14 @@ Scope {
         Dufs {
             theme: barRoot.theme
             dufs: barRoot.dufsService()
+        }
+    }
+
+    Component {
+        id: hubSyncComponent
+        HubSync {
+            theme: barRoot.theme
+            sync: barRoot.hubSyncService()
         }
     }
 
@@ -2250,6 +2296,14 @@ Scope {
     }
 
     Component {
+        id: warpComponent
+        Warp {
+            theme: barRoot.theme
+            warp: barRoot.warpService()
+        }
+    }
+
+    Component {
         id: spacerComponent
         Spacer {
             theme: barRoot.theme
@@ -2262,12 +2316,12 @@ Scope {
             property string missingId: "?"
             implicitWidth: barRoot.vertical ? barRoot.barSize : missingLabel.implicitWidth + barRoot.theme.space(2)
             implicitHeight: barRoot.vertical ? missingLabel.implicitHeight + barRoot.theme.space(2) : (parent ? parent.height : missingLabel.implicitHeight)
-            Text {
+            StyledText {
                 id: missingLabel
+                theme: barRoot.theme
+                mono: true
                 anchors.centerIn: parent
                 color: barRoot.theme.error
-                font.family: barRoot.theme.fontMono
-                font.pixelSize: barRoot.theme.fontPx(0.917)
                 text: "[" + parent.missingId + "?]"
             }
         }

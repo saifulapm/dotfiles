@@ -1,7 +1,7 @@
 #!/bin/bash
 # voxtype-status — stream voxtype's dictation state as bar-friendly JSON lines.
 #
-# Direct port of omarchy's bin/omarchy-voxtype-status (MIT, see CREDITS.md),
+# Direct port of omarchy's bin/omarchy-voxtype-status (MIT),
 # down to the fallback line it prints when voxtype is not installed, so a
 # machine without dictation still gets one well-formed idle record instead of
 # a broken pipe.

@@ -36,19 +36,21 @@ Item {
         text: "Copy"
     }
 
-    Text {
+    StyledText {
         id: infoLabel
+        theme: infoPair.theme
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         text: infoPair.label
+        role: StyledText.Small
         color: infoPair.labelColor
         opacity: infoPair.labelOpacity
-        font.family: infoPair.theme.fontUi
-        font.pixelSize: infoPair.theme.fontPx(0.833)
     }
 
-    Text {
+    // The value is mono because it IS one — an IP, a hostname, a byte count.
+    StyledText {
         id: infoValue
+        theme: infoPair.theme
         anchors.right: parent.right
         anchors.left: infoLabel.right
         anchors.leftMargin: infoPair.theme.space(2)
@@ -56,8 +58,8 @@ Item {
         horizontalAlignment: Text.AlignRight
         elide: Text.ElideRight
         text: infoPair.value
+        role: StyledText.Small
+        mono: true
         color: infoPair.valueColor
-        font.family: infoPair.theme.fontMono
-        font.pixelSize: infoPair.theme.fontPx(0.833)
     }
 }

@@ -1,7 +1,7 @@
 #!/bin/bash
 # network-status — print the active route's network status for the shell.
 #
-# Direct port of omarchy's bin/omarchy-network-status (MIT, see CREDITS.md).
+# Direct port of omarchy's bin/omarchy-network-status (MIT).
 # Same output contract, so the panel's parser is theirs too:
 #
 #   no args    one tab-separated line: kind<TAB>label<TAB>signal<TAB>freq

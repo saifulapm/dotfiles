@@ -1,7 +1,7 @@
 #!/bin/bash
 # bluetooth-restart — unblock the radio and restart the bluetooth stack.
 #
-# Port of omarchy's bin/omarchy-restart-bluetooth (MIT, see CREDITS.md), the
+# Port of omarchy's bin/omarchy-restart-bluetooth (MIT), the
 # escape hatch behind their Update → Hardware → Bluetooth menu row. Theirs is
 # rfkill unblock + rfkill list and nothing else; this adds the restart its
 # name (and their menu's "Restart" title) promises: bounce bluetoothd when it

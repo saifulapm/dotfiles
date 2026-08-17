@@ -126,12 +126,13 @@ Scope {
                     Keys.onReturnPressed: launcherRoot.launch(launcherRoot.entries[launcherRoot.selectedIndex])
                     Keys.onEscapePressed: launcherRoot.hide()
 
-                    Text {
+                    StyledText {
+                        theme: launcherRoot.theme
+                        role: StyledText.Title
+                        muted: true
+
                         anchors.verticalCenter: parent.verticalCenter
                         visible: searchField.text === ""
-                        color: launcherRoot.theme.textMuted
-                        font.family: launcherRoot.theme.fontUi
-                        font.pixelSize: launcherRoot.theme.fontPx(1.1)
                         text: "search apps"
                     }
                 }
@@ -145,14 +146,18 @@ Scope {
                 model: launcherRoot.entries
                 currentIndex: launcherRoot.selectedIndex
 
-                delegate: Rectangle {
+                delegate: CursorSurface {
                     required property var modelData
                     required property int index
 
+                    theme: launcherRoot.theme
                     width: list.width
                     height: launcherRoot.theme.space(10)
-                    radius: launcherRoot.theme.radius(0.75)
-                    color: index === launcherRoot.selectedIndex ? launcherRoot.theme.alpha(launcherRoot.theme.accent, 0.18) : (rowHover.hovered ? launcherRoot.theme.alpha(launcherRoot.theme.textPrimary, 0.06) : "transparent")
+                    // Selection and cursor are the same thing here, and the
+                    // fill already says so — no keyboard-cursor outline.
+                    bordered: false
+                    current: index === launcherRoot.selectedIndex
+                    hasCursor: rowHover.hovered
 
                     HoverHandler {
                         id: rowHover
@@ -178,22 +183,23 @@ Scope {
                             anchors.verticalCenter: parent.verticalCenter
                             width: parent.width - x
 
-                            Text {
+                            StyledText {
+                                theme: launcherRoot.theme
+                                role: StyledText.BodyLarge
+
                                 width: parent.width
                                 elide: Text.ElideRight
-                                color: launcherRoot.theme.textPrimary
-                                font.family: launcherRoot.theme.fontUi
-                                font.pixelSize: launcherRoot.theme.fontPx(1.0)
                                 text: modelData.name
                             }
 
-                            Text {
+                            StyledText {
+                                theme: launcherRoot.theme
+                                role: StyledText.Small
+                                muted: true
+
                                 width: parent.width
                                 elide: Text.ElideRight
                                 visible: text !== ""
-                                color: launcherRoot.theme.textMuted
-                                font.family: launcherRoot.theme.fontUi
-                                font.pixelSize: launcherRoot.theme.fontPx(0.833)
                                 text: modelData.genericName || modelData.comment || ""
                             }
                         }

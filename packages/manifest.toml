@@ -258,6 +258,30 @@ why = "The tailnet joining these three machines, and what the bar's `tailscale` 
 #     sudo dnf config-manager addrepo \
 #       --from-repofile=https://pkgs.tailscale.com/stable/fedora/tailscale.repo
 
+[[pkg]]
+name = "cloudflare-warp"
+category = "optional"
+arch = "all"
+why = "Cloudflare WARP: warp-cli + warp-svc, behind the bar's `warp` widget (user decision 2026-08-17, ported from tobi/omarchy-warp). From Cloudflare's own repo, bootstrapped in run_before_00 — Fedora packages nothing here. They build per Fedora release for both architectures, so the Asahi machines are first-class (fc44 aarch64 verified 2026-08-17), which is not what the older arm64 threads say"
+
+# Notes on the cloudflare-warp entry above:
+#
+#   * WARP and Tailscale both want the default route in a tunnel mode — but
+#     they coexist better than that suggests, which the widget now says out
+#     loud rather than warning unconditionally. Cloudflare's stock split-tunnel
+#     configuration is `exclude` with 27 entries, and 100.64.0.0/10 —
+#     Tailscale's CGNAT range — is the second of them (read off warp-cli
+#     2026.6.880.0 here, 2026-08-17). So out of the box the tailnet bypasses
+#     WARP. The panel's split-tunnel section states which of the two situations
+#     the machine is actually in; see WarpModel.tailnetVerdict.
+#   * The rpm pulls webkit2gtk4.1 and libappindicator-gtk3 for `warp-taskbar`,
+#     the GTK tray app. We do not run it — the bar widget is the interface —
+#     but the package has no CLI-only split, so the dependency is the price.
+#   * `warp-svc` is not started by anything in this repo, matching tailscaled
+#     above. `systemctl enable --now warp-svc` once, then register the device
+#     (`warp-cli registration new`); the widget's panel offers both as
+#     recovery rows when it finds the daemon down or the device unregistered.
+
 # Dropbox — REVERSED 2026-08-10 (user): there is no Dropbox package or tool
 # here at all any more. The proprietary daemon that ran on the NUC (the
 # dropboxd tarball in ~/.dropbox-dist, their python3 CLI, a script-written
@@ -941,6 +965,46 @@ category = "dev"
 arch = "all"
 why = "libpulse headers, pkg_check_modules REQUIRED by [[tool]] librepods (its media controller pauses playback on ear removal via PulseAudio). Was already on disk undeclared; claimed 2026-08-11 when the librepods build started depending on it"
 
+[[pkg]]
+name = "ruby"
+category = "dev"
+arch = "all"
+why = "Interpreter for vendor/try (tobi/try, the ~/Sites/tries picker behind the `try` fish function; user decision 2026-08-17). Nothing else here is Ruby and none is planned, and there is still no bundler and no rbenv — but see the four packages below: `ruby` alone is not a working ruby. ~19 MiB of it is ruby-libs, and the whole set comes to ~21 MiB"
+
+# The four packages below are what turn `ruby` into a ruby that runs anything.
+# Fedora splits the interpreter from its dispatcher and from the default gems,
+# and every one of the splits is a WEAK dependency — which this repo's global
+# install_weak_deps=False drops. Installing `ruby` on its own therefore gave a
+# machine with no /usr/bin/ruby and no io/console, and vendor/try died on its
+# third line (found 2026-08-17, after claiming in the entry above that the
+# stdlib was enough; it is not — io/console and set are default gems now, not
+# stdlib). ~2.1 MiB for all of it, rubygem-psych included as a hard dep of
+# rubygems.
+
+[[pkg]]
+name = "rubypick"
+category = "dev"
+arch = "all"
+why = "Owns /usr/bin/ruby. The `ruby` package installs only /usr/bin/ruby-mri and leaves the unversioned name to this dispatcher, so without it nothing that says `ruby` — or carries a `#!/usr/bin/env ruby` shebang, vendor/try/try.rb included — resolves. 4.4 KiB"
+
+[[pkg]]
+name = "rubygems"
+category = "dev"
+arch = "all"
+why = "The gem machinery every default gem loads through. Not here to install gems — nothing does — but because requiring io/console goes through it: without rubygems, ruby-mri warns that RubyGems were not loaded and the require fails outright"
+
+[[pkg]]
+name = "ruby-default-gems"
+category = "dev"
+arch = "all"
+why = "The gemspecs for what used to be stdlib. Ruby 4.0 ships io/console, set and friends as default gems rather than plain library files, so this is what makes them findable"
+
+[[pkg]]
+name = "rubygem-io-console"
+category = "dev"
+arch = "all"
+why = "vendor/try/try.rb requires io/console on line 3 — it reads keys one at a time and needs the terminal size for its picker. Declared by name rather than left to ruby-default-gems: it is a separate arch package, and it is the one require the tool cannot start without"
+
 # ------------------------------------------------------------------ optional
 
 # Removed 2026-08-06 by user decision, together: fuzzel and cliphist, plus the
@@ -1414,7 +1478,7 @@ why = "SMTP sending. Emacs message-mode drives it as its sendmail-program and pi
 [[tool]]
 name = "librepods"
 via  = "Built from source (github.com/librepods-org/librepods, linux/ dir, CMake + Qt6) with packages/librepods-status-ipc.patch applied, into ~/.local/bin/{librepods,librepods-ctl}. Build deps: qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtconnectivity-devel qt6-qttools-devel openssl-devel pulseaudio-libs-devel cmake gcc-c++ (installed 2026-08-11, kept for rebuilds). Runs as librepods.service with --no-ui, another patch addition: headless, no tray icon and no window — the bar's own airpods widget/panel (AirPods.qml, AirPodsPanel.qml, LibrePodsService.qml) is the only UI (graphical-session.target, enabled by run_after_02, ConditionPathExists so machines that never built it skip cleanly)"
-why  = "The Apple-exclusive AirPods features: ANC/Transparency/Adaptive switching (librepods-ctl noise:*), ear detection with auto play/pause, per-pod battery. It owns the AAP channel (L2CAP PSM 0x1001) — one connection per device, which is exactly why the patch exists: upstream's control socket was write-only, so the bar's battery display would have gone dark. The patch adds `status` (one JSON line) and `subscribe` (a line per state change) to its local socket, and bin/bluetooth-battery defers to that stream, re-shaped to its own output, whenever the daemon runs — the shell cannot tell the difference. Verified on the desk 2026-08-11: noise mode round-trips 2->1->2 by ctl, subscribe pushes on each change, per-pod battery matches. The hearing-aid features additionally want DeviceID = bluetooth:004C:0000:0000 spoofed in /etc/bluetooth/main.conf — deliberately NOT done (user decision 2026-08-11: skip until wanted)"
+why  = "The Apple-exclusive AirPods features: ANC/Transparency/Adaptive switching (librepods-ctl noise:*), ear detection with auto play/pause, per-pod battery. It owns the AAP channel (L2CAP PSM 0x1001) — one connection per device, which is exactly why the patch exists: upstream's control socket was write-only, so the bar's battery display would have gone dark. The patch adds `status` (one JSON line) and `subscribe` (a line per state change) to its local socket, and bin/bluetooth-battery defers to that stream, re-shaped to its own output, whenever the daemon runs — the shell cannot tell the difference. Verified on the desk 2026-08-11: noise mode round-trips 2->1->2 by ctl, subscribe pushes on each change, per-pod battery matches. The hearing-aid features additionally want DeviceID = bluetooth:004C:0000:0000 spoofed in /etc/bluetooth/main.conf — deliberately NOT done (user decision 2026-08-11: skip until wanted). Extended 2026-08-17 after an audit against github.com/thisisgm/omarchy-pods (which vendors its own librepods fork to get the same thing): the socket now also carries `ca:on|off` (conversational awareness), `onebud:on|off`, `adaptive:N` (0-100, a no-op outside adaptive mode — the daemon's own guard) and `ear:one|both|off`, plus conversationalAwareness/oneBudANC/adaptiveNoise/earDetectionBehavior/model/modelNumber in the status line and a change signal each on subscribe. Every one of those setters was ALREADY in the daemon and bound by its Main.qml — nothing was reverse-engineered, the verbs were the only missing piece. Verified on the desk 2026-08-17 with the pods disconnected: ear:one|both|off round-trips through status and pushes a line on subscribe each time (it is host-side, so it works without hardware); the AAP-backed three could not be exercised — the daemon correctly refuses a mode change with no pods connected. Same day, the control socket moved OFF the world-visible /tmp/app_server (Qt resolves a QLocalServer name without a leading slash under the temp dir, so any local user could drive the pods) to $XDG_RUNTIME_DIR/librepods.sock, mode-0700 dir: new shared header linux/ipcpath.hpp computes it for both binaries, and both REFUSE to fall back when XDG_RUNTIME_DIR is unset rather than quietly reopening the hole. Four consumers moved together — the daemon (listen, single-instance check, teardown), librepods-ctl, shell/Modules/Bar/widgets/LibrePodsService.qml and bin/bluetooth-battery (whose /tmp fallback is deliberately gone). The install also drops me.kavishdevar.librepods.desktop into ~/.local/share/applications; home/dot_local/share/applications/ carries a NoDisplay=true copy because launching that GUI would start a second instance fighting the daemon for the AAP channel — a REBUILD OVERWRITES IT, so run `chezmoi apply` after rebuilding"
 
 [[tool]]
 name = "nirisnap"
@@ -1646,8 +1710,13 @@ why  = "Deno runtime from the mac list; mise already manages node, one mechanism
 
 [[tool]]
 name = "cargo-cli-tools"
-via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc, ripdrag (yazi <C-n> drag-out, needs [[pkg]] gtk4-devel to build); from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07), wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere) and ttfx (user ask 2026-08-11: omacom-io/ttfx, omarchy 4e31b61's Rust terminaltexteffects port driving bin/screensaver; the crates.io name is UNCLAIMED — checked 2026-08-11 — so always install by git URL, never by crate name). herdr moved to run_after_10 prebuilt (974fc11)"
+via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc, ripdrag (yazi <C-n> drag-out, needs [[pkg]] gtk4-devel to build); from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07) and wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere). herdr moved to run_after_10 prebuilt (974fc11); ttfx dropped 2026-08-17 — [[tool]] nirisaver links the crate instead of shelling out to the binary, so nothing installed here ran it any more"
 why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/dufs are mac-list CLI (argc dropped 2026-08-10 — nothing in this repo ever called it); kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
+
+[[tool]]
+name = "nirisaver"
+via  = "run_after_35-nirisaver.sh — clone of github.com/saifulapm/nirisaver into ~/.local/src/nirisaver, cargo-built into ~/.local/bin/nirisaver. Ours outright, not a fork of anything: a plain `main`, no upstream remote, nothing to rebase. `just update-all` carries it: the source-build sweep fetches origin, and a moved HEAD drops the binary so the apply behind it rebuilds — push and the next update-all lands it here. Needs nothing but the rustup cargo — no [[pkg]] entry backs it: it generates its own Wayland protocol bindings, dispatches wl_keyboard by hand instead of taking smithay-client-toolkit's xkbcommon default (which would want libxkbcommon-devel, present here only because gtk3-devel and qt6-qtbase-devel pull it in), links ttfx as a crate rather than shelling out to it, and bundles JetBrains Mono so no system font has to be readable. Its CI asserts the binary links nothing but libc/libm/libgcc, so that stays true"
+why  = "The screensaver (user decision 2026-08-17). Replaces a foot window running bin/screensaver: no terminal, no pty resize wait, no animator child process, no window-rule — one wlr-layer-shell overlay per output, damaging only the cells that changed. Written from scratch rather than carried as a patch series on someone else's launcher, which is what it was until 2026-08-17: the rebase tax was buying nothing, because every interesting part here (the quote layout, the two-buffer scheme niri's release timing forces, damage reported against the screen rather than the buffer, a hold that costs zero scheduler ticks) had already diverged from anything upstream did. Two buffers at 3414x2134 is 57 MiB of the 73 MiB it holds resident; smoke and beams cost another ~150-200 MB of engine state at this canvas size and `exclude-effects` is the lever if that ever matters"
 
 [[tool]]
 name = "herdr"

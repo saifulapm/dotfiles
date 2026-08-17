@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 
 // Focused window title, omarchy-style: bare text at 0.85 opacity, elided at
 // maxWidth, animated width; middle or right click closes the window.
@@ -25,19 +26,20 @@ BarButton {
     Behavior on implicitWidth {
         NumberAnimation {
             duration: rootItem.theme.time(1.2)
-            easing.type: Easing.OutCubic
+            easing.type: rootItem.theme.motion.easing
         }
     }
 
-    Text {
+    StyledText {
         id: label
+        theme: rootItem.theme
+        role: StyledText.BodyLarge
+        mono: true
         anchors.verticalCenter: parent.verticalCenter
         width: Math.min(implicitWidth, rootItem.maxWidth)
         elide: Text.ElideRight
         opacity: 0.85
         color: rootItem.contentColor
-        font.family: rootItem.theme.fontMono
-        font.pixelSize: rootItem.theme.fontPx(1.0)
         renderType: Text.NativeRendering
         text: rootItem.niri.focusedTitle
     }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # crash-capture-toggle — turn the crash notifier on or off.
 #
-# Port of omarchy's bin/omarchy-toggle-crash-capture (CREDITS.md), on our state
+# Port of omarchy's bin/omarchy-toggle-crash-capture, on our state
 # dir rather than their omarchy-toggle helper.
 #
 # The flag is a STOP file: absent means enabled, so a fresh machine gets crash

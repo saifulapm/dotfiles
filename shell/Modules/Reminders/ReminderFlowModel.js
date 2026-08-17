@@ -1,5 +1,5 @@
-// Near-verbatim port of omarchy's plugins/reminders/ReminderFlowModel.js
-// (CREDITS.md): the whole of their capture-flow validation. Minutes are a
+// Near-verbatim port of omarchy's plugins/reminders/ReminderFlowModel.js:
+// the whole of their capture-flow validation. Minutes are a
 // positive integer and nothing else — their CLI parses no richer time input,
 // so neither does ours — and the argument list handed to the CLI carries the
 // message only when one was typed, so an empty message falls through to the

@@ -3,7 +3,7 @@
 # terminal-multiplexing job; herdr is for driving a pack of coding agents,
 # which is the thing tmux has no vocabulary for.
 #
-# Port of omarchy config/herdr/config.toml (CREDITS.md), including the
+# Port of omarchy config/herdr/config.toml, including the
 # ba7925a/f511cf8 follow-ups. Their comments describe THEIR tmux.conf, which
 # binds more than ours does — where ours never rebound a tmux default the two
 # agree anyway. The one place they genuinely diverge is pane focus: our

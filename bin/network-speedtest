@@ -1,7 +1,7 @@
 #!/bin/bash
 # network-speedtest — measure live throughput for one direction.
 #
-# Direct port of omarchy's bin/omarchy-network-speedtest (MIT, see CREDITS.md).
+# Direct port of omarchy's bin/omarchy-network-speedtest (MIT).
 # Saturates the link with parallel curl workers against fast.com's Netflix OCA
 # endpoints and prints one Mbit/s reading per second, computed from the
 # interface counters, until it is killed. The panel runs it for five seconds

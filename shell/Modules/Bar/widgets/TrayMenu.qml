@@ -2,10 +2,11 @@ import QtQuick
 import QtQuick.Controls
 import Quickshell
 import "../components"
+import "../../../components"
 
 // A tray item's own menu, drawn by us.
 //
-// Port of omarchy's tray menu popup (5b2c02d, CREDITS.md). We had no popup at
+// Port of omarchy's tray menu popup (5b2c02d). We had no popup at
 // all: Tray.qml called SystemTrayItem.display(), which builds a
 // PlatformMenuEntry, and quickshell refuses that unless the root QML sets
 // `//@ pragma UseQApplication` (src/core/platformmenu.cpp) — shell.qml does
@@ -143,10 +144,13 @@ BarPanel {
         width: parent.width
         height: visible ? panel.rowHeight : 0
 
-        Rectangle {
+        CursorSurface {
             anchors.fill: parent
-            radius: panel.theme.radius(0.75)
-            color: backMouse.containsMouse ? panel.theme.alpha(panel.theme.accent, 0.18) : "transparent"
+            theme: panel.theme
+            // A menu row highlights under the pointer only; there is no
+            // separate keyboard cursor here to outline.
+            bordered: false
+            current: backMouse.containsMouse
         }
 
         Text {
@@ -161,16 +165,15 @@ BarPanel {
             font.pixelSize: panel.theme.fontPx(0.917)
         }
 
-        Text {
+        StyledText {
+            theme: panel.theme
+
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: backGlyph.right
             anchors.leftMargin: panel.theme.space(1.5)
             anchors.right: parent.right
             anchors.rightMargin: panel.theme.space(2)
             text: panel.currentTitle
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.917)
             elide: Text.ElideRight
         }
 
@@ -198,16 +201,16 @@ BarPanel {
         color: panel.theme.alpha(panel.theme.textPrimary, 0.2)
     }
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        muted: true
+
         // currentChildren is an ObjectModel, not a JS array: it counts through
         // `values`, and `.length` on the model itself is undefined — which
         // would leave this row permanently invisible rather than erroring.
         visible: panel.trayItem !== null && panel.currentChildren && panel.currentChildren.values ? panel.currentChildren.values.length === 0 : false
         width: parent.width
         text: "This icon reports no menu."
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.917)
         font.italic: true
     }
 
@@ -269,11 +272,12 @@ BarPanel {
                         color: panel.theme.alpha(panel.theme.textPrimary, 0.2)
                     }
 
-                    Rectangle {
+                    CursorSurface {
                         visible: !menuRow.modelData.isSeparator
                         anchors.fill: parent
-                        radius: panel.theme.radius(0.75)
-                        color: rowMouse.containsMouse && menuRow.modelData.enabled ? panel.theme.alpha(panel.theme.accent, 0.18) : "transparent"
+                        theme: panel.theme
+                        bordered: false
+                        current: rowMouse.containsMouse && menuRow.modelData.enabled
                     }
 
                     Text {
@@ -307,7 +311,9 @@ BarPanel {
                         source: menuRow.modelData.icon
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+
                         visible: !menuRow.modelData.isSeparator
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.left: parent.left
@@ -315,9 +321,6 @@ BarPanel {
                         anchors.right: submenuGlyph.left
                         anchors.rightMargin: panel.theme.space(2)
                         text: menuRow.rowText
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.917)
                         elide: Text.ElideRight
                     }
 

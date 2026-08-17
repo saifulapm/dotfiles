@@ -5,7 +5,7 @@ import Quickshell.Wayland
 import "NotificationLogic.js" as Logic
 
 // Toast stack, top-right, one window per output. Ported from the popup half
-// of omarchy's notifications Service.qml (CREDITS.md): a full-screen overlay
+// of omarchy's notifications Service.qml: a full-screen overlay
 // surface per screen whose size never changes (adding or removing a toast
 // only changes the content inside, so the compositor can never scale a stale
 // buffer), click-through everywhere except over the toast column, and a slot

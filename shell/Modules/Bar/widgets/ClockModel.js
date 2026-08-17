@@ -1,7 +1,7 @@
 .pragma library
 
 // Pure date and format math for the clock widget and its calendar panel.
-// Ported near-verbatim from omarchy's clock plugin Model.js (CREDITS.md,
+// Ported near-verbatim from omarchy's clock plugin Model.js (
 // direct copies). Locale- and Qt-free; the QML owns month/weekday naming
 // through Qt.locale().
 

@@ -1,5 +1,5 @@
 # SSH port forwarding: fip starts, dip stops, lip lists (omarchy
-# default/bash/fns/ssh-port-forwarding, CREDITS.md).
+# default/bash/fns/ssh-port-forwarding).
 function fip --description 'Forward local ports over ssh'
     if test (count $argv) -lt 2
         echo "Usage: fip <host> <port1> [port2] ..."

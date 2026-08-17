@@ -10,7 +10,7 @@ import "MenuTree.js" as MenuTree
 
 // Command menu: one hierarchical tree of everything the desktop can do,
 // centered over a scrim in the launcher's visual language. Framework ported
-// from omarchy's menu plugin (CREDITS.md) — submenus by dotted id, type to
+// from omarchy's menu plugin — submenus by dotted id, type to
 // filter the WHOLE tree by label/id/aliases with their ranking, `when` guards
 // batched into a single bash run, ✓ on checked rows. The tree itself is ours,
 // in MenuTree.js.
@@ -843,7 +843,10 @@ Scope {
                     width: parent.width
                     height: menuRoot.headerHeight
 
-                    Text {
+                    StyledText {
+                        theme: menuRoot.theme
+                        role: StyledText.TitleLarge
+
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
@@ -858,10 +861,7 @@ Scope {
                             const entry = menuRoot.entryFor(menuRoot.activeMenu);
                             return (entry ? entry.title || entry.label : "Go") + "…";
                         }
-                        color: menuRoot.theme.textPrimary
                         opacity: menuRoot.filterText ? 1 : 0.58
-                        font.family: menuRoot.theme.fontUi
-                        font.pixelSize: menuRoot.theme.fontPx(1.167)
                         font.weight: Font.DemiBold
                     }
                 }
@@ -897,7 +897,7 @@ Scope {
                             }
                         }
 
-                        delegate: Rectangle {
+                        delegate: CursorSurface {
                             id: row
 
                             required property int index
@@ -907,14 +907,16 @@ Scope {
                             required property string label
                             required property string detail
 
-                            readonly property bool hasCursor: row.index === menuRoot.selectedIndex
                             readonly property bool isSubmenu: row.kind === "menu" || row.kind === "link"
                             readonly property bool isApp: row.kind === "app"
 
+                            theme: menuRoot.theme
                             width: list.width
                             height: menuRoot.rowHeight
-                            radius: menuRoot.theme.radius(0.75)
-                            color: row.hasCursor ? menuRoot.theme.alpha(menuRoot.theme.accent, 0.18) : "transparent"
+                            // Hovering moves the selection, so the cursor and
+                            // the choice are one state and the fill says it.
+                            bordered: false
+                            current: row.index === menuRoot.selectedIndex
 
                             MouseArea {
                                 anchors.fill: parent
@@ -962,50 +964,51 @@ Scope {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: menuRoot.theme.space(0.5)
 
-                                Text {
+                                StyledText {
+                                    theme: menuRoot.theme
+                                    role: StyledText.BodyLarge
+
                                     width: parent.width
                                     elide: Text.ElideRight
                                     text: row.label
-                                    color: menuRoot.theme.textPrimary
-                                    font.family: menuRoot.theme.fontUi
-                                    font.pixelSize: menuRoot.theme.fontPx(1.0)
                                 }
 
                                 // While filtering, the second line says
                                 // where the row actually lives.
-                                Text {
+                                StyledText {
+                                    theme: menuRoot.theme
+                                    role: StyledText.Small
+                                    muted: true
+
                                     width: parent.width
                                     elide: Text.ElideRight
                                     visible: menuRoot.filterText !== "" && row.detail !== ""
                                     text: row.detail
-                                    color: menuRoot.theme.textMuted
-                                    font.family: menuRoot.theme.fontUi
-                                    font.pixelSize: menuRoot.theme.fontPx(0.833)
                                 }
                             }
 
-                            Text {
+                            StyledText {
                                 id: chevron
+                                theme: menuRoot.theme
+                                role: StyledText.Heading
                                 anchors.right: parent.right
                                 anchors.rightMargin: menuRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: row.isSubmenu ? "›" : ""
                                 opacity: 0.45
-                                color: menuRoot.theme.textPrimary
-                                font.family: menuRoot.theme.fontUi
-                                font.pixelSize: menuRoot.theme.fontPx(1.333)
                             }
                         }
                     }
 
-                    Text {
+                    StyledText {
+                        theme: menuRoot.theme
+                        role: StyledText.BodyLarge
+                        muted: true
+
                         anchors.centerIn: parent
                         visible: displayModel.count === 0
                         horizontalAlignment: Text.AlignHCenter
                         text: menuRoot.filterText ? "No matches for “" + menuRoot.filterText + "”" : "Nothing here yet"
-                        color: menuRoot.theme.textMuted
-                        font.family: menuRoot.theme.fontUi
-                        font.pixelSize: menuRoot.theme.fontPx(1.0)
                     }
                 }
             }

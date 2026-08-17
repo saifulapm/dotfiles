@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "AiModel.js" as Model
 
 // Model-usage panel — port of omarchy's model-usage Panel.qml in our tokens:
@@ -145,7 +146,7 @@ BarPanel {
         Repeater {
             model: panel.usage.providers
 
-            Rectangle {
+            ChipSurface {
                 id: providerTab
 
                 required property var modelData
@@ -153,20 +154,19 @@ BarPanel {
 
                 readonly property bool selected: index === panel.usage.providerIndex
 
+                theme: panel.theme
                 width: providerSwitch.cellWidth
                 implicitHeight: tabLabel.implicitHeight + panel.theme.space(3)
-                radius: panel.theme.radius(0.75)
-                color: selected ? panel.theme.alpha(panel.theme.accent, 0.25) : (tabHover.hovered ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2)
-                border.width: panel.theme.borderWidth
-                border.color: selected ? panel.theme.accent : panel.theme.surface3
+                chosen: providerTab.selected
+                pointerOver: tabHover.hovered
 
-                Text {
+                StyledText {
                     id: tabLabel
+                    theme: panel.theme
+                    role: StyledText.Small
                     anchors.centerIn: parent
                     text: providerTab.modelData.providerName
                     color: providerTab.selected ? panel.theme.accent : panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.833)
                 }
 
                 HoverHandler {
@@ -191,17 +191,17 @@ BarPanel {
         border.width: panel.theme.borderWidth
         border.color: panel.theme.alpha(panel.theme.warn, 0.35)
 
-        Text {
+        StyledText {
             id: statusText
+            theme: panel.theme
+            role: StyledText.Small
+            muted: true
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: panel.theme.space(2.5)
             anchors.rightMargin: panel.theme.space(2.5)
             text: panel.provider ? String(panel.provider.authHelpText || "") : ""
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
             wrapMode: Text.WordWrap
         }
     }
@@ -245,8 +245,9 @@ BarPanel {
                         anchors.left: parent.left
                         spacing: panel.theme.space(1.5)
 
-                        Text {
+                        StyledText {
                             id: limitTitle
+                            theme: panel.theme
                             // A model-scoped window is titled after its model,
                             // and those names run long enough to reach the
                             // percentage, so the title gives way first. The
@@ -256,29 +257,27 @@ BarPanel {
                             width: Math.max(0, Math.min(implicitWidth, available))
                             elide: Text.ElideRight
                             text: limitRow.modelData.title
-                            color: panel.theme.textPrimary
-                            font.family: panel.theme.fontUi
-                            font.pixelSize: panel.theme.fontPx(0.917)
                         }
 
-                        Text {
+                        StyledText {
                             id: limitSubtitle
+                            theme: panel.theme
+                            role: StyledText.Caption
+                            muted: true
                             anchors.baseline: limitTitle.baseline
                             visible: text !== ""
                             text: limitRow.modelData.subtitle
-                            color: panel.theme.textMuted
-                            font.family: panel.theme.fontUi
-                            font.pixelSize: panel.theme.fontPx(0.75)
                         }
                     }
 
-                    Text {
+                    StyledText {
                         id: limitValue
+                        theme: panel.theme
+                        role: StyledText.Small
+                        mono: true
                         anchors.right: parent.right
                         text: Math.round(limitRow.modelData.percent * 100) + "%"
                         color: limitRow.alarming ? panel.theme.error : panel.theme.textPrimary
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.833)
                     }
                 }
 
@@ -305,20 +304,21 @@ BarPanel {
                         Behavior on width {
                             NumberAnimation {
                                 duration: panel.theme.time(1)
-                                easing.type: Easing.OutCubic
+                                easing.type: panel.theme.motion.easing
                             }
                         }
                     }
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    muted: true
+
                     text: {
                         const remaining = Model.resetMsFor(limitRow.modelData, panel.nowMs);
                         return remaining > 0 ? "Resets in " + Model.formatDuration(remaining) : "";
                     }
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.75)
                 }
             }
         }
@@ -329,12 +329,12 @@ BarPanel {
     }
 
     // --------------------------------------------------------------- today
-    Text {
+    StyledText {
+        theme: panel.theme
+        muted: true
+
         visible: !!panel.provider && !panel.provider.ready
         text: "Scanning sessions…"
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.917)
     }
 
     Row {
@@ -363,18 +363,20 @@ BarPanel {
 
                 required property var modelData
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Heading
+                    mono: true
+
                     text: todayStat.modelData.value
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(1.333)
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Small
+                    muted: true
+
                     text: todayStat.modelData.label
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.833)
                 }
             }
         }
@@ -407,15 +409,15 @@ BarPanel {
                 width: parent.width
                 height: dayLabel.implicitHeight + panel.theme.space(1)
 
-                Text {
+                StyledText {
                     id: dayLabel
+                    theme: panel.theme
+                    role: StyledText.Caption
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     width: panel.theme.space(11)
                     text: dayRow.isToday ? "Today" : Model.dayName(dayRow.modelData.date)
                     color: dayRow.isToday ? panel.theme.textPrimary : panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     font.weight: dayRow.isToday ? Font.DemiBold : Font.Normal
                 }
 
@@ -441,22 +443,23 @@ BarPanel {
                         Behavior on width {
                             NumberAnimation {
                                 duration: panel.theme.time(1)
-                                easing.type: Easing.OutCubic
+                                easing.type: panel.theme.motion.easing
                             }
                         }
                     }
                 }
 
-                Text {
+                StyledText {
                     id: dayValue
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: panel.theme.space(12)
                     horizontalAlignment: Text.AlignRight
                     text: panel.fmt(Number(dayRow.modelData.messageCount || 0))
                     color: dayRow.isToday ? panel.theme.textPrimary : panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
                 }
             }
         }
@@ -504,41 +507,45 @@ BarPanel {
                     Behavior on width {
                         NumberAnimation {
                             duration: panel.theme.time(1)
-                            easing.type: Easing.OutCubic
+                            easing.type: panel.theme.motion.easing
                         }
                     }
                 }
 
-                Text {
+                StyledText {
                     id: modelName
+                    theme: panel.theme
+                    role: StyledText.Small
                     anchors.left: parent.left
                     anchors.leftMargin: panel.theme.space(2)
                     anchors.right: modelTokens.left
                     anchors.rightMargin: panel.theme.space(2)
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelRow.modelData.name
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.833)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
                     id: modelTokens
+                    theme: panel.theme
+                    role: StyledText.Small
+                    mono: true
+                    muted: true
                     anchors.right: parent.right
                     anchors.rightMargin: panel.theme.space(2)
                     anchors.verticalCenter: parent.verticalCenter
                     text: panel.fmt(modelRow.modelData.total)
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.833)
                 }
             }
         }
     }
 
     // Only speaks up when the numbers cover more than this machine.
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Caption
+        muted: true
+
         readonly property string footer: {
             const sync = panel.usage.sync;
             if (sync && String(sync.statusText || "") !== "")
@@ -552,9 +559,6 @@ BarPanel {
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
         text: footer
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.75)
         elide: Text.ElideRight
     }
 }

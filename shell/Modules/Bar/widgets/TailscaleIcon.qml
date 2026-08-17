@@ -1,6 +1,6 @@
 import QtQuick
 
-// The Tailscale mark, ported from omarchy's TailscaleIcon.qml (CREDITS.md):
+// The Tailscale mark, ported from omarchy's TailscaleIcon.qml:
 // the official silhouette drawn as a 3×3 grid of dots with the six inactive
 // ones faded to 0.24, rather than typeset or loaded from an SVG. Drawn, so it
 // needs no brand glyph in the icon font (the FontAwesome, Devicons and Codicon

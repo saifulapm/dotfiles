@@ -1,7 +1,7 @@
 import QtQuick
 import "../components"
 
-// Do-not-disturb indicator, ported from omarchy's Dnd indicator (CREDITS.md):
+// Do-not-disturb indicator, ported from omarchy's Dnd indicator:
 // the bell-off glyph with their two tooltip strings, active while
 // notifications are silenced, click toggles either way.
 BarIndicator {

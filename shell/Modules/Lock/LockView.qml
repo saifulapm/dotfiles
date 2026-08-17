@@ -5,7 +5,7 @@ import Quickshell.Widgets
 import "../../components"
 
 // The lock screen's face, split out of the service exactly as omarchy splits
-// theirs (CREDITS.md): the session-lock surface and the preview overlay both
+// theirs: the session-lock surface and the preview overlay both
 // mount this, so what a preview shows is what a lock shows.
 //
 // Their design, our tokens: a blurred copy of the current wallpaper under one
@@ -201,11 +201,12 @@ Item {
                 text: Qt.formatDateTime(lockClock.date, "HH:mm")
             }
 
-            Text {
+            StyledText {
+                theme: root.theme
+                role: StyledText.Title
+
                 anchors.horizontalCenter: parent.horizontalCenter
                 color: root.placeholderColor
-                font.family: root.theme.fontUi
-                font.pixelSize: root.theme.fontPx(1.1)
                 text: Qt.formatDateTime(lockClock.date, "dddd, d MMMM")
             }
         }

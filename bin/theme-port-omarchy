@@ -2,8 +2,8 @@
 // theme-port-omarchy [--force] [--all | <name>...]
 // theme-port-omarchy --sections [--all | <name>...]
 //
-// Converts omarchy themes (~/ref/omarchy/themes/<name>/colors.toml, MIT —
-// CREDITS.md) into our token schema at themes/<name>.toml. Existing files
+// Converts omarchy themes (~/ref/omarchy/themes/<name>/colors.toml, MIT)
+// into our token schema at themes/<name>.toml. Existing files
 // are skipped unless --force: hand-tuned themes must win over generated
 // ports (omarchy's "first writer wins" rule).
 //
@@ -128,7 +128,7 @@ function port(name) {
 
   const lines = []
   const kv = (k, v) => lines.push(`${k} = "${v}"`)
-  lines.push(`# ${titleCase(name)} — ported from omarchy (MIT, see CREDITS.md).`)
+  lines.push(`# ${titleCase(name)} — ported from omarchy (MIT).`)
   lines.push(`# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.`)
   lines.push("")
   lines.push("[meta]")

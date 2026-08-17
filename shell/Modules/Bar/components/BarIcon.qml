@@ -1,4 +1,5 @@
 import QtQuick
+import "../../../components"
 
 // Omarchy's BarIconButton geometry: a fixed 27 px click slot with a 13 px
 // glyph optically centered on a 16 px canvas. `status` variant narrows to

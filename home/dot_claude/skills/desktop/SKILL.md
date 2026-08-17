@@ -266,8 +266,9 @@ into a reply that doesn't need it.
 
 **Cheapest first still applies.** `curl -s` answers most "is it up / what
 does this endpoint return" questions with no browser at all. Local
-projects serve at `https://<dir>.test` for `~/Sites/<dir>/public`
-(caddy + dnsmasq + local CA).
+projects serve at `https://<dir>.test` for `~/Sites/laravel/<dir>/public`
+(caddy + dnsmasq + local CA) — only that subdirectory; anything elsewhere
+under `~/Sites` needs its own `~/.config/caddy/sites/<name>.caddy`.
 
 Webapp wrappers (`webapp-launch chatgpt|discord|whatsapp|x|youtube|zoom`)
 are chromium app windows — drive them as GUI windows (app_id

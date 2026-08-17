@@ -1,5 +1,5 @@
 # Tmux dev layout: editor pane + AI column + bottom terminal (omarchy
-# default/bash/fns/tmux, CREDITS.md; their stray $opencode_pane select
+# default/bash/fns/tmux; their stray $opencode_pane select
 # fixed — focus lands on the editor).
 function tdl --description 'Tmux dev layout: editor / ai / terminal'
     if test (count $argv) -eq 0

@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
-import "../components"
+import "../../../components"
 
 // Centered speed-test overlay — port of omarchy's SpeedTestPanel.qml: no card,
 // two dials floating on a darkened scrim, with open 270° arcs, a faint tick
@@ -172,13 +172,15 @@ PanelWindow {
                 anchors.fill: parent
                 spacing: root.theme.space(4)
 
-                Text {
+                StyledText {
+                    theme: root.theme
+                    role: StyledText.Small
+                    mono: true
+
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.caption !== ""
                     text: root.caption.toUpperCase()
                     color: root.onScrimDim
-                    font.family: root.theme.fontMono
-                    font.pixelSize: root.theme.fontPx(0.833)
                     font.weight: Font.DemiBold
                     font.letterSpacing: 2
                 }
@@ -220,13 +222,13 @@ PanelWindow {
                     }
                 }
 
-                Text {
+                StyledText {
+                    theme: root.theme
+
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.failed
                     text: root.error
                     color: root.onScrimUrgent
-                    font.family: root.theme.fontUi
-                    font.pixelSize: root.theme.fontPx(0.917)
                     wrapMode: Text.Wrap
                     width: Math.min(implicitWidth, root.theme.space(100))
                     horizontalAlignment: Text.AlignHCenter
@@ -444,24 +446,27 @@ PanelWindow {
                 font.weight: Font.DemiBold
             }
 
-            Text {
+            StyledText {
+                theme: root.theme
+                role: StyledText.Small
+
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: root.unit
                 color: root.onScrimDim
-                font.family: root.theme.fontUi
-                font.pixelSize: root.theme.fontPx(0.833)
             }
         }
 
         // The 90° gap at the bottom of the scale is where a cluster prints its
         // unit; here it names the direction.
-        Text {
+        StyledText {
+            theme: root.theme
+            role: StyledText.Small
+            mono: true
+
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             text: dial.label
             color: root.onScrimDim
-            font.family: root.theme.fontMono
-            font.pixelSize: root.theme.fontPx(0.833)
             font.weight: Font.DemiBold
             font.letterSpacing: 1.5
         }

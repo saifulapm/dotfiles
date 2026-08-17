@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # system-stats — one snapshot of the machine's live vitals, as key<TAB>value
-# lines. Port of omarchy's `omarchy-system-stats` (CREDITS.md), extended with
+# lines. Port of omarchy's `omarchy-system-stats`, extended with
 # the battery facts UPower does not expose and the availability of
 # power-profiles-daemon, so the power panel needs exactly one process per
 # sample.

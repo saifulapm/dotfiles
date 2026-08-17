@@ -4,7 +4,7 @@ import Quickshell.Services.SystemTray
 import "../components"
 import "TrayModel.js" as TrayModel
 
-// StatusNotifier tray, ported from omarchy's tray widget (CREDITS.md).
+// StatusNotifier tray, ported from omarchy's tray widget.
 //
 // Items fall into three buckets: pinned ones always sit on the bar, hidden
 // ones never show, everything else lives in a drawer that stays collapsed
@@ -67,8 +67,8 @@ Item {
 
     Behavior on revealProgress {
         NumberAnimation {
-            duration: 600
-            easing.type: Easing.OutCubic
+            duration: rootItem.theme.time(4)
+            easing.type: rootItem.theme.motion.easing
         }
     }
 

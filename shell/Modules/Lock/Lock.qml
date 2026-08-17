@@ -7,7 +7,7 @@ import Quickshell.Services.Pam
 // Session lock: ext-session-lock-v1 via WlSessionLock, PAM auth via our own
 // pam.d/qshell-lock config (auth include system-auth) — no /etc writes.
 //
-// The state machine is omarchy's lock service (CREDITS.md): the requested /
+// The state machine is omarchy's lock service: the requested /
 // pending / secure split, the screen-stabilize queue, the failed-attempt
 // counter, the fingerprint flow beside the password one, the idle blank timer
 // with its suspend-gap guard, and the preview overlay. The face it drives is

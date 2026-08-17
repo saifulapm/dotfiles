@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # herdr-restart — reload a running herdr server's config (omarchy's
-# omarchy-restart-herdr, CREDITS.md).
+# omarchy-restart-herdr).
 #
 # The config is a chezmoi symlink into ~/.dotfiles, so an edit is live on disk
 # immediately but the server keeps the copy it parsed at startup. This is the

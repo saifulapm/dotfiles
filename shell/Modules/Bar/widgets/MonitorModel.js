@@ -1,6 +1,6 @@
 // Display panel model. The scale math and the brightness mood ladder are a
-// near-verbatim port of omarchy's plugins/panels/monitor/Model.js
-// (CREDITS.md); their `parseDisplays` is replaced by `parseState`, which
+// near-verbatim port of omarchy's plugins/panels/monitor/Model.js;
+// their `parseDisplays` is replaced by `parseState`, which
 // reads niri's output JSON instead of hyprctl's.
 
 function clampBrightness(value) {

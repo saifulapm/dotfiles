@@ -4,8 +4,8 @@
 #   crash-diagnose <pid> [comm] [exe] [signal]
 #
 # Clicked from a "Process crashed:" notification, or run by hand against any
-# PID in `coredumpctl list`. Port of omarchy's bin/omarchy-agent-crash
-# (CREDITS.md): the method lives in the diagnose-crash skill so it is edited in
+# PID in `coredumpctl list`. Port of omarchy's bin/omarchy-agent-crash:
+# the method lives in the diagnose-crash skill so it is edited in
 # one place, and this only gathers the facts and points at it.
 #
 # Deliberately NOT a revival of bin/launch-agent, which was removed in aa550d9

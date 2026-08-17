@@ -14,10 +14,15 @@ BarIcon {
     glyphScale: Quickshell.screens.length > 1 ? 1 : 1.1
     tooltipText: Quickshell.screens.length + " display" + (Quickshell.screens.length === 1 ? "" : "s")
 
+    // The shell's AutoBrightness service, handed on to the panel so its
+    // BRIGHTNESS section can carry the auto row.
+    property var autoBrightness: null
+
     function openPanel() {
         if (panelLoader.status === Loader.Null)
             panelLoader.setSource("MonitorPanel.qml", {
-                theme: rootItem.theme
+                theme: rootItem.theme,
+                autoBrightness: rootItem.autoBrightness
             });
         panelLoader.item.anchorItem = rootItem;
         panelLoader.item.toggle();

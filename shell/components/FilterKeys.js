@@ -1,6 +1,6 @@
 // The parts of type-to-filter key handling that were byte-identical across
 // the six filterable surfaces (ui-audit 2026-08-06, A14; upstream shape:
-// omarchy's Util.editsFilter, CREDITS.md). Only the shared COMPUTATIONS live
+// omarchy's Util.editsFilter). Only the shared COMPUTATIONS live
 // here — when a key edits the query versus navigates stays at each call
 // site, because those differences are invariants, not drift: Menu's
 // empty-filter Backspace goes back a menu, FilePicker's goes up a directory,

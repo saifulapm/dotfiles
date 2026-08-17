@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "TailscaleModel.js" as Model
 
 // Tailscale panel — full port of omarchy's tailscale plugin Panel.qml in our
@@ -667,13 +668,14 @@ BarPanel {
             }
 
             // -------------------------------------------------- action/error
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Small
+
                 visible: panel.tailscale.actionStatus !== "" || panel.tailscale.lastError !== ""
                 width: parent.width
                 text: panel.tailscale.actionStatus !== "" ? panel.tailscale.actionStatus : panel.tailscale.lastError
                 color: panel.tailscale.lastError !== "" && panel.tailscale.actionStatus === "" ? panel.theme.error : panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.833)
                 wrapMode: Text.WordWrap
             }
 
@@ -688,17 +690,16 @@ BarPanel {
                 radius: panel.theme.radius(0.75)
                 color: panel.theme.surface2
 
-                Text {
+                StyledText {
                     id: missingText
+                    theme: panel.theme
+                    muted: true
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.leftMargin: panel.theme.space(3)
                     anchors.rightMargin: panel.theme.space(3)
                     text: "Tailscale CLI is not installed or not on PATH."
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     wrapMode: Text.WordWrap
                 }
             }
@@ -871,13 +872,14 @@ BarPanel {
                             onCancelled: panel.closeMullvadPicker()
                         }
 
-                        Text {
+                        StyledText {
+                            theme: panel.theme
+                            role: StyledText.Small
+                            muted: true
+
                             visible: panel.filteredMullvadRegions.length === 0
                             width: parent.width
                             text: "No Mullvad regions found."
-                            color: panel.theme.textMuted
-                            font.family: panel.theme.fontUi
-                            font.pixelSize: panel.theme.fontPx(0.833)
                             horizontalAlignment: Text.AlignHCenter
                         }
 
@@ -920,13 +922,13 @@ BarPanel {
                     label: "MACHINES"
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    muted: true
+
                     visible: panel.tailscale.peers.length === 0
                     width: parent.width
                     text: "No machines found on this tailnet."
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     horizontalAlignment: Text.AlignHCenter
                 }
 
@@ -999,22 +1001,24 @@ BarPanel {
             anchors.rightMargin: panel.theme.space(3)
             spacing: panel.theme.space(1)
 
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Small
+                muted: true
+
                 width: parent.width
                 text: noticeRow.text
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.833)
                 wrapMode: Text.WordWrap
             }
 
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Small
+                mono: true
+
                 width: parent.width
                 visible: noticeRow.command !== ""
                 text: noticeRow.command
-                color: panel.theme.textPrimary
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.833)
                 elide: Text.ElideRight
             }
         }
@@ -1068,21 +1072,21 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.25)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+
                     width: parent.width
                     text: "Authorize Tailscale operator"
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    muted: true
+
                     width: parent.width
                     text: "Allow this user to operate this Tailscale profile"
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
             }
@@ -1155,17 +1159,15 @@ BarPanel {
                 }
             }
 
-            Text {
+            StyledText {
                 id: accountLabel
+                theme: panel.theme
 
                 anchors.left: accountGlyph.right
                 anchors.leftMargin: panel.theme.space(2)
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 text: accountRow.accountText
-                color: panel.theme.textPrimary
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
                 font.weight: accountRow.selectedAccount ? Font.DemiBold : Font.Normal
                 elide: Text.ElideRight
             }
@@ -1234,17 +1236,15 @@ BarPanel {
                     rotation = 0
             }
 
-            Text {
+            StyledText {
                 id: exitNodeLabel
+                theme: panel.theme
 
                 anchors.left: exitNodeGlyph.right
                 anchors.leftMargin: panel.theme.space(2)
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 text: exitNodeRow.peerName
-                color: panel.theme.textPrimary
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
                 font.weight: exitNodeRow.activeExitNode ? Font.DemiBold : Font.Normal
                 elide: Text.ElideRight
             }
@@ -1315,23 +1315,23 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.25)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+
                     width: parent.width
                     text: regionRow.regionName
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     font.weight: regionRow.activeExitNode ? Font.DemiBold : Font.Normal
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    muted: true
+
                     width: parent.width
                     visible: text !== ""
                     text: regionRow.regionDetail
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
             }
@@ -1430,16 +1430,19 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.25)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+
                     width: parent.width
                     text: peerRow.peerName
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    muted: true
+
                     width: parent.width
                     text: {
                         const parts = [];
@@ -1449,9 +1452,6 @@ BarPanel {
                             parts.push(peerRow.peerDns);
                         return parts.join(" · ");
                     }
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
             }
@@ -1508,16 +1508,17 @@ BarPanel {
             onClicked: copyChoice.chosen()
         }
 
-        Text {
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Small
+            mono: true
+
             anchors.left: parent.left
             anchors.right: choiceGlyph.left
             anchors.leftMargin: panel.theme.space(2.5)
             anchors.rightMargin: panel.theme.space(2)
             anchors.verticalCenter: parent.verticalCenter
             text: copyChoice.label
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.833)
             elide: Text.ElideRight
         }
 

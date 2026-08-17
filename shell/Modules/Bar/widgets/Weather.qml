@@ -1,7 +1,8 @@
 import QtQuick
 import "../components"
+import "../../../components"
 
-// Weather — port of omarchy's weather plugin bar button (CREDITS.md). The
+// Weather — port of omarchy's weather plugin bar button. The
 // bar slot carries the condition glyph and the temperature; the panel is the
 // detail view; everything they read lives in WeatherService, ONE instance at
 // the bar root shared by every screen's copy of this widget (S2).
@@ -41,15 +42,16 @@ BarButton {
         colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
     }
 
-    Text {
+    StyledText {
+        theme: rootItem.theme
+        mono: true
+
         anchors.verticalCenter: parent.verticalCenter
         // Their weather bar widget is glyph-only; ours adds the temperature,
         // which is the part that has no room on a vertical bar.
         visible: !rootItem.vertical && rootItem.weather.reportTempNum !== ""
         text: rootItem.weather.reportTempNum + "°"
         color: rootItem.contentColor
-        font.family: rootItem.theme.fontMono
-        font.pixelSize: rootItem.theme.fontPx(0.917)
         renderType: Text.NativeRendering
     }
 

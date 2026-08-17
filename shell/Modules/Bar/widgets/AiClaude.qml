@@ -4,7 +4,7 @@ import Quickshell.Io
 import "AiModel.js" as Model
 
 // Claude Code provider — port of omarchy's
-// plugins/model-usage/providers/Claude.qml (CREDITS.md), publishing the same
+// plugins/model-usage/providers/Claude.qml, publishing the same
 // property contract their panel reads.
 //
 // Limits are Anthropic's own numbers from the OAuth usage endpoint, using the

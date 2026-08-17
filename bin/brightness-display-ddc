@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # brightness-display-ddc — read or set DDC/CI brightness (VCP feature 10) for
-# one connector. Port of omarchy-brightness-display-ddc (CREDITS.md), monitor
+# one connector. Port of omarchy-brightness-display-ddc, monitor
 # names swapped from Hyprland's to niri's — both are DRM connector names
 # (HDMI-A-1, DP-2, …), which is exactly what ddcutil's detect output carries.
 #

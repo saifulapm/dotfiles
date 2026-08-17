@@ -1,7 +1,6 @@
 import QtQuick
-import "../components"
 
-// Indicator container, ported from omarchy's Indicators widget (CREDITS.md).
+// Indicator container, ported from omarchy's Indicators widget.
 //
 // Two blocks sit side by side. The ACTIVE block is always visible and holds
 // only the indicators that are currently on; the INACTIVE block holds all the
@@ -228,7 +227,7 @@ Item {
                 Behavior on width {
                     NumberAnimation {
                         duration: root.theme.time(1.2)
-                        easing.type: Easing.OutCubic
+                        easing.type: root.theme.motion.easing
                     }
                 }
 
@@ -288,7 +287,7 @@ Item {
                 Behavior on height {
                     NumberAnimation {
                         duration: root.theme.time(1.2)
-                        easing.type: Easing.OutCubic
+                        easing.type: root.theme.motion.easing
                     }
                 }
 

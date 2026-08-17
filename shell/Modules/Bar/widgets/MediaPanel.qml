@@ -1,8 +1,9 @@
 import QtQuick
 import "../components"
+import "../../../components"
 
 // The media widget's right-click card — omarchy's media popup
-// (shell/plugins/services/media/BarWidget.qml's PopupCard, CREDITS.md) on our
+// (shell/plugins/services/media/BarWidget.qml's PopupCard) on our
 // BarPanel machinery: album art beside title/artist/album, the transport row,
 // and the SOURCES list with one row per MPRIS player where clicking a row
 // makes it the service's sticky preferred player. The art box falls back to
@@ -144,33 +145,34 @@ BarPanel {
                 width: parent.width - artBox.width - panel.theme.space(2.5)
                 spacing: panel.theme.space(0.75)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Title
+
                     width: parent.width
                     text: panel.title || "Nothing playing"
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(1.083)
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    muted: true
+
                     width: parent.width
                     visible: text !== ""
                     text: panel.artist
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+
                     width: parent.width
                     visible: text !== ""
                     text: panel.album
                     color: panel.theme.alpha(panel.theme.textMuted, 0.7)
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
             }
@@ -233,25 +235,28 @@ BarPanel {
             Repeater {
                 model: panel.sourcePlayers
 
-                Rectangle {
+                CursorSurface {
                     id: sourceRow
 
                     required property var modelData
                     required property int index
 
-                    // Guarded on the active player too (upstream's rule): a
-                    // degenerate player with no identity keys to "" and would
-                    // otherwise match an empty activeKey.
-                    readonly property bool current: panel.player !== null && modelData !== null && panel.media.playerKey(modelData) === panel.activeKey()
-                    readonly property bool hasCursor: panel.cursorActive && panel.selectedIndex === index
                     readonly property string sourceTitle: modelData ? (modelData.trackTitle || modelData.identity || modelData.desktopEntry || "Media source") : "Media source"
                     readonly property string sourceDetail: modelData && modelData.trackArtist ? modelData.trackArtist : (modelData && modelData.identity ? modelData.identity : "")
 
+                    theme: panel.theme
+                    // Guarded on the active player too (upstream's rule): a
+                    // degenerate player with no identity keys to "" and would
+                    // otherwise match an empty activeKey.
+                    current: panel.player !== null && modelData !== null && panel.media.playerKey(modelData) === panel.activeKey()
+                    hasCursor: panel.cursorActive && panel.selectedIndex === index
+
                     width: parent.width
                     implicitHeight: sourceInner.implicitHeight + panel.theme.space(2.5)
-                    radius: panel.theme.radius(0.75)
-                    color: current ? panel.theme.alpha(panel.theme.accent, 0.18) : (hasCursor ? panel.theme.alpha(panel.theme.textPrimary, 0.06) : "transparent")
-                    border.width: panel.theme.borderWidth
+                    // Richer than the shared outline: this list marks the
+                    // PLAYING source as well as the cursor, so `current`
+                    // keeps a dimmer ring of its own rather than relying on
+                    // the fill alone.
                     border.color: hasCursor ? panel.theme.alpha(panel.theme.accent, 0.6) : (current ? panel.theme.alpha(panel.theme.accent, 0.35) : "transparent")
 
                     Row {
@@ -276,23 +281,23 @@ BarPanel {
                             width: parent.width - panel.theme.space(6)
                             spacing: 0
 
-                            Text {
+                            StyledText {
+                                theme: panel.theme
+
                                 width: parent.width
                                 text: sourceRow.sourceTitle
-                                color: panel.theme.textPrimary
-                                font.family: panel.theme.fontUi
-                                font.pixelSize: panel.theme.fontPx(0.917)
                                 font.weight: sourceRow.current ? Font.DemiBold : Font.Normal
                                 elide: Text.ElideRight
                             }
 
-                            Text {
+                            StyledText {
+                                theme: panel.theme
+                                role: StyledText.Caption
+                                muted: true
+
                                 width: parent.width
                                 visible: text !== ""
                                 text: sourceRow.sourceDetail
-                                color: panel.theme.textMuted
-                                font.family: panel.theme.fontUi
-                                font.pixelSize: panel.theme.fontPx(0.75)
                                 elide: Text.ElideRight
                             }
                         }
@@ -318,7 +323,7 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- components
-    component TransportButton: Rectangle {
+    component TransportButton: ChipSurface {
         id: transportButton
 
         property string glyph: ""
@@ -329,12 +334,14 @@ BarPanel {
 
         signal clicked
 
+        theme: panel.theme
         implicitWidth: buttonWidth
         implicitHeight: panel.theme.space(8)
-        radius: panel.theme.radius(0.75)
-        color: transportHover.hovered && enabled ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: panel.theme.surface3
+        // An action, not a choice — `chosen` never fires.
+        pointerOver: transportHover.hovered && enabled
+        // Its own dim rather than the family's 0.45: a transport button with
+        // no player to drive has always sat a shade deeper than an inert
+        // chip, and that is a design call, not drift.
         opacity: enabled ? 1 : 0.4
 
         OpticalGlyph {

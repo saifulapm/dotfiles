@@ -886,28 +886,28 @@ Scope {
                     width: parent.width
                     height: titleLabel.implicitHeight
 
-                    Text {
+                    StyledText {
                         id: titleLabel
+                        theme: pickerRoot.theme
+                        role: StyledText.Title
                         anchors.left: parent.left
                         anchors.right: modeLabel.left
                         anchors.rightMargin: pickerRoot.theme.space(3)
                         text: pickerRoot.title
-                        color: pickerRoot.theme.textPrimary
-                        font.family: pickerRoot.theme.fontUi
-                        font.pixelSize: pickerRoot.theme.fontPx(1.083)
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
                     }
 
-                    Text {
+                    StyledText {
                         id: modeLabel
+                        theme: pickerRoot.theme
+                        role: StyledText.Caption
+                        mono: true
+                        muted: true
                         anchors.right: parent.right
                         anchors.verticalCenter: titleLabel.verticalCenter
                         text: pickerRoot.queue.length > 1 ? pickerRoot.queue.length - 1 + " waiting" : (pickerRoot.multiple ? "MULTIPLE" : "")
                         visible: text !== ""
-                        color: pickerRoot.theme.textMuted
-                        font.family: pickerRoot.theme.fontMono
-                        font.pixelSize: pickerRoot.theme.fontPx(0.75)
                         font.letterSpacing: 1.2
                     }
                 }
@@ -934,19 +934,19 @@ Scope {
 
                                 spacing: 0
 
-                                Text {
+                                StyledText {
+                                    theme: pickerRoot.theme
+                                    muted: true
+
                                     visible: index > 0
                                     text: "  ›  "
-                                    color: pickerRoot.theme.textMuted
-                                    font.family: pickerRoot.theme.fontUi
-                                    font.pixelSize: pickerRoot.theme.fontPx(0.917)
                                 }
 
-                                Text {
+                                StyledText {
+                                    theme: pickerRoot.theme
+
                                     text: modelData.label
                                     color: index === pickerRoot.crumbs.length - 1 ? pickerRoot.theme.textPrimary : pickerRoot.theme.textMuted
-                                    font.family: pickerRoot.theme.fontUi
-                                    font.pixelSize: pickerRoot.theme.fontPx(0.917)
 
                                     MouseArea {
                                         anchors.fill: parent
@@ -982,8 +982,11 @@ Scope {
                         font.pixelSize: pickerRoot.theme.fontPx(1.0)
                     }
 
-                    Text {
+                    StyledText {
                         id: fieldHint
+                        theme: pickerRoot.theme
+                        role: StyledText.Small
+                        muted: true
                         anchors.right: parent.right
                         anchors.rightMargin: pickerRoot.theme.space(3)
                         anchors.verticalCenter: parent.verticalCenter
@@ -995,9 +998,6 @@ Scope {
                             return pickerRoot.activeFilter ? String(pickerRoot.activeFilter.name || "") + (pickerRoot.filters.length > 1 ? "  ⇥" : "") : "";
                         }
                         visible: text !== ""
-                        color: pickerRoot.theme.textMuted
-                        font.family: pickerRoot.theme.fontUi
-                        font.pixelSize: pickerRoot.theme.fontPx(0.833)
 
                         // Tab cycles filters; so does clicking the label.
                         MouseArea {
@@ -1037,28 +1037,34 @@ Scope {
                             width: sidebarList.width
                             height: pickerRoot.theme.space(8)
 
-                            Text {
+                            StyledText {
+                                theme: pickerRoot.theme
+                                role: StyledText.Micro
+                                mono: true
+                                muted: true
+
                                 visible: sideRow.modelData.kind === "header"
                                 anchors.left: parent.left
                                 anchors.leftMargin: pickerRoot.theme.space(2)
                                 anchors.bottom: parent.bottom
                                 anchors.bottomMargin: pickerRoot.theme.space(1)
                                 text: sideRow.modelData.label
-                                color: pickerRoot.theme.textMuted
-                                font.family: pickerRoot.theme.fontMono
-                                font.pixelSize: pickerRoot.theme.fontPx(0.667)
                                 font.letterSpacing: 1.2
                                 font.capitalization: Font.AllUppercase
                             }
 
-                            Rectangle {
+                            CursorSurface {
                                 id: sideItem
 
                                 visible: sideRow.modelData.kind === "item"
                                 anchors.fill: parent
-                                radius: pickerRoot.theme.radius(0.75)
+                                theme: pickerRoot.theme
                                 readonly property bool active: pickerRoot.currentPath === sideRow.modelData.path
-                                color: active ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.18) : (sideHover.hovered ? pickerRoot.theme.alpha(pickerRoot.theme.textPrimary, 0.06) : "transparent")
+                                // The sidebar shows where you ARE, not where a
+                                // keyboard cursor is — fill only, no outline.
+                                bordered: false
+                                current: sideItem.active
+                                hasCursor: sideHover.hovered
 
                                 HoverHandler {
                                     id: sideHover
@@ -1080,28 +1086,29 @@ Scope {
                                     font.pixelSize: pickerRoot.theme.fontPx(1.0)
                                 }
 
-                                Text {
+                                StyledText {
                                     id: sideDigit
+                                    theme: pickerRoot.theme
+                                    role: StyledText.Micro
+                                    mono: true
+                                    muted: true
                                     anchors.right: parent.right
                                     anchors.rightMargin: pickerRoot.theme.space(2)
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: sideRow.modelData.shortcut > 0 ? String(sideRow.modelData.shortcut) : ""
                                     visible: text !== ""
-                                    color: pickerRoot.theme.textMuted
-                                    font.family: pickerRoot.theme.fontMono
-                                    font.pixelSize: pickerRoot.theme.fontPx(0.667)
                                 }
 
-                                Text {
+                                StyledText {
+                                    theme: pickerRoot.theme
+                                    role: StyledText.Small
+
                                     anchors.left: sideGlyph.right
                                     anchors.leftMargin: pickerRoot.theme.space(2)
                                     anchors.right: sideDigit.visible ? sideDigit.left : parent.right
                                     anchors.rightMargin: pickerRoot.theme.space(2)
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: sideRow.modelData.label
-                                    color: pickerRoot.theme.textPrimary
-                                    font.family: pickerRoot.theme.fontUi
-                                    font.pixelSize: pickerRoot.theme.fontPx(0.833)
                                     elide: Text.ElideRight
                                 }
                             }
@@ -1181,16 +1188,20 @@ Scope {
                         currentIndex: pickerRoot.cursor
                         boundsBehavior: Flickable.StopAtBounds
 
-                        delegate: Rectangle {
+                        delegate: CursorSurface {
                             id: row
 
                             required property var modelData
                             required property int index
 
+                            theme: pickerRoot.theme
                             width: listView.width
                             height: pickerRoot.rowHeight
-                            radius: pickerRoot.theme.radius(0.75)
-                            color: index === pickerRoot.cursor ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.18) : (rowHover.hovered ? pickerRoot.theme.alpha(pickerRoot.theme.textPrimary, 0.06) : "transparent")
+                            // Selection and cursor are the same thing here,
+                            // and the fill already says so.
+                            bordered: false
+                            current: index === pickerRoot.cursor
+                            hasCursor: rowHover.hovered
 
                             readonly property bool picked: pickerRoot.selection[modelData.path] === true
 
@@ -1298,42 +1309,43 @@ Scope {
                                 }
                             }
 
-                            Text {
+                            StyledText {
                                 id: rowTime
+                                theme: pickerRoot.theme
+                                role: StyledText.Caption
+                                mono: true
+                                muted: true
                                 anchors.right: pickerRoot.multiple ? rowTick.left : parent.right
                                 anchors.rightMargin: pickerRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: pickerRoot.theme.space(20)
                                 horizontalAlignment: Text.AlignRight
                                 text: Model.formatTime(row.modelData.modified, pickerRoot.nowMs)
-                                color: pickerRoot.theme.textMuted
-                                font.family: pickerRoot.theme.fontMono
-                                font.pixelSize: pickerRoot.theme.fontPx(0.75)
                             }
 
-                            Text {
+                            StyledText {
                                 id: rowSize
+                                theme: pickerRoot.theme
+                                role: StyledText.Caption
+                                mono: true
+                                muted: true
                                 anchors.right: rowTime.left
                                 anchors.rightMargin: pickerRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
                                 horizontalAlignment: Text.AlignRight
                                 width: pickerRoot.theme.space(16)
                                 text: row.modelData.isDir ? "" : Model.formatSize(row.modelData.size)
-                                color: pickerRoot.theme.textMuted
-                                font.family: pickerRoot.theme.fontMono
-                                font.pixelSize: pickerRoot.theme.fontPx(0.75)
                             }
 
-                            Text {
+                            StyledText {
+                                theme: pickerRoot.theme
+
                                 anchors.left: rowGlyph.right
                                 anchors.leftMargin: pickerRoot.theme.space(3)
                                 anchors.right: rowSize.left
                                 anchors.rightMargin: pickerRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: row.modelData.name
-                                color: pickerRoot.theme.textPrimary
-                                font.family: pickerRoot.theme.fontUi
-                                font.pixelSize: pickerRoot.theme.fontPx(0.917)
                                 elide: Text.ElideRight
                             }
                         }
@@ -1436,19 +1448,23 @@ Scope {
                                 }
                             }
 
-                            Text {
+                            StyledText {
+                                theme: pickerRoot.theme
+
                                 width: parent.width
                                 text: previewPane.entry ? previewPane.entry.name : ""
-                                color: pickerRoot.theme.textPrimary
-                                font.family: pickerRoot.theme.fontUi
-                                font.pixelSize: pickerRoot.theme.fontPx(0.917)
                                 font.weight: Font.DemiBold
                                 wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                                 maximumLineCount: 2
                                 elide: Text.ElideRight
                             }
 
-                            Text {
+                            StyledText {
+                                theme: pickerRoot.theme
+                                role: StyledText.Caption
+                                mono: true
+                                muted: true
+
                                 width: parent.width
                                 visible: text !== ""
                                 text: {
@@ -1460,30 +1476,29 @@ Scope {
                                     const ext = Model.extensionOf(e.name);
                                     return (ext !== "" ? ext.toUpperCase() + " · " : "") + Model.formatSize(e.size);
                                 }
-                                color: pickerRoot.theme.textMuted
-                                font.family: pickerRoot.theme.fontMono
-                                font.pixelSize: pickerRoot.theme.fontPx(0.75)
                                 elide: Text.ElideRight
                             }
 
-                            Text {
+                            StyledText {
+                                theme: pickerRoot.theme
+                                role: StyledText.Caption
+                                mono: true
+                                muted: true
+
                                 width: parent.width
                                 visible: text !== ""
                                 text: previewPane.entry ? Model.formatTime(previewPane.entry.modified, pickerRoot.nowMs) : ""
-                                color: pickerRoot.theme.textMuted
-                                font.family: pickerRoot.theme.fontMono
-                                font.pixelSize: pickerRoot.theme.fontPx(0.75)
                             }
                         }
                     }
 
-                    Text {
+                    StyledText {
+                        theme: pickerRoot.theme
+                        muted: true
+
                         anchors.centerIn: listView
                         visible: pickerRoot.entries.length === 0
                         text: pickerRoot.query !== "" && !pickerRoot.saving ? "Nothing matches “" + pickerRoot.query + "”" : "Empty folder"
-                        color: pickerRoot.theme.textMuted
-                        font.family: pickerRoot.theme.fontUi
-                        font.pixelSize: pickerRoot.theme.fontPx(0.917)
                     }
 
                     // ---------------------------------------------- footer
@@ -1495,7 +1510,10 @@ Scope {
                         anchors.bottom: parent.bottom
                         height: acceptButton.height
 
-                        Text {
+                        StyledText {
+                            theme: pickerRoot.theme
+                            role: StyledText.Caption
+
                             anchors.left: parent.left
                             anchors.right: buttons.left
                             anchors.rightMargin: pickerRoot.theme.space(3)
@@ -1517,8 +1535,6 @@ Scope {
                                 return "type to filter · ctrl+l path · ctrl+d pins · ctrl+h hidden";
                             }
                             color: pickerRoot.overwritePending ? pickerRoot.theme.warn : pickerRoot.theme.textMuted
-                            font.family: pickerRoot.theme.fontUi
-                            font.pixelSize: pickerRoot.theme.fontPx(0.75)
                         }
 
                         Row {
@@ -1599,13 +1615,12 @@ Scope {
         border.width: pickerRoot.theme.borderWidth
         border.color: button.primary ? "transparent" : pickerRoot.theme.surface3
 
-        Text {
+        StyledText {
             id: buttonLabel
+            theme: pickerRoot.theme
             anchors.centerIn: parent
             text: button.label
             color: button.primary ? pickerRoot.theme.textOnAccent : pickerRoot.theme.textPrimary
-            font.family: pickerRoot.theme.fontUi
-            font.pixelSize: pickerRoot.theme.fontPx(0.917)
             font.weight: button.primary ? Font.DemiBold : Font.Normal
         }
 

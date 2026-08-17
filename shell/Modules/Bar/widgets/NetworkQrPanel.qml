@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../../../components"
 
 // Centered Wi-Fi share overlay — port of omarchy's WifiQrPanel.qml: no card,
 // just the code floating on a heavy scrim, with the SSID above it and the
@@ -104,12 +105,14 @@ PanelWindow {
                 anchors.fill: parent
                 spacing: root.theme.space(4)
 
-                Text {
+                StyledText {
+                    theme: root.theme
+                    role: StyledText.Small
+                    mono: true
+
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: (root.ssid || "Wi-Fi").toUpperCase()
                     color: root.onScrimDim
-                    font.family: root.theme.fontMono
-                    font.pixelSize: root.theme.fontPx(0.833)
                     font.weight: Font.DemiBold
                     font.letterSpacing: 2
                     elide: Text.ElideRight
@@ -153,34 +156,34 @@ PanelWindow {
                     }
                 }
 
-                Text {
+                StyledText {
+                    theme: root.theme
+
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.loading
                     text: "Generating QR code…"
                     color: root.onScrimDim
-                    font.family: root.theme.fontUi
-                    font.pixelSize: root.theme.fontPx(0.917)
                 }
 
-                Text {
+                StyledText {
+                    theme: root.theme
+
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.error !== ""
                     text: root.error
                     color: root.onScrimUrgent
-                    font.family: root.theme.fontUi
-                    font.pixelSize: root.theme.fontPx(0.917)
                     wrapMode: Text.Wrap
                     width: Math.min(implicitWidth, root.theme.space(80))
                     horizontalAlignment: Text.AlignHCenter
                 }
 
-                Text {
+                StyledText {
+                    theme: root.theme
+
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.showingQr
                     text: "Scan to join this network"
                     color: root.onScrimDim
-                    font.family: root.theme.fontUi
-                    font.pixelSize: root.theme.fontPx(0.917)
                 }
 
                 // The passphrase only enters shell memory when it is asked for,

@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../components"
+import "../../../components"
 import "MonitorModel.js" as Model
 
 // Display panel — port of omarchy's monitor plugin on niri's IPC: a hero
@@ -23,6 +24,11 @@ BarPanel {
     property var outputs: []
     property string focused: ""
     property var backlights: []
+
+    // The shell's AutoBrightness service, threaded down from shell.qml
+    // through the bar. Null on a panel opened before the service exists, and
+    // the row that uses it is gated on the service reporting a sensor.
+    property var autoBrightness: null
 
     // Live brightness per backlight device, keyed by device name. Set locally
     // on every move so the slider is never fighting the probe.
@@ -423,21 +429,23 @@ BarPanel {
                     width: parent.width
                     height: rowLabel.implicitHeight
 
-                    Text {
+                    StyledText {
                         id: rowLabel
+                        theme: panel.theme
+                        role: StyledText.Small
+                        muted: true
                         anchors.left: parent.left
                         text: brightnessRow.modelData.output
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.833)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Small
+                        mono: true
+                        muted: true
+
                         anchors.right: parent.right
                         text: brightnessRow.percentText
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.833)
                     }
                 }
 
@@ -469,17 +477,56 @@ BarPanel {
                 }
             }
         }
+
+        // Auto-brightness, in the BRIGHTNESS section because that is the
+        // thing it takes over. The row renders only where the service says
+        // it has an ambient-light sensor to read: the MacBook shows it, the
+        // Mac mini and the NUC render nothing rather than a switch that
+        // could never do anything. The lux reading rides the tooltip instead
+        // of the label so this stays a one-line row at any width.
+        Item {
+            visible: !!panel.autoBrightness && panel.autoBrightness.available
+            width: parent.width
+            height: Math.max(autoLabel.implicitHeight, autoSwitch.implicitHeight)
+
+            StyledText {
+                id: autoLabel
+                theme: panel.theme
+                role: StyledText.Small
+                muted: !autoSwitch.checked
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Auto"
+            }
+
+            PanelSwitch {
+                id: autoSwitch
+                theme: panel.theme
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                checked: !!panel.autoBrightness && panel.autoBrightness.enabled
+                hint: {
+                    const lux = panel.autoBrightness && panel.autoBrightness.smoothedLux >= 0 ? Math.round(panel.autoBrightness.smoothedLux) + " lx" : "no reading yet";
+                    return (checked ? "Stop following the ambient light" : "Follow the ambient light") + " — " + lux;
+                }
+                onToggled: {
+                    if (panel.autoBrightness)
+                        panel.autoBrightness.setEnabled(!panel.autoBrightness.enabled);
+                }
+            }
+        }
     }
 
     // Outputs with no backlight of their own: say why rather than showing a
     // dead slider.
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Small
+        muted: true
+
         visible: panel.outputs.length > panel.brightnessRows.length
         width: parent.width
         text: panel.brightnessRows.length === 0 ? "No controllable backlight on this machine." : "External displays have no backlight control — they need DDC/CI."
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
         wrapMode: Text.WordWrap
     }
 
@@ -506,13 +553,15 @@ BarPanel {
 
             // SCALE only applies to the focused output, so name it once there
             // is more than one.
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Caption
+                mono: true
+                muted: true
+
                 anchors.right: parent.right
                 visible: panel.outputs.length > 1 && panel.focused !== ""
                 text: panel.focused
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.75)
             }
         }
 
@@ -572,12 +621,14 @@ BarPanel {
                 label: "TEXT SIZE"
             }
 
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Caption
+                mono: true
+                muted: true
+
                 anchors.right: parent.right
                 text: panel.textSize + " px"
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.75)
             }
         }
 
@@ -664,20 +715,21 @@ BarPanel {
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - panel.theme.space(9)
 
-                        Text {
+                        StyledText {
+                            theme: panel.theme
+
                             width: parent.width
                             text: outputRow.modelData.name + (outputRow.isFocused ? " · focused" : "") + (outputRow.modelData.model && outputRow.modelData.model !== "Unknown" ? " · " + outputRow.modelData.model : "")
-                            color: panel.theme.textPrimary
-                            font.family: panel.theme.fontUi
-                            font.pixelSize: panel.theme.fontPx(0.917)
                             elide: Text.ElideRight
                         }
 
-                        Text {
+                        StyledText {
+                            theme: panel.theme
+                            role: StyledText.Caption
+                            mono: true
+                            muted: true
+
                             text: Model.modeLine(outputRow.modelData)
-                            color: panel.theme.textMuted
-                            font.family: panel.theme.fontMono
-                            font.pixelSize: panel.theme.fontPx(0.75)
                         }
                     }
 
@@ -703,40 +755,38 @@ BarPanel {
         }
     }
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        muted: true
+
         visible: panel.outputs.length === 0
         text: "Querying outputs…"
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.917)
     }
 
     // ---------------------------------------------------------- components
-    component Pill: Rectangle {
+    component Pill: ChipSurface {
         id: pill
 
         property string label: ""
         property bool isActive: false
-        property bool hasCursor: false
         property bool selectable: true
 
         signal hovered
         signal activated
 
+        theme: panel.theme
         implicitHeight: pillText.implicitHeight + panel.theme.space(2.5)
-        radius: panel.theme.radius(0.75)
-        color: isActive ? panel.theme.alpha(panel.theme.accent, 0.25) : (hasCursor || pillHover.hovered ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2)
-        border.width: panel.theme.borderWidth
-        border.color: isActive || hasCursor ? panel.theme.accent : panel.theme.surface3
-        opacity: selectable ? 1 : 0.45
+        chosen: pill.isActive
+        pointerOver: pillHover.hovered
+        interactive: pill.selectable
 
-        Text {
+        StyledText {
             id: pillText
+            theme: panel.theme
+            role: StyledText.Small
             anchors.centerIn: parent
             text: pill.label
             color: pill.isActive ? panel.theme.accent : panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
         }
 
         HoverHandler {

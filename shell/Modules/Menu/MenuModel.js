@@ -1,5 +1,5 @@
 // Tree, visibility and search semantics for the command menu. Near-verbatim
-// port of omarchy's plugins/menu/MenuModel.js (CREDITS.md), minus the parts
+// port of omarchy's plugins/menu/MenuModel.js, minus the parts
 // that only make sense for their shell: JSONC parsing and source merging (our
 // tree is a JS object in MenuTree.js) and their script-provider row merge
 // (ours keeps provider rows in a separate view, in Menu.qml).

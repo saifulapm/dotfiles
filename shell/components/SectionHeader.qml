@@ -16,28 +16,30 @@ Item {
 
     implicitHeight: Math.max(headerLabel.implicitHeight, headerValue.implicitHeight) + theme.space(1)
 
-    Text {
+    StyledText {
         id: headerLabel
+        theme: header.theme
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         text: header.label
-        color: header.theme.textMuted
-        font.family: header.theme.fontMono
-        font.pixelSize: header.theme.fontPx(0.75)
+        role: StyledText.Caption
+        mono: true
+        muted: true
         font.letterSpacing: 1.2
         font.weight: Font.DemiBold
     }
 
-    Text {
+    StyledText {
         id: headerValue
+        theme: header.theme
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         text: header.value
         visible: text !== ""
         opacity: header.dimmed ? 0.5 : 1
+        role: StyledText.Caption
+        mono: true
         color: header.valueColor
-        font.family: header.theme.fontMono
-        font.pixelSize: header.theme.fontPx(0.75)
         font.letterSpacing: header.valueSpacing
         font.weight: Font.DemiBold
     }

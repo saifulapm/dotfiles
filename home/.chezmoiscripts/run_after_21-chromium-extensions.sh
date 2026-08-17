@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Register the native messaging hosts for the Chromium extensions (omarchy's
-# copy-url + yt-dlp, CREDITS.md; browserpass). The omarchy extensions load
+# copy-url + yt-dlp; browserpass). The omarchy extensions load
 # straight from the repo via --load-extension in CHROMIUM_USER_FLAGS
 # (environment.d/60-chromium.conf); this half tells Chromium which script a
 # `sendNativeMessage` may launch. User-level files only — no sudo. The host

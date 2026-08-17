@@ -18,7 +18,7 @@ changes — per pod and for the case, which is strictly more than the single
 figure HFP would have carried.  That is what this reads.
 
 The protocol constants below are the ones documented by the openly reverse-
-engineered Linux/Android implementations (librepods, OpenPods — CREDITS.md);
+engineered Linux/Android implementations (librepods, OpenPods —);
 no code is borrowed, and every byte was re-verified against this desk's AirPods.
 One caveat is recorded there too: the notification bitmask must be
 `ff ff ff ff`.  With librepods' `ff ff fe ff` the device answers with its whole
@@ -133,15 +133,18 @@ def parse_battery(packet):
 def librepods_socket():
     """The librepods daemon's control socket, or None while it is not running.
 
-    Qt's QLocalServer puts relative server names in the temp dir (measured:
-    /tmp/app_server even with XDG_RUNTIME_DIR set), but check the runtime dir
-    first in case a future Qt moves it where it belongs.
+    $XDG_RUNTIME_DIR/librepods.sock, and nowhere else. It used to live at
+    /tmp/app_server, because Qt resolves a QLocalServer name without a leading
+    slash under the temp dir, which left the channel open to any local user;
+    the daemon computes this same path in linux/ipcpath.hpp (our patch) and
+    refuses to fall back. No /tmp fallback here either, deliberately — one
+    would quietly re-open what the move closed.
     """
     runtime = os.environ.get("XDG_RUNTIME_DIR", "")
-    for path in ((runtime + "/app_server") if runtime else "", "/tmp/app_server"):
-        if path and os.path.exists(path):
-            return path
-    return None
+    if not runtime:
+        return None
+    path = runtime + "/librepods.sock"
+    return path if os.path.exists(path) else None
 
 
 def librepods_stream(path, address, once):

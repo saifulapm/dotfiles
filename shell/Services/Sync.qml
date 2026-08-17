@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 
 // Cross-machine state sync, ported from the sync half of omarchy's
-// model-usage Main.qml (CREDITS.md) and generalized into a service.
+// model-usage Main.qml and generalized into a service.
 //
 // There is no server and no protocol. Each machine writes ONE snapshot file
 // of its own state into a shared directory and reads EVERY snapshot it finds

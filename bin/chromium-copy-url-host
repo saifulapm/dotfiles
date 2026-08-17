@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # chromium-copy-url-host — native messaging host for the Copy URL extension.
 #
-# Port of omarchy-chromium-copy-url-host (CREDITS.md): the browser launches
+# Port of omarchy-chromium-copy-url-host: the browser launches
 # this with a 4-byte little-endian length prefix + JSON {url} on stdin; the
 # URL goes to the Wayland clipboard and a toast confirms. The host keeps
 # omarchy's com.omarchy.copy_url name — the extension (direct copy) calls it

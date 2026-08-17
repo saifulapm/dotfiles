@@ -1,5 +1,5 @@
 // Contrast-by-construction, ported from noctalia src/theme/contrast.cpp
-// (MIT — see CREDITS.md): WCAG ratio as the target, OKLCH as the search
+// (MIT —): WCAG ratio as the target, OKLCH as the search
 // space, chroma-only gamut mapping. Plain JS with no QML dependencies so
 // the math is testable outside the shell.
 

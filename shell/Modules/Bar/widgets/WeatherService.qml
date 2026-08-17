@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "WeatherModel.js" as Model
 
-// Weather service — the fetch stack of omarchy's weather plugin (CREDITS.md),
+// Weather service — the fetch stack of omarchy's weather plugin,
 // split out of the bar widget so ONE instance serves every screen (S2): the
 // widget and the panel are views over this object, which the bar root owns.
 // DELIBERATE no-polling exception: weather has no event source, so the report

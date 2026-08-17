@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # chromium-ytdlp-host — native messaging host for the yt-dlp extension.
 #
-# Port of omarchy-chromium-ytdlp-host (CREDITS.md): the extension sends
+# Port of omarchy-chromium-ytdlp-host: the extension sends
 # {url}; a detached worker runs yt-dlp into ~/Videos while the shell's OSD
 # draws one in-place progress bar (their omarchy-osd calls become our
 # `qs ipc call osd -- show` — the `--` dodges the qs CLI's own `show`

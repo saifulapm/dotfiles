@@ -7,7 +7,7 @@ import "../Commons/gradient.js" as Gradient
 
 // Token resolution + live reload. Instantiated once by shell.qml and passed
 // down by property injection — relative-path singleton imports do not share
-// state (see CREDITS.md: omarchy).
+// state ( omarchy).
 //
 // Reads the active theme from ~/.local/state/qshell/theme.toml (a symlink
 // repointed by bin/theme-set). Every token falls back to the builtin values
@@ -89,8 +89,8 @@ QtObject {
     // [notifications], [menu], [osd] — without touching the base tokens every
     // other surface reads. Anything a section omits falls back to the base
     // token the surface would otherwise have used, so a section is always a
-    // partial override. Omarchy's surface-role model (Commons/Color.qml,
-    // CREDITS.md) adapted to our single-file themes.
+    // partial override. Omarchy's surface-role model (Commons/Color.qml)
+    // adapted to our single-file themes.
 
     // A section value may name another token instead of carrying a literal:
     // `border = "accent.error"` reads accent.error. Bounded, so a cycle
@@ -387,6 +387,62 @@ QtObject {
         readonly property int borderWidth: root.sWidth("osd", "border-width", Math.max(root.borderWidth, root.space(0.5)))
     }
 
+    // ------------------------------------------------------------- motion
+    // One motion vocabulary. `time(n)` and `easing` below already scale every
+    // animation with the theme, but call sites were choosing their own
+    // multipliers and easing curves by hand — an audit across the shell found
+    // 24 sites hardcoding Easing.OutCubic and raw durations of 140, 160, 420,
+    // 600 and 1400 sitting beside token-derived ones. Same intent, four
+    // different numbers, because each was written on its own day.
+    //
+    // These are the intents, not more knobs: pick the one that describes what
+    // the animation is FOR and the theme keeps every instance of that intent
+    // in step. A theme setting motion.duration = 0 still stops the whole
+    // shell dead, which is the property the raw numbers were quietly
+    // breaking.
+    // EVERY duration here runs through time(), so all of it collapses to zero
+    // under a theme that asks for it. That is not hypothetical: retro-82 ships
+    // `duration = 0` and means it, hackerman runs at 100, lumon at 250, and
+    // catppuccin and rose-pine at 180. A literal in a Behavior opts that
+    // animation out of the theme silently, which is the bug these replace.
+    readonly property QtObject motion: QtObject {
+        // The default: a property moving because something changed — hover
+        // and focus fills, glyph color, slider travel, reveal heights. 150 ms
+        // at the default token, which is what the 140 and 160 ms literals
+        // scattered through the bar were approximating.
+        readonly property int standard: root.time(1)
+
+        // Surface entrances and exits. Asymmetric on purpose — omarchy's
+        // window animations exit faster than they enter, and that asymmetry
+        // is most of what reads as "snappy" (OverlaySurface already did this
+        // by hand with time(0.5)/time(0.35)).
+        readonly property int enter: root.time(0.5)
+        readonly property int exit: root.time(0.35)
+
+        // Deliberate, attention-carrying motion — the hero phrase crossfade,
+        // anything the eye is meant to follow rather than just absorb.
+        readonly property int slow: root.time(1.73)
+
+        // A theme landing. The bar's background and foreground colors fade
+        // while the wallpaper reveal wipes across, and the two are meant to
+        // read as ONE event — which is why both spelled out 420 ms, in two
+        // different files, with no note saying they had to agree. 2.8 is
+        // simply 420/150: the number they already were at the default token.
+        readonly property int crossfade: root.time(2.8)
+
+        // The theme's own curve: "snap" -> OutQuint, "spring" -> OutBack,
+        // otherwise OutCubic. Twenty-one sites had hardcoded Easing.OutCubic,
+        // which is only coincidentally right — it is what this resolves to at
+        // the DEFAULT, so those animations quietly ignored hackerman's and
+        // retro-82's "snap".
+        readonly property int easing: root.easing
+        // Leaving the screen: start slow, accelerate out of view.
+        readonly property int easingExit: Easing.InQuad
+        // Symmetric moves that start and end at rest — a knob sliding between
+        // two detents, a reveal opening and closing.
+        readonly property int easingSmooth: Easing.InOutCubic
+    }
+
     // ------------------------------------------------------------ helpers
     // Every gap, corner, and animation in the shell goes through these, so a
     // theme setting radius = 0 / duration = 0 / density = 0.85 changes the
@@ -410,7 +466,7 @@ QtObject {
     // ------------------------------------------------------- TOML loading
     // Sectioned key = value walker (strings, numbers, quoted keys, inline
     // comments). Deliberately limited — the schema needs nothing fancier.
-    // Pattern from omarchy's Color.qml parseShell (CREDITS.md).
+    // Pattern from omarchy's Color.qml parseShell.
     function parseToml(raw) {
         const out = {};
         const lines = String(raw || "").split("\n");

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../components"
+import "../../../components"
 import "../../Notifications/NotificationLogic.js" as Logic
 
 // Notification history center — the review surface over Services/Notifs.qml's
@@ -275,17 +276,22 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.5)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Title
+
                     width: parent.width
                     text: "Notifications"
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(1.083)
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+                    muted: true
+
                     width: parent.width
                     text: {
                         const parts = [];
@@ -297,9 +303,6 @@ BarPanel {
                             parts.push(panel.recentCount + " RECENT");
                         return parts.length > 0 ? parts.join(" · ") : "ALL CAUGHT UP";
                     }
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     font.letterSpacing: 1.2
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
@@ -365,14 +368,15 @@ BarPanel {
                             label: sectionTitle + " · " + (modelData.section === "pending" ? panel.unseenCount : panel.recentCount)
                         }
 
-                        Text {
+                        StyledText {
                             id: clearAction
+                            theme: panel.theme
+                            role: StyledText.Caption
+                            mono: true
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             text: "CLEAR"
                             color: clearMouse.containsMouse ? panel.theme.textPrimary : panel.theme.textMuted
-                            font.family: panel.theme.fontMono
-                            font.pixelSize: panel.theme.fontPx(0.75)
                             font.letterSpacing: 1.2
                             font.weight: Font.DemiBold
 
@@ -407,20 +411,19 @@ BarPanel {
             width: parent.width
             spacing: panel.theme.space(1)
 
-            Text {
+            StyledText {
+                theme: panel.theme
+
                 width: parent.width
                 text: "All caught up"
-                color: panel.theme.textPrimary
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
             }
 
-            Text {
+            StyledText {
+                theme: panel.theme
+                muted: true
+
                 width: parent.width
                 text: panel.notifs.dnd ? "Do not disturb is on — new notifications queue here silently." : "Notifications you receive will queue here."
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
                 wrapMode: Text.WordWrap
             }
         }
@@ -524,38 +527,39 @@ BarPanel {
                     width: parent.width
                     height: summaryText.implicitHeight
 
-                    Text {
+                    StyledText {
                         id: summaryText
+                        theme: panel.theme
                         anchors.left: parent.left
                         anchors.right: timeText.visible ? timeText.left : parent.right
                         anchors.rightMargin: timeText.visible ? panel.theme.space(2) : 0
                         text: notifRow.entry.summary || notifRow.entry.app || "Notification"
                         color: notifRow.entry.urgency === 2 ? panel.theme.error : panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.917)
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
                     }
 
-                    Text {
+                    StyledText {
                         id: timeText
+                        theme: panel.theme
+                        role: StyledText.Caption
+                        mono: true
+                        muted: true
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         visible: !notifRow.showDismiss
                         text: panel.relativeTime(notifRow.entry.timestamp)
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.75)
                     }
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Small
+                    muted: true
+
                     visible: text !== ""
                     width: parent.width
                     text: notifRow.bodyPreview !== "" ? notifRow.bodyPreview : notifRow.entry.app
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.833)
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -579,13 +583,13 @@ BarPanel {
                             radius: panel.theme.radius(0.5)
                             color: chipMouse.containsMouse ? panel.theme.alpha(panel.theme.accent, 0.3) : panel.theme.alpha(panel.theme.accent, 0.15)
 
-                            Text {
+                            StyledText {
                                 id: chipLabel
+                                theme: panel.theme
+                                role: StyledText.Small
                                 anchors.centerIn: parent
                                 text: actionChip.modelData.text
                                 color: panel.theme.accent
-                                font.family: panel.theme.fontUi
-                                font.pixelSize: panel.theme.fontPx(0.833)
                             }
 
                             // MouseArea, not TapHandler: the row's own
@@ -606,18 +610,18 @@ BarPanel {
             // ForgetButton reasoning): the row underneath owns a full-fill
             // MouseArea, and a TapHandler's passive grab would let one click
             // dismiss AND activate.
-            Rectangle {
+            ChipSurface {
                 id: dismissBtn
 
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                theme: panel.theme
                 width: panel.theme.space(6)
                 height: panel.theme.space(6)
                 visible: notifRow.showDismiss
-                radius: panel.theme.radius(0.75)
-                color: dismissMouse.containsMouse ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
-                border.width: panel.theme.borderWidth
-                border.color: panel.theme.surface3
+                // An action, not a choice: `chosen` never fires, so this is
+                // the family's plain tile — surface2, hover lift, hairline.
+                pointerOver: dismissMouse.containsMouse
 
                 OpticalGlyph {
                     anchors.centerIn: parent

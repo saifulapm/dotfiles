@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../components"
+import "../../../components"
 import "DevServicesModel.js" as Model
 
 // devservices — this machine's Herd-like on-demand dev databases (podman

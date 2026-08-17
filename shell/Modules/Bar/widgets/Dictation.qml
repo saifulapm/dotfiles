@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import "../components"
 
-// Voice dictation, ported from omarchy's Dictation indicator (CREDITS.md):
+// Voice dictation, ported from omarchy's Dictation indicator:
 // their three voxtype states (idle hidden, recording lit, transcribing) and
 // their glyphs. The streaming status process lives in DictationService — ONE
 // follower at the bar root, shared by every screen's copy of this widget

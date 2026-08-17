@@ -1,7 +1,7 @@
 # Compose sequences, reached through the Compose key — CapsLock here
 # (niri input.xkb options "compose:caps", the omarchy default ported to xkb).
 # Port of omarchy's default/xcompose + its install/user/xcompose.sh identity
-# rows (CREDITS.md), inlined into one file instead of their include chain.
+# rows, inlined into one file instead of their include chain.
 #
 # GTK apps on Wayland read this at startup — restart the app to pick up edits.
 

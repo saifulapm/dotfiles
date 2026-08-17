@@ -2,58 +2,89 @@
 # qshell-sync — one sync round against the Dropbox hub. Ours; the structural
 # idea (each device writes ONLY its own file into a shared folder, so
 # conflicts are impossible by construction) is omarchy's model-usage sync
-# invariant (CREDITS.md), applied to real files with rclone as the transport.
+# invariant, applied to real files with rclone as the transport.
 #
-# What moves, and how:
+# Six units move, in three shapes:
+#
+#   push-own / pull-others — history, fish history, model usage
+#     Each device owns exactly one file in the hub and never writes another's,
+#     so plain `rclone copy` both ways is conflict-free by construction. The
+#     pull always excludes our own name; that exclusion is what keeps it from
+#     clobbering appends made since the push.
+#
+#   bisync — screenshots, notes
+#     Edited on every machine, and a delete must propagate, so neither end can
+#     be declared the writer. The first run (and recovery after an interrupted
+#     one) needs --resync, which this script does by itself when bisync asks.
+#
+#   encrypted blob — ssh
+#     Delegated to bin/ssh-hub-sync, which does its own three-way compare.
+#     Private keys never touch the hub in the clear; see that script.
+#
+# What each unit is, precisely:
 #
 #   history      ~/.local/state/qshell/sync/history/<machine>.history
-#                PUSH only this machine's file, PULL everyone else's.
-#                Append-only by nature, so plain `rclone copy` both ways is
-#                conflict-free — nothing ever writes another machine's file.
 #                bashrc.d/20-history.sh is the consumer: bash appends to its
 #                own file and reads the union.
 #
-#   fish history ~/.local/share/fish/<machine_slug>_history
-#                Push-own / pull-others like bash history, then
-#                bin/fish-history-merge unions the pulled files into the
-#                local session file (fish cannot read foreign session files
-#                the way bash reads foreign HISTFILEs). See the section
-#                comment below for the convergence trade-off.
+#   fish-history ~/.local/share/fish/<machine_slug>_history
+#                Push-own / pull-others, then bin/fish-history-merge unions
+#                the pulled files into the local session file (fish cannot
+#                read foreign session files the way bash reads foreign
+#                HISTFILEs). See the section comment for the trade-off.
 #
 #   model-usage  ~/.local/state/qshell/sync/model-usage/<machine>.json
-#                Same push-own / pull-others shape as history. The files are
 #                Services/Sync.qml's per-device snapshots (shell.json's sync
 #                block points there); the AI widget merges whatever the pull
 #                brings on its next publish cycle.
 #
 #   screenshots  ~/Pictures/Screenshots  <->  Dropbox:qshell-sync/screenshots
-#                `rclone bisync`, so pruning a screenshot on one machine
-#                deletes it everywhere. The first run (and recovery after an
-#                interrupted one) needs `--resync`, which this script does by
-#                itself when bisync asks for it — that one round is
-#                union-only, so a deletion made just before it can resurrect
-#                once. Said loudly when it happens.
+#                Pruning a screenshot on one machine deletes it everywhere.
 #
 #   notes        ~/.local/state/qshell/notes  <->  Dropbox:qshell-sync/notes
 #                The Notes panel's store (Modules/Notes): notes.json plus the
-#                pasted-image attachments dir. Same bisync shape as
-#                screenshots — notes are edited on every machine and a
-#                delete must propagate. The store's FileView watches the
-#                file, so a pulled change lands in an open panel by itself.
-#                last-capture.sha1 (the shift-shift dedupe) is machine-local
-#                state and stays out; attachments referencing files OUTSIDE
-#                the store (drops from ~/Downloads) never travel — only the
-#                store dir does.
+#                pasted-image attachments dir. The store's FileView watches
+#                the file, so a pulled change lands in an open panel by
+#                itself. last-capture.sha1 (the shift-shift dedupe) is
+#                machine-local state and stays out; attachments referencing
+#                files OUTSIDE the store (drops from ~/Downloads) never
+#                travel — only the store dir does.
+#
+#   ssh          ~/.ssh  <->  Dropbox:qshell-sync/ssh/ssh.age
+#                One identity on every machine, so they can reach each other
+#                and any host that trusts the key. bin/ssh-hub-sync owns it.
 #
 # No mount involved anywhere: rclone talks to Dropbox directly, so this runs
 # whether or not any remote is mounted. Fired by qshell-sync.timer every 15
 # minutes and by hand; a flock keeps the two from overlapping.
 #
-# Failures land in ~/.local/state/qshell/sync/status.json (error and empty
-# stay distinguishable) and notify ONCE per failure streak — a 15-minute
-# timer must not nag every round. Auth rot and a full Dropbox are named as
-# themselves; the free space on this account is thin (~60 MiB, 2026-08-06),
-# so the quota message is expected to matter someday.
+# ---------------------------------------------------------------- the status
+# Every round rewrites ~/.local/state/qshell/sync/status.json, and the file is
+# PER UNIT, not one global verdict (2026-08-17). The old shape carried a
+# single ok/error pair, which answered "something broke" and nothing else: a
+# notes failure and an auth failure read identically, a unit that had been
+# silently failing for a week looked exactly like one that failed a minute
+# ago, and there was no way to retry the one that broke. Each unit now keeps
+# its own ok / lastRun / lastOk / error / errorKind, `lastOk` carried forward
+# from the previous file when this round did not touch or did not fix the
+# unit — so "Notes: last synced 4 days ago" is answerable. The reader is
+# Modules/Bar/widgets/HubSyncService.qml, and this file is the whole contract
+# between the two: nothing else is shared, and the shell never runs a probe.
+#
+# The file is rewritten after EVERY unit, not once at the end, with `running`
+# and `currentUnit` set — that is what makes the panel show live progress
+# instead of freezing for the length of a round.
+#
+# Failures notify ONCE per failure streak per unit — a 15-minute timer must
+# not nag every round. Auth rot and a full Dropbox are named as themselves;
+# the free space on this account is thin (~60 MiB, 2026-08-06), so the quota
+# message is expected to matter someday.
+#
+# Usage:
+#   qshell-sync                     every unit
+#   qshell-sync --only notes        one unit (repeatable) — the panel's retry
+#   qshell-sync --only ssh --only notes
+#   qshell-sync --list              print the unit ids and exit
 set -euo pipefail
 
 remote="Dropbox:qshell-sync"
@@ -62,11 +93,73 @@ sync_dir="$state_dir/sync"
 hist_dir="$sync_dir/history"
 shots_dir="$HOME/Pictures/Screenshots"
 status_file="$sync_dir/status.json"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 machine="$(cat "$HOME/.config/qshell/machine" 2>/dev/null || true)"
 [[ -z $machine ]] && machine="$(uname -n)"
 
-mkdir -p "$hist_dir" "$shots_dir"
+# Canonical order — the panel renders the units in exactly this sequence.
+units_all=(history fish-history model-usage screenshots notes ssh)
+
+unit_label() {
+  case "$1" in
+  history) echo "Shell history" ;;
+  fish-history) echo "Fish history" ;;
+  model-usage) echo "AI usage" ;;
+  screenshots) echo "Screenshots" ;;
+  notes) echo "Notes" ;;
+  ssh) echo "SSH keys" ;;
+  *) echo "$1" ;;
+  esac
+}
+
+# ------------------------------------------------------------------ the argv
+selected=()
+while (($# > 0)); do
+  case "$1" in
+  --only)
+    [[ -z ${2:-} ]] && {
+      echo "qshell-sync: --only needs a unit id" >&2
+      exit 2
+    }
+    selected+=("$2")
+    shift 2
+    ;;
+  --only=*)
+    selected+=("${1#--only=}")
+    shift
+    ;;
+  --list)
+    printf '%s\n' "${units_all[@]}"
+    exit 0
+    ;;
+  -h | --help)
+    sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed 's/^# \?//;$d'
+    exit 0
+    ;;
+  *)
+    echo "qshell-sync: unknown argument $1" >&2
+    exit 2
+    ;;
+  esac
+done
+
+if ((${#selected[@]} == 0)); then
+  selected=("${units_all[@]}")
+else
+  for want in "${selected[@]}"; do
+    found=false
+    for known in "${units_all[@]}"; do
+      [[ $want == "$known" ]] && found=true && break
+    done
+    if [[ $found != true ]]; then
+      echo "qshell-sync: unknown unit '$want' (known: ${units_all[*]})" >&2
+      exit 2
+    fi
+  done
+fi
+
+mkdir -p "$hist_dir" "$shots_dir" "$sync_dir"
 
 # One round at a time: the timer and a hand-run must not interleave bisync.
 exec 9>>"$sync_dir/.lock"
@@ -75,22 +168,172 @@ if ! flock -n 9; then
   exit 0
 fi
 
-# Unconfigured is not an error either: on a fresh machine the timer's first
-# tick (OnStartupSec=3min) lands long before the documented manual
-# `rclone config` step, and without this guard that round raised a confusing
-# "Sync failed: didn't find section in config file" notification and left the
-# unit failed (audit 2026-08-07). Quiet skip; ok stays null (not false) so the
-# first real success never raises a phantom "Sync recovered" toast, and the
-# distinct errorKind names the state for anyone reading status.json.
+# --------------------------------------------------------------- unit state
+# Seeded from the previous status file so a --only run — and any unit this
+# round leaves untouched — keeps the history it already had. Without the
+# carry-forward a single-unit retry would blank the other five.
+declare -A UNIT_OK UNIT_RUN UNIT_OKAT UNIT_ERR UNIT_KIND UNIT_DETAIL
+
+for id in "${units_all[@]}"; do
+  UNIT_OK[$id]=null
+  UNIT_RUN[$id]=""
+  UNIT_OKAT[$id]=""
+  UNIT_ERR[$id]=""
+  UNIT_KIND[$id]=""
+  UNIT_DETAIL[$id]=""
+done
+
+# Fields are separated by US (0x1f), NOT by a tab. Tab is an IFS *whitespace*
+# character, so `IFS=$'\t' read` collapses runs of them into one delimiter and
+# empty fields simply vanish — which slid every column left for any unit whose
+# error and errorKind were empty (i.e. every healthy one) and silently ate its
+# detail. A non-whitespace separator delimits one field per occurrence, empty
+# or not. elide() strips both newlines and tabs from errors, and US cannot
+# appear in any of these values, so a row is always exactly seven fields.
+if [[ -f $status_file ]]; then
+  while IFS=$'\x1f' read -r id ok lastRun lastOk err kind detail; do
+    [[ -z $id ]] && continue
+    # A unit that has since been removed from units_all is dropped here.
+    for known in "${units_all[@]}"; do
+      if [[ $id == "$known" ]]; then
+        UNIT_OK[$id]="$ok"
+        UNIT_RUN[$id]="$lastRun"
+        UNIT_OKAT[$id]="$lastOk"
+        UNIT_ERR[$id]="$err"
+        UNIT_KIND[$id]="$kind"
+        UNIT_DETAIL[$id]="$detail"
+        break
+      fi
+    done
+  done < <(jq -r '
+      (.units // [])[]
+      | [ .id,
+          (if .ok == true then "true" elif .ok == false then "false" else "null" end),
+          (.lastRun // ""), (.lastOk // ""), (.error // ""),
+          (.errorKind // ""), (.detail // "") ]
+      | join("")' "$status_file" 2>/dev/null || true)
+fi
+
+now() { date -Is; }
+
+# Name the failure for what it is: an expired/revoked token and a full Dropbox
+# have fixes only a human can run, and deserve their own words.
+classify() {
+  local lowered="${1,,}"
+  if [[ $lowered == *"insufficient space"* || $lowered == *"quota"* || $lowered == *"507"* ]]; then
+    echo quota
+  elif [[ $lowered == *"oauth"* || $lowered == *"token"* || $lowered == *"unauthorized"* || $lowered == *"401"* || $lowered == *"expired"* || $lowered == *"reconnect"* ]]; then
+    echo auth
+  elif [[ $lowered == *"conflict"* ]]; then
+    echo conflict
+  else
+    echo other
+  fi
+}
+
+elide() { # text
+  # Tabs go too, not just newlines: the status file is read back as TSV on the
+  # next round, and a tab inside an error message would split one unit's row
+  # into two fields and shift every column after it.
+  local value
+  value="$(tr '\n\t' '  ' <<<"${1:-}" | tr -s ' ')"
+  value="${value# }"
+  value="${value% }"
+  if ((${#value} > 240)); then
+    echo "${value:0:237}…"
+  else
+    echo "$value"
+  fi
+}
+
+unit_ok() { # id, detail
+  UNIT_OK[$1]=true
+  UNIT_RUN[$1]="$(now)"
+  UNIT_OKAT[$1]="${UNIT_RUN[$1]}"
+  UNIT_ERR[$1]=""
+  UNIT_KIND[$1]=""
+  UNIT_DETAIL[$1]="${2:-}"
+}
+
+unit_fail() { # id, message
+  UNIT_OK[$1]=false
+  UNIT_RUN[$1]="$(now)"
+  UNIT_ERR[$1]="$(elide "$2")"
+  UNIT_KIND[$1]="$(classify "${UNIT_ERR[$1]}")"
+}
+
+# Neither ok nor failed: nothing on this machine to sync yet. Keeps a fresh
+# install from showing six red rows before it has ever written a note.
+unit_skip() { # id, why
+  UNIT_OK[$1]=null
+  UNIT_RUN[$1]="$(now)"
+  UNIT_ERR[$1]=""
+  UNIT_KIND[$1]=""
+  UNIT_DETAIL[$1]="${2:-}"
+}
+
+emit_units() {
+  local id
+  for id in "${units_all[@]}"; do
+    jq -cn \
+      --arg id "$id" \
+      --arg label "$(unit_label "$id")" \
+      --argjson ok "${UNIT_OK[$id]:-null}" \
+      --arg lastRun "${UNIT_RUN[$id]:-}" \
+      --arg lastOk "${UNIT_OKAT[$id]:-}" \
+      --arg error "${UNIT_ERR[$id]:-}" \
+      --arg errorKind "${UNIT_KIND[$id]:-}" \
+      --arg detail "${UNIT_DETAIL[$id]:-}" \
+      '{id:$id,label:$label,ok:$ok,lastRun:$lastRun,lastOk:$lastOk,error:$error,errorKind:$errorKind,detail:$detail}'
+  done
+}
+
+# Rewritten after every unit so the panel can watch a round progress. The
+# top-level `ok` is the AND of every unit that has a verdict — a null (never
+# run, or nothing to do) neither passes nor fails the whole.
+write_status() { # running(true|false), currentUnit
+  local tmp
+  tmp="$(mktemp "$status_file.XXXXXX")"
+  emit_units | jq -s \
+    --arg machine "$machine" \
+    --arg lastRun "$(now)" \
+    --argjson running "${1:-false}" \
+    --arg currentUnit "${2:-}" \
+    --arg scope "$(printf '%s,' "${selected[@]}")" \
+    '{
+       version: 2,
+       machine: $machine,
+       lastRun: $lastRun,
+       running: $running,
+       currentUnit: $currentUnit,
+       scope: ($scope | rtrimstr(",") | split(",")),
+       units: .,
+       ok: (if any(.[]; .ok == false) then false
+            elif any(.[]; .ok == true) then true
+            else null end)
+     }' >"$tmp"
+  mv "$tmp" "$status_file"
+}
+
+notify() { # summary, body
+  notify-send -a qshell "$1" "${2:-}" >/dev/null 2>&1 || true
+}
+
+# --------------------------------------------------------------- early exits
+# Unconfigured is not an error: on a fresh machine the timer's first tick
+# (OnStartupSec=3min) lands long before the documented manual `rclone config`
+# step, and without this guard that round raised a confusing "Sync failed:
+# didn't find section in config file" notification and left the unit failed
+# (audit 2026-08-07). Quiet skip; every unit stays null (not false) so the
+# first real success never raises a phantom "Sync recovered" toast.
 # `grep -x >/dev/null`, never `grep -qx`: -q exits at the first match, which
 # SIGPIPEs rclone mid-write and makes pipefail report 141 for a found remote.
 if ! rclone listremotes 2>/dev/null | grep -x "${remote%%:*}:" >/dev/null; then
   echo "qshell-sync: rclone remote ${remote%%:*}: not configured — skipped (run: rclone config)"
-  mkdir -p "$sync_dir"
-  tmp="$(mktemp "$status_file.XXXXXX")"
-  jq -cn --arg machine "$machine" --arg when "$(date -Is)" \
-    '{ok: null, machine: $machine, lastRun: $when, error: "rclone remote not configured", errorKind: "unconfigured", resynced: false}' >"$tmp"
-  mv "$tmp" "$status_file"
+  for id in "${selected[@]}"; do
+    unit_skip "$id" "rclone remote not configured"
+  done
+  write_status false ""
   exit 0
 fi
 
@@ -104,171 +347,271 @@ if command -v nmcli >/dev/null 2>&1; then
   fi
 fi
 
-failures=()
-resynced=false
+# Remember which units were already failing, so the notification fires once
+# per streak rather than once per 15-minute round.
+declare -A WAS_FAILING
+for id in "${units_all[@]}"; do
+  WAS_FAILING[$id]="${UNIT_OK[$id]}"
+done
 
-# Run one rclone verb, keeping stderr for classification. A failure is
-# recorded, never fatal — the other half of the round still deserves its try.
-run_rclone() { # label, argv...
-  local label="$1"
-  shift
+# ------------------------------------------------------------- the rclone verb
+# Run one rclone verb, keeping stderr for classification. Returns non-zero
+# with the first stderr line in `rclone_err` — the caller decides whether that
+# fails its unit.
+rclone_err=""
+run_rclone() { # argv...
   local rc=0 err=""
   err="$(rclone "$@" 2>&1 >/dev/null)" || rc=$?
   if ((rc != 0)); then
-    local first_line
-    first_line="$(head -n 1 <<<"$err")"
-    failures+=("$label: ${first_line:-rclone exited $rc}")
+    rclone_err="$(head -n 1 <<<"$err")"
+    [[ -z $rclone_err ]] && rclone_err="rclone exited $rc"
+    return 1
+  fi
+  rclone_err=""
+  return 0
+}
+
+# A push-own / pull-others pair, the shape three units share.
+push_pull() { # id, localFile, remoteDir, remoteName, stageDir
+  local id="$1" local_file="$2" remote_dir="$3" remote_name="$4" stage="$5"
+  local problems=()
+  if [[ -f $local_file ]]; then
+    run_rclone copyto "$local_file" "$remote_dir/$remote_name" || problems+=("push: $rclone_err")
+  fi
+  run_rclone copy "$remote_dir" "$stage" --exclude "$remote_name" || problems+=("pull: $rclone_err")
+  if ((${#problems[@]} > 0)); then
+    unit_fail "$id" "$(printf '%s; ' "${problems[@]}")"
     return 1
   fi
   return 0
 }
 
-# ------------------------------------------------------------------ history
-# Push only our own file; pull everything but it. The exclusion is what keeps
-# a pull from clobbering appends made since the push.
-if [[ -f "$hist_dir/$machine.history" ]]; then
-  run_rclone "history push" copyto "$hist_dir/$machine.history" "$remote/history/$machine.history" || true
-else
-  echo "qshell-sync: no local history file yet ($hist_dir/$machine.history), nothing to push"
-fi
-run_rclone "history pull" copy "$remote/history" "$hist_dir" --exclude "$machine.history" || true
+# bisync, with the two safety aborts this hub actually hits handled by name.
+#
+#   "cannot find prior" / "--resync"  — first run here, or a previous round
+#   died mid-flight. Answer it once, and say so: that round is union-only, so
+#   a deletion made just before it can resurrect.
+#
+#   "all files were changed"  — bisync treats a 100%-changed path as
+#   suspicious. For a directory holding one or two files that heuristic is
+#   arithmetic, not evidence: editing the single notes.json IS 100% of the
+#   files, so the notes unit could never sync a change and had been failing
+#   every round since (found 2026-08-17). --force is the documented bypass,
+#   but it also disables the --max-delete guard, so it is spent ONLY on the
+#   degenerate case — a path of at most `force_max` files. A big directory
+#   that really did change everything still aborts, which is the case the
+#   check exists for.
+bisync_unit() { # id, localDir, remoteDir, forceMaxFiles, extraArgs...
+  local id="$1" local_dir="$2" remote_dir="$3" force_max="$4"
+  shift 4
+  local err="" rc=0
+  # Its own variable rather than the unit's detail field: the detail carried
+  # over from the PREVIOUS round is still in place while this runs, and
+  # composing onto it produced "40 file(s) — 40 file(s)".
+  bisync_note=""
+  err="$(rclone bisync "$local_dir" "$remote_dir" --resilient --recover "$@" 2>&1 >/dev/null)" || rc=$?
+  ((rc == 0)) && return 0
 
-# ------------------------------------------------------------- fish history
+  if grep -q -i -e "--resync" -e "cannot find prior" <<<"$err"; then
+    resynced=true
+    run_rclone mkdir "$remote_dir" || true
+    if run_rclone bisync "$local_dir" "$remote_dir" --resync --resilient --recover "$@"; then
+      bisync_note="bootstrapped with --resync"
+      return 0
+    fi
+    unit_fail "$id" "resync: $rclone_err"
+    return 1
+  fi
+
+  if grep -q -i "all files were changed" <<<"$err"; then
+    local count
+    count="$(find "$local_dir" -type f 2>/dev/null | wc -l)"
+    if ((count <= force_max)); then
+      if run_rclone bisync "$local_dir" "$remote_dir" --resilient --recover --force "$@"; then
+        bisync_note="forced past the all-changed check"
+        return 0
+      fi
+      unit_fail "$id" "forced bisync: $rclone_err"
+      return 1
+    fi
+    unit_fail "$id" "all $count files changed — refusing to sync; run by hand with --force if that is real"
+    return 1
+  fi
+
+  unit_fail "$id" "$(head -n 1 <<<"$err")"
+  return 1
+}
+
+# ------------------------------------------------------------------ the units
+resynced=false
+bisync_note=""
+
+sync_history() {
+  if [[ ! -f "$hist_dir/$machine.history" ]]; then
+    echo "qshell-sync: no local history file yet ($hist_dir/$machine.history), nothing to push"
+  fi
+  push_pull history "$hist_dir/$machine.history" "$remote/history" "$machine.history" "$hist_dir" || return 0
+  local others
+  others="$(find "$hist_dir" -maxdepth 1 -name '*.history' 2>/dev/null | wc -l)"
+  unit_ok history "$others machine(s)"
+}
+
 # Same push-own / pull-others shape, plus an import step bash never needed:
 # fish cannot read another session's file, so pulled files stage under the
 # sync dir (NOT ~/.local/share/fish — fish must never see them as sessions)
-# and bin/fish-history-merge unions them into the local session file. The
-# push runs FIRST, so the hub copy of this machine's file converges toward
-# the union one round late — accepted: identity is (cmd, when), the union is
+# and bin/fish-history-merge unions them into the local session file. The push
+# runs FIRST, so the hub copy of this machine's file converges toward the
+# union one round late — accepted: identity is (cmd, when), the union is
 # monotone, and one writer per hub file still holds. Session slug mirrors
 # conf.d/10-history.fish: fish session names are [a-zA-Z0-9_] only.
-fish_slug="${machine//[^a-zA-Z0-9_]/_}"
-fish_local="$HOME/.local/share/fish/${fish_slug}_history"
-fish_stage="$sync_dir/fish-history"
-mkdir -p "$fish_stage"
-if [[ -f $fish_local ]]; then
-  run_rclone "fish-history push" copyto "$fish_local" "$remote/fish-history/${fish_slug}_history" || true
-fi
-run_rclone "fish-history pull" copy "$remote/fish-history" "$fish_stage" --exclude "${fish_slug}_history" || true
-shopt -s nullglob
-fish_remote_files=("$fish_stage"/*_history)
-shopt -u nullglob
-if ((${#fish_remote_files[@]} > 0)); then
-  merge_err="$("$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fish-history-merge" "$fish_local" "${fish_remote_files[@]}" 2>&1)" \
-    || failures+=("fish-history merge: ${merge_err:-merge failed}")
-fi
+sync_fish_history() {
+  local fish_slug="${machine//[^a-zA-Z0-9_]/_}"
+  local fish_local="$HOME/.local/share/fish/${fish_slug}_history"
+  local fish_stage="$sync_dir/fish-history"
+  mkdir -p "$fish_stage"
+  push_pull fish-history "$fish_local" "$remote/fish-history" "${fish_slug}_history" "$fish_stage" || return 0
 
-# -------------------------------------------------------------- model-usage
-# Services/Sync.qml's snapshots: same one-writer-per-device shape as history.
-usage_dir="$sync_dir/model-usage"
-mkdir -p "$usage_dir"
-if [[ -f "$usage_dir/$machine.json" ]]; then
-  run_rclone "model-usage push" copyto "$usage_dir/$machine.json" "$remote/model-usage/$machine.json" || true
-fi
-run_rclone "model-usage pull" copy "$remote/model-usage" "$usage_dir" --exclude "$machine.json" || true
-
-# -------------------------------------------------------------- screenshots
-# bisync needs both ends to exist, and demands --resync on its first run and
-# after a run that died mid-flight. Detect that exact ask and answer it once.
-bisync_err=""
-bisync_rc=0
-bisync_err="$(rclone bisync "$shots_dir" "$remote/screenshots" --resilient --recover 2>&1 >/dev/null)" || bisync_rc=$?
-if ((bisync_rc != 0)); then
-  if grep -q -i -e "--resync" -e "cannot find prior" <<<"$bisync_err"; then
-    resynced=true
-    run_rclone "screenshots resync" mkdir "$remote/screenshots" || true
-    if ! run_rclone "screenshots bisync --resync" bisync "$shots_dir" "$remote/screenshots" --resync --resilient --recover; then
-      : # recorded by run_rclone
-    fi
-  else
-    first_line="$(head -n 1 <<<"$bisync_err")"
-    failures+=("screenshots bisync: ${first_line:-rclone exited $bisync_rc}")
+  shopt -s nullglob
+  local fish_remote_files=("$fish_stage"/*_history)
+  shopt -u nullglob
+  if ((${#fish_remote_files[@]} == 0)); then
+    unit_ok fish-history "no other machine yet"
+    return 0
   fi
-fi
-
-# -------------------------------------------------------------------- notes
-# Same bisync-with-self-service---resync shape as screenshots above.
-notes_dir="$state_dir/notes"
-mkdir -p "$notes_dir/attachments"
-notes_err=""
-notes_rc=0
-notes_err="$(rclone bisync "$notes_dir" "$remote/notes" --resilient --recover --exclude last-capture.sha1 2>&1 >/dev/null)" || notes_rc=$?
-if ((notes_rc != 0)); then
-  if grep -q -i -e "--resync" -e "cannot find prior" <<<"$notes_err"; then
-    resynced=true
-    run_rclone "notes resync" mkdir "$remote/notes" || true
-    if ! run_rclone "notes bisync --resync" bisync "$notes_dir" "$remote/notes" --resync --resilient --recover --exclude last-capture.sha1; then
-      : # recorded by run_rclone
-    fi
-  else
-    first_line="$(head -n 1 <<<"$notes_err")"
-    failures+=("notes bisync: ${first_line:-rclone exited $notes_rc}")
+  local merge_err=""
+  if ! merge_err="$("$here/fish-history-merge" "$fish_local" "${fish_remote_files[@]}" 2>&1)"; then
+    unit_fail fish-history "merge: ${merge_err:-merge failed}"
+    return 0
   fi
-fi
-
-# ------------------------------------------------------------------- status
-# Name the failure for what it is: an expired/revoked token and a full
-# Dropbox have fixes only a human can run, and deserve their own words.
-error_text=""
-error_kind=""
-if ((${#failures[@]} > 0)); then
-  error_text="$(printf '%s; ' "${failures[@]}")"
-  error_text="${error_text%; }"
-  lowered="${error_text,,}"
-  if [[ $lowered == *"insufficient space"* || $lowered == *"quota"* || $lowered == *"507"* ]]; then
-    error_kind="quota"
-  elif [[ $lowered == *"oauth"* || $lowered == *"token"* || $lowered == *"unauthorized"* || $lowered == *"401"* || $lowered == *"expired"* || $lowered == *"reconnect"* ]]; then
-    error_kind="auth"
-  else
-    error_kind="other"
-  fi
-fi
-
-previous_ok="unknown"
-if [[ -f $status_file ]]; then
-  previous_ok="$(jq -r 'if .ok == true then "true" elif .ok == false then "false" else "unknown" end' "$status_file" 2>/dev/null || echo unknown)"
-fi
-
-tmp="$(mktemp "$status_file.XXXXXX")"
-jq -cn \
-  --arg machine "$machine" \
-  --arg when "$(date -Is)" \
-  --argjson ok "$([[ -z $error_text ]] && echo true || echo false)" \
-  --arg error "$error_text" \
-  --arg errorKind "$error_kind" \
-  --argjson resynced "$resynced" \
-  '{ok: $ok, machine: $machine, lastRun: $when, error: $error, errorKind: $errorKind, resynced: $resynced}' >"$tmp"
-mv "$tmp" "$status_file"
-
-notify() { # summary, body
-  notify-send -a qshell "$1" "${2:-}" >/dev/null 2>&1 || true
+  unit_ok fish-history "${#fish_remote_files[@]} machine(s) merged"
 }
 
-if [[ -n $error_text ]]; then
-  echo "qshell-sync: FAILED — $error_text" >&2
-  # One notification per failure streak, not one per 15-minute round.
-  if [[ $previous_ok != "false" ]]; then
-    case $error_kind in
+sync_model_usage() {
+  local usage_dir="$sync_dir/model-usage"
+  mkdir -p "$usage_dir"
+  # The pull is worth running either way; only the verdict differs, so the
+  # "has this machine published yet" question is asked once and answered
+  # after, rather than branching around two identical push_pull calls.
+  local published=true
+  [[ -f "$usage_dir/$machine.json" ]] || published=false
+  push_pull model-usage "$usage_dir/$machine.json" "$remote/model-usage" "$machine.json" "$usage_dir" || return 0
+  if [[ $published == false ]]; then
+    unit_skip model-usage "no snapshot published yet"
+    return 0
+  fi
+  local others
+  others="$(find "$usage_dir" -maxdepth 1 -name '*.json' 2>/dev/null | wc -l)"
+  unit_ok model-usage "$others machine(s)"
+}
+
+sync_screenshots() {
+  # A real screenshot folder holds dozens of files; the all-changed check is
+  # meaningful there, so nothing is forced (force_max 0).
+  bisync_unit screenshots "$shots_dir" "$remote/screenshots" 0 || return 0
+  local count
+  count="$(find "$shots_dir" -maxdepth 1 -type f 2>/dev/null | wc -l)"
+  unit_ok screenshots "$count file(s)${bisync_note:+ — $bisync_note}"
+}
+
+sync_notes() {
+  local notes_dir="$state_dir/notes"
+  mkdir -p "$notes_dir/attachments"
+  # notes.json plus a usually-empty attachments dir: the store is small by
+  # design, so up to 3 files earns the --force bypass described above.
+  bisync_unit notes "$notes_dir" "$remote/notes" 3 --exclude last-capture.sha1 || return 0
+  local notes_count
+  notes_count="$(find "$notes_dir" -type f ! -name last-capture.sha1 2>/dev/null | wc -l)"
+  unit_ok notes "$notes_count file(s)${bisync_note:+ — $bisync_note}"
+}
+
+# The blob unit: bin/ssh-hub-sync owns the compare, the crypto and the
+# conflict rule. It prints a one-line summary on success and exits 3 when both
+# ends moved — which is a conflict for a human, not a transport failure.
+sync_ssh() {
+  local out="" rc=0
+  out="$("$here/ssh-hub-sync" --remote "$remote/ssh" 2>&1)" || rc=$?
+  case $rc in
+  0) unit_ok ssh "$(tail -n 1 <<<"$out")" ;;
+  2) unit_skip ssh "$(tail -n 1 <<<"$out")" ;;
+  *) unit_fail ssh "$(tail -n 1 <<<"$out")" ;;
+  esac
+}
+
+# ------------------------------------------------------------------ the round
+write_status true ""
+
+for id in "${selected[@]}"; do
+  write_status true "$id"
+  case "$id" in
+  history) sync_history ;;
+  fish-history) sync_fish_history ;;
+  model-usage) sync_model_usage ;;
+  screenshots) sync_screenshots ;;
+  notes) sync_notes ;;
+  ssh) sync_ssh ;;
+  esac
+  write_status true "$id"
+done
+
+write_status false ""
+
+# ------------------------------------------------------------- the aftermath
+failed=()
+for id in "${selected[@]}"; do
+  [[ ${UNIT_OK[$id]} == false ]] && failed+=("$id")
+done
+
+if ((${#failed[@]} > 0)); then
+  summary=""
+  for id in "${failed[@]}"; do
+    summary+="$(unit_label "$id"): ${UNIT_ERR[$id]}; "
+  done
+  summary="${summary%; }"
+  echo "qshell-sync: FAILED — $summary" >&2
+
+  # One notification per failure streak per unit: a unit that was already
+  # failing when this round started stays quiet.
+  fresh=()
+  for id in "${failed[@]}"; do
+    [[ ${WAS_FAILING[$id]} != false ]] && fresh+=("$id")
+  done
+  if ((${#fresh[@]} > 0)); then
+    kind="${UNIT_KIND[${fresh[0]}]}"
+    names=""
+    for id in "${fresh[@]}"; do names+="$(unit_label "$id"), "; done
+    names="${names%, }"
+    case $kind in
     quota)
-      notify "Sync: Dropbox is full" "Free up space or upgrade — history and screenshots are not syncing. $error_text"
+      notify "Sync: Dropbox is full" "Free up space or upgrade — $names not syncing."
       ;;
     auth)
-      notify "Sync: Dropbox needs re-authorizing" "Run in a terminal:  rclone config reconnect Dropbox:  — until then nothing syncs. $error_text"
+      notify "Sync: Dropbox needs re-authorizing" "Run in a terminal:  rclone config reconnect Dropbox:  — until then nothing syncs."
+      ;;
+    conflict)
+      notify "Sync: $names changed on two machines" "Open the sync panel to pick a side."
       ;;
     *)
-      notify "Sync failed" "$error_text"
+      notify "Sync failed: $names" "Open the sync panel to see why and retry."
       ;;
     esac
   fi
   exit 1
 fi
 
-if [[ $previous_ok == "false" ]]; then
-  notify "Sync recovered" "History and screenshots are syncing again"
+# Recovered: something in this round's scope had been failing and no longer is.
+recovered=()
+for id in "${selected[@]}"; do
+  [[ ${WAS_FAILING[$id]} == false && ${UNIT_OK[$id]} == true ]] && recovered+=("$id")
+done
+if ((${#recovered[@]} > 0)); then
+  names=""
+  for id in "${recovered[@]}"; do names+="$(unit_label "$id"), "; done
+  notify "Sync recovered" "${names%, } syncing again"
 fi
+
 # Not `$resynced && echo`: a false left side would be this script's last
 # status and set -e would turn a clean round into exit 1.
 if [[ $resynced == true ]]; then
-  echo "qshell-sync: screenshots pair was (re)bootstrapped with --resync — deletions did not propagate this round"
+  echo "qshell-sync: a bisync pair was (re)bootstrapped with --resync — deletions did not propagate this round"
 fi
-echo "qshell-sync: ok"
+echo "qshell-sync: ok (${selected[*]})"

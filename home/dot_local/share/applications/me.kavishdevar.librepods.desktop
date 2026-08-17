@@ -1,0 +1,25 @@
+# Copy of the entry librepods' own `cmake --install` writes to this exact
+# path, plus one line: NoDisplay=true.
+#
+# Unlike the qt6-designer/qt6-linguist entries next door, this is NOT a shadow
+# of something in /usr — librepods installs straight into ~/.local, so this
+# file and the build's file are the same path and the build wins on a
+# reinstall. `chezmoi apply` puts this back; do that after rebuilding
+# librepods (packages/manifest.toml has the build line).
+#
+# Why hide it at all: librepods.service runs the daemon --no-ui and it owns
+# the AAP channel (L2CAP PSM 0x1001), which exactly one process can hold.
+# Launching the GUI from this entry starts a second instance that fights the
+# daemon for that channel, and the bar's own AirPods panel is already the UI.
+# Hiding beats deleting — the build recreates it, and a launcher entry that
+# reappears every rebuild is worse than one that is permanently silent.
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=LibrePods
+Comment=AirPods libreated from Apple's ecosystem
+Exec=librepods
+Icon=librepods
+Terminal=false
+Categories=Audio;AudioVideo;Utility;Qt;
+NoDisplay=true

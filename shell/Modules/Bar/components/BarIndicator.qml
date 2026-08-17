@@ -1,6 +1,6 @@
 import QtQuick
 
-// Status-slot indicator, ported from omarchy's BarIndicator (CREDITS.md).
+// Status-slot indicator, ported from omarchy's BarIndicator.
 //
 // An indicator is a two-state status glyph: ON is fully lit and always shown,
 // OFF is dimmed to 0.45 and hidden until the indicator container reveals it.

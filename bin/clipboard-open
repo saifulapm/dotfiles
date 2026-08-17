@@ -3,7 +3,7 @@
 #
 #   clipboard-open --history-index <index>
 #
-# Port of omarchy's bin/omarchy-clipboard-open (MIT, see CREDITS.md): a URL
+# Port of omarchy's bin/omarchy-clipboard-open (MIT): a URL
 # (or something that looks like a bare domain) goes to the browser, an image
 # entry opens in the image viewer, and any other text is written to a scratch
 # file and opened in an editor. The entry travels by INDEX for the same

@@ -9,7 +9,7 @@ import "../../components/PickerModel.js" as PickerModel
 // and calls `omarchy-menu-images --print-name --show-labels --filterable
 // --lazy-thumbnails --selected <current>`). So this is the same filmstrip the
 // wallpaper picker uses, one tile per theme, labelled and pre-selected on the
-// active theme, filterable by typing. See CREDITS.md.
+// active theme, filterable by typing.
 //
 // Preview images are resolved by bin/theme-list (their find_preview order:
 // preview.* in the theme's directory, else the first sorted image in its

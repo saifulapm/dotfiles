@@ -1,4 +1,4 @@
-// Direct copy of omarchy's shell/plugins/polkit/PolkitModel.js (CREDITS.md,
+// Direct copy of omarchy's shell/plugins/polkit/PolkitModel.js (
 // direct copies). Whitespace follows house 4-space style; nothing else
 // changed. promptLooksFingerprint is exported and unused, as it is upstream.
 

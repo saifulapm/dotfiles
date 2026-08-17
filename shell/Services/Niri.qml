@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 
 // niri IPC over $NIRI_SOCKET. Event stream only — state arrives as pushed
-// deltas, never by polling. Socket + SplitParser pattern per DMS (CREDITS.md).
+// deltas, never by polling. Socket + SplitParser pattern per DMS.
 // Wire format verified against ~/ref/niri/niri-ipc/src/lib.rs.
 QtObject {
     id: root

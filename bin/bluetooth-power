@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # bluetooth-power — turn Bluetooth on or off, remembered across reboots. Port
-# of omarchy's bin/omarchy-bluetooth-power (CREDITS.md, c53190b).
+# of omarchy's bin/omarchy-bluetooth-power (c53190b).
 #
 # BlueZ never persists an adapter's Powered property, so turning Bluetooth off
 # through bluetoothctl lasts only until the next boot. The rfkill soft block does

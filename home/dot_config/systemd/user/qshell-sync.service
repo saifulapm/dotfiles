@@ -1,5 +1,5 @@
 [Unit]
-Description=Sync shell history and screenshots through the Dropbox hub
+Description=Sync history, notes, screenshots and ~/.ssh through the Dropbox hub
 
 [Service]
 Type=oneshot

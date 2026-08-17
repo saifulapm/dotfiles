@@ -1,5 +1,5 @@
 # Rsync-on-change watchers: rsw starts one detached, lsw lists, dsw stops
-# (omarchy default/bash/fns/rsyncing, CREDITS.md). The watch loop itself
+# (omarchy default/bash/fns/rsyncing). The watch loop itself
 # stays a bash one-liner — setsid + inotifywait pipelines are what bash is
 # for — and one SSH ControlMaster socket per host keeps auth to one prompt.
 function rsw --description 'Mirror a directory on every change'

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # power-profile — set and REMEMBER the power profile per power source.
 #
-# Port of omarchy-powerprofiles-set/-list (CREDITS.md): one saved profile for
+# Port of omarchy-powerprofiles-set/-list: one saved profile for
 # AC and one for battery (~/.local/state/qshell/powerprofiles/{ac,battery}),
 # `autodetect` resolves the source the same way the shell does (UPower
 # OnBattery over D-Bus) so every entry point — PowerPanel buttons, the menu's

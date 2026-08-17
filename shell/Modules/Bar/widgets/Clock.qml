@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../components"
+import "../../../components"
 import "ClockModel.js" as Model
 
 // Omarchy's clock: the format lives in the widget's inline shell.json entry,
@@ -102,12 +103,14 @@ BarButton {
         precision: SystemClock.Minutes
     }
 
-    Text {
+    StyledText {
+        theme: rootItem.theme
+        role: StyledText.BodyLarge
+        mono: true
+
         anchors.verticalCenter: parent.verticalCenter
         visible: !rootItem.vertical
         color: rootItem.contentColor
-        font.family: rootItem.theme.fontMono
-        font.pixelSize: rootItem.theme.fontPx(1.0)
         renderType: Text.NativeRendering
         text: rootItem.displayText
     }

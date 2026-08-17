@@ -1,9 +1,10 @@
 import QtQuick
 import Quickshell
 import "../components"
+import "../../../components"
 
 // MPRIS now-playing — full port of omarchy's media bar widget
-// (shell/plugins/services/media/BarWidget.qml, CREDITS.md) over our media
+// (shell/plugins/services/media/BarWidget.qml) over our media
 // service: play/pause glyph dimmed darker while paused, the "title · artist"
 // label auto-scrolling inside a clip when it outgrows `maxLabelWidth` (an
 // inline shell.json setting, their default 180), left click play/pause,
@@ -75,15 +76,15 @@ BarButton {
         clip: true
         visible: !rootItem.vertical && rootItem.title !== ""
 
-        Text {
+        StyledText {
             id: labelText
+            theme: rootItem.theme
+            mono: true
 
             anchors.verticalCenter: parent.verticalCenter
             text: rootItem.title + (rootItem.artist ? "  ·  " + rootItem.artist : "")
             color: rootItem.contentColor
             opacity: 0.85
-            font.family: rootItem.theme.fontMono
-            font.pixelSize: rootItem.theme.fontPx(0.917)
             renderType: Text.NativeRendering
 
             property bool needsScroll: implicitWidth > scrollClip.width
