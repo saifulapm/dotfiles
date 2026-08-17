@@ -47,6 +47,28 @@ if [[ $cgroup == *qshell.service* ]]; then
   exec systemctl --user restart --no-block qshell.service
 fi
 
+# Reaching here means the CALLER is outside the unit, which is not the same
+# thing as the shell being outside it. A terminal, an editor task or an agent
+# invoking this by hand lands here while systemd owns the running shell
+# perfectly well — and the pkill below would then retire the unit (SIGTERM
+# reads as a clean exit, so Restart=on-failure declines, exactly as the header
+# describes) and leave a bare replacement running OUTSIDE the cgroup, with no
+# unit to restart it next time. So ask systemd whether it owns the only shell
+# that is running, which MainPID answers from any caller.
+#
+# No --no-block here, unlike the branch above: nothing is about to tear this
+# process down, so waiting is safe and tells the caller whether it worked.
+main_pid="$(systemctl --user show qshell.service -p MainPID --value 2>/dev/null || echo 0)"
+# Both names: a crash-relaunched or hand-started instance runs under comm
+# "quickshell" (qs is a symlink), and `pkill -x qs` misses it — the same sweep
+# bin/bench does.
+others="$(pgrep -x qs; pgrep -x quickshell)"
+others="$(printf '%s\n' "$others" | grep -v "^${main_pid}\$" | grep -c . || true)"
+
+if [[ ${main_pid:-0} -gt 0 && -d /proc/${main_pid} && ${others} -eq 0 ]]; then
+  exec systemctl --user restart qshell.service
+fi
+
 # A hand-run instance (`just run`, a dev checkout): no unit owns it, nothing
 # will bring it back, and the old dance is right — setsid so the replacement
 # does not sit in the dying process's session.
