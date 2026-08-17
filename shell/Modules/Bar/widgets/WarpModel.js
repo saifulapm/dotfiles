@@ -450,6 +450,34 @@ function formatLatency(value) {
     return (ms < 10 ? ms.toFixed(1) : Math.round(ms)) + " ms";
 }
 
+// `estimated_loss` is a fraction, not a percentage: 0.00018 is 0.018 %. Worth a
+// row of its own — on a tunnel, loss is what explains a connection that is up
+// and miserable, and it is the number the latency alone will not show you.
+function formatLoss(value) {
+    var fraction = Number(value);
+    if (!isFinite(fraction) || fraction < 0)
+        return "";
+    var percent = fraction * 100;
+    if (percent === 0)
+        return "0%";
+    if (percent < 0.01)
+        return "<0.01%";
+    return percent.toFixed(2) + "%";
+}
+
+// `secs_since_last_handshake` counts up from the last one, so it is an age and
+// reads as one. A tunnel whose handshake is minutes old is a tunnel to look at.
+function formatHandshake(value) {
+    var secs = Number(value);
+    if (!isFinite(secs) || secs < 0)
+        return "";
+    if (secs < 60)
+        return Math.round(secs) + " s ago";
+    if (secs < 3600)
+        return Math.round(secs / 60) + " min ago";
+    return Math.round(secs / 3600) + " h ago";
+}
+
 function metricsToObject(metrics) {
     var result = {};
     for (var i = 0; i < metrics.length; i++) {
@@ -462,9 +490,29 @@ function metricsToObject(metrics) {
     return result;
 }
 
+// The endpoint is split by family on this build, and an unused family is
+// present-but-blank rather than absent: "::" for v6, "0.0.0.0" for v4. Take
+// whichever one is actually carrying the tunnel.
+function tunnelEndpoint(stats) {
+    var v4 = firstString(stats, ["v4_endpoint", "endpoint", "peer_endpoint", "server"]);
+    if (v4 !== "" && v4 !== "0.0.0.0" && v4 !== "0.0.0.0:0")
+        return v4;
+    var v6 = firstString(stats, ["v6_endpoint"]);
+    if (v6 !== "" && v6 !== "::" && v6 !== "[::]:0")
+        return v6;
+    return "";
+}
+
 // `warp-cli --json tunnel stats` shapes differ per release: sometimes a flat
 // object, sometimes {"stats": {...}}, sometimes a metric array. Disconnected it
 // answers {"code":"WarpNotConnected"} at exit 0, which lands in `empty`.
+//
+// The key names below were read off a live tunnel here on 2026-08-17, and three
+// of them are why: this build says `v4_endpoint`, `estimated_latency_ms` and
+// `secs_since_last_handshake`, none of which the ported spellings probed — so
+// Endpoint, Latency and the handshake were silently blank on every connection
+// while Protocol and Transfer worked. Nothing but a real tunnel shows that; the
+// disconnected answer is an error payload, so the parse looked fine.
 function parseTunnelStats(raw) {
     var data = parseJson(raw);
     var empty = {
@@ -472,9 +520,12 @@ function parseTunnelStats(raw) {
         endpoint: "",
         protocol: "",
         latency: "",
+        loss: "",
         sent: "",
         received: "",
-        handshake: ""
+        handshake: "",
+        colo: "",
+        postQuantum: false
     };
     if (!data || typeof data !== "object" || data.code || data.error)
         return empty;
@@ -483,7 +534,9 @@ function parseTunnelStats(raw) {
     if (typeof stats.length === "number")
         stats = metricsToObject(stats);
 
-    var latency = stats.latency_ms;
+    var latency = stats.estimated_latency_ms;
+    if (latency === undefined)
+        latency = stats.latency_ms;
     if (latency === undefined)
         latency = stats.latency;
     if (latency === undefined)
@@ -492,14 +545,21 @@ function parseTunnelStats(raw) {
     var sent = stats.bytes_sent !== undefined ? stats.bytes_sent : stats.tx_bytes;
     var received = stats.bytes_received !== undefined ? stats.bytes_received : stats.rx_bytes;
 
+    var handshake = stats.secs_since_last_handshake;
+    var edge = stats.edge && typeof stats.edge === "object" ? stats.edge : {};
+    var tls = stats.tls && typeof stats.tls === "object" ? stats.tls : {};
+
     return {
         ok: true,
-        endpoint: firstString(stats, ["endpoint", "peer_endpoint", "server", "colo"]),
+        endpoint: tunnelEndpoint(stats),
         protocol: firstString(stats, ["protocol", "tunnel_protocol"]),
         latency: formatLatency(latency),
+        loss: stats.estimated_loss === undefined ? "" : formatLoss(stats.estimated_loss),
         sent: sent === undefined ? "" : formatBytes(sent),
         received: received === undefined ? "" : formatBytes(received),
-        handshake: firstString(stats, ["last_handshake", "latest_handshake", "handshake"])
+        handshake: handshake === undefined ? firstString(stats, ["last_handshake", "latest_handshake", "handshake"]) : formatHandshake(handshake),
+        colo: firstString(edge, ["colo"]),
+        postQuantum: tls.post_quantum_enabled === true
     };
 }
 
@@ -712,7 +772,9 @@ if (typeof module !== "undefined") {
         errorMessage: errorMessage,
         findMode: findMode,
         formatBytes: formatBytes,
+        formatHandshake: formatHandshake,
         formatLatency: formatLatency,
+        formatLoss: formatLoss,
         humanize: humanize,
         isDaemonDown: isDaemonDown,
         isTunnelMode: isTunnelMode,

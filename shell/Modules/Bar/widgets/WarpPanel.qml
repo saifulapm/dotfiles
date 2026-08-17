@@ -670,11 +670,29 @@ BarPanel {
                     value: panel.stats !== null ? panel.stats.latency : ""
                 }
 
+                // Loss is what explains a tunnel that is up and miserable, and
+                // the latency beside it will not show it.
+                InfoPair {
+                    theme: panel.theme
+                    visible: panel.stats !== null && panel.stats.loss !== ""
+                    label: "Loss"
+                    value: panel.stats !== null ? panel.stats.loss : ""
+                }
+
                 InfoPair {
                     theme: panel.theme
                     visible: panel.stats !== null && (panel.stats.sent !== "" || panel.stats.received !== "")
                     label: "Transfer"
                     value: panel.stats === null ? "" : "↑ " + panel.stats.sent + "   ↓ " + panel.stats.received
+                }
+
+                // An age, not a timestamp: a handshake minutes old on a tunnel
+                // that claims to be up is the first sign it is not.
+                InfoPair {
+                    theme: panel.theme
+                    visible: panel.stats !== null && panel.stats.handshake !== ""
+                    label: "Handshake"
+                    value: panel.stats !== null ? panel.stats.handshake : ""
                 }
             }
 

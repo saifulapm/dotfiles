@@ -178,6 +178,54 @@ test("formatBytes and formatLatency stay compact", () => {
     assert.equal(Model.formatLatency(0), "");
 });
 
+test("tunnel stats reads a live 2026.6 tunnel, key for key", () => {
+    // Verbatim off a connected tunnel here, 2026-08-17. Three of these key
+    // names were not probed before, so Endpoint, Latency and the handshake age
+    // were blank on every real connection while Protocol and Transfer worked —
+    // which is why this fixture exists rather than a hand-written one.
+    const live = JSON.stringify({
+        v4_endpoint: "162.159.198.2",
+        v6_endpoint: "::",
+        warp_is_on: true,
+        secs_since_last_handshake: 21,
+        bytes_sent: 3144310,
+        bytes_received: 194150,
+        estimated_latency_ms: 53,
+        estimated_loss: 0.00018122129,
+        protocol: "MASQUE (HTTPS via UDP)",
+        tls: {
+            version: "TLSv1.3",
+            curve: "P256Kyber768Draft00",
+            cipher: "TLS_AES_256_GCM_SHA384",
+            post_quantum_enabled: true
+        },
+        edge: { colo: "SIN", metal: "412f662" }
+    });
+
+    const stats = Model.parseTunnelStats(live);
+    assert.equal(stats.ok, true);
+    assert.equal(stats.endpoint, "162.159.198.2");
+    assert.equal(stats.protocol, "MASQUE (HTTPS via UDP)");
+    assert.equal(stats.latency, "53 ms");
+    assert.equal(stats.loss, "0.02%");
+    assert.equal(stats.sent, "3.0 MB");
+    assert.equal(stats.received, "190 KB");
+    assert.equal(stats.handshake, "21 s ago");
+    assert.equal(stats.colo, "SIN");
+    assert.equal(stats.postQuantum, true);
+
+    // An unused family is blank rather than absent, and must not be shown.
+    assert.equal(Model.parseTunnelStats('{"v4_endpoint":"0.0.0.0","v6_endpoint":"2606:4700::1"}').endpoint, "2606:4700::1");
+    assert.equal(Model.parseTunnelStats('{"v4_endpoint":"0.0.0.0","v6_endpoint":"::"}').endpoint, "");
+
+    assert.equal(Model.formatLoss(0), "0%");
+    assert.equal(Model.formatLoss(0.00000046), "<0.01%");
+    assert.equal(Model.formatLoss(0.031), "3.10%");
+    assert.equal(Model.formatHandshake(21), "21 s ago");
+    assert.equal(Model.formatHandshake(109), "2 min ago");
+    assert.equal(Model.formatHandshake(7200), "2 h ago");
+});
+
 test("tunnel stats reads whichever shape the release emits", () => {
     const flat = Model.parseTunnelStats('{"endpoint":"162.159.193.1:2408","latency_ms":12.5,"bytes_sent":2048,"bytes_received":4096}');
     assert.equal(flat.ok, true);
