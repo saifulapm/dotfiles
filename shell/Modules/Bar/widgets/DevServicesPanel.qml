@@ -266,18 +266,17 @@ BarPanel {
 
             // Their PanelActionButton shape: a bordered square holding one
             // glyph (md-web renders under the Symbols Nerd Font fallback).
-            Rectangle {
+            ChipSurface {
                 id: webButton
 
                 visible: row.hasWeb && row.isRunning
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                theme: panel.theme
                 implicitWidth: panel.theme.space(8)
                 implicitHeight: panel.theme.space(7)
-                radius: panel.theme.radius(0.75)
-                color: webMouse.containsMouse ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
-                border.width: panel.theme.borderWidth
-                border.color: panel.theme.surface3
+                // An action, not a choice — `chosen` never fires.
+                pointerOver: webMouse.containsMouse
 
                 OpticalGlyph {
                     anchors.centerIn: parent

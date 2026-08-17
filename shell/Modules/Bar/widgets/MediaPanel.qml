@@ -323,7 +323,7 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- components
-    component TransportButton: Rectangle {
+    component TransportButton: ChipSurface {
         id: transportButton
 
         property string glyph: ""
@@ -334,12 +334,14 @@ BarPanel {
 
         signal clicked
 
+        theme: panel.theme
         implicitWidth: buttonWidth
         implicitHeight: panel.theme.space(8)
-        radius: panel.theme.radius(0.75)
-        color: transportHover.hovered && enabled ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
-        border.width: panel.theme.borderWidth
-        border.color: panel.theme.surface3
+        // An action, not a choice — `chosen` never fires.
+        pointerOver: transportHover.hovered && enabled
+        // Its own dim rather than the family's 0.45: a transport button with
+        // no player to drive has always sat a shade deeper than an inert
+        // chip, and that is a design call, not drift.
         opacity: enabled ? 1 : 0.4
 
         OpticalGlyph {

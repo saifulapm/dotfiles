@@ -610,18 +610,18 @@ BarPanel {
             // ForgetButton reasoning): the row underneath owns a full-fill
             // MouseArea, and a TapHandler's passive grab would let one click
             // dismiss AND activate.
-            Rectangle {
+            ChipSurface {
                 id: dismissBtn
 
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                theme: panel.theme
                 width: panel.theme.space(6)
                 height: panel.theme.space(6)
                 visible: notifRow.showDismiss
-                radius: panel.theme.radius(0.75)
-                color: dismissMouse.containsMouse ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2
-                border.width: panel.theme.borderWidth
-                border.color: panel.theme.surface3
+                // An action, not a choice: `chosen` never fires, so this is
+                // the family's plain tile — surface2, hover lift, hairline.
+                pointerOver: dismissMouse.containsMouse
 
                 OpticalGlyph {
                     anchors.centerIn: parent
