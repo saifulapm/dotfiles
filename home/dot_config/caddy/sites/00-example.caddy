@@ -9,20 +9,25 @@
 # chezmoi's, so they are not tracked in the dotfiles repo. An exact hostname
 # always beats the wildcard *.test block, whatever the filenames sort to.
 #
+# The wildcard only serves ~/Sites/laravel/<project>/public, so a project that
+# lives anywhere else under ~/Sites (github/, shopify_themes/, tries/) needs a
+# file here to get a hostname at all — that is the main reason to write one.
+#
 # Pin one project to PHP 8.3 (9083 is the 8.3 socket; 9084 is the default):
 #
 #   legacy.test {
 #   	tls internal
-#   	root * /home/saiful/Sites/legacy/public
+#   	root * /home/saiful/Sites/laravel/legacy/public
 #   	php_fastcgi 127.0.0.1:9083
 #   	file_server
 #   }
 #
-# A project that is not a Laravel app — serve the repo root, no public/:
+# A project outside ~/Sites/laravel, or one that is not a Laravel app — serve
+# the repo root, no public/:
 #
 #   docs.test {
 #   	tls internal
-#   	root * /home/saiful/Sites/docs
+#   	root * /home/saiful/Sites/github/docs
 #   	file_server browse
 #   }
 #

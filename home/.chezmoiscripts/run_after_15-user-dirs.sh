@@ -8,7 +8,10 @@
 # as a stray symlink into the repo.
 set -euo pipefail
 
-mkdir -p "$HOME/Sites"
+# Sites/laravel is the one subdirectory the *.test wildcard serves — caddy
+# resolves app.test to Sites/laravel/app/public, so the directory has to exist
+# before a project can be dropped into it (see caddy/Caddyfile.tmpl).
+mkdir -p "$HOME/Sites/laravel"
 
 # GOBIN (~/.config/go/env homes go there) — pre-created because fish_add_path
 # silently skips directories that don't exist yet, leaving GOBIN off PATH
