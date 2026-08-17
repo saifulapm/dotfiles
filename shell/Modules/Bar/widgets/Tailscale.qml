@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import "../components"
 
-// Tailscale — port of omarchy's tailscale plugin bar button (CREDITS.md).
+// Tailscale — port of omarchy's tailscale plugin bar button.
 //
 // The mark is their drawn TailscaleIcon rather than a font glyph, and it
 // carries the three states theirs does: the plain mark in the bar foreground

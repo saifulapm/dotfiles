@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # menu-input — prompt for a line of text with the shell menu, dmenu-style.
 #
-# Port of omarchy-menu-input (CREDITS.md): the menu's header doubles as the
+# Port of omarchy-menu-input: the menu's header doubles as the
 # input line, Enter answers with whatever was typed (possibly empty), any
 # dismissal cancels. Same file round-trip as menu-select.
 #

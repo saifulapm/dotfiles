@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # file-select — pick files with the desktop file chooser.
-# Direct copy of omarchy's omarchy-file-select (CREDITS.md); only the program
+# Direct copy of omarchy's omarchy-file-select; only the program
 # name in its two error messages differs. bin/tailscale-send is its one caller
 # here, for the tailscale panel's Taildrop send.
 #

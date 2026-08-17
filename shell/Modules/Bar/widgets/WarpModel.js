@@ -1,4 +1,4 @@
-// Near-verbatim port of tobi/omarchy-warp's Model.js (CREDITS.md): the
+// Near-verbatim port of tobi/omarchy-warp's Model.js: the
 // `warp-cli --json` envelopes and everything read out of them — the status
 // reason object, the settings block, the registration record, the tunnel stats
 // and the split-tunnel rule list — plus the mode table and the humanizer.

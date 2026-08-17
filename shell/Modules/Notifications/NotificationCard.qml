@@ -5,7 +5,7 @@ import "NotificationLogic.js" as Logic
 import "../../components"
 
 // Notification card — a full port of omarchy's
-// plugins/notifications/components/NotificationCard.qml (CREDITS.md) in our
+// plugins/notifications/components/NotificationCard.qml in our
 // theme tokens. Pure presentation: no service, Notification or ListModel
 // references, so the popup container owns lifetime and this only draws.
 Rectangle {

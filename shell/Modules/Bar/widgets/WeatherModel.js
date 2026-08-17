@@ -1,5 +1,5 @@
 // Weather parsing/formatting layer — near-verbatim port of omarchy's
-// plugins/panels/weather/Model.js (CREDITS.md). Their `parseWeatherStatus`
+// plugins/panels/weather/Model.js. Their `parseWeatherStatus`
 // (the status.sh bar-script bridge) is dropped: our widget reads the report
 // directly. `parseLocationFile` takes the widget's inline settings entry
 // instead of their weather.json, and `iconForCode` returns Material Design

@@ -5,7 +5,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 
-// Wallpaper — full port of omarchy's background plugin (CREDITS.md): the new
+// Wallpaper — full port of omarchy's background plugin: the new
 // image is drawn behind a slanted parallelogram mask whose edge sweeps out
 // from the screen's center (420 ms InOutCubic), the old image underneath
 // until the sweep passes, per screen. A theme pushed with the transition is

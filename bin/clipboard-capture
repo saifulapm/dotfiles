@@ -1,8 +1,8 @@
 #!/bin/bash
 # clipboard-capture — record clipboard selections as JSON entries.
 #
-# Direct port of omarchy's shell/plugins/clipboard/capture.sh (MIT, see
-# CREDITS.md). Theirs is only the emitter: their Clipboard.qml owns three
+# Direct port of omarchy's shell/plugins/clipboard/capture.sh (MIT).
+# Theirs is only the emitter: their Clipboard.qml owns three
 # Process objects (one snapshot run, one `wl-paste --type text --watch`, one
 # `--type image/png --watch`) that invoke the script. Ours folds the two
 # watchers into a `watch` mode so the shell supervises a single persistent

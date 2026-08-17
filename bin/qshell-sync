@@ -2,7 +2,7 @@
 # qshell-sync — one sync round against the Dropbox hub. Ours; the structural
 # idea (each device writes ONLY its own file into a shared folder, so
 # conflicts are impossible by construction) is omarchy's model-usage sync
-# invariant (CREDITS.md), applied to real files with rclone as the transport.
+# invariant, applied to real files with rclone as the transport.
 #
 # Six units move, in three shapes:
 #

@@ -2,7 +2,7 @@ import QtQuick
 import "../components"
 import "../../../components"
 
-// Weather — port of omarchy's weather plugin bar button (CREDITS.md). The
+// Weather — port of omarchy's weather plugin bar button. The
 // bar slot carries the condition glyph and the temperature; the panel is the
 // detail view; everything they read lives in WeatherService, ONE instance at
 // the bar root shared by every screen's copy of this widget (S2).

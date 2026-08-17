@@ -6,7 +6,7 @@ import "../../../components"
 
 // A tray item's own menu, drawn by us.
 //
-// Port of omarchy's tray menu popup (5b2c02d, CREDITS.md). We had no popup at
+// Port of omarchy's tray menu popup (5b2c02d). We had no popup at
 // all: Tray.qml called SystemTrayItem.display(), which builds a
 // PlatformMenuEntry, and quickshell refuses that unless the root QML sets
 // `//@ pragma UseQApplication` (src/core/platformmenu.cpp) — shell.qml does

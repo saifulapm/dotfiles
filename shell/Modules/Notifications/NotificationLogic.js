@@ -1,6 +1,6 @@
 // Non-visual half of the notification module: body sanitising, snapshotting,
 // history parsing and popup placement. Near-verbatim port of omarchy's
-// shell/plugins/notifications/NotificationLogic.js (CREDITS.md), plus the
+// shell/plugins/notifications/NotificationLogic.js, plus the
 // window-matching helpers click-to-focus needs on niri (they shell out to a
 // Hyprland helper instead).
 //

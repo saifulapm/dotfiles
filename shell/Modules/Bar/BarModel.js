@@ -1,5 +1,5 @@
-// Bar interaction math, ported from omarchy's plugins/bar/BarModel.js
-// (CREDITS.md). Pure functions only, so they can be unit-tested under node:
+// Bar interaction math, ported from omarchy's plugins/bar/BarModel.js.
+// Pure functions only, so they can be unit-tested under node:
 //   node -e 'const M = require("./BarModel.js"); …'
 //
 // Our layout lives directly under shell.json's `bar` ({left, center, right}

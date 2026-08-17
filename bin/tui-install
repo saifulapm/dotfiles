@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tui-install — create a desktop launcher for a terminal (TUI) app.
 #
-# Port of omarchy-tui-install (CREDITS.md): the launcher entry runs the
+# Port of omarchy-tui-install: the launcher entry runs the
 # command in foot under app-id TUI.float or TUI.tile — the float id matches
 # a niri window rule (875×600 centered, the qshell-float treatment), tile
 # opens as a normal column. That app-id pairing IS the mechanism, exactly

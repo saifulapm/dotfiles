@@ -3,8 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "../components"
 
-// Screen recording, ported from omarchy's ScreenRecording indicator
-// (CREDITS.md): their glyph 󰻂, their two tooltip strings, their click rule
+// Screen recording, ported from omarchy's ScreenRecording indicator:
+// their glyph 󰻂, their two tooltip strings, their click rule
 // (recording → stop, idle → open the capture menu's Screenrecord submenu), and
 // their state contract — the indicator is active exactly while a recorder
 // process is alive.

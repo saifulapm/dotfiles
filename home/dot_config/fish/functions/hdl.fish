@@ -1,5 +1,5 @@
 # Herdr dev layout: editor pane + AI column + bottom terminal — the herdr
-# twin of tdl (omarchy default/bash/fns/herdr, CREDITS.md).
+# twin of tdl (omarchy default/bash/fns/herdr).
 function hdl --description 'Herdr dev layout: editor / ai / terminal'
     if test (count $argv) -eq 0
         echo "Usage: hdl <ai-command> [second-ai-command]"

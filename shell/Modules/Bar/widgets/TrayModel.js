@@ -1,4 +1,4 @@
-// Near-verbatim port of omarchy's bar TrayModel.js (CREDITS.md): the rule that
+// Near-verbatim port of omarchy's bar TrayModel.js: the rule that
 // a tray item belonging to an app the bar already has a dedicated widget for
 // is suppressed, so Dropbox is not on the bar twice.
 //

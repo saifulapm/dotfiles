@@ -2,7 +2,7 @@
 # screenshot-qr — select a region with slurp, decode the QR code in it, copy
 # the payload to the clipboard.
 #
-# Port of omarchy's omarchy-capture-qr (CREDITS.md). Two differences, both
+# Port of omarchy's omarchy-capture-qr. Two differences, both
 # ours: the screen freeze is wayfreeze rather than `hyprpicker -r -z` (same
 # reason — grim has to see the frozen overlay, not live content shifting
 # during teardown), and notifications go through notify-send like the rest of

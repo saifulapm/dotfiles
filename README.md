@@ -125,7 +125,7 @@ after the first apply.
 - `bench/` — measured numbers from `just bench`; performance is the product.
 - `vendor/` — third-party source carried verbatim and pinned by hand, when no
   package exists we can consume. One tree so far (`try`); see its README.
-- `CREDITS.md` — everything borrowed from omarchy/DMS/noctalia, exactly.
+- `CREDITS.md` — upstream copyright and licence notices for the ported code.
 
 ## Rules
 

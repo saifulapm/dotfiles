@@ -1,5 +1,5 @@
 // Icon table and payload model for the on-screen display. Near-verbatim port
-// of omarchy's shell/plugins/osd/OsdModel.js (CREDITS.md).
+// of omarchy's shell/plugins/osd/OsdModel.js.
 //
 // Kept free of QML types so it can be exercised under node.
 //

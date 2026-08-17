@@ -10,7 +10,7 @@ import QtQuick.Effects
 // Symbolic icons ship a fixed near-white fill that the host is meant to
 // replace with its own foreground; they are detected by the freedesktop
 // "-symbolic" name suffix and colorized, otherwise they vanish on a light
-// theme. Ported from omarchy's Tray.qml TrayIcon (CREDITS.md).
+// theme. Ported from omarchy's Tray.qml TrayIcon.
 Item {
     id: root
 

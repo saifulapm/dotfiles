@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # launch-or-focus — focus an existing window matching a pattern, else launch.
 #
-# Port of omarchy-launch-or-focus (CREDITS.md) onto niri: the pattern is
+# Port of omarchy-launch-or-focus onto niri: the pattern is
 # tested word-bounded and case-insensitive against every window's app_id; on
 # a hit the newest matching window is focused — highest id wins, the same
 # tie-break the notification click-to-focus path uses — otherwise the launch

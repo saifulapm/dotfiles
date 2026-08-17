@@ -1,5 +1,5 @@
 // Hub-sync parsing and phrasing for the sync widget — ours, in the shape of
-// the devservices model (CREDITS.md for the family's lineage): the pure data
+// the devservices model ( for the family's lineage): the pure data
 // the service and the panel read, with no Process and no state of its own.
 //
 // The input is bin/qshell-sync's status.json (version 2), which is the whole

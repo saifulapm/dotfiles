@@ -231,7 +231,7 @@ PanelWindow {
                     panelWindow.close();
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                    // Omarchy's cross-panel switching (CREDITS.md): Tab walks
+                    // Omarchy's cross-panel switching: Tab walks
                     // to the next panel-owning widget in the same bar section,
                     // Shift+Tab to the previous one, wrapping at the ends.
                     const back = event.key === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier);

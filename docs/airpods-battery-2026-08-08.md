@@ -65,7 +65,7 @@ connect, first battery packet 0.03 s after the notification request.
 
 Protocol credit and the one correction to the published byte strings (the
 notification bitmask must be `ff ff ff ff`; librepods' `ff ff fe ff` makes the
-device dump its whole state and withhold battery) are in CREDITS.md.
+device dump its whole state and withhold battery) are in
 
 ## Wiring
 

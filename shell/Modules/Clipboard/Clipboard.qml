@@ -7,7 +7,7 @@ import "ClipboardHistory.js" as ClipboardHistory
 import "../../components/FilterKeys.js" as FilterKeys
 
 // Clipboard history: a persistent capture watcher plus an overlay picker.
-// Ported from omarchy's clipboard plugin (CREDITS.md) — their capture
+// Ported from omarchy's clipboard plugin — their capture
 // mechanism (bin/clipboard-capture), their history semantics
 // (ClipboardHistory.js) and their picker layout (query line over a split of
 // entry list and full preview, with the same key model). The chrome is our

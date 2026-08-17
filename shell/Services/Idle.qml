@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 
-// Idle service, ported from omarchy's idle plugin (CREDITS.md).
+// Idle service, ported from omarchy's idle plugin.
 //
 // One ext-idle-notify-v1 monitor arms at the FIRST stage deadline; the
 // remaining stages hang off it as one-shot timers carrying the difference.

@@ -6,7 +6,7 @@ import Quickshell.Services.Polkit
 import "../../components"
 import "PolkitModel.js" as PolkitModel
 
-// Polkit authentication agent — omarchy's polkit plugin design (CREDITS.md)
+// Polkit authentication agent — omarchy's polkit plugin design
 // on our tokens. The agent object is eager — it must be registered with
 // polkit from startup or privileged prompts have no UI to land in. The
 // dialog window loads only while a request is active (or closing out).

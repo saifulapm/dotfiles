@@ -18,7 +18,7 @@ changes — per pod and for the case, which is strictly more than the single
 figure HFP would have carried.  That is what this reads.
 
 The protocol constants below are the ones documented by the openly reverse-
-engineered Linux/Android implementations (librepods, OpenPods — CREDITS.md);
+engineered Linux/Android implementations (librepods, OpenPods —);
 no code is borrowed, and every byte was re-verified against this desk's AirPods.
 One caveat is recorded there too: the notification bitmask must be
 `ff ff ff ff`.  With librepods' `ff ff fe ff` the device answers with its whole

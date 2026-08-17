@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# reminder — lightweight desktop reminders. Port of omarchy's omarchy-reminder
-# (CREDITS.md): same command surface (bare `<minutes> [message]`, `show`,
+# reminder — lightweight desktop reminders. Port of omarchy's omarchy-reminder:
+# same command surface (bare `<minutes> [message]`, `show`,
 # `show --json`, `clear`, `-i`), same confirmation/notification wording, same
 # JSON contract for the bar indicator, and the same firing mechanism — a
 # transient systemd user timer per reminder, so nothing polls.

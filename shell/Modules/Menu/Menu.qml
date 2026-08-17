@@ -10,7 +10,7 @@ import "MenuTree.js" as MenuTree
 
 // Command menu: one hierarchical tree of everything the desktop can do,
 // centered over a scrim in the launcher's visual language. Framework ported
-// from omarchy's menu plugin (CREDITS.md) — submenus by dotted id, type to
+// from omarchy's menu plugin — submenus by dotted id, type to
 // filter the WHOLE tree by label/id/aliases with their ranking, `when` guards
 // batched into a single bash run, ✓ on checked rows. The tree itself is ours,
 // in MenuTree.js.

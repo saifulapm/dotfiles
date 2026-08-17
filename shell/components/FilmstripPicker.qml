@@ -6,7 +6,7 @@ import Quickshell.Wayland
 import "PickerModel.js" as PickerModel
 import "FilterKeys.js" as FilterKeys
 
-// The filmstrip picker — port of omarchy's image-picker plugin (CREDITS.md):
+// The filmstrip picker — port of omarchy's image-picker plugin:
 // a full-screen scrim over a skewed strip, the selection expanded to a wide
 // preview with the rest of the set fanned out as dimmed slices to either
 // side, ←/→ (and Tab) walking it, type-to-filter, Enter or a click on the

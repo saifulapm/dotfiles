@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # screenrecord — start/stop a screen recording. Port of omarchy's
-# bin/omarchy-capture-screenrecording (CREDITS.md): the same command surface
+# bin/omarchy-capture-screenrecording: the same command surface
 # (bare toggle, `--fullscreen`, `--with-desktop-audio`,
 # `--with-microphone-audio`, `--stop-recording`), the same output naming
 # (`screenrecording-<timestamp>.mp4` under the XDG videos dir), the same

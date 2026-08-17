@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # text-size — one knob for apparent text size across the desktop.
 #
-# Port of omarchy-display-text-size (CREDITS.md) onto our theme machinery.
+# Port of omarchy-display-text-size onto our theme machinery.
 # The knob is `[font] size` in ~/.config/qshell/theme-override.toml: the
 # shell watches that file and reflows live, and bin/theme-apply layers it
 # over the active theme, so foot (derived point size + line height) and GTK

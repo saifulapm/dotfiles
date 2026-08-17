@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tailscale-send — send files to a machine on your tailnet with Taildrop.
-# Port of omarchy's omarchy-tailscale-send (CREDITS.md): the same argument
+# Port of omarchy's omarchy-tailscale-send: the same argument
 # shape (`<machine> [file...]`), the same short-name-in-messages rule, the same
 # file-chooser fallback when no files are named, and the same
 # `tailscale file cp --update-interval=0` transfer with a toast either way.

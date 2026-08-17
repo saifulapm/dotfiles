@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # screensaver-launch — put the screensaver on screen. A wrapper around
-# nirisaver (github.com/saifulapm/nirisaver, CREDITS.md), which draws straight
+# nirisaver (github.com/saifulapm/nirisaver), which draws straight
 # onto a wlr-layer-shell overlay: no terminal, no pty, no child process.
 #
 # Deliberately flagless. Everything about the screensaver — which quotes, how

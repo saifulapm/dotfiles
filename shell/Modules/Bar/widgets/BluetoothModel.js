@@ -1,4 +1,4 @@
-// Near-verbatim port of omarchy's bluetooth plugin Model.js (see CREDITS.md):
+// Near-verbatim port of omarchy's bluetooth plugin Model.js:
 // device labelling and the address/uuid-shaped-name filter, the three device
 // buckets, the pending-action map helpers, the visible-section list, and the
 // PipeWire-node-to-device match behind the audio output auto-switch.

@@ -7,7 +7,7 @@ import "EmojiSearch.js" as EmojiSearch
 import "../../components/FilterKeys.js" as FilterKeys
 
 // Emoji picker: fullscreen overlay layer with a centered card, a query line
-// and a grid of glyphs. Ported from omarchy's emojis plugin (CREDITS.md) —
+// and a grid of glyphs. Ported from omarchy's emojis plugin —
 // their flat grid (no group headers, no recents, no ranking), their key model
 // (←/→ by one, ↑/↓ by a row, PageUp/PageDown by a screen, Enter to take the
 // cursor's emoji, Escape clearing the query before it closes) and their

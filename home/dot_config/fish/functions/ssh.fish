@@ -1,5 +1,5 @@
 # Wrap ssh to clean up the terminal and reconnect when a connection drops
-# (omarchy default/bash/fns/ssh-reconnect, CREDITS.md — fish port).
+# (omarchy default/bash/fns/ssh-reconnect — fish port).
 #
 # A remote tmux, herdr or editor arms terminal modes over the SSH pipe that
 # only it can disarm. If the connection dies instead of exiting cleanly, those

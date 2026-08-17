@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Port of omarchy-bluetooth-device (see CREDITS.md): the Bluetooth sequencing
+# Port of omarchy-bluetooth-device: the Bluetooth sequencing
 # behind the shell's bluetooth panel. bluetoothctl rather than the D-Bus API
 # because the useful actions are compounds — pairing wants trust and a
 # connect behind it, forgetting wants a disconnect first — and BlueZ refuses

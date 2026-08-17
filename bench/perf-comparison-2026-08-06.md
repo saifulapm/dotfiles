@@ -183,7 +183,7 @@ sends; no pdeathsig either). Ours sends SIGTERM to a script that traps it.
 | S4 | **Residency policy for heavyweight lazy loaders** — unload pickers/emojis (the ~40-70 MiB filmstrips) on close after a grace period (lockLoader release at `shell.qml:281-288` is the in-repo template); keep launcher/panels warm for latency | reclaims most of the 130 MiB saturated-state cost for rarely-used surfaces; warm-open cost reverts to cold (~50 ms — acceptable) | medium — close-animation vs unload ordering | 1 session |
 | S5 | steal omarchy's `inlineSettingsDelta` (BarModel.js:76-102) if/when bar settings become live-editable — patch live widgets on cosmetic config change instead of rebuilding every widget on every monitor | future-proofing the config hot path; ~25 lines of testable JS | low | small, when needed |
 
-### For CREDITS.md (techniques observed in omarchy worth crediting when adopted)
+### For (techniques observed in omarchy worth crediting when adopted)
 Async plugin loading with pending-payload queues; `inlineSettingsDelta`
 structural-vs-cosmetic diffing; `Qt.clearComponentCache()` on hot-reload;
 out-of-process content-hashed thumbnail pre-render (`omarchy-menu-images`);
@@ -349,7 +349,7 @@ this sub-second race window differs).
   addressable from QML; would need quickshell-side changes (e.g. answering
   IPC before the first surface commit).
 
-### For CREDITS.md (do not edit yet — noting for the eventual entry)
+### For (do not edit yet — noting for the eventual entry)
 
 Adopted in S1: omarchy's async plugin loading with a pending-payload queue
 replayed on Loader resolution (their shell.qml `summon` /

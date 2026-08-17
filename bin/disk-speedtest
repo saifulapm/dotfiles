@@ -1,7 +1,7 @@
 #!/bin/bash
 # disk-speedtest — measure live disk read and write speed.
 #
-# Direct port of omarchy's bin/omarchy-disk-speedtest (MIT, see CREDITS.md).
+# Direct port of omarchy's bin/omarchy-disk-speedtest (MIT).
 # Saturates the device with parallel dd workers doing O_DIRECT passes over
 # per-worker scratch files and prints one MB/s reading per second, computed
 # from the block device's kernel I/O counters — the same shape as

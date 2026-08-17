@@ -3,7 +3,7 @@ import "../components"
 import "../../../components"
 
 // The media widget's right-click card — omarchy's media popup
-// (shell/plugins/services/media/BarWidget.qml's PopupCard, CREDITS.md) on our
+// (shell/plugins/services/media/BarWidget.qml's PopupCard) on our
 // BarPanel machinery: album art beside title/artist/album, the transport row,
 // and the SOURCES list with one row per MPRIS player where clicking a row
 // makes it the service's sticky preferred player. The art box falls back to

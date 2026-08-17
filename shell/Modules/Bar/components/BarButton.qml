@@ -1,6 +1,6 @@
 import QtQuick
 
-// Omarchy's WidgetButton, ported (CREDITS.md): the bar has NO button chrome.
+// Omarchy's WidgetButton, ported: the bar has NO button chrome.
 // No hover fill, no background — hover feedback is the tooltip and the
 // pointer cursor; state is carried by the glyph color alone (active =
 // theme.error, matching omarchy's bar.active = red) and by opacity dims.
@@ -47,7 +47,7 @@ Item {
     // ------------------------------------------------- click-target registry
     // The bar's drag-to-reorder MouseArea covers every widget, so it takes the
     // left press before any handler under it sees one. Omarchy solves this
-    // with a registry (CREDITS.md): every clickable registers with the bar,
+    // with a registry: every clickable registers with the bar,
     // and a press that did not turn into a drag is dispatched back to whichever
     // registered target sits under the pointer — which is also what lets a
     // button nested inside a widget (a workspace pip, a tray icon, a revealed

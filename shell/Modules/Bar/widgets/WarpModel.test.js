@@ -2,7 +2,7 @@
 //
 //     node shell/Modules/Bar/widgets/WarpModel.test.js
 //
-// Ported from tobi/omarchy-warp's tests/model.test.js (CREDITS.md) and extended
+// Ported from tobi/omarchy-warp's tests/model.test.js and extended
 // with the payloads warp-cli 2026.6.880.0 actually returned on this machine, so
 // the three traps the parser is shaped around stay covered: errors at exit 0,
 // a single-key `reason` object, and split-tunnel entries that are objects.

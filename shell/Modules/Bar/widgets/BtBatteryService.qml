@@ -4,7 +4,7 @@ import Quickshell.Io
 import Quickshell.Bluetooth
 
 // Apple-accessory battery levels for the Bluetooth widget and panel — ours, in
-// the shape of DevServicesService (CREDITS.md): one instance at the bar root
+// the shape of DevServicesService: one instance at the bar root
 // however many screens carry the widget (S2), state observed rather than
 // polled, and every child wrapped in `setpriv --pdeathsig TERM`.
 //

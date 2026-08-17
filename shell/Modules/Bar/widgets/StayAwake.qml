@@ -1,8 +1,8 @@
 import QtQuick
 import "../components"
 
-// Stay-awake indicator, ported from omarchy's StayAwake indicator
-// (CREDITS.md): the coffee glyph, their two tooltip strings, and a click that
+// Stay-awake indicator, ported from omarchy's StayAwake indicator:
+// the coffee glyph, their two tooltip strings, and a click that
 // toggles idle detection off and on. Active means the idle service is
 // suspended — no monitor blank, no idle lock — which it persists as the
 // presence of its flag file.

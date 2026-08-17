@@ -3,8 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "TailscaleModel.js" as Model
 
-// Tailscale service — port of omarchy's tailscale plugin Service.qml
-// (CREDITS.md). It owns everything the widget and the panel read: whether the
+// Tailscale service — port of omarchy's tailscale plugin Service.qml.
+// It owns everything the widget and the panel read: whether the
 // CLI exists at all, what `tailscale status --json` says about this device and
 // its tailnet, the Mullvad exit-node table, the list of login profiles, and the
 // up/down/switch/exit-node/authorize commands.

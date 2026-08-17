@@ -4,7 +4,7 @@ import Quickshell.Io
 
 // Voice dictation state, split out of the Dictation widget so ONE voxtype
 // follower serves every screen (S2). The follower is the whole state source —
-// `bin/voxtype-status` is our copy of omarchy-voxtype-status (CREDITS.md),
+// `bin/voxtype-status` is our copy of omarchy-voxtype-status,
 // i.e. `voxtype status --follow --format json` parsed line by line, one line
 // per transition. Nothing polls and there is no cadence to gate, so the
 // process runs for the life of the shell; it outlives a voxtype daemon

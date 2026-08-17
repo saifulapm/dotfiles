@@ -7,7 +7,7 @@ import "../Commons/gradient.js" as Gradient
 
 // Token resolution + live reload. Instantiated once by shell.qml and passed
 // down by property injection — relative-path singleton imports do not share
-// state (see CREDITS.md: omarchy).
+// state ( omarchy).
 //
 // Reads the active theme from ~/.local/state/qshell/theme.toml (a symlink
 // repointed by bin/theme-set). Every token falls back to the builtin values
@@ -89,8 +89,8 @@ QtObject {
     // [notifications], [menu], [osd] — without touching the base tokens every
     // other surface reads. Anything a section omits falls back to the base
     // token the surface would otherwise have used, so a section is always a
-    // partial override. Omarchy's surface-role model (Commons/Color.qml,
-    // CREDITS.md) adapted to our single-file themes.
+    // partial override. Omarchy's surface-role model (Commons/Color.qml)
+    // adapted to our single-file themes.
 
     // A section value may name another token instead of carrying a literal:
     // `border = "accent.error"` reads accent.error. Bounded, so a cycle
@@ -466,7 +466,7 @@ QtObject {
     // ------------------------------------------------------- TOML loading
     // Sectioned key = value walker (strings, numbers, quoted keys, inline
     // comments). Deliberately limited — the schema needs nothing fancier.
-    // Pattern from omarchy's Color.qml parseShell (CREDITS.md).
+    // Pattern from omarchy's Color.qml parseShell.
     function parseToml(raw) {
         const out = {};
         const lines = String(raw || "").split("\n");

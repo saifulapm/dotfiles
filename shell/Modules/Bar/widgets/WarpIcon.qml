@@ -1,8 +1,8 @@
 import QtQuick
 import QtQuick.Shapes
 
-// The Cloudflare mark, ported from tobi/omarchy-warp's WarpIcon.qml
-// (CREDITS.md): the cloud silhouette drawn from primitives on a viewBox
+// The Cloudflare mark, ported from tobi/omarchy-warp's WarpIcon.qml:
+// the cloud silhouette drawn from primitives on a viewBox
 // normalized to 1×1, with two trailing speed lines so it reads as "cloud,
 // moving" rather than as a weather glyph. Drawn rather than typeset or loaded
 // from an SVG, for the reasons TailscaleIcon.qml gives — no brand glyph

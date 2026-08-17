@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # webapp-install — create a desktop launcher for a web app.
 #
-# Port of omarchy-webapp-install (CREDITS.md): gum prompts, the site's own
+# Port of omarchy-webapp-install: gum prompts, the site's own
 # icon scraped in their preference order (apple-touch-icon link tag → the
 # well-known /apple-touch-icon.png → Google's favicon service), a .desktop
 # whose Exec goes through bin/webapp-launch (app window, focus-or-launch).

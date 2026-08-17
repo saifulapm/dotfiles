@@ -4,7 +4,7 @@ import "../../../components"
 import "RcloneRemoteModel.js" as Format
 
 // rclone-remote panel — ours, in the Dropbox panel's visual language
-// (omarchy's design; CREDITS.md), grown out of the iCloud panel and reshaped
+// (omarchy's design), grown out of the iCloud panel and reshaped
 // to the user's sketch (2026-08-06): the hero IS the mount surface — the
 // instance's mark, the name over the mount path, a folder button and the
 // on/off switch on the trailing edge — followed by a STORAGE section exactly

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # webapp-remove — delete a web-app launcher created by bin/webapp-install.
 #
-# Port of omarchy-webapp-remove (CREDITS.md): no argument = pick from the
+# Port of omarchy-webapp-remove: no argument = pick from the
 # installed set with gum; entries are recognized by the X-Qshell-WebApp
 # marker webapp-install writes, so a hand-made .desktop is never offered.
 #

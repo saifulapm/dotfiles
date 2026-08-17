@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tui-remove — delete a TUI launcher created by bin/tui-install.
 #
-# Port of omarchy-tui-remove (CREDITS.md): no argument = gum picker over the
+# Port of omarchy-tui-remove: no argument = gum picker over the
 # entries carrying tui-install's X-Qshell-TUI marker.
 set -euo pipefail
 

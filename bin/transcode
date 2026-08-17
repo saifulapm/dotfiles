@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # transcode — re-encode a picture or video into something share-friendly.
 #
-# Port of omarchy-transcode (CREDITS.md) with ffmpeg carrying BOTH halves:
+# Port of omarchy-transcode with ffmpeg carrying BOTH halves:
 # their picture branch runs imagemagick, which this box deliberately does not
 # ship — ffmpeg's scale/quality flags produce the same shrink-only resize.
 # Their omarchy-transcode-ascii is NOT ported for the same reason (it is

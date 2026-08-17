@@ -4,7 +4,7 @@ import Quickshell.Io
 import "RcloneRemoteModel.js" as Model
 
 // rclone-remote service — ours, in the shape of omarchy's dropbox Service.qml
-// (CREDITS.md; our port of it is gone — rclone is the one Dropbox path now),
+// (our port of it is gone — rclone is the one Dropbox path now),
 // grown out of the iCloud widget's service: it owns everything the widget and
 // the panel read, for ONE rclone remote named by the instance's `config`
 // (remote, remoteType, label, mountPoint, legacyUnit, glyph/drawnMark,

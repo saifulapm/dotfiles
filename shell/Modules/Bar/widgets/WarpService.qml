@@ -3,8 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "WarpModel.js" as Model
 
-// Cloudflare WARP service — port of tobi/omarchy-warp's Service.qml
-// (CREDITS.md). It owns everything the widget and the panel read: whether the
+// Cloudflare WARP service — port of tobi/omarchy-warp's Service.qml.
+// It owns everything the widget and the panel read: whether the
 // CLI exists, what `warp-cli status` says, the settings block behind the mode
 // switcher and the split-tunnel readout, the registration record, the tunnel
 // stats, and the connect/disconnect/mode/register commands.

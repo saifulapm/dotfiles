@@ -15,8 +15,8 @@
 # chosen path in the IPC push BEFORE the state file changes, or the file
 # watch would start an uncoordinated transition first.
 #
-# Candidates are omarchy-theme-bg-next's merged sources adapted to our layout
-# (CREDITS.md): the active theme's backgrounds first, then the user's own
+# Candidates are omarchy-theme-bg-next's merged sources adapted to our layout:
+# the active theme's backgrounds first, then the user's own
 # ~/Pictures/Wallpapers. Neither directory is ever created. Same-named files
 # collide the way their picker collides them — first listed wins.
 #

@@ -1,4 +1,4 @@
-// Near-verbatim port of omarchy's tailscale plugin Model.js (CREDITS.md): the
+// Near-verbatim port of omarchy's tailscale plugin Model.js: the
 // `tailscale status --json` envelope and everything read out of it (the self
 // device, the peers, the exit-node candidates), the Mullvad `exit-node list`
 // table parser and its region roll-up, the `switch --list --json` account

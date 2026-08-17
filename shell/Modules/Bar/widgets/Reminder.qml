@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../components"
 
-// Pending reminders, ported from omarchy's Reminder indicator (CREDITS.md) —
+// Pending reminders, ported from omarchy's Reminder indicator —
 // same glyph, same tooltip (the CLI's own wording in both states), same click
 // rule (with reminders pending, click notifies the list; with none, it opens
 // the capture flow) and the same `reminder show --json` contract.

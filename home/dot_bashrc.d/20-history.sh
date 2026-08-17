@@ -1,5 +1,5 @@
 # Cross-machine shell history — the per-device write-domain pattern
-# (omarchy's sync invariant, CREDITS.md): every machine appends ONLY to its
+# (omarchy's sync invariant): every machine appends ONLY to its
 # own history file inside the synced folder and reads the union, so three
 # machines can never conflict. bin/qshell-sync moves the folder through the
 # Dropbox hub on a timer; this file is the bash side of the contract.

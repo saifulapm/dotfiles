@@ -1,5 +1,5 @@
 // Dev-services catalog and parsing for the devservices widget — ours, in the
-// shape of omarchy's dropbox model (CREDITS.md): the pure data the service
+// shape of omarchy's dropbox model: the pure data the service
 // and the panel read.
 //
 // The catalog is this machine's Herd-like on-demand stack: podman quadlet

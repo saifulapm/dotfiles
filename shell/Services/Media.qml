@@ -6,7 +6,7 @@ import Quickshell.Services.Pipewire
 import "MediaModel.js" as MediaModel
 
 // MPRIS media layer — full port of omarchy's media service plugin
-// (shell/plugins/services/media/Service.qml, CREDITS.md) as a root service.
+// (shell/plugins/services/media/Service.qml) as a root service.
 //
 // What it carries, all theirs: playerctld proxy players ranked below real ones
 // everywhere (never filtered out — a proxy is a working fallback when it is

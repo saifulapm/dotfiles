@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # brightness-keyboard — the keyboard backlight LED, in one place: the
 # brightness keys adjust it with an OSD, and the blank paths park it while the
-# screen is off. Port of omarchy-brightness-keyboard (CREDITS.md), sibling of
+# screen is off. Port of omarchy-brightness-keyboard, sibling of
 # bin/brightness-display (that one owns panels and DDC monitors).
 #
 #   brightness-keyboard [--no-osd] up|down|cycle    adjust, raising the OSD

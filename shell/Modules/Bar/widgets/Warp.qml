@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import "../components"
 
-// Cloudflare WARP — port of tobi/omarchy-warp's bar button (CREDITS.md).
+// Cloudflare WARP — port of tobi/omarchy-warp's bar button.
 //
 // The mark is their drawn WarpIcon rather than a font glyph, and it carries the
 // three states theirs does: the cloud in the bar foreground while the tunnel is

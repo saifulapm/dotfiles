@@ -1,6 +1,6 @@
 import QtQuick
 
-// Indicator container, ported from omarchy's Indicators widget (CREDITS.md).
+// Indicator container, ported from omarchy's Indicators widget.
 //
 // Two blocks sit side by side. The ACTIVE block is always visible and holds
 // only the indicators that are currently on; the INACTIVE block holds all the

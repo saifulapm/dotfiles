@@ -1,5 +1,5 @@
 // Player and stream math for the media service — direct copy of omarchy's
-// shell/plugins/services/media/MediaModel.js (CREDITS.md, direct copies).
+// shell/plugins/services/media/MediaModel.js (direct copies).
 //
 // Deviations from the source: isPlaybackStream takes the node's resolved type
 // NAME as a second argument (quickshell 0.3 exposes PwNode.type as a numeric

@@ -12,7 +12,7 @@ import "../../components"
 // chrome-less buttons, red attention color, 420 ms color transitions on
 // theme swap, and a configurable center anchor pinned dead-center.
 //
-// The interaction machinery below is omarchy's too (CREDITS.md): press-drag a
+// The interaction machinery below is omarchy's too: press-drag a
 // widget to reorder it, press-drag the empty center to move the bar to any of
 // the four screen edges, double-click it to toggle transparency (with an
 // auto-contrast foreground sampled from the wallpaper behind the bar), an

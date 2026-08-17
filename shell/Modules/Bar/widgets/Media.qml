@@ -4,7 +4,7 @@ import "../components"
 import "../../../components"
 
 // MPRIS now-playing — full port of omarchy's media bar widget
-// (shell/plugins/services/media/BarWidget.qml, CREDITS.md) over our media
+// (shell/plugins/services/media/BarWidget.qml) over our media
 // service: play/pause glyph dimmed darker while paused, the "title · artist"
 // label auto-scrolling inside a clip when it outgrows `maxLabelWidth` (an
 // inline shell.json setting, their default 180), left click play/pause,

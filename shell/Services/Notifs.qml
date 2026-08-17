@@ -10,7 +10,7 @@ import "../Modules/Notifications/NotificationLogic.js" as Logic
 // this object is a bus registration, three models, and the persistence and
 // IPC around them.
 //
-// Ported from omarchy's notifications plugin Service.qml (CREDITS.md): the
+// Ported from omarchy's notifications plugin Service.qml: the
 // three-model split, the urgency timeout policy, replace-by-id, the DND
 // bypass rules, expire-vs-dismiss, the history file and its debounced write,
 // the /tmp image cache, and the IPC surface. Click-to-focus is ours — they

@@ -1,5 +1,5 @@
 // Near-verbatim port of omarchy's shell/plugins/panels/network/Model.js
-// (MIT, see CREDITS.md): the whole parsing and formatting layer behind the
+// (MIT): the whole parsing and formatting layer behind the
 // network panel — the key/tab/value reader for bin/network-status, the
 // throughput and ping-window math, byte/rate/latency formatting, the band
 // labels, the Wi-Fi row shaping and section titles, and the QR matrix parser.

@@ -15,8 +15,7 @@
 # ownership, not bandwidth: the images are most of what omarchy's tarball
 # weighs (111 MB there vs 99 MB here, measured), so the saving is ~11%. What
 # we actually gain is a set we can add to and remove from, and no pin on
-# someone else's repo. The mirror keeps omarchy's MIT LICENSE and credits it
-# (CREDITS.md).
+# someone else's repo. The mirror keeps omarchy's MIT LICENSE and credits it.
 #
 # It TRACKS MAIN rather than pinning a commit: push a wallpaper to the mirror
 # and the next apply on every machine has it, with no commit here. The tradeoff

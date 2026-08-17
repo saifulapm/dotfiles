@@ -7,7 +7,7 @@ import "OsdModel.js" as OsdModel
 
 // On-screen display: one pill at the bottom of the screen carrying a glyph
 // and either a progress bar with its readout or a message. Full port of
-// omarchy's osd plugin (CREDITS.md) — their card geometry, their icon table,
+// omarchy's osd plugin — their card geometry, their icon table,
 // their show/replace/timeout choreography and their `osd` IPC surface — in
 // our theme tokens.
 //

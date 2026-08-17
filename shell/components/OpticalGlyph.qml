@@ -4,7 +4,7 @@ import QtQuick
 // Text's layout box leaves the visible ink off-center. Measure the painted
 // ink (tightBoundingRect) and correct horizontally only — the baseline stays
 // shared so mixed-height icons don't drift vertically. Concept from omarchy's
-// Ui/OpticalGlyph.qml (CREDITS.md).
+// Ui/OpticalGlyph.qml.
 Item {
     id: root
 

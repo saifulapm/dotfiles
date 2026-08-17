@@ -4,7 +4,7 @@ import Quickshell.Io
 import "AiModel.js" as Model
 
 // Codex provider — port of omarchy's
-// plugins/model-usage/providers/Codex.qml (CREDITS.md), publishing the same
+// plugins/model-usage/providers/Codex.qml, publishing the same
 // property contract as the Claude provider beside it.
 //
 // Everything comes from one bin/codex-usage-scan run: it walks the local

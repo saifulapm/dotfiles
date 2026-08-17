@@ -1,7 +1,7 @@
 #!/bin/bash
 # network-band — show or pin the Wi-Fi band of the active connection.
 #
-# Direct port of omarchy's bin/omarchy-network-band (MIT, see CREDITS.md):
+# Direct port of omarchy's bin/omarchy-network-band (MIT):
 # same nmcli mechanism, same output contract ("band"/"available"/"selected"
 # key-tab-value lines), same revert-on-failure behaviour. The one change is
 # that the current SSID and frequency are read from NetworkManager's own scan

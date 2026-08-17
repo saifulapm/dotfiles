@@ -148,11 +148,11 @@ active = "accent.accent"
 # deliberately not ported until something draws an uneven border.
 #
 # The same sections are accepted in ~/.config/qshell/theme-override.toml, a
-# machine-level file layered over whatever theme is active (see CREDITS.md).
+# machine-level file layered over whatever theme is active.
 # ---------------------------------------------------------------------------
 
 # Omarchy ships this exact override for tokyo-night (themes/tokyo-night/
-# shell.lock.toml, MIT — see CREDITS.md): the lock screen goes monochrome,
+# shell.lock.toml, MIT —): the lock screen goes monochrome,
 # every role collapsing onto the theme's plain foreground. `border` is their
 # idle-field role; our field, like theirs, is always active-or-error, so it is
 # carried for completeness rather than read.

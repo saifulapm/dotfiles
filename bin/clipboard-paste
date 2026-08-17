@@ -5,7 +5,7 @@
 #   clipboard-paste [--copy-only] --history-index <index>
 #
 # Port of omarchy's bin/omarchy-clipboard-paste-text and
-# bin/omarchy-clipboard-paste-file (MIT, see CREDITS.md), merged: our history
+# bin/omarchy-clipboard-paste-file (MIT), merged: our history
 # store has the same shape as theirs, so one index resolves either an image or
 # a text entry and the picker does not have to hand over the content. That is
 # also why the entry travels by INDEX and never on argv — argv is

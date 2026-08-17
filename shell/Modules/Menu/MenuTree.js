@@ -1,7 +1,7 @@
 // The command menu's action tree — this file IS the menu. Edit it and the
 // running shell picks the change up on the next reload.
 //
-// Shape mirrors omarchy's omarchy-menu.jsonc (CREDITS.md): ids are keys, a
+// Shape mirrors omarchy's omarchy-menu.jsonc: ids are keys, a
 // dotted id declares its parent ("capture.region" lives under "capture"), and
 // the kind is inferred — `action` or `call` makes a row, `target` makes a
 // redirect, anything else is a submenu. Declaration order is display order.

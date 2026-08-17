@@ -6,7 +6,7 @@ import "ReminderFlowModel.js" as ReminderFlowModel
 import "../../components/FilterKeys.js" as FilterKeys
 
 // Reminder capture flow: a fullscreen overlay with one centered input line,
-// asked twice. Ported from omarchy's reminders plugin (CREDITS.md) — their
+// asked twice. Ported from omarchy's reminders plugin — their
 // two-step flow (minutes, then message), their prompts, their validation
 // (`ReminderFlowModel.js`), their submit rules (an empty minutes line
 // dismisses, an unparseable one notifies and stays put, an empty message is

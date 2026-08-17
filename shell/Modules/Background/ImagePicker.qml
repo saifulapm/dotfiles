@@ -4,7 +4,7 @@ import Quickshell.Io
 import "../../components"
 import "../../components/PickerModel.js" as PickerModel
 
-// Wallpaper picker — the caller half of the filmstrip port (CREDITS.md).
+// Wallpaper picker — the caller half of the filmstrip port.
 // The strip, the keyboard model and the filter all live in
 // components/FilmstripPicker.qml, shared with the theme switcher, which is
 // how omarchy has it: their theme switcher is their image selector, opened

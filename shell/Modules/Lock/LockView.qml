@@ -5,7 +5,7 @@ import Quickshell.Widgets
 import "../../components"
 
 // The lock screen's face, split out of the service exactly as omarchy splits
-// theirs (CREDITS.md): the session-lock surface and the preview overlay both
+// theirs: the session-lock surface and the preview overlay both
 // mount this, so what a preview shows is what a lock shows.
 //
 // Their design, our tokens: a blurred copy of the current wallpaper under one

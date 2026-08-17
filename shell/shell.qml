@@ -10,7 +10,7 @@ import "Modules/Bar/BarModel.js" as BarModel
 // into this instance, never by spawning a second `qs`.
 //
 // Services are instantiated here once and passed down by property injection.
-// Relative-path singleton imports do NOT share state (omarchy, CREDITS.md) —
+// Relative-path singleton imports do NOT share state (omarchy) —
 // nothing in this tree may `pragma Singleton` a service.
 //
 // Everything that is not the bar or a service loads through a SurfaceLoader
@@ -207,8 +207,8 @@ ShellRoot {
 
     // A surface that loads entirely off the startup critical path. `wake()`
     // starts resolving the URL; `summon()` wakes it and calls a method on it
-    // now or — the omarchy pendingPayloads pattern (their shell.qml, see
-    // CREDITS.md) — queues the call and replays it in arrival order once the
+    // now or — the omarchy pendingPayloads pattern (their shell.qml)
+    // — queues the call and replays it in arrival order once the
     // tree lands, so IPC that races the load is never dropped. `deliver()`
     // is for hide/cancel verbs: they reach a live or in-flight surface but
     // never wake one that was not summoned.

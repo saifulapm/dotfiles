@@ -1,4 +1,4 @@
-# Solitude — ported from omarchy (MIT, see CREDITS.md).
+# Solitude — ported from omarchy (MIT).
 # Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
 
 [meta]
@@ -48,7 +48,7 @@ border-width = 1
 duration = 150
 easing = "standard"
 
-# Omarchy's hyprland_active_border for this theme (MIT, see CREDITS.md):
+# Omarchy's hyprland_active_border for this theme (MIT):
 # rgba(798186ee) rgba(caccccee) — no angle, so left-to-right.
 # One token, gradient or solid: "#hex #hex angledeg" | "#hex".
 [border]

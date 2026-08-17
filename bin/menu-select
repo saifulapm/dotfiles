@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # menu-select — pick one option from the shell menu, dmenu-style.
 #
-# Port of omarchy-menu-select (CREDITS.md): options come as arguments or on
+# Port of omarchy-menu-select: options come as arguments or on
 # stdin, an option may lead with an icon as "<glyph><TAB><label>" (the menu
 # draws the glyph, the answer is the label alone). The payload rides
 # `qs ipc call menu prompt`; the shell writes the answer into selectionFile
