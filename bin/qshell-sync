@@ -386,7 +386,26 @@ push_pull() { # id, localFile, remoteDir, remoteName, stageDir
   return 0
 }
 
-# bisync, with the two safety aborts this hub actually hits handled by name.
+# bisync, with a conflict policy and the safety aborts this hub actually hits
+# handled by name.
+#
+# ------------------------------------------------------------- the conflict
+# `--conflict-resolve newer --conflict-loser pathname`, NOT bisync's default.
+# The default (`none` / `num`) renames BOTH sides to notes.json.conflict1 and
+# .conflict2 and leaves NO canonical notes.json on the hub — which the next
+# round reads as "the remote file was deleted", i.e. 1 of 1 files, 100%, over
+# the --max-delete guard. So one ordinary two-machine edit stranded the pair
+# in a state that then safety-aborted every 15 minutes forever. Seen for real
+# on 2026-08-17: the moment the all-changed fix let this machine push again,
+# it met another machine's notes.json and the unit locked up exactly that way.
+#
+# Preferring `newer` always leaves a winner in place, so the pair can never
+# enter that state; `pathname` keeps the loser beside it as
+# <name>.conflict-<path> rather than deleting it, so the edit that lost is
+# recoverable by hand. The honest limit: two machines editing notes inside one
+# 15-minute window still means one set is set ASIDE rather than merged. Only
+# per-note identity would fix that, and the store numbers from 1 on every
+# machine, so there is nothing to merge on yet.
 #
 #   "cannot find prior" / "--resync"  — first run here, or a previous round
 #   died mid-flight. Answer it once, and say so: that round is union-only, so
@@ -409,13 +428,17 @@ bisync_unit() { # id, localDir, remoteDir, forceMaxFiles, extraArgs...
   # over from the PREVIOUS round is still in place while this runs, and
   # composing onto it produced "40 file(s) — 40 file(s)".
   bisync_note=""
-  err="$(rclone bisync "$local_dir" "$remote_dir" --resilient --recover "$@" 2>&1 >/dev/null)" || rc=$?
+  # Applied to every bisync pair, not just notes: screenshots can collide the
+  # same way (two machines, one timestamped filename) and the stranding it
+  # causes is identical.
+  local -a policy=(--conflict-resolve newer --conflict-loser pathname)
+  err="$(rclone bisync "$local_dir" "$remote_dir" --resilient --recover "${policy[@]}" "$@" 2>&1 >/dev/null)" || rc=$?
   ((rc == 0)) && return 0
 
   if grep -q -i -e "--resync" -e "cannot find prior" <<<"$err"; then
     resynced=true
     run_rclone mkdir "$remote_dir" || true
-    if run_rclone bisync "$local_dir" "$remote_dir" --resync --resilient --recover "$@"; then
+    if run_rclone bisync "$local_dir" "$remote_dir" --resync --resilient --recover "${policy[@]}" "$@"; then
       bisync_note="bootstrapped with --resync"
       return 0
     fi
@@ -427,7 +450,7 @@ bisync_unit() { # id, localDir, remoteDir, forceMaxFiles, extraArgs...
     local count
     count="$(find "$local_dir" -type f 2>/dev/null | wc -l)"
     if ((count <= force_max)); then
-      if run_rclone bisync "$local_dir" "$remote_dir" --resilient --recover --force "$@"; then
+      if run_rclone bisync "$local_dir" "$remote_dir" --resilient --recover --force "${policy[@]}" "$@"; then
         bisync_note="forced past the all-changed check"
         return 0
       fi
