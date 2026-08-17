@@ -593,6 +593,31 @@ function splitTunnelSummary(mode, total) {
     return head + " · " + total + (total === 1 ? " rule" : " rules");
 }
 
+// The accordion's two halves, ours: the summary above is one string, and the
+// disclosure row wants a label it can set in the reading weight and a meta it
+// can mute. Split so the row reads left-to-right like every other row on the
+// card — the mode, then what the mode means.
+function splitTunnelModeLabel(mode) {
+    var value = trimmed(mode);
+    return value === "" ? "Split tunnel" : humanize(value);
+}
+
+// "Exclude · 27 rules" names the setting; it does not say that those 27 are
+// the ones that DO NOT go through the tunnel, which is the only thing anyone
+// opens this list to find out.
+function splitTunnelMeaning(mode, total) {
+    var count = Number(total);
+    if (!isFinite(count) || count <= 0)
+        return "No rules";
+    var subject = count + (count === 1 ? " rule " : " rules ");
+    var value = trimmed(mode).toLowerCase();
+    if (value === "exclude")
+        return subject + (count === 1 ? "skips" : "skip") + " the tunnel";
+    if (value === "include")
+        return subject + (count === 1 ? "takes" : "take") + " the tunnel";
+    return count + (count === 1 ? " rule" : " rules");
+}
+
 function splitTunnelText(settings) {
     if (!settings || settings.ok !== true)
         return "";
@@ -705,6 +730,8 @@ if (typeof module !== "undefined") {
         parseTrace: parseTrace,
         parseTunnelStats: parseTunnelStats,
         reasonText: reasonText,
+        splitTunnelMeaning: splitTunnelMeaning,
+        splitTunnelModeLabel: splitTunnelModeLabel,
         splitTunnelSummary: splitTunnelSummary,
         splitTunnelText: splitTunnelText,
         tailnetVerdict: tailnetVerdict,

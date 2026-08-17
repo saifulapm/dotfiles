@@ -10,17 +10,20 @@ import "WarpModel.js" as Model
 //
 // Their single cursor model comes with it, in the shape this shell already uses
 // for Tailscale: the mouse and the keyboard move the same highlight, j/k (and
-// the arrows) walk header → recovery → mode → split, Enter activates whatever is
-// under it, and their letter keys are t (toggle), r (refresh), i (register — a
-// rename, see below), m (jump to the mode list), s (expand the split tunnel) and
-// c (copy the device id). The first arrow press only reveals the cursor.
+// the arrows) walk header → recovery → mode → the split-tunnel disclosure →
+// the rules it opens, Enter activates whatever is under it, and their letter
+// keys are t (toggle), r (refresh), i (register — a rename, see below), m (jump
+// to the mode list), s (open the split tunnel) and c (copy the device id). The
+// first arrow press only reveals the cursor.
 //
 // Deviations, all marked in place:
 //   * their `i` was "install WARP from the AUR"; the package is declared in
 //     packages/manifest.toml here, so `i` means "register this device", which is
 //     the first-run step that actually remains;
-//   * the split-tunnel list is an inline expansion rather than a Controls
-//     Popup — this shell hand-rolls its controls;
+//   * the split-tunnel list is an accordion in the card rather than a Controls
+//     Popup — this shell hand-rolls its controls. A disclosure row that names
+//     the mode and says what it does, a chevron that turns, and the collapsing
+//     clip the Wi-Fi band pills use, so the card grows into the list;
 //   * a tailnet line under the split tunnel, which theirs has no reason to
 //     carry: WARP in a tunnel mode owns the default route and so does Tailscale.
 //     Cloudflare's own default exclude list carries 100.64.0.0/10, so the line
@@ -125,13 +128,18 @@ BarPanel {
 
     // Only claim the header cursor when the switch is on screen.
     readonly property bool headerHasCursor: cursorActive && focusSection === "header" && warp.installed
+    readonly property bool splitToggleHasCursor: cursorActive && focusSection === "splitToggle"
 
+    // The disclosure row is a stop of its own, so j/k reaches the accordion and
+    // Enter opens it — the `s` key is the shortcut, not the only way in.
     readonly property var sectionOrder: {
         const order = ["header"];
         if (panel.showRecovery)
             order.push("recovery");
         if (panel.showModes)
             order.push("mode");
+        if (panel.showSplit)
+            order.push("splitToggle");
         if (panel.showSplit && panel.splitExpanded && panel.splitEntries.length > 0)
             order.push("split");
         return order;
@@ -229,6 +237,23 @@ BarPanel {
         panel.splitIndex = index;
     }
 
+    function setSplitToggleCursor() {
+        panel.cursorActive = true;
+        panel.focusSection = "splitToggle";
+    }
+
+    // Nothing to open with no rules in the list — the row is then a readout, and
+    // clicking a readout should do nothing rather than animate an empty box.
+    function toggleSplit() {
+        if (panel.splitEntries.length === 0)
+            return;
+        panel.splitExpanded = !panel.splitExpanded;
+        // Collapsing under the cursor would leave it on a row inside a clip
+        // nobody can see. Hand it back to the row that closed the list.
+        if (!panel.splitExpanded && panel.focusSection === "split")
+            panel.setSplitToggleCursor();
+    }
+
     function jumpToModes() {
         if (!panel.showModes)
             return;
@@ -273,6 +298,9 @@ BarPanel {
             const row = panel.modeRows[panel.modeIndex];
             if (row)
                 panel.warp.setMode(row.id);
+            break;
+        case "splitToggle":
+            panel.toggleSplit();
             break;
         case "split":
             const entry = panel.splitEntries[panel.splitIndex];
@@ -351,7 +379,7 @@ BarPanel {
             panel.jumpToModes();
             break;
         case Qt.Key_S:
-            panel.splitExpanded = !panel.splitExpanded;
+            panel.toggleSplit();
             break;
         case Qt.Key_C:
             panel.warp.copyToClipboard(panel.warp.deviceId);
@@ -720,41 +748,157 @@ BarPanel {
                     label: "SPLIT TUNNEL"
                 }
 
-                // The summary doubles as the expander: warp-cli owns the rules,
-                // so this is a readout and the only interaction is looking.
+                // The disclosure row. warp-cli owns the rules, so the list it
+                // opens is a readout and the only interaction is looking —
+                // which is exactly why the row itself has to carry the whole
+                // answer: the mode in the reading weight, what the mode does
+                // muted beside it, and a chevron that turns rather than a
+                // caret glued to the end of a sentence.
                 CursorSurface {
                     id: splitToggle
 
                     theme: panel.theme
                     width: parent.width
-                    implicitHeight: splitToggleLabel.implicitHeight + panel.theme.space(3)
-                    hasCursor: splitToggleMouse.containsMouse
+                    implicitHeight: splitToggleInner.implicitHeight + panel.theme.space(3)
+                    hasCursor: panel.splitToggleHasCursor || splitToggleMouse.containsMouse
+                    // Held lit while the list is down, so an open accordion
+                    // reads as one block instead of a row and some strays.
                     current: panel.splitExpanded
+
+                    onHasCursorChanged: if (hasCursor)
+                        panel.ensureCursorVisible(splitToggle)
 
                     MouseArea {
                         id: splitToggleMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: panel.splitExpanded = !panel.splitExpanded
+                        cursorShape: panel.splitEntries.length > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onEntered: panel.setSplitToggleCursor()
+                        onClicked: panel.toggleSplit()
                     }
 
-                    Text {
-                        id: splitToggleLabel
+                    Item {
+                        id: splitToggleInner
+
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.leftMargin: panel.theme.space(2)
                         anchors.rightMargin: panel.theme.space(2)
-                        text: panel.warp.splitTunnelSummary + (panel.splitEntries.length > 0 ? (panel.splitExpanded ? "  ▴" : "  ▾") : "")
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.917)
-                        elide: Text.ElideRight
+                        implicitHeight: Math.max(splitChevron.implicitHeight, splitModeLabel.implicitHeight)
+
+                        // One chevron turned a quarter, not two glyphs swapped:
+                        // the turn is what says the row did something. Rotated
+                        // about its own centre so the arm does not walk sideways
+                        // through the label.
+                        OpticalGlyph {
+                            id: splitChevron
+
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: panel.splitEntries.length > 0
+                            text: "󰅂"
+                            color: panel.splitExpanded ? panel.theme.textPrimary : panel.theme.textMuted
+                            pixelSize: panel.theme.fontPx(1.0)
+                            rotation: panel.splitExpanded ? 90 : 0
+
+                            Behavior on rotation {
+                                NumberAnimation {
+                                    duration: panel.theme.time(1.2)
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
+                        }
+
+                        Text {
+                            id: splitModeLabel
+
+                            anchors.left: splitChevron.visible ? splitChevron.right : parent.left
+                            anchors.leftMargin: splitChevron.visible ? panel.theme.space(2) : 0
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: panel.warp.splitTunnelModeLabel
+                            color: panel.theme.textPrimary
+                            font.family: panel.theme.fontUi
+                            font.pixelSize: panel.theme.fontPx(0.917)
+                            font.weight: panel.splitExpanded ? Font.DemiBold : Font.Normal
+                        }
+
+                        Text {
+                            anchors.left: splitModeLabel.right
+                            anchors.leftMargin: panel.theme.space(2)
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: panel.warp.splitTunnelMeaning
+                            color: panel.theme.textMuted
+                            font.family: panel.theme.fontUi
+                            font.pixelSize: panel.theme.fontPx(0.792)
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                // The collapsing container this shell already uses for the
+                // Wi-Fi band pills and the tray's inactive drawer: the rows
+                // stay built and the clip slides over them, so the card grows
+                // into the list instead of the list appearing on top of it.
+                // `visible` only drops at a real zero, or a mid-collapse row
+                // would keep taking hover.
+                Item {
+                    id: splitClip
+
+                    width: parent.width
+                    clip: true
+                    visible: height > 0
+                    height: panel.splitExpanded ? splitList.implicitHeight : 0
+                    opacity: panel.splitExpanded ? 1 : 0
+
+                    Behavior on height {
+                        NumberAnimation {
+                            duration: panel.theme.time(1.2)
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: panel.theme.time(1.2)
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    Column {
+                        id: splitList
+
+                        // Top-anchored (the default): the clip grows downward
+                        // and hands the rows over from the first, which is the
+                        // direction the chevron just pointed. Bottom-anchoring
+                        // it — the tray drawer's trick, because that one grows
+                        // upward — would run the list past the opening.
+                        width: parent.width
+                        spacing: panel.theme.space(1.5)
+
+                        Repeater {
+                            model: panel.splitEntries
+
+                            SplitRow {
+                                required property var modelData
+                                required property int index
+
+                                width: splitList.width
+                                entry: modelData
+                                rowIndex: index
+                            }
+                        }
                     }
                 }
 
                 // Ours: which of the two route situations this machine is in.
+                // Last in the section deliberately. Collapsed, the clip above
+                // takes no height at all and this sits straight under the
+                // disclosure row, where it reads as a note on the mode that row
+                // names; open, it lands under the rules it is a note about,
+                // instead of wedged between a row and the list it just opened.
                 Text {
                     visible: panel.warp.tailnetVerdict !== ""
                     width: parent.width
@@ -763,19 +907,6 @@ BarPanel {
                     font.family: panel.theme.fontUi
                     font.pixelSize: panel.theme.fontPx(0.833)
                     wrapMode: Text.WordWrap
-                }
-
-                Repeater {
-                    model: panel.splitExpanded ? panel.splitEntries : []
-
-                    SplitRow {
-                        required property var modelData
-                        required property int index
-
-                        width: splitColumn.width
-                        entry: modelData
-                        rowIndex: index
-                    }
                 }
             }
         }

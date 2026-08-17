@@ -155,6 +155,11 @@ QtObject {
 
     readonly property var splitTunnelEntries: splitTunnel && splitTunnel.entries ? splitTunnel.entries : []
     readonly property string splitTunnelSummary: splitTunnel && splitTunnel.summary ? splitTunnel.summary : ""
+    // The same fact as the summary, in the two halves the panel's disclosure
+    // row wants: the mode to set in the reading weight, and what it means to
+    // mute beside it.
+    readonly property string splitTunnelModeLabel: Model.splitTunnelModeLabel(splitTunnel && splitTunnel.mode ? splitTunnel.mode : "")
+    readonly property string splitTunnelMeaning: Model.splitTunnelMeaning(splitTunnel && splitTunnel.mode ? splitTunnel.mode : "", splitTunnelEntries.length)
 
     // Ours, no upstream: WARP in a tunnel mode owns the default route, which is
     // also where the tailnet lives. Cloudflare's own default exclude list

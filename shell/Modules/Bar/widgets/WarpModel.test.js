@@ -143,6 +143,19 @@ test("split tunnel lists object entries and bare strings alike", () => {
     assert.equal(bare[0].description, "Host");
 });
 
+test("the disclosure row says what the mode does, not just what it is called", () => {
+    assert.equal(Model.splitTunnelModeLabel("exclude"), "Exclude");
+    assert.equal(Model.splitTunnelModeLabel(""), "Split tunnel");
+
+    assert.equal(Model.splitTunnelMeaning("exclude", 27), "27 rules skip the tunnel");
+    assert.equal(Model.splitTunnelMeaning("exclude", 1), "1 rule skips the tunnel");
+    assert.equal(Model.splitTunnelMeaning("include", 3), "3 rules take the tunnel");
+    assert.equal(Model.splitTunnelMeaning("include", 1), "1 rule takes the tunnel");
+    // Nothing to open, and no verb to guess for a mode we do not know.
+    assert.equal(Model.splitTunnelMeaning("exclude", 0), "No rules");
+    assert.equal(Model.splitTunnelMeaning("", 4), "4 rules");
+});
+
 test("mode ids match `warp-cli mode --help`, all seven", () => {
     const ids = Model.MODES.map(m => m.id).sort();
     assert.deepEqual(ids, ["doh", "dot", "proxy", "tunnel_only", "warp", "warp+doh", "warp+dot"]);
