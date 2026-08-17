@@ -1,0 +1,71 @@
+# notmuch — the index, the tag store, and the query engine behind the
+# HEY-style workflow. packages/manifest.toml: notmuch.
+#
+# This is the XDG location notmuch prefers ($XDG_CONFIG_HOME/notmuch/<profile>/
+# config, profile "default"); the legacy ~/.notmuch-config the macOS setup used
+# is only consulted if this is absent. NOTMUCH_CONFIG overrides both.
+#
+# A template so the paths are absolute and unambiguous — notmuch resolves a
+# relative database.path against $HOME but says nothing so clear about
+# hook_dir, and a hook that silently never runs is the worst failure mode
+# available here (mail would sync and index, but nothing would ever be routed).
+
+[database]
+path={{ .chezmoi.homeDir }}/Mail
+# Hooks live in the repo, not inside the maildir, so the routing engine is
+# versioned with everything else and a `rm -rf ~/Mail` to re-sync from scratch
+# cannot take it out.
+hook_dir={{ .chezmoi.homeDir }}/.config/notmuch/hooks
+
+[user]
+name=Saiful Islam
+primary_email={{ .mailUser }}
+# Every OTHER address that reaches this mailbox — the iCloud+ Custom Email
+# Domain addresses. One iCloud account, several domains, one inbox, and this
+# is the line that makes notmuch understand that.
+#
+# It buys three things, all of which are wrong without it:
+#   * `notmuch reply` picks the From: that the original was addressed TO, so
+#     answering a mail sent to support@<a domain> goes back out as
+#     support@<that domain> rather than as the iCloud address (verified: with
+#     this line absent the reply came from the iCloud address, with it present
+#     from the address the mail was delivered to).
+#   * `notmuch search from:` / to: knows what counts as "me".
+#   * the Emacs sender picker offers them (notmuch-mua-prompt-for-sender
+#     builds its list from primary_email + other_email).
+#
+# Semicolon-separated, and read from the machine-local chezmoi config for the
+# same reason as primary_email: ~/.dotfiles is PUBLIC and this is a list of
+# real addresses. `index` rather than `.mailIdentities` so a machine that
+# predates this key still applies instead of failing on a missing value.
+#
+# ONLY put addresses iCloud has actually been configured with here. A custom
+# domain with catch-all on DELIVERS anything@domain, but iCloud will only SEND
+# as the addresses set up in its own settings (three per domain, five domains)
+# — anything else is refused by the SMTP server at send time.
+{{- with (index . "mailIdentities") }}
+other_email={{ . }}
+{{- end }}
+
+[new]
+# Every newly indexed message starts unread and in the inbox; the post-new
+# hook is what then sorts it into a HEY box (or out of the inbox entirely,
+# for mail that landed in Sent/Drafts/Junk rather than INBOX). Keeping the
+# entry state dumb and fixing it in one place beats spreading the rules
+# across notmuch config and hook.
+tags=unread;inbox;new
+# mbsync's bookkeeping files must never be indexed as mail.
+ignore=.uidvalidity;.mbsyncstate;.isyncuidmap.db;dovecot-uidlist;.DS_Store
+
+[search]
+# Excluded from search results unless a query asks for them by name. Mail
+# screened out lands in both, and the Screener is a decision you make once —
+# it should not keep showing up in every unrelated search afterwards.
+exclude_tags=deleted;spam
+
+[maildir]
+# Propagate notmuch's unread/flagged state into Maildir filename flags, which
+# mbsync then pushes back to iCloud. This is what makes "read in Emacs" show
+# up as read on the iPhone — the cheapest slice of phone parity there is, and
+# it needs no file moving at all.
+synchronize_flags=true

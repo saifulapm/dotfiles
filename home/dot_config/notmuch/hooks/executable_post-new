@@ -1,0 +1,458 @@
+#!/usr/bin/env bash
+# notmuch post-new hook — the HEY routing engine.
+#
+# Runs after every `notmuch new`, i.e. after every IDLE-triggered sync and
+# every timer sweep. Its whole job is to turn "a pile of newly indexed
+# messages" into "mail that is already in the right HEY box", so that opening
+# Emacs never means sorting.
+#
+# The HEY idea this implements: you screen a SENDER once, and that decision
+# routes all their future mail forever. Emacs writes those decisions into the
+# .db files below (lisp/hey-notmuch.el); this hook applies them.
+#
+# `tag:new` is the marker for "indexed by the run that just happened" —
+# notmuch adds it via new.tags in the config, and step 9 is the only thing
+# that removes it. Every query here is scoped to tag:new so the hook stays
+# O(new mail) rather than O(mailbox), which is what keeps a 1-second push
+# feeling like a push.
+#
+# Deliberately NOT `set -e`: a hook that dies halfway leaves mail half-routed
+# and tag:new stranded, which poisons the NEXT run too. Every step is
+# independently survivable, failures are logged, and step 9 always runs.
+#
+# Files this reads, all written by the Emacs side (lisp/hey-*.el) and none of
+# them ever committed anywhere — every one is a list of who mails you:
+#
+#   screened.db  thefeed.db  spam.db      one address per line
+#   ledger.db    "<category> <address>"   Paper Trail
+#   autofile.db  "<address> <label>"      per-sender auto-labelling
+#   recycle.db   "<address> <days>"       per-sender expiry
+#   bubble.db    "<thread-id> <epoch>"    Bubble Up due list
+#   notify.db    one address per line     senders allowed to interrupt you
+#   bundle.db    one address per line     senders collapsed to one Imbox row
+#   speakeasy    one code                 skips the Screener
+#   away         until:/subject:/body     the out-of-office responder
+#   away-replied.db  one address per line who has already had one
+
+set -uo pipefail
+
+DB_DIR="${HEY_MAIL_DB_DIR:-$HOME/.local/share/hey-mail}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/qshell"
+LOG="${XDG_STATE_HOME:-$HOME/.local/state}/hey-mail/post-new.log"
+
+mkdir -p "$DB_DIR" "$STATE_DIR" "$(dirname "$LOG")"
+
+log() { printf '%s post-new: %s\n' "$(date -Is)" "$*" >>"$LOG"; }
+
+# Keep the log from growing without bound — this runs on every push.
+if [ -f "$LOG" ] && [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+    tail -n 2000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+fi
+
+# Addresses are user data and reach us from mail headers, so they are quoted
+# into every query. An address containing a double quote would still break the
+# query, so it is stripped rather than escaped — such a sender is malformed,
+# and dropping the routing rule is safer than emitting a query that matches
+# more than it should.
+sanitize() { printf '%s' "${1//\"/}"; }
+
+# ─────────────────────── 1. folder-based fixups ───────────────────────
+# new.tags marks EVERYTHING unread+inbox, including the copies mbsync pulled
+# down from Sent/Drafts/Junk. Fix those first so sender routing below only
+# ever sees real incoming mail.
+notmuch tag --batch <<'EOF' 2>>"$LOG"
+-inbox -unread +sent -- tag:new and folder:"icloud/Sent Messages"
+-inbox -unread +draft -- tag:new and folder:"icloud/Drafts"
+-inbox -unread +spam -- tag:new and folder:"icloud/Junk"
+-inbox -unread +deleted -- tag:new and folder:"icloud/Deleted Messages"
+-inbox -unread +archived -- tag:new and folder:"icloud/Archive"
+EOF
+
+# ─────────────────────── 2. Speakeasy ───────────────────────
+# HEY's Speakeasy: a private code that, placed on its own in the subject line,
+# bypasses the Screener entirely. Word-boundary anchored so "Red87" does not
+# match "yoRed87" — HEY's own rule, and the reason the code is worth anything.
+if [ -s "$DB_DIR/speakeasy" ]; then
+    code="$(head -n1 "$DB_DIR/speakeasy" | tr -d '[:space:]')"
+    if [ -n "$code" ]; then
+        # Asked first, so the log line means something.  The old version
+        # logged "speakeasy applied" on every sync, because `notmuch tag`
+        # exits 0 whether it matched a thousand messages or none — a line that
+        # appears whatever happens tells you nothing when you need it to.
+        # --exclude=false, or this asks the wrong question entirely.  The
+        # config sets search.exclude_tags=deleted;spam, so a plain `notmuch
+        # count` cannot see a message the folder fixup has just tagged spam —
+        # which is precisely the message this step exists to rescue.  Caught
+        # by testing: a junked message carrying the code counted as 0 and was
+        # left in Junk by the very code written to pull it out.
+        speak=$(notmuch count --exclude=false -- tag:new and subject:"$(sanitize "$code")" 2>/dev/null || echo 0)
+        if [ "${speak:-0}" -gt 0 ]; then
+            # `-spam -deleted +inbox +unread` as well as the screening, because
+            # the code has to work in the case it exists for: a stranger you
+            # handed it to, whose mail the provider then decides is junk.
+            # Verified on this mailbox — iCloud junks self-addressed test mail,
+            # and step 1's folder fixup had already taken it out of the inbox
+            # before this step ran.  Letting someone through the Screener but
+            # leaving them in Junk is not letting them through.  `+unread` is
+            # safe here in a way it is nowhere else: the query is scoped to
+            # tag:new carrying the code, i.e. mail that arrived seconds ago
+            # and genuinely is unread.
+            notmuch tag +screened +speakeasy -spam -deleted +inbox +unread -- \
+                tag:new and subject:"$(sanitize "$code")" 2>>"$LOG" \
+                && log "speakeasy: $speak message(s) let through"
+        fi
+    fi
+fi
+
+# ─────────────────────── 3. sender routing ───────────────────────
+# One `notmuch tag --batch` per database rather than one process per address:
+# a few thousand screened senders is an ordinary size for this file, and
+# spawning notmuch per line turns a 200ms hook into a 40-second one.
+
+route_simple() {
+    # $1 = db file, $2… = tag operations
+    local db="$1"; shift
+    [ -s "$db" ] || return 0
+    local ops="$*" count
+    # Counted BEFORE the loop, not inside it.  A `while … done | notmuch tag`
+    # runs the loop in a subshell — the left-hand side of a pipe always does —
+    # so a counter incremented in there dies with the subshell and the parent
+    # reads back 0.  The old version therefore never logged a routing line at
+    # all, which is a quiet way for a log to lie: routing was working the
+    # whole time and the log said nothing had happened.
+    count=$(grep -cvE '^[[:space:]]*(#|$)' "$db" 2>/dev/null || echo 0)
+    while IFS= read -r addr; do
+        addr="$(printf '%s' "$addr" | tr -d '[:space:]')"
+        case "$addr" in ''|'#'*) continue ;; esac
+        printf '%s -- tag:new and from:"%s"\n' "$ops" "$(sanitize "$addr")"
+    done <"$db" | notmuch tag --batch 2>>"$LOG"
+    [ "${count:-0}" -gt 0 ] && log "routed via $(basename "$db"): $count rules"
+    return 0
+}
+
+# Screened in → the Imbox. Stays in the inbox, stays unread.
+route_simple "$DB_DIR/screened.db" "+screened"
+# The Feed → newsletters. Out of the inbox, but still unread so the Feed
+# shows what you have not browsed yet.
+route_simple "$DB_DIR/thefeed.db" "+thefeed" "+archived" "-inbox"
+# Screened out → gone, now and forever. Never notified, never counted.
+route_simple "$DB_DIR/spam.db" "+spam" "+deleted" "+archived" "-inbox" "-unread" "-screened"
+
+# Paper Trail is `<category> <address>` per line — receipts filed by vendor.
+# Marked read on arrival: HEY's Paper Trail is a place you go looking, not a
+# thing that asks for attention.
+if [ -s "$DB_DIR/ledger.db" ]; then
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        cat="$(printf '%s' "$line" | awk '{print $1}' | tr -cd '[:alnum:]_-')"
+        addr="$(printf '%s' "$line" | awk '{print $2}' | tr -d '[:space:]')"
+        [ -n "$cat" ] && [ -n "$addr" ] || continue
+        printf '+ledger/%s +archived -inbox -unread -- tag:new and from:"%s"\n' \
+            "$cat" "$(sanitize "$addr")"
+    done <"$DB_DIR/ledger.db" | notmuch tag --batch 2>>"$LOG"
+fi
+
+# Bundled senders → collapsed to one row on the hello screen instead of one
+# row per thread in the Imbox (hey-flow.el draws it, the Imbox saved search
+# excludes the tag). Display only: still unread, still in the inbox, still
+# counted — a bundle you cannot see the size of is a bundle you would have to
+# open to trust.
+route_simple "$DB_DIR/bundle.db" "+bundled"
+
+# Autofile — HEY's per-contact auto-labelling: `<address> <label>` per line.
+if [ -s "$DB_DIR/autofile.db" ]; then
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        addr="$(printf '%s' "$line" | awk '{print $1}' | tr -d '[:space:]')"
+        label="$(printf '%s' "$line" | awk '{print $2}' | tr -cd '[:alnum:]_-')"
+        [ -n "$addr" ] && [ -n "$label" ] || continue
+        printf '+label/%s -- tag:new and from:"%s"\n' "$label" "$(sanitize "$addr")"
+    done <"$DB_DIR/autofile.db" | notmuch tag --batch 2>>"$LOG"
+fi
+
+# ─────────────────────── 4. Bubble Up sweep ───────────────────────
+# `<thread-id> <epoch-seconds>` per line. When the time passes, the thread
+# floats back to the top of the Imbox — unread again, in the inbox again,
+# and tagged so the Imbox can show it as bubbled rather than merely new.
+# Runs on every sync rather than on a clock of its own: worst case a bubble
+# surfaces one timer interval (15 min) late, which beats owning a scheduler.
+if [ -s "$DB_DIR/bubble.db" ]; then
+    now="$(date +%s)"
+    remaining="$DB_DIR/bubble.db.tmp"
+    : >"$remaining"
+    fired=0
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        tid="$(printf '%s' "$line" | awk '{print $1}')"
+        due="$(printf '%s' "$line" | awk '{print $2}')"
+        case "$due" in ''|*[!0-9]*) continue ;; esac
+        if [ "$now" -ge "$due" ]; then
+            notmuch tag +inbox +unread +bubbled -bubble -- \
+                "thread:$(sanitize "$tid")" 2>>"$LOG" && fired=$((fired + 1))
+        else
+            printf '%s\n' "$line" >>"$remaining"
+        fi
+    done <"$DB_DIR/bubble.db"
+    mv "$remaining" "$DB_DIR/bubble.db"
+    [ "$fired" -gt 0 ] && log "bubbled up: $fired thread(s)"
+fi
+
+# ─────────────────────── 5. Recycling sweep ───────────────────────
+# HEY's per-contact recycling: `<address> <days>`, older mail from that sender
+# is moved toward the trash automatically. Tagging only — nothing is unlinked
+# here. The `deleted` tag is excluded from search by config, and actual file
+# removal stays a separate, deliberate step, because an automated rule that
+# deletes mail is a rule that will one day delete the wrong mail.
+if [ -s "$DB_DIR/recycle.db" ]; then
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        addr="$(printf '%s' "$line" | awk '{print $1}' | tr -d '[:space:]')"
+        days="$(printf '%s' "$line" | awk '{print $2}')"
+        [ -n "$addr" ] || continue
+        case "$days" in ''|*[!0-9]*) continue ;; esac
+        # notmuch's relative dates are English-with-underscores
+        # ("6_weeks_ago"); a bare "30d_ago" does NOT parse, and an
+        # unparseable date range silently matches nothing — which would look
+        # exactly like "recycling is configured and working".
+        printf '+deleted -inbox -unread -- from:"%s" and date:..%s_days_ago\n' \
+            "$(sanitize "$addr")" "$days"
+    done <"$DB_DIR/recycle.db" | notmuch tag --batch 2>>"$LOG"
+fi
+
+# ─────────────────────── 6. muted threads ───────────────────────
+# A muted thread stays muted as it grows: HEY's mute is a promise about the
+# FUTURE of a conversation, not a one-off archive, and a thread that comes
+# back the moment somebody replies is not muted in any useful sense.
+#
+# `thread:{...}` is notmuch's subquery syntax (0.32+): it matches every
+# message in any thread containing a match for the inner query. Scoped to
+# tag:new, so this only ever touches the handful that just arrived.
+#
+# `unread` is deliberately NOT cleared — the same decision the Emacs side
+# makes (hey-thread.el) and the same one `a` (archive) makes. Read state is
+# mirrored into the maildir filename and pushed to iCloud by mbsync, and a
+# rule that silently marks mail read on your phone is a rule you would come
+# to distrust. Out of the inbox is enough: every box query requires tag:inbox.
+notmuch tag +muted -inbox -- 'tag:new and thread:{tag:muted}' 2>>"$LOG"
+
+# ─────────────────────── 7. away autoresponder ───────────────────────
+# The one thing in this hook that talks to the outside world, so it is also
+# the one thing wrapped in guards. Every condition below has cost somebody a
+# mail loop at some point in the history of the autoresponder:
+#
+#   * screened-in senders only     — a stranger who gets a reply has learned
+#                                    the address is live. That is precisely
+#                                    what the Screener exists to prevent, and
+#                                    it is how autoresponders become a spam
+#                                    confirmation service.
+#   * once per address, ever       — until you turn Away off, which is when
+#                                    Emacs deletes away-replied.db.
+#   * never to a list              — List-Id/List-Post/List-Unsubscribe or
+#                                    Precedence: bulk. Replying to a mailing
+#                                    list means replying to everyone on it.
+#   * never to auto-submitted mail — RFC 3834's own rule; two responders
+#                                    talking to each other is the classic
+#                                    infinite loop.
+#   * never to no-reply addresses  — nobody reads that mailbox, and some of
+#                                    them bounce, and bounces are mail too.
+#   * never to yourself            — the shortest loop there is.
+#   * capped per run               — a hundred-message sync should not become
+#                                    a hundred outbound SMTP sessions.
+#
+# The reply itself carries Auto-Submitted: auto-replied and
+# X-Auto-Response-Suppress, which is how a well-behaved responder on the
+# other side knows not to answer back.
+#
+# HEY_AWAY_DRY_RUN=1 logs what it would send and sends nothing.
+AWAY_FILE="$DB_DIR/away"
+AWAY_MAX="${HEY_AWAY_MAX:-10}"
+if [ -s "$AWAY_FILE" ] && command -v msmtp >/dev/null 2>&1; then
+    away_until="$(sed -n 's/^until:[[:space:]]*//p' "$AWAY_FILE" | head -n1)"
+    away_subject="$(sed -n 's/^subject:[[:space:]]*//p' "$AWAY_FILE" | head -n1)"
+    # Everything after the first blank line is the message.
+    away_body="$(sed '1,/^[[:space:]]*$/d' "$AWAY_FILE")"
+    away_epoch="$(date -d "$away_until 23:59:59" +%s 2>/dev/null || true)"
+    now_epoch="$(date +%s)"
+
+    if [ -z "$away_epoch" ]; then
+        log "away: cannot parse until:'$away_until' — not sending"
+    elif [ "$now_epoch" -gt "$away_epoch" ]; then
+        : # expired; silent, because it will be expired on every sync until
+          # you clear it, and a log line per sync is a log you stop reading.
+    elif [ -z "$(printf '%s' "$away_body" | tr -d '[:space:]')" ]; then
+        log "away: no message body — not sending"
+    else
+        me_name="$(notmuch config get user.name 2>/dev/null)"
+        me_addr="$(notmuch config get user.primary_email 2>/dev/null)"
+        # Every address that is us, one per line, for the "never to yourself"
+        # check — the domain address that forwards into iCloud belongs here
+        # too, which is what user.other_email is for.
+        mine="$(printf '%s\n%s\n' "$me_addr" "$(notmuch config get user.other_email 2>/dev/null)")"
+        sent=0
+
+        while IFS= read -r mid; do
+            [ -n "$mid" ] || continue
+            [ "$sent" -lt "$AWAY_MAX" ] || break
+            file="$(notmuch search --output=files -- "$mid" 2>/dev/null | head -n1)"
+            [ -n "$file" ] && [ -r "$file" ] || continue
+
+            # Headers only: everything up to the first blank line. Cheap, and
+            # it keeps a 4MB attachment out of the pipeline.
+            headers="$(sed -n '/^[[:space:]]*$/q;p' "$file")"
+
+            case "$(printf '%s' "$headers" | grep -i '^Auto-Submitted:' | head -n1)" in
+                ''|*[Nn][Oo]) ;;   # absent, or the explicit "no" — fine
+                *) continue ;;
+            esac
+            printf '%s' "$headers" | grep -qiE '^(List-Id|List-Post|List-Unsubscribe):' && continue
+            printf '%s' "$headers" | grep -qiE '^Precedence:[[:space:]]*(bulk|list|junk)' && continue
+
+            from_line="$(printf '%s' "$headers" | grep -i '^From:' | head -n1)"
+            # "Name <a@b>" → a@b; a bare "a@b" is left as it is.
+            addr="$(printf '%s' "$from_line" | sed -e 's/^[Ff]rom:[[:space:]]*//' \
+                        -e 's/.*<\([^>]*\)>.*/\1/' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+                    | tr '[:upper:]' '[:lower:]')"
+            case "$addr" in
+                ''|*' '*|*'"'*) continue ;;
+                *noreply*|*no-reply*|*donotreply*|*do-not-reply*) continue ;;
+                *mailer-daemon*|*postmaster*|*bounce*) continue ;;
+            esac
+            printf '%s\n' "$mine" | grep -qixF "$addr" && continue
+            [ -f "$DB_DIR/away-replied.db" ] && grep -qixF "$addr" "$DB_DIR/away-replied.db" && continue
+
+            msgid="$(printf '%s' "$headers" | grep -i '^Message-ID:' | head -n1 \
+                     | sed -e 's/^[Mm]essage-[Ii][Dd]:[[:space:]]*//')"
+            orig_subject="$(printf '%s' "$headers" | grep -i '^Subject:' | head -n1 \
+                            | sed -e 's/^[Ss]ubject:[[:space:]]*//')"
+            subject="${away_subject:-Re: ${orig_subject:-your mail}}"
+
+            if [ -n "${HEY_AWAY_DRY_RUN:-}" ]; then
+                log "away DRY RUN: would reply to $addr (subject: $subject)"
+                printf '%s\n' "$addr" >>"$DB_DIR/away-replied.db"
+                sent=$((sent + 1))
+                continue
+            fi
+
+            # `timeout` because this hook holds mail-sync's flock: an msmtp
+            # waiting on a dead TCP connection would stall every later push.
+            if {
+                printf 'From: %s <%s>\n' "$me_name" "$me_addr"
+                printf 'To: %s\n' "$addr"
+                printf 'Subject: %s\n' "$subject"
+                [ -n "$msgid" ] && printf 'In-Reply-To: %s\nReferences: %s\n' "$msgid" "$msgid"
+                printf 'Date: %s\n' "$(date -R)"
+                printf 'Message-ID: <away-%s-%s@%s>\n' "$(date +%s)" "$$" "$(hostname)"
+                printf 'Auto-Submitted: auto-replied\n'
+                printf 'X-Auto-Response-Suppress: All\n'
+                printf 'Precedence: auto_reply\n'
+                printf 'MIME-Version: 1.0\n'
+                printf 'Content-Type: text/plain; charset=utf-8\n'
+                printf 'Content-Transfer-Encoding: 8bit\n'
+                printf '\n%s\n' "$away_body"
+            } | timeout 30 msmtp -a icloud -- "$addr" 2>>"$LOG"; then
+                printf '%s\n' "$addr" >>"$DB_DIR/away-replied.db"
+                sent=$((sent + 1))
+                log "away: replied to $addr"
+            else
+                log "away: msmtp failed for $addr"
+            fi
+        done <<EOF
+$(notmuch search --output=messages -- 'tag:new and tag:inbox and tag:screened and tag:unread' 2>/dev/null)
+EOF
+        [ "$sent" -gt 0 ] && log "away: $sent repl$([ "$sent" = 1 ] && echo y || echo ies) sent"
+    fi
+fi
+
+# ─────────────────────── 8. per-contact notifications ───────────────────────
+# HEY's notifications are off by default and opt-in per contact, which is the
+# only arrangement under which a notification still means something. The
+# per-sender list is asked about BEFORE tag:new is retired, like `fresh`
+# below, because afterwards the question cannot be asked at all.
+notify_senders=""
+if [ -s "$DB_DIR/notify.db" ]; then
+    while IFS= read -r addr; do
+        addr="$(printf '%s' "$addr" | tr -d '[:space:]')"
+        case "$addr" in ''|'#'*) continue ;; esac
+        n=$(notmuch count -- "tag:new and tag:inbox and from:\"$(sanitize "$addr")\"" 2>/dev/null || echo 0)
+        [ "${n:-0}" -gt 0 ] && notify_senders="${notify_senders:+$notify_senders, }$addr"
+    done <"$DB_DIR/notify.db"
+fi
+
+# ─────────────────────── 9. retire tag:new ───────────────────────
+# Read the "arrived in THIS run" number first — step 11's notification needs
+# it, and after the next line there is no way left to ask the question.
+fresh=$(notmuch count -- tag:new and tag:inbox and tag:screened and tag:unread 2>/dev/null || echo 0)
+
+# Must happen even if everything above failed, or the next run re-processes
+# this batch on top of whatever it already did.
+notmuch tag -new -- tag:new 2>>"$LOG"
+
+# ─────────────────────── 10. publish counts for the bar ───────────────────────
+# The qshell convention is event-driven, never polled (see DufsService.qml):
+# we write the state file, the widget's FileView watcher notices. Written to a
+# temp file and renamed so the widget can never observe a half-written JSON.
+count() { notmuch count -- "$@" 2>/dev/null || echo 0; }
+
+# EXACTLY the Imbox saved search in hey-notmuch.el, exclusions and all: a bar
+# that says 7 next to a box showing 5 is a bar you stop believing. `seen` is
+# glanced-at-but-not-read (it moves to the Prev. Seen box) and `bundled` is a
+# prolific sender rolled up into one row on the hello screen.
+imbox=$(count tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled)
+seen=$(count tag:inbox and tag:screened and tag:unread and tag:seen)
+bundled=$(count tag:inbox and tag:screened and tag:unread and tag:bundled)
+screener=$(count tag:inbox and tag:unread and not tag:screened)
+feed=$(count tag:thefeed and tag:unread)
+# Anchored regex, not the bare tag:/ledger/ the first draft of the elisp used:
+# that one also matches a label called "my-ledger-notes". Phase 1 brings
+# hey-notmuch.el's saved searches onto this same form.
+papertrail=$(count 'tag:/^ledger\//')
+replylater=$(count tag:replylater)
+setaside=$(count tag:setaside)
+bubbled=$(count tag:bubbled and tag:unread)
+muted=$(count tag:muted)
+
+tmp="$STATE_DIR/mail.json.tmp"
+cat >"$tmp" <<JSON
+{
+  "imbox": $imbox,
+  "seen": $seen,
+  "bundled": $bundled,
+  "screener": $screener,
+  "feed": $feed,
+  "papertrail": $papertrail,
+  "replylater": $replylater,
+  "setaside": $setaside,
+  "bubbled": $bubbled,
+  "muted": $muted,
+  "updated": "$(date -Is)"
+}
+JSON
+mv "$tmp" "$STATE_DIR/mail.json"
+
+# ─────────────────────── 11. tell Emacs, tell the user ───────────────────────
+# The daemon is already running (emacs.service); refresh whatever notmuch
+# buffers are open so the Imbox is current the moment you switch to it.
+if command -v emacsclient >/dev/null 2>&1; then
+    emacsclient --suppress-output --eval \
+        '(when (fboundp (quote notmuch-refresh-all-buffers)) (notmuch-refresh-all-buffers))' \
+        >/dev/null 2>&1 &
+fi
+
+# Notify ONLY for screened-in mail. This is the whole point of the Screener:
+# an unscreened stranger must never be allowed to buzz you. Mirrors HEY, where
+# push notifications are off by default and opt-in per contact.
+if [ "${fresh:-0}" -gt 0 ] && command -v notify-send >/dev/null 2>&1; then
+    notify-send -a "Mail" -i mail-unread \
+        "$fresh new in your Imbox" "$imbox unread · $screener waiting in the Screener"
+fi
+
+# And a second, louder one for the handful of people on the notify list — the
+# ones whose mail you asked to be interrupted for (the contact page's `!').
+# Separate rather than folded into the line above because the whole value of
+# it is that it names the person: "3 new" is a number, "Mail from Anna" is a
+# reason to look.
+if [ -n "$notify_senders" ] && command -v notify-send >/dev/null 2>&1; then
+    notify-send -a "Mail" -i mail-unread -u critical "Mail from $notify_senders" ""
+fi
+
+exit 0

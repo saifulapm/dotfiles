@@ -1,0 +1,34 @@
+[Unit]
+Description=IMAP IDLE watcher for %i (goimapnotify)
+Documentation=https://gitlab.com/shackra/goimapnotify
+# Session-tied, the emacs.service/qshell.service shape. This is not just
+# tidiness: the watcher shells out to `pass`, and a LOCKED gpg-agent answers
+# by drawing a pinentry-qt dialog. Outside a graphical session there is
+# nowhere to draw it, so the daemon would block on a prompt no one can see
+# and then fail its logins in a loop.
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+# ~/.config/imapnotify/%i.yaml is the account definition; without it the
+# daemon exits immediately and systemd would restart it forever.
+ConditionPathExists=%h/.config/imapnotify/%i.yaml
+# Restart budget: 5 failures a day, then stop and stay stopped. An account
+# with a revoked app-specific password fails EVERY start, and without this it
+# would hammer Apple's IMAP endpoint indefinitely — the kind of thing that
+# gets an IP rate-limited.
+StartLimitIntervalSec=1d
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/goimapnotify -conf %h/.config/imapnotify/%i.yaml
+# The IDLE connection dies for ordinary reasons — suspend/resume, a wifi
+# change, iCloud hanging up. Reconnecting is the normal path, not an error.
+Restart=always
+RestartSec=30
+# The watcher only ever spawns mail-sync, which does the real work at idle
+# priority itself. Nothing here should compete with the editor.
+Nice=10
+
+[Install]
+WantedBy=graphical-session.target

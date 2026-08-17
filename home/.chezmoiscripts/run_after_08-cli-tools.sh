@@ -125,6 +125,33 @@ if command -v go >/dev/null 2>&1 && ! command -v mcp-language-server >/dev/null 
   fi
 fi
 
+# ─── goimapnotify (go) — IMAP IDLE for the mail setup ────────────────────────
+# The push half of the HEY mail workflow: holds an IDLE connection per mailbox
+# and runs bin/mail-sync within about a second of the server announcing new
+# mail. Without it the setup still works — mail-sync.timer polls every 15
+# minutes — so a failure here degrades rather than breaks, which is why it
+# only warns.
+#
+# The /cmd/goimapnotify suffix is load-bearing: the module ROOT contains no
+# main package, and `go install gitlab.com/shackra/goimapnotify@latest` fails
+# with "does not contain package". Upstream publishes no tags, so @latest
+# resolves to a pseudo-version and a rebuild is the only way to move.
+#
+# Sits here beside mcp-language-server rather than in a mail-specific script:
+# it is one more go binary, and packages/manifest.toml points at this file.
+if command -v go >/dev/null 2>&1 && ! command -v goimapnotify >/dev/null 2>&1; then
+  if go install gitlab.com/shackra/goimapnotify/cmd/goimapnotify@latest >/dev/null 2>&1; then
+    gobin="$(go env GOBIN)"; [ -z "$gobin" ] && gobin="$(go env GOPATH)/bin"
+    [ -x "$gobin/goimapnotify" ] && {
+      mkdir -p "$HOME/.local/bin"
+      ln -sf "$gobin/goimapnotify" "$HOME/.local/bin/goimapnotify"
+    }
+    echo "cli-tools: goimapnotify installed (go)"
+  else
+    warn "go install goimapnotify failed — mail falls back to mail-sync.timer (15 min)"
+  fi
+fi
+
 # ─── gh extensions ───────────────────────────────────────────────────────────
 # gh extension install needs an authenticated gh; the login is interactive and
 # deliberately not scripted (same policy as the agent CLIs). Until `gh auth

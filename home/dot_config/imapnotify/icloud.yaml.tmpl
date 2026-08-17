@@ -1,0 +1,55 @@
+# goimapnotify — IMAP IDLE watcher for iCloud.
+# packages/manifest.toml: goimapnotify (non-dnf, go install).
+# Consumed by imapnotify@icloud.service; the filename IS the unit instance
+# name, so a second account is one more file here plus one `systemctl --user
+# enable --now imapnotify@<name>`.
+#
+# What this buys: the server tells us the moment mail lands, so bin/mail-sync
+# runs within about a second instead of waiting out a poll interval. HEY's own
+# web app polls — this is the one place the Emacs setup is simply faster than
+# the thing it is replacing.
+
+configurations:
+    - host: imap.mail.me.com
+      port: 993
+      tls: true
+      tlsOptions:
+          # Verify the chain properly. The upstream README's first example
+          # shows rejectUnauthorized: false, which is fine for a self-signed
+          # test server and wrong for Apple.
+          rejectUnauthorized: true
+      username: {{ .mailUser }}
+      # Never the password itself: the same pass entry mbsync and msmtp read.
+      # Line 1 is the secret, the rest of the entry is host/port/revocation
+      # notes, hence head -n1. Note the key is passwordCMD with an UPPERCASE
+      # CMD — `passwordCmd` is silently ignored, and the daemon then tries to
+      # log in with an empty password and loops on auth failure.
+      passwordCMD: "pass email/icloud/{{ (splitList "@" .mailUser) | first }} | head -n1"
+      alias: icloud
+      xoAuth2: false
+
+      # Re-establish IDLE every 15 minutes. IMAP servers drop long-lived IDLE
+      # sessions silently, and iCloud is worse about it than most; a watcher
+      # that never re-arms looks perfectly healthy in `systemctl status` while
+      # delivering nothing. The RFC recommends re-issuing at least every 29
+      # minutes, and iCloud does not reliably last that long.
+      idleLogoutTimeout: 15
+
+      boxes:
+          # INBOX only, deliberately. mail-sync runs `mbsync icloud`, which
+          # syncs EVERY folder regardless of which one woke it, so watching
+          # more mailboxes would add IDLE connections that can only ever
+          # trigger the identical command. Worse, our own writes (reads
+          # propagating to Sent, tags moving files) would then wake the
+          # watcher we just caused to fire — a sync loop feeding itself.
+          - mailbox: INBOX
+            onNewMail: "mail-sync --quiet"
+            # SKIP means "no post-command"; leaving it empty makes the daemon
+            # try to execute the empty string and log an error per event.
+            onNewMailPost: SKIP
+            # A changed message is a flag change — almost always OUR read
+            # state propagating back up. Syncing on it is harmless (mail-sync
+            # is flock-serialised and idempotent) and it keeps another
+            # client's actions on the phone showing up here promptly.
+            onChangedMail: "mail-sync --quiet"
+            onChangedMailPost: SKIP

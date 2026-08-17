@@ -1,0 +1,21 @@
+[Unit]
+Description=Periodic mail sync (fallback for a dead IDLE session)
+
+[Timer]
+# This timer is the SAFETY NET, not the delivery mechanism — imapnotify@icloud
+# is what makes mail arrive in about a second. What the timer covers is the
+# failure mode that IDLE cannot report: the connection dying quietly, which
+# leaves the watcher looking healthy in `systemctl status` while delivering
+# nothing. Fifteen minutes is the most stale mail can ever get.
+OnStartupSec=2min
+OnUnitActiveSec=15min
+# Do not let mail sync land on the same second as qshell-sync (also 15min) on
+# every wake — two idle-priority jobs contending is how a resume gets janky.
+RandomizedDelaySec=2min
+# Fire the missed run after a suspend rather than silently waiting out the
+# next full interval. Closing the lid for an hour should not cost an hour of
+# mail once IDLE has also been asleep.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

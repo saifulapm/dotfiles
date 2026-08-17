@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# mail-sync — pull mail, index it, let the routing engine sort it.
+#
+# The single entry point for "get mail now", called from three places:
+#   * imapnotify-icloud.service, within ~1s of iCloud announcing new mail
+#   * mail-sync.timer, every 15 min, as the fallback for a dead IDLE session
+#   * by hand, and from Emacs (`G` in notmuch), when you are impatient
+#
+# All three run the same two commands in the same order. The interesting work
+# is not here — it is in ~/.config/notmuch/hooks/post-new, which turns freshly
+# indexed mail into mail that is already in the right HEY box.
+#
+# Usage: mail-sync [--quiet]
+
+set -uo pipefail
+
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/hey-mail"
+LOG="$STATE/sync.log"
+LOCK="$STATE/sync.lock"
+mkdir -p "$STATE"
+
+quiet=0
+[ "${1:-}" = "--quiet" ] && quiet=1
+
+log() {
+    printf '%s mail-sync: %s\n' "$(date -Is)" "$*" >>"$LOG"
+    [ "$quiet" -eq 1 ] || printf 'mail-sync: %s\n' "$*"
+}
+
+if [ -f "$LOG" ] && [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+    tail -n 2000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+fi
+
+# IDLE and the timer WILL overlap — that is the normal case, not the edge one:
+# a burst of arriving mail fires imapnotify repeatedly while the 15-minute
+# timer keeps its own schedule. Two mbsync processes on one maildir corrupt
+# the sync state, so the second caller simply leaves. Nothing is lost by
+# giving up: whatever the running sync is about to fetch includes the mail
+# this invocation was called for.
+exec 9>"$LOCK"
+if ! flock -n 9; then
+    log "another sync is running — skipping"
+    exit 0
+fi
+
+command -v mbsync >/dev/null 2>&1 || { log "mbsync not installed"; exit 1; }
+command -v notmuch >/dev/null 2>&1 || { log "notmuch not installed"; exit 1; }
+
+# gpg-agent holds the passphrase that unlocks the pass entry mbsync and msmtp
+# read. Its socket lives in the runtime dir and is reachable from a user unit,
+# but a LOCKED agent needs pinentry-qt, which needs the Wayland display — so a
+# sync that fires while the agent's cache has expired pops a passphrase dialog
+# rather than failing. That is the intended behaviour (it is the same prompt
+# browserpass causes), and it is why these units are session-tied: outside a
+# graphical session there would be nowhere to draw it.
+start=$(date +%s)
+
+if ! mbsync -c "$HOME/.mbsyncrc" icloud >>"$LOG" 2>&1; then
+    # Deliberately not fatal. iCloud drops IMAP connections mid-fetch under
+    # load, and mbsync exits nonzero having still written most of what it
+    # fetched. Indexing what DID land beats discarding a partial sync, and the
+    # next run resumes from the sync state.
+    log "mbsync exited nonzero — indexing what landed anyway"
+fi
+
+# `notmuch new` runs the post-new hook, which does the HEY routing, publishes
+# the bar counts, refreshes Emacs and raises the notification.
+if ! notmuch new --quiet >>"$LOG" 2>&1; then
+    log "notmuch new failed"
+    exit 1
+fi
+
+log "done in $(( $(date +%s) - start ))s"
+exit 0

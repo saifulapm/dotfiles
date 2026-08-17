@@ -1,0 +1,76 @@
+# mbsync (isync) — IMAP <-> Maildir sync for the HEY-style Emacs mail setup.
+# packages/manifest.toml: isync. Read by `mbsync -a`, by bin/mail-sync and by
+# imapnotify-icloud.service on every IDLE event.
+#
+# A TEMPLATE rather than a plain symlinked file on purpose. chezmoi is in
+# symlink mode here, so a non-templated entry would leave ~/.mbsyncrc pointing
+# into ~/.dotfiles — a PUBLIC repo (github.com/saifulapm/dotfiles), where git
+# tracks only the executable bit and a fresh clone lands 0644. Templates are
+# WRITTEN instead of linked, so `private_` actually produces 0600 on disk.
+# There is no password in this file either way (PassCmd shells out to `pass`)
+# and no address either — {{ "{{ .mailUser }}" }} comes from the machine-local
+# chezmoi.toml, so the public repo never names the account.
+#
+# FORMAT WARNING, learned the hard way: a BLANK LINE ENDS A SECTION in
+# mbsyncrc. Comment lines are fine inside one, empty lines are not — an
+# accidental blank between `IMAPAccount` and `PassCmd` makes mbsync report
+# "'PassCmd' is not a recognized section-starting or global keyword", which
+# reads like the keyword is unsupported rather than misplaced. Every section
+# below is therefore one contiguous run of lines, with the prose above it.
+
+# ---------------------------------------------------------------- iCloud
+# Host/port: implicit TLS on 993; iCloud offers no STARTTLS on 143 at all.
+# PassCmd: the app-specific password from appleid.apple.com, stored in `pass`
+#   as a multi-line entry (line 1 = the secret, the rest is host/port and
+#   revocation notes), hence `head -n1`. Apple rejects the ordinary Apple ID
+#   password on IMAP outright, so a login failure here is nearly always a
+#   revoked or regenerated app-specific password — make a new one, `pass edit`
+#   it in, nothing else changes.
+# PipelineDepth/Timeout: iCloud is the flaky half of this setup — it drops
+#   IMAP connections mid-fetch under load, which is why the macOS config
+#   capped each sync at 120s and told you to just poll again. Shallow
+#   pipelining trades a little throughput for far fewer mid-fetch resets.
+IMAPAccount icloud
+Host imap.mail.me.com
+Port 993
+User {{ .mailUser }}
+PassCmd "pass email/icloud/{{ (splitList "@" .mailUser) | first }} | head -n1"
+TLSType IMAPS
+SystemCertificates yes
+PipelineDepth 10
+Timeout 120
+
+IMAPStore icloud-remote
+Account icloud
+
+# SubFolders Verbatim keeps iCloud's own names ("Sent Messages", "Deleted
+# Messages") as real directories instead of Maildir++ dot-folders. notmuch
+# indexes either shape, but verbatim is what makes `notmuch search
+# folder:"Sent Messages"` read like the mailbox actually looks — and it is
+# what a future tag->folder step (phone parity) would write into.
+MaildirStore icloud-local
+Path ~/Mail/icloud/
+Inbox ~/Mail/icloud/INBOX
+SubFolders Verbatim
+
+# Create Both: folders made on either side appear on the other — required
+#   later if the tag->folder mapping lands, harmless before it.
+# Remove None: deliberately NOT `Remove Both`. A local indexing accident must
+#   never be able to delete a mailbox off the server. Folder removals stay a
+#   manual, deliberate act.
+# Patterns excludes "Notes": that folder is Apple Notes, which iCloud happens
+# to store over IMAP. It is not email, notmuch would index every note as a
+# message, and they would land in the Screener as mail from yourself. Verified
+# present on this account with `mbsync -l icloud` (2026-08-17), alongside
+# INBOX, Archive, Deleted Messages, Drafts, Junk and Sent Messages.
+Channel icloud
+Far :icloud-remote:
+Near :icloud-local:
+Patterns * !Notes
+Create Both
+Expunge Both
+Remove None
+SyncState *
+
+Group icloud-all
+Channel icloud

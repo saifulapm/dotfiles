@@ -6,7 +6,7 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service qshell.service emacs.service mempressure.service clipboard-sync.service
+# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer qshell.service emacs.service mempressure.service clipboard-sync.service imapnotify@icloud.service
 # Also DISABLES voxtype.service — see the block near the end of this file.
 set -euo pipefail
 
@@ -26,7 +26,12 @@ set -euo pipefail
 # crash-watch.service carries ConditionPathExists=! on its own off-switch and
 # ConditionEnvironment=WAYLAND_DISPLAY, so `enable --now` is a clean no-op on a
 # TTY-only apply or a machine where crash capture has been toggled off.
-units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service)
+# mail-sync.timer is the 15-minute fallback behind the IDLE watcher. The TIMER
+# carries no Requisite (only mail-sync.service does), so `enable --now` here is
+# safe on a TTY-only apply — the timer arms, and each firing is what checks for
+# a graphical session. Its ConditionPathExists on ~/.mbsyncrc also makes it a
+# clean no-op on a machine where the mail setup was never applied.
+units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service mail-sync.timer)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently
@@ -54,13 +59,18 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
   # shares qshell's Requisite gate and rides the same enable/start split.
   # clipboard-sync.service (wl-paste watcher pushing copies to the other
   # machines) needs the Wayland socket, so it rides it too.
-  systemctl --user enable qshell.service mempressure.service clipboard-sync.service \
-    || echo "user units: enable qshell/mempressure/clipboard-sync failed — check systemctl --user status qshell.service mempressure.service clipboard-sync.service" >&2
+  # imapnotify@icloud.service rides this same split: it is
+  # Requisite=graphical-session.target because it shells out to `pass`, and a
+  # locked gpg-agent needs pinentry-qt to have a display to draw on. Its
+  # ConditionPathExists on the per-account yaml keeps `enable` harmless on a
+  # machine that has no mail setup.
+  systemctl --user enable qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service \
+    || echo "user units: enable qshell/mempressure/clipboard-sync/imapnotify failed — check systemctl --user status qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service" >&2
   if systemctl --user -q is-active graphical-session.target; then
-    systemctl --user start qshell.service mempressure.service clipboard-sync.service \
-      || echo "user units: start qshell/mempressure/clipboard-sync failed — check systemctl --user status qshell.service mempressure.service clipboard-sync.service" >&2
+    systemctl --user start qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service \
+      || echo "user units: start qshell/mempressure/clipboard-sync/imapnotify failed — check systemctl --user status qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service" >&2
   fi
-  echo "user units: qshell.service mempressure.service clipboard-sync.service enabled"
+  echo "user units: qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service enabled"
   # emacs.service (ours — shadows the emacs-pgtk rpm unit) has the same
   # Requisite=graphical-session.target gate: enable always, start only
   # inside a session. --no-block because a first start bootstraps every

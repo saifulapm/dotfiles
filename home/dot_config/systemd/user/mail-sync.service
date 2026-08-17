@@ -1,0 +1,21 @@
+[Unit]
+Description=Sync mail (mbsync) and index it (notmuch)
+# Same session gate as imapnotify@: bin/mail-sync reads the iCloud password
+# out of `pass`, and a locked gpg-agent needs a graphical pinentry.
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+ConditionPathExists=%h/.mbsyncrc
+
+[Service]
+Type=oneshot
+ExecStart=%h/.dotfiles/bin/mail-sync --quiet
+# Mail arriving must never make the editor stutter. mbsync is IO-bound and
+# notmuch's indexer is CPU-bound, and neither is ever urgent — IDLE already
+# got us the latency we care about.
+Nice=19
+IOSchedulingClass=idle
+# A sync wedged on a half-open iCloud connection must not hold the lock that
+# every later sync needs. mbsync's own Timeout is 120s per operation; this is
+# the backstop for the whole run.
+TimeoutStartSec=10min

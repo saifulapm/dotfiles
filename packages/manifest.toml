@@ -1375,6 +1375,38 @@ category = "core"
 arch = "all"
 why = "Interactive disk-usage TUI (omarchy's Disk Usage launcher, user-picked 2026-08-08): the tui-install entry 'Disk Usage' runs `dua i /` in a TUI.float foot window, exactly their applications/Disk Usage.desktop. The launcher entry exists on this machine already; it does nothing until this package lands"
 
+# ------------------------------------------------------------------ mail
+# Added 2026-08-17, user-approved item by item. The HEY.com-style email
+# workflow in Emacs (~/.config/emacs/lisp/hey-notmuch.el, ported from the
+# macOS setup): mbsync pulls, notmuch indexes and tags, msmtp sends. One
+# iCloud account for now. The address itself is NOT written down anywhere in
+# this repo — it is `mailUser` in the machine-local ~/.config/chezmoi/
+# chezmoi.toml, prompted once by .chezmoi.toml.tmpl, and the mail configs are
+# templates that read it. This repo is public and an IMAP login address is
+# half a credential. The app-specific password lives in `pass` under
+# email/icloud/<local-part>. The HEY account itself is deliberately NOT
+# synced and never can be: HEY supports no IMAP or POP by design (verified
+# against help.hey.com 2026-08-17), which is exactly why the workflow is
+# rebuilt here rather than wrapped.
+
+[[pkg]]
+name = "isync"
+category = "core"
+arch = "all"
+why = "Provides mbsync — bidirectional IMAP <-> Maildir sync, the thing that actually puts mail on this disk. Picked over offlineimap (Python, unmaintained upstream since 2022) and over mpop/getmail (download-only, no upstream propagation of reads/moves/deletes, which the HEY workflow needs because tag changes have to travel back). Fedora ships 1.5.1. The binary is `mbsync`, NOT `isync` — the package name is the trap here. Config is chezmoi-managed at home/private_dot_mbsyncrc; the iCloud password comes from `pass` through PassCmd, never a file"
+
+[[pkg]]
+name = "notmuch"
+category = "core"
+arch = "all"
+why = "The index, the tag store, and the query language — the whole HEY box model is notmuch tags (tag:inbox+screened = Imbox, tag:thefeed = The Feed, tag:ledger/* = Paper Trail) and its post-new hook is where sender routing, Bubble Up sweeps and recycling run. Chosen over mu/mu4e because tags are first-class and arbitrary here (mu4e leans on maildir folders, which would force a file move per HEY box and put every routing decision on the network), and because notmuch's query syntax is the single biggest win over HEY's plain-text search box. Fedora ships 0.40 = CLI + libnotmuch only; the Emacs interface is the `notmuch` ELPA package, ALREADY installed in ~/.config/emacs/elpa. Fedora has no notmuch-emacs package — do not go looking for one"
+
+[[pkg]]
+name = "msmtp"
+category = "core"
+arch = "all"
+why = "SMTP sending. Emacs message-mode drives it as its sendmail-program and picks the account from the From: header (-a icloud), so adding a second account later is one msmtprc block and one line of elisp, with no Emacs-side SMTP state. Preferred over Emacs's built-in smtpmail because msmtp blocks in its own process instead of freezing the daemon that is also the editor, and because the same binary serves anything else on this machine that wants to send mail. Config chezmoi-managed at home/private_dot_msmtprc; password from `pass` through passwordeval"
+
 # ------------------------------------------------------------------ non-dnf tools
 # Installed by chezmoi scripts / declared externals, recorded here so the
 # manifest stays the complete inventory.
@@ -1693,6 +1725,11 @@ why  = "PHP formatter the mac had via brew; composer global is the Fedora-native
 name = "mcp-language-server"
 via  = "go install github.com/isaacphi/mcp-language-server@latest + symlink into ~/.local/bin (run_after_08-cli-tools.sh)"
 why  = "From the mac go.sh — bridges LSP servers to MCP agents"
+
+[[tool]]
+name = "goimapnotify"
+via  = "go install gitlab.com/shackra/goimapnotify/cmd/goimapnotify@latest + symlink into ~/.local/bin (run_after_08-cli-tools.sh, beside mcp-language-server — it is one more go binary, and a mail-only script would hold nothing else: the maildir is created by run_after_15-user-dirs.sh and the units enabled by run_after_02-user-timers.sh). Note the /cmd/goimapnotify suffix: the module ROOT holds no main package, so `go install <module>@latest` fails with 'does not contain package' — an easy half-hour to lose. UNTAGGED upstream, so @latest resolves to a pseudo-version (v0.0.0-20260726200550-ac7491be715b as of 2026-08-17): there is no release number to pin or compare against, a rebuild is how you move. `goimapnotify -list` enumerates the server's mailboxes, which is how the watched-mailbox list in the config was derived"
+why  = "IMAP IDLE for the mail setup (user-approved 2026-08-17): holds an open connection per mailbox and runs mbsync + notmuch new within about a second of the server announcing new mail, instead of waiting out a poll interval. This is the part that beats HEY outright — HEY's own web app polls. mail-sync.timer still runs every 15 minutes as the fallback, because IDLE connections die quietly (iCloud in particular drops them mid-session — the macOS setup capped its syncs at 120s for exactly this reason) and a push-only design would sit there looking fine while fetching nothing. Not in Fedora, not in any COPR (checked 2026-08-17); go is already on the machine for mcp-language-server, so `go install` is the cheap route. imapnotify (the original Node one) was not considered: unmaintained since 2019 and it would pull node into a path that has no other use for it"
 
 [[tool]]
 name = "gh-extensions"

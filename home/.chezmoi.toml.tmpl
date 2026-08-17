@@ -41,6 +41,36 @@ encryption = "age"
 
 [data]
     machine = {{ $machine | quote }}
+    # Primary mail account — the IMAP login and the From: address for the
+    # notmuch/mbsync/msmtp setup (packages/manifest.toml: isync, notmuch,
+    # msmtp). Prompted rather than committed BECAUSE ~/.dotfiles is PUBLIC and
+    # an IMAP login address is half a credential: the mail templates read
+    # .mailUser, so no file in the repo ever names it.
+    #
+    # promptStringOnce asks once per machine at `chezmoi init` and reads it
+    # back out of this file forever after. `chezmoi apply` never re-evaluates
+    # .chezmoi.toml.tmpl, so no background apply can be made to hang on the
+    # prompt. A machine that does no mail can answer with anything — every
+    # mail unit is ConditionPathExists-gated.
+    #
+    # Written as literal TOML comments rather than a {{ "{{/* ... */}}" }}
+    # template comment on purpose: a trim marker there swallows the newline
+    # after `machine`, which silently concatenates the two keys onto one line
+    # and fails the whole init with a TOML parse error.
+    mailUser = {{ promptStringOnce . "mailUser" "Primary email address (IMAP login)" | quote }}
+    # Every other address that lands in the same mailbox — the iCloud+ Custom
+    # Email Domain addresses (five domains, three addresses each, one inbox).
+    # Semicolon-separated, exactly the shape notmuch's other_email wants, so
+    # the template is a straight substitution.
+    #
+    # Here for the same reason as mailUser: a list of real addresses is not
+    # something a public repo gets to hold. Blank is a fine answer on a
+    # machine with one address — the notmuch template omits the line entirely.
+    #
+    # Keep it matching iCloud's own settings: catch-all delivers anything at a
+    # domain, but only the addresses iCloud is configured with may be SENT
+    # from, and a From it does not recognise is refused at send time.
+    mailIdentities = {{ promptStringOnce . "mailIdentities" "Other addresses you send as (semicolon-separated, blank for none)" | quote }}
 
 [age]
     identity = "~/.config/chezmoi/key.txt"

@@ -1,0 +1,37 @@
+# msmtp — SMTP sending for the HEY-style Emacs mail setup.
+# packages/manifest.toml: msmtp. Driven by Emacs message-mode as its
+# sendmail-program; lisp/hey-notmuch.el picks the account with `-a <name>`
+# from the From: header, so a second account is one block here plus one
+# string there, with no SMTP state inside Emacs at all.
+#
+# A TEMPLATE for the same reason as .mbsyncrc: chezmoi symlink mode plus a
+# PUBLIC source repo would give this 0644 on a fresh clone. msmtp refuses to
+# read a group- or world-readable file that contains a literal `password`
+# directive; this one uses passwordeval instead, so the check does not fire —
+# but 0600 is still the right posture for a file naming your accounts.
+
+defaults
+auth            on
+tls             on
+tls_starttls    on
+# `system`, not a path. Every msmtp guide hardcodes one of
+# /etc/ssl/certs/ca-certificates.crt (Debian) or /etc/pki/tls/certs/ca-bundle.crt
+# (older Fedora) and NEITHER exists on this machine — the real bundle is
+# /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem, which /etc/ssl/certs/
+# ca-bundle.crt symlinks to. A wrong path fails at send time with "cannot set
+# X509 trust file ... Error while reading file", which reads like a
+# permissions problem rather than a missing one. `system` asks the TLS library
+# for the platform store and is right everywhere.
+tls_trust_file  system
+logfile         ~/.local/state/msmtp/msmtp.log
+
+# ---------------------------------------------------------------- iCloud
+account         icloud
+host            smtp.mail.me.com
+port            587
+from            {{ .mailUser }}
+user            {{ .mailUser }}
+# Same pass entry as mbsync — one app-specific password serves IMAP and SMTP.
+passwordeval    "pass email/icloud/{{ (splitList "@" .mailUser) | first }} | head -n1"
+
+account default : icloud
