@@ -208,13 +208,36 @@ function mixHex(aHex, bHex, t) {
 // itself leans — red-warmer toward orange, blue-warmer toward violet), faint
 // drops chroma in OKLCH with hue and lightness held, intense is the bright
 // ansi color, and the special-purpose backgrounds are bg tinted by their hue.
+//
+// Blending in-gamut keeps the palette in character but says NOTHING about
+// whether the result can be read. A theme whose ansi yellow is a light gold
+// puts it on a light surface at 2.06:1 (catppuccin-latte), and the emacs
+// config's faint preset maps most syntax — builtin, keyword, constant,
+// string, variable, fnname, preprocessor, rx-* — onto exactly these entries.
+// So every derived FOREGROUND is floored against the surface it actually
+// lands on, via the shared `ensureContrast`: it holds hue and chroma and
+// binary-searches the smallest lightness change that clears the ratio, so a
+// theme already passing comes through byte-identical (no gruvbox hue moves).
+// Backgrounds are left raw — their legibility is the paired foreground's job.
 {
   const bg = tokens["surface.0"] || "#16161e"
   const fg = tokens["text.primary"] || "#c0caf5"
   const accent = tokens["accent.accent"] || "#7aa2f7"
   const raised = tokens["surface.3"] || bg
+  const dim = tokens["text.muted"] || fg
   const a = name => tokens["ansi." + name] || fg
+  const bright = name => tokens["ansi.bright-" + name] || a(name)
   const put = (key, v) => { tokens["emacs." + key] = v }
+
+  // WCAG AA for body text — these entries carry syntax, so they are read.
+  const AA = 4.5
+  // Comments, docstrings and the inactive mode line are de-emphasised BY
+  // INTENT; holding them to AA would erase the hierarchy that makes them
+  // read as secondary. AA-for-large-text is the floor that keeps them
+  // legible without promoting them to the weight of code.
+  const MUTED = 3.0
+  const readable = (hex, on, ratio) => ensureContrast(hex, on, ratio || AA)
+
   // chroma-only OKLCH adjustment; _gamutMap keeps the result in sRGB
   const okChroma = (hex, mul) => {
     const c = hexToRgb(hex)
@@ -229,43 +252,61 @@ function mixHex(aHex, bHex, t) {
     magenta: ["red", "blue"], cyan: ["blue", "green"]
   }
   for (const [hue, dirs] of Object.entries(NEIGHBORS)) {
-    put(hue + "-warmer", mixHex(a(hue), a(dirs[0]), 0.25))
-    put(hue + "-cooler", mixHex(a(hue), a(dirs[1]), 0.25))
-    put(hue + "-faint", okChroma(a(hue), 0.55))
+    // Foregrounds — floored against bg-main. Each variant is derived from the
+    // RAW ansi hue and floored afterwards, so the warmer/cooler/faint
+    // relationships are the ones the blend intended, not compounded lifts.
+    put(hue, readable(a(hue), bg))
+    put(hue + "-intense", readable(bright(hue), bg))
+    put(hue + "-warmer", readable(mixHex(a(hue), a(dirs[0]), 0.25), bg))
+    put(hue + "-cooler", readable(mixHex(a(hue), a(dirs[1]), 0.25), bg))
+    put(hue + "-faint", readable(okChroma(a(hue), 0.55), bg))
+    // Backgrounds — raw hue tinted into bg, no floor.
     put("bg-" + hue + "-intense", mixHex(bg, a(hue), 0.5))
     put("bg-" + hue + "-subtle", mixHex(bg, a(hue), 0.3))
     put("bg-" + hue + "-nuanced", mixHex(bg, a(hue), 0.15))
     put("bg-graph-" + hue + "-1", mixHex(a(hue), bg, 0.45))
   }
-  // diff blocks: bg tints stepped faint < base < refine < fringe, like modus
+  // diff blocks: bg tints stepped faint < base < refine < fringe, like modus.
+  // The fg pair is floored against its OWN block background, not bg-main —
+  // that is the surface a diff line actually paints behind the text.
   for (const [group, hue] of [["added", "green"], ["changed", "yellow"], ["removed", "red"]]) {
-    put("bg-" + group, mixHex(bg, a(hue), 0.2))
+    const block = mixHex(bg, a(hue), 0.2)
+    put("bg-" + group, block)
     put("bg-" + group + "-faint", mixHex(bg, a(hue), 0.12))
     put("bg-" + group + "-refine", mixHex(bg, a(hue), 0.3))
     put("bg-" + group + "-fringe", mixHex(bg, a(hue), 0.5))
-    put("fg-" + group, mixHex(a(hue), fg, 0.4))
+    put("fg-" + group, readable(mixHex(a(hue), fg, 0.4), block))
+    put("fg-" + group + "-intense", readable(bright(hue), block))
   }
   // modus's off-palette accent hues (org agenda dates, prose, mail levels),
   // as in-theme blends muted by a chroma cut
-  put("rust", okChroma(mixHex(a("red"), a("yellow"), 0.4), 0.75))
-  put("gold", okChroma(mixHex(a("yellow"), a("red"), 0.25), 0.8))
-  put("olive", okChroma(mixHex(a("green"), a("yellow"), 0.4), 0.7))
-  put("slate", okChroma(mixHex(a("blue"), a("cyan"), 0.4), 0.55))
-  put("indigo", okChroma(mixHex(a("blue"), a("magenta"), 0.4), 0.8))
-  put("maroon", okChroma(mixHex(a("red"), a("magenta"), 0.4), 0.7))
-  put("pink", okChroma(mixHex(a("magenta"), a("red"), 0.25), 0.7))
-  // tinted bg/fg companion pairs
+  put("rust", readable(okChroma(mixHex(a("red"), a("yellow"), 0.4), 0.75), bg))
+  put("gold", readable(okChroma(mixHex(a("yellow"), a("red"), 0.25), 0.8), bg))
+  put("olive", readable(okChroma(mixHex(a("green"), a("yellow"), 0.4), 0.7), bg))
+  put("slate", readable(okChroma(mixHex(a("blue"), a("cyan"), 0.4), 0.55), bg))
+  put("indigo", readable(okChroma(mixHex(a("blue"), a("magenta"), 0.4), 0.8), bg))
+  put("maroon", readable(okChroma(mixHex(a("red"), a("magenta"), 0.4), 0.7), bg))
+  put("pink", readable(okChroma(mixHex(a("magenta"), a("red"), 0.25), 0.7), bg))
+  // tinted bg/fg companion pairs — fg floored against its own bg, as above
   for (const [name, base] of [
     ["clay", mixHex(a("red"), a("yellow"), 0.35)],
     ["ochre", a("yellow")],
     ["lavender", mixHex(a("magenta"), a("blue"), 0.3)],
     ["sage", a("green")]
   ]) {
-    put("bg-" + name, mixHex(bg, base, 0.22))
-    put("fg-" + name, mixHex(base, fg, 0.4))
+    const tint = mixHex(bg, base, 0.22)
+    put("bg-" + name, tint)
+    put("fg-" + name, readable(mixHex(base, fg, 0.4), tint))
   }
-  put("fg-alt", mixHex(fg, accent, 0.35))
-  put("border", mixHex(raised, tokens["text.muted"] || fg, 0.5))
+  // fg-main is the theme's own primary text on its own background and clears
+  // AA unaided on every theme here (5.93:1 worst), so it is passed through
+  // untouched — flooring it would restyle the one color the theme most owns.
+  put("fg-alt", readable(mixHex(fg, accent, 0.35), bg))
+  put("fg-dim", readable(dim, bg, MUTED))
+  // The inactive mode line paints text.muted on surface.1, a pairing 16 of
+  // the 22 themes leave under 3:1 — the same muted floor rescues it.
+  put("fg-mode-line-inactive", readable(dim, tokens["surface.1"] || bg, MUTED))
+  put("border", mixHex(raised, dim, 0.5))
   put("bg-completion", mixHex(bg, accent, 0.35))
   put("bg-hover", mixHex(raised, accent, 0.2))
   put("bg-hover-secondary", mixHex(raised, tokens["accent.warn"] || a("yellow"), 0.25))
@@ -282,9 +323,11 @@ function mixHex(aHex, bHex, t) {
   // modeline status colors sit on bg-mode-line-active (surface.3); the fg
   // blend alone bottomed out at 2.47:1 on rose-pine, so the shared contrast
   // floor lifts them (lightness-only, hue kept) to stay legible everywhere.
-  put("modeline-err", ensureContrast(mixHex(tokens["accent.error"] || a("red"), fg, 0.35), raised, 3.0))
-  put("modeline-warning", ensureContrast(mixHex(tokens["accent.warn"] || a("yellow"), fg, 0.35), raised, 3.0))
-  put("modeline-info", ensureContrast(mixHex(a("cyan"), fg, 0.35), raised, 3.0))
+  // These stay at MUTED rather than AA: they are glyph-sized status accents
+  // on an already-raised surface, not running text.
+  put("modeline-err", readable(mixHex(tokens["accent.error"] || a("red"), fg, 0.35), raised, MUTED))
+  put("modeline-warning", readable(mixHex(tokens["accent.warn"] || a("yellow"), fg, 0.35), raised, MUTED))
+  put("modeline-info", readable(mixHex(a("cyan"), fg, 0.35), raised, MUTED))
 }
 
 // Template functions — `{{ fn token }}`. Plain `{{token}}` substitution stays
