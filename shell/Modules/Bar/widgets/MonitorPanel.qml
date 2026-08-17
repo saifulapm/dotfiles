@@ -721,23 +721,21 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- components
-    component Pill: Rectangle {
+    component Pill: ChipSurface {
         id: pill
 
         property string label: ""
         property bool isActive: false
-        property bool hasCursor: false
         property bool selectable: true
 
         signal hovered
         signal activated
 
+        theme: panel.theme
         implicitHeight: pillText.implicitHeight + panel.theme.space(2.5)
-        radius: panel.theme.radius(0.75)
-        color: isActive ? panel.theme.alpha(panel.theme.accent, 0.25) : (hasCursor || pillHover.hovered ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2)
-        border.width: panel.theme.borderWidth
-        border.color: isActive || hasCursor ? panel.theme.accent : panel.theme.surface3
-        opacity: selectable ? 1 : 0.45
+        chosen: pill.isActive
+        pointerOver: pillHover.hovered
+        interactive: pill.selectable
 
         StyledText {
             id: pillText

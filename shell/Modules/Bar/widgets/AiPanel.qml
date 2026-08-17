@@ -146,7 +146,7 @@ BarPanel {
         Repeater {
             model: panel.usage.providers
 
-            Rectangle {
+            ChipSurface {
                 id: providerTab
 
                 required property var modelData
@@ -154,12 +154,11 @@ BarPanel {
 
                 readonly property bool selected: index === panel.usage.providerIndex
 
+                theme: panel.theme
                 width: providerSwitch.cellWidth
                 implicitHeight: tabLabel.implicitHeight + panel.theme.space(3)
-                radius: panel.theme.radius(0.75)
-                color: selected ? panel.theme.alpha(panel.theme.accent, 0.25) : (tabHover.hovered ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2)
-                border.width: panel.theme.borderWidth
-                border.color: selected ? panel.theme.accent : panel.theme.surface3
+                chosen: providerTab.selected
+                pointerOver: tabHover.hovered
 
                 StyledText {
                     id: tabLabel

@@ -1,10 +1,12 @@
 import QtQuick
 
-// Small bordered action button for panel cards, house style.
-Rectangle {
+// Small bordered action button for panel cards, house style — the labelled
+// member of the ChipSurface family. The surface (the accent wash when
+// selected, the hover lift, the dim when disabled, and now the transitions
+// between them) is ChipSurface's; this adds a centered label and a tap.
+ChipSurface {
     id: button
 
-    required property var theme
     property string label: ""
     property bool selected: false
     property bool enabled: true
@@ -13,11 +15,12 @@ Rectangle {
 
     implicitWidth: text.implicitWidth + theme.space(4)
     implicitHeight: theme.space(7)
-    radius: theme.radius(0.75)
-    color: selected ? theme.alpha(theme.accent, 0.25) : (hover.hovered && enabled ? theme.alpha(theme.textPrimary, 0.08) : theme.surface2)
-    border.width: theme.borderWidth
-    border.color: selected ? theme.accent : theme.surface3
-    opacity: enabled ? 1 : 0.45
+
+    chosen: button.selected
+    // A button has no keyboard cursor of its own, so the outline follows the
+    // selection alone — which is what the open-coded border said.
+    pointerOver: hover.hovered && button.enabled
+    interactive: button.enabled
 
     StyledText {
         id: text

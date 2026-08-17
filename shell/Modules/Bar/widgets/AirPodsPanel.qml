@@ -238,21 +238,20 @@ BarPanel {
         Repeater {
             model: panel.modes
 
-            Rectangle {
+            ChipSurface {
                 id: modeCell
 
                 required property var modelData
                 required property int index
 
                 readonly property bool isActive: panel.service.noise === modelData.mode
-                readonly property bool hasCursor: panel.cursorActive && panel.cursorIndex === index
 
+                theme: panel.theme
                 width: modeRow.cellWidth
                 implicitHeight: modeContent.implicitHeight + panel.theme.space(3)
-                radius: panel.theme.radius(0.75)
-                color: isActive ? panel.theme.alpha(panel.theme.accent, 0.25) : (hasCursor || cellHover.hovered ? panel.theme.alpha(panel.theme.textPrimary, 0.08) : panel.theme.surface2)
-                border.width: panel.theme.borderWidth
-                border.color: isActive || hasCursor ? panel.theme.accent : panel.theme.surface3
+                chosen: modeCell.isActive
+                hasCursor: panel.cursorActive && panel.cursorIndex === index
+                pointerOver: cellHover.hovered
 
                 Column {
                     id: modeContent
