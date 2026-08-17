@@ -697,6 +697,13 @@ Scope {
         return sharedService("dufs", dufsServiceComponent, {});
     }
 
+    // No gate: the hub-sync service starts no process on its own — it only
+    // watches bin/qshell-sync's status.json and re-stamps a relative clock,
+    // so there is nothing to scope to visibility.
+    function hubSyncService() {
+        return sharedService("sync", hubSyncServiceComponent, {});
+    }
+
     // Keyed by widget id, not by type: "icloud" and "dropbox" are two
     // remotes, so they keep two services — one per remote, not per screen.
     function rcloneService(id, defaults) {
@@ -769,6 +776,11 @@ Scope {
     }
 
     Component {
+        id: hubSyncServiceComponent
+        HubSyncService {}
+    }
+
+    Component {
         id: weatherServiceComponent
         WeatherService {}
     }
@@ -806,6 +818,7 @@ Scope {
             "monitor": monitorComponent,
             "devservices": devservicesComponent,
             "dufs": dufsComponent,
+            "sync": hubSyncComponent,
             "icloud": icloudComponent,
             "dropbox": dropboxComponent,
             "tailscale": tailscaleComponent,
@@ -2208,6 +2221,14 @@ Scope {
         Dufs {
             theme: barRoot.theme
             dufs: barRoot.dufsService()
+        }
+    }
+
+    Component {
+        id: hubSyncComponent
+        HubSync {
+            theme: barRoot.theme
+            sync: barRoot.hubSyncService()
         }
     }
 
