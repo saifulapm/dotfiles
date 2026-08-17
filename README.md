@@ -109,6 +109,8 @@ after the first apply.
   `~/.local/share/qshell/backgrounds` (plus your own `~/Pictures/Wallpapers`).
 - `templates/` — theme fan-out targets (foot, GTK, niri, yazi, tmux, oma).
 - `bench/` — measured numbers from `just bench`; performance is the product.
+- `vendor/` — third-party source carried verbatim and pinned by hand, when no
+  package exists we can consume. One tree so far (`try`); see its README.
 - `CREDITS.md` — everything borrowed from omarchy/DMS/noctalia, exactly.
 
 ## Rules

@@ -941,6 +941,12 @@ category = "dev"
 arch = "all"
 why = "libpulse headers, pkg_check_modules REQUIRED by [[tool]] librepods (its media controller pauses playback on ear removal via PulseAudio). Was already on disk undeclared; claimed 2026-08-11 when the librepods build started depending on it"
 
+[[pkg]]
+name = "ruby"
+category = "dev"
+arch = "all"
+why = "Interpreter for vendor/try (tobi/try, the ~/Sites/tries picker behind the `try` fish function; user decision 2026-08-17). Nothing else here is Ruby and none is planned — no rubygems, no bundler, no rbenv: try.rb requires only io/console, time and set from the stdlib. ~21 MiB with ruby-libs, which is the whole price of the tool"
+
 # ------------------------------------------------------------------ optional
 
 # Removed 2026-08-06 by user decision, together: fuzzel and cliphist, plus the

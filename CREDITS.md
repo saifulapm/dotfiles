@@ -1070,6 +1070,16 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
 - **Surface-ladder derivation idea** from `src/theme/custom_schemes.cpp`:
   elevations as recipes (keep hue, cap saturation, force lightness).
 
+## try (MIT) — github.com/tobi/try
+
+- **The whole program**, carried verbatim in `vendor/try` and pinned there —
+  not ported, not adapted. `home/dot_config/fish/functions/try.fish` is the
+  wrapper upstream's `try init fish` prints, written out so fish startup does
+  not spawn ruby to regenerate eight fixed lines, with `~/Sites/tries` as the
+  default in place of upstream's `~/src/tries` (`TRY_PATH` still wins). It
+  replaced a fish function of ours that did dated directories, `clone` and an
+  fzf picker and nothing else — see `vendor/README.md` for the refresh drill.
+
 ## quickshell (LGPL/source reference) — github.com/quickshell-mirror/quickshell
 
 - Used as API reference only; no code copied.
