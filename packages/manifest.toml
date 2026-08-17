@@ -258,6 +258,27 @@ why = "The tailnet joining these three machines, and what the bar's `tailscale` 
 #     sudo dnf config-manager addrepo \
 #       --from-repofile=https://pkgs.tailscale.com/stable/fedora/tailscale.repo
 
+[[pkg]]
+name = "cloudflare-warp"
+category = "optional"
+arch = "all"
+why = "Cloudflare WARP: warp-cli + warp-svc, behind the bar's `warp` widget (user decision 2026-08-17, ported from tobi/omarchy-warp). From Cloudflare's own repo, bootstrapped in run_before_00 — Fedora packages nothing here. They build per Fedora release for both architectures, so the Asahi machines are first-class (fc44 aarch64 verified 2026-08-17), which is not what the older arm64 threads say"
+
+# Notes on the cloudflare-warp entry above:
+#
+#   * WARP and Tailscale both want the default route. `warp` and `warp+doh`
+#     mode take it; `doh`/`dot` mode is DNS only and leaves the tailnet alone.
+#     Nothing arbitrates between them — the two are simply not both-on tools
+#     in routing modes, which is why the widget surfaces the mode rather than
+#     hiding it behind one switch.
+#   * The rpm pulls webkit2gtk4.1 and libappindicator-gtk3 for `warp-taskbar`,
+#     the GTK tray app. We do not run it — the bar widget is the interface —
+#     but the package has no CLI-only split, so the dependency is the price.
+#   * `warp-svc` is not started by anything in this repo, matching tailscaled
+#     above. `systemctl enable --now warp-svc` once, then register the device
+#     (`warp-cli registration new`); the widget's panel offers both as
+#     recovery rows when it finds the daemon down or the device unregistered.
+
 # Dropbox — REVERSED 2026-08-10 (user): there is no Dropbox package or tool
 # here at all any more. The proprietary daemon that ran on the NUC (the
 # dropboxd tarball in ~/.dropbox-dist, their python3 CLI, a script-written
