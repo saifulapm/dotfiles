@@ -1703,7 +1703,16 @@ Scope {
             pressedY = mouse.y;
         }
 
-        onPressAndHold: mouse => startDrag(mouse.x, mouse.y)
+        // A widget's slot area sits above us with propagateComposedEvents and
+        // no press-and-hold of its own, so its composed hold lands here while
+        // it keeps the grab: we would start a bar move and then get neither a
+        // release nor a cancel to end it, leaving the ghost up for the rest of
+        // the session. Only the area holding the press may start the drag.
+        onPressAndHold: mouse => {
+            if (!gestureArea.pressed)
+                return;
+            startDrag(mouse.x, mouse.y);
+        }
 
         onPositionChanged: mouse => {
             if (!(mouse.buttons & Qt.LeftButton))
