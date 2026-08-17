@@ -387,6 +387,53 @@ QtObject {
         readonly property int borderWidth: root.sWidth("osd", "border-width", Math.max(root.borderWidth, root.space(0.5)))
     }
 
+    // ------------------------------------------------------------- motion
+    // One motion vocabulary. `time(n)` and `easing` below already scale every
+    // animation with the theme, but call sites were choosing their own
+    // multipliers and easing curves by hand — an audit across the shell found
+    // 24 sites hardcoding Easing.OutCubic and raw durations of 140, 160, 420,
+    // 600 and 1400 sitting beside token-derived ones. Same intent, four
+    // different numbers, because each was written on its own day.
+    //
+    // These are the intents, not more knobs: pick the one that describes what
+    // the animation is FOR and the theme keeps every instance of that intent
+    // in step. A theme setting motion.duration = 0 still stops the whole
+    // shell dead, which is the property the raw numbers were quietly
+    // breaking.
+    readonly property QtObject motion: QtObject {
+        // Hover, focus and state colors — the 140/160 ms transitions the bar
+        // and the panel controls were each spelling out. Deliberately NOT
+        // scaled by the theme's duration token: this one reads as "the
+        // surface responded", and stretching it makes the UI feel laggy
+        // rather than expressive.
+        readonly property int state: 150
+
+        // Surface entrances and exits. Asymmetric on purpose — omarchy's
+        // window animations exit faster than they enter, and that asymmetry
+        // is most of what reads as "snappy" (OverlaySurface already did this
+        // by hand with time(0.5)/time(0.35)).
+        readonly property int enter: root.time(0.5)
+        readonly property int exit: root.time(0.35)
+
+        // A property moving because the user moved it: slider fills, knob
+        // travel, reveal heights.
+        readonly property int standard: root.time(1)
+
+        // Deliberate, attention-carrying motion — the hero phrase crossfade,
+        // a countdown, anything the eye is meant to follow rather than just
+        // absorb.
+        readonly property int slow: root.time(1.73)
+
+        // The theme's own curve (snap -> OutQuint, spring -> OutBack, else
+        // OutCubic). Default for anything entering or settling.
+        readonly property int easing: root.easing
+        // Leaving the screen: start fast, ease out of view.
+        readonly property int easingExit: Easing.InQuad
+        // Symmetric moves that both start and end at rest — a knob sliding
+        // between two detents, a reveal opening and closing.
+        readonly property int easingSmooth: Easing.InOutCubic
+    }
+
     // ------------------------------------------------------------ helpers
     // Every gap, corner, and animation in the shell goes through these, so a
     // theme setting radius = 0 / duration = 0 / density = 0.85 changes the
