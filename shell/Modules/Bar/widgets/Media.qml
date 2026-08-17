@@ -76,15 +76,15 @@ BarButton {
         clip: true
         visible: !rootItem.vertical && rootItem.title !== ""
 
-        Text {
+        StyledText {
             id: labelText
+            theme: rootItem.theme
+            mono: true
 
             anchors.verticalCenter: parent.verticalCenter
             text: rootItem.title + (rootItem.artist ? "  ·  " + rootItem.artist : "")
             color: rootItem.contentColor
             opacity: 0.85
-            font.family: rootItem.theme.fontMono
-            font.pixelSize: rootItem.theme.fontPx(0.917)
             renderType: Text.NativeRendering
 
             property bool needsScroll: implicitWidth > scrollClip.width

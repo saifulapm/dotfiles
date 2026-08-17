@@ -236,13 +236,14 @@ BarPanel {
             font.pixelSize: panel.theme.fontPx(1.0)
             inputMethodHints: Qt.ImhDigitsOnly
 
-            Text {
+            StyledText {
+                theme: panel.theme
+                mono: true
+                muted: true
+
                 anchors.centerIn: parent
                 visible: input.text === ""
                 text: parent.parent.placeholder
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.917)
             }
         }
     }
@@ -310,12 +311,14 @@ BarPanel {
             anchors.centerIn: parent
             spacing: panel.theme.space(2)
 
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Caption
+                mono: true
+                muted: true
+
                 anchors.verticalCenter: parent.verticalCenter
                 text: "BORN"
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.75)
                 font.letterSpacing: 1
             }
 
@@ -326,13 +329,15 @@ BarPanel {
                 input.Keys.onPressed: event => panel.handleLifeKey(event, expectancyField)
             }
 
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Caption
+                mono: true
+                muted: true
+
                 anchors.verticalCenter: parent.verticalCenter
                 leftPadding: panel.theme.space(1)
                 text: "LIVE TO"
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.75)
                 font.letterSpacing: 1
             }
 
@@ -345,26 +350,25 @@ BarPanel {
             }
         }
 
-        Text {
+        StyledText {
             id: yearLabel
+            theme: panel.theme
+            mono: true
+            muted: true
             visible: !panel.editingLife
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             text: panel.today.getFullYear()
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.917)
         }
 
-        Text {
+        StyledText {
             id: yearPercent
+            theme: panel.theme
+            mono: true
             visible: !panel.editingLife
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: panel.yearDonePercent + "%"
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.917)
         }
 
         Item {
@@ -410,25 +414,24 @@ BarPanel {
             onDoubleTapped: panel.clearLife()
         }
 
-        Text {
+        StyledText {
             id: lifeLabel
+            theme: panel.theme
+            mono: true
+            muted: true
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             text: "LIFE"
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.917)
             font.letterSpacing: 1
         }
 
-        Text {
+        StyledText {
             id: lifePercent
+            theme: panel.theme
+            mono: true
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: panel.lifeDonePercent + "%"
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.917)
         }
 
         Item {
@@ -485,13 +488,15 @@ BarPanel {
                 width: parent.width / 8
                 height: panel.theme.space(7)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+
                     anchors.centerIn: parent
                     text: "W"
                     color: weekStartHover.hovered ? panel.theme.accent : panel.theme.textMuted
                     opacity: weekStartHover.hovered ? 1 : 0.6
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     font.letterSpacing: 1
                     font.weight: Font.DemiBold
                 }
@@ -514,12 +519,14 @@ BarPanel {
                     width: parent.width / 8
                     height: panel.theme.space(7)
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Caption
+                        mono: true
+                        muted: true
+
                         anchors.centerIn: parent
                         text: panel.weekdayLabel(parent.modelData)
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.75)
                         font.letterSpacing: 1
                     }
                 }
@@ -540,13 +547,15 @@ BarPanel {
                     width: parent.width / 8
                     height: panel.theme.space(8)
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Small
+                        mono: true
+                        muted: true
+
                         anchors.centerIn: parent
                         text: weekRow.modelData.week
-                        color: panel.theme.textMuted
                         opacity: 0.6
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.833)
                     }
                 }
 
@@ -568,13 +577,15 @@ BarPanel {
                             border.color: panel.theme.accent
                         }
 
-                        Text {
+                        StyledText {
+                            theme: panel.theme
+                            role: StyledText.BodyLarge
+                            mono: true
+
                             anchors.centerIn: parent
                             text: parent.modelData.day
                             color: parent.modelData.today ? panel.theme.accent : (parent.modelData.inMonth ? (parent.modelData.weekend ? panel.theme.textMuted : panel.theme.textPrimary) : panel.theme.textMuted)
                             opacity: parent.modelData.inMonth || parent.modelData.today ? 1 : 0.5
-                            font.family: panel.theme.fontMono
-                            font.pixelSize: panel.theme.fontPx(1.0)
                             font.weight: parent.modelData.today ? Font.Bold : Font.Normal
                         }
                     }
@@ -594,15 +605,16 @@ BarPanel {
             onClicked: panel.shiftMonth(-1)
         }
 
-        Text {
+        StyledText {
+            theme: panel.theme
+            mono: true
+
             width: parent.width - prevBtn.width - nextBtn.width
             height: prevBtn.height
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             text: Qt.formatDate(panel.viewDate, "MMMM yyyy").toUpperCase()
             color: monthHover.hovered && !panel.viewingCurrentMonth ? panel.theme.accent : panel.theme.textMuted
-            font.family: panel.theme.fontMono
-            font.pixelSize: panel.theme.fontPx(0.917)
             font.letterSpacing: 2
 
             HoverHandler {

@@ -247,12 +247,13 @@ PanelWindow {
                 width: parent.width - panelWindow.theme.space(8)
                 spacing: panelWindow.theme.space(3)
 
-                Text {
+                StyledText {
+                    theme: panelWindow.theme
+                    role: StyledText.Title
+
                     visible: panelWindow.panelTitle !== ""
                     text: panelWindow.panelTitle
                     color: panelWindow.theme.panel.text
-                    font.family: panelWindow.theme.fontUi
-                    font.pixelSize: panelWindow.theme.fontPx(1.083)
                     font.weight: Font.DemiBold
                 }
 

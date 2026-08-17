@@ -469,7 +469,10 @@ Scope {
                         border.width: clipboardRoot.theme.borderWidth
                         border.color: clipboardRoot.filterText ? clipboardRoot.theme.accent : clipboardRoot.theme.surface3
 
-                        Text {
+                        StyledText {
+                            theme: clipboardRoot.theme
+                            role: StyledText.Title
+
                             anchors.left: parent.left
                             anchors.right: countLabel.left
                             anchors.leftMargin: clipboardRoot.theme.space(3)
@@ -479,19 +482,17 @@ Scope {
                             textFormat: Text.PlainText
                             text: clipboardRoot.filterText || "search clipboard"
                             color: clipboardRoot.filterText ? clipboardRoot.theme.textPrimary : clipboardRoot.theme.textMuted
-                            font.family: clipboardRoot.theme.fontUi
-                            font.pixelSize: clipboardRoot.theme.fontPx(1.1)
                         }
 
-                        Text {
+                        StyledText {
                             id: countLabel
+                            theme: clipboardRoot.theme
+                            role: StyledText.Small
+                            muted: true
                             anchors.right: parent.right
                             anchors.rightMargin: clipboardRoot.theme.space(3)
                             anchors.verticalCenter: parent.verticalCenter
                             text: displayModel.count + (clipboardRoot.filterText ? "/" + clipboardRoot.history.length : "")
-                            color: clipboardRoot.theme.textMuted
-                            font.family: clipboardRoot.theme.fontUi
-                            font.pixelSize: clipboardRoot.theme.fontPx(0.833)
                         }
                     }
 
@@ -571,7 +572,10 @@ Scope {
                                             sourceSize.height: 96
                                         }
 
-                                        Text {
+                                        StyledText {
+                                            theme: clipboardRoot.theme
+                                            role: StyledText.BodyLarge
+
                                             anchors.left: thumb.visible ? thumb.right : parent.left
                                             anchors.leftMargin: clipboardRoot.theme.space(2)
                                             anchors.right: parent.right
@@ -587,12 +591,9 @@ Scope {
                                             textFormat: Text.PlainText
                                             maximumLineCount: 1
                                             text: row.previewText
-                                            color: clipboardRoot.theme.textPrimary
                                             // Images and file drops read as
                                             // metadata, not as content.
                                             opacity: row.entryType === "text" ? 1 : 0.72
-                                            font.family: clipboardRoot.theme.fontUi
-                                            font.pixelSize: clipboardRoot.theme.fontPx(1.0)
                                         }
                                     }
                                 }
@@ -614,15 +615,15 @@ Scope {
                                     color: clipboardRoot.theme.alpha(clipboardRoot.theme.textPrimary, 0.2)
                                 }
 
-                                Text {
+                                StyledText {
+                                    theme: clipboardRoot.theme
+                                    mono: true
+
                                     anchors.fill: parent
                                     anchors.leftMargin: clipboardRoot.theme.space(4)
                                     visible: previewPane.activeRow && !previewPane.activeRow.previewImage
                                     textFormat: Text.PlainText
                                     text: previewPane.activeRow ? previewPane.activeRow.fullText : ""
-                                    color: clipboardRoot.theme.textPrimary
-                                    font.family: clipboardRoot.theme.fontMono
-                                    font.pixelSize: clipboardRoot.theme.fontPx(0.917)
                                     wrapMode: Text.WrapAnywhere
                                     elide: Text.ElideRight
                                     verticalAlignment: Text.AlignTop
@@ -659,28 +660,29 @@ Scope {
                                 font.pixelSize: clipboardRoot.theme.fontPx(3.0)
                             }
 
-                            Text {
+                            StyledText {
+                                theme: clipboardRoot.theme
+                                role: StyledText.BodyLarge
+                                muted: true
+
                                 width: parent.width
                                 horizontalAlignment: Text.AlignHCenter
                                 textFormat: Text.PlainText
                                 text: clipboardRoot.history.length === 0 ? "Clipboard is empty" : "No matches for “" + clipboardRoot.filterText + "”"
-                                color: clipboardRoot.theme.textMuted
-                                font.family: clipboardRoot.theme.fontUi
-                                font.pixelSize: clipboardRoot.theme.fontPx(1.0)
                             }
                         }
                     }
 
                     // Upstream has no footer; the two Enters and
                     // Shift+Delete are all worth saying out loud.
-                    Text {
+                    StyledText {
                         id: footer
+                        theme: clipboardRoot.theme
+                        role: StyledText.Caption
+                        muted: true
                         width: parent.width
                         elide: Text.ElideRight
                         text: "enter paste   ·   shift+enter copy   ·   del remove   ·   shift+del clear all"
-                        color: clipboardRoot.theme.textMuted
-                        font.family: clipboardRoot.theme.fontUi
-                        font.pixelSize: clipboardRoot.theme.fontPx(0.75)
                     }
                 }
 
@@ -716,14 +718,14 @@ Scope {
                             width: parent.width - clipboardRoot.theme.space(8)
                             spacing: clipboardRoot.theme.space(4)
 
-                            Text {
+                            StyledText {
+                                theme: clipboardRoot.theme
+                                role: StyledText.Title
+
                                 width: parent.width
                                 horizontalAlignment: Text.AlignHCenter
                                 wrapMode: Text.WordWrap
                                 text: "Delete entire clipboard history?"
-                                color: clipboardRoot.theme.textPrimary
-                                font.family: clipboardRoot.theme.fontUi
-                                font.pixelSize: clipboardRoot.theme.fontPx(1.1)
                             }
 
                             Row {
@@ -748,12 +750,12 @@ Scope {
                                         border.width: clipboardRoot.theme.borderWidth
                                         border.color: confirmButton.hasCursor ? (confirmButton.index === 1 ? clipboardRoot.theme.error : clipboardRoot.theme.accent) : clipboardRoot.theme.surface3
 
-                                        Text {
+                                        StyledText {
+                                            theme: clipboardRoot.theme
+                                            role: StyledText.BodyLarge
+
                                             anchors.centerIn: parent
                                             text: confirmButton.modelData
-                                            color: clipboardRoot.theme.textPrimary
-                                            font.family: clipboardRoot.theme.fontUi
-                                            font.pixelSize: clipboardRoot.theme.fontPx(1.0)
                                         }
 
                                         MouseArea {

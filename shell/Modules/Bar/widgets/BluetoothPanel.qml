@@ -906,13 +906,13 @@ BarPanel {
         }
 
         // ---------------------------------------------------- empty state
-        Text {
+        StyledText {
+            theme: panel.theme
+            muted: true
+
             visible: panel.connectedDevices.length === 0 && panel.scrollRows.length === 0
             width: parent.width
             text: !panel.adapter ? "No Bluetooth adapter" : !panel.adapter.enabled ? "Turn Bluetooth on to scan" : "Scanning for devices…"
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.917)
             wrapMode: Text.WordWrap
         }
     }
@@ -1055,22 +1055,23 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.25)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+
                     width: parent.width
                     text: Model.deviceLabel(row.dev) || "Device"
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+
                     visible: row.statusText !== ""
                     width: parent.width
                     text: row.statusText
                     color: row.statusColor
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
             }

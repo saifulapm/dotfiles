@@ -156,13 +156,14 @@ BarPanel {
     }
 
     // ------------------------------------------------------------- headline
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Small
+
         visible: panel.headline !== ""
         width: parent.width
         text: panel.headline
         color: panel.theme.error
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
         wrapMode: Text.WordWrap
     }
 
@@ -179,13 +180,14 @@ BarPanel {
         onCopyRequested: panel.sync.copyReauthCommand()
     }
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Small
+
         visible: panel.sync.lastError !== ""
         width: parent.width
         text: panel.sync.lastError
         color: panel.theme.error
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
         wrapMode: Text.WordWrap
     }
 
@@ -228,13 +230,14 @@ BarPanel {
 
         // Before the first round there are no rows at all, and an empty panel
         // explains nothing.
-        Text {
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Small
+            muted: true
+
             visible: panel.units.length === 0
             width: parent.width
             text: "No sync has finished on this machine yet. Run one to fill this in."
-            color: panel.theme.textMuted
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.792)
             wrapMode: Text.WordWrap
         }
     }
@@ -244,12 +247,13 @@ BarPanel {
     }
 
     // --------------------------------------------------------------- footer
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Caption
+
         width: parent.width
         text: panel.sync.actionStatus !== "" ? panel.sync.actionStatus : (panel.sync.status.machine !== "" ? "This machine is " + panel.sync.status.machine + " · every 15 min · click a row to sync just that one" : "every 15 min")
         color: panel.sync.actionStatus !== "" ? panel.theme.textPrimary : panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.75)
         wrapMode: Text.WordWrap
     }
 
@@ -326,21 +330,22 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.25)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+
                     width: parent.width
                     text: row.unit ? row.unit.label : ""
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+
                     width: parent.width
                     text: Model.unitLine(row.unit, panel.sync.status, panel.sync.nowMs)
                     color: row.isFailed ? panel.theme.error : (row.state === "ok" || row.isBusy ? panel.theme.textPrimary : panel.theme.textMuted)
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
 

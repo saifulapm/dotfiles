@@ -99,13 +99,15 @@ Item {
                     colorAnimationEnabled: !wsButton.bar || wsButton.bar.foregroundAnimationEnabled === true
                 }
 
-                Text {
+                StyledText {
+                    theme: rootItem.theme
+                    role: StyledText.BodyLarge
+                    mono: true
+
                     anchors.verticalCenter: parent.verticalCenter
                     visible: !wsButton.ws || wsButton.ws.is_active !== true
                     text: wsButton.ws ? String(wsButton.ws.name || wsButton.ws.idx) : ""
                     color: wsButton.contentColor
-                    font.family: rootItem.theme.fontMono
-                    font.pixelSize: rootItem.theme.fontPx(1.0)
                     renderType: Text.NativeRendering
                 }
             }

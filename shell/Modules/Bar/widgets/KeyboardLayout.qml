@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 
 // Active XKB layout as omarchy renders it: first word, first three letters,
 // uppercased, caption-sized. Hidden with a single layout. Click cycles.
@@ -21,12 +22,14 @@ BarButton {
 
     onTapped: rootItem.niri.switchKeyboardLayout()
 
-    Text {
+    StyledText {
+        theme: rootItem.theme
+        role: StyledText.Small
+        mono: true
+
         anchors.verticalCenter: parent.verticalCenter
         text: rootItem.label
         color: rootItem.contentColor
-        font.family: rootItem.theme.fontMono
-        font.pixelSize: rootItem.theme.fontPx(0.833)
         renderType: Text.NativeRendering
     }
 }

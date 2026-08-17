@@ -42,15 +42,16 @@ BarButton {
         colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
     }
 
-    Text {
+    StyledText {
+        theme: rootItem.theme
+        mono: true
+
         anchors.verticalCenter: parent.verticalCenter
         // Their weather bar widget is glyph-only; ours adds the temperature,
         // which is the part that has no room on a vertical bar.
         visible: !rootItem.vertical && rootItem.weather.reportTempNum !== ""
         text: rootItem.weather.reportTempNum + "°"
         color: rootItem.contentColor
-        font.family: rootItem.theme.fontMono
-        font.pixelSize: rootItem.theme.fontPx(0.917)
         renderType: Text.NativeRendering
     }
 

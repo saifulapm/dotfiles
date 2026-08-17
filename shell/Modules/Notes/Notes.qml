@@ -479,26 +479,27 @@ Scope {
                             }
                         }
 
-                        Text {
+                        StyledText {
+                            theme: notesRoot.theme
+                            role: StyledText.BodyLarge
+                            muted: true
+
                             anchors.fill: parent
                             visible: !searchInput.text
                             text: "search"
-                            color: notesRoot.theme.textMuted
-                            font.family: notesRoot.theme.fontUi
-                            font.pixelSize: notesRoot.theme.fontPx(1.0)
                         }
                     }
 
-                    Text {
+                    StyledText {
                         id: countLabel
+                        theme: notesRoot.theme
+                        role: StyledText.Small
+                        muted: true
                         anchors.right: parent.right
                         anchors.rightMargin: notesRoot.theme.space(2.5)
                         anchors.verticalCenter: parent.verticalCenter
                         visible: searchInput.text.length > 0
                         text: displayModel.count + "/" + notesRoot.notes.length
-                        color: notesRoot.theme.textMuted
-                        font.family: notesRoot.theme.fontUi
-                        font.pixelSize: notesRoot.theme.fontPx(0.833)
                     }
                 }
 
@@ -583,7 +584,9 @@ Scope {
                                 font.pixelSize: notesRoot.theme.fontPx(1.1)
                             }
 
-                            Text {
+                            StyledText {
+                                theme: notesRoot.theme
+
                                 anchors.left: stageThumb.visible ? stageThumb.right : stageGlyph.right
                                 anchors.leftMargin: notesRoot.theme.space(2)
                                 anchors.right: stageCancel.left
@@ -592,9 +595,6 @@ Scope {
                                 elide: Text.ElideMiddle
                                 textFormat: Text.PlainText
                                 text: NotesModel.baseName(notesRoot.pendingAttachment)
-                                color: notesRoot.theme.textPrimary
-                                font.family: notesRoot.theme.fontUi
-                                font.pixelSize: notesRoot.theme.fontPx(0.917)
                             }
 
                             Rectangle {
@@ -647,14 +647,15 @@ Scope {
                                 }
                             }
 
-                            Text {
+                            StyledText {
+                                theme: notesRoot.theme
+                                role: StyledText.BodyLarge
+                                muted: true
+
                                 anchors.fill: parent
                                 visible: !captureInput.text
                                 wrapMode: Text.Wrap
                                 text: notesRoot.pendingAttachment ? "Add a note about the attachment…" : "Add a note, a prompt, a task…"
-                                color: notesRoot.theme.textMuted
-                                font.family: notesRoot.theme.fontUi
-                                font.pixelSize: notesRoot.theme.fontPx(1.0)
                             }
                         }
                     }
@@ -831,8 +832,10 @@ Scope {
                                     font.pixelSize: notesRoot.theme.fontPx(0.917)
                                 }
 
-                                Text {
+                                StyledText {
                                     id: bodyText
+                                    theme: notesRoot.theme
+                                    role: StyledText.BodyLarge
                                     anchors.left: fileGlyph.visible ? fileGlyph.right : parent.left
                                     anchors.leftMargin: fileGlyph.visible ? notesRoot.theme.space(1.5) : 0
                                     anchors.right: parent.right
@@ -842,8 +845,6 @@ Scope {
                                     textFormat: Text.PlainText
                                     text: row.noteLabel
                                     color: row.noteDone ? notesRoot.theme.textMuted : notesRoot.theme.textPrimary
-                                    font.family: notesRoot.theme.fontUi
-                                    font.pixelSize: notesRoot.theme.fontPx(1.0)
                                     font.strikeout: row.noteDone
                                 }
                             }
@@ -895,15 +896,16 @@ Scope {
                         font.pixelSize: notesRoot.theme.fontPx(3.0)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: notesRoot.theme
+                        role: StyledText.BodyLarge
+                        muted: true
+
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         textFormat: Text.PlainText
                         wrapMode: Text.WordWrap
                         text: notesRoot.notes.length === 0 ? "Type below, or drop files and text here" : "No matches for “" + notesRoot.filterText + "”"
-                        color: notesRoot.theme.textMuted
-                        font.family: notesRoot.theme.fontUi
-                        font.pixelSize: notesRoot.theme.fontPx(1.0)
                     }
                 }
             }

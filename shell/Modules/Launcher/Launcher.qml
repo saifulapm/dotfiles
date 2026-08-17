@@ -126,12 +126,13 @@ Scope {
                     Keys.onReturnPressed: launcherRoot.launch(launcherRoot.entries[launcherRoot.selectedIndex])
                     Keys.onEscapePressed: launcherRoot.hide()
 
-                    Text {
+                    StyledText {
+                        theme: launcherRoot.theme
+                        role: StyledText.Title
+                        muted: true
+
                         anchors.verticalCenter: parent.verticalCenter
                         visible: searchField.text === ""
-                        color: launcherRoot.theme.textMuted
-                        font.family: launcherRoot.theme.fontUi
-                        font.pixelSize: launcherRoot.theme.fontPx(1.1)
                         text: "search apps"
                     }
                 }
@@ -182,22 +183,23 @@ Scope {
                             anchors.verticalCenter: parent.verticalCenter
                             width: parent.width - x
 
-                            Text {
+                            StyledText {
+                                theme: launcherRoot.theme
+                                role: StyledText.BodyLarge
+
                                 width: parent.width
                                 elide: Text.ElideRight
-                                color: launcherRoot.theme.textPrimary
-                                font.family: launcherRoot.theme.fontUi
-                                font.pixelSize: launcherRoot.theme.fontPx(1.0)
                                 text: modelData.name
                             }
 
-                            Text {
+                            StyledText {
+                                theme: launcherRoot.theme
+                                role: StyledText.Small
+                                muted: true
+
                                 width: parent.width
                                 elide: Text.ElideRight
                                 visible: text !== ""
-                                color: launcherRoot.theme.textMuted
-                                font.family: launcherRoot.theme.fontUi
-                                font.pixelSize: launcherRoot.theme.fontPx(0.833)
                                 text: modelData.genericName || modelData.comment || ""
                             }
                         }

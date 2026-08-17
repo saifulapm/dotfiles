@@ -85,13 +85,14 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- action/error
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Small
+
         visible: panel.dufs.actionStatus !== "" || panel.dufs.lastError !== ""
         width: parent.width
         text: panel.dufs.actionStatus !== "" ? panel.dufs.actionStatus : panel.dufs.lastError
         color: panel.dufs.actionStatus !== "" ? panel.theme.textMuted : panel.theme.error
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
         wrapMode: Text.WordWrap
     }
 
@@ -173,12 +174,13 @@ BarPanel {
     }
 
     // --------------------------------------------------------------- footer
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Caption
+        muted: true
+
         width: parent.width
         text: "Runs only while the switch is on. Serves your home folder over HTTP — dotfiles hidden, uploads allowed — behind the sign-in above."
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.75)
         wrapMode: Text.WordWrap
     }
 }

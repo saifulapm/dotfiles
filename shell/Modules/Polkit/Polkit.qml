@@ -519,15 +519,16 @@ Scope {
                             }
                         }
 
-                        Text {
+                        StyledText {
+                            theme: polkitRoot.theme
+                            role: StyledText.Display
+
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             text: polkitRoot.errorFlash ? "Wrong" : (polkitRoot.submitted ? "Checking..." : "Enter password")
                             color: polkitRoot.errorFlash ? polkitRoot.theme.polkit.textError : polkitRoot.theme.polkit.text
                             opacity: polkitRoot.errorFlash ? 1 : 0.36
-                            font.family: polkitRoot.theme.fontUi
-                            font.pixelSize: polkitRoot.theme.fontPx(1.5)
                             elide: Text.ElideRight
                             visible: passwordInput.text.length === 0
                         }
@@ -577,15 +578,14 @@ Scope {
                 color: polkitRoot.theme.polkit.background
                 visible: justificationText.text.length > 0
 
-                Text {
+                StyledText {
                     id: justificationText
+                    theme: polkitRoot.theme
                     anchors.fill: parent
                     anchors.leftMargin: polkitRoot.theme.space(3)
                     anchors.rightMargin: polkitRoot.theme.space(3)
                     text: PolkitModel.authorizationLabel(polkitRoot.currentMessage)
                     color: polkitRoot.theme.polkit.text
-                    font.family: polkitRoot.theme.fontUi
-                    font.pixelSize: polkitRoot.theme.fontPx(0.917)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideMiddle

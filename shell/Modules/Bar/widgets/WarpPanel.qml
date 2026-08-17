@@ -467,13 +467,14 @@ BarPanel {
             }
 
             // -------------------------------------------------- action/error
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Small
+
                 visible: panel.warp.actionStatus !== "" || panel.warp.lastError !== ""
                 width: parent.width
                 text: panel.warp.actionStatus !== "" ? panel.warp.actionStatus : panel.warp.lastError
                 color: panel.warp.lastError !== "" && panel.warp.actionStatus === "" ? panel.theme.error : panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.833)
                 wrapMode: Text.WordWrap
             }
 
@@ -488,17 +489,16 @@ BarPanel {
                 radius: panel.theme.radius(0.75)
                 color: panel.theme.surface2
 
-                Text {
+                StyledText {
                     id: missingText
+                    theme: panel.theme
+                    muted: true
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.leftMargin: panel.theme.space(3)
                     anchors.rightMargin: panel.theme.space(3)
                     text: "warp-cli is not installed or not on PATH."
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     wrapMode: Text.WordWrap
                 }
             }
@@ -742,13 +742,14 @@ BarPanel {
                     value: "Filtering this device"
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Small
+
                     visible: panel.warp.traceLeaking
                     width: parent.width
                     text: "The client says the tunnel is up, and Cloudflare saw this request arrive outside it. Reconnecting usually settles it."
                     color: panel.theme.error
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.833)
                     wrapMode: Text.WordWrap
                 }
             }
@@ -829,28 +830,27 @@ BarPanel {
                             }
                         }
 
-                        Text {
+                        StyledText {
                             id: splitModeLabel
+                            theme: panel.theme
 
                             anchors.left: splitChevron.visible ? splitChevron.right : parent.left
                             anchors.leftMargin: splitChevron.visible ? panel.theme.space(2) : 0
                             anchors.verticalCenter: parent.verticalCenter
                             text: panel.warp.splitTunnelModeLabel
-                            color: panel.theme.textPrimary
-                            font.family: panel.theme.fontUi
-                            font.pixelSize: panel.theme.fontPx(0.917)
                             font.weight: panel.splitExpanded ? Font.DemiBold : Font.Normal
                         }
 
-                        Text {
+                        StyledText {
+                            theme: panel.theme
+                            role: StyledText.Small
+                            muted: true
+
                             anchors.left: splitModeLabel.right
                             anchors.leftMargin: panel.theme.space(2)
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             text: panel.warp.splitTunnelMeaning
-                            color: panel.theme.textMuted
-                            font.family: panel.theme.fontUi
-                            font.pixelSize: panel.theme.fontPx(0.792)
                             horizontalAlignment: Text.AlignRight
                             elide: Text.ElideRight
                         }
@@ -918,13 +918,14 @@ BarPanel {
                 // disclosure row, where it reads as a note on the mode that row
                 // names; open, it lands under the rules it is a note about,
                 // instead of wedged between a row and the list it just opened.
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Small
+                    muted: true
+
                     visible: panel.warp.tailnetVerdict !== ""
                     width: parent.width
                     text: panel.warp.tailnetVerdict
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.833)
                     wrapMode: Text.WordWrap
                 }
             }
@@ -981,23 +982,23 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.25)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+
                     width: parent.width
                     text: recoveryRow.row ? String(recoveryRow.row.label) : ""
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Small
+                    muted: true
+
                     width: parent.width
                     visible: text !== ""
                     text: recoveryRow.row ? String(recoveryRow.row.detail) : ""
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.792)
                     elide: Text.ElideRight
                 }
             }
@@ -1070,27 +1071,26 @@ BarPanel {
             // One line, not two. Seven modes stacked two-high turned the card
             // into a column of boxes taller than the screen; the description
             // earns its place but not its own row.
-            Text {
+            StyledText {
                 id: modeText
+                theme: panel.theme
                 anchors.left: modeGlyph.right
                 anchors.leftMargin: panel.theme.space(2)
                 anchors.verticalCenter: parent.verticalCenter
                 text: modeRow.row ? String(modeRow.row.label) : ""
-                color: panel.theme.textPrimary
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
                 font.weight: modeRow.isCurrent ? Font.DemiBold : Font.Normal
             }
 
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Small
+                muted: true
+
                 anchors.left: modeText.right
                 anchors.leftMargin: panel.theme.space(2)
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 text: modeRow.row ? String(modeRow.row.description) : ""
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.792)
                 horizontalAlignment: Text.AlignRight
                 elide: Text.ElideRight
             }
@@ -1131,27 +1131,27 @@ BarPanel {
             anchors.rightMargin: panel.theme.space(2)
             implicitHeight: Math.max(splitValue.implicitHeight, splitKind.implicitHeight)
 
-            Text {
+            StyledText {
                 id: splitValue
+                theme: panel.theme
+                role: StyledText.Small
+                mono: true
                 anchors.left: parent.left
                 anchors.right: splitKind.left
                 anchors.rightMargin: panel.theme.space(2)
                 anchors.verticalCenter: parent.verticalCenter
                 text: splitRow.entry ? String(splitRow.entry.value) : ""
-                color: panel.theme.textPrimary
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.833)
                 elide: Text.ElideRight
             }
 
-            Text {
+            StyledText {
                 id: splitKind
+                theme: panel.theme
+                role: StyledText.Small
+                muted: true
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 text: splitRow.entry ? String(splitRow.entry.description) : ""
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.792)
             }
         }
 

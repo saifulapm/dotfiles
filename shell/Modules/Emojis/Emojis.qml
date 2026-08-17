@@ -264,7 +264,10 @@ Scope {
                     border.width: emojisRoot.theme.borderWidth
                     border.color: emojisRoot.filterText ? emojisRoot.theme.accent : emojisRoot.theme.surface3
 
-                    Text {
+                    StyledText {
+                        theme: emojisRoot.theme
+                        role: StyledText.Title
+
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.leftMargin: emojisRoot.theme.space(3)
@@ -273,8 +276,6 @@ Scope {
                         elide: Text.ElideRight
                         text: emojisRoot.filterText || "search emojis"
                         color: emojisRoot.filterText ? emojisRoot.theme.textPrimary : emojisRoot.theme.textMuted
-                        font.family: emojisRoot.theme.fontUi
-                        font.pixelSize: emojisRoot.theme.fontPx(1.1)
                     }
                 }
 
@@ -333,14 +334,15 @@ Scope {
                         }
                     }
 
-                    Text {
+                    StyledText {
+                        theme: emojisRoot.theme
+                        role: StyledText.BodyLarge
+                        muted: true
+
                         anchors.centerIn: parent
                         visible: displayModel.count === 0
                         horizontalAlignment: Text.AlignHCenter
                         text: emojisRoot.filterText ? "No matches for “" + emojisRoot.filterText + "”" : "No emojis loaded"
-                        color: emojisRoot.theme.textMuted
-                        font.family: emojisRoot.theme.fontUi
-                        font.pixelSize: emojisRoot.theme.fontPx(1.0)
                     }
                 }
             }

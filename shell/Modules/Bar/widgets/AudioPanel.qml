@@ -808,14 +808,14 @@ BarPanel {
                 pixelSize: panel.theme.fontPx(1.083)
             }
 
-            Text {
+            StyledText {
+                theme: panel.theme
+
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width - panel.theme.space(7.5)
                 elide: Text.ElideRight
                 text: panel.nodeLabel(deviceRow.node)
                 color: deviceRow.isActive ? panel.theme.accent : panel.theme.textPrimary
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
                 font.weight: deviceRow.isActive ? Font.DemiBold : Font.Normal
             }
         }
@@ -878,8 +878,9 @@ BarPanel {
                     }
                 }
 
-                Text {
+                StyledText {
                     id: streamName
+                    theme: panel.theme
                     anchors.left: streamMuteIcon.right
                     anchors.leftMargin: panel.theme.space(2.5)
                     anchors.right: streamPercent.left
@@ -887,21 +888,19 @@ BarPanel {
                     anchors.verticalCenter: parent.verticalCenter
                     elide: Text.ElideRight
                     text: panel.streamLabel(streamRow.node)
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     font.weight: streamRow.isActive ? Font.DemiBold : Font.Normal
                 }
 
-                Text {
+                StyledText {
                     id: streamPercent
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+                    muted: true
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     text: Math.round((streamSlider.dragging ? streamSlider.liveValue : streamRow.streamVolume) * 100) + "%"
                     opacity: streamRow.streamMuted ? 0.5 : 1
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     font.weight: Font.DemiBold
                 }
             }

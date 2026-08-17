@@ -16,21 +16,22 @@ BarPanel {
 
     panelTitle: "Tray icons"
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Small
+        muted: true
+
         width: parent.width
         text: "Pinned icons stay on the bar. Hidden icons never show. Everything else lives in the drawer."
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
         wrapMode: Text.WordWrap
     }
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        muted: true
+
         visible: panel.items.length === 0
         text: "No tray items reporting."
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.917)
         font.italic: true
     }
 
@@ -64,16 +65,15 @@ BarPanel {
                 tint: panel.theme.textPrimary
             }
 
-            Text {
+            StyledText {
+                theme: panel.theme
+
                 anchors.left: rowIcon.right
                 anchors.leftMargin: panel.theme.space(2.5)
                 anchors.right: hideButton.left
                 anchors.rightMargin: panel.theme.space(2)
                 anchors.verticalCenter: parent.verticalCenter
                 text: panel.tray ? panel.tray.displayName(row.modelData) : ""
-                color: panel.theme.textPrimary
-                font.family: panel.theme.fontUi
-                font.pixelSize: panel.theme.fontPx(0.917)
                 elide: Text.ElideRight
             }
 

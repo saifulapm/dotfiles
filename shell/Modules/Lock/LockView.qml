@@ -201,11 +201,12 @@ Item {
                 text: Qt.formatDateTime(lockClock.date, "HH:mm")
             }
 
-            Text {
+            StyledText {
+                theme: root.theme
+                role: StyledText.Title
+
                 anchors.horizontalCenter: parent.horizontalCenter
                 color: root.placeholderColor
-                font.family: root.theme.fontUi
-                font.pixelSize: root.theme.fontPx(1.1)
                 text: Qt.formatDateTime(lockClock.date, "dddd, d MMMM")
             }
         }

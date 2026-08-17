@@ -81,13 +81,15 @@ BarButton {
         colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
     }
 
-    Text {
+    StyledText {
+        theme: rootItem.theme
+        role: StyledText.Small
+        mono: true
+
         anchors.verticalCenter: parent.verticalCenter
         visible: rootItem.percentageShown
         text: rootItem.pct + "%"
         color: rootItem.contentColor
-        font.family: rootItem.theme.fontMono
-        font.pixelSize: rootItem.theme.fontPx(0.833)
         renderType: Text.NativeRendering
     }
 }

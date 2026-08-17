@@ -165,16 +165,15 @@ BarPanel {
             font.pixelSize: panel.theme.fontPx(0.917)
         }
 
-        Text {
+        StyledText {
+            theme: panel.theme
+
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: backGlyph.right
             anchors.leftMargin: panel.theme.space(1.5)
             anchors.right: parent.right
             anchors.rightMargin: panel.theme.space(2)
             text: panel.currentTitle
-            color: panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.917)
             elide: Text.ElideRight
         }
 
@@ -202,16 +201,16 @@ BarPanel {
         color: panel.theme.alpha(panel.theme.textPrimary, 0.2)
     }
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        muted: true
+
         // currentChildren is an ObjectModel, not a JS array: it counts through
         // `values`, and `.length` on the model itself is undefined — which
         // would leave this row permanently invisible rather than erroring.
         visible: panel.trayItem !== null && panel.currentChildren && panel.currentChildren.values ? panel.currentChildren.values.length === 0 : false
         width: parent.width
         text: "This icon reports no menu."
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.917)
         font.italic: true
     }
 
@@ -312,7 +311,9 @@ BarPanel {
                         source: menuRow.modelData.icon
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+
                         visible: !menuRow.modelData.isSeparator
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.left: parent.left
@@ -320,9 +321,6 @@ BarPanel {
                         anchors.right: submenuGlyph.left
                         anchors.rightMargin: panel.theme.space(2)
                         text: menuRow.rowText
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.917)
                         elide: Text.ElideRight
                     }
 

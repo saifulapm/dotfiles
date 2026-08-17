@@ -109,13 +109,14 @@ BarPanel {
     }
 
     // ---------------------------------------------------------------- error
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Small
+
         visible: panel.devservices.lastError !== ""
         width: parent.width
         text: panel.devservices.lastError
         color: panel.theme.error
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
         wrapMode: Text.WordWrap
     }
 
@@ -157,12 +158,13 @@ BarPanel {
     }
 
     // --------------------------------------------------------------- footer
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Caption
+        muted: true
+
         width: parent.width
         text: "First connection wakes a service; ten idle minutes stop it. The ports stay armed either way."
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.75)
         wrapMode: Text.WordWrap
     }
 
@@ -242,21 +244,22 @@ BarPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.25)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+
                     width: parent.width
                     text: row.svc ? row.svc.label : ""
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+
                     width: parent.width
                     text: Model.stateText(row.svc)
                     color: row.isRunning || row.busy ? panel.theme.textPrimary : panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
             }

@@ -843,7 +843,10 @@ Scope {
                     width: parent.width
                     height: menuRoot.headerHeight
 
-                    Text {
+                    StyledText {
+                        theme: menuRoot.theme
+                        role: StyledText.TitleLarge
+
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
@@ -858,10 +861,7 @@ Scope {
                             const entry = menuRoot.entryFor(menuRoot.activeMenu);
                             return (entry ? entry.title || entry.label : "Go") + "…";
                         }
-                        color: menuRoot.theme.textPrimary
                         opacity: menuRoot.filterText ? 1 : 0.58
-                        font.family: menuRoot.theme.fontUi
-                        font.pixelSize: menuRoot.theme.fontPx(1.167)
                         font.weight: Font.DemiBold
                     }
                 }
@@ -964,50 +964,51 @@ Scope {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: menuRoot.theme.space(0.5)
 
-                                Text {
+                                StyledText {
+                                    theme: menuRoot.theme
+                                    role: StyledText.BodyLarge
+
                                     width: parent.width
                                     elide: Text.ElideRight
                                     text: row.label
-                                    color: menuRoot.theme.textPrimary
-                                    font.family: menuRoot.theme.fontUi
-                                    font.pixelSize: menuRoot.theme.fontPx(1.0)
                                 }
 
                                 // While filtering, the second line says
                                 // where the row actually lives.
-                                Text {
+                                StyledText {
+                                    theme: menuRoot.theme
+                                    role: StyledText.Small
+                                    muted: true
+
                                     width: parent.width
                                     elide: Text.ElideRight
                                     visible: menuRoot.filterText !== "" && row.detail !== ""
                                     text: row.detail
-                                    color: menuRoot.theme.textMuted
-                                    font.family: menuRoot.theme.fontUi
-                                    font.pixelSize: menuRoot.theme.fontPx(0.833)
                                 }
                             }
 
-                            Text {
+                            StyledText {
                                 id: chevron
+                                theme: menuRoot.theme
+                                role: StyledText.Heading
                                 anchors.right: parent.right
                                 anchors.rightMargin: menuRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: row.isSubmenu ? "›" : ""
                                 opacity: 0.45
-                                color: menuRoot.theme.textPrimary
-                                font.family: menuRoot.theme.fontUi
-                                font.pixelSize: menuRoot.theme.fontPx(1.333)
                             }
                         }
                     }
 
-                    Text {
+                    StyledText {
+                        theme: menuRoot.theme
+                        role: StyledText.BodyLarge
+                        muted: true
+
                         anchors.centerIn: parent
                         visible: displayModel.count === 0
                         horizontalAlignment: Text.AlignHCenter
                         text: menuRoot.filterText ? "No matches for “" + menuRoot.filterText + "”" : "Nothing here yet"
-                        color: menuRoot.theme.textMuted
-                        font.family: menuRoot.theme.fontUi
-                        font.pixelSize: menuRoot.theme.fontPx(1.0)
                     }
                 }
             }

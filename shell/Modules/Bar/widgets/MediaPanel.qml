@@ -145,33 +145,34 @@ BarPanel {
                 width: parent.width - artBox.width - panel.theme.space(2.5)
                 spacing: panel.theme.space(0.75)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Title
+
                     width: parent.width
                     text: panel.title || "Nothing playing"
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(1.083)
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    muted: true
+
                     width: parent.width
                     visible: text !== ""
                     text: panel.artist
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.917)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+
                     width: parent.width
                     visible: text !== ""
                     text: panel.album
                     color: panel.theme.alpha(panel.theme.textMuted, 0.7)
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     elide: Text.ElideRight
                 }
             }
@@ -280,23 +281,23 @@ BarPanel {
                             width: parent.width - panel.theme.space(6)
                             spacing: 0
 
-                            Text {
+                            StyledText {
+                                theme: panel.theme
+
                                 width: parent.width
                                 text: sourceRow.sourceTitle
-                                color: panel.theme.textPrimary
-                                font.family: panel.theme.fontUi
-                                font.pixelSize: panel.theme.fontPx(0.917)
                                 font.weight: sourceRow.current ? Font.DemiBold : Font.Normal
                                 elide: Text.ElideRight
                             }
 
-                            Text {
+                            StyledText {
+                                theme: panel.theme
+                                role: StyledText.Caption
+                                muted: true
+
                                 width: parent.width
                                 visible: text !== ""
                                 text: sourceRow.sourceDetail
-                                color: panel.theme.textMuted
-                                font.family: panel.theme.fontUi
-                                font.pixelSize: panel.theme.fontPx(0.75)
                                 elide: Text.ElideRight
                             }
                         }

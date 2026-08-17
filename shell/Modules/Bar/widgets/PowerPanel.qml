@@ -253,12 +253,12 @@ BarPanel {
         }
     }
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        muted: true
+
         visible: !panel.present
         text: "No battery — on mains power"
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.917)
     }
 
     // ------------------------------------------------------- battery facts
@@ -460,12 +460,13 @@ BarPanel {
                         pixelSize: panel.theme.fontPx(1.333)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Small
+
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: profileCell.modelData === "power-saver" ? "Saver" : (profileCell.modelData.charAt(0).toUpperCase() + profileCell.modelData.slice(1))
                         color: profileCell.isActive ? panel.theme.accent : panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.833)
                     }
                 }
 

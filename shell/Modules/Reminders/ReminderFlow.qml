@@ -156,20 +156,23 @@ Scope {
                     width: parent.width
                     spacing: flowRoot.theme.space(2)
 
-                    Text {
+                    StyledText {
+                        theme: flowRoot.theme
+                        role: StyledText.BodyLarge
+                        mono: true
+
                         anchors.verticalCenter: parent.verticalCenter
                         text: "󰢌" // md-reminder, as upstream's indicator
                         color: flowRoot.theme.accent
-                        font.family: flowRoot.theme.fontMono
-                        font.pixelSize: flowRoot.theme.fontPx(1.0)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: flowRoot.theme
+                        role: StyledText.Small
+                        muted: true
+
                         anchors.verticalCenter: parent.verticalCenter
                         text: flowRoot.captionText
-                        color: flowRoot.theme.textMuted
-                        font.family: flowRoot.theme.fontUi
-                        font.pixelSize: flowRoot.theme.fontPx(0.833)
                         font.capitalization: Font.AllUppercase
                         font.letterSpacing: 1
                     }
@@ -183,7 +186,10 @@ Scope {
                     border.width: flowRoot.theme.borderWidth
                     border.color: flowRoot.filterText ? flowRoot.theme.accent : flowRoot.theme.surface3
 
-                    Text {
+                    StyledText {
+                        theme: flowRoot.theme
+                        role: StyledText.Title
+
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.leftMargin: flowRoot.theme.space(3)
@@ -194,8 +200,6 @@ Scope {
                         // ellipsis, dimmed until something is typed.
                         text: flowRoot.filterText || (flowRoot.promptText + "…")
                         color: flowRoot.filterText ? flowRoot.theme.textPrimary : flowRoot.theme.textMuted
-                        font.family: flowRoot.theme.fontUi
-                        font.pixelSize: flowRoot.theme.fontPx(1.1)
                     }
                 }
             }

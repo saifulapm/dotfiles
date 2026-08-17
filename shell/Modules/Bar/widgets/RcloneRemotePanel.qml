@@ -210,13 +210,14 @@ BarPanel {
         }
 
         // -------------------------------------------------- action/error
-        Text {
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Small
+
             visible: panel.service.actionStatus !== "" || panel.service.lastError !== ""
             width: parent.width
             text: panel.service.actionStatus !== "" ? panel.service.actionStatus : panel.service.lastError
             color: panel.service.lastError !== "" && panel.service.actionStatus === "" ? panel.theme.error : panel.theme.textMuted
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
             wrapMode: Text.WordWrap
         }
 
@@ -317,31 +318,35 @@ BarPanel {
                 anchors.rightMargin: panel.theme.space(3)
                 spacing: panel.theme.space(1)
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Small
+                    muted: true
+
                     width: parent.width
                     text: panel.service.label + " did not answer — the session may have expired. Re-authenticate in a terminal (interactive):"
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontUi
-                    font.pixelSize: panel.theme.fontPx(0.833)
                     wrapMode: Text.WordWrap
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Small
+                    mono: true
+
                     width: parent.width
                     text: panel.service.reauthCommand
-                    color: panel.theme.textPrimary
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.833)
                     elide: Text.ElideRight
                 }
 
-                Text {
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+                    muted: true
+
                     visible: panel.service.probeError !== ""
                     width: parent.width
                     text: panel.service.elideStatus(panel.service.probeError)
-                    color: panel.theme.textMuted
-                    font.family: panel.theme.fontMono
-                    font.pixelSize: panel.theme.fontPx(0.75)
                     wrapMode: Text.WrapAnywhere
                 }
             }

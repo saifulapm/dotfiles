@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "widgets"
 import "BarModel.js" as BarModel
+import "../../components"
 
 // The bar, styled 100% after omarchy's: theme background surface, foreground
 // text (colors.toml `foreground`, i.e. our ansi.white — not bright), zero
@@ -1371,13 +1372,14 @@ Scope {
                     border.width: barRoot.theme.tooltip.borderWidth
                     border.color: barRoot.theme.tooltip.border
 
-                    Text {
+                    StyledText {
                         id: tooltipLabel
+                        theme: barRoot.theme
+                        role: StyledText.BodyLarge
+                        mono: true
                         anchors.centerIn: parent
                         text: panel.tooltipText
                         color: barRoot.theme.tooltip.text
-                        font.family: barRoot.theme.fontMono
-                        font.pixelSize: barRoot.theme.fontPx(1.0)
                         horizontalAlignment: Text.AlignHCenter
                     }
                 }
@@ -2313,12 +2315,12 @@ Scope {
             property string missingId: "?"
             implicitWidth: barRoot.vertical ? barRoot.barSize : missingLabel.implicitWidth + barRoot.theme.space(2)
             implicitHeight: barRoot.vertical ? missingLabel.implicitHeight + barRoot.theme.space(2) : (parent ? parent.height : missingLabel.implicitHeight)
-            Text {
+            StyledText {
                 id: missingLabel
+                theme: barRoot.theme
+                mono: true
                 anchors.centerIn: parent
                 color: barRoot.theme.error
-                font.family: barRoot.theme.fontMono
-                font.pixelSize: barRoot.theme.fontPx(0.917)
                 text: "[" + parent.missingId + "?]"
             }
         }

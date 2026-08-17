@@ -167,21 +167,21 @@ BarPanel {
                     width: parent.width
                     height: rowLabel.implicitHeight
 
-                    Text {
+                    StyledText {
                         id: rowLabel
+                        theme: panel.theme
                         anchors.left: parent.left
                         text: parent.parent.modelData.label + (parent.parent.modelData.inEar ? "  ·  in ear" : "")
-                        color: panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.917)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Small
+                        mono: true
+                        muted: true
+
                         anchors.right: parent.right
                         text: parent.parent.reading ? parent.parent.reading.level + "%" + (parent.parent.reading.charging ? " 󰂄" : "") : ""
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.833)
                         font.weight: Font.DemiBold
                     }
                 }
@@ -266,12 +266,13 @@ BarPanel {
                         pixelSize: panel.theme.fontPx(1.167)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Caption
+
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: modeCell.modelData.label
                         color: modeCell.isActive ? panel.theme.accent : panel.theme.textPrimary
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.75)
                     }
                 }
 

@@ -424,21 +424,23 @@ BarPanel {
                     width: parent.width
                     height: rowLabel.implicitHeight
 
-                    Text {
+                    StyledText {
                         id: rowLabel
+                        theme: panel.theme
+                        role: StyledText.Small
+                        muted: true
                         anchors.left: parent.left
                         text: brightnessRow.modelData.output
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontUi
-                        font.pixelSize: panel.theme.fontPx(0.833)
                     }
 
-                    Text {
+                    StyledText {
+                        theme: panel.theme
+                        role: StyledText.Small
+                        mono: true
+                        muted: true
+
                         anchors.right: parent.right
                         text: brightnessRow.percentText
-                        color: panel.theme.textMuted
-                        font.family: panel.theme.fontMono
-                        font.pixelSize: panel.theme.fontPx(0.833)
                     }
                 }
 
@@ -474,13 +476,14 @@ BarPanel {
 
     // Outputs with no backlight of their own: say why rather than showing a
     // dead slider.
-    Text {
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Small
+        muted: true
+
         visible: panel.outputs.length > panel.brightnessRows.length
         width: parent.width
         text: panel.brightnessRows.length === 0 ? "No controllable backlight on this machine." : "External displays have no backlight control — they need DDC/CI."
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.833)
         wrapMode: Text.WordWrap
     }
 
@@ -507,13 +510,15 @@ BarPanel {
 
             // SCALE only applies to the focused output, so name it once there
             // is more than one.
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Caption
+                mono: true
+                muted: true
+
                 anchors.right: parent.right
                 visible: panel.outputs.length > 1 && panel.focused !== ""
                 text: panel.focused
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.75)
             }
         }
 
@@ -573,12 +578,14 @@ BarPanel {
                 label: "TEXT SIZE"
             }
 
-            Text {
+            StyledText {
+                theme: panel.theme
+                role: StyledText.Caption
+                mono: true
+                muted: true
+
                 anchors.right: parent.right
                 text: panel.textSize + " px"
-                color: panel.theme.textMuted
-                font.family: panel.theme.fontMono
-                font.pixelSize: panel.theme.fontPx(0.75)
             }
         }
 
@@ -665,20 +672,21 @@ BarPanel {
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - panel.theme.space(9)
 
-                        Text {
+                        StyledText {
+                            theme: panel.theme
+
                             width: parent.width
                             text: outputRow.modelData.name + (outputRow.isFocused ? " · focused" : "") + (outputRow.modelData.model && outputRow.modelData.model !== "Unknown" ? " · " + outputRow.modelData.model : "")
-                            color: panel.theme.textPrimary
-                            font.family: panel.theme.fontUi
-                            font.pixelSize: panel.theme.fontPx(0.917)
                             elide: Text.ElideRight
                         }
 
-                        Text {
+                        StyledText {
+                            theme: panel.theme
+                            role: StyledText.Caption
+                            mono: true
+                            muted: true
+
                             text: Model.modeLine(outputRow.modelData)
-                            color: panel.theme.textMuted
-                            font.family: panel.theme.fontMono
-                            font.pixelSize: panel.theme.fontPx(0.75)
                         }
                     }
 
@@ -704,12 +712,12 @@ BarPanel {
         }
     }
 
-    Text {
+    StyledText {
+        theme: panel.theme
+        muted: true
+
         visible: panel.outputs.length === 0
         text: "Querying outputs…"
-        color: panel.theme.textMuted
-        font.family: panel.theme.fontUi
-        font.pixelSize: panel.theme.fontPx(0.917)
     }
 
     // ---------------------------------------------------------- components
@@ -731,13 +739,13 @@ BarPanel {
         border.color: isActive || hasCursor ? panel.theme.accent : panel.theme.surface3
         opacity: selectable ? 1 : 0.45
 
-        Text {
+        StyledText {
             id: pillText
+            theme: panel.theme
+            role: StyledText.Small
             anchors.centerIn: parent
             text: pill.label
             color: pill.isActive ? panel.theme.accent : panel.theme.textPrimary
-            font.family: panel.theme.fontUi
-            font.pixelSize: panel.theme.fontPx(0.833)
         }
 
         HoverHandler {
