@@ -52,20 +52,33 @@ after the first apply.
 
 ### What stays manual, honestly
 
-- `~/.ssh` — needed for **pushing** (the https clone works without it). It is
-  a qshell-sync unit now (2026-08-17): the hub carries `~/.ssh` as one
-  age-encrypted blob, so all three machines hold the same keys and can ssh
-  each other by tailnet name. Two things must exist before that can run —
-  `~/.config/chezmoi/key.txt` (the age identity; copy it from a machine that
-  has it, it is the one secret this repo cannot bootstrap itself) and the
-  Dropbox rclone remote. Then:
+- `~/.ssh` — needed for **pushing** (the https clone works without it), and
+  no longer manual: `bin/secrets-restore` does it. It is a qshell-sync unit
+  now (2026-08-17), so the hub carries `~/.ssh` as one age-encrypted blob and
+  all three machines hold the same keys and can ssh each other by tailnet
+  name. The restore chain is iCloud → Dropbox → keys: `rclone config` for
+  iCloud is the one credential typed by hand, iCloud supplies both the
+  Dropbox remote and `~/.config/chezmoi/key.txt`, and that key opens the hub's
+  blob. Nothing has to be carried between machines by hand.
 
-      ssh-hub-sync --adopt-remote     # take the hub's copy, wholesale
+  The age key sits in **iCloud** rather than beside the blob in Dropbox on
+  purpose: two providers means one compromised account yields only half, and
+  a key stored next to what it decrypts would make encrypting the blob
+  pointless.
 
-  A machine with its own `~/.ssh` and no agreed base will NOT merge silently
-  — the ssh unit reports a conflict and waits, which is what the sync panel's
-  "Use this machine" / "Use the hub" buttons answer. The previous `~/.ssh` is
-  tarred into `~/.local/state/qshell/sync/ssh/backups/` first, either way.
+  iCloud also still holds a plaintext `iCloud:.ssh/` from the pre-hub
+  procedure. Nothing reads it automatically any more — it predates
+  `authorized_keys` and the `Host` blocks, and restoring from it would give a
+  machine a `~/.ssh` that disagrees with the hub. It stays only as a cold,
+  possibly stale last resort for a disaster where Dropbox itself is gone.
+
+  A machine that already has its own `~/.ssh` and no agreed base will NOT
+  merge silently — the ssh unit reports a conflict and waits, which is what
+  the sync panel's "Use this machine" / "Use the hub" buttons answer, or
+  `ssh-hub-sync --adopt-remote` from a terminal. The previous `~/.ssh` is
+  tarred into `~/.local/state/qshell/sync/ssh/backups/` first, either way. A
+  genuinely fresh machine skips all of that: an empty `~/.ssh` has no stake in
+  the argument, so the ordinary sync round just pulls.
 
   Then flip the remote with `git -C ~/.dotfiles remote set-url origin
   git@github.com:saifulapm/dotfiles.git`. The ssh config routes github.com
@@ -107,8 +120,10 @@ after the first apply.
   `iCloud:.dotfiles/config/zed/settings.json` (zed itself was rejected for
   this desktop). Place it in `~/intelephense/licence.txt` for the language
   server to pick up premium features.
-- `~/.config/chezmoi/key.txt` (age key) — only needed if encrypted files are
-  ever added to the repo; none exist today. Transport it out of band.
+- `~/.config/chezmoi/key.txt` (age key) — restored by `bin/secrets-restore`
+  from `iCloud:chezmoi/key.txt`. No longer optional: it is what decrypts the
+  hub's `~/.ssh` blob, so a machine without it has no keys. Still nothing in
+  the repo itself is age-encrypted.
 
 ## Layout
 

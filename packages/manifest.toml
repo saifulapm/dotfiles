@@ -277,6 +277,16 @@ why = "Cloudflare WARP: warp-cli + warp-svc, behind the bar's `warp` widget (use
 #   * The rpm pulls webkit2gtk4.1 and libappindicator-gtk3 for `warp-taskbar`,
 #     the GTK tray app. We do not run it — the bar widget is the interface —
 #     but the package has no CLI-only split, so the dependency is the price.
+#     "We do not run it" was aspirational until 2026-08-17: the rpm's
+#     /etc/xdg/autostart entry started the applet at every login, which put a
+#     second WARP icon in the bar's tray and a "Cloudflare One Client" window
+#     behind it. Three suppressions now hold it, all of them reversible and none
+#     of them touching /usr — dot_config/autostart shadows that entry with
+#     Hidden=true, dot_local/share/applications shadows the launcher copy with
+#     NoDisplay=true, and run_after_36 disables warp-desktop-svc, the user unit
+#     that is the applet's own backend. What is deliberately left alone:
+#     com.cloudflare.warp.desktop, already NoDisplay in the package, which only
+#     handles com.cloudflare.warp:// registration deep links.
 #   * `warp-svc` is not started by anything in this repo, matching tailscaled
 #     above. `systemctl enable --now warp-svc` once, then register the device
 #     (`warp-cli registration new`); the widget's panel offers both as

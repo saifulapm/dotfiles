@@ -1,0 +1,36 @@
+# Shadows /etc/xdg/autostart/com.cloudflare.WarpTaskbar.desktop (same
+# desktop-file-id, and ~/.config/autostart wins) to add one line: Hidden=true.
+#
+# That entry is what starts Cloudflare's own tray applet at login — systemd's
+# xdg-autostart generator turns it into
+# app-com.cloudflare.WarpTaskbar@autostart.service, and the applet then puts a
+# StatusNotifierItem in the bar's tray and opens the "Cloudflare One Client"
+# window. The bar has its own WARP widget (shell/Modules/Bar/widgets/Warp.qml),
+# which is the UI here, so the applet is a second control surface for the same
+# daemon and a second icon for the same state.
+#
+# Hidden, not NoDisplay: for an autostart entry NoDisplay only hides it from a
+# session's startup-applications list, it still runs. Hidden=true is the key the
+# spec (and the systemd generator) treat as "ignore this file entirely".
+#
+# Hiding beats uninstalling: warp-taskbar ships inside the same cloudflare-warp
+# RPM as warp-svc and warp-cli, which is the whole point of having it installed
+# (packages/manifest.toml). Deleting the /etc file works until the next `dnf
+# upgrade` puts it back.
+#
+# The other two entries the package ships are deliberately left alone:
+# /usr/share/applications/com.cloudflare.warp.desktop is already NoDisplay and
+# only handles com.cloudflare.warp:// registration links, and the launcher copy
+# of this applet is shadowed separately in dot_local/share/applications.
+[Desktop Entry]
+Type=Application
+Version=1.2
+Name=Cloudflare One Client
+Comment=View the current status of the WARP Tunnel
+Exec=/usr/bin/warp-taskbar
+StartupNotify=false
+Keywords=warp teams cloudflare vpn
+Icon=zero-trust-orange
+Terminal=false
+StartupWMClass=warp-taskbar
+Hidden=true
