@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "AiModel.js" as Model
 
 // Model-usage panel — port of omarchy's model-usage Panel.qml in our tokens:

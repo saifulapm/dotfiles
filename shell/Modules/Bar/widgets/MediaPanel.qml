@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 
 // The media widget's right-click card — omarchy's media popup
 // (shell/plugins/services/media/BarWidget.qml's PopupCard, CREDITS.md) on our

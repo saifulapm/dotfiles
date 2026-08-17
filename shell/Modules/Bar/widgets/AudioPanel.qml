@@ -3,6 +3,7 @@ import Quickshell.Io
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import "../components"
+import "../../../components"
 import "AudioModel.js" as Model
 
 // Audio panel — full port of omarchy's audio plugin Panel.qml in our own

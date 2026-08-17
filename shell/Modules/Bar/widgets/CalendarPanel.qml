@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../components"
+import "../../../components"
 import "ClockModel.js" as Model
 
 // Month calendar under the clock — omarchy's clock panel, our card. Hero

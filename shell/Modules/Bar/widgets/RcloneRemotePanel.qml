@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "RcloneRemoteModel.js" as Format
 
 // rclone-remote panel — ours, in the Dropbox panel's visual language

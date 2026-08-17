@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Services.SystemTray
 import "../components"
+import "../../../components"
 
 // Tray manage card — omarchy's tray manage popup in our tokens. Lists every
 // item the tray knows about, including hidden ones and the passive items the

@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "HubSyncModel.js" as Model
 
 // Sync — the Dropbox hub's six units as one bar button, in the dufs/rclone

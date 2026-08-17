@@ -1,5 +1,4 @@
 import QtQuick
-import "../components"
 
 // Indicator container, ported from omarchy's Indicators widget (CREDITS.md).
 //

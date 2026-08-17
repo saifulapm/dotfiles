@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.UPower
 import "../components"
+import "../../../components"
 
 // Battery from UPower's display device, omarchy power-widget glyph ladders.
 // Icon-only by default; right click toggles the percentage label. Hidden on

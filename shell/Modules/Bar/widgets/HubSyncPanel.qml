@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "HubSyncModel.js" as Model
 
 // Sync panel — the Dropbox hub's six units, in the family's visual language:

@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Bluetooth
 import "../components"
+import "../../../components"
 import "BluetoothModel.js" as Model
 
 // AirPods panel — a hero of the pods with their BlueZ alias and live ear

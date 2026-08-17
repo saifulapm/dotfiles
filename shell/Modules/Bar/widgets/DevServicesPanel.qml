@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "DevServicesModel.js" as Model
 
 // Dev-services panel — the on-demand database rows, in the family's visual

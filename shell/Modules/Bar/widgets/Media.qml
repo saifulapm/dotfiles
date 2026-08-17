@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../components"
+import "../../../components"
 
 // MPRIS now-playing — full port of omarchy's media bar widget
 // (shell/plugins/services/media/BarWidget.qml, CREDITS.md) over our media

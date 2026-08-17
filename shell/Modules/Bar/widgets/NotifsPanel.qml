@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../components"
+import "../../../components"
 import "../../Notifications/NotificationLogic.js" as Logic
 
 // Notification history center — the review surface over Services/Notifs.qml's

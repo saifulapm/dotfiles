@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Networking
 import "../components"
+import "../../../components"
 import "NetworkModel.js" as Model
 
 // Network panel — full port of omarchy's network plugin Panel.qml in our own

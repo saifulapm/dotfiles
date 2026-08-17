@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../components"
+import "../../../components"
 import "MonitorModel.js" as Model
 
 // Display panel — port of omarchy's monitor plugin on niri's IPC: a hero

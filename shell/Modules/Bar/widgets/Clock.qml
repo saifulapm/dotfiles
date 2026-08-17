@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../components"
+import "../../../components"
 import "ClockModel.js" as Model
 
 // Omarchy's clock: the format lives in the widget's inline shell.json entry,

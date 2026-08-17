@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import "../components"
+import "../../../components"
 import "WeatherModel.js" as Model
 
 // Weather panel — full port of omarchy's weather Panel.qml in our tokens:

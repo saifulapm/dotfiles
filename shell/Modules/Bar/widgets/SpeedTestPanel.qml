@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
-import "../components"
+import "../../../components"
 
 // Centered speed-test overlay — port of omarchy's SpeedTestPanel.qml: no card,
 // two dials floating on a darkened scrim, with open 270° arcs, a faint tick

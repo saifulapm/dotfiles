@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
 import "../components"
+import "../../../components"
 import "PowerModel.js" as Model
 
 // Power panel — full port of omarchy's power plugin Panel.qml in our tokens:

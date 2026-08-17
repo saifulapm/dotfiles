@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 
 // Dufs panel — the file server's card in the family's visual language: a
 // hero of the mark over the serving state with the switch as the headline

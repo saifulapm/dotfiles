@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 
 // Weather — port of omarchy's weather plugin bar button (CREDITS.md). The
 // bar slot carries the condition glyph and the temperature; the panel is the

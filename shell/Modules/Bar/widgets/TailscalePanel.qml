@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "TailscaleModel.js" as Model
 
 // Tailscale panel — full port of omarchy's tailscale plugin Panel.qml in our

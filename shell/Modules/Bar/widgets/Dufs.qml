@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../components"
+import "../../../components"
 
 // dufs — the on-demand file server (bin/dufs-serve behind the dufs.service
 // user unit: $HOME over HTTP with basic auth on port 5000) as a bar button in

@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 import "WarpModel.js" as Model
 
 // Cloudflare WARP panel — port of tobi/omarchy-warp's Panel.qml in our tokens:

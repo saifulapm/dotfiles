@@ -3,7 +3,6 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Polkit
-import "../Bar/components"
 import "../../components"
 import "PolkitModel.js" as PolkitModel
 

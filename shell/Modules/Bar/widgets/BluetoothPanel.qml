@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Bluetooth
 import Quickshell.Services.Pipewire
 import "../components"
+import "../../../components"
 import "BluetoothModel.js" as Model
 
 // Bluetooth panel — full port of omarchy's bluetooth plugin Panel.qml in our

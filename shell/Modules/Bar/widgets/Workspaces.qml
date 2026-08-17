@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../../../components"
 
 // Omarchy-style workspaces: the focused one is a filled circle glyph, the
 // rest show their number; empty workspaces sit at half strength; urgent
