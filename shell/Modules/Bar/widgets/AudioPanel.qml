@@ -144,8 +144,7 @@ BarPanel {
         // immediately renders the AirPods -> Dummy -> rebuilt cycle as
         // flapping. If the devices are genuinely gone the hold expires and
         // the honest shrink commits.
-        const shrinking = panel.realDeviceCount(panel.audioSinks) < panel.realDeviceCount(panel.displaySinks)
-            || panel.audioSources.length < panel.displaySources.length;
+        const shrinking = panel.realDeviceCount(panel.audioSinks) < panel.realDeviceCount(panel.displaySinks) || panel.audioSources.length < panel.displaySources.length;
         refreshTimer.interval = shrinking ? 1500 : 75;
         refreshTimer.restart();
     }

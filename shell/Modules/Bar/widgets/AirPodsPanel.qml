@@ -41,10 +41,26 @@ BarPanel {
     // ------------------------------------------------------- noise picker
     // Display in intensity order; the service speaks librepods ints.
     readonly property var modes: [
-        { mode: 0, label: "Off",          glyph: "󰝟" },
-        { mode: 2, label: "Transparency", glyph: "󰋌" },
-        { mode: 3, label: "Adaptive",     glyph: "󰧑" },
-        { mode: 1, label: "ANC",          glyph: "󰋍" }
+        {
+            mode: 0,
+            label: "Off",
+            glyph: "󰝟"
+        },
+        {
+            mode: 2,
+            label: "Transparency",
+            glyph: "󰋌"
+        },
+        {
+            mode: 3,
+            label: "Adaptive",
+            glyph: "󰧑"
+        },
+        {
+            mode: 1,
+            label: "ANC",
+            glyph: "󰋍"
+        }
     ]
 
     property int cursorIndex: 0
@@ -114,10 +130,26 @@ BarPanel {
 
         Repeater {
             model: [
-                { key: "left",   label: "Left",  inEar: panel.service.leftInEar },
-                { key: "right",  label: "Right", inEar: panel.service.rightInEar },
-                { key: "case",   label: "Case",  inEar: false },
-                { key: "single", label: "Pods",  inEar: panel.service.leftInEar }
+                {
+                    key: "left",
+                    label: "Left",
+                    inEar: panel.service.leftInEar
+                },
+                {
+                    key: "right",
+                    label: "Right",
+                    inEar: panel.service.rightInEar
+                },
+                {
+                    key: "case",
+                    label: "Case",
+                    inEar: false
+                },
+                {
+                    key: "single",
+                    label: "Pods",
+                    inEar: panel.service.leftInEar
+                }
             ]
 
             Column {
