@@ -61,16 +61,11 @@ if ! command -v wayfreeze >/dev/null 2>&1; then
     || warn "cargo install wayfreeze (git) failed"
 fi
 
-# ttfx (user ask 2026-08-11, omarchy 4e31b61): Rust port of
-# terminaltexteffects, the engine under bin/screensaver. The crates.io name
-# is unclaimed (checked 2026-08-11), so install by git URL ONLY — a bare
-# `cargo install ttfx` would hand the screensaver to whoever registers it.
-if ! command -v ttfx >/dev/null 2>&1; then
-  echo "cargo-tools: building ttfx from git (first run only)"
-  cargo install --quiet --git https://github.com/omacom-io/ttfx --locked \
-    && echo "cargo-tools: installed ttfx" \
-    || warn "cargo install ttfx (git) failed"
-fi
+# ttfx is NOT installed here any more (2026-08-17). It was the animator
+# behind the old terminal screensaver; nirisaver (run_after_35) links the
+# same crate directly, so there is nothing left that runs the ttfx binary.
+# An already-installed ~/.cargo/bin/ttfx is harmless and stays — removal is
+# a user call.
 
 # herdr is NOT built here, though it can be: a git build understands seven
 # config keys the release does not. It needs zig 0.15.2 EXACTLY (it vendors

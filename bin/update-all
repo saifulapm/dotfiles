@@ -122,6 +122,7 @@ update_src() { # <src-dir> <installed-binary> <label>
 }
 update_src "$HOME/.local/src/kakoune" "$HOME/.local/bin/kak" kakoune-fork
 update_src "$HOME/.local/src/nirisnap" "$HOME/.local/bin/omasnap" nirisnap
+update_src "$HOME/.local/src/nirisaver" "$HOME/.local/bin/omarchy-launch-screensaver" nirisaver
 update_src "$HOME/.local/src/omacalc" "$HOME/.local/bin/omacalc" omacalc
 update_src "$HOME/.local/src/omacut" "$HOME/.local/bin/omacut" omacut
 update_src "$HOME/.local/src/omawrite" "$HOME/.local/bin/omawrite" omawrite
@@ -147,8 +148,10 @@ cargo install --quiet --git https://github.com/kakoune-lsp/kakoune-lsp --locked 
   || warn "cargo update kakoune-lsp failed"
 cargo install --quiet --git https://github.com/Jappie3/wayfreeze --locked \
   || warn "cargo update wayfreeze failed"
-cargo install --quiet --git https://github.com/omacom-io/ttfx --locked \
-  || warn "cargo update ttfx failed"
+# ttfx is no longer installed as a binary: the screensaver links it as a
+# crate now (nirisaver), so it rides that source build's Cargo.lock. An
+# already-installed ~/.cargo/bin/ttfx is left alone — removing it is a user
+# call, and nothing here calls it.
 
 # ------------------------------------------------------------------- emacs
 if [ "$WITH_EMACS" = 1 ]; then

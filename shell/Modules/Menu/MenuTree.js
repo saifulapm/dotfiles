@@ -410,6 +410,14 @@ var TREE = {
         "when": "command -v foot",
         "action": "foot-run --app-id=qshell-float -e \"${EDITOR:-vi}\" \"$HOME/.dotfiles/shell/shell.json\""
     },
+    "setup.quotes": {
+        "icon": "󰉾",
+        "label": "Screensaver Quotes",
+        "aliases": ["screensaver", "quotes"],
+        "description": "Edit the quotes the screensaver draws from",
+        "when": "command -v foot",
+        "action": "foot-run --app-id=qshell-float -e \"${EDITOR:-vi}\" \"$HOME/.dotfiles/home/dot_config/qshell/screensaver-quotes.txt\""
+    },
     "setup.niri": {
         "icon": "󱂬",
         "label": "Niri Config",

@@ -20,28 +20,39 @@ import Quickshell.Wayland
 // Seconds. A missing/invalid value falls back to the default; 0 disables that
 // stage; with every stage disabled the monitor itself never arms.
 //
+// Three more keys in the same block belong to the screensaver rather than to
+// this service, and are read by bin/screensaver-launch, not here:
+//
+//     "screensaverQuotes":  path to the quote list, one "text — author" per
+//                           line (default ~/.config/qshell/screensaver-quotes.txt,
+//                           which the Setup ▸ Screensaver Quotes menu row opens)
+//     "screensaverHold":    seconds a finished quote stays readable (default 14)
+//     "screensaverEffects": comma-separated ttfx effects to pick from
+//                           (default: all of them, at random)
+//
 // Three deliberate adaptations of upstream's semantics:
 //
 //  * Their first stage launches a screensaver window and their whole Hyprland
 //    openwindow/closewindow dance exists to know whether that window is still
-//    up. Ours launches bin/screensaver-launch (the ttfx quotes screensaver)
-//    but keeps none of that bookkeeping: the screensaver polices itself (it
-//    exits on input or focus loss).
+//    up. Ours launches bin/screensaver-launch (the native quotes overlay)
+//    but keeps none of that bookkeeping: the screensaver polices itself. It
+//    takes an exclusive keyboard grab on its own layer surface, so a
+//    keystroke or a pointer move dismisses it without anyone asking.
 //  * `blank` has no upstream counterpart. Powering the panel off was this
 //    service's whole first stage until the screensaver took that slot over
 //    (ce8bbac), which left the panel lit through the quotes right up to the
 //    lock. It is its own stage now rather than a retimed screensaver, so the
 //    two run in sequence: quotes first, dark panel after. Defaults to 0 (off)
 //    so the stage is opt-in and upstream's two-stage shape is the fallback.
-//    The screensaver keeps running behind the dark panel — it costs nothing
-//    on its 1s tick, and the wake path sweeps it either way.
+//    The screensaver keeps running behind the dark panel — between quotes
+//    it presents nothing at all, and the wake path sweeps it either way.
 //  * Because launching their screensaver itself reads as activity on
 //    Hyprland, upstream ignores the wake signal while the screensaver is up.
 //    niri's ext-idle-notify only resets on real input, so we keep the plain
 //    swayidle-style rule: any activity cancels every pending stage, powers
-//    the monitors back on, and sweeps the screensaver windows (belt to the
-//    screensaver's own braces — its read loop only sees the keyboard, so a
-//    mouse-move wake reaches it through this sweep).
+//    the monitors back on, and sweeps the screensaver (belt to its own
+//    braces: it dismisses itself on the same input, and the sweep is what
+//    covers a wake this service saw first).
 QtObject {
     id: root
 
@@ -148,21 +159,16 @@ QtObject {
     }
 
     function killScreensaver() {
-        // ttfx first (omarchy 438f7b3): the pattern below matches the foot
-        // window, and the animator inside it can outlive the terminal it was
-        // drawing into — bin/screensaver's own exit trap only fires when the
-        // script gets to run its handler, which it may not if its foreground
-        // ttfx is what is still alive.
-        //
-        // One shell, not two run() calls: run() is execDetached, so separate
-        // launches race. ttfx also handles SIGTERM asynchronously (omarchy
-        // f6fd2e7) and restores the terminal on its way out, so the window
-        // teardown waits for it — briefly, since a ttfx that will not go
-        // must not keep the screensaver on screen.
+        // One process now, not a terminal with an animator inside it: the
+        // native screensaver owns its own overlay, and SIGTERM is a first-
+        // class dismissal for it — it fades out and exits rather than being
+        // torn off the screen. Nothing to wait for and nothing that can
+        // outlive it, so the two-stage ttfx teardown this used to need
+        // (omarchy 438f7b3, f6fd2e7) is gone with the terminal.
         //
         // The bracketed pattern keeps pkill from matching its own cmdline
         // (or this shell's, which carries the same argument).
-        run(["bash", "-c", "pkill -x ttfx; timeout 1s pidwait -x ttfx; pkill -f '[o]rg.qshell.screensaver'"]);
+        run(["pkill", "-f", "[o]marchy-launch-screensaver"]);
     }
 
     function lockNow(reason) {
@@ -311,8 +317,9 @@ QtObject {
     }
 
     // Launch through a Process, not execDetached: the exit code is the
-    // fallback signal. screensaver-launch exits nonzero when ttfx (or foot)
-    // is missing, and this stage then does what it always did before the
+    // fallback signal. screensaver-launch exits nonzero when the binary or
+    // the quotes file is missing, and this stage then does what it always
+    // did before the
     // screensaver existed — power the monitors off. Unless the blank stage is
     // configured, which already owns the panel on its own deadline: blanking
     // here too would drag that forward to the screensaver's time.

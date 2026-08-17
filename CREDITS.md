@@ -1009,19 +1009,26 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
 - **Herdr launch bind** (507059e): SUPER+CTRL+RETURN attaches to the
   persistent herdr session, mirrored as Mod+Ctrl+Return on our singleton
   launch-or-focus shape (their keybindings menu deliberately not ported).
-- **Screensaver design** from `bin/omarchy-screensaver` + `omarchy-launch-screensaver`
-  + `default/foot/screensaver.ini` (4e31b61 swapped their Python TTE for ttfx,
-  a parity-exact Rust port): a fullscreen terminal with a dedicated app-id
-  runs ttfx effects in a loop, exiting on input or focus loss; the pty-resize
-  wait and the black-background OSC are theirs verbatim. Ours draws random
-  motivational quotes instead of a branding file, holds each readable between
-  effects (zero-CPU sleep — ttfx exits when its effect completes), runs at
-  30fps not their 120, and asks niri for focus where they ask hyprctl. Their
-  per-monitor spawn choreography is dropped (single-display machines). The
-  idle chain follows their Service.qml: screensaver stage at 150s, lock at
-  300s, with our lock screen's own 5s blank timer taking display power-off —
-  and a fallback their design doesn't need: if ttfx is missing the stage
-  powers the monitors off, which was our whole stage 1 before this port.
+- **Screensaver** from `omarchy-launch-screensaver` (4e31b61 swapped their
+  Python TTE for ttfx, a parity-exact Rust port; tobi then rewrote the whole
+  launcher as a native Rust Wayland client). We take the native one, forked as
+  `saifulapm/nirisaver` and installed by `run_after_35` — its NIRI.md carries
+  the diff, which is three commits: a second SHM buffer (upstream redraws only
+  after a `wl_buffer.release` that niri never sends, so it froze on the
+  fade-in's invisible first frame), cursor hiding through
+  `wl_pointer.set_cursor` instead of `hyprctl eval`, and `--quotes`/`--hold`.
+  The last is the only port-side one, and it is what carries our own design
+  across: random motivational quotes instead of a branding file, each laid out
+  with its attribution on its own line and held readable between effects,
+  where theirs replays one text forever. `bin/screensaver-launch` keeps its
+  old contract — nonzero means "no screensaver here", and the idle stage falls
+  back to powering the monitors off — and now also reads the quote list, hold
+  and effect filter out of `shell.json`. The idle chain still follows their
+  Service.qml: screensaver at 150s, lock at 300s, with our own `blank` stage
+  between them. Superseded with this port: their `bin/omarchy-screensaver`
+  loop, `default/foot/screensaver.ini`, the fullscreen window-rule, the
+  pty-resize wait and the black-background OSC — a layer-shell overlay needs
+  none of them.
 
 - **Crash capture** from omarchy `bin/omarchy-crash-watch`,
   `bin/omarchy-agent-crash`, `bin/omarchy-toggle-crash-capture`,
