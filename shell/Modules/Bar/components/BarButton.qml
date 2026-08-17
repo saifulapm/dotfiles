@@ -105,8 +105,8 @@ Item {
     opacity: dimmed ? 0.45 : 1
     Behavior on opacity {
         NumberAnimation {
-            duration: 140
-            easing.type: Easing.OutCubic
+            duration: button.theme.motion.standard
+            easing.type: button.theme.motion.easing
         }
     }
 

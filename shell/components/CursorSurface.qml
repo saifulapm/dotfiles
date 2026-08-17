@@ -40,19 +40,20 @@ Rectangle {
     border.width: root.bordered ? root.theme.borderWidth : 0
     border.color: root.bordered && root.hasCursor ? root.theme.alpha(root.theme.accent, 0.6) : "transparent"
 
-    // theme.motion.state, not a duration of its own: this reads as "the
-    // surface answered", and every hover in the shell should answer at the
-    // same speed.
+    // theme.motion.standard, not a duration of its own: this reads as "the
+    // surface answered", every hover in the shell should answer at the same
+    // speed, and a theme asking for no motion (retro-82 ships duration = 0)
+    // has to be able to switch it off.
     Behavior on color {
         ColorAnimation {
-            duration: root.theme.motion.state
+            duration: root.theme.motion.standard
             easing.type: root.theme.motion.easing
         }
     }
 
     Behavior on border.color {
         ColorAnimation {
-            duration: root.theme.motion.state
+            duration: root.theme.motion.standard
             easing.type: root.theme.motion.easing
         }
     }

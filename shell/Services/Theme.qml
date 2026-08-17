@@ -400,13 +400,17 @@ QtObject {
     // in step. A theme setting motion.duration = 0 still stops the whole
     // shell dead, which is the property the raw numbers were quietly
     // breaking.
+    // EVERY duration here runs through time(), so all of it collapses to zero
+    // under a theme that asks for it. That is not hypothetical: retro-82 ships
+    // `duration = 0` and means it, hackerman runs at 100, lumon at 250, and
+    // catppuccin and rose-pine at 180. A literal in a Behavior opts that
+    // animation out of the theme silently, which is the bug these replace.
     readonly property QtObject motion: QtObject {
-        // Hover, focus and state colors — the 140/160 ms transitions the bar
-        // and the panel controls were each spelling out. Deliberately NOT
-        // scaled by the theme's duration token: this one reads as "the
-        // surface responded", and stretching it makes the UI feel laggy
-        // rather than expressive.
-        readonly property int state: 150
+        // The default: a property moving because something changed — hover
+        // and focus fills, glyph color, slider travel, reveal heights. 150 ms
+        // at the default token, which is what the 140 and 160 ms literals
+        // scattered through the bar were approximating.
+        readonly property int standard: root.time(1)
 
         // Surface entrances and exits. Asymmetric on purpose — omarchy's
         // window animations exit faster than they enter, and that asymmetry
@@ -415,22 +419,20 @@ QtObject {
         readonly property int enter: root.time(0.5)
         readonly property int exit: root.time(0.35)
 
-        // A property moving because the user moved it: slider fills, knob
-        // travel, reveal heights.
-        readonly property int standard: root.time(1)
-
         // Deliberate, attention-carrying motion — the hero phrase crossfade,
-        // a countdown, anything the eye is meant to follow rather than just
-        // absorb.
+        // anything the eye is meant to follow rather than just absorb.
         readonly property int slow: root.time(1.73)
 
-        // The theme's own curve (snap -> OutQuint, spring -> OutBack, else
-        // OutCubic). Default for anything entering or settling.
+        // The theme's own curve: "snap" -> OutQuint, "spring" -> OutBack,
+        // otherwise OutCubic. Twenty-one sites had hardcoded Easing.OutCubic,
+        // which is only coincidentally right — it is what this resolves to at
+        // the DEFAULT, so those animations quietly ignored hackerman's and
+        // retro-82's "snap".
         readonly property int easing: root.easing
-        // Leaving the screen: start fast, ease out of view.
+        // Leaving the screen: start slow, accelerate out of view.
         readonly property int easingExit: Easing.InQuad
-        // Symmetric moves that both start and end at rest — a knob sliding
-        // between two detents, a reveal opening and closing.
+        // Symmetric moves that start and end at rest — a knob sliding between
+        // two detents, a reveal opening and closing.
         readonly property int easingSmooth: Easing.InOutCubic
     }
 

@@ -824,7 +824,7 @@ BarPanel {
                             Behavior on rotation {
                                 NumberAnimation {
                                     duration: panel.theme.time(1.2)
-                                    easing.type: Easing.OutCubic
+                                    easing.type: panel.theme.motion.easing
                                 }
                             }
                         }
@@ -875,14 +875,14 @@ BarPanel {
                     Behavior on height {
                         NumberAnimation {
                             duration: panel.theme.time(1.2)
-                            easing.type: Easing.OutCubic
+                            easing.type: panel.theme.motion.easing
                         }
                     }
 
                     Behavior on opacity {
                         NumberAnimation {
                             duration: panel.theme.time(1.2)
-                            easing.type: Easing.OutCubic
+                            easing.type: panel.theme.motion.easing
                         }
                     }
 

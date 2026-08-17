@@ -1550,14 +1550,14 @@ BarPanel {
                     Behavior on height {
                         NumberAnimation {
                             duration: panel.theme.time(1)
-                            easing.type: Easing.OutCubic
+                            easing.type: panel.theme.motion.easing
                         }
                     }
 
                     Behavior on opacity {
                         NumberAnimation {
                             duration: panel.theme.time(1)
-                            easing.type: Easing.OutCubic
+                            easing.type: panel.theme.motion.easing
                         }
                     }
 

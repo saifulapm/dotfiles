@@ -406,7 +406,7 @@ Scope {
                                 enabled: osdRoot.opened
                                 NumberAnimation {
                                     duration: osdRoot.theme.time(1)
-                                    easing.type: Easing.OutCubic
+                                    easing.type: osdRoot.theme.motion.easing
                                 }
                             }
                         }

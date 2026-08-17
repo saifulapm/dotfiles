@@ -225,7 +225,7 @@ BarPanel {
             Behavior on width {
                 NumberAnimation {
                     duration: panel.theme.time(2.13)
-                    easing.type: Easing.OutCubic
+                    easing.type: panel.theme.motion.easing
                 }
             }
 

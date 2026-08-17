@@ -306,7 +306,7 @@ BarPanel {
                         Behavior on width {
                             NumberAnimation {
                                 duration: panel.theme.time(1)
-                                easing.type: Easing.OutCubic
+                                easing.type: panel.theme.motion.easing
                             }
                         }
                     }
@@ -442,7 +442,7 @@ BarPanel {
                         Behavior on width {
                             NumberAnimation {
                                 duration: panel.theme.time(1)
-                                easing.type: Easing.OutCubic
+                                easing.type: panel.theme.motion.easing
                             }
                         }
                     }
@@ -505,7 +505,7 @@ BarPanel {
                     Behavior on width {
                         NumberAnimation {
                             duration: panel.theme.time(1)
-                            easing.type: Easing.OutCubic
+                            easing.type: panel.theme.motion.easing
                         }
                     }
                 }

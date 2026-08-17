@@ -67,8 +67,8 @@ Item {
 
     Behavior on revealProgress {
         NumberAnimation {
-            duration: 600
-            easing.type: Easing.OutCubic
+            duration: rootItem.theme.time(4)
+            easing.type: rootItem.theme.motion.easing
         }
     }
 

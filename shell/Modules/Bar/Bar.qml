@@ -1682,8 +1682,8 @@ Scope {
 
                     Behavior on opacity {
                         NumberAnimation {
-                            duration: 140
-                            easing.type: Easing.OutCubic
+                            duration: barRoot.theme.motion.standard
+                            easing.type: barRoot.theme.motion.easing
                         }
                     }
                 }
@@ -1920,8 +1920,8 @@ Scope {
 
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 120
-                    easing.type: Easing.OutCubic
+                    duration: barRoot.theme.time(0.8)
+                    easing.type: barRoot.theme.motion.easing
                 }
             }
         }

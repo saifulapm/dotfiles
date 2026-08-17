@@ -227,7 +227,7 @@ Item {
                 Behavior on width {
                     NumberAnimation {
                         duration: root.theme.time(1.2)
-                        easing.type: Easing.OutCubic
+                        easing.type: root.theme.motion.easing
                     }
                 }
 
@@ -287,7 +287,7 @@ Item {
                 Behavior on height {
                     NumberAnimation {
                         duration: root.theme.time(1.2)
-                        easing.type: Easing.OutCubic
+                        easing.type: root.theme.motion.easing
                     }
                 }
 
