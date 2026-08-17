@@ -145,14 +145,18 @@ Scope {
                 model: launcherRoot.entries
                 currentIndex: launcherRoot.selectedIndex
 
-                delegate: Rectangle {
+                delegate: CursorSurface {
                     required property var modelData
                     required property int index
 
+                    theme: launcherRoot.theme
                     width: list.width
                     height: launcherRoot.theme.space(10)
-                    radius: launcherRoot.theme.radius(0.75)
-                    color: index === launcherRoot.selectedIndex ? launcherRoot.theme.alpha(launcherRoot.theme.accent, 0.18) : (rowHover.hovered ? launcherRoot.theme.alpha(launcherRoot.theme.textPrimary, 0.06) : "transparent")
+                    // Selection and cursor are the same thing here, and the
+                    // fill already says so — no keyboard-cursor outline.
+                    bordered: false
+                    current: index === launcherRoot.selectedIndex
+                    hasCursor: rowHover.hovered
 
                     HoverHandler {
                         id: rowHover

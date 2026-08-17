@@ -520,7 +520,7 @@ Scope {
                                     spacing: clipboardRoot.theme.space(1)
                                     boundsBehavior: Flickable.StopAtBounds
 
-                                    delegate: Rectangle {
+                                    delegate: CursorSurface {
                                         id: row
 
                                         required property int index
@@ -528,12 +528,14 @@ Scope {
                                         required property string previewText
                                         required property string previewImage
 
-                                        readonly property bool hasCursor: clipboardRoot.cursorActive && row.index === clipboardRoot.selectedIndex
-
+                                        theme: clipboardRoot.theme
                                         width: list.width
                                         height: clipboardRoot.rowHeight
-                                        radius: clipboardRoot.theme.radius(0.75)
-                                        color: row.hasCursor ? clipboardRoot.theme.alpha(clipboardRoot.theme.accent, 0.18) : "transparent"
+                                        // Hovering moves the selection, so
+                                        // the cursor and the choice are one
+                                        // state and the fill alone says it.
+                                        bordered: false
+                                        current: clipboardRoot.cursorActive && row.index === clipboardRoot.selectedIndex
 
                                         MouseArea {
                                             anchors.fill: parent

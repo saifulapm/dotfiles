@@ -291,18 +291,20 @@ Scope {
                         cellHeight: emojisRoot.cellSize
                         boundsBehavior: Flickable.StopAtBounds
 
-                        delegate: Rectangle {
+                        delegate: CursorSurface {
                             id: cell
 
                             required property int index
                             required property string emoji
 
-                            readonly property bool hasCursor: emojisRoot.cursorActive && cell.index === emojisRoot.selectedIndex
-
+                            theme: emojisRoot.theme
                             width: emojisRoot.cellSize
                             height: emojisRoot.cellSize
-                            radius: emojisRoot.theme.radius(0.75)
-                            color: cell.hasCursor ? emojisRoot.theme.alpha(emojisRoot.theme.accent, 0.18) : "transparent"
+                            // Hovering moves the selection, so the cursor and
+                            // the choice are one state: the accent fill says
+                            // it, and there is no outline to add.
+                            bordered: false
+                            current: emojisRoot.cursorActive && cell.index === emojisRoot.selectedIndex
 
                             Text {
                                 anchors.centerIn: parent

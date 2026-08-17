@@ -234,25 +234,28 @@ BarPanel {
             Repeater {
                 model: panel.sourcePlayers
 
-                Rectangle {
+                CursorSurface {
                     id: sourceRow
 
                     required property var modelData
                     required property int index
 
-                    // Guarded on the active player too (upstream's rule): a
-                    // degenerate player with no identity keys to "" and would
-                    // otherwise match an empty activeKey.
-                    readonly property bool current: panel.player !== null && modelData !== null && panel.media.playerKey(modelData) === panel.activeKey()
-                    readonly property bool hasCursor: panel.cursorActive && panel.selectedIndex === index
                     readonly property string sourceTitle: modelData ? (modelData.trackTitle || modelData.identity || modelData.desktopEntry || "Media source") : "Media source"
                     readonly property string sourceDetail: modelData && modelData.trackArtist ? modelData.trackArtist : (modelData && modelData.identity ? modelData.identity : "")
 
+                    theme: panel.theme
+                    // Guarded on the active player too (upstream's rule): a
+                    // degenerate player with no identity keys to "" and would
+                    // otherwise match an empty activeKey.
+                    current: panel.player !== null && modelData !== null && panel.media.playerKey(modelData) === panel.activeKey()
+                    hasCursor: panel.cursorActive && panel.selectedIndex === index
+
                     width: parent.width
                     implicitHeight: sourceInner.implicitHeight + panel.theme.space(2.5)
-                    radius: panel.theme.radius(0.75)
-                    color: current ? panel.theme.alpha(panel.theme.accent, 0.18) : (hasCursor ? panel.theme.alpha(panel.theme.textPrimary, 0.06) : "transparent")
-                    border.width: panel.theme.borderWidth
+                    // Richer than the shared outline: this list marks the
+                    // PLAYING source as well as the cursor, so `current`
+                    // keeps a dimmer ring of its own rather than relying on
+                    // the fill alone.
                     border.color: hasCursor ? panel.theme.alpha(panel.theme.accent, 0.6) : (current ? panel.theme.alpha(panel.theme.accent, 0.35) : "transparent")
 
                     Row {

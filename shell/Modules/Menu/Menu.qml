@@ -897,7 +897,7 @@ Scope {
                             }
                         }
 
-                        delegate: Rectangle {
+                        delegate: CursorSurface {
                             id: row
 
                             required property int index
@@ -907,14 +907,16 @@ Scope {
                             required property string label
                             required property string detail
 
-                            readonly property bool hasCursor: row.index === menuRoot.selectedIndex
                             readonly property bool isSubmenu: row.kind === "menu" || row.kind === "link"
                             readonly property bool isApp: row.kind === "app"
 
+                            theme: menuRoot.theme
                             width: list.width
                             height: menuRoot.rowHeight
-                            radius: menuRoot.theme.radius(0.75)
-                            color: row.hasCursor ? menuRoot.theme.alpha(menuRoot.theme.accent, 0.18) : "transparent"
+                            // Hovering moves the selection, so the cursor and
+                            // the choice are one state and the fill says it.
+                            bordered: false
+                            current: row.index === menuRoot.selectedIndex
 
                             MouseArea {
                                 anchors.fill: parent

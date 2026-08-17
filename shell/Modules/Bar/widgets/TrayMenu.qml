@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import Quickshell
 import "../components"
+import "../../../components"
 
 // A tray item's own menu, drawn by us.
 //
@@ -143,10 +144,13 @@ BarPanel {
         width: parent.width
         height: visible ? panel.rowHeight : 0
 
-        Rectangle {
+        CursorSurface {
             anchors.fill: parent
-            radius: panel.theme.radius(0.75)
-            color: backMouse.containsMouse ? panel.theme.alpha(panel.theme.accent, 0.18) : "transparent"
+            theme: panel.theme
+            // A menu row highlights under the pointer only; there is no
+            // separate keyboard cursor here to outline.
+            bordered: false
+            current: backMouse.containsMouse
         }
 
         Text {
@@ -269,11 +273,12 @@ BarPanel {
                         color: panel.theme.alpha(panel.theme.textPrimary, 0.2)
                     }
 
-                    Rectangle {
+                    CursorSurface {
                         visible: !menuRow.modelData.isSeparator
                         anchors.fill: parent
-                        radius: panel.theme.radius(0.75)
-                        color: rowMouse.containsMouse && menuRow.modelData.enabled ? panel.theme.alpha(panel.theme.accent, 0.18) : "transparent"
+                        theme: panel.theme
+                        bordered: false
+                        current: rowMouse.containsMouse && menuRow.modelData.enabled
                     }
 
                     Text {

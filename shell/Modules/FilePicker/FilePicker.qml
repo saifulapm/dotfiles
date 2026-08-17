@@ -1051,14 +1051,18 @@ Scope {
                                 font.capitalization: Font.AllUppercase
                             }
 
-                            Rectangle {
+                            CursorSurface {
                                 id: sideItem
 
                                 visible: sideRow.modelData.kind === "item"
                                 anchors.fill: parent
-                                radius: pickerRoot.theme.radius(0.75)
+                                theme: pickerRoot.theme
                                 readonly property bool active: pickerRoot.currentPath === sideRow.modelData.path
-                                color: active ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.18) : (sideHover.hovered ? pickerRoot.theme.alpha(pickerRoot.theme.textPrimary, 0.06) : "transparent")
+                                // The sidebar shows where you ARE, not where a
+                                // keyboard cursor is — fill only, no outline.
+                                bordered: false
+                                current: sideItem.active
+                                hasCursor: sideHover.hovered
 
                                 HoverHandler {
                                     id: sideHover
@@ -1181,16 +1185,20 @@ Scope {
                         currentIndex: pickerRoot.cursor
                         boundsBehavior: Flickable.StopAtBounds
 
-                        delegate: Rectangle {
+                        delegate: CursorSurface {
                             id: row
 
                             required property var modelData
                             required property int index
 
+                            theme: pickerRoot.theme
                             width: listView.width
                             height: pickerRoot.rowHeight
-                            radius: pickerRoot.theme.radius(0.75)
-                            color: index === pickerRoot.cursor ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.18) : (rowHover.hovered ? pickerRoot.theme.alpha(pickerRoot.theme.textPrimary, 0.06) : "transparent")
+                            // Selection and cursor are the same thing here,
+                            // and the fill already says so.
+                            bordered: false
+                            current: index === pickerRoot.cursor
+                            hasCursor: rowHover.hovered
 
                             readonly property bool picked: pickerRoot.selection[modelData.path] === true
 

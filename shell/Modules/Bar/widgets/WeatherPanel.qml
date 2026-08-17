@@ -329,16 +329,19 @@ BarPanel {
         Repeater {
             model: panel.locationSuggestions
 
-            Rectangle {
+            CursorSurface {
                 id: suggestion
 
                 required property var modelData
                 required property int index
 
+                theme: panel.theme
                 width: parent.width
                 height: suggestionRow.implicitHeight + panel.theme.space(3)
-                radius: panel.theme.radius(0.75)
-                color: index === panel.suggestionIndex ? panel.theme.alpha(panel.theme.accent, 0.18) : "transparent"
+                // Arrowing through the suggestions moves the choice itself,
+                // so the fill is the whole story.
+                bordered: false
+                current: index === panel.suggestionIndex
 
                 Row {
                     id: suggestionRow
