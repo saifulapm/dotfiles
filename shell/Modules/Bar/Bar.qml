@@ -2207,6 +2207,7 @@ Scope {
         id: monitorComponent
         MonitorWidget {
             theme: barRoot.theme
+            autoBrightness: barRoot.shell.autoBrightness
         }
     }
 

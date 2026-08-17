@@ -25,6 +25,11 @@ BarPanel {
     property string focused: ""
     property var backlights: []
 
+    // The shell's AutoBrightness service, threaded down from shell.qml
+    // through the bar. Null on a panel opened before the service exists, and
+    // the row that uses it is gated on the service reporting a sensor.
+    property var autoBrightness: null
+
     // Live brightness per backlight device, keyed by device name. Set locally
     // on every move so the slider is never fighting the probe.
     property var brightness: ({})
@@ -469,6 +474,44 @@ BarPanel {
                         onHoveredChanged: if (hovered)
                             panel.takeCursor("brightness", brightnessRow.index)
                     }
+                }
+            }
+        }
+
+        // Auto-brightness, in the BRIGHTNESS section because that is the
+        // thing it takes over. The row renders only where the service says
+        // it has an ambient-light sensor to read: the MacBook shows it, the
+        // Mac mini and the NUC render nothing rather than a switch that
+        // could never do anything. The lux reading rides the tooltip instead
+        // of the label so this stays a one-line row at any width.
+        Item {
+            visible: !!panel.autoBrightness && panel.autoBrightness.available
+            width: parent.width
+            height: Math.max(autoLabel.implicitHeight, autoSwitch.implicitHeight)
+
+            StyledText {
+                id: autoLabel
+                theme: panel.theme
+                role: StyledText.Small
+                muted: !autoSwitch.checked
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Auto"
+            }
+
+            PanelSwitch {
+                id: autoSwitch
+                theme: panel.theme
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                checked: !!panel.autoBrightness && panel.autoBrightness.enabled
+                hint: {
+                    const lux = panel.autoBrightness && panel.autoBrightness.smoothedLux >= 0 ? Math.round(panel.autoBrightness.smoothedLux) + " lx" : "no reading yet";
+                    return (checked ? "Stop following the ambient light" : "Follow the ambient light") + " — " + lux;
+                }
+                onToggled: {
+                    if (panel.autoBrightness)
+                        panel.autoBrightness.setEnabled(!panel.autoBrightness.enabled);
                 }
             }
         }
