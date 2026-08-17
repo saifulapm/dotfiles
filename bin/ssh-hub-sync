@@ -45,6 +45,11 @@
 # (what the hub's meta says) and `base` (what this machine last agreed with
 # the hub, remembered in the state dir).
 #
+#   nothing syncable here    pull — the fresh-install case. An empty ~/.ssh
+#                            cannot lose an argument it has no stake in, so
+#                            this needs no human and asks for none: a new
+#                            machine comes up holding the shared identity
+#                            given only the age key and the rclone remote.
 #   local == remote          nothing to do
 #   no remote yet            push — this machine seeds the hub
 #   local == base            pull — only the hub moved
@@ -104,10 +109,11 @@ mkdir -p "$state_dir" "$backup_dir"
 chmod 700 "$state_dir" "$backup_dir"
 
 # ------------------------------------------------------------ prerequisites
-if [[ ! -d $ssh_dir ]]; then
-  echo "no ~/.ssh on this machine"
-  exit 2
-fi
+# A missing ~/.ssh is NOT a reason to stop: it is precisely the fresh-install
+# case, and a machine with no keys at all is the one that most needs the hub's
+# copy. The directory is created by pull() when it is actually needed;
+# hash_local answers "" for a missing or empty one, which the dispatch below
+# reads as "nothing here to lose".
 if ! command -v age >/dev/null 2>&1; then
   echo "age is not installed — cannot encrypt the blob"
   exit 1
@@ -163,13 +169,8 @@ hash_local() {
 
 file_count() { list_files | tr '\0' '\n' | grep -c . || true; }
 
+# May legitimately be empty — see the dispatch at the foot of this script.
 local_hash="$(hash_local)"
-if [[ -z $local_hash ]]; then
-  # Display text for a human, not a path to expand.
-  # shellcheck disable=SC2088
-  echo "~/.ssh holds nothing syncable"
-  exit 2
-fi
 
 base_hash=""
 [[ -f $base_file ]] && base_hash="$(cat "$base_file")"
@@ -258,6 +259,10 @@ pull() {
   fi
 
   backup_local pull
+  # A fresh machine has no ~/.ssh at all; rsync would create it with the
+  # umask's mode, and ssh refuses a directory anything but the owner can read.
+  mkdir -p "$ssh_dir"
+  chmod 700 "$ssh_dir"
 
   # Mirror the blob, but never touch what the blob deliberately excludes:
   # known_hosts is this machine's own and the control sockets are live.
@@ -291,6 +296,11 @@ harden() {
 # ---------------------------------------------------------------- the choice
 case "$mode" in
 push)
+  if [[ -z $local_hash ]]; then
+    # shellcheck disable=SC2088
+    echo "nothing in ~/.ssh to publish"
+    exit 2
+  fi
   backup_local adopt-local
   push
   exit $?
@@ -304,6 +314,21 @@ pull)
   exit $?
   ;;
 esac
+
+# Nothing syncable here. With a blob on the hub that is the fresh-install
+# case and there is nothing to weigh: pull it, because an empty ~/.ssh cannot
+# lose an argument it has no stake in. This is what lets a new machine come up
+# with the shared identity on its own, given only the age key and the rclone
+# remote.
+if [[ -z $local_hash ]]; then
+  if [[ -n $remote_hash ]]; then
+    pull
+    exit $?
+  fi
+  # shellcheck disable=SC2088
+  echo "nothing in ~/.ssh and nothing on the hub yet"
+  exit 2
+fi
 
 if [[ $local_hash == "$remote_hash" ]]; then
   # Agreement is worth recording: it makes this the new base, so the next
