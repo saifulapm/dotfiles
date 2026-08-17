@@ -1079,6 +1079,38 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
 - **Surface-ladder derivation idea** from `src/theme/custom_schemes.cpp`:
   elevations as recipes (keep hue, cap saturation, force lightness).
 
+## omarchy-warp (MIT) — github.com/tobi/omarchy-warp
+
+- **The whole Cloudflare WARP widget**, ported to this bar's five-file shape:
+  their `Model.js` → `shell/Modules/Bar/widgets/WarpModel.js` near-verbatim
+  (the `warp-cli --json` envelopes, the single-key `reason` object, the
+  settings block, the registration probe-several-spellings, the tunnel-stats
+  shapes and the mode table), `Service.qml` → `WarpService.qml`,
+  `Panel.qml` → `WarpPanel.qml`, `WarpIcon.qml` → `WarpIcon.qml` (their cloud
+  drawn from primitives, with the speed lines), and their bar button →
+  `Warp.qml`. Their design carries over whole: the optimistic
+  `_desired`/`active` pair so the switch throws on the click, `status` as the
+  only unconditional read with settings/registration/stats chained off a
+  healthy one, the 5-minute registration throttle, the startup ramp, and one
+  cursor that mouse and keyboard share.
+- Their tests come with it, extended: `WarpModel.test.js` adds the payloads
+  warp-cli 2026.6.880.0 actually returns here, which confirmed three of their
+  defensive choices are load-bearing rather than decorative — errors arrive as
+  `{"code","error"}` **at exit status 0**, `reason` is an object, and
+  `split_tunnel_ips` entries are objects while hosts may be bare strings.
+- Not ported: their plugin manifest and `omarchy plugin add` layer (ours is a
+  `shell.json` widget entry like every other), and their whole install path —
+  `install()`, the install probe and the floating-terminal `omarchy-pkg-aur-add`
+  call. Software arrives here through `packages/manifest.toml`, so the widget
+  hides itself when `warp-cli` is absent, the way every optional CLI does on
+  this bar, instead of staying visible to offer an install. Their panel's `i`
+  key meant "install"; here it registers the device, which is the first-run
+  step that remains.
+- Ours, with no upstream: a line under the split-tunnel readout saying whether
+  the tailnet is actually routed through WARP. Both want the default route in a
+  tunnel mode, but Cloudflare's stock `exclude` list carries 100.64.0.0/10, so
+  the honest answer depends on the machine (`WarpModel.tailnetVerdict`).
+
 ## try (MIT) — github.com/tobi/try
 
 - **The whole program**, carried verbatim in `vendor/try` and pinned there —

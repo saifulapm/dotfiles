@@ -667,6 +667,13 @@ Scope {
         });
     }
 
+    function warpService() {
+        return sharedService("warp", warpServiceComponent, {
+            settings: Qt.binding(() => barRoot.inlineEntryFor("warp")),
+            pollingAllowed: Qt.binding(() => barRoot.servicePollingGate("warp"))
+        });
+    }
+
     // No gate: the podman-events follower is event-driven (one line per
     // container transition, nothing polls), so — like the dictation
     // follower — it runs for the life of the shell. One instance, one
@@ -729,6 +736,11 @@ Scope {
     Component {
         id: tailscaleServiceComponent
         TailscaleService {}
+    }
+
+    Component {
+        id: warpServiceComponent
+        WarpService {}
     }
 
     Component {
@@ -797,6 +809,7 @@ Scope {
             "icloud": icloudComponent,
             "dropbox": dropboxComponent,
             "tailscale": tailscaleComponent,
+            "warp": warpComponent,
             "spacer": spacerComponent
         })
 
@@ -2255,6 +2268,14 @@ Scope {
         Tailscale {
             theme: barRoot.theme
             tailscale: barRoot.tailscaleService()
+        }
+    }
+
+    Component {
+        id: warpComponent
+        Warp {
+            theme: barRoot.theme
+            warp: barRoot.warpService()
         }
     }
 

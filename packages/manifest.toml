@@ -266,11 +266,14 @@ why = "Cloudflare WARP: warp-cli + warp-svc, behind the bar's `warp` widget (use
 
 # Notes on the cloudflare-warp entry above:
 #
-#   * WARP and Tailscale both want the default route. `warp` and `warp+doh`
-#     mode take it; `doh`/`dot` mode is DNS only and leaves the tailnet alone.
-#     Nothing arbitrates between them — the two are simply not both-on tools
-#     in routing modes, which is why the widget surfaces the mode rather than
-#     hiding it behind one switch.
+#   * WARP and Tailscale both want the default route in a tunnel mode — but
+#     they coexist better than that suggests, which the widget now says out
+#     loud rather than warning unconditionally. Cloudflare's stock split-tunnel
+#     configuration is `exclude` with 27 entries, and 100.64.0.0/10 —
+#     Tailscale's CGNAT range — is the second of them (read off warp-cli
+#     2026.6.880.0 here, 2026-08-17). So out of the box the tailnet bypasses
+#     WARP. The panel's split-tunnel section states which of the two situations
+#     the machine is actually in; see WarpModel.tailnetVerdict.
 #   * The rpm pulls webkit2gtk4.1 and libappindicator-gtk3 for `warp-taskbar`,
 #     the GTK tray app. We do not run it — the bar widget is the interface —
 #     but the package has no CLI-only split, so the dependency is the price.
