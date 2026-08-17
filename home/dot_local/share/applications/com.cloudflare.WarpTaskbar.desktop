@@ -1,0 +1,24 @@
+# Shadows /usr/share/applications/com.cloudflare.WarpTaskbar.desktop (same
+# desktop-file-id, and ~/.local/share wins) to add one line: NoDisplay=true.
+#
+# The pair to dot_config/autostart's copy of this same entry, which carries
+# Hidden=true and is what stops the tray applet launching at login. This one is
+# only about the launcher: without it, "Cloudflare One Client" stays in the app
+# list and one Enter starts the applet the autostart override just suppressed —
+# tray icon, GUI window and all.
+#
+# Copied verbatim from the system entry so nothing else changes. Same reasoning
+# as the qt6-designer entry next door: hiding beats uninstalling, because
+# warp-taskbar ships in the same RPM as warp-svc and warp-cli.
+[Desktop Entry]
+Type=Application
+Version=1.2
+Name=Cloudflare One Client
+Comment=View the current status of the WARP Tunnel
+Exec=/usr/bin/warp-taskbar
+StartupNotify=false
+Keywords=warp teams cloudflare vpn
+Icon=zero-trust-orange
+Terminal=false
+StartupWMClass=warp-taskbar
+NoDisplay=true
