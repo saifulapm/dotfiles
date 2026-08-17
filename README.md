@@ -52,15 +52,29 @@ after the first apply.
 
 ### What stays manual, honestly
 
-- `~/.ssh` — needed for **pushing** (the https clone works without it). It
-  lives in iCloud Drive: after the apply, `rclone config` the iCloud remote,
-  then `rclone copy iCloud:.ssh ~/.ssh && chmod 700 ~/.ssh && chmod 600
-  ~/.ssh/* && chmod 644 ~/.ssh/*.pub`. Flip the remote with
-  `git -C ~/.dotfiles remote set-url origin
-  git@github.com:saifulapm/dotfiles.git` — the first ssh connect asks to
-  accept GitHub's host key (the ssh config routes github.com via
-  ssh.github.com:443; its `UseKeychain` line needs the synced
-  `IgnoreUnknown UseKeychain` guard on Linux, which the iCloud copy carries).
+- `~/.ssh` — needed for **pushing** (the https clone works without it). It is
+  a qshell-sync unit now (2026-08-17): the hub carries `~/.ssh` as one
+  age-encrypted blob, so all three machines hold the same keys and can ssh
+  each other by tailnet name. Two things must exist before that can run —
+  `~/.config/chezmoi/key.txt` (the age identity; copy it from a machine that
+  has it, it is the one secret this repo cannot bootstrap itself) and the
+  Dropbox rclone remote. Then:
+
+      ssh-hub-sync --adopt-remote     # take the hub's copy, wholesale
+
+  A machine with its own `~/.ssh` and no agreed base will NOT merge silently
+  — the ssh unit reports a conflict and waits, which is what the sync panel's
+  "Use this machine" / "Use the hub" buttons answer. The previous `~/.ssh` is
+  tarred into `~/.local/state/qshell/sync/ssh/backups/` first, either way.
+
+  Then flip the remote with `git -C ~/.dotfiles remote set-url origin
+  git@github.com:saifulapm/dotfiles.git`. The ssh config routes github.com
+  via ssh.github.com:443, and its `UseKeychain` line needs the
+  `IgnoreUnknown UseKeychain` guard on Linux — which the synced config
+  carries. `known_hosts` deliberately does NOT travel (it is per-machine and
+  would conflict on every new host), so the first GitHub connect still asks
+  to accept its host key; our own three boxes skip that ask via
+  `StrictHostKeyChecking accept-new`.
   `~/.config/emacs` is the same story — the apply clones saifulapm/emacs.d
   over https; `git -C ~/.config/emacs remote set-url origin
   git@github.com:saifulapm/emacs.d.git` before pushing from it.

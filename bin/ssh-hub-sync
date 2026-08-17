@@ -1,0 +1,335 @@
+#!/usr/bin/env bash
+# ssh-hub-sync — carry ~/.ssh between this machine and the Dropbox hub, so
+# every box answers to the same identity and they can all reach each other.
+# Ours. Called as qshell-sync's `ssh` unit; safe to run by hand.
+#
+# --------------------------------------------------------------- why a blob
+# The other five units are files a merge can reason about. Key material is
+# not: a half-pulled ~/.ssh is a locked-out machine, and an id_ed25519 that
+# lost a race is a key you no longer hold. So this unit moves ~/.ssh as ONE
+# atomic encrypted blob with a three-way compare against a remembered base —
+# never a file-by-file sync, never last-writer-wins.
+#
+# ------------------------------------------------------------ why encrypted
+# The dotfiles repo is PUBLIC, which rules out chezmoi's own age files as the
+# transport for private keys. Dropbox is private storage, but private storage
+# is not the same as no storage: the hub keeps version history, the account is
+# reachable with one password, and a plaintext id_ed25519 sitting there is a
+# key that has left this machine. So the blob is age-encrypted before it ever
+# reaches the hub, with the identity that already exists on every machine for
+# chezmoi's sake (~/.config/chezmoi/key.txt). The recipient is DERIVED from
+# that identity rather than pasted, so the two can never drift apart.
+#
+# What the hub sees is `ssh.age` (opaque) and `ssh.meta.json`, which carries a
+# content hash, a machine name and a timestamp — no filenames, because the
+# names alone would say which hosts this identity reaches.
+#
+# ------------------------------------------------------------- what travels
+# Everything in ~/.ssh except:
+#
+#   known_hosts, known_hosts.old   Machine-local by nature and rewritten on
+#                                  every new host, so including them would
+#                                  make a conflict out of every ordinary ssh.
+#                                  They are also not needed for the goal:
+#                                  the Host blocks this script installs use
+#                                  StrictHostKeyChecking=accept-new for our
+#                                  own boxes.
+#   cm-*, *.sock                   ControlMaster sockets — not files, and
+#                                  meaningless off the machine that made them.
+#
+# Modes ride along inside the tar and are re-asserted after extraction anyway:
+# ssh rejects a private key the moment it is group-readable.
+#
+# ---------------------------------------------------------- the sync itself
+# Three hashes decide everything: `local` (what is on this disk), `remote`
+# (what the hub's meta says) and `base` (what this machine last agreed with
+# the hub, remembered in the state dir).
+#
+#   local == remote          nothing to do
+#   no remote yet            push — this machine seeds the hub
+#   local == base            pull — only the hub moved
+#   remote == base           push — only this machine moved
+#   otherwise                CONFLICT: both moved. Exit 3 and touch nothing.
+#
+# That last line is the whole point. It is also what the FIRST run on an
+# already-populated machine hits — base is empty, both ends have real content
+# — and hitting it is correct: two machines with different key sets must not
+# silently merge. Resolve it deliberately:
+#
+#   ssh-hub-sync --adopt-local     this machine's ~/.ssh wins, hub overwritten
+#   ssh-hub-sync --adopt-remote    the hub wins, this ~/.ssh overwritten
+#
+# Either way the previous ~/.ssh is tarred into the state dir first (mode 600,
+# never leaves the disk), and the last five of those are kept.
+#
+# Exit codes, which qshell-sync maps onto unit states:
+#   0  synced (or already in sync)     2  nothing to do / not provisioned
+#   1  failed                          3  conflict, needs a human
+set -euo pipefail
+
+ssh_dir="$HOME/.ssh"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/sync/ssh"
+base_file="$state_dir/base.hash"
+backup_dir="$state_dir/backups"
+identity="${QSHELL_AGE_IDENTITY:-$HOME/.config/chezmoi/key.txt}"
+remote="Dropbox:qshell-sync/ssh"
+mode="auto"
+
+while (($# > 0)); do
+  case "$1" in
+  --remote)
+    remote="$2"
+    shift 2
+    ;;
+  --adopt-local)
+    mode="push"
+    shift
+    ;;
+  --adopt-remote)
+    mode="pull"
+    shift
+    ;;
+  -h | --help)
+    sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed 's/^# \?//;$d'
+    exit 0
+    ;;
+  *)
+    echo "ssh-hub-sync: unknown argument $1" >&2
+    exit 1
+    ;;
+  esac
+done
+
+mkdir -p "$state_dir" "$backup_dir"
+chmod 700 "$state_dir" "$backup_dir"
+
+# ------------------------------------------------------------ prerequisites
+if [[ ! -d $ssh_dir ]]; then
+  echo "no ~/.ssh on this machine"
+  exit 2
+fi
+if ! command -v age >/dev/null 2>&1; then
+  echo "age is not installed — cannot encrypt the blob"
+  exit 1
+fi
+if [[ ! -f $identity ]]; then
+  # Not a failure: a machine that has never been given the age key simply
+  # cannot take part yet, and saying so is more useful than a red row.
+  echo "no age identity at $identity — copy it from a provisioned machine first"
+  exit 2
+fi
+
+recipient="$(age-keygen -y "$identity" 2>/dev/null || true)"
+if [[ -z $recipient ]]; then
+  echo "could not derive an age recipient from $identity"
+  exit 1
+fi
+
+# --------------------------------------------------------------- the manifest
+# Relative path + mode + content hash, sorted, hashed. Sorting is what makes
+# the answer independent of the order the filesystem hands files back, so two
+# machines holding identical key sets always agree.
+list_files() {
+  find "$ssh_dir" -type f \
+    ! -name 'known_hosts' \
+    ! -name 'known_hosts.old' \
+    ! -name 'cm-*' \
+    ! -name '*.sock' \
+    ! -name '.DS_Store' \
+    -print0 2>/dev/null | sort -z
+}
+
+manifest() {
+  local f
+  while IFS= read -r -d '' f; do
+    printf '%s\t%s\t%s\n' "${f#"$ssh_dir"/}" "$(stat -c %a "$f")" "$(sha256sum "$f" | cut -d' ' -f1)"
+  done < <(list_files)
+}
+
+hash_local() {
+  local m
+  m="$(manifest)"
+  [[ -z $m ]] && {
+    echo ""
+    return 0
+  }
+  printf '%s' "$m" | sha256sum | cut -d' ' -f1
+}
+
+file_count() { list_files | tr '\0' '\n' | grep -c . || true; }
+
+local_hash="$(hash_local)"
+if [[ -z $local_hash ]]; then
+  # Display text for a human, not a path to expand.
+  # shellcheck disable=SC2088
+  echo "~/.ssh holds nothing syncable"
+  exit 2
+fi
+
+base_hash=""
+[[ -f $base_file ]] && base_hash="$(cat "$base_file")"
+
+# ----------------------------------------------------------------- the hub
+remote_hash=""
+remote_machine=""
+remote_when=""
+meta_tmp="$(mktemp -d)"
+trap 'rm -rf "$meta_tmp"' EXIT
+
+if rclone copy "$remote/ssh.meta.json" "$meta_tmp" --ignore-times 2>/dev/null && [[ -f "$meta_tmp/ssh.meta.json" ]]; then
+  remote_hash="$(jq -r '.hash // ""' "$meta_tmp/ssh.meta.json" 2>/dev/null || echo "")"
+  remote_machine="$(jq -r '.machine // ""' "$meta_tmp/ssh.meta.json" 2>/dev/null || echo "")"
+  remote_when="$(jq -r '.when // ""' "$meta_tmp/ssh.meta.json" 2>/dev/null || echo "")"
+fi
+
+machine="$(cat "$HOME/.config/qshell/machine" 2>/dev/null || uname -n)"
+
+# ---------------------------------------------------------------- the moves
+backup_local() { # why
+  local stamp
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  local out="$backup_dir/ssh-$stamp-$1.tar.gz"
+  tar czf "$out" -C "$HOME" .ssh 2>/dev/null || true
+  chmod 600 "$out" 2>/dev/null || true
+  # Keep the five most recent; a key you deleted last month is not worth an
+  # unbounded pile of plaintext tarballs on disk.
+  local old
+  # These names are ours and hold no newlines, so ls is safe to parse here.
+  # shellcheck disable=SC2012
+  old="$(ls -1t "$backup_dir"/ssh-*.tar.gz 2>/dev/null | tail -n +6 || true)"
+  if [[ -n $old ]]; then
+    xargs -r rm -f <<<"$old"
+  fi
+  # Explicit, and NOT `[[ -n $old ]] && xargs …`: with nothing to prune that
+  # test is false, false becomes this function's exit status, and `set -e`
+  # then killed the whole script right after the backup and before the push —
+  # silently, because the failure had no message of its own. (The same trap
+  # qshell-sync's `$resynced && echo` comment names.)
+  return 0
+}
+
+push() {
+  local blob="$meta_tmp/ssh.age" meta="$meta_tmp/push.meta.json"
+  # --files-from with NUL-separated relative names: a path with a space must
+  # not become two entries.
+  if ! (cd "$ssh_dir" && list_files | sed -z "s|^$ssh_dir/||" | tar czf - --null --files-from - 2>/dev/null) | age -r "$recipient" -o "$blob" 2>/dev/null; then
+    echo "could not build the encrypted blob"
+    return 1
+  fi
+  jq -n --arg hash "$local_hash" --arg machine "$machine" --arg when "$(date -Is)" \
+    '{hash:$hash, machine:$machine, when:$when}' >"$meta"
+
+  local err
+  if ! err="$(rclone copyto "$blob" "$remote/ssh.age" 2>&1 >/dev/null)"; then
+    echo "push: $(head -n 1 <<<"$err")"
+    return 1
+  fi
+  if ! err="$(rclone copyto "$meta" "$remote/ssh.meta.json" 2>&1 >/dev/null)"; then
+    echo "push meta: $(head -n 1 <<<"$err")"
+    return 1
+  fi
+  echo "$local_hash" >"$base_file"
+  echo "pushed $(file_count) file(s) from this machine"
+  return 0
+}
+
+pull() {
+  local blob="$meta_tmp/ssh.age" err
+  if ! err="$(rclone copyto "$remote/ssh.age" "$blob" 2>&1 >/dev/null)"; then
+    echo "pull: $(head -n 1 <<<"$err")"
+    return 1
+  fi
+
+  local stage="$meta_tmp/stage"
+  mkdir -p "$stage"
+  chmod 700 "$stage"
+  if ! age -d -i "$identity" "$blob" 2>/dev/null | tar xzf - -C "$stage" 2>/dev/null; then
+    echo "could not decrypt the hub blob — is this machine's age key the right one?"
+    return 1
+  fi
+  if [[ -z "$(ls -A "$stage" 2>/dev/null)" ]]; then
+    echo "the hub blob decrypted to nothing — refusing to apply it"
+    return 1
+  fi
+
+  backup_local pull
+
+  # Mirror the blob, but never touch what the blob deliberately excludes:
+  # known_hosts is this machine's own and the control sockets are live.
+  local rsync_err
+  if ! rsync_err="$(rsync -a --delete \
+    --exclude 'known_hosts' --exclude 'known_hosts.old' \
+    --exclude 'cm-*' --exclude '*.sock' \
+    "$stage/" "$ssh_dir/" 2>&1)"; then
+    echo "applying the hub copy failed: $(head -n 1 <<<"$rsync_err")"
+    return 1
+  fi
+  harden
+  echo "$remote_hash" >"$base_file"
+  echo "pulled $(file_count) file(s) from ${remote_machine:-the hub}"
+  return 0
+}
+
+# ssh refuses a private key it considers world- or group-readable, and it is
+# right to. Re-asserted after every pull rather than trusted to the tar.
+harden() {
+  chmod 700 "$ssh_dir" 2>/dev/null || true
+  local f
+  while IFS= read -r -d '' f; do
+    case "$(basename "$f")" in
+    *.pub | known_hosts | known_hosts.old) chmod 644 "$f" 2>/dev/null || true ;;
+    *) chmod 600 "$f" 2>/dev/null || true ;;
+    esac
+  done < <(find "$ssh_dir" -type f -print0 2>/dev/null)
+}
+
+# ---------------------------------------------------------------- the choice
+case "$mode" in
+push)
+  backup_local adopt-local
+  push
+  exit $?
+  ;;
+pull)
+  if [[ -z $remote_hash ]]; then
+    echo "the hub has no ssh blob to adopt"
+    exit 1
+  fi
+  pull
+  exit $?
+  ;;
+esac
+
+if [[ $local_hash == "$remote_hash" ]]; then
+  # Agreement is worth recording: it makes this the new base, so the next
+  # one-sided change is recognised as one-sided.
+  echo "$local_hash" >"$base_file"
+  harden
+  echo "in sync — $(file_count) file(s)"
+  exit 0
+fi
+
+if [[ -z $remote_hash ]]; then
+  push
+  exit $?
+fi
+
+if [[ $local_hash == "$base_hash" ]]; then
+  pull
+  exit $?
+fi
+
+if [[ $remote_hash == "$base_hash" ]]; then
+  push
+  exit $?
+fi
+
+# Both ends moved since they last agreed — or this machine has never agreed
+# with the hub at all, which is the same evidence and deserves the same
+# caution.
+if [[ -z $base_hash ]]; then
+  echo "conflict: this machine has its own ~/.ssh and the hub has one from ${remote_machine:-another machine} (${remote_when:-unknown date}) — adopt one side to resolve"
+else
+  echo "conflict: ~/.ssh changed here AND on ${remote_machine:-another machine} (${remote_when:-unknown date}) since the last sync — adopt one side to resolve"
+fi
+exit 3
