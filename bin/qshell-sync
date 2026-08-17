@@ -84,6 +84,12 @@
 #   qshell-sync                     every unit
 #   qshell-sync --only notes        one unit (repeatable) — the panel's retry
 #   qshell-sync --only ssh --only notes
+#   qshell-sync --only notes --allow-deletes
+#                                   let a bisync round carry out a mass
+#                                   deletion it would otherwise refuse. Pair it
+#                                   with --only: it applies to every bisync
+#                                   unit in this round's scope, and a bare
+#                                   --allow-deletes arms screenshots too.
 #   qshell-sync --list              print the unit ids and exit
 set -euo pipefail
 
@@ -115,8 +121,15 @@ unit_label() {
 
 # ------------------------------------------------------------------ the argv
 selected=()
+# Never on by default and deliberately not settable from the panel: the whole
+# point is that a human looked at the deletion and vouched for it.
+allow_deletes=false
 while (($# > 0)); do
   case "$1" in
+  --allow-deletes)
+    allow_deletes=true
+    shift
+    ;;
   --only)
     [[ -z ${2:-} ]] && {
       echo "qshell-sync: --only needs a unit id" >&2
@@ -224,7 +237,10 @@ classify() {
     echo quota
   elif [[ $lowered == *"oauth"* || $lowered == *"token"* || $lowered == *"unauthorized"* || $lowered == *"401"* || $lowered == *"expired"* || $lowered == *"reconnect"* ]]; then
     echo auth
-  elif [[ $lowered == *"conflict"* ]]; then
+  elif [[ $lowered == *"conflict"* || $lowered == *"too many deletes"* ]]; then
+    # A refused mass deletion is a divergence a human has to rule on, not a
+    # transport failure — same bucket as a conflict so the panel says which
+    # unit needs a decision instead of raising a generic "sync failed".
     echo conflict
   else
     echo other
@@ -420,6 +436,30 @@ push_pull() { # id, localFile, remoteDir, remoteName, stageDir
 #   degenerate case — a path of at most `force_max` files. A big directory
 #   that really did change everything still aborts, which is the case the
 #   check exists for.
+#
+#   "too many deletes"  — the --max-delete guard: this round would remove more
+#   than half the files on one side. The small-directory arithmetic above
+#   applies here too (dropping 1 of 2 notes is 50%), and it is tempting to
+#   force it the same way. It is NOT forced, at any size, because the two
+#   aborts risk different things: all-changed is about content, and forcing it
+#   can at worst move an edit to the losing side of the conflict rule, where
+#   `pathname` still keeps it. This one is about absence — force it wrongly
+#   and the notes are gone from every machine with nothing left to recover
+#   from. So it stays a decision, and --allow-deletes is how a human records
+#   having made it.
+#
+#   rclone's own message ends "Run with --force if desired", which reads as an
+#   instruction and is wrong twice over here: --force is not an argument this
+#   script takes, and the abort is usually not asking for one. That sentence is
+#   stripped from what we report and replaced with the command that does apply.
+#   The first real occurrence (2026-08-17) was not a deletion at all: the prior
+#   listing still named the .conflict1/.conflict2 pair the OLD default conflict
+#   policy had produced, the hub had since gone back to a single notes.json,
+#   and bisync read the pair's absence as 2 of 2 deleted. Nothing had been
+#   deleted and forcing would have propagated a phantom; the fix was to restore
+#   the canonical notes.json from the conflict file and let the resync path
+#   above re-baseline. Suspect a stale baseline FIRST — check whether the files
+#   it wants to delete are ones you ever deleted.
 bisync_unit() { # id, localDir, remoteDir, forceMaxFiles, extraArgs...
   local id="$1" local_dir="$2" remote_dir="$3" force_max="$4"
   shift 4
@@ -458,6 +498,24 @@ bisync_unit() { # id, localDir, remoteDir, forceMaxFiles, extraArgs...
       return 1
     fi
     unit_fail "$id" "all $count files changed — refusing to sync; run by hand with --force if that is real"
+    return 1
+  fi
+
+  if grep -q -i "too many deletes" <<<"$err"; then
+    if [[ $allow_deletes == true ]]; then
+      if run_rclone bisync "$local_dir" "$remote_dir" --resilient --recover --force "${policy[@]}" "$@"; then
+        bisync_note="deletions propagated on request"
+        return 0
+      fi
+      unit_fail "$id" "forced bisync: $rclone_err"
+      return 1
+    fi
+    # Keep bisync's own counts and side — "2 of 2 on Path2" is the whole
+    # diagnosis — but drop its --force advice, which does not apply here.
+    local abort
+    abort="$(grep -i -m1 "too many deletes" <<<"$err" |
+      sed -e 's/.*[Ss]afety abort: //' -e 's/ *Run with --force if desired\.*//' -e 's/[[:space:].]*$//')"
+    unit_fail "$id" "$abort — if you really deleted those, re-run: qshell-sync --only $id --allow-deletes"
     return 1
   fi
 
