@@ -1103,6 +1103,52 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   tunnel mode, but Cloudflare's stock `exclude` list carries 100.64.0.0/10, so
   the honest answer depends on the machine (`WarpModel.tailnetVerdict`).
 
+## owarp (MIT) — github.com/ussego/owarp
+
+The second of the three omarchy WARP plugins, read against ours for what it
+knew that tobi's did not.
+
+- **The egress check**, their best idea and the one thing in any of the three
+  that `warp-cli` cannot answer: a `curl` of Cloudflare's own
+  `cdn-cgi/trace`, whose `warp=` line is Cloudflare reporting which
+  connection the request actually arrived over. A tunnel that is up and
+  carrying nothing looks perfect from the daemon's side and shows up here
+  immediately. Ported as `WarpModel.parseTrace` and the panel's EGRESS
+  section, with the fetch scoped harder than theirs: theirs polls every 60 s
+  whenever the daemon is up, ours only goes out while the tunnel is up, a
+  panel is open, and the connection is at least five seconds old — warp-svc
+  reports Connected before the routes carry anything, and a trace sent into
+  that gap comes back `warp=off`, which is a race and not a leak.
+- **An action watchdog.** Theirs reaps a `connect`/`disconnect`/`registration
+  new` that never exits; without one, `busy` stays true and every control in
+  the panel is dead for the life of the shell.
+- Not taken: their virtual-IP read (`ip addr show dev CloudflareWARP`), which
+  the egress IP supersedes, and their status parsing, which is regex over
+  human-readable output where ours has `--json`.
+
+## omarchy-cloudflare-warp (MIT) — github.com/rpots/omarchy-cloudflare-warp
+
+The third, and the most careful of the three about state it has not actually
+established.
+
+- **The settle poll.** `warp-cli connect` returns when the daemon accepts the
+  request, not when the tunnel is up, so an optimistic switch that only clears
+  when reality agrees can sit there claiming a connection that never came.
+  Theirs polls the status on a 1 s beat with a hard attempt cap and gives up
+  out loud; ours is `settleTimer`, same shape.
+- **Reading `switch_locked` as Cloudflare means it** — the org's "Lock WARP
+  switch", which pins the client on and so belongs on `disconnect()`. tobi's
+  spends the same flag on the mode list, dimming seven rows over a policy that
+  has nothing to say about them.
+- **Refusing to act on a read that did not parse** (their `known` flags). Ours
+  takes it for the registration record: an empty `registration show` — what a
+  watchdog kill leaves behind — used to read as "this device is not
+  registered" and badge the bar.
+- Not taken: their consent-gated registration with an MDM preflight, which is
+  the right design for a plugin a stranger installs and the wrong one for a
+  single-user dotfiles shell; their `PanelConfirmDialog`; and their text
+  parsing, for the same reason as owarp's.
+
 ## try (MIT) — github.com/tobi/try
 
 - **The whole program**, carried verbatim in `vendor/try` and pinned there —

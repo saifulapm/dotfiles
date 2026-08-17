@@ -25,7 +25,19 @@ import "WarpModel.js" as Model
 //     carry: WARP in a tunnel mode owns the default route and so does Tailscale.
 //     Cloudflare's own default exclude list carries 100.64.0.0/10, so the line
 //     says which of the two situations this machine is in instead of warning
-//     unconditionally (Model.tailnetVerdict).
+//     unconditionally (Model.tailnetVerdict);
+//   * an EGRESS section over Cloudflare's cdn-cgi/trace, after ussego/owarp.
+//     Every other line on this card is the daemon describing itself; this is
+//     the only one that is Cloudflare answering, and so the only one that can
+//     say the tunnel is up and carrying nothing;
+//   * the panel counts itself into WarpService.viewers while it is open, which
+//     is what puts the service on its full cadence. Closed, the poll is one
+//     `status` — the stats and the egress line have no reader.
+//
+// Switch-locked is read as Cloudflare means it: the org has pinned the client
+// ON, so the hero switch refuses to go off and says why. Theirs spends the same
+// flag on the mode list, dimming seven rows over a policy that is about the
+// switch — see WarpService.disconnect().
 BarPanel {
     id: panel
 
@@ -46,6 +58,10 @@ BarPanel {
     readonly property string heroMeta: {
         if (!warp.installed && warp.probed)
             return "warp-cli is not installed";
+        // A tunnel that is up and not carrying the traffic has one thing to
+        // say, and it is not a phrase about folding distance.
+        if (warp.traceLeaking)
+            return "Traffic is not going through WARP";
         if (warp.active)
             return panel.heroPhraseText;
         return warp.statusText;
@@ -54,6 +70,8 @@ BarPanel {
     readonly property string toggleHint: {
         if (warp.needsRegistration)
             return "Register this device";
+        if (warp.lockedOn)
+            return "Locked on by your organization";
         return warp.active ? "Disconnect WARP" : "Connect WARP";
     }
 
@@ -93,6 +111,9 @@ BarPanel {
     readonly property var stats: warp.tunnelStats && warp.tunnelStats.ok === true ? warp.tunnelStats : null
     readonly property var splitEntries: warp.splitTunnelEntries
     readonly property bool showSplit: warp.installed && warp.splitTunnelSummary !== ""
+    // Only ever over a real connection and a real answer: never a stale trace
+    // from before a disconnect, and never the optimistic switch.
+    readonly property bool showEgress: warp.connected && warp.traceOk
 
     // -------------------------------------------------------------- cursor
     property string focusSection: "header"
@@ -280,6 +301,16 @@ BarPanel {
         panel.warp.refreshDetails();
     }
 
+    // What puts the service on its full cadence, and what takes it off again.
+    // Counted rather than set, because a bar per screen carries its own panel.
+    onOpenedChanged: panel.warp.viewers += panel.opened ? 1 : -1
+
+    // BarPanel documents that a panel can die open — a config edit replaces its
+    // section's id list and the widget is torn down under it. Hand the count
+    // back, or the service polls in full forever for a card nobody can see.
+    Component.onDestruction: if (panel.opened)
+        panel.warp.viewers -= 1
+
     // ------------------------------------------------------------ keyboard
     onContentKey: event => {
         switch (event.key) {
@@ -331,10 +362,12 @@ BarPanel {
         event.accepted = true;
     }
 
+    // Stopped over a leak: the meta line is then a warning, not a phrase, and
+    // the rotator would spend half its cycle fading the warning out.
     PhraseRotator {
         theme: panel.theme
         target: hero.metaItem
-        running: panel.opened && panel.warp.active
+        running: panel.opened && panel.warp.active && !panel.warp.traceLeaking
         onAdvance: panel.phraseIndex = (panel.phraseIndex + 1) % panel.activePhrases.length
     }
 
@@ -366,6 +399,9 @@ BarPanel {
                 width: parent.width
                 title: panel.warp.deviceName !== "" ? panel.warp.deviceName : "Cloudflare WARP"
                 meta: panel.heroMeta
+                // Muted for everything the client has to say about itself; the
+                // leak is the one line here that is not a status.
+                metaColor: panel.warp.traceLeaking ? panel.theme.error : panel.theme.textMuted
                 metaFamily: panel.theme.fontUi
                 metaWeight: Font.Normal
                 metaLetterSpacing: 0
@@ -376,7 +412,7 @@ BarPanel {
                     color: panel.warp.active ? panel.theme.textPrimary : panel.theme.textMuted
                     opacity: panel.warp.active ? 1.0 : 0.5
                     crossed: !panel.warp.active && !panel.warp.needsRegistration && !panel.warp.daemonDown && !panel.warp.needsTos
-                    warning: panel.warp.needsRegistration || panel.warp.daemonDown || panel.warp.needsTos
+                    warning: panel.warp.needsRegistration || panel.warp.daemonDown || panel.warp.needsTos || panel.warp.traceLeaking
                     badgeColor: panel.theme.error
                     badgeBorderColor: panel.theme.surface1
                     badgeTextColor: panel.theme.surface1
@@ -391,7 +427,9 @@ BarPanel {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: panel.warp.installed
                     checked: panel.warp.active
-                    busy: panel.warp.busy
+                    // Dimmed until the daemon agrees, not just until warp-cli
+                    // returns: it returns as soon as the request is taken.
+                    busy: panel.warp.busy || panel.warp.settling
                     hasCursor: panel.headerHasCursor
                     hint: panel.toggleHint
                     onHovered: panel.setHeaderCursor()
@@ -481,10 +519,14 @@ BarPanel {
                     label: "THIS DEVICE"
                 }
 
+                // The hero already carries the status whenever it is not busy
+                // rotating a phrase over a live tunnel, and a card that says
+                // "Device is not registered" three times over reads as noise.
                 InfoPair {
                     theme: panel.theme
+                    visible: panel.warp.statusText !== "" && panel.warp.statusText !== panel.heroMeta
                     label: "Status"
-                    value: panel.warp.statusText === "" ? "Unknown" : panel.warp.statusText
+                    value: panel.warp.statusText
                 }
 
                 InfoPair {
@@ -494,11 +536,23 @@ BarPanel {
                     value: panel.warp.reasonText
                 }
 
+                // Only when the MODE list below is not on screen to say it in
+                // full — with the list up, this row is the same fact twice.
                 InfoPair {
                     theme: panel.theme
-                    visible: panel.warp.mode !== ""
+                    visible: panel.warp.mode !== "" && !panel.showModes
                     label: "Mode"
-                    value: panel.warp.modeLabel(panel.warp.mode) + (panel.warp.switchLocked ? " · locked" : "")
+                    value: panel.warp.modeLabel(panel.warp.mode)
+                }
+
+                // Cloudflare's "Lock WARP switch". It says the client cannot be
+                // turned off — nothing about the mode list, which is why it is
+                // its own row here rather than a suffix on that one.
+                InfoPair {
+                    theme: panel.theme
+                    visible: panel.warp.switchLocked
+                    label: "Switch"
+                    value: "Locked on by policy"
                 }
 
                 InfoPair {
@@ -536,7 +590,7 @@ BarPanel {
                 SectionHeader {
                     theme: panel.theme
                     width: parent.width
-                    label: panel.warp.switchLocked ? "MODE · LOCKED" : "MODE"
+                    label: "MODE"
                 }
 
                 Repeater {
@@ -593,6 +647,62 @@ BarPanel {
                     visible: panel.stats !== null && (panel.stats.sent !== "" || panel.stats.received !== "")
                     label: "Transfer"
                     value: panel.stats === null ? "" : "↑ " + panel.stats.sent + "   ↓ " + panel.stats.received
+                }
+            }
+
+            // -------------------------------------------------------- egress
+            // The only section on this card the daemon does not write. Every
+            // line here is Cloudflare's answer about the request that just
+            // reached it, which is the one thing `warp-cli status` cannot say.
+            Column {
+                visible: panel.showEgress
+                width: parent.width
+                spacing: panel.theme.space(1.5)
+
+                SectionHeader {
+                    theme: panel.theme
+                    width: parent.width
+                    label: "EGRESS"
+                }
+
+                InfoPair {
+                    theme: panel.theme
+                    label: "Cloudflare sees"
+                    value: panel.warp.traceWarpLabel
+                    valueColor: panel.warp.traceLeaking ? panel.theme.error : panel.theme.textPrimary
+                }
+
+                InfoPair {
+                    theme: panel.theme
+                    visible: panel.warp.traceIp !== ""
+                    label: "Public IP"
+                    value: panel.warp.traceIp
+                    copyValue: panel.warp.traceIp
+                    onCopyRequested: value => panel.warp.copyToClipboard(value)
+                }
+
+                InfoPair {
+                    theme: panel.theme
+                    visible: panel.warp.traceLocation !== ""
+                    label: "Datacenter"
+                    value: panel.warp.traceLocation
+                }
+
+                InfoPair {
+                    theme: panel.theme
+                    visible: panel.warp.traceGateway
+                    label: "Gateway"
+                    value: "Filtering this device"
+                }
+
+                Text {
+                    visible: panel.warp.traceLeaking
+                    width: parent.width
+                    text: "The client says the tunnel is up, and Cloudflare saw this request arrive outside it. Reconnecting usually settles it."
+                    color: panel.theme.error
+                    font.family: panel.theme.fontUi
+                    font.pixelSize: panel.theme.fontPx(0.833)
+                    wrapMode: Text.WordWrap
                 }
             }
 
@@ -667,14 +777,6 @@ BarPanel {
                         rowIndex: index
                     }
                 }
-            }
-
-            // ---------------------------------------------------------- hints
-            PanelHint {
-                theme: panel.theme
-                visible: false
-                anchor: sections
-                text: ""
             }
         }
     }
@@ -764,14 +866,12 @@ BarPanel {
 
         hasCursor: panel.cursorActive && panel.focusSection === "mode" && panel.modeIndex === rowIndex
         current: isCurrent || pending
-        opacity: panel.warp.switchLocked && !isCurrent ? 0.45 : 1.0
         implicitHeight: modeInner.implicitHeight + panel.theme.space(2)
 
         onHasCursorChanged: if (hasCursor)
             panel.ensureCursorVisible(modeRow)
 
         MouseArea {
-            id: modeMouse
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
@@ -844,13 +944,6 @@ BarPanel {
                 horizontalAlignment: Text.AlignRight
                 elide: Text.ElideRight
             }
-        }
-
-        PanelHint {
-            theme: panel.theme
-            visible: modeMouse.containsMouse && panel.warp.switchLocked && !modeRow.isCurrent
-            anchor: modeRow
-            text: "Locked by your organization"
         }
     }
 

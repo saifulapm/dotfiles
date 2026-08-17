@@ -21,6 +21,26 @@
 // The mode table is verified against `warp-cli mode --help`: all seven ids
 // match, and the descriptions here are the CLI's own wording rather than a
 // paraphrase of it.
+//
+// Two things theirs carries are gone rather than ported:
+//
+//   * families_mode. It is not in the settings block on this build and no
+//     `get` exists for it — `warp-cli dns families <MODE>` is set-only, and
+//     Consumer-only at that. A switch that can be thrown but never read is a
+//     switch that lies about where it is, so there is neither a parse nor a
+//     setter for it here (theirs parses a key that is never present and ships
+//     a setFamiliesMode() its own panel never calls).
+//   * an unconditional trust in `registration show`. A read that came back
+//     empty — killed by the watchdog, or the daemon dropping the socket
+//     mid-answer — used to read as "this device is not registered" and put the
+//     "!" badge on the bar. parseRegistration now says `known: false` for that
+//     case and the service leaves the last real answer standing.
+//
+// Added here with no upstream in any of the three: parseTrace, over
+// Cloudflare's own cdn-cgi/trace endpoint. `warp-cli status` reports what the
+// daemon believes; the trace reports what Cloudflare actually received, which
+// is the only way to catch a tunnel that is up but not carrying the traffic
+// (ussego/owarp is where the idea comes from).
 
 var MODES = [
     {
@@ -304,7 +324,6 @@ function parseSettings(raw) {
             splitTunnelCount: 0,
             disableForWifi: false,
             disableForEthernet: false,
-            familiesMode: "",
             fallbackDomainCount: 0
         };
     }
@@ -322,7 +341,6 @@ function parseSettings(raw) {
         splitTunnelCount: (splitIps && splitIps.length ? splitIps.length : 0) + (splitHosts && splitHosts.length ? splitHosts.length : 0),
         disableForWifi: settings.disable_for_wifi === true,
         disableForEthernet: settings.disable_for_ethernet === true,
-        familiesMode: trimmed(settings.families_mode || settings.dns_families_mode),
         fallbackDomainCount: fallback && fallback.length ? fallback.length : 0
     };
 }
@@ -356,18 +374,39 @@ function accountLabel(accountType, organization) {
 // so probe the plausible spellings instead of trusting one shape. Note the
 // unregistered answer is {"code":"MissingRegistration","error":"…"} at exit 0,
 // which is why the code/error test comes first.
+//
+// `known` separates "the client answered, and the answer is no registration"
+// from "nothing came back" — an empty read is what a watchdog kill leaves
+// behind, and it must not be allowed to badge the bar as unregistered.
 function parseRegistration(raw) {
     var data = parseJson(raw);
-    if (!data || typeof data !== "object" || data.code || data.error) {
+    if (!data || typeof data !== "object") {
         return {
+            known: false,
             registered: false,
+            missing: false,
             accountType: "",
             accountLabel: "",
             organization: "",
             deviceId: "",
             deviceName: "",
             publicKey: "",
-            error: data ? errorMessage(raw) : ""
+            error: ""
+        };
+    }
+    if (data.code || data.error) {
+        var failure = trimmed(data.code) + " " + trimmed(data.error);
+        return {
+            known: true,
+            registered: false,
+            missing: /registration/i.test(failure),
+            accountType: "",
+            accountLabel: "",
+            organization: "",
+            deviceId: "",
+            deviceName: "",
+            publicKey: "",
+            error: errorMessage(raw)
         };
     }
 
@@ -377,7 +416,9 @@ function parseRegistration(raw) {
     var organization = firstString(account, ["organization", "org", "team", "name"]) || firstString(registration, ["organization", "org", "team"]);
 
     return {
+        known: true,
         registered: true,
+        missing: false,
         accountType: accountType,
         accountLabel: accountLabel(accountType, organization),
         organization: organization,
@@ -460,6 +501,91 @@ function parseTunnelStats(raw) {
         received: received === undefined ? "" : formatBytes(received),
         handshake: firstString(stats, ["last_handshake", "latest_handshake", "handshake"])
     };
+}
+
+// ------------------------------------------------------------- egress check
+// `curl https://www.cloudflare.com/cdn-cgi/trace` answers plain `key=value`
+// lines, one per line, and `warp=` is Cloudflare's own verdict on the
+// connection the request arrived over: "off", "on", or "plus" for WARP+.
+// `gateway=` says whether a Zero Trust gateway saw it. This is the one fact
+// warp-cli cannot supply — the daemon reports what it believes, not what
+// Cloudflare received — so it is what catches a tunnel that is up and idle.
+//
+// Read off this machine 2026-08-17 with WARP off: ip, colo=DAC, loc=BD,
+// warp=off, gateway=off. Verified keys only; the rest of the answer (uag, tls,
+// sni, kex, …) is deliberately ignored.
+function traceWarpLabel(value) {
+    var warp = trimmed(value).toLowerCase();
+    if (warp === "on")
+        return "Through WARP";
+    if (warp === "plus")
+        return "Through WARP+";
+    if (warp === "off")
+        return "Not through WARP";
+    return warp === "" ? "" : humanize(warp);
+}
+
+// "DAC" + "BD" -> "DAC · BD". Cloudflare's colo is the IATA code of the
+// datacenter that answered, loc the country it placed the client in.
+function traceLocation(colo, loc) {
+    var edge = trimmed(colo).toUpperCase();
+    var country = trimmed(loc).toUpperCase();
+    if (edge !== "" && country !== "")
+        return edge + " · " + country;
+    return edge !== "" ? edge : country;
+}
+
+function parseTrace(raw) {
+    var empty = {
+        ok: false,
+        warp: "",
+        warpLabel: "",
+        gateway: "",
+        ip: "",
+        colo: "",
+        loc: "",
+        location: ""
+    };
+    var text = trimmed(raw);
+    if (text === "")
+        return empty;
+
+    var lines = text.split(/\r?\n/);
+    var values = {};
+    for (var i = 0; i < lines.length; i++) {
+        var line = trimmed(lines[i]);
+        var at = line.indexOf("=");
+        if (at <= 0)
+            continue;
+        values[line.substring(0, at)] = line.substring(at + 1);
+    }
+
+    var warp = trimmed(values.warp).toLowerCase();
+    var ip = trimmed(values.ip);
+    // A body that carried neither is not a trace — a captive portal's login
+    // page, or an error page, rather than Cloudflare answering.
+    if (warp === "" && ip === "")
+        return empty;
+
+    var colo = trimmed(values.colo);
+    var loc = trimmed(values.loc);
+    return {
+        ok: true,
+        warp: warp,
+        warpLabel: traceWarpLabel(warp),
+        gateway: trimmed(values.gateway).toLowerCase(),
+        ip: ip,
+        colo: colo,
+        loc: loc,
+        location: traceLocation(colo, loc)
+    };
+}
+
+// The tunnel is up as far as the daemon is concerned and Cloudflare still saw
+// the request arrive outside it. Only ever said about a real `connected`, never
+// about the optimistic one, so a click cannot make the panel cry leak.
+function traceLeaking(connected, trace) {
+    return connected === true && !!trace && trace.ok === true && trace.warp === "off";
 }
 
 function splitTunnelSummary(mode, total) {
@@ -576,10 +702,14 @@ if (typeof module !== "undefined") {
         parseSettings: parseSettings,
         parseSplitTunnel: parseSplitTunnel,
         parseStatus: parseStatus,
+        parseTrace: parseTrace,
         parseTunnelStats: parseTunnelStats,
         reasonText: reasonText,
         splitTunnelSummary: splitTunnelSummary,
         splitTunnelText: splitTunnelText,
-        tailnetVerdict: tailnetVerdict
+        tailnetVerdict: tailnetVerdict,
+        traceLeaking: traceLeaking,
+        traceLocation: traceLocation,
+        traceWarpLabel: traceWarpLabel
     };
 }

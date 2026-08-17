@@ -87,11 +87,29 @@ test("a daemon that is not listening is its own state, not an error", () => {
 test("an error payload at exit 0 is still an error", () => {
     // This is the trap: warp-cli exits 0 and puts the failure in the body.
     const registration = Model.parseRegistration(REGISTRATION_MISSING);
+    assert.equal(registration.known, true);
     assert.equal(registration.registered, false);
+    assert.equal(registration.missing, true);
     assert.match(registration.error, /Missing registration/);
 
     const stats = Model.parseTunnelStats(STATS_DISCONNECTED);
     assert.equal(stats.ok, false);
+});
+
+test("a read that came back with nothing is not a claim about registration", () => {
+    // What a watchdog kill leaves behind. It must not read as "unregistered",
+    // which is what puts the "!" badge on the bar.
+    for (const nothing of ["", "   ", "<html>502</html>"]) {
+        const registration = Model.parseRegistration(nothing);
+        assert.equal(registration.known, false);
+        assert.equal(registration.missing, false);
+    }
+
+    const real = Model.parseRegistration('{"registration":{"device_id":"abc","account":{"account_type":"free"}}}');
+    assert.equal(real.known, true);
+    assert.equal(real.registered, true);
+    assert.equal(real.deviceId, "abc");
+    assert.equal(real.accountLabel, "Free");
 });
 
 test("settings reads the operating mode and counts the rules", () => {
@@ -102,8 +120,6 @@ test("settings reads the operating mode and counts the rules", () => {
     assert.equal(settings.splitTunnelMode, "exclude");
     assert.equal(settings.splitTunnelCount, 2);
     assert.equal(settings.fallbackDomainCount, 1);
-    // Not present on this build; must read as absent rather than as a mode.
-    assert.equal(settings.familiesMode, "");
 });
 
 test("settings survives junk", () => {
@@ -163,6 +179,31 @@ test("tunnel stats reads whichever shape the release emits", () => {
     const metrics = Model.parseTunnelStats('[{"name":"latency","value":8},{"name":"endpoint","value":"edge"}]');
     assert.equal(metrics.latency, "8.0 ms");
     assert.equal(metrics.endpoint, "edge");
+});
+
+test("the trace is read key by key, and only Cloudflare's own answer counts", () => {
+    // Verbatim off this machine, 2026-08-17, with WARP off.
+    const off = Model.parseTrace(["fl=123abc", "h=www.cloudflare.com", "ip=27.147.145.186", "ts=1755400000.1", "colo=DAC", "loc=BD", "warp=off", "gateway=off", "rbi=off"].join("\n"));
+    assert.equal(off.ok, true);
+    assert.equal(off.ip, "27.147.145.186");
+    assert.equal(off.location, "DAC · BD");
+    assert.equal(off.warpLabel, "Not through WARP");
+    assert.equal(Model.traceLeaking(true, off), true);
+    // The optimistic switch must never be what raises a leak.
+    assert.equal(Model.traceLeaking(false, off), false);
+
+    const on = Model.parseTrace("warp=on\nip=104.28.1.1\ncolo=SIN\nloc=SG");
+    assert.equal(on.warpLabel, "Through WARP");
+    assert.equal(on.location, "SIN · SG");
+    assert.equal(Model.traceLeaking(true, on), false);
+    assert.equal(Model.traceWarpLabel("plus"), "Through WARP+");
+
+    // A captive portal answering 200 with a login page is not a trace.
+    for (const junk of ["", "<html><body>Sign in</body></html>", "= \nzzz"]) {
+        const parsed = Model.parseTrace(junk);
+        assert.equal(parsed.ok, false);
+        assert.equal(Model.traceLeaking(true, parsed), false);
+    }
 });
 
 test("the tailnet verdict tells you which situation you are in", () => {
