@@ -416,7 +416,7 @@ var TREE = {
         "aliases": ["screensaver", "quotes"],
         "description": "Edit the quotes the screensaver draws from",
         "when": "command -v foot",
-        "action": "foot-run --app-id=qshell-float -e \"${EDITOR:-vi}\" \"$HOME/.dotfiles/home/dot_config/qshell/screensaver-quotes.txt\""
+        "action": "foot-run --app-id=qshell-float -e \"${EDITOR:-vi}\" \"$HOME/.dotfiles/home/dot_config/nirisaver/quotes.txt\""
     },
     "setup.niri": {
         "icon": "󱂬",

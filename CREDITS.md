@@ -1022,8 +1022,10 @@ Reference checkouts live in `~/ref/` (read-only, never symlinked into live confi
   with its attribution on its own line and held readable between effects,
   where theirs replays one text forever. `bin/screensaver-launch` keeps its
   old contract — nonzero means "no screensaver here", and the idle stage falls
-  back to powering the monitors off — and now also reads the quote list, hold
-  and effect filter out of `shell.json`. The idle chain still follows their
+  back to powering the monitors off — but passes no flags at all: the quote
+  list, the hold and the effect choice are the fork's own configuration, read
+  from `~/.config/nirisaver/quotes.txt`, which this repo owns as
+  `home/dot_config/nirisaver/quotes.txt`. The idle chain still follows their
   Service.qml: screensaver at 150s, lock at 300s, with our own `blank` stage
   between them. Superseded with this port: their `bin/omarchy-screensaver`
   loop, `default/foot/screensaver.ini`, the fullscreen window-rule, the

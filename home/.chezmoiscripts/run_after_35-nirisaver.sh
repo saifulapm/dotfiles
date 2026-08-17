@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # nirisaver (github.com/saifulapm/nirisaver) — tobi's native Rust screensaver
-# ported to niri, plus the quote rotation bin/screensaver-launch drives it
-# with. The binary keeps upstream's name, so this installs
+# ported to niri, plus the quote rotation it reads out of
+# ~/.config/nirisaver/quotes.txt on its own (this repo owns that file; nothing
+# here passes it a flag). The binary keeps upstream's name, so this installs
 # ~/.local/bin/omarchy-launch-screensaver. Built once; guarded,
-# warn-don't-abort, same shape as run_after_29-nirisaver's sibling.
+# warn-don't-abort, same shape as its sibling run_after_29-nirisnap.
 #
 # Needs only the rustup cargo from 03-dev-toolchain: no C toolchain, no Qt,
 # no system wayland headers — the crate generates its own protocol bindings.

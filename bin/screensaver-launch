@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
-# screensaver-launch — put the quotes screensaver on screen. Thin wrapper
-# around nirisaver's omarchy-launch-screensaver (a fork of tobi's native Rust
+# screensaver-launch — put the screensaver on screen. A wrapper around
+# nirisaver's omarchy-launch-screensaver (a fork of tobi's native Rust
 # screensaver; see CREDITS.md), which draws straight onto a wlr-layer-shell
 # overlay: no terminal, no pty, no ttfx child process.
 #
-# What this file is still for: the knobs, and the exit status. The idle
-# service falls back to powering the monitors off when this returns nonzero,
-# so a machine without the binary keeps its old screensaver-less behavior
-# rather than idling with the desktop up.
+# Deliberately flagless. Everything about the screensaver — which quotes, how
+# long each stays up, how fast the effects run, which effects — is nirisaver's
+# to configure, and it reads ~/.config/nirisaver/quotes.txt on its own
+# (home/dot_config/nirisaver/quotes.txt here, so the list is version
+# controlled). Splitting those knobs across a shell.json block and a flag in
+# this file only made two places to look.
 #
-# It replaced a foot window running bin/screensaver, which had to wait out
-# the pty resize, drive ttfx over a tty, poll niri for focus to notice the
-# lock, and repaint every animated cell through a terminal emulator. All of
-# that is gone; what survives is the quote rotation, which now lives in the
-# binary behind --quotes/--hold.
-set -uo pipefail
+# What is left is the launch itself, and the exit status. The idle service
+# falls back to powering the monitors off when this returns nonzero, so a
+# machine without the binary keeps its old screensaver-less behavior rather
+# than idling with the desktop up.
+#
+# It replaced a foot window running bin/screensaver, which had to wait out the
+# pty resize, drive ttfx over a tty, poll niri for focus to notice the lock,
+# and repaint every animated cell through a terminal emulator.
 
 # The idle service spawns this from qshell.service, whose PATH carries
 # neither ~/.local/bin nor the cargo bin dir.
@@ -22,63 +26,14 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
 command -v omarchy-launch-screensaver >/dev/null 2>&1 || exit 1
 
-config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-shell_json="$config_home/quickshell/shell.json"
-
-# Everything below is overridable from shell.json's `idle` block, beside the
-# stage timings the service itself reads:
+# force: the toggle and lock guards it would otherwise consult are omarchy's,
+#   and neither exists here. Services/Idle.qml already skips this stage while
+#   the session is locked, which is the check that matters.
 #
-#   "idle": {
-#     "screensaver": 150, "blank": 300, "lock": 360,
-#     "screensaverQuotes":  "~/Documents/my-quotes.txt",
-#     "screensaverHold":    14,
-#     "screensaverEffects": "decrypt,print,rain"
-#   }
-#
-# Read with jq and defaulted here rather than in the binary, so a bad value
-# degrades to the default instead of failing the launch — this script's
-# nonzero exit means "no screensaver on this machine", which is a different
-# claim entirely.
-setting() { # <jq-path> <default>
-  local value=""
-  [ -r "$shell_json" ] && value="$(jq -r "$1 // empty" "$shell_json" 2>/dev/null)"
-  printf '%s' "${value:-$2}"
-}
-
-quotes="$(setting '.idle.screensaverQuotes' "$config_home/qshell/screensaver-quotes.txt")"
-quotes="${quotes/#\~/$HOME}"
-hold_seconds="$(setting '.idle.screensaverHold' 14)"
-effects="$(setting '.idle.screensaverEffects' '')"
-
-# One quote per line, "text — author"; blank lines and # comments ignored.
-# No readable file is a real failure: the binary would fall back to its
-# bundled omarchy branding text, which is not what anyone here asked for.
-[ -r "$quotes" ] || exit 1
-case $hold_seconds in
-  '' | *[!0-9]*) hold_seconds=14 ;;
-esac
-
-# --hold: the old bash loop's HOLD_SECONDS, long enough to read a quote
-#   twice. The hold presents nothing at all, so its only cost is the event
-#   loop's wakeups.
-# --frame-rate 30: the old value, chosen when foot had to repaint every
-#   animated cell. The native renderer is far cheaper — it damages only the
-#   changed cells — so this is now about how the animation *reads* rather
-#   than what it costs; 30 keeps the effects legible instead of a blur.
-# force: the toggle and lock guards it would otherwise consult are
-#   omarchy's, and neither exists here. Services/Idle.qml already skips this
-#   stage while the session is locked, which is the check that matters.
-argv=(force --quotes "$quotes" --hold "$((hold_seconds * 1000))" --frame-rate 30)
-if [ -n "$effects" ]; then
-  argv+=(--include-effects "$effects")
-else
-  argv+=(--random-effect)
-fi
-
 # Detached, and returning as soon as it is spawned, because the exit status
 # above is the contract: a launcher that blocked for the whole screensaver
-# would report its dismissal as a launch failure and blank the monitors on
-# the way back to the desktop. A second launch is harmless anyway — the
-# binary flocks $XDG_RUNTIME_DIR/omarchy-screensaver.lock and exits 0 quietly
-# if another instance holds it.
-setsid -f omarchy-launch-screensaver "${argv[@]}" >/dev/null 2>&1
+# would report its dismissal as a launch failure and blank the monitors on the
+# way back to the desktop. A second launch is harmless anyway — the binary
+# flocks $XDG_RUNTIME_DIR/omarchy-screensaver.lock and exits 0 quietly if
+# another instance holds it.
+setsid -f omarchy-launch-screensaver force >/dev/null 2>&1

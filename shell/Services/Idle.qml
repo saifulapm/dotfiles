@@ -20,15 +20,10 @@ import Quickshell.Wayland
 // Seconds. A missing/invalid value falls back to the default; 0 disables that
 // stage; with every stage disabled the monitor itself never arms.
 //
-// Three more keys in the same block belong to the screensaver rather than to
-// this service, and are read by bin/screensaver-launch, not here:
-//
-//     "screensaverQuotes":  path to the quote list, one "text — author" per
-//                           line (default ~/.config/qshell/screensaver-quotes.txt,
-//                           which the Setup ▸ Screensaver Quotes menu row opens)
-//     "screensaverHold":    seconds a finished quote stays readable (default 14)
-//     "screensaverEffects": comma-separated ttfx effects to pick from
-//                           (default: all of them, at random)
+// Only the stage timings live here. What the screensaver actually shows — the
+// quote list, how long each stays up, which effects, how fast — is nirisaver's
+// configuration, not the shell's: it reads ~/.config/nirisaver/quotes.txt
+// itself and bin/screensaver-launch passes it no flags at all.
 //
 // Three deliberate adaptations of upstream's semantics:
 //
