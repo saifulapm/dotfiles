@@ -6,9 +6,15 @@
 # passes it a flag). Built once; guarded, warn-don't-abort, same shape as its
 # sibling run_after_29-nirisnap.
 #
-# Needs only the rustup cargo from 03-dev-toolchain: no C toolchain, no Qt,
-# no system wayland headers, not even a system font — the crate generates its
-# own protocol bindings and bundles the one it draws with.
+# Needs only the rustup cargo from 03-dev-toolchain: no C toolchain, no Qt, no
+# system wayland headers, no libxkbcommon-devel, not even a system font — the
+# crate generates its own protocol bindings, dispatches wl_keyboard by hand
+# rather than taking smithay-client-toolkit's xkbcommon default, and bundles
+# the font it draws with. That last set is load-bearing rather than incidental:
+# libxkbcommon-devel is on this machine only because gtk3-devel and
+# qt6-qtbase-devel drag it in, so a build that started needing it would work
+# here and fail on a machine without them. nirisaver's CI asserts the built
+# binary links nothing but libc, libm and libgcc.
 set -uo pipefail
 
 export PATH="$HOME/.cargo/bin:$PATH"
