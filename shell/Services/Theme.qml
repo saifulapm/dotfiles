@@ -423,6 +423,13 @@ QtObject {
         // anything the eye is meant to follow rather than just absorb.
         readonly property int slow: root.time(1.73)
 
+        // A theme landing. The bar's background and foreground colors fade
+        // while the wallpaper reveal wipes across, and the two are meant to
+        // read as ONE event — which is why both spelled out 420 ms, in two
+        // different files, with no note saying they had to agree. 2.8 is
+        // simply 420/150: the number they already were at the default token.
+        readonly property int crossfade: root.time(2.8)
+
         // The theme's own curve: "snap" -> OutQuint, "spring" -> OutBack,
         // otherwise OutCubic. Twenty-one sites had hardcoded Easing.OutCubic,
         // which is only coincidentally right — it is what this resolves to at

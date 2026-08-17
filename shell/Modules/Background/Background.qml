@@ -217,8 +217,8 @@ Scope {
         property: "revealProgress"
         from: 0
         to: 1
-        duration: 420
-        easing.type: Easing.InOutCubic
+        duration: backgroundRoot.theme.motion.crossfade
+        easing.type: backgroundRoot.theme.motion.easingSmooth
         onFinished: {
             if (backgroundRoot.incomingBackground) {
                 backgroundRoot.displayedBackground = backgroundRoot.currentBackground || backgroundRoot.incomingBackground;

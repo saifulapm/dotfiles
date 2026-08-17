@@ -909,15 +909,15 @@ Scope {
 
             Behavior on barBackground {
                 ColorAnimation {
-                    duration: 420
-                    easing.type: Easing.InOutCubic
+                    duration: barRoot.theme.motion.crossfade
+                    easing.type: barRoot.theme.motion.easingSmooth
                 }
             }
             Behavior on barForeground {
                 enabled: barRoot.foregroundAnimationEnabled
                 ColorAnimation {
-                    duration: 420
-                    easing.type: Easing.InOutCubic
+                    duration: barRoot.theme.motion.crossfade
+                    easing.type: barRoot.theme.motion.easingSmooth
                 }
             }
 
