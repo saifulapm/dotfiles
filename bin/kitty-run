@@ -1,0 +1,42 @@
+#!/bin/sh
+# Spawn a command in a kitty window — the yazi terminal on this machine
+# (drag-and-drop needs kitty's OSC 72 protocol; foot implements none).
+#
+# The foot-run parallel is deliberate but not exact. foot has a real
+# socket-activated server (foot-server.socket) that footclient talks to, so a
+# foot window costs nothing to open even when none is up. kitty has no such
+# daemon and no socket activation: --single-instance is the nearest thing, and
+# it is a genuine one WHILE a window is open — the first invocation becomes the
+# instance, every later one is a thin client asking it for another OS window,
+# sharing the process, its font and glyph caches. Measured here 2026-08-18:
+# 135 ms cold, 5 ms as a client against a live instance.
+# Close the last window and the process exits, so the next launch pays full
+# startup again (foot's server does not: it outlives its windows). Keeping a resident
+# kitty to avoid that would trade steady RAM for a cold start nobody sees more
+# than once per session, on a machine that watches its RAM (see the qshell
+# memory work) — so it is not done.
+#
+# --instance-group keeps this pool separate from any kitty started by hand.
+
+if ! command -v kitty >/dev/null 2>&1; then
+    # kitty not installed yet (a machine that has pulled this config but not
+    # yet applied the manifest): open the window in foot rather than open
+    # nothing. Drag-and-drop will not work there — the whole point of kitty —
+    # but a file manager that starts beats a keybinding that does. The one flag
+    # the callers pass has a different spelling in each terminal, so translate
+    # it while rotating the argument list.
+    n=$#
+    i=0
+    while [ "$i" -lt "$n" ]; do
+        arg=$1
+        shift
+        case "$arg" in
+            --class=*) set -- "$@" "--app-id=${arg#--class=}" ;;
+            *)         set -- "$@" "$arg" ;;
+        esac
+        i=$((i + 1))
+    done
+    exec foot-run "$@"
+fi
+
+exec kitty --single-instance --instance-group qshell "$@"

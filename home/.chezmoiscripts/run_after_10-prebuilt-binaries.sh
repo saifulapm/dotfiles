@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Tools Fedora does not package whose upstreams ship linux binaries for both
 # our arches (asset names verified against the GitHub API 2026-08-07, jj and
-# witr 2026-08-08, lazysql 2026-08-08, herdr 2026-08-10): watchexec, hurl,
-# cloudflared, stripe, ouch, usql, jj, witr, lazysql, herdr.
-# Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
+# witr 2026-08-08, lazysql 2026-08-08, herdr 2026-08-10, yazi 2026-08-18):
+# watchexec, hurl, cloudflared, stripe, ouch, usql, jj, witr, lazysql, herdr,
+# yazi. Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
 #
-# GitHub's unauthenticated API allows 60 requests/hour per IP — ten here
+# GitHub's unauthenticated API allows 60 requests/hour per IP — eleven here
 # (witr's man page is a second call to the same repo), and only on a run
 # where something is actually missing (fully-guarded runs make no requests).
 set -uo pipefail
@@ -166,6 +166,62 @@ if ! command -v herdr >/dev/null 2>&1; then
     echo "prebuilt: installed herdr"
   else
     rm -f "$bindir/herdr.tmp"; warn "herdr install failed"
+  fi
+fi
+
+# yazi + ya — the TUI file manager, moved here off COPR lihaohong/yazi
+# (2026-08-18, user call). That copr sat at 26.5.6 while upstream shipped
+# 26.8.15, whose headline feature is native drag-and-drop (kitty's new OSC 72
+# protocol, sxyazi/yazi#4005) — waiting on one person's spare-time rebuild for
+# that is the wrong trade when upstream ships aarch64 and x86_64 binaries
+# themselves. Removing the rpm is a separate migration (run_once_after_38);
+# until that runs both exist, and ~/.local/bin comes before /usr/bin in fish's
+# PATH, so ours is what a shell finds.
+#
+# Two things make this block hand-rolled rather than a fetch_tar call: the
+# asset is a ZIP (the only one in this script), and it carries two binaries —
+# `yazi` and `ya`, the plugin manager run_after_28 drives — plus the shell
+# completions the rpm used to put in /usr/share/fish/vendor_completions.d.
+#
+# The guard is the FILE, not `command -v`: while the old rpm is still
+# installed a PATH lookup finds /usr/bin/yazi and this would skip forever.
+if [ ! -x "$bindir/yazi" ]; then
+  url="$(latest_asset sxyazi/yazi "^yazi-${arch}-unknown-linux-gnu\\.zip$")"
+  if [ -z "$url" ]; then
+    warn "yazi: no release asset matched yazi-${arch}-unknown-linux-gnu.zip"
+  elif ! command -v unzip >/dev/null 2>&1; then
+    warn "yazi: unzip missing (packages not installed yet?) — retry next apply"
+  else
+    tmp="$(mktemp -d)"
+    if curl -fsSL -o "$tmp/yazi.zip" "$url" \
+      && unzip -qq "$tmp/yazi.zip" -d "$tmp" \
+      && ybin="$(find "$tmp" -type f -name yazi -print -quit)" && [ -n "$ybin" ] \
+      && yabin="$(find "$tmp" -type f -name ya -print -quit)" && [ -n "$yabin" ]; then
+      # -print -quit, not `| head -1`: under `set -o pipefail` a find that gets
+      # SIGPIPE from head fails the whole && chain (the bug class this repo has
+      # already been bitten by), and here that would mean "install failed" on a
+      # download that actually worked.
+      # Both or neither: a half-installed pair is a yazi that starts and then
+      # fails every plugin operation.
+      install -m755 "$ybin" "$bindir/yazi.part" \
+        && install -m755 "$yabin" "$bindir/ya.part" \
+        && mv "$bindir/yazi.part" "$bindir/yazi" \
+        && mv "$bindir/ya.part" "$bindir/ya" \
+        && echo "prebuilt: installed yazi + ya"
+      rm -f "$bindir/yazi.part" "$bindir/ya.part"
+      # Completions the rpm used to vendor. Plain files in the same directory
+      # chezmoi symlinks its static ones into — chezmoi never deletes unmanaged
+      # files, so the two coexist (same arrangement as run_after_23's).
+      compdir="$HOME/.config/fish/completions"
+      mkdir -p "$compdir"
+      for c in yazi ya; do
+        src="$(find "$tmp" -type f -name "$c.fish" -print -quit)"
+        [ -n "$src" ] && install -m644 "$src" "$compdir/$c.fish"
+      done
+    else
+      warn "yazi install failed"
+    fi
+    rm -rf "$tmp"
   fi
 fi
 

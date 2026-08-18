@@ -1,3 +1,15 @@
+#:schema https://yazi-rs.github.io/schemas/keymap.json
+
+# Shell templates here use the same `%` formatting as yazi.toml's openers —
+# `%s` selection, `%s1` first selected, `%h` hovered. The `$@` / `$1` spelling
+# this file used until 2026-08-18 expanded to nothing; see the header comment
+# in yazi.toml for why. `--` is an end-of-options marker: everything after it
+# is a raw string, so no escaping is needed, and `%` is still substituted.
+#
+# Every binding carries a `desc`, and that is load-bearing now: since v26.8.15
+# the help menu (`~` / F1) is a command palette with an always-on filter, so a
+# description is how a binding is found rather than decoration.
+
 [[mgr.prepend_keymap]]
 on   = "!"
 run  = 'shell "$SHELL" --block'
@@ -18,8 +30,12 @@ on   = "p"
 run  = "plugin smart-paste"
 desc = "Paste into the hovered directory or CWD"
 
+# `t` ⇒ `t`, not a bare `t`. v26.5.6 moved tab creation to the `t` chord and
+# added `t` ⇒ `r` to rename a tab; a single-key `t` matched first and made the
+# rename unreachable. Upstream's own smart-tab tip binds the chord for this
+# same reason.
 [[mgr.prepend_keymap]]
-on   = "t"
+on   = [ "t", "t" ]
 run  = "plugin smart-tab"
 desc = "Create a tab and enter the hovered directory"
 
@@ -40,10 +56,10 @@ desc = "Go to the root of the repository"
 # several images as their bare paths (one per line, which is what makes
 # Claude Code's Ctrl+V attach them all — it ignores a file:// prefix),
 # anything else as file:// URIs for a file manager or upload dialog. The
-# helper runs first, while "$@" is still the selection.
+# helper runs first, while the selection is still the selection.
 [[mgr.prepend_keymap]]
 on   = "y"
-run  = [ 'shell -- yazi-yank-clipboard "$@"', "yank" ]
+run  = [ 'shell -- yazi-yank-clipboard %s', "yank" ]
 desc = "Yank, and mirror the selection onto the system clipboard"
 
 [[mgr.prepend_keymap]]
@@ -51,26 +67,51 @@ on   = "T"
 run  = "plugin toggle-pane min-preview"
 desc = "Show or hide the preview pane"
 
+# The other three states the plugin offers, on the number row with Ctrl.
+[[mgr.prepend_keymap]]
+on   = "<C-1>"
+run  = "plugin toggle-pane max-parent"
+desc = "Maximise the parent pane"
+
+[[mgr.prepend_keymap]]
+on   = "<C-2>"
+run  = "plugin toggle-pane max-current"
+desc = "Maximise the current pane"
+
+[[mgr.prepend_keymap]]
+on   = "<C-3>"
+run  = "plugin toggle-pane max-preview"
+desc = "Maximise the preview pane"
+
 [[mgr.prepend_keymap]]
 on  = "k"
 run = "plugin arrow -1"
+desc = "Previous file (wrapping)"
 
 [[mgr.prepend_keymap]]
 on  = "j"
 run = "plugin arrow 1"
+desc = "Next file (wrapping)"
 
 [[mgr.prepend_keymap]]
 on  = "K"
 run = "plugin parent-arrow -1"
+desc = "Previous directory in the parent pane"
 
 [[mgr.prepend_keymap]]
 on  = "J"
 run = "plugin parent-arrow 1"
+desc = "Next directory in the parent pane"
 
+# Enter on an archive now uses yazi's own extractor (a real task, with progress
+# and nested/encrypted archive support). This key stays pointed at ouch, which
+# reads formats 7-Zip does not. It used to carry `--confirm`, which is not a
+# `shell` option at all — the parser accepts only block/orphan/interactive/
+# cursor/cwd — so it was silently ignored.
 [[mgr.prepend_keymap]]
 on   = "e"
-run  = 'shell "ouch decompress \"$@\"" --confirm'
-desc = "Extract archive"
+run  = "shell --block -- ouch decompress %s"
+desc = "Extract archive with ouch"
 
 [[mgr.prepend_keymap]]
 on   = [ "c", "m" ]
@@ -86,25 +127,81 @@ desc = "Restore from trash"
 # on  = "q"
 # run = "plugin confirm-quit"
 
-# Terminals can't be drag *sources* — foot only shows niri a grid of cells,
-# so there's nothing for the mouse to pick up. <C-n> hands the selection to
-# ripdrag instead: a small floating window of icons you drag into mpv, GIMP,
-# a browser, or another foot (foot is a drop *target* and pastes the path —
-# that's how images reach Claude Code). -x closes the window once the drag
-# lands, -a adds a drag-them-all button for multi-selections, -n stops a
-# stray click from opening the file, -b labels icons by basename (yazi
-# hands over absolute paths). GTK_THEME picks up the theme-apply-rendered
-# plain-GTK4 recolor (templates/gtk4-theme.css.tmpl) — scoped here because
-# globally it would stomp libadwaita apps.
-[[mgr.prepend_keymap]]
-on   = "<C-n>"
-run  = 'shell -- GTK_THEME=qshell ripdrag -x -a -n -b "$@" 2>/dev/null &'
-desc = "Drag selected files out (ripdrag)"
+# No drag-out keybinding any more, and that is the feature: since yazi 26.8.15
+# dragging is NATIVE — grab a file with the mouse and drop it into any app.
+# What made a keybinding necessary was the terminal, not yazi: foot shows niri
+# a grid of cells with nothing for a pointer to pick up, so <C-n> used to hand
+# the selection to ripdrag, a floating window of icons to drag from. yazi now
+# speaks kitty's OSC 72 drag-and-drop protocol, kitty implements it (foot does
+# not — its answer to the capability query is device attributes alone), and
+# Mod+E/yazi.desktop open yazi in kitty for exactly that reason. ripdrag and
+# its gtk4-devel build dependency were removed 2026-08-18.
 
 # Transcode the hovered picture/video for sharing (omarchy wires the same
 # helper into Nautilus's right-click; ours rides bin/transcode in a float —
 # format/resolution picked with gum, result URI lands on the clipboard).
+# On <C-t>, not T: T was bound twice, and toggle-pane above won, so this had
+# been unreachable since it was added. `%h` is the hovered file — yazi escapes
+# it, so it is passed as bash's $0 rather than re-quoted here.
 [[mgr.prepend_keymap]]
-on   = "T"
-run  = '''shell 'foot-run --app-id=qshell-float -e bash -lc "transcode \"$1\"; read -r -p \"press enter to close\""' '''
+on   = "<C-t>"
+run  = '''shell -- foot-run --app-id=qshell-float -e bash -lc 'transcode "$0"; read -r -p "press enter to close"' %h'''
 desc = "Transcode for sharing"
+
+# ---- plugins added 2026-08-18 ----
+
+# `f` was `filter --smart`; smart-filter on `F` is a superset of it (it filters
+# continuously, enters a directory that becomes the only match, and opens a
+# file on submit), so the plain key goes to the vim-style jump instead.
+[[mgr.prepend_keymap]]
+on   = "f"
+run  = "plugin jump-to-char"
+desc = "Jump to the next file starting with a character"
+
+[[mgr.prepend_keymap]]
+on   = "F"
+run  = "plugin smart-filter"
+desc = "Smart filter"
+
+# Zoom is on Alt-i/Alt-o rather than the plugin's suggested +/- because `-` is
+# the preset `link` and `_` is `link --relative`.
+[[mgr.prepend_keymap]]
+on   = "<A-i>"
+run  = "plugin zoom 1"
+desc = "Zoom in on the preview image"
+
+[[mgr.prepend_keymap]]
+on   = "<A-o>"
+run  = "plugin zoom -1"
+desc = "Zoom out of the preview image"
+
+[[mgr.prepend_keymap]]
+on   = "M"
+run  = "plugin mount"
+desc = "Mount, unmount or eject a disk"
+
+[[mgr.prepend_keymap]]
+on   = "<C-x>"
+run  = "plugin diff"
+desc = "Diff the selected file against the hovered one"
+
+[[mgr.prepend_keymap]]
+on   = [ "g", "s" ]
+run  = "plugin vcs-files"
+desc = "Show Git file changes"
+
+[[mgr.prepend_keymap]]
+on   = [ "g", "i" ]
+run  = "plugin lazygit"
+desc = "Open lazygit here"
+
+[[mgr.prepend_keymap]]
+on   = "W"
+run  = "plugin what-size"
+desc = "Total size of the selection, or of the CWD"
+
+# `'` is the vim mark key, and free in the preset.
+[[mgr.prepend_keymap]]
+on   = "'"
+run  = "plugin bunny"
+desc = "Bookmarks: hop to a directory"

@@ -18,6 +18,21 @@ esac
 # Relative link within the state dir, same shape theme-apply bootstraps.
 ln -sfn "$target" "$state/foot-alpha.ini"
 
+# The kitty half of the same toggle (kitty hosts yazi — see
+# templates/kitty.conf.tmpl). Deliberately BEFORE foot's early exit below, so a
+# missing foot theme.ini cannot leave the two terminals disagreeing. The name
+# of this script stayed foot-frost: Services/Blur.qml calls it by that name and
+# foot is still the reason it exists.
+case "$1" in
+    on) ktarget=kitty-alpha-frost.conf ;;
+    *)  ktarget=kitty-alpha-solid.conf ;;
+esac
+ln -sfn "$ktarget" "$state/kitty-alpha.conf"
+
+# kitty re-reads its whole config on SIGUSR1 — one signal instead of foot's
+# per-pty OSC walk. Usually a no-op: kitty only runs while a yazi window is up.
+pkill -SIGUSR1 -x kitty 2>/dev/null || true
+
 # theme.ini's background is bare RRGGBB (the template's |hex filter).
 bg="$(sed -n 's/^background=//p' "$HOME/.config/foot/theme.ini" 2>/dev/null | head -n1)"
 [ -n "$bg" ] || exit 0

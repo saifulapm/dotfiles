@@ -515,6 +515,23 @@ window-rule {
     default-window-height { proportion 0.55; }
 }
 
+// yazi gets the same floating treatment 20% larger (user ask 2026-08-18): a
+// file manager with a parent pane, a file pane and an image preview wants the
+// room in a way nmtui does not. 0.5 → 0.6 and 0.55 → 0.66 are those proportions
+// times 1.2.
+//
+// It needs its OWN app-id rather than a title match, because default-column-width
+// is applied when the window is mapped and at that moment the title is still
+// kitty's — yazi only sends its OSC 2 title once it has started. Everything else
+// keyed on qshell-float has to name this id too: the scroll-factor rule below
+// and Services/Blur.qml's exclude list.
+window-rule {
+    match app-id="^qshell-float-yazi$"
+    open-floating true
+    default-column-width { proportion 0.6; }
+    default-window-height { proportion 0.66; }
+}
+
 // bin/tui-install's launcher entries (omarchy's TUI.float/TUI.tile app-id
 // convention): float gets the qshell-float treatment above, tile opens as a
 // normal column and needs no rule. Desktop file and window rule are a
@@ -582,6 +599,7 @@ window-rule {
 window-rule {
     match app-id="^foot$"
     match app-id="^qshell-float$"
+    match app-id="^qshell-float-yazi$"
     match app-id="^tmux-main$"
     match app-id="^herdr-main$"
     match app-id=r#"^TUI\.(float|tile)$"#
@@ -634,9 +652,17 @@ binds {
     Mod+Shift+B hotkey-overlay-title="Focus the Browser" { spawn "launch-or-focus" "chromium-browser" "chromium-browser"; }
     Mod+Shift+Alt+B hotkey-overlay-title="Browser (Incognito)" { spawn "chromium-browser" "--incognito"; }
     // omarchy: SUPER+SHIFT+F file manager — taken by fullscreen-window here,
-    // so the explorer key instead. Same yazi-in-foot as yazi.desktop.
+    // so the explorer key instead. Same yazi-in-kitty as yazi.desktop.
     // Floating via the qshell-float rule, like btop and the shell's helpers.
-    Mod+E hotkey-overlay-title="File Manager: yazi" { spawn "foot-run" "--app-id=qshell-float" "yazi"; }
+    //
+    // kitty, not foot, since 2026-08-18, and ONLY here: yazi does drag-and-drop
+    // natively over kitty's OSC 72 protocol, which foot does not implement (its
+    // answer to the capability query is device attributes alone). --class sets
+    // the Wayland app-id, and yazi has its own — qshell-float-yazi, floating at
+    // 1.2x the shared helper size (see the window rule above). Every other rule
+    // keyed on qshell-float names that id too: scroll-factor here, and the blur
+    // excludes in Services/Blur.qml.
+    Mod+E hotkey-overlay-title="File Manager: yazi" { spawn "kitty-run" "--class=qshell-float-yazi" "yazi"; }
     // omarchy: SUPER+SHIFT+N editor — $EDITOR (kak) in a foot window.
     Mod+Shift+N hotkey-overlay-title="Editor: kak" { spawn "foot-run" "kak"; }
     // Emacs: raise the daemon's existing frame or make one — the same

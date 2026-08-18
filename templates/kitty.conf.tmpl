@@ -1,0 +1,140 @@
+# Rendered to ~/.config/kitty/kitty.conf by bin/theme-apply — do not edit there.
+#
+# kitty is on this machine for ONE job: hosting yazi so drag-and-drop works.
+# yazi has spoken the OSC 72 DnD protocol since 26.8.15 and kitty (>= 0.47) is
+# the only terminal that implements it — foot answers the protocol's own
+# capability query with device attributes alone, which the spec defines as "no
+# support" (measured 2026-08-18, alacritty likewise). foot stays the terminal
+# for everything else; nothing here is meant to be a second daily driver.
+#
+# Only deviations from kitty 0.47 defaults live here. Ported from omarchy's
+# config/kitty/kitty.conf, minus everything a single-window file manager cannot
+# use (their tab-bar styling, their remote-control socket).
+include ~/.config/kitty/theme.conf
+
+# ---------------------------------------------------------------- font
+# The same glyphs foot draws, from the same two tokens: foot renders
+# {{font.mono}} at {{font.foot-pt}}pt in a {{font.foot-line-height}}px cell, and
+# both numbers ride the desktop text-size knob (bin/text-size → theme-override
+# [font] size → theme-apply's font.foot-* derivations). Points, not pixelsize,
+# for the same reason foot uses them: they stay proportional under any output
+# scale.
+#
+# The cell height is a PERCENTAGE, not foot's px number, and that is load
+# bearing: modify_font's px form is a DELTA on the natural cell, not the cell
+# itself. Measured 2026-08-18 — `modify_font cell_height 29px` produced a 60px
+# cell on top of kitty's natural 31px, where foot's line-height=29 means 29.
+# The percentage form is of the natural value, so ONE constant holds at every
+# position of the text-size knob: foot's line-height and kitty's natural cell
+# both scale linearly with the point size, so their ratio does not move.
+#
+# 142% = foot's 44px cell / kitty's natural 31px, both read out of the running
+# terminals with CSI 16 t at the same font and scale. Re-derive it if the mono
+# font ever changes — the constant is a property of THAT font's line metrics
+# (foot asks for ~40% leading; Maple Mono's natural cell is ~1.8x its point
+# size).
+#
+# Cell WIDTH is deliberately left alone: foot reports 13px and kitty 14px for
+# the same font, which is the two of them rounding one sub-pixel advance in
+# opposite directions, not a disagreement about the font. Squeezing kitty's
+# cell to 93% to match would risk clipping exactly the glyphs yazi leans on
+# (full-border's box drawing, the Nerd Font icons) to chase a rounding
+# artifact.
+font_family      {{font.mono}}
+bold_font        auto
+italic_font      auto
+bold_italic_font auto
+font_size        {{font.foot-pt}}
+modify_font cell_height 142%
+
+# Icon glyphs — yazi's file icons — arrive through the fontconfig fallback
+# chain: 50-qshell.conf puts Symbols Nerd Font Mono on the `monospace`
+# accept-list. foot names that font explicitly as a second entry; kitty has no
+# fallback-font list at all, so the alias is what carries them.
+#
+# That is enough for a codepoint only the symbols font can draw, and NOT enough
+# for one that two fonts can. Fedora's 49-sansserif.conf appends `sans-serif`
+# to any pattern carrying no generic name, `sans-serif` here is Adwaita Sans
+# (Inter), and Inter keeps stylistic alternates in the private-use area — so
+# for the handful of codepoints both fonts claim, the fallback answers with a
+# letterform instead of an icon. Measured 2026-08-18 against yazi's 282 preset
+# icon codepoints: exactly 8 are also covered by Adwaita Sans — U+E21C, E244,
+# E271, E28B, E28C, E2A6, EE72, EEB6 — and ~/Pictures rendered as a literal
+# "j".
+#
+# symbol_map bypasses fontconfig for a range, which is the only thing that
+# settles it. Two ranges cover all 8, and the gap in the middle is deliberate:
+# Maple Mono ships its own glyphs at U+EE00-U+EE0B and those stay with it.
+# Powerline (U+E0B0-U+E0B7) is untouched for the same reason — Maple draws the
+# indicator caps yazi's cursor row uses.
+symbol_map U+E200-U+E2A9,U+ED00-U+EDFF,U+EE0C-U+F2FF Symbols Nerd Font Mono
+
+# -------------------------------------------------------------- window
+# foot's pad=14x14, and niri draws the borders either way.
+window_padding_width 14
+hide_window_decorations yes
+confirm_os_window_close 0
+
+# ------------------------------------------- no tabs, no splits, no keys
+# kitty cannot be built without tabs and windows, but nothing here can reach
+# them: the tab bar never draws, and clear_all_shortcuts drops EVERY default
+# binding — new tab, new window, layout switching, font resizing, the
+# scrollback pager, the hints/unicode kittens. That is the "disable tabs and
+# panes" ask, and it has a second effect worth more: every keystroke goes
+# straight to yazi, so no yazi binding can ever collide with a kitty one.
+#
+# Mapped back: only the two clipboard pairs foot binds, and omarchy's CSI-u
+# escapes (foot's [text-bindings]) so TUIs can tell Shift+Return apart from
+# Return.
+tab_bar_style hidden
+clear_all_shortcuts yes
+map ctrl+shift+c copy_to_clipboard
+map ctrl+insert  copy_to_clipboard
+map ctrl+shift+v paste_from_clipboard
+map shift+insert paste_from_clipboard
+map shift+enter     send_text all \e[13;2u
+map alt+shift+enter send_text all \e[13;4u
+
+# ------------------------------------------------------- startup weight
+# Everything kitty does by default that a file manager has no use for.
+# shell_integration: kitty execs yazi, never a shell, so there is nothing to
+#   source — and it is the one that would otherwise inject a wrapper.
+# allow_remote_control: omarchy sets `yes` plus a listen_on socket for its
+#   own tooling. Nothing here drives kitty remotely, and `no` means no control
+#   socket and no listener at all.
+# update_check_interval: kitty checks for new releases over the network by
+#   default. dnf owns this package.
+shell_integration disabled
+allow_remote_control no
+update_check_interval 0
+wayland_enable_ime no
+
+# auto_reload_config: kitty polls its config files for changes by default
+# (0.1s debounce), and it does that in a SEPARATE PROCESS — every window gets a
+# `kitten __watch_conf__` child (boss.py:1415), measured at 18.8 MB PSS here.
+# Nothing on this machine edits kitty.conf by hand: theme-apply renders it and
+# then signals SIGUSR1, which reloads regardless of this setting. A negative
+# value is how the option is disabled. The one child that remains,
+# `kitten __atexit__`, is not optional — kitty spawns it to unlink its temp
+# files if it dies (boss.py:211).
+auto_reload_config -1
+
+# yazi lives on the alternate screen and never scrolls back. Kept small rather
+# than at foot's 10000 — kitty allocates on demand, so this is about intent,
+# not bytes: enough that a crash message survives, not a second buffer.
+scrollback_lines 2000
+
+# ---------------------------------------------------------- aesthetics
+# omarchy's, where foot has no equivalent to copy. The blink interval is not
+# cosmetic here: a blinking cursor is a timer that wakes the GPU forever.
+cursor_shape block
+cursor_blink_interval 0
+enable_audio_bell no
+
+# The frost half of the blur toggle, built exactly like foot's: a symlink that
+# bin/foot-frost flips between two rendered fragments, so the toggle never
+# needs to know the theme's alpha and this file never carries one.
+# dynamic_background_opacity is what lets the value take effect on a config
+# reload (SIGUSR1) rather than only at startup.
+dynamic_background_opacity yes
+include ~/.local/state/qshell/kitty-alpha.conf

@@ -1,3 +1,5 @@
+#:schema https://yazi-rs.github.io/schemas/yazi.json
+
 # Plugin ownership (2026-08-07): package.toml's deps are installed/updated by
 # `ya pkg install` / `ya pkg upgrade` into ~/.config/yazi/plugins and are NOT
 # in the chezmoi tree (ya rewrites package.toml, so this note lives here).
@@ -16,64 +18,82 @@ wrap = "no"
 max_width  = 2000
 max_height = 2000
 
+# Every `run` here is a SHELL FORMAT TEMPLATE, and the only substitution yazi
+# performs is `%`. The old `$@` / `$1` / `$0` spelling this file used until
+# 2026-08-18 was deprecated in v25.12.29 and is now gone from the code
+# (yazi-fs/src/splatter.rs looks for '%' and nothing else), while the command
+# itself runs as a bare `sh -c "<template>"` with no positional arguments
+# appended — so `$@` expanded to the empty string and every opener below was
+# launching with no file at all. Measured, not inferred.
+#   %s  all selected paths      %s1 the first one       %h  the hovered path
+#   %d  dirnames                %y  yanked paths        %%  a literal percent
+# `%s` also makes an opener "spread": one invocation for the whole selection.
+# `%s1` does not, so yazi runs the command once per file — which is what the
+# single-argument tools below want.
 [opener]
 play = [
-	# The IPC socket is what the add-sub opener below talks to (sub-add via
-	# socat). One socket = one controllable mpv; a second instance just runs
-	# without IPC.
-	{ run = 'mpv --input-ipc-server=/tmp/mpv.sock "$@"', orphan = true, for = "unix" },
+	# The IPC socket is what the add-sub opener talks to (sub-add via socat).
+	# One socket = one controllable mpv; a second instance just runs without IPC.
+	{ run = 'mpv --input-ipc-server=/tmp/mpv.sock %s', orphan = true, for = "unix" },
+	# Second entry, so `O` offers it: same shape upstream gives its own preset.
+	{ run = "mediainfo %s1; echo 'Press enter to exit'; read _", block = true, desc = "Show media info", for = "unix" },
 ]
 edit = [
-	{ run = '$EDITOR "$@"', block = true, for = "unix" },
+	{ run = '$EDITOR %s', block = true, for = "unix" },
 ]
 open = [
-	{ run = 'xdg-open "$@"', desc = "Open (default app)" },
+	{ run = 'xdg-open %s1', desc = "Open (default app)" },
 ]
 browser = [
-	{ run = 'chromium-browser "$@"', orphan = true, desc = "Open in Chromium", for = "unix" },
+	{ run = 'chromium-browser %s', orphan = true, desc = "Open in Chromium", for = "unix" },
 ]
 evince = [
-	{ run = 'evince "$@"', orphan = true, desc = "Open in Evince", for = "unix" },
+	{ run = 'evince %s', orphan = true, desc = "Open in Evince", for = "unix" },
 ]
 add-sub = [
-  { run  = ''' echo sub-add "'$0'" | socat - /tmp/mpv.sock ''', desc = "Add sub to MPV" },
+	# `%%s` is an escaped literal `%s` for printf's own format string; `%s1` is
+	# the hovered subtitle's path. Upstream's tip verbatim.
+	{ run = ''' printf "sub-add '%%s'\n" %s1 | socat - /tmp/mpv.sock ''', desc = "Add sub to MPV" },
 ]
 extract = [
-	{ run = 'ouch decompress "$@"', desc = "Extract here", block = true },
-]
-reveal = [
-	{ run = 'mediainfo "$1" | less', block = true, desc = "Media info" },
+	# Built-in first: since v26.8.15 extraction is a native task with progress in
+	# the task manager, and it handles nested and password-protected archives.
+	# ouch stays as the explicit second choice on `O` for the formats 7-Zip does
+	# not read (and `e` below still goes straight to it).
+	{ run = "ya pub extract --list %s", desc = "Extract here" },
+	{ run = "ouch decompress %s", block = true, desc = "Extract with ouch" },
 ]
 
+# `prepend_rules`, NOT `rules`. A bare `rules` replaces the preset set outright,
+# which is what this file did until 2026-08-18 — and the preset has grown rules
+# we were silently throwing away: `trash/**` (restore / empty a trashed file),
+# `vfs/{absent,stale}` (download a remote file), `*/` (folders) and
+# `inode/empty`. Prepends are matched before the presets, so ours still win;
+# the `*` fallback goes in `append_rules`, where a wildcard is documented to
+# take precedence over the preset's own fallback.
 [open]
-rules = [
-	# Archives - extract with enter
-	{ mime = "application/zip", use = "extract" },
-	{ mime = "application/x-tar", use = "extract" },
-	{ mime = "application/x-bzip*", use = "extract" },
-	{ mime = "application/x-7z-compressed", use = "extract" },
-	{ mime = "application/x-xz", use = "extract" },
-	{ mime = "application/x-rar", use = "extract" },
-	{ mime = "application/gzip", use = "extract" },
+prepend_rules = [
+	# First, and only because our extension globs below would otherwise catch a
+	# trashed video: keep the preset's trash rule reachable ahead of them.
+	{ mime = "trash/**", use = [ "open", "trash" ] },
 
 	# Multi-opener lists feed the native "Open with" menu on O (open
 	# --interactive); Enter/l always takes the first entry.
-	{ mime = "text/*", use = [ "edit", "open" ] },
-	{ mime = "video/*", use = [ "play", "reveal", "browser" ] },
-	{ mime = "audio/*", use = [ "play", "reveal" ] },
+	{ mime = "text/*", use = [ "edit", "open", "reveal" ] },
+	{ mime = "video/*", use = [ "play", "browser", "reveal" ] },
 	{ mime = "image/*", use = [ "open", "browser", "reveal" ] },
 
 	# PDF: default via mimeapps (zathura), with the fallbacks as explicit picks
-	{ mime = "application/pdf", use = [ "open", "evince", "browser" ] },
+	{ mime = "application/pdf", use = [ "open", "evince", "browser", "reveal" ] },
 
 	# The same openers keyed on the extension, for when yazi cannot sniff the
 	# mime: a partial download, an odd container, a file on a mount that will
-	# not read. Without these the `*` fallback below sends the file to
-	# xdg-open, and a type nothing claims resolves through the desktop-file
-	# cache to the browser — which is how an mkv opened in Chromium instead of
-	# mpv (nuc, 2026-08-17). Deliberately no `ts` here: *.ts is TypeScript far
-	# more often than it is a transport stream, and the rule above it wins.
-	{ url = "*.{mkv,mp4,avi,mov,webm,m4v,mpg,mpeg,wmv,flv,m2ts,ogv}", use = [ "play", "reveal", "browser" ] },
+	# not read. Without these the fallback sends the file to xdg-open, and a
+	# type nothing claims resolves through the desktop-file cache to the
+	# browser — which is how an mkv opened in Chromium instead of mpv (nuc,
+	# 2026-08-17). Deliberately no `ts` here: *.ts is TypeScript far more often
+	# than it is a transport stream, and the text/* rule above it wins.
+	{ url = "*.{mkv,mp4,avi,mov,webm,m4v,mpg,mpeg,wmv,flv,m2ts,ogv}", use = [ "play", "browser", "reveal" ] },
 	{ url = "*.{mp3,flac,ogg,opus,wav,m4a,aac,wma}", use = [ "play", "reveal" ] },
 
 	# Common config files
@@ -90,7 +110,18 @@ rules = [
 	# Multiple openers for a single rule
 	{ url = "*.html", use = [ "open", "edit" ] },
 	{ url = "*.{ass,srt,ssa,sty,sup,vtt}", use = [ "add-sub", "edit" ] },
-
-	# Fallback
+]
+append_rules = [
 	{ url = "*", use = [ "open", "edit", "reveal" ] },
+]
+
+# git.yazi is two halves and we only ever had one: `require("git"):setup()` in
+# init.lua renders the status signs, but nothing computes them until the plugin
+# is registered as a fetcher here. Without this block the linemode has been
+# blank since the plugin was installed (2026-08-07). `group` is the current
+# spelling — it was `id` until v26.5.6 renamed it.
+[plugin]
+prepend_fetchers = [
+	{ url = "*",  run = "git", group = "git" },
+	{ url = "*/", run = "git", group = "git" },
 ]

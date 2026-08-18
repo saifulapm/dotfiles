@@ -34,9 +34,10 @@ why  = "starship is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (
 name = "atim/lazygit"
 why  = "lazygit is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (latest 0.47.1, verified 2026-08-07). Primary git TUI on the mac; the kak config opens it in a popup"
 
-[[copr]]
-name = "lihaohong/yazi"
-why  = "yazi is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (latest 26.5.6, verified 2026-08-07). File manager TUI; the kak config opens it in a popup"
+# lihaohong/yazi was here until 2026-08-18 (user call). yazi now comes from
+# upstream's own GitHub release via run_after_10 — see the prebuilt-binaries
+# [[tool]] note. run_after_38 removes the rpm and this repo from machines that
+# still carry them.
 
 # ------------------------------------------------------------------ core
 # The machine is usable as a desktop without anything below `dev`.
@@ -46,6 +47,12 @@ name = "foot"
 category = "core"
 arch = "all"
 why = "Terminal. Lightest maintained Wayland-native terminal; retheme-able live via OSC sequences"
+
+[[pkg]]
+name = "kitty"
+category = "core"
+arch = "all"
+why = "SECOND terminal, for exactly one window: yazi (user call 2026-08-18). yazi 26.8.15 does drag-and-drop natively over kitty's OSC 72 protocol, and kitty >= 0.47 is the only terminal that implements it — foot answers the protocol's own capability query with device attributes alone, which the spec defines as no support (measured, alacritty the same; Ghostty has an open tracking issue). foot remains the terminal for everything else. Fedora ships 0.47.1, past the 0.47.0 the protocol needs. Config is rendered by theme-apply from templates/kitty.conf.tmpl — same font tokens and palette as foot, tab bar hidden, every default shortcut cleared. VERIFIED 2026-08-18 on 0.47.1: kitty answers the OSC 72 capability query ahead of the DA reply (foot answers with the DA alone), config parses with an empty stderr, --class sets the Wayland app-id so the existing qshell-float rules apply unchanged, SIGUSR1 reloads without complaint, and the cell is 44px tall in both terminals. Drag-and-drop itself confirmed working by the user. Startup: 135 ms cold, 5 ms as a --single-instance client (bin/kitty-run)"
 
 [[pkg]]
 name = "wl-clipboard"
@@ -1153,11 +1160,16 @@ category = "shell"
 arch = "all"
 why = "Line-count statistics per language, from the mac list"
 
+# yazi is deliberately NOT a [[pkg]] since 2026-08-18 — it is a GitHub release
+# binary now (prebuilt-binaries [[tool]] below, run_after_10). It stays in the
+# shell tier conceptually: the kak config's file-browser popup and Mod+E both
+# run it.
+
 [[pkg]]
-name = "yazi"
+name = "unzip"
 category = "shell"
 arch = "all"
-why = "TUI file manager (from COPR lihaohong/yazi) — the kak config's file-browser popup runs it"
+why = "Only zip extractor on the box (bsdtar is not installed, GNU tar cannot read zips) — run_after_10 needs it because yazi is the one upstream here that ships its release as a .zip. Present on every machine already; declared 2026-08-18 so a fresh install cannot land a yazi-less desktop"
 
 [[pkg]]
 name = "glow"
@@ -1419,11 +1431,11 @@ category = "dev"
 arch = "all"
 why = "Qt Multimedia — omacut's .pro declares QT += multimedia (video preview); its build died with 'Unknown module(s) in QT: multimedia' on the first apply (2026-08-07). Pulls the runtime QML module too"
 
-[[pkg]]
-name = "gtk4-devel"
-category = "dev"
-arch = "all"
-why = "GTK4 headers + pkg-config files — cargo builds [[tool]] ripdrag (gtk4-sys), the yazi drag-out hand (keymap 0a093ca). The gtk4 runtime was already here; the commit that bound ripdrag shipped no provisioning, so every machine but the one that built it had a dead keybinding (found 2026-08-13)"
+# gtk4-devel was here until 2026-08-18. Its ONLY job was giving cargo the
+# headers to build ripdrag (gtk4-sys), and ripdrag went the day yazi got native
+# drag-and-drop. Nothing else on this machine compiles against GTK4 — satty is
+# a prebuilt binary and links the gtk4 RUNTIME, which the portal chain installs
+# and which stays. run_after_39 removes the package from machines that have it.
 
 [[pkg]]
 name = "wayland-devel"
@@ -1720,7 +1732,7 @@ why  = "Deno runtime from the mac list; mise already manages node, one mechanism
 
 [[tool]]
 name = "cargo-cli-tools"
-via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc, ripdrag (yazi <C-n> drag-out, needs [[pkg]] gtk4-devel to build); from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07) and wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere). herdr moved to run_after_10 prebuilt (974fc11); ttfx dropped 2026-08-17 — [[tool]] nirisaver links the crate instead of shelling out to the binary, so nothing installed here ran it any more"
+via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc; from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07) and wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere). herdr moved to run_after_10 prebuilt (974fc11); ripdrag dropped 2026-08-18 with its gtk4-devel build dependency — it was yazi's <C-n> drag-out hand, and yazi 26.8.15 does drag-and-drop natively in kitty (run_after_39 uninstalls both); ttfx dropped 2026-08-17 — [[tool]] nirisaver links the crate instead of shelling out to the binary, so nothing installed here ran it any more"
 why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/dufs are mac-list CLI (argc dropped 2026-08-10 — nothing in this repo ever called it); kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
 
 [[tool]]
@@ -1755,8 +1767,8 @@ why  = "laravel new <app> scaffolder (user decision 2026-08-07, Herd workflow pa
 
 [[tool]]
 name = "prebuilt-binaries"
-via  = "run_after_10-prebuilt-binaries.sh — GitHub release binaries into ~/.local/bin: watchexec, hurl, cloudflared, stripe, ouch (added 2026-08-07 for the yazi config port — its cargo build needs libclang, so the release binary is the mechanism), usql (added 2026-08-07 for the mac config port — the regular not _static variant: common drivers at half the size; linux-arm64 asset verified against the GitHub API. dprint deliberately NOT here: it is already a pnpm global via run_after_08. aichat + yek removed 2026-08-07: aichat dropped from the port, yek existed only as its git document loader), jj + witr (added 2026-08-08, user picks off the new-tooling sweep — see the two notes below)"
-why  = "Fedora packages none of these; all ship both aarch64 and x86_64 linux release assets (asset names verified against the GitHub API 2026-08-07, jj/witr 2026-08-08). Chosen over cargo builds for the heavy ones (hurl needs libxml)"
+via  = "run_after_10-prebuilt-binaries.sh — GitHub release binaries into ~/.local/bin: watchexec, hurl, cloudflared, stripe, ouch (added 2026-08-07 for the yazi config port — its cargo build needs libclang, so the release binary is the mechanism), usql (added 2026-08-07 for the mac config port — the regular not _static variant: common drivers at half the size; linux-arm64 asset verified against the GitHub API. dprint deliberately NOT here: it is already a pnpm global via run_after_08. aichat + yek removed 2026-08-07: aichat dropped from the port, yek existed only as its git document loader), jj + witr (added 2026-08-08, user picks off the new-tooling sweep — see the two notes below), yazi + ya (moved here off COPR lihaohong/yazi 2026-08-18 — see the note below)"
+why  = "Fedora packages none of these; all ship both aarch64 and x86_64 linux release assets (asset names verified against the GitHub API 2026-08-07, jj/witr 2026-08-08, yazi 2026-08-18). Chosen over cargo builds for the heavy ones (hurl needs libxml)"
 
 # jj (Jujutsu) v0.44.0 — git-compatible VCS. Taken as an ADDITION to git, not a
 # replacement: since 0.39 `jj git init --colocate` is the default, so it drives
@@ -1773,6 +1785,31 @@ why  = "Fedora packages none of these; all ship both aarch64 and x86_64 linux re
 # start and stop on their own (see dev-services), so "what just woke mysql" is a
 # question this box actually raises. Bare binary + a witr.1 man page, which is
 # why the install block is hand-rolled rather than using fetch_tar.
+
+# yazi + ya v26.8.15 — moved out of the [[copr]] tier on 2026-08-18 (user
+# call). The trigger: upstream shipped native drag-and-drop in 26.8.15 (kitty's
+# new OSC 72 protocol, sxyazi/yazi#4005, merged 2026-05-28) and COPR
+# lihaohong/yazi was still building 26.5.6 three days after the release —
+# a single maintainer's spare time between us and the file manager we run
+# daily. Upstream publishes aarch64 + x86_64 linux assets itself, so the copr
+# was never buying anything but the rpm database entry.
+#
+# The one asset in this whole tier that is a ZIP, and the one that carries two
+# binaries: `yazi` and `ya` (the plugin manager run_after_28 drives) — hence a
+# hand-rolled block, plus the fish completions the rpm used to vendor into
+# /usr/share/fish/vendor_completions.d. [[pkg]] unzip is declared for it.
+#
+# gnu, not the musl variant: Fedora's glibc is the host anyway, and nothing
+# about a file manager wants a static build.
+#
+# The drag-and-drop needs a terminal that speaks OSC 72, and foot does not
+# (measured 2026-08-18: its answer to the protocol's own capability query is the
+# device-attributes reply alone, which the spec defines as no support; no
+# mention in foot-ctlseqs(7) for 1.27.0, no request on its tracker, and dnkl has
+# declined kitty-origin protocols before). kitty >= 0.47 is the only
+# implementation today; Ghostty has an open tracking issue. Hence [[pkg]] kitty
+# above, hosting yazi and nothing else — and hence ripdrag's removal on the same
+# day: there is no keybinding any more, you drag the file.
 
 [[tool]]
 name = "pnpm-globals"

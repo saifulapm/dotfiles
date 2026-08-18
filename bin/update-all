@@ -57,6 +57,10 @@ sudo dnf upgrade --refresh || warn "dnf upgrade failed"
 # redownloading (the guards installed these recently enough). On a bump the
 # binary is removed; the apply below reinstalls it through run_after_10's
 # own asset logic — the tool→repo map here is the only duplication.
+#
+# yazi is the one entry that stands for two binaries: removing ~/.local/bin/yazi
+# is enough, because run_after_10 guards on that file and reinstalls `ya`
+# alongside it from the same zip. Removing `ya` instead would refresh nothing.
 say "release binaries"
 declare -A PREBUILT=(
   [watchexec]=watchexec/watchexec
@@ -68,6 +72,7 @@ declare -A PREBUILT=(
   [jj]=jj-vcs/jj
   [witr]=pranshuparmar/witr
   [herdr]=herdrdev/herdr
+  [yazi]=sxyazi/yazi
 )
 latest_tag() {
   gh api "repos/$1/releases/latest" --jq .tag_name 2>/dev/null \
@@ -126,6 +131,7 @@ update_src "$HOME/.local/src/nirisaver" "$HOME/.local/bin/nirisaver" nirisaver
 update_src "$HOME/.local/src/omacalc" "$HOME/.local/bin/omacalc" omacalc
 update_src "$HOME/.local/src/omacut" "$HOME/.local/bin/omacut" omacut
 update_src "$HOME/.local/src/omawrite" "$HOME/.local/bin/omawrite" omawrite
+update_src "$HOME/.local/src/libinput-gestures" "$HOME/.local/bin/libinput-gestures" libinput-gestures
 
 # -------------------------------------------------------------------- apply
 say "chezmoi apply (reinstalls everything removed above)"
@@ -141,7 +147,7 @@ rustup update || warn "rustup update failed"
 # check: a re-run no-ops when the index (or git HEAD) has not moved and
 # rebuilds when it has — no guard removal needed.
 say "cargo tools"
-for crate in sd skim television dufs hop-kak kak-popup dedoc ripdrag; do
+for crate in sd skim television dufs hop-kak kak-popup dedoc; do
   cargo install --quiet "$crate" || warn "cargo update $crate failed"
 done
 cargo install --quiet --git https://github.com/kakoune-lsp/kakoune-lsp --locked \

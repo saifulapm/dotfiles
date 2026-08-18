@@ -27,8 +27,10 @@ declare -A CRATES=(
   [hop-kak]="hop-kak"
   [kak-popup]="kak-popup"
   [dedoc]="dedoc"
-  [ripdrag]="ripdrag"
 )
+# ripdrag was here until 2026-08-18: yazi's <C-n> drag-out hand, obsolete the
+# day yazi got native drag-and-drop over kitty's OSC 72 protocol. Its
+# gtk4-devel build dependency went with it.
 # ouch is NOT here: its cargo build needs libclang (libbzip3-sys bindgen) —
 # it comes prebuilt from run_after_10-prebuilt-binaries.sh instead
 # (verified 2026-08-07).
