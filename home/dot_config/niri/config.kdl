@@ -41,12 +41,24 @@ input {
     touchpad {
         // off
         tap
+        // Already libinput's default, written out because it is exactly the
+        // macOS mapping and it is silently load-bearing: two-finger tap =
+        // right click, three-finger tap = middle. The other value,
+        // "left-middle-right", swaps those last two.
+        tap-button-map "left-right-middle"
         // Palm-brush guard while typing — Hyprland ships this on (omarchy
         // inherits it); niri's default is off.
         dwt
         // dwtp
         // drag false
-        // drag-lock
+        // macOS's "dragging with drag lock" (Accessibility -> Pointer
+        // Control -> Trackpad Options): tap-tap-hold begins a drag, and
+        // lifting the finger keeps the button held until the next tap, so a
+        // drag longer than the pad can be done in several strokes.
+        // Bare node only — libinput 1.28 grew "sticky"/"timeout" drag-lock
+        // modes, but niri 26.04's parser rejects both spellings (verified),
+        // so this is libinput's classic timeout-based lock.
+        drag-lock
         natural-scroll
         // Mac-style whole-pad clicks (omarchy: clickfinger_behavior).
         click-method "clickfinger"
@@ -84,6 +96,29 @@ input {
     // Focus windows and outputs automatically when moving the mouse into them.
     // "0%" = only when it would not scroll the view (omarchy: follow_mouse 1).
     focus-follows-mouse max-scroll-amount="0%"
+}
+
+// macOS has four assignable hot corners; niri's can only ever toggle the
+// overview — a corner takes no action of its own (`top-right { spawn ... }`
+// is rejected by the parser), so this section is purely a choice of *which*
+// corners are live, not what they do.
+//
+// Only the two left corners are enabled, and the omission is deliberate
+// rather than conservative: the whole right edge is already spoken for by
+// the shell. Notes/NotesEdge.qml holds a 1-px hot strip down the right edge
+// (below the bar) to summon the capture panel, and Notifications/Popups.qml
+// anchors top-right. A right-hand hot corner would fire the overview on the
+// same pointer travel that reveals notes, so top-right and bottom-right stay
+// off. top-left is niri's default, written out so the pair reads as one
+// decision; bottom-left is the only genuinely unclaimed corner.
+gestures {
+    hot-corners {
+        // off
+        top-left
+        bottom-left
+        // top-right     — Notifications/Popups.qml
+        // bottom-right  — Notes/NotesEdge.qml right-edge strip
+    }
 }
 
 // You can configure outputs by their name, which you can find

@@ -1,0 +1,30 @@
+[Unit]
+Description=libinput-gestures (touchpad pinch gestures niri cannot bind)
+Documentation=https://github.com/bulletmark/libinput-gestures
+# Same session shape as qshell.service and qshell-dshift.service: starts only
+# inside a graphical session, stops with it, never outlives it. The gate is
+# not merely tidy here — every configured action shells out to `qs ipc`, so
+# the daemon is useless without the shell it drives.
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+# session.slice like the shell and the dshift watcher: a small always-on
+# input reader does not belong in the oomd-eligible app pool, where a kill
+# would silently drop the gestures with nothing on screen to say so.
+Slice=session.slice
+# Ours, not upstream's unit (which hardcodes /usr/bin/libinput-gestures from
+# a `sudo make install`). Nothing here is installed system-wide: the script
+# is a user checkout under ~/.local, and its config is found first at
+# ~/.config/libinput-gestures.conf because the program searches
+# (XDG_CONFIG_HOME, /etc) in that order — so the whole setup is sudo-free.
+ExecStart=%h/.local/bin/libinput-gestures
+# It reads /dev/input, which needs the `input` group. On a fresh machine that
+# membership only lands at the next login, so let it back off and recover
+# rather than fail permanently.
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
