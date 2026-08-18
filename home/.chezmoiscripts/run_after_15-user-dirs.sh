@@ -13,6 +13,13 @@ set -euo pipefail
 # before a project can be dropped into it (see caddy/Caddyfile.tmpl).
 mkdir -p "$HOME/Sites/laravel"
 
+# ~/Music — cliamp's initial_directory (what `o` opens in its file browser)
+# and the parent of ~/Music/cliamp, where `Ctrl+S` saves a track pulled off
+# YouTube or SoundCloud. cliamp creates the cliamp/ subdirectory on the first
+# save; it does not create the root, and its file browser opens on an error
+# instead.
+mkdir -p "$HOME/Music"
+
 # GOBIN (~/.config/go/env homes go there) — pre-created because fish_add_path
 # silently skips directories that don't exist yet, leaving GOBIN off PATH
 # until a login after the first `go install`.

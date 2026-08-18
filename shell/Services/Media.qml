@@ -29,6 +29,16 @@ import "MediaModel.js" as MediaModel
 // (same events: the player list and each player's isPlaying); and the IPC
 // surface keeps our `stop` verb — niri's XF86AudioStop bind predates this
 // service and keeps working.
+//
+// THE BAR WIDGET THIS USED TO FEED IS GONE (2026-08-18): Media.qml and
+// MediaPanel.qml were removed with bin/radio and bin/music when cliamp became
+// the music player, and the service was deliberately kept. It has three other
+// consumers, all of which would have broken with it — every XF86Audio* bind
+// in niri (they call `qs ipc call media …`, not playerctl), the track-change
+// OSD, and the audio panel's active-stream highlight, which reads
+// activePlayer straight off this ladder. Nothing here knows or cares that the
+// player answering is now usually cliamp; to this layer it is one more MPRIS
+// name beside a browser tab and mpv.
 QtObject {
     id: root
 

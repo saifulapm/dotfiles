@@ -532,6 +532,20 @@ window-rule {
     default-window-height { proportion 0.66; }
 }
 
+// cliamp (bin/music, Mod+Ctrl+M) gets the same 20%-larger floating treatment,
+// and for the same reason: it draws a now-playing header, a five-row spectrum
+// analyser, a ten-band EQ, a source line and a playlist, all at once. Its own
+// layout ladder drops to a compact three-row visualizer below 80x24 and to a
+// bare seek bar below 56x16, so the smaller qshell-float box would silently
+// cost the full player. Its own app-id rather than a title match for the same
+// reason yazi needs one — at map time the title is still the terminal's.
+window-rule {
+    match app-id="^cliamp-main$"
+    open-floating true
+    default-column-width { proportion 0.6; }
+    default-window-height { proportion 0.66; }
+}
+
 // bin/tui-install's launcher entries (omarchy's TUI.float/TUI.tile app-id
 // convention): float gets the qshell-float treatment above, tile opens as a
 // normal column and needs no rule. Desktop file and window rule are a
@@ -600,6 +614,7 @@ window-rule {
     match app-id="^foot$"
     match app-id="^qshell-float$"
     match app-id="^qshell-float-yazi$"
+    match app-id="^cliamp-main$"
     match app-id="^tmux-main$"
     match app-id="^herdr-main$"
     match app-id=r#"^TUI\.(float|tile)$"#
@@ -742,14 +757,21 @@ binds {
     Mod+Ctrl+9 hotkey-overlay-title="Bar Panel 9" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "9"; }
     // omarchy: SUPER+CTRL+T btop, floating via the qshell-float rule.
     Mod+Ctrl+T hotkey-overlay-title="System Monitor: btop" { spawn "foot-run" "--app-id=qshell-float" "btop"; }
-    // Ours: omarchy has no radio and no music picker at all — their music
-    // story is a Spotify package with no aarch64 build (bin/radio's header).
-    // Mod+Ctrl+M and its Shift variant were the free keys beside the other
-    // Mod+Ctrl pickers. Both open a menu-select; playback then lands in the
-    // bar's media widget like any MPRIS player, so the XF86Audio* binds
-    // below already control it.
-    Mod+Ctrl+M hotkey-overlay-title="Radio" { spawn "radio"; }
-    Mod+Ctrl+Shift+M hotkey-overlay-title="Play Music" { spawn "music"; }
+    // Music: cliamp. omarchy binds the same player at SUPER+SHIFT+ALT+M and
+    // launches it as a plain TUI; ours keeps the Mod+Ctrl+M it has had since
+    // the bin/radio days, because that is the key already in the fingers and
+    // it sits with the other Mod+Ctrl pickers.
+    //
+    // Through bin/music rather than `cliamp` directly, for the two things the
+    // bare binary cannot do: keep playing when the window closes (it holds the
+    // player in a detached tmux session) and stay a singleton (cliamp allows
+    // one instance and a second one silently loses MPRIS). launch-or-focus
+    // makes the WINDOW a singleton to match; bin/music's header has the rest.
+    //
+    // Playback appears to the shell as any other MPRIS player, so the
+    // XF86Audio* binds below drive it with no special-casing.
+    Mod+Ctrl+M hotkey-overlay-title="Music: cliamp" { spawn "music"; }
+    Mod+Ctrl+Shift+M hotkey-overlay-title="Play Music" { spawn "music" "--prompt"; }
     // omarchy: XF86Calculator → their calculator; ours is omacalc. (Their
     // SUPER+SHIFT+EQUAL alternative is set-window-height here.)
     XF86Calculator hotkey-overlay-title="Calculator" { spawn "omacalc"; }

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Tools Fedora does not package whose upstreams ship linux binaries for both
 # our arches (asset names verified against the GitHub API 2026-08-07, jj and
-# witr 2026-08-08, lazysql 2026-08-08, herdr 2026-08-10, yazi 2026-08-18):
-# watchexec, hurl, cloudflared, stripe, ouch, usql, jj, witr, lazysql, herdr,
-# yazi. Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
+# witr 2026-08-08, lazysql 2026-08-08, herdr 2026-08-10, yazi and cliamp
+# 2026-08-18): watchexec, hurl, cloudflared, stripe, ouch, usql, jj, witr,
+# lazysql, herdr, yazi, cliamp. Everything lands in ~/.local/bin; guarded per
+# binary; warn-don't-abort.
 #
 # GitHub's unauthenticated API allows 60 requests/hour per IP — eleven here
-# (witr's man page is a second call to the same repo), and only on a run
-# where something is actually missing (fully-guarded runs make no requests).
+# (witr's man page is a second call to the same repo; cliamp makes none, see
+# its block), and only on a run where something is actually missing
+# (fully-guarded runs make no requests).
 set -uo pipefail
 
 warn() { echo "prebuilt: $*" >&2; }
@@ -223,6 +225,50 @@ if [ ! -x "$bindir/yazi" ]; then
     fi
     rm -rf "$tmp"
   fi
+fi
+
+# cliamp — the music player (user call 2026-08-18). A Winamp-2-shaped TUI that
+# plays local files, 30 000+ radio stations from radio-browser.info, podcast
+# RSS feeds, YouTube, YouTube Music, SoundCloud, Bandcamp, Bilibili, NetEase,
+# Spotify (Premium), Qobuz, Navidrome, Plex, Jellyfin and Emby — through ONE
+# audio pipeline with a 10-band EQ, 29 visualizers, synced lyrics, playlists
+# and an MPRIS bridge. It replaced bin/radio, bin/music and the bar's media
+# widget/panel the same day: all three existed only because omarchy's music
+# story is a Spotify package with no aarch64 build, and cliamp is the answer
+# omarchy itself moved to (their install/omarchy-base.packages carries it, and
+# SUPER+SHIFT+ALT+M launches it as a TUI).
+#
+# The ONLY block in this script that makes NO GitHub API call. cliamp's asset
+# names carry no version — `cliamp-linux-arm64`, `cliamp-linux-amd64` — so the
+# releases/latest/download/<name> redirect resolves them directly, which keeps
+# the 60/hr budget where it is AND buys a checksum for free: checksums.txt is
+# an asset under the same redirect. Upstream's own install.sh refuses to
+# install a release with no matching checksum, and so does this.
+#
+# Runtime deps are already here and declared: ffmpeg (AAC/ALAC/Opus/WMA and
+# HLS), yt-dlp (YouTube/SoundCloud/Bandcamp/Bilibili/NetEase) and
+# pipewire-alsa — cliamp's audio backend is ALSA, so that bridge is what makes
+# it audible on a PipeWire box at all. Nothing is built here: alsa-lib-devel
+# would be a build dep only, and the release binary statically links
+# FLAC/Vorbis/Ogg.
+if ! command -v cliamp >/dev/null 2>&1; then
+  goarch="arm64"; [ "$arch" = "x86_64" ] && goarch="amd64"
+  asset="cliamp-linux-${goarch}"
+  base="https://github.com/bjarneo/cliamp/releases/latest/download"
+  tmp="$(mktemp -d)"
+  if curl -fsSL -o "$tmp/$asset" "$base/$asset" \
+    && curl -fsSL -o "$tmp/checksums.txt" "$base/checksums.txt" \
+    && expected="$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1 }' "$tmp/checksums.txt")" \
+    && [ -n "$expected" ] \
+    && [ "$(sha256sum "$tmp/$asset" | cut -d' ' -f1)" = "$expected" ]; then
+    install -m755 "$tmp/$asset" "$bindir/cliamp.part" \
+      && mv "$bindir/cliamp.part" "$bindir/cliamp" \
+      && echo "prebuilt: installed cliamp"
+    rm -f "$bindir/cliamp.part"
+  else
+    warn "cliamp install failed (download failed or checksum did not match)"
+  fi
+  rm -rf "$tmp"
 fi
 
 exit 0

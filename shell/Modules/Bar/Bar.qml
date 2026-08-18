@@ -816,7 +816,6 @@ Scope {
             "bluetooth": bluetoothComponent,
             "airpods": airpodsComponent,
             "battery": batteryComponent,
-            "media": mediaComponent,
             "kb": kbComponent,
             "tray": trayComponent,
             "update": updateComponent,
@@ -2112,13 +2111,6 @@ Scope {
     Component {
         id: batteryComponent
         Battery {
-            theme: barRoot.theme
-        }
-    }
-
-    Component {
-        id: mediaComponent
-        Media {
             theme: barRoot.theme
         }
     }

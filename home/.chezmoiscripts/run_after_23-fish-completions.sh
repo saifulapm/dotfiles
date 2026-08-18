@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# fish completions for tools that can only SELF-generate — stripe and herdr.
+# fish completions for tools that can only SELF-generate — stripe, herdr and
+# cliamp.
 # Regenerated into ~/.config/fish/completions on every apply (that dir also
 # holds the chezmoi-symlinked static completions; chezmoi never deletes
 # unmanaged files, so the two coexist).
@@ -13,9 +14,9 @@
 # bash-only in the Fedora build — fish's shipped file covers it.
 set -uo pipefail
 
-# stripe and herdr live in ~/.local/bin (run_after_10), which bash sessions do
-# NOT have on PATH — without this export the guards below never saw them on a
-# fresh machine and the completions were silently never generated.
+# stripe, herdr and cliamp live in ~/.local/bin (run_after_10), which bash
+# sessions do NOT have on PATH — without this export the guards below never saw
+# them on a fresh machine and the completions were silently never generated.
 export PATH="$HOME/.local/bin:$PATH"
 
 warn() { echo "fish-completions: $*" >&2; }
@@ -46,6 +47,20 @@ if command -v herdr >/dev/null 2>&1; then
     echo "fish-completions: herdr.fish regenerated"
   else
     rm -f "$tmp"; warn "herdr completion generation failed"
+  fi
+fi
+
+# cliamp — same stdout shape as herdr, same reason for the scratch file. Worth
+# having: the completion covers the whole `playlist`/`history`/`device` verb
+# tree and the provider and EQ-preset names, which is most of what the CLI is.
+if command -v cliamp >/dev/null 2>&1; then
+  tmp="$(mktemp)"
+  if cliamp completion fish >"$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+    mv -f "$tmp" "$dest/cliamp.fish"
+    chmod 644 "$dest/cliamp.fish"
+    echo "fish-completions: cliamp.fish regenerated"
+  else
+    rm -f "$tmp"; warn "cliamp completion generation failed"
   fi
 fi
 

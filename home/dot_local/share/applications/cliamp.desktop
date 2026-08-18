@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Music
+GenericName=Music Player
+Comment=Radio, YouTube, podcasts and local files in cliamp inside a foot window
+Exec=music
+Terminal=false
+Icon=multimedia-audio-player
+StartupNotify=true
+Categories=AudioVideo;Audio;Player;ConsoleOnly;
+Keywords=music;radio;player;cliamp;youtube;spotify;podcast;soundcloud;stream;winamp;
+X-Qshell-TUI=true

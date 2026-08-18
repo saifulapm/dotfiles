@@ -436,6 +436,9 @@ const OUTPUTS = {
   // state file is sourced by fish conf.d/40-gum-theme.fish at shell start.
   "btop-theme.tmpl": [path.join(HOME, ".config/btop/themes/qshell.theme")],
   "helix-theme.toml.tmpl": [path.join(HOME, ".config/helix/themes/qshell.toml")],
+  // cliamp (the music player) takes a theme's NAME from its filename, so this
+  // one has to land as qshell.toml — config.toml pins `theme = "qshell"`.
+  "cliamp-theme.toml.tmpl": [path.join(HOME, ".config/cliamp/themes/qshell.toml")],
   // television: same themes/<name>.toml convention as helix/btop, pinned by
   // theme = "qshell" in its config.toml. No poke below — tv is spawned fresh
   // by each ctrl-r/ctrl-t, so it picks the new palette up on next open.
@@ -691,6 +694,15 @@ try {
   // app:theme. Verified end to end: a running yazi repainted from the new file
   // without restarting. No instance running is not an error.
   try { execSync("ya pub-to 0 qshell-theme --str ''", { stdio: "ignore", timeout: 5000 }) } catch (e) { /* no ya, or no instances */ }
+  // cliamp: no signal either, and no need for one — its IPC `theme` command
+  // calls theme.LoadAll() BEFORE applying (ui/model/update.go, ipc.ThemeMsg),
+  // so re-sending the name it already has is precisely what makes it re-read
+  // the file just written. Not running is not an error: the CLI reports no
+  // socket and exits. Note this also persists `theme = "qshell"` back into
+  // cliamp's config.toml, which is harmless — that file is deliberately
+  // unmanaged (run_after_40-cliamp.sh explains why) and the value is the same
+  // one already there.
+  try { execSync("cliamp theme qshell", { stdio: "ignore", timeout: 5000 }) } catch (e) { /* not running */ }
 }
 
 console.log("theme-apply: done")

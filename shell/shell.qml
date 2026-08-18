@@ -56,8 +56,13 @@ ShellRoot {
     // player, playing-order ledger, PipeWire stream correlation, source
     // cycling with playback transfer, media OSDs, and the `media` IPC target
     // niri's XF86 keys call. Eager like upstream's keepLoaded service — the
-    // keybinds and the bar widget both need it standing; PipeWire is already
-    // resident (Audio), so the cost is one MPRIS D-Bus subscription.
+    // keybinds need it standing whether or not anything is playing; PipeWire
+    // is already resident (Audio), so the cost is one MPRIS D-Bus
+    // subscription. It OUTLIVED the bar's media widget, removed 2026-08-18
+    // with the rest of the homegrown music stack: this layer is what the
+    // XF86Audio* binds, the track-change OSD and the audio panel's active-
+    // stream picker all read, and it does not care whether the player
+    // answering is cliamp, a browser tab or mpv.
     // `osd` stays null until the OSD surface resolves (~a beat after start);
     // Media null-guards every use.
     property Media media: Media {

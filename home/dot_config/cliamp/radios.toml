@@ -1,0 +1,100 @@
+# radios.toml — the saved station list, ported from the old
+# ~/.config/qshell/radio-stations when cliamp replaced bin/radio (2026-08-18).
+#
+# These appear at the TOP of cliamp's Radio provider (press `R`), above the
+# 30 000+ stations it pulls from radio-browser.info. `/` filters, Enter plays,
+# `a` appends to the playlist.
+#
+# cliamp only ever READS this file — the `f` favourite key writes
+# radio_favorites.toml beside it — which is why, unlike config.toml, this one
+# is a chezmoi symlink straight into the repo. A station added here is a diff
+# you commit, and every machine gets it. That was the point of the old file
+# too, so nothing about the workflow changed except the syntax.
+#
+# To find a new one: press `R`, then `/` and search the catalogue; `f`
+# favourites it locally. Move the keepers here to make them permanent.
+#
+# Every URL below was re-fetched and confirmed streaming on 2026-08-18.
+# Stations rot — when one goes quiet, search the catalogue for a replacement.
+
+# ------------------------------------------------------------ Bangladesh
+
+[[station]]
+name = "Peoples Radio 91.6"
+url = "https://s3.myradiostream.com:14498/listen.mp3"
+
+[[station]]
+name = "Bangladesh Betar Dhaka"
+url = "http://as1.digitalsynapsebd.com:8582/;"
+
+[[station]]
+name = "Radio GoonGoon"
+url = "https://audio.streamcast.xyz/listen/radiogoongoon/radio.mp3"
+
+[[station]]
+name = "A2Z Radio"
+url = "https://listen.radioking.com/radio/1743/stream/125"
+
+# ------------------------------------------------------- chilled / work
+# SomaFM is listener-supported and ad-free, and every channel sends ICY
+# metadata — which is what puts a live track name in cliamp's title row
+# (and, through its MPRIS bridge, into the OSD on a track change).
+
+[[station]]
+name = "SomaFM Groove Salad"
+url = "https://ice1.somafm.com/groovesalad-128-mp3"
+
+[[station]]
+name = "SomaFM Drone Zone"
+url = "https://ice1.somafm.com/dronezone-128-mp3"
+
+[[station]]
+name = "SomaFM Lush"
+url = "https://ice1.somafm.com/lush-128-mp3"
+
+[[station]]
+name = "SomaFM Beat Blender"
+url = "https://ice1.somafm.com/beatblender-128-mp3"
+
+[[station]]
+name = "SomaFM Secret Agent"
+url = "https://ice1.somafm.com/secretagent-128-mp3"
+
+[[station]]
+name = "SomaFM Indie Pop Rocks"
+url = "https://ice1.somafm.com/indiepop-128-mp3"
+
+# ----------------------------------------------------------- hand-picked
+
+[[station]]
+name = "Radio Paradise Main"
+url = "https://stream.radioparadise.com/mp3-192"
+
+[[station]]
+name = "Radio Paradise Mellow"
+url = "https://stream.radioparadise.com/mellow-192"
+
+[[station]]
+name = "Radio Paradise Rock"
+url = "https://stream.radioparadise.com/rock-192"
+
+[[station]]
+name = "Radio Paradise Global"
+url = "https://stream.radioparadise.com/global-192"
+
+[[station]]
+name = "KEXP Seattle"
+url = "https://kexp-mp3-128.streamguys1.com/kexp128.mp3"
+
+# ------------------------------------------------------- jazz / eclectic
+# FIP sends no inline ICY; cliamp special-cases it and pulls now-playing
+# from Radio France's livemeta API instead, so the artist and title still
+# show. (It does the same for NTS 1 / NTS 2, which report the show name.)
+
+[[station]]
+name = "FIP"
+url = "https://icecast.radiofrance.fr/fip-midfi.mp3"
+
+[[station]]
+name = "FIP Jazz"
+url = "https://icecast.radiofrance.fr/fipjazz-midfi.mp3"

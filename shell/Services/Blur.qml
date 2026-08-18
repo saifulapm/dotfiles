@@ -53,7 +53,7 @@ QtObject {
     // The excludes are the foot family (the same set as config.kdl's scroll
     // rule): those windows frost via their own background alpha, not a
     // whole-window fade — see the header comment.
-    readonly property string footExcludes: "    exclude app-id=\"^foot$\"\n" + "    exclude app-id=\"^qshell-float$\"\n" + "    exclude app-id=\"^qshell-float-yazi$\"\n" + "    exclude app-id=\"^tmux-main$\"\n" + "    exclude app-id=r#\"^TUI\\.(float|tile)$\"#\n"
+    readonly property string footExcludes: "    exclude app-id=\"^foot$\"\n" + "    exclude app-id=\"^qshell-float$\"\n" + "    exclude app-id=\"^qshell-float-yazi$\"\n" + "    exclude app-id=\"^cliamp-main$\"\n" + "    exclude app-id=\"^tmux-main$\"\n" + "    exclude app-id=r#\"^TUI\\.(float|tile)$\"#\n"
     readonly property string fragmentOn: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Frosted app windows over niri's cached xray wallpaper blur. Global\n" + "// blur tuning stays at niri's defaults (passes 3, offset 3).\n" + "window-rule {\n" + "    background-effect {\n" + "        blur true\n" + "    }\n" + "}\n" + "\n" + "window-rule {\n" + "    opacity 0.95\n" + footExcludes + "}\n" + "\n" + "window-rule {\n" + "    match is-active=false\n" + "    opacity 0.9\n" + footExcludes + "}\n"
     readonly property string fragmentOff: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Blur is disabled; config.kdl includes this file optionally.\n"
 

@@ -82,14 +82,15 @@ var TREE = {
     },
     // Omarchy files this under their Trigger submenu, with the same three
     // rows; ours sits at the root next to the other pickers.
-    // Ours, with no upstream counterpart: omarchy ships no radio and no music
-    // picker — their whole music story is a Spotify package that has no
-    // aarch64 build (bin/radio's header). Sits with the other pickers.
-    "radio": {
-        "icon": "󰖖",
-        "label": "Radio",
-        "aliases": ["music", "radio", "stream", "listen", "song", "player", "station", "stations", "somafm", "youtube"],
-        "description": "Play internet radio, or a track from YouTube"
+    // omarchy files cliamp under Apps and launches it with one bind; ours gets
+    // a submenu instead, because the player is a singleton with a running
+    // state worth acting on from here (stop it, queue a track into it) rather
+    // than only something to open. Sits with the other pickers.
+    "music": {
+        "icon": "󰝚",
+        "label": "Music",
+        "aliases": ["music", "radio", "stream", "listen", "song", "player", "station", "stations", "somafm", "youtube", "spotify", "podcast", "cliamp"],
+        "description": "Radio, YouTube, podcasts — anything cliamp plays"
     },
     "reminder": {
         "icon": "󰢌",
@@ -286,47 +287,51 @@ var TREE = {
         "action": "\"$HOME/.dotfiles/bin/background-next\""
     },
 
-    // ----------------------------------------------------------------- radio
-    // Stop leads and hides while nothing plays, the way
-    // capture.screenrecord.stop does. `radio status` exits non-zero when idle,
-    // so the same command is both the guard here and the answer elsewhere.
-    "radio.stop": {
+    // ----------------------------------------------------------------- music
+    // Four rows, where the old radio submenu had five. The two that went are
+    // not missing features, they moved INSIDE the player, which is the whole
+    // point of replacing a pile of shell scripts with cliamp: browsing the
+    // 30 000+ radio-browser.info catalogue is `R` then `/`, and saving what is
+    // playing is `f` — neither has a CLI verb, and wrapping the socket to fake
+    // one would be building a worse copy of a screen that already exists.
+    //
+    // `cliamp status` exits non-zero when nothing is running, so it guards the
+    // two rows that only make sense mid-playback exactly the way the old
+    // `radio status` did — they lead the submenu and hide while it is idle,
+    // like capture.screenrecord.stop.
+    // cliamp is named by absolute path, like every other command here: it
+    // lives in ~/.local/bin, which the shell's own environment does not
+    // reliably carry (run_after_10's header has the same note about bash).
+    "music.toggle": {
+        "icon": "󰏤",
+        "label": "Pause / Resume",
+        "aliases": ["pause", "resume", "toggle", "hold"],
+        "description": "Pause what is playing, or start it again",
+        "when": "\"$HOME/.local/bin/cliamp\" status",
+        "action": "\"$HOME/.local/bin/cliamp\" toggle"
+    },
+    "music.stop": {
         "icon": "󰓛",
         "label": "Stop",
         "aliases": ["stop", "off", "silence", "quit"],
-        "description": "Stop the stream that is playing",
-        "when": "\"$HOME/.dotfiles/bin/radio\" status",
-        "action": "\"$HOME/.dotfiles/bin/radio\" stop"
+        "description": "Stop playback",
+        "when": "\"$HOME/.local/bin/cliamp\" status",
+        "action": "\"$HOME/.local/bin/cliamp\" stop"
     },
-    "radio.stations": {
-        "icon": "󰲰",
-        "label": "Stations",
-        "aliases": ["station", "saved", "presets", "list"],
-        "description": "Pick one of the saved stations",
-        "action": "\"$HOME/.dotfiles/bin/radio\""
-    },
-    "radio.music": {
+    "music.open": {
         "icon": "󰝚",
-        "label": "Play Music",
-        "aliases": ["song", "track", "youtube", "play", "search"],
-        "description": "Search YouTube for a track and play its audio",
-        "when": "command -v yt-dlp",
+        "label": "Open Player",
+        "aliases": ["open", "player", "cliamp", "radio", "stations", "browse", "podcast", "spotify"],
+        "description": "Open cliamp, or focus it if it is already playing",
         "action": "\"$HOME/.dotfiles/bin/music\""
     },
-    "radio.search": {
+    "music.play": {
         "icon": "󰍉",
-        "label": "Search Stations",
-        "aliases": ["find", "browse", "radio-browser", "new", "country"],
-        "description": "Search radio-browser.info for a station anywhere",
-        "action": "\"$HOME/.dotfiles/bin/radio\" search"
-    },
-    "radio.save": {
-        "icon": "󰆓",
-        "label": "Save Current Station",
-        "aliases": ["save", "bookmark", "keep", "add"],
-        "description": "Append what is playing to the saved station list",
-        "when": "\"$HOME/.dotfiles/bin/radio\" status",
-        "action": "\"$HOME/.dotfiles/bin/radio\" save"
+        "label": "Play a Track",
+        "aliases": ["song", "track", "youtube", "play", "search", "queue"],
+        "description": "Search YouTube for a track and add it to the playlist",
+        "when": "command -v yt-dlp",
+        "action": "\"$HOME/.dotfiles/bin/music\" --prompt"
     },
 
     // -------------------------------------------------------------- reminder

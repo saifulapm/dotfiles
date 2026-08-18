@@ -1357,13 +1357,13 @@ why = "Video player, from both lists. CORRECTION 2026-08-11: the parenthetical '
 name = "yt-dlp"
 category = "optional"
 arch = "all"
-why = "Video downloader, from both lists. Also the search-and-resolve half of bin/music — mpv's ytdl hook calls it to turn a YouTube link into an audio stream"
+why = "Video downloader, from both lists. Also the whole non-Spotify streaming half of [[tool]] cliamp: YouTube, YouTube Music, SoundCloud, Bandcamp, Bilibili and NetEase all resolve through it, and `cliamp search` is a ytsearch. Was bin/music's resolver until cliamp replaced that script 2026-08-18 — same dependency, one fewer wrapper. KEEP IT FRESH: yt-dlp breaks whenever YouTube changes, and cliamp surfaces the failure as a bare 'waiting for audio data: EOF' unless the real message is read from its log"
 
 [[pkg]]
 name = "mpv-mpris"
 category = "optional"
 arch = "all"
-why = "The one package bin/radio and bin/music need (user-approved 2026-08-08). Drops mpris.so into /etc/mpv/scripts, which mpv auto-loads with no config, so every mpv publishes org.mpris.MediaPlayer2 — that is the whole bridge between a playing stream and the bar's media widget, its panel, the OSD and the XF86Audio* binds. Spotify has no aarch64 build and omarchy's music story is `pkg-add spotify`, so this replaces it"
+why = "Drops mpris.so into /etc/mpv/scripts, which mpv auto-loads with no config, so every mpv publishes org.mpris.MediaPlayer2 — the OSD, the audio panel's SOURCES list and the XF86Audio* binds all see a playing video without knowing what mpv is. Installed 2026-08-08 (user-approved) for bin/radio and bin/music, which streamed through mpv; both scripts were replaced by [[tool]] cliamp on 2026-08-18 and cliamp brings its OWN MPRIS bridge, so this no longer carries any music. Kept for the video case it still serves — a package this small that makes a whole class of player controllable is worth its 30 KB"
 
 [[pkg]]
 name = "imv"
@@ -1496,6 +1496,11 @@ why = "SMTP sending. Emacs message-mode drives it as its sendmail-program and pi
 # ------------------------------------------------------------------ non-dnf tools
 # Installed by chezmoi scripts / declared externals, recorded here so the
 # manifest stays the complete inventory.
+
+[[tool]]
+name = "cliamp"
+via  = "run_after_10-prebuilt-binaries.sh (github.com/bjarneo/cliamp, `cliamp-linux-{arm64,amd64}` bare binary off the releases/latest/download redirect, sha256-verified against the release's checksums.txt) → ~/.local/bin/cliamp. The only block in that script that costs no GitHub API request — the asset names carry no version. Its config is split three ways on purpose: ~/.config/cliamp/radios.toml is a chezmoi symlink (cliamp only reads it — the `f` favourite key writes radio_favorites.toml instead), config.toml is SEEDED once by run_after_40-cliamp.sh and then left alone (cliamp rewrites it atomically on every theme change and on `cliamp setup`, so managing it would mean permanent repo dirt and a credential committed), and themes/qshell.toml is RENDERED by theme-apply and poked live over cliamp's own IPC. Fish completions self-generate in run_after_23. Launched by bin/music (Mod+Ctrl+M) inside a detached tmux session so closing the window does not stop the music"
+why  = "THE music player, replacing bin/radio + bin/music + the bar's media widget and panel (user call 2026-08-18). Those three existed for one reason: omarchy's entire music story was `pkg-add spotify`, which has no aarch64 build, so this machine had to grow its own radio and YouTube-search scripts around mpv. omarchy has since moved to cliamp itself (install/omarchy-base.packages, SUPER+SHIFT+ALT+M in their applications.lua, manual/21-tuis.md), and cliamp does strictly more than the scripts did, in one process: 30 000+ radio-browser.info stations with ICY now-playing, podcast RSS feeds, YouTube + YouTube Music, SoundCloud, Bandcamp, Bilibili, NetEase, Spotify (Premium, via go-librespot), Qobuz, Navidrome, Plex, Jellyfin, Emby and plain local files — all through ONE audio pipeline with a 10-band parametric EQ, 29 visualizers, synced lyrics from embedded tags/LRCLIB/NetEase, TOML + M3U/PLS playlists, listening history, per-track bookmarks, an audio-device switcher, a Lua plugin VM, and an MPRIS bridge (org.mpris.MediaPlayer2.cliamp) that makes every existing XF86Audio* bind work on it unchanged. Runtime deps were ALL already installed and declared: ffmpeg, yt-dlp, pipewire-alsa (its backend is ALSA — that bridge is what makes it audible on PipeWire). Deliberately NOT taken from the same repo: contrib/quickshell's now-playing card, a 300x72 Winamp-2 spectrum panel that reads cliamp's `visstream` IPC. It is written against omarchy's colors.toml, and adding a media card back to the bar is the opposite of the ask that removed ours"
 
 [[tool]]
 name = "librepods"
