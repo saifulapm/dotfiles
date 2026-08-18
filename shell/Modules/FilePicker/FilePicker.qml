@@ -123,6 +123,47 @@ Scope {
         return saving ? "file name" : "filter";
     }
 
+    // Whether the field holds a name the user is COMPOSING (a save name, a
+    // typed path, a new folder's name) rather than a filter over the list.
+    // A composed name gets a real caret — click to place it, ← → to walk it,
+    // home/end, selection — because turning "invoice-2026.pdf" into
+    // "invoice-final.pdf" is an edit, and an append-only field makes that a
+    // count-the-backspaces exercise. The open-mode filter stays append-only:
+    // there, ← → are worth far more as folder navigation than as caret moves.
+    readonly property bool fieldEditable: fieldMode !== "query" || saving
+
+    // Write back to whichever property the field is currently showing.
+    function setFieldText(value) {
+        const text = String(value);
+        if (fieldMode === "path")
+            pathInput = text;
+        else if (fieldMode === "newfolder")
+            newFolderName = text;
+        else
+            query = text;
+    }
+
+    // Where the caret lands when the field takes focus. A save name preselects
+    // its stem, so the first keystroke replaces the name and keeps the
+    // extension — what every other save dialog does, and the whole reason a
+    // suggested name is worth suggesting. A typed path is seeded with the
+    // current directory and wants the caret at the end instead: selecting it
+    // would mean the first keystroke threw the seed away.
+    function placeCaret(input) {
+        if (!input)
+            return;
+        if (fieldMode === "path" || fieldMode === "newfolder") {
+            input.cursorPosition = input.length;
+            return;
+        }
+        const text = String(input.text || "");
+        const dot = text.lastIndexOf(".");
+        if (dot > 0)
+            input.select(0, dot);
+        else
+            input.selectAll();
+    }
+
     // -------------------------------------------------------------- sidebar
     // Places and mounts come from a per-open probe (they change under us);
     // pins live in GTK's own bookmarks file so every GTK app shares them.
@@ -836,6 +877,8 @@ Scope {
                 } else if (event.key === Qt.Key_End) {
                     go(pickerRoot.entries.length - 1);
                 } else if (event.key === Qt.Key_Left || (alt && event.key === Qt.Key_Up)) {
+                    // alt+← → is the same walk, and the only one available
+                    // while a name is being composed — see fieldEditable.
                     pickerRoot.goUp();
                 } else if (event.key === Qt.Key_Right) {
                     if (pickerRoot.currentEntry && pickerRoot.currentEntry.isDir)
@@ -969,7 +1012,10 @@ Scope {
                     border.width: pickerRoot.theme.borderWidth
                     border.color: pickerRoot.overwritePending ? pickerRoot.theme.warn : (pickerRoot.fieldText !== "" || pickerRoot.fieldMode !== "query" ? pickerRoot.theme.accent : pickerRoot.theme.surface3)
 
+                    // The filter, as a label: append-only, so there is nothing
+                    // to put a caret in.
                     Text {
+                        visible: !pickerRoot.fieldEditable
                         anchors.left: parent.left
                         anchors.right: fieldHint.left
                         anchors.leftMargin: pickerRoot.theme.space(3)
@@ -978,8 +1024,150 @@ Scope {
                         elide: Text.ElideLeft
                         text: pickerRoot.fieldText !== "" ? pickerRoot.fieldText : pickerRoot.fieldPlaceholder
                         color: pickerRoot.fieldText !== "" ? pickerRoot.theme.textPrimary : pickerRoot.theme.textMuted
-                        font.family: pickerRoot.saving || pickerRoot.fieldMode !== "query" ? pickerRoot.theme.fontMono : pickerRoot.theme.fontUi
+                        font.family: pickerRoot.theme.fontUi
                         font.pixelSize: pickerRoot.theme.fontPx(1.0)
+                    }
+
+                    // The placeholder for the editable field, which a TextInput
+                    // cannot draw itself.
+                    Text {
+                        visible: pickerRoot.fieldEditable && pickerRoot.fieldText === ""
+                        anchors.left: parent.left
+                        anchors.right: fieldHint.left
+                        anchors.leftMargin: pickerRoot.theme.space(3)
+                        anchors.rightMargin: pickerRoot.theme.space(2)
+                        anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideRight
+                        text: pickerRoot.fieldPlaceholder
+                        color: pickerRoot.theme.textMuted
+                        font.family: pickerRoot.theme.fontMono
+                        font.pixelSize: pickerRoot.theme.fontPx(1.0)
+                    }
+
+                    // A composed name, as a real text input.
+                    TextInput {
+                        id: fieldInput
+
+                        visible: pickerRoot.fieldEditable
+                        enabled: visible
+                        anchors.left: parent.left
+                        anchors.right: fieldHint.left
+                        anchors.leftMargin: pickerRoot.theme.space(3)
+                        anchors.rightMargin: pickerRoot.theme.space(2)
+                        anchors.verticalCenter: parent.verticalCenter
+                        clip: true
+
+                        text: pickerRoot.fieldText
+                        // onTextEdited fires for user edits only, never for the
+                        // binding above — so the two can point at each other
+                        // without looping.
+                        onTextEdited: pickerRoot.setFieldText(text)
+
+                        color: pickerRoot.theme.textPrimary
+                        selectionColor: pickerRoot.theme.accent
+                        selectedTextColor: pickerRoot.theme.surface1
+                        selectByMouse: true
+                        activeFocusOnPress: true
+                        font.family: pickerRoot.theme.fontMono
+                        font.pixelSize: pickerRoot.theme.fontPx(1.0)
+
+                        // Everything the picker owns has to be taken back
+                        // before TextInput swallows it: the list cursor, the
+                        // accept/cancel keys, and the picker's own chords.
+                        // What is left through is text editing — which now
+                        // includes ← → home/end, so folder walking moves onto
+                        // alt+← → for as long as a name is being composed.
+                        Keys.onPressed: event => {
+                            const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
+                            const alt = (event.modifiers & Qt.AltModifier) !== 0;
+                            const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
+
+                            if (alt && event.key === Qt.Key_Left)
+                                pickerRoot.goUp();
+                            else if (alt && event.key === Qt.Key_Up)
+                                pickerRoot.goUp();
+                            else if (alt && event.key === Qt.Key_Right) {
+                                if (pickerRoot.currentEntry && pickerRoot.currentEntry.isDir)
+                                    pickerRoot.enter(pickerRoot.currentEntry.path);
+                            } else if (event.key === Qt.Key_Up)
+                                pickerRoot.moveTo(pickerRoot.cursor - 1);
+                            else if (event.key === Qt.Key_Down)
+                                pickerRoot.moveTo(pickerRoot.cursor + 1);
+                            else if (event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown) {
+                                const page = Math.max(1, Math.floor(listView.height / pickerRoot.rowHeight));
+                                pickerRoot.moveTo(pickerRoot.cursor + (event.key === Qt.Key_PageUp ? -page : page));
+                            } else if (event.key === Qt.Key_Escape) {
+                                if (pickerRoot.fieldMode !== "query") {
+                                    pickerRoot.fieldMode = "query";
+                                    pickerRoot.pathInput = "";
+                                    pickerRoot.newFolderName = "";
+                                } else if (pickerRoot.overwritePending)
+                                    pickerRoot.overwritePending = false;
+                                else
+                                    pickerRoot.cancel();
+                            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                if (pickerRoot.fieldMode === "path")
+                                    pickerRoot.commitPath();
+                                else if (pickerRoot.fieldMode === "newfolder")
+                                    pickerRoot.commitNewFolder();
+                                else
+                                    pickerRoot.activate();
+                            } else if (event.key === Qt.Key_Tab) {
+                                if (pickerRoot.filters.length > 1)
+                                    pickerRoot.filterIndex = (pickerRoot.filterIndex + 1) % pickerRoot.filters.length;
+                            } else if (ctrl && event.key === Qt.Key_L) {
+                                pickerRoot.fieldMode = "path";
+                                pickerRoot.pathInput = pickerRoot.currentPath === "/" ? "/" : pickerRoot.currentPath + "/";
+                            } else if (ctrl && shift && event.key === Qt.Key_N) {
+                                pickerRoot.fieldMode = "newfolder";
+                                pickerRoot.newFolderName = "";
+                            } else if (ctrl && event.key === Qt.Key_H)
+                                pickerRoot.showHidden = !pickerRoot.showHidden;
+                            else if (ctrl && event.key === Qt.Key_D)
+                                pickerRoot.togglePin();
+                            else if (ctrl && event.key >= Qt.Key_1 && event.key <= Qt.Key_9)
+                                pickerRoot.jumpToPlace(event.key - Qt.Key_1 + 1);
+                            else
+                                return; // TextInput handles the rest.
+                            event.accepted = true;
+                        }
+
+                        // The field only owns the keyboard while it is holding
+                        // a name; the moment it stops, the list wants its keys
+                        // back (or the surface is closing and nothing should
+                        // hold focus at all).
+                        function claim() {
+                            fieldInput.forceActiveFocus();
+                            pickerRoot.placeCaret(fieldInput);
+                        }
+
+                        Connections {
+                            target: pickerRoot
+
+                            function onOpenedChanged() {
+                                if (pickerRoot.opened && pickerRoot.fieldEditable)
+                                    Qt.callLater(fieldInput.claim);
+                                else if (!pickerRoot.opened)
+                                    keyCatcher.forceActiveFocus();
+                            }
+
+                            // Covers both directions of ctrl+L / ctrl+shift+N
+                            // and the escape back out of them.
+                            function onFieldEditableChanged() {
+                                if (pickerRoot.fieldEditable)
+                                    Qt.callLater(fieldInput.claim);
+                                else
+                                    keyCatcher.forceActiveFocus();
+                            }
+
+                            // Switching between two editable modes keeps the
+                            // field but changes which property it edits, so the
+                            // caret has to be placed again for the new one.
+                            function onFieldModeChanged() {
+                                if (pickerRoot.fieldEditable)
+                                    Qt.callLater(fieldInput.claim);
+                            }
+                        }
                     }
 
                     StyledText {
@@ -1529,7 +1717,7 @@ Scope {
                                 if (pickerRoot.multiple && pickerRoot.selectionCount > 0)
                                     return pickerRoot.selectionCount + " selected · shift extends · ctrl+enter accepts";
                                 if (pickerRoot.saving)
-                                    return "type the name · enter saves · ← → walks folders";
+                                    return "edit the name · enter saves · alt+← → walks folders";
                                 if (pickerRoot.multiple)
                                     return "ctrl/shift+click selects · ctrl+a all · ctrl+enter accepts";
                                 return "type to filter · ctrl+l path · ctrl+d pins · ctrl+h hidden";
