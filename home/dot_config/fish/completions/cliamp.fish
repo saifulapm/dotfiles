@@ -43,7 +43,29 @@ function __cliamp_perform_completion
     # $args[2..-1] on a single-element list is empty in fish rather than an
     # error, so this covers bare `cliamp <TAB>` and any depth of subcommand.
     for line in ($args[1] $args[2..-1] --generate-shell-completion 2>/dev/null)
-        test -n "$line"; and printf '%s\n' $line
+        test -n "$line"; or continue
+
+        # THE OUTPUT FORMAT DEPENDS ON $SHELL. urfave/cli prints bare names
+        # under bash, but `name:description` when $SHELL ends in fish or zsh —
+        # which is every real session this file runs in:
+        #
+        #   SHELL=/bin/bash     → setup
+        #   SHELL=/usr/bin/fish → setup:interactive wizard to configure remote providers
+        #
+        # Passed through unsplit, that whole string becomes the completion
+        # VALUE, and accepting it types `cliamp setup:interactive\ wizard\ to\
+        # configure\ remote\ providers` onto the command line. Splitting on the
+        # first colon into fish's own value<TAB>description is what upstream's
+        # template intended to do here.
+        #
+        # -m 1 so a value that itself contains a colon keeps the remainder in
+        # its description rather than being cut into three.
+        set -l parts (string split -m 1 ":" -- $line)
+        if test (count $parts) -eq 2
+            printf '%s\t%s\n' $parts[1] $parts[2]
+        else
+            printf '%s\n' $line
+        end
     end
 end
 
