@@ -54,7 +54,7 @@ BarPanel {
     // md-headphones_box and md-headphones_settings, adjacent codepoints that
     // draw as near-identical headphone squares — the two cells a user most
     // needs to tell apart were the two that looked the same.
-    readonly property var modes: [
+    readonly property var allModes: [
         {
             mode: 0,
             label: "Off",
@@ -76,6 +76,17 @@ BarPanel {
             glyph: "󰩅"
         }
     ]
+
+    // The device decides which of those it actually has. A chip the hardware
+    // silently refuses is worse than a missing one: it looks like the panel
+    // is broken rather than like the mode does not exist.
+    readonly property var modes: panel.allModes.filter(entry => {
+        if (entry.mode === 0)
+            return panel.service.supportsNoiseOff;
+        if (entry.mode === 3)
+            return panel.service.proControls;
+        return true;
+    })
 
     // The adaptive level is a property of adaptive mode, and the daemon's
     // setter is a no-op in any other, so the slider only exists there.
@@ -152,7 +163,11 @@ BarPanel {
     function activateRow() {
         switch (panel.cursorRow) {
         case "modes":
-            panel.service.setNoise(panel.modes[panel.cursorIndex].mode);
+            // The list shrinks on a device without Off or without Adaptive,
+            // and the cursor may still be sitting past the new end.
+            const chip = panel.modes[panel.cursorIndex];
+            if (chip)
+                panel.service.setNoise(chip.mode);
             break;
         case "ca":
             panel.service.setConversationalAwareness(!panel.service.conversationalAwareness);
@@ -547,6 +562,14 @@ BarPanel {
             }
         }
 
+        // Deliberately NOT wired to `toggled`. PanelSwitch carries its own
+        // TapHandler, and pointer handlers do not consume a tap the way a
+        // MouseArea does — both it and the row's handler below fire for a tap
+        // that lands on the switch. That ran the setter twice, the second call
+        // reading the value the first had already flipped optimistically, so
+        // clicking the switch itself toggled and untoggled and looked dead
+        // while clicking the row worked. The row owns the gesture; the switch
+        // is the indicator.
         PanelSwitch {
             id: rowSwitch
             theme: panel.theme
@@ -556,7 +579,6 @@ BarPanel {
             checked: switchRow.checked
             hasCursor: switchRow.hasCursor
             onHovered: panel.focusRow(switchRow.rowName)
-            onToggled: switchRow.toggled()
         }
 
         HoverHandler {

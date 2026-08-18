@@ -63,6 +63,22 @@ QtObject {
     // Coarse on purpose — refine it per model when there is a device to test.
     readonly property bool proControls: model === 0 || model === 5 || model === 6
 
+    // Off is not a listening mode these pods have. Measured 2026-08-18 on the
+    // A2698 in this repo (model 5), both pods in ear, from ANC, Transparency
+    // and Adaptive in turn with 4 s to settle: `noise:off` was ignored all
+    // three times while every other mode applied in about 1.5 s. ctl exits 0
+    // and the daemon counts the attempt, so nothing reports the refusal —
+    // which is precisely what the settle deadline above exists to survive.
+    //
+    // omarchy-pods measured the same refusal but recorded it as an AirPods
+    // Pro 3 trait. It is not: this is a Pro 2. The pattern that actually fits
+    // both is Adaptive — the models that gained Adaptive Audio lost Off, and
+    // macOS shows Transparency/Adaptive/Noise Cancellation for them with no
+    // Off entry. So the same 5/6 list drives both, and anything else
+    // (including Unknown) keeps Off, which is what every pre-Adaptive model
+    // had.
+    readonly property bool supportsNoiseOff: model !== 5 && model !== 6
+
     readonly property bool leftInEar: ear.primaryInEar === true
     readonly property bool rightInEar: ear.secondaryInEar === true
 
@@ -209,15 +225,29 @@ QtObject {
                 flush();
             } else {
                 root.connected = false;
-                if (++root.attempts <= 3)
-                    retry.restart();
+                root.scheduleRetry();
             }
         }
         onError: {
             root.connected = false;
-            if (++root.attempts <= 3)
-                retry.restart();
+            root.scheduleRetry();
         }
+    }
+
+    // 2s, 4s, 8s, 16s, 30s, 30s — about 90 seconds of trying, against the
+    // 15 the three flat 5s attempts used to give. That window was the bug:
+    // librepods.service and qshell are both on graphical-session.target, so
+    // which one wins the race is undefined, and a daemon that took longer
+    // than 15s to come up left the stream parked for the rest of the session
+    // with the widget simply absent. Backing off rather than lengthening the
+    // interval keeps the common case — daemon already up, socket there on the
+    // first or second try — as fast as it was.
+    readonly property int maxAttempts: 6
+    function scheduleRetry() {
+        if (++root.attempts > root.maxAttempts)
+            return;
+        retry.interval = Math.min(30000, 2000 * Math.pow(2, root.attempts - 1));
+        retry.restart();
     }
 
     // Not `connected: true` on the Socket: declarative property order is
@@ -243,13 +273,33 @@ QtObject {
         }
     }
 
-    // The event-driven revival: BlueZ device changes (the AirPods
-    // connecting, mostly) grant one fresh attempt after the retries parked.
+    // The event-driven revival: a BlueZ change grants a fresh set of attempts
+    // after the backoff parked.
+    //
+    // This used to watch `Bluetooth.devices.values` alone, which is the list
+    // of KNOWN devices — and the AirPods are paired, so connecting them adds
+    // and removes nothing and that array never changes identity. The one
+    // event the revival existed for was the one event it could not see, which
+    // is why the widget could stay missing on a machine where the pods were
+    // plainly connected. Counting the connected ones instead reads
+    // `d.connected` per device, so the binding depends on that property and
+    // re-runs when any of them connects or drops.
     readonly property var btDevices: Bluetooth.devices ? Bluetooth.devices.values : []
-    onBtDevicesChanged: {
-        if (!root.stream.connected && !retry.running) {
-            root.attempts = 0;
-            root.stream.connected = true;
-        }
+    readonly property int btConnectedCount: {
+        let count = 0;
+        for (const device of root.btDevices)
+            if (device && device.connected)
+                count++;
+        return count;
     }
+
+    function reviveStream() {
+        if (root.stream.connected || retry.running)
+            return;
+        root.attempts = 0;
+        root.stream.connected = true;
+    }
+
+    onBtDevicesChanged: root.reviveStream()
+    onBtConnectedCountChanged: root.reviveStream()
 }

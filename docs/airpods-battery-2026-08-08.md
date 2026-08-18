@@ -175,8 +175,54 @@ Verified 2026-08-17 with the pods **disconnected**: `ear:one|both|off`
 round-trips through `status` and pushes one `subscribe` line per change (it is
 a host-side daemon setting, so it needs no hardware), the panel compiles and
 draws every new row, and the empty-battery case no longer leaves a `BATTERY`
-heading over nothing. Not verified — the pods would not connect (page timeout):
-conversational awareness, one-bud ANC, the adaptive slider, and model
-detection, all of which need a live AAP link. The `proControls` model list
-(`5`/`6`, the Pro 2 pair) is deliberately coarse and is the first thing to
-refine when there is a device to test it against.
+heading over nothing. The rest waited for hardware.
+
+## Against the real pods (2026-08-18)
+
+Everything the disconnected pass could not reach, on the A2698: `ca:on|off`,
+`onebud:on|off` and `adaptive:25|75|50` all round-trip through `status`, and
+the daemon reports `model 5` / `A2698`, so the Pro rows gate off real device
+knowledge rather than a guess. The panel draws battery per pod with the in-ear
+hint, and the adaptive slider appears only in adaptive mode as intended.
+
+**These pods have no Off mode, and it is not a Pro 3 trait.** From ANC,
+Transparency and Adaptive in turn, both pods in ear, four seconds to settle:
+`noise:off` was ignored all three times, while every other mode applied in
+about 1.5 s. omarchy-pods measured the same refusal and filed it under AirPods
+Pro 3; this is a Pro **2**. The pattern that fits both is Adaptive — the
+models that gained Adaptive Audio lost Off, and macOS shows them
+Transparency/Adaptive/Noise Cancellation with no Off entry. So
+`supportsNoiseOff` rides the same `5`/`6` list as `proControls`, and the Off
+chip is gone on this hardware. Anything else, Unknown included, keeps Off,
+which is what every pre-Adaptive model had.
+
+This is also the first real demonstration of the settle deadline: before it,
+clicking Off would have lit the cell and left it lit, because the refusal
+produces no packet, no state change, and no pushed line.
+
+Two bugs the live session turned up:
+
+- **Clicking the switch did nothing while clicking the row worked.**
+  `PanelSwitch` carries its own `TapHandler`, and `SwitchRow` had added a
+  second one to make the whole row a target. Pointer handlers do not consume a
+  tap the way a `MouseArea` does, so both fired: the setter ran twice, the
+  second call reading the value the first had already flipped optimistically,
+  and the control landed exactly where it started. The switch is now an
+  indicator and the row owns the gesture. Worth remembering before wrapping
+  any other component that has its own handler.
+- **The widget could stay missing on a machine where the pods were plainly
+  connected** (seen on the NUC). Two causes. The stream gave up after three
+  flat 5 s attempts, but `librepods.service` and `qshell` are both on
+  `graphical-session.target` and neither wins reliably, so a daemon slower
+  than 15 s left the widget absent for the session; the backoff now runs about
+  90 s. And the revival hook watched `Bluetooth.devices.values`, the list of
+  *known* devices — the pods are paired, so connecting them adds and removes
+  nothing and that array never changes identity. The one event the revival
+  existed for was the one event it could not see. It now counts connected
+  devices, so the binding depends on `device.connected` and fires on connect.
+
+Not verified: a synthesised pointer click. niri does not implement the wlr
+virtual-pointer protocol, so `wlrctl` exits 0 and does nothing; `ydotool`
+(uinput, via ydotoold) does move the pointer but could not be aimed reliably
+enough to trust. The toggle fix is by construction and by the symptom
+matching; the confirming click was the user's.
