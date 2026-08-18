@@ -324,8 +324,20 @@ function wifiSectionTitle(wifiNetworks, index) {
     return "";
 }
 
-function isProtected(security, openSecurity) {
-    return security !== openSecurity;
+// OWE (Enhanced Open) encrypts the air without authenticating anyone, so it has
+// no credentials to collect. The lock glyph and the passphrase prompt behind it
+// are both credentials-required affordances, so an OWE network gets neither.
+function requiresCredentials(security, openSecurity, oweSecurity) {
+    // Only the explicitly passwordless types bypass the prompt. A security type
+    // this does not recognise stays credentialed, as the conservative fallback.
+    return security !== openSecurity && security !== oweSecurity;
+}
+
+// Any known network that is not the current one can be forgotten — whether it
+// took a passphrase to join has nothing to do with it. Tying this to the lock
+// meant a saved open network could never be removed from the panel at all.
+function canForgetNetwork(network) {
+    return !!(network && network.known && !network.connected);
 }
 
 // --------------------------------------------------------------------- qr
@@ -366,11 +378,12 @@ function parseQrMatrix(raw) {
 // with it either).
 var enterpriseConnectScript = "u=$(uuidgen); IFS= read -r pw;" + " nmcli connection add type wifi con-name \"$1\" ssid \"$1\" connection.uuid \"$u\"" + " wifi-sec.key-mgmt wpa-eap 802-1x.eap peap 802-1x.phase2-auth mschapv2" + " 802-1x.identity \"$2\" 802-1x.auth-timeout 8 >/dev/null" + " && printf 'set 802-1x.password %s\\nsave\\nquit\\n' \"$pw\" | nmcli connection edit uuid \"$u\" >/dev/null" + " && nmcli connection up uuid \"$u\"" + " || { nmcli connection delete uuid \"$u\" >/dev/null 2>&1; false; }";
 
-function networkFailureReason(reason, reasons) {
+function networkFailureReason(reason, needsCredentials, reasons) {
     const r = reasons || {};
-    if (reason === r.NoSecrets)
+    // Both of these name a passphrase, so they only fit a network that has one.
+    if (needsCredentials && reason === r.NoSecrets)
         return "Passphrase required";
-    if (reason === r.WifiAuthTimeout)
+    if (needsCredentials && reason === r.WifiAuthTimeout)
         return "Wrong password";
     if (reason === r.WifiNetworkLost)
         return "Network lost";
@@ -381,14 +394,15 @@ function networkFailureReason(reason, reasons) {
     return "Failed to connect";
 }
 
-// Whether a failed connect should reopen the passphrase prompt. NoSecrets
-// always means credentials are missing. An auth timeout on a protected
-// network means the saved passphrase is wrong (the same profile a first
-// failed attempt leaves behind as "known"), so the user needs a chance to
-// re-enter it — connectWithPsk overwrites the stored PSK on submit.
-function shouldRepromptPassphrase(reason, isProtected, reasons) {
+// Whether a failed connect should reopen the passphrase prompt. NoSecrets means
+// credentials are missing, but only for a network that uses them at all. An auth
+// timeout on such a network means the saved passphrase is wrong (the same
+// profile a first failed attempt leaves behind as "known"), so the user needs a
+// chance to re-enter it — connectWithPsk overwrites the stored PSK on submit.
+// A passwordless network has no prompt to reopen, so it never reprompts.
+function shouldRepromptPassphrase(reason, needsCredentials, reasons) {
     const r = reasons || {};
-    if (reason === r.NoSecrets)
-        return true;
-    return !!isProtected && reason === r.WifiAuthTimeout;
+    if (!needsCredentials)
+        return false;
+    return reason === r.NoSecrets || reason === r.WifiAuthTimeout;
 }

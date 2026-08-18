@@ -319,8 +319,8 @@ BarPanel {
 
     readonly property bool busy: actionKind !== ""
 
-    function isProtected(security) {
-        return Model.isProtected(security, WifiSecurityType.Open);
+    function requiresCredentials(security) {
+        return Model.requiresCredentials(security, WifiSecurityType.Open, WifiSecurityType.Owe);
     }
 
     function isEnterprise(security) {
@@ -328,7 +328,7 @@ BarPanel {
     }
 
     function canForgetNetwork(net) {
-        return !!(net && net.known && panel.isProtected(net.security) && !net.connected);
+        return Model.canForgetNetwork(net);
     }
 
     function canShareNetwork(net) {
@@ -401,7 +401,7 @@ BarPanel {
             return;
         actionTimeout.stop();
         panel.failureSsid = panel.actionSsid;
-        panel.failureReason = Model.networkFailureReason(reason, panel.connectionFailReasons);
+        panel.failureReason = Model.networkFailureReason(reason, panel.requiresCredentials(network.security), panel.connectionFailReasons);
         panel.actionSsid = "";
         panel.actionKind = "";
         panel.refresh();
@@ -418,7 +418,9 @@ BarPanel {
             panel.clearNetworkAction();
     }
 
-    function connectKnown(ssid) {
+    // Joins without collecting anything: a known network reuses its saved
+    // profile, a passwordless one has nothing to save.
+    function connectDirectly(ssid) {
         panel.runNetworkAction("connect", panel.networkForSsid(ssid), function (network) {
             network.connect();
         });
@@ -847,11 +849,11 @@ BarPanel {
             panel.disconnectRow(net.ssid);
             return;
         }
-        if (panel.isProtected(net.security) && !net.known) {
+        if (panel.requiresCredentials(net.security) && !net.known) {
             panel.openPasswordPrompt(net.ssid);
             return;
         }
-        panel.connectKnown(net.ssid);
+        panel.connectDirectly(net.ssid);
     }
 
     function selectByDelta(delta) {
@@ -1318,7 +1320,7 @@ BarPanel {
         loading: panel.qrLoading
         error: panel.qrError
         ssid: panel.info.ssid || ""
-        secured: panel.connectedWifiNetwork ? panel.isProtected(panel.connectedWifiNetwork.security) : false
+        secured: panel.connectedWifiNetwork ? panel.requiresCredentials(panel.connectedWifiNetwork.security) : false
         password: panel.qrPassword
         passwordVisible: panel.qrPasswordVisible
         passwordError: panel.qrPasswordError
@@ -1961,12 +1963,15 @@ BarPanel {
 
         readonly property bool isConnected: !!(net && net.connected)
         readonly property bool isKnown: !!(net && net.known)
-        readonly property bool isSecured: net ? panel.isProtected(net.security) : false
+        readonly property bool requiresCredentials: net ? panel.requiresCredentials(net.security) : false
         readonly property bool isEnterprise: net ? panel.isEnterprise(net.security) : false
-        readonly property bool canForget: isKnown && isSecured && !isConnected
+        readonly property bool canForget: panel.canForgetNetwork(net)
         readonly property bool isSelected: panel.focusSection === "wifi" && panel.selectedIndex === rowIndex
         readonly property bool forgetFocused: isSelected && panel.wifiActionFocused && canForget
-        readonly property bool forgetVisible: canForget && (forgetFocused || forgetHover.hovered)
+        // A row with a lock hides Forget behind hover or focus, because the
+        // lock is what the right edge says at rest. A passwordless row has no
+        // lock to make way for, so Forget is simply what that edge is.
+        readonly property bool forgetVisible: canForget && (!requiresCredentials || forgetFocused || forgetHover.hovered)
         readonly property bool isBusy: panel.actionKind !== "" && panel.actionSsid === (net ? net.ssid : "")
         readonly property bool isFailed: panel.failureReason !== "" && panel.failureSsid === (net ? net.ssid : "")
         readonly property bool isPasswordOpen: panel.passwordSsid !== "" && panel.passwordSsid === (net ? net.ssid : "")
@@ -2021,7 +2026,7 @@ BarPanel {
                 // failNetworkAction, which clears the action state.
                 const ours = panel.actionKind === "connect" && panel.actionSsid === (row.net.ssid || "");
                 panel.failNetworkAction(panel.networkForSsid(row.net.ssid), reason);
-                if (ours && Model.shouldRepromptPassphrase(reason, row.isSecured, panel.connectionFailReasons))
+                if (ours && Model.shouldRepromptPassphrase(reason, row.requiresCredentials, panel.connectionFailReasons))
                     panel.openPasswordPrompt(row.net.ssid);
             }
 
@@ -2071,11 +2076,11 @@ BarPanel {
                         panel.disconnectRow(row.net.ssid);
                         return;
                     }
-                    if (row.isSecured && !row.isKnown) {
+                    if (row.requiresCredentials && !row.isKnown) {
                         panel.openPasswordPrompt(row.net.ssid);
                         return;
                     }
-                    panel.connectKnown(row.net.ssid);
+                    panel.connectDirectly(row.net.ssid);
                 }
             }
 
@@ -2088,14 +2093,17 @@ BarPanel {
                 pixelSize: panel.theme.fontPx(1.083)
             }
 
-            // Lock glyph for protected networks; a known disconnected network
-            // reveals the forget action on that same right edge.
+            // Lock glyph for networks that want credentials; a known
+            // disconnected network reveals the forget action on that same
+            // right edge. A known passwordless network has no lock to reveal
+            // it from behind, so the edge carries Forget outright rather than
+            // reserving an invisible target.
             Item {
                 id: rightAction
 
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                visible: row.isSecured
+                visible: row.requiresCredentials || row.canForget
                 width: panel.theme.space(5.5)
                 implicitHeight: panel.theme.space(5.5)
 

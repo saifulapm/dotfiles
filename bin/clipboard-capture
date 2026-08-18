@@ -116,8 +116,40 @@ emit_image() {
         '{type:"image", mime:$mime, path:$path, capturedAt:$captured_at}' | emit
 }
 
+# wl-paste hands over the selection's raw bytes. Some apps offer text/plain as
+# UTF-16, which jq -R reads as UTF-8 and turns into mojibake — every other byte
+# a NUL on the BOM-less variants. Decode to UTF-8 first, then let jq encode the
+# JSON as before.
+#
+# Upstream (omarchy 006460a) does both halves in perl and encodes with
+# JSON::PP. That module is absent here — perl-interpreter does not pull it in
+# on Fedora — and one line is not worth a package, so only the decode is perl
+# (Encode is present) and jq keeps the encoding.
+decode_text() {
+    perl -MEncode=decode,encode,FB_CROAK -0777 -e '
+        my $raw = <STDIN>;
+        exit unless length $raw;
+
+        my $encoding;
+        if ($raw =~ /^(?:\xFF\xFE|\xFE\xFF)/) {
+            $encoding = "UTF-16";
+        } elsif ($raw =~ /^(?:[^\0]\0)+\z/s) {
+            # BOM-less UTF-16 is indistinguishable from NUL-separated bytes, so
+            # only the consistent whole-payload pattern the affected apps send
+            # is decoded.
+            $encoding = "UTF-16LE";
+        } elsif ($raw =~ /^(?:\0[^\0])+\z/s) {
+            $encoding = "UTF-16BE";
+        }
+
+        my $text = $encoding ? eval { decode($encoding, $raw, FB_CROAK) } : undef;
+        $text = decode("UTF-8", $raw) unless defined $text;
+        print encode("UTF-8", $text);
+    '
+}
+
 emit_text() {
-    jq -cRs 'select(length > 0) | {type:"text", text:.}' | emit
+    decode_text | jq -cRs 'select(length > 0) | {type:"text", text:.}' | emit
 }
 
 case "${1:-}" in
