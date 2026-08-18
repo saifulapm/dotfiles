@@ -160,14 +160,29 @@ enabled = true
 [spotify]
 bitrate = 320              # 96 | 160 | 320
 
-# YouTube Music and YouTube work out of the box — cliamp ships fallback OAuth
-# credentials, and yt-dlp does the playback. Press `Y`, hit Enter to sign in,
-# and your playlists are auto-split into two providers by content type (music
-# vs podcasts/vlogs). Uncomment and run `cliamp setup` only if you want your
-# own Google Cloud OAuth client, or cookie access for private/age-gated
-# uploads. Nothing here is required today: yt-dlp resolves YouTube anonymously
-# on this machine (measured 2026-08-18) — set cookies_from the day it starts
-# answering "Sign in to confirm you're not a bot".
+# YouTube / YouTube Music.
+#
+# CORRECTION 2026-08-18, measured: upstream's docs/youtube-music.md claims this
+# "works out of the box with built-in fallback credentials". NOT TRUE of the
+# released binary — external/ytmusic/fallback.go declares the credential pool
+# and leaves it EMPTY in the public source, so v1.63.2 prints
+#
+#   YouTube: no credentials available (configure client_id/client_secret ...)
+#
+# at startup and the `Y` provider browser has nothing to show. Browsing YOUR
+# playlists and Liked Music therefore needs your own Google Cloud OAuth client
+# (Desktop type, YouTube Data API v3 enabled) — `cliamp setup`, or the two
+# keys below.
+#
+# What needs NO credentials, because it goes through yt-dlp rather than the
+# API: Ctrl+F YouTube search, pasting any YouTube URL, `u`, and `music <query>`.
+#
+# cookies_from is NOT optional for PLAYBACK either, also measured: YouTube 403s
+# the audio download for most music content unless yt-dlp presents a signed-in
+# session AND is newer than Fedora's build. Both halves are required — neither
+# alone works. Full test matrix in the yt-dlp entry of packages/manifest.toml.
+# Uncomment cookies_from once a yt-dlp newer than 2026.06.09 is on PATH;
+# chromium must be signed in to YouTube.
 # [ytmusic]
 # client_id = "${YTMUSIC_CLIENT_ID}"
 # client_secret = "${YTMUSIC_CLIENT_SECRET}"
