@@ -66,6 +66,16 @@ rules = [
 	# PDF: default via mimeapps (zathura), with the fallbacks as explicit picks
 	{ mime = "application/pdf", use = [ "open", "evince", "browser" ] },
 
+	# The same openers keyed on the extension, for when yazi cannot sniff the
+	# mime: a partial download, an odd container, a file on a mount that will
+	# not read. Without these the `*` fallback below sends the file to
+	# xdg-open, and a type nothing claims resolves through the desktop-file
+	# cache to the browser — which is how an mkv opened in Chromium instead of
+	# mpv (nuc, 2026-08-17). Deliberately no `ts` here: *.ts is TypeScript far
+	# more often than it is a transport stream, and the rule above it wins.
+	{ url = "*.{mkv,mp4,avi,mov,webm,m4v,mpg,mpeg,wmv,flv,m2ts,ogv}", use = [ "play", "reveal", "browser" ] },
+	{ url = "*.{mp3,flac,ogg,opus,wav,m4a,aac,wma}", use = [ "play", "reveal" ] },
+
 	# Common config files
 	{ url = "*.json", use = "edit" },
 	{ url = "*.js", use = "edit" },
