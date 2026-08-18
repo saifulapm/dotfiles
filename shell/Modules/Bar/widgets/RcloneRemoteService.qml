@@ -73,6 +73,17 @@ QtObject {
     property int _desired: -1
     readonly property bool mountActive: _desired === -1 ? mounted : (_desired === 1)
 
+    // Whether the folder button has anywhere to go. It does not require the
+    // remote to be mounted already: an unmounted click mounts first and opens
+    // when the mount lands (see openFolder), so the button is only dead when
+    // there is no mount to arrange at all.
+    readonly property bool canOpenFolder: mounted || (installed && configured && (mountPoint !== "" || cfgMountPoint !== ""))
+
+    // A folder click that had to mount first, waiting for the mount to appear.
+    // Cleared on failure and when the settle window closes, so a click can
+    // never open a window minutes after the fact.
+    property bool _openWhenMounted: false
+
     property bool refreshing: false
     // A network probe is in flight (they can take seconds).
     property bool checking: false
@@ -181,11 +192,13 @@ QtObject {
             mount();
     }
 
+    // Returns whether the mount was actually started, so a caller waiting to
+    // open the folder afterwards knows there is something to wait for.
     function mount() {
         if (!installed || !configured || controlProcess.running)
-            return;
+            return false;
         if (mountPoint === "" || mountUnit === "" || remote === "")
-            return;
+            return false;
         _desired = 1;
         _controlOutput = "";
         _controlError = "";
@@ -194,11 +207,14 @@ QtObject {
         // must not take the user's mounted folder with it.
         controlProcess.command = ["setpriv", "--pdeathsig", "TERM", "--", "bash", "-c", 'mkdir -p "$1" && exec systemd-run --user --quiet --collect --unit="$2" -- rclone mount "$3:" "$1" --vfs-cache-mode writes', "rclone-remote-mount", mountPoint, mountUnit, remote];
         controlProcess.running = true;
+        return true;
     }
 
     function unmount() {
         if (controlProcess.running || mountUnit === "")
             return;
+        // Whatever the folder button was waiting for, it is not happening now.
+        _openWhenMounted = false;
         _desired = 0;
         _controlOutput = "";
         _controlError = "";
@@ -206,10 +222,40 @@ QtObject {
         controlProcess.running = true;
     }
 
+    // Open the remote's folder in the default file manager (yazi, via
+    // inode/directory in mimeapps).
+    //
+    // An unmounted remote used to make this a no-op, which from the outside is
+    // indistinguishable from a broken button: the folder icon sits there and
+    // clicking it does nothing. Mount first and open when the mount lands
+    // instead. Opening the bare mountpoint immediately would be the other
+    // option, but an empty directory reads as "your Dropbox is empty", which
+    // is a worse answer than a short wait.
     function openFolder() {
-        if (!mounted || mountPoint === "")
+        const target = mountPoint !== "" ? mountPoint : cfgMountPoint;
+        if (target === "")
             return;
-        Quickshell.execDetached(["xdg-open", mountPoint]);
+        if (mounted) {
+            Quickshell.execDetached(["xdg-open", target]);
+            return;
+        }
+        _openWhenMounted = true;
+        if (!mount()) {
+            _openWhenMounted = false;
+            actionStatus = !installed ? "rclone is not installed" : (!configured ? label + " is not configured in rclone" : "Cannot mount " + label + " right now");
+            actionStatusTimer.restart();
+            return;
+        }
+        actionStatus = "Mounting " + label + "…";
+    }
+
+    // The mount the folder button was waiting for.
+    onMountedChanged: {
+        if (!mounted || !_openWhenMounted)
+            return;
+        _openWhenMounted = false;
+        actionStatus = "";
+        openFolder();
     }
 
     function copyReauthCommand() {
@@ -244,6 +290,14 @@ QtObject {
                 ticks = 0;
                 running = false;
                 root._desired = -1;
+                // The mount never showed up inside the settle window. Drop the
+                // pending open rather than let it fire whenever the mount
+                // eventually lands, long after the click that asked for it.
+                if (root._openWhenMounted && !root.mounted) {
+                    root._openWhenMounted = false;
+                    root.actionStatus = root.label + " did not mount";
+                    root.actionStatusTimer.restart();
+                }
             }
         }
     }
@@ -311,6 +365,7 @@ QtObject {
             const err = String(controlStderr.text || root._controlError || "");
             if (exitCode !== 0) {
                 root._desired = -1;
+                root._openWhenMounted = false;
                 root.lastError = root.elideStatus(err || out || "rclone mount command failed");
                 root.actionStatus = root.lastError;
             } else {

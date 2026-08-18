@@ -46,11 +46,11 @@ BarPanel {
 
     // -------------------------------------------------------------- cursor
     // The actionable targets, in reading order: the hero switch always, the
-    // hero folder button only once there is a folder to open, the re-auth
+    // hero folder button once there is a folder to open or mount, the re-auth
     // row only while a failed probe holds it up.
     readonly property var cursorRows: {
         const rows = ["mount"];
-        if (panel.service.mounted)
+        if (panel.service.canOpenFolder)
             rows.push("open");
         if (panel.service.lastProbeFailed)
             rows.push("reauth");
@@ -182,15 +182,17 @@ BarPanel {
             }
 
             trailing: [
-                // Open folder, as just the folder — dimmed while there is no
-                // mounted folder to open.
+                // Open folder, as just the folder. Live whenever there is a
+                // folder to arrange — an unmounted remote mounts first and
+                // opens when it lands, so the button is dead only when there
+                // is no mount to be had.
                 GlyphButton {
                     theme: panel.theme
                     anchors.verticalCenter: parent.verticalCenter
                     glyph: "󰉋" // md-folder
-                    enabled: panel.service.mounted
+                    enabled: panel.service.canOpenFolder
                     hasCursor: panel.hasCursorOn("open")
-                    hint: "Open folder"
+                    hint: panel.service.mounted ? "Open folder" : "Mount and open folder"
                     onHovered: panel.setCursorOn("open")
                     onActivated: panel.service.openFolder()
                 },
