@@ -78,6 +78,12 @@ declare -A PREBUILT=(
   [herdr]=herdrdev/herdr
   [yazi]=sxyazi/yazi
   [cliamp]=bjarneo/cliamp
+  # yt-dlp shadows the rpm from ~/.local/bin, so `command -v` below always
+  # succeeds whether or not OUR copy exists — which is fine: the staleness
+  # check still fires, and removing ~/.local/bin/yt-dlp is what run_after_10
+  # guards on. This is the entry most worth refreshing; it breaks whenever
+  # YouTube changes, which is roughly monthly.
+  [yt-dlp]=yt-dlp/yt-dlp
 )
 latest_tag() {
   gh api "repos/$1/releases/latest" --jq .tag_name 2>/dev/null \

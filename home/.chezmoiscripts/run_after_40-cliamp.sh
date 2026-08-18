@@ -180,13 +180,19 @@ bitrate = 320              # 96 | 160 | 320
 # cookies_from is NOT optional for PLAYBACK either, also measured: YouTube 403s
 # the audio download for most music content unless yt-dlp presents a signed-in
 # session AND is newer than Fedora's build. Both halves are required — neither
-# alone works. Full test matrix in the yt-dlp entry of packages/manifest.toml.
-# Uncomment cookies_from once a yt-dlp newer than 2026.06.09 is on PATH;
-# chromium must be signed in to YouTube.
-# [ytmusic]
+# alone works, and the pair is why run_after_10 now installs upstream's yt-dlp
+# over the rpm. Full test matrix in the yt-dlp entry of packages/manifest.toml.
+#
+# Chromium has to be signed in to YouTube for this to mean anything, and yt-dlp
+# reads its cookie DB on each playback — a run while Chromium holds the file
+# locked can fail; reopening the track is the whole remedy.
+[ytmusic]
+cookies_from = "chromium"
+# Your own Google Cloud OAuth Desktop client, needed ONLY to browse your own
+# playlists and Liked Music with `Y` (`cliamp setup` fills these in). Search,
+# pasted URLs and `music <query>` never touch them.
 # client_id = "${YTMUSIC_CLIENT_ID}"
 # client_secret = "${YTMUSIC_CLIENT_SECRET}"
-# cookies_from = "chromium"
 # expand_playlist = true   # false resolves a list= URL as a single video
 
 # NetEase Cloud Music rides a browser session rather than an API key — sign in

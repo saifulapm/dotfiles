@@ -227,6 +227,48 @@ if [ ! -x "$bindir/yazi" ]; then
   fi
 fi
 
+# yt-dlp — upstream's build, SHADOWING the rpm (user call 2026-08-18). Same
+# move as yazi above and for the same reason: Fedora sits a release behind on a
+# package whose whole job is keeping up with a hostile, fast-moving target, and
+# waiting for the distro costs a working feature.
+#
+# What forced it, measured that day: YouTube 403s the audio download for music
+# content, and the fix needs BOTH a build newer than Fedora's 2026.06.09 AND a
+# signed-in cookie jar. Neither alone works — 06.09+cookies and 07.04+no-cookies
+# both 403, only 07.04+cookies plays. packages/manifest.toml's yt-dlp entry has
+# the full matrix and everything that was ruled out.
+#
+# The rpm STAYS installed rather than being removed: it is a dependency of
+# nothing here, it costs a few MB, and it is the fallback if this fetch ever
+# fails on a fresh machine. ~/.local/bin precedes /usr/bin in the graphical
+# session's PATH (verified — position 8 vs 11), so ours is what cliamp finds.
+#
+# THE GUARD IS THE FILE, not `command -v`: a PATH lookup finds /usr/bin/yt-dlp
+# from the rpm and this would skip forever. Exactly the trap the yazi block
+# above documents.
+#
+# No API call — the asset names carry no version, so the releases/latest
+# redirect resolves them and hands over SHA2-256SUMS the same way cliamp's
+# block does.
+if [ ! -x "$bindir/yt-dlp" ]; then
+  ytarch="yt-dlp_linux_aarch64"; [ "$arch" = "x86_64" ] && ytarch="yt-dlp_linux"
+  ytbase="https://github.com/yt-dlp/yt-dlp/releases/latest/download"
+  tmp="$(mktemp -d)"
+  if curl -fsSL -o "$tmp/$ytarch" "$ytbase/$ytarch" \
+    && curl -fsSL -o "$tmp/SUMS" "$ytbase/SHA2-256SUMS" \
+    && expected="$(awk -v f="$ytarch" '$2 == f || $2 == "*" f { print $1 }' "$tmp/SUMS")" \
+    && [ -n "$expected" ] \
+    && [ "$(sha256sum "$tmp/$ytarch" | cut -d' ' -f1)" = "$expected" ]; then
+    install -m755 "$tmp/$ytarch" "$bindir/yt-dlp.part" \
+      && mv "$bindir/yt-dlp.part" "$bindir/yt-dlp" \
+      && echo "prebuilt: installed yt-dlp"
+    rm -f "$bindir/yt-dlp.part"
+  else
+    warn "yt-dlp install failed (download failed or checksum did not match) — the rpm still works"
+  fi
+  rm -rf "$tmp"
+fi
+
 # cliamp — the music player (user call 2026-08-18). A Winamp-2-shaped TUI that
 # plays local files, 30 000+ radio stations from radio-browser.info, podcast
 # RSS feeds, YouTube, YouTube Music, SoundCloud, Bandcamp, Bilibili, NetEase,
