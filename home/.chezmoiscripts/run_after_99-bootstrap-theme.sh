@@ -23,11 +23,34 @@ state="$HOME/.local/state/qshell/theme.toml"
 # would work too, but it would also reset a user-chosen theme back to the
 # default, and theme.toml existing means the choice already happened.
 applied="$HOME/.local/state/qshell/niri-theme.kdl"
+
+# Third gate: templates newer than the last render (2026-08-18). theme-apply is
+# the ONLY producer of the files in its OUTPUTS map, and until this, an apply
+# that shipped a new template rendered nothing — the two gates above are both
+# "has this machine ever been themed", and a themed machine answers yes. So
+# kitty joined the fan-out that day, chezmoi applied kitty.conf.tmpl into the
+# source tree, ~/.config/kitty stayed EMPTY, and kitty came up on its built-in
+# defaults next to a themed foot until a theme switch happened to run the
+# renderer. Every future addition to OUTPUTS would have done the same.
+#
+# bin/theme-apply is in the check beside templates/ because a new output does
+# not always mean a new template — an existing one gaining a second
+# destination (as gtk4-theme.css.tmpl has) touches only the map.
+#
+# -print -quit stops at the first hit, so this is one stat in the common case,
+# and re-rendering is idempotent: theme-apply writes atomically from the active
+# theme.toml, so the no-change path costs a rewrite of identical bytes and the
+# live-reload signals to whatever is running.
+newer() {
+  [ -n "$(find "${CHEZMOI_WORKING_TREE:?}/templates" "${CHEZMOI_WORKING_TREE:?}/bin/theme-apply" \
+            -newer "$applied" -print -quit 2>/dev/null)" ]
+}
+
 if [ ! -f "$state" ]; then
   if ! "${CHEZMOI_WORKING_TREE:?}/bin/theme-set" tokyo-night; then
     echo "bootstrap-theme: theme-set failed (node missing? offline?) — rerun 'chezmoi apply'" >&2
   fi
-elif [ ! -f "$applied" ]; then
+elif [ ! -f "$applied" ] || newer; then
   if ! "${CHEZMOI_WORKING_TREE:?}/bin/theme-apply"; then
     echo "bootstrap-theme: theme-apply failed (node missing? offline?) — rerun 'chezmoi apply'" >&2
   fi

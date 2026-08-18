@@ -56,10 +56,24 @@ done < <(awk '
 
 ((missing)) || exit 0
 
-if ya pkg install >/dev/null 2>&1; then
+# --discard, and it is load-bearing (2026-08-18). `ya` refuses to overwrite a
+# plugin whose on-disk content does not hash to what package.toml records, and
+# it aborts the WHOLE install on the first one rather than skipping it. Re-pin
+# every dep to a new rev — as the 08-18 audit did, b9598e6 → 6f26ae0 — and the
+# next apply hits that on dep #1 (full-border), so the nine newly added plugins
+# never install; bunny is one of them, init.lua requires it at startup, and
+# yazi then exits 1 before drawing anything. Mod+E opened a kitty window that
+# vanished. Nothing here is ever hand-edited — these directories are `ya`'s to
+# own, the hand-written plugins are symlinks elsewhere in plugins/ — so the
+# "local changes" this discards are only ever a stale pin.
+#
+# Keep the output: a swallowed failure is how the above stayed invisible for a
+# day. The message only prints when something actually broke.
+if out=$(ya pkg install --discard 2>&1); then
   echo "yazi-plugins: installed from package.toml"
 else
   warn "ya pkg install failed (offline?) — rerun 'chezmoi apply'"
+  printf '%s\n' "$out" | tail -5 >&2
 fi
 
 exit 0
