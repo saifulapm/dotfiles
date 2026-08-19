@@ -11,9 +11,14 @@
 #                             TunnelSecret)
 #
 # Both are secrets and this is a git repo with a GitHub remote, so both are
-# deliberately skipped. Nothing in this repo is age-encrypted today, so there
-# is no encrypted path to put them on either. Restore them by hand, the same
-# way ~/.ssh is restored (see README, "What stays manual, honestly"):
+# deliberately skipped. An age-encrypted path through the repo DOES exist now
+# (home/.chezmoitemplates/mail-identities.toml.age, 2026-08-19) and these two
+# still deliberately do not take it: that file carries addresses, while these
+# are a PEM private key and a tunnel secret — things that open something. A
+# public repo's ciphertext is permanent across forks and history, so putting
+# them there would bet the tunnel on the age key never leaking. Restore them
+# by hand, the same way ~/.ssh is restored (see README, "What stays manual,
+# honestly"):
 #
 #   rclone copy iCloud:.dotfiles/home/.cloudflared ~/.cloudflared \
 #     --include cert.pem --include '*.json'

@@ -122,8 +122,12 @@ after the first apply.
   server to pick up premium features.
 - `~/.config/chezmoi/key.txt` (age key) — restored by `bin/secrets-restore`
   from `iCloud:chezmoi/key.txt`. No longer optional: it is what decrypts the
-  hub's `~/.ssh` blob, so a machine without it has no keys. Still nothing in
-  the repo itself is age-encrypted.
+  hub's `~/.ssh` blob, so a machine without it has no keys. Since 2026-08-19
+  it also decrypts `home/.chezmoitemplates/mail-identities.toml.age`, the one
+  age-encrypted file the repo carries — so on a machine without the key the
+  four mail configs render empty and are therefore absent, and mail stays off
+  until `secrets-restore` runs. That is by design, not a failure: every mail
+  unit is `ConditionPathExists`-gated on exactly those paths.
 
 ## Layout
 
