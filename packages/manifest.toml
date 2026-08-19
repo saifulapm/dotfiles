@@ -1465,11 +1465,14 @@ why = "Interactive disk-usage TUI (omarchy's Disk Usage launcher, user-picked 20
 # Added 2026-08-17, user-approved item by item. The HEY.com-style email
 # workflow in Emacs (~/.config/emacs/lisp/hey-notmuch.el, ported from the
 # macOS setup): mbsync pulls, notmuch indexes and tags, msmtp sends. One
-# iCloud account for now. The address itself is NOT written down anywhere in
-# this repo — it is `mailUser` in the machine-local ~/.config/chezmoi/
-# chezmoi.toml, prompted once by .chezmoi.toml.tmpl, and the mail configs are
-# templates that read it. This repo is public and an IMAP login address is
-# half a credential. The app-specific password lives in `pass` under
+# iCloud account for now. The address itself is NOT written in cleartext
+# anywhere in this repo — it lives in home/.chezmoitemplates/
+# mail-identities.toml.age, age-encrypted to the chezmoi recipient, and the
+# mail configs are templates that decrypt it on every apply (moved there from
+# a machine-local chezmoi.toml prompt on 2026-08-19, so one commit updates
+# every machine instead of three by-hand re-inits). This repo is public and an
+# IMAP login address is half a credential. Edit the list with
+# bin/mail-identities. The app-specific password lives in `pass` under
 # email/icloud/<local-part>. The HEY account itself is deliberately NOT
 # synced and never can be: HEY supports no IMAP or POP by design (verified
 # against help.hey.com 2026-08-17), which is exactly why the workflow is

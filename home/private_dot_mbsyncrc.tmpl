@@ -1,3 +1,6 @@
+{{- $mail := fromToml (includeTemplate "mail-identities.toml" .) -}}
+{{- $primary := index $mail "primary" -}}
+{{- if $primary -}}
 # mbsync (isync) — IMAP <-> Maildir sync for the HEY-style Emacs mail setup.
 # packages/manifest.toml: isync. Read by `mbsync -a`, by bin/mail-sync and by
 # imapnotify-icloud.service on every IDLE event.
@@ -8,8 +11,11 @@
 # tracks only the executable bit and a fresh clone lands 0644. Templates are
 # WRITTEN instead of linked, so `private_` actually produces 0600 on disk.
 # There is no password in this file either way (PassCmd shells out to `pass`)
-# and no address either — {{ "{{ .mailUser }}" }} comes from the machine-local
-# chezmoi.toml, so the public repo never names the account.
+# and no address either — the account comes from the age-encrypted
+# .chezmoitemplates/mail-identities.toml.age, so the public repo never names
+# it. The whole file sits inside that data's guard: no age key on the machine,
+# no ~/.mbsyncrc at all, which is what keeps a phase-1 install from rendering
+# a half-configured one (see .chezmoitemplates/mail-identities.toml).
 #
 # FORMAT WARNING, learned the hard way: a BLANK LINE ENDS A SECTION in
 # mbsyncrc. Comment lines are fine inside one, empty lines are not — an
@@ -33,8 +39,8 @@
 IMAPAccount icloud
 Host imap.mail.me.com
 Port 993
-User {{ .mailUser }}
-PassCmd "pass email/icloud/{{ (splitList "@" .mailUser) | first }} | head -n1"
+User {{ $primary }}
+PassCmd "pass email/icloud/{{ (splitList "@" $primary) | first }} | head -n1"
 TLSType IMAPS
 SystemCertificates yes
 PipelineDepth 10
@@ -94,3 +100,4 @@ SyncState *
 
 Group icloud-all
 Channel icloud
+{{ end -}}

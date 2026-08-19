@@ -1,0 +1,29 @@
+{{- /* Mail identities, decrypted — the single source of the primary address
+  and the other_email list for every mail template in this repo.
+
+  Emits the plaintext TOML of .chezmoitemplates/mail-identities.toml.age, or
+  NOTHING AT ALL when the age key is absent. Consumers do:
+
+    {{ "{{- $mail := fromToml (includeTemplate \"mail-identities.toml\" .) -}}" }}
+    {{ "{{- $primary := index $mail \"primary\" -}}" }}
+    {{ "{{- if $primary -}}" }} ... body ... {{ "{{- end -}}" }}
+
+  `index` rather than $mail.primary for the lookup: chezmoi executes templates
+  with missingkey=error, so a bare field access on the empty map returned by
+  `fromToml ""` aborts the whole apply instead of falling through. Inside the
+  guard, $mail.primary is safe again — the key demonstrably exists there.
+
+  THE GUARD IS THE POINT, and it is what makes the two-phase install still
+  work (docs/pass-2026-08-09.md). Phase 1 is `chezmoi init --apply` from a
+  TTY, BEFORE bin/secrets-restore has fetched iCloud:chezmoi/key.txt — so
+  `decrypt` at that moment has no identity and fails, and an unguarded call
+  would take the ENTIRE first apply down with it, not just the mail configs.
+  Guarded, a keyless machine renders these four templates to empty output,
+  and chezmoi removes files whose contents are empty unless the `empty_`
+  attribute is set (verified 2026-08-19) — so ~/.mbsyncrc, ~/.msmtprc and the
+  notmuch/imapnotify configs simply do not exist yet. Every mail unit is
+  ConditionPathExists-gated on exactly those paths, so mail stays cleanly off
+  rather than half-configured, and phase 2's apply switches it on. */ -}}
+{{- if stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt") -}}
+{{- decrypt (include ".chezmoitemplates/mail-identities.toml.age") -}}
+{{- end -}}

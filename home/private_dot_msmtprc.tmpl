@@ -1,3 +1,6 @@
+{{- $mail := fromToml (includeTemplate "mail-identities.toml" .) -}}
+{{- $primary := index $mail "primary" -}}
+{{- if $primary -}}
 # msmtp — SMTP sending for the HEY-style Emacs mail setup.
 # packages/manifest.toml: msmtp. Driven by Emacs message-mode as its
 # sendmail-program; lisp/hey-notmuch.el picks the account with `-a <name>`
@@ -9,6 +12,10 @@
 # read a group- or world-readable file that contains a literal `password`
 # directive; this one uses passwordeval instead, so the check does not fire —
 # but 0600 is still the right posture for a file naming your accounts.
+#
+# The address comes from the age-encrypted .chezmoitemplates/
+# mail-identities.toml.age, and the whole file is inside that data's guard:
+# a machine with no age key gets no ~/.msmtprc rather than a broken one.
 
 defaults
 auth            on
@@ -29,9 +36,10 @@ logfile         ~/.local/state/msmtp/msmtp.log
 account         icloud
 host            smtp.mail.me.com
 port            587
-from            {{ .mailUser }}
-user            {{ .mailUser }}
+from            {{ $primary }}
+user            {{ $primary }}
 # Same pass entry as mbsync — one app-specific password serves IMAP and SMTP.
-passwordeval    "pass email/icloud/{{ (splitList "@" .mailUser) | first }} | head -n1"
+passwordeval    "pass email/icloud/{{ (splitList "@" $primary) | first }} | head -n1"
 
 account default : icloud
+{{ end -}}

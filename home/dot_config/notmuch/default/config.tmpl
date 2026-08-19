@@ -1,3 +1,6 @@
+{{- $mail := fromToml (includeTemplate "mail-identities.toml" .) -}}
+{{- $primary := index $mail "primary" -}}
+{{- if $primary -}}
 # notmuch — the index, the tag store, and the query engine behind the
 # HEY-style workflow. packages/manifest.toml: notmuch.
 #
@@ -19,7 +22,7 @@ hook_dir={{ .chezmoi.homeDir }}/.config/notmuch/hooks
 
 [user]
 name=Saiful Islam
-primary_email={{ .mailUser }}
+primary_email={{ $primary }}
 # Every OTHER address that reaches this mailbox — the iCloud+ Custom Email
 # Domain addresses. One iCloud account, several domains, one inbox, and this
 # is the line that makes notmuch understand that.
@@ -34,17 +37,20 @@ primary_email={{ .mailUser }}
 #   * the Emacs sender picker offers them (notmuch-mua-prompt-for-sender
 #     builds its list from primary_email + other_email).
 #
-# Semicolon-separated, and read from the machine-local chezmoi config for the
-# same reason as primary_email: ~/.dotfiles is PUBLIC and this is a list of
-# real addresses. `index` rather than `.mailIdentities` so a machine that
-# predates this key still applies instead of failing on a missing value.
+# Notmuch wants one semicolon-separated string; the source of truth is a TOML
+# LIST in the age-encrypted .chezmoitemplates/mail-identities.toml.age, kept
+# that way so the file stays readable, and joined back here. Encrypted for the
+# same reason primary_email is: ~/.dotfiles is PUBLIC and this is a list of
+# real addresses. `index` rather than $mail.others because chezmoi executes
+# templates with missingkey=error — a machine whose data file predates this
+# key must still apply rather than abort.
 #
 # ONLY put addresses iCloud has actually been configured with here. A custom
 # domain with catch-all on DELIVERS anything@domain, but iCloud will only SEND
-# as the addresses set up in its own settings (three per domain, five domains)
-# — anything else is refused by the SMTP server at send time.
-{{- with (index . "mailIdentities") }}
-other_email={{ . }}
+# as the addresses set up in its own settings — anything else is refused by the
+# SMTP server at send time.
+{{- with (index $mail "others") }}
+other_email={{ join ";" . }}
 {{- end }}
 
 [new]
@@ -69,3 +75,4 @@ exclude_tags=deleted;spam
 # up as read on the iPhone — the cheapest slice of phone parity there is, and
 # it needs no file moving at all.
 synchronize_flags=true
+{{ end -}}

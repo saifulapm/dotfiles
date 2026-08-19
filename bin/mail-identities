@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# mail-identities — edit the age-encrypted mail identity list, then rewrite
+# every config that reads it.
+#
+# The list is home/.chezmoitemplates/mail-identities.toml.age: the primary
+# iCloud address (IMAP/SMTP login and default From:) plus every other address
+# that lands in the same inbox. It is encrypted because ~/.dotfiles is PUBLIC
+# and an IMAP login address is half a credential; it is IN THE REPO rather
+# than in the machine-local chezmoi.toml because `chezmoi apply` never
+# re-evaluates .chezmoi.toml.tmpl, so a value there is frozen at init and
+# adding one address would mean re-initialising all three machines by hand.
+#
+# This script exists because chezmoi has no `chezmoi edit` for files under
+# .chezmoitemplates — those are not target files, so the native decrypt ->
+# $EDITOR -> re-encrypt cycle does not apply to them. Doing it by hand is
+# three commands with a plaintext temp file in the middle, which is exactly
+# the kind of step that gets half-done.
+#
+# The plaintext never touches $HOME. It is written under $XDG_RUNTIME_DIR,
+# which is a tmpfs — deleting it actually destroys it. On $HOME (btrfs) it
+# would not: copy-on-write plus SSD wear-levelling mean the old extents are
+# not necessarily overwritten, the same reason docs/pass-2026-08-09.md calls
+# `shred` theatre there.
+#
+# Usage:
+#   mail-identities          decrypt -> $EDITOR -> validate -> re-encrypt -> apply
+#   mail-identities --show   print the decrypted list and exit
+set -euo pipefail
+
+AGE_FILE="${MAIL_IDENTITIES_FILE:-$HOME/.dotfiles/home/.chezmoitemplates/mail-identities.toml.age}"
+KEY_FILE="$HOME/.config/chezmoi/key.txt"
+
+die() { printf '\033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
+say() { printf '\033[36m→\033[0m %s\n' "$*"; }
+ok()  { printf '\033[32m✓\033[0m %s\n' "$*"; }
+
+[ -f "$AGE_FILE" ] || die "no $AGE_FILE"
+# Without the key `chezmoi decrypt` fails with an age error that does not say
+# what to do about it. This is a fresh machine that has not run phase 2 yet.
+[ -f "$KEY_FILE" ] || die "no age key at $KEY_FILE — run bin/secrets-restore first"
+
+# 0700 by mktemp, and on tmpfs. The trap covers the editor exiting non-zero
+# and the validation below rejecting the edit.
+tmpdir="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/mail-identities.XXXXXX")"
+trap 'rm -rf "$tmpdir"' EXIT
+plain="$tmpdir/mail-identities.toml"
+
+chezmoi decrypt "$AGE_FILE" > "$plain" || die "decrypt failed"
+
+if [ "${1:-}" = "--show" ]; then
+  cat "$plain"
+  exit 0
+fi
+
+cp "$plain" "$plain.orig"
+"${EDITOR:-vi}" "$plain"
+
+# Validate BEFORE re-encrypting. A TOML syntax error here would otherwise be
+# discovered by `chezmoi apply` on some other machine days later, and the
+# failure mode is not a broken mail config but NO mail config at all — the
+# templates are wrapped in a guard, and a guard that cannot read its data
+# renders empty, which chezmoi turns into "delete the file".
+python3 - "$plain" <<'PY' || die "rejected — the encrypted file was NOT changed"
+import sys, tomllib
+try:
+    with open(sys.argv[1], "rb") as f:
+        d = tomllib.load(f)
+except (tomllib.TOMLDecodeError, OSError) as e:
+    sys.exit(f"not valid TOML: {e}")
+p = d.get("primary")
+if not isinstance(p, str) or "@" not in p:
+    sys.exit("`primary` must be a single address string")
+o = d.get("others", [])
+if not isinstance(o, list) or any(not isinstance(a, str) or "@" not in a for a in o):
+    sys.exit("`others` must be a list of address strings")
+if len(set(o)) != len(o):
+    sys.exit("`others` contains duplicates")
+if p in o:
+    sys.exit("`primary` is repeated in `others` — notmuch wants it in exactly one")
+print(f"{p} + {len(o)} other addresses", file=sys.stderr)
+PY
+
+if cmp -s "$plain" "$plain.orig"; then
+  ok "unchanged — nothing re-encrypted"
+  exit 0
+fi
+
+# Re-encrypting always produces different ciphertext (fresh ephemeral key per
+# age encryption), so this only runs when the plaintext actually changed —
+# otherwise every no-op edit would show up as a repo diff worth committing.
+chezmoi encrypt --output "$AGE_FILE" "$plain" || die "re-encrypt failed"
+ok "re-encrypted $AGE_FILE"
+
+say "rewriting the configs that read it"
+chezmoi apply "$HOME/.mbsyncrc" "$HOME/.msmtprc" \
+              "$HOME/.config/notmuch/default/config" \
+              "$HOME/.config/imapnotify/icloud.yaml" || die "chezmoi apply failed"
+
+# goimapnotify reads its username once at startup, so a changed primary leaves
+# the running watcher logging in as the old one until it is restarted.
+# try-restart is a no-op when the unit is not running (a machine that does no
+# mail, or one where the restart budget has already stopped it).
+systemctl --user try-restart imapnotify@icloud.service 2>/dev/null || true
+
+ok "done — commit and push so the other machines pick it up:"
+printf '    git -C ~/.dotfiles commit -am "mail: update identities" && git -C ~/.dotfiles push\n'
+printf '  then on each other box: update-all  (or: git -C ~/.dotfiles pull && chezmoi apply)\n'

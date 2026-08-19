@@ -41,36 +41,28 @@ encryption = "age"
 
 [data]
     machine = {{ $machine | quote }}
-    # Primary mail account — the IMAP login and the From: address for the
-    # notmuch/mbsync/msmtp setup (packages/manifest.toml: isync, notmuch,
-    # msmtp). Prompted rather than committed BECAUSE ~/.dotfiles is PUBLIC and
-    # an IMAP login address is half a credential: the mail templates read
-    # .mailUser, so no file in the repo ever names it.
+    # mailUser and mailIdentities USED TO LIVE HERE, prompted by
+    # promptStringOnce. Moved 2026-08-19 into the age-encrypted
+    # .chezmoitemplates/mail-identities.toml.age, which the four mail
+    # templates read directly.
     #
-    # promptStringOnce asks once per machine at `chezmoi init` and reads it
-    # back out of this file forever after. `chezmoi apply` never re-evaluates
-    # .chezmoi.toml.tmpl, so no background apply can be made to hang on the
-    # prompt. A machine that does no mail can answer with anything — every
-    # mail unit is ConditionPathExists-gated.
+    # The reason is the same property that made this file the safe place for
+    # them at first: `chezmoi apply` NEVER re-evaluates .chezmoi.toml.tmpl.
+    # That is exactly what you want for a machine id and exactly wrong for
+    # data you edit — a value in [data] is frozen at `chezmoi init`, so adding
+    # one address meant re-initialising all three boxes by hand. The encrypted
+    # file is read on every apply instead, so `update-all` (git pull, then
+    # apply) rewrites .mbsyncrc, .msmtprc and the notmuch/imapnotify configs
+    # from one pushed commit.
+    #
+    # It also removes the prompt from a fresh install: the addresses arrive
+    # with the repo, and the key that opens them arrives with
+    # bin/secrets-restore. Nothing to type either way.
     #
     # Written as literal TOML comments rather than a {{ "{{/* ... */}}" }}
     # template comment on purpose: a trim marker there swallows the newline
-    # after `machine`, which silently concatenates the two keys onto one line
-    # and fails the whole init with a TOML parse error.
-    mailUser = {{ promptStringOnce . "mailUser" "Primary email address (IMAP login)" | quote }}
-    # Every other address that lands in the same mailbox — the iCloud+ Custom
-    # Email Domain addresses (five domains, three addresses each, one inbox).
-    # Semicolon-separated, exactly the shape notmuch's other_email wants, so
-    # the template is a straight substitution.
-    #
-    # Here for the same reason as mailUser: a list of real addresses is not
-    # something a public repo gets to hold. Blank is a fine answer on a
-    # machine with one address — the notmuch template omits the line entirely.
-    #
-    # Keep it matching iCloud's own settings: catch-all delivers anything at a
-    # domain, but only the addresses iCloud is configured with may be SENT
-    # from, and a From it does not recognise is refused at send time.
-    mailIdentities = {{ promptStringOnce . "mailIdentities" "Other addresses you send as (semicolon-separated, blank for none)" | quote }}
+    # after `machine`, which silently concatenates the keys onto one line and
+    # fails the whole init with a TOML parse error.
 
 [age]
     identity = "~/.config/chezmoi/key.txt"
