@@ -1,33 +1,55 @@
-{{- /* Machine identity — detected, not asked (2026-08-10).
+{{- /* Machine identity — RECORDED first, detected second, asked last
+  (2026-08-10, reworked 2026-08-19 so a fourth machine cannot inherit a
+  third's id).
 
   This is not a preference: it is the sync fabric's device id. Shell history
   is one file per machine inside the synced folder (dot_bashrc.d/20-history.sh,
   fish conf.d/10-history.fish) and Services/Sync.qml names its snapshot the
   same way, so two boxes answering the same id collapse into one device and
-  overwrite each other. The hostname cannot supply it — every Asahi install
-  here answers "fedora" — which is why a prompt existed at all.
+  overwrite each other. The hostname cannot supply it — every install here
+  answers "fedora" — which is why a prompt existed at all.
 
-  Detection instead, because the hardware already says which box this is:
-  x86_64 is the NUC (the only one), and every Apple box publishes its exact
-  model in the device tree ("Apple Mac mini (M2, 2023)" / "Apple MacBook Pro
-  (13-inch, M2, 2022)" — apple,j473 / apple,j493). The prompt stays as the
-  fallback for hardware not listed here, so a fourth machine still installs;
-  it just no longer asks the three known ones a question they can answer
-  themselves. The strings are unchanged, so a machine that answered the
-  prompt before keeps its identity across a re-init. */ -}}
+  Step 1, an id already in this file WINS, and it is the fix for the whole
+  class of problem. Detection can only ever guess from hardware, and the
+  guess is unstable across a model bump or a second box of the same shape;
+  once a machine has an id, the sync fabric has files named after it, so
+  re-deriving it on a later `chezmoi init` would orphan them. Recorded beats
+  clever.
+
+  Step 2 detects, but ONLY the three machines that exist, and precisely. The
+  previous version matched "any amd64" -> nuc and bare "mac mini"/"macbook"
+  -> the M2 ids, which meant a second x86 box, a Mac mini M4 or a MacBook Air
+  silently ANSWERED AS an existing machine — the exact collision described
+  above, arriving without a prompt or a warning. Model strings are the ones
+  these boxes actually report: this Mac mini says "Apple Mac mini (M2 Pro,
+  2023)" (Mac14,12 / J474s — measured 2026-08-19; the old comment's
+  "M2, 2023"/j473 was the base model, not this one). x86 reads DMI instead,
+  where an Intel NUC names itself.
+
+  Step 3 asks, as free text with the model as the default — promptChoiceOnce
+  over the three existing names was a trap: hardware that fell through
+  detection could only be given an id that was already taken. */ -}}
 {{- $machine := "" -}}
-{{- if eq .chezmoi.arch "amd64" -}}
-{{-   $machine = "nuc" -}}
-{{- else if stat "/proc/device-tree/model" -}}
-{{-   $model := lower (output "sh" "-c" "tr -d '\\0' < /proc/device-tree/model") -}}
-{{-   if contains "mac mini" $model -}}
+{{- if hasKey . "machine" -}}
+{{-   $machine = .machine -}}
+{{- end -}}
+{{- $model := "" -}}
+{{- if stat "/proc/device-tree/model" -}}
+{{-   $model = lower (output "sh" "-c" "tr -d '\\0' < /proc/device-tree/model") -}}
+{{- else if stat "/sys/class/dmi/id/product_name" -}}
+{{-   $model = lower (output "sh" "-c" "cat /sys/class/dmi/id/product_name") -}}
+{{- end -}}
+{{- if not $machine -}}
+{{-   if contains "mac mini (m2" $model -}}
 {{-     $machine = "mac-mini-m2" -}}
-{{-   else if contains "macbook" $model -}}
+{{-   else if contains "macbook pro (13-inch, m2" $model -}}
 {{-     $machine = "macbook-m2" -}}
+{{-   else if contains "nuc" $model -}}
+{{-     $machine = "nuc" -}}
 {{-   end -}}
 {{- end -}}
 {{- if not $machine -}}
-{{-   $machine = promptChoiceOnce . "machine" "Which machine is this" (list "macbook-m2" "mac-mini-m2" "nuc") -}}
+{{-   $machine = promptStringOnce . "machine" "Machine id — must be unique, it names this device's files in the sync fabric" (trimPrefix "apple-" (trimAll "-" (regexReplaceAll "[^a-z0-9]+" $model "-"))) -}}
 {{- end -}}
 # The repo lives at ~/.dotfiles on every machine; restore with:
 #   sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply --source ~/.dotfiles <repo-url>
