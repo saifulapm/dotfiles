@@ -66,9 +66,11 @@ fi
 # and every request under the new one gets tailscaled's own "404 page not
 # found" (found live 2026-08-11: the fedora→macbook/nuc renames silently
 # killed machine-to-machine sync). So the guard checks for the CURRENT
-# name, not just the port, and re-keys via reset when they disagree —
-# reset is safe here because the clipboard proxy is the only serve user
-# on these machines.
+# name, not just the port, and re-keys via reset when they disagree.
+# NOTE: `serve reset` wipes EVERY mapping, not only this one. Until
+# 2026-08-19 this comment said the clipboard proxy was the only serve
+# user on these machines; hub (:8787) is a second one now, so the block
+# below re-publishes it after any reset.
 if [ "$state" = "Running" ]; then
   dnsname="$(tailscale status --json 2>/dev/null \
     | python3 -c 'import json,sys; print(json.load(sys.stdin).get("Self",{}).get("DNSName","").rstrip("."))' 2>/dev/null || true)"
@@ -89,6 +91,33 @@ if [ "$state" = "Running" ]; then
       echo "tailscale: clipboard endpoint published (http://$dnsname → 127.0.0.1:9411)"
     else
       echo "tailscale: clipboard endpoint NOT published — run: tailscale serve --bg --http=80 9411" >&2
+    fi
+  fi
+fi
+
+# hub (~/Sites/github/workflow, specs/hub-v1.md §7) publishes loopback :8787 to
+# the tailnet the same way, added 2026-08-19. It needs its own block for two
+# reasons: the `serve reset` above wipes every mapping, so a machine rename plus
+# `chezmoi apply` would otherwise silently drop hub off the tailnet; and the
+# rename re-keys hub's mapping exactly as it re-keys the clipboard's. Guarded on
+# the unit file, because this script does not decide that hub should run — it
+# only refuses to be the thing that takes it off the tailnet. `--bg` is a no-op
+# when the mapping is already right, so this acts once per machine.
+if [ "$state" = "Running" ] && [ -f "$HOME/.config/systemd/user/hub.service" ]; then
+  serve_now="$(tailscale serve status 2>/dev/null || true)"
+  hub_ok=""
+  case $serve_now in
+  *127.0.0.1:8787*)
+    case $serve_now in
+    *"$dnsname"*) [ -n "$dnsname" ] && hub_ok=1 ;;
+    esac
+    ;;
+  esac
+  if [ -z "$hub_ok" ]; then
+    if tailscale serve --bg --http=8787 8787 >/dev/null 2>&1; then
+      echo "tailscale: hub endpoint published (http://$dnsname:8787 → 127.0.0.1:8787)"
+    else
+      echo "tailscale: hub endpoint NOT published — run: tailscale serve --bg --http=8787 8787" >&2
     fi
   fi
 fi

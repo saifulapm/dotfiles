@@ -105,7 +105,7 @@ machine="$(cat "$HOME/.config/qshell/machine" 2>/dev/null || true)"
 [[ -z $machine ]] && machine="$(uname -n)"
 
 # Canonical order — the panel renders the units in exactly this sequence.
-units_all=(history fish-history model-usage screenshots notes ssh)
+units_all=(history fish-history model-usage screenshots notes ssh memory parked)
 
 unit_label() {
   case "$1" in
@@ -115,6 +115,8 @@ unit_label() {
   screenshots) echo "Screenshots" ;;
   notes) echo "Notes" ;;
   ssh) echo "SSH keys" ;;
+  memory) echo "AI memory" ;;
+  parked) echo "Parked work" ;;
   *) echo "$1" ;;
   esac
 }
@@ -605,6 +607,43 @@ sync_notes() {
   unit_ok notes "$notes_count file(s)${bisync_note:+ — $bisync_note}"
 }
 
+# The mem store: one small markdown file per item, plus a per-project
+# project.toml, plan.md and status.md. A normal round is a handful of
+# modifications — prune archives in place rather than deleting, so the
+# --max-delete guard is never approached.
+sync_memory() {
+  local mem_dir="$HOME/.local/share/mem/store"
+  local filters="$HOME/.config/qshell/memory-filters.txt"
+  mkdir -p "$mem_dir"
+  # Fixed at bootstrap on purpose: rclone hashes the filters FILE and demands a
+  # --resync when it changes, so the excludes have to be right on day one.
+  # In-flight writes are same-dir dot-temps; *.partial is rclone's own.
+  if [[ ! -f $filters ]]; then
+    mkdir -p "$(dirname "$filters")"
+    printf -- '- .tmp-*\n- *.partial\n' >"$filters"
+  fi
+  # force_max 5: a store with a couple of files IS "100% changed" the first few
+  # rounds, which is arithmetic rather than evidence (the notes unit's recorded
+  # failure). A real store is far bigger, so the check still means something.
+  bisync_unit memory "$mem_dir" "$remote/memory" 5 --filters-file "$filters" || return 0
+  local items
+  items="$(find "$mem_dir" -name '*.md' -type f 2>/dev/null | wc -l)"
+  unit_ok memory "$items item(s)${bisync_note:+ — $bisync_note}"
+}
+
+# Parked work: git bundles under ~/.local/share/workflow/parked/<project>/,
+# each with a .meta sidecar. A bundle is written once and never edited, so a
+# round is adds and retention deletes (five per project) — the same shape as
+# screenshots rather than the churn of the memory store.
+sync_parked() {
+  local parked_dir="$HOME/.local/share/workflow/parked"
+  mkdir -p "$parked_dir"
+  bisync_unit parked "$parked_dir" "$remote/parked" 5 || return 0
+  local bundles
+  bundles="$(find "$parked_dir" -name '*.bundle' -type f 2>/dev/null | wc -l)"
+  unit_ok parked "$bundles bundle(s)${bisync_note:+ — $bisync_note}"
+}
+
 # The blob unit: bin/ssh-hub-sync owns the compare, the crypto and the
 # conflict rule. It prints a one-line summary on success and exits 3 when both
 # ends moved — which is a conflict for a human, not a transport failure.
@@ -630,6 +669,8 @@ for id in "${selected[@]}"; do
   screenshots) sync_screenshots ;;
   notes) sync_notes ;;
   ssh) sync_ssh ;;
+  memory) sync_memory ;;
+  parked) sync_parked ;;
   esac
   write_status true "$id"
 done

@@ -21,6 +21,7 @@
   # $VISUAL/$EDITOR, and here the environment is the source of truth —
   # kak outside Emacs, with-editor's emacsclient inside (00-env.fish).
   pager = delta
+  hooksPath = /home/saiful/.config/git/hooks
 
 [init]
   defaultBranch = main

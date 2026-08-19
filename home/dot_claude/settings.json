@@ -10,11 +10,14 @@
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_NO_FLICKER": "1",
     "ENABLE_PROMPT_CACHING_1H": "1",
-    "CLAUDE_CODE_SCROLL_SPEED": "1"
+    "CLAUDE_CODE_SCROLL_SPEED": "1",
+    "WORKFLOW_AGENT": "1"
   },
   "attribution": {
     "commit": "",
-    "pr": ""
+    "pr": "",
+    "commitTrailers": false,
+    "sessionUrl": false
   },
   "permissions": {
     "allow": [
@@ -39,7 +42,74 @@
   "fallbackModel": [
     "opus"
   ],
-  "hooks": {},
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "amx _hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "amx _hook"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "amx _hook"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "amx _hook"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "amx _hook"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "amx _hook"
+          }
+        ]
+      }
+    ]
+  },
   "worktree": {
     "symlinkDirectories": [
       "node_modules",
