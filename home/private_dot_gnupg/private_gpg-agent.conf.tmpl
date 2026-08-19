@@ -20,10 +20,33 @@
 # line to pinentry-qt.
 {{ if lookPath "pinentry-qt" }}pinentry-program {{ lookPath "pinentry-qt" }}{{ else }}pinentry-program /usr/bin/pinentry{{ end }}
 
-# 1 h idle, 8 h hard ceiling. Long enough that a working day is not a parade
-# of passphrase prompts; short enough that a walked-away-from laptop stops
-# handing out secrets. max-cache-ttl is measured from first entry rather than
-# last use, so the passphrase is re-asked at least once a day no matter how
-# continuously the agent is exercised.
-default-cache-ttl 3600
-max-cache-ttl 28800
+# Cache for the life of the session — 400 days, which on a machine that is
+# switched off nightly means "until the next boot".
+#
+# What this is really tuning is ONE prompt, and it is not a browser prompt.
+# imapnotify@icloud.service starts with the graphical session and resolves
+# `pass email/icloud/<user>` before it can log into iCloud IMAP, so a fresh
+# boot draws pinentry about half a second after the watcher starts (measured
+# 2026-08-19: unit started 16:06:32.710, pinentry-qt at 16:06:33.172). mbsync
+# via mail-sync.timer and msmtp's passwordeval want the same secret and hit
+# the cache behind it. That first prompt CANNOT be removed by any TTL: the
+# agent's cache is memory-only and dies with the session, so nothing here
+# survives a power cycle. Removing it would mean taking the mail password out
+# of gpg entirely — considered 2026-08-19, deliberately not done.
+#
+# What the TTL does control is the SECOND prompt. The previous 1 h idle / 8 h
+# ceiling meant a machine left on through a working day re-asked mid-afternoon
+# for no security gained, because max-cache-ttl counts from first entry, not
+# from last use — so a continuously-exercised agent still expired on schedule.
+#
+# The security this gives up is smaller than the number suggests, because the
+# TTL was never the thing guarding a walked-away machine: Idle.qml locks the
+# session after 300 s (defaultLockSeconds), and an attacker at a locked screen
+# cannot reach gpg-agent at all. Nor was it protecting much against someone
+# with the disk — tty1 autologins, /home is plain btrfs with no LUKS, and the
+# store holds exactly one entry (the iCloud app-specific password) whose entire
+# mailbox already sits unencrypted in ~/Mail. The residual cost is honest and
+# accepted: an attacker who reaches an UNLOCKED session can now read the store
+# all day rather than only within 8 h of the last unlock.
+default-cache-ttl 34560000
+max-cache-ttl 34560000
