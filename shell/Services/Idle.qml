@@ -60,6 +60,13 @@ QtObject {
     // Upstream keeps this flag at ~/.local/state/omarchy/indicators/stay-awake.
     // Presence is the whole state — the file's contents are never read.
     readonly property string stayAwakePath: stateDir + "/stay-awake"
+    // Present exactly while the idle cycle is active, in the same
+    // file-is-the-state pattern. hub's doorbell reads it (with the `locked`
+    // marker and the stay-awake flag) to decide whether Saiful is watching
+    // this machine — a phone that buzzes for someone sitting at the desk is
+    // the defect it exists to prevent. Swept at startup: a flag left by a
+    // shell that died mid-cycle would otherwise read as idle for ever.
+    readonly property string idleFlagPath: stateDir + "/idle"
 
     // Upstream's defaults (their Service.qml); `blank` is ours and stays off
     // unless shell.json asks for it.
@@ -176,6 +183,9 @@ QtObject {
         blankTimer.stop();
         lockTimer.stop();
         idledThisCycle = false;
+        // The `locked` marker takes over as the not-watching signal, but the
+        // cycle is over: leaving the flag would double-report after unlock.
+        run(["rm", "-f", idleFlagPath]);
         // The lock surface steals focus, so the screensaver would notice and
         // exit within a second anyway — the kill just skips the overlap.
         killScreensaver();
@@ -192,6 +202,7 @@ QtObject {
         if (idledThisCycle)
             return;
         idledThisCycle = true;
+        run(["touch", idleFlagPath]);
         logEvent("idle-cycle-start", "screensaver=" + screensaverTimeoutSeconds + " lock=" + lockTimeoutSeconds);
 
         if (screensaverStageEnabled) {
@@ -226,6 +237,7 @@ QtObject {
         }
         powerOnMonitors();
         idledThisCycle = false;
+        run(["rm", "-f", idleFlagPath]);
     }
 
     function handleIdleChanged() {
@@ -375,7 +387,7 @@ QtObject {
     // the re-arm (same defence as Theme.qml; each service defends itself
     // because service construction order is undefined).
     readonly property Process stateDirProc: Process {
-        command: ["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/qshell"]
+        command: ["bash", "-c", "mkdir -p \"$1\" && rm -f \"$1/idle\"", "qshell-idle-state", Quickshell.env("HOME") + "/.local/state/qshell"]
         onExited: root.stayAwakeFlag.reload()
         Component.onCompleted: running = true
     }
