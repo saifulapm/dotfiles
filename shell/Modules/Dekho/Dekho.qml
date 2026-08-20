@@ -1402,7 +1402,57 @@ Scope {
     property bool trailerRunning: false
     property string trailerLabel: ""
 
-    function play(seasonNumber, episodeNumber, fromResume) {
+    // ------------------------------------------------------ release choice
+    // The release menu, as the CLI has it: play asks `dekho api releases`,
+    // shows the list, and only then starts dekho-play — with `--release` when
+    // a row was chosen, without it when the Auto row was. Resume skips the
+    // menu entirely: the whole point of resuming is picking up the release
+    // whose pieces are already on disk.
+    property var releaseItems: []
+    property bool releasesLoading: false
+    property string releasesError: ""
+    property int releasesDropped: 0
+    property int releaseSeason: 0
+    property int releaseEpisode: 0
+
+    function openReleases(seasonNumber, episodeNumber) {
+        if (!detail)
+            return;
+        releaseSeason = seasonNumber;
+        releaseEpisode = episodeNumber;
+        releaseItems = [];
+        releasesError = "";
+        releasesDropped = 0;
+        releasesLoading = true;
+        releaseView.filter = "";
+        releaseView.cursor = 0;
+        push({
+            view: "releases"
+        });
+        const args = ["releases", "--id", String(detail.id), "--kind", String(detail.kind)];
+        if (detail.kind === "tv" && seasonNumber > 0) {
+            args.push("-s", String(seasonNumber));
+            args.push("-e", String(episodeNumber));
+        }
+        releasesFetch.fetch(args);
+    }
+
+    ApiRequest {
+        id: releasesFetch
+        // No memo: seeder counts go stale in minutes, and a stale hash sent
+        // back with --release is an error the panel would have caused itself.
+        onLoaded: data => {
+            dekhoRoot.releaseItems = data.items || [];
+            dekhoRoot.releasesDropped = Number(data.dropped) || 0;
+            dekhoRoot.releasesLoading = false;
+        }
+        onFailed: message => {
+            dekhoRoot.releasesError = message;
+            dekhoRoot.releasesLoading = false;
+        }
+    }
+
+    function play(seasonNumber, episodeNumber, fromResume, releaseHash) {
         if (!detail)
             return;
         sessionFile = runtimeDir + "/session-" + Date.now() + ".ndjson";
@@ -1413,6 +1463,8 @@ Scope {
         }
         if (fromResume)
             args.push("--resume");
+        if (releaseHash)
+            args.push("--release", String(releaseHash));
 
         session = {
             events: [],
@@ -1793,6 +1845,8 @@ Scope {
             return personView.handleKey(event);
         if (view === "browse")
             return browseView.handleKey(event);
+        if (view === "releases")
+            return releaseView.handleKey(event);
 
         // The query line owns every printable key — this is a search-first
         // surface, so navigation lives on the arrows, as it does in the emoji
@@ -2568,7 +2622,7 @@ Scope {
                 // first arrow key the two would silently stop agreeing. The
                 // nav stack reads them back through captureTop() instead.
                 onSeasonPicked: number => dekhoRoot.loadSeason(number)
-                onPlayed: (s, e, fromResume) => dekhoRoot.play(s, e, fromResume)
+                onPlayed: (s, e, fromResume) => fromResume ? dekhoRoot.play(s, e, true) : dekhoRoot.openReleases(s, e)
                 onTrailerRequested: dekhoRoot.playTrailer()
                 onPersonPicked: p => dekhoRoot.openPerson(p)
                 onGenrePicked: name => dekhoRoot.openGenre(name)
@@ -2629,6 +2683,33 @@ Scope {
                 onFacetChosen: (facet, value) => dekhoRoot.setFacet(facet, value)
                 onPageStepped: delta => dekhoRoot.stepPage(delta)
                 onTitlePicked: item => dekhoRoot.openTitle(item)
+                onDismissed: dekhoRoot.pop()
+            }
+
+            // ----------------------------------------------------- releases
+            ReleaseView {
+                id: releaseView
+
+                anchors.fill: parent
+                visible: dekhoRoot.view === "releases"
+                theme: dekhoRoot.theme
+                fonts: dekhoRoot.fonts
+                edgePad: dekhoRoot.edgePad
+                label: dekhoRoot.detail ? dekhoRoot.detail.title + (dekhoRoot.detail.kind === "tv" && dekhoRoot.releaseSeason > 0 ? " — " + Model.episodeCode(dekhoRoot.releaseSeason, dekhoRoot.releaseEpisode) : "") : ""
+                items: dekhoRoot.releaseItems
+                loading: dekhoRoot.releasesLoading
+                error: dekhoRoot.releasesError
+                dropped: dekhoRoot.releasesDropped
+
+                onPicked: hash => {
+                    // Replace this screen with the playback one: coming back
+                    // from a film must land on the detail view, not on a list
+                    // of seeder counts that stopped being true.
+                    const s = dekhoRoot.releaseSeason;
+                    const e = dekhoRoot.releaseEpisode;
+                    dekhoRoot.pop();
+                    dekhoRoot.play(s, e, false, hash);
+                }
                 onDismissed: dekhoRoot.pop()
             }
 
