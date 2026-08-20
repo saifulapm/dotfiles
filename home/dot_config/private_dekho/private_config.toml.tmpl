@@ -1,0 +1,22 @@
+{{- $dekho := fromToml (includeTemplate "dekho.toml" .) -}}
+{{- $key := index $dekho "tmdb_api_key" -}}
+{{- if $key -}}
+# dekho — films and series into mpv (github.com/saifulapm/dekho).
+#
+# A TEMPLATE, not a symlink into ~/.dotfiles: chezmoi runs in symlink mode
+# here, and that repo is PUBLIC, so a linked file would put this key on
+# github. Templates are written instead of linked, so `private_` produces a
+# real 0600 file on disk and the key lives only in the age blob upstream
+# (home/.chezmoitemplates/dekho.toml.age).
+#
+# Everything in this file is overridable per shell: dekho reads $TMDB_API_KEY
+# first and only falls back to here. The shell's Movies & TV hub has no
+# environment to speak of — `dekho api` is spawned by qshell.service — which
+# is the whole reason this file exists.
+#
+# `index` rather than a bare field access on the map: chezmoi executes with
+# missingkey=error, so a keyless machine (phase-1 install, no age key yet)
+# would otherwise abort the entire apply instead of rendering nothing and
+# letting the file be removed.
+tmdb_api_key = {{ $key | quote }}
+{{- end -}}

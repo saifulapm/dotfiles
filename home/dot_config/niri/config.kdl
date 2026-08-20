@@ -557,6 +557,32 @@ window-rule {
     default-window-height { proportion 0.55; }
 }
 
+// The shell's dekho hub (shell/Modules/Dekho/Dekho.qml, Mod+Ctrl+Alt+M). It
+// is a real toplevel rather than a layer-shell overlay precisely so that the
+// mpv it launches — floating, by the media rule below — is drawn ABOVE it
+// instead of behind it.
+//
+// OPEN-MAXIMIZED, NEVER FULLSCREEN, and the distinction is the entire reason
+// the window exists. niri draws a fullscreen window above the floating layer:
+// measured 2026-08-20, a fullscreen Quickshell window covered both a floating
+// mpv and the bar, which is the exact situation the hub was moved off the
+// Overlay layer to escape. Maximized is a full-width COLUMN — 3467x1914 of
+// this desk's 3490x1963, bar and gaps still visible — and floating windows
+// stay on top of it.
+//
+// app-id AND title, because app-id alone is not specific enough to be safe:
+// every Quickshell toplevel in the session is `org.quickshell` (Qt sets
+// app_id per process from QGuiApplication::desktopFileName(), not per
+// window), so the title is the only thing that says "the hub" rather than
+// "the shell". The title is set in Dekho.qml's `windowTitle` — the two are a
+// matched pair, change one and change the other. Same shape as the chromium
+// sign-in rule above, and safe for the same reason: open-* is evaluated once,
+// at map.
+window-rule {
+    match app-id=r#"^org\.quickshell$"# title="^Movies & TV$"
+    open-maximized true
+}
+
 // omarchy's floating-window tag (system.lua) also covers the media viewers:
 // mpv, imv and Evince open floating at the same 875×600 — zathura joins them
 // as the Evince replacement. omacalc floats in omarchy untagged — no forced
@@ -624,8 +650,16 @@ window-rule {
 // No transparency on media windows (omarchy system.lua's list) nor on PiP
 // players (pip.lua forces opacity 1). Deliberately the last opacity rule:
 // for a contested property, the latest matching rule wins.
+//
+// org.quickshell joins them: it is the shell's own toplevel (today, the dekho
+// hub), and the 0.985/0.96 pair above is a focus cue for APP windows. The hub
+// is opaque surface0 on purpose — a cinema is a room with the lights off, and
+// backdrop art with the wallpaper showing through it looks like neither — so
+// at 0.96 unfocused it would read as a bug. Every other shell surface is a
+// layer-shell one and was never matched by a window rule at all.
 window-rule {
     match app-id=r#"^(zoom|vlc|mpv|org\.kde\.kdenlive|com\.obsproject\.Studio|com\.github\.PintaProject\.Pinta|imv)$"#
+    match app-id=r#"^org\.quickshell$"#
     match title=r#"Picture.?in.?[Pp]icture"#
     opacity 1.0
 }
@@ -772,6 +806,12 @@ binds {
     // XF86Audio* binds below drive it with no special-casing.
     Mod+Ctrl+M hotkey-overlay-title="Music: cliamp" { spawn "music"; }
     Mod+Ctrl+Shift+M hotkey-overlay-title="Play Music" { spawn "music" "--prompt"; }
+    // Films and series: the shell's dekho hub (github.com/saifulapm/dekho) —
+    // continue watching, trending, search, straight into mpv. Next to music
+    // by meaning, on Mod+Ctrl+ALT+M because Mod+Ctrl+Shift+M is taken above,
+    // which also puts it with the other Mod+Ctrl+Alt panels (calendar, idle,
+    // reminders, notification centre).
+    Mod+Ctrl+Alt+M hotkey-overlay-title="Movies & TV: dekho" { spawn "qs" "ipc" "call" "dekho" "toggle"; }
     // omarchy: XF86Calculator → their calculator; ours is omacalc. (Their
     // SUPER+SHIFT+EQUAL alternative is set-window-height here.)
     XF86Calculator hotkey-overlay-title="Calculator" { spawn "omacalc"; }

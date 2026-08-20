@@ -143,6 +143,9 @@ update_src "$HOME/.local/src/omacalc" "$HOME/.local/bin/omacalc" omacalc
 update_src "$HOME/.local/src/omacut" "$HOME/.local/bin/omacut" omacut
 update_src "$HOME/.local/src/omawrite" "$HOME/.local/bin/omawrite" omawrite
 update_src "$HOME/.local/src/libinput-gestures" "$HOME/.local/bin/libinput-gestures" libinput-gestures
+# dekho's build is the long one here (librqbit), so it only ever runs when
+# origin actually moved — which is the point of the check.
+update_src "$HOME/.local/src/dekho" "$HOME/.local/bin/dekho" dekho
 
 # -------------------------------------------------------------------- apply
 say "chezmoi apply (reinstalls everything removed above)"

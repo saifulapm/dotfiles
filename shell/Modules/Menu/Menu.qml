@@ -440,6 +440,9 @@ Scope {
         case "reminders":
             shellRoot.toggleReminders();
             break;
+        case "dekho":
+            shellRoot.toggleDekho();
+            break;
         case "lock":
             shellRoot.lockSession();
             break;

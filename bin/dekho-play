@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+# dekho-play — start a dekho playback that OUTLIVES the shell, and write its
+# progress somewhere the panel can watch.
+#
+# Called by shell/Modules/Dekho/Dekho.qml. There is nothing here you cannot do
+# by hand with `dekho play`; what this adds is the two things a panel needs.
+#
+# WHY systemd-run AND NOT execDetached. Quickshell's execDetached children do
+# not leave the shell's cgroup — `systemd-cgls --user-unit qshell.service`
+# lists every helper the shell spawns — and qshell.service is KillMode=
+# control-group. So a `dekho play` started the ordinary way dies, together
+# with its mpv, the moment the shell restarts: the menu's "Relaunch Shell"
+# row, a `chezmoi apply` that touches the QML, a crash. Killing a film forty
+# minutes in because the bar was reloaded is not a trade worth making, and it
+# is the same trap bin/qshell-relaunch documents from the other side. A
+# transient unit is owned by the USER MANAGER instead, so playback survives
+# the shell entirely — and `--collect` retires the unit on its own when the
+# film ends.
+#
+# WHY A FILE AND NOT A PIPE. Nothing is reading when playback starts (the
+# panel may be closed, or reopened later), so the NDJSON `dekho play --json`
+# emits goes to a file under $XDG_RUNTIME_DIR and the panel tails it. systemd
+# does the redirect itself.
+#
+# WHY THE CALLER NAMES THE FILE. `--session` is how the panel avoids a race
+# it cannot otherwise win: it starts its `tail -n +1 -F` the instant it spawns
+# this script, while this script still has to stop the previous unit before
+# systemd truncates anything — so with one fixed filename the tail replays the
+# PREVIOUS run's events into the new run's view. A path that has never existed
+# cannot be stale. Old ones are swept below; run by hand without --session and
+# you get the shared default, which is fine because nothing is watching it.
+#
+# WHY A TRAILER IS A DIFFERENT UNIT. `--trailer` runs `dekho trailer` under
+# `dekho-trailer.service` instead of `dekho-play.service`, and that name is the
+# whole point: the "one playback at a time" stop below is what makes the panel's
+# Play button safe, and it would otherwise mean that glancing at a trailer kills
+# the film you are forty minutes into. Two unit names, two independent stops —
+# a trailer replaces a trailer, a film replaces a film, and neither touches the
+# other. The session and log files are prefixed to match, because the sweep of
+# stale per-run files is per-prefix: a film's sweep must not unlink the file a
+# running trailer's unit is still writing to, and vice versa.
+#
+#   dekho-play --id 550 --kind movie
+#   dekho-play --id 1396 --kind tv --season 2 --episode 5
+#   dekho-play --id 1396 --kind tv --resume
+#   dekho-play --session /run/user/1000/dekho/session-1.ndjson --id 550 --kind movie
+#   dekho-play --trailer --id 550 --kind movie
+#   dekho-play --stop
+#   dekho-play --trailer --stop
+#
+# Every other flag is passed through to `dekho play` (or `dekho trailer`)
+# untouched (--quality, --dual, --no-next, --dry-run …).
+set -uo pipefail
+
+runtime="${XDG_RUNTIME_DIR:-/tmp}/dekho"
+unit="dekho-play"
+verb="play"
+prefix="session"
+session=""
+
+# Leading flags in any order, so `--trailer --stop` and `--trailer --session P`
+# both read the way they are written.
+while true; do
+  case "${1:-}" in
+  --session)
+    [[ -n ${2:-} ]] || {
+      echo "dekho-play: --session needs a path" >&2
+      exit 2
+    }
+    session="$2"
+    shift 2
+    ;;
+  --trailer)
+    unit="dekho-trailer"
+    verb="trailer"
+    prefix="trailer"
+    shift
+    ;;
+  *) break ;;
+  esac
+done
+
+log="$runtime/$prefix.log"
+[[ -n $session ]] || session="$runtime/$prefix.ndjson"
+
+notify() { notify-send -a qshell "󰎁 $1" "${2:-}" >/dev/null 2>&1 || true; }
+
+# Stopping the unit stops mpv with it: KillMode defaults to control-group and
+# mpv is dekho's child, so it is in the same cgroup. That is the intent —
+# "stop playback" means the film stops, not that dekho lets go of it. Only THIS
+# mode's unit: stopping a trailer must leave a film running.
+stop() {
+  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
+}
+
+# `systemctl stop` returns before the cgroup is empty, so "stopped" is not yet
+# "finished": dekho writes the watch history on its way out, and both callers
+# below need that write to have landed before they act. Bounded, because a unit
+# that will not die must not hang the panel's button.
+wait_gone() {
+  local _
+  for _ in $(seq 1 40); do
+    systemctl --user is-active --quiet "$unit.service" || break
+    sleep 0.05
+  done
+}
+
+# --stop waits too, and that is what lets the panel re-read the history the
+# moment this exits: the Stop button moves a film into Continue watching, and
+# before this wait existed the panel's re-fetch raced dekho's own final write
+# and lost, so the rail kept the position from before the stop until the next
+# time the panel was opened.
+if [[ ${1:-} == --stop ]]; then
+  stop
+  wait_gone
+  exit 0
+fi
+
+if (($# == 0)); then
+  echo "dekho-play: nothing to play — see the header of $0" >&2
+  exit 2
+fi
+
+if ! command -v dekho >/dev/null 2>&1; then
+  notify "dekho is not installed" "Run chezmoi apply to build it"
+  echo "dekho-play: dekho not found on PATH — run \`chezmoi apply\`" >&2
+  exit 1
+fi
+
+mkdir -p "$runtime" || exit 1
+
+# Sweep the per-run files this and previous runs left behind. $XDG_RUNTIME_DIR
+# is tmpfs and cleared at logout, so this is only about a long uptime with a
+# lot of films in it, not about correctness. The one being written now is
+# excluded because systemd has not created it yet — but a re-run with the same
+# path would otherwise delete it out from under the unit.
+#
+# ONLY THIS MODE'S PREFIX. The other mode's unit may be running right now, and
+# unlinking the file it is writing to would leave the panel's `tail -F` waiting
+# on a name that never comes back — a trailer would silently blank the film's
+# progress view. Within one prefix the sweep is safe because starting a run in
+# a mode has just stopped that mode's previous unit.
+find "$runtime" -maxdepth 1 -name "$prefix-*.ndjson" ! -path "$session" -delete 2>/dev/null || true
+
+# One playback per mode. `systemd-run --unit` REFUSES to start a unit that is
+# already active rather than replacing it, so without this a second pick would
+# fail silently from the panel's point of view — and two dekho sessions would
+# in any case be two mpv windows fighting for the same swarm bandwidth.
+stop
+
+# Wait for the unit to actually be gone, or systemd-run below would refuse to
+# start a unit whose cgroup has not drained yet.
+wait_gone
+
+# StandardOutput=truncate: is what empties the session file, so there is no
+# race between this script clearing it and the unit's first write.
+# StandardError=append: keeps dekho's human log across runs — it is the first
+# thing to read when a playback fails for a reason the NDJSON did not carry.
+if ! systemd-run --user --collect --quiet \
+  --unit="$unit" \
+  --description="dekho $verb" \
+  --property="StandardOutput=truncate:$session" \
+  --property="StandardError=append:$log" \
+  -- dekho "$verb" --json "$@"; then
+  notify "Could not start playback" "systemd-run refused the unit"
+  echo "dekho-play: systemd-run failed" >&2
+  exit 1
+fi
+
+exit 0

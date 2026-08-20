@@ -92,6 +92,18 @@ var TREE = {
         "aliases": ["music", "radio", "stream", "listen", "song", "player", "station", "stations", "somafm", "youtube", "spotify", "podcast", "cliamp"],
         "description": "Radio, YouTube, podcasts — anything cliamp plays"
     },
+    // The dekho hub, beside Music for the same reason Music is here: it is a
+    // player with a running state, not just an app to open. One row rather
+    // than a submenu — everything it can do (resume, search, pick an episode)
+    // is a thing you do INSIDE the panel, so a menu tree of it would be a
+    // second, worse copy of the panel's own navigation.
+    "watch": {
+        "icon": "󰎁",
+        "label": "Movies & TV",
+        "aliases": ["dekho", "movie", "movies", "film", "films", "tv", "series", "show", "shows", "watch", "stream", "mpv", "cinema", "episode"],
+        "description": "Browse, resume and play films and series in mpv",
+        "call": "dekho"
+    },
     "reminder": {
         "icon": "󰢌",
         "label": "Reminder",

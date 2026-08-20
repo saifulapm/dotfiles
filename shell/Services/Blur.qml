@@ -54,7 +54,19 @@ QtObject {
     // rule): those windows frost via their own background alpha, not a
     // whole-window fade — see the header comment.
     readonly property string footExcludes: "    exclude app-id=\"^foot$\"\n" + "    exclude app-id=\"^qshell-float$\"\n" + "    exclude app-id=\"^qshell-float-yazi$\"\n" + "    exclude app-id=\"^cliamp-main$\"\n" + "    exclude app-id=\"^tmux-main$\"\n" + "    exclude app-id=r#\"^TUI\\.(float|tile)$\"#\n"
-    readonly property string fragmentOn: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Frosted app windows over niri's cached xray wallpaper blur. Global\n" + "// blur tuning stays at niri's defaults (passes 3, offset 3).\n" + "window-rule {\n" + "    background-effect {\n" + "        blur true\n" + "    }\n" + "}\n" + "\n" + "window-rule {\n" + "    opacity 0.95\n" + footExcludes + "}\n" + "\n" + "window-rule {\n" + "    match is-active=false\n" + "    opacity 0.9\n" + footExcludes + "}\n"
+    // THE SHELL IS NOT AN APP WINDOW. Every rule in this fragment is written
+    // for the windows the shell sits above, and since 2026-08-20 the shell
+    // itself has one toplevel among them — the dekho hub (Modules/Dekho),
+    // app-id org.quickshell like any Quickshell window. It is deliberately
+    // opaque (a cinema is a room with the lights off), so the 0.95/0.9 pair
+    // would make backdrop art fight the wallpaper through it, and blurring
+    // the wallpaper behind a maximized opaque window is a pass with nothing
+    // to show for it. The shell's other surfaces are layer-shell and are not
+    // matched by window rules at all; this keeps its window on the same side
+    // of the line as the rest of it. config.kdl's base opacity pair exempts
+    // the same app-id, for the same reason.
+    readonly property string shellExclude: "    exclude app-id=r#\"^org\\.quickshell$\"#\n"
+    readonly property string fragmentOn: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Frosted app windows over niri's cached xray wallpaper blur. Global\n" + "// blur tuning stays at niri's defaults (passes 3, offset 3).\n" + "window-rule {\n" + shellExclude + "    background-effect {\n" + "        blur true\n" + "    }\n" + "}\n" + "\n" + "window-rule {\n" + "    opacity 0.95\n" + footExcludes + shellExclude + "}\n" + "\n" + "window-rule {\n" + "    match is-active=false\n" + "    opacity 0.9\n" + footExcludes + shellExclude + "}\n"
     readonly property string fragmentOff: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Blur is disabled; config.kdl includes this file optionally.\n"
 
     function logEvent(event, details) {

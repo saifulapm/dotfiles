@@ -481,6 +481,11 @@ ShellRoot {
         notesLoader.summon("toggle");
     }
 
+    function toggleDekho() {
+        dismissBarPanels();
+        dekhoLoader.summon("toggle");
+    }
+
     // What the hot-edge strip calls on a right-edge hover. The strip stays
     // reachable past the card's 10 px niri gap while the panel is open, so the
     // same gesture that summoned it dismisses it: move away from the edge and
@@ -912,6 +917,60 @@ ShellRoot {
         // for scripts and keybinds that capture without stealing the screen.
         function add(text: string): string {
             notesLoader.summon("addText", [text]);
+            return "ok";
+        }
+    }
+
+    // The movie hub (github.com/saifulapm/dekho): browse, resume and play into
+    // mpv. Evictable for the same reason the filmstrip pickers are — a hub
+    // holds sixty decoded posters while it is open and nothing at all when it
+    // is not. It re-fetches on every summon rather than caching in this
+    // process; the poster files are already on disk in dekho's own cache, so a
+    // reopen paints from disk and the TMDB calls only refresh what is on
+    // screen. Playback itself is NOT a child of this process — see the module
+    // header and bin/dekho-play.
+    //
+    // THE ONLY SURFACE HERE THAT IS A REAL WINDOW rather than a layer-shell
+    // one (2026-08-20), so that the mpv it starts is drawn above it instead of
+    // behind it. That does not change this loader's contract: the module's
+    // `opened` is its window's own visibility, so a close from the compositor
+    // (Mod+Q) satisfies `surfaceOpen`'s "closed" exactly as its own hide()
+    // does and the grace timer starts either way. `toggle` is no longer a
+    // two-state verb — a window can be open and not in front of you — see the
+    // module's toggle().
+    SurfaceLoader {
+        id: dekhoLoader
+        evictable: true
+        surfaceSource: shell.moduleRoot + "/Modules/Dekho/Dekho.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
+    }
+
+    IpcHandler {
+        target: "dekho"
+
+        function toggle(): string {
+            shell.toggleDekho();
+            return "ok";
+        }
+
+        function show(): string {
+            shell.dismissBarPanels();
+            dekhoLoader.summon("show");
+            return "ok";
+        }
+
+        function hide(): string {
+            dekhoLoader.deliver("hide");
+            return "ok";
+        }
+
+        // `qs ipc call dekho search "the wire"` — open straight onto a query,
+        // for a keybind or a script that already knows what you want.
+        function search(query: string): string {
+            shell.dismissBarPanels();
+            dekhoLoader.summon("searchFor", [query]);
             return "ok";
         }
     }

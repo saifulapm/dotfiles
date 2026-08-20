@@ -1,0 +1,26 @@
+{{- /* dekho's TMDB key, decrypted — the single source of it on every machine.
+
+  Emits the plaintext TOML of .chezmoitemplates/dekho.toml.age, or NOTHING AT
+  ALL when the age key is absent. Exactly the shape and the reasoning of
+  mail-identities.toml next door; read that file's header for the two-phase
+  install argument, which applies here unchanged:
+
+  phase 1 is `chezmoi init --apply` BEFORE bin/secrets-restore has fetched
+  iCloud:chezmoi/key.txt, so an unguarded `decrypt` would take the whole first
+  apply down. Guarded, a keyless machine renders this to empty output, chezmoi
+  removes a file whose contents are empty, and ~/.config/dekho/config.toml
+  simply does not exist — which dekho already treats as "no key here" rather
+  than as an error. Phase 2's apply writes it.
+
+  WHY THE KEY IS IN THE REPO AT ALL. github.com/saifulapm/dotfiles is public,
+  so it is in the repo only because it is encrypted to one age recipient. The
+  alternative considered and rejected was `pass`: the store is unlocked by the
+  gpg agent, so the hub would fail on every boot until something else had
+  unlocked it, and the panel is exactly the kind of thing you open first.
+
+  It is a free, per-user, read-only TMDB key with no billing attached
+  (themoviedb.org/settings/api) — worth encrypting, not worth a prompt on
+  every fresh install. */ -}}
+{{- if stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt") -}}
+{{- decrypt (include ".chezmoitemplates/dekho.toml.age") -}}
+{{- end -}}

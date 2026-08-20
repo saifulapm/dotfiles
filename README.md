@@ -25,8 +25,8 @@ themselves), sets up tty1 autologin, registers the shell's file-chooser
 portal, installs the dev toolchain (node via mise, pnpm via corepack, rust
 via rustup, Shopify CLI), the agent CLIs (claude, codex, copilot, pi), the
 pnpm/cargo/go/composer tool sets, prebuilt binaries (watchexec, hurl,
-cloudflared, stripe, ouch, usql, satty), builds the kakoune fork and the
-three oma apps from source, **switches the login shell to fish**, sets up
+cloudflared, stripe, ouch, usql, satty), builds the kakoune fork, dekho and
+the three oma apps from source, **switches the login shell to fish**, sets up
 multi-PHP (php82/83/84 beside system 8.5), on-demand podman dev services
 (mysql/postgres/redis/mailpit) and `https://<project>.test` domains, applies
 the chromium policy, disables suspend everywhere, opens the dufs port,
@@ -34,8 +34,9 @@ fetches fonts (pinned externals) + the theme wallpapers (from our own
 saifulapm/wallpapers repo) and bootstraps the default theme.
 
 Expect the first apply to take a while — it compiles kakoune, **Emacs 31
-(from source, the longest single step)**, ~10 cargo crates and three Qt
-apps, and pre-pulls ~1.5 GB of container images. sudo's timestamp expires
+(from source, the longest single step)**, dekho (which links a whole
+BitTorrent stack), ~10 cargo crates and three Qt apps, and pre-pulls ~1.5 GB
+of container images. sudo's timestamp expires
 between the root-needing steps, so **the password prompt returns several
 times across the run** — the prompts surface mid build-output, so stay near
 the keyboard rather than leaving it unattended. If anything fails mid-way
