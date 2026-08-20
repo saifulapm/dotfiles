@@ -151,6 +151,13 @@ function describeEvent(ev) {
             text: ev.found + " releases · " + (ev.dual || 0) + " dual audio",
             kind: "status"
         };
+    case "title-guard":
+        // Releases filed under this title's IMDB id whose names say they are
+        // a different production entirely — dekho drops them before ranking.
+        return {
+            text: "Ignoring " + ev.dropped + " release" + (ev.dropped === 1 ? "" : "s") + " named like a different title",
+            kind: "warn"
+        };
     case "trying":
         return {
             text: "Trying " + ev.quality + " · " + (ev.size || "size unknown") + " · " + ev.seeders + " seeder" + (ev.seeders === 1 ? "" : "s") + (ev.audio ? " · " + ev.audio : ""),

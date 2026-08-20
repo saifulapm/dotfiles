@@ -49,7 +49,7 @@
 #   dekho-play --trailer --stop
 #
 # Every other flag is passed through to `dekho play` (or `dekho trailer`)
-# untouched (--quality, --dual, --no-next, --dry-run …).
+# untouched (--quality, --max-bitrate, --no-next, --dry-run …).
 set -uo pipefail
 
 runtime="${XDG_RUNTIME_DIR:-/tmp}/dekho"
