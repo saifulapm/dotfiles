@@ -39,74 +39,7 @@
   "fallbackModel": [
     "opus"
   ],
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "amx _hook"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "amx _hook"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "amx _hook"
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "amx _hook"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "amx _hook"
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "amx _hook"
-          }
-        ]
-      }
-    ]
-  },
+  "hooks": {},
   "worktree": {
     "symlinkDirectories": [
       "node_modules",
@@ -120,9 +53,7 @@
     "command": "~/.claude/statusline.py",
     "refreshInterval": 10
   },
-  "enabledPlugins": {
-    "focus@focus": true
-  },
+  "enabledPlugins": {},
   "extraKnownMarketplaces": {
     "focus": {
       "source": {
