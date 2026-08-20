@@ -19,4 +19,8 @@
 # would otherwise abort the entire apply instead of rendering nothing and
 # letting the file be removed.
 tmdb_api_key = {{ $key | quote }}
-{{- end -}}
+
+# Always rank Hindi+English dual-audio releases first, falling back when a
+# title has none; mpv then opens on the Hindi track. --no-dual for one run.
+dual = "prefer"
+{{ end -}}
