@@ -34,6 +34,14 @@
         "birthYear": 1991,
         "lifeExpectancy": 70
       },
+      {
+        "id": "timezones",
+        "zones": [
+          "Asia/Dhaka",
+          "Europe/London",
+          "America/New_York"
+        ]
+      },
       "weather",
       "update"
     ],
@@ -44,6 +52,10 @@
       "kb",
       "devservices",
       "dufs",
+      "pass",
+      "ports",
+      "drives",
+      "ssh",
       "icloud",
       "dropbox",
       "sync",
@@ -54,6 +66,7 @@
       "bluetooth",
       "network",
       "audio",
+      "nightlight",
       "monitor",
       "battery",
       "notifs"

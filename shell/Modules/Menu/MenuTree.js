@@ -110,6 +110,52 @@ var TREE = {
         "aliases": ["reminders", "remind", "timer", "alarm"],
         "description": "Set a reminder that notifies you later"
     },
+    // The five panel-opening rows ported from the omarchy plugin marketplace
+    // (2026-08-21). Each is a `bar open <id>` IPC, which the shell routes to
+    // the focused output — so a row here and the matching Mod+Ctrl chord land
+    // in exactly the same place. They are top-level rather than buried in a
+    // submenu because each is a verb, the way Clipboard and Music are, and
+    // the menu's search is what makes a flat list of verbs work.
+    //
+    // No `when` guard on any of them: the underlying widget hides itself when
+    // its subject is absent, and a row that opens a panel with an honest
+    // empty state is better than a row that vanishes and leaves the user
+    // wondering where it went.
+    "passwords": {
+        "icon": "󰌆",
+        "label": "Passwords",
+        "aliases": ["pass", "password", "secret", "credential", "login", "otp", "2fa", "totp"],
+        "description": "Search the password store and copy or type an entry",
+        "action": "qs ipc call bar open pass"
+    },
+    "ssh": {
+        "icon": "󰣀",
+        "label": "SSH",
+        "aliases": ["ssh", "remote", "server", "host", "connect", "shell"],
+        "description": "Open a terminal on a host from ~/.ssh/config",
+        "action": "qs ipc call bar open ssh"
+    },
+    "ports": {
+        "icon": "󰛳",
+        "label": "Ports",
+        "aliases": ["port", "listening", "localhost", "server", "dev", "socket", "listener"],
+        "description": "What is listening, and open, copy or stop it",
+        "action": "qs ipc call bar open ports"
+    },
+    "drives": {
+        "icon": "󱊞",
+        "label": "Drives",
+        "aliases": ["drive", "usb", "stick", "sd", "card", "eject", "mount", "unmount", "removable"],
+        "description": "Mount, open and safely eject removable storage",
+        "action": "qs ipc call bar open drives"
+    },
+    "worldclock": {
+        "icon": "󰖟",
+        "label": "World Clock",
+        "aliases": ["timezone", "timezones", "zone", "clock", "world", "utc", "time"],
+        "description": "The time in other places, on one aligned grid",
+        "action": "qs ipc call bar open timezones"
+    },
     "toggle": {
         "icon": "󰔎",
         "label": "Toggle",
@@ -377,6 +423,19 @@ var TREE = {
         "description": "Silence notification popups",
         "state": "dnd",
         "call": "dnd"
+    },
+    // The blue-light filter, as the one-key decision. `checked` asks
+    // bin/nightlight rather than sunsetr directly, so the tick and the key
+    // agree by construction; the row is hidden entirely on a machine where
+    // the cargo pass has not built sunsetr.
+    "toggle.nightlight": {
+        "icon": "󰖙",
+        "label": "Night Light",
+        "aliases": ["night", "nightlight", "blue", "bluelight", "warm", "sunset", "gamma", "temperature", "sunsetr", "eye"],
+        "description": "Warm the display, or hand the schedule back",
+        "when": "command -v sunsetr || test -x \"$HOME/.cargo/bin/sunsetr\"",
+        "checked": "nightlight status | grep -qE 'warm|^night'",
+        "action": "nightlight toggle"
     },
     "toggle.blur": {
         "icon": "󰂵",

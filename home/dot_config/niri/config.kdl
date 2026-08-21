@@ -768,6 +768,23 @@ binds {
     Mod+Ctrl+Alt+D hotkey-overlay-title="Calendar" { spawn "qs" "ipc" "call" "bar" "open" "clock"; }
     // omarchy: SUPER+SHIFT+CTRL+A agent — the bar's AI panel.
     Mod+Shift+Ctrl+A hotkey-overlay-title="AI Panel" { spawn "qs" "ipc" "call" "bar" "open" "ai"; }
+    // The six widgets ported from the omarchy plugin marketplace (2026-08-21).
+    // Every one of them is also reachable by position through Mod+Ctrl+<n>
+    // below; these letters exist for the ones worth muscle memory.
+    //
+    // Night light gets TWO keys and the plain one is the toggle, not the
+    // panel: it is the only widget here whose everyday use is a single
+    // decision ("not this, not now") made without looking at anything. The
+    // panel, where the three modes and the temperature live, is the shifted
+    // one. bin/nightlight owns the toggle policy so this key and the panel's
+    // rows can never disagree.
+    Mod+Ctrl+N hotkey-overlay-title="Night Light: hold / release" { spawn "nightlight" "toggle"; }
+    Mod+Shift+Ctrl+N hotkey-overlay-title="Night Light Panel" { spawn "qs" "ipc" "call" "bar" "open" "nightlight"; }
+    Mod+Ctrl+S hotkey-overlay-title="SSH Hosts" { spawn "qs" "ipc" "call" "bar" "open" "ssh"; }
+    Mod+Ctrl+Shift+P hotkey-overlay-title="Passwords" { spawn "qs" "ipc" "call" "bar" "open" "pass"; }
+    Mod+Ctrl+Shift+O hotkey-overlay-title="Listening Ports" { spawn "qs" "ipc" "call" "bar" "open" "ports"; }
+    Mod+Ctrl+Shift+U hotkey-overlay-title="Removable Drives" { spawn "qs" "ipc" "call" "bar" "open" "drives"; }
+    Mod+Ctrl+Z hotkey-overlay-title="World Clock" { spawn "qs" "ipc" "call" "bar" "open" "timezones"; }
     // omarchy: SUPER+CTRL+number opens the bar's right-hand panels by
     // position, so a chord keeps meaning the same icon after the bar is
     // rearranged (their utilities.lua loop, `code:10`..`code:18`). The letters

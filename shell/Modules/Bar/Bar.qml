@@ -683,6 +683,54 @@ Scope {
         return sharedService("devservices", devServicesServiceComponent, {});
     }
 
+    // No gate: the pass service watches the store directory and runs
+    // bin/pass-store only at startup, on panel open and when the store
+    // changes — there is no cadence to scope to visibility.
+    function passService() {
+        return sharedService("pass", passServiceComponent, {});
+    }
+
+    // No gate: the ports service starts nothing on its own — it probes at
+    // startup and then only while its panel is open (the approved
+    // "panels refreshing while open" exception, enforced in the service).
+    function portsService() {
+        return sharedService("ports", portsServiceComponent, {});
+    }
+
+    // No gate here, and note what that means for this one: the drives
+    // service runs a udev follower for the life of the shell (event-driven,
+    // one line per block-device change), and its 1 Hz throughput sampler
+    // gates itself on the panel being open or an eject waiting — the
+    // approved "panels refreshing while open" exception, enforced inside the
+    // service rather than by a bar-level visibility gate.
+    function drivesService() {
+        return sharedService("drives", drivesServiceComponent, {});
+    }
+
+    // No gate: the world clock ticks on Quickshell's own SystemClock (the
+    // clock widget's object, no second timer) and re-reads offsets only at a
+    // DST boundary it schedules itself — nothing to scope to visibility.
+    function timezonesService() {
+        return sharedService("timezones", timezonesServiceComponent, {
+            settings: Qt.binding(() => barRoot.inlineEntryFor("timezones"))
+        });
+    }
+
+    // No gate: the ssh service watches ~/.ssh/config and runs bin/ssh-hosts
+    // only at startup, on panel open and when that file changes — there is
+    // no cadence to scope to visibility.
+    function sshService() {
+        return sharedService("ssh", sshServiceComponent, {});
+    }
+
+    // No gate: sunsetr's `status --json --follow` is event-driven (one line
+    // per state change, nothing polls), so — like the dictation and
+    // devservices followers — it runs for the life of the shell. One
+    // instance, one follower, however many screens carry the widget.
+    function nightLightService() {
+        return sharedService("nightlight", nightLightServiceComponent, {});
+    }
+
     function btBatteryService() {
         return sharedService("btbattery", btBatteryServiceComponent, {});
     }
@@ -765,6 +813,36 @@ Scope {
     }
 
     Component {
+        id: sshServiceComponent
+        SshService {}
+    }
+
+    Component {
+        id: timezonesServiceComponent
+        TimezonesService {}
+    }
+
+    Component {
+        id: drivesServiceComponent
+        DrivesService {}
+    }
+
+    Component {
+        id: portsServiceComponent
+        PortsService {}
+    }
+
+    Component {
+        id: passServiceComponent
+        PassService {}
+    }
+
+    Component {
+        id: nightLightServiceComponent
+        NightLightService {}
+    }
+
+    Component {
         id: btBatteryServiceComponent
         BtBatteryService {}
     }
@@ -829,6 +907,12 @@ Scope {
             "ai": aiComponent,
             "weather": weatherComponent,
             "monitor": monitorComponent,
+            "nightlight": nightlightComponent,
+            "ssh": sshComponent,
+            "timezones": timezonesComponent,
+            "drives": drivesComponent,
+            "ports": portsComponent,
+            "pass": passComponent,
             "devservices": devservicesComponent,
             "dufs": dufsComponent,
             "mail": mailComponent,
@@ -2214,6 +2298,54 @@ Scope {
         MonitorWidget {
             theme: barRoot.theme
             autoBrightness: barRoot.shell.autoBrightness
+        }
+    }
+
+    Component {
+        id: nightlightComponent
+        NightLight {
+            theme: barRoot.theme
+            nightlight: barRoot.nightLightService()
+        }
+    }
+
+    Component {
+        id: sshComponent
+        Ssh {
+            theme: barRoot.theme
+            ssh: barRoot.sshService()
+        }
+    }
+
+    Component {
+        id: timezonesComponent
+        Timezones {
+            theme: barRoot.theme
+            timezones: barRoot.timezonesService()
+        }
+    }
+
+    Component {
+        id: drivesComponent
+        Drives {
+            theme: barRoot.theme
+            drives: barRoot.drivesService()
+        }
+    }
+
+    Component {
+        id: portsComponent
+        Ports {
+            theme: barRoot.theme
+            ports: barRoot.portsService()
+        }
+    }
+
+    Component {
+        id: passComponent
+        Pass {
+            theme: barRoot.theme
+            pass: barRoot.passService()
         }
     }
 

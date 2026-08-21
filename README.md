@@ -47,6 +47,16 @@ land after the logins below.
 
 **Reboot at the end** — autologin lands you in niri with the shell running.
 
+One thing that apply changes and you will notice on the first evening: **the
+display now warms after sunset**. `sunsetr.service` runs the blue-light filter,
+aimed by coordinates each machine resolves from its own timezone into
+`~/.config/sunsetr/geo.toml` (never this repo — it is public). `Mod+Ctrl+N`
+holds it off or back on, the bar's night-light icon opens the rest, and
+`nightlight auto|day|night|status` is the same thing from a terminal. It
+arrived with five other widgets ported from the omarchy plugin marketplace on
+2026-08-21 — passwords, SSH hosts, listening ports, removable drives and a
+world clock — see `docs/marketplace-ports-2026-08-21.md`.
+
 Housekeeping: the bootstrap drops a temporary chezmoi at `~/bin/chezmoi`;
 the manifest installs the real `/usr/bin/chezmoi`, so `rm ~/bin/chezmoi`
 after the first apply.
@@ -153,6 +163,8 @@ after the first apply.
   `~/.local/share/qshell/backgrounds` (plus your own `~/Pictures/Wallpapers`).
 - `templates/` — theme fan-out targets (foot, GTK, niri, yazi, tmux, oma).
 - `bench/` — measured numbers from `just bench`; performance is the product.
+- `docs/` — one dated note per non-obvious change, with the measurements and
+  the decisions that did not survive contact.
 - `vendor/` — third-party source carried verbatim and pinned by hand, when no
   package exists we can consume. One tree so far (`try`); see its README.
 - `CREDITS.md` — upstream copyright and licence notices for the ported code.
