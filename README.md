@@ -94,9 +94,19 @@ after the first apply.
   git@github.com:saifulapm/emacs.d.git` before pushing from it.
 - `tailscale up` — interactive browser auth (the apply prints this loudly;
   the bar's tailscale widget has the same login flow).
-- `gh auth login` — once per account: saifulapm (personal), Cool9977 (work),
-  saiful408 (main). The gh aliases switch between them with
-  `gh auth switch`. Then rerun `chezmoi apply` so the gh extensions install.
+- `gh auth` — **no longer manual, and deliberately no longer `gh auth login`**
+  (2026-08-21). That flow authorizes a single OAuth App, so logging in on the
+  second of three machines leaves the first answering `401 Bad credentials`
+  with nothing to announce it: the token carries no expiry, so it looks valid
+  right up until it is refused. It is a classic PAT with **No expiration** and
+  every scope instead, kept in `pass` as `github/cli-token`, installed by
+  `bin/secrets-restore` and reinstalled by `run_after_43-gh-auth.sh` on any
+  apply where gh has stopped having a working one — so `update-all` repairs a
+  revoked token by itself. Rotating it is `pass edit github/cli-token` +
+  `pass git push`, then a re-run on the other boxes; never a second
+  `gh auth login`, which is the thing that breaks them. One account only
+  (saifulapm) — the work/main aliases were never logged in here and are gone.
+  The gh extensions still want a rerun of `chezmoi apply` once auth lands.
 - First login for each agent CLI: `claude`, `codex`, `copilot`.
 - `rclone config` — once per remote, per machine: the iCloud remote
   (interactive Apple 2FA) and the Dropbox remote (interactive browser

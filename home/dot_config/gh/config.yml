@@ -3,14 +3,25 @@
 # The mac's account aliases copied hosts.yml.{personal,work,project} variants
 # over hosts.yml — safe there because tokens lived in the macOS Keychain. On
 # this desktop there is no keyring (gnome-keyring is deliberately absent), so
-# gh stores oauth tokens INSIDE hosts.yml and the copy trick would wipe them.
-# The aliases now use gh's native multi-account switching instead; run
-# `gh auth login` once per account and the same alias names keep working.
-# Accounts (from the mac hosts variants): personal=saifulapm, work=Cool9977,
-# main=saiful408.
+# gh stores tokens INSIDE hosts.yml and the copy trick would wipe them. The
+# alias below uses gh's native account switching instead.
+#
+# ONE ACCOUNT since 2026-08-21 (user: "I am not using those"). The work
+# (Cool9977) and main (saiful408) aliases are gone. They came across with the
+# mac config and were never logged in on any of these three boxes, so `gh
+# work` and `gh main` could only ever fail on an account gh had never heard
+# of — a config that describes a setup that does not exist is worse than no
+# config, because it reads as a working feature. Restoring one is this alias
+# line plus a token in pass; nothing else depends on them.
+#
+# AUTH IS A CLASSIC PAT FROM `pass` (github/cli-token), NOT `gh auth login`.
+# That flow authorizes a single OAuth App, so a fresh login on the second of
+# three machines leaves the first answering 401 Bad credentials with nothing
+# to announce it — the token carries no expiry, so it looks valid until it is
+# refused. bin/secrets-restore installs the PAT; run_after_43-gh-auth.sh
+# reinstalls it on any apply where gh has stopped having a working one. The
+# full reasoning is on the gh entry in packages/manifest.toml.
 git_protocol: ssh
 aliases:
     personal: '!gh auth switch --user saifulapm && gh auth setup-git && gh auth status'
-    work: '!gh auth switch --user Cool9977 && gh auth setup-git && gh auth status'
-    main: '!gh auth switch --user saiful408 && gh auth setup-git && gh auth status'
 version: "1"
