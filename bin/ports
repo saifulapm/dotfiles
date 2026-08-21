@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+# ports — what is listening on this machine, as TSV.
+#
+#   ports                       list every TCP listener
+#   ports kill <pid> <start>    stop a listener, safely (see below)
+#
+#   port<TAB>bind<TAB>scope<TAB>pid<TAB>comm<TAB>cwd<TAB>start<TAB>owner<TAB>unit<TAB>label
+#
+# `unit` is the systemd unit this listener belongs to, or empty. It is the
+# column that separates the machine's DECLARED services — the caddy, mailpit
+# and database sockets this repo installs — from something you started in a
+# terminal a minute ago. It is filled from two places:
+#
+#   * `systemctl list-sockets` on both managers, for socket-activated ports.
+#     `ss` cannot see these at all: the socket is held by systemd, which it
+#     declines to attribute, so every one of them arrives with no pid.
+#   * the process's own cgroup, for a plain service like dufs or hub that
+#     holds its own socket.
+#
+# The second needs care, because a `pnpm dev` started in a terminal ALSO sits
+# in a .service cgroup — the terminal's (foot-server.service). What separates
+# them is whether the listening process is that unit's MainPID: hub.service's
+# MainPID is the hub process, while foot-server.service's is the foot server
+# and not the python you just launched under it. That comparison needs no
+# denylist of terminal names, which is the reason it is the check used.
+#
+# scope is loopback | tailnet | lan | any — where the socket can be reached
+# FROM, which is the only property of a listener that is a security fact
+# rather than a curiosity. owner is self | system: whether this user's uid
+# owns the process, and therefore whether anything here can act on it.
+#
+# `start` is the process's start time in kernel clock ticks (field 22 of
+# /proc/<pid>/stat). It is carried through the listing and required back by
+# `kill` for one reason: PIDs are recycled. Between a panel drawing a row and
+# a click landing on it, the process can exit and its number be handed to
+# something else — and "kill the thing on port 3000" must never become "kill
+# whatever now happens to be PID 52230". The pair (pid, start) is unique for
+# the life of the machine, so requiring it makes the recycled-PID kill
+# impossible rather than unlikely.
+#
+# NOTHING HERE USES sudo. Sockets owned by root (caddy, dnsmasq, sshd) are
+# listed — they are part of the honest answer to "what is listening" — but
+# they come through with owner=system and no cwd, and `kill` refuses them.
+set -uo pipefail
+
+self_uid="$(id -u)"
+
+# A process's start time in clock ticks — field 22 of /proc/<pid>/stat.
+#
+# The fields are NOT split from the front, and that is the whole reason this
+# is a function. Field 2 is the command name in parentheses and it can
+# contain spaces AND brackets of its own (a process really can be called
+# "(sd-pam)" or "Web Content"), so counting from the left desynchronizes
+# every field after it — the classic /proc/stat trap. Everything after the
+# LAST ')' is fixed-width, and starttime is the 20th of those.
+start_time_of() {
+  local line
+  line="$(cat "/proc/$1/stat" 2>/dev/null)" || return 1
+  [ -n "$line" ] || return 1
+  awk '{print $20}' <<<"${line##*') '}"
+}
+
+# --------------------------------------------------------------------- kill
+if [ "${1:-list}" = "kill" ]; then
+  pid="${2:-}"
+  want_start="${3:-}"
+  [[ $pid =~ ^[0-9]+$ ]] || { echo "ports: kill needs a numeric pid" >&2; exit 1; }
+  [[ $want_start =~ ^[0-9]+$ ]] || { echo "ports: kill needs the start time the listing reported" >&2; exit 1; }
+
+  stat_file="/proc/$pid/stat"
+  [ -r "$stat_file" ] || { echo "ports: no such process: $pid" >&2; exit 1; }
+
+  have_start="$(start_time_of "$pid")"
+  [ -n "$have_start" ] || { echo "ports: could not read the start time of $pid" >&2; exit 1; }
+
+  if [ "$have_start" != "$want_start" ]; then
+    echo "ports: pid $pid is not the process that was listed (it exited and the number was reused)" >&2
+    exit 1
+  fi
+
+  owner_uid="$(awk '/^Uid:/ {print $2; exit}' "/proc/$pid/status" 2>/dev/null)"
+  if [ "$owner_uid" != "$self_uid" ]; then
+    echo "ports: $pid belongs to uid $owner_uid, not you — stop it with systemctl instead" >&2
+    exit 1
+  fi
+
+  kill -TERM "$pid" 2>/dev/null || { echo "ports: could not signal $pid" >&2; exit 1; }
+  exit 0
+fi
+
+if [ "${1:-list}" != "list" ]; then
+  echo "Usage: ports [list|kill <pid> <start>]" >&2
+  exit 1
+fi
+
+# --------------------------------------------------------------------- list
+command -v ss >/dev/null 2>&1 || exit 0
+
+# This machine's tailnet address, so a socket bound to it can be told apart
+# from one bound to the LAN. Empty when tailscale is down, which just means
+# those rows fall through to "lan".
+tailnet_ip="$(ip -4 -o addr show dev tailscale0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+# The v6 half matters as much: a socket bound to the tailnet's IPv6 address
+# was being reported as "lan" (observed 2026-08-21), which is the one
+# misclassification with a security consequence — it reads as "reachable by
+# anyone on the coffee-shop wifi" when it is not.
+tailnet_ip6="$(ip -6 -o addr show dev tailscale0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+
+scope_of() {
+  case "$1" in
+  127.* | ::1 | "[::1]") echo loopback ;;
+  0.0.0.0 | "*" | "[::]" | ::) echo any ;;
+  *)
+    # ss brackets IPv6 literals; compare against the bare form.
+    local bare="${1#[}"
+    bare="${bare%]}"
+    if { [ -n "$tailnet_ip" ] && [ "$bare" = "$tailnet_ip" ]; } \
+      || { [ -n "$tailnet_ip6" ] && [ "$bare" = "$tailnet_ip6" ]; } \
+      || [[ $bare == fd7a:115c:a1e0:* ]]; then
+      # fd7a:115c:a1e0::/48 is Tailscale's own ULA prefix, so an address in
+      # it is a tailnet address even on a machine where the interface could
+      # not be read.
+      echo tailnet
+    else
+      echo lan
+    fi
+    ;;
+  esac
+}
+
+# What to call the process behind a listener.
+#
+# NOT `ss`'s comm, which is the kernel's 16-byte task name and is wrong for
+# exactly the processes this panel exists to show: node renames its main
+# thread, so every Vite, Next, Astro and Shopify CLI server reports itself as
+# "MainThread" (measured 2026-08-21). argv is better.
+#
+# And one step better than argv[0]: a dev server is almost always a RUNTIME
+# running a tool — `node .../node_modules/.bin/vite` — where argv[0] is "node"
+# and the interesting word is argv[1]. So a known runtime defers to its first
+# non-flag argument, and anything else uses argv[0]. `node -e '…'` correctly
+# stays "node", because -e is a flag.
+process_name() {
+  local pid="$1" argv0 arg1 base
+  mapfile -d '' -t argv < "/proc/$pid/cmdline" 2>/dev/null || return 0
+  argv0="${argv[0]:-}"
+  [ -n "$argv0" ] || return 0
+  base="$(basename -- "$argv0")"
+  case "$base" in
+  node | nodejs | bun | deno | python | python3 | ruby | php | perl)
+    arg1="${argv[1]:-}"
+    case "$arg1" in
+    "" | -*) ;;
+    *) base="$(basename -- "$arg1")" ;;
+    esac
+    ;;
+  esac
+  printf '%s' "$base"
+}
+
+# The unit a pid is the MAIN process of, or empty. See the header for why the
+# MainPID comparison is the load-bearing part.
+unit_of_pid() {
+  local pid="$1" cg unit main
+  cg="$(cat "/proc/$pid/cgroup" 2>/dev/null)" || return 0
+  # The last .service/.scope component of the cgroup path is the owning unit.
+  unit="$(grep -oE '[^/]+\.(service|scope)$' <<<"$cg" | tail -1)"
+  [ -n "$unit" ] || return 0
+  case "$unit" in *.scope) return 0 ;; esac
+  # A TRANSIENT unit declares nothing. bin/app-run launches everything as its
+  # own transient `app-<cmd>-<random>.service`, so a dev server started from
+  # the menu or the launcher would otherwise be filed as infrastructure and
+  # hidden — the opposite of what a launcher-started process should be
+  # (measured 2026-08-21). `Transient` is an exact property; matching the
+  # generated unit NAME would be a guess.
+  local transient
+  transient="$(systemctl --user show -p Transient --value "$unit" 2>/dev/null)"
+  [ -z "$transient" ] && transient="$(systemctl show -p Transient --value "$unit" 2>/dev/null)"
+  [ "$transient" = "yes" ] && return 0
+
+  main="$(systemctl --user show -p MainPID --value "$unit" 2>/dev/null)"
+  [ -z "$main" ] && main="$(systemctl show -p MainPID --value "$unit" 2>/dev/null)"
+  [ "$main" = "$pid" ] && printf '%s' "$unit"
+  return 0
+}
+
+# port -> owning socket unit. `systemctl list-sockets` prints "LISTEN UNIT
+# ACTIVATES"; only the ip:port rows are of interest (the rest are unix paths,
+# netlink and friends). Both managers are asked and neither needs root — the
+# user manager is where this repo's caddy/mailpit/database sockets live.
+declare -A UNIT_OF=()
+while read -r listen unit _; do
+  case "$listen" in
+  *:[0-9]*)
+    port="${listen##*:}"
+    [[ $port =~ ^[0-9]+$ ]] || continue
+    [ -n "${UNIT_OF[$port]:-}" ] && continue
+    UNIT_OF[$port]="$unit"
+    ;;
+  esac
+done < <({ systemctl --user list-sockets --no-legend --no-pager 2>/dev/null; systemctl list-sockets --no-legend --no-pager 2>/dev/null; })
+
+# ss -H drops the header; -t TCP, -l listening, -n numeric, -p the process.
+# The process column is `users:(("comm",pid=N,fd=N))` and is only populated
+# for processes this uid can see — root's sockets come through bare, which is
+# exactly the owner=system case.
+ss -tlnpH 2>/dev/null | while read -r _state _recvq _sendq local _peer procinfo; do
+  # local is addr:port, and an IPv6 address brings its own colons and
+  # brackets: strip from the LAST colon.
+  port="${local##*:}"
+  bind="${local%:*}"
+  [[ $port =~ ^[0-9]+$ ]] || continue
+
+  pid=""
+  comm=""
+  if [[ ${procinfo:-} =~ \"([^\"]+)\",pid=([0-9]+) ]]; then
+    comm="${BASH_REMATCH[1]}"
+    pid="${BASH_REMATCH[2]}"
+  fi
+
+  cwd=""
+  start=""
+  owner="system"
+  if [ -n "$pid" ] && [ -r "/proc/$pid/status" ]; then
+    # argv beats the kernel task name — see process_name.
+    name="$(process_name "$pid")"
+    [ -n "$name" ] && comm="$name"
+    owner_uid="$(awk '/^Uid:/ {print $2; exit}' "/proc/$pid/status" 2>/dev/null)"
+    [ "$owner_uid" = "$self_uid" ] && owner="self"
+    # The working directory is what turns "node, pid 4211" into "the app in
+    # ~/Sites/laravel/shopfront". Only readable for our own processes.
+    [ "$owner" = "self" ] && cwd="$(readlink -f "/proc/$pid/cwd" 2>/dev/null)"
+    start="$(start_time_of "$pid")"
+  fi
+
+  # A socket unit wins over the process's own unit: for an activated port the
+  # socket is the thing that declared it, and the service behind it may not
+  # even be running yet.
+  unit="${UNIT_OF[$port]:-}"
+  [ -z "$unit" ] && [ -n "$pid" ] && unit="$(unit_of_pid "$pid")"
+
+  # A short human label: the project directory's basename where we have one,
+  # else the command.
+  label="$comm"
+  [ -n "$cwd" ] && [ "$cwd" != "$HOME" ] && [ "$cwd" != "/" ] && label="$(basename "$cwd")"
+  [ -z "$label" ] && label="port $port"
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$port" "$bind" "$(scope_of "$bind")" "${pid:-0}" "$comm" "$cwd" "${start:-0}" "$owner" "$unit" "$label"
+# Sorted by port, unique on port AND bind address. `-u -k1,1n` alone was
+# unique on the PORT, which silently dropped listeners: 8787 has three (the
+# tailnet v4 and v6 addresses plus loopback) and only one survived — and the
+# one that survived was the unattributed tailnet row, hiding the loopback one
+# that ss could actually name a process for.
+done | sort -t$'\t' -k1,1n -k2,2 -u

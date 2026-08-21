@@ -6,6 +6,14 @@
 #
 #   network-qr [interface]              print the QR matrix as 0/1 rows
 #   network-qr --password [interface]   print the active connection's password
+#   network-qr --text <payload>         print a QR matrix for arbitrary text
+#
+# --text exists for the ports panel, which offers a phone the URL of a dev
+# server on this machine (bin/ports, Modules/Bar/widgets/PortsPanel.qml). It
+# shares the matrix renderer below rather than growing a second copy of it.
+# Note that --text takes its payload in ARGV, which is deliberate and safe
+# only because a URL is not a secret — see the argv warning below, which
+# still governs everything Wi-Fi.
 #
 # The matrix form needs `qrencode`; it is listed in packages/manifest.toml, and
 # the panel hides its share button when the binary is absent rather than
@@ -15,6 +23,36 @@
 # never in argv, which is world-readable in /proc.
 
 set -euo pipefail
+
+# ASCII uses two characters per module. Collapse each pair to one 0/1 value so
+# the panel can render a square matrix directly with native QML rectangles.
+# Margin 4 is the spec quiet zone; the card surround is dark, so this white
+# border is all the scanner gets.
+render_matrix() {
+    command -v qrencode >/dev/null 2>&1 || {
+        echo "qrencode is not installed" >&2
+        exit 1
+    }
+    local ascii line row column
+    ascii=$(printf '%s' "$1" | qrencode --type ASCII --margin 4 --output -)
+    while IFS= read -r line; do
+        row=
+        for ((column = 0; column < ${#line}; column += 2)); do
+            [[ ${line:column:2} == *#* ]] && row+=1 || row+=0
+        done
+        printf '%s\n' "$row"
+    done <<<"$ascii"
+}
+
+if [[ ${1:-} == "--text" ]]; then
+    shift
+    [[ -n ${1:-} ]] || {
+        echo "network-qr: --text needs something to encode" >&2
+        exit 1
+    }
+    render_matrix "$1"
+    exit 0
+fi
 
 mode=matrix
 if [[ ${1:-} == "--password" ]]; then
@@ -133,11 +171,4 @@ payload+=";"
 # the panel can render a square matrix directly with native QML rectangles.
 # Margin 4 is the spec quiet zone; the card surround is dark, so this white
 # border is all the scanner gets.
-ascii=$(printf '%s' "$payload" | qrencode --type ASCII --margin 4 --output -)
-while IFS= read -r line; do
-    row=
-    for ((column = 0; column < ${#line}; column += 2)); do
-        [[ ${line:column:2} == *#* ]] && row+=1 || row+=0
-    done
-    printf '%s\n' "$row"
-done <<<"$ascii"
+render_matrix "$payload"
