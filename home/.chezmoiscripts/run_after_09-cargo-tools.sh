@@ -27,7 +27,13 @@ declare -A CRATES=(
   [hop-kak]="hop-kak"
   [kak-popup]="kak-popup"
   [dedoc]="dedoc"
+  [sunsetr]="sunsetr"
 )
+# sunsetr is here rather than in run_after_10 for one reason: upstream's
+# releases ship a single `sunsetr-vX-x86_64-linux.tar.gz` and no aarch64 asset
+# (checked against the API 2026-08-21, v0.12.5), so the prebuilt path covers
+# the NUC and neither Mac. crates.io covers all three, and the crate builds in
+# ~40 s — cheaper than carrying two mechanisms for one binary.
 # ripdrag was here until 2026-08-18: yazi's <C-n> drag-out hand, obsolete the
 # day yazi got native drag-and-drop over kitty's OSC 72 protocol. Its
 # gtk4-devel build dependency went with it.

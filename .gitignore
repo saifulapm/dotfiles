@@ -4,3 +4,6 @@ bench/.last-qs.log
 
 # per-directory agent memory, auto-populated by claude code reviews
 **/.claude/
+
+# python bytecode, from importing bin/otp-import as a module while testing
+bin/__pycache__/
