@@ -1241,7 +1241,7 @@ why = "Text-mode browser, from the mac list (quick doc reads inside the terminal
 name = "gh"
 category = "dev"
 arch = "all"
-why = "GitHub CLI — PRs/issues/API, and the host for the gh extensions installed by run_after_08-cli-tools.sh"
+why = "GitHub CLI — PRs/issues/API, and the host for the gh extensions installed by run_after_08-cli-tools.sh. AUTH IS A CLASSIC PAT, NOT `gh auth login` (decided 2026-08-21): the OAuth flow authorizes a single OAuth App, so a fresh login on the second of three machines leaves the first answering 401 Bad credentials with nothing to indicate it — the token carries no expiry, so it looks valid until it is refused. The PAT is issued with NO expiration and every classic scope (user ask; delete_repo and admin:org included, so a lost machine means revoke immediately), stored as `github/cli-token` in the pass store, and installed by bin/secrets-restore via `gh auth login --with-token` — that step re-authenticates a REVOKED token too, since `gh auth status` is a live API call, and it audits the granted scopes against the full list. Rotating it is one `pass edit github/cli-token` + `pass git push`, then a re-run of secrets-restore on the other boxes; never a second `gh auth login`, which is what breaks the others. Deliberately in hosts.yml rather than a GH_TOKEN env var read from pass: a systemd timer has no unlocked gpg-agent, so the env var would be empty in exactly the unattended context that needs it. bin/update-all's release checks no longer depend on any of this — they fall back to unauthenticated curl, and shape-check the result so an API error body can never be mistaken for a version tag"
 
 [[pkg]]
 name = "lazygit"
