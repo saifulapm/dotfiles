@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# ssh-hosts — every host you can actually `ssh <name>` to, as TSV.
+#
+#   ssh-hosts                 list, one host per line
+#   ssh-hosts --used <alias>  record a connection, for the recency column
+#
+#   alias<TAB>hostname<TAB>user<TAB>port<TAB>proxyjump<TAB>lastUsed
+#
+# lastUsed is epoch seconds, 0 for a host never opened from here. It lives in
+# ~/.local/state/qshell/ssh/recent — NOT in ~/.ssh/config, which this script
+# never writes to: the config is input, and a launcher that reordered its
+# user's config file would be a surprising thing to have installed.
+#
+# The gathering half of the bar's ssh widget (Modules/Bar/widgets/Ssh*.qml),
+# in the shape bin/system-stats set: this script knows how to ask, the
+# Model.js beside the widget knows how to rank and filter, and neither has to
+# do the other's job. Also usable on its own — `ssh-hosts | column -t`.
+#
+# TWO PASSES, and the second one is the point.
+#
+# The first pass reads ~/.ssh/config for literal `Host` aliases, following
+# `Include` (globs allowed, relative names resolved against ~/.ssh as OpenSSH
+# does). It is a NAME COLLECTOR only — it deliberately does not try to work
+# out what those names resolve to.
+#
+# The second pass asks `ssh -G <alias>` per name, which is OpenSSH resolving
+# its own configuration: Match blocks, per-option first-match-wins, the
+# `Host *` defaults at the bottom of the file, canonicalization, everything.
+# Hand-resolving that in awk is how these scripts get subtly wrong — this
+# config alone has a three-alias `Host macbook mini nuc` block, a `Host *`
+# block that is defaults rather than a host, and github.com aliases whose
+# real hostname is ssh.github.com on port 443. `ssh -G` is 10 ms, opens no
+# connection and resolves no DNS (measured 2026-08-21), so the honest answer
+# is also the cheap one.
+#
+# Wildcard patterns are excluded on purpose: `Host *` and `Host web-*` are
+# rules that apply TO hosts, not hosts you can connect to. Negations (!x)
+# likewise.
+set -uo pipefail
+
+# NOGLOB, and this one is load-bearing. Splitting a `Host` line into patterns
+# needs word splitting but must NOT do pathname expansion: with globbing on,
+# the `Host *` block at the bottom of every ssh config expands to a listing
+# of the current directory, and this script cheerfully reports that ~/.dotfiles
+# contains hosts named "README.md" and "justfile" (observed 2026-08-21, which
+# is how this line got here). The one place expansion IS wanted — an Include
+# glob — turns it back on for exactly that word.
+set -f
+
+config="${SSH_CONFIG_FILE:-$HOME/.ssh/config}"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/ssh"
+recent_file="$state_dir/recent"
+
+# Record a use and exit. Rewritten rather than appended so the file stays one
+# line per host; the rename is atomic, so a reader never sees it half-written.
+if [ "${1:-}" = "--used" ]; then
+  alias="${2:-}"
+  [ -n "$alias" ] || { echo "ssh-hosts: --used needs a host alias" >&2; exit 1; }
+  mkdir -p "$state_dir" || exit 0
+  tmp="$(mktemp "$recent_file.XXXXXX")" || exit 0
+  {
+    printf '%s\t%s\n' "$(date +%s)" "$alias"
+    # Everything except this host, capped at 100 lines: the list is a
+    # ranking input, and a machine that has ssh'd to more than a hundred
+    # distinct aliases does not need the tail of that history to sort a menu.
+    [ -f "$recent_file" ] && awk -F'\t' -v a="$alias" '$2 != a' "$recent_file" | head -100
+  } >"$tmp" 2>/dev/null
+  mv -f "$tmp" "$recent_file" 2>/dev/null || rm -f "$tmp"
+  exit 0
+fi
+
+[ -r "$config" ] || exit 0
+
+# Guard against an Include cycle (a file that includes itself, directly or
+# through a chain). OpenSSH caps nesting at 16; a seen-set is simpler and
+# covers the same ground.
+declare -A seen_files=()
+
+# Emits one alias per line, in file order, duplicates included — the dedup
+# happens once at the end so first-seen order survives.
+collect_aliases() {
+  local file="$1"
+  local real
+  real="$(readlink -f -- "$file" 2>/dev/null)" || return 0
+  [ -n "$real" ] || return 0
+  [ -n "${seen_files[$real]:-}" ] && return 0
+  seen_files[$real]=1
+  [ -r "$real" ] || return 0
+
+  local keyword rest
+  while read -r keyword rest || [ -n "$keyword" ]; do
+    # ssh_config keywords are case-insensitive, and `Host=foo` is legal
+    # alongside `Host foo`.
+    keyword="${keyword%%=*}"
+    case "${keyword,,}" in
+    host)
+      local pattern
+      for pattern in $rest; do
+        # Strip the quotes OpenSSH allows around a pattern.
+        pattern="${pattern%\"}"
+        pattern="${pattern#\"}"
+        case "$pattern" in
+        "" | *[*?]* | !*) continue ;;
+        esac
+        printf '%s\n' "$pattern"
+      done
+      ;;
+    include)
+      local spec expanded
+      for spec in $rest; do
+        spec="${spec%\"}"
+        spec="${spec#\"}"
+        # "~" and a bare relative name both resolve against ~/.ssh, per
+        # ssh_config(5). An absolute path is used as given.
+        case "$spec" in
+        "~"/*) spec="$HOME/${spec#\~/}" ;;
+        /*) ;;
+        *) spec="$HOME/.ssh/$spec" ;;
+        esac
+        # The one place a glob must expand, so noglob comes off for the
+        # length of this expansion and goes straight back on. A pattern
+        # matching nothing yields itself, which the -f test drops.
+        set +f
+        local matches=($spec)
+        set -f
+        for expanded in "${matches[@]}"; do
+          [ -f "$expanded" ] && collect_aliases "$expanded"
+        done
+      done
+      ;;
+    esac
+  done <"$real"
+}
+
+# `ssh -G` prints `keyword value` lines, lowercased keywords, one per line.
+# proxyjump is absent entirely when there is none.
+#
+# -F is passed ONLY when SSH_CONFIG_FILE overrode the path, and that
+# asymmetry is deliberate: ssh(1) says a config given on the command line
+# makes it ignore /etc/ssh/ssh_config entirely. In the normal case that
+# system file is part of the answer, and dropping it would make these rows
+# disagree with what `ssh <host>` actually does — which is the one thing this
+# script exists to avoid. Under an override, faithfulness to the named file
+# is what is wanted instead.
+ssh_args=()
+[ -n "${SSH_CONFIG_FILE:-}" ] && ssh_args=(-F "$config")
+
+resolve() {
+  local alias="$1"
+  local last="${RECENT[$alias]:-0}"
+  ssh -G "${ssh_args[@]}" "$alias" 2>/dev/null | awk -v alias="$alias" -v last="$last" '
+    $1 == "hostname"  && hostname == "" { hostname = $2 }
+    $1 == "user"      && user == ""     { user = $2 }
+    $1 == "port"      && port == ""     { port = $2 }
+    $1 == "proxyjump" && jump == ""     { jump = $2 }
+    END {
+      if (hostname == "") hostname = alias
+      # "none" is how ssh -G spells "no ProxyJump", and it is not a host.
+      if (jump == "none") jump = ""
+      printf "%s\t%s\t%s\t%s\t%s\t%s\n", alias, hostname, user, port, jump, last
+    }
+  '
+}
+
+# alias -> last-used epoch, first line wins (the file is newest-first).
+declare -A RECENT=()
+if [ -r "$recent_file" ]; then
+  while IFS=$'\t' read -r stamp alias; do
+    [ -n "${alias:-}" ] || continue
+    [ -n "${RECENT[$alias]:-}" ] && continue
+    RECENT[$alias]="$stamp"
+  done <"$recent_file"
+fi
+
+# Dedup, first-seen order kept (awk '!seen[$0]++', the idiom). An alias
+# repeated across included files is one host, not two.
+collect_aliases "$config" | awk 'NF && !seen[$0]++' | while IFS= read -r alias; do
+  resolve "$alias"
+done
