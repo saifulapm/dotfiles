@@ -209,6 +209,17 @@ fi
 
 # ------------------------------------------------------------------ summary
 say "summary"
+# gh's token is the one credential this script depends on that can go stale
+# with no symptom until it does: an expiring PAT works perfectly right up to
+# its date, and the release checks above would then drop silently to
+# unauthenticated curl (60/hr, shared per IP). Report the date while there is
+# still time to rotate. Never a FAILURE — a token with a month left is not a
+# reason to fail an update run, and secrets-restore is where it gets fixed.
+gh_exp="$(gh api user -i 2>/dev/null \
+          | awk -F': ' 'tolower($1)=="github-authentication-token-expiration"{print $2}' | tr -d '\r')"
+if [ -n "$gh_exp" ]; then
+  echo "  gh token EXPIRES $gh_exp — regenerate with 'No expiration' (github.com/settings/tokens)"
+fi
 echo "  librepods: hand-built with a patch — rebuild manually after upstream bumps (manifest has the recipe)"
 echo "  podman dev images: deliberately untouched (data-dir compatibility)"
 if [ "${#FAILURES[@]}" -gt 0 ]; then
