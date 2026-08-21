@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# drives — removable storage, as TSV.
+#
+#   drives              list every removable drive and its volumes
+#   drives busy <path>  what is holding a mount point open
+#
+# Row shapes, distinguished by the first column:
+#
+#   drive<TAB>sys<TAB>dev<TAB>name<TAB>size<TAB>bus<TAB>reads<TAB>writes<TAB>sectors
+#   vol<TAB>sys<TAB>dev<TAB>parentSys<TAB>label<TAB>fstype<TAB>size<TAB>mount<TAB>avail
+#
+# `reads`/`writes` are the kernel's in-flight request counts for the drive and
+# `sectors` is its lifetime sector total — the pair a caller samples twice to
+# turn into "still writing, 4.2 MB/s". They are read here rather than
+# computed here on purpose: one snapshot is a fact, a rate is two snapshots
+# and a clock, and only the caller knows how far apart it took them.
+#
+# WHAT COUNTS AS REMOVABLE: the kernel's own `rm` (removable media) or
+# `hotplug` (the bus can drop it) flag, on a whole disk. That is deliberately
+# broader than "USB" — an SD card in a built-in reader is hotplug but not USB,
+# and a phone over MTP is neither, so a bus-name allowlist would miss things
+# people obviously want ejected. The system disk is excluded by exclusion of
+# whatever carries /, not by name, so this stays correct on a machine that
+# boots off a USB stick.
+set -uo pipefail
+
+case "${1:-list}" in
+busy)
+  mount="${2:-}"
+  [ -n "$mount" ] || { echo "drives: busy needs a mount point" >&2; exit 1; }
+  # `fuser -m` names the processes with anything open under the mount. It is
+  # gated rather than required: psmisc is not a declared dependency of this
+  # repo, and the panel's fallback ("something is still using it") is worse
+  # but not useless. Output is `pid\tcomm` per line.
+  command -v fuser >/dev/null 2>&1 || exit 0
+  # -m: the whole filesystem, not just the directory entry. Errors are the
+  # normal case for a mount nobody is holding.
+  fuser -m "$mount" 2>/dev/null | tr ' ' '\n' | while read -r pid; do
+    [[ $pid =~ ^[0-9]+$ ]] || continue
+    comm="$(cat "/proc/$pid/comm" 2>/dev/null)" || continue
+    printf '%s\t%s\n' "$pid" "$comm"
+  done | sort -u -k2,2
+  exit 0
+  ;;
+list) ;;
+*)
+  echo "Usage: drives [list|busy <mount>]" >&2
+  exit 1
+  ;;
+esac
+
+command -v lsblk >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || exit 0
+
+# The disk carrying / — never offered for ejection, whatever its flags say.
+#
+# --nofsroot is load-bearing, not tidiness. On btrfs, `findmnt -no SOURCE /`
+# answers "/dev/nvme0n1p3[/root]" — the subvolume in brackets — which lsblk
+# rejects as "not a block device" and which a naive strip turns into the
+# nonsense name "nvme0n1p3[/root]" (observed on the NUC, 2026-08-21). The
+# exclusion then matches nothing, and on a machine that BOOTS from a hotplug
+# device the system disk would be offered for ejection. --nofsroot returns
+# the bare device.
+root_source="$(findmnt -no SOURCE --nofsroot / 2>/dev/null)"
+root_disk="$(lsblk -no PKNAME "$root_source" 2>/dev/null | head -1)"
+# A root sitting directly on a whole disk has no parent; it is its own.
+[ -z "$root_disk" ] && root_disk="$(lsblk -no KNAME "$root_source" 2>/dev/null | head -1)"
+
+lsblk -J -b -o NAME,PATH,TYPE,RM,HOTPLUG,SIZE,FSTYPE,LABEL,MOUNTPOINT,MODEL,VENDOR,TRAN,FSAVAIL 2>/dev/null |
+  jq -r --arg root "$root_disk" '
+    def clean: if . == null then "" else (. | tostring | gsub("^\\s+|\\s+$"; "")) end;
+    # Human sizes the way a person says them, not the way df does: one
+    # decimal below 10, none above, because "14.6 GB" and "128 GB" are both
+    # what is written on the stick.
+    def human:
+      if . == null or . == "" then "" else
+        (. | tonumber) as $b
+        | if   $b >= 1099511627776 then ($b / 1099511627776) as $v | (if $v < 10 then ($v * 10 | round / 10 | tostring) else ($v | round | tostring) end) + " TB"
+          elif $b >= 1073741824    then ($b / 1073741824)    as $v | (if $v < 10 then ($v * 10 | round / 10 | tostring) else ($v | round | tostring) end) + " GB"
+          elif $b >= 1048576       then ($b / 1048576)       as $v | (if $v < 10 then ($v * 10 | round / 10 | tostring) else ($v | round | tostring) end) + " MB"
+          elif $b > 0              then ($b / 1024 | round | tostring) + " KB"
+          else "" end
+      end;
+    .blockdevices[]
+    | select(.type == "disk")
+    | select((.rm == true) or (.hotplug == true))
+    | select(.name != $root)
+    # Virtual block devices are hotplug-flagged and are not storage anyone
+    # ejects.
+    | select(.name | test("^(zram|loop|ram|dm-|md)") | not)
+    | . as $disk
+    | (
+        [ "drive",
+          ($disk.name | clean),
+          ($disk.path | clean),
+          # The name on the label: vendor and model where the kernel knows
+          # them, else the device name so a row is never blank.
+          (([($disk.vendor | clean), ($disk.model | clean)] | map(select(length > 0)) | join(" ")) as $n
+            | if ($n | length) > 0 then $n else ($disk.name | clean) end),
+          ($disk.size | human),
+          ($disk.tran | clean)
+        ] | @tsv
+      ),
+      (
+        # A disk with no partition table holds its filesystem directly, and
+        # is its own only volume.
+        ($disk.children // [ $disk ])[]
+        | select(.type == "part" or .type == "disk")
+        | [ "vol",
+            (.name | clean),
+            (.path | clean),
+            ($disk.name | clean),
+            (.label | clean),
+            (.fstype | clean),
+            (.size | human),
+            (.mountpoint | clean),
+            (.fsavail | human)
+          ] | @tsv
+      )
+  ' 2>/dev/null |
+  while IFS= read -r row; do
+    # In-flight counts and the lifetime sector total are per DRIVE and live
+    # in sysfs, which lsblk does not report. Appended here so one read of
+    # this script's output is one complete answer.
+    if [[ $row == drive$'\t'* ]]; then
+      sys="$(cut -f2 <<<"$row")"
+      read -r reads writes <<<"$(cat "/sys/class/block/$sys/inflight" 2>/dev/null)"
+      # Field 3 of stat is sectors read, field 7 sectors written; their sum
+      # is what a caller differences to get a throughput.
+      sectors="$(awk '{print $3 + $7}' "/sys/class/block/$sys/stat" 2>/dev/null)"
+      printf '%s\t%s\t%s\t%s\n' "$row" "${reads:-0}" "${writes:-0}" "${sectors:-0}"
+    else
+      printf '%s\n' "$row"
+    fi
+  done
