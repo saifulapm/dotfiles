@@ -21,6 +21,19 @@ Rectangle {
     signal moveRequested(int delta)
     signal accepted
     signal cancelled
+    // A key with Alt or Ctrl held, offered to the host BEFORE the input sees
+    // it. Accept the event to claim it; anything left unaccepted falls
+    // through to normal editing.
+    //
+    // This exists because a TextInput does not ignore Alt chords the way it
+    // ignores Ctrl ones: Qt's line control inserts any key event carrying
+    // text, and Alt+U carries "u". So Alt+U typed a literal "u" into the box
+    // and the panel's key catcher never saw the event at all (measured
+    // 2026-08-21 — the pass panel's Alt+U/Alt+O/Alt+E were all dead on
+    // arrival, and the search box quietly filled up with letters instead).
+    // Key propagation could not have fixed it: the event was accepted, not
+    // ignored, so there was nothing left to bubble.
+    signal chord(var event)
 
     function takeFocus() {
         input.forceActiveFocus();
@@ -65,6 +78,15 @@ Rectangle {
         Keys.onEscapePressed: field.cancelled()
         Keys.onDownPressed: field.moveRequested(1)
         Keys.onUpPressed: field.moveRequested(-1)
+
+        // Runs ahead of the input's own handling (Keys.priority defaults to
+        // BeforeItem), which is the only place a chord can be caught — see
+        // the `chord` signal above. Plain keys are untouched and go straight
+        // to editing; Return and Escape keep their dedicated handlers.
+        Keys.onPressed: event => {
+            if (event.modifiers & (Qt.AltModifier | Qt.ControlModifier))
+                field.chord(event);
+        }
 
         StyledText {
             theme: field.theme

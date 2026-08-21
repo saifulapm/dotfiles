@@ -7,7 +7,26 @@
 # reason — grim has to see the frozen overlay, not live content shifting
 # during teardown), and notifications go through notify-send like the rest of
 # bin/screenshot-*.
+#
+#   screenshot-qr [--exit-codes]
+#
+# --exit-codes makes a cancelled selection exit 2 instead of 0. A person
+# pressing Escape has not failed at anything, which is why 0 is the default
+# and stays the default for the menu entry; but a CALLER that acts on the
+# result — the bar's password panel reopens itself on a decoded code — needs
+# to tell "changed my mind" apart from "here is a code", and the clipboard
+# cannot say which, because a cancel leaves it exactly as it was.
 set -euo pipefail
+
+cancel_status=0
+case "${1:-}" in
+--exit-codes) cancel_status=2 ;;
+"") ;;
+*)
+  echo "Usage: screenshot-qr [--exit-codes]" >&2
+  exit 64
+  ;;
+esac
 
 notify() {
   notify-send -a qshell -t "${3:-2000}" ${2:+-u "$2"} "QR code" "$1" >/dev/null 2>&1 || true
@@ -21,15 +40,45 @@ fi
 # Freeze while picking (wayfreeze, presence-gated — see screenshot-ocr); the
 # EXIT trap covers every early return, including slurp's own cancel.
 freeze_pid=""
+slurp_pid=""
+region_file=""
+
+cleanup() {
+  [[ -n $slurp_pid ]] && kill "$slurp_pid" 2>/dev/null
+  [[ -n $freeze_pid ]] && kill "$freeze_pid" 2>/dev/null
+  [[ -n $region_file ]] && rm -f "$region_file"
+  return 0
+}
+trap cleanup EXIT
+trap 'cleanup; exit "$cancel_status"' TERM INT
+
 if command -v wayfreeze >/dev/null 2>&1; then
   wayfreeze --hide-cursor &
   freeze_pid=$!
-  trap '[[ -n $freeze_pid ]] && kill "$freeze_pid" 2>/dev/null || true' EXIT
   sleep 0.15
 fi
 
-region="$(slurp 2>/dev/null)" || exit 0
-[[ -z $region ]] && exit 0
+# THE SELECTION RUNS IN THE BACKGROUND, AND THAT IS NOT AN ACCIDENT. bash
+# defers a trap until the foreground command finishes, and a command
+# substitution is a foreground command — so `region="$(slurp)"` made this
+# script unkillable in the way that matters: a TERM would land, slurp would
+# keep the screen, and there was no way to call the whole thing off. It cost
+# an evening of the passwords panel looking broken (2026-08-21: a selection
+# nobody completed sat waiting for four minutes with the panel's QR chip
+# greyed out behind it, because the shell had a capture "in flight" that
+# nothing could reach). `wait` IS interruptible, so the trap above runs, and
+# slurp goes with it.
+region_file="$(mktemp -t screenshot-qr.XXXXXX)"
+slurp >"$region_file" 2>/dev/null &
+slurp_pid=$!
+slurp_status=0
+wait "$slurp_pid" || slurp_status=$?
+slurp_pid=""
+
+region="$(cat "$region_file" 2>/dev/null)"
+rm -f "$region_file"
+region_file=""
+[[ $slurp_status -ne 0 || -z $region ]] && exit "$cancel_status"
 
 # Decode QR codes only. Leaving the other symbologies enabled lets dense screen
 # content false-positive as an EAN or Code 39 barcode and take over the

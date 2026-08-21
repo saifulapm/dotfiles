@@ -1,0 +1,360 @@
+#!/usr/bin/env bash
+# pass-store — the shell's hands for `pass`, and nothing more.
+#
+#   pass-store list              entry names, most recently used first
+#   pass-store copy <entry>      password to the clipboard (clears itself)
+#   pass-store user <entry>      username to the clipboard
+#   pass-store otp <entry>       a fresh TOTP code to the clipboard
+#   pass-store type <entry>      type the password into the focused window
+#   pass-store type-user <entry> type the username into the focused window
+#   pass-store edit <entry>      open the entry in `pass edit`
+#   pass-store used <entry>      record a use, for the recency ordering
+#   pass-store caps              which of the above this machine can do
+#   pass-store otp-scan          what the QR on the clipboard SAYS IT IS
+#   pass-store otp-save insert|append <entry>
+#                                write that QR's code into the store
+#
+# THE RULES THIS FILE EXISTS TO KEEP. The bar widget calls only this script,
+# so the reasoning is in one place rather than spread through QML.
+#
+# 1. NOTHING HERE DECRYPTS ANYTHING ITSELF. Every action is handed to `pass`,
+#    so gpg-agent prompts exactly as it would from a terminal, the agent's
+#    cache policy is the one that applies, and this script never holds a key.
+#
+# 2. NO SECRET EVER TOUCHES argv. /proc/<pid>/cmdline is world-readable, so a
+#    password passed as an argument to wl-copy or wtype is readable by every
+#    process on the machine for as long as it runs. Clipboard actions go
+#    through `pass -c`, which pipes internally and clears after 45 s; typing
+#    goes through `wtype -`, which reads stdin. The pipes are private.
+#
+# 3. AN ENTRY NAME IS NEVER INTERPOLATED INTO A SHELL STRING. Names come from
+#    the store's own filenames and are passed as positional arguments
+#    throughout. A name is data.
+#
+# 4. THE ENTRY LIST IS NOT A SECRET LEAK, and this is worth being explicit
+#    about: gpg encrypts file CONTENTS and not file NAMES, so the names here
+#    are already plaintext on disk. That is precisely why the store is a
+#    separate private repo and must never move into this public one — see the
+#    `pass` entry in packages/manifest.toml.
+#
+# 5. A CAPTURED otpauth:// URI IS READ HERE AND NEVER HANDED BACK. The two
+#    otp-* verbs exist so that the bar's QR capture can work without the
+#    shell process ever holding a TOTP seed: `otp-scan` answers with the four
+#    fields that let a person recognise the code — issuer, account, type,
+#    digits — and `otp-save` pipes the URI into `pass otp` on stdin. Neither
+#    ever prints the URI, and neither puts it in argv, for rule 2's reason.
+set -uo pipefail
+
+store="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/pass"
+recent_file="$state_dir/recent"
+
+die() { echo "pass-store: $*" >&2; exit 1; }
+
+command -v pass >/dev/null 2>&1 || die "pass is not installed"
+
+# Is pass-otp actually present? This is a real gate, not politeness: WITHOUT
+# the extension, `pass otp foo` does not fail — pass falls through to its own
+# `show` command and looks for an entry literally named "otp", reporting that
+# it is not in the store. That is a confusing error to surface for a missing
+# package, so the capability is checked rather than attempted.
+otp_available() {
+  [ -r "/usr/lib/password-store/extensions/otp.bash" ] && return 0
+  [ -r "${PASSWORD_STORE_EXTENSIONS_DIR:-$store/.extensions}/otp.bash" ] && return 0
+  return 1
+}
+
+# Typing needs a compositor-level input path. wtype speaks the virtual-keyboard
+# protocol niri implements; without it, typing is simply not offered.
+type_available() {
+  command -v wtype >/dev/null 2>&1
+}
+
+# Capturing a code off the screen needs the whole chain: something to decode a
+# QR with, somewhere to read the result from, and the extension that can write
+# it. pass-otp is in here on purpose — a capture that ends in "pass-otp is not
+# installed" wasted a region selection to say so.
+qr_available() {
+  otp_available || return 1
+  command -v screenshot-qr >/dev/null 2>&1 || return 1
+  command -v zbarimg >/dev/null 2>&1 || return 1
+  command -v wl-paste >/dev/null 2>&1 || return 1
+  return 0
+}
+
+# An entry name addresses a file under the store, so it is validated rather
+# than trusted: no absolute paths, no traversal out of the store. Shared, so
+# the otp-save verbs — whose name is argument 3, not 2 — cannot quietly get a
+# weaker check than the rest.
+check_name() {
+  [ -n "$1" ] || die "$action needs an entry name"
+  case "$1" in
+  # `*../*` covers a bare leading `../` as well, which is why the original
+  # four-pattern list is three here; `..` on its own has no slash to match.
+  /* | *../* | */.. | ..) die "refusing a path-like entry name: $1" ;;
+  esac
+}
+
+action="${1:-list}"
+
+# ------------------------------------------------------------------ caps
+if [ "$action" = "caps" ]; then
+  otp_available && echo "otp" || true
+  type_available && echo "type" || true
+  qr_available && echo "qr" || true
+  exit 0
+fi
+
+# ------------------------------------------------------------------ list
+if [ "$action" = "list" ]; then
+  [ -d "$store" ] || exit 0
+  # Names only. -printf %P strips the store prefix; the .gpg suffix goes with
+  # sed. .git and .gpg-id are not entries.
+  names="$(find "$store" -name '*.gpg' -type f -not -path '*/.git/*' -printf '%P\n' 2>/dev/null | sed 's/\.gpg$//' | sort)"
+  [ -n "$names" ] || exit 0
+
+  # Recently used first, in recency order, then everything else
+  # alphabetically. One pass: the recency file (newest-first) builds the
+  # order, the name list says which of those still exist, and whatever the
+  # first loop did not print comes out in the sorted order it arrived in.
+  #
+  # A recency entry for a deleted password is skipped rather than printed —
+  # `exists` is the gate — so removing an entry from the store removes it
+  # from this list even though the recency file still remembers it.
+  if [ -r "$recent_file" ]; then
+    awk -F'\t' '
+      NR == FNR {
+        if ($2 != "" && !($2 in seen)) { seen[$2] = 1; order[++n] = $2 }
+        next
+      }
+      { exists[$0] = 1; all[++m] = $0 }
+      END {
+        for (i = 1; i <= n; i++)
+          if (order[i] in exists) { print order[i]; printed[order[i]] = 1 }
+        for (i = 1; i <= m; i++)
+          if (!(all[i] in printed)) print all[i]
+      }
+    ' "$recent_file" <(printf '%s\n' "$names")
+  else
+    printf '%s\n' "$names"
+  fi
+  exit 0
+fi
+
+# The username, by the conventions pass entries actually use: the first line
+# is the password, and a `field: value` line below it carries the rest.
+# Printed on stdout, which is a private pipe to the caller.
+read_username() {
+  pass show -- "$1" 2>/dev/null |
+    awk 'NR > 1 && tolower($1) ~ /^(login|user|username|email|e-mail):$/ { $1 = ""; sub(/^[[:space:]]+/, ""); print; exit }'
+}
+
+record_use() {
+  mkdir -p "$state_dir" 2>/dev/null || return 0
+  local tmp
+  tmp="$(mktemp "$recent_file.XXXXXX")" || return 0
+  {
+    printf '%s\t%s\n' "$(date +%s)" "$1"
+    [ -f "$recent_file" ] && awk -F'\t' -v e="$1" '$2 != e' "$recent_file" | head -50
+  } >"$tmp" 2>/dev/null
+  mv -f "$tmp" "$recent_file" 2>/dev/null || rm -f "$tmp"
+}
+
+# ------------------------------------------------------- the captured QR
+# bin/screenshot-qr freezes the screen, decodes the QR in the region you drag
+# out, and puts the payload on the clipboard with `wl-copy --sensitive`. That
+# hint is honoured by bin/clipboard-capture and bin/clipboard-sync-push, so a
+# captured URI reaches neither the clipboard history nor the other two
+# machines — which is what makes the clipboard a safe place to hand a TOTP
+# seed over in. Reading it back HERE rather than in the QML is the other half:
+# a shell variable and a pipe are private, and argv is not.
+uri=""
+read_clipboard_uri() {
+  command -v wl-paste >/dev/null 2>&1 || die "wl-clipboard is not installed"
+  # --no-newline: wl-paste otherwise appends one, and `pass otp` would take it
+  # as part of the URI.
+  uri="$(wl-paste --no-newline 2>/dev/null)"
+  [ -n "$uri" ] || die "the clipboard is empty — capture a QR code first"
+  case "$uri" in
+  otpauth://totp/* | otpauth://hotp/*) ;;
+  *) die "the clipboard does not hold an otpauth:// code" ;;
+  esac
+  # An otpauth URI without a secret= is a QR that looked right and carries
+  # nothing; `pass otp` would refuse it too, but three lines later and with
+  # the URI in its error message.
+  case "$uri" in
+  *secret=*) ;;
+  *) die "that code carries no secret" ;;
+  esac
+}
+
+# %XX -> the byte, and + -> space, which is what pass-otp's own urldecode
+# does and therefore how labels written by `pass otp insert` already read.
+# The backslash pass is not decoration: printf %b eats \n and \t, so a label
+# containing a literal backslash would come out as something else entirely.
+urldecode() {
+  local value="${1//+/ }"
+  value="${value//\\/\\\\}"
+  printf '%b' "${value//%/\\x}"
+}
+
+# Identity fields go out on stdout, so anything that could break the TSV the
+# caller parses — a tab, a newline, any other control character — comes out
+# first.
+clean_field() {
+  printf '%s' "$1" | tr -d '[:cntrl:]' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+if [ "$action" = "otp-scan" ]; then
+  read_clipboard_uri
+
+  rest="${uri#otpauth://}"
+  otp_type="${rest%%/*}"
+  rest="${rest#*/}"
+  label="${rest%%\?*}"
+  case "$rest" in
+  *\?*) query="${rest#*\?}" ;;
+  *) query="" ;;
+  esac
+
+  # The label is "Issuer:account", often written "Issuer: account" — and the
+  # colon is as likely to arrive as %3A, so it is decoded before the split.
+  label="$(urldecode "$label")"
+  account="$label"
+  issuer=""
+  case "$label" in
+  *:*)
+    issuer="${label%%:*}"
+    account="${label#*:}"
+    ;;
+  esac
+
+  # Word splitting on & is wanted here; pathname expansion is not. `set -f`
+  # for the same reason bin/ssh-hosts needs it — an unquoted * in a parameter
+  # would otherwise be replaced by the contents of the working directory.
+  digits=""
+  param_issuer=""
+  saved_ifs="$IFS"
+  set -f
+  IFS='&'
+  for pair in $query; do
+    case "$pair" in
+    issuer=*) param_issuer="$(urldecode "${pair#issuer=}")" ;;
+    digits=*) digits="${pair#digits=}" ;;
+    esac
+  done
+  IFS="$saved_ifs"
+  set +f
+
+  # The Key URI spec makes the issuer PARAMETER authoritative and the label
+  # prefix the compatibility copy, so the parameter wins where both are there.
+  [ -n "$param_issuer" ] && issuer="$param_issuer"
+
+  case "$digits" in
+  6 | 7 | 8 | 9 | 10) ;;
+  *) digits=6 ;; # the spec's default, and what pass otp assumes
+  esac
+
+  printf '%s\t%s\t%s\t%s\n' \
+    "$(clean_field "$issuer")" \
+    "$(clean_field "$account")" \
+    "$(printf '%s' "$otp_type" | tr '[:lower:]' '[:upper:]')" \
+    "$digits"
+  exit 0
+fi
+
+# Does this entry already carry a code? It matters because `pass otp append`
+# does NOT append in that case — it REPLACES the existing otpauth line, and
+# asks first only when it has a terminal to ask at: pass's yesno returns TRUE
+# when stdin is a pipe (read from /usr/bin/pass, 2026-08-21), which ours
+# always is. A replaced TOTP seed is gone, and re-enrolling is the only way
+# back, so the refusal lives here rather than in a prompt nobody would see.
+#
+# awk rather than `grep -q`: grep exits on the first match, `pass` takes
+# SIGPIPE for it, and under `set -o pipefail` the pipeline would then report
+# failure for the case that FOUND something — inverting the guard.
+has_otp() {
+  pass show -- "$1" 2>/dev/null | awk '/^otpauth:\/\// { found = 1 } END { exit found ? 0 : 1 }'
+}
+
+if [ "$action" = "otp-save" ]; then
+  otp_available || die "pass-otp is not installed on this machine"
+  mode="${2:-}"
+  name="${3:-}"
+  case "$mode" in
+  insert | append) ;;
+  *) die "otp-save needs insert or append" ;;
+  esac
+  check_name "$name"
+  read_clipboard_uri
+
+  if [ "$mode" = "insert" ]; then
+    # -f is here so that `pass` never asks a question no terminal can answer,
+    # NOT to permit an overwrite: with stdin a pipe it would overwrite in
+    # silence, taking the entry's password with it. This test is the guard.
+    [ -e "$store/$name.gpg" ] && die "$name already exists — append the code to it instead"
+    printf '%s\n' "$uri" | pass otp insert -f -- "$name" >/dev/null 2>&1 ||
+      die "pass would not write $name"
+  else
+    [ -f "$store/$name.gpg" ] || die "no such entry: $name"
+    has_otp "$name" && die "$name already has a code — nothing was changed"
+    printf '%s\n' "$uri" | pass otp append -f -- "$name" >/dev/null 2>&1 ||
+      die "pass would not append to $name"
+  fi
+
+  record_use "$name"
+  exit 0
+fi
+
+entry="${2:-}"
+check_name "$entry"
+[ -f "$store/$entry.gpg" ] || die "no such entry: $entry"
+
+case "$action" in
+copy)
+  # `pass -c` copies line 1 and restores the previous clipboard after 45 s,
+  # all inside pass. Nothing here ever sees the password.
+  pass show -c -- "$entry" >/dev/null 2>&1 || die "could not copy $entry (gpg refused or was cancelled)"
+  record_use "$entry"
+  ;;
+user)
+  username="$(read_username "$entry")"
+  [ -n "$username" ] || die "no username field in $entry (looked for login/user/username/email)"
+  # A username is not a password, but it is still not going in argv — the
+  # same pipe discipline, so there is one rule here rather than two.
+  printf '%s' "$username" | wl-copy
+  record_use "$entry"
+  ;;
+otp)
+  otp_available || die "pass-otp is not installed on this machine"
+  pass otp -c -- "$entry" >/dev/null 2>&1 || die "could not generate a code for $entry"
+  record_use "$entry"
+  ;;
+type)
+  type_available || die "wtype is not installed"
+  # head -1: the password is the first line, and typing the whole entry
+  # would spray its metadata into the window. `wtype -` reads stdin.
+  pass show -- "$entry" 2>/dev/null | head -1 | tr -d '\n' | wtype - \
+    || die "could not type $entry"
+  record_use "$entry"
+  ;;
+type-user)
+  type_available || die "wtype is not installed"
+  username="$(read_username "$entry")"
+  [ -n "$username" ] || die "no username field in $entry"
+  printf '%s' "$username" | wtype -
+  record_use "$entry"
+  ;;
+edit)
+  # An interactive editor, so it needs a terminal of its own.
+  foot-run pass edit -- "$entry" >/dev/null 2>&1 &
+  ;;
+used)
+  record_use "$entry"
+  ;;
+*)
+  echo "Usage: pass-store [list|copy|user|otp|type|type-user|edit|used|caps|otp-scan] [entry]" >&2
+  echo "       pass-store otp-save insert|append <entry>" >&2
+  exit 1
+  ;;
+esac

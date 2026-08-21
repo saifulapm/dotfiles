@@ -46,6 +46,16 @@ Item {
 
     implicitHeight: Math.max(iconSlot.implicitHeight, labels.implicitHeight, trailingRow.implicitHeight)
 
+    // The hero is the FIRST row of a panel's content column, and a trailing
+    // control's PanelHint hangs off the bottom of it — into the row below,
+    // which is a later sibling and therefore paints over everything this row
+    // owns, whatever z the hint itself sets (PanelHint says so in its own
+    // header). The hint for the pass panel's QR chip was landing behind the
+    // search field; every hero hint in the tree had the same problem, so the
+    // row is lifted here rather than at one call site. Nothing else overlaps
+    // the hero, so there is nothing for this to get in front of.
+    z: 1
+
     Item {
         id: iconSlot
 
