@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+"""otp-import — move Google Authenticator's accounts into `pass`.
+
+    otp-import                 decode from the clipboard and LIST (changes nothing)
+    otp-import --file <path>   read the URI from a file, or - for stdin
+    otp-import --qr            capture the export QR off the screen first
+    otp-import --insert        actually write the entries into pass
+    otp-import --prefix otp    where they land (default: otp/<issuer>/<account>)
+
+Google Authenticator's "Transfer accounts -> Export accounts" does not produce
+the `otpauth://` URIs `pass otp` understands. It produces ONE QR per batch
+holding every selected account at once:
+
+    otpauth-migration://offline?data=<base64 protobuf>
+
+`pass otp validate` rejects that outright (checked 2026-08-21), so something
+has to take it apart first.
+
+WHY THIS FILE EXISTS RATHER THAN A DEPENDENCY. There are tools that do this —
+dim13/otpauth is the usual answer — and there are a dozen websites that will
+do it in a text box. The websites are disqualified outright: that payload is
+the seed to every second factor you own, and pasting it into someone's server
+hands them all of it permanently. A local Go binary would be fine, but the
+protobuf here is four fields deep and stable since 2020, so the whole decoder
+is the ~70 lines below and needs no package, no network and no trust beyond
+this file. Read it before you run it; that is rather the point.
+
+Nothing here prints a secret. The listing shows issuer, account, type and
+digits; the secret goes from the decoder into `pass otp insert` over a pipe
+and nowhere else.
+"""
+
+import argparse
+import base64
+import binascii
+import os
+import subprocess
+import sys
+import urllib.parse
+
+# ----------------------------------------------------------------- protobuf
+# A minimal reader for the two messages Google Authenticator emits. Only the
+# wire types those messages actually use are implemented; anything else is
+# skipped rather than guessed at, so a future field cannot corrupt the parse.
+
+WIRE_VARINT, WIRE_64, WIRE_LEN, WIRE_32 = 0, 1, 2, 5
+
+
+def read_varint(buf, pos):
+    result = shift = 0
+    while True:
+        if pos >= len(buf):
+            raise ValueError("truncated varint")
+        byte = buf[pos]
+        pos += 1
+        result |= (byte & 0x7F) << shift
+        if not byte & 0x80:
+            return result, pos
+        shift += 7
+        if shift > 63:
+            raise ValueError("varint too long")
+
+
+def read_fields(buf):
+    """Yield (field_number, wire_type, value) for one message."""
+    pos = 0
+    while pos < len(buf):
+        key, pos = read_varint(buf, pos)
+        field, wire = key >> 3, key & 0x07
+        if wire == WIRE_VARINT:
+            value, pos = read_varint(buf, pos)
+        elif wire == WIRE_LEN:
+            length, pos = read_varint(buf, pos)
+            value = buf[pos:pos + length]
+            pos += length
+        elif wire == WIRE_64:
+            value, pos = buf[pos:pos + 8], pos + 8
+        elif wire == WIRE_32:
+            value, pos = buf[pos:pos + 4], pos + 4
+        else:
+            raise ValueError("unknown wire type %d" % wire)
+        yield field, wire, value
+
+
+# MigrationPayload.otp_parameters = 1, and the batch counters are 3/4/5.
+ALGORITHMS = {0: "SHA1", 1: "SHA1", 2: "SHA256", 3: "SHA512", 4: "MD5"}
+DIGITS = {0: 6, 1: 6, 2: 8}
+TYPES = {0: "totp", 1: "hotp", 2: "totp"}
+
+
+def parse_payload(raw):
+    accounts, batch = [], {}
+    for field, _wire, value in read_fields(raw):
+        if field == 1:
+            accounts.append(parse_account(value))
+        elif field == 3:
+            batch["size"] = value
+        elif field == 4:
+            batch["index"] = value
+        elif field == 5:
+            batch["id"] = value
+    return accounts, batch
+
+
+def parse_account(raw):
+    account = {"secret": b"", "name": "", "issuer": "",
+               "algorithm": "SHA1", "digits": 6, "type": "totp", "counter": 0}
+    for field, _wire, value in read_fields(raw):
+        if field == 1:
+            account["secret"] = value
+        elif field == 2:
+            account["name"] = value.decode("utf-8", "replace")
+        elif field == 3:
+            account["issuer"] = value.decode("utf-8", "replace")
+        elif field == 4:
+            account["algorithm"] = ALGORITHMS.get(value, "SHA1")
+        elif field == 5:
+            account["digits"] = DIGITS.get(value, 6)
+        elif field == 6:
+            account["type"] = TYPES.get(value, "totp")
+        elif field == 7:
+            account["counter"] = value
+    return account
+
+
+# ------------------------------------------------------------------- URIs
+def to_uri(account):
+    """The otpauth:// URI `pass otp` understands."""
+    # The migration payload carries the secret as RAW BYTES; every otpauth
+    # URI carries it base32-encoded, unpadded.
+    secret = base64.b32encode(account["secret"]).decode("ascii").rstrip("=")
+    issuer, name = account["issuer"], account["name"]
+    # GA writes the label as "Issuer:account" when it knows the issuer; do not
+    # double it up.
+    label = name if not issuer or name.startswith(issuer + ":") else "%s:%s" % (issuer, name)
+    params = {"secret": secret}
+    if issuer:
+        params["issuer"] = issuer
+    if account["algorithm"] != "SHA1":
+        params["algorithm"] = account["algorithm"]
+    if account["digits"] != 6:
+        params["digits"] = str(account["digits"])
+    if account["type"] == "hotp":
+        params["counter"] = str(account["counter"])
+    return "otpauth://%s/%s?%s" % (
+        account["type"],
+        urllib.parse.quote(label, safe=""),
+        urllib.parse.urlencode(params),
+    )
+
+
+def decode_migration(text):
+    text = text.strip()
+    if not text.startswith("otpauth-migration://"):
+        raise SystemExit(
+            "otp-import: that is not a Google Authenticator export URI.\n"
+            "            Expected one starting otpauth-migration://offline?data=…\n"
+            "            (a single otpauth:// URI needs no import — pipe it to"
+            " `pass otp insert`)")
+    query = urllib.parse.urlparse(text).query
+    data = urllib.parse.parse_qs(query).get("data", [None])[0]
+    if not data:
+        raise SystemExit("otp-import: the URI has no data= payload")
+    # parse_qs already percent-decodes; base64 needs its padding back.
+    padded = data + "=" * (-len(data) % 4)
+    try:
+        raw = base64.b64decode(padded)
+    except binascii.Error as error:
+        raise SystemExit("otp-import: the data= payload is not valid base64 (%s)" % error)
+    return parse_payload(raw)
+
+
+# ------------------------------------------------------------------- pass
+def pass_path(prefix, account):
+    """otp/<issuer>/<account>, with the parts made safe for a filename."""
+    def clean(value):
+        value = value.strip().replace("/", "-").replace(" ", "-")
+        return "".join(ch for ch in value if ch.isprintable()).strip("-.")
+
+    name = account["name"]
+    issuer = account["issuer"]
+    # GA labels are usually "Issuer:account"; the account half is the leaf.
+    if issuer and name.startswith(issuer + ":"):
+        name = name[len(issuer) + 1:]
+    parts = [p for p in (prefix, clean(issuer), clean(name)) if p]
+    return "/".join(parts) or "otp/unnamed"
+
+
+def entry_exists(path):
+    store = os.environ.get("PASSWORD_STORE_DIR") or os.path.expanduser("~/.password-store")
+    return os.path.isfile(os.path.join(store, path + ".gpg"))
+
+
+def read_clipboard():
+    try:
+        return subprocess.run(["wl-paste"], capture_output=True, text=True,
+                              timeout=10).stdout
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SystemExit("otp-import: could not read the clipboard (%s)" % error)
+
+
+def capture_qr():
+    print("Drag a box around the export QR code…", file=sys.stderr)
+    result = subprocess.run(["screenshot-qr"], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise SystemExit("otp-import: no QR code was decoded")
+    # screenshot-qr puts the payload on the clipboard.
+    return read_clipboard()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="otp-import",
+        description="Move Google Authenticator's accounts into pass.")
+    parser.add_argument("--qr", action="store_true",
+                        help="capture the export QR off the screen first")
+    parser.add_argument("--uri", help="the otpauth-migration:// URI, explicitly")
+    parser.add_argument("--file", help="read the URI from a file, or - for stdin. "
+                                       "Preferred over --uri for a real export: a "
+                                       "migration payload in argv is readable from "
+                                       "/proc by every process on the machine.")
+    parser.add_argument("--insert", action="store_true",
+                        help="write the entries (without this, only lists)")
+    parser.add_argument("--prefix", default="otp",
+                        help="pass path prefix (default: otp)")
+    parser.add_argument("--force", action="store_true",
+                        help="overwrite entries that already exist")
+    args = parser.parse_args()
+
+    if args.file:
+        text = sys.stdin.read() if args.file == "-" else open(args.file, encoding="utf-8").read()
+    else:
+        text = args.uri or (capture_qr() if args.qr else read_clipboard())
+    accounts, batch = decode_migration(text)
+    if not accounts:
+        raise SystemExit("otp-import: the payload decoded, but held no accounts")
+
+    if "index" in batch and batch.get("size", 1) > 1:
+        print("Batch %d of %d — Google Authenticator splits large exports, so "
+              "run this once per QR code.\n" % (batch["index"] + 1, batch["size"]))
+
+    width = max(len(pass_path(args.prefix, a)) for a in accounts)
+    print("%d account%s found:\n" % (len(accounts), "" if len(accounts) == 1 else "s"))
+    for account in accounts:
+        path = pass_path(args.prefix, account)
+        mark = "  exists" if entry_exists(path) else ""
+        print("  %-*s  %s, %d digits, %s%s" % (
+            width, path, account["type"].upper(), account["digits"],
+            account["algorithm"], mark))
+
+    if not args.insert:
+        print("\nNothing written. Re-run with --insert to add these to pass.")
+        return 0
+
+    print()
+    failed = 0
+    for account in accounts:
+        path = pass_path(args.prefix, account)
+        if entry_exists(path) and not args.force:
+            print("  skipped  %s (already exists — pass --force to replace)" % path)
+            continue
+        # The URI goes in over stdin, never argv: /proc/<pid>/cmdline is
+        # world-readable and this string IS the secret.
+        result = subprocess.run(
+            ["pass", "otp", "insert", "--force", "--", path],
+            input=to_uri(account) + "\n", text=True, capture_output=True)
+        if result.returncode == 0:
+            print("  added    %s" % path)
+        else:
+            failed += 1
+            print("  FAILED   %s — %s" % (path, result.stderr.strip().splitlines()[-1:] or "unknown"))
+    if failed:
+        print("\n%d entry/entries failed. Nothing already in the store was changed." % failed)
+        return 1
+    print("\nDone. Check one with: pass otp <path>")
+    print("Then `pass git push` to send them to the other machines.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
