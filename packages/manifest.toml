@@ -1306,6 +1306,12 @@ arch = "all"
 why = "GNU make — the kakoune fork build (run_after_11) and countless repos need it; Fedora minimal does not ship it"
 
 [[pkg]]
+name = "ninja-build"
+category = "dev"
+arch = "all"
+why = "Ninja build generator — nirisnap's CMake defaults to -G Ninja and CI uses it; without it `make build` fails with CMAKE_MAKE_PROGRAM not set on fresh Fedora (F44 minimal has no ninja) and the Makefile fallback needs quoting; declared so `chezmoi apply` installs it everywhere"
+
+[[pkg]]
 name = "gcc-c++"
 category = "dev"
 arch = "all"
