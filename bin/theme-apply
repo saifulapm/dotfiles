@@ -198,6 +198,29 @@ function mixHex(aHex, bHex, t) {
   tokens["claude.rate-limit-empty"] = mix(bg, fg, 0.20)
 }
 
+// Pi theme derived vars (templates/pi-theme.json.tmpl) — port of
+// omarchy default/themed/pi.json.tpl: `{{ mix a b N% }}` becomes flat
+// tokens here (like claude above). Omarchy background/foreground/accent map
+// to surface.0 / text.primary / accent.accent; selection is surface.3.
+{
+  const mix = mixHex
+  const bg = tokens["surface.0"] || "#16161e"
+  const fg = tokens["text.primary"] || "#c0caf5"
+  const accent = tokens["accent.accent"] || "#7aa2f7"
+  const green = tokens["ansi.green"] || "#9ece6a"
+  const red = tokens["ansi.red"] || "#f7768e"
+  tokens["pi.selectedBackground"] = mix(bg, accent, 0.22)
+  tokens["pi.panel"] = mix(bg, fg, 0.06)
+  tokens["pi.panelAlt"] = mix(bg, fg, 0.10)
+  tokens["pi.panelPending"] = mix(bg, accent, 0.12)
+  tokens["pi.panelSuccess"] = mix(bg, green, 0.12)
+  tokens["pi.panelError"] = mix(bg, red, 0.12)
+  tokens["pi.border"] = mix(bg, fg, 0.30)
+  tokens["pi.borderMuted"] = mix(bg, fg, 0.20)
+  tokens["pi.mutedText"] = mix(fg, bg, 0.34)
+  tokens["pi.dimText"] = mix(fg, bg, 0.52)
+}
+
 // Emacs modus-palette shades (templates/emacs-theme.el.tmpl). The
 // qshell-dark/qshell-light themes in the emacs config (saifulapm/emacs.d,
 // themes/) are Modus derivatives: modus-themes keeps all ~200 semantic
@@ -444,6 +467,12 @@ const OUTPUTS = {
   // by each ctrl-r/ctrl-t, so it picks the new palette up on next open.
   "tv-theme.toml.tmpl": [path.join(HOME, ".config/television/themes/qshell.toml")],
   "claude-theme.json.tmpl": [path.join(HOME, ".claude/themes/qshell.json")],
+  // pi + opencode: omarchy ports (2026-08-23) — Pi watches ~/.pi/agent/themes
+  // hot-reloads qshell.json (like Claude), Opencode watches
+  // ~/.config/opencode/themes hot-reloads. Both pin their *config to qshell
+  // so a fresh install lands themed without a manual /theme pick.
+  "pi-theme.json.tmpl": [path.join(HOME, ".pi/agent/themes/qshell.json")],
+  "opencode-theme.json.tmpl": [path.join(HOME, ".config/opencode/themes/qshell.json")],
   "gum-theme.fish.tmpl": [path.join(HOME, ".local/state/qshell/gum-theme.fish")],
   // emacs: rendered DATA, not a theme — the qshell-dark/qshell-light Modus
   // derivatives in the emacs config (its own repo) load this file for their
@@ -703,6 +732,28 @@ try {
   // unmanaged (run_after_40-cliamp.sh explains why) and the value is the same
   // one already there.
   try { execSync("cliamp theme qshell", { stdio: "ignore", timeout: 5000 }) } catch (e) { /* not running */ }
+  // pi: theme file at ~/.pi/agent/themes/qshell.json is watched and hot-reloaded
+  // (like Claude). Pin settings.json theme to qshell so fresh installs land
+  // themed without a manual /theme pick — same shape as omarchy-theme-set-pi
+  // (--activate) but done every apply (idempotent jq-style update).
+  try {
+    const piSettings = path.join(HOME, ".pi/agent/settings.json")
+    let piJson = {}
+    let piRaw = ""
+    try { piRaw = fs.readFileSync(piSettings, "utf8") } catch (e) { /* first run */ }
+    try { piJson = piRaw ? JSON.parse(piRaw) : {} } catch (e) { piJson = {} }
+    if (piJson.theme !== "qshell") {
+      piJson.theme = "qshell"
+      fs.mkdirSync(path.dirname(piSettings), { recursive: true })
+      writeAtomic(piSettings, JSON.stringify(piJson, null, 2) + "\n")
+    }
+  } catch (e) { /* ignore */ }
+  // opencode: TUI theme at ~/.config/opencode/themes/qshell.json is watched
+  // and hot-reloads; tui.json pins `theme:"qshell"` via chezmoi
+  // (home/dot_config/opencode/tui.json), so no pin here — the theme file
+  // itself is the live artifact. Poke running servers to reload
+  // (SIGUSR2, per omarchy bin/omarchy-restart-opencode).
+  try { execSync("pkill -SIGUSR2 -x opencode", { stdio: "ignore" }) } catch (e) { /* none running */ }
 }
 
 console.log("theme-apply: done")

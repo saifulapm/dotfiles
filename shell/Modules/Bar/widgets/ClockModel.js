@@ -19,12 +19,21 @@ var WEEKDAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "fr
 // the walk from a 24-hour label to the same label in AM/PM is a single right
 // click rather than a lap of the ring. The ISO preset is deliberately left
 // without one: ISO 8601 writes time on a 24-hour clock.
-var CLOCK_FORMATS = ["dddd HH:mm", "dddd h:mm AP", "HH:mm", "h:mm AP", "ddd d MMM HH:mm", "ddd d MMM h:mm AP", "d MMMM 'W'ww yyyy", "yyyy-MM-dd HH:mm"]
+var CLOCK_FORMATS = ["dddd HH:mm", "dddd h:mm AP", "dddd HH:mm:ss", "dddd h:mm:ss AP", "HH:mm", "h:mm AP", "ddd d MMM HH:mm", "ddd d MMM h:mm AP", "d MMMM 'W'ww yyyy", "yyyy-MM-dd HH:mm"]
 
 // Vertical bars have room for a few stacked lines and nothing else, so the
 // ring stays short. AM/PM costs a fourth line, which is why only the plain
 // time carries it here. Theirs, verbatim.
 var VERTICAL_CLOCK_FORMATS = ["HH\n—\nmm", "h\n—\nmm\nAP", "dd\nMMM\n'W'ww\n''yy", "HH\nmm"]
+
+// Whether a format prints seconds, so the widget can tick once a second only
+// for the formats that show them. Quoted literals go first: the s in a 'Sat'
+// is text rather than a token, and an opening quote with no closing one runs
+// to the end of the format the way Qt reads it.
+function clockNeedsSeconds(format) {
+    var text = String(format === undefined || format === null ? "" : format)
+    return /s/.test(text.replace(/'[^']*'?/g, ""))
+}
 
 function clockFormats(vertical) {
     return vertical ? VERTICAL_CLOCK_FORMATS.slice() : CLOCK_FORMATS.slice()

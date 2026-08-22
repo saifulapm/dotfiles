@@ -448,6 +448,12 @@ arch = "all"
 why = "The shell runtime (from COPR errornointernet/quickshell); pulls its own Qt6 runtime deps"
 
 [[pkg]]
+name = "qt6-qtimageformats"
+category = "shell"
+arch = "all"
+why = "Qt6 image format plugins for webp (port of omarchy a4219f8, 71 KB + libwebp already via libvips). QImageReader ships png/jpeg/gif but not webp, so any theme/wallpaper shipping .webp (omarchy now stores all 79 backgrounds as webp, 28 lossless bit-identical) draws blank. Dekho hub and Background.qml both decode through Qt; third-party theme with .webp hits this today even though globs already accept the extension"
+
+[[pkg]]
 name = "google-noto-color-emoji-fonts"
 category = "shell"
 arch = "all"

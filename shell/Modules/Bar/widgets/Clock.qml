@@ -19,6 +19,9 @@ BarButton {
     readonly property string format: vertical ? String(setting("verticalFormat", "HH\n—\nmm")) : String(setting("format", "dddd HH:mm"))
     readonly property string formatAlt: vertical ? String(setting("verticalFormatAlt", "dd\nMMM\n'W'ww\n''yy")) : String(setting("formatAlt", "d MMMM 'W'ww yyyy"))
     readonly property var formatRing: Model.clockFormatRing(format, formatAlt, Model.clockFormats(vertical))
+    // A seconds label needs the clock to tick sixty times as often, and a
+    // repaint a second is a price only the formats that print seconds pay.
+    readonly property bool showsSeconds: Model.clockNeedsSeconds(format)
     readonly property string displayText: formatted(clock.date)
     readonly property var verticalLines: displayText.split("\n")
 
@@ -100,7 +103,7 @@ BarButton {
 
     SystemClock {
         id: clock
-        precision: SystemClock.Minutes
+        precision: rootItem.showsSeconds ? SystemClock.Seconds : SystemClock.Minutes
     }
 
     StyledText {
