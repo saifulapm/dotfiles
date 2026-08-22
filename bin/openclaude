@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# openclaude — Claude Code through the opencode.ai zen gateway.
+set -euo pipefail
+
+export ANTHROPIC_DEFAULT_FABLE_MODEL=qwen3.8-max
+export ANTHROPIC_DEFAULT_OPUS_MODEL=minimax-m3
+export ANTHROPIC_DEFAULT_SONNET_MODEL=qwen3.7-plus
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=qwen3.7-plus
+export ANTHROPIC_DEFAULT_MODEL=qwen3.7-plus
+export CLAUDE_CODE_SUBAGENT_MODEL=qwen3.7-plus
+export ANTHROPIC_BASE_URL=https://opencode.ai/zen/go/
+export ANTHROPIC_API_KEY="$(pass show opencode-zen/api-key)"
+export ANTHROPIC_AUTH_TOKEN=""
+exec claude --allow-dangerously-skip-permissions "$@"
