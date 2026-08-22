@@ -36,3 +36,6 @@ if status is-interactive
     command -q zoxide; and zoxide init fish | source
     command -q tv; and tv init fish | source
 end
+
+# opencode
+fish_add_path /home/saiful/.opencode/bin

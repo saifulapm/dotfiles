@@ -1,16 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "agentPushNotifEnabled": true,
-  "alwaysThinkingEnabled": true,
-  "attribution": {
-    "commit": "",
-    "commitTrailers": false,
-    "pr": "",
-    "sessionUrl": false
-  },
   "cleanupPeriodDays": 90,
-  "effortLevel": "xhigh",
-  "enabledPlugins": {},
+  "skillListingBudgetFraction": 0.02,
   "env": {
     "CLAUDE_CODE_AUTO_CONNECT_IDE": "false",
     "CLAUDE_CODE_DISABLE_CRON": "1",
@@ -22,93 +13,12 @@
     "ENABLE_PROMPT_CACHING_1H": "1",
     "WORKFLOW_AGENT": "1"
   },
-  "extraKnownMarketplaces": {
-    "focus": {
-      "source": {
-        "repo": "saifulapm/focus",
-        "source": "github"
-      }
-    }
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false,
+    "commitTrailers": false
   },
-  "fallbackModel": [
-    "opus"
-  ],
-  "hooks": {
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "command": "/home/saiful/.cargo/bin/amx _hook",
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "PermissionDenied": [
-      {
-        "hooks": [
-          {
-            "command": "/home/saiful/.cargo/bin/amx _hook",
-            "type": "command"
-          }
-        ],
-        "matcher": "*"
-      }
-    ],
-    "PermissionRequest": [
-      {
-        "hooks": [
-          {
-            "command": "/home/saiful/.cargo/bin/amx _hook",
-            "type": "command"
-          }
-        ],
-        "matcher": "*"
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "command": "/home/saiful/.cargo/bin/amx _hook",
-            "type": "command"
-          }
-        ],
-        "matcher": "*"
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "command": "/home/saiful/.cargo/bin/amx _hook",
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "command": "/home/saiful/.cargo/bin/amx _hook",
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "command": "/home/saiful/.cargo/bin/amx _hook",
-            "type": "command"
-          }
-        ]
-      }
-    ]
-  },
-  "model": "haiku",
   "permissions": {
     "allow": [
       "Bash(git status:*)",
@@ -128,29 +38,119 @@
     ],
     "defaultMode": "auto"
   },
+  "model": "opus",
+  "fallbackModel": [
+    "opus"
+  ],
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ]
+  },
+  "worktree": {
+    "symlinkDirectories": [
+      "node_modules",
+      "vendor"
+    ],
+    "baseRef": "fresh",
+    "bgIsolation": "none"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.py",
+    "refreshInterval": 10
+  },
+  "enabledPlugins": {},
+  "extraKnownMarketplaces": {
+    "focus": {
+      "source": {
+        "source": "github",
+        "repo": "saifulapm/focus"
+      }
+    }
+  },
   "sandbox": {
     "enabled": false
   },
-  "skillListingBudgetFraction": 0.02,
-  "skipDangerousModePermissionPrompt": true,
-  "skipWorkflowUsageWarning": true,
-  "statusLine": {
-    "command": "~/.claude/statusline.py",
-    "refreshInterval": 10,
-    "type": "command"
-  },
-  "theme": "custom:qshell",
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "xhigh",
   "tui": "fullscreen",
   "voice": {
     "enabled": true,
     "mode": "hold"
   },
-  "worktree": {
-    "baseRef": "fresh",
-    "bgIsolation": "none",
-    "symlinkDirectories": [
-      "node_modules",
-      "vendor"
-    ]
-  }
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "theme": "custom:qshell",
+  "agentPushNotifEnabled": true
 }
