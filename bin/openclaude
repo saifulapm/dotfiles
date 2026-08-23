@@ -9,6 +9,6 @@ export ANTHROPIC_DEFAULT_HAIKU_MODEL=qwen3.7-plus
 export ANTHROPIC_DEFAULT_MODEL=qwen3.7-plus
 export CLAUDE_CODE_SUBAGENT_MODEL=qwen3.7-plus
 export ANTHROPIC_BASE_URL=https://opencode.ai/zen/go/
-export ANTHROPIC_API_KEY="$(pass show opencode-zen/api-key)"
+export ANTHROPIC_API_KEY="$(pass show opencode-go/api-key)"
 export ANTHROPIC_AUTH_TOKEN=""
 exec claude --allow-dangerously-skip-permissions "$@"
