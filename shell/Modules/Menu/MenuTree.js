@@ -337,6 +337,13 @@ var TREE = {
         "description": "Pick a wallpaper from this theme and your own",
         "call": "wallpaper"
     },
+    "background.wallhaven": {
+        "icon": "󰋩",
+        "label": "Browse Wallhaven",
+        "aliases": ["wallhaven", "browse", "online", "download"],
+        "description": "Browse and download a wallpaper from wallhaven.cc",
+        "call": "wallhaven"
+    },
     "background.next": {
         "icon": "󰒭",
         "label": "Next",

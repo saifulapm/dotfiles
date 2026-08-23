@@ -431,6 +431,9 @@ Scope {
         case "wallpaper":
             shellRoot.toggleWallpaper();
             break;
+        case "wallhaven":
+            shellRoot.toggleWallhaven();
+            break;
         case "emojis":
             shellRoot.toggleEmojis();
             break;

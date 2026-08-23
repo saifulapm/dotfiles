@@ -51,6 +51,58 @@ function loadRows(rows) {
     return images;
 }
 
+// Wallhaven rows from bin/wallhaven-fetch --list — five tab-separated columns:
+//   <thumb_path>  <image_url>  <id>  <resolution>  <ext>
+// The thumbnail is a cached local path (the picker decodes from it); the
+// image_url is the wallhaven-hosted full-resolution file the caller downloads
+// on apply. We attach url / wallhavenId / ext as extra fields so the picker
+// stays oblivious to wallhaven specifics and the caller can reach them off
+// `strip.items[index]` the way ImagePicker reaches filePath.
+function loadWallhavenRows(rows) {
+    var images = [];
+    var seen = {};
+    var lines = String(rows || "").split("\n");
+
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (!line || line.indexOf("__META__") === 0)
+            continue;
+
+        var columns = line.split("\t");
+        var imageUrl = columns[1];
+        var id = columns[2];
+        if (!imageUrl || !id)
+            continue;
+        if (seen[id])
+            continue;
+        seen[id] = true;
+
+        var resolution = columns[3] || "";
+        var ext = columns[4] || "jpg";
+        var thumbPath = columns[0] || "";
+
+        images.push({
+            key: id,
+            label: resolution,
+            // The strip draws the cached thumb; imagePath is what FilmstripPicker
+            // binds the Image source to. An empty string falls through to the
+            // swatch slot — a missing thumb draws the empty state instead of
+            // crashing on a bad URL.
+            imagePath: thumbPath,
+            // filePath is the apply target — wallhaven-fetch --download takes
+            // the URL directly, so we use it as filePath here. Same field name
+            // keeps the FilmstripPicker contract: it never reads filePath.
+            filePath: imageUrl,
+            imageUrl: imageUrl,
+            wallhavenId: id,
+            ext: ext,
+            resolution: resolution
+        });
+    }
+
+    return images;
+}
+
 function itemMatches(items, index, filterText) {
     if (!Array.isArray(items) || index < 0 || index >= items.length)
         return false;

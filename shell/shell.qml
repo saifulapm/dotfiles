@@ -461,6 +461,11 @@ ShellRoot {
         wallpaperLoader.summon("toggle");
     }
 
+    function toggleWallhaven() {
+        dismissBarPanels();
+        wallhavenLoader.summon("toggle");
+    }
+
     function toggleEmojis() {
         dismissBarPanels();
         emojisLoader.summon("toggle");
@@ -1061,6 +1066,35 @@ ShellRoot {
 
         function hide(): string {
             wallpaperLoader.deliver("hide");
+            return "ok";
+        }
+    }
+
+    SurfaceLoader {
+        id: wallhavenLoader
+        evictable: true
+        surfaceSource: shell.moduleRoot + "/Modules/Background/WallhavenPicker.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
+    }
+
+    IpcHandler {
+        target: "wallhaven"
+
+        function toggle(): string {
+            shell.toggleWallhaven();
+            return "ok";
+        }
+
+        function show(): string {
+            shell.dismissBarPanels();
+            wallhavenLoader.summon("show");
+            return "ok";
+        }
+
+        function hide(): string {
+            wallhavenLoader.deliver("hide");
             return "ok";
         }
     }

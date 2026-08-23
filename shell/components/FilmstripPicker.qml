@@ -43,6 +43,14 @@ Scope {
     signal applied(int index)
     signal cancelled
 
+    // Optional bottom-chrome slot for caller-specific controls (e.g. the
+    // Wallhaven picker's prev/next/page row). When `extraChromeComponent` is
+    // non-null the chrome grows by `extraChromeHeight` and the loader renders
+    // below the filter-text label — theme switcher and wallpaper picker
+    // leave both unset, so their chrome height is unchanged.
+    property Component extraChromeComponent: null
+    property int extraChromeHeight: 0
+
     // Their carousel geometry, in raw pixels like theirs: the strip is sized
     // by the images it shows, not by the spacing scale.
     readonly property int expandedWidth: 768
@@ -51,9 +59,10 @@ Scope {
     readonly property int sliceHeight: 432
     readonly property int sliceSpacing: -30
     readonly property int skewOffset: 28
-    // Their Style.space(30) / bottom chrome for labels + filter line.
+    // Their Style.space(30) / bottom chrome for labels + filter line, plus
+    // any caller-supplied extra chrome (page nav, search field, ...).
     readonly property int topPad: theme.space(8)
-    readonly property int bottomChromeHeight: theme.space(26)
+    readonly property int bottomChromeHeight: theme.space(26) + extraChromeHeight
 
     function prepare() {
         filterText = "";
@@ -413,6 +422,7 @@ Scope {
         }
 
         Text {
+            id: filterLabel
             visible: pickerRoot.filterText !== ""
             anchors.top: selectedLabel.bottom
             anchors.topMargin: pickerRoot.theme.space(2)
@@ -427,6 +437,20 @@ Scope {
             font.pixelSize: pickerRoot.theme.fontPx(1.167)
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
+        }
+
+        // Caller-supplied extra chrome — the Wallhaven picker slots a
+        // prev/next/page row here. Anchored to the filter label's bottom so
+        // it sits below both the resolved label and the live filter string.
+        Loader {
+            id: extraChromeLoader
+            active: pickerRoot.extraChromeComponent !== null
+            anchors.top: filterLabel.bottom
+            anchors.topMargin: pickerRoot.theme.space(2)
+            anchors.horizontalCenter: carousel.horizontalCenter
+            width: pickerRoot.expandedWidth
+            height: pickerRoot.extraChromeHeight
+            sourceComponent: pickerRoot.extraChromeComponent
         }
         // Theirs shows a bare scrim when a directory turns up empty. Say so
         // instead — there is nothing else on screen to explain it. On the
