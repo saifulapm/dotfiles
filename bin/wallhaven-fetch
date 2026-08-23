@@ -63,8 +63,15 @@ case "$mode" in
 
     # Wallhaven's /search params: q (free text), page (1-based), sorting, order,
     # and purity/categories/ratios/resolutions (left at defaults so SFW only).
-    params=("sorting=toplist" "order=desc" "page=$page")
-    [[ -n $query ]] && params+=("q=$(printf %s "$query" | jq -sRr @uri)")
+    # toplist is the curated popular list (works with or without a query);
+    # relevance is what users actually want when they've typed something —
+    # toplist with a query would return "popular wallpapers that happen to
+    # match" instead of the best match for the typed phrase.
+    if [[ -n $query ]]; then
+        params=("sorting=relevance" "order=desc" "page=$page" "q=$(printf %s "$query" | jq -sRr @uri)")
+    else
+        params=("sorting=toplist" "order=desc" "page=$page")
+    fi
 
     url="$api_base/search?$(IFS='&'; echo "${params[*]}")"
 
@@ -131,8 +138,11 @@ case "$mode" in
     done
 
     # Trailing sentinel so the QML caller learns current/total page in the
-    # same read — saves a second HTTP round trip per page change.
-    printf '__META__\t%s\t%s\n' "$page" "$last_page"
+    # same read — saves a second HTTP round trip per page change. The query
+    # is echoed back so the caller can drop a stale response when a newer
+    # fetch was started before the previous one finished (rapid typing
+    # fires one debounce per pause, but the network may reorder responses).
+    printf '__META__\t%s\t%s\t%s\n' "$page" "$last_page" "$query"
     ;;
 
 --download)

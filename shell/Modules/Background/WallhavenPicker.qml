@@ -6,10 +6,21 @@ import "../../components/PickerModel.js" as PickerModel
 
 // Wallhaven picker — same filmstrip UI as the local wallpaper picker, but
 // backed by wallhaven.cc instead of the on-disk theme + ~/Pictures/Wallpapers
-// directories. The list is paginated: opening lands on the toplist page 1,
-// ←/→ still walk items, type-to-filter still narrows the current page (the
-// Background picker's invisible search), and the bottom chrome now carries
-// Prev/Next + "Page N / M" controls that re-fetch with a new page number.
+// directories.
+//
+// Type-to-filter is wired to a wallhaven search: a keystroke updates
+// `currentQuery`, a 500ms debounce fires fetchPage(1) with q=currentQuery,
+// and the API returns 24 results for the typed phrase (sorted by relevance;
+// an empty query falls back to wallhaven's curated toplist). The strip runs
+// in `externalQueryMode` so its built-in substring filter is bypassed —
+// wallhaven IDs and resolutions are random strings and would never match a
+// phrase like "spiderman" anyway. ←/→ still walk items, Prev/Next paginate,
+// and Enter / preview-click apply.
+//
+// Results are cached in-memory per (query, page) for 10 minutes: re-typing
+// the same phrase, clicking Next then Back, and re-opening the picker within
+// the TTL all skip the HTTP round trip. Each (query, page) entry holds the
+// parsed items plus totalPages so pagination works without an extra call.
 //
 // Apply downloads the full-resolution image into ~/Pictures/Wallpapers/
 // via bin/wallhaven-fetch --download (so the file is permanent and the next
@@ -32,6 +43,24 @@ Scope {
     property int currentPage: 1
     property int totalPages: 1
     property bool isLoading: false
+    // The search query driving the current items. Mirrors strip.filterText,
+    // updated through Connections on the strip — the picker never writes to
+    // strip.filterText directly; keystrokes flow through FilmstripPicker's
+    // own key handler (so Escape-to-clear, Ctrl+U word-kill, backspace all
+    // keep working).
+    property string currentQuery: ""
+    // "{query|page -> { items, totalPages, ts }}". Bounded by maxCacheEntries
+    // with LRU eviction so a long browsing session doesn't grow without limit.
+    // The cap is generous (100 entries = 2400 items) — typical use stays well
+    // under 20: a handful of queries × a few pages each.
+    property var itemCache: ({})
+    property int cacheTtlMs: 600000
+    property int maxCacheEntries: 100
+    // Set to "query|page" when a fetch is in flight; loadRows compares the
+    // meta line's echoed query+page against this and drops the response if
+    // they don't match — protects against a slow first response being
+    // clobbered by a faster second one when the user types through a pause.
+    property string pendingKey: ""
 
     readonly property string binDir: Quickshell.env("HOME") + "/.dotfiles/bin"
 
@@ -52,9 +81,45 @@ Scope {
             show();
     }
 
-    // wallhaven-fetch --list ends its stdout with a `__META__\tpage\ttotal`
-    // sentinel; split it off so loadWallhavenRows sees only real rows.
+    function getCached(query, page) {
+        const key = query + "|" + String(page);
+        const entry = itemCache[key];
+        if (!entry)
+            return null;
+        if (Date.now() - entry.ts > cacheTtlMs)
+            return null;
+        return entry;
+    }
+
+    function putCached(query, page, items, totalPages) {
+        const key = query + "|" + String(page);
+        const next = Object.assign({}, itemCache);
+        next[key] = {
+            items: items,
+            totalPages: totalPages,
+            ts: Date.now()
+        };
+        // Evict the oldest entries if over cap. Object key order is
+        // insertion order, so a timestamp sort is enough — newer entries
+        // land at the tail.
+        const keys = Object.keys(next);
+        if (keys.length > maxCacheEntries) {
+            keys.sort(function (a, b) {
+                return next[a].ts - next[b].ts;
+            });
+            const drop = keys.length - maxCacheEntries;
+            for (let i = 0; i < drop; i++)
+                delete next[keys[i]];
+        }
+        itemCache = next;
+    }
+
+    // wallhaven-fetch --list ends its stdout with a
+    // `__META__\tpage\ttotal\tquery` sentinel; split it off so
+    // loadWallhavenRows sees only real rows.
     function loadRows(rows) {
+        isLoading = false;
+
         var text = String(rows || "");
         var lines = text.split("\n");
         // The script's terminating newline leaves a trailing empty entry —
@@ -70,18 +135,40 @@ Scope {
                 var parts = last.split("\t");
                 meta = {
                     page: parseInt(parts[1] || "1", 10),
-                    total: parseInt(parts[2] || "1", 10)
+                    total: parseInt(parts[2] || "1", 10),
+                    query: parts[3] || ""
                 };
                 lines.pop();
             }
+        }
+        // Stale-response guard: the script echoes the query it ran with,
+        // and we captured the same query|page in pendingKey when fetchPage
+        // started. A mismatch means a newer fetch has superseded this one
+        // (the user kept typing) — drop without touching items so the
+        // superseding fetch's response wins the race.
+        if (meta) {
+            const actualKey = meta.query + "|" + String(meta.page);
+            if (actualKey !== pendingKey)
+                return;
         }
         if (meta) {
             if (meta.page > 0)
                 currentPage = meta.page;
             totalPages = Math.max(1, meta.total);
         }
+
+        if (lines.length === 0) {
+            // Empty response (API failure or genuine empty result set) —
+            // keep the previous items visible so a transient blip doesn't
+            // blank the strip. Don't cache an empty page either.
+            pendingKey = "";
+            return;
+        }
+
         const items = PickerModel.loadWallhavenRows(lines.join("\n"));
         strip.setItems(items, 0);
+        putCached(currentQuery, currentPage, items, totalPages);
+        pendingKey = "";
     }
 
     function apply(index) {
@@ -98,23 +185,39 @@ Scope {
     function fetchPage(page) {
         if (page < 1)
             page = 1;
-        if (page > totalPages)
+        if (page > totalPages && totalPages > 0)
             page = totalPages;
+
+        const cached = getCached(currentQuery, page);
+        if (cached) {
+            currentPage = page;
+            totalPages = cached.totalPages;
+            pendingKey = "";
+            strip.setItems(cached.items, 0);
+            return;
+        }
+
         currentPage = page;
+        pendingKey = currentQuery + "|" + String(page);
         isLoading = true;
         // Quickshell.Io.Process restarts when command changes; setting running
         // false first avoids the "already running, no-op" trap on the same page.
         listProc.running = false;
-        listProc.command = [binDir + "/wallhaven-fetch", "--list", "--page", String(page)];
+        listProc.command = [binDir + "/wallhaven-fetch", "--list", "--query", currentQuery, "--page", String(page)];
         listProc.running = true;
     }
 
     function prevPage() {
+        // Cancels an in-flight debounce: the user just clicked Next with a
+        // clear intent, so don't reset to page 1 of whatever they were
+        // half-typing.
+        debounceTimer.stop();
         if (currentPage > 1)
             fetchPage(currentPage - 1);
     }
 
     function nextPage() {
+        debounceTimer.stop();
         if (currentPage < totalPages)
             fetchPage(currentPage + 1);
     }
@@ -124,7 +227,6 @@ Scope {
         stdout: StdioCollector {
             waitForEnd: true
             onStreamFinished: {
-                pickerRoot.isLoading = false;
                 pickerRoot.loadRows(String(text || ""));
             }
         }
@@ -143,13 +245,52 @@ Scope {
         }
     }
 
+    // 500ms debounce on type-to-filter — coalesces a typing burst into one
+    // wallhaven query (otherwise "spiderman" would fire 8 searches). Fires
+    // fetchPage(1) so every new query restarts pagination from page 1.
+    Timer {
+        id: debounceTimer
+        interval: 500
+        repeat: false
+        onTriggered: pickerRoot.fetchPage(1)
+    }
+
+    // Hook the strip's keystroke-driven filterText and treat it as a search
+    // query: copy it into currentQuery and (re)start the debounce. Also
+    // stop the debounce when the picker closes so a half-typed query that
+    // never paused doesn't fire a fetch after the user picked something
+    // and moved on.
+    Connections {
+        target: strip
+        function onFilterTextChanged() {
+            pickerRoot.currentQuery = strip.filterText;
+            debounceTimer.restart();
+        }
+        function onOpenChanged() {
+            if (!strip.open)
+                debounceTimer.stop();
+        }
+    }
+
     FilmstripPicker {
         id: strip
         theme: pickerRoot.theme
         layerNamespace: "qshell-wallhaven"
-        // The text doubles as the empty-state copy during the brief gap
-        // before the first page lands — clearer than a bare scrim.
-        emptyText: pickerRoot.isLoading ? "Loading…" : "No wallpapers found"
+        // Treat the typed filter as a wallhaven query, not a local substring
+        // match — wallhaven IDs are random strings ("lydkg2") and resolutions
+        // ("1920x1080") so local matching against them would always miss.
+        // Item selection is managed by fetchPage's results, not by the
+        // strip's substring filter.
+        externalQueryMode: true
+        // Query-aware empty text: while loading, say so; on a real empty
+        // result, quote the query so the user knows what they searched for.
+        emptyText: {
+            if (pickerRoot.isLoading)
+                return "Loading…";
+            if (pickerRoot.currentQuery)
+                return "No results for \"" + pickerRoot.currentQuery + "\"";
+            return "No wallpapers found";
+        }
         extraChromeHeight: 36
         extraChromeComponent: footerComponent
         onApplied: index => pickerRoot.apply(index)

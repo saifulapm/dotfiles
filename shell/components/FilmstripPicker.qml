@@ -51,6 +51,15 @@ Scope {
     property Component extraChromeComponent: null
     property int extraChromeHeight: 0
 
+    // Caller-supplied search mode. When true, the typed filterText is treated
+    // as a query string the caller resolves into items itself (via a fetch
+    // off the keypress). Local substring filtering is disabled, every visible
+    // slice is considered "matched", and updateFilter does not try to re-aim
+    // the selection — the caller owns the items and is expected to replace
+    // them when the query changes. Theme switcher and wallpaper picker leave
+    // this false; the Wallhaven picker sets it to true.
+    property bool externalQueryMode: false
+
     // Their carousel geometry, in raw pixels like theirs: the strip is sized
     // by the images it shows, not by the spacing scale.
     readonly property int expandedWidth: 768
@@ -94,14 +103,20 @@ Scope {
     }
 
     function itemMatches(index) {
+        if (pickerRoot.externalQueryMode)
+            return index >= 0 && index < items.length;
         return PickerModel.itemMatches(items, index, filterText);
     }
 
     function filteredPosition(index) {
+        if (pickerRoot.externalQueryMode)
+            return index;
         return PickerModel.filteredPosition(items, index, filterText);
     }
 
     function selectedFilteredPosition() {
+        if (pickerRoot.externalQueryMode)
+            return selectedIndex;
         return PickerModel.selectedFilteredPosition(items, selectedIndex, filterText);
     }
 
@@ -133,6 +148,8 @@ Scope {
 
     function updateFilter(next) {
         filterText = next;
+        if (pickerRoot.externalQueryMode)
+            return;
         if (!itemMatches(selectedIndex)) {
             const first = PickerModel.nextSelectedIndexForFilter(items, selectedIndex, filterText);
             if (first >= 0)
