@@ -1,0 +1,281 @@
+#!/usr/bin/env -S mise exec -- node
+// theme-from-image <image-path>
+//
+// Extract dominant colors from <image-path> and write a theme TOML to
+// ~/.local/state/qshell/theme.toml. The shell's Theme service watches
+// that file and reloads automatically — no IPC, no restart.
+//
+// Single balanced pass:
+//   - ffmpeg downscales to 64×36, output as raw RGB (6912 bytes / 2304 pixels).
+//     64×36 is small enough that bucket counting is instant and large
+//     enough that rare highlights don't push out the surface color.
+//   - node converts each pixel to OKLCH and buckets by 0.05 L/C, ~6° hue.
+//     The first sample in each bucket is the representative color.
+//   - Top 16 buckets by pixel count are the working palette.
+//
+// Role assignment:
+//   - surface 0 = darkest palette entry; 1..3 = same hue/chroma with +0.06,
+//     +0.10, +0.16 L (gamut-mapped).
+//   - text primary = ensureContrast(white, surface 0, 4.5, 1).
+//   - text muted   = ensureContrast(text primary, surface 0, 3.0, 0).
+//   - accent       = most saturated palette entry.
+//   - error/warn/ok = hue-rotated accents at 30°/80°/140°, contrast-checked
+//     against surface 0 at 3:1 — a vibrant palette yields vibrant signals,
+//     a muted one yields muted signals.
+//   - ansi 16      = surface/text for black/white, six chromatic picks
+//     from the palette's hue ranges (red wraps), bright-* = +0.15 L.
+//
+// No wallpaper pinning: re-applying this theme (via background-next) just
+// advances the rotation. The [meta] name is derived from the image basename
+// for the Theme service's meta UI.
+//
+// Why ffmpeg + raw RGB instead of an imagemagick pipeline: we already have
+// ffmpeg on this machine (bin/wallhaven-fetch uses it for thumbs) and our
+// existing color math (shell/Commons/color.js) does the OKLCH math — no
+// new tools to install.
+
+"use strict"
+const fs = require("fs")
+const os = require("os")
+const path = require("path")
+const { execSync } = require("child_process")
+
+const ROOT = path.resolve(__dirname, "..")
+const HOME = os.homedir()
+const STATE = path.join(HOME, ".local/state/qshell/theme.toml")
+
+const SCALE_W = 64
+const SCALE_H = 36
+
+// Indirect eval so color.js's function declarations land in global scope
+// despite this module's "use strict" — same trick bin/theme-apply uses.
+;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/color.js"), "utf8"))
+
+function extractPalette(imagePath) {
+    const tmp = `/tmp/raw-${process.pid}.rgb`
+    try {
+        execSync(
+            `ffmpeg -y -i "${imagePath}" -vf "scale=${SCALE_W}:${SCALE_H}" -frames:v 1 -f rawvideo "${tmp}"`,
+            { stdio: ['ignore', 'ignore', 'ignore'] }
+        )
+    } catch (e) {
+        throw new Error(`ffmpeg failed on ${imagePath}: ${e.message}`)
+    }
+    const data = fs.readFileSync(tmp)
+    try { fs.unlinkSync(tmp) } catch {}
+
+    const buckets = new Map()
+    for (let i = 0; i + 2 < data.length; i += 3) {
+        const rgb = { r: data[i] / 255, g: data[i+1] / 255, b: data[i+2] / 255 }
+        const o = _rgbToOklch(rgb)
+        // Near-greys have C ≈ 0; atan2 then returns whatever noise is
+        // left in a/b — typically π/2. Force h to 0 so these land in a
+        // single achromatic bucket rather than scattering across all
+        // hue slots. Hue only matters once a color has measurable chroma.
+        const h = o.C < 0.01 ? 0 : o.h
+        // 0.05 buckets on L and C; ~6° (π/30) on hue.
+        const key = `${Math.round(o.L * 20)},${Math.round(o.C * 20)},${Math.round(h * 9.55)}`
+        if (!buckets.has(key)) buckets.set(key, { count: 0, sample: o })
+        buckets.get(key).count++
+    }
+
+    return [...buckets.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 16)
+        .map(b => rgbToHex(_gamutMap(b.sample)))
+}
+
+function oklchOf(hex) {
+    return _rgbToOklch(hexToRgb(hex))
+}
+
+function pickRoles(palette) {
+    const items = palette.map(hex => ({ hex, o: oklchOf(hex) }))
+
+    // Surface ramp anchored at the darkest palette entry.
+    const sortedByL = [...items].sort((a, b) => a.o.L - b.o.L)
+    const baseHex = sortedByL[0].hex
+    const base = sortedByL[0].o
+    const shade = (deltaL) => rgbToHex(_gamutMap({
+        L: Math.min(1, base.L + deltaL),
+        C: base.C,
+        h: base.h
+    }))
+    const surface = {
+        "0": baseHex,
+        "1": shade(0.06),
+        "2": shade(0.10),
+        "3": shade(0.16)
+    }
+
+    // Text — ensureContrast walks OKLCH lightness, preserving hue/chroma.
+    const textPrimary = ensureContrast("#ffffff", surface["0"], 4.5, 1)
+    const textMuted = ensureContrast(textPrimary, surface["0"], 3.0, 0)
+    const textInverse = surface["0"]
+
+    // Accent + status signals. Status hues in radians from atan2's output.
+    const mostSat = [...items].sort((a, b) => b.o.C - a.o.C)[0]
+    const accentHex = mostSat.hex
+    const accentOk = mostSat.o
+    const hueSignal = (targetH) => ensureContrast(
+        rgbToHex(_gamutMap({
+            L: accentOk.L,
+            C: Math.max(0.08, accentOk.C * 0.9),
+            h: targetH
+        })),
+        surface["0"],
+        3.0,
+        0
+    )
+    // red ≈ 30°, amber ≈ 80°, green ≈ 140°.
+    const error = hueSignal(0.5)
+    const warn = hueSignal(1.4)
+    const ok = hueSignal(2.4)
+
+    const ansi = pickAnsi(items, surface["0"], textPrimary, accentHex)
+
+    return {
+        surface,
+        text: { primary: textPrimary, muted: textMuted, inverse: textInverse },
+        accent: { accent: accentHex, error, warn, ok },
+        ansi
+    }
+}
+
+function pickAnsi(items, surface0, textPrimary, accent) {
+    // Hue ranges in radians, normalized to [0, 2π). Red wraps around 0.
+    const ranges = {
+        red:     [5.8, 0.5],   // wraps
+        yellow:  [1.0, 1.7],
+        green:   [1.9, 2.9],
+        cyan:    [2.9, 3.7],
+        blue:    [3.7, 5.0],
+        magenta: [5.0, 5.8]
+    }
+
+    function hueInRange(h, lo, hi) {
+        // Wrap case: lo > hi, so the range is [lo, 2π] ∪ [0, hi].
+        if (lo > hi) return h >= lo || h <= hi
+        return h >= lo && h <= hi
+    }
+
+    function pickFor([lo, hi]) {
+        let best = null, bestC = -1
+        for (const { hex, o } of items) {
+            // Skip near-greys: their hue is undefined (the C ≈ 0 case in
+            // _rgbToOklch makes atan2 return a noise angle). Without
+            // this guard, every wallpaper with greys would have its
+            // entire grey mass cluster into one ANSI slot by accident.
+            if (o.C < 0.01) continue
+            const h = o.h < 0 ? o.h + 2 * Math.PI : o.h
+            if (hueInRange(h, lo, hi) && o.C > bestC) {
+                best = hex; bestC = o.C
+            }
+        }
+        return best || accent
+    }
+
+    const red = pickFor(ranges.red)
+    const yellow = pickFor(ranges.yellow)
+    const green = pickFor(ranges.green)
+    const cyan = pickFor(ranges.cyan)
+    const blue = pickFor(ranges.blue)
+    const magenta = pickFor(ranges.magenta)
+
+    // Bright variants: same hue/chroma, +0.15 L (gamut-mapped).
+    const brighten = (hex) => {
+        const o = oklchOf(hex)
+        return rgbToHex(_gamutMap({
+            L: Math.min(1, o.L + 0.15),
+            C: o.C,
+            h: o.h
+        }))
+    }
+
+    return {
+        black: surface0,
+        red, green, yellow, blue, magenta, cyan,
+        white: textPrimary,
+        "bright-black": accent,
+        "bright-red":    brighten(red),
+        "bright-green":  brighten(green),
+        "bright-yellow": brighten(yellow),
+        "bright-blue":   brighten(blue),
+        "bright-magenta":brighten(magenta),
+        "bright-cyan":   brighten(cyan),
+        "bright-white":  textPrimary
+    }
+}
+
+function generateToml(roles, name) {
+    const lines = []
+    lines.push("[meta]")
+    lines.push(`name = "${name}"`)
+    lines.push(`mode = "dark"`)
+    lines.push("")
+    lines.push("[surface]")
+    for (const k of ["0", "1", "2", "3"])
+        lines.push(`"${k}" = "${roles.surface[k]}"`)
+    lines.push("")
+    lines.push("[text]")
+    lines.push(`primary = "${roles.text.primary}"`)
+    lines.push(`muted = "${roles.text.muted}"`)
+    lines.push(`inverse = "${roles.text.inverse}"`)
+    lines.push("")
+    lines.push("[accent]")
+    lines.push(`accent = "${roles.accent.accent}"`)
+    lines.push(`error = "${roles.accent.error}"`)
+    lines.push(`warn = "${roles.accent.warn}"`)
+    lines.push(`ok = "${roles.accent.ok}"`)
+    lines.push("")
+    lines.push("[ansi]")
+    for (const k of [
+        "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+        "bright-black", "bright-red", "bright-green", "bright-yellow",
+        "bright-blue", "bright-magenta", "bright-cyan", "bright-white"
+    ]) lines.push(`${k} = "${roles.ansi[k]}"`)
+    lines.push("")
+    lines.push("[shape]")
+    lines.push(`radius = 8`)
+    lines.push(`border-width = 1`)
+    lines.push("")
+    lines.push("[motion]")
+    lines.push(`duration = 150`)
+    lines.push(`easing = "standard"`)
+    lines.push("")
+    return lines.join("\n")
+}
+
+function usage() {
+    process.stderr.write("usage: theme-from-image <image-path>\n")
+    process.exit(2)
+}
+
+const args = process.argv.slice(2)
+if (args.length !== 1) usage()
+
+const imagePath = args[0]
+if (!fs.existsSync(imagePath)) {
+    process.stderr.write(`theme-from-image: file not found: ${imagePath}\n`)
+    process.exit(1)
+}
+
+let palette
+try {
+    palette = extractPalette(imagePath)
+} catch (e) {
+    process.stderr.write(`theme-from-image: ${e.message}\n`)
+    process.exit(1)
+}
+
+const roles = pickRoles(palette)
+const name = path.basename(imagePath, path.extname(imagePath))
+const toml = generateToml(roles, name)
+
+fs.mkdirSync(path.dirname(STATE), { recursive: true })
+// Atomic write — the Theme service's inotify watch must never see a
+// half-written file, so tmp + rename, same trick bin/theme-set uses.
+const tmp = STATE + ".tmp"
+fs.writeFileSync(tmp, toml)
+fs.renameSync(tmp, STATE)
+process.stdout.write(`${STATE}\n`)

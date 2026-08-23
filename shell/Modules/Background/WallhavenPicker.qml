@@ -182,6 +182,21 @@ Scope {
         downloadProc.running = true;
     }
 
+    // Shift+Enter — same as Enter (download + set wallpaper) plus
+    // bin/theme-from-image on the saved file. theme-from-image extracts
+    // dominant colors, writes ~/.local/state/qshell/theme.toml, and the
+    // shell's Theme service file-watch reloads the colors automatically.
+    // Separate download proc so each post-processing chain runs its own
+    // execDetached sequence (Enter → background-next --set;
+    // Shift+Enter → background-next --set AND theme-from-image).
+    function applyAsTheme(index) {
+        const item = strip.items[index];
+        if (!item || !item.imageUrl || !item.wallhavenId)
+            return;
+        themeDownloadProc.command = [binDir + "/wallhaven-fetch", "--download", item.imageUrl, item.wallhavenId, item.ext || "jpg"];
+        themeDownloadProc.running = true;
+    }
+
     function fetchPage(page) {
         if (page < 1)
             page = 1;
@@ -245,6 +260,25 @@ Scope {
         }
     }
 
+    // Shift+Enter download path — same wallhaven-fetch call, but the
+    // post-process chain fans out to background-next (wallpaper) AND
+    // theme-from-image (palette). Both are fire-and-forget execDetached
+    // because each is independently idempotent and they don't need to
+    // coordinate beyond "the file is on disk".
+    Process {
+        id: themeDownloadProc
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                const savedPath = String(text || "").trim();
+                if (!savedPath)
+                    return;
+                Quickshell.execDetached([pickerRoot.binDir + "/background-next", "--set", savedPath]);
+                Quickshell.execDetached([pickerRoot.binDir + "/theme-from-image", savedPath]);
+            }
+        }
+    }
+
     // 500ms debounce on type-to-filter — coalesces a typing burst into one
     // wallhaven query (otherwise "spiderman" would fire 8 searches). Fires
     // fetchPage(1) so every new query restarts pagination from page 1.
@@ -294,6 +328,7 @@ Scope {
         extraChromeHeight: 36
         extraChromeComponent: footerComponent
         onApplied: index => pickerRoot.apply(index)
+        onAppliedAsTheme: index => pickerRoot.applyAsTheme(index)
     }
 
     // The Prev / Page N of M / Next row. Lives in the bottom chrome slot

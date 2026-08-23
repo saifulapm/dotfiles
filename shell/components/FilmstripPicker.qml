@@ -41,6 +41,12 @@ Scope {
     property string emptyText: ""
 
     signal applied(int index)
+    // Shift+Enter companion to `applied` — same selection, different
+    // action (e.g. the Wallhaven picker uses it to download + apply a
+    // theme derived from the wallpaper). Theme switcher and local
+    // wallpaper picker leave it disconnected; Enter keeps its current
+    // `applied` behavior.
+    signal appliedAsTheme(int index)
     signal cancelled
 
     // Optional bottom-chrome slot for caller-specific controls (e.g. the
@@ -172,6 +178,16 @@ Scope {
         applied(index);
     }
 
+    function applyThemeSelection() {
+        const index = selectedIndex;
+        if (!currentItem()) {
+            cancel();
+            return;
+        }
+        open = false;
+        appliedAsTheme(index);
+    }
+
     OverlaySurface {
         id: surface
 
@@ -219,7 +235,10 @@ Scope {
                         pickerRoot.cancel();
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    pickerRoot.applySelection();
+                    if (event.modifiers & Qt.ShiftModifier)
+                        pickerRoot.applyThemeSelection();
+                    else
+                        pickerRoot.applySelection();
                     event.accepted = true;
                 } else if (PickerModel.editsFilter(event, pickerRoot.filterText)) {
                     pickerRoot.updateFilter(PickerModel.editedFilter(event, pickerRoot.filterText));
