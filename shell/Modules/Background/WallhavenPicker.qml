@@ -182,13 +182,11 @@ Scope {
         downloadProc.running = true;
     }
 
-    // Shift+Enter — same as Enter (download + set wallpaper) plus
-    // bin/theme-from-image on the saved file. theme-from-image extracts
-    // dominant colors, writes ~/.local/state/qshell/theme.toml, and the
-    // shell's Theme service file-watch reloads the colors automatically.
-    // Separate download proc so each post-processing chain runs its own
-    // execDetached sequence (Enter → background-next --set;
-    // Shift+Enter → background-next --set AND theme-from-image).
+    // Shift+Enter — downloads then runs bin/theme-from-image. The script
+    // owns the WHOLE fan-out (flock + IPC themeTransition for synchronized
+    // wipe + theme.toml atomic publish + background-next --set + exec
+    // theme-apply). Don't background-next --set here: that would race the
+    // script's own --set and steal the old_bg the wipe reveal wants.
     function applyAsTheme(index) {
         const item = strip.items[index];
         if (!item || !item.imageUrl || !item.wallhavenId)
@@ -260,11 +258,12 @@ Scope {
         }
     }
 
-    // Shift+Enter download path — same wallhaven-fetch call, but the
-    // post-process chain fans out to background-next (wallpaper) AND
-    // theme-from-image (palette). Both are fire-and-forget execDetached
-    // because each is independently idempotent and they don't need to
-    // coordinate beyond "the file is on disk".
+    // Shift+Enter download path — same wallhaven-fetch call, then hand
+    // the saved path to bin/theme-from-image. That script runs the full
+    // fan-out (theme.toml + IPC transition + background-next --set +
+    // theme-apply). We do NOT background-next --set here: the script's
+    // own --set is sequenced inside its flock so the wipe reveal reads
+    // a consistent old_bg.
     Process {
         id: themeDownloadProc
         stdout: StdioCollector {
@@ -273,7 +272,6 @@ Scope {
                 const savedPath = String(text || "").trim();
                 if (!savedPath)
                     return;
-                Quickshell.execDetached([pickerRoot.binDir + "/background-next", "--set", savedPath]);
                 Quickshell.execDetached([pickerRoot.binDir + "/theme-from-image", savedPath]);
             }
         }

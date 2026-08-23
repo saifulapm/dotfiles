@@ -273,9 +273,95 @@ const name = path.basename(imagePath, path.extname(imagePath))
 const toml = generateToml(roles, name)
 
 fs.mkdirSync(path.dirname(STATE), { recursive: true })
-// Atomic write — the Theme service's inotify watch must never see a
-// half-written file, so tmp + rename, same trick bin/theme-set uses.
-const tmp = STATE + ".tmp"
-fs.writeFileSync(tmp, toml)
-fs.renameSync(tmp, STATE)
+
+// Hand the toml off to a bash subshell that runs the apply pipeline. Doing
+// this in bash (not node) keeps the flock / IPC / quoting identical to
+// bin/theme-set's, which is the entire point — same race semantics, same
+// degradation path, same fan-out ordering. The toml goes through a temp
+// file (passed as $TOML_TMP) because heredocs collide with the toml's own
+// quoted strings; base64 goes through TOML_B64 because the IPC call needs
+// the bytes and we don't want to fight argv quoting.
+const tomlTmp = `/tmp/theme-from-image-${process.pid}.toml`
+fs.writeFileSync(tomlTmp, toml)
+
+try {
+    // Same pattern as bin/theme-set, condensed: flock the state dir, write
+    // theme.name, send the synchronized themeTransition IPC, atomic-publish
+    // theme.toml, set the wallpaper, exec theme-apply. A second Shift+Enter
+    // mid-extract races its own theme.toml write against ours; the flock
+    // serializes both and the file-watch sees whichever lands second.
+    //
+    // All values flow through env vars (TOML_B64, TOML_NAME, TOML_WALLPAPER,
+    // TOML_TMP). Env values are stored as opaque strings — bash never
+    // re-expands them — so a name or path containing $, ", or \ arrives
+    // intact. The previous inline-interpolation pattern broke the moment a
+    // wallhaven ID grew a character class the JS-side escape didn't cover.
+    const b64 = Buffer.from(toml).toString("base64")
+    const bash = `
+        set -euo pipefail
+        state_dir="$HOME/.local/state/qshell"
+        exec 9>"$state_dir/theme-set.lock"
+        flock 9
+
+        # Synthesize a virtual theme name from the image basename so
+        # theme-set (no args) stars the most recent pick.
+        name_file="$state_dir/theme.name"
+        printf '%s\\n' "$TOML_NAME" >"$name_file.tmp"
+        mv "$name_file.tmp" "$name_file"
+
+        # Read the current wallpaper BEFORE background-next --set overwrites
+        # it — the synchronized wipe shows old → new, not new → new.
+        bg_state="$state_dir/background"
+        old_bg=""
+        [[ -f "$bg_state" ]] && old_bg="$(<"$bg_state")"
+
+        # IPC push FIRST. The shell latches off Theme.qml's file watch on
+        # this call (Background.qml setPendingTheme), so the theme.toml
+        # publish below is silent — the palette applies on the reveal's
+        # first frame instead of from the file-watch.
+        if ! timeout 2 qs ipc call background themeTransition \\
+            "$old_bg" \\
+            "$TOML_WALLPAPER" \\
+            "$TOML_B64" >/dev/null 2>&1; then
+            # Degradation path — shell dead, absent, or predating the IPC
+            # surface. The file watch below will apply the palette; the
+            # compositor-level crossfade folds the uncoordinated flips into
+            # one motion.
+            timeout 1 niri msg action do-screen-transition --delay-ms 200 >/dev/null 2>&1 || true
+        fi
+
+        # Atomic theme.toml publish — Theme.qml's inotify watch must never
+        # see a half-written file (tmp + rename, same as theme-set).
+        cp "$TOML_TMP" "$state_dir/theme.toml.tmp"
+        mv "$state_dir/theme.toml.tmp" "$state_dir/theme.toml"
+
+        # Persist the new wallpaper — the shell already has it via the IPC
+        # and is mid-wipe-reveal; this is the record for the next shell
+        # start and for non-shell consumers. Best-effort, never fatal.
+        "$ROOT/bin/background-next" --set "$TOML_WALLPAPER" >/dev/null 2>&1 || true
+
+        # Critical section over — release before the slow fan-out.
+        flock -u 9
+
+        exec "$ROOT/bin/theme-apply"
+    `
+    execSync(bash, {
+        stdio: "inherit",
+        env: {
+            ...process.env,
+            ROOT: ROOT,
+            TOML_B64: b64,
+            TOML_TMP: tomlTmp,
+            TOML_NAME: name,
+            TOML_WALLPAPER: imagePath
+        },
+        shell: "/bin/bash"
+    })
+} catch (e) {
+    process.stderr.write(`theme-from-image: apply failed: ${e.message}\n`)
+    process.exit(1)
+} finally {
+    try { fs.unlinkSync(tomlTmp) } catch {}
+}
+
 process.stdout.write(`${STATE}\n`)
