@@ -38,7 +38,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "fable",
+  "model": "opus",
   "fallbackModel": [
     "opus"
   ],
