@@ -6,7 +6,7 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer qshell.service emacs.service mempressure.service clipboard-sync.service imapnotify@icloud.service
+# unit-list: vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer qshell.service emacs.service mempressure.service clipboard-sync.service imapnotify@icloud.service
 # Also DISABLES voxtype.service — see the block near the end of this file.
 set -euo pipefail
 
@@ -31,7 +31,7 @@ set -euo pipefail
 # safe on a TTY-only apply — the timer arms, and each firing is what checks for
 # a graphical session. Its ConditionPathExists on ~/.mbsyncrc also makes it a
 # clean no-op on a machine where the mail setup was never applied.
-units=(qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service mail-sync.timer)
+units=(vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service mail-sync.timer)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently

@@ -27,6 +27,10 @@ name = "jdxcode/mise"
 why  = "mise is not in Fedora; author's COPR builds aarch64 + x86_64 for F43/F44 (verified 2026-08-05) — one repo mechanism for the install script"
 
 [[copr]]
+name = "quadratech188/vicinae"
+why  = "vicinae (Raycast-style launcher) is not in Fedora; this COPR auto-builds upstream releases within 15 min, f44 aarch64 + x86_64 succeed (0.26.3 verified 2026-08-26), links system Qt so it shares libraries with quickshell"
+
+[[copr]]
 name = "atim/starship"
 why  = "starship is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (latest 1.24.2, verified 2026-08-07). The prompt for the fish shell setup"
 
@@ -41,6 +45,12 @@ why  = "lazygit is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (l
 
 # ------------------------------------------------------------------ core
 # The machine is usable as a desktop without anything below `dev`.
+
+[[pkg]]
+name = "vicinae"
+category = "shell"
+arch = "all"
+why = "The launcher: app launch, clipboard history, script commands — replaced the in-shell Launcher/Menu/Clipboard pickers 2026-08-26. Runs as vicinae.service with --no-extension-runtime (no node); config layered via VICINAE_OVERRIDES; themed by theme-apply (vicinae-theme.toml.tmpl)"
 
 [[pkg]]
 name = "foot"

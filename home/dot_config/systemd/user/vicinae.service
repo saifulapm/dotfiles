@@ -1,0 +1,26 @@
+[Unit]
+Description=Vicinae launcher daemon (qshell-managed)
+# Shadows the packaged /usr/lib/systemd/user/vicinae.service: ours is
+# session-scoped like every other desktop unit here, runs without the
+# TypeScript extension runtime (no resident node process — the only
+# extensions in use are native: apps, clipboard, script commands), and
+# layers declarative config over whatever the GUI writes to settings.json.
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+Slice=session.slice
+ExecStart=/usr/bin/vicinae server --replace --no-extension-runtime
+# overrides.json (chezmoi-managed) then the theme-generated fragment
+# (bin/theme-apply): later files win, so the active theme's font/rounding
+# ride on top of the static config.
+Environment=VICINAE_OVERRIDES=%h/.config/vicinae/overrides.json:%h/.local/state/qshell/vicinae-overrides.json
+Restart=on-failure
+RestartSec=2
+# Apps launched from vicinae must survive a launcher restart.
+KillMode=process
+
+[Install]
+WantedBy=graphical-session.target

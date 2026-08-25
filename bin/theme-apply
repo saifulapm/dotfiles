@@ -536,6 +536,11 @@ const OUTPUTS = {
   "pi-theme.json.tmpl": [path.join(HOME, ".pi/agent/themes/qshell.json")],
   "opencode-theme.json.tmpl": [path.join(HOME, ".config/opencode/themes/qshell.json")],
   "gum-theme.fish.tmpl": [path.join(HOME, ".local/state/qshell/gum-theme.fish")],
+  // vicinae: TOML theme into its user theme dir (id = filename) + the
+  // theme-dependent config fragment VICINAE_OVERRIDES lists after the
+  // static overrides.json. Poked below via `vicinae theme set qshell`.
+  "vicinae-theme.toml.tmpl": [path.join(HOME, ".local/share/vicinae/themes/qshell.toml")],
+  "vicinae-overrides.json.tmpl": [path.join(HOME, ".local/state/qshell/vicinae-overrides.json")],
   // emacs: rendered DATA, not a theme — the qshell-dark/qshell-light Modus
   // derivatives in the emacs config (its own repo) load this file for their
   // named colors, so the generated artifact stays out of that repo's tree.
@@ -733,6 +738,11 @@ if (osc) {
 // per-pty escape sequence for. Usually a no-op; kitty only runs while a yazi
 // window is open.
 try { execSync("pkill -SIGUSR1 -x kitty", { stdio: "ignore" }) } catch (e) { /* none running */ }
+
+// vicinae: `theme set` forces a theme-dir rescan then re-applies — the
+// deterministic hot-reload hook (its dir watcher can miss in-place writes).
+// No binary or no running server both land in the catch and are fine.
+try { execSync("vicinae theme set qshell", { stdio: "ignore", timeout: 3000 }) } catch (e) { /* not installed / not running */ }
 
 // ---- kakoune theme: converted from the rendered helix theme ----
 // bin/helix-to-kak.js (the mac dotfiles converter, resurrected) is the
