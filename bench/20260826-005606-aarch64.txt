@@ -1,0 +1,9 @@
+date:            2026-08-26T00:57:13+06:00
+machine:         aarch64 7.1.6-400.asahi.fc44.aarch64+16k
+shell pid:       1223533
+cold start:      273 ms to bar constructed (shell-reported)
+ipc ready:       578 ms from spawn (external)
+idle rss:        232 MiB (237664 kB)
+idle cpu (60s):  2.950%
+picker cold:     142 ms (incl. ~56 ms qs-ipc overhead)
+picker warm:     46 ms (incl. ~56 ms qs-ipc overhead)

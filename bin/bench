@@ -62,6 +62,17 @@ qspid=$(pgrep -x qs | head -1)
 sleep 5
 rss_kb=$(awk '/VmRSS/ {print $2}' "/proc/$qspid/status")
 
+# ---- 3. idle CPU over 60s — BEFORE the picker tests: the theme switcher
+# decodes 22 wallpaper thumbnails on first open (the retired launcher was
+# trivial), and sampling after it charged that burst to "idle" (measured
+# 2.95% vs 0.35% steady on 2026-08-26).
+read -r ut0 st0 < <(awk '{print $14, $15}' "/proc/$qspid/stat")
+sleep 60
+read -r ut1 st1 < <(awk '{print $14, $15}' "/proc/$qspid/stat")
+ticks=$(( ut1 - ut0 + st1 - st0 ))
+hz=$(getconf CLK_TCK)
+cpu_pct=$(python3 -c "print(f'{$ticks / $hz / 60 * 100:.3f}')")
+
 # ---- 4a. theme-switcher cold latency (still honest this late: nothing
 # above summons it, so its loader has never been active in this process)
 lc0=$(now_ms)
@@ -80,14 +91,6 @@ qs ipc call theme hide >/dev/null
 po0=$(now_ms)
 qs ipc call shell ping >/dev/null
 ipc_overhead=$(( $(now_ms) - po0 ))
-
-# ---- 3. idle CPU over 60s
-read -r ut0 st0 < <(awk '{print $14, $15}' "/proc/$qspid/stat")
-sleep 60
-read -r ut1 st1 < <(awk '{print $14, $15}' "/proc/$qspid/stat")
-ticks=$(( ut1 - ut0 + st1 - st0 ))
-hz=$(getconf CLK_TCK)
-cpu_pct=$(python3 -c "print(f'{$ticks / $hz / 60 * 100:.3f}')")
 
 {
   echo "date:            $(date -Iseconds)"
