@@ -52,8 +52,7 @@ BarIcon {
     onWheelMoved: delta => rootItem.audio.setVolume(rootItem.audio.volume + (delta > 0 ? 0.05 : -0.05))
 
     // Source-based: the panel compiles on first open, not with the bar (S1).
-    Loader {
+    PanelLoader {
         id: panelLoader
-        visible: false
     }
 }

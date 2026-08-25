@@ -59,8 +59,7 @@ BarIcon {
     // Source-based so the panel's tree compiles on first open, not with the
     // bar (S1). Invisible: BarButton's default property is a Row, and a Row
     // skips invisible items — the loaded BarPanel is its own window anyway.
-    Loader {
+    PanelLoader {
         id: panelLoader
-        visible: false
     }
 }

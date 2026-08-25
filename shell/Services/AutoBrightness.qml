@@ -132,6 +132,19 @@ QtObject {
     // sample after a wake make a large move instead of easing from a fake 0.
     property real smoothedLux: -1
 
+    // Adaptive cadence. The two sysfs reads are cheap, but at 5 s they are
+    // the most frequent wake in the shell, and a room's light is stable for
+    // hours at a stretch. Ticks that keep reading the same lux stretch the
+    // interval to 3× base; anything eventful — the light moving, a
+    // mismatch, a retry — snaps it back. The only cost is that the FIRST
+    // tick after a manual brightness press can arrive up to 15 s late;
+    // nudges cannot fire in that window (apply only runs from a tick), so
+    // the human never fights the sensor for longer than before.
+    property int stableTicks: 0
+    property real lastRawLux: -1
+    readonly property int stableAfterTicks: 6
+    readonly property int slowIntervalMs: intervalMs * 3
+
     // What this service last asked for. -1 (nothing applied yet) must never
     // read as a mismatch, or the first sample would declare an override.
     property int lastAppliedPercent: -1
@@ -230,6 +243,13 @@ QtObject {
         if (!isFinite(lux) || lux < 0 || measuredPercent < 0)
             return;
 
+        // Stability bookkeeping for the adaptive cadence: within 10% (or 2
+        // lux near dark) of the previous raw reading counts as "nothing is
+        // happening".
+        const luxStable = lastRawLux >= 0 && Math.abs(lux - lastRawLux) <= Math.max(2, lastRawLux * 0.1);
+        lastRawLux = lux;
+        stableTicks = luxStable ? stableTicks + 1 : 0;
+
         smoothedLux = smoothedLux < 0 ? lux : smoothedLux + smoothing * (lux - smoothedLux);
 
         // The panel is not where we put it. That has two very different
@@ -249,6 +269,7 @@ QtObject {
         // A dropped write is re-issued instead, and only a genuinely new
         // value counts as a human.
         if (lastAppliedPercent >= 0 && Math.abs(measuredPercent - lastAppliedPercent) > 1) {
+            stableTicks = 0;
             if (measuredPercent === preApplyPercent && retryCount < maxRetries) {
                 retryCount++;
                 apply(lastAppliedPercent, true);
@@ -300,6 +321,8 @@ QtObject {
     onActiveChanged: {
         if (active) {
             smoothedLux = -1;
+            lastRawLux = -1;
+            stableTicks = 0;
             lastAppliedPercent = -1;
             mismatchStreak = 0;
             sample();
@@ -334,7 +357,7 @@ QtObject {
     }
 
     readonly property Timer sampler: Timer {
-        interval: root.intervalMs
+        interval: root.stableTicks >= root.stableAfterTicks ? root.slowIntervalMs : root.intervalMs
         running: root.active
         repeat: true
         triggeredOnStart: true

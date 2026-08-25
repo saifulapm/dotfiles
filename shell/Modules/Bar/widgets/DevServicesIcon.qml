@@ -26,8 +26,7 @@ Item {
     Shape {
         anchors.fill: parent
         antialiasing: true
-        layer.enabled: true
-        layer.samples: 4
+        preferredRendererType: Shape.CurveRenderer
 
         // The lid: a full ellipse, in two arcs.
         ShapePath {

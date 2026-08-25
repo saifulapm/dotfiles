@@ -1,4 +1,5 @@
 import QtQuick
+import "../components"
 
 // Indicator container, ported from omarchy's Indicators widget.
 //
@@ -363,9 +364,8 @@ Item {
     }
 
     // Source-based: the panel compiles on first open, not with the bar (S1).
-    Loader {
+    PanelLoader {
         id: notifsPanelLoader
-        visible: false
     }
 
     Component {

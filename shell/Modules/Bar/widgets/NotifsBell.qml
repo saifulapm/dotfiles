@@ -82,8 +82,7 @@ BarIndicator {
     }
 
     // Source-based: the panel compiles on first open, not with the bar (S1).
-    Loader {
+    PanelLoader {
         id: panelLoader
-        visible: false
     }
 }

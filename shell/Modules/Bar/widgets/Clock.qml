@@ -142,9 +142,8 @@ BarButton {
     }
 
     // Source-based: the panel compiles on first open, not with the bar (S1).
-    Loader {
+    PanelLoader {
         id: calendarLoader
-        visible: false
     }
 
     // setSource props are set-once, but `settings` is reassigned every time

@@ -20,8 +20,7 @@ Item {
     Shape {
         anchors.fill: parent
         antialiasing: true
-        layer.enabled: true
-        layer.samples: 4
+        preferredRendererType: Shape.CurveRenderer
         scale: 0.95
 
         Tile {

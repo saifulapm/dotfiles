@@ -54,8 +54,7 @@ BarButton {
         colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
     }
 
-    Loader {
+    PanelLoader {
         id: panelLoader
-        visible: false
     }
 }

@@ -115,8 +115,7 @@ BarButton {
     }
 
     // Source-based: the panel compiles on first open, not with the bar.
-    Loader {
+    PanelLoader {
         id: panelLoader
-        visible: false
     }
 }

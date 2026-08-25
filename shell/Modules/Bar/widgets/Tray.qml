@@ -265,7 +265,7 @@ Item {
                         x: rootItem.drawerExtent - rootItem.revealExtent
                         height: parent.height
                         spacing: 0
-                        layer.enabled: true
+                        layer.enabled: rootItem.revealProgress > 0
 
                         Repeater {
                             model: rootItem.drawerItems
@@ -352,7 +352,7 @@ Item {
                         y: rootItem.drawerExtent - rootItem.revealExtent
                         width: parent.width
                         spacing: 0
-                        layer.enabled: true
+                        layer.enabled: rootItem.revealProgress > 0
 
                         Repeater {
                             model: rootItem.drawerItems
@@ -378,15 +378,13 @@ Item {
     }
 
     // Source-based: the panel compiles on first open, not with the bar (S1).
-    Loader {
+    PanelLoader {
         id: panelLoader
-        visible: false
     }
 
     // Same deal for the item menu, which most sessions never open at all.
-    Loader {
+    PanelLoader {
         id: menuLoader
-        visible: false
     }
 
     component TrayItem: BarButton {
