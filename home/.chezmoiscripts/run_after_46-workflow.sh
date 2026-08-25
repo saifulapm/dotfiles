@@ -34,6 +34,12 @@ src="$HOME/.local/src/workflow"
 # ---------------------------------------------------------------- binaries
 # Guarded on `workflow` alone; see the header. update-all drops that one
 # binary when origin moves, and this block rebuilds all three.
+#
+# rebuilt tracks whether THIS run replaced the binaries, because the hub
+# restart at the bottom must fire on a rebuild and not on the many applies
+# that change nothing — bouncing a running service on every `chezmoi apply`
+# is a cost with no cause.
+rebuilt=0
 if [ ! -x "$HOME/.local/bin/workflow" ]; then
   if ! command -v cargo >/dev/null 2>&1; then
     warn "cargo missing (03-dev-toolchain skipped?) — skipping"
@@ -66,7 +72,10 @@ if [ ! -x "$HOME/.local/bin/workflow" ]; then
       built=0
     fi
   done
-  [ "$built" = 1 ] && echo "workflow: installed mem, workflow and hub to ~/.local/bin"
+  if [ "$built" = 1 ]; then
+    echo "workflow: installed mem, workflow and hub to ~/.local/bin"
+    rebuilt=1
+  fi
 fi
 
 # ------------------------------------------------------------------ skills
@@ -94,12 +103,17 @@ if [ -d "$skills_src" ]; then
     # is somebody's own skill (or a chezmoi-managed one like amx/ and
     # desktop/) and is never clobbered by this loop.
     if [ -L "$dest" ] || [ ! -e "$dest" ]; then
-      ln -sfn "$skill" "$dest"
+      # Quiet when it already points where it should: this loop runs on every
+      # apply so that a skill added upstream appears without ceremony, and an
+      # apply that changed nothing should say nothing.
+      [ "$(readlink "$dest" 2>/dev/null)" = "$skill" ] && continue
+      ln -sfn "$skill" "$dest" && linked=$((${linked:-0} + 1))
     else
       warn "$dest is a real directory — leaving it alone"
     fi
   done
-  echo "workflow: skills linked from $skills_src"
+  [ "${linked:-0}" -gt 0 ] \
+    && echo "workflow: linked ${linked} skill(s) from $skills_src"
 fi
 
 # --------------------------------------------------------------------- hub
@@ -109,7 +123,11 @@ fi
 # per-machine decision, not a side effect of an apply. What this does do is
 # keep a hub that is ALREADY running running — a rebuild above replaced the
 # binary under it, and the old process is still the old build until restarted.
-if systemctl --user is-active --quiet hub 2>/dev/null; then
+#
+# Gated on `rebuilt`, not just on hub being active: without that this bounces
+# the service on every apply, which is a running process interrupted for no
+# reason several times a day.
+if [ "$rebuilt" = 1 ] && systemctl --user is-active --quiet hub 2>/dev/null; then
   systemctl --user daemon-reload
   systemctl --user restart hub && echo "workflow: hub restarted on the new build"
 fi
