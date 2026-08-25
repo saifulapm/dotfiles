@@ -774,12 +774,17 @@ binds {
     //
     // Night light gets TWO keys and the plain one is the toggle, not the
     // panel: it is the only widget here whose everyday use is a single
-    // decision ("not this, not now") made without looking at anything. The
-    // panel, where the three modes and the temperature live, is the shifted
-    // one. bin/nightlight owns the toggle policy so this key and the panel's
-    // rows can never disagree.
+    // decision ("not this, not now") made without looking at anything.
+    // bin/nightlight owns the toggle policy so this key and the panel's rows
+    // can never disagree.
+    //
+    // The shifted one lands on the Display panel, where the three modes and
+    // the temperature now live alongside brightness. It is the same panel
+    // Mod+Ctrl+D opens — kept as a second door because the muscle memory is
+    // for the feature, not the panel. `nightlight` reaches it through the
+    // bar's widgetIdAliases.
     Mod+Ctrl+N hotkey-overlay-title="Night Light: hold / release" { spawn "nightlight" "toggle"; }
-    Mod+Shift+Ctrl+N hotkey-overlay-title="Night Light Panel" { spawn "qs" "ipc" "call" "bar" "open" "nightlight"; }
+    Mod+Shift+Ctrl+N hotkey-overlay-title="Night Light (Display Panel)" { spawn "qs" "ipc" "call" "bar" "open" "nightlight"; }
     Mod+Ctrl+S hotkey-overlay-title="SSH Hosts" { spawn "qs" "ipc" "call" "bar" "open" "ssh"; }
     Mod+Ctrl+Shift+P hotkey-overlay-title="Passwords" { spawn "qs" "ipc" "call" "bar" "open" "pass"; }
     Mod+Ctrl+Shift+O hotkey-overlay-title="Listening Ports" { spawn "qs" "ipc" "call" "bar" "open" "ports"; }

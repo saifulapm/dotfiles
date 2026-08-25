@@ -3,12 +3,11 @@
 # url mode, mouse bindings) is deliberately stock. See foot.ini(5).
 [main]
 # The Arch config's tuned pair — 12.5pt glyphs in a 32px cell (~40% leading),
-# within 2 physical px of the Emacs look at this machine's scale — is the
-# ANCHOR; both numbers now scale with the desktop text-size knob
-# (bin/text-size → theme-override [font] size → theme-apply's font.foot-*
-# derivations; token 12 renders exactly the tuned 12.5/32 pair). Points beat
-# pixelsize: they stay proportional under any output scale. foot cannot
-# reload config — running windows keep their size until reopened.
+# within 2 physical px of the Emacs look at this machine's scale. It is the
+# pair theme-apply pins font.foot-pt / font.foot-line-height to, for the one
+# 12px text size this desktop draws at. Points beat pixelsize: they stay
+# proportional under any output scale. foot cannot reload config — running
+# windows keep their size until reopened.
 #
 # The second entry is the icon font, named explicitly rather than left to
 # fontconfig. foot.ini(5): "the first font is the primary font. The remaining

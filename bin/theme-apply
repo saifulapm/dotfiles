@@ -41,20 +41,13 @@ const themeTokens = parseToml(fs.readFileSync(STATE, "utf8"))
 
 // Machine-level overrides, exactly as Services/Theme.qml layers them: the
 // same ~/.config/qshell/theme-override.toml wins over the active theme, so a
-// per-machine tweak (bin/text-size writes [font] size there) reaches the
-// TEMPLATED apps too, not just the shell — before this the shell scaled and
-// foot/GTK stayed put.
+// per-machine tweak reaches the TEMPLATED apps too, not just the shell.
 let overrideTokens = {}
 try {
   overrideTokens = parseToml(fs.readFileSync(path.join(HOME, ".config/qshell/theme-override.toml"), "utf8"))
 } catch (e) { /* no override file — the common case */ }
 
 const tokens = Object.assign({}, THEME_DEFAULTS, themeTokens, overrideTokens)
-
-// The theme's own base size, pre-override: the GTK settings.ini font pins to
-// this so text scaling flows through ONE channel (text-scaling-factor below)
-// instead of compounding with a scaled gtk-font-name.
-tokens["font.size-base"] = String(themeTokens["font.size"] !== undefined ? themeTokens["font.size"] : THEME_DEFAULTS["font.size"] || 12)
 
 // Same font precedence Services/Theme.qml applies, so the shell and the
 // templated app configs never disagree: a theme that names the token wins; one
@@ -75,29 +68,29 @@ tokens["font.size-base"] = String(themeTokens["font.size"] !== undefined ? theme
   }
 }
 
-// ---- text-size derivations (omarchy-display-text-size port) ----
-// One knob: [font] size in the override file (bin/text-size writes it).
-// Anchors follow the foot metrics commit: token 12 == foot 12.5pt / 32px
-// line-height == GTK factor 1.0. Terminal sizes are derived here so the foot
-// template scales with the knob instead of hardcoding the pair.
-{
-  const base = Number(tokens["font.size-base"]) || 12
-  const size = Number(tokens["font.size"]) || base
-  const ratio = size / base
-  tokens["font.foot-pt"] = String(Math.round(12.5 * ratio * 10) / 10)
-  tokens["font.foot-line-height"] = String(Math.max(1, Math.round(32 * ratio)))
+// ---- font size ----
+// This desktop draws text at one size, 12px, and does not offer a knob for it.
+// The omarchy-display-text-size port that used to live here scaled the shell,
+// foot, GTK and Emacs together off `[font] size` in the override file; it is
+// gone, and with it the reason for a separate base/effective pair. A theme is
+// free to name any other token, but not this one — a theme that shipped a
+// different size would resize the whole desktop by being selected.
+//
+// The terminal metrics are the anchor pair the foot-metrics commit measured
+// for 12px: 12.5pt in a 32px line box. Kitty reads the same two tokens.
+const FONT_SIZE = 12
+tokens["font.size"] = String(FONT_SIZE)
+tokens["font.foot-pt"] = "12.5"
+tokens["font.foot-line-height"] = "32"
 
-  // GTK: the interface fonts are ours (set below), so the factor's
-  // quantization anchor is our own base — rounded so the effective interface
-  // font lands on a whole point size (omarchy's fix for GTK4 menus clipping
-  // ascenders on raw ratios). Always written: 1.0000 on reset IS the reset.
-  const factor = (Math.round(base * ratio) / base).toFixed(4)
-  try {
-    execSync(`gsettings set org.gnome.desktop.interface font-name "${tokens["font.ui"]} ${base}"`, { stdio: "ignore" })
-    execSync(`gsettings set org.gnome.desktop.interface monospace-font-name "${tokens["font.mono"]} ${base}"`, { stdio: "ignore" })
-    execSync(`gsettings set org.gnome.desktop.interface text-scaling-factor ${factor}`, { stdio: "ignore" })
-  } catch (e) { /* gsettings absent or no session bus */ }
-}
+// GTK: the interface fonts are ours, at the same fixed size. The scaling
+// factor is written rather than left alone so a machine that carried a scaled
+// one from the old knob is put back to 1.0 by the next theme apply.
+try {
+  execSync(`gsettings set org.gnome.desktop.interface font-name "${tokens["font.ui"]} ${FONT_SIZE}"`, { stdio: "ignore" })
+  execSync(`gsettings set org.gnome.desktop.interface monospace-font-name "${tokens["font.mono"]} ${FONT_SIZE}"`, { stdio: "ignore" })
+  execSync(`gsettings set org.gnome.desktop.interface text-scaling-factor 1.0`, { stdio: "ignore" })
+} catch (e) { /* gsettings absent or no session bus */ }
 
 // Per-theme GTK icon theme, resolved once — the settings.ini template and the
 // gsettings flip below must agree. (meta.mode read inline: `mode` is declared

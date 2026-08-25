@@ -314,8 +314,8 @@ Rectangle {
             anchors.centerIn: parent
             text: "✕"
             color: closeArea.containsMouse ? root.theme.notifications.text : root.theme.notifications.textMuted
-            // Their caption × 1.44, kept as a derivation so the glyph tracks
-            // the text-size knob exactly as theirs does.
+            // Their caption × 1.44, kept as a derivation off the font token
+            // rather than a literal so the glyph stays in step with the text.
             font.pixelSize: Math.round(root.theme.fontPx(0.833) * 1.44)
         }
 

@@ -4,17 +4,25 @@ import Quickshell.Io
 import "../components"
 import "../../../components"
 import "MonitorModel.js" as Model
+import "NightLightModel.js" as NightModel
 
 // Display panel — port of omarchy's monitor plugin on niri's IPC: a hero
 // naming the current brightness mood, a live brightness slider per output
 // that has a backlight, their scale presets filtered down to the ones this
 // mode can actually land on, and the per-output enable rows.
 //
+// Night light lives here too, rather than in a panel of its own. Brightness
+// and colour temperature are the same question — how this screen should look
+// right now — and splitting them cost two bar widgets and two keybindings to
+// answer it. The MODE radio and the warmth nudge are the night-light panel's,
+// unchanged; what went away is its hero, which duplicated this one's job.
+//
 // One probe process gathers everything (`niri msg --json outputs`, the
 // focused output and `brightnessctl -lm`), on their 5 s cadence and only
 // while the panel is open. Brightness writes are debounced 180 ms like
 // theirs, and the value we just wrote is authoritative — the probe never
-// gets to bounce the slider back mid-drag.
+// gets to bounce the slider back mid-drag. Night light is not part of that
+// probe: NightLightService follows sunsetr's own stream and pushes.
 BarPanel {
     id: panel
 
@@ -25,10 +33,20 @@ BarPanel {
     property string focused: ""
     property var backlights: []
 
+    // The shared NightLightService, threaded down through the bar the same
+    // way autoBrightness is. Null until the bar hands it over, and every
+    // night-light row is gated on it having probed a real sunsetr.
+    property var nightlight: null
+    readonly property bool nightLightAvailable: !!nightlight && nightlight.probed && nightlight.available
+    readonly property var nightLightModes: NightModel.MODES
+
     // The shell's AutoBrightness service, threaded down from shell.qml
     // through the bar. Null on a panel opened before the service exists, and
-    // the row that uses it is gated on the service reporting a sensor.
+    // the hero switch is gated on the service reporting BOTH an ambient-light
+    // sensor and a battery — see AutoBrightness.available.
     property var autoBrightness: null
+    readonly property bool autoBrightnessAvailable: !!autoBrightness && autoBrightness.available
+    readonly property bool autoBrightnessOn: autoBrightnessAvailable && autoBrightness.enabled
 
     // Live brightness per backlight device, keyed by device name. Set locally
     // on every move so the slider is never fighting the probe.
@@ -91,8 +109,6 @@ BarPanel {
         focused = state.focused;
         backlights = state.backlights;
         ddcOutputs = state.ddc || [];
-        if (state.textSize > 0)
-            textSize = state.textSize;
 
         // Adopt the hardware's values only for devices with no write in
         // flight — otherwise a probe landing mid-drag snaps the knob back.
@@ -114,11 +130,16 @@ BarPanel {
     onPanelOpened: {
         refresh();
         cursorActive = false;
+        // Probe-on-open, the night-light panel's contract: one snapshot
+        // squares the rows with reality and re-arms a follower that gave up
+        // while the daemon was down.
+        if (nightlight)
+            nightlight.refresh();
     }
 
     Process {
         id: stateProc
-        command: ["bash", "-c", "echo '##outputs'; niri msg --json outputs; echo '##focused'; niri msg --json focused-output; echo '##backlights'; brightnessctl -lm --class=backlight 2>/dev/null; echo '##ddc'; if command -v ddcutil >/dev/null 2>&1; then niri msg --json outputs | jq -r 'keys[]' | while read -r o; do case \"$o\" in eDP*|LVDS*|DSI*) ;; *) p=$(brightness-display-ddc \"$o\" 2>/dev/null) && echo \"$o $p\";; esac; done; fi; echo '##textsize'; text-size --value 2>/dev/null"]
+        command: ["bash", "-c", "echo '##outputs'; niri msg --json outputs; echo '##focused'; niri msg --json focused-output; echo '##backlights'; brightnessctl -lm --class=backlight 2>/dev/null; echo '##ddc'; if command -v ddcutil >/dev/null 2>&1; then niri msg --json outputs | jq -r 'keys[]' | while read -r o; do case \"$o\" in eDP*|LVDS*|DSI*) ;; *) p=$(brightness-display-ddc \"$o\" 2>/dev/null) && echo \"$o $p\";; esac; done; fi"]
         stdout: StdioCollector {
             waitForEnd: true
             onStreamFinished: panel.applyState(text)
@@ -232,26 +253,13 @@ BarPanel {
 
     readonly property var scaleValues: scalePresets
 
-    // The desktop text-size knob (bin/text-size, omarchy's display-text-size).
-    readonly property int textSizeMin: 9
-    readonly property int textSizeMax: 20
-    property int textSize: 12
-
-    function stepTextSize(delta) {
-        const next = Math.max(textSizeMin, Math.min(textSizeMax, textSize + delta));
-        if (next === textSize)
-            return;
-        textSize = next;
-        Quickshell.execDetached(["text-size", String(next)]);
-        settleTimer.restart();
-    }
-
     readonly property var visibleSections: {
         const list = [];
         if (brightnessRows.length > 0)
             list.push("brightness");
+        if (nightLightAvailable)
+            list.push("nightlight");
         list.push("scale");
-        list.push("textsize");
         if (outputs.length > 1)
             list.push("displays");
         return list;
@@ -260,10 +268,10 @@ BarPanel {
     function sectionCount(section) {
         if (section === "brightness")
             return brightnessRows.length;
+        if (section === "nightlight")
+            return nightLightModes.length;
         if (section === "scale")
             return scaleValues.length;
-        if (section === "textsize")
-            return 1;
         if (section === "displays")
             return outputs.length;
         return 0;
@@ -271,7 +279,7 @@ BarPanel {
 
     // The scale pills sit side by side, so j/k treats them as one row.
     function sectionIsSingleRow(section) {
-        return section === "scale" || section === "textsize";
+        return section === "scale";
     }
 
     function moveCursor(delta) {
@@ -315,10 +323,6 @@ BarPanel {
                 commitBrightness(row.device, percentFor(row.device) + delta * 5);
             return;
         }
-        if (focusSection === "textsize") {
-            stepTextSize(delta);
-            return;
-        }
         if (focusSection === "scale")
             selectedIndex = Math.max(0, Math.min(scaleValues.length - 1, selectedIndex + delta));
     }
@@ -326,7 +330,12 @@ BarPanel {
     function activateCursor() {
         if (focusSection === "scale" && focusedOutput)
             setScale(focusedOutput.name, scaleValues[selectedIndex]);
-        else if (focusSection === "displays") {
+        else if (focusSection === "nightlight") {
+            // A radio, not a toggle: re-choosing the active mode is a no-op.
+            const mode = nightLightModes[selectedIndex];
+            if (mode && !(nightlight.running && mode.key === nightlight.modeKey))
+                nightlight.setMode(mode.key);
+        } else if (focusSection === "displays") {
             const out = outputs[selectedIndex];
             if (out)
                 setPower(out.name, !Model.isEnabled(out));
@@ -363,6 +372,10 @@ BarPanel {
             if (cursorActive)
                 activateCursor();
             event.accepted = true;
+        } else if (nightLightAvailable && (event.key === Qt.Key_BracketLeft || event.key === Qt.Key_BracketRight)) {
+            // The night-light panel's warmth keys, kept: [ cooler, ] warmer.
+            nightlight.nudgeNightTemp(event.key === Qt.Key_BracketLeft ? -100 : 100);
+            event.accepted = true;
         }
     }
 
@@ -370,14 +383,46 @@ BarPanel {
     PanelHero {
         theme: panel.theme
         width: parent.width
-        labelRightMargin: 0
         title: "Display"
-        meta: panel.heroPercent < 0 ? "FIXED BRIGHTNESS" : Model.brightnessName(panel.heroPercent).toUpperCase()
+        // A bare switch on a hero that says "Display" would read as a power
+        // switch, which is not a mistake worth risking on a control that
+        // hands the backlight over to a sensor. The meta line already names
+        // the brightness; it names who is choosing it too.
+        meta: {
+            const mood = panel.heroPercent < 0 ? "FIXED BRIGHTNESS" : Model.brightnessName(panel.heroPercent).toUpperCase();
+            return panel.autoBrightnessOn ? mood + " · AUTO" : mood;
+        }
 
+        // The bar mark, at hero size: the same sun/moon pair, so the panel
+        // and the icon that opened it are recognisably one thing. A screen
+        // glyph here named the hardware, which the DISPLAYS rows already do
+        // and which was never what the hero is for.
         icon: OpticalGlyph {
-            text: panel.outputs.length > 1 ? "󰍺" : "󰍹"
-            color: panel.theme.textPrimary
-            pixelSize: panel.theme.fontPx(2.333)
+            text: panel.nightLightAvailable && panel.nightlight.warm ? "󰖔" // md-weather_night
+            : "󰖙" // md-white_balance_sunny
+            color: panel.nightLightAvailable && panel.nightlight.running && panel.nightlight.forced ? panel.theme.accent : panel.theme.textPrimary
+            pixelSize: panel.theme.fontPx(2.0)
+            verticalInkCenter: true
+        }
+
+        // Auto-brightness, the panel's headline control — the same slot the
+        // audio, bluetooth and warp heroes put their one switch in. Present
+        // only where the service has both an ambient-light sensor and a
+        // battery to justify following it; invisible trailing controls take
+        // no space, so the hero closes up on the machines without one.
+        trailing: PanelSwitch {
+            theme: panel.theme
+            anchors.verticalCenter: parent.verticalCenter
+            visible: panel.autoBrightnessAvailable
+            checked: panel.autoBrightnessOn
+            hint: {
+                const lux = panel.autoBrightness && panel.autoBrightness.smoothedLux >= 0 ? Math.round(panel.autoBrightness.smoothedLux) + " lx" : "no reading yet";
+                return (panel.autoBrightnessOn ? "Stop following the ambient light" : "Follow the ambient light") + " — " + lux;
+            }
+            onToggled: {
+                if (panel.autoBrightness)
+                    panel.autoBrightness.setEnabled(!panel.autoBrightness.enabled);
+            }
         }
     }
 
@@ -477,44 +522,6 @@ BarPanel {
                 }
             }
         }
-
-        // Auto-brightness, in the BRIGHTNESS section because that is the
-        // thing it takes over. The row renders only where the service says
-        // it has an ambient-light sensor to read: the MacBook shows it, the
-        // Mac mini and the NUC render nothing rather than a switch that
-        // could never do anything. The lux reading rides the tooltip instead
-        // of the label so this stays a one-line row at any width.
-        Item {
-            visible: !!panel.autoBrightness && panel.autoBrightness.available
-            width: parent.width
-            height: Math.max(autoLabel.implicitHeight, autoSwitch.implicitHeight)
-
-            StyledText {
-                id: autoLabel
-                theme: panel.theme
-                role: StyledText.Small
-                muted: !autoSwitch.checked
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Auto"
-            }
-
-            PanelSwitch {
-                id: autoSwitch
-                theme: panel.theme
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                checked: !!panel.autoBrightness && panel.autoBrightness.enabled
-                hint: {
-                    const lux = panel.autoBrightness && panel.autoBrightness.smoothedLux >= 0 ? Math.round(panel.autoBrightness.smoothedLux) + " lx" : "no reading yet";
-                    return (checked ? "Stop following the ambient light" : "Follow the ambient light") + " — " + lux;
-                }
-                onToggled: {
-                    if (panel.autoBrightness)
-                        panel.autoBrightness.setEnabled(!panel.autoBrightness.enabled);
-                }
-            }
-        }
     }
 
     // Outputs with no backlight of their own: say why rather than showing a
@@ -528,6 +535,128 @@ BarPanel {
         width: parent.width
         text: panel.brightnessRows.length === 0 ? "No controllable backlight on this machine." : "External displays have no backlight control — they need DDC/CI."
         wrapMode: Text.WordWrap
+    }
+
+    Separator {
+        theme: panel.theme
+        visible: panel.nightLightAvailable
+    }
+
+    // ---------------------------------------------------------- night light
+    // The night-light panel's MODE radio and warmth nudge, next to brightness
+    // because they answer the same question. Absent entirely without a
+    // sunsetr on the machine — this bar's contract for an optional CLI.
+    Column {
+        width: parent.width
+        spacing: panel.theme.space(1.5)
+        visible: panel.nightLightAvailable
+
+        SectionHeader {
+            theme: panel.theme
+            width: parent.width
+            label: "NIGHT LIGHT"
+            // The schedule's next move, where there is one. A hold has none,
+            // and says so rather than showing a stale time.
+            value: {
+                if (!panel.nightlight || !panel.nightlight.running)
+                    return "OFF";
+                return panel.nightlight.nextText !== "" ? panel.nightlight.nextText.toUpperCase() : "HELD";
+            }
+        }
+
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Small
+
+            visible: !!panel.nightlight && panel.nightlight.lastError !== ""
+            width: parent.width
+            text: panel.nightlight ? panel.nightlight.lastError : ""
+            color: panel.theme.error
+            wrapMode: Text.WordWrap
+        }
+
+        Column {
+            id: nightRowColumn
+
+            width: parent.width
+            spacing: panel.theme.space(0.5)
+
+            Repeater {
+                model: panel.nightLightModes
+
+                NightModeRow {
+                    required property var modelData
+                    required property int index
+
+                    width: nightRowColumn.width
+                    mode: modelData
+                    rowIndex: index
+                }
+            }
+        }
+
+        // Only worth saying when it is the actionable fact; a running
+        // schedule explains itself through the rows.
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Caption
+            muted: true
+
+            visible: !!panel.nightlight && !panel.nightlight.running
+            width: parent.width
+            text: "sunsetr is not running — choose a mode to start it."
+            wrapMode: Text.WordWrap
+        }
+    }
+
+    // ------------------------------------------------------ night warmth
+    // Hidden under a day hold: the control would still write the config, but
+    // nothing on the glass would move, and a slider that does nothing is
+    // worse than no slider.
+    Column {
+        width: parent.width
+        spacing: panel.theme.space(1.5)
+        visible: panel.nightLightAvailable && panel.nightlight.running && panel.nightlight.modeKey !== "day"
+
+        SectionHeader {
+            theme: panel.theme
+            width: parent.width
+            label: "NIGHT WARMTH"
+            value: panel.nightlight ? NightModel.kelvinText(panel.nightlight.dayTemp) + " NEUTRAL" : ""
+        }
+
+        Item {
+            width: parent.width
+            implicitHeight: Math.max(warmerButton.implicitHeight, nudgeLabel.implicitHeight)
+
+            NudgeButton {
+                id: coolerButton
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                glyph: "󰍶" // md-minus-circle-outline
+                hint: "Cooler"
+                delta: 100
+            }
+
+            StyledText {
+                id: nudgeLabel
+
+                theme: panel.theme
+                anchors.centerIn: parent
+                text: panel.nightlight ? NightModel.moodName(panel.nightlight.temp) : ""
+                color: panel.theme.textPrimary
+                elide: Text.ElideRight
+            }
+
+            NudgeButton {
+                id: warmerButton
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                glyph: "󰐗" // md-plus-circle-outline
+                hint: "Warmer"
+                delta: -100
+            }
+        }
     }
 
     Separator {
@@ -594,67 +723,6 @@ BarPanel {
                     onActivated: if (panel.focusedOutput)
                         panel.setScale(panel.focusedOutput.name, modelData)
                 }
-            }
-        }
-    }
-
-    Separator {
-        theme: panel.theme
-    }
-
-    // ------------------------------------------------------------ text size
-    // The desktop-wide knob (omarchy's TEXT SIZE stepper): shell, foot, GTK
-    // and Emacs scale together through bin/text-size.
-    Column {
-        width: parent.width
-        spacing: panel.theme.space(2)
-
-        Item {
-            width: parent.width
-            height: textSizeHeader.implicitHeight
-
-            SectionHeader {
-                id: textSizeHeader
-                theme: panel.theme
-                width: parent.width
-                anchors.left: parent.left
-                label: "TEXT SIZE"
-            }
-
-            StyledText {
-                theme: panel.theme
-                role: StyledText.Caption
-                mono: true
-                muted: true
-
-                anchors.right: parent.right
-                text: panel.textSize + " px"
-            }
-        }
-
-        Row {
-            id: textSizeRow
-
-            readonly property real cellWidth: (width - panel.theme.space(1.5)) / 2
-
-            width: parent.width
-            spacing: panel.theme.space(1.5)
-
-            Pill {
-                width: textSizeRow.cellWidth
-                label: "−"
-                selectable: panel.textSize > panel.textSizeMin
-                hasCursor: panel.cursorActive && panel.focusSection === "textsize"
-                onHovered: panel.takeCursor("textsize", 0)
-                onActivated: panel.stepTextSize(-1)
-            }
-
-            Pill {
-                width: textSizeRow.cellWidth
-                label: "+"
-                selectable: panel.textSize < panel.textSizeMax
-                onHovered: panel.takeCursor("textsize", 0)
-                onActivated: panel.stepTextSize(1)
             }
         }
     }
@@ -764,6 +832,162 @@ BarPanel {
     }
 
     // ---------------------------------------------------------- components
+    // The night-light panel's ModeRow, unchanged except for reading this
+    // panel's shared cursor (focusSection/selectedIndex) instead of its own.
+    component NightModeRow: CursorSurface {
+        id: row
+
+        theme: panel.theme
+
+        property var mode: null
+        property int rowIndex: 0
+
+        readonly property bool rowSelected: panel.cursorActive && panel.focusSection === "nightlight" && panel.selectedIndex === rowIndex
+        readonly property bool isActive: !!panel.nightlight && panel.nightlight.running && !!mode && mode.key === panel.nightlight.modeKey
+
+        hasCursor: rowSelected
+        current: isActive
+        implicitHeight: rowContent.implicitHeight + panel.theme.space(3)
+
+        MouseArea {
+            id: rowMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onContainsMouseChanged: if (containsMouse)
+                panel.takeCursor("nightlight", row.rowIndex)
+            // A radio, not a toggle: re-choosing the active mode is a no-op.
+            onClicked: if (!row.isActive)
+                panel.nightlight.setMode(row.mode.key)
+        }
+
+        PanelHint {
+            theme: panel.theme
+            visible: rowMouse.containsMouse && !row.isActive
+            anchor: row
+            above: true
+            text: row.mode ? row.mode.detail : ""
+        }
+
+        Item {
+            id: rowContent
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: panel.theme.space(2.5)
+            anchors.rightMargin: panel.theme.space(2.5)
+            implicitHeight: Math.max(rowMark.implicitHeight, rowLabels.implicitHeight, rowCheck.implicitHeight)
+
+            // Fixed-width slot so the label column lines up across rows
+            // whatever each glyph's ink width is.
+            OpticalGlyph {
+                id: rowMark
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: panel.theme.space(5)
+                text: row.mode ? row.mode.glyph : ""
+                verticalInkCenter: true
+                color: row.isActive ? panel.theme.textPrimary : panel.theme.textMuted
+                pixelSize: panel.theme.fontPx(1.083)
+            }
+
+            Column {
+                id: rowLabels
+
+                anchors.left: rowMark.right
+                anchors.leftMargin: panel.theme.space(2.5)
+                anchors.right: rowCheck.left
+                anchors.rightMargin: panel.theme.space(2)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: panel.theme.space(0.25)
+
+                StyledText {
+                    theme: panel.theme
+
+                    width: parent.width
+                    text: row.mode ? row.mode.label : ""
+                    elide: Text.ElideRight
+                }
+
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+
+                    width: parent.width
+                    // The active row states the fact; the others state the
+                    // offer. "Auto" showing its next transition is the one
+                    // line in this panel that changes on its own.
+                    text: {
+                        if (!row.mode)
+                            return "";
+                        if (!row.isActive)
+                            return row.mode.detail;
+                        if (row.mode.key === "auto")
+                            return panel.nightlight.nextText !== "" ? panel.nightlight.nextText : row.mode.detail;
+                        return "Held — " + NightModel.kelvinText(panel.nightlight.temp);
+                    }
+                    color: row.isActive ? panel.theme.textPrimary : panel.theme.textMuted
+                    elide: Text.ElideRight
+                }
+            }
+
+            OpticalGlyph {
+                id: rowCheck
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: panel.theme.space(4)
+                text: row.isActive ? "󰄬" // md-check
+                : ""
+                verticalInkCenter: true
+                color: panel.theme.accent
+                pixelSize: panel.theme.fontPx(1.0)
+            }
+        }
+    }
+
+    // A bordered square holding one glyph. `delta` is signed the way sunsetr
+    // counts: LOWER kelvin is warmer, so "warmer" carries a negative step.
+    component NudgeButton: ChipSurface {
+        id: chip
+
+        property string glyph: ""
+        property string hint: ""
+        property int delta: 0
+
+        theme: panel.theme
+        implicitWidth: panel.theme.space(8)
+        implicitHeight: panel.theme.space(7)
+        // An action, not a choice — `chosen` never fires.
+        pointerOver: chipMouse.containsMouse
+
+        OpticalGlyph {
+            anchors.centerIn: parent
+            text: chip.glyph
+            color: panel.theme.textPrimary
+            pixelSize: panel.theme.fontPx(1.0)
+        }
+
+        // A MouseArea rather than a TapHandler: a TapHandler's passive grab
+        // lets the press fall through to anything underneath.
+        MouseArea {
+            id: chipMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: panel.nightlight.nudgeNightTemp(chip.delta)
+        }
+
+        PanelHint {
+            theme: panel.theme
+            visible: chipMouse.containsMouse
+            anchor: chip
+            above: true
+            text: chip.hint
+        }
+    }
+
     component Pill: ChipSurface {
         id: pill
 

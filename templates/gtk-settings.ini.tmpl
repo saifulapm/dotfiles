@@ -34,9 +34,9 @@
 [Settings]
 gtk-theme-name=Adwaita
 gtk-application-prefer-dark-theme={{gtk.prefer-dark}}
-# size-base, not size: the text-size knob reaches GTK as text-scaling-factor
-# (set by theme-apply); a scaled font-name here would compound with it.
-gtk-font-name={{font.ui}} {{font.size-base}}
+# The desktop's one text size. theme-apply also pins text-scaling-factor to
+# 1.0, so this is the whole story rather than half of a scaled pair.
+gtk-font-name={{font.ui}} {{font.size}}
 # Arch dotfiles parity: pin the cursor GTK apps draw to the same Adwaita/24
 # the compositor uses, and carry the per-theme icon theme in-file so GTK3
 # apps get it even where the gsettings flip is not read.

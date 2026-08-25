@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.UPower
 
 // Auto-brightness — the ambient-light half of what macOS does for free on
 // this hardware, and the biggest single battery lever on the machine. The
@@ -162,7 +163,16 @@ QtObject {
     // fleet changes, and would still be wrong about a machine whose sensor
     // the kernel stopped exposing.
     property bool sensorPresent: false
-    readonly property bool available: sensorPresent && maxRaw > 0
+
+    // ...and a battery, because this is a laptop feature. The sensor gate
+    // above very nearly says that already, but "nearly" is the problem: a
+    // desktop that ever exposed a readable ambient-light device would switch
+    // the whole feature on, and following the room's light is only ever worth
+    // doing on a machine that gets carried between rooms. UPower's display
+    // device answers it directly, the way Services/Battery.qml asks.
+    readonly property bool hasBattery: !!(UPower.displayDevice && UPower.displayDevice.isPresent && UPower.displayDevice.isLaptopBattery)
+
+    readonly property bool available: sensorPresent && maxRaw > 0 && hasBattery
 
     readonly property bool screenVisible: !(idle && idle.monitorsPoweredOff) && !(shellRoot && shellRoot.locked)
     readonly property bool active: enabled && available && screenVisible

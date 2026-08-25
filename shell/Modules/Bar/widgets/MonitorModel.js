@@ -130,15 +130,11 @@ function parseState(raw) {
         });
     }
 
-    // bin/text-size --value: the effective desktop text-size knob in px.
-    const textSize = parseInt((sections.textsize || []).join("").trim(), 10);
-
     return {
         outputs: outputs,
         focused: focused,
         backlights: backlights,
-        ddc: ddc,
-        textSize: isFinite(textSize) ? textSize : 0
+        ddc: ddc
     };
 }
 

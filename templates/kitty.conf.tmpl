@@ -14,19 +14,18 @@ include ~/.config/kitty/theme.conf
 
 # ---------------------------------------------------------------- font
 # The same glyphs foot draws, from the same two tokens: foot renders
-# {{font.mono}} at {{font.foot-pt}}pt in a {{font.foot-line-height}}px cell, and
-# both numbers ride the desktop text-size knob (bin/text-size → theme-override
-# [font] size → theme-apply's font.foot-* derivations). Points, not pixelsize,
-# for the same reason foot uses them: they stay proportional under any output
-# scale.
+# {{font.mono}} at {{font.foot-pt}}pt in a {{font.foot-line-height}}px cell,
+# both pinned by theme-apply to the desktop's one 12px text size. Points, not
+# pixelsize, for the same reason foot uses them: they stay proportional under
+# any output scale.
 #
 # The cell height is a PERCENTAGE, not foot's px number, and that is load
 # bearing: modify_font's px form is a DELTA on the natural cell, not the cell
 # itself. Measured 2026-08-18 — `modify_font cell_height 29px` produced a 60px
 # cell on top of kitty's natural 31px, where foot's line-height=29 means 29.
-# The percentage form is of the natural value, so ONE constant holds at every
-# position of the text-size knob: foot's line-height and kitty's natural cell
-# both scale linearly with the point size, so their ratio does not move.
+# The percentage form is of the natural value, so the constant is a ratio
+# rather than a size: foot's line-height and kitty's natural cell both scale
+# linearly with the point size, so it holds at any point size, not just ours.
 #
 # 142% = foot's 44px cell / kitty's natural 31px, both read out of the running
 # terminals with CSI 16 t at the same font and scale. Re-derive it if the mono

@@ -378,11 +378,27 @@ Scope {
         return screenBars.slice().sort((a, b) => Number(b.screen && b.screen.name === focusedOutput) - Number(a.screen && a.screen.name === focusedOutput));
     }
 
+    // Ids that used to name a widget of their own and now name a section of
+    // another one's panel. Kept because they are what the keybindings, the
+    // menu and anything a user typed into a script already say — a rename is
+    // ours to absorb, not theirs. Applied at the summon boundary rather than
+    // in the component registry: the registry is what shell.json instantiates
+    // from, so an alias there would mount a second copy of the same widget.
+    readonly property var widgetIdAliases: ({
+            "nightlight": "monitor"
+        })
+
+    function canonicalWidgetId(widgetId) {
+        const alias = widgetIdAliases[widgetId];
+        return alias !== undefined ? alias : widgetId;
+    }
+
     // Omarchy's summonBarWidget: any process (a niri bind) can open a widget's
     // panel — `qs ipc call bar open audio`.
     function summonWidgetPanel(widgetId) {
+        const id = canonicalWidgetId(widgetId);
         for (const b of focusedFirstBars())
-            if (b.summonWidget(widgetId))
+            if (b.summonWidget(id))
                 return "ok";
         return "no widget with a panel: " + widgetId;
     }
@@ -445,7 +461,8 @@ Scope {
     // wrong monitor. Rank surfaces instead: a copy that already has the panel
     // open wins, so close/hide/toggle reach what the user can see; then the
     // niri-focused output, where a keyboard summon belongs.
-    function summonWidgetMode(widgetId, mode) {
+    function summonWidgetMode(widgetIdRaw, mode) {
+        const widgetId = canonicalWidgetId(widgetIdRaw);
         const focusedWs = niri.workspaces.find(w => w.is_focused);
         const focusedOutput = focusedWs ? focusedWs.output : "";
         const rank = b => (b.widgetPanelOpen(widgetId) ? 2 : 0) + (b.screen && b.screen.name === focusedOutput ? 1 : 0);
@@ -907,7 +924,6 @@ Scope {
             "ai": aiComponent,
             "weather": weatherComponent,
             "monitor": monitorComponent,
-            "nightlight": nightlightComponent,
             "ssh": sshComponent,
             "timezones": timezonesComponent,
             "drives": drivesComponent,
@@ -2298,13 +2314,6 @@ Scope {
         MonitorWidget {
             theme: barRoot.theme
             autoBrightness: barRoot.shell.autoBrightness
-        }
-    }
-
-    Component {
-        id: nightlightComponent
-        NightLight {
-            theme: barRoot.theme
             nightlight: barRoot.nightLightService()
         }
     }
