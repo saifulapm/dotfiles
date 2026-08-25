@@ -4,9 +4,16 @@ import Quickshell.Io
 import "../../components"
 import "../../components/PickerModel.js" as PickerModel
 
-// Wallhaven picker — same filmstrip UI as the local wallpaper picker, but
-// backed by wallhaven.cc instead of the on-disk theme + ~/Pictures/Wallpapers
-// directories.
+// Remote wallpaper picker — same filmstrip UI as the local wallpaper
+// picker, but backed by bin/wallpaper-fetch's sources (wallhaven, bing's
+// daily gallery, picsum, pexels when a key exists) instead of the on-disk
+// theme + ~/Pictures/Wallpapers directories. Historically wallhaven-only —
+// the IPC target and file name keep that name.
+//
+// Sources: the footer draws one chip per available source (clickable), and
+// Ctrl+S cycles them from the keyboard. Typing into a source that cannot
+// search (bing, picsum) hops to the first searchable source instead of
+// silently ignoring the query.
 //
 // Type-to-filter is wired to a wallhaven search: a keystroke updates
 // `currentQuery`, a 500ms debounce fires fetchPage(1) with q=currentQuery,
@@ -23,7 +30,7 @@ import "../../components/PickerModel.js" as PickerModel
 // parsed items plus totalPages so pagination works without an extra call.
 //
 // Apply downloads the full-resolution image into ~/Pictures/Wallpapers/
-// via bin/wallhaven-fetch --download (so the file is permanent and the next
+// via bin/wallpaper-fetch --download (so the file is permanent and the next
 // time the Background picker opens, the local directory lists it too), then
 // calls bin/background-next --set with the same atomic write the local
 // picker uses. Net result: the user's wallhaven browse becomes a wallpaper
@@ -49,6 +56,17 @@ Scope {
     // own key handler (so Escape-to-clear, Ctrl+U word-kill, backspace all
     // keep working).
     property string currentQuery: ""
+    // Available sources, from `wallpaper-fetch --sources` (probed on first
+    // show): [{name, searchable, label}]. wallhaven/pexels appear only when
+    // their pass(1) key exists.
+    property var sources: []
+    property int sourceIndex: 0
+    readonly property var currentSource: sources[sourceIndex] || ({
+            name: "wallhaven",
+            searchable: true,
+            label: "Wallhaven"
+        })
+    property bool sourcesProbed: false
     // "{query|page -> { items, totalPages, ts }}". Bounded by maxCacheEntries
     // with LRU eviction so a long browsing session doesn't grow without limit.
     // The cap is generous (100 entries = 2400 items) — typical use stays well
@@ -66,8 +84,30 @@ Scope {
 
     function show() {
         strip.prepare();
-        fetchPage(currentPage);
+        if (!sourcesProbed) {
+            isLoading = true;
+            sourcesProc.running = true;
+        } else {
+            fetchPage(currentPage);
+        }
         strip.open = true;
+    }
+
+    function setSourceIndex(i) {
+        if (sources.length === 0)
+            return;
+        const next = ((i % sources.length) + sources.length) % sources.length;
+        if (next === sourceIndex)
+            return;
+        sourceIndex = next;
+        currentPage = 1;
+        totalPages = 1;
+        debounceTimer.stop();
+        fetchPage(1);
+    }
+
+    function cycleSource() {
+        setSourceIndex(sourceIndex + 1);
     }
 
     function hide() {
@@ -82,7 +122,7 @@ Scope {
     }
 
     function getCached(query, page) {
-        const key = query + "|" + String(page);
+        const key = currentSource.name + "|" + query + "|" + String(page);
         const entry = itemCache[key];
         if (!entry)
             return null;
@@ -92,7 +132,7 @@ Scope {
     }
 
     function putCached(query, page, items, totalPages) {
-        const key = query + "|" + String(page);
+        const key = currentSource.name + "|" + query + "|" + String(page);
         const next = Object.assign({}, itemCache);
         next[key] = {
             items: items,
@@ -114,7 +154,7 @@ Scope {
         itemCache = next;
     }
 
-    // wallhaven-fetch --list ends its stdout with a
+    // wallpaper-fetch --list ends its stdout with a
     // `__META__\tpage\ttotal\tquery` sentinel; split it off so
     // loadWallhavenRows sees only real rows.
     function loadRows(rows) {
@@ -136,7 +176,8 @@ Scope {
                 meta = {
                     page: parseInt(parts[1] || "1", 10),
                     total: parseInt(parts[2] || "1", 10),
-                    query: parts[3] || ""
+                    query: parts[3] || "",
+                    source: parts[4] || "wallhaven"
                 };
                 lines.pop();
             }
@@ -147,7 +188,7 @@ Scope {
         // (the user kept typing) — drop without touching items so the
         // superseding fetch's response wins the race.
         if (meta) {
-            const actualKey = meta.query + "|" + String(meta.page);
+            const actualKey = meta.source + "|" + meta.query + "|" + String(meta.page);
             if (actualKey !== pendingKey)
                 return;
         }
@@ -178,7 +219,7 @@ Scope {
         // Run a single download Process so we can pipe its stdout (the saved
         // path) into background-next --set. execDetached would fire-and-forget
         // and the race would set the wallpaper before the file finished writing.
-        downloadProc.command = [binDir + "/wallhaven-fetch", "--download", item.imageUrl, item.wallhavenId, item.ext || "jpg"];
+        downloadProc.command = [binDir + "/wallpaper-fetch", "--download", "--source", currentSource.name, item.imageUrl, item.wallhavenId, item.ext || "jpg"];
         downloadProc.running = true;
     }
 
@@ -191,7 +232,7 @@ Scope {
         const item = strip.items[index];
         if (!item || !item.imageUrl || !item.wallhavenId)
             return;
-        themeDownloadProc.command = [binDir + "/wallhaven-fetch", "--download", item.imageUrl, item.wallhavenId, item.ext || "jpg"];
+        themeDownloadProc.command = [binDir + "/wallpaper-fetch", "--download", "--source", currentSource.name, item.imageUrl, item.wallhavenId, item.ext || "jpg"];
         themeDownloadProc.running = true;
     }
 
@@ -211,12 +252,12 @@ Scope {
         }
 
         currentPage = page;
-        pendingKey = currentQuery + "|" + String(page);
+        pendingKey = currentSource.name + "|" + currentQuery + "|" + String(page);
         isLoading = true;
         // Quickshell.Io.Process restarts when command changes; setting running
         // false first avoids the "already running, no-op" trap on the same page.
         listProc.running = false;
-        listProc.command = [binDir + "/wallhaven-fetch", "--list", "--query", currentQuery, "--page", String(page)];
+        listProc.command = [binDir + "/wallpaper-fetch", "--list", "--source", currentSource.name, "--query", currentQuery, "--page", String(page)];
         listProc.running = true;
     }
 
@@ -233,6 +274,30 @@ Scope {
         debounceTimer.stop();
         if (currentPage < totalPages)
             fetchPage(currentPage + 1);
+    }
+
+    // One probe per picker lifetime: which sources have what they need
+    // (keys in pass, nothing for bing/picsum). Rows: name\tsearchable\tlabel.
+    Process {
+        id: sourcesProc
+        command: [pickerRoot.binDir + "/wallpaper-fetch", "--sources"]
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                const rows = String(text || "").split("\n").filter(l => l.length > 0).map(l => {
+                    const c = l.split("\t");
+                    return {
+                        name: c[0],
+                        searchable: c[1] === "1",
+                        label: c[2] || c[0]
+                    };
+                });
+                if (rows.length > 0)
+                    pickerRoot.sources = rows;
+                pickerRoot.sourcesProbed = true;
+                pickerRoot.fetchPage(1);
+            }
+        }
     }
 
     Process {
@@ -258,7 +323,7 @@ Scope {
         }
     }
 
-    // Shift+Enter download path — same wallhaven-fetch call, then hand
+    // Shift+Enter download path — same wallpaper-fetch call, then hand
     // the saved path to bin/theme-from-image. That script runs the full
     // fan-out (theme.toml + IPC transition + background-next --set +
     // theme-apply). We do NOT background-next --set here: the script's
@@ -296,6 +361,16 @@ Scope {
         target: strip
         function onFilterTextChanged() {
             pickerRoot.currentQuery = strip.filterText;
+            // A query needs a source that can search: typing while on
+            // bing/picsum hops to the first searchable one rather than
+            // debouncing into a fetch that ignores the words.
+            if (pickerRoot.currentQuery !== "" && !pickerRoot.currentSource.searchable) {
+                const idx = pickerRoot.sources.findIndex(s => s.searchable);
+                if (idx >= 0) {
+                    pickerRoot.sourceIndex = idx;
+                    pickerRoot.currentPage = 1;
+                }
+            }
             debounceTimer.restart();
         }
         function onOpenChanged() {
@@ -318,10 +393,19 @@ Scope {
         // result, quote the query so the user knows what they searched for.
         emptyText: {
             if (pickerRoot.isLoading)
-                return "Loading…";
+                return "Loading " + pickerRoot.currentSource.label + "…";
             if (pickerRoot.currentQuery)
-                return "No results for \"" + pickerRoot.currentQuery + "\"";
+                return "No " + pickerRoot.currentSource.label + " results for \"" + pickerRoot.currentQuery + "\"";
             return "No wallpapers found";
+        }
+        // Ctrl+S cycles the source from the keyboard (the footer chips are
+        // the pointer path). Claimed here so the strip's own key handling
+        // never sees it.
+        onChord: event => {
+            if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_S) {
+                pickerRoot.cycleSource();
+                event.accepted = true;
+            }
         }
         extraChromeHeight: 36
         extraChromeComponent: footerComponent
@@ -344,6 +428,49 @@ Scope {
                 id: row
                 anchors.centerIn: parent
                 spacing: 12
+
+                // One chip per source; the active one wears the accent.
+                // Ctrl+S cycles the same list from the keyboard.
+                Row {
+                    spacing: 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: pickerRoot.sources.length > 1
+
+                    Repeater {
+                        model: pickerRoot.sources
+
+                        Rectangle {
+                            required property var modelData
+                            required property int index
+
+                            readonly property bool active: index === pickerRoot.sourceIndex
+                            width: chipLabel.implicitWidth + 18
+                            height: 26
+                            radius: 13
+                            color: active ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.3) : (chipMa.containsMouse ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.15) : pickerRoot.theme.alpha(pickerRoot.theme.surface0, 0.6))
+                            border.color: active ? pickerRoot.theme.alpha(pickerRoot.theme.accent, 0.7) : pickerRoot.theme.alpha(pickerRoot.theme.textPrimary, 0.2)
+                            border.width: 1
+
+                            Text {
+                                id: chipLabel
+                                anchors.centerIn: parent
+                                text: parent.modelData.label
+                                color: pickerRoot.theme.textPrimary
+                                font.family: pickerRoot.theme.fontUi
+                                font.pixelSize: pickerRoot.theme.fontPx(0.9)
+                                font.weight: parent.active ? Font.DemiBold : Font.Normal
+                            }
+
+                            MouseArea {
+                                id: chipMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: pickerRoot.setSourceIndex(parent.index)
+                            }
+                        }
+                    }
+                }
 
                 Rectangle {
                     id: prevButton
@@ -374,15 +501,39 @@ Scope {
                     }
                 }
 
-                Text {
+                // Page position, or the loading state while a fetch is in
+                // flight — pagination with items already on screen used to
+                // give no sign anything was happening.
+                Row {
+                    spacing: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    text: `Page ${pickerRoot.currentPage} / ${pickerRoot.totalPages}`
-                    color: pickerRoot.theme.textPrimary
-                    font.family: pickerRoot.theme.fontUi
-                    font.pixelSize: pickerRoot.theme.fontPx(1.1)
-                    font.weight: Font.DemiBold
-                    style: Text.Outline
-                    styleColor: pickerRoot.theme.alpha(pickerRoot.theme.surface0, 0.7)
+
+                    Text {
+                        visible: pickerRoot.isLoading
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "󰑓" // md-refresh, spun below
+                        color: pickerRoot.theme.accent
+                        font.pixelSize: pickerRoot.theme.fontPx(1.3)
+
+                        RotationAnimation on rotation {
+                            from: 0
+                            to: 360
+                            duration: 900
+                            loops: Animation.Infinite
+                            running: pickerRoot.isLoading
+                        }
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: pickerRoot.isLoading ? "Loading…" : `Page ${pickerRoot.currentPage} / ${pickerRoot.totalPages}`
+                        color: pickerRoot.theme.textPrimary
+                        font.family: pickerRoot.theme.fontUi
+                        font.pixelSize: pickerRoot.theme.fontPx(1.1)
+                        font.weight: Font.DemiBold
+                        style: Text.Outline
+                        styleColor: pickerRoot.theme.alpha(pickerRoot.theme.surface0, 0.7)
+                    }
                 }
 
                 Rectangle {

@@ -48,6 +48,11 @@ Scope {
     // `applied` behavior.
     signal appliedAsTheme(int index)
     signal cancelled
+    // First refusal on every keypress, for caller-specific chords (the
+    // Wallhaven picker's Ctrl+S source cycle). A handler that accepts the
+    // event stops the strip's own handling — same contract as BarPanel's
+    // contentKey.
+    signal chord(var event)
 
     // Optional bottom-chrome slot for caller-specific controls (e.g. the
     // Wallhaven picker's prev/next/page row). When `extraChromeComponent` is
@@ -228,6 +233,9 @@ Scope {
 
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: event => {
+                pickerRoot.chord(event);
+                if (event.accepted)
+                    return;
                 if (event.key === Qt.Key_Escape) {
                     if (pickerRoot.filterText)
                         pickerRoot.updateFilter("");

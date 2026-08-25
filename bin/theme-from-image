@@ -1,9 +1,16 @@
 #!/usr/bin/env -S mise exec -- node
-// theme-from-image <image-path>
+// theme-from-image [--dry-run] <image-path>
 //
 // Extract dominant colors from <image-path> and write a theme TOML to
 // ~/.local/state/qshell/theme.toml. The shell's Theme service watches
-// that file and reloads automatically — no IPC, no restart.
+// that file and reloads automatically — no IPC, no restart. --dry-run
+// prints the TOML to stdout and touches nothing.
+//
+// Polarity is decided by the image (2026-08-26): the pixel-count-weighted
+// median lightness picks dark or light, so a snowy landscape becomes a
+// light theme instead of a muddy dark one. Dark themes get the glass
+// preset (frost against the wallpaper), light ones shaded — glass over a
+// bright image washes out.
 //
 // Single balanced pass:
 //   - ffmpeg downscales to 64×36, output as raw RGB (6912 bytes / 2304 pixels).
@@ -30,7 +37,7 @@
 // for the Theme service's meta UI.
 //
 // Why ffmpeg + raw RGB instead of an imagemagick pipeline: we already have
-// ffmpeg on this machine (bin/wallhaven-fetch uses it for thumbs) and our
+// ffmpeg on this machine (bin/wallpaper-fetch uses it for thumbs) and our
 // existing color math (shell/Commons/color.js) does the OKLCH math — no
 // new tools to install.
 
@@ -79,44 +86,92 @@ function extractPalette(imagePath) {
         buckets.get(key).count++
     }
 
-    return [...buckets.values()]
+    const top = [...buckets.values()]
         .sort((a, b) => b.count - a.count)
         .slice(0, 16)
-        .map(b => rgbToHex(_gamutMap(b.sample)))
+        .map(b => ({ hex: rgbToHex(_gamutMap(b.sample)), count: b.count }))
+
+    // Pixel-count-weighted median lightness over EVERY bucket (not just the
+    // top 16): the polarity question is about the whole frame.
+    const all = [...buckets.values()].sort((a, b) => a.sample.L - b.sample.L)
+    const totalPx = all.reduce((n, b) => n + b.count, 0)
+    let acc = 0, medianL = 0.5
+    for (const b of all) {
+        acc += b.count
+        if (acc >= totalPx / 2) { medianL = b.sample.L; break }
+    }
+
+    return { palette: top, medianL }
 }
 
 function oklchOf(hex) {
     return _rgbToOklch(hexToRgb(hex))
 }
 
-function pickRoles(palette) {
-    const items = palette.map(hex => ({ hex, o: oklchOf(hex) }))
+function pickRoles(palette, light) {
+    const items = palette.map(p => ({ hex: p.hex, count: p.count, o: oklchOf(p.hex) }))
 
-    // Surface ramp anchored at the darkest palette entry.
+    // Surface ramp anchored at the darkest (light mode: lightest) palette
+    // entry, walking toward the middle. Chroma capped at 0.09 — surfaces
+    // carry the image's tint, but a saturated anchor pixel must not turn
+    // every card neon.
     const sortedByL = [...items].sort((a, b) => a.o.L - b.o.L)
-    const baseHex = sortedByL[0].hex
-    const base = sortedByL[0].o
+    const anchor = light ? sortedByL[sortedByL.length - 1] : sortedByL[0]
+    const base = { L: anchor.o.L, C: Math.min(anchor.o.C, 0.09), h: anchor.o.h }
+    const dir = light ? -1 : 1
     const shade = (deltaL) => rgbToHex(_gamutMap({
-        L: Math.min(1, base.L + deltaL),
+        L: Math.max(0, Math.min(1, base.L + dir * deltaL)),
         C: base.C,
         h: base.h
     }))
     const surface = {
-        "0": baseHex,
+        "0": shade(0),
         "1": shade(0.06),
         "2": shade(0.10),
         "3": shade(0.16)
     }
 
     // Text — ensureContrast walks OKLCH lightness, preserving hue/chroma.
-    const textPrimary = ensureContrast("#ffffff", surface["0"], 4.5, 1)
-    const textMuted = ensureContrast(textPrimary, surface["0"], 3.0, 0)
+    const textPrimary = ensureContrast(light ? "#1a1a1a" : "#ffffff", surface["0"], 4.5, light ? -1 : 1)
+    // Muted is a REDUCTION, which ensureContrast cannot express (it only
+    // raises deficient contrast — primary already passes 3:1, so the old
+    // call returned primary verbatim and every generated theme had
+    // muted == primary). Walk primary's lightness toward the surface until
+    // the ratio lands near 3.4:1: quieter than primary, still readable.
+    const textMuted = (() => {
+        const p = oklchOf(textPrimary)
+        const s0 = oklchOf(surface["0"])
+        let lo = s0.L, hi = p.L, best = textPrimary
+        for (let i = 0; i < 18; i++) {
+            const mid = (lo + hi) / 2
+            const hex = rgbToHex(_gamutMap({ L: mid, C: p.C, h: p.h }))
+            const ratio = contrastRatio(hex, surface["0"])
+            if (ratio >= 3.4) { best = hex; hi = mid } else { lo = mid }
+        }
+        return best
+    })()
     const textInverse = surface["0"]
 
-    // Accent + status signals. Status hues in radians from atan2's output.
-    const mostSat = [...items].sort((a, b) => b.o.C - a.o.C)[0]
-    const accentHex = mostSat.hex
+    // Accent: salience-weighted, not just the single most-saturated bucket —
+    // one vivid noise pixel used to win over the color the image is actually
+    // about. Chroma dominates, presence breaks ties; near-greys sit out.
+    const salience = it => (it.o.C < 0.04 ? 0 : Math.pow(it.o.C, 1.5) * Math.sqrt(it.count))
+    const bySalience = [...items].sort((a, b) => salience(b) - salience(a))
+    const mostSat = salience(bySalience[0]) > 0 ? bySalience[0] : [...items].sort((a, b) => b.o.C - a.o.C)[0]
+    // Contrast-checked against the surface so a dark accent on a dark theme
+    // (or pale on light) still reads; hue and chroma survive the walk.
+    const accentHex = ensureContrast(mostSat.hex, surface["0"], 3.0, 0)
     const accentOk = mostSat.o
+
+    // The border gradient's second color: the most salient hue at least
+    // ~57° away from the accent — a REAL second color of the image. Only
+    // synthesized (hue-rotated ok) when the image is effectively one hue.
+    const hueDist = (a, b) => {
+        let d = Math.abs(a - b) % (2 * Math.PI)
+        return d > Math.PI ? 2 * Math.PI - d : d
+    }
+    const second = bySalience.find(it => salience(it) > 0 && hueDist(it.o.h, accentOk.h) > 1.0)
+    const gradientEnd = second ? ensureContrast(second.hex, surface["0"], 2.0, 0) : null
     const hueSignal = (targetH) => ensureContrast(
         rgbToHex(_gamutMap({
             L: accentOk.L,
@@ -138,6 +193,7 @@ function pickRoles(palette) {
         surface,
         text: { primary: textPrimary, muted: textMuted, inverse: textInverse },
         accent: { accent: accentHex, error, warn, ok },
+        gradientEnd: gradientEnd || ok,
         ansi
     }
 }
@@ -196,7 +252,10 @@ function pickAnsi(items, surface0, textPrimary, accent) {
         black: surface0,
         red, green, yellow, blue, magenta, cyan,
         white: textPrimary,
-        "bright-black": accent,
+        // A lightened surface tone, not the accent: bright-black is the
+        // "subdued" slot (comments, line numbers) and the accent there made
+        // every terminal comment shout.
+        "bright-black": brighten(surface0),
         "bright-red":    brighten(red),
         "bright-green":  brighten(green),
         "bright-yellow": brighten(yellow),
@@ -207,14 +266,15 @@ function pickAnsi(items, surface0, textPrimary, accent) {
     }
 }
 
-function generateToml(roles, name) {
+function generateToml(roles, name, light) {
     const lines = []
     lines.push("[meta]")
     lines.push(`name = "${name}"`)
-    lines.push(`mode = "dark"`)
-    // A wallpaper-derived theme lives against its wallpaper, which is what
-    // the glass preset is for: compositor blur on, frosted windows.
-    lines.push(`preset = "glass"`)
+    lines.push(`mode = "${light ? "light" : "dark"}"`)
+    // A dark wallpaper theme lives against its wallpaper — the glass preset
+    // (compositor blur, frosted windows). Glass over a bright image washes
+    // out, so light themes separate by depth instead.
+    lines.push(`preset = "${light ? "shaded" : "glass"}"`)
     lines.push("")
     lines.push("[surface]")
     for (const k of ["0", "1", "2", "3"])
@@ -246,20 +306,22 @@ function generateToml(roles, name) {
     lines.push(`duration = 150`)
     lines.push(`easing = "standard"`)
     lines.push("")
-    // Gradient border from the image's own accents — accent into ok reads as
-    // the image's two strongest hues moving across the frame.
+    // Gradient border from the image's own two strongest hues (gradientEnd
+    // falls back to the synthetic ok only for a one-hue image).
     lines.push("[border]")
-    lines.push(`active = "${roles.accent.accent} ${roles.accent.ok} 45deg"`)
+    lines.push(`active = "${roles.accent.accent} ${roles.gradientEnd} 45deg"`)
     lines.push("")
     return lines.join("\n")
 }
 
 function usage() {
-    process.stderr.write("usage: theme-from-image <image-path>\n")
+    process.stderr.write("usage: theme-from-image [--dry-run] <image-path>\n")
     process.exit(2)
 }
 
 const args = process.argv.slice(2)
+const dryRun = args[0] === "--dry-run"
+if (dryRun) args.shift()
 if (args.length !== 1) usage()
 
 const imagePath = args[0]
@@ -268,17 +330,25 @@ if (!fs.existsSync(imagePath)) {
     process.exit(1)
 }
 
-let palette
+let extracted
 try {
-    palette = extractPalette(imagePath)
+    extracted = extractPalette(imagePath)
 } catch (e) {
     process.stderr.write(`theme-from-image: ${e.message}\n`)
     process.exit(1)
 }
 
-const roles = pickRoles(palette)
+// 0.62, not 0.5: mid-bright images still read better as dark themes (the
+// desktop is dark-leaning); only a genuinely bright frame flips polarity.
+const light = extracted.medianL > 0.62
+const roles = pickRoles(extracted.palette, light)
 const name = path.basename(imagePath, path.extname(imagePath))
-const toml = generateToml(roles, name)
+const toml = generateToml(roles, name, light)
+
+if (dryRun) {
+    process.stdout.write(toml + "\n")
+    process.exit(0)
+}
 
 fs.mkdirSync(path.dirname(STATE), { recursive: true })
 

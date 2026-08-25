@@ -1,0 +1,275 @@
+#!/usr/bin/env bash
+# wallpaper-fetch — remote wallpaper search and download, multi-source.
+# Grew out of wallhaven-fetch (2026-08-26) when the picker gained sources.
+#
+#   wallpaper-fetch --sources
+#       One line per usable source: <name>\t<searchable 0|1>\t<label>.
+#       wallhaven needs `pass wallhaven/api_key`, pexels `pass
+#       pexels/api_key`; a missing key just drops that source from the list
+#       (nothing else fails), so adding a key is the whole setup.
+#
+#   wallpaper-fetch --list --source S [--query QUERY] [--page N]
+#       Fetch one page of results, pre-build thumbs under
+#       ~/.cache/qshell/<source>-thumbs/, emit TSV rows to stdout:
+#           <thumb_path>\t<image_url>\t<id>\t<resolution>\t<ext>
+#       Last line is a sentinel:
+#           __META__\t<page>\t<total_pages>\t<query>\t<source>
+#       Sources without search (bing, picsum) ignore --query but echo it in
+#       the sentinel so the caller's stale-response guard still matches.
+#
+#   wallpaper-fetch --download --source S URL ID EXT
+#       Download the full image to ~/Pictures/Wallpapers/<source>-<id>.<ext>
+#       and print the saved path. Skips if the file already exists.
+#
+# Thumbs are built IN PARALLEL (8 jobs): the serial loop this replaces
+# downloaded 24 full wallhaven images one after another, which is why the
+# first page of a fresh query took the better part of a minute. Rows are
+# still emitted in API order — each job writes its row to a numbered file
+# and the emit pass reads them back in sequence.
+set -uo pipefail
+
+thumb_root="${XDG_CACHE_HOME:-$HOME/.cache}/qshell"
+download_dir="$HOME/Pictures/Wallpapers"
+UA="qshell-wallpaper-fetch/1.0"
+# 1080-wide intermediates: the filmstrip draws 108x432 slices and a 768x475
+# expanded preview; 1080 gives both headroom in ~80 KiB of JPEG.
+THUMB_WIDTH=1080
+PARALLEL=8
+
+mkdir -p "$download_dir" 2>/dev/null || true
+
+usage() {
+    cat >&2 <<EOF
+usage:
+  wallpaper-fetch --sources
+  wallpaper-fetch --list --source S [--query QUERY] [--page N]
+  wallpaper-fetch --download --source S URL ID EXT
+EOF
+    exit 2
+}
+
+wallhaven_key() { pass show wallhaven/api_key 2>/dev/null || true; }
+pexels_key() { pass show pexels/api_key 2>/dev/null || true; }
+
+# ---- one thumb job: download + downscale, then write the finished TSV row
+# to $3 so the parent can emit rows in API order. Exported and run under
+# xargs -P; best-effort throughout — a failed download leaves the row with
+# an empty thumb path and the picker draws its empty swatch slot.
+thumb_job() {
+    local src_url="$1" thumb_file="$2" row_file="$3" tsv_rest="$4" direct="$5"
+    if [[ ! -s $thumb_file ]]; then
+        local raw="$thumb_file.raw"
+        if curl -fsSL --max-time 30 -A "$UA" -o "$raw" "$src_url" 2>/dev/null; then
+            if [[ $direct == 1 ]] || ! command -v ffmpeg >/dev/null 2>&1; then
+                # Already thumb-sized at the source (picsum serves resized,
+                # reddit-style preview URLs would too) — cache as delivered.
+                mv -f "$raw" "$thumb_file"
+            else
+                if ffmpeg -v error -y -i "$raw" -frames:v 1 \
+                    -vf "scale='min($THUMB_WIDTH,iw)':-2" -q:v 4 \
+                    -f mjpeg "$thumb_file.tmp" </dev/null 2>/dev/null \
+                    && [[ -s $thumb_file.tmp ]]; then
+                    mv -f "$thumb_file.tmp" "$thumb_file"
+                else
+                    rm -f "$thumb_file.tmp"
+                fi
+                rm -f "$raw"
+            fi
+        fi
+    fi
+    local thumb_path=""
+    [[ -s $thumb_file ]] && thumb_path="$thumb_file"
+    printf '%s\t%s\n' "$thumb_path" "$tsv_rest" >"$row_file"
+}
+export -f thumb_job
+export UA THUMB_WIDTH
+
+# Feed jobs to xargs and emit the finished rows in API order. stdin: one job
+# per line as <src_url>\t<thumb_file>\t<direct>\t<tsv_rest> — tsv_rest is
+# LAST because it carries embedded tabs, and read hands the remainder of a
+# line to its final variable. Jobs are slurped into an array BEFORE the
+# xargs pipeline: a `while | xargs` one-liner would grow the array in a
+# pipeline subshell and emit nothing (the audit's pipeline-subshell trap).
+run_jobs_and_emit() {
+    local workdir
+    workdir="$(mktemp -d)" || return 1
+    local -a jobs=()
+    local job_line
+    while IFS= read -r job_line; do
+        [[ -n $job_line ]] && jobs+=("$job_line")
+    done
+    ((${#jobs[@]} > 0)) || { rm -rf "$workdir"; return 0; }
+    local i
+    for i in "${!jobs[@]}"; do
+        printf '%s\t%s\0' "$workdir/$i" "${jobs[$i]}"
+    done | xargs -0 -P "$PARALLEL" -n 1 bash -c '
+        IFS=$'"'"'\t'"'"' read -r row_file src_url thumb_file direct tsv_rest <<<"$0"
+        thumb_job "$src_url" "$thumb_file" "$row_file" "$tsv_rest" "$direct"' 2>/dev/null
+    for i in "${!jobs[@]}"; do
+        [[ -s "$workdir/$i" ]] && cat "$workdir/$i"
+    done
+    rm -rf "$workdir"
+}
+
+# ----------------------------------------------------------------- sources
+list_wallhaven() {
+    local query="$1" page="$2" api_key
+    api_key="$(wallhaven_key)"
+    [[ -n $api_key ]] || { echo "wallpaper-fetch: no API key in pass wallhaven/api_key" >&2; return 1; }
+    local params
+    # toplist for a blank query (curated, landscape-heavy), relevance once
+    # the user typed something.
+    if [[ -n $query ]]; then
+        params="sorting=relevance&order=desc&page=$page&q=$(printf %s "$query" | jq -sRr @uri)"
+    else
+        params="sorting=toplist&order=desc&page=$page"
+    fi
+    local body
+    body="$(curl -fsS --max-time 30 -H 'Accept: application/json' -H "X-API-Key: $api_key" \
+        "https://wallhaven.cc/api/v1/search?$params")" || return 1
+    local last_page
+    last_page="$(jq -r '.meta.last_page // 1' <<<"$body")"
+    local cache="$thumb_root/wallhaven-thumbs"
+    mkdir -p "$cache"
+    jq -r '.data[]? | [
+        .id, .path, (.resolution // ""),
+        (.file_type // "image/jpeg" | split("/")[1] // "jpg")
+      ] | @tsv' <<<"$body" \
+    | while IFS=$'\t' read -r id path resolution ext; do
+        [[ -n $id && -n $path ]] || continue
+        printf '%s\t%s\t0\t%s\n' \
+            "$path" "$cache/$id.jpg" "$path	$id	$resolution	$ext"
+    done | run_jobs_and_emit
+    printf '__META__\t%s\t%s\t%s\t%s\n' "$page" "$last_page" "$query" "wallhaven"
+}
+
+list_pexels() {
+    local query="$1" page="$2" api_key
+    api_key="$(pexels_key)"
+    [[ -n $api_key ]] || { echo "wallpaper-fetch: no API key in pass pexels/api_key" >&2; return 1; }
+    local url
+    if [[ -n $query ]]; then
+        url="https://api.pexels.com/v1/search?query=$(printf %s "$query" | jq -sRr @uri)&per_page=24&page=$page&orientation=landscape"
+    else
+        url="https://api.pexels.com/v1/curated?per_page=24&page=$page"
+    fi
+    local body
+    body="$(curl -fsS --max-time 30 -H "Authorization: $api_key" "$url")" || return 1
+    # Pexels reports total_results; 8000 is their hard result-window cap.
+    local total pages
+    total="$(jq -r '.total_results // 480' <<<"$body")"
+    pages=$(((total + 23) / 24)); ((pages > 200)) && pages=200; ((pages < 1)) && pages=1
+    local cache="$thumb_root/pexels-thumbs"
+    mkdir -p "$cache"
+    # src.large2x is ~1880w server-side — thumb-sized already, no ffmpeg.
+    jq -r '.photos[]? | [
+        (.id|tostring), .src.original, .src.large2x,
+        ((.width|tostring) + "x" + (.height|tostring))
+      ] | @tsv' <<<"$body" \
+    | while IFS=$'\t' read -r id full thumb resolution; do
+        [[ -n $id && -n $full ]] || continue
+        printf '%s\t%s\t1\t%s\n' \
+            "$thumb" "$cache/$id.jpg" "$full	$id	$resolution	jpg"
+    done | run_jobs_and_emit
+    printf '__META__\t%s\t%s\t%s\t%s\n' "$page" "$pages" "$query" "pexels"
+}
+
+list_bing() {
+    local query="$1" page="$2"
+    # Bing's daily-image archive reaches back ~16 images in two windows.
+    local idx=0
+    ((page >= 2)) && idx=8
+    local body
+    body="$(curl -fsS --max-time 30 -A "$UA" \
+        "https://www.bing.com/HPImageArchive.aspx?format=js&idx=$idx&n=8&mkt=en-US")" || return 1
+    local cache="$thumb_root/bing-thumbs"
+    mkdir -p "$cache"
+    jq -r '.images[]? | [.urlbase, (.startdate // "")] | @tsv' <<<"$body" \
+    | while IFS=$'\t' read -r urlbase startdate; do
+        [[ -n $urlbase ]] || continue
+        local id="${urlbase##*id=OHR.}"
+        id="${id%%_*}-$startdate"
+        printf '%s\t%s\t1\t%s\n' \
+            "https://www.bing.com${urlbase}_1920x1080.jpg" "$cache/$id.jpg" \
+            "https://www.bing.com${urlbase}_UHD.jpg	$id	UHD	jpg"
+    done | run_jobs_and_emit
+    printf '__META__\t%s\t%s\t%s\t%s\n' "$page" 2 "$query" "bing"
+}
+
+list_picsum() {
+    local query="$1" page="$2"
+    local body
+    body="$(curl -fsS --max-time 30 -A "$UA" \
+        "https://picsum.photos/v2/list?page=$page&limit=24")" || return 1
+    local cache="$thumb_root/picsum-thumbs"
+    mkdir -p "$cache"
+    # Full image at native resolution via the sized URL; download_url points
+    # at the same thing. Thumb served resized by picsum itself.
+    jq -r '.[] | [(.id|tostring), (.width|tostring), (.height|tostring)] | @tsv' <<<"$body" \
+    | while IFS=$'\t' read -r id w h; do
+        [[ -n $id ]] || continue
+        local th=$((1080 * h / w)); ((th % 2)) && th=$((th + 1))
+        printf '%s\t%s\t1\t%s\n' \
+            "https://picsum.photos/id/$id/1080/$th" "$cache/$id.jpg" \
+            "https://picsum.photos/id/$id/$w/$h	$id	${w}x${h}	jpg"
+    done | run_jobs_and_emit
+    # picsum's list is ~1000 images; 42 pages of 24 is the honest window.
+    printf '__META__\t%s\t%s\t%s\t%s\n' "$page" 42 "$query" "picsum"
+}
+
+# -------------------------------------------------------------------- main
+[[ $# -ge 1 ]] || usage
+mode="$1"; shift
+
+case "$mode" in
+--sources)
+    [[ -n "$(wallhaven_key)" ]] && printf 'wallhaven\t1\tWallhaven\n'
+    [[ -n "$(pexels_key)" ]] && printf 'pexels\t1\tPexels\n'
+    printf 'bing\t0\tBing daily\n'
+    printf 'picsum\t0\tPicsum\n'
+    ;;
+
+--list)
+    source="wallhaven" query="" page=1
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --source) source="${2:-wallhaven}"; shift 2 ;;
+        --query) query="${2:-}"; shift 2 ;;
+        --page) page="${2:-1}"; shift 2 ;;
+        *) echo "wallpaper-fetch: unknown arg: $1" >&2; exit 2 ;;
+        esac
+    done
+    case "$source" in
+    wallhaven) list_wallhaven "$query" "$page" ;;
+    pexels) list_pexels "$query" "$page" ;;
+    bing) list_bing "$query" "$page" ;;
+    picsum) list_picsum "$query" "$page" ;;
+    *) echo "wallpaper-fetch: unknown source: $source" >&2; exit 2 ;;
+    esac
+    ;;
+
+--download)
+    source="wallhaven"
+    if [[ "${1:-}" == "--source" ]]; then
+        source="${2:-wallhaven}"; shift 2
+    fi
+    [[ $# -eq 3 ]] || usage
+    url="$1" id="$2" ext="$3"
+    dest="$download_dir/$source-$id.$ext"
+    if [[ -s $dest ]]; then
+        echo "$dest"
+        exit 0
+    fi
+    if ! curl -fsSL --max-time 120 -A "$UA" -o "$dest.part" "$url"; then
+        rm -f "$dest.part"
+        echo "wallpaper-fetch: download failed for $id" >&2
+        exit 1
+    fi
+    mv "$dest.part" "$dest"
+    echo "$dest"
+    ;;
+
+*)
+    usage
+    ;;
+esac

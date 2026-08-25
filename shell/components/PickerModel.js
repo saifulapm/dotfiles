@@ -51,7 +51,7 @@ function loadRows(rows) {
     return images;
 }
 
-// Wallhaven rows from bin/wallhaven-fetch --list — five tab-separated columns:
+// Remote-source rows from bin/wallpaper-fetch --list — five tab-separated columns:
 //   <thumb_path>  <image_url>  <id>  <resolution>  <ext>
 // The thumbnail is a cached local path (the picker decodes from it); the
 // image_url is the wallhaven-hosted full-resolution file the caller downloads
@@ -89,7 +89,7 @@ function loadWallhavenRows(rows) {
             // swatch slot — a missing thumb draws the empty state instead of
             // crashing on a bad URL.
             imagePath: thumbPath,
-            // filePath is the apply target — wallhaven-fetch --download takes
+            // filePath is the apply target — wallpaper-fetch --download takes
             // the URL directly, so we use it as filePath here. Same field name
             // keeps the FilmstripPicker contract: it never reads filePath.
             filePath: imageUrl,
