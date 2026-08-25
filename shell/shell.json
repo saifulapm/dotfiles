@@ -29,12 +29,12 @@
     ],
     "center": [
       "indicators",
+      "prayer",
       {
         "id": "clock",
         "birthYear": 1991,
         "lifeExpectancy": 70
       },
-      "prayer",
       {
         "id": "timezones",
         "zones": [
