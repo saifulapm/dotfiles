@@ -371,10 +371,10 @@ QtObject {
             glyph: row.glyph || "",
             // Carried like every other role: this is the entry the history
             // center hands to invokeEntryDefault, and a row that loses its
-            // exec here is a row whose click silently does nothing. It is
+            // execArgv here is a row whose click silently does nothing. It is
             // also the pending→past migration in markAllSeen, so dropping it
             // would disarm a notification just for being marked seen.
-            exec: row.exec || "",
+            execArgv: row.execArgv || "",
             urgency: row.urgency,
             expireTimeout: row.expireTimeout || 0,
             timestamp: row.timestamp
@@ -534,22 +534,28 @@ QtObject {
         clearPast();
     }
 
-    // Run a row's carried click command, if it has one. Our own toasts send
-    // the action as data (`--hint=string:qshell-exec:...`, see
-    // NotificationLogic.execFromHints) precisely so it survives into the popup
-    // files and the history — a restored row's liveRefs entry is a miss by
-    // construction, so a libnotify action would be dead on arrival, and the
+    // Run a row's carried click action, if it has one. Our own toasts send it
+    // as data (`--hint=string:qshell-exec-argv:...`, see
+    // NotificationLogic.execArgvFromHints) precisely so it survives into the
+    // popup files and the history — a restored row's liveRefs entry is a miss
+    // by construction, so a libnotify action would be dead on arrival, and the
     // sender that registered it would still be blocked waiting for a click it
-    // can never be told about. Ported from omarchy 5a58f79.
+    // can never be told about. Ported from omarchy 5a58f79, then 07443f3.
+    //
+    // The constant `exec "$@"` is what keeps this out of shell-string
+    // territory: the argv only ever lands in positional parameters, which bash
+    // expands without re-tokenizing, so a filename or a page title stays one
+    // argument no matter what is in it. The login shell is still there for the
+    // PATH and session environment a GUI target needs.
     //
     // Launched through app-run, not execDetached alone: execDetached children
     // stay in qshell.service's cgroup, so anything the click opens would die
     // with the next shell restart (the same trap bin/qshell-relaunch documents).
     function runExecAction(entry) {
-        const command = entry ? String(entry.exec || "") : "";
-        if (!command)
+        const argv = Logic.parseExecArgv(entry ? entry.execArgv : "");
+        if (!argv)
             return false;
-        Quickshell.execDetached(["app-run", "bash", "-lc", command]);
+        Quickshell.execDetached(["app-run", "bash", "-lc", 'exec "$@"', "bash"].concat(argv));
         return true;
     }
 
@@ -1024,7 +1030,7 @@ QtObject {
                     body: r.body,
                     image: r.image,
                     glyph: r.glyph || "",
-                    exec: r.exec || "",
+                    execArgv: r.execArgv || "",
                     urgency: r.urgency,
                     expireTimeout: r.expireTimeout || 0,
                     timestamp: r.timestamp

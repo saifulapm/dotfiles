@@ -29,22 +29,86 @@ osd_close() {
   qs ipc call osd close >/dev/null 2>&1 || true
 }
 
+# The click action rides along as a JSON argv (Notifs.runExecAction runs it as
+# bash positional parameters, never a shell string), so a path is only ever one
+# argument no matter what is in it.
+exec_argv_hint() {
+  printf -- '--hint=string:qshell-exec-argv:%s' "$(jq -cn '$ARGS.positional' --args -- "$@")"
+}
+
+# A printed path is only usable if it is a regular file inside DOWNLOAD_DIR. A
+# forged record — a video title carrying a newline closes its own line, so the
+# rest of it arrives looking like the path field — must not reach the click
+# command: `mpv --script=/tmp/evil.lua` is a path only until mpv reads it as an
+# option. Ported from omarchy b71c60f.
+resolve_download_file() {
+  local candidate=$1 file_real dir_real
+
+  [[ -n $candidate ]] || return 1
+  [[ $candidate != *$'\n'* && $candidate != *$'\r'* && $candidate != *$'\t'* ]] || return 1
+  [[ -f $candidate ]] || return 1
+
+  # Read to a NUL: command substitution strips trailing newlines, so a name
+  # ending in one would resolve to a different file that may well exist.
+  IFS= read -r -d '' file_real < <(realpath -ze -- "$candidate") || return 1
+  IFS= read -r -d '' dir_real < <(realpath -ze -- "$DOWNLOAD_DIR") || return 1
+
+  [[ $file_real != *$'\n'* && $file_real != *$'\r'* && $file_real != *$'\t'* ]] || return 1
+  # Trim the slash so a download directory that resolves to "/" still leaves a
+  # usable prefix rather than the pattern "//*", which matches nothing.
+  [[ $file_real == "${dir_real%/}"/* ]] || return 1
+
+  printf '%s' "$file_real"
+}
+
+# yt-dlp prints the title JSON-encoded, so a newline or a tab in page metadata
+# is an escape sequence inside one quoted string rather than a record boundary.
+# This is toast text and nothing else — never part of a command.
+decode_title() {
+  local decoded
+
+  decoded=$(jq -r 'if type == "string" then . else empty end' <<<"$1" 2>/dev/null) || return 1
+  decoded=${decoded%%[[:cntrl:]]*} # keep what a person would read, drop the forgery
+  [[ -n $decoded && $decoded != -* ]] || return 1
+
+  printf '%s' "$decoded"
+}
+
+title_from_file() {
+  local name=${1##*/}
+  name=${name%.*}
+  name=${name//[$'\n\r\t']/}
+  if [[ -z $name || $name == -* ]]; then
+    printf '%s' "Video"
+  else
+    printf '%s' "$name"
+  fi
+}
+
 download_url() {
   local url="$1"
 
   mkdir -p "$DOWNLOAD_DIR"
 
   # Nothing shows until yt-dlp confirms there is actually a video here.
-  if ! yt-dlp --no-playlist --simulate --quiet --no-warnings "$url" >/dev/null 2>&1; then
-    notify-send -a qshell -u critical -t 6000 "󰅖 No video found for download" "$url" >/dev/null 2>&1 || true
+  # --no-exec clears the modern --exec map but leaves --exec-before-download
+  # stored separately, which yt-dlp restores as a before_dl postprocessor — so
+  # both are needed to keep a hook from the user's own yt-dlp config out of the
+  # download this host drives.
+  if ! yt-dlp --no-playlist --simulate --quiet --no-warnings \
+    --no-exec --no-exec-before-download -- "$url" >/dev/null 2>&1; then
+    notify-send -a qshell -u critical -t 6000 -- "󰅖 No video found for download" "$url" >/dev/null 2>&1 || true
     exit 0
   fi
 
   osd_progress 0
 
-  # QSHELL_PROG carries the percent (drives the OSD); QSHELL_FILE prints only
-  # after a successful move, so a captured path == success.
-  local line rest pct intpct last="" er nowms lastms=0 title="" filepath=""
+  # QSHELL_PROG carries the percent (drives the OSD); QSHELL_FILE and
+  # QSHELL_TITLE print only after a successful move, so a captured path ==
+  # success. They are two records because one was forgeable: with title and
+  # path on a line together, a title ending in a newline closed the record and
+  # left the path field to the metadata that followed it.
+  local line pct intpct last="" er nowms lastms=0 title="" filepath="" resolved
   while IFS= read -r line; do
     case $line in
     QSHELL_PROG*)
@@ -61,21 +125,25 @@ download_url() {
       osd_progress "$intpct"
       ;;
     QSHELL_FILE*)
-      rest=${line#QSHELL_FILE$'\t'}
-      title=${rest%%$'\t'*}
-      filepath=${rest#*$'\t'}
+      resolved=$(resolve_download_file "${line#QSHELL_FILE$'\t'}") || continue
+      filepath=$resolved
+      ;;
+    QSHELL_TITLE*)
+      title=$(decode_title "${line#QSHELL_TITLE$'\t'}") || title=""
       ;;
     esac
-  done < <(PYTHONUNBUFFERED=1 yt-dlp --no-playlist --restrict-filenames --no-simulate \
-    --quiet --no-warnings --progress --newline \
+  done < <(PYTHONUNBUFFERED=1 yt-dlp --no-playlist --no-simulate \
+    --quiet --no-warnings --no-exec --no-exec-before-download --progress --newline \
     --progress-template $'download:QSHELL_PROG\t%(progress._percent_str)s' \
-    --paths "$DOWNLOAD_DIR" -o '%(title)s [%(id)s].%(ext)s' \
-    --print $'after_move:QSHELL_FILE\t%(title)s\t%(filepath)s' \
-    "$url" 2>&1)
+    --paths "$DOWNLOAD_DIR" -o '%(title)s.%(ext)s' \
+    --print $'after_move:QSHELL_FILE\t%(filepath)s' \
+    --print $'after_move:QSHELL_TITLE\t%(title)j' \
+    -- "$url" 2>&1)
 
   osd_close
 
   if [[ -n $filepath ]]; then
+    [[ -n $title ]] || title=$(title_from_file "$filepath")
     ((${#title} > 50)) && title="${title:0:50}…"
 
     # Square, center-cropped thumbnail so the toast preview isn't stretched.
@@ -91,9 +159,13 @@ download_url() {
     # never emits NotificationClosed). As a hint the command is data — it
     # survives into the popup file, so the toast stays clickable even after a
     # restart, and nothing here waits. (Notifs.runExecAction, omarchy 5a58f79.)
+    #
+    # `--` before the path keeps mpv from reading a leading dash as an option,
+    # and `--` before the summary keeps a title that starts with one out of
+    # notify-send's own option parser.
     notify-send -a qshell -t 10000 -i "${preview:-$filepath}" \
-      --hint=string:qshell-exec:"$(printf 'mpv %q' "$filepath")" \
-      "󰄬 Download complete" "$title" >/dev/null 2>&1 || true
+      "$(exec_argv_hint mpv -- "$filepath")" \
+      -- "󰄬 Download complete" "$title" >/dev/null 2>&1 || true
 
     # The shell copies /tmp images into its own cache asynchronously, so the
     # preview has to outlive the toast's arrival — not its dismissal.
@@ -102,7 +174,7 @@ download_url() {
       rm -f "$preview"
     ) &
   else
-    notify-send -a qshell -u critical -t 6000 "󰅖 Download failed" "$url" >/dev/null 2>&1 || true
+    notify-send -a qshell -u critical -t 6000 -- "󰅖 Download failed" "$url" >/dev/null 2>&1 || true
   fi
 
   exit 0

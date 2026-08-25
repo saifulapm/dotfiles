@@ -163,7 +163,10 @@ notify_arrival() {
       | jq -r '.Node.ComputedName // empty' 2>/dev/null) || sender=""
     ;;
   esac
-  notify-send -a qshell "󰅌 Clipboard from ${sender:-tailnet}" "$preview" >/dev/null 2>&1 || true
+  # `--`: the preview is clipboard content posted from the tailnet, and one
+  # starting with a dash would otherwise reach notify-send's option parser
+  # instead of the screen.
+  notify-send -a qshell -- "󰅌 Clipboard from ${sender:-tailnet}" "$preview" >/dev/null 2>&1 || true
 }
 
 # Peer watchers mark their posts X-Clipboard-Relay: the sender is fanning

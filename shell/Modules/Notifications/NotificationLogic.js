@@ -79,15 +79,50 @@ function glyphFromHints(hints) {
     return stringHint(hints, "qshell-glyph");
 }
 
-// Shell command to run when the card is clicked, sent as
-// `--hint=string:qshell-exec:<command>`. Carrying the action as DATA is what
+// What to run when the card is clicked: a JSON argv array, sent as
+// `--hint=string:qshell-exec-argv:<json>`. Carrying the action as DATA is what
 // makes it survive: it travels with the row into the popup files and the
 // history, so a toast restored after a shell restart clicks through exactly
 // like a live one. A libnotify action cannot — its identifier only means
 // something to the server generation that handed it out, and the sender is
 // still blocked waiting on an id from a server that no longer exists.
-function execFromHints(hints) {
-    return stringHint(hints, "qshell-exec");
+//
+// An ARGV, not a shell string (omarchy 07443f3): the old `qshell-exec` hint was
+// free-form and safe only while every sender quoted every interpolated value
+// perfectly, and one slip is command execution — a hostile video title forged a
+// yt-dlp output record and put an mpv option in the click command. Rows still
+// carrying the old role simply lose their click; the 100-row cap ages them out.
+function execArgvFromHints(hints) {
+    return stringHint(hints, "qshell-exec-argv");
+}
+
+// Turn a persisted qshell-exec-argv into a runnable argv, or null. STRUCTURAL
+// only: it fails closed on a malformed hint (not an array, empty, a non-string
+// element, or a leading-dash program that the runner would read as an option).
+// It does not judge intent — a well-formed ["bash", "-c", …] is accepted, and
+// nothing here is a privilege boundary, since any process on the session bus
+// can set the hint at all, which already means same-uid code execution.
+function parseExecArgv(value) {
+    var text = String(value || "");
+    if (!text)
+        return null;
+
+    var parsed;
+    try {
+        parsed = JSON.parse(text);
+    } catch (e) {
+        return null;
+    }
+
+    if (!Array.isArray(parsed) || parsed.length === 0)
+        return null;
+    for (var i = 0; i < parsed.length; i++) {
+        if (typeof parsed[i] !== "string")
+            return null;
+    }
+    if (!parsed[0] || parsed[0].charAt(0) === "-")
+        return null;
+    return parsed;
 }
 
 function shouldRenderCompactGlyph(glyph, iconSource, singleLineToast) {
@@ -110,7 +145,7 @@ function snapshotOf(notification, timestamp) {
         body: n.body || "",
         image: n.image || "",
         glyph: glyphFromHints(n.hints),
-        exec: execFromHints(n.hints),
+        execArgv: execArgvFromHints(n.hints),
         urgency: n.urgency,
         expireTimeout: expireTimeout,
         timestamp: timestamp === undefined ? Date.now() : timestamp
@@ -129,7 +164,7 @@ function historyEntry(value, normalUrgency) {
         body: e.body || "",
         image: e.image || "",
         glyph: e.glyph || "",
-        exec: e.exec || "",
+        execArgv: e.execArgv || "",
         urgency: typeof e.urgency === "number" ? e.urgency : normalUrgency,
         expireTimeout: 0,
         timestamp: e.timestamp || 0
@@ -467,6 +502,8 @@ if (typeof module !== "undefined") {
         shouldBypassDnd: shouldBypassDnd,
         isEphemeralApp: isEphemeralApp,
         glyphFromHints: glyphFromHints,
+        execArgvFromHints: execArgvFromHints,
+        parseExecArgv: parseExecArgv,
         shouldRenderCompactGlyph: shouldRenderCompactGlyph,
         snapshotOf: snapshotOf,
         historyEntry: historyEntry,

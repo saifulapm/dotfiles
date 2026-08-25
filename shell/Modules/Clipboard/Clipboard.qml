@@ -60,8 +60,10 @@ Scope {
         const xdg = Quickshell.env("XDG_STATE_HOME");
         return (xdg ? xdg : Quickshell.env("HOME") + "/.local/state") + "/qshell/clipboard";
     }
-    // Upstream's cap: 300 entries kept on disk, 50 rows shown at a time.
-    readonly property int historyLimit: 300
+    // Upstream's cap: 500 entries kept on disk, 50 rows shown at a time. The
+    // per-row cost is already bounded by ClipboardHistory's 8192-char
+    // cappedEntry, so the raise (omarchy 1926611) only costs file size.
+    readonly property int historyLimit: 500
     readonly property int displayLimit: 50
 
     // ------------------------------------------------------------ geometry

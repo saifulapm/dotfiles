@@ -55,26 +55,34 @@ notification_server_ready() {
   return 1
 }
 
-announce() {
-  local comm=$1 pid=$2 exe=$3 signal=$4 exec_command
+# The click action rides along as a JSON argv (Notifs.runExecAction runs it as
+# bash positional parameters, never a shell string), so a value out of the
+# journal is only ever one argument no matter what is in it.
+exec_argv_hint() {
+  printf -- '--hint=string:qshell-exec-argv:%s' "$(jq -cn '$ARGS.positional' --args -- "$@")"
+}
 
-  exec_command=$(printf '%s/.dotfiles/bin/crash-diagnose %q %q %q %q' "$HOME" "$pid" "$comm" "$exe" "$signal")
+announce() {
+  local comm=$1 pid=$2 exe=$3 signal=$4
 
   notification_server_ready || return 1
 
   # -a Crash, not -a qshell: NotificationLogic.isEphemeralApp keeps "qshell"
   # and bare "notify-send" out of the history buckets entirely, and a crash you
   # were away for is exactly the one you want to find later — the row stays
-  # clickable in the notification centre (same qshell-exec command runs).
+  # clickable in the notification centre (same argv runs).
   #
   # Deliberate deviation from upstream: they send this under the one app name
   # shouldBypassDnd() lets through, so a crash interrupts Do Not Disturb. Ours
   # does not. DND here is an explicit "not now", a crash is diagnosable just as
   # well ten minutes later, and the history row means nothing is lost by
   # waiting. Critical urgency still gives it the long on-screen life.
+  #
+  # `--` before the summary: comm comes from the journal, and a process named
+  # with a leading dash would otherwise reach notify-send's option parser.
   notify-send -a Crash --urgency=critical \
-    --hint=string:qshell-exec:"$exec_command" \
-    "$CRASH_GLYPH Process crashed: $comm" \
+    "$(exec_argv_hint "$HOME/.dotfiles/bin/crash-diagnose" "$pid" "$comm" "$exe" "$signal")" \
+    -- "$CRASH_GLYPH Process crashed: $comm" \
     "Click to diagnose with AI" >/dev/null 2>&1
 }
 

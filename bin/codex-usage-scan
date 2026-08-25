@@ -300,7 +300,11 @@ def fetch_codex_rpc():
 
   try:
     proc = subprocess.Popen(
-      [codex, "-s", "read-only", "-a", "untrusted", "app-server"],
+      # "untrusted" was dropped as an approval policy in codex 0.149, which
+      # rejects it as an unexpected argument and leaves the panel with no codex
+      # data at all — the collector never gets to the app-server handshake.
+      # (omarchy 4cd8a08.)
+      [codex, "-s", "read-only", "-a", "on-request", "app-server"],
       stdin=subprocess.PIPE,
       stdout=subprocess.PIPE,
       stderr=subprocess.DEVNULL,
