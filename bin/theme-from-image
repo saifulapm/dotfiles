@@ -30,7 +30,9 @@
 //     against surface 0 at 3:1 — a vibrant palette yields vibrant signals,
 //     a muted one yields muted signals.
 //   - ansi 16      = surface/text for black/white, six chromatic picks
-//     from the palette's hue ranges (red wraps), bright-* = +0.15 L.
+//     from the palette's hue ranges (red wraps) scored by chroma + pixel
+//     mass; a range the image lacks is synthesized at its canonical hue
+//     with the accent's L/C. bright-* = +0.15 L.
 //
 // No wallpaper pinning: re-applying this theme (via background-next) just
 // advances the rotation. The [meta] name is derived from the image basename
@@ -61,8 +63,12 @@ const SCALE_H = 36
 function extractPalette(imagePath) {
     const tmp = `/tmp/raw-${process.pid}.rgb`
     try {
+        // -pix_fmt rgb24 is load-bearing: without it, rawvideo emits the
+        // DECODER's format — RGBA for PNGs (channel rotation: a red image
+        // grew a phantom blue accent) and planar YUV for JPEGs (the luma
+        // plane read as grey triples: a green forest themed grey).
         execSync(
-            `ffmpeg -y -i "${imagePath}" -vf "scale=${SCALE_W}:${SCALE_H}" -frames:v 1 -f rawvideo "${tmp}"`,
+            `ffmpeg -y -i "${imagePath}" -vf "scale=${SCALE_W}:${SCALE_H}" -frames:v 1 -f rawvideo -pix_fmt rgb24 "${tmp}"`,
             { stdio: ['ignore', 'ignore', 'ignore'] }
         )
     } catch (e) {
@@ -70,6 +76,8 @@ function extractPalette(imagePath) {
     }
     const data = fs.readFileSync(tmp)
     try { fs.unlinkSync(tmp) } catch {}
+    if (data.length !== SCALE_W * SCALE_H * 3)
+        throw new Error(`raw frame is ${data.length} bytes, expected ${SCALE_W * SCALE_H * 3} — pixel format drifted`)
 
     const buckets = new Map()
     for (let i = 0; i + 2 < data.length; i += 3) {
@@ -187,7 +195,7 @@ function pickRoles(palette, light) {
     const warn = hueSignal(1.4)
     const ok = hueSignal(2.4)
 
-    const ansi = pickAnsi(items, surface["0"], textPrimary, accentHex)
+    const ansi = pickAnsi(items, surface["0"], textPrimary, accentOk)
 
     return {
         surface,
@@ -198,15 +206,16 @@ function pickRoles(palette, light) {
     }
 }
 
-function pickAnsi(items, surface0, textPrimary, accent) {
+function pickAnsi(items, surface0, textPrimary, accentO) {
     // Hue ranges in radians, normalized to [0, 2π). Red wraps around 0.
+    // The third value is the range's canonical hue, for synthesized slots.
     const ranges = {
-        red:     [5.8, 0.5],   // wraps
-        yellow:  [1.0, 1.7],
-        green:   [1.9, 2.9],
-        cyan:    [2.9, 3.7],
-        blue:    [3.7, 5.0],
-        magenta: [5.0, 5.8]
+        red:     [5.8, 0.5, 0.45],   // wraps
+        yellow:  [1.0, 1.7, 1.4],
+        green:   [1.9, 2.9, 2.4],
+        cyan:    [2.9, 3.7, 3.3],
+        blue:    [3.7, 5.0, 4.5],
+        magenta: [5.0, 5.8, 5.4]
     }
 
     function hueInRange(h, lo, hi) {
@@ -215,20 +224,32 @@ function pickAnsi(items, surface0, textPrimary, accent) {
         return h >= lo && h <= hi
     }
 
-    function pickFor([lo, hi]) {
-        let best = null, bestC = -1
-        for (const { hex, o } of items) {
+    function pickFor([lo, hi, canonical]) {
+        let best = null, bestScore = 0
+        for (const { hex, o, count } of items) {
             // Skip near-greys: their hue is undefined (the C ≈ 0 case in
             // _rgbToOklch makes atan2 return a noise angle). Without
             // this guard, every wallpaper with greys would have its
             // entire grey mass cluster into one ANSI slot by accident.
             if (o.C < 0.01) continue
             const h = o.h < 0 ? o.h + 2 * Math.PI : o.h
-            if (hueInRange(h, lo, hi) && o.C > bestC) {
-                best = hex; bestC = o.C
-            }
+            if (!hueInRange(h, lo, hi)) continue
+            // Same salience shape as the accent pick: chroma first, pixel
+            // mass breaks ties. Raw max-C let a single compression-artifact
+            // pixel put a neon slot into an otherwise muted theme.
+            const score = Math.pow(o.C, 1.5) * Math.sqrt(count)
+            if (score > bestScore) { best = hex; bestScore = score }
         }
-        return best || accent
+        if (best) return best
+        // The image has no pixels in this hue range. Terminal slots are
+        // semantic — yellow MUST read yellow — so synthesize the canonical
+        // hue carrying the accent's L/C (the old accent-verbatim fallback
+        // painted a red image's yellow/green/blue slots all crimson).
+        return ensureContrast(rgbToHex(_gamutMap({
+            L: accentO.L,
+            C: Math.max(0.08, accentO.C * 0.9),
+            h: canonical
+        })), surface0, 3.0, 0)
     }
 
     const red = pickFor(ranges.red)
