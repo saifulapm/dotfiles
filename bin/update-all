@@ -153,6 +153,7 @@ update_src() { # <src-dir> <installed-binary> <label>
 update_src "$HOME/.local/src/kakoune" "$HOME/.local/bin/kak" kakoune-fork
 update_src "$HOME/.local/src/nirisnap" "$HOME/.local/bin/omasnap" nirisnap
 update_src "$HOME/.local/src/nirisaver" "$HOME/.local/bin/nirisaver" nirisaver
+update_src "$HOME/.local/src/pxy" "$HOME/.local/bin/pxy" pxy
 update_src "$HOME/.local/src/omacalc" "$HOME/.local/bin/omacalc" omacalc
 update_src "$HOME/.local/src/omacut" "$HOME/.local/bin/omacut" omacut
 update_src "$HOME/.local/src/omawrite" "$HOME/.local/bin/omawrite" omawrite

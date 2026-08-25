@@ -7,6 +7,8 @@
 [Unit]
 Description=pxy - tiny multi-provider LLM proxy
 After=network.target
+# Machines that never built it (run_after_36 skipped) must not fail-loop.
+ConditionPathExists=%h/.local/bin/pxy
 
 [Service]
 ExecStart=%h/.local/bin/pxy serve
