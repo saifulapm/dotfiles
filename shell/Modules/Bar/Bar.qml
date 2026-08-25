@@ -708,10 +708,16 @@ Scope {
     }
 
     // No gate: the ports service starts nothing on its own — it probes at
-    // startup and then only while its panel is open (the approved
-    // "panels refreshing while open" exception, enforced in the service).
+    // startup, a slow presence poll while the bar is visible, and 2 s only
+    // while its panel is open (the approved exception, enforced in the
+    // service). The slow poll exists because the icon now HIDES itself when
+    // nothing user-started is listening (2026-08-26) — an icon whose
+    // visibility is data cannot live on data refreshed only by opening the
+    // panel that hides behind it.
     function portsService() {
-        return sharedService("ports", portsServiceComponent, {});
+        return sharedService("ports", portsServiceComponent, {
+            pollingAllowed: Qt.binding(() => barRoot.servicePollingGate("ports"))
+        });
     }
 
     // No gate here, and note what that means for this one: the drives
@@ -1118,7 +1124,13 @@ Scope {
                     if (!slot || slot.widgetId !== widgetId)
                         continue;
                     const item = slot.activeItem;
-                    if (!item || item.visible !== true || typeof item.openPanel !== "function")
+                    if (!item || typeof item.openPanel !== "function")
+                        continue;
+                    // A hidden widget is normally not summonable, but one
+                    // that hides itself as a STATE (the ports icon with
+                    // nothing user-started listening) may opt in — its
+                    // panel is still the only window onto that state.
+                    if (item.visible !== true && item.summonWhenHidden !== true)
                         continue;
                     item.openPanel();
                     return true;

@@ -2,7 +2,7 @@
 # @vicinae.schemaVersion 1
 # @vicinae.title Shut Down
 # @vicinae.mode silent
-# @vicinae.icon ⏻
+# @vicinae.icon 🔴
 # @vicinae.packageName System
 # @vicinae.keywords ["poweroff"]
 # @vicinae.needsConfirmation true

@@ -281,5 +281,38 @@ test("the unit is rendered without its systemd suffix", () => {
     assert.equal(Model.unitText(vite), "", "nothing declared it");
 });
 
+// -------------------------------------------------- the system-ports toggle
+
+test("showSystem off (the default) lists only what you started", () => {
+    const shown = Model.rank(rows, "", false).map(r => r.port);
+    assert.deepEqual(shown, [5173], "the vite alone — the hub is a declared unit");
+});
+
+test("showSystem on brings the declared services in, still yours-first", () => {
+    const shown = Model.rank(rows, "", true).map(r => r.port);
+    assert.deepEqual(shown.slice(0, 2), [5173, 8787], "self-owned rows stay on top");
+    assert.ok(shown.includes(22) && shown.includes(3306), "sshd and mysql now listed");
+    assert.equal(shown.length, Model.groupByPort(rows).length, "nothing hidden");
+});
+
+test("a query still searches everything regardless of the toggle", () => {
+    assert.equal(Model.rank(rows, "mysql", false).length, 1);
+    assert.equal(Model.rank(rows, "mysql", true).length, 1);
+});
+
+test("only YOUR exposed listeners count for the bar warning", () => {
+    assert.ok(Model.isExposedMine(vite), "an undeclared 0.0.0.0 bind is the warning case");
+    assert.ok(Model.isExposed(byPort(22)), "sshd is exposed…");
+    assert.ok(!Model.isExposedMine(byPort(22)), "…but declared, so it must not tint the bar");
+    const grouped = Model.groupByPort(rows);
+    assert.equal(grouped.filter(Model.isExposedMine).length, 1, "exactly the vite row");
+});
+
+test("the hero stops claiming hidden services while the toggle shows them", () => {
+    const all = Model.groupByPort(rows).length;
+    assert.match(Model.heroMeta(rows, 2, "", false), /hidden/);
+    assert.doesNotMatch(Model.heroMeta(rows, all, "", true), /hidden/);
+});
+
 console.log(failures === 0 ? "\nall passed" : `\n${failures} failed`);
 process.exit(failures === 0 ? 0 : 1);

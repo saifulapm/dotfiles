@@ -2,7 +2,7 @@
 # @vicinae.schemaVersion 1
 # @vicinae.title Switch Keyboard Layout
 # @vicinae.mode silent
-# @vicinae.icon ⌨️
+# @vicinae.icon 🔠
 # @vicinae.packageName Toggles
 # @vicinae.keywords ["language"]
 set -euo pipefail

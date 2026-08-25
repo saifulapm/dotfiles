@@ -81,6 +81,14 @@ function isExposed(row) {
     return !!row && (row.scope === "any" || row.scope === "lan");
 }
 
+// Exposed AND yours — the only combination that deserves the bar's warning
+// tint. A declared service bound wide (sshd, the clipboard socket) is in the
+// manifest on purpose; an undeclared process on 0.0.0.0 is the accident the
+// warning exists for.
+function isExposedMine(row) {
+    return isExposed(row) && !isDeclared(row);
+}
+
 function scopeLabel(row) {
     switch (row ? row.scope : "") {
     case "loopback":
@@ -211,13 +219,15 @@ function groupByPort(rows) {
 // warning is FOR is an undeclared process on 0.0.0.0, and that is shown
 // because it is undeclared.
 //
-// A query searches everything, grouped the same way.
-function rank(rows, query) {
+// A query searches everything, grouped the same way. `showSystem` is the
+// panel's toggle (default off): with it on, the declared rows join the
+// no-query list instead of needing a search to reach.
+function rank(rows, query, showSystem) {
     var needle = String(query || "").trim();
     return groupByPort(rows).filter(function (row) {
         if (!matches(row, needle))
             return false;
-        return needle !== "" || !isDeclared(row);
+        return needle !== "" || showSystem === true || !isDeclared(row);
     }).sort(function (a, b) {
         var mine = (b.owner === "self" ? 1 : 0) - (a.owner === "self" ? 1 : 0);
         if (mine !== 0)
@@ -258,14 +268,14 @@ function plural(n, word) {
 // The hero's second line. It never just says a number without saying what the
 // number is OF — "16 listeners" over a list of one is the kind of quiet
 // disagreement that makes someone stop trusting the panel.
-function heroMeta(rows, shown, query) {
+function heroMeta(rows, shown, query, showSystem) {
     var all = groupByPort(rows);
     if (all.length === 0)
         return "Nothing listening";
     if (String(query || "").trim())
         return shown === all.length ? plural(all.length, "listener") : shown + " of " + plural(all.length, "listener");
 
-    var hidden = declaredCount(all);
+    var hidden = showSystem === true ? 0 : declaredCount(all);
     var head = shown === 0 ? "Nothing you started" : plural(shown, "listener");
     return hidden > 0 ? head + " · " + plural(hidden, "service") + " hidden" : head;
 }
@@ -305,6 +315,7 @@ if (typeof module !== "undefined") {
         heroMeta: heroMeta,
         isDeclared: isDeclared,
         isExposed: isExposed,
+        isExposedMine: isExposedMine,
         isHttp: isHttp,
         isKillable: isKillable,
         matches: matches,

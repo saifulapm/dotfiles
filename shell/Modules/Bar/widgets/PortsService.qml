@@ -14,11 +14,13 @@ import "PortsModel.js" as Model
 // mean a privileged helper for a panel that answers a question nobody asks
 // while it is shut.
 //
-// So the cadence is: once at startup, on every panel open, and 2 s while the
-// panel is on screen — the shell's approved "panels refreshing while open"
-// exception, and nothing at all the rest of the time. The tooltip can
-// therefore be a few minutes stale on a bar nobody has clicked, which is the
-// right trade for a list whose whole audience is someone about to look at it.
+// So the cadence is: once at startup, a slow 90 s presence poll while the
+// bar is on screen (pollingAllowed, wired to Bar.servicePollingGate), on
+// every panel open, and 2 s while the panel is on screen. The slow poll is
+// new with the self-hiding icon (2026-08-26): the icon appears only while
+// something user-started is listening, and a visibility that is data cannot
+// wait for a panel-open to learn the data changed. 90 s of staleness on a
+// presence mark is fine; 90 s of `ss` costs nothing measurable.
 QtObject {
     id: root
 
@@ -29,12 +31,25 @@ QtObject {
     // Set by the panel while it is on screen; the refresher gates on it.
     property bool panelOpen: false
 
+    // Bound by the bar: the bar is visible and the widget configured. Gates
+    // the slow presence poll the self-hiding icon depends on.
+    property bool pollingAllowed: false
+
+    // The panel's "show system ports" toggle. Off by default: the declared
+    // plumbing (caddy, the database sockets, sshd) is a haystack, not a
+    // listing. Lives on the service so the choice survives panel eviction
+    // for the session; a shell restart returns to off.
+    property bool showSystem: false
+
     // Counted over PORTS, not raw sockets: a service on both v4 and v6 is one
     // listener to a person, and the bar tooltip is written for a person.
     readonly property var ports: Model.groupByPort(rows)
     readonly property int listenerCount: ports.length
     readonly property int mineCount: ports.filter(row => !Model.isDeclared(row)).length
     readonly property int exposedCount: ports.filter(row => Model.isExposed(row)).length
+    // Exposed AND undeclared — what the bar icon warns about. A declared
+    // wide bind is deliberate and must not tint the bar.
+    readonly property int exposedMineCount: ports.filter(row => Model.isExposedMine(row)).length
     readonly property string tooltip: Model.tooltipText(rows)
 
     readonly property string home: Quickshell.env("HOME") || ""
@@ -61,7 +76,7 @@ QtObject {
     }
 
     function ranked(query) {
-        return Model.rank(rows, query);
+        return Model.rank(rows, query, showSystem);
     }
 
     // ------------------------------------------------------------- actions
@@ -149,6 +164,15 @@ QtObject {
         interval: 2000
         repeat: true
         running: root.panelOpen
+        onTriggered: root.refresh()
+    }
+
+    // The presence poll — see the header. Idle while the panel is open (the
+    // fast timer owns that window) and while the bar is hidden.
+    readonly property Timer presenceTimer: Timer {
+        interval: 90000
+        repeat: true
+        running: root.pollingAllowed && !root.panelOpen
         onTriggered: root.refresh()
     }
 

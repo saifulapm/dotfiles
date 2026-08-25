@@ -2,7 +2,7 @@
 # @vicinae.schemaVersion 1
 # @vicinae.title Remove TUI App
 # @vicinae.mode silent
-# @vicinae.icon 🖥️
+# @vicinae.icon 💻
 # @vicinae.packageName Setup
 # @vicinae.keywords ["terminal"]
 set -euo pipefail

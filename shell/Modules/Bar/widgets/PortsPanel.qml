@@ -56,6 +56,14 @@ BarPanel {
 
     onQueryChanged: rowIndex = 0
 
+    // One entry point for both the hero switch and Alt+S: flipping the
+    // filter republishes the list, so the cursor goes home like a query
+    // change sends it.
+    function toggleSystem() {
+        panel.ports.showSystem = !panel.ports.showSystem;
+        panel.rowIndex = 0;
+    }
+
     // Claimed ahead of the search field — PanelTextField.chord explains why a
     // TextInput has to be asked first rather than fallen through.
     function handleChord(event) {
@@ -81,6 +89,9 @@ BarPanel {
             break;
         case Qt.Key_R:
             panel.ports.refresh();
+            break;
+        case Qt.Key_S:
+            panel.toggleSystem();
             break;
         default:
             return;
@@ -113,7 +124,7 @@ BarPanel {
         theme: panel.theme
         width: parent.width
         title: "Ports"
-        meta: Model.heroMeta(panel.ports.rows, panel.rows.length, panel.query)
+        meta: Model.heroMeta(panel.ports.rows, panel.rows.length, panel.query, panel.ports.showSystem)
         metaFamily: panel.theme.fontUi
         metaWeight: Font.Normal
         metaLetterSpacing: 0
@@ -124,6 +135,16 @@ BarPanel {
             pixelSize: panel.theme.fontPx(1.6)
             verticalInkCenter: true
             color: panel.ports.exposedCount > 0 ? panel.theme.warn : panel.theme.textPrimary
+        }
+
+        // The system-ports toggle (Alt+S). Off by default: declared services
+        // join the list only on request, and never wake the bar icon.
+        trailing: PanelSwitch {
+            theme: panel.theme
+            anchors.verticalCenter: parent.verticalCenter
+            checked: panel.ports.showSystem
+            hint: "System ports (Alt+S)"
+            onToggled: panel.toggleSystem()
         }
     }
 
@@ -217,7 +238,7 @@ BarPanel {
         text: {
             if (panel.hiddenCount > 0)
                 return panel.hiddenCount + " more — keep typing to narrow";
-            return "Enter opens · Alt+C copies · Alt+Q a QR · Alt+D the folder · Alt+X stops it";
+            return "Enter opens · Alt+C copies · Alt+Q a QR · Alt+D the folder · Alt+X stops it · Alt+S system";
         }
         wrapMode: Text.WordWrap
     }

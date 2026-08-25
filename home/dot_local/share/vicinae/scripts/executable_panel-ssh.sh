@@ -2,7 +2,7 @@
 # @vicinae.schemaVersion 1
 # @vicinae.title SSH Hosts
 # @vicinae.mode silent
-# @vicinae.icon 🖧
+# @vicinae.icon 📡
 # @vicinae.packageName Panels
 # @vicinae.keywords ["remote"]
 set -euo pipefail

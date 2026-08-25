@@ -2,7 +2,7 @@
 # @vicinae.schemaVersion 1
 # @vicinae.title Toggle Blur
 # @vicinae.mode silent
-# @vicinae.icon 🌫️
+# @vicinae.icon 💨
 # @vicinae.packageName Toggles
 # @vicinae.keywords ["frost", "glass"]
 set -euo pipefail
