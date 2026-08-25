@@ -337,18 +337,12 @@ ShellRoot {
         }
     }
 
-    // Startup staging: the always-on surfaces resolve asynchronously right
-    // after the root lands, in priority order — the clipboard capture watcher
-    // first (it must not miss early selections for long), then the wallpaper,
-    // OSD and polkit agent. None of them holds back IPC registration.
-    // Startup staging. The clipboard capture watcher resolves as soon as the
-    // root lands — it must not miss early selections (wl-paste re-fires on
-    // watch start, so only a selection made AND replaced inside this first
-    // beat could ever slip by). The other always-on surfaces wait one beat
-    // more so their incubation doesn't contend with the first IPC answers
-    // and the bar's first frames.
+    // Startup staging: the always-on surfaces (wallpaper, OSD, polkit,
+    // notes edge) resolve asynchronously one beat after the root lands, so
+    // their incubation doesn't contend with the first IPC answers and the
+    // bar's first frames. Clipboard capture and the launcher belong to
+    // vicinae now (2026-08-26) — the shell watches nothing at startup.
     Component.onCompleted: {
-        clipboardLoader.wake();
         recoverLockIfStranded();
     }
 
@@ -401,7 +395,7 @@ ShellRoot {
     Timer {
         interval: 3000
         running: true
-        onTriggered: shell.warmedComponents = [shell.moduleRoot + "/Modules/Launcher/Launcher.qml", shell.moduleRoot + "/Modules/Menu/Menu.qml", shell.moduleRoot + "/Modules/Lock/Lock.qml", shell.moduleRoot + "/Modules/Notes/Notes.qml"].map(url => Qt.createComponent(url, Component.Asynchronous))
+        onTriggered: shell.warmedComponents = [shell.moduleRoot + "/Modules/Lock/Lock.qml", shell.moduleRoot + "/Modules/Notes/Notes.qml"].map(url => Qt.createComponent(url, Component.Asynchronous))
     }
 
     // An open bar widget panel holds an Exclusive keyboard grab, and niri
@@ -412,31 +406,9 @@ ShellRoot {
         bar.closeAllPanels();
     }
 
-    // Shared entry points for the bar's buttons, the command menu and the IPC
-    // targets. Each one wakes its surface on first use.
-    function toggleLauncher() {
-        dismissBarPanels();
-        launcherLoader.summon("toggle");
-    }
-
-    function toggleMenu() {
-        dismissBarPanels();
-        menuLoader.summon("toggle");
-    }
-
-    // Open the menu straight at a submenu (or fire a leaf) by id or alias —
-    // what the IPC `menu open <route>` does, for callers already inside the
-    // shell (the screen-recording indicator opens `capture.screenrecord`).
-    // While the menu is still resolving the route is queued and this reports
-    // "ok" — the route outcome lands when the tree does.
-    function openMenu(route) {
-        dismissBarPanels();
-        if (menuLoader.item !== null)
-            return menuLoader.item.openRoute(route);
-        menuLoader.summon("openRoute", [route]);
-        return "ok";
-    }
-
+    // Shared entry points for the bar's buttons and the IPC targets. Each
+    // one wakes its surface on first use. (Launcher, menu and clipboard
+    // picker retired 2026-08-26 — vicinae owns those surfaces.)
     // The notification history center lives in the bar (a bell indicator's
     // BarPanel), so these route through it; the `notifs` IPC verbs call them
     // via the service's injected shellRoot.
@@ -474,11 +446,6 @@ ShellRoot {
     function toggleEmojis() {
         dismissBarPanels();
         emojisLoader.summon("toggle");
-    }
-
-    function toggleClipboard() {
-        dismissBarPanels();
-        clipboardLoader.summon("toggle");
     }
 
     function toggleReminders() {
@@ -683,80 +650,6 @@ ShellRoot {
     }
 
     SurfaceLoader {
-        id: launcherLoader
-        surfaceSource: shell.moduleRoot + "/Modules/Launcher/Launcher.qml"
-        surfaceProps: ({
-                theme: shell.theme
-            })
-    }
-
-    IpcHandler {
-        target: "launcher"
-
-        function toggle(): string {
-            shell.toggleLauncher();
-            return "ok";
-        }
-
-        function show(): string {
-            shell.dismissBarPanels();
-            launcherLoader.summon("show");
-            return "ok";
-        }
-
-        function hide(): string {
-            launcherLoader.deliver("hide");
-            return "ok";
-        }
-    }
-
-    SurfaceLoader {
-        id: menuLoader
-        evictable: true
-        surfaceSource: shell.moduleRoot + "/Modules/Menu/Menu.qml"
-        surfaceProps: ({
-                theme: shell.theme,
-                shellRoot: shell
-            })
-    }
-
-    IpcHandler {
-        target: "menu"
-
-        function toggle(): string {
-            shell.toggleMenu();
-            return "ok";
-        }
-
-        function show(): string {
-            shell.dismissBarPanels();
-            menuLoader.summon("show");
-            return "ok";
-        }
-
-        function hide(): string {
-            menuLoader.deliver("hide");
-            return "ok";
-        }
-
-        // Jump straight to a submenu (or fire a leaf) by id or alias:
-        // `qs ipc call menu open system`, `… open screenshot`.
-        function open(route: string): string {
-            return shell.openMenu(route);
-        }
-
-        // Generic picker/prompt for scripts (omarchy's dmenu modes; built by
-        // bin/menu-select and bin/menu-input): payload JSON carries
-        // mode/prompt/options/selectionFile/doneFile, the caller polls for
-        // the done file.
-        function prompt(payload: string): string {
-            shell.dismissBarPanels();
-            menuLoader.summon("promptOpen", [payload]);
-            return "ok";
-        }
-    }
-
-    SurfaceLoader {
         id: emojisLoader
         evictable: true
         surfaceSource: shell.moduleRoot + "/Modules/Emojis/Emojis.qml"
@@ -820,38 +713,6 @@ ShellRoot {
 
         function hide(): string {
             emojisLoader.deliver("hide");
-            return "ok";
-        }
-    }
-
-    // The capture watcher must be running before anything is copied, or there
-    // is no history to pick from — so this surface wakes first in the startup
-    // staging above; the async load defers its wl-paste spawn by a beat, no
-    // more. Its picker window stays lazy inside the module.
-    SurfaceLoader {
-        id: clipboardLoader
-        surfaceSource: shell.moduleRoot + "/Modules/Clipboard/Clipboard.qml"
-        surfaceProps: ({
-                theme: shell.theme
-            })
-    }
-
-    IpcHandler {
-        target: "clipboard"
-
-        function toggle(): string {
-            shell.toggleClipboard();
-            return "ok";
-        }
-
-        function show(): string {
-            shell.dismissBarPanels();
-            clipboardLoader.summon("show");
-            return "ok";
-        }
-
-        function hide(): string {
-            clipboardLoader.deliver("hide");
             return "ok";
         }
     }

@@ -163,7 +163,8 @@ record_use() {
 # ------------------------------------------------------- the captured QR
 # bin/screenshot-qr freezes the screen, decodes the QR in the region you drag
 # out, and puts the payload on the clipboard with `wl-copy --sensitive`. That
-# hint is honoured by bin/clipboard-capture and bin/clipboard-sync-push, so a
+# hint is honoured by vicinae's clipboard history (ignorePasswords) and
+# bin/clipboard-sync-push, so a
 # captured URI reaches neither the clipboard history nor the other two
 # machines — which is what makes the clipboard a safe place to hand a TOTP
 # seed over in. Reading it back HERE rather than in the QML is the other half:

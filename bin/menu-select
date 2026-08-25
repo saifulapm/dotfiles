@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# menu-select — pick one option from the shell menu, dmenu-style.
+# menu-select — pick one option from a list, dmenu-style, via vicinae.
 #
-# Port of omarchy-menu-select: options come as arguments or on
-# stdin, an option may lead with an icon as "<glyph><TAB><label>" (the menu
-# draws the glyph, the answer is the label alone). The payload rides
-# `qs ipc call menu prompt`; the shell writes the answer into selectionFile
-# and touches doneFile on EVERY dismissal, cancelled ones included.
+# Same interface as the retired in-shell version (omarchy-menu-select port):
+# options come as arguments or on stdin, an option may lead with an icon as
+# "<glyph><TAB><label>" (the glyph is dropped — the answer is the label
+# alone, and vicinae draws its own row chrome). Prints the selection to
+# stdout; a cancelled picker exits 1.
 #
 #   menu-select <prompt> [option...]
 #   printf '%s\n' one two | menu-select "Pick"
@@ -32,26 +32,9 @@ fi
 
 ((${#options[@]} > 0)) || { echo "menu-select: no options" >&2; exit 1; }
 
-selection_file=$(mktemp)
-done_file=$(mktemp)
-rm -f "$done_file"
-trap 'rm -f "$selection_file" "$done_file"' EXIT
+# Strip a leading "<glyph><TAB>" so callers keep their icon lists unchanged.
+selection=$(printf '%s\n' "${options[@]}" | sed 's/^[^\t]*\t//' \
+  | vicinae dmenu -p "$prompt" --no-quick-look --no-metadata) || exit 1
 
-payload=$(jq -cn --arg prompt "$prompt" --arg sel "$selection_file" --arg done "$done_file" \
-  '{mode: "select", prompt: $prompt, selectionFile: $sel, doneFile: $done, options: $ARGS.positional}' \
-  --args "${options[@]}")
-
-qs ipc call menu -- prompt "$payload" >/dev/null
-
-# 120s cap: if the shell dies mid-prompt the done file never appears.
-for ((i = 0; i < 2400; i++)); do
-  [[ -e $done_file ]] && break
-  sleep 0.05
-done
-[[ -e $done_file ]] || exit 1
-
-if [[ -s $selection_file ]]; then
-  cat "$selection_file"
-else
-  exit 1
-fi
+[[ -n $selection ]] || exit 1
+printf '%s\n' "$selection"

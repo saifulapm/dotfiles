@@ -38,11 +38,84 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus",
   "fallbackModel": [
     "opus"
   ],
-  "hooks": {},
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/saiful/.cargo/bin/amx _hook"
+          }
+        ]
+      }
+    ]
+  },
   "worktree": {
     "symlinkDirectories": [
       "node_modules",
@@ -65,24 +138,24 @@
       }
     }
   },
+  "outputStyle": "default",
   "sandbox": {
     "enabled": false
   },
+  "spinnerTipsEnabled": false,
   "alwaysThinkingEnabled": true,
   "effortLevel": "xhigh",
+  "awaySummaryEnabled": false,
   "tui": "fullscreen",
   "voice": {
     "enabled": true,
     "mode": "hold"
   },
+  "prefersReducedMotion": true,
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "custom:qshell",
   "verbose": false,
   "switchModelsOnFlag": true,
-  "agentPushNotifEnabled": true,
-  "awaySummaryEnabled": false,
-  "outputStyle": "default",
-  "spinnerTipsEnabled": false,
-  "prefersReducedMotion": true
+  "agentPushNotifEnabled": true
 }

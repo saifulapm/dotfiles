@@ -1,39 +1,96 @@
 {
-  "//": "Declarative vicinae config, loaded via VICINAE_OVERRIDES in vicinae.service — highest priority, survives GUI writes to settings.json (which stays vicinae-owned and unmanaged, the cliamp lesson). A second, theme-generated overrides file rides after this one in the list.",
-  "telemetry": { "system_info": false },
+  "//": "Declarative vicinae config, loaded via VICINAE_OVERRIDES in vicinae.service \u2014 highest priority, survives GUI writes to settings.json (which stays vicinae-owned and unmanaged, the cliamp lesson). A second, theme-generated overrides file rides after this one in the list.",
+  "telemetry": {
+    "system_info": false
+  },
   "favicon_service": "none",
   "search_files_in_root": false,
   "close_on_focus_loss": true,
   "pop_to_root_on_close": true,
   "escape_key_behavior": "close_window",
   "keybinding": "vim",
-  "font": { "normal": { "family": "monospace" } },
+  "font": {
+    "normal": {
+      "family": "monospace"
+    }
+  },
   "theme": {
-    "dark": { "name": "qshell", "icon_theme": "auto" },
-    "light": { "name": "qshell", "icon_theme": "auto" }
+    "dark": {
+      "name": "qshell",
+      "icon_theme": "auto"
+    },
+    "light": {
+      "name": "qshell",
+      "icon_theme": "auto"
+    }
   },
   "launcher_window": {
     "material": "none",
-    "layer_shell": { "enabled": true, "keyboard_interactivity": "on_demand", "layer": "top" },
-    "size": { "width": 760, "height": 470 }
+    "layer_shell": {
+      "enabled": true,
+      "keyboard_interactivity": "on_demand",
+      "layer": "top"
+    },
+    "size": {
+      "width": 760,
+      "height": 470
+    }
   },
-  "global_shortcuts": { "toggle": "" },
-  "favorites": ["clipboard:history"],
+  "global_shortcuts": {
+    "toggle": ""
+  },
+  "favorites": [
+    "clipboard:history"
+  ],
   "providers": {
-    "files": { "enabled": false },
-    "calculator": { "enabled": false },
-    "browser-extension": { "enabled": false },
-    "browser-tabs": { "enabled": false },
-    "wm": { "enabled": false },
-    "snippets": { "enabled": false },
-    "manage-shortcuts": { "enabled": false },
-    "theme": { "enabled": false },
-    "font": { "enabled": false },
-    "power": { "enabled": false },
-    "developer": { "enabled": false },
-    "raycast-compat": { "enabled": false },
-    "system": { "enabled": false },
-    "core": { "enabled": false },
-    "clipboard": { "preferences": { "monitoring": true, "ignorePasswords": true } }
-  }
+    "files": {
+      "enabled": false
+    },
+    "calculator": {
+      "enabled": false
+    },
+    "browser-extension": {
+      "enabled": false
+    },
+    "browser-tabs": {
+      "enabled": false
+    },
+    "wm": {
+      "enabled": false
+    },
+    "snippets": {
+      "enabled": false
+    },
+    "manage-shortcuts": {
+      "enabled": false
+    },
+    "theme": {
+      "enabled": false
+    },
+    "font": {
+      "enabled": false
+    },
+    "power": {
+      "enabled": false
+    },
+    "developer": {
+      "enabled": false
+    },
+    "raycast-compat": {
+      "enabled": false
+    },
+    "system": {
+      "enabled": false
+    },
+    "core": {
+      "enabled": false
+    },
+    "clipboard": {
+      "preferences": {
+        "monitoring": true,
+        "ignorePasswords": true
+      }
+    }
+  },
+  "fallbacks": []
 }

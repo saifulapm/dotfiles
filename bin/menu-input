@@ -1,35 +1,41 @@
 #!/usr/bin/env bash
-# menu-input — prompt for a line of text with the shell menu, dmenu-style.
+# menu-input — prompt for a line of text, dmenu-style.
 #
-# Port of omarchy-menu-input: the menu's header doubles as the
-# input line, Enter answers with whatever was typed (possibly empty), any
-# dismissal cancels. Same file round-trip as menu-select.
+# The in-shell menu that used to draw this prompt retired with the vicinae
+# switch (2026-08-26), and vicinae's dmenu is a list picker with no
+# free-text answer (verified: a non-matching query + Enter cancels). So the
+# input line is gum in a qshell-float terminal — fish so conf.d loads the
+# theme-apply gum palette — with the same file round-trip the old shell
+# prompt used: Enter answers with whatever was typed (possibly empty), any
+# dismissal cancels.
 #
 #   menu-input [prompt]
 set -euo pipefail
 
 prompt="${1:-Input}"
 
-selection_file=$(mktemp)
+answer_file=$(mktemp)
 done_file=$(mktemp)
 rm -f "$done_file"
-trap 'rm -f "$selection_file" "$done_file"' EXIT
+trap 'rm -f "$answer_file" "$done_file"' EXIT
 
-payload=$(jq -cn --arg prompt "$prompt" --arg sel "$selection_file" --arg done "$done_file" \
-  '{mode: "input", prompt: $prompt, selectionFile: $sel, doneFile: $done}')
+foot-run --app-id=qshell-float -e fish -c '
+  set -l out $argv[1]; set -l done $argv[2]; set -l prompt $argv[3]
+  if set -l answer (gum input --placeholder "$prompt")
+    printf "%s" "$answer" > "$out"
+  else
+    rm -f "$out"
+  end
+  touch "$done"' "$answer_file" "$done_file" "$prompt"
 
-qs ipc call menu -- prompt "$payload" >/dev/null
-
+# 120s cap: if the float never runs the done file never appears.
 for ((i = 0; i < 2400; i++)); do
   [[ -e $done_file ]] && break
   sleep 0.05
 done
 [[ -e $done_file ]] || exit 1
 
-# Empty input is a legitimate answer — only a missing selection file (never
-# written = cancelled) fails.
-if [[ -f $selection_file ]]; then
-  cat "$selection_file"
-else
-  exit 1
-fi
+# A missing answer file (never written = cancelled) fails; empty input is a
+# legitimate answer.
+[[ -e $answer_file ]] || exit 1
+cat "$answer_file"

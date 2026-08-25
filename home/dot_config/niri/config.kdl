@@ -186,7 +186,7 @@ layout {
         // fixed 1920
     }
 
-    // You can also customize the heights that "switch-preset-window-height" (Mod+Ctrl+Shift+R) toggles between.
+    // You can also customize the heights that "switch-preset-window-height" toggles between (unbound here).
     // preset-window-heights { }
 
     // You can change the default width of the new windows.
@@ -552,7 +552,7 @@ window-rule {
     default-window-height { proportion 0.55; }
 }
 
-// The shell's dekho hub (shell/Modules/Dekho/Dekho.qml, Mod+Ctrl+Alt+M). It
+// The shell's dekho hub (shell/Modules/Dekho/Dekho.qml, "Movies & TV" in the launcher). It
 // is a real toplevel rather than a layer-shell overlay precisely so that the
 // mpv it launches — floating, by the media rule below — is drawn ABOVE it
 // instead of behind it.
@@ -694,7 +694,6 @@ binds {
     // launch-or-focus semantics). Mod+Shift+Return above stays a plain spawn
     // so a second window is always one keypress away.
     Mod+Shift+B hotkey-overlay-title="Focus the Browser" { spawn "launch-or-focus" "chromium-browser" "chromium-browser"; }
-    Mod+Shift+Alt+B hotkey-overlay-title="Browser (Incognito)" { spawn "chromium-browser" "--incognito"; }
     // omarchy: SUPER+SHIFT+F file manager — taken by fullscreen-window here,
     // so the explorer key instead. Same yazi-in-kitty as yazi.desktop.
     // Floating via the qshell-float rule, like btop and the shell's helpers.
@@ -726,12 +725,10 @@ binds {
     // the tmux bind above; a bare `herdr` attaches to (or starts) its
     // persistent server, herdr's own equivalent of new-session -A.
     Mod+Ctrl+Return hotkey-overlay-title="Terminal: herdr" { spawn "launch-or-focus" "herdr-main" "foot-run" "--app-id=herdr-main" "herdr"; }
-    Mod+D hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
-    Mod+Space hotkey-overlay-title="Open the Menu" { spawn "qs" "ipc" "call" "menu" "toggle"; }
+    Mod+Space hotkey-overlay-title="Launcher" { spawn "vicinae" "toggle"; }
     // Omarchy's SUPER+ALT+SPACE apps-menu bind (b92510f). Our menu has no
     // app rows — its Apps row hands off to the launcher, as Mod+D does — so
     // this summons the launcher directly.
-    Mod+Alt+Space hotkey-overlay-title="Run an Application" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Shift+T hotkey-overlay-title="Switch Theme" { spawn "qs" "ipc" "call" "theme" "toggle"; }
     // Omarchy's own emoji bind (SUPER+CTRL+E). Their commented-out
     // SUPER+PERIOD alternative is unavailable here: Mod+Period is niri's
@@ -740,7 +737,7 @@ binds {
     // Omarchy's own clipboard bind (SUPER+CTRL+V), which is also the only key
     // left: Mod+V is toggle-window-floating and Mod+Shift+V is
     // switch-focus-between-floating-and-tiling, both niri defaults we keep.
-    Mod+Ctrl+V hotkey-overlay-title="Clipboard History" { spawn "qs" "ipc" "call" "clipboard" "toggle"; }
+    Mod+Ctrl+V hotkey-overlay-title="Clipboard History" { spawn "vicinae" "deeplink" "vicinae://launch/clipboard/history"; }
     // The Notes quick-capture panel (Modules/Notes, our Copper): same panel
     // the right-edge hover summons; the key is a toggle. Ctrl+grave was
     // free — Mod+grave is niri's within-app window switcher above.
@@ -752,17 +749,13 @@ binds {
     // wallpaper picker above (established first, kept), so bluetooth takes
     // the Shift variant. Same toggle semantics as theirs, on the ported
     // `bluetooth` IPC target.
-    Mod+Ctrl+Shift+B hotkey-overlay-title="Bluetooth Panel" { spawn "qs" "ipc" "call" "bluetooth" "toggle"; }
     // The rest of omarchy's SUPER+CTRL panel chords, same letters, on the
     // bar's summon-widget IPC (focused-output-first, like their
     // summonBarWidget).
     Mod+Ctrl+A hotkey-overlay-title="Audio Panel" { spawn "qs" "ipc" "call" "bar" "open" "audio"; }
     Mod+Ctrl+W hotkey-overlay-title="Network Panel" { spawn "qs" "ipc" "call" "bar" "open" "network"; }
     Mod+Ctrl+P hotkey-overlay-title="Power Panel" { spawn "qs" "ipc" "call" "bar" "open" "battery"; }
-    Mod+Ctrl+D hotkey-overlay-title="Display Panel" { spawn "qs" "ipc" "call" "bar" "open" "monitor"; }
-    Mod+Ctrl+Alt+D hotkey-overlay-title="Calendar" { spawn "qs" "ipc" "call" "bar" "open" "clock"; }
     // omarchy: SUPER+SHIFT+CTRL+A agent — the bar's AI panel.
-    Mod+Shift+Ctrl+A hotkey-overlay-title="AI Panel" { spawn "qs" "ipc" "call" "bar" "open" "ai"; }
     // The six widgets ported from the omarchy plugin marketplace (2026-08-21).
     // Every one of them is also reachable by position through Mod+Ctrl+<n>
     // below; these letters exist for the ones worth muscle memory.
@@ -778,13 +771,6 @@ binds {
     // Mod+Ctrl+D opens — kept as a second door because the muscle memory is
     // for the feature, not the panel. `nightlight` reaches it through the
     // bar's widgetIdAliases.
-    Mod+Ctrl+N hotkey-overlay-title="Night Light: hold / release" { spawn "nightlight" "toggle"; }
-    Mod+Shift+Ctrl+N hotkey-overlay-title="Night Light (Display Panel)" { spawn "qs" "ipc" "call" "bar" "open" "nightlight"; }
-    Mod+Ctrl+S hotkey-overlay-title="SSH Hosts" { spawn "qs" "ipc" "call" "bar" "open" "ssh"; }
-    Mod+Ctrl+Shift+P hotkey-overlay-title="Passwords" { spawn "qs" "ipc" "call" "bar" "open" "pass"; }
-    Mod+Ctrl+Shift+O hotkey-overlay-title="Listening Ports" { spawn "qs" "ipc" "call" "bar" "open" "ports"; }
-    Mod+Ctrl+Shift+U hotkey-overlay-title="Removable Drives" { spawn "qs" "ipc" "call" "bar" "open" "drives"; }
-    Mod+Ctrl+Z hotkey-overlay-title="World Clock" { spawn "qs" "ipc" "call" "bar" "open" "timezones"; }
     // omarchy: SUPER+CTRL+number opens the bar's right-hand panels by
     // position, so a chord keeps meaning the same icon after the bar is
     // rearranged (their utilities.lua loop, `code:10`..`code:18`). The letters
@@ -797,15 +783,6 @@ binds {
     // from the left would start at the least-wanted end and renumber whenever
     // one appeared (see Bar.qml panelWidgetIdAt). A bar with fewer panels than
     // the number leaves that key doing nothing.
-    Mod+Ctrl+1 hotkey-overlay-title="Bar Panel 1 (from the right)" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "1"; }
-    Mod+Ctrl+2 hotkey-overlay-title="Bar Panel 2" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "2"; }
-    Mod+Ctrl+3 hotkey-overlay-title="Bar Panel 3" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "3"; }
-    Mod+Ctrl+4 hotkey-overlay-title="Bar Panel 4" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "4"; }
-    Mod+Ctrl+5 hotkey-overlay-title="Bar Panel 5" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "5"; }
-    Mod+Ctrl+6 hotkey-overlay-title="Bar Panel 6" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "6"; }
-    Mod+Ctrl+7 hotkey-overlay-title="Bar Panel 7" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "7"; }
-    Mod+Ctrl+8 hotkey-overlay-title="Bar Panel 8" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "8"; }
-    Mod+Ctrl+9 hotkey-overlay-title="Bar Panel 9" { spawn "qs" "ipc" "call" "bar" "openAt" "right" "9"; }
     // omarchy: SUPER+CTRL+T btop, floating via the qshell-float rule.
     Mod+Ctrl+T hotkey-overlay-title="System Monitor: btop" { spawn "foot-run" "--app-id=qshell-float" "btop"; }
     // Music: cliamp. omarchy binds the same player at SUPER+SHIFT+ALT+M and
@@ -822,13 +799,10 @@ binds {
     // Playback appears to the shell as any other MPRIS player, so the
     // XF86Audio* binds below drive it with no special-casing.
     Mod+Ctrl+M hotkey-overlay-title="Music: cliamp" { spawn "music"; }
-    Mod+Ctrl+Shift+M hotkey-overlay-title="Play Music" { spawn "music" "--prompt"; }
     // Films and series: the shell's dekho hub (github.com/saifulapm/dekho) —
-    // continue watching, trending, search, straight into mpv. Next to music
-    // by meaning, on Mod+Ctrl+ALT+M because Mod+Ctrl+Shift+M is taken above,
-    // which also puts it with the other Mod+Ctrl+Alt panels (calendar, idle,
+    // continue watching, trending, search, straight into mpv. Reached from
+    // the launcher ("Movies & TV") since the 3-modifier binds left (2026-08-26,
     // reminders, notification centre).
-    Mod+Ctrl+Alt+M hotkey-overlay-title="Movies & TV: dekho" { spawn "qs" "ipc" "call" "dekho" "toggle"; }
     // omarchy: XF86Calculator → their calculator; ours is omacalc. (Their
     // SUPER+SHIFT+EQUAL alternative is set-window-height here.)
     XF86Calculator hotkey-overlay-title="Calculator" { spawn "omacalc"; }
@@ -842,30 +816,22 @@ binds {
     // the Alt variant — which is their invokeLast chord, left unbound here
     // because clicking a toast already invokes its default action.
     Mod+Alt+Comma hotkey-overlay-title="Dismiss Last Notification" { spawn "qs" "ipc" "call" "notifs" "dismissOne"; }
-    Mod+Shift+Alt+Comma hotkey-overlay-title="Show Notification History" { spawn "qs" "ipc" "call" "notifs" "showHistory"; }
     Mod+Shift+Comma hotkey-overlay-title="Dismiss All Notifications" { spawn "qs" "ipc" "call" "notifs" "dismissAll"; }
     Mod+Ctrl+Comma hotkey-overlay-title="Toggle Do Not Disturb" { spawn "qs" "ipc" "call" "notifs" "toggleDnd"; }
     // Ours: the review panel over the same history the replay bind pops as
     // toasts — the last free chord in the comma family.
-    Mod+Ctrl+Alt+Comma hotkey-overlay-title="Notification Center" { spawn "qs" "ipc" "call" "notifs" "toggle"; }
 
     // The rest of omarchy's utility chords (2026-08-06 parity audit), each on
     // the nearest free key where the upstream chord is a niri default we keep.
     // Omarchy: SUPER+CTRL+C — Mod+Ctrl+C is niri's center-visible-columns, so
     // the capture menu takes Shift.
-    Mod+Shift+C hotkey-overlay-title="Capture Menu" { spawn "qs" "ipc" "call" "menu" "open" "capture"; }
-    Mod+Ctrl+O hotkey-overlay-title="Toggles Menu" { spawn "qs" "ipc" "call" "menu" "open" "toggle"; }
     // Omarchy: SUPER+ESCAPE — taken by niri's toggle-keyboard-shortcuts-inhibit;
     // the power key opens the system menu instead, which is also their bind.
-    XF86PowerOff hotkey-overlay-title="System Menu" { spawn "qs" "ipc" "call" "menu" "open" "system"; }
+    XF86PowerOff hotkey-overlay-title="Power" { spawn "vicinae" "open" "-q" "shut"; }
     Mod+Shift+Space hotkey-overlay-title="Toggle the Bar" { spawn "qs" "ipc" "call" "bar" "toggle"; }
     // Omarchy: SUPER+CTRL+I — taken by niri's move-column-to-workspace-up.
-    Mod+Ctrl+Alt+I hotkey-overlay-title="Toggle Idle Locking" { spawn "qs" "ipc" "call" "idle" "toggle"; }
-    // Omarchy's reminder family hangs off SUPER+CTRL+R; Mod+Ctrl+R and
-    // Mod+Ctrl+Shift+R are niri's window-height defaults, so ours take Alt.
-    Mod+Alt+R hotkey-overlay-title="Set a Reminder" { spawn "qs" "ipc" "call" "reminders" "toggle"; }
-    Mod+Ctrl+Alt+R hotkey-overlay-title="Show Reminders" { spawn "reminder" "show"; }
-    Mod+Alt+Shift+R hotkey-overlay-title="Clear Reminders" { spawn "reminder" "clear"; }
+    // Reminders moved to the launcher (Set/Show/Clear Reminders script
+    // commands) when the 3-modifier binds left (2026-08-26).
 
     // Voice dictation (voxtype), state shown by the bar's dictation indicator.
     // Omarchy's own toggle chord is SUPER+CTRL+X; Ctrl+X is free here.
@@ -987,25 +953,12 @@ binds {
     Mod+Shift+K     { focus-monitor-up; }
     Mod+Shift+L     { focus-monitor-right; }
 
-    Mod+Shift+Ctrl+Left  { move-column-to-monitor-left; }
-    Mod+Shift+Ctrl+Down  { move-column-to-monitor-down; }
-    Mod+Shift+Ctrl+Up    { move-column-to-monitor-up; }
-    Mod+Shift+Ctrl+Right { move-column-to-monitor-right; }
-    Mod+Shift+Ctrl+H     { move-column-to-monitor-left; }
-    Mod+Shift+Ctrl+J     { move-column-to-monitor-down; }
-    Mod+Shift+Ctrl+K     { move-column-to-monitor-up; }
-    Mod+Shift+Ctrl+L     { move-column-to-monitor-right; }
-
-    // Alternatively, there are commands to move just a single window:
-    // Mod+Shift+Ctrl+Left  { move-window-to-monitor-left; }
-    // ...
-
-    // omarchy: SUPER+SHIFT+ALT+arrows move the whole workspace to another
-    // monitor (the same chord on numbers is the silent column move below).
-    Mod+Shift+Alt+Left  { move-workspace-to-monitor-left; }
-    Mod+Shift+Alt+Down  { move-workspace-to-monitor-down; }
-    Mod+Shift+Alt+Up    { move-workspace-to-monitor-up; }
-    Mod+Shift+Alt+Right { move-workspace-to-monitor-right; }
+    // Column-to-monitor moves on two modifiers (2026-08-26: every 3-modifier
+    // chord left this config). Arrows only — Mod+Alt+L belongs to the lock.
+    Mod+Alt+Left  { move-column-to-monitor-left; }
+    Mod+Alt+Down  { move-column-to-monitor-down; }
+    Mod+Alt+Up    { move-column-to-monitor-up; }
+    Mod+Alt+Right { move-column-to-monitor-right; }
 
     Mod+Page_Down      { focus-workspace-down; }
     Mod+Page_Up        { focus-workspace-up; }
@@ -1045,8 +998,6 @@ binds {
     // horizontal scrolling; these binds replicate that.
     Mod+Shift+WheelScrollDown      { focus-column-right; }
     Mod+Shift+WheelScrollUp        { focus-column-left; }
-    Mod+Ctrl+Shift+WheelScrollDown { move-column-right; }
-    Mod+Ctrl+Shift+WheelScrollUp   { move-column-left; }
 
     // Similarly, you can bind touchpad scroll "ticks".
     // Touchpad scrolling is continuous, so for these binds it is split into
@@ -1093,16 +1044,6 @@ binds {
     Mod+Alt+0 { move-column-to-workspace 10; }
 
     // omarchy: SUPER+SHIFT+ALT+number moves the column without following it.
-    Mod+Shift+Alt+1 { move-column-to-workspace 1 focus=false; }
-    Mod+Shift+Alt+2 { move-column-to-workspace 2 focus=false; }
-    Mod+Shift+Alt+3 { move-column-to-workspace 3 focus=false; }
-    Mod+Shift+Alt+4 { move-column-to-workspace 4 focus=false; }
-    Mod+Shift+Alt+5 { move-column-to-workspace 5 focus=false; }
-    Mod+Shift+Alt+6 { move-column-to-workspace 6 focus=false; }
-    Mod+Shift+Alt+7 { move-column-to-workspace 7 focus=false; }
-    Mod+Shift+Alt+8 { move-column-to-workspace 8 focus=false; }
-    Mod+Shift+Alt+9 { move-column-to-workspace 9 focus=false; }
-    Mod+Shift+Alt+0 { move-column-to-workspace 10 focus=false; }
 
     // Alternatively, there are commands to move just a single window:
     // Mod+Ctrl+1 { move-window-to-workspace 1; }
@@ -1128,7 +1069,6 @@ binds {
     // Cycling through the presets in reverse order is also possible.
     Mod+Shift+R { switch-preset-column-width-back; }
 
-    Mod+Ctrl+Shift+R { switch-preset-window-height; }
     Mod+Ctrl+R { reset-window-height; }
 
     Mod+F { maximize-column; }
@@ -1194,7 +1134,6 @@ binds {
     // Read a region aloud (OCR → text-to-speech). Deliberately NOT Orca: a
     // screen reader walks AT-SPI widget trees, so it cannot see text baked
     // into images, video, canvas or PDFs — this reads the pixels themselves.
-    Mod+Ctrl+Shift+Print hotkey-overlay-title="Read Region Aloud" { spawn "sh" "-c" "screenshot-ocr --speak"; }
     // Apple keyboards have NO Print key, so every Print bind above is dead on
     // this hardware — the macOS-style Mod+Shift+number family from the
     // pre-qshell dotfiles-linux is the reachable set (Cmd+Shift+3/4/5 muscle
@@ -1207,11 +1146,9 @@ binds {
     // Read-aloud rides the "6 = OCR" mnemonic with one extra modifier: same
     // pick, spoken instead of copied. 8/9/0 are the dynamic-cast family below,
     // so the Mod+Shift+number row is full — hence Mod+Ctrl+Shift here.
-    Mod+Ctrl+Shift+6 hotkey-overlay-title="Read Region Aloud" { spawn "sh" "-c" "screenshot-ocr --speak"; }
-    Mod+Ctrl+Shift+S hotkey-overlay-title="Stop Reading Aloud" { spawn "sh" "-c" "screenshot-ocr --stop"; }
     // Omarchy: ALT+PRINT — taken by screenshot-window above. Stops a running
     // recording, else opens the capture menu's Screenrecord submenu.
-    Mod+Print hotkey-overlay-title="Screen Recording" { spawn "sh" "-c" "screenrecord --stop-recording || qs ipc call menu open screenrecording"; }
+    Mod+Print hotkey-overlay-title="Screen Recording" { spawn "sh" "-c" "screenrecord --stop-recording || vicinae open -q Record"; }
 
     // Dynamic cast target (niri >= 25.05): a screencast source that can be
     // re-pointed mid-call. Share "niri Dynamic Cast Target" once in the
@@ -1231,14 +1168,12 @@ binds {
     Mod+Shift+8 hotkey-overlay-title="Cast: Focused Window" { set-dynamic-cast-window; }
     Mod+Shift+9 hotkey-overlay-title="Cast: Focused Monitor" { set-dynamic-cast-monitor; }
     Mod+Shift+0 hotkey-overlay-title="Cast: Blank Target" { clear-dynamic-cast-target; }
-    // Click-to-pick variant of Mod+Shift+8, riding the same Mod+Ctrl+Shift+digit
-    // "variant of that digit" shape as Read Region Aloud above. Worth having
+    // The click-to-pick cast variant lives in the launcher now. Worth having
     // because the plain bind takes whatever is FOCUSED at press time — and
     // right after you click Share, that is the browser, so the obvious press
     // casts the meeting window into itself. This one asks instead.
     // jq -e exits non-zero on a cancelled pick (empty input), so Escape is a
     // no-op rather than a set-target call with an empty --id.
-    Mod+Ctrl+Shift+8 hotkey-overlay-title="Cast: Pick a Window" { spawn-sh "id=$(niri msg --json pick-window | jq -e -r .id) && niri msg action set-dynamic-cast-window --id \"$id\""; }
 
     // Applications such as remote-desktop clients and software KVM switches may
     // request that niri stops processing the keyboard shortcuts defined here

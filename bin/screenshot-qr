@@ -99,7 +99,7 @@ fi
 # codes, so the decoded value goes to the clipboard and nowhere else. Printing
 # it or putting it in the notification body would leak it to the session
 # journal and to the notification history, and an unmarked copy would be
-# retained by clipboard history (bin/clipboard-capture honours the same
+# retained by clipboard history (vicinae's capture honours the same
 # x-kde-passwordManagerHint wl-copy --sensitive sets). Pasting still works;
 # only the recorded copy is given up.
 printf '%s' "$result" | wl-copy --sensitive

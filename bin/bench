@@ -4,7 +4,9 @@
 #      plus launch -> IPC responsive (externally observed)
 #   2. idle RSS
 #   3. idle CPU% over 60s
-#   4. launcher open latency, cold (first LazyLoader load) and warm
+#   4. theme-switcher open latency, cold (first LazyLoader load) and warm —
+#      the launcher itself is vicinae now (2026-08-26), so the shell's
+#      lazy-surface cost is measured on the heaviest surviving picker
 # Restarts the running shell. The session shell is qshell.service: it is
 # stopped for the measurement (its Restart=on-failure would double-spawn
 # against the bench instance otherwise) and handed back to systemd at the end.
@@ -54,28 +56,27 @@ done
 
 qspid=$(pgrep -x qs | head -1)
 
-# ---- 2. idle RSS (settle first, and sample BEFORE the launcher tests: the
-# launcher's LazyLoader stays resident once loaded, so measuring after them
-# would charge the launcher tree to "idle")
+# ---- 2. idle RSS (settle first, and sample BEFORE the picker tests: a
+# summoned surface stays resident for its grace period, so measuring after
+# them would charge the picker tree to "idle")
 sleep 5
 rss_kb=$(awk '/VmRSS/ {print $2}' "/proc/$qspid/status")
 
-# ---- 4a. launcher cold latency (still honest this late: nothing above
-# summons the launcher, so its LazyLoader has never been active in this
-# process)
+# ---- 4a. theme-switcher cold latency (still honest this late: nothing
+# above summons it, so its loader has never been active in this process)
 lc0=$(now_ms)
-qs ipc call launcher toggle >/dev/null
-launcher_cold=$(( $(now_ms) - lc0 ))
-qs ipc call launcher hide >/dev/null
+qs ipc call theme show >/dev/null
+picker_cold=$(( $(now_ms) - lc0 ))
+qs ipc call theme hide >/dev/null
 sleep 0.3
 
 # warm
 lw0=$(now_ms)
-qs ipc call launcher toggle >/dev/null
-launcher_warm=$(( $(now_ms) - lw0 ))
-qs ipc call launcher hide >/dev/null
+qs ipc call theme show >/dev/null
+picker_warm=$(( $(now_ms) - lw0 ))
+qs ipc call theme hide >/dev/null
 
-# IPC round-trip overhead baked into the launcher numbers
+# IPC round-trip overhead baked into the picker numbers
 po0=$(now_ms)
 qs ipc call shell ping >/dev/null
 ipc_overhead=$(( $(now_ms) - po0 ))
@@ -96,8 +97,8 @@ cpu_pct=$(python3 -c "print(f'{$ticks / $hz / 60 * 100:.3f}')")
   echo "ipc ready:       ${ipc_ready:-n/a} ms from spawn (external)"
   echo "idle rss:        $(( rss_kb / 1024 )) MiB (${rss_kb} kB)"
   echo "idle cpu (60s):  ${cpu_pct}%"
-  echo "launcher cold:   ${launcher_cold} ms (incl. ~${ipc_overhead} ms qs-ipc overhead)"
-  echo "launcher warm:   ${launcher_warm} ms (incl. ~${ipc_overhead} ms qs-ipc overhead)"
+  echo "picker cold:     ${picker_cold} ms (incl. ~${ipc_overhead} ms qs-ipc overhead)"
+  echo "picker warm:     ${picker_warm} ms (incl. ~${ipc_overhead} ms qs-ipc overhead)"
 } | tee "$out"
 
 echo "saved: $out"

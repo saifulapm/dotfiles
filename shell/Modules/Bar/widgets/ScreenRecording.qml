@@ -56,14 +56,14 @@ BarIndicator {
         outputFile = String(data.file || "");
     }
 
-    // Upstream's click rule exactly: stop while recording, otherwise hand over
-    // to the menu — theirs shells out to `omarchy-menu toggle
-    // trigger.capture.screenrecord`, ours opens the same submenu in-process.
+    // Upstream's click rule exactly: stop while recording, otherwise hand
+    // over to the recording commands — theirs opens a menu submenu, ours
+    // opens the launcher pre-filtered to the Record script commands.
     onTapped: {
         if (rootItem.recording)
             Quickshell.execDetached([rootItem.binPath, "stop"]);
         else
-            rootItem.shell.openMenu("capture.screenrecord");
+            Quickshell.execDetached(["vicinae", "open", "-q", "Record"]);
     }
 
     Component.onCompleted: refresh()

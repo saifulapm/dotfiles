@@ -311,7 +311,7 @@ hot-reloads QML edits — restart it (`qshell-relaunch`). Syntax check QML with
   via `nmcli` (no polkit prompt in-session, verified)
 - Media: `qs ipc call media playPause` (media keys route here; no playerctl)
 - Misc: `power-profile`, `system-stats`, `reminder <min> [msg]`,
-  `screenrecord` (wf-recorder), `color-pick`, `clipboard-open`
+  `screenrecord` (wf-recorder), `color-pick`
 - Clipboard: `wl-copy` / `wl-paste` (`wl-copy` detaches a child — don't wait
   on it in a pipeline)
 
