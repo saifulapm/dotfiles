@@ -50,7 +50,11 @@ case "$cmd" in
 to | click)
     [[ $# -ge 3 ]] || usage
     goto "$(clampx "$2")" "$(clampy "$3")"
-    [[ $cmd == click ]] && wlrctl pointer click "${4:-left}"
+    # Not `[[ click ]] && …`: as the case's last list that leaves `to`
+    # exiting 1, and every && chain built on a plain move aborts.
+    if [[ $cmd == click ]]; then
+        wlrctl pointer click "${4:-left}"
+    fi
     ;;
 drag)
     [[ $# -eq 5 ]] || usage
