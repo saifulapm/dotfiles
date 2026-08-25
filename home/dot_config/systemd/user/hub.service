@@ -1,0 +1,32 @@
+# systemd user unit for hub — mem's phone-facing view: a small web page over
+# the open-question queue, served tailnet-only, so a question a session is
+# blocked on can be answered from a phone.
+#
+# Installed by run_after_46-workflow.sh (binary) + chezmoi (this file).
+# Deliberately NOT enabled by that script on a machine where it is not already
+# running: this listens on a socket, and turning a network service on across
+# every machine is a decision to make per machine rather than a side effect of
+# an apply. To turn it on here:
+#
+#   systemctl --user enable --now hub
+[Unit]
+Description=hub — mem's phone-facing view
+After=network-online.target
+# Machines that never built it (run_after_46 skipped for want of cargo) must
+# not fail-loop. Same guard pxy.service carries.
+ConditionPathExists=%h/.local/bin/hub
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/hub
+# hub shells out to `mem` for the queue it renders (hub/src/memcli.rs), so the
+# directory holding the SIBLING binary has to be on PATH here — a user unit
+# does not inherit the shell's. ~/.local/bin leads, which is where
+# run_after_46 installs all three; ~/.cargo/bin stays behind it so a dev
+# `cargo install` still resolves if ~/.local/bin has not been populated yet.
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

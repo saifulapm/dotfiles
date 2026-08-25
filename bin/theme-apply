@@ -528,6 +528,10 @@ const OUTPUTS = {
   // theme = "qshell" in its config.toml. No poke below — tv is spawned fresh
   // by each ctrl-r/ctrl-t, so it picks the new palette up on next open.
   "tv-theme.toml.tmpl": [path.join(HOME, ".config/television/themes/qshell.toml")],
+  // amx (coding agents as tmux panes): same themes/<name>.toml convention
+  // again, pinned by theme = "qshell" in its config.toml. No poke — amx
+  // watches this file's mtime and repaints an open view by itself.
+  "amx-theme.toml.tmpl": [path.join(HOME, ".config/amx/themes/qshell.toml")],
   "claude-theme.json.tmpl": [path.join(HOME, ".claude/themes/qshell.json")],
   // pi + opencode: omarchy ports (2026-08-23) — Pi watches ~/.pi/agent/themes
   // hot-reloads qshell.json (like Claude), Opencode watches

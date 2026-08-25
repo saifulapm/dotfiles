@@ -154,6 +154,16 @@ update_src "$HOME/.local/src/kakoune" "$HOME/.local/bin/kak" kakoune-fork
 update_src "$HOME/.local/src/nirisnap" "$HOME/.local/bin/omasnap" nirisnap
 update_src "$HOME/.local/src/nirisaver" "$HOME/.local/bin/nirisaver" nirisaver
 update_src "$HOME/.local/src/pxy" "$HOME/.local/bin/pxy" pxy
+# amx has no releases to check, so the source lane is the only lane it has —
+# `main` is the version. Same dev caveat as pxy: this builds from the clone in
+# ~/.local/src, not from ~/Sites/github/amx, so push before update-all or the
+# binary goes back to origin/main.
+update_src "$HOME/.local/src/amx" "$HOME/.local/bin/amx" amx
+# workflow is THREE binaries (mem, workflow, hub) out of one checkout at one
+# revision, so one guard is the honest number: dropping `workflow` is what
+# makes run_after_46 rebuild and reinstall all three. Same no-releases story as
+# amx — `main` is the version.
+update_src "$HOME/.local/src/workflow" "$HOME/.local/bin/workflow" workflow
 update_src "$HOME/.local/src/omacalc" "$HOME/.local/bin/omacalc" omacalc
 update_src "$HOME/.local/src/omacut" "$HOME/.local/bin/omacut" omacut
 update_src "$HOME/.local/src/omawrite" "$HOME/.local/bin/omawrite" omawrite

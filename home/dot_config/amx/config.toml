@@ -1,0 +1,64 @@
+# amx — coding agents as tmux panes. Ten keys and nothing else; this file
+# spells out the five that are a decision and leaves the four dials unset.
+#
+# A chezmoi SYMLINK, unlike cliamp's and sunsetr's configs, and safe to be one
+# for the reason those two are not: amx only ever READS this file (src/config.rs
+# deserializes, nothing in the tree writes it), so there is no in-place rewrite
+# to leave permanent dirt in the repo. An unparseable file here is not a
+# breakage either — amx warns on stderr and runs on its built-in defaults,
+# because losing an agent to a stray comma is the worse outcome.
+#
+# Unknown keys are warned about and ignored, so this file outliving the version
+# that wrote it is survivable in both directions.
+
+# The vendor command a new agent runs. claude is amx's own default; it is here
+# to be found, not because it differs.
+agent = "claude"
+
+# How many live agents `new` allows before it refuses. Five panes is about what
+# fits a screen worth watching, and the refusal is the point — the limit exists
+# so a runaway loop cannot quietly start a twentieth.
+max_agents = 5
+
+# Give new agents their own git worktree. On for the reason the worktrees exist:
+# two agents editing one checkout is the failure this whole tool is arranged to
+# avoid. `amx new --no-worktree` is the per-invocation escape.
+worktrees = true
+
+# Desktop notifications on the transitions worth interrupting for — an agent
+# that finished, or one that is stuck waiting on an answer. These land through
+# the same notification daemon the bar uses.
+notifications = true
+
+# Answer claude's folder-trust screen for the worktrees amx cuts, by writing
+# claude's own trust store. OFF, which is amx's default and a deliberate one:
+# that store is claude's file, and the flag is the consent a write to somebody
+# else's config stands behind. Flip it to true if the trust prompt on every
+# fresh worktree becomes the thing that wastes the time — it is a real cost of
+# worktrees = true, just not one to opt into silently.
+trust = false
+
+# The palette, by name. "qshell" is the theme bin/theme-apply renders to
+# ~/.config/amx/themes/qshell.toml from templates/amx-theme.toml.tmpl, so amx
+# follows the system theme the way helix, btop, television and cliamp do.
+# amx re-reads the file when its mtime moves (src/theme.rs), so a theme switch
+# lands in a running view without restarting it.
+#
+# Named rather than left at "default": amx's built-in palette is claude's own
+# colours, which is a good answer for somebody who has not themed their machine
+# and the wrong one here, where everything else on screen is already following
+# one set of tokens.
+theme = "qshell"
+
+# The four dials amx can start an agent on are deliberately ABSENT rather than
+# set. Absent means amx passes no flag and the vendor makes its own choice,
+# which is what should happen until there is a reason it should not — there is
+# no value here that means "default", so writing one is always a decision.
+#
+#   model = "opus"                  # the model a new agent starts on
+#   permission = "acceptEdits"      # the permission mode it starts in
+#   effort = "high"                 # the reasoning effort it starts at
+#   summary_command = "..."         # what writes the one line a finished turn
+#                                   # is worth; absent means the row says what
+#                                   # the agent said, not what a second model
+#                                   # would have written about it

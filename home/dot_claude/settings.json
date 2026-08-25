@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/saiful/.cargo/bin/amx _hook"
+            "command": "/home/saiful/.local/bin/amx _hook"
           }
         ]
       }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/saiful/.cargo/bin/amx _hook"
+            "command": "/home/saiful/.local/bin/amx _hook"
           }
         ]
       }
@@ -69,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/saiful/.cargo/bin/amx _hook"
+            "command": "/home/saiful/.local/bin/amx _hook"
           }
         ]
       }
@@ -80,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/saiful/.cargo/bin/amx _hook"
+            "command": "/home/saiful/.local/bin/amx _hook"
           }
         ]
       }
@@ -90,7 +90,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/saiful/.cargo/bin/amx _hook"
+            "command": "/home/saiful/.local/bin/amx _hook"
           }
         ]
       }
@@ -100,7 +100,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/saiful/.cargo/bin/amx _hook"
+            "command": "/home/saiful/.local/bin/amx _hook"
           }
         ]
       }
@@ -110,7 +110,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/saiful/.cargo/bin/amx _hook"
+            "command": "/home/saiful/.local/bin/amx _hook"
           }
         ]
       }

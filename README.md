@@ -25,8 +25,9 @@ themselves), sets up tty1 autologin, registers the shell's file-chooser
 portal, installs the dev toolchain (node via mise, pnpm via corepack, rust
 via rustup, Shopify CLI), the agent CLIs (claude, codex, copilot, pi), the
 pnpm/cargo/go/composer tool sets, prebuilt binaries (watchexec, hurl,
-cloudflared, stripe, ouch, usql, satty), builds the kakoune fork, dekho and
-the three oma apps from source, **switches the login shell to fish**, sets up
+cloudflared, stripe, ouch, usql, satty), builds the kakoune fork, dekho, amx,
+the workflow trio (mem/workflow/hub) and the three oma apps from source,
+**switches the login shell to fish**, sets up
 multi-PHP (php82/83/84 beside system 8.5), on-demand podman dev services
 (mysql/postgres/redis/mailpit) and `https://<project>.test` domains, applies
 the chromium policy, disables suspend everywhere, opens the dufs port,
