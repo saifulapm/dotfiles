@@ -27,22 +27,54 @@ BarButton {
             shelf.toggle();
     }
 
-    OpticalGlyph {
-        id: glyph
-        text: {
-            if (dropZone.containsDrag)
-                return "\u{F0120}"; // md-tray-arrow-down
-            return rootItem.shelf.items.length > 0 ? "\u{F1296}" : "\u{F1294}"; // md-tray-full / md-tray
+    // md-inbox, not ledge's md-tray: the tray is a near-empty outline that
+    // reads as a broken glyph at bar size (verified in an isolated render);
+    // the inbox is solid ink and unmistakably "things land here". The item
+    // count rides a badge instead of a glyph swap.
+    Item {
+        width: 27
+        height: 26
+
+        OpticalGlyph {
+            id: glyph
+            anchors.centerIn: parent
+            text: dropZone.containsDrag ? "\u{F0120}" : "\u{F02FB}" // md-tray-arrow-down / md-inbox
+            pixelSize: 13
+            verticalInkCenter: true
+            color: dropZone.containsDrag ? rootItem.theme.accent : (rootItem.shelf.items.length > 0 ? rootItem.barFg : Qt.darker(rootItem.barFg, 1.55))
+            opacity: rootItem.shelf.items.length > 0 || dropZone.containsDrag ? 1.0 : 0.6
+            colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
         }
-        pixelSize: 13
-        verticalInkCenter: true
-        color: dropZone.containsDrag ? rootItem.theme.accent : (rootItem.shelf.items.length > 0 ? rootItem.barFg : Qt.darker(rootItem.barFg, 1.55))
-        opacity: rootItem.shelf.items.length > 0 || dropZone.containsDrag ? 1.0 : 0.6
-        colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
+
+        Rectangle {
+            visible: rootItem.shelf.items.length > 0 && !dropZone.containsDrag
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 2
+            width: Math.max(height, badgeText.implicitWidth + 4)
+            height: 11
+            radius: height / 2
+            color: rootItem.theme.accent
+
+            Text {
+                id: badgeText
+                anchors.centerIn: parent
+                text: Math.min(rootItem.shelf.items.length, 9)
+                color: rootItem.theme.textOnAccent
+                font.family: rootItem.theme.fontUi
+                font.pixelSize: 8
+                font.weight: Font.Bold
+            }
+        }
     }
 
     DropArea {
         id: dropZone
+        // BarButton's default property routes children into its content Row,
+        // where an anchors.fill item breaks the row's layout (the glyph got
+        // shoved off the slot). Reparent onto the button itself: the drop
+        // target is the whole icon slot, not a row cell.
+        parent: rootItem
         anchors.fill: parent
 
         onEntered: drag => {

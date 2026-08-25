@@ -38,6 +38,11 @@ Scope {
     property var items: []
     property bool loaded: false
 
+    // Where the card sits, dragged there by its header and persisted with
+    // the items. -1 = the default berth (right edge, vertically centered).
+    property real cardX: -1
+    property real cardY: -1
+
     function show() {
         opened = true;
     }
@@ -50,7 +55,11 @@ Scope {
 
     // ------------------------------------------------------------- storage
     function saveItems() {
-        storeFile.setText(JSON.stringify(items, null, 2) + "\n");
+        storeFile.setText(JSON.stringify({
+            items: items,
+            x: cardX,
+            y: cardY
+        }, null, 2) + "\n");
     }
 
     readonly property FileView storeFile: FileView {
@@ -62,8 +71,16 @@ Scope {
             shelfRoot.loaded = true;
             try {
                 const parsed = JSON.parse(text());
-                if (Array.isArray(parsed))
-                    shelfRoot.items = parsed.filter(it => it && typeof it.path === "string");
+                // Legacy stores were a bare array; the object shape carries
+                // the card position too.
+                const list = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.items) ? parsed.items : []);
+                shelfRoot.items = list.filter(it => it && typeof it.path === "string");
+                if (parsed && !Array.isArray(parsed)) {
+                    if (isFinite(Number(parsed.x)))
+                        shelfRoot.cardX = Number(parsed.x);
+                    if (isFinite(Number(parsed.y)))
+                        shelfRoot.cardY = Number(parsed.y);
+                }
             } catch (e) {}
         }
         onLoadFailed: shelfRoot.loaded = true
@@ -271,22 +288,17 @@ Scope {
             color: "transparent"
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "qshell-shelf"
-            WlrLayershell.keyboardFocus: shelfRoot.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+            // NO keyboard, ever: the shelf stays open WHILE you work, and
+            // any keyboard interactivity steals focus from the window under
+            // it (Exclusive stole it outright; OnDemand still grabs on map
+            // under niri — both measured, focused-window went null). Close
+            // is the header button, the bar icon, or IPC; there is no Esc
+            // because there are no keys.
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
             Region {
                 id: cardMask
                 item: card
-            }
-
-            Item {
-                anchors.fill: parent
-                focus: true
-                Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Escape) {
-                        shelfRoot.hide();
-                        event.accepted = true;
-                    }
-                }
             }
 
             Rectangle {
@@ -294,9 +306,19 @@ Scope {
 
                 readonly property real cardWidth: shelfRoot.theme.space(52)
 
-                anchors.right: parent.right
-                anchors.rightMargin: shelfRoot.theme.space(3)
-                anchors.verticalCenter: parent.verticalCenter
+                // Free-floating: the header drags it anywhere, the berth is
+                // remembered. Clamped so a saved position from a bigger
+                // screen cannot strand the card off-frame.
+                x: {
+                    const def = parent.width - width - shelfRoot.theme.space(3);
+                    const want = shelfRoot.cardX >= 0 ? shelfRoot.cardX : def;
+                    return Math.max(0, Math.min(want, parent.width - width));
+                }
+                y: {
+                    const def = (parent.height - height) / 2;
+                    const want = shelfRoot.cardY >= 0 ? shelfRoot.cardY : def;
+                    return Math.max(0, Math.min(want, parent.height - height));
+                }
                 width: cardWidth
                 height: Math.min(column.implicitHeight + shelfRoot.theme.space(6), parent.height - shelfRoot.theme.space(20))
                 radius: shelfRoot.theme.radius(1.5)
@@ -336,6 +358,21 @@ Scope {
                         width: parent.width
                         height: shelfRoot.theme.space(6)
 
+                        // The header is the card's drag grip: move the shelf
+                        // wherever the current work wants it; the berth is
+                        // saved with the items.
+                        DragHandler {
+                            target: card
+                            cursorShape: Qt.SizeAllCursor
+                            onActiveChanged: {
+                                if (active)
+                                    return;
+                                shelfRoot.cardX = card.x;
+                                shelfRoot.cardY = card.y;
+                                shelfRoot.saveItems();
+                            }
+                        }
+
                         StyledText {
                             theme: shelfRoot.theme
                             anchors.left: parent.left
@@ -370,12 +407,23 @@ Scope {
                         GlyphButton {
                             id: clearBtn
                             theme: shelfRoot.theme
-                            anchors.right: parent.right
+                            anchors.right: closeBtn.left
+                            anchors.rightMargin: shelfRoot.theme.space(1)
                             anchors.verticalCenter: parent.verticalCenter
                             glyph: "󰆴" // md-trash-can
                             visible: shelfRoot.items.length > 0
                             hint: "Clear the shelf"
                             onActivated: shelfRoot.clearAll()
+                        }
+
+                        GlyphButton {
+                            id: closeBtn
+                            theme: shelfRoot.theme
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            glyph: "󰅖" // md-close
+                            hint: "Hide the shelf"
+                            onActivated: shelfRoot.hide()
                         }
                     }
 
@@ -514,7 +562,7 @@ Scope {
                         visible: shelfRoot.items.length > 0
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
-                        text: "drag out · click copies as file · ctrl-click selects · esc hides"
+                        text: "drag out · click copies as file · ctrl-click selects\ndrag the header to move the card"
                     }
                 }
             }
