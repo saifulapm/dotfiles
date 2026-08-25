@@ -4,6 +4,7 @@ import Quickshell.Io
 
 import qs.Services
 import qs.Modules.Bar
+import qs.Modules.Shelf
 import "Modules/Bar/BarModel.js" as BarModel
 
 // Single long-running ShellRoot. One process: panels are summoned by IPC
@@ -78,6 +79,13 @@ ShellRoot {
     // until then.
     property Sync sync: Sync {
         shellRoot: shell
+    }
+    // The shelf dropzone (Modules/Shelf). Eager but nearly free: until it is
+    // opened the whole thing is one FileView and a few properties — the
+    // window lives behind a LazyLoader. Eager because the bar's tray icon
+    // must take drops and show the count with the window never opened.
+    property Shelf shelf: Shelf {
+        theme: shell.theme
     }
 
     // Hardcoded fallback: a broken or missing shell.json still renders this
@@ -713,6 +721,39 @@ ShellRoot {
 
         function hide(): string {
             emojisLoader.deliver("hide");
+            return "ok";
+        }
+    }
+
+    IpcHandler {
+        target: "shelf"
+
+        function toggle(): string {
+            shell.shelf.toggle();
+            return "ok";
+        }
+
+        function show(): string {
+            shell.shelf.show();
+            return "ok";
+        }
+
+        function hide(): string {
+            shell.shelf.hide();
+            return "ok";
+        }
+
+        // `qs ipc call shelf add /absolute/path` — yazi, scripts, vicinae.
+        function add(path: string): string {
+            return shell.shelf.addPath(path);
+        }
+
+        function addClipboard(): string {
+            return shell.shelf.addClipboard();
+        }
+
+        function clear(): string {
+            shell.shelf.clearAll();
             return "ok";
         }
     }

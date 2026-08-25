@@ -15,7 +15,7 @@ import Quickshell.Wayland
 //
 // Config lives in shell.json's root `idle` block:
 //
-//     "idle": { "screensaver": 150, "blank": 300, "lock": 360 }
+//     "idle": { "keyboard": 45, "screensaver": 150, "blank": 300, "lock": 360 }
 //
 // Seconds. A missing/invalid value falls back to the default; 0 disables that
 // stage; with every stage disabled the monitor itself never arms.
@@ -69,12 +69,20 @@ QtObject {
     readonly property string idleFlagPath: stateDir + "/idle"
 
     // Upstream's defaults (their Service.qml); `blank` is ours and stays off
-    // unless shell.json asks for it.
+    // unless shell.json asks for it. `keyboard` (2026-08-26, the omarchy
+    // keyboard-idle port): the backlight goes dark well before the
+    // screensaver — it is the brightest thing on an idle MacBook — and
+    // comes back with the first touch. brightness-keyboard is a no-op on
+    // machines without the LED, and its `off` parks the level only once,
+    // so the blank stage repeating it later cannot clobber the restore.
+    readonly property int defaultKeyboardSeconds: 45
     readonly property int defaultScreensaverSeconds: 150
     readonly property int defaultBlankSeconds: 0
     readonly property int defaultLockSeconds: 300
 
     readonly property var idleConfig: shellRoot && shellRoot.config && shellRoot.config.idle && typeof shellRoot.config.idle === "object" ? shellRoot.config.idle : ({})
+    readonly property int keyboardTimeoutSeconds: secondsFromConfig(idleConfig.keyboard, defaultKeyboardSeconds)
+    readonly property bool keyboardStageEnabled: keyboardTimeoutSeconds > 0
     readonly property int screensaverTimeoutSeconds: secondsFromConfig(idleConfig.screensaver, defaultScreensaverSeconds)
     readonly property int blankTimeoutSeconds: secondsFromConfig(idleConfig.blank, defaultBlankSeconds)
     readonly property int lockTimeoutSeconds: secondsFromConfig(idleConfig.lock, defaultLockSeconds)
@@ -86,6 +94,8 @@ QtObject {
     // stage's deadline plus the difference.
     readonly property int firstIdleTimeoutSeconds: {
         const stages = [];
+        if (keyboardStageEnabled)
+            stages.push(keyboardTimeoutSeconds);
         if (screensaverStageEnabled)
             stages.push(screensaverTimeoutSeconds);
         if (blankStageEnabled)
@@ -94,6 +104,7 @@ QtObject {
             stages.push(lockTimeoutSeconds);
         return stages.length > 0 ? Math.min.apply(Math, stages) : 0;
     }
+    readonly property int keyboardDelaySeconds: Math.max(0, keyboardTimeoutSeconds - firstIdleTimeoutSeconds)
     readonly property int screensaverDelaySeconds: Math.max(0, screensaverTimeoutSeconds - firstIdleTimeoutSeconds)
     readonly property int blankDelaySeconds: Math.max(0, blankTimeoutSeconds - firstIdleTimeoutSeconds)
     readonly property int lockDelaySeconds: Math.max(0, lockTimeoutSeconds - firstIdleTimeoutSeconds)
@@ -152,6 +163,26 @@ QtObject {
         run(["brightness-keyboard", "restore"]);
     }
 
+    // The keyboard idle stage. Restore is safe to repeat: `off` parks the
+    // level once and `restore` consumes the parked file, so overlapping
+    // with the blank stage's own off/restore pair cannot double-park.
+    property bool keyboardDimmed: false
+
+    function dimKeyboard() {
+        if (keyboardDimmed)
+            return;
+        keyboardDimmed = true;
+        logEvent("keyboard", "backlight-off");
+        run(["brightness-keyboard", "off"]);
+    }
+
+    function restoreKeyboard() {
+        if (!keyboardDimmed)
+            return;
+        keyboardDimmed = false;
+        run(["brightness-keyboard", "restore"]);
+    }
+
     function launchScreensaver() {
         if (shellRoot.locked) {
             logEvent("screensaver", "skipped-locked");
@@ -179,6 +210,7 @@ QtObject {
     }
 
     function lockNow(reason) {
+        keyboardTimer.stop();
         screensaverTimer.stop();
         blankTimer.stop();
         lockTimer.stop();
@@ -205,6 +237,13 @@ QtObject {
         run(["touch", idleFlagPath]);
         logEvent("idle-cycle-start", "screensaver=" + screensaverTimeoutSeconds + " lock=" + lockTimeoutSeconds);
 
+        if (keyboardStageEnabled) {
+            if (keyboardDelaySeconds === 0)
+                dimKeyboard();
+            else
+                keyboardTimer.restart();
+        }
+
         if (screensaverStageEnabled) {
             if (screensaverDelaySeconds === 0)
                 launchScreensaver();
@@ -228,9 +267,11 @@ QtObject {
     }
 
     function cancelIdleCycle(reason) {
+        keyboardTimer.stop();
         screensaverTimer.stop();
         blankTimer.stop();
         lockTimer.stop();
+        restoreKeyboard();
         if (idledThisCycle) {
             logEvent("idle-cycle-cancel", reason || "requested");
             killScreensaver();
@@ -317,6 +358,15 @@ QtObject {
         // Honour idle inhibitors: a player holding one suspends the cycle.
         respectInhibitors: true
         onIsIdleChanged: root.handleIdleChanged()
+    }
+
+    readonly property Timer keyboardTimer: Timer {
+        interval: root.keyboardDelaySeconds * 1000
+        repeat: false
+        onTriggered: {
+            if (root.idleEnabled && root.idledThisCycle)
+                root.dimKeyboard();
+        }
     }
 
     readonly property Timer screensaverTimer: Timer {

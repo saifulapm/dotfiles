@@ -34,6 +34,7 @@
         "birthYear": 1991,
         "lifeExpectancy": 70
       },
+      "prayer",
       {
         "id": "timezones",
         "zones": [
@@ -68,7 +69,8 @@
       "audio",
       "monitor",
       "battery",
-      "notifs"
+      "notifs",
+      "shelf"
     ]
   }
 }

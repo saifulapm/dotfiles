@@ -733,6 +733,12 @@ Scope {
     // No gate: the world clock ticks on Quickshell's own SystemClock (the
     // clock widget's object, no second timer) and re-reads offsets only at a
     // DST boundary it schedules itself — nothing to scope to visibility.
+    function prayerService() {
+        return sharedService("prayer", prayerServiceComponent, {
+            settings: Qt.binding(() => barRoot.inlineEntryFor("prayer"))
+        });
+    }
+
     function timezonesService() {
         return sharedService("timezones", timezonesServiceComponent, {
             settings: Qt.binding(() => barRoot.inlineEntryFor("timezones"))
@@ -905,6 +911,11 @@ Scope {
         DictationService {}
     }
 
+    Component {
+        id: prayerServiceComponent
+        PrayerService {}
+    }
+
     // ------------------------------------------------------ widget registry
     readonly property var registry: ({
             "launcher": launcherComponent,
@@ -932,6 +943,8 @@ Scope {
             "monitor": monitorComponent,
             "ssh": sshComponent,
             "timezones": timezonesComponent,
+            "prayer": prayerComponent,
+            "shelf": shelfComponent,
             "drives": drivesComponent,
             "ports": portsComponent,
             "pass": passComponent,
@@ -2343,6 +2356,22 @@ Scope {
         Timezones {
             theme: barRoot.theme
             timezones: barRoot.timezonesService()
+        }
+    }
+
+    Component {
+        id: prayerComponent
+        Prayer {
+            theme: barRoot.theme
+            prayer: barRoot.prayerService()
+        }
+    }
+
+    Component {
+        id: shelfComponent
+        ShelfWidget {
+            theme: barRoot.theme
+            shelf: barRoot.shell.shelf
         }
     }
 
