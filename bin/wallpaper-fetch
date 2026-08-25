@@ -4,9 +4,10 @@
 #
 #   wallpaper-fetch --sources
 #       One line per usable source: <name>\t<searchable 0|1>\t<label>.
-#       wallhaven needs `pass wallhaven/api_key`, pexels `pass
-#       pexels/api_key`; a missing key just drops that source from the list
-#       (nothing else fails), so adding a key is the whole setup.
+#       wallhaven needs `pass wallhaven/api_key`, unsplash `pass
+#       unsplash/access_key`, pexels `pass pexels/api_key`; a missing key
+#       just drops that source from the list (nothing else fails), so
+#       adding a key is the whole setup.
 #
 #   wallpaper-fetch --list --source S [--query QUERY] [--page N]
 #       Fetch one page of results, pre-build thumbs under
@@ -50,6 +51,7 @@ EOF
 
 wallhaven_key() { pass show wallhaven/api_key 2>/dev/null || true; }
 pexels_key() { pass show pexels/api_key 2>/dev/null || true; }
+unsplash_key() { pass show unsplash/access_key 2>/dev/null || true; }
 
 # ---- one thumb job: download + downscale, then write the finished TSV row
 # to $3 so the parent can emit rows in API order. Exported and run under
@@ -174,6 +176,43 @@ list_pexels() {
     printf '__META__\t%s\t%s\t%s\t%s\n' "$page" "$pages" "$query" "pexels"
 }
 
+list_unsplash() {
+    local query="$1" page="$2" api_key
+    api_key="$(unsplash_key)"
+    [[ -n $api_key ]] || { echo "wallpaper-fetch: no API key in pass unsplash/access_key" >&2; return 1; }
+    local body pages rows_jq
+    if [[ -n $query ]]; then
+        body="$(curl -fsS --max-time 30 -H "Authorization: Client-ID $api_key" \
+            "https://api.unsplash.com/search/photos?query=$(printf %s "$query" | jq -sRr @uri)&per_page=24&page=$page&orientation=landscape")" || return 1
+        pages="$(jq -r '.total_pages // 1' <<<"$body")"
+        ((pages > 200)) && pages=200; ((pages < 1)) && pages=1
+        rows_jq='.results[]?'
+    else
+        # The editorial feed reports its total only in headers; 100 pages is
+        # a deep enough window for a picker.
+        body="$(curl -fsS --max-time 30 -H "Authorization: Client-ID $api_key" \
+            "https://api.unsplash.com/photos?per_page=24&page=$page&order_by=popular")" || return 1
+        pages=100
+        rows_jq='.[]?'
+    fi
+    local cache="$thumb_root/unsplash-thumbs"
+    mkdir -p "$cache"
+    # urls.regular is 1080w server-side (direct=1, no ffmpeg). The image_url
+    # column carries links.download_location — an API endpoint, not a file —
+    # which --download resolves with the key; hitting it is also how
+    # Unsplash's guidelines want a download registered.
+    jq -r "$rows_jq | [
+        .id, .links.download_location, .urls.regular,
+        ((.width|tostring) + \"x\" + (.height|tostring))
+      ] | @tsv" <<<"$body" \
+    | while IFS=$'\t' read -r id dl thumb resolution; do
+        [[ -n $id && -n $dl ]] || continue
+        printf '%s\t%s\t1\t%s\n' \
+            "$thumb" "$cache/$id.jpg" "$dl	$id	$resolution	jpg"
+    done | run_jobs_and_emit
+    printf '__META__\t%s\t%s\t%s\t%s\n' "$page" "$pages" "$query" "unsplash"
+}
+
 list_bing() {
     local query="$1" page="$2"
     # Bing's daily-image archive reaches back ~16 images in two windows.
@@ -224,6 +263,7 @@ mode="$1"; shift
 case "$mode" in
 --sources)
     [[ -n "$(wallhaven_key)" ]] && printf 'wallhaven\t1\tWallhaven\n'
+    [[ -n "$(unsplash_key)" ]] && printf 'unsplash\t1\tUnsplash\n'
     [[ -n "$(pexels_key)" ]] && printf 'pexels\t1\tPexels\n'
     printf 'bing\t0\tBing daily\n'
     printf 'picsum\t0\tPicsum\n'
@@ -241,6 +281,7 @@ case "$mode" in
     done
     case "$source" in
     wallhaven) list_wallhaven "$query" "$page" ;;
+    unsplash) list_unsplash "$query" "$page" ;;
     pexels) list_pexels "$query" "$page" ;;
     bing) list_bing "$query" "$page" ;;
     picsum) list_picsum "$query" "$page" ;;
@@ -255,6 +296,15 @@ case "$mode" in
     fi
     [[ $# -eq 3 ]] || usage
     url="$1" id="$2" ext="$3"
+    # Unsplash rows carry links.download_location — an authed API endpoint
+    # returning {url}. Resolving it here both finds the real file and
+    # registers the download, which their API guidelines ask for.
+    if [[ $source == unsplash ]]; then
+        api_key="$(unsplash_key)"
+        real="$(curl -fsS --max-time 30 -H "Authorization: Client-ID $api_key" "$url" | jq -r '.url // empty')"
+        [[ -n $real ]] || { echo "wallpaper-fetch: could not resolve unsplash download for $id" >&2; exit 1; }
+        url="$real"
+    fi
     dest="$download_dir/$source-$id.$ext"
     if [[ -s $dest ]]; then
         echo "$dest"
