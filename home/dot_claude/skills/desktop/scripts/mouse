@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# mouse — hot-zone-safe absolute pointer positioning (wlrctl is relative-only).
+#
+#   mouse to X Y             put the pointer at logical (X,Y) (= grim -s 1 pixels)
+#   mouse click X Y [button] move there, then click (left, right, middle)
+#   mouse drag X1 Y1 X2 Y2   left-press at 1, glide, release at 2 (needs ydotoold)
+#
+# Absolute positioning needs a corner pin first, and the pin corner MUST be
+# top-right: (0,0) and (0,H-1) are niri overview hot corners — a 1x1-px rect
+# at the exact corner pixel that fires even where the bar covers it
+# (contents_under() special-cases it; niri.rs is_inside_hot_corner) — and
+# the right screen edge below the bar is the notes 1-px hot strip
+# (NotesEdge.qml: 150 ms hover dwell, instant for drags). The bar's right
+# end is the one corner with nothing behind it: both right hot corners are
+# off in config.kdl, and the strip starts below the bar's exclusive zone.
+#
+# Targets are clamped 2 px inside the screen so a landing can never rest in
+# a hot corner or on the notes strip. wlrctl deltas are applied as a single
+# jump (no traversal), so only endpoints matter.
+#
+# Screen geometry comes from `niri msg -j outputs` (rightmost output; these
+# machines drive one display). Under the nested dev compositor niri msg
+# still answers for the LIVE session — override with MOUSE_SCREEN=WxH.
+
+set -euo pipefail
+
+usage() { sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+die() { echo "mouse: $*" >&2; exit 1; }
+
+if [[ -n "${MOUSE_SCREEN:-}" ]]; then
+    OX=0 OY=0 W=${MOUSE_SCREEN%x*} H=${MOUSE_SCREEN#*x}
+else
+    read -r OX OY W H < <(niri msg -j outputs | jq -r '
+        [.[] | .logical | select(. != null)] | max_by(.x + .width)
+        | "\(.x) \(.y) \(.width) \(.height)"') || true
+fi
+[[ "${W:-0}" =~ ^[0-9]+$ && ${W:-0} -gt 0 ]] || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
+
+clamp() { local v=$1 lo=$2 hi=$3; ((v < lo)) && v=$lo; ((v > hi)) && v=$hi; echo "$v"; }
+clampx() { clamp "$1" $((OX + 2)) $((OX + W - 3)); }
+clampy() { clamp "$1" $((OY + 2)) $((OY + H - 3)); }
+
+goto() { # args already clamped
+    wlrctl pointer move 20000 -20000                       # pin at top-right, on the bar
+    wlrctl pointer move $(($1 - OX - W + 1)) $(($2 - OY))  # one jump to the target
+}
+
+cmd=${1:-}
+case "$cmd" in
+to | click)
+    [[ $# -ge 3 ]] || usage
+    goto "$(clampx "$2")" "$(clampy "$3")"
+    [[ $cmd == click ]] && wlrctl pointer click "${4:-left}"
+    ;;
+drag)
+    [[ $# -eq 5 ]] || usage
+    systemctl --user is-active -q ydotoold || die "ydotoold is not running; drag needs it for the held button"
+    X1=$(clampx "$2") Y1=$(clampy "$3") X2=$(clampx "$4") Y2=$(clampy "$5")
+    goto "$X1" "$Y1"
+    ydotool click 0x40 # press and HOLD left
+    sleep 0.05
+    wlrctl pointer move $((X2 - X1)) $((Y2 - Y1))
+    sleep 0.05
+    ydotool click 0x80 # release
+    ;;
+*)
+    usage
+    ;;
+esac

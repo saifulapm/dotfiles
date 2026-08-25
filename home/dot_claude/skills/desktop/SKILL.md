@@ -42,7 +42,7 @@ eDP-1 at 1706x1066 logical / scale 1.5, qshell bar = top 26px strip).
 | CLI / TUI | tmux (`send-keys` + `capture-pane`) | full text in, full text out, nothing visual to pay for |
 | The shell itself (bar, panels, overlays) | `qs ipc` + `niri msg` | the surfaces answer directly; screenshots are a last resort |
 
-`gui` prints its full usage with no arguments.
+`gui` and `mouse` (same scripts dir) print their full usage with no arguments.
 
 ## The loop — every interaction, any app type
 
@@ -94,12 +94,24 @@ bug — re-verify at fullscreen / re-read the real state, then retest once.
 - **grim BEFORE pressing Return inside qshell panels.** Blind Right+Return in
   the network panel once switched the user's DNS to Cloudflare. Look, then press.
 
-## Mouse — wlrctl to point, ydotool to hold
+## Mouse — scripts/mouse (wlrctl to point, ydotool to hold)
 
-- Relative only, so reach absolute (X,Y) logical coords by pinning to the
-  corner first:
-  `wlrctl pointer move -20000 -20000 && wlrctl pointer move X Y`
-- `wlrctl pointer click` (left; also `right`, `middle`), `wlrctl pointer scroll dy dx`.
+- All absolute positioning goes through `~/.claude/skills/desktop/scripts/mouse`:
+  `mouse to X Y` · `mouse click X Y [left|right|middle]` ·
+  `mouse drag X1 Y1 X2 Y2`.
+- **Never pin the pointer to a corner yourself**
+  (`wlrctl pointer move -20000 -20000` is FORBIDDEN): (0,0) and (0,H-1) are
+  niri overview hot corners — a 1×1-px rect at the exact corner pixel that
+  fires even where the bar covers it — and the right screen edge below the
+  bar is the notes 1-px hot strip (150 ms hover dwell; a drag touching it
+  summons the panel instantly). The old top-left pin opened the overview on
+  EVERY absolute move. The script pins to the bar's right end (the only
+  inert corner) and clamps targets 2 px inside the screen; wlrctl deltas
+  land in a single jump, so only endpoints matter, never the path.
+- If a stray move did trip something: overview →
+  `niri msg action close-overview` (idempotent; state:
+  `niri msg -j overview-state`); notes panel → `qs ipc call notes -- hide`.
+- Scroll stays raw wlrctl: `wlrctl pointer scroll dy dx`.
 - Coordinates == pixels in a `grim -s 1` capture. Take the region shot, find
   the target, click those numbers.
 - **Moving the pointer changes focus** (focus-follows-mouse is on) and can
@@ -110,22 +122,18 @@ bug — re-verify at fullscreen / re-read the real state, then retest once.
   cursor) on a small region — the only way to confirm a move landed.
 - Prefer `gui click` over coordinates whenever the app exposes a11y: it
   can't miss, and it doesn't move the user's pointer at all.
-- **Dragging** (sliders, drag-and-drop, marquee) needs a held button, which
-  wlrctl cannot express — hold it with ydotool and steer with wlrctl:
-
-```sh
-wlrctl pointer move -20000 -20000 && wlrctl pointer move X Y   # to the grab point
-ydotool click 0x40      # press and HOLD left     (0x40 down · 0x80 up · 0xC0 click)
-wlrctl pointer move DX DY                                       # drag, relatively
-ydotool click 0x80      # release
-```
-
-  Verified end to end (a GTK slider moved 50 → 89). Two traps: **don't
-  reach for `ydotool mousemove --absolute`** — ydotoold's default device is
-  relative, so absolute coordinates are ignored, and `ydotoold -T` (the
-  EV_ABS/touch device that would accept them) exits 2 immediately on this
-  machine, verified against a working control run. Position with wlrctl,
-  use ydotool only for the buttons. And `ydotoold` must be running
+- **Dragging** (sliders, drag-and-drop, marquee): `mouse drag X1 Y1 X2 Y2` —
+  it holds the button with ydotool (wlrctl cannot express a held button) and
+  steers with wlrctl. Verified end to end (a GTK slider moved 50 → 89). For
+  a multi-waypoint drag, do it manually — `mouse to` the grab point,
+  `ydotool click 0x40` (press and HOLD; `0x80` up), steer with *relative*
+  `wlrctl pointer move DX DY` legs, release — and keep every waypoint off
+  the right edge (notes DropArea). Two traps: **don't reach for `ydotool
+  mousemove --absolute`** — ydotoold's default device is relative, so
+  absolute coordinates are ignored, and `ydotoold -T` (the EV_ABS/touch
+  device that would accept them) exits 2 immediately on this machine,
+  verified against a working control run. Position with wlrctl, use ydotool
+  only for the buttons. And `ydotoold` must be running
   (`systemctl --user status ydotoold`), which needs the `input` group
   active in the session — a fresh login after install.
 - **To click a spot inside a window, fullscreen it first**
@@ -322,7 +330,8 @@ crashes, destructive keybinds): `just dev` in ~/.dotfiles opens a nested niri
 on wayland-2 with its own qshell. Prefix every command with
 `WAYLAND_DISPLAY=wayland-2` (`grim`, `wtype`, `qs list --all`, `qs ipc -i <id>`).
 grim there captures only the nested output and keeps working if the real
-session locks.
+session locks. For `mouse` there, also set `MOUSE_SCREEN=WxH` to the nested
+output size — `niri msg` still answers for the live session.
 
 ## Never do (without the user asking in this conversation)
 
