@@ -112,6 +112,7 @@ Scope {
                         required property string body
                         required property string image
                         required property string glyph
+                        required property string execArgv
                         required property int urgency
                         required property double expireTimeout
                         required property double timestamp
@@ -132,6 +133,8 @@ Scope {
 
                         Component.onDestruction: {
                             if (card.hovered)
+                                popupsRoot.setHoverHold(cardSlot.originalId, false);
+                            if (card.dragActive)
                                 popupsRoot.setHoverHold(cardSlot.originalId, false);
                         }
 
@@ -161,6 +164,13 @@ Scope {
                             id: card
                             anchors.right: parent.right
                             onHoveredChanged: popupsRoot.setHoverHold(cardSlot.originalId, card.hovered)
+                            // A platform drag moves the pointer grab off the
+                            // card, dropping the hover hold — on EVERY
+                            // screen's copy of this toast, any of which could
+                            // then expire the row and destroy the drag
+                            // source mid-flight. The drag takes its own hold
+                            // on the same counter for as long as it runs.
+                            onDragActiveChanged: popupsRoot.setHoverHold(cardSlot.originalId, card.dragActive)
                             theme: popupsRoot.theme
                             app: cardSlot.app
                             appIcon: cardSlot.appIcon
@@ -168,6 +178,7 @@ Scope {
                             body: cardSlot.body
                             image: cardSlot.image
                             glyph: cardSlot.glyph
+                            execArgv: cardSlot.execArgv
                             urgency: cardSlot.urgency
                             timestamp: cardSlot.timestamp
                             // A replayed history row has no live notification

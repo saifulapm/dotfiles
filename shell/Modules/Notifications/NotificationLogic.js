@@ -125,6 +125,48 @@ function parseExecArgv(value) {
     return parsed;
 }
 
+// Files a notification is ABOUT, for dragging out of its card. Derived from
+// the exec-argv hint rather than declared as its own hint, so it works on
+// every row exec-argv already reaches — live toasts, replayed history, rows
+// restored across a shell restart. Only commands whose arguments ARE the
+// subject files qualify: yazi-yank-clipboard (Taildrop arrivals) and mpv
+// (the ytdlp download toast). An allowlist, not "any absolute argument" —
+// crash-watch's argv carries the crashed binary's path, and a crash toast
+// must not drag /usr/bin/foo around. Falls back to a file-backed image (a
+// screenshot toast drags the shot); icon-theme names and image:// provider
+// URLs have no file behind them.
+var DRAG_CARRIERS = {
+    "yazi-yank-clipboard": true,
+    "mpv": true
+};
+
+function dragPaths(execArgv, image) {
+    var argv = parseExecArgv(execArgv);
+    if (argv && DRAG_CARRIERS[argv[0].split("/").pop()]) {
+        var paths = [];
+        for (var i = 1; i < argv.length; i++) {
+            if (argv[i].charAt(0) === "/")
+                paths.push(argv[i]);
+        }
+        if (paths.length > 0)
+            return paths;
+    }
+    var img = String(image || "");
+    if (img.indexOf("file://") === 0)
+        img = decodeURIComponent(img.substring(7));
+    if (img.charAt(0) === "/")
+        return [img];
+    return [];
+}
+
+// Same wire format as the Shelf's uriList: file:// URIs, CRLF-joined,
+// trailing terminator — what every uri-list consumer expects.
+function dragUriList(paths) {
+    return paths.map(function (p) {
+        return "file://" + String(p).split("/").map(encodeURIComponent).join("/");
+    }).join("\r\n") + "\r\n";
+}
+
 function shouldRenderCompactGlyph(glyph, iconSource, singleLineToast) {
     return String(glyph || "").length > 0 && String(iconSource || "").length === 0 && !!singleLineToast;
 }
@@ -504,6 +546,8 @@ if (typeof module !== "undefined") {
         glyphFromHints: glyphFromHints,
         execArgvFromHints: execArgvFromHints,
         parseExecArgv: parseExecArgv,
+        dragPaths: dragPaths,
+        dragUriList: dragUriList,
         shouldRenderCompactGlyph: shouldRenderCompactGlyph,
         snapshotOf: snapshotOf,
         historyEntry: historyEntry,

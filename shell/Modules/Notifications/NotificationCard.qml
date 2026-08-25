@@ -31,12 +31,22 @@ Rectangle {
     // Actions as the server reports them; the container passes the live
     // notification's list, or nothing for a replayed history row.
     property var actions: []
+    // The persisted qshell-exec-argv hint, when the container has one. Rows
+    // whose argv carries subject files (Taildrop, ytdlp — see
+    // Logic.dragPaths) make the whole card a drag source.
+    property string execArgv: ""
     // Remaining share of this toast's lifetime, 1 → 0. Drives the countdown
     // rail along the bottom edge; a lifetime of 0 (critical) hides it.
     property real progress: 1
     property bool showCountdown: false
 
     readonly property bool hovered: hoverTracker.hovered
+    // Files this notification is about; non-empty makes the card draggable.
+    // The container holds the toast's expiry while this is active — an
+    // Automatic drag moves the pointer grab off the card, so hover alone
+    // would let the countdown remove the drag source mid-flight.
+    readonly property var dragPaths: Logic.dragPaths(execArgv, image)
+    readonly property bool dragActive: cardDrag.active
 
     signal closeRequested
     signal cardClicked
@@ -98,6 +108,32 @@ Rectangle {
 
     HoverHandler {
         id: hoverTracker
+        // Grab the drag pixmap on HOVER — the grab is asynchronous and must
+        // be done before the press that starts the drag (the Shelf's note).
+        onHoveredChanged: if (hovered && root.dragPaths.length > 0)
+            root.grabToImage(result => {
+                root.Drag.imageSource = result.url;
+            })
+    }
+
+    // The Shelf rows' verified drag-out recipe: Automatic platform drag,
+    // uri-list + plain paths, DragHandler alongside the click MouseArea —
+    // the handler only takes the grab once the press actually moves, so
+    // click (copy / default action) and right-click (close) are untouched.
+    // A Taildrop arrival drags straight onto the Shelf tray icon, the notes
+    // edge, or any application.
+    Drag.dragType: Drag.Automatic
+    Drag.supportedActions: Qt.CopyAction
+    Drag.mimeData: ({
+            "text/uri-list": Logic.dragUriList(root.dragPaths),
+            "text/plain": root.dragPaths.join("\n")
+        })
+    Drag.active: cardDrag.active
+
+    DragHandler {
+        id: cardDrag
+        enabled: root.dragPaths.length > 0
+        target: null
     }
 
     MouseArea {

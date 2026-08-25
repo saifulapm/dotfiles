@@ -473,6 +473,7 @@ QtObject {
                 body: "",
                 image: "",
                 glyph: "󰂚",
+                execArgv: "",
                 urgency: NotificationUrgency.Low,
                 expireTimeout: 0,
                 timestamp: Date.now()
