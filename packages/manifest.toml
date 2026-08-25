@@ -113,6 +113,12 @@ arch = "x86_64"
 why = "VAAPI (iHD) for the NUC's Raptor Lake iGPU. libva was installed with no driver behind it, so hardware decode was unavailable and every decode fell back to CPU. Survivable at 1080p — 10-bit HEVC benchmarked here at 25x realtime, 300 frames in 0.49 s on the i5-13420H — but the monitor on this desk is a 4K M32UC and 4K HEVC has nothing like that headroom. Lives in RPM Fusion NONFREE, which 00-install-packages now bootstraps (x86_64 only) alongside the -free release rpm; user decision 2026-08-11. There is no free alternative for this GPU: libva-intel-driver in -free is the old i965 for pre-Skylake parts, and Mesa's VA state tracker has no Intel backend, so mesa-va-drivers-freeworld does nothing here. arch=x86_64, NOT all: the filter is a literal `p.get(\"arch\", \"all\") in (\"all\", uname -m)`, and on the aarch64 laptop this name resolves to nothing — which --skip-unavailable would survive, but the rpm -q sweep at the end of that script WITHHOLDS THE STATE HASH for anything that did not land, so every future apply there would re-run the whole package pass forever"
 
 [[pkg]]
+name = "iwlwifi-mvm-firmware"
+category = "core"
+arch = "x86_64"
+why = "WiFi firmware for the NUC's Intel Wi-Fi 6E AX211 (PCI 8086:51f1, Raptor Lake PCH CNVi). iwlwifi loads but never creates wlan0 without it — dmesg: 'Direct firmware load for iwlwifi-so-a0-gf-a0-89.ucode failed with error -2 / no suitable firmware found!'. The linux-firmware meta-package is only a license stub on Fedora (the blobs are split into per-vendor subpackages); this MVM set is the one the AX211 needs (ships iwlwifi-so-a0-gf-a0-89.ucode.xz). Its absence left WiFi dead on 2026-08-25. arch=x86_64 for the SAME reason as [[pkg]] intel-media-driver: the aarch64 Asahi laptop has no Intel WiFi, so listing this as all would resolve to nothing there and the rpm -q sweep would withhold the state hash forever, re-running the package pass on every apply"
+
+[[pkg]]
 name = "xdg-desktop-portal-gnome"
 category = "core"
 arch = "all"
