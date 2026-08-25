@@ -1,0 +1,15 @@
+# The service half of qshell-sync-notes.path. The sleep is the debounce: a
+# multi-file drop writes the store several times in a burst, and three
+# seconds folds that into one round instead of queueing one per write (the
+# path unit cannot re-trigger while this runs; a write during the round fires
+# one more, which the idempotent merge ends). bin/qshell-sync's flock keeps
+# this from interleaving with the 15-minute timer's full round.
+[Unit]
+Description=Notes sync round after a store change
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/sleep 3
+ExecStart=%h/.dotfiles/bin/qshell-sync --only notes
+Nice=19
+IOSchedulingClass=idle

@@ -23,6 +23,10 @@ var UNIT_GLYPHS = {
     "notes": "󰦨" // md-note_text
     ,
     "ssh": "󰌆" // md-key
+    ,
+    "memory": "󰧡" // md-brain
+    ,
+    "parked": "󰏗" // md-package_variant_closed
 };
 
 // What each unit is for, in one line — the panel shows it where a unit has
@@ -32,8 +36,10 @@ var UNIT_BLURBS = {
     "fish-history": "Fish history, merged from every machine",
     "model-usage": "What the AI widget counts",
     "screenshots": "~/Pictures/Screenshots, both ways",
-    "notes": "The notes panel's store, both ways",
-    "ssh": "~/.ssh as one encrypted blob"
+    "notes": "The notes panel's store, merged by note id",
+    "ssh": "~/.ssh as one encrypted blob",
+    "memory": "The mem store, both ways",
+    "parked": "Parked work bundles, both ways"
 };
 
 function unitGlyph(id) {
@@ -87,6 +93,13 @@ function parseStatus(raw) {
         running: data.running === true,
         currentUnit: String(data.currentUnit || ""),
         ok: data.ok === true ? true : (data.ok === false ? false : null),
+        // The hub's own headroom, from `rclone about` once per round; null
+        // when the round could not ask (offline, unconfigured, old script).
+        hub: data.hub && typeof data.hub === "object" ? {
+            total: Number(data.hub.total || 0),
+            used: Number(data.hub.used || 0),
+            free: Number(data.hub.free || 0)
+        } : null,
         units: units
     };
 }
@@ -101,6 +114,7 @@ function emptyStatus(parseError) {
         running: false,
         currentUnit: "",
         ok: null,
+        hub: null,
         units: []
     };
 }
@@ -139,6 +153,32 @@ function okCount(status) {
             n++;
     }
     return n;
+}
+
+// -------------------------------------------------------------------- hub
+// The free-space line under the rows, and the early warning the quota
+// errorKind exists for: this account is thin, so the wall should be visible
+// from a distance, not discovered by the round that hits it.
+var HUB_LOW_BYTES = 200 * 1024 * 1024;
+
+function fmtBytes(n) {
+    if (!(n > 0))
+        return "0 B";
+    if (n >= 1024 * 1024 * 1024)
+        return (n / (1024 * 1024 * 1024)).toFixed(1) + " GiB";
+    if (n >= 1024 * 1024)
+        return Math.round(n / (1024 * 1024)) + " MiB";
+    return Math.round(n / 1024) + " KiB";
+}
+
+function hubLow(status) {
+    return !!(status && status.hub && status.hub.total > 0 && status.hub.free < HUB_LOW_BYTES);
+}
+
+function hubLine(status) {
+    if (!status || !status.hub || !(status.hub.total > 0))
+        return "";
+    return "Dropbox: " + fmtBytes(status.hub.free) + " free of " + fmtBytes(status.hub.total);
 }
 
 // ------------------------------------------------------------------- time
@@ -217,7 +257,7 @@ function tooltip(status, nowMs) {
         return "Sync — running";
     var failed = failedUnits(status);
     if (failed.length === 0)
-        return "Sync — all six synced " + relative(status.lastRun, nowMs);
+        return "Sync — all " + status.units.length + " synced " + relative(status.lastRun, nowMs);
     var names = [];
     for (var i = 0; i < failed.length; i++)
         names.push(failed[i].label);

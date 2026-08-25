@@ -194,7 +194,7 @@ Scope {
     }
 
     function commitEntry(entry) {
-        const note = NotesModel.makeNote(NotesModel.nextId(notes), entry.text, entry.path);
+        const note = NotesModel.makeNote(entry.text, entry.path);
         notes = NotesModel.addNote(notes, note);
         persist();
         const rows = NotesModel.displayRows([note], filterText);
@@ -499,7 +499,7 @@ Scope {
                         anchors.rightMargin: notesRoot.theme.space(2.5)
                         anchors.verticalCenter: parent.verticalCenter
                         visible: searchInput.text.length > 0
-                        text: displayModel.count + "/" + notesRoot.notes.length
+                        text: displayModel.count + "/" + NotesModel.liveNotes(notesRoot.notes).length
                     }
                 }
 
@@ -686,7 +686,7 @@ Scope {
                         id: row
 
                         required property int index
-                        required property int noteId
+                        required property string noteId
                         required property string noteLabel
                         required property string noteAttach
                         required property bool noteIsImage
@@ -905,7 +905,7 @@ Scope {
                         horizontalAlignment: Text.AlignHCenter
                         textFormat: Text.PlainText
                         wrapMode: Text.WordWrap
-                        text: notesRoot.notes.length === 0 ? "Type below, or drop files and text here" : "No matches for “" + notesRoot.filterText + "”"
+                        text: NotesModel.liveNotes(notesRoot.notes).length === 0 ? "Type below, or drop files and text here" : "No matches for “" + notesRoot.filterText + "”"
                     }
                 }
             }

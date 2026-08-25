@@ -4,15 +4,17 @@
 # conflicts are impossible by construction) is omarchy's model-usage sync
 # invariant, applied to real files with rclone as the transport.
 #
-# Six units move, in three shapes:
+# Eight units move, in three shapes:
 #
-#   push-own / pull-others — history, fish history, model usage
+#   push-own / pull-others — history, fish history, model usage, notes
 #     Each device owns exactly one file in the hub and never writes another's,
 #     so plain `rclone copy` both ways is conflict-free by construction. The
 #     pull always excludes our own name; that exclusion is what keeps it from
-#     clobbering appends made since the push.
+#     clobbering appends made since the push. Fish history and notes add a
+#     local merge step over what the pull brings (bin/fish-history-merge,
+#     bin/notes-merge).
 #
-#   bisync — screenshots, notes
+#   bisync — screenshots, notes attachments, memory, parked
 #     Edited on every machine, and a delete must propagate, so neither end can
 #     be declared the writer. The first run (and recovery after an interrupted
 #     one) needs --resync, which this script does by itself when bisync asks.
@@ -41,14 +43,22 @@
 #   screenshots  ~/Pictures/Screenshots  <->  Dropbox:qshell-sync/screenshots
 #                Pruning a screenshot on one machine deletes it everywhere.
 #
-#   notes        ~/.local/state/qshell/notes  <->  Dropbox:qshell-sync/notes
-#                The Notes panel's store (Modules/Notes): notes.json plus the
-#                pasted-image attachments dir. The store's FileView watches
-#                the file, so a pulled change lands in an open panel by
-#                itself. last-capture.sha1 (the shift-shift dedupe) is
-#                machine-local state and stays out; attachments referencing
-#                files OUTSIDE the store (drops from ~/Downloads) never
-#                travel — only the store dir does.
+#   notes        ~/.local/state/qshell/notes  <->  Dropbox:qshell-sync/notes-v2
+#                The Notes panel's store (Modules/Notes). notes.json is
+#                push-own / pull-others (notes-v2/machines/<machine>.json),
+#                merged locally by bin/notes-merge on per-note identity:
+#                newest updatedAt wins per id, tombstones carry deletions.
+#                Two machines editing inside one window MERGE — the v1
+#                design's set-aside-the-loser limit, closed 2026-08-26. The
+#                attachments dir (write-once pasted images) still bisyncs,
+#                under notes-v2/attachments. The store's FileView watches the
+#                file, so a merged change lands in an open panel by itself.
+#                last-capture.sha1 (the shift-shift dedupe) is machine-local
+#                state and stays out; attachments referencing files OUTSIDE
+#                the store (drops from ~/Downloads) never travel — only the
+#                store dir does. The old bisynced hub dir notes/ is left in
+#                place for machines still on the old script; purge it by hand
+#                once every machine has updated.
 #
 #   ssh          ~/.ssh  <->  Dropbox:qshell-sync/ssh/ssh.age
 #                One identity on every machine, so they can reach each other
@@ -103,6 +113,10 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 machine="$(cat "$HOME/.config/qshell/machine" 2>/dev/null || true)"
 [[ -z $machine ]] && machine="$(uname -n)"
+
+# The hub's headroom, filled in once per round further down; null until (and
+# unless) rclone answers, so an early-exit status write is still valid JSON.
+hub_json=null
 
 # Canonical order — the panel renders the units in exactly this sequence.
 units_all=(history fish-history model-usage screenshots notes ssh memory parked)
@@ -318,6 +332,7 @@ write_status() { # running(true|false), currentUnit
     --argjson running "${1:-false}" \
     --arg currentUnit "${2:-}" \
     --arg scope "$(printf '%s,' "${selected[@]}")" \
+    --argjson hub "$hub_json" \
     '{
        version: 2,
        machine: $machine,
@@ -325,6 +340,7 @@ write_status() { # running(true|false), currentUnit
        running: $running,
        currentUnit: $currentUnit,
        scope: ($scope | rtrimstr(",") | split(",")),
+       hub: $hub,
        units: .,
        ok: (if any(.[]; .ok == false) then false
             elif any(.[]; .ok == true) then true
@@ -365,6 +381,12 @@ if command -v nmcli >/dev/null 2>&1; then
   fi
 fi
 
+# The hub's own headroom, asked once per round and carried in every status
+# write: the panel shows it so the quota failure — expected to matter someday
+# on this thin account — gets seen coming instead of arriving.
+hub_json="$(rclone about "${remote%%:*}:" --json 2>/dev/null | jq -c '{total, used, free}' 2>/dev/null || true)"
+[[ -z $hub_json ]] && hub_json=null
+
 # Remember which units were already failing, so the notification fires once
 # per streak rather than once per 15-minute round.
 declare -A WAS_FAILING
@@ -389,14 +411,21 @@ run_rclone() { # argv...
   return 0
 }
 
-# A push-own / pull-others pair, the shape three units share.
+# A push-own / pull-others pair, the shape four units share. The pull is
+# `sync`, not `copy`: copy is append-only, so a machine retired or renamed
+# off the hub left its last file frozen in every stage forever — for the
+# merged units that file keeps re-asserting notes whose tombstones have long
+# since pruned, resurrecting a deletion with no machine even involved (review
+# 2026-08-26). sync mirrors the hub's dir, and the --exclude covers the
+# deletion pass too, so our own file in a shared stage is never touched.
+# Retiring a machine is now one hand-deletion, on the hub alone.
 push_pull() { # id, localFile, remoteDir, remoteName, stageDir
   local id="$1" local_file="$2" remote_dir="$3" remote_name="$4" stage="$5"
   local problems=()
   if [[ -f $local_file ]]; then
     run_rclone copyto "$local_file" "$remote_dir/$remote_name" || problems+=("push: $rclone_err")
   fi
-  run_rclone copy "$remote_dir" "$stage" --exclude "$remote_name" || problems+=("pull: $rclone_err")
+  run_rclone sync "$remote_dir" "$stage" --exclude "$remote_name" || problems+=("pull: $rclone_err")
   if ((${#problems[@]} > 0)); then
     unit_fail "$id" "$(printf '%s; ' "${problems[@]}")"
     return 1
@@ -598,13 +627,36 @@ sync_screenshots() {
 
 sync_notes() {
   local notes_dir="$state_dir/notes"
-  mkdir -p "$notes_dir/attachments"
-  # notes.json plus a usually-empty attachments dir: the store is small by
-  # design, so up to 3 files earns the --force bypass described above.
-  bisync_unit notes "$notes_dir" "$remote/notes" 3 --exclude last-capture.sha1 || return 0
-  local notes_count
-  notes_count="$(find "$notes_dir" -type f ! -name last-capture.sha1 2>/dev/null | wc -l)"
-  unit_ok notes "$notes_count file(s)${bisync_note:+ — $bisync_note}"
+  local stage="$sync_dir/notes-machines"
+  mkdir -p "$notes_dir/attachments" "$stage"
+  # bisync cannot hold a baseline for an EMPTY directory: it aborts with
+  # "empty prior Path1 listing", and that message contains the very string
+  # "--resync" the recovery branch greps for (it reads "retryable without
+  # --resync"), so an empty attachments dir re-bootstrapped every round
+  # forever (found 2026-08-26, the day this unit was born). A permanent
+  # zero-byte .keep means neither side is ever empty. No note references it,
+  # so the panel never shows it.
+  [[ -e "$notes_dir/attachments/.keep" ]] || touch "$notes_dir/attachments/.keep"
+  # Attachments first: write-once files (paste-<epoch-ns>.<ext> cannot
+  # collide across machines) whose deletions must propagate — bisync's job.
+  # A usually-empty dir, so up to 3 files earns the --force bypass above.
+  bisync_unit notes "$notes_dir/attachments" "$remote/notes-v2/attachments" 3 || return 0
+  local att_note="$bisync_note"
+  # notes.json: push-own / pull-others, then a merge on per-note identity.
+  # The push runs FIRST (the fish-history trade-off): the hub copy of this
+  # machine's file converges toward the union one round late, and one writer
+  # per hub file still holds. A fresh machine has no local file to push, pulls
+  # the others, and the merge writes its first store from them.
+  push_pull notes "$notes_dir/notes.json" "$remote/notes-v2/machines" "$machine.json" "$stage" || return 0
+  shopt -s nullglob
+  local foreign=("$stage"/*.json)
+  shopt -u nullglob
+  local merge_out=""
+  if ! merge_out="$("$here/notes-merge" "$notes_dir/notes.json" "${foreign[@]}" 2>&1)"; then
+    unit_fail notes "merge: $(head -n 1 <<<"${merge_out:-merge failed}")"
+    return 0
+  fi
+  unit_ok notes "$(tail -n 1 <<<"$merge_out")${att_note:+ — $att_note}"
 }
 
 # The mem store: one small markdown file per item, plus a per-project

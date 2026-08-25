@@ -3,7 +3,7 @@ import "../components"
 import "../../../components"
 import "HubSyncModel.js" as Model
 
-// Sync panel — the Dropbox hub's six units, in the family's visual language:
+// Sync panel — the Dropbox hub's units, in the family's visual language:
 // a hero of the sync mark over a one-line verdict, the headline reason when
 // something is wrong, and one row per unit saying what it carries and when it
 // last actually worked.
@@ -247,6 +247,20 @@ BarPanel {
     }
 
     // --------------------------------------------------------------- footer
+    // The hub's headroom, from the last round's `rclone about`: the quota
+    // failure has its own errorKind, but this line is how it gets seen
+    // COMING — the account is thin, and red under 200 MiB beats a surprise.
+    StyledText {
+        theme: panel.theme
+        role: StyledText.Caption
+
+        visible: Model.hubLine(panel.sync.status) !== ""
+        width: parent.width
+        text: Model.hubLine(panel.sync.status)
+        color: Model.hubLow(panel.sync.status) ? panel.theme.error : panel.theme.textMuted
+        wrapMode: Text.WordWrap
+    }
+
     StyledText {
         theme: panel.theme
         role: StyledText.Caption

@@ -1,0 +1,16 @@
+# Fires a notes-only sync round shortly after the store changes, so a note
+# captured here reaches the other machines in seconds instead of waiting out
+# the 15-minute timer. PathChanged (not PathModified) because the panel and
+# bin/notes-merge both write atomically — temp + rename — and PathChanged is
+# the trigger that fires on a move-into-place. The round's own merge write
+# re-fires this once, harmlessly: that second round finds the store already
+# merged, writes nothing, and the loop stops there (notes-merge is idempotent
+# by contract — see its header).
+[Unit]
+Description=Notes sync on store change
+
+[Path]
+PathChanged=%h/.local/state/qshell/notes/notes.json
+
+[Install]
+WantedBy=default.target

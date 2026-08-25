@@ -1,0 +1,117 @@
+#!/usr/bin/env node
+// notes-merge <local-notes.json> [<foreign-notes.json>...] — union note
+// stores by note id. Ours; the cross-machine half of qshell-sync's notes
+// unit, the same role fish-history-merge plays for fish history.
+//
+// The semantics live in ONE place: shell/Modules/Notes/NotesModel.js, the
+// exact file the Notes panel runs, required here under node (it carries a
+// module.exports tail for this). So the panel and the sync round can never
+// disagree about what a note, a tombstone or a merge is — including the
+// version-1 migration, which must be deterministic across machines (see the
+// model's header for why "l<n>" ids dedupe instead of triplicating).
+//
+// Newest updatedAt wins per id, tombstones propagate deletions and prune
+// after their TTL, output order is chronological and identical on every
+// machine. The merged result is written back to <local-notes.json> only when
+// it differs — an idle round must not touch the file, both because the
+// panel's FileView watches it and because the notes path unit fires a sync
+// round on change (an always-write would loop the two forever).
+//
+// The write is temp + rename in the store dir, and only lands if the store
+// still reads exactly as it did when the merge started — the panel can
+// commit a note mid-merge (its FileView writes are atomic renames too), and
+// last-writer-wins here would silently drop that note. Honestly: the
+// recheck-then-rename is a narrowing, not a lock — a panel write landing in
+// the microseconds between the recheck and the rename still loses. Closing
+// it needs the panel to take a lock FileView does not offer; the 3-second
+// debounce ahead of every scripted run keeps the two writers apart in
+// practice. A store that will not hold still after a few tries is left
+// alone; the next round merges it.
+//
+// A foreign file that will not read or parse is skipped with a warning, not
+// fatal: one machine publishing garbage must not stop the other two from
+// converging. Exit is 0 with a one-line summary (qshell-sync's unit detail),
+// nonzero only when the local store cannot be read or written.
+
+"use strict";
+
+const fs = require("node:fs");
+const path = require("node:path");
+const Model = require(path.join(__dirname, "..", "shell", "Modules", "Notes", "NotesModel.js"));
+
+const args = process.argv.slice(2);
+if (args.length < 1 || args[0] === "-h" || args[0] === "--help") {
+    console.error("usage: notes-merge <local-notes.json> [<foreign-notes.json>...]");
+    process.exit(2);
+}
+
+const localPath = args[0];
+
+function readOrEmpty(file) {
+    try {
+        return fs.readFileSync(file, "utf8");
+    } catch (e) {
+        if (e.code === "ENOENT")
+            return "";
+        throw e;
+    }
+}
+
+const foreignLists = [];
+for (const file of args.slice(1)) {
+    try {
+        foreignLists.push(Model.parseNotes(fs.readFileSync(file, "utf8")));
+    } catch (e) {
+        console.error(`notes-merge: skipping unreadable ${file}: ${e.message}`);
+    }
+}
+
+// A crash between write and rename leaves a temp behind; sweep any older
+// than an hour so the store dir cannot collect them (they are local-only —
+// no sync unit looks at this dir's root — but litter is litter).
+try {
+    const dir = path.dirname(localPath);
+    for (const name of fs.readdirSync(dir)) {
+        if (!name.startsWith(".tmp-notes-merge-"))
+            continue;
+        const full = path.join(dir, name);
+        if (Date.now() - fs.statSync(full).mtimeMs > 60 * 60 * 1000)
+            fs.rmSync(full, { force: true });
+    }
+} catch (e) {}
+
+let localRaw = "";
+let merged = null;
+let written = false;
+const ATTEMPTS = 3;
+for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    localRaw = readOrEmpty(localPath);
+    merged = Model.mergeStores([Model.parseNotes(localRaw)].concat(foreignLists), Date.now());
+    const out = Model.serialize(merged);
+    if (out === localRaw)
+        break;
+
+    const tmp = path.join(path.dirname(localPath), `.tmp-notes-merge-${process.pid}`);
+    fs.mkdirSync(path.dirname(localPath), { recursive: true });
+    fs.writeFileSync(tmp, out);
+    if (readOrEmpty(localPath) !== localRaw) {
+        fs.rmSync(tmp, { force: true });
+        continue;
+    }
+    fs.renameSync(tmp, localPath);
+    written = true;
+    break;
+}
+
+if (merged === null || (!written && Model.serialize(merged) !== localRaw)) {
+    console.error("notes-merge: store kept changing underneath, deferred to the next round");
+    console.log("deferred — store busy");
+    process.exit(0);
+}
+
+const live = Model.liveNotes(merged).length;
+const tombs = merged.length - live;
+console.log(`${live} note(s)` +
+    (tombs > 0 ? `, ${tombs} tombstone(s)` : "") +
+    (foreignLists.length > 0 ? `, ${foreignLists.length} machine(s) merged` : "") +
+    (written ? "" : " — unchanged"));
