@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell.Io
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import "../components"
@@ -8,9 +7,9 @@ import "AudioModel.js" as Model
 
 // Audio panel — full port of omarchy's audio plugin Panel.qml in our own
 // tokens: hero with the now-playing context and a master mute switch, then
-// OUTPUT (volume + sink picker), INPUT (mic volume + live peak meter +
-// source picker) and SOURCES (per-application playback streams, each with
-// its own slider and mute).
+// OUTPUT (volume + sink picker), INPUT (mic volume + source picker) and
+// SOURCES (per-application playback streams, each with its own slider and
+// mute).
 //
 // One cursor model drives both mouse and keyboard: hovering a row moves the
 // cursor, j/k walk it, h/l adjust the slider it sits on, Enter activates and
@@ -162,27 +161,10 @@ BarPanel {
         objects: panel.opened ? panel.candidateSinks.concat(panel.candidateSources).concat(panel.candidateStreams) : []
     }
 
-    // Live microphone level. omarchy reads it from PwNodePeakMonitor, which
-    // taps the node's own stream through PipeWire rather than polling
-    // anything; quickshell 0.3 ships the same type (verified in the Pipewire
-    // qmltypes) and it only runs while the panel is open.
-    PwNodePeakMonitor {
-        id: inputPeak
-        node: panel.opened ? panel.source : null
-        enabled: panel.opened && panel.source !== null
-    }
-
-    // A Bluetooth mic is dead metal until something actually records:
-    // wireplumber only flips the headset from A2DP (mic off) into HFP when
-    // it sees a real capture stream, and the peak monitor's passive tap
-    // doesn't count. Feed it one for as long as the panel shows a bluez
-    // source, so the meter reads the live mic. The cost — playback drops to
-    // headset quality while the panel is open — is the Bluetooth trade,
-    // not ours; it recovers the moment the panel closes.
-    Process {
-        running: panel.opened && panel.source !== null && String(panel.source.name).indexOf("bluez_input") === 0
-        command: ["pw-record", "--target", panel.source ? String(panel.source.name) : "", "/dev/null"]
-    }
+    // No live input meter: a PwNodePeakMonitor (or the pw-record feed that
+    // kept Bluetooth mics in HFP for it) opens a real capture stream, which
+    // wakes the microphone the moment the panel opens. Deliberately removed —
+    // the panel must never record.
 
     // ------------------------------------------------------------- writing
     // Measured on this MacBook: the mono headset-mic node takes scalar and
@@ -694,28 +676,6 @@ BarPanel {
                             value: panel.inputVolume
                             onMoved: v => panel.setInputVolume(v)
                             onRightClicked: panel.toggleInputMute()
-                        }
-
-                        // Live microphone level.
-                        Rectangle {
-                            width: parent.width
-                            height: panel.theme.space(1)
-                            radius: height / 2
-                            color: panel.theme.alpha(panel.theme.textPrimary, 0.18)
-                            opacity: panel.inputMuted ? 0.35 : 1
-
-                            Rectangle {
-                                height: parent.height
-                                radius: height / 2
-                                width: parent.width * Math.max(0, Math.min(1, inputPeak.peak))
-                                color: panel.theme.accent
-
-                                Behavior on width {
-                                    NumberAnimation {
-                                        duration: 70
-                                    }
-                                }
-                            }
                         }
                     }
                 }
