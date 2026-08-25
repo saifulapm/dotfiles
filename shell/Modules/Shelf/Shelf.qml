@@ -99,6 +99,13 @@ Scope {
         const p = String(path || "").trim();
         if (!p || p[0] !== "/")
             return "not an absolute path: " + p;
+        // An add DURING our own drag-out can only be that drag landing on
+        // one of our own drop targets (the bar tray icon; the card's own
+        // dropZone never hears a self-drop on this stack — verified, the
+        // drop event simply is not delivered to the source surface). Mark
+        // it so the removeDragged that follows keeps the row.
+        if (dragOutInFlight)
+            selfDropGuard[p] = true;
         const next = items.filter(it => it.path !== p);
         next.unshift({
             path: p,
@@ -126,6 +133,37 @@ Scope {
         const next = items.slice();
         next.splice(index, 1);
         items = next;
+        saveItems();
+    }
+
+    // Dragging out removes the row: the shelf holds things IN TRANSIT, and a
+    // drag that left the card is the transit ending (Yoink's model; what the
+    // user expects). dropAction cannot distinguish a landed drop from a
+    // canceled one (IgnoreAction always — ledge's finding), so a canceled
+    // drag removes too; the row was only a reference, the file survives, and
+    // re-adding is one drop. A drop back onto our own card re-adds through
+    // dropZone before Drag.onDragFinished runs — the guard keeps that
+    // round-trip from reading as a departure.
+    //
+    // The guard arms ONLY while one of our rows is mid-drag (set in
+    // addPath): exactly one DnD session exists at a time, so an add arriving
+    // then can only be our own drag landing on one of our own targets, e.g.
+    // the bar tray. Guarding every drop (the first cut) left a stale entry
+    // behind whenever something ELSE was dropped in — a toast-drop's path
+    // sat in the guard and silently swallowed that item's next drag-out
+    // (verified live). A drop back onto the CARD never reaches its dropZone
+    // (same-surface DnD is undelivered on this stack), so that gesture is a
+    // canceled drag and removes like any other — the file survives.
+    property bool dragOutInFlight: false
+    property var selfDropGuard: ({})
+
+    function removeDragged(paths) {
+        const keep = selfDropGuard;
+        selfDropGuard = {};
+        const gone = paths.filter(p => keep[p] !== true);
+        if (gone.length === 0)
+            return;
+        items = items.filter(it => gone.indexOf(it.path) === -1);
         saveItems();
     }
 
@@ -451,7 +489,26 @@ Scope {
                             width: column.width
                             height: shelfRoot.theme.space(11)
                             radius: shelfRoot.theme.radius(1)
-                            color: rowMouse.containsMouse || selected ? shelfRoot.theme.alpha(shelfRoot.theme.accent, selected ? 0.16 : 0.1) : shelfRoot.theme.alpha(shelfRoot.theme.surface2, 0.6)
+                            color: rowHover.hovered || selected ? shelfRoot.theme.alpha(shelfRoot.theme.accent, selected ? 0.16 : 0.1) : shelfRoot.theme.alpha(shelfRoot.theme.surface2, 0.6)
+
+                            // Row hover for the highlight, the remove button
+                            // and the pixmap grab — a HoverHandler, NOT
+                            // rowMouse.containsMouse: the remove button's own
+                            // hover steals from the MouseArea, so a button
+                            // bound to containsMouse vanishes the moment the
+                            // pointer reaches it (the flicker). A handler on
+                            // the row keeps reporting hover over children —
+                            // same pattern as NotificationCard's close.
+                            HoverHandler {
+                                id: rowHover
+                                // Grab the drag pixmap on HOVER — the grab
+                                // is asynchronous and must be done before
+                                // the press that starts the drag.
+                                onHoveredChanged: if (hovered)
+                                    row.grabToImage(result => {
+                                        row.Drag.imageSource = result.url;
+                                    })
+                            }
                             border.width: selected ? Math.max(1, shelfRoot.theme.borderWidth) : 0
                             border.color: shelfRoot.theme.accent
 
@@ -468,10 +525,14 @@ Scope {
                             // What happened is settled by the files, never by
                             // dropAction (IgnoreAction for every drag here).
                             Drag.onDragFinished: {
+                                shelfRoot.dragOutInFlight = false;
                                 const carried = shelfRoot.carriedPaths(row.modelData.path);
                                 if (row.selected)
                                     shelfRoot.clearSelection();
-                                shelfRoot.settleAfterDrag(carried);
+                                // One tick later, so a self-drop's re-add
+                                // (dropZone) lands first and the guard in
+                                // removeDragged sees it.
+                                Qt.callLater(() => shelfRoot.removeDragged(carried));
                             }
 
                             DragHandler {
@@ -483,14 +544,6 @@ Scope {
                             MouseArea {
                                 id: rowMouse
                                 anchors.fill: parent
-                                hoverEnabled: true
-                                // Grab the drag pixmap on HOVER — the grab is
-                                // asynchronous and must be done before the
-                                // press that starts the drag (ledge's note).
-                                onContainsMouseChanged: if (containsMouse)
-                                    row.grabToImage(result => {
-                                        row.Drag.imageSource = result.url;
-                                    })
                                 onClicked: mouse => {
                                     if (mouse.modifiers & Qt.ControlModifier)
                                         shelfRoot.toggleSelected(row.modelData.path);
@@ -549,7 +602,7 @@ Scope {
                                 anchors.rightMargin: shelfRoot.theme.space(1)
                                 anchors.verticalCenter: parent.verticalCenter
                                 glyph: "󰅖" // md-close
-                                visible: rowMouse.containsMouse
+                                visible: rowHover.hovered
                                 onActivated: shelfRoot.removeAt(row.index)
                             }
                         }
