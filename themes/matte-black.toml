@@ -4,6 +4,7 @@
 [meta]
 name = "Matte Black"
 mode = "dark"
+preset = "shaded"
 
 [surface]
 "0" = "#0d0d0d"

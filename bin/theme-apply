@@ -18,6 +18,7 @@ const STATE = path.join(HOME, ".local/state/qshell/theme.toml")
 ;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/color.js"), "utf8"))
 ;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/defaults.js"), "utf8"))
 ;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/gradient.js"), "utf8"))
+;(0, eval)(fs.readFileSync(path.join(ROOT, "shell/Commons/presets.js"), "utf8"))
 
 // Same limited walker as Services/Theme.qml — sections, key = value,
 // quoted keys, strings/numbers/bare words, inline comments.
@@ -47,7 +48,14 @@ try {
   overrideTokens = parseToml(fs.readFileSync(path.join(HOME, ".config/qshell/theme-override.toml"), "utf8"))
 } catch (e) { /* no override file — the common case */ }
 
-const tokens = Object.assign({}, THEME_DEFAULTS, themeTokens, overrideTokens)
+// The preset layer — `[meta] preset` names a bundle from Commons/presets.js
+// that fills appearance keys the theme leaves unset. Same order as
+// Services/Theme.qml: defaults < preset < theme < machine override.
+const presetName = overrideTokens["meta.preset"] !== undefined
+  ? overrideTokens["meta.preset"] : themeTokens["meta.preset"]
+const presetTokens = THEME_PRESETS[String(presetName || "")] || {}
+
+const tokens = Object.assign({}, THEME_DEFAULTS, presetTokens, themeTokens, overrideTokens)
 
 // Same font precedence Services/Theme.qml applies, so the shell and the
 // templated app configs never disagree: a theme that names the token wins; one
@@ -370,16 +378,77 @@ const TEMPLATE_FNS = {
   // The flat color a gradient degrades to, for configs with nowhere to put
   // one (theirs: gradient_start).
   gradient_start: spec => firstColor(spec) || spec,
-  // The compositor side of the theme's motion character. motion.duration is
-  // the shell's base animation duration (150 ms = reference speed); niri gets
-  // the same scale as one global slowdown factor, so a slow theme slows the
-  // compositor with the shell and a zero-motion theme turns niri animations
-  // off outright. Clamped: past 2× the springs read as broken, not dreamy.
-  niri_motion: v => {
-    const d = Number(v)
-    if (!isFinite(d) || d < 0) return "slowdown 1.0"
-    if (d === 0) return "off"
-    return "slowdown " + Math.min(2, Math.max(0.5, d / 150)).toFixed(2)
+  // The window drop shadow, per theme. Emits a full shadow block when the
+  // theme (or its preset) enables it; a comment otherwise — config.kdl never
+  // turns shadows on, so the absence of an `on` here IS the off state.
+  niri_shadow: () => {
+    if (String(tokens["shadow.enabled"]) !== "true") return "// shadow: off for this theme"
+    const n = k => { const v = Number(tokens["shadow." + k]); return isFinite(v) ? v : 0 }
+    return "shadow {\n" +
+      "        on\n" +
+      `        softness ${n("softness")}\n` +
+      `        spread ${n("spread")}\n` +
+      `        offset x=${n("offset-x")} y=${n("offset-y")}\n` +
+      `        color "${tokens["shadow.color"] || "#00000077"}"\n` +
+      "    }"
+  },
+  // The base window-opacity pair (blur off), with the media exemption
+  // re-stated AFTER it: this include is the last opacity writer before the
+  // blur fragment, and for a contested property the latest matching rule
+  // wins — without the re-statement a theme's blanket opacity would beat
+  // config.kdl's media rule. Must mirror config.kdl's media match set.
+  niri_opacity: () => {
+    const num = (k, d) => { const v = Number(tokens["opacity." + k]); return isFinite(v) ? Math.min(1, Math.max(0.5, v)) : d }
+    const active = num("active", 0.985)
+    const inactive = num("inactive", 0.96)
+    const rules = []
+    if (active < 1) rules.push(`window-rule {\n    opacity ${active}\n}`)
+    if (inactive < 1 && inactive !== active) rules.push(`window-rule {\n    match is-active=false\n    opacity ${inactive}\n}`)
+    if (rules.length === 0) return "// opacity: fully opaque for this theme"
+    rules.push('window-rule {\n' +
+      '    match app-id=r#"^(zoom|vlc|mpv|org\\.kde\\.kdenlive|com\\.obsproject\\.Studio|com\\.github\\.PintaProject\\.Pinta|imv)$"#\n' +
+      '    match app-id=r#"^org\\.quickshell$"#\n' +
+      '    match title=r#"Picture.?in.?[Pp]icture"#\n' +
+      '    opacity 1.0\n' +
+      '}')
+    return rules.join("\n\n")
+  },
+  // The compositor side of the theme's motion character: explicit animation
+  // blocks built from the motion.* tokens, replacing config.kdl's reference
+  // values (included sections merge and the later definition of each block
+  // wins). motion.duration 0 stills the compositor outright.
+  niri_animations: () => {
+    if (Number(tokens["motion.duration"]) === 0) return "off"
+    const n = (k, d) => { const v = Number(tokens["motion." + k]); return isFinite(v) && v > 0 ? v : d }
+    const damping = Math.min(2, Math.max(0.4, n("spring-damping", 1.0)))
+    const curve = name => {
+      const named = {
+        "linear": null,
+        "standard": [0.33, 1, 0.68, 1],
+        "signature": [0.23, 1, 0.32, 1],
+        "snap": [0.19, 1, 0.22, 1],
+        "overshoot": [0.34, 1.56, 0.64, 1]
+      }
+      const v = String(name || "").trim()
+      if (v in named) return named[v] === null ? `curve "linear"` : `curve "cubic-bezier" ${named[v].join(" ")}`
+      const pts = v.split(/\s+/).map(Number)
+      if (pts.length === 4 && pts.every(isFinite)) return `curve "cubic-bezier" ${pts.join(" ")}`
+      return `curve "ease-out-cubic"`
+    }
+    // damping-ratio must be a KDL float literal — `1` is rejected as an
+    // integer where niri expects a float.
+    const spring = stiffness => `spring damping-ratio=${damping.toFixed(2)} stiffness=${stiffness} epsilon=0.0001`
+    const s = n("spring-stiffness", 1000)
+    const ws = n("workspace-stiffness", 1200)
+    return [
+      `window-open {\n        duration-ms ${n("open-ms", 400)}\n        ${curve(tokens["motion.open-curve"])}\n    }`,
+      `window-close {\n        duration-ms ${n("close-ms", 150)}\n        ${curve(tokens["motion.close-curve"])}\n    }`,
+      `window-movement {\n        ${spring(s)}\n    }`,
+      `window-resize {\n        ${spring(s)}\n    }`,
+      `horizontal-view-movement {\n        ${spring(s)}\n    }`,
+      `overview-open-close {\n        ${spring(s)}\n    }`,
+      `workspace-switch {\n        ${spring(ws)}\n    }`
+    ].join("\n    ")
   }
 }
 
@@ -577,7 +646,18 @@ if (gtkSettingsChanged) {
 // missing include (it aborts the whole config on one). Rendered every apply;
 // the link is repaired to match the blur flag, the one truth both writers
 // derive from.
-const blurOn = fs.existsSync(path.join(HOME, ".local/state/qshell/blur"))
+// Effective blur = the flag file's override when present ("on"/"off";
+// legacy empty file = on), else the theme's own [blur] enabled default —
+// the exact rule Services/Blur.qml applies, and both must agree or the
+// foot side frosts against an unfrosted compositor.
+const blurOn = (() => {
+  try {
+    const flag = fs.readFileSync(path.join(HOME, ".local/state/qshell/blur"), "utf8").trim()
+    return flag !== "off"
+  } catch (e) {
+    return String(tokens["blur.enabled"]) === "true"
+  }
+})()
 {
   const stateDir = path.join(HOME, ".local/state/qshell")
   // Section matches the theme polarity ([colors] is deprecated in foot

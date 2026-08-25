@@ -4,6 +4,7 @@
 // so the shell and every templated app agree on the fallback.
 var THEME_DEFAULTS = {
   "meta.mode": "dark",
+  "meta.preset": "flat",
   "surface.0": "#16161e",
   "surface.1": "#1a1b26",
   "surface.2": "#24283b",
@@ -41,6 +42,35 @@ var THEME_DEFAULTS = {
   "font.size": 12,
   "motion.duration": 150,
   "motion.easing": "standard",
+  // Compositor motion (templates/niri-theme.kdl.tmpl via niri_animations).
+  // Curve names resolve in the emitter; see Commons/presets.js.
+  "motion.open-ms": 400,
+  "motion.open-curve": "signature",
+  "motion.close-ms": 150,
+  "motion.close-curve": "linear",
+  "motion.spring-damping": 1.0,
+  "motion.spring-stiffness": 1000,
+  "motion.workspace-stiffness": 1200,
+  // Compositor blur (Services/Blur.qml renders the niri fragment from
+  // these; `enabled` is only the theme DEFAULT — the blur flag file, when
+  // it holds on/off, is the user override that wins across theme switches).
+  "blur.enabled": "false",
+  "blur.alpha": 0.8,
+  "blur.noise": 0.02,
+  "blur.saturation": 1.5,
+  // Window opacity pairs: base (blur off) and frost (blur on). Emitted by
+  // niri_opacity / the blur fragment; media apps are re-exempted after.
+  "opacity.active": 0.985,
+  "opacity.inactive": 0.96,
+  "opacity.blur-active": 0.95,
+  "opacity.blur-inactive": 0.9,
+  // Window drop shadow (layout.shadow in the niri include).
+  "shadow.enabled": "false",
+  "shadow.softness": 30,
+  "shadow.spread": 5,
+  "shadow.offset-x": 0,
+  "shadow.offset-y": 5,
+  "shadow.color": "#00000077",
   "bar.height": 26,
   "bar.width-vertical": 28
 }

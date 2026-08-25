@@ -4,6 +4,7 @@
 [meta]
 name = "Ristretto"
 mode = "dark"
+preset = "shaded"
 
 [surface]
 "0" = "#211b1b"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-yellow"
+
+# Gradient border: accent.accent into ansi.yellow across the frame.
+[border]
+active = "#f38d70 #f9cc6c 45deg"

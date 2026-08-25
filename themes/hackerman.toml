@@ -4,6 +4,7 @@
 [meta]
 name = "Hackerman"
 mode = "dark"
+preset = "snap"
 
 [surface]
 "0" = "#080910"

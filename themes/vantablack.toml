@@ -4,6 +4,7 @@
 [meta]
 name = "Vantablack"
 mode = "dark"
+preset = "snap"
 
 [surface]
 "0" = "#090909"
@@ -53,3 +54,8 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-dark"
+
+# Pure black stays pure: no translucency anywhere.
+[opacity]
+active = 1.0
+inactive = 1.0

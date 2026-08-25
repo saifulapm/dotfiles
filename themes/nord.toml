@@ -4,6 +4,7 @@
 [meta]
 name = "Nord"
 mode = "dark"
+preset = "calm"
 
 [surface]
 "0" = "#222730"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-blue"
+
+# Gradient border: accent.accent into ansi.cyan across the frame.
+[border]
+active = "#81a1c1 #88c0d0 45deg"

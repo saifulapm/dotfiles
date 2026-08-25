@@ -4,6 +4,7 @@
 [meta]
 name = "Lumon"
 mode = "dark"
+preset = "glass"
 
 [surface]
 "0" = "#101b21"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-blue"
+
+# Gradient border: accent.accent into ansi.cyan across the frame.
+[border]
+active = "#8bc9eb #b4e4f6 90deg"

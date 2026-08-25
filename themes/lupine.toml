@@ -4,6 +4,7 @@
 [meta]
 name = "Lupine"
 mode = "light"
+preset = "playful"
 
 [surface]
 "0" = "#ececec"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-purple"
+
+# Gradient border: accent.accent into accent.error across the frame.
+[border]
+active = "#3264eb #c900c4 45deg"

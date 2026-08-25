@@ -4,6 +4,7 @@
 [meta]
 name = "White"
 mode = "light"
+preset = "shaded"
 
 [surface]
 "0" = "#f5f5f5"

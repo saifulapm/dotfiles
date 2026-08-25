@@ -4,6 +4,7 @@
 [meta]
 name = "Last Horizon"
 mode = "dark"
+preset = "calm"
 
 [surface]
 "0" = "#090809"

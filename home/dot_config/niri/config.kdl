@@ -493,16 +493,11 @@ window-rule {
 }
 
 // Rounded corners come from the theme include at the end of this file
-// (the radius is a theme token). These two rules are omarchy's window
-// opacity: 0.985 active / 0.96 inactive.
-window-rule {
-    opacity 0.985
-}
-
-window-rule {
-    match is-active=false
-    opacity 0.96
-}
+// (the radius is a theme token). The window opacity pair moved there too
+// (2026-08-26): opacity is themeable now ([opacity] active/inactive), and
+// the include re-states the media exemption below after its own pair so the
+// later-rule-wins contest still lands on the media apps. With no include
+// rendered yet (first boot), windows are simply opaque.
 
 // The shell's helper terminals (nmtui, bluetoothctl, voxtype configure, …)
 // launch as `foot --app-id=qshell-float` and expect omarchy's floating

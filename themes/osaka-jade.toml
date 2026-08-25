@@ -4,6 +4,7 @@
 [meta]
 name = "Osaka Jade"
 mode = "dark"
+preset = "glass"
 
 [surface]
 "0" = "#0c1512"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-sage"
+
+# Gradient border: accent.accent into ansi.green across the frame.
+[border]
+active = "#509475 #549e6a 45deg"

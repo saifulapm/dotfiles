@@ -4,6 +4,7 @@
 [meta]
 name = "Rose Pine"
 mode = "light"
+preset = "calm"
 
 [surface]
 "0" = "#ede7e1"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-blue"
+
+# Gradient border: accent.accent into accent.error across the frame.
+[border]
+active = "#56949f #b4637a 45deg"

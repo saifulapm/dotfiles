@@ -4,6 +4,7 @@
 [meta]
 name = "Kanagawa"
 mode = "dark"
+preset = "shaded"
 
 [surface]
 "0" = "#17171e"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-blue"
+
+# Gradient border: ansi.blue into accent.error across the frame.
+[border]
+active = "#7e9cd8 #c34043 45deg"

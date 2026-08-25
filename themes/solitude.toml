@@ -4,6 +4,7 @@
 [meta]
 name = "Solitude"
 mode = "dark"
+preset = "calm"
 
 [surface]
 "0" = "#0c0e10"

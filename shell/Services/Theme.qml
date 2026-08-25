@@ -4,6 +4,7 @@ import Quickshell.Io
 import "../Commons/color.js" as ColorMath
 import "../Commons/defaults.js" as Defaults
 import "../Commons/gradient.js" as Gradient
+import "../Commons/presets.js" as Presets
 
 // Token resolution + live reload. Instantiated once by shell.qml and passed
 // down by property injection — relative-path singleton imports do not share
@@ -55,16 +56,30 @@ QtObject {
         previewValues = null;
     }
 
-    // Raw lookup through the whole layer stack — override > preview-or-theme.
-    // Returns undefined when no layer defines the key, so callers can tell
-    // "unset" from "set to something unparseable".
+    // The preset layer under the active map: `[meta] preset` names a bundle
+    // from Commons/presets.js that fills in appearance keys the theme leaves
+    // unset (defaults < preset < theme < override). Preview maps arrive from
+    // bin/theme-list already preset-merged; recomputing here is harmless and
+    // keeps a directly-pushed map honest too.
+    readonly property var presetValues: {
+        const base = previewValues !== null ? previewValues : values;
+        const name = base["meta.preset"] !== undefined ? String(base["meta.preset"]) : "";
+        return Presets.THEME_PRESETS[name] || {};
+    }
+
+    // Raw lookup through the whole layer stack — override > preview-or-theme
+    // > preset. Returns undefined when no layer defines the key, so callers
+    // can tell "unset" from "set to something unparseable".
     function rawTok(key) {
         const o = overrideValues[key];
         if (o !== undefined)
             return o;
         const base = previewValues !== null ? previewValues : values;
         const v = base[key];
-        return v !== undefined ? v : undefined;
+        if (v !== undefined)
+            return v;
+        const p = presetValues[key];
+        return p !== undefined ? p : undefined;
     }
 
     function tok(key) {
@@ -160,6 +175,15 @@ QtObject {
         const n = Number(v);
         return v !== undefined && isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.8;
     }
+
+    // The theme's compositor-blur character, consumed by Services/Blur.qml
+    // when it renders the niri fragment. `blurThemeDefault` is only the
+    // default — the user's blur flag file overrides it either way.
+    readonly property bool blurThemeDefault: String(tok("blur.enabled")) === "true"
+    readonly property real blurNoise: num("blur.noise")
+    readonly property real blurSaturation: num("blur.saturation")
+    readonly property real blurOpacityActive: num("opacity.blur-active")
+    readonly property real blurOpacityInactive: num("opacity.blur-inactive")
 
     // Base-token card fills (surface1 cards and the like): unchanged while
     // blur is off, glass while it is on. A color already more transparent

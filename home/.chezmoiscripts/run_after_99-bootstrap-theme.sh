@@ -42,7 +42,10 @@ applied="$HOME/.local/state/qshell/niri-theme.kdl"
 # theme.toml, so the no-change path costs a rewrite of identical bytes and the
 # live-reload signals to whatever is running.
 newer() {
+  # shell/Commons rides along: theme-apply evals defaults.js/presets.js/
+  # color.js/gradient.js from there, so an edited preset must re-render too.
   [ -n "$(find "${CHEZMOI_WORKING_TREE:?}/templates" "${CHEZMOI_WORKING_TREE:?}/bin/theme-apply" \
+            "${CHEZMOI_WORKING_TREE:?}/shell/Commons" \
             -newer "$applied" -print -quit 2>/dev/null)" ]
 }
 

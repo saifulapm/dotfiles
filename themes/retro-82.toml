@@ -4,6 +4,7 @@
 [meta]
 name = "Retro 82"
 mode = "dark"
+preset = "still"
 
 [surface]
 "0" = "#031222"

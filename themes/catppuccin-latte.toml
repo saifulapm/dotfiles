@@ -4,6 +4,7 @@
 [meta]
 name = "Catppuccin Latte"
 mode = "light"
+preset = "shaded"
 
 [surface]
 "0" = "#e3e4e8"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-blue"
+
+# Gradient border: accent.accent into ansi.magenta across the frame.
+[border]
+active = "#1e66f5 #ea76cb 45deg"

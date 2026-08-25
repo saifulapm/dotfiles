@@ -4,6 +4,7 @@
 [meta]
 name = "Tokyo Night"
 mode = "dark"
+preset = "glass"
 
 [surface]
 "0" = "#16161e"
@@ -169,3 +170,30 @@ border-error = "#a9b1d6"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-magenta"
+
+# ---------------------------------------------------------------------------
+# APPEARANCE CHARACTER (2026-08-26). Every key optional; the merge order is
+# builtin defaults < preset < this file < ~/.config/qshell/theme-override.toml.
+#
+# [meta] preset — a named bundle from shell/Commons/presets.js that fills the
+# keys below when the theme doesn't: flat (baseline), glass (compositor blur
+# on, frosted windows), shaded (opaque + drop shadow), playful (bouncy
+# springs), calm (slow + soft shadow), snap (fast, stiff), still (zero
+# motion, hard offset shadow, opaque).
+#
+# [blur]    enabled ("true"/"false" theme DEFAULT — the blur flag file, when
+#           it holds on/off, is the user override), alpha (shell glass
+#           opacity 0..1), noise, saturation (niri background-effect knobs).
+# [opacity] active / inactive (base window pair, blur off; 1.0 = opaque),
+#           blur-active / blur-inactive (frost pair while blur is on).
+# [shadow]  enabled, softness, spread, offset-x, offset-y, color — the niri
+#           layout shadow, per theme.
+# [motion]  duration + easing drive the shell (unchanged); open-ms,
+#           open-curve, close-ms, close-curve, spring-damping,
+#           spring-stiffness, workspace-stiffness drive niri's animation
+#           blocks. Curves: linear | standard | signature | snap | overshoot
+#           | "a b c d" raw cubic-bezier. duration = 0 stills everything.
+# [border]  active — solid "#rrggbb[aa]" or gradient "#a #b <angle>deg"
+#           (Hyprland angle convention), drawn by niri and the shell's
+#           gradient ring renderers alike.
+# ---------------------------------------------------------------------------

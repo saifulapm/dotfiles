@@ -15,6 +15,11 @@ const ROOT = path.resolve(__dirname, "..")
 const THEMES = path.join(ROOT, "themes")
 const NAME_FILE = path.join(os.homedir(), ".local/state/qshell/theme.name")
 
+// Preset bundles — merged under each theme's own keys so the token map fed
+// to the shell's live preview carries the preset-resolved values (the
+// switcher must preview the blur/shadow/motion character, not just colors).
+;(0, eval)(require("fs").readFileSync(path.join(ROOT, "shell/Commons/presets.js"), "utf8"))
+
 function parseToml(raw) {
   const out = {}
   let section = ""
@@ -85,7 +90,9 @@ if (!process.argv.includes("--json")) {
 }
 
 const list = names.map(name => {
-  const tokens = parseToml(fs.readFileSync(path.join(THEMES, name + ".toml"), "utf8"))
+  const raw = parseToml(fs.readFileSync(path.join(THEMES, name + ".toml"), "utf8"))
+  const preset = THEME_PRESETS[String(raw["meta.preset"] || "")] || {}
+  const tokens = Object.assign({}, preset, raw)
   return {
     name,
     title: tokens["meta.name"] || name,

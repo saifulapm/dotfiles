@@ -4,6 +4,7 @@
 [meta]
 name = "Miasma"
 mode = "dark"
+preset = "calm"
 
 [surface]
 "0" = "#191919"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-wartybrown"
+
+# Gradient border: accent.warn into accent.accent across the frame.
+[border]
+active = "#b36d43 #78824b 45deg"

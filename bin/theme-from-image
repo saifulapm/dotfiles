@@ -212,6 +212,9 @@ function generateToml(roles, name) {
     lines.push("[meta]")
     lines.push(`name = "${name}"`)
     lines.push(`mode = "dark"`)
+    // A wallpaper-derived theme lives against its wallpaper, which is what
+    // the glass preset is for: compositor blur on, frosted windows.
+    lines.push(`preset = "glass"`)
     lines.push("")
     lines.push("[surface]")
     for (const k of ["0", "1", "2", "3"])
@@ -242,6 +245,11 @@ function generateToml(roles, name) {
     lines.push("[motion]")
     lines.push(`duration = 150`)
     lines.push(`easing = "standard"`)
+    lines.push("")
+    // Gradient border from the image's own accents — accent into ok reads as
+    // the image's two strongest hues moving across the frame.
+    lines.push("[border]")
+    lines.push(`active = "${roles.accent.accent} ${roles.accent.ok} 45deg"`)
     lines.push("")
     return lines.join("\n")
 }

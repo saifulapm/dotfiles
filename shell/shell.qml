@@ -25,9 +25,14 @@ ShellRoot {
         blurActive: shell.blur.enabled
         wallpaperPath: shell.blur.wallpaperPath
     }
-    // Eager, but only as a flag-file watcher: blur is off by default and the
-    // disabled path must cost nothing but the watch.
-    property Blur blur: Blur {}
+    // Eager, but only as a flag-file watcher: with no override and a
+    // flat-preset theme the disabled path costs nothing but the watch.
+    // Mutual wiring with Theme is deliberate: the theme carries the blur
+    // DEFAULT + fragment parameters, the flag file carries the user
+    // override, and Theme.blurActive reads back the effective state.
+    property Blur blur: Blur {
+        theme: shell.theme
+    }
     property Niri niri: Niri {}
     // Eager by necessity: must own org.freedesktop.Notifications from startup.
     // The popup UI below stays lazy. `niri` is what click-to-focus resolves a

@@ -33,23 +33,35 @@ import Quickshell.Io
 // live window content) is experimental and re-blurs every frame — nothing
 // here ever asks for it.
 //
-// State persists as a flag file at ~/.local/state/qshell/blur, watched like
-// stay-awake, so `touch`/`rm` from a terminal toggles blur exactly as the
-// menu row does.
+// State: the theme carries the DEFAULT (`[blur] enabled`, usually via its
+// preset) plus the fragment parameters (noise, saturation, frost opacities);
+// the flag file at ~/.local/state/qshell/blur is the USER override. The file
+// holds "on" or "off" and wins over any theme; absent means follow the
+// theme. A legacy empty flag (the old existence-is-on contract) reads as
+// "on". `echo on > blur` / `rm blur` from a terminal work exactly like the
+// menu row and the IPC verbs.
 QtObject {
     id: root
+
+    // The active Theme service (wired in shell.qml): blur default + fragment
+    // parameters are theme tokens, so a theme switch restyles the frost.
+    property var theme: null
 
     readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/qshell"
     readonly property string statePath: stateDir + "/blur"
     readonly property string fragmentPath: stateDir + "/niri-blur.kdl"
+
+    // "", "on" or "off" — the flag file's content ("" = no override).
+    property string override: ""
+    readonly property bool themeDefault: theme ? theme.blurThemeDefault : false
 
     property bool enabled: false
     property bool stateLoaded: false
     property string lastEvent: "starting"
 
     // The app-window side of the switch. Opacity rules ride along because
-    // blur behind a 98.5%-opaque window is invisible; these are the values
-    // the frost was tuned at.
+    // blur behind a 98.5%-opaque window is invisible; the pair is the
+    // theme's [opacity] blur-active/blur-inactive.
     // The excludes are the foot family (the same set as config.kdl's scroll
     // rule): those windows frost via their own background alpha, not a
     // whole-window fade — see the header comment.
@@ -58,23 +70,47 @@ QtObject {
     // for the windows the shell sits above, and since 2026-08-20 the shell
     // itself has one toplevel among them — the dekho hub (Modules/Dekho),
     // app-id org.quickshell like any Quickshell window. It is deliberately
-    // opaque (a cinema is a room with the lights off), so the 0.95/0.9 pair
+    // opaque (a cinema is a room with the lights off), so the frost pair
     // would make backdrop art fight the wallpaper through it, and blurring
     // the wallpaper behind a maximized opaque window is a pass with nothing
     // to show for it. The shell's other surfaces are layer-shell and are not
     // matched by window rules at all; this keeps its window on the same side
-    // of the line as the rest of it. config.kdl's base opacity pair exempts
-    // the same app-id, for the same reason.
+    // of the line as the rest of it. The media exemption re-stated at the
+    // bottom mirrors the theme include's, for the same later-rule-wins
+    // reason: a frosted mpv is a broken movie.
     readonly property string shellExclude: "    exclude app-id=r#\"^org\\.quickshell$\"#\n"
-    readonly property string fragmentOn: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Frosted app windows over niri's cached xray wallpaper blur. Global\n" + "// blur tuning stays at niri's defaults (passes 3, offset 3).\n" + "window-rule {\n" + shellExclude + "    background-effect {\n" + "        blur true\n" + "    }\n" + "}\n" + "\n" + "window-rule {\n" + "    opacity 0.95\n" + footExcludes + shellExclude + "}\n" + "\n" + "window-rule {\n" + "    match is-active=false\n" + "    opacity 0.9\n" + footExcludes + shellExclude + "}\n"
+    readonly property string mediaExemption: "window-rule {\n" + "    match app-id=r#\"^(zoom|vlc|mpv|org\\.kde\\.kdenlive|com\\.obsproject\\.Studio|com\\.github\\.PintaProject\\.Pinta|imv)$\"#\n" + "    match app-id=r#\"^org\\.quickshell$\"#\n" + "    match title=r#\"Picture.?in.?[Pp]icture\"#\n" + "    opacity 1.0\n" + "}\n"
+
+    // The theme's frost parameters, with the pre-theme constants as
+    // fallbacks. noise/saturation are emitted only when they leave niri's
+    // own defaults (0.02 / 1.5), so a default theme renders the proven
+    // minimal fragment.
+    readonly property real frostNoise: theme ? theme.blurNoise : 0.02
+    readonly property real frostSaturation: theme ? theme.blurSaturation : 1.5
+    readonly property real frostOpacityActive: theme ? theme.blurOpacityActive : 0.95
+    readonly property real frostOpacityInactive: theme ? theme.blurOpacityInactive : 0.9
+
+    function fragmentOnText() {
+        let effect = "    background-effect {\n" + "        blur true\n";
+        if (Math.abs(frostNoise - 0.02) > 0.0001)
+            effect += "        noise " + frostNoise + "\n";
+        if (Math.abs(frostSaturation - 1.5) > 0.0001)
+            effect += "        saturation " + frostSaturation + "\n";
+        effect += "    }\n";
+        return "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Frosted app windows over niri's cached xray wallpaper blur. Global\n" + "// blur tuning stays at niri's defaults (passes 3, offset 3).\n" + "window-rule {\n" + shellExclude + effect + "}\n" + "\n" + "window-rule {\n" + "    opacity " + frostOpacityActive + "\n" + footExcludes + shellExclude + "}\n" + "\n" + "window-rule {\n" + "    match is-active=false\n" + "    opacity " + frostOpacityInactive + "\n" + footExcludes + shellExclude + "}\n" + "\n" + mediaExemption;
+    }
     readonly property string fragmentOff: "// Written by the qshell blur service (Services/Blur.qml) — do not edit.\n" + "// Blur is disabled; config.kdl includes this file optionally.\n"
 
     function logEvent(event, details) {
         lastEvent = details === undefined || details === "" ? event : event + ": " + details;
     }
 
-    function applyBlur(value, reason) {
-        const on = !!value;
+    // Effective state from (override, themeDefault); rewrites the fragment
+    // on every change. A cold start re-renders it only when blur is on: the
+    // off fragment is inert, and every boot rewriting it would poke a niri
+    // config reload for nothing.
+    function applyState(reason) {
+        const on = override === "" ? themeDefault : override === "on";
         const first = !stateLoaded;
         const changed = first || enabled !== on;
         enabled = on;
@@ -82,13 +118,17 @@ QtObject {
         if (!changed)
             return;
         logEvent("blur", (on ? "enabled" : "disabled") + (reason ? " " + reason : ""));
-        // The niri fragment follows every state change, including an external
-        // touch/rm of the flag. A cold start re-renders it only when blur is
-        // on: the off fragment is inert, and every boot rewriting it would
-        // poke a niri config reload for nothing.
         if (!first || on)
             writeFragment(on);
     }
+
+    // A theme switch can flip the default (override absent) or restyle the
+    // frost parameters (blur on): both re-render the fragment.
+    onThemeDefaultChanged: if (stateLoaded)
+        applyState("theme-default")
+    readonly property string frostParamsKey: [frostNoise, frostSaturation, frostOpacityActive, frostOpacityInactive].join("|")
+    onFrostParamsKeyChanged: if (stateLoaded && enabled)
+        writeFragment(true)
 
     // tmp+mv in the same directory: niri watches included files, and a
     // half-written include must never be what it reloads.
@@ -107,17 +147,19 @@ QtObject {
         // alpha include must flip together or windows frost twice / not at
         // all. Semicolon, not &&: a failed fragment write must not strand
         // the foot side on the old state.
-        fragmentWriter.command = ["bash", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s' \"$2\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\"; foot-frost \"$3\"", "qshell-blur-fragment", fragmentPath, on ? fragmentOn : fragmentOff, on ? "on" : "off"];
+        fragmentWriter.command = ["bash", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s' \"$2\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\"; foot-frost \"$3\"", "qshell-blur-fragment", fragmentPath, on ? fragmentOnText() : fragmentOff, on ? "on" : "off"];
         fragmentWriter.running = true;
     }
 
-    function persistBlur(value) {
+    // value: "on" | "off" writes the override; "" removes the file (follow
+    // the theme). The watcher re-delivers whatever lands.
+    function persistOverride(value) {
         if (stateWriter.running) {
-            pendingPersist = !!value;
+            pendingPersist = value;
             hasPendingPersist = true;
             return;
         }
-        stateWriter.command = ["bash", "-c", value ? "mkdir -p \"$(dirname \"$1\")\" && touch \"$1\"" : "rm -f \"$1\"", "qshell-blur", statePath];
+        stateWriter.command = value === "" ? ["bash", "-c", "rm -f \"$1\"", "qshell-blur", statePath] : ["bash", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s' \"$2\" > \"$1\"", "qshell-blur", statePath, value];
         stateWriter.running = true;
     }
 
@@ -125,9 +167,18 @@ QtObject {
     // is the durable copy and its watcher re-delivers the same value.
     function setBlur(value) {
         const on = !!value;
-        persistBlur(on);
-        applyBlur(on, "requested");
+        override = on ? "on" : "off";
+        persistOverride(override);
+        applyState("requested");
         return on;
+    }
+
+    // Clear the override: blur follows the active theme again.
+    function setAuto() {
+        override = "";
+        persistOverride("");
+        applyState("auto");
+        return enabled;
     }
 
     function toggle() {
@@ -137,6 +188,8 @@ QtObject {
     function statusJson() {
         return JSON.stringify({
             enabled: enabled,
+            override: override,
+            themeDefault: themeDefault,
             stateLoaded: stateLoaded,
             statePath: statePath,
             fragmentPath: fragmentPath,
@@ -145,7 +198,7 @@ QtObject {
     }
 
     property bool hasPendingPersist: false
-    property bool pendingPersist: false
+    property string pendingPersist: ""
 
     readonly property Process fragmentWriter: Process {
         onExited: root.drainFragmentQueue()
@@ -156,19 +209,26 @@ QtObject {
             if (root.hasPendingPersist) {
                 const pending = root.pendingPersist;
                 root.hasPendingPersist = false;
-                root.persistBlur(pending);
+                root.persistOverride(pending);
             }
         }
     }
 
-    // The flag file IS the state. FileView watches the file and its directory,
-    // so creation and deletion both land here.
+    // The flag file IS the override. FileView watches the file and its
+    // directory, so creation, edits and deletion all land here. An empty
+    // file is the legacy existence-is-on contract and still reads as "on".
     readonly property FileView stateFlag: FileView {
         path: root.statePath
         watchChanges: true
         printErrors: false
-        onLoaded: root.applyBlur(true, "state-file")
-        onLoadFailed: root.applyBlur(false, "state-file")
+        onLoaded: {
+            root.override = String(text()).trim() === "off" ? "off" : "on";
+            root.applyState("state-file");
+        }
+        onLoadFailed: {
+            root.override = "";
+            root.applyState("state-file");
+        }
         onFileChanged: reload()
         // Without an explicit read the view stays unloaded and neither signal
         // above ever fires.
@@ -226,6 +286,11 @@ QtObject {
 
         function toggle(): string {
             return root.toggle() ? "enabled" : "disabled";
+        }
+
+        // Drop the user override and follow the active theme's default.
+        function auto(): string {
+            return "auto (" + (root.setAuto() ? "enabled" : "disabled") + " by theme)";
         }
     }
 }

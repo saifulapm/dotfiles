@@ -4,6 +4,7 @@
 [meta]
 name = "Ethereal"
 mode = "dark"
+preset = "glass"
 
 [surface]
 "0" = "#040816"
@@ -53,3 +54,7 @@ easing = "standard"
 # yaru-icon-theme rpm).
 [icon]
 theme = "Yaru-blue"
+
+# Gradient border: ansi.blue into ansi.magenta across the frame.
+[border]
+active = "#7d82d9 #c89dc1 30deg"

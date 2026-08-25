@@ -36,6 +36,11 @@ layout {
     insert-hint {
         color "{{accent.accent}}80"
     }
+
+    // Per-theme drop shadow — a full block with explicit `on` when the theme
+    // (or its preset) enables it, a comment otherwise. config.kdl carries no
+    // shadow of its own, so this is the only writer.
+    {{ niri_shadow shadow.enabled }}
 }
 
 overview {
@@ -96,10 +101,17 @@ window-rule {
     }
 }
 
-// Included sections merge, so this only sets the slowdown factor (or off) on
-// top of the animation blocks config.kdl defines: the theme's motion.duration
-// scaled against the 150 ms reference, same scale the shell's theme.time()
-// applies. A zero-motion theme stills the compositor too.
+// The base window-opacity pair, themed (config.kdl no longer carries one).
+// The media/PiP/shell-toplevel exemption is re-stated by the emitter AFTER
+// the pair: for a contested property the latest matching rule wins, and this
+// include sits after every config.kdl rule. The blur fragment (niri-blur.kdl,
+// included after this file) overrides the pair again while blur is on.
+{{ niri_opacity opacity.active }}
+
+// The compositor side of the theme's motion character: explicit blocks built
+// from the motion.* tokens. Included sections merge per block and the later
+// definition wins, so these replace config.kdl's reference values wholesale.
+// A zero-motion theme emits `off` and stills the compositor outright.
 animations {
-    {{ niri_motion motion.duration }}
+    {{ niri_animations motion.duration }}
 }
