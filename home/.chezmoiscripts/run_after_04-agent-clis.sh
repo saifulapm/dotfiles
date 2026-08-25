@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # The agent CLIs this desktop actually uses: claude, codex and copilot feed
-# the bar's model-usage widget; pi is swept by bin/codex-usage-scan. All are
-# user-local installs (no root), each guarded so re-runs no-op. Their LOGINS
-# are interactive and deliberately not scripted — each CLI asks on first run.
+# the bar's model-usage widget; pi is swept by bin/codex-usage-scan; fx feeds
+# neither widget nor sweep and is here on its own merits. All are user-local
+# installs (no root), each guarded so re-runs no-op. Their LOGINS are
+# interactive and deliberately not scripted — each CLI asks on first run.
 #
 # voxtype (dictation) used to be wired up at the end of this script because it
 # was a hand install. It is scripted now — binary, model and systemd unit —
@@ -32,6 +33,40 @@ if ! command -v copilot >/dev/null 2>&1; then
   curl -fsSL https://gh.io/copilot-install | bash \
     && echo "agent-clis: copilot installed (run 'copilot' once to log in)" \
     || warn "copilot install failed"
+fi
+
+# fx (Vercel Labs, written in Zig) — a model-agnostic agent harness: `fx` for
+# a session, `fx ask` for one noninteractive request, `fx acp` to serve it
+# over stdio. Installed 2026-08-26.
+#
+# THE `export PATH` AT THE TOP IS LOAD-BEARING FOR THIS ONE, where for the
+# three above it is only a guard convenience. fx's setup.sh ends by checking
+# whether its install dir is on PATH and, when it is not, APPENDS a PATH line
+# to the rc file for $SHELL — which here is fish, whose config.fish is a
+# chezmoi symlink INTO THIS REPO. That append would land in the source tree
+# and leave the repo dirty on every machine that applied: the same trap
+# documented at run_after_45-amx for `amx doctor --fix`. With ~/.local/bin
+# exported above the check passes and no rc file is touched (verified
+# 2026-08-26 — install ran, `git status` stayed clean).
+#
+# Auth is a first-run decision and not scripted, like the three above:
+# `fx login` for Vercel AI Gateway, or `fx provider codex|grok` to ride a
+# subscription that is already logged in. Neither is required to USE it here —
+# `pxy launch fx` wires it to 127.0.0.1:4100 through FX_GATEWAY_* plus pxy's
+# own local api_key, which short-circuits fx's credential chain, so the
+# proxy's ~30 providers answer with no Vercel account existing at all and no
+# gateway traffic leaving the machine. State (settings.json, sessions,
+# mcp.json, usage) lives in ~/.fx, which on Linux holds the API key in
+# plaintext — deliberately unmanaged, and never a candidate for this repo.
+#
+# Install-only guard: fx ships `fx upgrade`, and bin/update-all runs it, so
+# rerunning the installer here would be a slower second path to the same
+# binary. Stdout is dropped because the noninteractive installer echoes the
+# bare install path; its "installed fx <version>" line goes to stderr and stays.
+if ! command -v fx >/dev/null 2>&1; then
+  curl -fsSL https://fx.sh/setup.sh | bash >/dev/null \
+    && echo "agent-clis: fx installed (run 'fx login', or just 'pxy launch fx')" \
+    || warn "fx install failed"
 fi
 
 # pi installs into the mise-managed node's bin directory, so node must exist —

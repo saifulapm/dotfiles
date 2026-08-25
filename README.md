@@ -23,8 +23,8 @@ That run asks which machine this is, then: installs every package in
 `/etc/dnf/dnf.conf`; COPRs, Remi PHP SCLs and RPM Fusion ffmpeg bootstrap
 themselves), sets up tty1 autologin, registers the shell's file-chooser
 portal, installs the dev toolchain (node via mise, pnpm via corepack, rust
-via rustup, Shopify CLI), the agent CLIs (claude, codex, copilot, pi), the
-pnpm/cargo/go/composer tool sets, prebuilt binaries (watchexec, hurl,
+via rustup, Shopify CLI), the agent CLIs (claude, codex, copilot, pi, fx),
+the pnpm/cargo/go/composer tool sets, prebuilt binaries (watchexec, hurl,
 cloudflared, stripe, ouch, usql, satty), builds the kakoune fork, dekho, amx,
 the workflow trio (mem/workflow/hub) and the three oma apps from source,
 **switches the login shell to fish**, sets up
@@ -118,7 +118,9 @@ after the first apply.
   `gh auth login`, which is the thing that breaks them. One account only
   (saifulapm) — the work/main aliases were never logged in here and are gone.
   The gh extensions still want a rerun of `chezmoi apply` once auth lands.
-- First login for each agent CLI: `claude`, `codex`, `copilot`.
+- First login for each agent CLI: `claude`, `codex`, `copilot`. `fx` only if
+  you want it on Vercel's gateway (`fx login`) or on a subscription
+  (`fx provider codex|grok`) — `pxy launch fx` needs neither.
 - `rclone config` — once per remote, per machine: the iCloud remote
   (interactive Apple 2FA) and the Dropbox remote (interactive browser
   OAuth). rclone is the ONE Dropbox path on every machine (2026-08-10): the

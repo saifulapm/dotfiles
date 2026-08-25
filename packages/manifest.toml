@@ -1603,6 +1603,11 @@ name = "pi"
 via  = "curl -fsSL https://pi.dev/install.sh | sh → the mise-managed node's bin (needs node first; script order guarantees it)"
 why  = "pi coding agent — its session logs are swept by bin/codex-usage-scan (with ripgrep) into the Codex provider's local usage numbers. Was entirely unrecorded until 2026-08-06"
 
+[[tool]]
+name = "fx"
+via  = "curl -fsSL https://fx.sh/setup.sh | bash → ~/.local/bin/fx (prebuilt tarball from releases.fx.sh, latest stable). Thereafter `fx upgrade` is its own updater and bin/update-all runs it"
+why  = "fx (Vercel Labs, Zig) — a model-agnostic coding agent harness, added 2026-08-26. The fifth CLI here and the only one that is NOT in the bar's model-usage widget and NOT swept by a usage scanner: it keeps its own numbers (`fx usage`) under ~/.fx and nothing reads them. It earns its place through pxy instead — `pxy launch fx` was already an arm of `pxy launch` before fx was installed on any machine, wiring FX_GATEWAY_BASE_URL/FX_GATEWAY_CHAT_URL at 127.0.0.1:4100 plus pxy's own api_key, which short-circuits fx's credential chain: the proxy's ~30 providers answer with no Vercel account and no gateway traffic leaving the box. Bare `fx` instead wants `fx login` (Vercel AI Gateway) or `fx provider codex|grok` to ride a subscription already logged in — interactive, first-run, not scripted. State lives in ~/.fx (settings.json, sessions, mcp.json, usage); on Linux that file holds the API key in plaintext, so it is deliberately unmanaged and must never enter this repo. INSTALLER HAZARD, handled in run_after_04: setup.sh appends a PATH line to config.fish when ~/.local/bin is not already on PATH, and config.fish is a chezmoi symlink into the source tree — the script's `export PATH` at the top is what keeps that append from firing"
+
 # Editor note: the editor is Emacs (emacs-pgtk above). `vi` comes from
 # vim-minimal, which Fedora minimal always ships — vim-enhanced (`vim`) is
 # deliberately NOT installed; bash history shows `vim` failing and the user

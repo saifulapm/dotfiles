@@ -215,6 +215,14 @@ say "agent CLIs"
 if command -v claude >/dev/null 2>&1; then
   claude update || warn "claude update failed"
 fi
+# fx replaces its own binary in place, so unlike the source-built tools above
+# there is nothing to make stale for the apply to repair. --json keeps an
+# already-current run to one line instead of a redraw, and </dev/null is the
+# same courtesy the rest of this script pays: nothing here owns the tty.
+# The channel comes from ~/.fx (stable unless someone chose dev by hand).
+if command -v fx >/dev/null 2>&1; then
+  fx upgrade --json </dev/null || warn "fx upgrade failed"
+fi
 # codex ships no update verb worth scripting — rerun its installer by hand
 # when needed (run_after_04 has the URL).
 
