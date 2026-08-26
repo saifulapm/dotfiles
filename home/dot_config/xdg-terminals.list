@@ -1,0 +1,24 @@
+# The terminal a Terminal=true desktop entry opens in, per the XDG terminal
+# spec draft: one desktop-entry id per line, first one that exists wins.
+#
+# vicinae reads this FIRST in XdgAppDatabase::terminalEmulator(), ahead of
+# niri-xdg-terminals.list, the xdg-terminal-exec binary, the
+# x-scheme-handler/terminal default, and finally a hardcoded scan of entries
+# carrying Categories=TerminalEmulator. That last step is the bug this file
+# exists to kill: foot ships THREE such entries and one of them,
+# foot-server.desktop, is Exec=foot --server — a daemon, not a window. On the
+# mini vicinae picked it and ran `foot --server --app-id btop.desktop -e btop`,
+# which races the already-running foot-server.socket and dies; btop never
+# appeared and nothing was reported, since the launch is fire-and-forget
+# (found 2026-08-26, btop from vicinae). The MacBook only worked by accident:
+# a stray alacritty left over from the OSC 72 drag-and-drop test outranked
+# foot-server in that same scan.
+#
+# footclient first for the same reason bin/foot-run reaches for it — the
+# socket-activated server shares glyph caches and spawns instantly. vicinae
+# knows this binary by name and drives it as `footclient --app-id <id> -e <cmd>`,
+# so the window lands with the entry's id (btop.desktop), not `foot`; the
+# niri scroll-factor rule keyed on ^foot$ therefore misses these. foot.desktop
+# is the standalone fallback if the client entry ever goes missing.
+footclient.desktop
+foot.desktop
