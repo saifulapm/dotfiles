@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+"""Scan OpenCode usage and emit compact stats as one JSON object.
+
+Two sources, same output contract as the codex/copilot scanners:
+
+* Local: OpenCode's session store (~/.local/share/opencode/opencode.db,
+  sqlite). Assistant messages carry modelID/providerID/tokens. Messages routed
+  through pxy (providerID "pxy") are SKIPPED for token counting — their model
+  is recorded as "auto" client-side, and pxy's own per-model accounting covers
+  them — but still count toward prompts/sessions (the activity happened here).
+* pxy: `pxy status --json --remote --provider opencode-go-github --provider
+  opencode-go-google` supplies (a) the real routed models for pxy traffic
+  (modelUsage rows with agent "opencode") and (b) both opencode Go accounts'
+  dollar-window percentages for the LIMITS meters, emitted as the finished
+  extraLimits records the panel renders (title/subtitle/percent/resetAt).
+"""
+
+import json
+import os
+import shutil
+import sqlite3
+import subprocess
+from datetime import datetime, timedelta
+from pathlib import Path
+
+DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
+
+# pxy provider name -> meter title. Also the remote fetch filter: balance
+# checks cost real HTTP, so only these two are queried.
+GO_ACCOUNTS = {
+    "opencode-go-github": "GitHub",
+    "opencode-go-google": "Google",
+}
+WINDOWS = [("rolling", "5-hour"), ("weekly", "7-day"), ("monthly", "30-day")]
+
+now = datetime.now()
+today = now.strftime("%Y-%m-%d")
+recent_dates = [(now - timedelta(days=offset)).strftime("%Y-%m-%d") for offset in range(6, -1, -1)]
+recent = {day: {"date": day, "messageCount": 0} for day in recent_dates}
+
+today_prompts = 0
+today_sessions = set()
+today_total = 0
+today_by_model = {}
+model_usage = {}
+total_prompts = 0
+total_sessions = set()
+active_days = set()
+status_text = ""
+help_text = ""
+
+
+def bucket(model):
+  return model_usage.setdefault(model, {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "cacheCreationInputTokens": 0,
+  })
+
+
+def scan_db():
+  global today_prompts, today_total, total_prompts
+  if not DB_PATH.exists():
+    return
+  try:
+    con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True, timeout=5)
+    rows = con.execute("SELECT session_id, data FROM message").fetchall()
+    con.close()
+  except Exception:
+    return
+
+  for session_id, raw in rows:
+    try:
+      m = json.loads(raw)
+    except Exception:
+      continue
+    if m.get("role") != "assistant":
+      continue
+    tokens = m.get("tokens") or {}
+    created = ((m.get("time") or {}).get("created") or 0) / 1000
+    day = datetime.fromtimestamp(created).strftime("%Y-%m-%d") if created else today
+
+    total_prompts += 1
+    total_sessions.add(session_id)
+    active_days.add(day)
+    if day == today:
+      today_prompts += 1
+      today_sessions.add(session_id)
+
+    # pxy-routed: model is "auto" here; tokens arrive via pxy's model rows.
+    if m.get("providerID") == "pxy":
+      continue
+
+    cache = tokens.get("cache") or {}
+    inp = int(tokens.get("input") or 0)
+    out = int(tokens.get("output") or 0) + int(tokens.get("reasoning") or 0)
+    cr = int(cache.get("read") or 0)
+    cw = int(cache.get("write") or 0)
+    total = inp + out + cr + cw
+    if total <= 0:
+      continue
+
+    model = str(m.get("modelID") or "opencode")
+    b = bucket(model)
+    b["inputTokens"] += inp
+    b["outputTokens"] += out
+    b["cacheReadInputTokens"] += cr
+    b["cacheCreationInputTokens"] += cw
+    if day in recent:
+      recent[day]["messageCount"] += total
+    if day == today:
+      today_total += total
+      today_by_model[model] = today_by_model.get(model, 0) + total
+
+
+def pxy_status():
+  global status_text, help_text
+  pxy = shutil.which("pxy") or str(Path.home() / ".local" / "bin" / "pxy")
+  if not os.path.exists(pxy):
+    status_text = "pxy unavailable"
+    help_text = "pxy not found; showing OpenCode's own session stats only."
+    return None
+  cmd = [pxy, "status", "--json", "--remote"]
+  for name in GO_ACCOUNTS:
+    cmd += ["--provider", name]
+  try:
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    return json.loads(out.stdout)
+  except Exception as exc:
+    status_text = "pxy status failed"
+    help_text = f"{exc}; showing OpenCode's own session stats only."
+    return None
+
+
+def merge_pxy(data):
+  """pxy's per-model rows for agent=opencode: the real models behind auto."""
+  global today_total
+  for row in data.get("modelUsage") or []:
+    if row.get("agent") != "opencode":
+      continue
+    day = str(row.get("day") or "")
+    total = int(row.get("inputTokens") or 0) + int(row.get("outputTokens") or 0)
+    model = str(row.get("model") or "auto")
+    b = bucket(model)
+    b["inputTokens"] += int(row.get("inputTokens") or 0)
+    b["outputTokens"] += int(row.get("outputTokens") or 0)
+    active_days.add(day)
+    if day in recent:
+      recent[day]["messageCount"] += total
+    if day == today:
+      today_total += total
+      today_by_model[model] = today_by_model.get(model, 0) + total
+
+
+def go_limits(data):
+  """Both Go accounts' windows as finished extraLimits records."""
+  global status_text, help_text
+  limits = []
+  remote = data.get("remote") or {}
+  for name, title in GO_ACCOUNTS.items():
+    entry = remote.get(name) or {}
+    usage = ((entry.get("data") or {}).get("usage")) or {}
+    if not usage:
+      if not status_text:
+        status_text = f"{title} Go limits unavailable"
+        help_text = str(entry.get("summary") or "no data from opencode.ai")
+      continue
+    for key, subtitle in WINDOWS:
+      win = usage.get(key) or {}
+      if "percent" not in win:
+        continue
+      limits.append({
+        "title": title,
+        "subtitle": subtitle + ("  ⚠ rate-limited" if win.get("status") == "rate-limited" else ""),
+        "percent": float(win.get("percent") or 0) / 100.0,
+        "resetAt": str(win.get("resetsAt") or ""),
+      })
+  return limits
+
+
+scan_db()
+data = pxy_status()
+extra_limits = []
+if data is not None:
+  merge_pxy(data)
+  extra_limits = go_limits(data)
+
+print(json.dumps({
+  "ready": True,
+  "todayPrompts": today_prompts,
+  "todaySessions": len(today_sessions),
+  "todayTotalTokens": today_total,
+  "todayTokensByModel": today_by_model,
+  "recentDays": [recent[d] for d in recent_dates],
+  "totalPrompts": total_prompts,
+  "totalSessions": len(total_sessions),
+  "activeDays": len(active_days),
+  "activeDates": sorted(active_days),
+  "modelUsage": model_usage,
+  "extraLimits": extra_limits,
+  "tierLabel": "Go × 2",
+  "usageStatusText": status_text,
+  "authHelpText": help_text,
+}, separators=(",", ":")))

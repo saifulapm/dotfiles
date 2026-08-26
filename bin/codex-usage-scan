@@ -91,6 +91,20 @@ usage_status = ""
 usage_help = ""
 
 
+def add_activity(day, session_key):
+  """Prompt/session/day counters only — for pxy-routed turns, whose tokens
+  arrive per-model from pxy's own accounting instead."""
+  global today_prompts, total_prompts
+  total_prompts += 1
+  total_sessions.add(session_key)
+  active_days.add(day)
+  if day in recent:
+    sessions_by_day[day].add(session_key)
+  if day == today:
+    today_prompts += 1
+    today_sessions.add(session_key)
+
+
 def add_usage(day, session_key, model, input_tokens, output_tokens, cache_read, cache_write):
   global today_prompts, today_total_tokens, total_prompts
   total = input_tokens + output_tokens + cache_read + cache_write
@@ -203,6 +217,7 @@ def scan_native_codex_sessions():
 
   for path in files:
     current_model = "codex"
+    via_pxy = False
     try:
       with path.open(errors="replace") as handle:
         for raw in handle:
@@ -210,9 +225,19 @@ def scan_native_codex_sessions():
             entry = json.loads(raw)
           except Exception:
             continue
+          payload = entry.get("payload") or {}
+          if entry.get("type") == "session_meta":
+            # The reliable pxy marker: `pxy launch codex` sets
+            # model_provider = "pxy" whatever model was picked, and the
+            # rollout records it here. The model id alone can't tell —
+            # a concrete `pxy launch codex -m provider/model` session
+            # never says "auto".
+            via_pxy = payload.get("model_provider") == "pxy"
+            continue
           if entry.get("type") == "turn_context":
-            payload = entry.get("payload") or {}
             current_model = model_name(payload.get("model") or payload.get("model_slug") or current_model)
+            if payload.get("model_provider"):
+              via_pxy = payload.get("model_provider") == "pxy"
             continue
           payload = entry.get("payload") or entry
           if entry.get("type") == "response_item" and isinstance(payload, dict):
@@ -235,9 +260,64 @@ def scan_native_codex_sessions():
           if not (input_tokens or output_tokens or cache_read or cache_write):
             continue
           day = local_day(entry.get("timestamp") or path.stat().st_mtime)
+          if via_pxy:
+            # This turn only knows the model it ASKED pxy for; its tokens
+            # arrive per resolved model from merge_pxy_models(). Count the
+            # activity here (pxy has no session notion), tokens there.
+            add_activity(day, str(path))
+            continue
           add_usage(day, str(path), current_model, input_tokens, output_tokens, cache_read, cache_write)
     except Exception:
       continue
+
+
+def merge_pxy_models():
+  """Real models behind pxy-routed turns, from pxy's own accounting.
+
+  `pxy launch codex` tags every request with agent=codex, and pxy records
+  which model the routing actually used. The native scan above counts those
+  turns' prompts/sessions but not their tokens, so these rows are the sole
+  token source for them — no double counting. TOKENS ONLY here: prompts are
+  already counted natively, and pxy's request count would double them.
+  Same 30-day horizon as the native session scan, so the totals stay one
+  window rather than mixing 30 days of files with all-time pxy rows.
+  """
+  global today_total_tokens
+  pxy = find_command("pxy") or os.path.expanduser("~/.local/bin/pxy")
+  if not os.path.exists(pxy):
+    return
+  try:
+    out = subprocess.run([pxy, "status", "--json"], capture_output=True, text=True, timeout=15, env=ENV)
+    rows = (json.loads(out.stdout).get("modelUsage")) or []
+  except Exception:
+    return
+  cutoff = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+  for row in rows:
+    if row.get("agent") != "codex":
+      continue
+    day = str(row.get("day") or "")
+    if day < cutoff:
+      continue
+    model = model_name(row.get("model"))
+    inp = number(row.get("inputTokens"))
+    outp = number(row.get("outputTokens"))
+    total = inp + outp
+    if total <= 0:
+      continue
+    active_days.add(day)
+    bucket = model_usage.setdefault(model, {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+    })
+    bucket["inputTokens"] += inp
+    bucket["outputTokens"] += outp
+    if day in recent:
+      recent[day]["messageCount"] += total
+    if day == today:
+      today_total_tokens += total
+      today_tokens_by_model[model] = today_tokens_by_model.get(model, 0) + total
 
 
 def rpc_request(proc, request_id, method, params=None, timeout=8):
@@ -379,6 +459,7 @@ def fetch_codex_rpc():
 
 scan_pi_sessions()
 scan_native_codex_sessions()
+merge_pxy_models()
 rpc = fetch_codex_rpc()
 
 out = {

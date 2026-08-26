@@ -939,6 +939,7 @@ Scope {
             "stayawake": stayAwakeComponent,
             "screenrecording": screenRecordingComponent,
             "ai": aiComponent,
+            "pxy": pxyComponent,
             "weather": weatherComponent,
             "monitor": monitorComponent,
             "ssh": sshComponent,
@@ -2322,6 +2323,13 @@ Scope {
     Component {
         id: aiComponent
         Ai {
+            theme: barRoot.theme
+        }
+    }
+
+    Component {
+        id: pxyComponent
+        Pxy {
             theme: barRoot.theme
         }
     }

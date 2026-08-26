@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Gather everything the pxy bar panel shows into one JSON object.
+
+Sources, all pxy's own: `pxy status --json [--remote]` (usage, limits,
+cooldowns, route pin), `pxy explain auto --json` (the live walk order with
+per-candidate verdicts, pin included), `pxy models` (the full catalog for the
+picker's search), and a healthz probe for the daemon light.
+
+`--no-remote` skips the balance HTTP calls — used for the quick re-scan after
+pinning a model, where only the route/eligibility data changed.
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import urllib.request
+
+PXY = shutil.which("pxy") or os.path.expanduser("~/.local/bin/pxy")
+
+# Remote balance shapes pxy passes through raw; each maps to (percent 0..1 of
+# the allowance USED, reset timestamp or ""). Unknown shapes fall back to the
+# summary line with no meter.
+GO_WINDOWS = ["rolling", "weekly", "monthly"]
+
+
+def run(args, timeout):
+  out = subprocess.run([PXY] + args, capture_output=True, text=True, timeout=timeout)
+  if out.returncode != 0:
+    raise RuntimeError(out.stderr.strip() or f"pxy {' '.join(args)} failed")
+  return out.stdout
+
+
+def remote_meter(data):
+  """(percent, resetAt) from a known balance body, or (-1, "")."""
+  usage = (data or {}).get("usage") or {}
+  if isinstance(usage.get("monthly"), dict):  # opencode Go windows
+    best, reset = -1.0, ""
+    for w in GO_WINDOWS:
+      win = usage.get(w) or {}
+      pct = float(win.get("percent") or 0) / 100.0
+      if pct > best:
+        best, reset = pct, str(win.get("resetsAt") or "")
+    return best, reset
+  prem = ((data or {}).get("quota_snapshots") or {}).get("premium_interactions") or {}
+  if prem:  # copilot premium quota
+    remaining = float(prem.get("percent_remaining") or 0)
+    return max(0.0, 1.0 - remaining / 100.0), str((data or {}).get("quota_reset_date") or "")
+  d = (data or {}).get("data") or {}
+  if d.get("total_credits") is not None:  # openrouter dollars
+    credits = float(d.get("total_credits") or 0)
+    used = float(d.get("total_usage") or 0)
+    return (used / credits if credits > 0 else -1.0), ""
+  return -1.0, ""
+
+
+def local_meter(windows):
+  """Fullest used/cap ratio across the day/month/total windows, with detail."""
+  best, parts = -1.0, []
+  for label, w in (("day", windows.get("day")), ("mo", windows.get("month")), ("all", windows.get("total"))):
+    if not isinstance(w, dict):
+      continue
+    for kind, used_key, cap_key in (("req", "requests", "requestLimit"), ("tok", "tokens", "tokenLimit")):
+      cap = w.get(cap_key)
+      if not cap:
+        continue
+      used = float(w.get(used_key) or 0)
+      best = max(best, used / float(cap))
+      parts.append(f"{label} {fmt_count(used)}/{fmt_count(cap)} {kind}")
+  return best, " · ".join(parts)
+
+
+def fmt_count(n):
+  n = float(n)
+  if n >= 1e9:
+    return f"{n / 1e9:.1f}B"
+  if n >= 1e6:
+    return f"{n / 1e6:.1f}M"
+  if n >= 1e3:
+    return f"{n / 1e3:.1f}K"
+  return str(int(n))
+
+
+def main():
+  with_remote = "--no-remote" not in sys.argv
+  out = {
+    # False = pxy isn't installed here; the widget hides itself entirely
+    # rather than showing a red "daemon down" on a machine that never had one.
+    "ready": True,
+    # Tells the widget whether "limits" carries remote balances: a quick
+    # re-scan after pinning must not overwrite them with local-caps-only rows.
+    "remoteIncluded": with_remote,
+    "daemon": {"active": False, "port": 0, "modelCount": 0},
+    "routePin": None,
+    "routePinActive": False,
+    "chain": [],
+    "cooldowns": [],
+    "limits": [],
+    "models": [],
+    "statusText": "",
+  }
+  if not os.path.exists(PXY):
+    out["ready"] = False
+    out["statusText"] = "pxy binary not found"
+    print(json.dumps(out, separators=(",", ":")))
+    return
+
+  try:
+    status = json.loads(run(["status", "--json"] + (["--remote"] if with_remote else []), 30))
+  except Exception as exc:
+    out["statusText"] = f"pxy status failed: {exc}"
+    print(json.dumps(out, separators=(",", ":")))
+    return
+
+  out["routePin"] = status.get("routePin")
+  out["routePinActive"] = bool(status.get("routePinActive"))
+  out["cooldowns"] = status.get("cooldowns") or []
+  port = int(status.get("port") or 0)
+  out["daemon"]["port"] = port
+
+  try:
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/v1/models", timeout=3) as resp:
+      out["daemon"]["active"] = True
+      models = json.load(resp).get("data") or []
+      # The claude/ discovery mirrors double every id for Claude Code's
+      # picker; the panel wants each model once.
+      out["daemon"]["modelCount"] = sum(1 for m in models if not str(m.get("id", "")).startswith("claude/"))
+  except Exception:
+    out["daemon"]["active"] = False
+
+  try:
+    explain = json.loads(run(["explain", "auto", "--json"], 15))
+    out["chain"] = explain.get("candidates") or []
+  except Exception as exc:
+    out["statusText"] = f"pxy explain failed: {exc}"
+
+  try:
+    out["models"] = [m for m in run(["models"], 10).splitlines() if m and m != "auto"]
+  except Exception:
+    pass
+
+  # One limits row per provider: remote balance when there is one, local caps
+  # otherwise. Percent is of the allowance USED (panel meter), -1 = no meter.
+  remote = status.get("remote") or {}
+  providers = status.get("providers") or {}
+  rows = []
+  for name, entry in remote.items():
+    pct, reset = remote_meter(entry.get("data"))
+    rows.append({
+      "name": name,
+      "percent": pct,
+      "detail": str(entry.get("summary") or ""),
+      "resetAt": reset,
+    })
+  for name, windows in providers.items():
+    if name in remote:
+      continue
+    pct, detail = local_meter(windows)
+    if pct < 0:
+      continue
+    rows.append({"name": name, "percent": pct, "detail": detail, "resetAt": ""})
+  rows.sort(key=lambda r: -r["percent"])
+  out["limits"] = rows
+
+  print(json.dumps(out, separators=(",", ":")))
+
+
+main()

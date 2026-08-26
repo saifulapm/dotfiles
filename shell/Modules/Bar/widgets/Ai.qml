@@ -8,8 +8,8 @@ import "AiModel.js" as Model
 // have actually produced numbers. A CLI that was installed and never run gets
 // no tab full of zeroes, and a machine that has run none shows no widget.
 //
-// Claude and Codex are their two providers; GitHub Copilot is ours, following
-// the same contract (see AiCopilot.qml).
+// Claude and Codex are their two providers; GitHub Copilot and OpenCode are
+// ours, following the same contract (see AiCopilot.qml, AiOpencode.qml).
 //
 // The bar glyph carries the alarm: when the selected provider's fullest
 // window — the one that stops the next prompt — is at 90% or more, the glyph
@@ -31,7 +31,7 @@ BarIcon {
         return providers[id].enabled !== false;
     }
 
-    readonly property var allProviders: [claudeProvider, codexProvider, copilotProvider]
+    readonly property var allProviders: [claudeProvider, codexProvider, copilotProvider, opencodeProvider]
 
     // ------------------------------------------------------------- syncing
     // The Sync service owns transport and device identity; the merge rules
@@ -109,6 +109,12 @@ BarIcon {
     AiCopilot {
         id: copilotProvider
         enabled: rootItem.providerEnabled("copilot")
+        settings: rootItem.settings
+    }
+
+    AiOpencode {
+        id: opencodeProvider
+        enabled: rootItem.providerEnabled("opencode")
         settings: rootItem.settings
     }
 
