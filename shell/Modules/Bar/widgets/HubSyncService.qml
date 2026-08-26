@@ -98,8 +98,18 @@ QtObject {
         actionStatusTimer.restart();
     }
 
-    function openScreenshots() {
-        Quickshell.execDetached(["xdg-open", Quickshell.env("HOME") + "/Pictures/Screenshots"]);
+    // Open one unit's folder in the file manager (yazi, via inode/directory).
+    // Nothing guards a missing path: a row exists only once a round has
+    // written a verdict for that unit, and a round creates the directory it
+    // syncs before it can report on it.
+    //
+    // Replaced an openScreenshots() that hardcoded the one folder anybody had
+    // asked for and was wired to nothing.
+    function openUnitDir(unitId) {
+        const dir = Model.unitDir(String(unitId || ""));
+        if (dir === "")
+            return;
+        Quickshell.execDetached(["xdg-open", Quickshell.env("HOME") + "/" + dir]);
     }
 
     function elide(text) {

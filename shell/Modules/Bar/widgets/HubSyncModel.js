@@ -42,12 +42,49 @@ var UNIT_BLURBS = {
     "parked": "Parked work bundles, both ways"
 };
 
+// Where each unit's content sits on THIS machine, relative to $HOME — what
+// the row's folder button opens, so the answer to "what is actually in there"
+// is one click rather than a path hunt. These are bin/qshell-sync's own paths
+// written down a second time; a unit that moves has to move here too, and a
+// unit with no entry simply grows no button rather than opening the wrong
+// thing.
+//
+// Two are not the directory you would guess. The push-own / pull-others units
+// keep the hub's copies under the sync state dir rather than beside the live
+// data, and that staging dir is the unit: history holds every machine's file
+// including ours, fish-history holds only the OTHER machines' (ours is the
+// live session file under ~/.local/share/fish, which fish must be the sole
+// writer of — see the script's comment). Notes opens the store, whose
+// notes.json and attachments/ are both inside the one unit.
+var UNIT_DIRS = {
+    "history": ".local/state/qshell/sync/history",
+    "fish-history": ".local/state/qshell/sync/fish-history",
+    "model-usage": ".local/state/qshell/sync/model-usage",
+    "screenshots": "Pictures/Screenshots",
+    "notes": ".local/state/qshell/notes",
+    "ssh": ".ssh",
+    "memory": ".local/share/mem/store",
+    "parked": ".local/share/workflow/parked"
+};
+
 function unitGlyph(id) {
     return UNIT_GLYPHS[id] || "󰋗"; // md-help_circle
 }
 
 function unitBlurb(id) {
     return UNIT_BLURBS[id] || "";
+}
+
+function unitDir(id) {
+    return UNIT_DIRS[id] || "";
+}
+
+// The same path as a person writes it, for the button's hint: the hover says
+// WHERE it is about to send you, which is most of the value on the four rows
+// whose folder is buried three levels into ~/.local.
+function unitDirLabel(id) {
+    var dir = unitDir(id);
+    return dir === "" ? "" : "~/" + dir;
 }
 
 // ---------------------------------------------------------------- parsing

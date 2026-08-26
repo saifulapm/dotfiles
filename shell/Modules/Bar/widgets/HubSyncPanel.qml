@@ -21,9 +21,17 @@ import "HubSyncModel.js" as Model
 // is also the state a machine sits in the FIRST time it meets a populated hub
 // — which is exactly when you want to be asked rather than obeyed.
 //
+// Every row also carries a folder button, under the pointer or the keyboard
+// cursor: the sentence under a label can only ever summarise ("14 file(s)",
+// "3 machine(s) merged"), and the folder is what those sentences are counting.
+// It is the one honest answer to "what is it actually syncing", and for the
+// four units living three levels deep in ~/.local it is the only practical
+// one.
+//
 // The cursor model is the family's single-highlight one: j/k and the arrows
-// walk the rows, Enter retries the selected unit, s syncs everything, y
-// copies the re-auth command. The first arrow press only reveals the cursor.
+// walk the rows, Enter retries the selected unit, o opens its folder, s syncs
+// everything, y copies the re-auth command. The first arrow press only
+// reveals the cursor.
 BarPanel {
     id: panel
 
@@ -70,6 +78,18 @@ BarPanel {
             panel.sync.retry(unit.id);
     }
 
+    // Same reveal-first rule as Enter: a key that acts on "the selected row"
+    // must not act before the panel has said which row that is.
+    function openSelected() {
+        if (!cursorActive) {
+            cursorActive = true;
+            return;
+        }
+        const unit = selectedUnit();
+        if (unit)
+            panel.sync.openUnitDir(unit.id);
+    }
+
     onContentKey: event => {
         switch (event.key) {
         case Qt.Key_Down:
@@ -84,6 +104,9 @@ BarPanel {
         case Qt.Key_Enter:
         case Qt.Key_Space:
             panel.activateCursor();
+            break;
+        case Qt.Key_O:
+            panel.openSelected();
             break;
         case Qt.Key_S:
             panel.sync.syncAll();
@@ -308,7 +331,7 @@ BarPanel {
 
         PanelHint {
             theme: panel.theme
-            visible: rowMouse.containsMouse && !row.isBusy && !row.isConflict
+            visible: rowMouse.containsMouse && !folderMouse.containsMouse && !row.isBusy && !row.isConflict
             anchor: row
             above: true
             text: "Sync this now"
@@ -322,7 +345,7 @@ BarPanel {
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: panel.theme.space(2.5)
             anchors.rightMargin: panel.theme.space(2.5)
-            implicitHeight: Math.max(rowMark.implicitHeight, rowLabels.implicitHeight)
+            implicitHeight: Math.max(rowMark.implicitHeight, rowLabels.implicitHeight, folderChip.visible ? folderChip.implicitHeight : 0)
 
             OpticalGlyph {
                 id: rowMark
@@ -340,7 +363,8 @@ BarPanel {
 
                 anchors.left: rowMark.right
                 anchors.leftMargin: panel.theme.space(2.5)
-                anchors.right: parent.right
+                anchors.right: folderChip.visible ? folderChip.left : parent.right
+                anchors.rightMargin: folderChip.visible ? panel.theme.space(2) : 0
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: panel.theme.space(0.25)
 
@@ -418,6 +442,57 @@ BarPanel {
                             onClicked: panel.sync.adoptSsh("remote")
                         }
                     }
+                }
+            }
+
+            // What this row is actually carrying, in the file manager. Laid
+            // out always and merely PAINTED on hover: making it visible only
+            // under the pointer would re-elide the label column every time
+            // the mouse crossed a row, and the label is what you are reading
+            // at that moment. Nothing is lost by keeping it click-live while
+            // transparent — reaching it means hovering the row first, which
+            // is what fades it in.
+            //
+            // The keyboard cursor lights it too, otherwise `o` would be a key
+            // with nothing on screen to suggest it.
+            ChipSurface {
+                id: folderChip
+
+                visible: Model.unitDir(row.unit ? row.unit.id : "") !== ""
+                opacity: rowMouse.containsMouse || folderMouse.containsMouse || row.rowSelected ? 1 : 0
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                theme: panel.theme
+                implicitWidth: panel.theme.space(8)
+                implicitHeight: panel.theme.space(7)
+                pointerOver: folderMouse.containsMouse
+
+                OpticalGlyph {
+                    anchors.centerIn: parent
+                    text: "󰉋" // md-folder
+                    color: panel.theme.textPrimary
+                    pixelSize: panel.theme.fontPx(1.0)
+                }
+
+                // A MouseArea rather than a TapHandler, for the drives
+                // panel's reason: the row's own full-fill MouseArea is
+                // underneath, and a TapHandler's passive grab would let one
+                // click both open the folder and start a sync round.
+                MouseArea {
+                    id: folderMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: if (row.unit)
+                        panel.sync.openUnitDir(row.unit.id)
+                }
+
+                PanelHint {
+                    theme: panel.theme
+                    visible: folderMouse.containsMouse
+                    anchor: folderChip
+                    above: true
+                    text: "Open " + Model.unitDirLabel(row.unit ? row.unit.id : "")
                 }
             }
         }
