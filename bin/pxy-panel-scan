@@ -34,6 +34,8 @@ def run(args, timeout):
 
 def remote_meter(data):
   """(percent, resetAt) from a known balance body, or (-1, "")."""
+  if (data or {}).get("usedPct") is not None:  # rolling allowance from response headers
+    return float(data["usedPct"]) / 100.0, str(data.get("resetsAt") or "")
   usage = (data or {}).get("usage") or {}
   if isinstance(usage.get("monthly"), dict):  # opencode Go windows
     best, reset = -1.0, ""
