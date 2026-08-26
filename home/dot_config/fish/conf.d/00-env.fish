@@ -35,6 +35,21 @@ set -gx GOBIN "$XDG_DATA_HOME/go/bin"
 # pnpm
 set -gx PNPM_HOME "$HOME/.local/share/pnpm"
 
+# npm — give the web-login opener a launcher that returns immediately. npm
+# awaits the browser process it spawns (npm-profile's webAuthOpener runs the
+# opener and the done-check in one Promise.all, and the spawn never sees the
+# abort signal the done-check fires), while under niri xdg-open falls to its
+# DE=generic path — XDG_CURRENT_DESKTOP=niri matches nothing in detectDE — and
+# that path runs the handler in the FOREGROUND (`env "$command" "$@"`, no
+# gio/kde-open to hand off to). With Chromium already up it looks fine: the
+# second process passes the URL to the singleton and exits in milliseconds.
+# From a cold browser the spawn IS the browser, so `npm login` sat there until
+# you quit Chromium — minutes after the token had already been written.
+# app-run returns in ~15ms and slices the browser off on its own, as everywhere
+# else. Env and not ~/.npmrc: that file holds the registry token, so it stays
+# unmanaged — and env beats every npmrc in npm's precedence anyway.
+set -gx npm_config_browser "app-run xdg-open"
+
 # composer — XDG-homed, and pinned: without COMPOSER_HOME composer silently
 # prefers a legacy ~/.composer if one exists (a bash script once created it
 # and split the global tree off the PATH below). environment.d/55-composer
