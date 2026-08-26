@@ -1,0 +1,95 @@
+#!/bin/bash
+# Turns off NetworkManager's Wi-Fi power save on machines whose Wi-Fi and
+# Bluetooth share a die.
+#
+# Why this needs root at all: NM reads its defaults from /etc/NetworkManager/
+# conf.d at daemon start and there is no per-user equivalent. The reasoning for
+# the setting itself is in the file being installed,
+# packages/wifi-powersave-off.conf.
+#
+# Same shape as run_after_33-hda-power-save.sh.tmpl, for the same reasons: runs
+# on every apply with a src-vs-dest cmp as the real change gate, rather than
+# run_onchange, which records "done" on exit 0 and would therefore mark a
+# declined-authorization run as complete and never retry it.
+set -euo pipefail
+
+# workingTree, not a hardcoded ~/.dotfiles — a non-default --source makes the
+# hardcoded path miss and the [ -f ] guard below then skips silently.
+src="{{ .chezmoi.workingTree }}/packages/wifi-powersave-off.conf"
+dest=/etc/NetworkManager/conf.d/wifi-powersave-off.conf
+
+[ -f "$src" ] || exit 0
+
+# Nothing to do where NM is not the one deciding.
+command -v nmcli >/dev/null 2>&1 || exit 0
+
+# Gate on the combo chip rather than on the hostname: this is a fix for sharing
+# one radio between Wi-Fi and BT, and the NUC's Intel Wi-Fi with its own
+# separate BT does not have the problem. hci_bcm4377 is the driver for the
+# Bluetooth function of Apple's Broadcom combo parts (BCM4377/4378/4387/4388),
+# so its presence is the same question asked in one path.
+[ -d /sys/bus/pci/drivers/hci_bcm4377 ] || exit 0
+
+if [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+  exit 0
+fi
+
+# Root by whichever route this run can reach: passwordless sudo, then sudo with
+# a controlling terminal, then pkexec against the shell's polkit agent for runs
+# with no tty (background agents, keybinds, systemd units).
+run_root() {
+  if sudo -n true 2>/dev/null; then
+    sudo "$@"
+  elif [ -t 0 ] && sudo -v 2>/dev/null; then
+    sudo "$@"
+  elif command -v pkexec >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+    echo "wifi powersave: asking for authorization on screen…" >&2
+    timeout 180 pkexec "$@"
+  else
+    return 1
+  fi
+}
+
+# Both root actions go through ONE run_root. Splitting them costs two polkit
+# prompts on any run that lands on the pkexec branch, because pkexec authorizes
+# per invocation and caches nothing between them the way sudo does.
+#
+# The actions after the install are what make an already-associated radio take
+# the setting now instead of at the next reboot, and it takes BOTH of them.
+#
+# `nmcli general reload conf` re-reads /etc/NetworkManager so the new default
+# is in the daemon's hands, but it does not reach the device: NM evaluates
+# wifi.powersave once, when it activates a connection, and the profile here
+# holds `default` rather than a literal, so there is nothing on the profile for
+# a reload to re-push. `nmcli device reapply wld0` does not do it either —
+# measured, it reports "Connection successfully reapplied" and leaves
+# `iw dev wld0 get power_save` reading `on` (2026-08-26). The only ways left
+# are re-activating the connection, which drops the link, or writing the radio
+# directly, which does not.
+#
+# So `iw` carries the live half. It is the surgical option: it changes the
+# running interface and nothing else, an SSH session over Wi-Fi survives it,
+# and NM is not upset by it because NM was never going to touch power save
+# again before the next activation — by which time conf.d is what it reads.
+#
+# Looping over phy80211 rather than hardcoding wld0, since the interface name
+# is a udev rename away from being something else. Best-effort on purpose: if
+# only the live write fails the persistent half is still installed and correct,
+# so that warns rather than failing the script.
+if ! run_root /bin/sh -c '
+  /usr/bin/install -D -m 0644 "$1" "$2" || exit 1
+  /usr/bin/nmcli general reload conf 2>/dev/null ||
+    echo "wifi powersave: conf reload failed — daemon takes it at restart" >&2
+  for phy in /sys/class/net/*/phy80211; do
+    [ -e "$phy" ] || continue
+    dev=$(basename "$(dirname "$phy")")
+    /usr/bin/iw dev "$dev" set power_save off 2>/dev/null ||
+      echo "wifi powersave: live write failed on $dev — takes effect on next connect" >&2
+  done
+' _ "$src" "$dest"; then
+  echo "wifi powersave: not authorized — skipping (rerun 'chezmoi apply')" >&2
+  echo "wifi powersave: Bluetooth audio keeps stuttering until then" >&2
+  exit 0
+fi
+
+echo "wifi powersave: installed $dest"
