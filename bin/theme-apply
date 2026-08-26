@@ -84,12 +84,24 @@ const tokens = Object.assign({}, THEME_DEFAULTS, presetTokens, themeTokens, over
 // free to name any other token, but not this one — a theme that shipped a
 // different size would resize the whole desktop by being selected.
 //
-// The terminal metrics are the anchor pair the foot-metrics commit measured
-// for 12px: 12.5pt in a 32px line box. Kitty reads the same two tokens.
+// The terminals are the one exception, and they carry their own pair rather
+// than the shell's number: 11.5pt in a 29px line box, on user ask 2026-08-26.
+// That pair is not a new taste — it is exactly what the removed knob derived
+// at `[font] size = 11` (12.5 * 11/12 rounded to a tenth, 32 * 11/12 rounded
+// to a px), the rung the terminals had been sitting on. The knob's stepper was
+// nudged back to 12 shortly before it was deleted, which is what actually
+// resized the terminals to 12.5pt/32px; this restores the smaller rung and
+// pins it, so no stepper can move it again.
+//
+// The two move together: the box is the point size times the same ~40%
+// leading, and kitty's cell is a PERCENTAGE of its natural cell (see
+// kitty.conf.tmpl), so shrinking the glyphs without the box would leave foot's
+// rows at their old height while kitty's followed the font. Kitty reads the
+// same two tokens.
 const FONT_SIZE = 12
 tokens["font.size"] = String(FONT_SIZE)
-tokens["font.foot-pt"] = "12.5"
-tokens["font.foot-line-height"] = "32"
+tokens["font.foot-pt"] = "11.5"
+tokens["font.foot-line-height"] = "29"
 
 // GTK: the interface fonts are ours, at the same fixed size. The scaling
 // factor is written rather than left alone so a machine that carried a scaled

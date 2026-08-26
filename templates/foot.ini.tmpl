@@ -2,11 +2,13 @@
 # Only deviations from foot 1.27 defaults live here; everything else (TERM=foot,
 # url mode, mouse bindings) is deliberately stock. See foot.ini(5).
 [main]
-# The Arch config's tuned pair — 12.5pt glyphs in a 32px cell (~40% leading),
-# within 2 physical px of the Emacs look at this machine's scale. It is the
-# pair theme-apply pins font.foot-pt / font.foot-line-height to, for the one
-# 12px text size this desktop draws at. Points beat pixelsize: they stay
-# proportional under any output scale. foot cannot reload config — running
+# The pair theme-apply pins font.foot-pt / font.foot-line-height to: 11.5pt
+# glyphs in a 29px cell (~40% leading), on user ask 2026-08-26. The Arch
+# config's tuned pair was 12.5pt/32px — within 2 physical px of the Emacs look
+# at this machine's scale — and the removed text-size knob scaled it; 11.5/29
+# is what that knob produced one rung down, at `[font] size = 11`, which is the
+# size these terminals were actually being read at. Points beat pixelsize: they
+# stay proportional under any output scale. foot cannot reload config — running
 # windows keep their size until reopened.
 #
 # The second entry is the icon font, named explicitly rather than left to

@@ -15,9 +15,9 @@ include ~/.config/kitty/theme.conf
 # ---------------------------------------------------------------- font
 # The same glyphs foot draws, from the same two tokens: foot renders
 # {{font.mono}} at {{font.foot-pt}}pt in a {{font.foot-line-height}}px cell,
-# both pinned by theme-apply to the desktop's one 12px text size. Points, not
-# pixelsize, for the same reason foot uses them: they stay proportional under
-# any output scale.
+# both pinned by theme-apply, and a notch under the 12px the rest of the
+# desktop draws at (user ask 2026-08-26). Points, not pixelsize, for the same
+# reason foot uses them: they stay proportional under any output scale.
 #
 # The cell height is a PERCENTAGE, not foot's px number, and that is load
 # bearing: modify_font's px form is a DELTA on the natural cell, not the cell
@@ -28,7 +28,9 @@ include ~/.config/kitty/theme.conf
 # linearly with the point size, so it holds at any point size, not just ours.
 #
 # 142% = foot's 44px cell / kitty's natural 31px, both read out of the running
-# terminals with CSI 16 t at the same font and scale. Re-derive it if the mono
+# terminals with CSI 16 t at the same font and scale (physical px, measured at
+# the old 12.5pt/32px pair — the ratio is size-invariant, so the smaller pair
+# inherits it untouched). Re-derive it if the mono
 # font ever changes — the constant is a property of THAT font's line metrics
 # (foot asks for ~40% leading; Maple Mono's natural cell is ~1.8x its point
 # size).
