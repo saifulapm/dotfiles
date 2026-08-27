@@ -5,7 +5,7 @@
 
 [server]
 port = 4100
-api_key = "pxy-local"   # soft gate; server binds 127.0.0.1 only
+api_key = "pxy-local" # soft gate; server binds 127.0.0.1 only
 
 # ---------------------------------------------------------------------------
 # The auto chain: ordered priority. First provider with limit headroom and no
@@ -28,77 +28,74 @@ api_key = "pxy-local"   # soft gate; server binds 127.0.0.1 only
 #   qwen3.7-plus 4,300 | minimax-m3 3,200 | kimi-k2.7-code 1,350 | glm-5.2 880
 models = [
   # --- free frontier, zero cost, renewable ---
-  "zenmux/deepseek/deepseek-v4-flash-vision-exp-free",  # 1M ctx, tool-calling verified 2026-08-25
-  "openrouter/stealth/ox-alpha",                   # frontier agentic coder, 1M ctx, 20rpm/1000day
-  "openrouter/minimax/minimax-m3:free",            # GMI promo, unlimited+free UNTIL SEP 6 2026 — remove after
-  "opencode-zen/hy3-free",                         # Hunyuan 3 (295B reasoning)
+  "zenmux/deepseek/deepseek-v4-flash-vision-exp-free", # 1M ctx, tool-calling verified 2026-08-25
+  "openrouter/stealth/ox-alpha", # frontier agentic coder, 1M ctx, 20rpm/1000day
+  "openrouter/minimax/minimax-m3:free", # GMI promo, unlimited+free UNTIL SEP 6 2026 — remove after
+  "opencode-zen/hy3-free", # Hunyuan 3 (295B reasoning)
 
   # --- opencode Go subscriptions: unlimited / huge allowance models only ---
-  "opencode-go-github/ox-alpha-free",              # INFINITE requests
-  "opencode-go-google/ox-alpha-free",              # INFINITE requests
-  "opencode-go-github/hy3",                        # ~34,400 effective / 5h
+  "opencode-go-github/ox-alpha-free", # INFINITE requests
+  "opencode-go-google/ox-alpha-free", # INFINITE requests
+  "opencode-go-github/hy3", # ~34,400 effective / 5h
   "opencode-go-google/hy3",
 
   # --- other free renewables ---
-  "ollama/gpt-oss:120b",                           # ollama cloud free tier
-  "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",  # 550B, 1M ctx
-  "mistral/devstral-latest",                       # free Experiment tier, agentic coder
-  "zai/glm-4.7-flash",                             # permanently free, 59.2 SWE-bench; 1 concurrent (rpm 5)
-  "google/gemini-3-flash-preview",                 # AI Studio free tier direct, 1M ctx (trains on prompts)
-  "aihubmix/gemini-3.7-flash-free",                # 2nd Gemini pool via aggregator, 1M ctx
-  "aihubmix/minimax-m3-free",                      # outlives the openrouter GMI promo
-  "aihubmix/ox-alpha",                             # 4th ox-alpha pool, deep fallback
-  "kilocode/tencent/hy3:free",                     # hy3 pool #3 (295B reasoning)
-  "kilocode/minimax/minimax-m3:free",              # M3 pool #4, 1M ctx
-  "agnes/agnes-2.5-flash",                         # free flash tier
-  "tokenharbor/mimo-v2.5:free",                    # tokenharbor free tier, tools verified 2026-08-26
-  "tokenharbor/deepseek-v4-flash:free",            # deepseek-v4-flash pool #4
-  "tokenharbor/qwen3.8-27b:free",                  # qwen3.8-27b pool #2
+  "ollama/gpt-oss:120b", # ollama cloud free tier
+  "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free", # 550B, 1M ctx
+  "mistral/devstral-latest", # free Experiment tier, agentic coder
+  "zai/glm-4.7-flash", # permanently free, 59.2 SWE-bench; 1 concurrent (rpm 5)
+  "google/gemini-3-flash-preview", # AI Studio free tier direct, 1M ctx (trains on prompts)
+  "aihubmix/gemini-3.7-flash-free", # 2nd Gemini pool via aggregator, 1M ctx
+  "aihubmix/minimax-m3-free", # outlives the openrouter GMI promo
+  "aihubmix/ox-alpha", # 4th ox-alpha pool, deep fallback
+  "kilocode/tencent/hy3:free", # hy3 pool #3 (295B reasoning)
+  "kilocode/minimax/minimax-m3:free", # M3 pool #4, 1M ctx
+  "agnes/agnes-2.5-flash", # free flash tier
+  "tokenharbor/mimo-v2.5:free", # tokenharbor free tier, tools verified 2026-08-26
+  "tokenharbor/deepseek-v4-flash:free", # deepseek-v4-flash pool #4
+  "tokenharbor/qwen3.8-27b:free", # qwen3.8-27b pool #2
 
   # --- deeper Go fallbacks (still very high allowance) ---
-  "opencode-go-github/deepseek-v4-flash",          # 7,600 / 5h
-  "opencode-go-google/mimo-v2.5",                  # 30,100 / 5h
+  "opencode-go-github/deepseek-v4-flash", # 7,600 / 5h
+  "opencode-go-google/mimo-v2.5", # 30,100 / 5h
 
   # --- finite free packs (spend after renewables; alibaba expires ~Nov 2026) ---
-  "tokenrouter/moonshotai/kimi-k3",                # 50M-token promo grant, tools verified
-  "inception/mercury-2",                           # 100M-token signup grant, >1000 tok/s diffusion
+  "tokenrouter/moonshotai/kimi-k3", # 50M-token promo grant, tools verified
+  "inception/mercury-2", # 100M-token signup grant, >1000 tok/s diffusion
   "tencent/glm-5.3",
   "alibaba/qwen3.8-max",
 
   # --- premium last: scarce, then the 0x model that never runs out ---
-  "github/claude-sonnet-4.6",                      # 300 premium requests/month
-  "github-free/gpt-5-mini",                        # 0x multiplier, unlimited floor
+  "github/claude-sonnet-4.6", # 300 premium requests/month
+  "github-free/gpt-5-mini", # 0x multiplier, unlimited floor
 ]
 
 # ---------------------------------------------------------------------------
-# Model quality ranking for `pxy refresh --write`. Bare model names, best
-# first, no provider. Ordering applies WITHIN a cost tier: a preferred model
-# on a paid pool still sits below the free tier, so this list can never
-# quietly start spending money.
+# `pxy refresh --write` generates the auto chain from FREE-tier providers only
+# (subscriptions, promotional balances and finite grants are manual-only), and
+# orders it by context bucket (widest first) -> open weights before proprietary
+# -> newest release date.
+#
+# `models` below is a TIE-BREAKER applied after all three: bare model names,
+# best first, no provider. It picks between models that come out equal on
+# context, openness and release date — it can never lift a narrower or older
+# model up the chain. Empty = the automatic order stands.
 # ---------------------------------------------------------------------------
 [preferences]
-models = [
-  "ox-alpha",             # frontier agentic coder, 1M ctx
-  "hy3",                  # Hunyuan 3, 295B reasoning
-  "kimi-k3",              # 1M ctx
-  "glm-5.3",
-  "minimax-m3",           # 1M ctx
-  "gemini-3.7-flash",     # widest context of the Gemini line
-  "gemini-3-flash",
-  "deepseek-v4-flash-vision-exp",
-  "nemotron-3-ultra-550b-a55b",
-  "glm-4.7-flash",        # 59.2 SWE-bench; note z.ai does not list it
-  "devstral",
-  "mercury-2",
-]
+models = []
 max_pools_per_model = 3
-max_unranked = 12          # resilience tail below the ranked models
+# Chain length (with `models` empty, every candidate is "unranked"). 24 keeps
+# the whole chain inside the 1M-context bucket, which matters: /v1/models
+# advertises the MINIMUM context over the chain, so a tail of small-window
+# models would tell agents `auto` holds 32k and break their auto-compaction.
+max_unranked = 24
 # Listed by a provider but verified not to work — never let discovery re-add
 # these (checked 2026-08-25).
 deny = [
-  "kilo-auto/free",        # kilocode's router id errors on every call
-  "openrouter/free",       # same shape, same problem
-  "gpt-5.5-free",          # aihubmix lists it; it never routes
+  "kilo-auto/free", # kilocode's router id errors on every call
+  "openrouter/free", # same shape, same problem
+  "gpt-5.5-free", # aihubmix lists it; it never routes
+  "ox-alpha", # Out of market now
 ]
 
 [launch]
@@ -153,7 +150,7 @@ models = [
   { id = "kimi-k2.7-code", context_length = 256000, max_output_tokens = 32000 },
 ]
 [providers.github.limits]
-monthly_requests = 300        # premium request allowance (Pro)
+monthly_requests = 300 # premium request allowance (Pro)
 reset = "00:00"
 reset_tz = "UTC"
 
@@ -383,7 +380,7 @@ models = [
 [providers.tokenharbor]
 base_url = "https://tokenharbor.ai/v1/chat/completions"
 api_key = { pass = "AI/tokenharbor/main" }
-discover = false   # /models also lists ~17 paid models; keep discovery off
+discover = false # /models also lists ~17 paid models; keep discovery off
 models = [
   { id = "mimo-v2.5:free", context_length = 196608, tool_call = true },
   { id = "deepseek-v4-flash:free", context_length = 131072, tool_call = true },
@@ -435,7 +432,7 @@ transcription_models = ["voxtral-mini-latest", "voxtral-small-latest"]
 [providers.codestral]
 base_url = "https://codestral.mistral.ai/v1/chat/completions"
 api_key = { pass = "AI/codestral/main" }
-discover = false   # the codestral endpoint serves no /models list (404)
+discover = false # the codestral endpoint serves no /models list (404)
 models = ["codestral-latest", "codestral-2508"]
 [providers.codestral.limits]
 rpm = 30
@@ -457,11 +454,11 @@ models = [
   "qwen3.7-plus",
   "qwen3.7-flash",
   "qwen3.8-27b",
-  "qwen3-vl-flash",   # vision (image_url content verified 2026-08-25); own free quota
+  "qwen3-vl-flash", # vision (image_url content verified 2026-08-25); own free quota
 ]
 embedding_models = ["qwen3.7-text-embedding", "text-embedding-v4"]
 [providers.alibaba.limits]
-total_tokens = 5000000        # 5 chat models x 1M free quota (90-day expiry!)
+total_tokens = 5000000 # 5 chat models x 1M free quota (90-day expiry!)
 # DashScope native multimodal endpoint: images + TTS + ASR on ONE url
 # (verified live 2026-08-25: qwen-image-3.0, z-image-turbo, qwen3-tts-flash
 # wav-url out, qwen3-asr-flash incl. base64 data-URI in). ⚠️ free-quota
@@ -690,7 +687,7 @@ models = [
 ]
 embedding_models = ["kinfra-text-embedding-0.6b", "kinfra-text-embedding-4b"]
 [providers.tencent.limits]
-total_tokens = 5000000   # provider-wide guard; Tencent enforces 1M per model
+total_tokens = 5000000 # provider-wide guard; Tencent enforces 1M per model
 
 # Tencent VL (multimodal) embeddings — same key, DIFFERENT path: TokenHub
 # serves them only on /v1/embeddings/multimodal, with content-part input
@@ -797,7 +794,7 @@ models = [
   { id = "minimax-m2.5", context_length = 196000 },
 ]
 [providers.kiro.limits]
-monthly_requests = 400        # ~50 credits at the cheap models' multipliers
+monthly_requests = 400 # ~50 credits at the cheap models' multipliers
 reset = "00:00"
 reset_tz = "UTC"
 
@@ -963,13 +960,13 @@ transcription_models = ["scribe_v1"]
 speech_url = "https://api.elevenlabs.io/v1/text-to-speech/{voice}"
 speech_models = ["eleven_turbo_v2_5", "eleven_multilingual_v2"]
 [providers.elevenlabs.media.voices]
-default = "EXAVITQu4vr4xnSDxMaL"   # Sarah
-alloy = "SAz9YHcvj6GT2YYXdXww"     # River
-echo = "IKne3meq5aSn9XLyUdCD"      # Charlie
-fable = "JBFqnCBsd6RMkjVDRZzb"     # George
-onyx = "CwhRBWXzGAHq8TQ4Fs17"      # Roger
-nova = "FGY2WhTYpPnrIDTdsKH5"      # Laura
-shimmer = "Xb7hH8MSUJpSbSDYk0k2"   # Alice
+default = "EXAVITQu4vr4xnSDxMaL" # Sarah
+alloy = "SAz9YHcvj6GT2YYXdXww" # River
+echo = "IKne3meq5aSn9XLyUdCD" # Charlie
+fable = "JBFqnCBsd6RMkjVDRZzb" # George
+onyx = "CwhRBWXzGAHq8TQ4Fs17" # Roger
+nova = "FGY2WhTYpPnrIDTdsKH5" # Laura
+shimmer = "Xb7hH8MSUJpSbSDYk0k2" # Alice
 
 # Voyage — embeddings + rerank (generous free token allowance per model).
 # Rerank dialect: top_k in, data[] out — pxy maps to/from Cohere shape.
@@ -998,7 +995,12 @@ rerank_models = ["jina-reranker-v2-base-multilingual"]
 # the Model Studio console (explicit alibaba/... requests still work).
 [media]
 image = ["cloudflare/@cf/black-forest-labs/flux-1-schnell", "agnes/agnes-image-2.1-flash"]
-transcription = ["groq/whisper-large-v3-turbo", "mistral/voxtral-mini-latest", "cloudflare/@cf/openai/whisper-large-v3-turbo", "elevenlabs/scribe_v1"]
+transcription = [
+  "groq/whisper-large-v3-turbo",
+  "mistral/voxtral-mini-latest",
+  "cloudflare/@cf/openai/whisper-large-v3-turbo",
+  "elevenlabs/scribe_v1",
+]
 speech = ["cloudflare/@cf/deepgram/aura-2-en", "elevenlabs/eleven_turbo_v2_5"]
 rerank = ["voyage/rerank-2.5-lite", "jina/jina-reranker-v2-base-multilingual"]
 video = "agnes/agnes-video-v2.0"
