@@ -4,9 +4,12 @@ import Quickshell.Io
 import "../components"
 import "PxyModel.js" as Model
 
-// pxy — the local LLM proxy's control surface. The panel pins the auto route
-// to one model (chain stays as fallback), shows the live walk order with
-// per-candidate verdicts, active cooldowns, and every provider's limits.
+// pxy — the local LLM proxy's control surface. Routing is by GROUP: config.toml
+// declares named failover chains (free, subscription, payperuse…), an agent is
+// launched with a group name as its model, and the group walks its list until
+// one candidate serves. The panel shows any group's live walk order with
+// per-candidate verdicts, active cooldowns, and every provider's limits, and
+// pins one model ahead of whichever chain a request asks for.
 //
 // All data comes from one bin/pxy-panel-scan run (which shells out to the
 // pxy CLI); pinning runs `pxy route`, so the CLI and this panel can never
@@ -25,15 +28,27 @@ BarIcon {
     property int modelCount: 0
     property string routePin: ""
     property bool routePinActive: false
-    property var chain: []
+    // [{name, size}] and name -> walk order; every group is scanned at once, so
+    // switching chips is instant and can't show a stale chain.
+    property var groups: []
+    property var chains: ({})
     property var cooldowns: []
     property var limits: []
     property var models: []
     property string statusText: ""
 
+    readonly property string firstGroup: groups.length > 0 ? String(groups[0].name) : ""
+
+    function chainOf(group) {
+        return (chains && chains[group]) || [];
+    }
+
     // A route/restart action in flight; rows stay clickable but the panel
     // shows the spinner through `refreshing`.
     property bool acting: false
+    // Specifically the daemon restart, so its button spins on its own rather
+    // than every action lighting up every button.
+    property bool restarting: false
 
     readonly property bool alarming: scanned && !daemonActive
 
@@ -44,7 +59,7 @@ BarIcon {
             return "pxy · daemon down";
         if (routePin !== "" && routePinActive)
             return "pxy · pinned " + Model.modelName(routePin);
-        return "pxy · auto (chain priority)";
+        return "pxy · " + groups.length + " group(s), chain priority";
     }
 
     // -------------------------------------------------------------- actions
@@ -75,7 +90,8 @@ BarIcon {
             return;
         acting = true;
         refreshing = true;
-        if (args[0] === "__restart")
+        restarting = args[0] === "__restart";
+        if (restarting)
             actionProc.command = ["systemctl", "--user", "restart", "pxy"];
         else
             actionProc.command = [Quickshell.env("HOME") + "/.local/bin/pxy"].concat(args);
@@ -97,7 +113,8 @@ BarIcon {
             modelCount = data.daemon ? Number(data.daemon.modelCount || 0) : 0;
             routePin = String(data.routePin || "");
             routePinActive = data.routePinActive === true;
-            chain = data.chain || [];
+            groups = data.groups || [];
+            chains = data.chains || {};
             cooldowns = data.cooldowns || [];
             // A quick scan (--no-remote) carries local caps only; keep the
             // remote-balance rows the last full scan brought rather than
@@ -123,7 +140,13 @@ BarIcon {
             onStreamFinished: if (String(text || "").trim() !== "")
                 console.warn("pxy-panel", String(text).trim())
         }
-        onExited: rootItem.refreshing = rootItem.refreshing && running
+        // Cleared here rather than in parseScan: this fires even when the scan
+        // produced nothing parseable, and a spinner that outlives its work is
+        // worse than no spinner at all.
+        onExited: {
+            rootItem.refreshing = rootItem.refreshing && running;
+            rootItem.restarting = false;
+        }
     }
 
     Process {
@@ -135,7 +158,10 @@ BarIcon {
         }
         onExited: {
             rootItem.acting = false;
-            // A daemon restart needs a beat before healthz answers.
+            // `restarting` stays true through the settle timer and the rescan
+            // it triggers: systemctl returns before the daemon answers healthz,
+            // and a button that stopped spinning there would say "done" while
+            // the panel still reads DAEMON DOWN.
             actionSettle.restart();
         }
     }

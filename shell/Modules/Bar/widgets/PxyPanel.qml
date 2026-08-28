@@ -3,16 +3,17 @@ import "../components"
 import "../../../components"
 import "PxyModel.js" as Model
 
-// pxy panel — the auto route's control surface.
+// pxy panel — the route's control surface.
 //
-// ROUTE is a picker over the live walk order: without a query the rows ARE
-// the auto chain, in the order a request would walk it, each with its
-// verdict (eligible, or why it would be skipped). Typing filters the whole
-// catalog instead, so anything pxy serves is pinnable. Clicking (or Enter)
-// pins that model — the chain stays behind it as fallback — and the top
-// "Auto" row clears the pin. COOLDOWNS lists who is benched and for how
-// long; LIMITS one meter per provider, fullest first, so "which model
-// should I use" has an answer at a glance.
+// ROUTE is a picker over one group's live walk order: the chips choose which
+// group to look at, and without a query the rows ARE that group's chain, in
+// the order a request would walk it, each with its verdict (eligible, or why
+// it would be skipped). Typing filters the whole catalog instead, so anything
+// pxy serves is pinnable. Clicking (or Enter) pins that model — one pin leads
+// every group's chain, which stays behind it as fallback — and the top row
+// clears the pin. COOLDOWNS lists who is benched and for how long; LIMITS one
+// meter per provider, fullest first, so "which model should I use" has an
+// answer at a glance.
 BarPanel {
     id: panel
 
@@ -21,7 +22,7 @@ BarPanel {
     panelTitle: ""
     cardWidth: theme.space(100)
 
-    readonly property int maxRows: 9
+    readonly property int maxRows: 4
     // Fullest first, so the cut drops only the providers with headroom.
     readonly property int maxLimits: 10
     readonly property var limitRows: (pxy.limits || []).slice(0, maxLimits)
@@ -29,13 +30,43 @@ BarPanel {
 
     property string query: ""
     property int rowIndex: 0
+    // Which group's chain is on screen. Empty until a scan lands, and reset to
+    // the first group whenever the scanned set no longer contains it (a group
+    // renamed in config.toml must not leave the panel showing nothing).
+    property string group: ""
 
-    readonly property var picker: Model.pickerRows(pxy.chain, pxy.models, query, maxRows)
-    // The synthetic Auto row leads the unfiltered list; while searching it
-    // would only push real matches down.
-    readonly property var listRows: (query === "" ? [{ isAuto: true, id: "auto" }] : []).concat(picker.rows)
+    readonly property var groupChain: pxy.chainOf(group)
+    readonly property string groupLabel: {
+        const found = (pxy.groups || []).find(g => String(g.name) === group);
+        return found ? String(found.label || found.name) : group;
+    }
+    readonly property var picker: Model.pickerRows(groupChain, pxy.models, query, maxRows)
+    // The synthetic "clear pin" row leads the unfiltered list; while searching
+    // it would only push real matches down.
+    readonly property var listRows: (query === "" ? [
+            {
+                isGroup: true,
+                id: panel.group
+            }
+        ] : []).concat(picker.rows)
+
+    function syncGroup() {
+        const names = (pxy.groups || []).map(g => String(g.name));
+        if (names.indexOf(group) === -1)
+            group = pxy.firstGroup;
+    }
+
+    Connections {
+        target: panel.pxy
+        function onGroupsChanged() {
+            panel.syncGroup();
+        }
+    }
+
+    Component.onCompleted: syncGroup()
 
     onQueryChanged: rowIndex = 0
+    onGroupChanged: rowIndex = 0
 
     function moveCursor(dy) {
         if (listRows.length === 0)
@@ -46,7 +77,7 @@ BarPanel {
     function choose(row) {
         if (!row)
             return;
-        if (row.isAuto)
+        if (row.isGroup)
             panel.pxy.clearPin();
         else
             panel.pxy.pin(row.id);
@@ -64,6 +95,7 @@ BarPanel {
     onPanelOpened: {
         panel.query = "";
         panel.rowIndex = 0;
+        panel.syncGroup();
         searchField.text = "";
         searchField.focusWhen = true;
     }
@@ -79,7 +111,7 @@ BarPanel {
         meta: {
             if (!panel.pxy.daemonActive)
                 return "DAEMON DOWN";
-            let route = "AUTO · CHAIN PRIORITY";
+            let route = panel.pxy.groups.length + " GROUPS · CHAIN PRIORITY";
             if (panel.pxy.routePin !== "")
                 // A stale pin (model dropped from the catalog) is ignored by
                 // routing; saying "PINNED" here would lie about the walk.
@@ -100,14 +132,16 @@ BarPanel {
                 theme: panel.theme
                 anchors.verticalCenter: parent.verticalCenter
                 glyph: "󰜉" // md-restart
-                hint: "Restart the pxy daemon (needed after config or pass changes)"
+                busy: panel.pxy.restarting
+                hint: panel.pxy.restarting ? "Restarting the daemon…" : "Restart the pxy daemon (needed after config or pass changes)"
                 onActivated: panel.pxy.restartDaemon()
             },
             GlyphButton {
                 theme: panel.theme
                 anchors.verticalCenter: parent.verticalCenter
                 glyph: "󰑐" // md-refresh
-                hint: "Re-scan, remote balances included (Ctrl+R)"
+                busy: panel.pxy.refreshing
+                hint: panel.pxy.refreshing ? "Scanning…" : "Re-scan, remote balances included (Ctrl+R)"
                 onActivated: panel.pxy.refresh(true)
             }
         ]
@@ -120,10 +154,60 @@ BarPanel {
     }
 
     // ------------------------------------------------------------- route
-    SectionHeader {
-        theme: panel.theme
+    // No section header: the group tabs are the header — they name what the
+    // rows below them are.
+    // One tab per group — AiPanel's provider switch, same shape and the same
+    // component. Selecting a tab only changes which chain is shown; which
+    // group a request uses is the agent's launch model, not a panel setting,
+    // so this never writes anything.
+    Row {
+        id: groupSwitch
+
+        readonly property real cellWidth: panel.pxy.groups.length > 0 ? (width - spacing * (panel.pxy.groups.length - 1)) / panel.pxy.groups.length : 0
+
+        visible: panel.pxy.groups.length > 1
         width: parent.width
-        label: "ROUTE"
+        spacing: panel.theme.space(1.5)
+
+        Repeater {
+            model: panel.pxy.groups
+
+            ChipSurface {
+                id: groupTab
+
+                required property var modelData
+
+                readonly property string name: String(groupTab.modelData.name)
+                // The label is what config.toml wants shown ("Pay Per Use");
+                // `name` stays the routable id everything else keys on.
+                readonly property string label: String(groupTab.modelData.label || groupTab.modelData.name)
+                readonly property bool selected: panel.group === groupTab.name
+
+                theme: panel.theme
+                width: groupSwitch.cellWidth
+                implicitHeight: tabLabel.implicitHeight + panel.theme.space(3)
+                chosen: groupTab.selected
+                pointerOver: tabHover.hovered
+
+                StyledText {
+                    id: tabLabel
+                    theme: panel.theme
+                    role: StyledText.Small
+                    anchors.centerIn: parent
+                    text: groupTab.label
+                    color: groupTab.selected ? panel.theme.accent : panel.theme.textPrimary
+                }
+
+                HoverHandler {
+                    id: tabHover
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                TapHandler {
+                    onTapped: panel.group = groupTab.name
+                }
+            }
+        }
     }
 
     PanelTextField {
@@ -132,7 +216,7 @@ BarPanel {
         theme: panel.theme
         width: parent.width
         inputFont: panel.theme.fontMono
-        placeholder: "Search all " + panel.pxy.models.length + " models — Enter pins for the auto route"
+        placeholder: "Search all " + panel.pxy.models.length + " models — Enter pins one ahead of every chain"
 
         onTextEdited: text => panel.query = text
         onAccepted: panel.choose(panel.listRows[Math.min(panel.rowIndex, panel.listRows.length - 1)])
@@ -174,11 +258,18 @@ BarPanel {
 
         width: parent.width
         text: {
-            if (panel.query !== "" && panel.picker.rows.length === 0)
-                return "Nothing matches “" + panel.query + "”.";
-            if (panel.picker.hidden > 0)
-                return panel.picker.hidden + " more — keep typing to narrow";
-            return panel.query === "" ? "The walk order for auto requests; a pinned model leads, the chain stays as fallback." : "";
+            if (panel.query !== "") {
+                if (panel.picker.rows.length === 0)
+                    return "Nothing matches “" + panel.query + "”.";
+                return panel.picker.hidden > 0 ? panel.picker.hidden + " more — keep typing to narrow" : "";
+            }
+            if (panel.group === "")
+                return "No groups configured — add a [groups.<name>] chain to config.toml.";
+            // "keep typing to narrow" is wrong here — typing searches the whole
+            // catalog, not this chain. The chain length is the tab's missing
+            // number instead: with 4 rows shown, it is how you know there is
+            // depth behind them.
+            return panel.groupChain.length + " candidates in “" + panel.groupLabel + "” — a pinned model leads, the chain stays as fallback.";
         }
         visible: text !== ""
         wrapMode: Text.WordWrap
@@ -355,9 +446,9 @@ BarPanel {
         property int rowIndex: 0
 
         readonly property bool rowSelected: panel.rowIndex === rowIndex
-        readonly property bool isAuto: !!row && row.isAuto === true
-        readonly property bool isCurrent: isAuto ? panel.pxy.routePin === "" : (!!row && row.pinned === true)
-        readonly property bool eligible: isAuto || !row || row.eligible !== false
+        readonly property bool isGroup: !!row && row.isGroup === true
+        readonly property bool isCurrent: isGroup ? panel.pxy.routePin === "" : (!!row && row.pinned === true)
+        readonly property bool eligible: isGroup || !row || row.eligible !== false
 
         hasCursor: rowSelected
         bordered: false
@@ -415,7 +506,7 @@ BarPanel {
                     theme: panel.theme
 
                     width: parent.width
-                    text: routeRow.isAuto ? "Auto — chain priority" : Model.modelName(routeRow.row ? routeRow.row.id : "")
+                    text: routeRow.isGroup ? panel.groupLabel + " — chain priority" : Model.modelName(routeRow.row ? routeRow.row.id : "")
                     elide: Text.ElideRight
                     font.weight: routeRow.isCurrent ? Font.DemiBold : Font.Normal
                 }
@@ -423,15 +514,15 @@ BarPanel {
                 StyledText {
                     theme: panel.theme
                     role: StyledText.Caption
-                    mono: !routeRow.isAuto
+                    mono: !routeRow.isGroup
                     muted: true
 
                     visible: text !== ""
                     width: parent.width
                     text: {
-                        if (routeRow.isAuto)
-                            return panel.pxy.routePin === "" ? "" : "Clear the pin — follow the configured chain again";
-                        const provider = Model.providerOf(routeRow.row ? routeRow.row.id : "");
+                        if (routeRow.isGroup)
+                            return panel.pxy.routePin === "" ? "" : "Clear the pin — every group follows its configured chain again";
+                        const provider = routeRow.row && routeRow.row.provider ? routeRow.row.provider : Model.providerOf(routeRow.row ? routeRow.row.id : "");
                         const caption = Model.rowCaption(routeRow.row);
                         return caption === "" ? provider : provider + "  ·  " + caption;
                     }

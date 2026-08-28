@@ -2,9 +2,15 @@
 """Gather everything the pxy bar panel shows into one JSON object.
 
 Sources, all pxy's own: `pxy status --json [--remote]` (usage, limits,
-cooldowns, route pin), `pxy explain auto --json` (the live walk order with
-per-candidate verdicts, pin included), `pxy models` (the full catalog for the
-picker's search), and a healthz probe for the daemon light.
+cooldowns, route pin, the group list), one `pxy explain <group> --json` per
+group (that group's live walk order with per-candidate verdicts, pin
+included), `pxy models --json` (the full catalog for the picker's search), and
+a healthz probe for the daemon light.
+
+Every group is walked in one scan rather than on each chip click: explain is
+local sqlite + config, costs no HTTP, and there are a handful of groups — so
+switching chains in the panel is instant and can never show a stale chain
+next to fresh cooldowns.
 
 `--no-remote` skips the balance HTTP calls — used for the quick re-scan after
 pinning a model, where only the route/eligibility data changed.
@@ -61,6 +67,13 @@ def remote_meter(data):
     credits = float(d.get("total_credits") or 0)
     used = float(d.get("total_usage") or 0)
     return (used / credits if credits > 0 else -1.0), ""
+  if d.get("quota") is not None and d.get("used_quota") is not None:
+    # new-api (aihubmix): `quota` is what's LEFT, `used_quota` what's spent,
+    # so the grant is their sum. Units cancel out of the ratio.
+    left = float(d.get("quota") or 0)
+    used = float(d.get("used_quota") or 0)
+    grant = left + used
+    return (used / grant if grant > 0 else -1.0), ""
   return -1.0, ""
 
 
@@ -103,7 +116,9 @@ def main():
     "daemon": {"active": False, "port": 0, "modelCount": 0},
     "routePin": None,
     "routePinActive": False,
-    "chain": [],
+    "groups": [],
+    # group name -> that group's walk order (the panel's ROUTE rows)
+    "chains": {},
     "cooldowns": [],
     "limits": [],
     "models": [],
@@ -124,6 +139,7 @@ def main():
 
   out["routePin"] = status.get("routePin")
   out["routePinActive"] = bool(status.get("routePinActive"))
+  out["groups"] = status.get("groups") or []
   out["cooldowns"] = status.get("cooldowns") or []
   port = int(status.get("port") or 0)
   out["daemon"]["port"] = port
@@ -138,14 +154,32 @@ def main():
   except Exception:
     out["daemon"]["active"] = False
 
-  try:
-    explain = json.loads(run(["explain", "auto", "--json"], 15))
-    out["chain"] = explain.get("candidates") or []
-  except Exception as exc:
-    out["statusText"] = f"pxy explain failed: {exc}"
+  for group in out["groups"]:
+    name = str(group.get("name") or "")
+    if not name:
+      continue
+    try:
+      explain = json.loads(run(["explain", name, "--json"], 15))
+      out["chains"][name] = explain.get("candidates") or []
+    except Exception as exc:
+      out["statusText"] = f"pxy explain {name} failed: {exc}"
 
+  # Only the fields the picker renders: the full catalogue is thousands of
+  # models, and shipping every key through the pipe on each scan is dead weight.
   try:
-    out["models"] = [m for m in run(["models"], 10).splitlines() if m and m != "auto"]
+    catalog = json.loads(run(["models", "--json"], 20))
+    out["models"] = [
+      {
+        "id": m["id"],
+        "provider": m.get("provider") or "",
+        "tier": m.get("tier") or "",
+        "free": m.get("free"),
+        "context": m.get("contextLength") or 0,
+        "groups": m.get("groups") or [],
+      }
+      for m in catalog
+      if m.get("kind") == "model"
+    ]
   except Exception:
     pass
 

@@ -53,24 +53,48 @@ function searchScore(id, needle) {
     return subsequence(full, needle) * 100;
 }
 
-// The picker's rows. Without a query: the auto chain in walk order (that IS
-// the eligibility view). With one: a fuzzy filter over the whole catalog —
-// anything `pxy models` knows is pinnable, chain member or not — best
-// matches first, catalog order breaking ties inside a band.
+// One picker row, merging what routing knows about a model (its verdict in
+// the chain being viewed) with what the catalogue knows (provider, tier,
+// price, which chains route to it). `entry` is the `pxy models --json` record
+// and may be missing for a model no longer in the catalogue.
+function decorated(row, entry) {
+    return {
+        id: row.id,
+        eligible: row.eligible !== false,
+        pinned: row.pinned === true,
+        skips: row.skips || [],
+        notes: row.notes || [],
+        provider: (entry && entry.provider) || providerOf(row.id),
+        tier: entry ? String(entry.tier || "") : "",
+        free: entry ? entry.free : null,
+        groups: (entry && entry.groups) || []
+    };
+}
+
+function indexById(models) {
+    const out = {};
+    for (let i = 0; i < (models || []).length; i++)
+        out[String(models[i].id)] = models[i];
+    return out;
+}
+
+// The picker's rows. Without a query: the selected group's chain in walk
+// order (that IS the eligibility view). With one: a fuzzy filter over the
+// whole catalog — anything `pxy models` knows is pinnable, chain member or
+// not — best matches first, catalog order breaking ties inside a band.
 function pickerRows(chain, models, query, maxRows) {
     const q = String(query || "").trim().toLowerCase();
+    const meta = indexById(models);
     if (q === "") {
-        return {
-            rows: (chain || []).slice(0, maxRows),
-            hidden: Math.max(0, (chain || []).length - maxRows)
-        };
+        const rows = (chain || []).slice(0, maxRows).map(r => decorated(r, meta[r.id]));
+        return { rows: rows, hidden: Math.max(0, (chain || []).length - maxRows) };
     }
     const byId = {};
     for (let i = 0; i < (chain || []).length; i++)
         byId[chain[i].id] = chain[i];
     const scored = [];
     for (let i = 0; i < (models || []).length; i++) {
-        const id = String(models[i]);
+        const id = String(models[i].id);
         const s = searchScore(id, q);
         if (s === 0)
             continue;
@@ -78,7 +102,7 @@ function pickerRows(chain, models, query, maxRows) {
         scored.push({
             score: s,
             order: i,
-            row: byId[id] || { id: id, eligible: true, pinned: false, skips: [], notes: [] }
+            row: decorated(byId[id] || { id: id }, models[i])
         });
     }
     scored.sort((a, b) => (b.score - a.score) || (a.order - b.order));
@@ -89,12 +113,26 @@ function pickerRows(chain, models, query, maxRows) {
     };
 }
 
+// Under a row: why it would be skipped beats what it costs. A chain member
+// always carries routing notes; a plain catalog hit has none, so it falls
+// back to the facts that decide whether you want it at all.
 function rowCaption(row) {
     if (!row)
         return "";
     if ((row.skips || []).length > 0)
         return row.skips.join(" · ");
-    return (row.notes || []).join(" · ");
+    if ((row.notes || []).length > 0)
+        return row.notes.join(" · ");
+    const bits = [];
+    if (row.tier)
+        bits.push(row.tier);
+    if (row.free === true)
+        bits.push("free");
+    else if (row.free === false)
+        bits.push("paid");
+    if ((row.groups || []).length > 0)
+        bits.push("in " + row.groups.join(", "));
+    return bits.join(" · ");
 }
 
 function formatSeconds(s) {
