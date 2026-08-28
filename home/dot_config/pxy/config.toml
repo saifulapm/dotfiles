@@ -375,6 +375,56 @@ models = [
   "glm-5.3",
 ]
 
+# Command Code ($10/mo "GOAT"): $70 of monthly credits spent against dollar
+# windows enforced upstream — $14 per 5h, $35/week, $70/month. Credits bought
+# on top roll over and never expire.
+# OpenAI-shaped. The Anthropic /messages route exists, but every Claude model
+# 403s MODEL_NOT_IN_PLAN below the Pro plan, so discovery stays off and the
+# list below is what GOAT actually serves. Monthly request allowances (plan
+# page) are in the comments; tool calling verified on every id 2026-08-28.
+[providers.commandcode]
+tier = "subscription"
+parse_think_tags = true # same reasoning families as opencode above; no-op otherwise
+base_url = "https://api.commandcode.ai/provider/v1/chat/completions"
+# Dollar windows + credits left — the endpoint Command Code's own CLI reads
+# for `/usage`. Undocumented; the provider key authorizes it.
+balance_url = "https://api.commandcode.ai/alpha/billing/credits"
+api_key = { pass = "AI/commandcode/main" }
+discover = false # /models also lists Pro-plan Claude models that 403 here
+models = [
+  # --- free under the plan: these spend no credits at all ---
+  { id = "minimax/minimax-m3-free", context_length = 1000000, tool_call = true },
+  { id = "poolside/laguna-s-2.1-free", context_length = 256000, tool_call = true },
+  { id = "minimax/minimax-m2.7-free", context_length = 197000, tool_call = true },
+
+  # --- highest allowance per month ---
+  { id = "xiaomi/mimo-v2.5", context_length = 1000000, tool_call = true },          # 97,400
+  { id = "deepseek/deepseek-v4-flash", context_length = 1000000, tool_call = true }, # 91,200
+  # muse-spark contributor tier is cheap because it TRAINS ON PROMPTS.
+  { id = "meta/muse-spark-1.2-contributor", context_length = 1048576, tool_call = true }, # 90,900
+  { id = "tencent/hy3-paid", context_length = 262144, tool_call = true },           # 35,400
+  { id = "deepseek/deepseek-v4-flash-vision-exp", context_length = 1000000, tool_call = true }, # 30,400
+  { id = "xiaomi/mimo-v2.5-pro", context_length = 1000000, tool_call = true },      # 28,500
+  { id = "Qwen/Qwen3.8-27B", context_length = 262144, tool_call = true },           # 24,000
+  { id = "z-ai/glm-5.3-flash", context_length = 1048576, tool_call = true },        # 23,600
+  { id = "Qwen/Qwen3.8-Flash", context_length = 1000000, tool_call = true },        # 19,600
+  { id = "stepfun/Step-3.5-Flash", context_length = 1000000, tool_call = true },    # 17,500
+  { id = "gpt-5.6-luna", context_length = 1050000, tool_call = true },              # 14,800
+  { id = "MiniMaxAI/MiniMax-M3", context_length = 1000000, tool_call = true },      # 13,900
+  { id = "deepseek/deepseek-v4-pro", context_length = 1000000, tool_call = true },  # 9,880
+  { id = "Qwen/Qwen3.7-Plus", context_length = 1000000, tool_call = true },         # 7,110
+  { id = "moonshotai/Kimi-K2.7-Code", context_length = 256000, tool_call = true },  # 5,420
+  { id = "zai-org/GLM-5.2", context_length = 1000000, tool_call = true },           # 4,740
+  { id = "google/gemini-3.7-flash", context_length = 1048576, tool_call = true },   # 3,920
+
+  # --- frontier, but each call eats the windows fast ---
+  { id = "gpt-5.6-sol", context_length = 1050000, tool_call = true },               # 2,070
+  { id = "zai-org/GLM-5.3", context_length = 1000000, tool_call = true },           # 1,350
+  { id = "Qwen/Qwen3.8-Max", context_length = 1000000, tool_call = true },          # 1,310
+  { id = "moonshotai/Kimi-K3", context_length = 1000000, tool_call = true },        # 980
+  { id = "xai/grok-4.6", context_length = 500000, tool_call = true },               # 719
+]
+
 # TokenHarbor — OpenAI-compatible aggregator (tokenharbor.ai), ACTIVE 2026-08-26.
 # Free tier = ONLY the three `:free` ids below ("rolling 7-day allowance, then
 # rate-limit error; never billed" per the /models blurbs). Paid models are
@@ -646,20 +696,57 @@ video_status_url = "https://apihub.agnes-ai.com/agnesapi?video_id={id}"
 # from the client once Agnes documents it.
 video_models = ["agnes-video-v2.0", "agnes-video-2.5-flash", "agnes-video-2.5"]
 
-# b.ai — 42 models (Claude/GPT/Gemini/GLM/Qwen), nearly all deposit-gated
-# ("Access restricted. Deposit required to unlock premium models"). Full
-# catalog sweep 2026-08-24 found exactly ONE model usable at zero balance:
-# mimo-v2.5 — free but heavily throttled (429s with empty bodies under any
-# concurrency), so keep rpm low and let failover absorb it.
+# b.ai — 44 models (Claude/GPT/Gemini/GLM/Qwen), nearly all deposit-gated
+# ("Access restricted. Deposit required to unlock premium models", or a
+# balance=0 quota error). Re-swept 2026-08-28: SIX models now answer at zero
+# balance, up from just mimo-v2.5 in the 08-24 sweep. All six tool call in both
+# streaming and non-streaming, and vision-exp reads images. Free tier, so they
+# are auto-chain candidates — safely: b.ai's /v1/models reports no pricing and
+# no :free suffix, so discovery can never promote the deposit-gated catalogue,
+# and only the hand-listed ids below become candidates.
+# The rate limit is ACCOUNT-WIDE, not per-model — saturating deepseek-v4-flash
+# 429s hy3/qwen/mimo in the same breath — which is exactly the shape of pxy's
+# per-provider rpm gate. Measured ~10 req/min on a sliding window, empty-body
+# 429s, no rate-limit headers at all (it's a One API gateway); rpm 8 leaves
+# headroom. No balance_url: every non-inference path 403s with "HTTP node only
+# allows access to inference API paths".
+# There is a SECOND, account-wide ceiling underneath the rpm one: a COST
+# budget. Past it every model 503s with activity_cost_limit_reached — "today's
+# activity cost limit has been reached". Despite that wording it is NOT a
+# day-long lockout: it tripped after ~5.5M prompt tokens of padded probes and
+# cleared roughly ten minutes later, so treat it as a rolling cost window.
+# No `daily_tokens` limit is set here: the budget is denominated in cost rather
+# than tokens, b.ai publishes no figure, and the 503 already does the work —
+# pxy cools the model down and walks on. Only bulk traffic gets near it;
+# ordinary agent turns are orders of magnitude smaller.
+# ⚠️ context_length is measured against the LIVE API (binary search on a padded
+# prompt; the largest window that actually answered is what's recorded).
+# b.ai's over-limit 400 names no ceiling — except on hy3, which states its own.
 [providers.bai]
-tier = "reserve"
 base_url = "https://api.b.ai/v1/chat/completions"
 api_key = { pass = "AI/bai/main" }
 models = [
-  { id = "mimo-v2.5", context_length = 128000 },
+  # 960,002 prompt tokens accepted, ~1.02M rejected. Fastest here (~2s), and
+  # the only one that answers from several backends (-0731, -202605, plain).
+  { id = "deepseek-v4-flash", context_length = 1000000, tool_call = true },
+  # Same window. Image input verified 2026-08-28. max_tokens capped at 393216.
+  { id = "deepseek-v4-flash-vision-exp", context_length = 1000000, tool_call = true },
+  # 507,419 accepted, ~970k rejected. max_tokens capped at 131072. A cold call
+  # can take 80s+ before the first byte; short probes make it look dead.
+  { id = "glm-5.3-flash", context_length = 524288, tool_call = true },
+  # 503,552 accepted, ~970k rejected. max_tokens capped at 131072.
+  { id = "qwen3.8-flash", context_length = 524288, tool_call = true },
+  # 489,408 accepted, ~940k rejected. Flakiest of the six: intermittent 503
+  # "No available channel for model mimo-v2.5" that clears on its own, so let
+  # failover absorb it. Reports reasoning as `reasoning` (OpenRouter shape),
+  # not `reasoning_content`.
+  { id = "mimo-v2.5", context_length = 524288, tool_call = true },
+  # The one model that names its own ceiling in the 400: "Input tokens exceed
+  # the configured limit of 192000 tokens".
+  { id = "hy3", context_length = 192000, tool_call = true },
 ]
 [providers.bai.limits]
-rpm = 2
+rpm = 8
 
 # UNUSABLE (commented out) — freemodel.dev: 3 GPT-5.6 models, account returns "Insufficient
 # balance" (probed 2026-08-24). Disabled until topped up.

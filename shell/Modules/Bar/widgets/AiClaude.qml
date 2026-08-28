@@ -21,7 +21,7 @@ Item {
     visible: false
 
     readonly property string providerId: "claude"
-    readonly property string providerName: "Claude Code"
+    readonly property string providerName: "Claude"
     readonly property url markSource: Qt.resolvedUrl("assets/claude.svg")
 
     property bool enabled: true

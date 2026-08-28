@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""Scan Command Code usage and emit compact stats as one JSON object.
+
+One source, same output contract as the codex/copilot/opencode scanners:
+`pxy status --json --remote --provider commandcode`. Command Code keeps
+nothing on disk worth scanning — ~/.commandcode holds auth and update state,
+no session store — so BOTH halves come from pxy: the local counters are its
+per-model accounting for whatever it routed to the provider, and the meters
+are the plan's dollar windows from Command Code's billing endpoint (the
+undocumented one its own CLI reads for `/usage`).
+
+The two windows are hard caps that stop the next prompt; the monthly grant is
+the credit pool they draw from, so it rides along as a third meter.
+"""
+
+import json
+import os
+import shutil
+import subprocess
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+PROVIDER = "commandcode"
+
+# GOAT plan facts (commandcode.ai/docs/plans/goat), the way AiOpencode pins
+# "Go x 2": $14 per rolling 5h and $35 per week come down the wire as caps,
+# but the $70 monthly grant is only ever reported as what is LEFT of it.
+PLAN_LABEL = "GOAT"
+MONTHLY_CREDITS = 70.0
+
+# Wire key -> meter label, in the order the panel should read them.
+WINDOWS = [("fiveHour", "5-hour"), ("weekly", "Weekly")]
+
+now = datetime.now()
+today = now.strftime("%Y-%m-%d")
+recent_dates = [(now - timedelta(days=offset)).strftime("%Y-%m-%d") for offset in range(6, -1, -1)]
+recent = {day: {"date": day, "messageCount": 0} for day in recent_dates}
+
+today_prompts = 0
+today_total = 0
+today_by_model = {}
+model_usage = {}
+total_prompts = 0
+active_days = set()
+status_text = ""
+help_text = ""
+
+
+def bucket(model):
+  return model_usage.setdefault(model, {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "cacheCreationInputTokens": 0,
+  })
+
+
+def iso(ms):
+  """Epoch milliseconds -> the ISO string limitWindowOpen() can parse."""
+  try:
+    stamp = datetime.fromtimestamp(float(ms) / 1000, tz=timezone.utc)
+  except (TypeError, ValueError, OSError, OverflowError):
+    return ""
+  return stamp.isoformat().replace("+00:00", "Z")
+
+
+def pxy_status():
+  global status_text, help_text
+  pxy = shutil.which("pxy") or str(Path.home() / ".local" / "bin" / "pxy")
+  if not os.path.exists(pxy):
+    status_text = "pxy unavailable"
+    help_text = "pxy not found; Command Code reports its limits through pxy only."
+    return None
+  cmd = [pxy, "status", "--json", "--remote", "--provider", PROVIDER]
+  try:
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    return json.loads(out.stdout)
+  except Exception as exc:
+    status_text = "pxy status failed"
+    help_text = f"{exc}; no Command Code limits available."
+    return None
+
+
+def merge_pxy(data):
+  """pxy's per-model rows for provider=commandcode: what it actually routed."""
+  global today_prompts, today_total, total_prompts
+  for row in data.get("modelUsage") or []:
+    if row.get("provider") != PROVIDER:
+      continue
+    day = str(row.get("day") or "")
+    requests = int(row.get("requests") or 0)
+    inp = int(row.get("inputTokens") or 0)
+    out = int(row.get("outputTokens") or 0)
+    total = inp + out
+    model = str(row.get("model") or PROVIDER)
+
+    b = bucket(model)
+    b["inputTokens"] += inp
+    b["outputTokens"] += out
+    total_prompts += requests
+    active_days.add(day)
+    if day in recent:
+      recent[day]["messageCount"] += total
+    if day == today:
+      today_prompts += requests
+      today_total += total
+      today_by_model[model] = today_by_model.get(model, 0) + total
+
+
+def plan_limits(data):
+  """The dollar windows, plus what is left of the monthly grant.
+
+  Returns (flat, extra): the two enforced windows go in the flat pair the
+  panel reads first, the credit pool is appended as its own meter. A window
+  the endpoint did not report is left out rather than shown as an empty one.
+  """
+  global status_text, help_text
+  entry = (data.get("remote") or {}).get(PROVIDER) or {}
+  body = entry.get("data") or {}
+  limits = body.get("windowLimits") or {}
+  if not limits:
+    status_text = "Command Code limits unavailable"
+    help_text = str(entry.get("summary") or "no data from api.commandcode.ai")
+    return [], []
+
+  flat = []
+  for key, label in WINDOWS:
+    win = limits.get(key) or {}
+    used, cap = win.get("used"), win.get("cap")
+    if used is None or not cap:
+      continue
+    flat.append({
+      "label": label + ("  ⚠ spent" if win.get("exceeded") else ""),
+      "percent": min(1.0, float(used) / float(cap)),
+      "resetAt": iso(win.get("resetAt")),
+    })
+
+  # Credits are reported only as a remainder, so the meter is grant-minus-left
+  # against the plan constant above. Buying extra credits lifts the remainder
+  # over the grant; that clamps to 0% rather than reading negative.
+  credits = body.get("credits") or {}
+  left = sum(float(credits.get(k) or 0) for k in ("monthlyCredits", "purchasedCredits", "freeCredits"))
+  extra = [{
+    "title": "Credits",
+    "subtitle": f"30-day · ${left:,.2f} of ${MONTHLY_CREDITS:,.0f} left",
+    "percent": max(0.0, min(1.0, (MONTHLY_CREDITS - left) / MONTHLY_CREDITS)),
+    "resetAt": "",
+  }]
+  return flat, extra
+
+
+data = pxy_status()
+flat_limits, extra_limits = ([], [])
+if data is not None:
+  merge_pxy(data)
+  flat_limits, extra_limits = plan_limits(data)
+
+primary = flat_limits[0] if len(flat_limits) > 0 else None
+secondary = flat_limits[1] if len(flat_limits) > 1 else None
+
+print(json.dumps({
+  "ready": True,
+  "todayPrompts": today_prompts,
+  # pxy accounts for requests, not conversations: it has no session concept,
+  # and Command Code stores none locally to count.
+  "todaySessions": 0,
+  "todayTotalTokens": today_total,
+  "todayTokensByModel": today_by_model,
+  "recentDays": [recent[d] for d in recent_dates],
+  "totalPrompts": total_prompts,
+  "totalSessions": 0,
+  "activeDays": len(active_days),
+  "activeDates": sorted(active_days),
+  "modelUsage": model_usage,
+  "rateLimitPercent": primary["percent"] if primary else -1,
+  "rateLimitLabel": primary["label"] if primary else "",
+  "rateLimitResetAt": primary["resetAt"] if primary else "",
+  "secondaryRateLimitPercent": secondary["percent"] if secondary else -1,
+  "secondaryRateLimitLabel": secondary["label"] if secondary else "",
+  "secondaryRateLimitResetAt": secondary["resetAt"] if secondary else "",
+  "extraLimits": extra_limits,
+  "tierLabel": PLAN_LABEL,
+  "usageStatusText": status_text,
+  "authHelpText": help_text,
+}, separators=(",", ":")))
