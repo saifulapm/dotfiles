@@ -24,6 +24,13 @@ PXY = shutil.which("pxy") or os.path.expanduser("~/.local/bin/pxy")
 # summary line with no meter.
 GO_WINDOWS = ["rolling", "weekly", "monthly"]
 
+# Providers the AI usage panel already meters, per agent and in more detail
+# (Ai.qml's Copilot tab for github, OpenCode for both Go accounts, Command for
+# commandcode). The same allowance in two panels is just two places to read
+# the same number, so this one drops them; `pxy status --remote` still reports
+# every provider in full.
+PANEL_HIDDEN = {"github", "opencode-go-github", "opencode-go-google", "commandcode"}
+
 
 def run(args, timeout):
   out = subprocess.run([PXY] + args, capture_output=True, text=True, timeout=timeout)
@@ -148,6 +155,8 @@ def main():
   providers = status.get("providers") or {}
   rows = []
   for name, entry in remote.items():
+    if name in PANEL_HIDDEN:
+      continue
     pct, reset = remote_meter(entry.get("data"))
     rows.append({
       "name": name,
@@ -156,7 +165,7 @@ def main():
       "resetAt": reset,
     })
   for name, windows in providers.items():
-    if name in remote:
+    if name in remote or name in PANEL_HIDDEN:
       continue
     pct, detail = local_meter(windows)
     if pct < 0:
