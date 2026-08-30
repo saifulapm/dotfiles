@@ -19,6 +19,13 @@ Scope {
     id: lockRoot
 
     required property var theme
+    // Whether the panel may be powered off at all, mirrored from the idle
+    // service's blank stage. Without this the lock screen owns a second,
+    // unconditional blank path and disabling the stage only moves the
+    // power-off five seconds later, to just after the lock instead of just
+    // before it — which on the Mac mini's 4K60 HDMI is the transition that
+    // wedges the DCP (2026-08-30).
+    required property bool blankEnabled
 
     readonly property string userName: Quickshell.env("USER") || Quickshell.env("LOGNAME")
     readonly property string pamDir: Quickshell.shellDir + "/Modules/Lock/pam.d"
@@ -195,10 +202,12 @@ Scope {
         // prompt, a lock with no marker behind it costs the whole session.
         writeLockMarker();
         lockRequested = true;
-        // Assume the monitors may already be off (the idle service's
-        // screensaver stage runs before the lock stage), so the first key or
-        // click on the lock screen is guaranteed to bring them back.
-        blanked = true;
+        // Assume the monitors may already be off (the idle service's blank
+        // stage runs before the lock stage), so the first key or click on the
+        // lock screen is guaranteed to bring them back. With that stage off
+        // nothing can have blanked them, and claiming otherwise would report a
+        // blanked lock screen that is plainly lit.
+        blanked = blankEnabled;
         armBlankTimer();
         logEvent("lock-requested");
         queueSessionLock();
@@ -229,6 +238,8 @@ Scope {
     }
 
     function armBlankTimer() {
+        if (!blankEnabled)
+            return;
         idleBlankTimer.armedAt = Date.now();
         idleBlankTimer.restart();
     }

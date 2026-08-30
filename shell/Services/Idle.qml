@@ -380,22 +380,20 @@ QtObject {
 
     // Launch through a Process, not execDetached: the exit code is the
     // fallback signal. screensaver-launch exits nonzero when the binary or
-    // the quotes file is missing, and this stage then does what it always
-    // did before the
-    // screensaver existed — power the monitors off. Unless the blank stage is
-    // configured, which already owns the panel on its own deadline: blanking
-    // here too would drag that forward to the screensaver's time.
+    // the quotes file is missing. That used to fall back to powering the
+    // monitors off — the shape this stage had before the screensaver existed
+    // — but the blank stage is now the ONLY thing that may power the panel
+    // down (2026-08-30): on the Mac mini's 4K60 HDMI a DCP power-off/on cycle
+    // intermittently wedges the display coprocessor until reboot, and a
+    // fallback that blanks precisely when the stage is disabled is how that
+    // comes back without anyone asking for it. A broken screensaver now
+    // leaves the panel lit until the lock stage, which still fires.
     readonly property Process screensaverProcess: Process {
         command: [Quickshell.env("HOME") + "/.dotfiles/bin/screensaver-launch"]
         onExited: (exitCode, exitStatus) => {
             if (exitCode === 0 || !root.idledThisCycle)
                 return;
-            if (root.blankStageEnabled) {
-                root.logEvent("screensaver", "unavailable — blank stage holds the panel");
-                return;
-            }
-            root.logEvent("screensaver", "unavailable — monitors off");
-            root.powerOffMonitors();
+            root.logEvent("screensaver", "unavailable — panel stays lit");
         }
     }
 

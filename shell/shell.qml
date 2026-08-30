@@ -578,7 +578,8 @@ ShellRoot {
         asynchronous: false
         surfaceSource: shell.moduleRoot + "/Modules/Lock/Lock.qml"
         surfaceProps: ({
-                theme: shell.theme
+                theme: shell.theme,
+                blankEnabled: shell.idle.blankStageEnabled
             })
     }
 

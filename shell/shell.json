@@ -2,7 +2,7 @@
   "version": 1,
   "idle": {
     "screensaver": 150,
-    "blank": 300,
+    "blank": 0,
     "lock": 360
   },
   "autoBrightness": {
