@@ -22,7 +22,11 @@ BarPanel {
     panelTitle: ""
     cardWidth: theme.space(100)
 
-    readonly property int maxRows: 4
+    // How many rows the picker offers before "keep typing to narrow" kicks
+    // in. The ROUTE list scrolls: the viewport stays the height of the old
+    // 4-row panel (group row + 4 models) and the rest is reached by wheel or
+    // cursor.
+    readonly property int maxRows: 20
     // Fullest first, so the cut drops only the providers with headroom.
     readonly property int maxLimits: 10
     readonly property var limitRows: (pxy.limits || []).slice(0, maxLimits)
@@ -65,13 +69,20 @@ BarPanel {
 
     Component.onCompleted: syncGroup()
 
-    onQueryChanged: rowIndex = 0
-    onGroupChanged: rowIndex = 0
+    onQueryChanged: {
+        rowIndex = 0;
+        routeScroll.contentY = 0;
+    }
+    onGroupChanged: {
+        rowIndex = 0;
+        routeScroll.contentY = 0;
+    }
 
     function moveCursor(dy) {
         if (listRows.length === 0)
             return;
         rowIndex = Math.max(0, Math.min(listRows.length - 1, rowIndex + dy));
+        routeScroll.reveal(rowIndex);
     }
 
     function choose(row) {
@@ -231,22 +242,67 @@ BarPanel {
         }
     }
 
-    Column {
-        id: routeColumn
+    // The route list scrolls inside a viewport exactly as tall as the old
+    // 4-model panel: all 20 offered rows are in the content, the rest is
+    // reached by wheel or by moving the cursor past the edge.
+    Flickable {
+        id: routeScroll
 
         width: parent.width
-        spacing: panel.theme.space(0.5)
+        height: Math.min(contentHeight, viewportBottom)
+        clip: true
+        contentWidth: width
+        contentHeight: routeColumn.height
+        interactive: contentHeight > height + 1
 
-        Repeater {
-            model: panel.listRows
+        // This Qt build has no Flickable.wheelEnabled — handle the wheel
+        // manually or the list never scrolls.
+        WheelHandler {
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: event => {
+                const max = Math.max(0, routeScroll.contentHeight - routeScroll.height);
+                routeScroll.contentY = Math.max(0, Math.min(max, routeScroll.contentY - event.angleDelta.y));
+                event.accepted = true;
+            }
+        }
 
-            RouteRow {
-                required property var modelData
-                required property int index
+        // Bottom edge of the last fully visible row: the clear-pin group row
+        // plus 4 model rows when unfiltered, 4 model rows while searching.
+        readonly property real viewportBottom: {
+            const i = panel.query === "" ? 4 : 3;
+            const k = routeRepeater.itemAt(i);
+            return k ? k.y + k.height : routeColumn.implicitHeight;
+        }
 
-                width: routeColumn.width
-                row: modelData
-                rowIndex: index
+        // Keyboard cursor past the viewport edge pulls the content along.
+        function reveal(i) {
+            const k = routeRepeater.itemAt(i);
+            if (!k)
+                return;
+            if (k.y < contentY)
+                contentY = k.y;
+            else if (k.y + k.height > contentY + height)
+                contentY = k.y + k.height - height;
+        }
+
+        Column {
+            id: routeColumn
+
+            width: routeScroll.width
+            spacing: panel.theme.space(0.5)
+
+            Repeater {
+                id: routeRepeater
+                model: panel.listRows
+
+                RouteRow {
+                    required property var modelData
+                    required property int index
+
+                    width: routeColumn.width
+                    row: modelData
+                    rowIndex: index
+                }
             }
         }
     }
@@ -265,11 +321,11 @@ BarPanel {
             }
             if (panel.group === "")
                 return "No groups configured — add a [groups.<name>] chain to config.toml.";
-            // "keep typing to narrow" is wrong here — typing searches the whole
-            // catalog, not this chain. The chain length is the tab's missing
-            // number instead: with 4 rows shown, it is how you know there is
-            // depth behind them.
-            return panel.groupChain.length + " candidates in “" + panel.groupLabel + "” — a pinned model leads, the chain stays as fallback.";
+            // The list shows the first rows and SCROLLS for the rest (the
+            // viewport is 4 models tall), so the count is information, not a
+            // promise of hidden rows.
+            return panel.groupChain.length + " candidates in “" + panel.groupLabel
+                + "” — scroll the list; a pinned model leads, the chain stays as fallback.";
         }
         visible: text !== ""
         wrapMode: Text.WordWrap
