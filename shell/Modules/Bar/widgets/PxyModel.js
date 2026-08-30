@@ -60,6 +60,9 @@ function searchScore(id, needle) {
 function decorated(row, entry) {
     return {
         id: row.id,
+        // Multi-account providers expand into one row per account; the
+        // account name is what keeps two same-model rows distinguishable.
+        account: row.account || "",
         eligible: row.eligible !== false,
         pinned: row.pinned === true,
         skips: row.skips || [],

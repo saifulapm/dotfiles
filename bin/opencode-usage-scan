@@ -8,8 +8,8 @@ Two sources, same output contract as the codex/copilot scanners:
   through pxy (providerID "pxy") are SKIPPED for token counting — their model
   is recorded as "auto" client-side, and pxy's own per-model accounting covers
   them — but still count toward prompts/sessions (the activity happened here).
-* pxy: `pxy status --json --remote --provider opencode-go-github --provider
-  opencode-go-google` supplies (a) the real routed models for pxy traffic
+* pxy: `pxy status --json --remote --provider opencode-go` supplies (a) the
+  real routed models for pxy traffic
   (modelUsage rows with agent "opencode") and (b) both opencode Go accounts'
   dollar-window percentages for the LIMITS meters, emitted as the finished
   extraLimits records the panel renders (title/subtitle/percent/resetAt).
@@ -27,9 +27,11 @@ DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 
 # pxy provider name -> meter title. Also the remote fetch filter: balance
 # checks cost real HTTP, so only these two are queried.
+# Per-account pxy remote keys (multi-account provider, 2026-08-30): one
+# provider `opencode-go`, two accounts, each reporting its own dollar windows.
 GO_ACCOUNTS = {
-    "opencode-go-github": "GitHub",
-    "opencode-go-google": "Google",
+    "opencode-go#github": "GitHub",
+    "opencode-go#google": "Google",
 }
 WINDOWS = [("rolling", "5-hour"), ("weekly", "7-day"), ("monthly", "30-day")]
 
@@ -121,9 +123,7 @@ def pxy_status():
     status_text = "pxy unavailable"
     help_text = "pxy not found; showing OpenCode's own session stats only."
     return None
-  cmd = [pxy, "status", "--json", "--remote"]
-  for name in GO_ACCOUNTS:
-    cmd += ["--provider", name]
+  cmd = [pxy, "status", "--json", "--remote", "--provider", "opencode-go"]
   try:
     out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     return json.loads(out.stdout)

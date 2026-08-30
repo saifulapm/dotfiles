@@ -506,7 +506,12 @@ BarPanel {
                     theme: panel.theme
 
                     width: parent.width
-                    text: routeRow.isGroup ? panel.groupLabel + " — chain priority" : Model.modelName(routeRow.row ? routeRow.row.id : "")
+                    // Two accounts of one provider expand into two rows with
+                    // the same model id — the account tag tells them apart.
+                    text: routeRow.isGroup ? panel.groupLabel + " — chain priority"
+                        : Model.modelName(routeRow.row ? routeRow.row.id : "")
+                            + (routeRow.row && routeRow.row.account
+                                ? "  [" + routeRow.row.account + "]" : "")
                     elide: Text.ElideRight
                     font.weight: routeRow.isCurrent ? Font.DemiBold : Font.Normal
                 }

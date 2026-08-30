@@ -8,7 +8,7 @@
 # sees, group chains keep only the members that survive the filter, a group
 # left with nothing stops being advertised, and an explicit request for a
 # hidden provider routes nowhere. An entry matches a provider by exact name or
-# as a FAMILY PREFIX — "opencode-go" covers opencode-go-github and
+# as a FAMILY PREFIX — "opencode-go" would cover opencode-go-github and
 # opencode-go-google, and never matches an unrelated name that merely starts
 # with the same letters ("go" will not match "google"). An entry that matches
 # no provider is a hard error: a typo in an allowlist would otherwise fail
@@ -76,13 +76,11 @@ models = [
 #   qwen3.7-plus 4,300 | minimax-m3 3,200 | kimi-k2.7-code 1,350 | glm-5.2 880
 [groups.subscription]
 models = [
-  "opencode-go-github/ox-alpha-free", # INFINITE requests
-  "opencode-go-google/ox-alpha-free", # INFINITE requests
+  "opencode-go/ox-alpha-free", # INFINITE requests; walks BOTH accounts (gh then g)
   "opencode-zen/hy3-free", # Hunyuan 3 (295B reasoning)
-  "opencode-go-github/hy3", # ~34,400 effective / 5h
-  "opencode-go-google/hy3",
-  "opencode-go-github/deepseek-v4-flash", # 7,600 / 5h
-  "opencode-go-google/mimo-v2.5", # 30,100 / 5h
+  "opencode-go/hy3", # ~34,400 effective / 5h per account, fill-first
+  "opencode-go/deepseek-v4-flash", # 7,600 / 5h per account
+  "opencode-go/mimo-v2.5", # 30,100 / 5h per account
   "commandcode/deepseek/deepseek-v4-flash",
   "github-free/gpt-5-mini", # 0x multiplier, unlimited floor
   "claude/claude-sonnet-5", # Anthropic Pro/Max, 5h window
@@ -341,55 +339,43 @@ models = [
 ]
 
 # opencode Go ($10/mo sub per account): dollar-based limits enforced
-# upstream — $12 per 5h window, $30/week, $60/month. Two accounts; pxy's
-# 429+Retry-After cooldown rotates between them automatically.
-[providers.opencode-go-github]
+# upstream — $12 per 5h window, $30/week, $60/month per account. TWO accounts
+# behind one entry (multi-account, 2026-08-30): the walk tries github first
+# (fill-first), and a 429 cools only the spent account's key
+# (`opencode-go#google`-style state keys) before falling to the other.
+# Cooldowns, usage windows and the limit enforcement are per account, so each
+# gets the full configured allowance; `pxy status` sums them into the row and
+# `status --remote` reports `opencode-go#github` / `opencode-go#google`
+# windows separately.
+[providers.opencode-go]
 tier = "subscription"
 parse_think_tags = true # same reasoning models as opencode-zen above
 base_url = "https://opencode.ai/zen/go/v1/chat/completions"
 # Dollar-window utilization (5h/weekly/monthly percent) straight from opencode.
+# Fetched PER ACCOUNT with that account's key (pxy status --remote).
 balance_url = "https://opencode.ai/zen/go/v1/usage"
+models = [
+  # High-allowance picks only (per-5h caps in the [groups.subscription] comment above).
+  "ox-alpha-free",
+  "hy3",
+  "mimo-v2.5",
+  "deepseek-v4-flash",
+  "longcat-2.0",
+  "minimax-m3",
+  "qwen3.7-plus",
+  "kimi-k2.7-code",
+  "glm-5.2",
+  # Deliberately NOT in a group (tiny allowances): kimi-k3 110/5h,
+  # grok-4.5 120, qwen3.8-max 160, glm-5.3 220.
+  "kimi-k3",
+  "glm-5.3",
+]
+[[providers.opencode-go.accounts]]
+name = "github"
 api_key = { pass = "AI/opencode-go/github" }
-models = [
-  # High-allowance picks only (per-5h caps in the [groups.subscription] comment above).
-  "ox-alpha-free",
-  "hy3",
-  "mimo-v2.5",
-  "deepseek-v4-flash",
-  "longcat-2.0",
-  "minimax-m3",
-  "qwen3.7-plus",
-  "kimi-k2.7-code",
-  "glm-5.2",
-  # Deliberately NOT in a group (tiny allowances): kimi-k3 110/5h,
-  # grok-4.5 120, qwen3.8-max 160, glm-5.3 220.
-  "kimi-k3",
-  "glm-5.3",
-]
-
-[providers.opencode-go-google]
-tier = "subscription"
-parse_think_tags = true # same reasoning models as opencode-zen above
-base_url = "https://opencode.ai/zen/go/v1/chat/completions"
-# Dollar-window utilization (5h/weekly/monthly percent) straight from opencode.
-balance_url = "https://opencode.ai/zen/go/v1/usage"
+[[providers.opencode-go.accounts]]
+name = "google"
 api_key = { pass = "AI/opencode-go/google" }
-models = [
-  # High-allowance picks only (per-5h caps in the [groups.subscription] comment above).
-  "ox-alpha-free",
-  "hy3",
-  "mimo-v2.5",
-  "deepseek-v4-flash",
-  "longcat-2.0",
-  "minimax-m3",
-  "qwen3.7-plus",
-  "kimi-k2.7-code",
-  "glm-5.2",
-  # Deliberately NOT in a group (tiny allowances): kimi-k3 110/5h,
-  # grok-4.5 120, qwen3.8-max 160, glm-5.3 220.
-  "kimi-k3",
-  "glm-5.3",
-]
 
 # Command Code ($10/mo "GOAT"): $70 of monthly credits spent against dollar
 # windows enforced upstream — $14 per 5h, $35/week, $70/month. Credits bought
@@ -589,6 +575,14 @@ models = [
   # force_stream streams upstream and re-assembles JSON for the client.
   { id = "deepseek-v4f", context_length = 128000, force_stream = true },
 ]
+# Their channel pool churns: a model with no live upstream answers 503
+# 无可用渠道 ("no channel available"). Skip to the next candidate and cool
+# the model briefly instead of surfacing the raw 503. NOTE: [[...]] arrays of
+# tables must come AFTER every plain key of their parent table — hence
+# `models` above, not below.
+[[providers.agentrouter.errors]]
+match = "无可用渠道"
+action = "skip-cooldown"
 
 # gpt-5.6-sol is OpenAI-endpoint-only; deepseek-v4f also lives here because
 # agentrouter's Anthropic route rejects it unless stream=true (probed).
