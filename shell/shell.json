@@ -33,11 +33,13 @@
       {
         "id": "clock",
         "birthYear": 1991,
-        "lifeExpectancy": 70
+        "lifeExpectancy": 70,
+        "format": "ddd d MMM HH:mm"
       },
       {
         "id": "timezones",
         "zones": [
+          "UTC",
           "Asia/Dhaka",
           "Europe/London",
           "America/New_York"

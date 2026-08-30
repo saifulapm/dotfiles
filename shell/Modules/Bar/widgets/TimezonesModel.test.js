@@ -176,6 +176,58 @@ test("business hours and midnight are flagged", () => {
     cells.forEach(cell => assert.equal(cell.dayStart, cell.hour === 0));
 });
 
+// ------------------------------------------------------------- peak windows
+
+// Peak is 01:00–04:00 and 06:00–10:00 UTC, Monday through Friday. These dates
+// are picked by weekday on purpose: 2026-08-21 is a Friday, the 22nd/23rd are
+// the weekend, and the 24th is a Monday.
+const peakAt = (day, hour, minute) => Model.isPeakInstant(Date.UTC(2026, 7, day, hour, minute || 0, 0));
+
+test("the peak windows are inclusive at the start and exclusive at the end", () => {
+    assert.equal(peakAt(21, 0, 59), false, "before the first window");
+    assert.equal(peakAt(21, 1), true, "01:00 is peak");
+    assert.equal(peakAt(21, 3, 59), true, "03:59 is still peak");
+    assert.equal(peakAt(21, 4), false, "04:00 is already off-peak");
+    assert.equal(peakAt(21, 5), false, "the gap between the windows");
+    assert.equal(peakAt(21, 6), true, "06:00 is peak");
+    assert.equal(peakAt(21, 9, 59), true, "09:59 is still peak");
+    assert.equal(peakAt(21, 10), false, "10:00 is already off-peak");
+    assert.equal(peakAt(21, 23), false, "the evening is off-peak");
+});
+
+test("the weekend is off-peak at every hour", () => {
+    for (let hour = 0; hour < 24; hour++) {
+        assert.equal(peakAt(22, hour), false, `Saturday ${hour}:00`);
+        assert.equal(peakAt(23, hour), false, `Sunday ${hour}:00`);
+    }
+    assert.equal(peakAt(24, 2), true, "Monday 02:00 is back in the window");
+});
+
+test("peak is read in UTC, never in the local zone", () => {
+    // 02:00 UTC on a Friday is peak whatever the machine's own offset is; the
+    // guard is that the model never touches a local getter.
+    const instant = Date.UTC(2026, 7, 21, 2, 0, 0);
+    assert.equal(Model.isPeakInstant(instant), true);
+    // 21:00 UTC Friday is 03:00 Saturday in Dhaka — still off-peak, because
+    // peak is a property of the instant in UTC and not of any row's clock.
+    assert.equal(Model.clockText(dhaka, Date.UTC(2026, 7, 21, 21, 0, 0)), "03:00");
+    assert.equal(Model.isPeakInstant(Date.UTC(2026, 7, 21, 21, 0, 0)), false);
+});
+
+test("a grid column is peak or not for every row at once", () => {
+    // 2026-08-21 (Friday) 02:00 UTC, with Dhaka home: the "now" column sits
+    // inside the first peak window.
+    const rows = Model.grid(zones, dhaka, Date.UTC(2026, 7, 21, 2, 0, 0));
+    const nowIndex = Model.GRID_BEFORE;
+    rows.forEach(row => assert.equal(row.cells[nowIndex].peak, true, row.zone.zone));
+    // And every column carries the same flag down the grid, whatever each
+    // row's own local hour reads.
+    for (let i = 0; i < Model.GRID_COLUMNS; i++) {
+        const expected = rows[0].cells[i].peak;
+        rows.forEach(row => assert.equal(row.cells[i].peak, expected, `column ${i} in ${row.zone.zone}`));
+    }
+});
+
 // --------------------------------------------------------------- home & DST
 
 test("home is the system zone when it is in the list", () => {
@@ -200,13 +252,19 @@ test("the soonest transition is what the re-read is scheduled for", () => {
 test("the tooltip lists every zone, and names a date change", () => {
     const text = Model.tooltipText(zones, dhaka, NOON_UTC);
     const lines = text.split("\n");
-    assert.equal(lines.length, 4);
+    assert.equal(lines.length, 6, "four zones, a blank, then the peak state");
     assert.ok(lines[0].startsWith("New York  08:00"));
     assert.ok(lines[2].startsWith("Dhaka  18:00"));
 
     const late = Date.UTC(2026, 7, 21, 20, 0, 0);
     assert.ok(Model.tooltipText([dhaka], newYork, late)[0] !== undefined);
     assert.ok(Model.tooltipText([dhaka], newYork, late).includes("(tomorrow)"));
+});
+
+test("the tooltip says which state the mark's colour is showing", () => {
+    // 12:00 UTC Friday is off-peak; 02:00 UTC the same day is not.
+    assert.ok(Model.tooltipText(zones, dhaka, NOON_UTC).endsWith("Off-peak"));
+    assert.ok(Model.tooltipText(zones, dhaka, Date.UTC(2026, 7, 21, 2, 0, 0)).endsWith("Peak hours"));
 });
 
 test("no zones is a sentence, not a crash", () => {

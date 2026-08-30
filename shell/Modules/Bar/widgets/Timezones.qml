@@ -6,10 +6,12 @@ import "TimezonesModel.js" as Model
 
 // Timezones — a globe on the bar, the world clock behind it.
 //
-// The mark is constant: unlike its neighbours this widget has no state to
-// carry, only information to hold. It sits at the bar's idle weight and the
-// tooltip does the talking — every configured zone, one line each, which is
-// the whole answer most of the time and costs no click.
+// The mark carries exactly one bit: peak or not. It sits at the bar's idle
+// weight through the off-peak hours and warms to the accent inside a peak
+// window, so "am I in the window" is answered by glancing at the bar. The
+// tooltip does the rest of the talking — every configured zone, one line each,
+// plus the word for the colour — which is the whole answer most of the time
+// and costs no click.
 //
 // Left click opens the grid panel, right click re-reads the offsets.
 BarButton {
@@ -46,9 +48,20 @@ BarButton {
         text: "󰖟" // md-web
         pixelSize: 13
         verticalInkCenter: true
-        color: Qt.darker(rootItem.barFg, 1.55)
-        opacity: 0.6
+        // Warms to the accent inside a peak window and drops back to the bar's
+        // idle weight outside one — the same gesture the prayer mark makes
+        // when a prayer is imminent, so the bar has one vocabulary for "now is
+        // the moment" rather than a new one per widget.
+        color: rootItem.timezones.peak ? rootItem.theme.accent : Qt.darker(rootItem.barFg, 1.55)
+        opacity: rootItem.timezones.peak ? 1.0 : 0.6
         colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: rootItem.theme.motion.standard
+                easing.type: rootItem.theme.motion.easing
+            }
+        }
     }
 
     PanelLoader {

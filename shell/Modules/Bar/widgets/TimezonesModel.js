@@ -32,6 +32,16 @@ var GRID_COLUMNS = GRID_BEFORE + GRID_AFTER + 1;
 var BUSINESS_START = 9;
 var BUSINESS_END = 18;
 
+// Peak hours: 01:00–04:00 and 06:00–10:00 UTC, Monday through Friday.
+// Inclusive start, exclusive end — the same convention as BUSINESS_START/END,
+// so 04:00 and 10:00 are already off-peak.
+//
+// These are stated in UTC and MUST stay that way. Peak is a property of the
+// instant, not of where anyone is standing, which is why a grid column — one
+// absolute moment read in every row — is either peak or it isn't for the whole
+// column at once.
+var PEAK_WINDOWS = [[1, 4], [6, 10]];
+
 function parseRows(raw) {
     var zones = [];
     var lines = String(raw || "").split("\n");
@@ -126,6 +136,22 @@ function isBusinessHour(hour) {
     return hour >= BUSINESS_START && hour < BUSINESS_END;
 }
 
+// Whether an absolute instant falls inside a peak window. Read through the UTC
+// getters only — same as the rest of this file — so the answer is identical on
+// every machine no matter what the local zone is.
+function isPeakInstant(ms) {
+    var at = new Date(Number(ms) || 0);
+    var day = at.getUTCDay(); // 0 Sunday … 6 Saturday
+    if (day < 1 || day > 5)
+        return false;
+    var hour = at.getUTCHours();
+    for (var i = 0; i < PEAK_WINDOWS.length; i++) {
+        if (hour >= PEAK_WINDOWS[i][0] && hour < PEAK_WINDOWS[i][1])
+            return true;
+    }
+    return false;
+}
+
 // The absolute instants the grid's columns stand for: the current hour,
 // truncated, with GRID_BEFORE hours behind it and GRID_AFTER ahead. Truncated
 // to the hour in the HOME zone rather than in UTC, so the column boundaries
@@ -158,6 +184,9 @@ function gridRow(zone, instants, home) {
             // strip of hour numbers alone does not show that.
             dayStart: hour === 0,
             isNow: i === GRID_BEFORE,
+            // Carried per cell so the strip can draw it, but it is the same
+            // value down the whole column — the instant decides, not the zone.
+            peak: isPeakInstant(instants[i]),
             day: dayDelta(zone, home, instants[i])
         });
     }
@@ -204,16 +233,21 @@ function earliestTransition(zones) {
     return soonest;
 }
 
-// The bar tooltip: every zone on one line each, home first.
+// The bar tooltip: every zone on one line each, home first, then what the
+// mark's colour means. Without that last line a warm globe is a colour change
+// with no explanation attached to it.
 function tooltipText(zones, home, nowMs) {
     var rows = Array.isArray(zones) ? zones : [];
     if (rows.length === 0)
         return "World clock — no zones configured";
-    return rows.map(function (zone) {
+    var lines = rows.map(function (zone) {
         var line = zone.label + "  " + clockText(zone, nowMs);
         var delta = dayDeltaText(zone, home, nowMs);
         return delta ? line + " (" + delta.toLowerCase() + ")" : line;
-    }).join("\n");
+    });
+    lines.push("");
+    lines.push(isPeakInstant(nowMs) ? "Peak hours" : "Off-peak");
+    return lines.join("\n");
 }
 
 if (typeof module !== "undefined") {
@@ -225,6 +259,7 @@ if (typeof module !== "undefined") {
         GRID_BEFORE: GRID_BEFORE,
         GRID_COLUMNS: GRID_COLUMNS,
         HOUR_MS: HOUR_MS,
+        PEAK_WINDOWS: PEAK_WINDOWS,
         clockText: clockText,
         dayDelta: dayDelta,
         dayDeltaText: dayDeltaText,
@@ -235,6 +270,7 @@ if (typeof module !== "undefined") {
         homeZone: homeZone,
         hourOf: hourOf,
         isBusinessHour: isBusinessHour,
+        isPeakInstant: isPeakInstant,
         labelFor: labelFor,
         parseRows: parseRows,
         relativeText: relativeText,

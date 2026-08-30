@@ -48,6 +48,12 @@ QtObject {
     readonly property int zoneCount: zones.length
     readonly property string tooltip: Model.tooltipText(zones, home, nowMs)
 
+    // Inside a peak window right now. Recomputed on the same minute tick as
+    // the clocks, so the mark flips within a minute of the boundary and no
+    // separate timer exists to keep it honest. One answer for the whole shell:
+    // peak is stated in UTC, not per zone.
+    readonly property bool peak: Model.isPeakInstant(nowMs)
+
     property bool refreshing: false
     property string lastError: ""
 

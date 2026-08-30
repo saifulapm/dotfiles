@@ -177,7 +177,6 @@ def main():
       {
         "id": m["id"],
         "provider": m.get("provider") or "",
-        "tier": m.get("tier") or "",
         "free": m.get("free"),
         "context": m.get("contextLength") or 0,
         "groups": m.get("groups") or [],

@@ -54,9 +54,9 @@ function searchScore(id, needle) {
 }
 
 // One picker row, merging what routing knows about a model (its verdict in
-// the chain being viewed) with what the catalogue knows (provider, tier,
-// price, which chains route to it). `entry` is the `pxy models --json` record
-// and may be missing for a model no longer in the catalogue.
+// the chain being viewed) with what the catalogue knows (provider, context
+// window, price, which chains route to it). `entry` is the `pxy models --json`
+// record and may be missing for a model no longer in the catalogue.
 function decorated(row, entry) {
     return {
         id: row.id,
@@ -68,7 +68,7 @@ function decorated(row, entry) {
         skips: row.skips || [],
         notes: row.notes || [],
         provider: (entry && entry.provider) || providerOf(row.id),
-        tier: entry ? String(entry.tier || "") : "",
+        context: entry ? Number(entry.context || 0) : 0,
         free: entry ? entry.free : null,
         groups: (entry && entry.groups) || []
     };
@@ -116,6 +116,27 @@ function pickerRows(chain, models, query, maxRows) {
     };
 }
 
+// Context window, compact: 1M / 256K / 8K. Providers quote windows in both
+// bases — 131072 and 128000 are BOTH sold as "128k" — so divide by whichever
+// one the number is an exact multiple of, decimal first. Plain /1000 would
+// print a 32768 window as "33K" and a 262144 one as "262K", numbers that
+// appear on no spec sheet. The decimal AiModel's formatTokenCount keeps (it
+// counts arbitrary usage) is noise on a round window, but stays above the
+// megatoken or 1M and 1.5M would read alike.
+function contextLabel(n) {
+    const v = Number(n || 0);
+    if (v <= 0)
+        return "";
+    const k = v % 1000 === 0 ? 1000 : (v % 1024 === 0 ? 1024 : 1000);
+    if (v >= k * k) {
+        const m = (v / (k * k)).toFixed(1);
+        return (m.slice(-2) === ".0" ? m.slice(0, -2) : m) + "M";
+    }
+    if (v >= k)
+        return Math.round(v / k) + "K";
+    return String(v);
+}
+
 // Under a row: why it would be skipped beats what it costs. A chain member
 // always carries routing notes; a plain catalog hit has none, so it falls
 // back to the facts that decide whether you want it at all.
@@ -127,8 +148,6 @@ function rowCaption(row) {
     if ((row.notes || []).length > 0)
         return row.notes.join(" · ");
     const bits = [];
-    if (row.tier)
-        bits.push(row.tier);
     if (row.free === true)
         bits.push("free");
     else if (row.free === false)
@@ -136,6 +155,25 @@ function rowCaption(row) {
     if ((row.groups || []).length > 0)
         bits.push("in " + row.groups.join(", "));
     return bits.join(" · ");
+}
+
+// The whole line under a model: what it IS (provider, context window) before
+// how it is doing (skip reason, price, chains). The two stable facts lead so
+// the column reads down consistently while verdicts change underneath.
+function rowSubtitle(row) {
+    if (!row)
+        return "";
+    const bits = [];
+    const provider = row.provider || providerOf(row.id);
+    if (provider)
+        bits.push(provider);
+    const ctx = contextLabel(row.context);
+    if (ctx)
+        bits.push(ctx);
+    const caption = rowCaption(row);
+    if (caption)
+        bits.push(caption);
+    return bits.join("  ·  ");
 }
 
 function formatSeconds(s) {

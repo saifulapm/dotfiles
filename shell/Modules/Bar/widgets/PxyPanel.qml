@@ -583,9 +583,7 @@ BarPanel {
                     text: {
                         if (routeRow.isGroup)
                             return panel.pxy.routePin === "" ? "" : "Clear the pin — every group follows its configured chain again";
-                        const provider = routeRow.row && routeRow.row.provider ? routeRow.row.provider : Model.providerOf(routeRow.row ? routeRow.row.id : "");
-                        const caption = Model.rowCaption(routeRow.row);
-                        return caption === "" ? provider : provider + "  ·  " + caption;
+                        return Model.rowSubtitle(routeRow.row);
                     }
                     elide: Text.ElideRight
                 }

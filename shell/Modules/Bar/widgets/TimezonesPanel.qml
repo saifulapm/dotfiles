@@ -12,6 +12,10 @@ import "TimezonesModel.js" as Model
 // of hour numbers with the working day shaded and midnight marked. The
 // current hour is a filled column running through every row.
 //
+// Peak hours get an accent rule along the top of the column. They are stated
+// in UTC, not in a local working day, so the rule lands on the same columns in
+// every row and reads as one band across the grid.
+//
 // Hovering a column reads every row at that moment instead of at now — the
 // same gesture worldtimebuddy uses, and the reason the grid beats three
 // separate clocks.
@@ -76,7 +80,19 @@ BarPanel {
         theme: panel.theme
         width: parent.width
         title: "World Clock"
-        meta: panel.home ? (panel.hoverColumn >= 0 ? "Reading " + Model.clockText(panel.home, panel.readInstant) + " in " + panel.home.label : panel.home.label + " · " + Model.clockText(panel.home, panel.timezones.nowMs)) : "No zones"
+        // Follows the reading cursor, peak flag included: hovering a column
+        // answers "would that moment have been peak" as well as "what time is
+        // it there". readInstant is the current hour's column when nothing is
+        // hovered, and peak windows are hour-aligned, so this is also the
+        // right answer for now.
+        meta: {
+            if (!panel.home)
+                return "No zones";
+            const state = Model.isPeakInstant(panel.readInstant) ? " · Peak" : " · Off-peak";
+            if (panel.hoverColumn >= 0)
+                return "Reading " + Model.clockText(panel.home, panel.readInstant) + " in " + panel.home.label + state;
+            return panel.home.label + " · " + Model.clockText(panel.home, panel.timezones.nowMs) + state;
+        }
         metaFamily: panel.theme.fontUi
         metaWeight: Font.Normal
         metaLetterSpacing: 0
@@ -131,7 +147,7 @@ BarPanel {
         muted: true
 
         width: parent.width
-        text: panel.hoverColumn >= 0 ? "Escape releases the reading cursor." : "Hover or arrow across a column to read every zone at that moment."
+        text: panel.hoverColumn >= 0 ? "Escape releases the reading cursor." : "Hover or arrow across a column to read every zone at that moment. The rule above a column marks peak hours — 01:00–04:00 and 06:00–10:00 UTC, Mon–Fri."
         wrapMode: Text.WordWrap
     }
 
@@ -248,6 +264,22 @@ BarPanel {
                                 duration: panel.theme.motion.standard
                                 easing.type: panel.theme.motion.easing
                             }
+                        }
+
+                        // Peak hours: a rule along the top edge. Because peak
+                        // is a property of the instant, the same columns carry
+                        // it in every row — so a run of rules reads as one
+                        // band down the whole grid rather than a per-zone
+                        // decoration, which is exactly what a UTC-defined
+                        // window is.
+                        Rectangle {
+                            visible: cell.modelData.peak
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            height: Math.max(2, panel.theme.borderWidth * 2)
+                            color: panel.theme.accent
+                            opacity: 0.85
                         }
 
                         // Midnight: where the date turns over. Without this
