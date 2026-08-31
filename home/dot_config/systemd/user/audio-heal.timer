@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodic audio heal (HomePod IP drift, HAVIT wedges)
+
+[Timer]
+# Two minutes: fast enough that a wedged headset fixes itself before anyone
+# reaches for bluetoothctl, slow enough that the healthy-path cost (one dig,
+# one wpctl, one busctl) is nothing. The HAVIT cycle needs two consecutive
+# bad ticks, so the worst-case repair is about four minutes after the wedge.
+OnStartupSec=1min
+OnUnitActiveSec=2min
+RandomizedDelaySec=15s
+
+[Install]
+WantedBy=timers.target

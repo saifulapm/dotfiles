@@ -17,7 +17,6 @@ name = "Promo"
 models = [
   "opencode-zen/muse-spark-1.2-contributor-free",
   "gmicloud/MiniMaxAI/MiniMax-M3",
-  "commandcode/poolside/laguna-s-2.1-free",
   "commandcode/minimax/minimax-m3-free",
 ]
 
@@ -53,52 +52,6 @@ models = [
 
 [launch]
 model = "general"
-# small_model = "github-free/gpt-5-mini"
-
-# ---------------------------------------------------------------------------
-# OAuth providers
-# ---------------------------------------------------------------------------
-# [providers.claude]
-# kind = "claude-oauth"
-# format = "anthropic"
-# tier = "reserve"
-# discover = false
-# headers = { user-agent = "claude-cli/2.1.220 (external, cli)" }
-# models = [
-#   # Fable/Opus/Sonnet 5 reject non-default temperature/top_p/top_k (400) —
-#   # sampling is fixed, reasoning is steered by effort. drop_params handles it.
-#   { id = "claude-fable-5", context_length = 1000000, max_output_tokens = 128000, tool_call = true, drop_params = ["temperature", "top_p", "top_k"] },
-#   { id = "claude-opus-5", context_length = 1000000, max_output_tokens = 128000, tool_call = true, drop_params = ["temperature", "top_p", "top_k"] },
-#   { id = "claude-sonnet-5", context_length = 1000000, max_output_tokens = 128000, tool_call = true, drop_params = ["temperature", "top_p", "top_k"] },
-#   { id = "claude-sonnet-4-6", context_length = 1000000, max_output_tokens = 64000, tool_call = true },
-#   { id = "claude-haiku-4-5-20251001", context_length = 200000, max_output_tokens = 64000, tool_call = true },
-# ]
-
-# [providers.github]
-# tier = "subscription"
-# kind = "github-copilot"
-# format = "openai"
-# balance_url = "https://api.github.com/copilot_internal/user"
-# credentials = { pass = "AI/github/main" }
-# models = [
-#   { id = "claude-sonnet-4.6", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "claude-haiku-4.5", context_length = 128000, max_output_tokens = 32000 },
-#   { id = "gpt-5.4", context_length = 272000, max_output_tokens = 128000 },
-#   { id = "kimi-k2.7-code", context_length = 256000, max_output_tokens = 32000 },
-# ]
-# [providers.github.limits]
-# monthly_requests = 300
-# reset = "00:00"
-# reset_tz = "UTC"
-
-# [providers.github-free]
-# tier = "subscription"
-# kind = "github-copilot"
-# format = "openai"
-# credentials = { pass = "AI/github/main" }
-# models = [
-#   { id = "gpt-5-mini", context_length = 128000, max_output_tokens = 64000 },
-# ]
 
 # ---------------------------------------------------------------------------
 # API-key providers (base URLs from OmniRoute registry, docs/06)
@@ -192,7 +145,6 @@ daily_requests = 30
 
 [providers.opencode-zen]
 base_url = "https://opencode.ai/zen/v1/chat/completions"
-parse_think_tags = true
 models = [
   { id = "muse-spark-1.2-contributor-free", context_length = 1048576 },
   { id = "deepseek-v4-flash-free", context_length = 1000000 },
@@ -212,7 +164,6 @@ api_key = { pass = "AI/opencode-go/google" }
 [providers.opencode-go]
 base_url = "https://opencode.ai/zen/go/v1/chat/completions"
 balance_url = "https://opencode.ai/zen/go/v1/usage"
-parse_think_tags = true
 models = [
   { id = "deepseek-v4-flash", context_length = 1000000 },
   { id = "deepseek-v4-flash-vision-exp", context_length = 1000000 },
@@ -243,7 +194,6 @@ api_key = { pass = "AI/opencode-go/google" }
 base_url = "https://api.commandcode.ai/provider/v1/chat/completions"
 balance_url = "https://api.commandcode.ai/alpha/billing/credits"
 api_key = { pass = "AI/commandcode/main" }
-parse_think_tags = true
 models = [
   { id = "MiniMaxAI/MiniMax-M3", context_length = 1000000 },
   { id = "Qwen/Qwen3.8-Flash", context_length = 1000000 },
@@ -345,7 +295,6 @@ models = [
 # # deepseek) are paid — deliberately not listed here. The china account is
 # # not activated (AccessDenied.Unpurchased) — parked.
 # [providers.alibaba]
-# tier = "finite"
 # base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
 # embeddings_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/embeddings"
 # api_key = { pass = "AI/alibaba/global" }
@@ -380,7 +329,6 @@ models = [
 # # money. Cheap picks: gpt-oss-120b $0.15/$0.60 per M, deepseek-v4-flash
 # # $0.14/$0.28. Fully-qualified model ids required.
 # [providers.fireworks]
-# tier = "reserve"
 # base_url = "https://api.fireworks.ai/inference/v1/chat/completions"
 # embeddings_url = "https://api.fireworks.ai/inference/v1/embeddings"
 # api_key = { pass = "AI/fireworks/main" }
@@ -398,10 +346,11 @@ models = [
 
 # # agentrouter speaks Anthropic messages natively (docs/06). Its WAF rejects
 # # unknown clients ("unauthorized client detected") — a claude-cli User-Agent
-# # is the minimal passing fingerprint (probed 2026-08-24). PAID balance
+# # is the minimal passing fingerprint (probed 2026-08-24; re-probed
+# # 2026-08-31: an honest pxy UA is still rejected, so the override stays —
+# # the last one anywhere in pxy). PAID balance
 # # (prepaid credits) — [groups.payperuse] only; premium manual-use reserve.
 # [providers.agentrouter]
-# tier = "reserve"
 # format = "anthropic"
 # base_url = "https://agentrouter.org/v1/messages"
 # # Same account/key as agentrouter-openai — one balance, fetched once here.
@@ -428,7 +377,6 @@ models = [
 # # gpt-5.6-sol is OpenAI-endpoint-only; deepseek-v4f also lives here because
 # # agentrouter's Anthropic route rejects it unless stream=true (probed).
 # [providers.agentrouter-openai]
-# tier = "reserve"
 # base_url = "https://agentrouter.org/v1/chat/completions"
 # api_key = { pass = "AI/agentrouter/main" }
 # headers = { User-Agent = "claude-cli/2.1.241 (external, cli)" }
@@ -439,19 +387,19 @@ models = [
 
 # # TabiToken — reseller in the agentrouter mold; usage object leaks `kiro_credits`,
 # # so it fronts Kiro/Amazon-Q accounts. $120 referral credits (2026-08-25). Same
-# # WAF: claude-cli User-Agent required (403 without). Speaks Anthropic natively.
+# # Speaks Anthropic natively. Honest UA verified 2026-08-31: pxy/0.1.0 gets a
+# # real 200 completion, so no User-Agent override (their WAF no longer gates,
+# # or never gated, this route).
 # # ⚠️ Injects a ~7k-token hidden system prompt billed to us on EVERY call — fine
 # # for real coding sessions, wasteful for tiny calls. Their billing endpoint
 # # returns dummy limits, so no remote balance readout. PAID balance — kept OUT
 # # of [groups.free]; premium manual-use reserve.
 # [providers.tabitoken]
-# tier = "reserve"
 # format = "anthropic"
 # base_url = "https://tabitoken.com/v1/messages"
 # balance_url = "https://tabitoken.com/v1/dashboard/billing/usage"
 # auth_header = "x-api-key"
 # api_key = { pass = "AI/tabitoken/main" }
-# headers = { User-Agent = "claude-cli/2.1.241 (external, cli)" }
 # models = [
 #   { id = "claude-opus-5", context_length = 200000, max_output_tokens = 64000 },
 #   { id = "claude-opus-5-thinking", context_length = 200000, max_output_tokens = 64000 },
@@ -459,17 +407,15 @@ models = [
 #   { id = "claude-opus-4-8-thinking", context_length = 200000, max_output_tokens = 64000 },
 # ]
 
-# # GoRouter — same operator as tabitoken (identical WAF, model list, ~7k prompt
+# # GoRouter — same operator as tabitoken (identical gateway, model list, ~7k prompt
 # # injection, `kiro_credits` leak). $70 referral credits (2026-08-25). Same
 # # caveats apply. PAID balance — [groups.payperuse] only; premium manual-use reserve.
 # [providers.gorouter]
-# tier = "reserve"
 # format = "anthropic"
 # base_url = "https://gorouter.app/v1/messages"
 # balance_url = "https://gorouter.app/v1/dashboard/billing/usage"
 # auth_header = "x-api-key"
 # api_key = { pass = "AI/gorouter/main" }
-# headers = { User-Agent = "claude-cli/2.1.241 (external, cli)" }
 # models = [
 #   { id = "claude-opus-5", context_length = 200000, max_output_tokens = 64000 },
 #   { id = "claude-opus-5-thinking", context_length = 200000, max_output_tokens = 64000 },
@@ -482,7 +428,6 @@ models = [
 # # headers; concurrency probing showed sporadic 503s, so keep rpm modest and
 # # rely on failover. total_usage on this account is $0 — free models only here.
 # [providers.tokenrouter]
-# tier = "finite"
 # base_url = "https://api.tokenrouter.com/v1/chat/completions"
 # balance_url = "https://api.tokenrouter.com/v1/dashboard/billing/usage"
 # api_key = { pass = "AI/tokenrouter/main" }
@@ -504,7 +449,6 @@ models = [
 # # models are PAID-plan only (their "free/" prefix means free-*experimental*,
 # # not free-to-you); only these 5 small models are callable — probed 2026-08-24.
 # [providers.openadapter]
-# tier = "reserve"
 # base_url = "https://api.openadapter.in/v1/chat/completions"
 # api_key = { pass = "AI/openadapter/main" }
 # models = [
@@ -619,11 +563,9 @@ models = [
 # # Tencent Cloud TokenHub intl — activated flagships, each with its own 1M free
 # # quota (until 2027-08). Pay-as-you-go OFF: requests stop when quota runs out.
 # [providers.tencent]
-# tier = "finite"
 # base_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/chat/completions"
 # embeddings_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/embeddings"
 # api_key = { pass = "AI/tencent/main" }
-# parse_think_tags = true
 # models = [
 #   "hy3",
 #   "glm-5.3",
@@ -643,7 +585,6 @@ models = [
 # # above; hy-mt2-* = INSUFFICIENT_BALANCE, hy-3d-3.1 = BILLING_PROVISION_FAILED,
 # # tripo-3d = no trial quota — 3D/translation are dead without paid billing.
 # [providers.tencent-vl]
-# tier = "finite"
 # embeddings_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/embeddings/multimodal"
 # api_key = { pass = "AI/tencent/main" }
 # discover = false
@@ -676,7 +617,6 @@ models = [
 # #    pre-2026-02-24 accounts — mercury-2 is the only model on this key.
 # #    Flip the training opt-out in Account Settings after signup.
 # [providers.inception]
-# tier = "finite"
 # base_url = "https://api.inceptionlabs.ai/v1/chat/completions"
 # api_key = { pass = "AI/inception/main" }
 # models = [{ id = "mercury-2", context_length = 128000, tool_call = true }]
@@ -706,7 +646,6 @@ models = [
 # base_url = "https://integrate.api.nvidia.com/v1/chat/completions"
 # embeddings_url = "https://integrate.api.nvidia.com/v1/embeddings"
 # api_key = { pass = "AI/nvidia/main" }
-# parse_think_tags = true
 # drop_params = ["prompt_cache_key"]
 # discover = false
 # models = [
@@ -757,61 +696,6 @@ models = [
 # #    = 250 req/day, 70K TPM, built-in web search/code-exec; REJECTS external
 # #    tools ("tool calling is not supported"), so ask it questions directly.
 # #    ~3000 tok/s. No card on the account = hard 429 stop, no billing risk.
-# # Kiro (AWS CodeWhisperer) — Phase 3 #3, ACTIVE 2026-08-25. kind = kiro
-# # (providers/kiro.rs + translate/kiro.rs): social-login refresh at
-# # prod.us-east-1.auth.desktop.kiro.dev, conversationState request bodies, and
-# # vnd.amazon.eventstream binary responses decoded back to SSE. base_url and
-# # profileArn are derived at runtime from the ARN in the credential, so the
-# # region follows the profile automatically.
-# # FREE plan: 50 credits/month, resets the 1st (verified via GetUsageLimits).
-# # Overage is DISABLED + OVERAGE_INCAPABLE on this account => cannot bill.
-# # Model ids MUST match the account's live catalog or Kiro 400s; these came
-# # from ListAvailableModels. Credit cost scales with rateMultiplier, so the
-# # cheap models go a very long way (qwen3-coder-next 0.05x, minimax-m2.1 0.15x,
-# # deepseek-3.2/minimax-m2.5 0.25x, haiku 0.4x, glm-5 0.5x, sonnet-4.5 1.3x).
-# # NOT in a group: 50 credits/month is scarcer than every free pool above.
-# [providers.kiro]
-# tier = "finite"
-# kind = "kiro"
-# format = "kiro"
-# credentials = { pass = "AI/kiro/main" }
-# models = [
-#   { id = "claude-sonnet-4.5", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "claude-haiku-4.5", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "qwen3-coder-next", context_length = 256000 },
-#   { id = "glm-5", context_length = 200000 },
-#   { id = "deepseek-3.2", context_length = 164000 },
-#   { id = "minimax-m2.5", context_length = 196000 },
-# ]
-# [providers.kiro.limits]
-# monthly_requests = 400 # ~50 credits at the cheap models' multipliers
-# reset = "00:00"
-# reset_tz = "UTC"
-
-# # Kimi coding tier — Phase 3 #2, ACTIVE 2026-08-25 (kind = kimi-coding in
-# # providers/kimi.rs). ROTATING refresh tokens: the live credential lives in
-# # state.sqlite kv (kimi_token:kimi-coding) after the first refresh; pass holds
-# # only the login-time bootstrap + device identity. If state.sqlite is lost, a
-# # fresh device-flow login is needed (pxy has no login flow yet — use kimi-cli
-# # or OmniRoute's flow and re-archive). Speaks Anthropic natively (x-api-key,
-# # ?beta=true). Free coding tier: weekly + rolling-window quotas (403s can be
-# # EITHER — see docs/06 quota note).
-# # STATUS 2026-08-25: account credits EXHAUSTED ("Credits used up" from
-# # /coding/v1/usages) — chat + /models return bare 500s while in this state
-# # (Kimi's error hygiene is poor). Auth/refresh verified working end-to-end.
-# # Keep OUT of the groups until a quota reset makes calls succeed; retest with:
-# #   curl pxy /v1/messages -d '{"model":"kimi-coding/k3",...}'
-# [providers.kimi-coding]
-# tier = "finite"
-# kind = "kimi-coding"
-# format = "anthropic"
-# credentials = { pass = "AI/kimi-coding/main" }
-# models = [
-#   { id = "k3", context_length = 1048576 },
-#   { id = "kimi-for-coding", context_length = 262144 },
-#   { id = "kimi-for-coding-highspeed", context_length = 262144 },
-# ]
-
 # # Kilo Code gateway — Phase 3 #1, ACTIVE 2026-08-25, and it needed ZERO Rust:
 # # the device-flow token archived in pass is a long-lived JWT (exp ~2031, no
 # # refresh), so runtime is a plain bearer + the mandatory X-KILOCODE-EDITORNAME

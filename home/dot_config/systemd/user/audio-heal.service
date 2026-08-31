@@ -1,0 +1,15 @@
+[Unit]
+Description=Heal the HomePod RAOP sink and the HAVIT headset
+# bin/audio-heal's header carries the whole story: HomePod DHCP drift and the
+# two HAVIT wedge shapes, each detected cheaply and repaired only when it is
+# safe (no pipewire restart under a live stream, two bad ticks before a
+# headset cycle).
+
+[Service]
+Type=oneshot
+ExecStart=%h/.dotfiles/bin/audio-heal
+# A repair job must never make the audio it repairs stutter.
+Nice=19
+IOSchedulingClass=idle
+# The subnet scan path tops out around a minute; anything longer is wedged.
+TimeoutStartSec=3min

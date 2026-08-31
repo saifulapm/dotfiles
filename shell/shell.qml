@@ -579,7 +579,11 @@ ShellRoot {
         surfaceSource: shell.moduleRoot + "/Modules/Lock/Lock.qml"
         surfaceProps: ({
                 theme: shell.theme,
-                blankEnabled: shell.idle.blankStageEnabled
+                // Unconditional, no longer mirroring the idle blank stage: a
+                // lock screen woken by a keypress or a desk bump stayed lit
+                // until unlock (user call 2026-08-31, accepting the DCP
+                // power-cycle risk the mirror existed to avoid).
+                blankEnabled: true
             })
     }
 

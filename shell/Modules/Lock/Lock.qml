@@ -19,12 +19,11 @@ Scope {
     id: lockRoot
 
     required property var theme
-    // Whether the panel may be powered off at all, mirrored from the idle
-    // service's blank stage. Without this the lock screen owns a second,
-    // unconditional blank path and disabling the stage only moves the
-    // power-off five seconds later, to just after the lock instead of just
-    // before it — which on the Mac mini's 4K60 HDMI is the transition that
-    // wedges the DCP (2026-08-30).
+    // Whether the panel may be powered off at all. Mirrored the idle
+    // service's blank stage until 2026-08-31 to spare the Mac mini's DCP the
+    // power cycles; the cost was a lock screen that any input woke and
+    // nothing ever re-blanked. Saiful took the DCP risk over the lit panel —
+    // shell.qml now passes true unconditionally.
     required property bool blankEnabled
 
     readonly property string userName: Quickshell.env("USER") || Quickshell.env("LOGNAME")
