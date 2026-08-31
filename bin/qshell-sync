@@ -14,7 +14,7 @@
 #     local merge step over what the pull brings (bin/fish-history-merge,
 #     bin/notes-merge).
 #
-#   bisync — screenshots, notes attachments, memory, parked
+#   bisync — screenshots, notes attachments, memory
 #     Edited on every machine, and a delete must propagate, so neither end can
 #     be declared the writer. The first run (and recovery after an interrupted
 #     one) needs --resync, which this script does by itself when bisync asks.
@@ -119,7 +119,7 @@ machine="$(cat "$HOME/.config/qshell/machine" 2>/dev/null || true)"
 hub_json=null
 
 # Canonical order — the panel renders the units in exactly this sequence.
-units_all=(history fish-history model-usage screenshots notes ssh memory parked)
+units_all=(history fish-history model-usage screenshots notes ssh memory)
 
 unit_label() {
   case "$1" in
@@ -130,7 +130,6 @@ unit_label() {
   notes) echo "Notes" ;;
   ssh) echo "SSH keys" ;;
   memory) echo "AI memory" ;;
-  parked) echo "Parked work" ;;
   *) echo "$1" ;;
   esac
 }
@@ -683,19 +682,6 @@ sync_memory() {
   unit_ok memory "$items item(s)${bisync_note:+ — $bisync_note}"
 }
 
-# Parked work: git bundles under ~/.local/share/workflow/parked/<project>/,
-# each with a .meta sidecar. A bundle is written once and never edited, so a
-# round is adds and retention deletes (five per project) — the same shape as
-# screenshots rather than the churn of the memory store.
-sync_parked() {
-  local parked_dir="$HOME/.local/share/workflow/parked"
-  mkdir -p "$parked_dir"
-  bisync_unit parked "$parked_dir" "$remote/parked" 5 || return 0
-  local bundles
-  bundles="$(find "$parked_dir" -name '*.bundle' -type f 2>/dev/null | wc -l)"
-  unit_ok parked "$bundles bundle(s)${bisync_note:+ — $bisync_note}"
-}
-
 # The blob unit: bin/ssh-hub-sync owns the compare, the crypto and the
 # conflict rule. It prints a one-line summary on success and exits 3 when both
 # ends moved — which is a conflict for a human, not a transport failure.
@@ -722,7 +708,6 @@ for id in "${selected[@]}"; do
   notes) sync_notes ;;
   ssh) sync_ssh ;;
   memory) sync_memory ;;
-  parked) sync_parked ;;
   esac
   write_status true "$id"
 done

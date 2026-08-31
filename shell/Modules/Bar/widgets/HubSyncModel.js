@@ -25,8 +25,6 @@ var UNIT_GLYPHS = {
     "ssh": "󰌆" // md-key
     ,
     "memory": "󰧡" // md-brain
-    ,
-    "parked": "󰏗" // md-package_variant_closed
 };
 
 // What each unit is for, in one line — the panel shows it where a unit has
@@ -38,8 +36,7 @@ var UNIT_BLURBS = {
     "screenshots": "~/Pictures/Screenshots, both ways",
     "notes": "The notes panel's store, merged by note id",
     "ssh": "~/.ssh as one encrypted blob",
-    "memory": "The mem store, both ways",
-    "parked": "Parked work bundles, both ways"
+    "memory": "The mem store, both ways"
 };
 
 // Where each unit's content sits on THIS machine, relative to $HOME — what
@@ -63,8 +60,7 @@ var UNIT_DIRS = {
     "screenshots": "Pictures/Screenshots",
     "notes": ".local/state/qshell/notes",
     "ssh": ".ssh",
-    "memory": ".local/share/mem/store",
-    "parked": ".local/share/workflow/parked"
+    "memory": ".local/share/mem/store"
 };
 
 function unitGlyph(id) {
