@@ -1,0 +1,17 @@
+[Unit]
+Description=HomePod (Office) AirPlay sink (standalone PipeWire host)
+# bin/homepod-sink hosts the RAOP module OUTSIDE the session pipewire
+# daemon, so DHCP-drift repairs and failed-session reloads restart only
+# this unit — never the audio stack, never a running stream.
+BindsTo=pipewire.service
+After=pipewire.service
+
+[Service]
+ExecStart=%h/.dotfiles/bin/homepod-sink
+# Every exit is a retry with a fresh IP resolve; the script paces its own
+# quiet paths (off-LAN 30 min, HomePod-absent ~5 min, sweep 10 min).
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=pipewire.service

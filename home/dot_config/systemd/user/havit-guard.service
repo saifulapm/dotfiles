@@ -1,0 +1,14 @@
+[Unit]
+Description=HAVIT connect-time AVRCP guard
+# bin/havit-guard: event-driven (dbus signals, no polling timer), acts only
+# in the settle window after a connect, and never while a stream is live.
+
+[Service]
+ExecStart=%h/.dotfiles/bin/havit-guard
+# always: a dead dbus-monitor ends the pipeline with status 0
+Restart=always
+RestartSec=30
+Nice=19
+
+[Install]
+WantedBy=default.target

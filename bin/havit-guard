@@ -1,0 +1,66 @@
+#!/bin/bash
+# havit-guard — fix the HAVIT LITE NC01H's connect-time AVRCP wedge without
+# ever touching audio that is playing.
+#
+# The wedge: the headset connects, A2DP comes up, but AVRCP never does —
+# MediaControl1.Connected stays false and the "(AVRCP)" uinput device never
+# appears, so the shell's media buttons are dead. One bluetoothctl
+# disconnect/connect fixes it, and the wedge is born at connect time — so
+# that is the only moment this guard acts. The old audio-heal timer polled
+# for it around the clock and cycled the connection mid-movie; a movie is
+# worth more than working headset buttons, so here a live stream always
+# wins: if anything is playing, the guard stands down and waits for the
+# next signal.
+#
+# Mechanics: follow the device's PropertiesChanged signals, and on each one
+# give AVRCP 12 s to settle (it is legitimately down for a moment right
+# after a connect) before judging it. Cycle at most once per 5 min so a
+# headset that wedges on every connect cannot be bounced in a loop.
+
+set -u
+
+HAVIT="67:6D:E6:03:06:ED"
+DEV="dev_${HAVIT//:/_}"
+COOLDOWN="${XDG_RUNTIME_DIR:-/tmp}/havit-guard.cycled"
+
+busy() {
+    pw-dump 2>/dev/null | jq -e '
+        [.[] | select(.type == "PipeWire:Interface:Node"
+                      and .info.state == "running"
+                      and ((.info.props["media.class"] // "") | startswith("Stream/")))]
+        | length > 0' >/dev/null 2>&1
+}
+
+avrcp_ok() {
+    [[ "$(busctl --system get-property org.bluez "/org/bluez/hci0/$DEV" \
+        org.bluez.MediaControl1 Connected 2>/dev/null)" == *true* ]] \
+        && grep -qF "HAVIT LITE NC01H (AVRCP)" /proc/bus/input/devices
+}
+
+check() {
+    sleep 12
+    bluetoothctl info "$HAVIT" 2>/dev/null | grep -q "Connected: yes" || return
+    avrcp_ok && return
+    if busy; then
+        echo "AVRCP down but a stream is live — standing down"
+        return
+    fi
+    if [[ -f "$COOLDOWN" ]] \
+        && (($(date +%s) - $(stat -c %Y "$COOLDOWN") < 300)); then
+        return
+    fi
+    touch "$COOLDOWN"
+    echo "AVRCP never settled after connect — cycling connection"
+    bluetoothctl disconnect "$HAVIT" >/dev/null
+    sleep 3
+    bluetoothctl connect "$HAVIT" >/dev/null
+}
+
+dbus-monitor --system \
+    "type='signal',path='/org/bluez/hci0/$DEV',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged'" \
+    2>/dev/null \
+    | while read -r line; do
+        case "$line" in
+            signal*member=PropertiesChanged*) check ;;
+        esac
+    done
