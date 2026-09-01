@@ -22,8 +22,10 @@ Scope {
     // Whether the panel may be powered off at all. Mirrored the idle
     // service's blank stage until 2026-08-31 to spare the Mac mini's DCP the
     // power cycles; the cost was a lock screen that any input woke and
-    // nothing ever re-blanked. Saiful took the DCP risk over the lit panel —
-    // shell.qml now passes true unconditionally.
+    // nothing ever re-blanked. Saiful took the DCP risk over the lit panel,
+    // and on 2026-09-01 it came due — see shell.qml's lockBlankEnabled, which
+    // now switches this off on that one machine and leaves it on everywhere
+    // else. The mirror is NOT back: this no longer tracks idle.blank.
     required property bool blankEnabled
 
     readonly property string userName: Quickshell.env("USER") || Quickshell.env("LOGNAME")

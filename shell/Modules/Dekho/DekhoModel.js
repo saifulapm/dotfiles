@@ -17,6 +17,25 @@ function posterArgs(items, field) {
     return out;
 }
 
+// One list out of two, alternating. `dekho api discover` cannot take
+// kind=all — TMDB's discover endpoint is per-kind and so is dekho's flag — so
+// the library's ALL is a movie page and a series page fetched together and
+// zipped. Alternating rather than concatenating is the whole point: a
+// concatenated list is a page of films followed by a page of series, which is
+// the two rails this design replaced with extra steps.
+function interleave(a, b) {
+    const left = a || [];
+    const right = b || [];
+    const out = [];
+    for (let i = 0; i < Math.max(left.length, right.length); i++) {
+        if (i < left.length)
+            out.push(left[i]);
+        if (i < right.length)
+            out.push(right[i]);
+    }
+    return out;
+}
+
 // ------------------------------------------------------------------ labels
 
 function ratingLabel(vote) {
@@ -88,6 +107,19 @@ function resumeLabel(entry) {
         return entry.episode_name ? code + " · " + entry.episode_name : code;
     }
     return remainingLabel(entry.position, entry.duration);
+}
+
+// The short pill in a card's top-left corner. omakade puts a completion state
+// there ("PLAYING", "COMPLETED"); the useful fact here is where you stopped —
+// the episode for a series, and for a film just that there is something to pick
+// up. A catalog row has neither and gets no pill, which is what keeps the pill
+// meaning something when it appears.
+function statusPill(entry) {
+    if (!entry)
+        return "";
+    if (entry.kind === "tv" && entry.season !== null && entry.season !== undefined)
+        return episodeCode(entry.season, entry.episode);
+    return progressOf(entry) > 0.01 ? "RESUME" : "";
 }
 
 // 0..1, clamped. Anything without a duration reads as "not started" rather
@@ -174,7 +206,14 @@ function describeEvent(ev) {
             // Showing the ratio is what makes a slow swarm legible rather
             // than just slow.
             ratio: ev.needed_bps > 0 ? Number(ev.rate_bps) / Number(ev.needed_bps) : 0,
-            peers: Number(ev.live_peers) || 0
+            peers: Number(ev.live_peers) || 0,
+            // Carried as numbers as well as inside `text`, because the playback
+            // screen now states them as their own tiles — omakade's 3-up fact
+            // grid — and slicing them back out of a display string would break
+            // the first time the wording changed. Same reason `playing` carries
+            // its title.
+            rate: Number(ev.rate_bps) || 0,
+            buffered: Number(ev.buffered) || 0
         };
     case "ready":
         return {
@@ -189,7 +228,14 @@ function describeEvent(ev) {
     case "playing":
         return {
             text: "Playing " + String(ev.title || ""),
-            kind: "playing"
+            kind: "playing",
+            // Carried separately, not sliced back out of `text`, because a run
+            // this panel ADOPTED rather than started has no label of its own —
+            // play() is where that is normally set, and a panel reopened
+            // mid-film never ran it. The trail is the only place the title
+            // survives, and prefix-stripping a display string to recover it
+            // would break the first time the wording changed.
+            title: String(ev.title || "")
         };
     case "queued":
         return {
@@ -215,6 +261,33 @@ function describeEvent(ev) {
     default:
         return null;
     }
+}
+
+// The playback screen's fact tiles — omakade's 3-up grid, over the numbers the
+// buffer events carry. Empty while there is nothing measured yet and empty once
+// the run is over, because a swarm nobody is downloading from has no rate and
+// stating its last one as a fact would be the frozen-meter bug the ended state
+// exists to prevent.
+function swarmTiles(session, ended) {
+    if (!session || ended)
+        return [];
+    const out = [];
+    if (Number(session.buffered) > 0)
+        out.push({
+            label: "BUFFERED",
+            value: formatBytes(session.buffered)
+        });
+    if (Number(session.rate) > 0)
+        out.push({
+            label: "RATE",
+            value: formatBps(session.rate)
+        });
+    if (Number(session.peers) > 0)
+        out.push({
+            label: "PEERS",
+            value: String(session.peers)
+        });
+    return out;
 }
 
 // ---------------------------------------------------------------- people
@@ -332,38 +405,46 @@ function nameList(arr, limit) {
     return capped.join(", ");
 }
 
-// The right column of the detail page: label/value pairs, in the order a
-// person asks for them. Anything TMDB left empty simply is not a row — a page
-// of "—" says nothing and costs a line each.
-function factPairs(t) {
+// The StatTile grid on a title page: {label, value} in the order a person asks
+// for them, three across. Anything TMDB left empty simply is not a tile — a
+// grid of "—" says nothing and costs a card each.
+//
+// IT LIVES HERE RATHER THAN IN THE BINDING THAT USES IT, and not only because
+// this module keeps its arithmetic out of its layout. qmlformat in this Qt
+// build ABORTS on a `function` declared inside a binding block — measured
+// 2026-09-01, SIGABRT with a core dump on a six-line reduction — and `just fmt`
+// runs `qmlformat -i`, so writing this loop where it is read would have
+// truncated the file the first time anyone formatted the tree.
+function titleFacts(t) {
     if (!t)
         return [];
     const out = [];
-    function add(label, value) {
+    const add = function (label, value) {
         if (value !== undefined && value !== null && String(value) !== "")
             out.push({
                 label: label,
-                value: String(value)
+                value: String(value).toUpperCase()
             });
-    }
-    add("Status", t.status || (t.in_production === true ? "In production" : ""));
+    };
+    add("RUNTIME", durationLabel(t.runtime));
+    const rating = ratingLabel(t.vote);
+    add("RATING", rating ? "★ " + rating : "");
+    add("STATUS", t.status || (t.in_production === true ? "In production" : ""));
     if (t.kind === "tv") {
-        add("Network", nameList(t.networks, 3));
         const seasons = Number(t.season_count) || 0;
         const eps = Number(t.episode_count) || 0;
-        if (seasons > 0)
-            add("Seasons", seasons + (eps > 0 ? "  ·  " + eps + " episodes" : ""));
-        add("First aired", dateLabel(t.first_air));
-        add("Last aired", dateLabel(t.last_air));
+        add("SEASONS", seasons > 0 ? seasons + (eps > 0 ? "  ·  " + eps + " episodes" : "") : "");
+        add("NETWORK", nameList(t.networks, 2));
+        add("FIRST AIRED", dateLabel(t.first_air));
+        add("LAST AIRED", dateLabel(t.last_air));
     } else {
-        add("Released", dateLabel(t.release_date));
-        add("Budget", moneyLabel(t.budget));
-        add("Revenue", moneyLabel(t.revenue));
+        add("RELEASED", dateLabel(t.release_date));
+        add("BUDGET", moneyLabel(t.budget));
+        add("REVENUE", moneyLabel(t.revenue));
     }
-    add("Runtime", durationLabel(t.runtime));
-    add("Studio", nameList(t.studios, 3));
-    add("Language", nameList(t.languages, 3));
-    add("Country", nameList(t.countries, 3));
+    add("STUDIO", nameList(t.studios, 2));
+    add("LANGUAGE", nameList(t.languages, 2));
+    add("COUNTRY", nameList(t.countries, 3));
     return out;
 }
 

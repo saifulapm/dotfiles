@@ -540,6 +540,31 @@ ShellRoot {
     // service's lock stage).
     readonly property bool locked: lockLoader.item !== null && lockLoader.item.locked
 
+    // Whether the lock screen may power the panel off. False on the Mac mini,
+    // whose 4K60 output goes through Apple's DP2HDMI bridge: a modeset there
+    // takes ~8 s (`set_digital_out_mode finished:7892` in dmesg) and the
+    // bridge drops HPD once mid-bring-up, so a single power-on is really two
+    // modesets and ~16 s of link negotiation. Lock.qml's blank timer is 5 s,
+    // which lands inside that window — the power-off hits an in-flight
+    // modeset, the DCP flaps connected/disconnected and parks the panel dark
+    // until something powers it back on (2026-09-01: locked 10:52:12, blanked
+    // 10:52:16, and the 11:00 wake never came up).
+    //
+    // This is the same hardware fault that keeps shell.json's `idle.blank` at
+    // 0 (Services/Idle.qml, the screensaverProcess note). Blanking the lock
+    // screen bypassed that stage and so bypassed the protection with it: the
+    // unconditional `true` here was a deliberate 2026-08-31 call to accept the
+    // DCP risk in exchange for a lock screen that does not stay lit, taken
+    // before the failure had been traced to the 5 s/8 s overlap. The other
+    // machines keep that behaviour — the MacBook's panel is internal and the
+    // NUC is not Asahi, so neither goes near this path.
+    //
+    // Sync owns machine identity (it reads ~/.config/qshell/machine at
+    // startup, milliseconds in, and the lock does not load until a lock);
+    // this is a hardware quirk of one box, not a preference, so it is not a
+    // shell.json knob — that file is shared across all three machines.
+    readonly property bool lockBlankEnabled: shell.sync.detectedMachine !== "mac-mini-m2"
+
     FileView {
         id: configFile
         path: Quickshell.shellDir + "/shell.json"
@@ -579,11 +604,8 @@ ShellRoot {
         surfaceSource: shell.moduleRoot + "/Modules/Lock/Lock.qml"
         surfaceProps: ({
                 theme: shell.theme,
-                // Unconditional, no longer mirroring the idle blank stage: a
-                // lock screen woken by a keypress or a desk bump stayed lit
-                // until unlock (user call 2026-08-31, accepting the DCP
-                // power-cycle risk the mirror existed to avoid).
-                blankEnabled: true
+                // Everywhere but the Mac mini — see lockBlankEnabled.
+                blankEnabled: shell.lockBlankEnabled
             })
     }
 
@@ -890,6 +912,37 @@ ShellRoot {
             dekhoLoader.summon("searchFor", [query]);
             return "ok";
         }
+
+        // `qs ipc call dekho stop` — end playback without opening anything.
+        //
+        // NEVER summon() for this. Playback outlives the panel by design (the
+        // unit is in another slice, doc §3), so the common case is a film
+        // running with the surface long since evicted — and waking the whole
+        // hub, sixty posters and four TMDB requests, purely to press its own
+        // Stop button would be a strange way to spend a stop.
+        //
+        // A live surface goes through the module so its screen updates and its
+        // Continue watching rail is re-fetched on the stop's exit; a dead one
+        // gets the wrapper directly, where there is no screen to keep honest.
+        function stop(): string {
+            if (dekhoLoader.item !== null) {
+                dekhoLoader.item.stopPlayback();
+                return "ok";
+            }
+            dekhoStopper.running = false;
+            dekhoStopper.running = true;
+            return "ok";
+        }
+    }
+
+    // The stop for a panel that is not instantiated. Not under --pdeathsig:
+    // `systemctl --user stop` is handed to the user manager before anything
+    // could kill this helper, so a shell that dies mid-stop still stops the
+    // film (the same reasoning the module's own stopper carries).
+    Process {
+        id: dekhoStopper
+        running: false
+        command: [Quickshell.env("HOME") + "/.dotfiles/bin/dekho-play", "--stop"]
     }
 
     // The disk speed test, reached from the menu (System > Disk Speed Test).

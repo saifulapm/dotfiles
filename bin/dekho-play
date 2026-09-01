@@ -47,6 +47,7 @@
 #   dekho-play --trailer --id 550 --kind movie
 #   dekho-play --stop
 #   dekho-play --trailer --stop
+#   dekho-play --status          # {"active":true,"mode":"play","session":"…"}
 #
 # Every other flag is passed through to `dekho play` (or `dekho trailer`)
 # untouched (--quality, --max-bitrate, --no-next, --dry-run …).
@@ -113,6 +114,35 @@ wait_gone() {
 if [[ ${1:-} == --stop ]]; then
   stop
   wait_gone
+  exit 0
+fi
+
+# --status: is this mode playing, and which file is it narrating into?
+#
+# The panel needs this because the SURFACE IS EVICTABLE. Whether a film is
+# running lives in QML properties that a 45 s close destroys along with the rest
+# of the tree (shell.qml's residency policy), so a panel reopened mid-film knew
+# nothing about it — no Stop control, no progress, no way back to the playback
+# screen. The unit is the real answer and systemd already holds it; this is the
+# one question the panel asks on every open.
+#
+# The session path is the newest per-run file for this mode, which is the one
+# the live unit is writing to: the sweep below leaves exactly one behind, and
+# `tail -n +1` replays the whole trail, so following it again reconstructs the
+# run from its first line. Empty when nothing is playing, so a stale file from
+# an earlier run can never be tailed as though it were live.
+if [[ ${1:-} == --status ]]; then
+  if systemctl --user is-active --quiet "$unit.service"; then
+    newest=""
+    for f in "$runtime/$prefix-"*.ndjson; do
+      [[ -e $f ]] || continue
+      [[ -z $newest || $f -nt $newest ]] && newest="$f"
+    done
+    [[ -n $newest ]] || newest="$session"
+    printf '{"active":true,"mode":"%s","session":"%s"}\n' "$verb" "$newest"
+  else
+    printf '{"active":false,"mode":"%s","session":""}\n' "$verb"
+  fi
   exit 0
 fi
 

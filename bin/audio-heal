@@ -114,7 +114,18 @@ heal_homepod() {
     local found
     if found=$(find_homepod); then
         log "homepod: moved $ip → $found — rewriting conf"
-        sed -i "s/raop\.ip = \"$ip\"/raop.ip = \"$found\"/" "$CONF"
+        # $CONF is a chezmoi symlink into the repo, and sed -i replaces a
+        # symlink with a regular file: editing it leaves the repo on the old
+        # IP, so the next `chezmoi apply` reverts the heal, this branch fires
+        # again and the audio stack restarts once per apply instead of once
+        # per lease change. Edit the source, then re-apply just this file.
+        # --force because apply prompts on a changed file and there is no TTY
+        # here; --exclude=scripts so a DHCP blip never re-runs the installers.
+        local src
+        src=$(chezmoi source-path "$CONF" 2>/dev/null) || src="$CONF"
+        sed -i "s/raop\.ip = \"$ip\"/raop.ip = \"$found\"/" "$src"
+        [[ "$src" == "$CONF" ]] \
+            || chezmoi apply --force --exclude=scripts "$CONF"
         clear_flag scan-backoff
         restart_pipewire
     else
