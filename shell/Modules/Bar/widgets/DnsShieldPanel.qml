@@ -115,7 +115,7 @@ BarPanel {
             anchors.left: parent.left
             anchors.right: dashboardChip.left
             anchors.rightMargin: panel.theme.space(2)
-            text: "Ads and YouTube for every device the router hands here. AdGuard answers while this machine is off."
+            text: "Ads and YouTube for every device the router hands here. The other helper answers while this machine is off."
             wrapMode: Text.WordWrap
         }
 
