@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Family DNS helper (decision 2026-09-02): helper machines serve filtered
-# DNS to their network — the MacBook to home (192.168.0.105, Archer C6
-# DHCP + AdGuard 94.140.14.14 fallback), the mini to the office
-# (192.168.68.x). Each router's DHCP hands out its helper's reserved LAN
-# address; dnsmasq (run_after_17) forwards everything that is not *.test to
-# the uBlockDNS client on 127.0.0.1:53, which filters ads and the YouTube
-# block rules over DoH for the shared profile ui7ojwdm. The qshell bar's
+# DNS to their network — the mini to the office Deco, the MacBook/NUC as a
+# roaming/backup layer at home (the home router itself runs OpenWrt with
+# native DoH since 2026-09-02, see docs/openwrt-home-2026-09-02.md).
+# dnsmasq (run_after_17) forwards everything that is not *.test to the
+# uBlockDNS client on 127.0.0.1:53, which filters ads and the YouTube
+# block rules over DoH. The account profile ID is a secret (this repo is
+# PUBLIC — the ID is the whole key to the DoH endpoint) and lives in
+# ~/.config/dns-helper/profile, one line, per machine. The qshell bar's
 # dnsshield widget watches the chain on every helper.
 #
 # A machine is a helper iff ~/.config/dns-helper/lan-ip exists (its reserved
@@ -21,6 +23,12 @@ set -uo pipefail
 warn() { echo "ublockdns: $*" >&2; }
 
 [ -f "$HOME/.config/dns-helper/lan-ip" ] || exit 0
+
+profile=$(head -1 "$HOME/.config/dns-helper/profile" 2>/dev/null | tr -cd 'a-z0-9')
+[ -n "$profile" ] || {
+  warn "helper machine but no ~/.config/dns-helper/profile — client not configured"
+  exit 0
+}
 
 UBLOCKDNS_VERSION="v0.3.0"
 UBLOCKDNS_SHA256_ARM64="fa5c07aad44677028890f10b0b4bb5f54dba9a30bc5a90469be6e9461d0b0c33"
@@ -82,7 +90,7 @@ Description=uBlockDNS DoH filtering client (127.0.0.1:53)
 After=network.target dnsmasq.service
 
 [Service]
-ExecStart=/usr/local/bin/ublockdns run -profile ui7ojwdm
+ExecStart=/usr/local/bin/ublockdns run -profile @PROFILE@
 Environment=UBLOCKDNS_NO_AUTOUPDATE=1
 Restart=on-failure
 RestartSec=3
@@ -95,6 +103,7 @@ ReadWritePaths=/etc/ublockdns /var/log
 [Install]
 WantedBy=multi-user.target
 EOF
+sed -i "s|@PROFILE@|$profile|" "$tmp/ublockdns.service"
 chmod 0644 "$tmp"/ublockdns.service
 
 # is-active in the gate, 17's lesson: a unit that enabled but failed to
