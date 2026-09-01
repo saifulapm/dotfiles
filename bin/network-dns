@@ -24,6 +24,10 @@ CLOUDFLARE_V4="1.1.1.1 1.0.0.1"
 CLOUDFLARE_V6="2606:4700:4700::1111 2606:4700:4700::1001"
 GOOGLE_V4="8.8.8.8 8.8.4.4"
 GOOGLE_V6="2001:4860:4860::8888 2001:4860:4860::8844"
+# The local dnsmasq → uBlockDNS chain (see DnsShieldModel.js): *.test stays
+# local, everything else is ad+YouTube filtered over DoH. v4 only — the
+# chain has no v6 listener. Works on any network, not just at home.
+UBLOCKDNS_V4="127.0.0.2"
 
 nm_get() {
     LC_ALL=C nmcli -e no -g "$@" 2>/dev/null
@@ -59,6 +63,8 @@ current_provider() {
 
     if [[ -z ${servers// /} ]]; then
         echo "DHCP"
+    elif [[ $servers == *"127.0.0.2"* ]]; then
+        echo "uBlockDNS"
     elif [[ $servers == *"1.1.1.1"* || $servers == *"2606:4700:4700::1111"* ]]; then
         echo "Cloudflare"
     elif [[ $servers == *"8.8.8.8"* || $servers == *"2001:4860:4860::8888"* ]]; then
@@ -143,7 +149,7 @@ reapply_active_connections() {
 }
 
 usage() {
-    echo "Usage: network-dns [DHCP|Cloudflare|Google|Custom \"<servers>\"]" >&2
+    echo "Usage: network-dns [DHCP|uBlockDNS|Cloudflare|Google|Custom \"<servers>\"]" >&2
 }
 
 if (($# == 0)); then
@@ -154,6 +160,9 @@ fi
 case "$1" in
 DHCP | dhcp)
     set_connection_dns "" ""
+    ;;
+uBlockDNS | ublockdns)
+    set_connection_dns "$UBLOCKDNS_V4" ""
     ;;
 Cloudflare | cloudflare)
     set_connection_dns "$CLOUDFLARE_V4" "$CLOUDFLARE_V6"

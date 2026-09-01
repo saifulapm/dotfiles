@@ -2,10 +2,12 @@
 # Herd-style https://<project>.test (decision 2026-08-07). Three moving parts,
 # and only the first of them is ever running:
 #
-#   1. dnsmasq answers *.test with 127.0.0.1 on 127.0.0.1:53, and a
-#      systemd-resolved drop-in routes the `test` domain there. This is the
-#      one always-on piece — ~2 MB, and DNS cannot be socket-activated on
-#      demand because resolved needs an answer before anything connects.
+#   1. dnsmasq answers *.test with 127.0.0.1 on 127.0.0.2:53 (moved off
+#      127.0.0.1 on 2026-09-02 for the uBlockDNS client — see
+#      run_after_18-ublockdns.sh), and a systemd-resolved drop-in routes the
+#      `test` domain there. This is the one always-on piece — ~2 MB, and DNS
+#      cannot be socket-activated on demand because resolved needs an answer
+#      before anything connects.
 #   2. caddy serves the sites over https with its own CA, as a USER service
 #      on 38080/38443, woken by sockets holding 80/443 (see
 #      ~/.config/systemd/user/caddy-dev*). Idle 10 min → gone.
@@ -49,36 +51,53 @@ run_root() {
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# DNS-helper parameterization (see run_after_18-ublockdns.sh): a machine
+# carrying ~/.config/dns-helper/lan-ip — its reserved LAN address(es), one
+# per line — serves the family ad+YouTube-filtered chain on them and gains
+# the client upstream. Everyone else keeps the pure *.test stub.
+helper_ips=""
+if [ -f "$HOME/.config/dns-helper/lan-ip" ]; then
+  helper_ips=$(grep -Eo '^[0-9][0-9.]*' "$HOME/.config/dns-helper/lan-ip" | paste -sd, -)
+fi
+
 cat >"$tmp/dnsmasq.conf" <<'EOF'
 # *.test → this machine, for the Herd-style dev domains (managed by chezmoi,
-# see run_after_17-test-domains.sh).
+# see run_after_17-test-domains.sh — the listen/server tail is generated
+# there, from ~/.config/dns-helper/lan-ip on DNS-helper machines).
 #
-# Port 53 on 127.0.0.1 — NOT 5353, which this config shipped with for a day
-# (fixed 2026-08-08). SELinux confines the systemd-started daemon as
-# dnsmasq_t, which may name_bind dns_port_t (53) but not 5353: the unit
-# failed EVERY boot with 'Permission denied' (AVC in the audit journal,
-# tcontext unreserved_port_t), while the 2026-08-07 verification of the 5353
-# bind had run dnsmasq from a shell — unconfined, so it proved nothing about
-# the unit. The conflict 5353 was dodging never existed: resolved's stub
-# binds 127.0.0.53:53 only, so 127.0.0.1:53 is free.
+# Port 53 — NOT 5353 (fixed 2026-08-08): SELinux confines the systemd-started
+# daemon as dnsmasq_t, which may name_bind dns_port_t (53) but not 5353.
+#
+# On 127.0.0.2 since 2026-09-02: the uBlockDNS client hardcodes 127.0.0.1:53
+# (run_after_18), and helper machines also listen on their reserved LAN
+# address(es) for the router to hand out. Explicit listen-address, never
+# interface=: interface= implicitly adds loopback too, so dnsmasq stole the
+# client's port and refused its own upstream as a loop (hit 2026-09-02).
+# bind-dynamic (not bind-interfaces): a LAN address does not exist at boot
+# or away from that network, and bind-interfaces would fail the unit;
+# bind-dynamic binds whichever appears — a roaming helper simply stops
+# serving on foreign networks.
 address=/test/127.0.0.1
-listen-address=127.0.0.1
+bind-dynamic
 port=53
-bind-interfaces
-
-# A resolver for one hardcoded answer has no business reading /etc/resolv.conf
-# or forwarding anything upstream.
 no-resolv
 no-hosts
 EOF
+if [ -n "$helper_ips" ]; then
+  printf 'listen-address=127.0.0.2,%s\n# The one upstream: the uBlockDNS client.\nserver=127.0.0.1\n' "$helper_ips" >>"$tmp/dnsmasq.conf"
+else
+  printf 'listen-address=127.0.0.2\n' >>"$tmp/dnsmasq.conf"
+fi
 
 cat >"$tmp/resolved.conf" <<'EOF'
-# Route the `test` domain to the dnsmasq stub on 127.0.0.1:53 (managed by
-# chezmoi, see run_after_17-test-domains.sh). The ~ prefix makes this a
-# ROUTING-only domain: it sends *.test lookups to dnsmasq without making it
-# a search suffix or the default resolver for anything else.
+# Route the `test` domain to the dnsmasq stub (managed by chezmoi, see
+# run_after_17-test-domains.sh). The ~ prefix makes this a ROUTING-only
+# domain: it sends *.test lookups to dnsmasq without making it a search
+# suffix or the default resolver for anything else.
+# 127.0.0.2 since 2026-09-02: dnsmasq moved off 127.0.0.1 so the uBlockDNS
+# client could take 127.0.0.1:53 (see run_after_18-ublockdns.sh).
 [Resolve]
-DNS=127.0.0.1
+DNS=127.0.0.2
 Domains=~test
 EOF
 

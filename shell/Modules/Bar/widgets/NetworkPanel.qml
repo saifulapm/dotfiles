@@ -249,7 +249,7 @@ BarPanel {
     }
 
     // ----------------------------------------------------------------- dns
-    readonly property var dnsProviders: ["DHCP", "Cloudflare", "Google", "Custom"]
+    readonly property var dnsProviders: ["DHCP", "uBlockDNS", "Cloudflare", "Google", "Custom"]
     property string dnsProvider: ""
     property string pendingDnsProvider: ""
     property bool dnsCustomOpen: false

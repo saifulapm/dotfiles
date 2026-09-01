@@ -700,6 +700,10 @@ Scope {
         return sharedService("devservices", devServicesServiceComponent, {});
     }
 
+    function dnsShieldService() {
+        return sharedService("dnsshield", dnsShieldServiceComponent, {});
+    }
+
     // No gate: the pass service watches the store directory and runs
     // bin/pass-store only at startup, on panel open and when the store
     // changes — there is no cadence to scope to visibility.
@@ -842,6 +846,11 @@ Scope {
     }
 
     Component {
+        id: dnsShieldServiceComponent
+        DnsShieldService {}
+    }
+
+    Component {
         id: sshServiceComponent
         SshService {}
     }
@@ -950,6 +959,7 @@ Scope {
             "ports": portsComponent,
             "pass": passComponent,
             "devservices": devservicesComponent,
+            "dnsshield": dnsshieldComponent,
             "dufs": dufsComponent,
             "mail": mailComponent,
             "sync": hubSyncComponent,
@@ -2412,6 +2422,14 @@ Scope {
         DevServices {
             theme: barRoot.theme
             devservices: barRoot.devServicesService()
+        }
+    }
+
+    Component {
+        id: dnsshieldComponent
+        DnsShield {
+            theme: barRoot.theme
+            dnsshield: barRoot.dnsShieldService()
         }
     }
 
