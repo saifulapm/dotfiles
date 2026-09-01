@@ -6,10 +6,11 @@
 // for when this machine is off).
 .pragma library
 
-// Which LAN addresses this machine serves is per-machine state
-// (~/.config/dns-helper/lan-ip, read by the probe) — the MacBook serves
-// home, the mini serves the office, and a roaming helper's foreign-network
-// addresses simply never bind.
+// Whether this machine serves its LAN is per-machine state
+// (~/.config/dns-helper/serve names the interface; the probe reads its
+// CURRENT address, so a changed reservation shows up truthfully) — the
+// mini serves the office, the NUC backs up home, the MacBook serves
+// nobody and just filters itself.
 const FALLBACK_IP = "94.140.14.14";
 const DASHBOARD_URL = "https://ublockdns.com/";
 
@@ -110,9 +111,9 @@ function rows(st) {
             state: st.dnsmasq === "active" ? (st.bindFwd ? "Active" : "Active, port missing") : st.dnsmasq || "unknown"
         }, {
             label: "Serving the LAN",
-            detail: st.lanBound.length > 0 ? st.lanBound.join(", ") + ":53 — what the router hands out" : st.lanIps.length > 0 ? "reserved " + st.lanIps.join(", ") + " — none present" : "no ~/.config/dns-helper/lan-ip",
-            ok: st.lanBound.length > 0,
-            state: st.lanBound.length > 0 ? "Listening" : st.lanIps.length > 0 ? "Away from its network" : "Self-filter only"
+            detail: st.lanBound.length > 0 ? st.lanBound.join(", ") + ":53 — point the router's DNS here" : st.lanIps.length > 0 ? st.lanIps.join(", ") + " has no listener" : "no ~/.config/dns-helper/serve",
+            ok: st.lanBound.length > 0 || st.lanIps.length === 0,
+            state: st.lanBound.length > 0 ? "Listening" : st.lanIps.length > 0 ? "Interface up, not bound" : "Self-filter only"
         }, {
             label: "Live block test",
             detail: "youtube.com through the client",

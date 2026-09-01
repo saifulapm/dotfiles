@@ -10,9 +10,11 @@
 # ~/.config/dns-helper/profile, one line, per machine. The qshell bar's
 # dnsshield widget watches the chain on every helper.
 #
-# A machine is a helper iff ~/.config/dns-helper/lan-ip exists (its reserved
-# LAN address(es), one per line — run_after_17 turns them into dnsmasq
-# listeners). On a helper this script bootstraps and keeps: the pinned,
+# A machine runs the filter client iff ~/.config/dns-helper/profile exists
+# (the account profile ID, one line — recoverable from the uBlockDNS
+# dashboard or `pass show uBlockDNS/profile`). Whether it also SERVES its
+# LAN is run_after_17's `serve` marker, independent of this script. On a
+# client machine this script bootstraps and keeps: the pinned,
 # checksum-verified client binary (github.com/ugzv/ublockdnsclient — we run
 # `ublockdns run` under our own unit, deliberately NOT their `ublockdns
 # install`, which chattr +i's /etc/resolv.conf and disables the resolved
@@ -22,13 +24,8 @@
 set -uo pipefail
 warn() { echo "ublockdns: $*" >&2; }
 
-[ -f "$HOME/.config/dns-helper/lan-ip" ] || exit 0
-
 profile=$(head -1 "$HOME/.config/dns-helper/profile" 2>/dev/null | tr -cd 'a-z0-9')
-[ -n "$profile" ] || {
-  warn "helper machine but no ~/.config/dns-helper/profile — client not configured"
-  exit 0
-}
+[ -n "$profile" ] || exit 0
 
 UBLOCKDNS_VERSION="v0.3.0"
 UBLOCKDNS_SHA256_ARM64="fa5c07aad44677028890f10b0b4bb5f54dba9a30bc5a90469be6e9461d0b0c33"

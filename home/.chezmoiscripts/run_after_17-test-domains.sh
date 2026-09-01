@@ -51,14 +51,20 @@ run_root() {
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-# DNS-helper parameterization (see run_after_18-ublockdns.sh): a machine
-# carrying ~/.config/dns-helper/lan-ip — its reserved LAN address(es), one
-# per line — serves the family ad+YouTube-filtered chain on them and gains
-# the client upstream. Everyone else keeps the pure *.test stub.
-helper_ips=""
-if [ -f "$HOME/.config/dns-helper/lan-ip" ]; then
-  helper_ips=$(grep -Eo '^[0-9][0-9.]*' "$HOME/.config/dns-helper/lan-ip" | paste -sd, -)
+# DNS-helper parameterization (see run_after_18-ublockdns.sh), two
+# independent one-line markers in ~/.config/dns-helper/:
+#   profile — machine runs the uBlockDNS client; dnsmasq gains the
+#             127.0.0.1 upstream (the self-filter chain).
+#   serve   — an INTERFACE name (enp86s0, wld0); dnsmasq also serves that
+#             interface's current address. By-interface, not a pinned IP:
+#             a changed DHCP reservation heals itself (2026-09-03 request).
+# Everyone else keeps the pure *.test stub.
+serve_iface=""
+if [ -f "$HOME/.config/dns-helper/serve" ]; then
+  serve_iface=$(head -1 "$HOME/.config/dns-helper/serve" | tr -cd 'a-z0-9')
 fi
+has_profile=""
+[ -s "$HOME/.config/dns-helper/profile" ] && has_profile=yes
 
 cat >"$tmp/dnsmasq.conf" <<'EOF'
 # *.test → this machine, for the Herd-style dev domains (managed by chezmoi,
@@ -69,24 +75,25 @@ cat >"$tmp/dnsmasq.conf" <<'EOF'
 # daemon as dnsmasq_t, which may name_bind dns_port_t (53) but not 5353.
 #
 # On 127.0.0.2 since 2026-09-02: the uBlockDNS client hardcodes 127.0.0.1:53
-# (run_after_18), and helper machines also listen on their reserved LAN
-# address(es) for the router to hand out. Explicit listen-address, never
-# interface=: interface= implicitly adds loopback too, so dnsmasq stole the
-# client's port and refused its own upstream as a loop (hit 2026-09-02).
-# bind-dynamic (not bind-interfaces): a LAN address does not exist at boot
-# or away from that network, and bind-interfaces would fail the unit;
-# bind-dynamic binds whichever appears — a roaming helper simply stops
-# serving on foreign networks.
+# (run_after_18). Helper machines additionally serve their LAN interface's
+# CURRENT address (interface= + except-interface=lo): bare interface=
+# implicitly adds loopback too and stole the client's port (hit
+# 2026-09-02); except-interface=lo removes exactly that while
+# listen-address keeps 127.0.0.2. bind-dynamic (not bind-interfaces): the
+# interface has no address at boot, and bind-interfaces would fail the
+# unit; bind-dynamic follows addresses as they come, go, and change.
 address=/test/127.0.0.1
 bind-dynamic
 port=53
 no-resolv
 no-hosts
+listen-address=127.0.0.2
 EOF
-if [ -n "$helper_ips" ]; then
-  printf 'listen-address=127.0.0.2,%s\n# The one upstream: the uBlockDNS client.\nserver=127.0.0.1\n' "$helper_ips" >>"$tmp/dnsmasq.conf"
-else
-  printf 'listen-address=127.0.0.2\n' >>"$tmp/dnsmasq.conf"
+if [ -n "$serve_iface" ]; then
+  printf 'interface=%s\nexcept-interface=lo\n' "$serve_iface" >>"$tmp/dnsmasq.conf"
+fi
+if [ -n "$has_profile" ]; then
+  printf '# The one upstream: the uBlockDNS client.\nserver=127.0.0.1\n' >>"$tmp/dnsmasq.conf"
 fi
 
 cat >"$tmp/resolved.conf" <<'EOF'
