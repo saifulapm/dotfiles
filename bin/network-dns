@@ -24,10 +24,20 @@ CLOUDFLARE_V4="1.1.1.1 1.0.0.1"
 CLOUDFLARE_V6="2606:4700:4700::1111 2606:4700:4700::1001"
 GOOGLE_V4="8.8.8.8 8.8.4.4"
 GOOGLE_V6="2001:4860:4860::8888 2001:4860:4860::8844"
-# The local dnsmasq → uBlockDNS chain (see DnsShieldModel.js): *.test stays
-# local, everything else is ad+YouTube filtered over DoH. v4 only — the
-# chain has no v6 listener. Works on any network, not just at home.
-UBLOCKDNS_V4="127.0.0.2"
+# The local uBlockDNS chain (see DnsShieldModel.js): ad+YouTube filtered
+# over DoH, on any network. v4 only — the chain has no v6 listener.
+#
+# 127.0.0.1 (the CLIENT), not 127.0.0.2 (dnsmasq), and that is load-bearing:
+# when the client cannot reach its hardcoded bootstrap resolvers — a wifi
+# blip is enough — it falls back to whatever the system resolver is, and if
+# that is our own chain it wedges in a loop and every lookup times out. Its
+# guard against exactly this (HasDNS127001 in the client source) recognises
+# only the literal 127.0.0.1, so pointing the link here arms it. Hit on the
+# mini 2026-09-02, when the office Deco began handing the mini its own LAN
+# address as DNS: client → dnsmasq → client, office-wide timeouts.
+# *.test is unaffected: the resolved drop-in from run_after_17 routes ~test
+# to dnsmasq's 127.0.0.2 as a routing domain (verified).
+UBLOCKDNS_V4="127.0.0.1"
 
 nm_get() {
     LC_ALL=C nmcli -e no -g "$@" 2>/dev/null
@@ -63,7 +73,8 @@ current_provider() {
 
     if [[ -z ${servers// /} ]]; then
         echo "DHCP"
-    elif [[ $servers == *"127.0.0.2"* ]]; then
+    elif [[ $servers == *"127.0.0.1"* || $servers == *"127.0.0.2"* ]]; then
+        # 127.0.0.2 is the pre-2026-09-02 form of the same chain.
         echo "uBlockDNS"
     elif [[ $servers == *"1.1.1.1"* || $servers == *"2606:4700:4700::1111"* ]]; then
         echo "Cloudflare"
