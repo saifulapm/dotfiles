@@ -60,7 +60,9 @@ apply_hold() {
 }
 
 drop_hold() {
-  run_root sed -i '/^# qt6 held by bin\/qt6-hold/d; /^excludepkgs=qt6-\*/d' "$CONF"
+  # Matches this script's note AND the hand-written one from the day the
+  # breakage was found, so lifting never leaves an orphan comment behind.
+  run_root sed -i '/^# qt6 held /d; /^excludepkgs=qt6-\*/d' "$CONF"
 }
 
 case "$mode" in
