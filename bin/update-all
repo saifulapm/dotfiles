@@ -49,7 +49,14 @@ fi
 
 # ----------------------------------------------------------------- dnf / rpm
 say "dnf packages"
+# BEFORE the upgrade, because the whole question is whether qt6 may move in
+# THIS transaction: quickshell links Qt's private API and a patch release can
+# leave it unable to start (bin/qt6-hold — it also lifts its own hold once a
+# rebuilt quickshell is available). Then verify, so a shell that broke anyway
+# is reported here instead of at the next reboot.
+qt6-hold --refresh || warn "qt6-hold could not set the qt6 hold"
 sudo dnf upgrade --refresh || warn "dnf upgrade failed"
+qt6-hold --verify || warn "quickshell is broken against the installed Qt — run: qshell-rebuild"
 
 # ----------------------------------------------- prebuilt release binaries
 # Tag-file staleness: compare the repo's latest release tag against the one

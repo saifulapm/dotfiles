@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# qt6-hold — hold Fedora's qt6 packages while an upgrade would break the
+# quickshell binary, and lift the hold by itself the moment it would not.
+#
+# Why this exists (2026-09-02): quickshell links Qt's PRIVATE API, and Fedora
+# changed it inside a patch release — qt6 6.11.1 → 6.11.2 landed in `updates`
+# and the COPR binary died at startup with "undefined symbol ...
+# Qt_6.11_PRIVATE_API". The mini took that upgrade and lost its shell; 6.11.1
+# was already gone from the repos (a downgrade lands on 6.10.2, which breaks
+# the same way), and the COPR's own rebuilds were failing. The only defence
+# for a machine that still works is not to take the update — and the only
+# real fix is a quickshell built against the Qt that is actually installed
+# (bin/qshell-rebuild).
+#
+# The decision, re-evaluated on every run:
+#   no quickshell installed         → RELEASE (nothing to protect)
+#   a quickshell upgrade is pending → RELEASE (the COPR has rebuilt; let qt6
+#                                     and quickshell move in one transaction)
+#   otherwise                       → HOLD
+#
+# So the hold lifts itself as soon as a rebuilt package appears: nobody has
+# to remember this file exists. Qt security updates ARE being skipped while
+# it is on, which is exactly why it must not outlive the breakage.
+#
+#   qt6-hold             decide and enforce (silent when already correct)
+#   qt6-hold --refresh   same, but check the COPR with fresh metadata
+#   qt6-hold --status    print state, touch nothing, need no root
+#   qt6-hold --verify    exit nonzero if the installed qs cannot start
+#   qt6-hold --undo      drop the hold and leave it off
+set -uo pipefail
+
+CONF=/etc/dnf/dnf.conf
+EXCLUDE='excludepkgs=qt6-*'
+NOTE='# qt6 held by bin/qt6-hold — quickshell links Qt private API; lifts itself when a rebuilt quickshell lands'
+
+mode=${1:-}
+
+is_held() { grep -q '^excludepkgs=qt6-\*' "$CONF" 2>/dev/null; }
+have_qs_pkg() { rpm -q quickshell >/dev/null 2>&1; }
+qs_runs() { command -v qs >/dev/null 2>&1 && qs --version >/dev/null 2>&1; }
+
+# Same root policy as the chezmoi scripts (14-chromium-policy, 17, 18):
+# cached sudo, then interactive sudo, then pkexec's on-screen dialog — so an
+# unattended run can still land it with one visible approval.
+run_root() {
+  if sudo -n true 2>/dev/null; then
+    sudo "$@"
+  elif [ -t 0 ] && sudo -v 2>/dev/null; then
+    sudo "$@"
+  elif command -v pkexec >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+    echo "qt6-hold: asking for authorization on screen…" >&2
+    timeout 180 pkexec "$@"
+  else
+    return 1
+  fi
+}
+
+apply_hold() {
+  run_root sed -i "/^\[main\]/a $NOTE\n$EXCLUDE" "$CONF"
+}
+
+drop_hold() {
+  run_root sed -i '/^# qt6 held by bin\/qt6-hold/d; /^excludepkgs=qt6-\*/d' "$CONF"
+}
+
+case "$mode" in
+--status)
+  printf 'hold:       %s\n' "$(is_held && echo on || echo off)"
+  printf 'quickshell: %s\n' "$(rpm -q quickshell 2>/dev/null || echo 'not installed')"
+  printf 'qt6-qtbase: %s\n' "$(rpm -q qt6-qtbase 2>/dev/null || echo 'not installed')"
+  printf 'qs starts:  %s\n' "$(qs_runs && echo yes || echo NO)"
+  exit 0
+  ;;
+--verify)
+  # A broken shell is worth saying out loud, but only on machines that are
+  # supposed to have one.
+  have_qs_pkg || exit 0
+  qs_runs && exit 0
+  echo "qt6-hold: quickshell cannot start against $(rpm -q qt6-qtbase) — rebuild it with: qshell-rebuild" >&2
+  exit 1
+  ;;
+--undo)
+  is_held || { echo "qt6-hold: not held"; exit 0; }
+  drop_hold && echo "qt6-hold: hold removed — qt6 may upgrade again"
+  exit $?
+  ;;
+--refresh | '') ;;
+*)
+  echo "usage: qt6-hold [--refresh|--status|--verify|--undo]" >&2
+  exit 2
+  ;;
+esac
+
+# ------------------------------------------------------------------ decide
+want=hold
+reason=""
+
+if ! have_qs_pkg; then
+  want=release
+  reason="quickshell is not installed"
+else
+  # check-upgrade: 100 = an upgrade is available, 0 = none. The exclusion
+  # only ever names qt6-*, so quickshell's own availability is unaffected by
+  # the hold and this stays a fair question to ask while held.
+  args=(-q check-upgrade quickshell)
+  [ "$mode" = "--refresh" ] && args=(-q --refresh check-upgrade quickshell)
+  if dnf "${args[@]}" >/dev/null 2>&1; then
+    reason="no rebuilt quickshell available yet"
+  else
+    want=release
+    reason="a quickshell upgrade is available — letting qt6 move with it"
+  fi
+fi
+
+# ----------------------------------------------------------------- enforce
+# Only touch /etc when the state is actually wrong: a correct machine must
+# never prompt for a password just to be told nothing changed.
+if [ "$want" = hold ]; then
+  is_held && exit 0
+  apply_hold || { echo "qt6-hold: could not hold qt6 (not authorized)" >&2; exit 1; }
+  echo "qt6-hold: holding qt6-* — $reason (see 'qt6-hold --status')"
+else
+  is_held || exit 0
+  drop_hold || { echo "qt6-hold: could not release qt6 (not authorized)" >&2; exit 1; }
+  echo "qt6-hold: released qt6-* — $reason"
+fi

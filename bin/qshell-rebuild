@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# qshell-rebuild — rebuild the quickshell package against the Qt that is
+# actually installed on this machine, and restart the shell.
+#
+# The repair half of bin/qt6-hold (read that first for the why). quickshell
+# links Qt's PRIVATE API, so a Fedora qt6 patch release can leave the COPR
+# binary unable to start: "undefined symbol ... Qt_6.11_PRIVATE_API", exit
+# 127, five restarts, unit failed. Downgrading Qt is not a way out — the
+# matching build is usually gone from the repos by then — so the fix is to
+# rebuild the same SRPM here.
+#
+# This INSTALLS PACKAGES (rpm-build plus quickshell's build deps, which pull
+# the Qt devel stack) and takes a few minutes, so it is never run by an
+# apply or by update-all: they detect the breakage and print this command.
+#
+# The result is an ordinary RPM with the same NVR, force-installed over the
+# COPR one — qshell.service runs /usr/bin/qs by absolute path, so nothing
+# under /usr/local would be picked up. A later COPR release supersedes it
+# normally.
+set -euo pipefail
+say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
+
+rpm -q quickshell >/dev/null 2>&1 || {
+  echo "qshell-rebuild: quickshell is not installed here" >&2
+  exit 1
+}
+
+say "build tooling and quickshell build deps"
+echo "   (installs rpm-build, dnf-plugins-core and the Qt devel stack)"
+sudo dnf install -y rpm-build dnf-plugins-core
+sudo dnf builddep -y quickshell
+
+say "fetching the SRPM the installed package came from"
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+cd "$work"
+dnf download --source quickshell
+srpm=$(ls quickshell-*.src.rpm | head -1)
+echo "   $srpm"
+
+say "rebuilding against $(rpm -q qt6-qtbase)"
+rpmbuild --rebuild --define "_topdir $HOME/rpmbuild" "$srpm"
+
+rpm_out=$(ls -t "$HOME"/rpmbuild/RPMS/*/quickshell-*.rpm 2>/dev/null | grep -v debug | head -1)
+[ -n "$rpm_out" ] || { echo "qshell-rebuild: no RPM produced — see the build log above" >&2; exit 1; }
+
+say "installing $(basename "$rpm_out")"
+sudo rpm -Uvh --force "$rpm_out"
+
+say "restarting the shell"
+systemctl --user reset-failed qshell.service 2>/dev/null || true
+systemctl --user restart qshell.service
+sleep 4
+if systemctl --user is-active --quiet qshell.service; then
+  echo "qshell-rebuild: shell is running — $(qs --version 2>&1 | head -1)"
+  # The hold exists to protect a WORKING quickshell; re-evaluate now that
+  # this one matches the installed Qt.
+  command -v qt6-hold >/dev/null 2>&1 && qt6-hold || true
+else
+  echo "qshell-rebuild: shell still not running — journalctl --user -u qshell.service -n 20" >&2
+  exit 1
+fi
