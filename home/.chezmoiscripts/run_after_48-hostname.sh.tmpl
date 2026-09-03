@@ -1,0 +1,92 @@
+#!/bin/bash
+# Pins a STATIC hostname, because not having one silently breaks Chromium.
+#
+# /etc/hostname shipped empty here (one newline), so the static hostname was
+# unset and NetworkManager's default hostname-mode filled the transient one
+# from DHCP instead. That makes the hostname a property of whichever network
+# answered at boot: this NUC came up as `fedora` for months, then as `nuc` once
+# the office DHCP server started handing out a name (docs/office-dns).
+#
+# What that costs: Chromium records its profile lock as `<hostname>-<pid>`
+# (SingletonLock, a symlink). On startup it breaks a lock whose PID is dead —
+# but ONLY when the recorded hostname matches the current one. When it does not
+# match, it assumes the profile lives on storage shared with another live
+# machine and refuses to touch the lock, on purpose, to avoid corrupting it.
+# The profile here is local btrfs and never shared, so that branch can only
+# ever be a false positive, and it is unrecoverable without deleting the lock
+# by hand: the browser exits 21 and cannot even draw its own error dialog
+# ("Unable to show message box"), so clicking the icon does nothing at all,
+# forever. Measured 2026-09-03 — a lock left by `fedora-2390` on 09-01 still
+# blocked every launch two reboots later.
+#
+# A static hostname fixes it at the root: it takes precedence over DHCP (NM
+# only sets the transient name when no static one exists), so the name stops
+# changing and Chromium's own stale-lock recovery starts working again.
+#
+# The name is .machine — the id .chezmoi.toml.tmpl already guarantees is unique
+# per box and stable for the life of the machine. NOT a shared name: identical
+# hostnames would collide on mDNS (avahi is active, nsswitch has mdns4_minimal)
+# and give the LAN's DNS three answers for one name. Tailnet names are
+# unaffected either way — they are pinned in the admin console (nuc, mini,
+# macbook) and do not follow the OS hostname.
+#
+# Runs on every apply with the live hostname as the change gate, not
+# run_onchange: run_onchange records "done" on exit 0, which would mark a
+# declined-authorization run complete and never retry it.
+set -euo pipefail
+
+want={{ .machine | quote }}
+
+# No id, nothing to pin — leave the system alone rather than guess a name.
+[ -n "$want" ] || exit 0
+
+command -v hostnamectl >/dev/null 2>&1 || exit 0
+
+# The static name is the one that matters; the transient follows from it.
+have="$(hostnamectl --static 2>/dev/null || true)"
+
+if [ "$have" != "$want" ]; then
+  # Root by whichever route this run can reach: passwordless sudo, then sudo
+  # with a controlling terminal, then pkexec against the shell's polkit agent
+  # for runs with no tty (background agents, keybinds, systemd units).
+  run_root() {
+    if sudo -n true 2>/dev/null; then
+      sudo "$@"
+    elif [ -t 0 ] && sudo -v 2>/dev/null; then
+      sudo "$@"
+    elif command -v pkexec >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+      echo "hostname: asking for authorization on screen…" >&2
+      timeout 180 pkexec "$@"
+    else
+      return 1
+    fi
+  }
+
+  if ! run_root /usr/bin/hostnamectl set-hostname "$want"; then
+    echo "hostname: not authorized — still DHCP-assigned (rerun 'chezmoi apply')" >&2
+    echo "hostname: Chromium stays wedged after any name change until then" >&2
+    exit 0
+  fi
+  echo "hostname: static hostname set to $want"
+fi
+
+# Sweep the lock this rename just invalidated.
+#
+# Every machine applying this for the first time renames itself away from the
+# name in its existing SingletonLock, which lands it in exactly the dead end
+# described above — the fix would otherwise break the browser on the way in.
+#
+# Deliberately narrow: only a lock recorded under a DIFFERENT hostname is
+# touched. A matching one is Chromium's own business, whether the PID is alive
+# (it is running) or dead (it clears that itself on next start). Trailing field
+# is the PID, so stripping it leaves the hostname even when that hostname
+# contains hyphens (mac-mini-m2-1234 -> mac-mini-m2).
+lock="$HOME/.config/chromium/SingletonLock"
+if [ -L "$lock" ]; then
+  recorded="$(readlink "$lock")"
+  if [ "${recorded%-*}" != "$want" ]; then
+    rm -f "$lock" "$HOME/.config/chromium/SingletonCookie" \
+      "$HOME/.config/chromium/SingletonSocket"
+    echo "hostname: cleared Chromium lock left by '${recorded%-*}' (would block startup)"
+  fi
+fi
