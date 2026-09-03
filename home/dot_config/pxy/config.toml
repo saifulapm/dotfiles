@@ -15,9 +15,11 @@ models = [
 [groups.promo]
 name = "Promo"
 models = [
-  "opencode-zen/muse-spark-1.2-contributor-free",
+  "opencode-zen/muse-spark-1.3-contributor-free",
   "gmicloud/MiniMaxAI/MiniMax-M3",
   "commandcode/minimax/minimax-m3-free",
+  "tokenharbor/mimo-v2.5",
+  "tokenharbor/deepseek-v4-flash",
 ]
 
 [groups.credit]
@@ -25,20 +27,32 @@ name = "Credit"
 models = [
   "deepseek/deepseek-v4-flash-vision-exp",
   "aihubmix/glm-5.3-flash",
+  "zenmux/z-ai/glm-5.3-flash",
+  "meta/muse-spark-1.3-contributor",
+  "zenmux/meta/muse-spark-1.3-contributor",
+  "agentrouter-openai/gpt-5.6-sol",
+  "agentrouter-openai/glm-5.3",
+  "agentrouter/claude-opus-5",
+  "tabitoken/claude-opus-5",
+  "gorouter/claude-opus-5",
 ]
 
 [groups.plans]
 name = "Plans"
 models = [
+  "opencode-go/muse-spark-1.3-contributor",
+  "commandcode/meta/muse-spark-1.3-contributor",
   "opencode-go/deepseek-v4-flash",
   "commandcode/z-ai/glm-5.3-flash",
+  "tokenharbor/glm-5.3-flash",
   "commandcode/Qwen/Qwen3.8-Flash",
+  "tokenharbor/qwen3.8-flash",
   "commandcode/gpt-5.6-luna",
+  "tokenharbor/gpt-5.6-luna",
   "opencode-go/qwen3.8-flash",
   "opencode-go/mimo-v2.5-pro",
   "opencode-go/glm-5.3-flash",
   "opencode-go/gpt-5.6-luna",
-  "opencode-go/muse-spark-1.2-contributor",
   "opencode-go/hy3",
   "opencode-go/y4-preview",
   "opencode-go/deepseek-v4-flash-vision-exp",
@@ -47,7 +61,14 @@ models = [
 [groups.quota]
 name = "Quota"
 models = [
+  "nvidia/moonshotai/kimi-k3",
   "cloudflare/@cf/zai-org/glm-5.3-flash",
+  "alibaba/qwen3.8-max",
+  "tencent/glm-5.3-flash",
+  "tokenrouter/z-ai/glm-5.3-free",
+  "openadapter/free/minimax-m3",
+  "agnes/agnes-2.5-flash",
+  "bai/glm-5.3-flash",
 ]
 
 [launch]
@@ -78,6 +99,25 @@ models = [
   { id = "deepseek-v4-flash", context_length = 1000000, max_output_tokens = 8192 },
   { id = "deepseek-v4-pro", context_length = 1000000, max_output_tokens = 8192 },
 ]
+
+[providers.meta]
+base_url = "https://api.meta.ai/v1/messages"
+format = "anthropic"
+models_url = "https://api.meta.ai/v1/models"
+api_key = { pass = "AI/facebook/main" }
+models = [
+  { id = "muse-spark-1.3-contributor", context_length = 1048576, max_output_tokens = 262144 },
+  { id = "muse-spark-1.2-contributor", context_length = 1048576, max_output_tokens = 262144 },
+  { id = "muse-spark-1.3", context_length = 1048576, max_output_tokens = 262144 },
+  { id = "muse-spark-1.2", context_length = 1048576, max_output_tokens = 262144 },
+]
+
+[providers.meta.media]
+kind = "meta"
+images_url = "https://api.meta.ai/v1/images/generations"
+image_models = ["muse-image-1.0"]
+transcription_url = "https://api.meta.ai/v1/asr/transcribe"
+transcription_models = ["muse-voice-transcribe-1.0"]
 
 [providers.openrouter]
 base_url = "https://openrouter.ai/api/v1/chat/completions"
@@ -143,10 +183,22 @@ transcription_models = ["@cf/openai/whisper-large-v3-turbo"]
 speech_models = ["@cf/deepgram/aura-2-en", "@cf/myshell-ai/melotts"]
 daily_requests = 30
 
+# opencode.ai emailed 2026-09-03: requests were arriving with NO user agent and
+# no `x-opencode-session`, and from 2026-09-06 a missing session header "may
+# error". pxy now sends `x-opencode-session` on every provider whose NAME
+# starts with "opencode" (the same rule the opencode CLI uses) — the client's
+# own id when it sends one, otherwise a conversation-stable fingerprint, never
+# a per-request UUID: opencode routes on this value, so a fresh id each turn
+# would scatter one conversation across upstreams and lose every cache hit.
+# The User-Agent below is Saiful's call: it claims the opencode CLI's identity
+# (real format `opencode/<channel>/<version>/<client>`, from their
+# installation/index.ts) rather than an honest pxy/0.1.0. Bump the version when
+# the local CLI moves — `opencode --version` was 1.18.21 when this was set.
 [providers.opencode-zen]
 base_url = "https://opencode.ai/zen/v1/chat/completions"
+headers = { User-Agent = "opencode/latest/1.18.21/cli" }
 models = [
-  { id = "muse-spark-1.2-contributor-free", context_length = 1048576 },
+  { id = "muse-spark-1.3-contributor-free", context_length = 1048576 },
   { id = "deepseek-v4-flash-free", context_length = 1000000 },
   { id = "laguna-s-2.1-free", context_length = 1048576 },
   { id = "mimo-v2.5-free", context_length = 1048576 },
@@ -161,9 +213,11 @@ api_key = { pass = "AI/opencode-go/github" }
 name = "google"
 api_key = { pass = "AI/opencode-go/google" }
 
+# See the opencode-zen note above: same UA claim, same session-header handling.
 [providers.opencode-go]
 base_url = "https://opencode.ai/zen/go/v1/chat/completions"
 balance_url = "https://opencode.ai/zen/go/v1/usage"
+headers = { User-Agent = "opencode/latest/1.18.21/cli" }
 models = [
   { id = "deepseek-v4-flash", context_length = 1000000 },
   { id = "deepseek-v4-flash-vision-exp", context_length = 1000000 },
@@ -179,7 +233,7 @@ models = [
   { id = "longcat-2.0", context_length = 1048756 },
   { id = "mimo-v2.5-pro", context_length = 1048576 },
   { id = "minimax-m3", context_length = 1000000 },
-  { id = "muse-spark-1.2-contributor", context_length = 1048576 },
+  { id = "muse-spark-1.3-contributor", context_length = 1048576 },
   { id = "qwen3.8-flash", context_length = 1000000 },
   { id = "qwen3.8-max", context_length = 1000000 },
 ]
@@ -203,7 +257,7 @@ models = [
   { id = "deepseek/deepseek-v4-pro", context_length = 1000000 },
   { id = "gpt-5.6-luna", context_length = 1050000 },
   { id = "gpt-5.6-sol", context_length = 1050000 },
-  { id = "meta/muse-spark-1.2-contributor", context_length = 1048576 },
+  { id = "meta/muse-spark-1.3-contributor", context_length = 1048576 },
   { id = "minimax/minimax-m3-free", context_length = 1000000 },
   { id = "moonshotai/Kimi-K3", context_length = 1000000 },
   { id = "nvidia/nemotron-3-ultra-550b-a55b", context_length = 1000000 },
@@ -218,116 +272,81 @@ models = [
   { id = "zai-org/GLM-5.3", context_length = 1000000 },
 ]
 
-# # TokenHarbor — OpenAI-compatible aggregator (tokenharbor.ai), ACTIVE 2026-08-26.
-# # Free tier = ONLY the three `:free` ids below ("rolling 7-day allowance, then
-# # rate-limit error; never billed" per the /models blurbs). Paid models are
-# # deliberately NOT listed — the key is live-billing-capable. Tool calling
-# # verified on all three 2026-08-26; mimo reports prompt-cache hits.
-# # No balance_url: TokenHarbor has no billing endpoint (every /v1/usage-shaped
-# # path 404s). The allowance is reported in undocumented response headers on
-# # successful free calls (`x-th-plan`, `x-th-free-used-pct`, `x-th-free-resets`),
-# # which the router snapshots into state.sqlite for `pxy status --remote` and the
-# # panel; 100% there cools the provider until the window rolls.
-# [providers.tokenharbor]
-# base_url = "https://tokenharbor.ai/v1/chat/completions"
-# api_key = { pass = "AI/tokenharbor/main" }
-# discover = false # /models also lists ~17 paid models; keep discovery off
-# models = [
-#   { id = "mimo-v2.5:free", context_length = 196608, tool_call = true },
-#   { id = "deepseek-v4-flash:free", context_length = 131072, tool_call = true },
-#   { id = "qwen3.8-27b:free", context_length = 131072, tool_call = true },
-# ]
+[providers.tokenharbor]
+base_url = "https://tokenharbor.ai/v1/chat/completions"
+api_key = { pass = "AI/tokenharbor/main" }
+models = [
+  { id = "deepseek-v4-flash", context_length = 262144 },
+  { id = "deepseek-v4-flash:free", context_length = 262144 },
+  { id = "glm-5.3-flash", context_length = 1000000 },
+  { id = "gpt-5.6-luna", context_length = 1000000 },
+  { id = "mimo-v2.5", context_length = 1048576 },
+  { id = "mimo-v2.5-pro", context_length = 1048576 },
+  { id = "qwen3.8-flash", context_length = 1000000 },
+]
 
-# # ZenMux — has 8 zero-priced models (catalog probe 2026-08-24), notably
-# # z-ai/glm-5.3-free with 1M context. NOTE: current key returns 403 on ALL
-# # generation calls (verified independently via OmniRoute too) — the account
-# # needs a new key or re-verification at zenmux.ai. Kept out of the groups until
-# # the key works.
-# # UPDATE 2026-08-24: new key + $5 balance -> all free models verified working.
-# [providers.zenmux]
-# base_url = "https://zenmux.ai/api/v1/chat/completions"
-# api_key = { pass = "AI/zenmux/main" }
-# # NOTE 2026-08-25: z-ai/glm-5.3-free was DELISTED by zenmux — their free list
-# # churns; re-check `curl zenmux.ai/api/v1/models` occasionally. (Upstream 404s
-# # now fail over inside a group instead of killing the chain, fixed 2026-08-25.)
-# models = [
-#   { id = "deepseek/deepseek-v4-flash-vision-exp-free", context_length = 1000000 },
-#   { id = "sapiens-ai/agnes-2.5-flash", context_length = 524288 },
-#   { id = "z-ai/glm-4.7-flash-free", context_length = 200000 },
-#   { id = "inclusionai/ling-3.0-tiny", context_length = 262144 },
-# ]
+[providers.zenmux]
+base_url = "https://zenmux.ai/api/v1/chat/completions"
+api_key = { pass = "AI/zenmux/main" }
+balance_url = "https://zenmux.ai/api/v1/management/payg/balance"
+balance_key = { cmd = 'set -e; k=$(pass show AI/zenmux/manage | head -1); test -n "$k"; printf "Bearer %s" "$k"' }
+models = [
+  { id = "deepseek/deepseek-v4-flash", context_length = 1000000 },
+  { id = "deepseek/deepseek-v4-flash-vision-exp", context_length = 1000000 },
+  { id = "deepseek/deepseek-v4-pro", context_length = 1000000 },
+  { id = "google/gemini-3.8-flash", context_length = 1048576 },
+  { id = "meta/muse-spark-1.3", context_length = 1048576 },
+  { id = "meta/muse-spark-1.3-contributor", context_length = 1048576 },
+  { id = "minimax/minimax-m3", context_length = 1000000 },
+  { id = "moonshotai/kimi-k3", context_length = 1048576 },
+  { id = "openai/gpt-5.6-luna", context_length = 1050000 },
+  { id = "openai/gpt-5.6-sol", context_length = 1050000 },
+  { id = "openai/gpt-5.6-terra", context_length = 1050000 },
+  { id = "qwen/qwen3.8-flash", context_length = 1000000 },
+  { id = "qwen/qwen3.8-max", context_length = 1000000 },
+  { id = "qwen/qwen3.8-max-0902", context_length = 1000000 },
+  { id = "x-ai/grok-4.6", context_length = 500000 },
+  { id = "xiaomi/mimo-v2.5-pro", context_length = 1048576 },
+  { id = "z-ai/glm-5.3", context_length = 1000000 },
+  { id = "z-ai/glm-5.3-flash", context_length = 1000000 },
+]
 
-# # Mistral La Plateforme — free "Experiment" plan (phone-verified, data-training
-# # opt-in). Official limits only visible in admin.mistral.ai console; community
-# # figures: ~1 req/sec, generous monthly tokens. 429s handled by failover.
-# [providers.mistral]
-# base_url = "https://api.mistral.ai/v1/chat/completions"
-# api_key = { pass = "AI/mistral/main" }
-# models = [
-#   "devstral-latest",
-#   "devstral-medium-latest",
-#   "mistral-large-latest",
-#   "magistral-medium-latest",
-#   "mistral-small-latest",
-# ]
-# [providers.mistral.limits]
-# rpm = 30
-# # Voxtral STT on the free Experiment tier (OpenAI multipart; returns real
-# # usage incl. prompt_audio_seconds). Verified 2026-08-25.
-# [providers.mistral.media]
-# transcription_url = "https://api.mistral.ai/v1/audio/transcriptions"
-# transcription_models = ["voxtral-mini-latest", "voxtral-small-latest"]
+[providers.mistral]
+base_url = "https://api.mistral.ai/v1/chat/completions"
+api_key = { pass = "AI/mistral/main" }
+models = [
+  { id = "codestral-latest", context_length = 256000 },
+  { id = "mistral-code-latest", context_length = 256000 },
+]
+[providers.mistral.media]
+transcription_url = "https://api.mistral.ai/v1/audio/transcriptions"
+transcription_models = ["voxtral-mini-latest", "voxtral-small-latest"]
 
-# # Codestral dedicated endpoint — SEPARATE key from api.mistral.ai, currently
-# # free (phone-verified). Aimed at IDE/FIM use; also serves chat.
-# [providers.codestral]
-# base_url = "https://codestral.mistral.ai/v1/chat/completions"
-# api_key = { pass = "AI/codestral/main" }
-# discover = false # the codestral endpoint serves no /models list (404)
-# models = ["codestral-latest", "codestral-2508"]
-# [providers.codestral.limits]
-# rpm = 30
+[providers.alibaba]
+base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
+embeddings_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/embeddings"
+api_key = { pass = "AI/alibaba/global" }
+models = [
+  { id = "ZHIPU/GLM-5.3", context_length = 1048576 },
+  { id = "deepseek-v4-flash-0731", context_length = 1000000 },
+  { id = "deepseek-v4-pro-0813", context_length = 1000000 },
+  { id = "qwen3.8-flash", context_length = 1000000 },
+  { id = "qwen3.8-max", context_length = 1000000 },
+  { id = "qwen3.8-max-0902", context_length = 991808 },
+]
+embedding_models = ["qwen3.7-text-embedding", "text-embedding-v4"]
+[providers.alibaba.limits]
+total_tokens = 5000000
+[providers.alibaba.media]
+kind = "dashscope"
+run_url = "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
+image_models = ["qwen-image-3.0", "z-image-turbo"]
+transcription_models = ["qwen3-asr-flash"]
+speech_models = ["qwen3-tts-flash"]
+daily_requests = 20
+[providers.alibaba.media.voices]
+default = "Cherry"
 
-# # Alibaba Model Studio intl (global account; free quota ACTIVE 2026-08-24).
-# # Each Qwen model has its own 1M-token free quota, valid 90 days from
-# # activation — after that calls bill pay-as-you-go UNLESS "Free Quota Only"
-# # is enabled in the console (recommended!). Non-Qwen models (kimi/glm/
-# # deepseek) are paid — deliberately not listed here. The china account is
-# # not activated (AccessDenied.Unpurchased) — parked.
-# [providers.alibaba]
-# base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
-# embeddings_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/embeddings"
-# api_key = { pass = "AI/alibaba/global" }
-# models = [
-#   "qwen3.8-max",
-#   "qwen3.8-2.4t-a95b",
-#   "qwen3.7-plus",
-#   "qwen3.7-flash",
-#   "qwen3.8-27b",
-#   "qwen3-vl-flash", # vision (image_url content verified 2026-08-25); own free quota
-# ]
-# embedding_models = ["qwen3.7-text-embedding", "text-embedding-v4"]
-# [providers.alibaba.limits]
-# total_tokens = 5000000 # 5 chat models x 1M free quota (90-day expiry!)
-# # DashScope native multimodal endpoint: images + TTS + ASR on ONE url
-# # (verified live 2026-08-25: qwen-image-3.0, z-image-turbo, qwen3-tts-flash
-# # wav-url out, qwen3-asr-flash incl. base64 data-URI in). ⚠️ free-quota
-# # status for these models is UNVERIFIED in the console — daily cap kept low
-# # until "Free Quota Only" is confirmed; check Model Studio -> each model.
-# [providers.alibaba.media]
-# kind = "dashscope"
-# run_url = "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
-# image_models = ["qwen-image-3.0", "z-image-turbo"]
-# transcription_models = ["qwen3-asr-flash"]
-# speech_models = ["qwen3-tts-flash"]
-# daily_requests = 20
-# [providers.alibaba.media.voices]
-# default = "Cherry"
-
-# # Fireworks — PAID serverless (pay per token; $1 signup credit only, 10 rpm
-# # without a payment method). Kept OUT of [groups.free] deliberately: it spends real
-# # money. Cheap picks: gpt-oss-120b $0.15/$0.60 per M, deepseek-v4-flash
-# # $0.14/$0.28. Fully-qualified model ids required.
 # [providers.fireworks]
 # base_url = "https://api.fireworks.ai/inference/v1/chat/completions"
 # embeddings_url = "https://api.fireworks.ai/inference/v1/embeddings"
@@ -344,263 +363,142 @@ models = [
 # [providers.fireworks.limits]
 # rpm = 10
 
-# # agentrouter speaks Anthropic messages natively (docs/06). Its WAF rejects
-# # unknown clients ("unauthorized client detected") — a claude-cli User-Agent
-# # is the minimal passing fingerprint (probed 2026-08-24; re-probed
-# # 2026-08-31: an honest pxy UA is still rejected, so the override stays —
-# # the last one anywhere in pxy). PAID balance
-# # (prepaid credits) — [groups.payperuse] only; premium manual-use reserve.
-# [providers.agentrouter]
-# format = "anthropic"
-# base_url = "https://agentrouter.org/v1/messages"
-# # Same account/key as agentrouter-openai — one balance, fetched once here.
-# balance_url = "https://agentrouter.org/v1/dashboard/billing/usage"
-# auth_header = "x-api-key"
-# api_key = { pass = "AI/agentrouter/main" }
-# headers = { User-Agent = "claude-cli/2.1.241 (external, cli)" }
-# models = [
-#   { id = "claude-opus-5", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "claude-opus-4-8", context_length = 200000, max_output_tokens = 64000 },
-#   # Their Anthropic route rejects deepseek-v4f unless stream=true;
-#   # force_stream streams upstream and re-assembles JSON for the client.
-#   { id = "deepseek-v4f", context_length = 128000, force_stream = true },
-# ]
-# # Their channel pool churns: a model with no live upstream answers 503
-# # 无可用渠道 ("no channel available"). Skip to the next candidate and cool
-# # the model briefly instead of surfacing the raw 503. NOTE: [[...]] arrays of
-# # tables must come AFTER every plain key of their parent table — hence
-# # `models` above, not below.
-# [[providers.agentrouter.errors]]
-# match = "无可用渠道"
-# action = "skip-cooldown"
+[providers.agentrouter]
+format = "anthropic"
+base_url = "https://agentrouter.org/v1/messages"
+balance_url = "https://agentrouter.org/v1/dashboard/billing/usage"
+auth_header = "x-api-key"
+api_key = { pass = "AI/agentrouter/main" }
+headers = { User-Agent = "claude-cli/2.1.241 (external, cli)" }
+discover = false
+models = [
+  { id = "claude-opus-5", context_length = 1000000 },
+  { id = "claude-opus-4-8", context_length = 1000000 },
+  { id = "deepseek-v4f", context_length = 128000, force_stream = true },
+]
+# Their channel pool churns: a model with no live upstream answers 503
+# 无可用渠道 ("no channel available"). Skip to the next candidate and cool
+# the model briefly instead of surfacing the raw 503. NOTE: [[...]] arrays of
+# tables must come AFTER every plain key of their parent table — hence
+# `models` above, not below.
+[[providers.agentrouter.errors]]
+match = "无可用渠道"
+action = "skip-cooldown"
 
-# # gpt-5.6-sol is OpenAI-endpoint-only; deepseek-v4f also lives here because
-# # agentrouter's Anthropic route rejects it unless stream=true (probed).
-# [providers.agentrouter-openai]
-# base_url = "https://agentrouter.org/v1/chat/completions"
-# api_key = { pass = "AI/agentrouter/main" }
-# headers = { User-Agent = "claude-cli/2.1.241 (external, cli)" }
-# models = [
-#   { id = "gpt-5.6-sol", context_length = 272000 },
-#   { id = "deepseek-v4f", context_length = 128000 },
-# ]
+[providers.agentrouter-openai]
+base_url = "https://agentrouter.org/v1/chat/completions"
+api_key = { pass = "AI/agentrouter/main" }
+headers = { User-Agent = "claude-cli/2.1.241 (external, cli)" }
+discover = false
+models = [
+  { id = "gpt-5.6-sol", context_length = 1050000 },
+  { id = "glm-5.3", context_length = 1048576 },
+]
 
-# # TabiToken — reseller in the agentrouter mold; usage object leaks `kiro_credits`,
-# # so it fronts Kiro/Amazon-Q accounts. $120 referral credits (2026-08-25). Same
-# # Speaks Anthropic natively. Honest UA verified 2026-08-31: pxy/0.1.0 gets a
-# # real 200 completion, so no User-Agent override (their WAF no longer gates,
-# # or never gated, this route).
-# # ⚠️ Injects a ~7k-token hidden system prompt billed to us on EVERY call — fine
-# # for real coding sessions, wasteful for tiny calls. Their billing endpoint
-# # returns dummy limits, so no remote balance readout. PAID balance — kept OUT
-# # of [groups.free]; premium manual-use reserve.
-# [providers.tabitoken]
-# format = "anthropic"
-# base_url = "https://tabitoken.com/v1/messages"
-# balance_url = "https://tabitoken.com/v1/dashboard/billing/usage"
-# auth_header = "x-api-key"
-# api_key = { pass = "AI/tabitoken/main" }
-# models = [
-#   { id = "claude-opus-5", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "claude-opus-5-thinking", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "claude-opus-4-8", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "claude-opus-4-8-thinking", context_length = 200000, max_output_tokens = 64000 },
-# ]
+[providers.tabitoken]
+format = "anthropic"
+base_url = "https://tabitoken.com/v1/messages"
+balance_url = "https://tabitoken.com/v1/dashboard/billing/usage"
+auth_header = "x-api-key"
+api_key = { pass = "AI/tabitoken/main" }
+discover = false
+models = [
+  { id = "claude-opus-5", context_length = 1000000 },
+  { id = "claude-opus-5-thinking", context_length = 1000000 },
+]
 
-# # GoRouter — same operator as tabitoken (identical gateway, model list, ~7k prompt
-# # injection, `kiro_credits` leak). $70 referral credits (2026-08-25). Same
-# # caveats apply. PAID balance — [groups.payperuse] only; premium manual-use reserve.
-# [providers.gorouter]
-# format = "anthropic"
-# base_url = "https://gorouter.app/v1/messages"
-# balance_url = "https://gorouter.app/v1/dashboard/billing/usage"
-# auth_header = "x-api-key"
-# api_key = { pass = "AI/gorouter/main" }
-# models = [
-#   { id = "claude-opus-5", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "claude-opus-5-thinking", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "claude-opus-4-8", context_length = 200000, max_output_tokens = 64000 },
-#   { id = "claude-opus-4-8-thinking", context_length = 200000, max_output_tokens = 64000 },
-# ]
+[providers.gorouter]
+format = "anthropic"
+base_url = "https://gorouter.app/v1/messages"
+balance_url = "https://gorouter.app/v1/dashboard/billing/usage"
+auth_header = "x-api-key"
+api_key = { pass = "AI/gorouter/main" }
+discover = false
+models = [
+  { id = "claude-opus-5", context_length = 1000000 },
+  { id = "claude-opus-5-thinking", context_length = 1000000 },
+]
 
-# # TokenRouter — aggregator with 128 models; only 2 are FREE (verified
-# # 2026-08-24). Rate limits are undocumented and it returns no ratelimit
-# # headers; concurrency probing showed sporadic 503s, so keep rpm modest and
-# # rely on failover. total_usage on this account is $0 — free models only here.
-# [providers.tokenrouter]
-# base_url = "https://api.tokenrouter.com/v1/chat/completions"
-# balance_url = "https://api.tokenrouter.com/v1/dashboard/billing/usage"
-# api_key = { pass = "AI/tokenrouter/main" }
-# models = [
-#   { id = "qwen/qwen3.8-max-free", context_length = 262144 },
-#   { id = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", context_length = 256000 },
-#   # 50M-token Kimi K3 promo grant (2026-08-25): the PLAIN id is free-routed on
-#   # this $0-balance account (the tweeted "kimi-k3-free" id doesn't exist).
-#   # Usage is metered against the grant; no way to read remaining balance —
-#   # if it starts erroring with quota messages, the grant is gone: remove it.
-#   { id = "moonshotai/kimi-k3", context_length = 262144 },
-# ]
-# [providers.tokenrouter.limits]
-# rpm = 10
+[providers.tokenrouter]
+base_url = "https://api.tokenrouter.com/v1/chat/completions"
+balance_url = "https://api.tokenrouter.com/v1/dashboard/billing/usage"
+api_key = { pass = "AI/tokenrouter/main" }
+models = [
+  { id = "z-ai/glm-5.3-free", context_length = 1000000 },
+]
+[providers.tokenrouter.limits]
+rpm = 10
 
-# # OpenAdapter — FREE plan: 50 requests/day, 200/month (per their dashboard).
-# # Quota consumed is echoed on every response as X-Quota-5h / X-Quota-Week /
-# # X-Quota-Month percentages. The whole `free/*` namespace and all top-tier
-# # models are PAID-plan only (their "free/" prefix means free-*experimental*,
-# # not free-to-you); only these 5 small models are callable — probed 2026-08-24.
-# [providers.openadapter]
-# base_url = "https://api.openadapter.in/v1/chat/completions"
-# api_key = { pass = "AI/openadapter/main" }
-# models = [
-#   { id = "0GM-1.0-35B-A3B", context_length = 128000 },
-#   { id = "Gemma-4-31B-TEE", context_length = 128000 },
-#   { id = "GPT-20-OSS", context_length = 128000 },
-#   { id = "Gemma-3-12B", context_length = 128000 },
-#   { id = "Llama-3.1-8B", context_length = 128000 },
-# ]
-# [providers.openadapter.limits]
-# daily_requests = 50
-# monthly_requests = 200
-# rpm = 5
+[providers.openadapter]
+base_url = "https://api.openadapter.in/v1/chat/completions"
+api_key = { pass = "AI/openadapter/main" }
+models = [
+  { id = "free/glm-5-2", context_length = 256000 },
+  { id = "free/inkling", context_length = 1048576 },
+  { id = "free/minimax-m3", context_length = 1048576 },
+  { id = "free/nemotron-3-ultra-550b-a55b", context_length = 1000000 },
+]
+[providers.openadapter.limits]
+daily_requests = 50
+monthly_requests = 200
+rpm = 5
 
-# # Agnes AI — balance is $0, but the *flash* tier still answers free
-# # (pro tiers return "用户额度不足" / insufficient balance). Probed 2026-08-24.
-# # Also hosts image/video models (agnes-image-*, agnes-video-*) for Phase 2.
-# [providers.agnes]
-# base_url = "https://apihub.agnes-ai.com/v1/chat/completions"
-# api_key = { pass = "AI/agnes/main" }
-# models = [
-#   { id = "agnes-2.5-flash", context_length = 128000 },
-#   { id = "agnes-2.0-flash", context_length = 128000 },
-# ]
-# [providers.agnes.limits]
-# rpm = 10
-# # Agnes media (free flash tier): OpenAI-ish images (`size` is REQUIRED — the
-# # default fills it) and async video jobs (submit /v1/videos -> poll
-# # /agnesapi?video_id=...; flow lifted from OmniRoute's agnes-video-job preset).
-# [providers.agnes.media]
-# kind = "agnes"
-# images_url = "https://apihub.agnes-ai.com/v1/images/generations"
-# image_models = ["agnes-image-2.1-flash", "agnes-image-2.0-flash"]
-# image_defaults = { size = "1K" }
-# video_url = "https://apihub.agnes-ai.com/v1/videos"
-# video_status_url = "https://apihub.agnes-ai.com/agnesapi?video_id={id}"
-# # v2.0 first: verified end-to-end (~75s, ~2/min rate limit upstream). The 2.5
-# # models 400 with "mode is required" and no documented value works
-# # (std/pro/fast/t2v all "invalid mode", 2026-08-25) — pass `mode` through
-# # from the client once Agnes documents it.
-# video_models = ["agnes-video-v2.0", "agnes-video-2.5-flash", "agnes-video-2.5"]
+[providers.agnes]
+base_url = "https://apihub.agnes-ai.com/v1/chat/completions"
+api_key = { pass = "AI/agnes/main" }
+models = [
+  { id = "agnes-2.5-flash", context_length = 512000 },
+  { id = "agnes-2.5-pro", context_length = 128000 },
+]
+[providers.agnes.limits]
+rpm = 10
+[providers.agnes.media]
+kind = "agnes"
+images_url = "https://apihub.agnes-ai.com/v1/images/generations"
+image_models = ["agnes-image-2.5-flash"]
+image_defaults = { size = "1K" }
+video_url = "https://apihub.agnes-ai.com/v1/videos"
+video_status_url = "https://apihub.agnes-ai.com/agnesapi?video_id={id}"
+video_models = ["agnes-video-2.5-flash"]
 
-# # b.ai — 44 models (Claude/GPT/Gemini/GLM/Qwen), nearly all deposit-gated
-# # ("Access restricted. Deposit required to unlock premium models", or a
-# # balance=0 quota error). Re-swept 2026-08-28: SIX models now answer at zero
-# # balance, up from just mimo-v2.5 in the 08-24 sweep. All six tool call in both
-# # streaming and non-streaming, and vision-exp reads images. Free tier, so they
-# # are good [groups.free] candidates — safely: b.ai's /v1/models reports no
-# # pricing and no :free suffix, so the generated catalogue can never claim the
-# # deposit-gated models are free.
-# # The rate limit is ACCOUNT-WIDE, not per-model — saturating deepseek-v4-flash
-# # 429s hy3/qwen/mimo in the same breath — which is exactly the shape of pxy's
-# # per-provider rpm gate. Measured ~10 req/min on a sliding window, empty-body
-# # 429s, no rate-limit headers at all (it's a One API gateway); rpm 8 leaves
-# # headroom. No balance_url: every non-inference path 403s with "HTTP node only
-# # allows access to inference API paths".
-# # There is a SECOND, account-wide ceiling underneath the rpm one: a COST
-# # budget. Past it every model 503s with activity_cost_limit_reached — "today's
-# # activity cost limit has been reached". Despite that wording it is NOT a
-# # day-long lockout: it tripped after ~5.5M prompt tokens of padded probes and
-# # cleared roughly ten minutes later, so treat it as a rolling cost window.
-# # No `daily_tokens` limit is set here: the budget is denominated in cost rather
-# # than tokens, b.ai publishes no figure, and the 503 already does the work —
-# # pxy cools the model down and walks on. Only bulk traffic gets near it;
-# # ordinary agent turns are orders of magnitude smaller.
-# # ⚠️ context_length is measured against the LIVE API (binary search on a padded
-# # prompt; the largest window that actually answered is what's recorded).
-# # b.ai's over-limit 400 names no ceiling — except on hy3, which states its own.
-# [providers.bai]
-# base_url = "https://api.b.ai/v1/chat/completions"
-# api_key = { pass = "AI/bai/main" }
-# models = [
-#   # 960,002 prompt tokens accepted, ~1.02M rejected. Fastest here (~2s), and
-#   # the only one that answers from several backends (-0731, -202605, plain).
-#   { id = "deepseek-v4-flash", context_length = 1000000, tool_call = true },
-#   # Same window. Image input verified 2026-08-28. max_tokens capped at 393216.
-#   { id = "deepseek-v4-flash-vision-exp", context_length = 1000000, tool_call = true },
-#   # 507,419 accepted, ~970k rejected. max_tokens capped at 131072. A cold call
-#   # can take 80s+ before the first byte; short probes make it look dead.
-#   { id = "glm-5.3-flash", context_length = 524288, tool_call = true },
-#   # 503,552 accepted, ~970k rejected. max_tokens capped at 131072.
-#   { id = "qwen3.8-flash", context_length = 524288, tool_call = true },
-#   # 489,408 accepted, ~940k rejected. Flakiest of the six: intermittent 503
-#   # "No available channel for model mimo-v2.5" that clears on its own, so let
-#   # failover absorb it. Reports reasoning as `reasoning` (OpenRouter shape),
-#   # not `reasoning_content`.
-#   { id = "mimo-v2.5", context_length = 524288, tool_call = true },
-#   # The one model that names its own ceiling in the 400: "Input tokens exceed
-#   # the configured limit of 192000 tokens".
-#   { id = "hy3", context_length = 192000, tool_call = true },
-# ]
-# [providers.bai.limits]
-# rpm = 8
+[providers.bai]
+base_url = "https://api.b.ai/v1/chat/completions"
+api_key = { pass = "AI/bai/main" }
+models = [
+  { id = "glm-5.3-flash", context_length = 1000000 },
+  { id = "hy3", context_length = 256000 },
+  { id = "mimo-v2.5", context_length = 1048576 },
+  { id = "qwen3.8-flash", context_length = 1000000 },
+]
+[providers.bai.limits]
+rpm = 8
 
-# # UNUSABLE (commented out) — freemodel.dev: 3 GPT-5.6 models, account returns "Insufficient
-# # balance" (probed 2026-08-24). Disabled until topped up.
-# # [providers.freemodel-dev]
-# # base_url = "https://api.freemodel.dev/v1/chat/completions"
-# # api_key = { pass = "AI/freemodel-dev/main" }
-# # models = ["gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"]
+[providers.tencent]
+base_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/chat/completions"
+embeddings_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/embeddings"
+api_key = { pass = "AI/tencent/main" }
+models = [
+  { id = "deepseek-v4-flash-0731", context_length = 1000000 },
+  { id = "deepseek-v4-pro-0813", context_length = 1000000 },
+  { id = "deepseek/deepseek-v4-flash-vision-exp", context_length = 1000000 },
+  { id = "glm-5.3", context_length = 1048576 },
+  { id = "glm-5.3-flash", context_length = 1000000 },
+  { id = "hy3", context_length = 256000 },
+  { id = "hy4-preview", context_length = 1048576 },
+  { id = "kimi-k3", context_length = 1048576 },
+  { id = "mimo-v2.5-pro", context_length = 1048576 },
+  { id = "minimax-m3", context_length = 1000000 },
+]
+embedding_models = ["kinfra-text-embedding-0.6b", "kinfra-text-embedding-4b"]
+[providers.tencent.limits]
+total_tokens = 5000000
 
-# # UNUSABLE (commented out) — v0 (Vercel): key authenticates but API is plan-gated: both
-# # /v1/chat/completions and /v1/models return 404 not_found_error, which v0
-# # uses instead of 403 for un-entitled accounts (needs a paid v0 plan).
-# # Disabled. NOTE for the router: a 404 here is terminal for the model, not
-# # retryable (OmniRoute #6827 hit a retry storm on exactly this).
-# # [providers.v0-vercel]
-# # base_url = "https://api.v0.dev/v1/chat/completions"
-# # api_key = { pass = "AI/v0-vercel/main" }
-# # models = ["v0-1.5-md", "v0-1.5-lg"]
+[providers.tencent-vl]
+embeddings_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/embeddings/multimodal"
+api_key = { pass = "AI/tencent/main" }
+discover = false
+embedding_models = ["kinfra-vl-embedding-2b", "kinfra-vl-embedding-8b"]
 
-# # Tencent Cloud TokenHub intl — activated flagships, each with its own 1M free
-# # quota (until 2027-08). Pay-as-you-go OFF: requests stop when quota runs out.
-# [providers.tencent]
-# base_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/chat/completions"
-# embeddings_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/embeddings"
-# api_key = { pass = "AI/tencent/main" }
-# models = [
-#   "hy3",
-#   "glm-5.3",
-#   "kimi-k3",
-#   "deepseek-v4-pro-0813",
-#   "minimax-m3",
-# ]
-# embedding_models = ["kinfra-text-embedding-0.6b", "kinfra-text-embedding-4b"]
-# [providers.tencent.limits]
-# total_tokens = 5000000 # provider-wide guard; Tencent enforces 1M per model
-
-# # Tencent VL (multimodal) embeddings — same key, DIFFERENT path: TokenHub
-# # serves them only on /v1/embeddings/multimodal, with content-part input
-# # ([{type:"text",...}, {type:"image_url", image_url:{url}}]); the whole input
-# # array fuses into ONE embedding (4096-dim on 8b). Verified 2026-08-25.
-# # Grant sweep same day: the 5 activated chat models are exactly the ones
-# # above; hy-mt2-* = INSUFFICIENT_BALANCE, hy-3d-3.1 = BILLING_PROVISION_FAILED,
-# # tripo-3d = no trial quota — 3D/translation are dead without paid billing.
-# [providers.tencent-vl]
-# embeddings_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/embeddings/multimodal"
-# api_key = { pass = "AI/tencent/main" }
-# discover = false
-# embedding_models = ["kinfra-vl-embedding-2b", "kinfra-vl-embedding-8b"]
-
-# # ---------------------------------------------------------------------------
-# # STAGED — free-tier providers researched 2026-08-24 (docs/08). Each needs a
-# # signup + `pass insert -m -f AI/<id>/main`, then uncomment and restart pxy.
-# # Ranked by value; see docs/08 for quotas, gotchas and ToS notes.
-# # ---------------------------------------------------------------------------
-
-# # 1) Z.AI — permanently FREE glm-4.7-flash (59.2 SWE-bench, agentic-coding tuned).
-# #    ACTIVE since 2026-08-25 (key verified: chat + tool calling on all 3 models).
-# #    General key → /api/paas/v4 endpoint (Coding-Plan keys use /api/coding/paas/v4 —
-# #    mixing them is the #1 auth error).
-# #    Free tier allows ONE concurrent request, hence rpm = 5.
 # [providers.zai]
 # base_url = "https://api.z.ai/api/paas/v4/chat/completions"
 # api_key = { pass = "AI/zai/main" }
@@ -612,10 +510,6 @@ models = [
 # [providers.zai.limits]
 # rpm = 5
 
-# # 2) Inception Labs — 100M free tokens on signup, no card. Diffusion LLM, >1000 tok/s.
-# #    ACTIVE since 2026-08-25 (tool calling verified). mercury-coder is gated to
-# #    pre-2026-02-24 accounts — mercury-2 is the only model on this key.
-# #    Flip the training opt-out in Account Settings after signup.
 # [providers.inception]
 # base_url = "https://api.inceptionlabs.ai/v1/chat/completions"
 # api_key = { pass = "AI/inception/main" }
@@ -623,206 +517,33 @@ models = [
 # [providers.inception.limits]
 # total_tokens = 100000000
 
-# # 3) NVIDIA NIM — ACTIVE 2026-08-27 (~40 RPM free dev tier, no card; ToS:
-# #    prototyping/dev only). The catalog is KEY-TIER DEPENDENT (OmniRoute #2463):
-# #    our key lists 84 models, but some listed ids still 404 "not found for
-# #    account" (kimi-k2.6) and GLM/Qwen need a "Public API Endpoints" permission
-# #    we don't have — hence discover off + curated list. Most of the ~40 "Free
-# #    Endpoint" cards on build.nvidia.com are NOT chat: video/driving/broadcast
-# #    microservices, safety classifiers, translation and TTS. Everything below is
-# #    a real chat model, tool-verified live 2026-08-27/28 except v4-flash (every
-# #    probe hit a busy worker; refresh will assert it later).
-# #    No rate-limit headers or quota API → client-side rpm. NIM quirks: 400s on
-# #    `prompt_cache_key` (Codex injects it; OmniRoute #7617 — dropped provider-
-# #    wide); 200-then-empty-stream EOFs and per-model "Worker local total request
-# #    limit" 503s → both just failover (laguna-xs is chronically oversubscribed,
-# #    seen at 497/32). ultra-550b answers slowly (>60s with reasoning), and
-# #    muse-glimmer returns a 500 rather than a 400 once its window is exceeded.
-# #    ⚠️ context_length here is measured against the LIVE API (oversized probe →
-# #    NIM states its own ceiling), NOT build.nvidia.com: that page's spec panel
-# #    disagrees for four models, e.g. it claims 262144 for nemotron-3-nano-30b
-# #    which really serves 1M. Do not "fix" these from the website.
-# [providers.nvidia]
-# base_url = "https://integrate.api.nvidia.com/v1/chat/completions"
-# embeddings_url = "https://integrate.api.nvidia.com/v1/embeddings"
-# api_key = { pass = "AI/nvidia/main" }
-# drop_params = ["prompt_cache_key"]
-# discover = false
-# models = [
-#   { id = "deepseek-ai/deepseek-v4-pro-0813", context_length = 1048576, tool_call = true },
-#   { id = "deepseek-ai/deepseek-v4-flash-0731", context_length = 1048576 },
-#   { id = "moonshotai/kimi-k3", context_length = 1048576, tool_call = true },
-#   { id = "nvidia/nemotron-3-ultra-550b-a55b", context_length = 1048576, tool_call = true },
-#   { id = "nvidia/nemotron-3-super-120b-a12b", context_length = 1000000, tool_call = true },
-#   { id = "nvidia/nemotron-3.5-lightning-30b-a3b", context_length = 1000000, tool_call = true },
-#   { id = "nvidia/nemotron-3-nano-30b-a3b", context_length = 1000000, tool_call = true },
-#   # omni-modal: image/video/speech in, text out
-#   { id = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", context_length = 1000000, tool_call = true },
-#   { id = "minimaxai/minimax-m3", context_length = 262144, tool_call = true },
-#   { id = "mistralai/mistral-nemotron", context_length = 262144, tool_call = true },
-#   { id = "stepfun-ai/step-3.7-flash", context_length = 262144, tool_call = true },
-#   { id = "poolside/laguna-xs-2.1", context_length = 262144, tool_call = true },
-#   # diffusion LLM (fast, parallel decode); answers real prompts fine but
-#   # returns EMPTY content when the reply would be a token or two ("say OK")
-#   { id = "google/diffusiongemma-26b-a4b-it", context_length = 250000, tool_call = true },
-#   # gpt-oss DOES tool-call here (the old staged note claiming otherwise was
-#   # wrong). gpt-oss-20b works too — omitted as a strictly weaker twin of 120b.
-#   { id = "openai/gpt-oss-120b", context_length = 131072, tool_call = true },
-#   { id = "meta/muse-glimmer-30b", context_length = 131072, tool_call = true },
-# ]
-# # nemotron-3-embed-1b (2048-dim) is the ONLY embedding model here that speaks
-# # plain OpenAI shape. nv-embedqa-*, arctic-embed-l and the nemoretriever VL
-# # models need NVIDIA's proprietary `input_type` and answer 200 with an EMPTY
-# # vector without it — a silent corruption, so they stay unlisted.
-# # Call it as "nvidia/nvidia/nemotron-3-embed-1b": pxy strips the first segment
-# # as the provider, so the single-prefix form loses the vendor half of the id
-# # and NVIDIA answers with a body pxy renders as {}.
-# embedding_models = ["nvidia/nemotron-3-embed-1b"]
-# [providers.nvidia.limits]
-# rpm = 40
+[providers.nvidia]
+base_url = "https://integrate.api.nvidia.com/v1/chat/completions"
+embeddings_url = "https://integrate.api.nvidia.com/v1/embeddings"
+api_key = { pass = "AI/nvidia/main" }
+drop_params = ["prompt_cache_key"]
+models = [
+  { id = "deepseek-ai/deepseek-v4-flash-0731", context_length = 1000000 },
+  { id = "deepseek-ai/deepseek-v4-pro-0813", context_length = 1000000 },
+  { id = "minimaxai/minimax-m3", context_length = 1000000 },
+  { id = "mistralai/mistral-large", context_length = 262144 },
+  { id = "moonshotai/kimi-k3", context_length = 1048576 },
+  { id = "nvidia/nemotron-3-ultra-550b-a55b", context_length = 1000000 },
+  { id = "nvidia/nemotron-3.5-lightning-30b-a3b", context_length = 1000000 },
+]
+embedding_models = ["nvidia/nemotron-3-embed-1b"]
+[providers.nvidia.limits]
+rpm = 40
 
-# # 4) Vercel AI Gateway — REJECTED 2026-08-25: the $5/month grant needs the Vercel
-# #    Pro plan ($20/mo); Hobby accounts 403 on every call, even -free models.
-# #    Key kept in pass (AI/vercel-gateway/main) in case the account ever goes Pro.
-# # [providers.vercel-gateway]
-# # base_url = "https://ai-gateway.vercel.sh/v1/chat/completions"
-# # api_key = { pass = "AI/vercel-gateway/main" }
-# # models = ["anthropic/claude-sonnet-4.6", "openai/gpt-5.4", "google/gemini-3-flash"]
+[providers.google]
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+api_key = { pass = "AI/google/main" }
+models = [
+  { id = "models/gemini-3.8-flash", context_length = 1048576 },
+]
+[providers.google.limits]
+rpm = 8
 
-# # 5) Groq — ACTIVE 2026-08-25 as a SHORT-CALL sidecar, NEVER in a group.
-# #    Verified from live headers: gpt-oss/qwen = 1000 req/day but 8K TPM —
-# #    context_length below is set to 8192 ON PURPOSE so pxy rejects bigger
-# #    requests locally instead of upstream request_too_large. compound(-mini)
-# #    = 250 req/day, 70K TPM, built-in web search/code-exec; REJECTS external
-# #    tools ("tool calling is not supported"), so ask it questions directly.
-# #    ~3000 tok/s. No card on the account = hard 429 stop, no billing risk.
-# # Kilo Code gateway — Phase 3 #1, ACTIVE 2026-08-25, and it needed ZERO Rust:
-# # the device-flow token archived in pass is a long-lived JWT (exp ~2031, no
-# # refresh), so runtime is a plain bearer + the mandatory X-KILOCODE-EDITORNAME
-# # header. The `cmd` secret extracts the token from the archived OAuth JSON.
-# # Free tier: 17 `:free` models (tool calling verified on 4); paid models
-# # refuse cleanly ("Add credits to continue") — zero billing risk. The
-# # `kilo-auto/free` router id errors — use concrete model ids. Rate limits
-# # undocumented; rpm kept modest, 429s handled by cooldown/failover.
-# [providers.kilocode]
-# base_url = "https://api.kilo.ai/api/openrouter/chat/completions"
-# api_key = { cmd = "pass show 'AI/kilocode/saiful.apm@gmail.com' | jq -r .access_token" }
-# headers = { X-KILOCODE-EDITORNAME = "pxy" }
-# models = [
-#   { id = "tencent/hy3:free", context_length = 262144 },
-#   { id = "minimax/minimax-m3:free", context_length = 1048576 },
-#   { id = "nvidia/nemotron-3-ultra-550b-a55b:free", context_length = 1000000 },
-#   { id = "meituan/longcat-2.0-free", context_length = 1048576 },
-#   { id = "poolside/laguna-s-2.1:free", context_length = 262144 },
-#   { id = "stepfun/step-3.7-flash:free", context_length = 262144 },
-#   { id = "thinkingmachines/inkling:free", context_length = 1048576 },
-# ]
-# [providers.kilocode.limits]
-# rpm = 15
-
-# # Google AI Studio (Gemini API) — free tier, ACTIVE 2026-08-25. docs/08 said
-# # this needs a Gemini translator: WRONG (3rd correction) — Google's OpenAI
-# # compatibility layer (/v1beta/openai/) does chat + tool calling fine.
-# # Free tier = no billing on the project -> hard 429 stop past quota, no
-# # billing risk. Google doesn't publish free per-model limits; rpm kept low,
-# # upstream 429s handled by cooldown/failover. ⚠️ free tier TRAINS on prompts.
-# # Key line 1 of pass entry, project number line 2 (project 416746239844).
-# [providers.google]
-# base_url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-# api_key = { pass = "AI/google/main" }
-# models = [
-#   { id = "gemini-3-flash-preview", context_length = 1048576, tool_call = true },
-#   { id = "gemini-3.1-flash-lite", context_length = 1048576 },
-#   { id = "gemini-2.5-flash", context_length = 1048576 },
-# ]
-# [providers.google.limits]
-# rpm = 8
-
-# [providers.groq]
-# base_url = "https://api.groq.com/openai/v1/chat/completions"
-# api_key = { pass = "AI/groq/main" }
-# models = [
-#   { id = "openai/gpt-oss-120b", context_length = 8192 },
-#   { id = "openai/gpt-oss-20b", context_length = 8192 },
-#   { id = "qwen/qwen3.6-27b", context_length = 8192 },
-#   { id = "groq/compound", context_length = 65536 },
-#   { id = "groq/compound-mini", context_length = 65536 },
-# ]
-# [providers.groq.limits]
-# rpm = 25
-# daily_requests = 1000
-# # Groq whisper: the best free STT we hold (generous daily quota, very fast).
-# # Plain OpenAI multipart. NB groq infers the format from the FILENAME — a
-# # file part without a real extension is rejected.
-# [providers.groq.media]
-# transcription_url = "https://api.groq.com/openai/v1/audio/transcriptions"
-# transcription_models = ["whisper-large-v3-turbo", "whisper-large-v3"]
-
-# # 6) Ant Ling — 500K tokens/day recurring (resets 02:00 UTC+8). Signup may need a
-# #    Chinese phone/ID — unverified.
-# # [providers.ant-ling]
-# # base_url = "https://api.ant-ling.com/v1/chat/completions"
-# # api_key = { pass = "AI/ant-ling/main" }
-# # models = ["Ling-3.0-flash", "Ring-2.6-1T"]
-# # [providers.ant-ling.limits]
-# # daily_tokens = 500000
-# # reset = "02:00"
-# # reset_tz = "Asia/Shanghai"
-
-# # 7) Scaleway — DISABLED 2026-08-25, docs/08 was WRONG: the account has ZERO
-# #    billing discounts (verified via billing API) — there is NO 1M free-token
-# #    tier, and a card IS on file, so every call bills real money. Key verified
-# #    working (secret key = Bearer, access key id line 2 of pass entry; 4 chat
-# #    models + whisper + embeddings all fine) — kept in pass, re-enable only
-# #    deliberately as a PAID provider, never in a group.
-# # [providers.scaleway]
-# # base_url = "https://api.scaleway.ai/v1/chat/completions"
-# # api_key = { pass = "AI/scaleway/main" }
-# # models = [
-# #   { id = "qwen3.5-397b-a17b", context_length = 131072 },
-# #   { id = "glm-5.2", context_length = 131072 },
-# #   { id = "deepseek-v4-flash-0731", context_length = 131072 },
-# #   { id = "gpt-oss-120b", context_length = 128000 },
-# # ]
-# # [providers.scaleway.limits]
-# # rpm = 30
-# # total_tokens = 1000000
-
-# # 8) Cerebras — ~3000 tok/s but free tier is capped at 8K CONTEXT and 5 RPM.
-# #    Use for commit messages / classification only. NEVER put in a group.
-# # [providers.cerebras]
-# # base_url = "https://api.cerebras.ai/v1/chat/completions"
-# # api_key = { pass = "AI/cerebras/main" }
-# # models = [
-# #   { id = "gpt-oss-120b", context_length = 8192 },
-# #   { id = "gemma-4-31b", context_length = 8192 },
-# # ]
-# # [providers.cerebras.limits]
-# # rpm = 5
-
-# # 9) Morph — fast-apply edit merging (not a chat model): a weak model sketches the
-# #    diff, morph applies it at ~10,500 tok/s. 250K credits / ~200 req per month.
-# # [providers.morph]
-# # base_url = "https://api.morphllm.com/v1/chat/completions"
-# # api_key = { pass = "AI/morph/main" }
-# # models = [{ id = "auto", context_length = 262144 }]
-
-# # Google AI Studio (Gemini): DONE — served by [providers.google] above via
-# # Google's OpenAI compat layer (/v1beta/openai/); no Gemini translator needed.
-# # (This note previously claimed one was required — that was wrong.)
-
-# # ---------------------------------------------------------------------------
-# # Phase 2 (2026-08-25): non-chat capabilities.
-# # Endpoints: /v1/images/generations, /v1/audio/transcriptions,
-# # /v1/audio/speech, /v1/rerank, /v1/videos/generations, /v1/search, /v1/fetch.
-# # CLI: pxy search / fetch / transcribe / say / image / video.
-# # Media usage + cooldowns are tracked under <provider>#media, search/fetch
-# # under search#<name> / fetch#<name> — never mixed with chat counters.
-# # ---------------------------------------------------------------------------
-
-# # ElevenLabs — media only. Free tier: 10k credits/month (TTS chars; STT
-# # included). Library voices 402 on free — only premade voice ids work, hence
-# # the map (keys mirror OpenAI voice names; "default" = Sarah).
 # [providers.elevenlabs]
 # api_key = { pass = "AI/elevenlabs/main" }
 # auth_header = "xi-api-key"
@@ -842,8 +563,6 @@ models = [
 # nova = "FGY2WhTYpPnrIDTdsKH5" # Laura
 # shimmer = "Xb7hH8MSUJpSbSDYk0k2" # Alice
 
-# # Voyage — embeddings + rerank (generous free token allowance per model).
-# # Rerank dialect: top_k in, data[] out — pxy maps to/from Cohere shape.
 # [providers.voyage]
 # api_key = { pass = "AI/voyage-ai/main" }
 # discover = false
@@ -854,59 +573,49 @@ models = [
 # rerank_url = "https://api.voyageai.com/v1/rerank"
 # rerank_models = ["rerank-2.5-lite", "rerank-2.5"]
 
-# # Jina — rerank (Cohere-compatible passthrough). Same key as jina-reader.
-# [providers.jina]
-# api_key = { pass = "AI/jina-reader/main" }
-# discover = false
-# [providers.jina.media]
-# rerank_url = "https://api.jina.ai/v1/rerank"
-# rerank_models = ["jina-reranker-v2-base-multilingual"]
+[providers.jina]
+api_key = { pass = "AI/jina-reader/main" }
+discover = false
+[providers.jina.media]
+rerank_url = "https://api.jina.ai/v1/rerank"
+rerank_models = ["jina-reranker-v2-base-multilingual"]
 
-# # Default per capability (requests with model omitted or "auto"). One id or
-# # an ordered failover chain: first healthy (not cooling down, under its media
-# # cap) wins; provider-side failures walk to the next entry. Alibaba media is
-# # deliberately NOT in these chains until its free-quota status is verified in
-# # the Model Studio console (explicit alibaba/... requests still work).
-# [media]
-# image = ["cloudflare/@cf/black-forest-labs/flux-1-schnell", "agnes/agnes-image-2.1-flash"]
-# transcription = [
-#   "groq/whisper-large-v3-turbo",
-#   "mistral/voxtral-mini-latest",
-#   "cloudflare/@cf/openai/whisper-large-v3-turbo",
-#   "elevenlabs/scribe_v1",
-# ]
-# speech = ["cloudflare/@cf/deepgram/aura-2-en", "elevenlabs/eleven_turbo_v2_5"]
-# rerank = ["voyage/rerank-2.5-lite", "jina/jina-reranker-v2-base-multilingual"]
-# video = "agnes/agnes-video-v2.0"
+[media]
+image = ["cloudflare/@cf/black-forest-labs/flux-1-schnell", "agnes/agnes-image-2.1-flash"]
+transcription = [
+  "groq/whisper-large-v3-turbo",
+  "mistral/voxtral-mini-latest",
+  "cloudflare/@cf/openai/whisper-large-v3-turbo",
+  "elevenlabs/scribe_v1",
+]
+speech = ["cloudflare/@cf/deepgram/aura-2-en", "elevenlabs/eleven_turbo_v2_5"]
+rerank = ["voyage/rerank-2.5-lite", "jina/jina-reranker-v2-base-multilingual"]
+video = "agnes/agnes-video-v2.0"
 
-# # Web search, priority order. Brave free = 2,000 q/month (cap with margin);
-# # jina search shares the reader key; firecrawl = 500 credits/month split
-# # between search and scrape below.
-# [[search.providers]]
-# name = "brave"
-# kind = "brave"
-# api_key = { pass = "AI/brave-search/main" }
-# monthly_requests = 1900
+[[search.providers]]
+name = "brave"
+kind = "brave"
+api_key = { pass = "AI/brave-search/main" }
+monthly_requests = 1900
 
-# [[search.providers]]
-# name = "jina"
-# kind = "jina"
-# api_key = { pass = "AI/jina-reader/main" }
+[[search.providers]]
+name = "jina"
+kind = "jina"
+api_key = { pass = "AI/jina-reader/main" }
 
-# [[search.providers]]
-# name = "firecrawl"
-# kind = "firecrawl-search"
-# api_key = { pass = "AI/firecrawl/main" }
-# monthly_requests = 200
+[[search.providers]]
+name = "firecrawl"
+kind = "firecrawl-search"
+api_key = { pass = "AI/firecrawl/main" }
+monthly_requests = 200
 
-# # URL -> markdown. jina-reader first (big free quota), firecrawl fallback.
-# [[fetch.providers]]
-# name = "jina-reader"
-# kind = "jina-reader"
-# api_key = { pass = "AI/jina-reader/main" }
+[[fetch.providers]]
+name = "jina-reader"
+kind = "jina-reader"
+api_key = { pass = "AI/jina-reader/main" }
 
-# [[fetch.providers]]
-# name = "firecrawl"
-# kind = "firecrawl-scrape"
-# api_key = { pass = "AI/firecrawl/main" }
-# monthly_requests = 200
+[[fetch.providers]]
+name = "firecrawl"
+kind = "firecrawl-scrape"
+api_key = { pass = "AI/firecrawl/main" }
+monthly_requests = 200
