@@ -61,7 +61,7 @@ models = [
 [groups.quota]
 name = "Quota"
 models = [
-  "nvidia/moonshotai/kimi-k3",
+  # "nvidia/moonshotai/kimi-k3",
   "cloudflare/@cf/zai-org/glm-5.3-flash",
   "alibaba/qwen3.8-max",
   "tencent/glm-5.3-flash",
@@ -99,6 +99,45 @@ models = [
   { id = "deepseek-v4-flash", context_length = 1000000, max_output_tokens = 8192 },
   { id = "deepseek-v4-pro", context_length = 1000000, max_output_tokens = 8192 },
 ]
+
+# AMD Radeon Cloud (developer.amd.com.cn) — 4 FREE models on AMD GPUs.
+# Serves both dialects (/chat/completions and /messages). OPENAI is chosen
+# deliberately: MiniCPM5-1B leaks literal <think> tags into `content` whenever
+# a reply is TRUNCATED mid-thought, and pxy's parse_think_tags only ever runs
+# on OpenAI-format upstreams. Measured 2026-09-03 with "Say OK": at
+# max_tokens=50 the raw tags appear 3/3 straight from AMD and 0/3 through pxy;
+# at max_tokens=250 the model closes the block and neither side leaks. Over
+# /messages those tags would reach the client as ordinary assistant text and
+# be replayed as history every turn. The models are OpenAI-native anyway;
+# /messages is AMD's own translation layer.
+# All 4 tool-call, verified live 2026-09-03 (deepseek-v4-flash needed a retry —
+# see the 429 note). Two are vision-capable (deepseek-v4-flash-vision-exp,
+# qwen3.8-flash-next) per /models.
+# ⚠️ "Limited Free" means a REAL budget, and /v1/usage publishes it:
+# rpm_limit 20 (hence the limits block — not a guess) and
+# daily_cost_limit_usd 1, on a rolling 24h window (daily_reset_at). Usage is
+# denominated in "points"/notional USD, not billed — there is no card on the
+# account, so past the cap requests stop rather than charge.
+# ⚠️ Its 429 is a GLOBAL, shared concurrency pool, not our quota:
+# "Model 'X' is at its concurrency limit (64); please retry later or use
+# another model" (code model_concurrency_rate_limit_exceeded). It arrives in
+# under a second and clears on its own, so ordinary cooldown+failover is the
+# right response — no error rule needed. NOTE the envelope is nested one level
+# deeper than the OpenAI norm: {"detail":{"error":{...}}}.
+# Latency is uneven (a .com.cn host): most calls are 1-4s, but deepseek-v4-flash
+# was seen at 31s once.
+[providers.amd]
+base_url = "https://developer.amd.com.cn/radeon/api/v1/chat/completions"
+balance_url = "https://developer.amd.com.cn/radeon/api/v1/usage"
+api_key = { pass = "AI/amd/main" }
+models = [
+  { id = "DeepSeek-V4-Flash", context_length = 1048576, tool_call = true, free = true },
+  { id = "DeepSeek-V4-Flash-Vision-Exp", context_length = 1048576, tool_call = true, free = true },
+  { id = "Qwen3.8-Flash-Next", context_length = 262144, tool_call = true, free = true },
+  { id = "MiniCPM5-1B", context_length = 131072, tool_call = true, free = true },
+]
+[providers.amd.limits]
+rpm = 20
 
 [providers.meta]
 base_url = "https://api.meta.ai/v1/messages"
@@ -517,19 +556,45 @@ embedding_models = ["kinfra-vl-embedding-2b", "kinfra-vl-embedding-8b"]
 # [providers.inception.limits]
 # total_tokens = 100000000
 
+# NVIDIA NIM — free dev tier (no card; ToS: prototyping/dev only).
+# ⚠️ Its failure mode is SILENCE, not an error: NIM accepts the connection and
+# then sends ZERO BYTES while the request sits behind a busy worker. Measured
+# 2026-09-03, 3 rounds/model at a 25s budget — only lightning answered (3/3);
+# deepseek-v4-flash, deepseek-v4-pro, minimax-m3, kimi-k3 and ultra-550b timed
+# out 3/3. They are queued, not broken: minimax-m3 did answer on a longer
+# leash, at 56.6s. Hence the ordering below — lightning first so a group walk
+# reaches the responsive model before the queued ones.
+# `timeout_secs` is the whole point of this block. pxy only applies its 30s
+# HEADERS_DEADLINE to a MULTI-candidate streaming walk; an explicitly named
+# model (`nvidia/kimi-k3`) or any non-streaming call is exempt and waits
+# timeout_secs instead — which defaulted to 600, so a silent NIM hung for ten
+# minutes before reporting pxy's own "network error".
+# It bounds ONE ATTEMPT, not the request: MAX_RETRIES=2 means three tries, so a
+# named-and-stalled model now errors in ~2m25s (measured) rather than ~30min.
+# Shrink this further if that is still too long to wait on a dead worker.
+# ⚠️ It doubles as the per-read stall deadline for streams, and ultra-550b
+# legitimately thinks >60s: raise this to ~90 if ultra must work when called
+# directly, at the cost of a longer hang while NIM is congested.
+# `discover = false` is load-bearing: the catalog is KEY-TIER dependent —
+# /v1/models advertises 81 ids, but some 404 "not found for account" on this
+# key. `mistralai/mistral-large` was exactly that (listed, yet 404 "Function
+# … not found" on every call) and has been removed; `mistralai/mistral-nemotron`
+# is the real one if a Mistral model is wanted here.
+# No rate-limit headers or quota API, hence the client-side rpm.
 [providers.nvidia]
 base_url = "https://integrate.api.nvidia.com/v1/chat/completions"
 embeddings_url = "https://integrate.api.nvidia.com/v1/embeddings"
 api_key = { pass = "AI/nvidia/main" }
 drop_params = ["prompt_cache_key"]
+discover = false
+timeout_secs = 45
 models = [
+  { id = "nvidia/nemotron-3.5-lightning-30b-a3b", context_length = 1000000 },
+  { id = "minimaxai/minimax-m3", context_length = 1000000 },
   { id = "deepseek-ai/deepseek-v4-flash-0731", context_length = 1000000 },
   { id = "deepseek-ai/deepseek-v4-pro-0813", context_length = 1000000 },
-  { id = "minimaxai/minimax-m3", context_length = 1000000 },
-  { id = "mistralai/mistral-large", context_length = 262144 },
   { id = "moonshotai/kimi-k3", context_length = 1048576 },
   { id = "nvidia/nemotron-3-ultra-550b-a55b", context_length = 1000000 },
-  { id = "nvidia/nemotron-3.5-lightning-30b-a3b", context_length = 1000000 },
 ]
 embedding_models = ["nvidia/nemotron-3-embed-1b"]
 [providers.nvidia.limits]
