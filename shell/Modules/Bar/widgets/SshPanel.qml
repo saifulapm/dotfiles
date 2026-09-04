@@ -7,7 +7,7 @@ import "SshModel.js" as Model
 //
 // The search field owns the keyboard from the moment the panel opens, which
 // is the difference between this panel and the rows-only ones (devservices,
-// night light): there is nothing to do here BUT filter, so making the user
+// drives): there is nothing to do here BUT filter, so making the user
 // press a key to start typing would be a step for nothing. A focused
 // TextInput swallows every printable key, so the list is driven through the
 // field's moveRequested/accepted signals rather than j/k — PanelTextField

@@ -756,21 +756,12 @@ binds {
     Mod+Ctrl+W hotkey-overlay-title="Network Panel" { spawn "qs" "ipc" "call" "bar" "open" "network"; }
     Mod+Ctrl+P hotkey-overlay-title="Power Panel" { spawn "qs" "ipc" "call" "bar" "open" "battery"; }
     // omarchy: SUPER+SHIFT+CTRL+A agent — the bar's AI panel.
-    // The six widgets ported from the omarchy plugin marketplace (2026-08-21).
-    // Every one of them is also reachable by position through Mod+Ctrl+<n>
-    // below; these letters exist for the ones worth muscle memory.
-    //
-    // Night light gets TWO keys and the plain one is the toggle, not the
-    // panel: it is the only widget here whose everyday use is a single
-    // decision ("not this, not now") made without looking at anything.
-    // bin/nightlight owns the toggle policy so this key and the panel's rows
-    // can never disagree.
-    //
-    // The shifted one lands on the Display panel, where the three modes and
-    // the temperature now live alongside brightness. It is the same panel
-    // Mod+Ctrl+D opens — kept as a second door because the muscle memory is
-    // for the feature, not the panel. `nightlight` reaches it through the
-    // bar's widgetIdAliases.
+    // The widgets ported from the omarchy plugin marketplace (2026-08-21) are
+    // reachable by position through Mod+Ctrl+<n> below; the letters above
+    // exist for the ones worth muscle memory. Night light was one of them
+    // until 2026-09-04, when it was removed fleet-wide — the Apple panel has
+    // no gamma LUT and niri refuses the ramp (packages/manifest.toml has the
+    // measurement).
     // omarchy: SUPER+CTRL+number opens the bar's right-hand panels by
     // position, so a chord keeps meaning the same icon after the bar is
     // rearranged (their utilities.lua loop, `code:10`..`code:18`). The letters

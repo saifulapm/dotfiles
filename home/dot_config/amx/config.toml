@@ -1,8 +1,8 @@
 # amx — coding agents as tmux panes. Ten keys and nothing else; this file
 # spells out the five that are a decision and leaves the four dials unset.
 #
-# A chezmoi SYMLINK, unlike cliamp's and sunsetr's configs, and safe to be one
-# for the reason those two are not: amx only ever READS this file (src/config.rs
+# A chezmoi SYMLINK, unlike cliamp's config, and safe to be one for the reason
+# that one is not: amx only ever READS this file (src/config.rs
 # deserializes, nothing in the tree writes it), so there is no in-place rewrite
 # to leave permanent dirt in the repo. An unparseable file here is not a
 # breakage either — amx warns on stderr and runs on its built-in defaults,

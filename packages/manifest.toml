@@ -1784,13 +1784,42 @@ why  = "Deno runtime from the mac list; mise already manages node, one mechanism
 
 [[tool]]
 name = "cargo-cli-tools"
-via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc, sunsetr (its own [[tool]] entry below); from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07) and wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere). herdr moved to run_after_10 prebuilt (974fc11); ripdrag dropped 2026-08-18 with its gtk4-devel build dependency — it was yazi's <C-n> drag-out hand, and yazi 26.8.15 does drag-and-drop natively in kitty (run_after_39 uninstalls both); ttfx dropped 2026-08-17 — [[tool]] nirisaver links the crate instead of shelling out to the binary, so nothing installed here ran it any more"
+via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc; from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07) and wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere). herdr moved to run_after_10 prebuilt (974fc11); ripdrag dropped 2026-08-18 with its gtk4-devel build dependency — it was yazi's <C-n> drag-out hand, and yazi 26.8.15 does drag-and-drop natively in kitty (run_after_39 uninstalls both); ttfx dropped 2026-08-17 — [[tool]] nirisaver links the crate instead of shelling out to the binary, so nothing installed here ran it any more; sunsetr dropped 2026-09-04 with the whole night-light feature (run_after_44-sunsetr-remove.sh uninstalls it) — see below"
 why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/dufs are mac-list CLI (argc dropped 2026-08-10 — nothing in this repo ever called it); kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
 
-[[tool]]
-name = "sunsetr"
-via  = "run_after_09-cargo-tools.sh (crates.io, `sunsetr` — upstream's releases carry an x86_64 tarball and NOTHING for aarch64, checked 2026-08-21 at v0.12.5, so the prebuilt path in run_after_10 would have covered the NUC and neither Mac). Runs as sunsetr.service, a session user unit; its config and the two presets are SEEDED ONCE by run_after_44-sunsetr.sh and then left alone, never symlinked — `sunsetr set` rewrites the TOML in place, so a chezmoi symlink would mean permanent repo dirt on every temperature nudge (the cliamp precedent, and the same reasoning). bin/nightlight is the CLI face; the bar's nightlight widget and panel are the graphical one"
-why  = "The blue-light filter, and before it there was NOTHING here — no gammastep, no wlsunset, no compositor gamma path of any kind (grepped 2026-08-21; the gap turned up in the omarchy-plugin-marketplace triage the same day and the user picked it first of six). omarchy's own answer, `omarchy.nightlight`, drives hyprsunset and is Hyprland-only, so none of it ports. sunsetr is the one project that names niri as a supported compositor and means it: on 0.12.5 it announced `Starting sunsetr via niri compositor` unprompted and drove the gamma correctly on the first run, no backend key set. Two properties earned it the slot over gammastep/wlsunset. First, it resolves the location from the system timezone when it generates a config, and reads coordinates from a `geo.toml` that upstream designed to be gitignored — so each machine aims itself and this PUBLIC repo carries no home location. Note the limit, measured the hard way 2026-08-21: that timezone lookup happens at config GENERATION only, not at runtime, and a geo config with no coordinates exits 1 rather than falling back to the clock — which is why run_after_44 resolves them once per machine instead of shipping a coordinate-free file. Second, `sunsetr status --json --follow` streams NEWLINE-DELIMITED compact JSON, one object per line (verified 2026-08-21 — the one-shot `status --json` is pretty-printed, the follower is not), which is exactly the SplitParser shape the shell's services already consume: the bar widget therefore polls nothing, and the no-polling rule survives a feature that is fundamentally about the time of day"
+# sunsetr, and the night light with it, is deliberately absent (2026-08-21 →
+# 2026-09-04). It never worked on this hardware and could not have, which took
+# a measurement to establish because the failure was completely silent.
+#
+# niri says it at DEBUG on every start:
+#   couldn't get gamma properties: missing GAMMA_LUT property
+#   couldn't reset gamma: setting gamma is not supported
+# The Apple panel exposes no GAMMA_LUT atomic property, so niri falls back to
+# the legacy CRTC path, where `gamma_length` is 0 and its `ensure!` fires.
+# `get_gamma_size` therefore returns 0, niri's GammaControlHandler maps that to
+# None, and zwlr_gamma_control_manager_v1.get_gamma_control answers `failed`
+# before a single ramp is sent. sunsetr never checks for that event, so
+# `status --json` reported 3300K at 90% gamma and the journal showed clean
+# sunrise transitions — against a dead protocol object, for 13 hours.
+#
+# It was not free: ~50% of a core and 130 MB resident, continuously (6h11m CPU
+# in 13h uptime, measured), on the one machine in the fleet where battery is
+# the point. The 2026-08-07 note at state/nightlight-nogamma had already
+# recorded wlsunset refusing gamma on this panel for the same reason; sunsetr's
+# only advantage was that it did not say so.
+#
+# NOT a sunsetr defect and NOT a niri one — the panel simply has no gamma LUT.
+# The mini and the NUC drive external monitors that probably do have one, so
+# this is a deliberate FLEET-WIDE removal of a feature that worked on part of
+# the fleet (user call, 2026-09-04). If it ever returns it returns gated on a
+# real gamma probe, not on whether a daemon happens to be running.
+#
+# run_after_44-sunsetr-remove.sh does the uninstall. Gone with it: bin/nightlight,
+# NightLightService.qml, NightLightModel.js + its test, the Display panel's
+# NIGHT LIGHT and NIGHT WARMTH sections, the bar's sun/moon mark and its
+# right-click, and the `nightlight` → `monitor` widget alias. Anything from
+# omarchy's own `omarchy.nightlight` stays N/A regardless — it drives
+# hyprsunset and is Hyprland-only.
 
 [[tool]]
 name = "nirisaver"

@@ -378,27 +378,11 @@ Scope {
         return screenBars.slice().sort((a, b) => Number(b.screen && b.screen.name === focusedOutput) - Number(a.screen && a.screen.name === focusedOutput));
     }
 
-    // Ids that used to name a widget of their own and now name a section of
-    // another one's panel. Kept because they are what the keybindings, the
-    // menu and anything a user typed into a script already say — a rename is
-    // ours to absorb, not theirs. Applied at the summon boundary rather than
-    // in the component registry: the registry is what shell.json instantiates
-    // from, so an alias there would mount a second copy of the same widget.
-    readonly property var widgetIdAliases: ({
-            "nightlight": "monitor"
-        })
-
-    function canonicalWidgetId(widgetId) {
-        const alias = widgetIdAliases[widgetId];
-        return alias !== undefined ? alias : widgetId;
-    }
-
     // Omarchy's summonBarWidget: any process (a niri bind) can open a widget's
     // panel — `qs ipc call bar open audio`.
     function summonWidgetPanel(widgetId) {
-        const id = canonicalWidgetId(widgetId);
         for (const b of focusedFirstBars())
-            if (b.summonWidget(id))
+            if (b.summonWidget(widgetId))
                 return "ok";
         return "no widget with a panel: " + widgetId;
     }
@@ -461,8 +445,7 @@ Scope {
     // wrong monitor. Rank surfaces instead: a copy that already has the panel
     // open wins, so close/hide/toggle reach what the user can see; then the
     // niri-focused output, where a keyboard summon belongs.
-    function summonWidgetMode(widgetIdRaw, mode) {
-        const widgetId = canonicalWidgetId(widgetIdRaw);
+    function summonWidgetMode(widgetId, mode) {
         const focusedWs = niri.workspaces.find(w => w.is_focused);
         const focusedOutput = focusedWs ? focusedWs.output : "";
         const rank = b => (b.widgetPanelOpen(widgetId) ? 2 : 0) + (b.screen && b.screen.name === focusedOutput ? 1 : 0);
@@ -756,14 +739,6 @@ Scope {
         return sharedService("ssh", sshServiceComponent, {});
     }
 
-    // No gate: sunsetr's `status --json --follow` is event-driven (one line
-    // per state change, nothing polls), so — like the dictation and
-    // devservices followers — it runs for the life of the shell. One
-    // instance, one follower, however many screens carry the widget.
-    function nightLightService() {
-        return sharedService("nightlight", nightLightServiceComponent, {});
-    }
-
     function btBatteryService() {
         return sharedService("btbattery", btBatteryServiceComponent, {});
     }
@@ -873,11 +848,6 @@ Scope {
     Component {
         id: passServiceComponent
         PassService {}
-    }
-
-    Component {
-        id: nightLightServiceComponent
-        NightLightService {}
     }
 
     Component {
@@ -2356,8 +2326,6 @@ Scope {
         id: monitorComponent
         MonitorWidget {
             theme: barRoot.theme
-            autoBrightness: barRoot.shell.autoBrightness
-            nightlight: barRoot.nightLightService()
         }
     }
 

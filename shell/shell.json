@@ -5,15 +5,6 @@
     "blank": 0,
     "lock": 360
   },
-  "autoBrightness": {
-    "enabled": true,
-    "intervalSeconds": 5,
-    "minPercent": 8,
-    "maxPercent": 90,
-    "hysteresis": 4,
-    "smoothing": 0.35,
-    "overrideMinutes": 10
-  },
   "sync": {
     "enabled": true,
     "dir": "~/.local/state/qshell/sync/model-usage"
@@ -66,10 +57,10 @@
       "dnsshield",
       "warp",
       "tailscale",
-      "mic",
       "airpods",
       "bluetooth",
       "network",
+      "mic",
       "audio",
       "monitor",
       "battery",

@@ -48,15 +48,13 @@ land after the logins below.
 
 **Reboot at the end** — autologin lands you in niri with the shell running.
 
-One thing that apply changes and you will notice on the first evening: **the
-display now warms after sunset**. `sunsetr.service` runs the blue-light filter,
-aimed by coordinates each machine resolves from its own timezone into
-`~/.config/sunsetr/geo.toml` (never this repo — it is public). `Mod+Ctrl+N`
-holds it off or back on, the bar's night-light icon opens the rest, and
-`nightlight auto|day|night|status` is the same thing from a terminal. It
-arrived with five other widgets ported from the omarchy plugin marketplace on
-2026-08-21 — passwords, SSH hosts, listening ports, removable drives and a
-world clock — see `docs/marketplace-ports-2026-08-21.md`.
+Six widgets ported from the omarchy plugin marketplace on 2026-08-21 —
+passwords, SSH hosts, listening ports, removable drives, a world clock and a
+night light — arrived together; see `docs/marketplace-ports-2026-08-21.md`.
+Five of them are still here. The night light was removed fleet-wide on
+2026-09-04: this MacBook's panel exposes no gamma LUT, so niri refuses every
+ramp and the daemon warmed nothing while holding half a core
+(`packages/manifest.toml` has the measurement).
 
 Housekeeping: the bootstrap drops a temporary chezmoi at `~/bin/chezmoi`;
 the manifest installs the real `/usr/bin/chezmoi`, so `rm ~/bin/chezmoi`

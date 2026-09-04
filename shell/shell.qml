@@ -50,14 +50,6 @@ ShellRoot {
         shellRoot: shell
     }
     property Battery batteryService: Battery {}
-    // Ambient auto-brightness (MacBook only in practice: it parks itself
-    // where there is no ambient-light sensor, which is every other machine
-    // here). Eager, but it costs one file read at startup to discover it has
-    // no sensor, and its sampler is gated on the screen actually being on.
-    property AutoBrightness autoBrightness: AutoBrightness {
-        shellRoot: shell
-        idle: shell.idle
-    }
     // MPRIS media layer (omarchy's media service plugin): sticky preferred
     // player, playing-order ledger, PipeWire stream correlation, source
     // cycling with playback transfer, media OSDs, and the `media` IPC target

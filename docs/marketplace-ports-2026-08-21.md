@@ -1,5 +1,12 @@
 # Six widgets ported from the omarchy plugin marketplace — 2026-08-21
 
+> **Five of these six are still here.** The night light (sunsetr) was removed
+> fleet-wide on 2026-09-04: this MacBook's panel exposes no gamma LUT, so niri
+> answers `failed` to every gamma-control request and the daemon warmed nothing
+> while holding ~50% of a core. The rest of this document is left as written —
+> it is the record of the port, not of the current tree. See the sunsetr note
+> in `packages/manifest.toml` for the measurement.
+
 User ask: survey `HANCORE-linux/omarchy-plugin-marketplace` (815 plugins), then
 adopt six of them — sunsetr, passwordstore, removable-drives,
 localhost/omaport, omassh and timezones — into this shell, working on all three

@@ -9,7 +9,7 @@ import "PortsModel.js" as Model
 //
 // NO FOLLOWER, and that is a deliberate admission rather than an oversight.
 // The other event-driven services here each have a real event source —
-// systemd's JobRemoved, udev, sunsetr's own stream. A socket entering LISTEN
+// systemd's JobRemoved, udev, a FileView watch. A socket entering LISTEN
 // has no such thing short of a netlink sock_diag subscription, which would
 // mean a privileged helper for a panel that answers a question nobody asks
 // while it is shut.
