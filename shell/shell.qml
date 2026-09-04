@@ -1004,6 +1004,13 @@ ShellRoot {
             return "ok";
         }
 
+        // `qs ipc call deen read 36` — open the mushaf on a surah.
+        function read(surah: string): string {
+            shell.dismissBarPanels();
+            deenLoader.summon("readSurah", [surah]);
+            return "ok";
+        }
+
         // `qs ipc call deen pedal` — start the recitation, or end it. One verb
         // for both so a single keybind can drive a whole attempt.
         function pedal(): string {

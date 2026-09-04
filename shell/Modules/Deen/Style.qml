@@ -78,6 +78,100 @@ QtObject {
         }
     }
 
+    // -------------------------------------------------------------- tajweed
+    // The data carries eighteen rules. A printed tajweed mushaf uses six or
+    // eight colours and expects you to learn them from a key inside the cover;
+    // eighteen would be a colour per rule and a legend nobody reads. These are
+    // FOUR FAMILIES, grouped by what your mouth actually has to do, which is
+    // the distinction a person relearning to read needs first:
+    //
+    //   madd     hold the vowel longer
+    //   ghunnah  let it resonate through the nose
+    //   qalqalah bounce the consonant
+    //   silent   do not pronounce it, or merge it into the next letter
+    //
+    // Finer distinctions — how many counts of madd, which kind of idghaam —
+    // are real and are deliberately not drawn. They are a teacher's job, and
+    // guessing at them in colour would be the same overclaiming the Recite
+    // screen refuses to do.
+    function tajweedFamily(rule) {
+        switch (rule) {
+        case "madd_2":
+        case "madd_246":
+        case "madd_6":
+        case "madd_munfasil":
+        case "madd_muttasil":
+            return "madd";
+        case "ghunnah":
+        case "idghaam_ghunnah":
+        case "ikhfa":
+        case "ikhfa_shafawi":
+        case "idghaam_shafawi":
+        case "iqlab":
+            return "ghunnah";
+        case "qalqalah":
+            return "qalqalah";
+        case "silent":
+        case "hamzat_wasl":
+        case "lam_shamsiyyah":
+        case "idghaam_no_ghunnah":
+        case "idghaam_mutajanisayn":
+        case "idghaam_mutaqaribayn":
+            return "silent";
+        default:
+            return "";
+        }
+    }
+
+    function tajweedColor(rule) {
+        switch (tajweedFamily(rule)) {
+        case "madd":
+            return style.accent;
+        case "ghunnah":
+            return style.green;
+        case "qalqalah":
+            return style.yellow;
+        case "silent":
+            return style.alpha(style.muted, 0.55);
+        default:
+            return style.fg;
+        }
+    }
+
+    readonly property var tajweedLegend: [
+        {
+            family: "madd",
+            label: "hold it longer"
+        },
+        {
+            family: "ghunnah",
+            label: "through the nose"
+        },
+        {
+            family: "qalqalah",
+            label: "bounce it"
+        },
+        {
+            family: "silent",
+            label: "not pronounced"
+        }
+    ]
+
+    function familyColor(family) {
+        switch (family) {
+        case "madd":
+            return style.accent;
+        case "ghunnah":
+            return style.green;
+        case "qalqalah":
+            return style.yellow;
+        case "silent":
+            return style.alpha(style.muted, 0.55);
+        default:
+            return style.fg;
+        }
+    }
+
     readonly property int radiusSm: Math.max(ui(5), theme.radius(0.6))
     readonly property int radiusMd: Math.max(ui(6), theme.radius(0.75))
     readonly property int radiusLg: Math.max(ui(8), theme.radius(1))

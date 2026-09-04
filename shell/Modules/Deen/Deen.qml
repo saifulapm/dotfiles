@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Window
 import Quickshell
 import Quickshell.Io
@@ -37,6 +38,16 @@ Scope {
         theme: deenRoot.theme
         windowWidth: panel.width
         windowHeight: panel.height
+    }
+
+    // Which room you are in: "recite" or "mushaf".
+    property string view: "recite"
+
+    // The mushaf is only worth a 1.16 MB Al-Baqarah parse once you actually
+    // open it, so the first switch is what fetches it rather than the open.
+    onViewChanged: {
+        if (deenRoot.view === "mushaf" && deenRoot.surahAyahs.length === 0)
+            surahReq.fetch(["surah", String(deenRoot.mushafSurah)]);
     }
 
     // ------------------------------------------------------------ the ayah
@@ -116,6 +127,54 @@ Scope {
 
     onReferenceChanged: ayahReq.fetch(["ayah", deenRoot.reference])
 
+    // -------------------------------------------------------------- the mushaf
+    // A whole surah, words included, in one call — `api surah` carries them for
+    // exactly this reason: a reader paints every ayah at once and Al-Baqarah
+    // would otherwise be 286 processes for one screen.
+    property int mushafSurah: 1
+    property var surahMeta: null
+    property var surahAyahs: []
+    property var surahWords: []
+    property string surahBasmala: ""
+    property string mushafError: ""
+
+    DeenApi {
+        id: surahReq
+        onLoaded: data => {
+            deenRoot.surahMeta = data.surah || null;
+            deenRoot.surahAyahs = data.ayahs || [];
+            deenRoot.surahWords = data.words || [];
+            deenRoot.surahBasmala = data.basmala || "";
+            deenRoot.mushafError = "";
+        }
+        onFailed: message => {
+            deenRoot.surahAyahs = [];
+            deenRoot.surahWords = [];
+            deenRoot.mushafError = message;
+        }
+    }
+
+    onMushafSurahChanged: surahReq.fetch(["surah", String(deenRoot.mushafSurah)])
+
+    // ------------------------------------------------------------------ audio
+    // `deen audio` caches and answers with a path; mpv plays it. Two programs
+    // because neither should be the other: deen knows which file a word is,
+    // mpv knows how to make a sound.
+    property string playing: ""
+
+    function playAudio(reference) {
+        deenRoot.playing = reference;
+        audioProc.running = false;
+        audioProc.command = ["setpriv", "--pdeathsig", "TERM", "--", "bash", "-c", 'p=$(deen audio "$1" | jq -r .path 2>/dev/null) && [ -n "$p" ] && exec mpv --no-video --really-quiet "$p"', "deen-audio", reference];
+        audioProc.running = true;
+    }
+
+    Process {
+        id: audioProc
+        running: false
+        onExited: deenRoot.playing = ""
+    }
+
     // ------------------------------------------------------------ open/close
     function show() {
         if (panel.visible) {
@@ -187,6 +246,17 @@ Scope {
         goTo(ref);
     }
 
+    // `qs ipc call deen read 36` — open the mushaf on a surah.
+    function readSurah(n) {
+        show();
+        deenRoot.view = "mushaf";
+        const num = Math.max(1, Math.min(114, Number(n) || 1));
+        if (deenRoot.mushafSurah === num)
+            surahReq.fetch(["surah", String(num)]);
+        else
+            deenRoot.mushafSurah = num;
+    }
+
     // The recitation pedal, reachable from outside the window as well as from
     // the button and Space. A keybind can start a recitation without the hub
     // having the keyboard, which is the difference between "press Recite, then
@@ -237,15 +307,70 @@ Scope {
             anchors.fill: parent
             focus: true
 
-            ReciteScreen {
-                id: recite
+            // The screen strip. Two rooms so far; it is a Row rather than a
+            // TabBar because the hub will grow more of them than a tab bar
+            // reads well with, and this is what the row becomes.
+            Row {
+                id: nav
 
-                anchors.fill: parent
-                style: deenRoot.style
-                reference: deenRoot.reference
-                ayah: deenRoot.ayah
-                loadError: deenRoot.loadError
-                onReferenceChanged_: ref => deenRoot.goTo(ref)
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.topMargin: deenRoot.style.ui(10)
+                spacing: deenRoot.style.ui(6)
+                z: 1
+
+                Repeater {
+                    model: [
+                        {
+                            id: "recite",
+                            label: "Recite"
+                        },
+                        {
+                            id: "mushaf",
+                            label: "Read"
+                        }
+                    ]
+
+                    delegate: Button {
+                        required property var modelData
+                        text: modelData.label
+                        flat: deenRoot.view !== modelData.id
+                        onClicked: deenRoot.view = modelData.id
+                    }
+                }
+            }
+
+            Item {
+                anchors.top: nav.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+
+                ReciteScreen {
+                    id: recite
+
+                    anchors.fill: parent
+                    visible: deenRoot.view === "recite"
+                    style: deenRoot.style
+                    reference: deenRoot.reference
+                    ayah: deenRoot.ayah
+                    loadError: deenRoot.loadError
+                    onReferenceChanged_: ref => deenRoot.goTo(ref)
+                }
+
+                MushafScreen {
+                    anchors.fill: parent
+                    visible: deenRoot.view === "mushaf"
+                    style: deenRoot.style
+                    surah: deenRoot.surahMeta
+                    ayahs: deenRoot.surahAyahs
+                    words: deenRoot.surahWords
+                    basmala: deenRoot.surahBasmala
+                    loadError: deenRoot.mushafError
+                    playing: deenRoot.playing
+                    onSurahStepped: delta => deenRoot.mushafSurah = Math.max(1, Math.min(114, deenRoot.mushafSurah + delta))
+                    onPlay: reference => deenRoot.playAudio(reference)
+                }
             }
         }
     }
