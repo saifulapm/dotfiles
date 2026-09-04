@@ -18,6 +18,53 @@ function wifiIconFor(strength) {
     return icons[index];
 }
 
+// ---------------------------------------------------------- connectivity
+// A known plain-HTTP endpoint, so the network is free to redirect a browser
+// pointed at it to its own login page. NEVER executed, and never opened
+// automatically — only on an explicit click, and we hand the browser this
+// fixed URL rather than anything the portal told us.
+var CAPTIVE_PORTAL_URL = "http://ping.archlinux.org/nm-check.txt";
+
+// NetworkManager's own connectivity verdict, mapped to a word. NM does the
+// HTTP probe itself and recognises an unexpected page body, not just a
+// redirect, so consuming its answer beats running a second curl loop here and
+// beats mistaking an ordinary timeout for a portal.
+//
+// `checksEnabled` is not decoration: NM keeps reporting its LAST value after
+// probing is turned off (and reports an optimistic Full when it has never
+// probed at all — this machine, where Fedora ships no ConnectivityCheckUri),
+// so without the gate a stale or invented Full reads as a verdict.
+//
+// Enum values PROBED against our quickshell 0.3.1 rather than assumed:
+// None=1, Portal=2, Limited=3, Full=4.
+function connectivityState(kind, connectivity, states, checksEnabled) {
+    if (kind === "disconnected")
+        return "none";
+    if (!checksEnabled)
+        return "unknown";
+    const s = states || {};
+    if (connectivity === s.Portal)
+        return "portal";
+    if (connectivity === s.Limited)
+        return "limited";
+    if (connectivity === s.Full)
+        return "full";
+    if (connectivity === s.None)
+        return "none";
+    return "unknown";
+}
+
+// The connection mark, with a restricted variant: a link that carries packets
+// but not the internet should not draw the same as a working one.
+function connectionIcon(kind, strengthPercent, connectivity) {
+    const restricted = connectivity === "portal" || connectivity === "limited";
+    if (kind === "wifi")
+        return restricted ? "󰤩" : wifiIconFor(strengthPercent); // md-wifi-alert
+    if (kind === "ethernet")
+        return restricted ? "󰈂" : "󰈀"; // md-ethernet-off : md-ethernet
+    return "󰤮"; // md-wifi-off
+}
+
 // quickshell's WifiNetwork.signalStrength is a 0..1 double (verified on this
 // machine); every consumer here works in percent.
 function signalPercent(network) {
@@ -405,4 +452,19 @@ function shouldRepromptPassphrase(reason, needsCredentials, reasons) {
     if (!needsCredentials)
         return false;
     return reason === r.NoSecrets || reason === r.WifiAuthTimeout;
+}
+
+// Node-visible for the model tests; `module` is undefined under QML, so this
+// block is inert there. The file had no exports until the connectivity
+// helpers arrived and wanted covering.
+if (typeof module !== "undefined") {
+    module.exports = {
+        wifiIconFor: wifiIconFor,
+        signalPercent: signalPercent,
+        connectivityState: connectivityState,
+        connectionIcon: connectionIcon,
+        CAPTIVE_PORTAL_URL: CAPTIVE_PORTAL_URL,
+        shouldRepromptPassphrase: shouldRepromptPassphrase,
+        requiresCredentials: typeof requiresCredentials === "function" ? requiresCredentials : undefined
+    };
 }

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# crash-mute — silence crash notifications for ONE program.
+#
+#   crash-mute                       list what is muted
+#   crash-mute [--] <program> [on|off|toggle]
+#
+# bin/crash-watch reads these flags before announcing anything. Muting is per
+# program; bin/crash-capture-toggle is the switch for all of them.
+#
+# WHY PER PROGRAM. 44 of the 45 crashes this machine has recorded were our own
+# builds under ~/Sites, which crash-watch already filters by path. What the
+# path filter cannot answer is a PACKAGED program that crashes in a loop —
+# the toast then fires every dedupe window until the program is fixed or
+# removed, and the only lever was turning crash capture off entirely and
+# losing the ones worth seeing.
+#
+# A flag file per program rather than one list: presence IS the state, which
+# is the same shape as the stay-awake and capture toggles, so `ls` reads the
+# whole set, `rm` un-mutes, and there is no file format to get wrong.
+#
+# The name is keyed the way crash-watch keys it — the executable's basename,
+# falling back to comm — so both `crash-mute qs` and `crash-mute /usr/bin/qs`
+# reach the same flag.
+set -uo pipefail
+
+mute_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/crash-ignore"
+
+usage() {
+  echo "Usage: crash-mute [--] [<program>] [on|off|toggle]" >&2
+}
+
+# Only regular files, because that is all the watcher honours: anything else
+# in there would be listed as muted while the crashes kept arriving.
+list() {
+  local entry found=0
+  shopt -s nullglob dotglob
+  for entry in "$mute_dir"/*; do
+    [ -f "$entry" ] || continue
+    printf '%s\n' "${entry##*/}"
+    found=1
+  done
+  shopt -u nullglob dotglob
+  [ "$found" -eq 1 ] || echo "No programs muted. Every crash notifies."
+}
+
+# A program may legitimately be named `-h`, and the option parse above would
+# answer that with usage; `crash-mute -- -h` is the way through.
+[ "${1:-}" = "--" ] && shift
+
+if [ "$#" -eq 0 ]; then
+  list
+  exit 0
+fi
+
+program=$1
+action=${2:-on}
+
+# Reduce a path the same way crash-watch does, then refuse what is left if it
+# is not one component — a flag must never land outside crash-ignore/.
+program=${program##*/}
+if [ -z "$program" ] || [ "$program" = "." ] || [ "$program" = ".." ]; then
+  echo "crash-mute: not a program name: $1" >&2
+  usage
+  exit 1
+fi
+
+flag="$mute_dir/$program"
+
+case "$action" in
+on) ;;
+off) ;;
+toggle)
+  [ -e "$flag" ] && action=off || action=on
+  ;;
+*)
+  echo "crash-mute: not an action: $action" >&2
+  usage
+  exit 1
+  ;;
+esac
+
+if [ "$action" = on ]; then
+  mkdir -p "$mute_dir" || exit 1
+  : >"$flag" || exit 1
+  echo "Muted crash notifications for $program."
+else
+  rm -f "$flag" || exit 1
+  echo "Crash notifications for $program are back on."
+fi

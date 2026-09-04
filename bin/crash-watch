@@ -34,6 +34,11 @@ readonly ignore_pattern=${QSHELL_CRASH_IGNORE:-}
 # Set QSHELL_CRASH_IGNORE_PREFIX= (empty) to hear about your own builds too.
 readonly ignore_prefix=${QSHELL_CRASH_IGNORE_PREFIX-$HOME/Sites}
 
+# Per-program mutes, written by bin/crash-mute. A directory of flag files
+# rather than one list: presence IS the state, the same shape the stay-awake
+# and crash-capture toggles use, so `ls` reads the set and `rm` un-mutes.
+readonly mute_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/crash-ignore"
+
 declare -A last_notified
 
 # The shell owns org.freedesktop.Notifications, so a shell crash takes the
@@ -106,6 +111,21 @@ journalctl -f -n 0 -o json "MESSAGE_ID=$COREDUMP_MESSAGE_ID" 2>/dev/null |
     # comm is truncated to 15 characters, so prefer the executable's basename.
     name=$comm
     [[ $exe == /* ]] && name=${exe##*/}
+
+    # A process can set its own comm to anything prctl takes, SLASHES INCLUDED,
+    # and a crash with no recorded executable falls back to it. The mute below
+    # turns this name into a path, so keep it to one component: a crash must
+    # never reach a flag outside crash-ignore/, nor have anything write one
+    # there. What that leaves is not always a name — "/" leaves nothing, and a
+    # dot component names a directory rather than a flag, so a mute on it would
+    # touch that directory and then never match.
+    name=${name##*/}
+    [[ -n $name && $name != "." && $name != ".." ]] || name=unknown
+
+    # Muted by hand, or from the end of a diagnosis. A flag file per program
+    # rather than one list, so it is the same "presence IS the state" shape as
+    # the stay-awake and capture toggles, and `ls` reads the whole set.
+    [[ -e "$mute_dir/$name" ]] && continue
 
     [[ -n $ignore_prefix && $exe == "$ignore_prefix"/* ]] && continue
     [[ -n $ignore_pattern && $name =~ $ignore_pattern ]] && continue

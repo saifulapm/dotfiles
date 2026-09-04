@@ -80,6 +80,14 @@ fi
 cp "$src" "$state.tmp"
 mv "$state.tmp" "$state"
 
+# Nudge the shell to re-read it rather than trusting the FileView watch on this
+# file. A watch on something rewritten in quick succession can stop delivering
+# permanently (omarchy hit that on their bar-toggle flag, e1fc5022), and the
+# failure mode is silent: the shell keeps the old palette until it restarts,
+# with nothing in the log to say why. Best-effort and after the move, so a dead
+# or absent shell costs a timeout and the watch still covers a hand edit.
+timeout 2 qs ipc call theme reload >/dev/null 2>&1 || true
+
 # No candidates just means no wallpaper change. Never abort here: the shell
 # has already accepted the transition, and the app fan-out below must still
 # run even if the peeked path vanished in between.

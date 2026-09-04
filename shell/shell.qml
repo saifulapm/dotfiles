@@ -981,6 +981,19 @@ ShellRoot {
     IpcHandler {
         target: "theme"
 
+        // A nudge for bin/theme-set, so a theme change does not depend on the
+        // FileView watch still being alive. A watch on a file that is rewritten
+        // in quick succession can stop delivering permanently (omarchy hit this
+        // on their bar-toggle flag, e1fc5022), and the failure is invisible:
+        // the shell keeps the old colours until it is restarted, with nothing
+        // in the log. The watch stays — it is what catches an edit made by
+        // hand — this just removes the writer's dependence on it.
+        function reload(): string {
+            shell.theme.themeFile.reload();
+            shell.theme.overrideFile.reload();
+            return "ok";
+        }
+
         function toggle(): string {
             shell.toggleThemes();
             return "ok";

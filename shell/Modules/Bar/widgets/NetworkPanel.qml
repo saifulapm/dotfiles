@@ -111,6 +111,62 @@ BarPanel {
         return "disconnected";
     }
 
+    // -------------------------------------------------------- connectivity
+    // NetworkManager does the HTTP probe itself and recognises an unexpected
+    // page body rather than only a redirect, so this consumes its verdict
+    // instead of running a second curl loop that could not tell a captive
+    // portal from an ordinary timeout.
+    //
+    // INERT ON THIS MACHINE AS SHIPPED, and deliberately so: Fedora sets no
+    // ConnectivityCheckUri, so NM reports ConnectivityCheckAvailable=false and
+    // answers an optimistic Full it never measured. `connectivityChecksEnabled`
+    // gates on NM's own two flags, so with no URI configured every row below
+    // simply does not appear — no false "you have internet", no false portal.
+    // Turning it on means a periodic HTTP probe to a third party, which is a
+    // privacy decision rather than a technical one; packages/manifest.toml
+    // carries the one-file opt-in and the reasoning.
+    readonly property bool connectivityChecksEnabled: networkManagerAvailable && Networking.canCheckConnectivity && Networking.connectivityCheckEnabled
+    readonly property string connectivity: Model.connectivityState(kind, Networking.connectivity, ({
+            None: NetworkConnectivity.None,
+            Portal: NetworkConnectivity.Portal,
+            Limited: NetworkConnectivity.Limited,
+            Full: NetworkConnectivity.Full
+        }), connectivityChecksEnabled)
+    readonly property bool hasCaptivePortal: connectivity === "portal"
+    readonly property bool restricted: hasCaptivePortal || connectivity === "limited"
+
+    // Re-probe when the connection itself changes; NM's own schedule covers
+    // the rest of the time.
+    readonly property string connectionKey: kind + ":" + (info.iface || "") + ":" + (connectedWifiNetwork ? connectedWifiNetwork.name : "")
+    onConnectionKeyChanged: Qt.callLater(checkConnectivity)
+
+    function checkConnectivity() {
+        if (connectivityChecksEnabled && kind !== "disconnected")
+            Networking.checkConnectivity();
+    }
+
+    // An EXPLICIT click only, and we hand the browser a fixed http URL rather
+    // than anything the portal told us — the network is then free to redirect
+    // it to the real login page, which is the whole mechanism. argv, never a
+    // shell string.
+    function openCaptivePortal() {
+        if (!hasCaptivePortal)
+            return;
+        Quickshell.execDetached(["app-run", "xdg-open", Model.CAPTIVE_PORTAL_URL]);
+        panel.close();
+    }
+
+    // While the link is restricted the answer changes on the user signing in
+    // elsewhere, which NM's normal schedule is too slow to notice; the poll
+    // stops the moment the link is healthy again. Runs with the panel CLOSED
+    // on purpose — the user is in the browser at that point.
+    Timer {
+        interval: 10000
+        repeat: true
+        running: panel.restricted && panel.connectivityChecksEnabled
+        onTriggered: panel.checkConnectivity()
+    }
+
     // --------------------------------------------------------------- stats
     // { iface, type, ip, prefix, gateway, speed, duplex, ssid, signal, freq,
     //   bitrate, rx_bytes, tx_bytes, router_ping_ms, internet_ping_ms }
@@ -1399,7 +1455,9 @@ BarPanel {
                 metaVisible: meta !== ""
 
                 icon: OpticalGlyph {
-                    text: panel.kind === "ethernet" ? "󰈀" : panel.kind === "wifi" ? Model.wifiIconFor(Model.signalPercent(panel.connectedWifiNetwork)) : "󰤮"
+                    // A link that carries packets but not the internet must
+                    // not draw the same as a working one.
+                    text: Model.connectionIcon(panel.kind, Model.signalPercent(panel.connectedWifiNetwork), panel.connectivity)
                     color: panel.theme.textPrimary
                     opacity: panel.networkManagerAvailable ? 1 : 0.5
                     pixelSize: panel.theme.fontPx(1.6)
@@ -1472,6 +1530,45 @@ BarPanel {
                     rightLabel: "Gateway"
                     rightValue: panel.info.gateway || "--"
                     rightCopyable: !!panel.info.gateway
+                }
+            }
+
+            // ---------------------------------------------------- portal
+            // Only when NM has actually measured a portal. Sits directly under
+            // the connection facts because "you are connected to nothing
+            // useful until you sign in" is the most important thing the panel
+            // can say, and the row is the answer to it.
+            Separator {
+                theme: panel.theme
+                visible: panel.restricted
+            }
+
+            Column {
+                width: parent.width
+                spacing: panel.theme.space(1.5)
+                visible: panel.restricted
+
+                SectionHeader {
+                    theme: panel.theme
+                    width: parent.width
+                    label: panel.hasCaptivePortal ? "SIGN-IN REQUIRED" : "LIMITED ACCESS"
+                }
+
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Small
+                    muted: true
+
+                    width: parent.width
+                    text: panel.hasCaptivePortal ? "This network wants a login before it will carry traffic." : "Connected, but the internet is not reachable through this link."
+                    wrapMode: Text.WordWrap
+                }
+
+                PanelButton {
+                    theme: panel.theme
+                    visible: panel.hasCaptivePortal
+                    label: "Open the sign-in page"
+                    onClicked: panel.openCaptivePortal()
                 }
             }
 

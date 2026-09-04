@@ -334,7 +334,14 @@ fi
 # eng+ben, in that order, costs nothing measurable: both scripts still OCR at
 # 100% on rendered samples and English goes 0.09 s -> 0.13 s. Reversing it to
 # ben+eng triples the English case to 0.27 s, so the order is deliberate.
-text="$(grim -g "$region" - | tesseract stdin stdout "${tess_args[@]}" 2>/dev/null)" || {
+#
+# `-s 2` upscales the capture: tesseract routinely drops small caption text at
+# the size it is drawn, and letting the COMPOSITOR do the scaling gives it a
+# clean resample instead of asking tesseract to guess at a few pixels. grim
+# already hands us physical pixels here (2560x1600 on a 1.5-scaled output), so
+# this is 2x on top of that — the cost is one larger PNG through a pipe, on an
+# operation the user waits on anyway.
+text="$(grim -s 2 -g "$region" - | tesseract stdin stdout "${tess_args[@]}" 2>/dev/null)" || {
   notify "tesseract failed" 3000
   exit 1
 }
