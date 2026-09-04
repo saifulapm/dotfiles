@@ -22,6 +22,7 @@ warn() { echo "deen: $*" >&2; }
 export PATH="$HOME/.cargo/bin:$PATH"
 
 data="$HOME/.local/share/deen/quran.json"
+duas="$HOME/.local/share/deen/duas.json"
 model_dir="$HOME/.local/share/voxtype/models"
 model="$model_dir/ggml-quran-base-q8.bin"
 src="$HOME/.local/src/deen"
@@ -66,6 +67,26 @@ if [ ! -s "$data" ] && [ -x "$src/scripts/fetch-data" ]; then
   else
     rm -f "$data.tmp"
     warn "could not fetch the Quran text — the hub will say so; rerun a chezmoi apply"
+  fi
+fi
+
+# -------------------------------------------------------------------- the duas
+# Hisn al-Muslim: 268 duas in 132 chapters, each with the book's own reference
+# footnote. Fetched once and never refreshed, like the text — and separately
+# guarded, so a machine that already has the Quran file picks this up on the
+# next apply without refetching 5 MB it already has.
+#
+# The fetch fails loudly rather than installing a half-right book: it pulls
+# sunnah.com's page and an archived copy of the same page pinned to a commit,
+# and every field of all 268 has to match. See scripts/fetch-duas.
+if [ ! -s "$duas" ] && [ -x "$src/scripts/fetch-duas" ]; then
+  mkdir -p "$(dirname "$duas")"
+  echo "deen: fetching the duas (once)"
+  if "$src/scripts/fetch-duas" >"$duas.tmp" 2>/dev/null; then
+    mv "$duas.tmp" "$duas"
+  else
+    rm -f "$duas.tmp"
+    warn "could not fetch the duas — the hub's Duas screen will say so; rerun a chezmoi apply"
   fi
 fi
 

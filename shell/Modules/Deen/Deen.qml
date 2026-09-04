@@ -40,7 +40,7 @@ Scope {
         windowHeight: panel.height
     }
 
-    // Which room you are in: "recite", "mushaf" or "hifz".
+    // Which room you are in: "recite", "mushaf", "hifz" or "duas".
     property string view: "recite"
 
     // The mushaf is only worth a 1.16 MB Al-Baqarah parse once you actually
@@ -52,6 +52,11 @@ Scope {
         // is refetched on every visit rather than cached.
         if (deenRoot.view === "hifz")
             refreshHifz();
+        // 268 duas is a quarter of a megabyte and every chapter of it is drawn
+        // from the same answer, so it is one call on the first visit and none
+        // after — the book does not change while the hub is open.
+        if (deenRoot.view === "duas" && deenRoot.duaList.length === 0)
+            duaReq.fetch(["dua", "list"]);
     }
 
     // ------------------------------------------------------------ the ayah
@@ -178,6 +183,36 @@ Scope {
         surahReq.fetch(["api", "surah", String(deenRoot.mushafSurah)]);
     }
 
+    // --------------------------------------------------------------- the duas
+    // Hisn al-Muslim, whole, in one answer: `deen dua list` carries the source
+    // block, the 132 chapters and all 268 duas with the book's own reference
+    // footnote on each. NOTHING HERE COMPOSES CONTENT — the screen draws what
+    // the file says and shows where it came from, which is the rule this hub is
+    // built around and the reason the Duas screen was allowed to exist at all.
+    property var duaSource: null
+    property var duaChapters: []
+    property var duaList: []
+    // Opens on the morning-and-evening adhkar, because that is what "daily"
+    // means for someone rebuilding a practice.
+    property int duaChapter: 27
+    property string duaError: ""
+
+    DeenCall {
+        id: duaReq
+        onLoaded: data => {
+            deenRoot.duaSource = data.source || null;
+            deenRoot.duaChapters = data.chapters || [];
+            deenRoot.duaList = data.duas || [];
+            deenRoot.duaError = "";
+        }
+        onFailed: message => {
+            deenRoot.duaList = [];
+            deenRoot.duaError = message;
+        }
+    }
+
+    onDuaChapterChanged: stopPlayback()
+
     // ------------------------------------------------------------------ audio
     // `deen audio` caches and answers with a path; mpv plays it. Two programs
     // because neither should be the other: deen knows which file a word is,
@@ -192,7 +227,7 @@ Scope {
     // milliseconds between them, which is a pause a recitation has anyway.
     property var playQueue: []
     property int playIndex: -1
-    readonly property bool playingSurah: deenRoot.playIndex >= 0
+    readonly property bool playingQueue: deenRoot.playIndex >= 0
 
     // A surah whose audio will not fetch must not spin through 286 ayat in a
     // second. Three failures in a row and it gives up.
@@ -214,11 +249,10 @@ Scope {
         audioProc.running = true;
     }
 
-    /// Recite the whole surah, Basmala first where there is one — because that
-    /// is how a surah is recited, and `deen` already tells us which surahs have
-    /// one (Al-Fatiha's is its first ayah, At-Tawbah has none).
-    function playSurah() {
-        const refs = (deenRoot.surahBasmala !== "" ? ["1:1"] : []).concat(deenRoot.surahAyahs.map(a => a.s + ":" + a.a));
+    /// Recite a list of references in order, each one prefetched while the one
+    /// before it plays. A surah and a chapter of adhkar are the same problem
+    /// once they are a list of things to fetch and sound in order.
+    function playList(refs) {
         if (refs.length === 0)
             return;
         deenRoot.playQueue = refs;
@@ -226,6 +260,21 @@ Scope {
         deenRoot.playIndex = 0;
         startAudio(refs[0]);
         prefetch(1);
+    }
+
+    /// Recite the whole surah, Basmala first where there is one — because that
+    /// is how a surah is recited, and `deen` already tells us which surahs have
+    /// one (Al-Fatiha's is its first ayah, At-Tawbah has none).
+    function playSurah() {
+        playList((deenRoot.surahBasmala !== "" ? ["1:1"] : []).concat(deenRoot.surahAyahs.map(a => a.s + ":" + a.a)));
+    }
+
+    /// Recite a chapter of adhkar. The duas with no recitation matched to them
+    /// are left OUT of the queue rather than left in to fail: three failures in
+    /// a row stops playback, and a chapter with two unmatched duas in it would
+    /// otherwise stop halfway through for a reason nobody could see.
+    function playChapter() {
+        playList(deenRoot.duaList.filter(d => d.chapter === deenRoot.duaChapter && d.audio !== undefined).map(d => "dua:" + d.id));
     }
 
     /// Move a running recitation to another ayah. Tapping a number while the
@@ -275,7 +324,7 @@ Scope {
             if (audioProc.running)
                 return;
             deenRoot.playing = "";
-            if (!deenRoot.playingSurah)
+            if (!deenRoot.playingQueue)
                 return;
             deenRoot.playFailures = exitCode === 0 ? 0 : deenRoot.playFailures + 1;
             const next = deenRoot.playIndex + 1;
@@ -457,6 +506,12 @@ Scope {
             deenRoot.mushafSurah = num;
     }
 
+    // `qs ipc call deen duas` — the day's adhkar, on the morning chapter.
+    function duas() {
+        show();
+        deenRoot.view = "duas";
+    }
+
     // `qs ipc call deen memorise` — go straight to what is due.
     function memorise() {
         show();
@@ -470,10 +525,15 @@ Scope {
     // start reciting" and just reciting.
     function pedal() {
         show();
-        if (deenRoot.view === "hifz")
+        if (deenRoot.view === "hifz") {
             hifzScreen.toggleRecording();
-        else
-            recite.toggleRecording();
+            return;
+        }
+        // Anywhere else, the pedal means Recite — and it has to SHOW Recite
+        // first. Pressed from the reader it used to start a recording against
+        // a screen that is not on screen, which is the bug `reciteAyah` had.
+        deenRoot.view = "recite";
+        recite.toggleRecording();
     }
 
     FloatingWindow {
@@ -509,6 +569,10 @@ Scope {
                     mushaf.closeSheet();
                     return;
                 }
+                if (duasScreen.sheetOpen) {
+                    duasScreen.closeSheet();
+                    return;
+                }
                 deenRoot.hide();
             }
         }
@@ -518,7 +582,7 @@ Scope {
         // "1:1" would begin a recording.
         Shortcut {
             sequence: "Space"
-            enabled: !recite.editingReference && deenRoot.view !== "mushaf"
+            enabled: !recite.editingReference && deenRoot.view !== "mushaf" && deenRoot.view !== "duas"
             onActivated: deenRoot.view === "hifz" ? hifzScreen.toggleRecording() : recite.toggleRecording()
         }
 
@@ -622,6 +686,10 @@ Scope {
                             {
                                 id: "hifz",
                                 label: "MEMORISE"
+                            },
+                            {
+                                id: "duas",
+                                label: "DUAS"
                             }
                         ]
 
@@ -687,7 +755,7 @@ Scope {
                     basmala: deenRoot.surahBasmala
                     loadError: deenRoot.mushafError
                     playing: deenRoot.playing
-                    playingSurah: deenRoot.playingSurah
+                    playingSurah: deenRoot.playingQueue
                     onSurahStepped: delta => deenRoot.mushafSurah = Math.max(1, Math.min(114, deenRoot.mushafSurah + delta))
                     onSurahPicked: n => deenRoot.mushafSurah = n
                     onPlay: reference => deenRoot.playAudio(reference)
@@ -711,6 +779,27 @@ Scope {
                     reciter: deenRoot.hifzReciter
                     onGraded: (reference, grade, accuracy) => deenRoot.gradeCard(reference, grade, accuracy)
                     onEnrol: reference => deenRoot.enrolSurah(reference)
+                }
+
+                DuasScreen {
+                    id: duasScreen
+
+                    anchors.fill: parent
+                    visible: deenRoot.view === "duas"
+                    style: deenRoot.style
+                    source: deenRoot.duaSource
+                    chapters: deenRoot.duaChapters
+                    duas: deenRoot.duaList
+                    chapter: deenRoot.duaChapter
+                    loadError: deenRoot.duaError
+                    playing: deenRoot.playing
+                    playingSet: deenRoot.playingQueue
+                    onChapterStepped: delta => deenRoot.duaChapter = Math.max(1, Math.min(deenRoot.duaChapters.length || 132, deenRoot.duaChapter + delta))
+                    onChapterPicked: n => deenRoot.duaChapter = n
+                    onPlay: reference => deenRoot.playAudio(reference)
+                    onPlayFrom: reference => deenRoot.playFrom(reference)
+                    onPlayChapter: deenRoot.playChapter()
+                    onStopPlayback: deenRoot.stopPlayback()
                 }
             }
 

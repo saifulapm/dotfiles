@@ -1018,6 +1018,13 @@ ShellRoot {
             return "ok";
         }
 
+        // `qs ipc call deen duas` — the day's adhkar, on the morning chapter.
+        function duas(): string {
+            shell.dismissBarPanels();
+            deenLoader.summon("duas");
+            return "ok";
+        }
+
         // `qs ipc call deen pedal` — start the recitation, or end it. One verb
         // for both so a single keybind can drive a whole attempt.
         function pedal(): string {
