@@ -197,6 +197,13 @@ QtObject {
     readonly property int slow: theme.motion.slow
     readonly property int easing: theme.motion.easing
 
+    // THE HEIGHT OF ONE CONTROL IN A ROW OF THEM. Chips and compact buttons sit
+    // side by side all over this module — a citation chip beside a Listen
+    // button, a grade chip beside a sunnah.com link — and they were 26 and 34,
+    // so every mixed row was misaligned by construction. One number now, read
+    // by MetaChip and by GlassButton's compact form.
+    readonly property int rowControl: ui(34)
+
     readonly property int pagePad: Math.max(ui(22), Math.round(windowWidth * 0.032))
     readonly property int gutter: ui(8)
 }

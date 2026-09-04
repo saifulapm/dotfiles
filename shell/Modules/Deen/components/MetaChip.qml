@@ -17,7 +17,7 @@ Rectangle {
     readonly property bool hasDot: chip.dotColor.a > 0
 
     implicitWidth: label.implicitWidth + style.ui(20) + (chip.hasDot ? style.ui(15) : 0)
-    implicitHeight: style.ui(26)
+    implicitHeight: style.rowControl
     radius: height / 2
     color: style.alpha(style.fg, 0.05)
     border.width: style.hairline

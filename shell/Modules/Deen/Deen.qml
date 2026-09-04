@@ -40,8 +40,10 @@ Scope {
         windowHeight: panel.height
     }
 
-    // Which room you are in: "recite", "mushaf", "hifz", "duas" or "hadith".
-    property string view: "recite"
+    // Which room you are in: "home", "recite", "mushaf", "hifz", "duas" or
+    // "hadith". The hub opens on the home page, and the logo is the way back to
+    // it — a landing page nobody lands on is a screen to maintain for nothing.
+    property string view: "home"
 
     // The mushaf is only worth a 1.16 MB Al-Baqarah parse once you actually
     // open it, so the first switch is what fetches it rather than the open.
@@ -59,6 +61,8 @@ Scope {
             duaReq.fetch(["dua", "list"]);
         // The corpus is 104 MB and is never handed over whole — this asks only
         // for the ten collection names, which is what the filter row draws.
+        if (deenRoot.view === "home")
+            refreshHome();
         if (deenRoot.view === "hadith") {
             if (deenRoot.hadithCollections.length === 0)
                 hadithMetaReq.fetch(["hadith", "collections"]);
@@ -221,6 +225,80 @@ Scope {
     }
 
     onDuaChapterChanged: stopPlayback()
+
+    // -------------------------------------------------------------------- home
+    // TODAY'S PRAYER TIMES ARE READ, NOT FETCHED. The bar's prayer widget owns
+    // that calendar — it is the thing that must tick while the hub is closed
+    // (doc §2), it caches a month at a time, and it is where the latitude,
+    // method and Asr school are configured. The hub reads the same cache
+    // through bin/deen-prayer-today and does the only arithmetic it needs:
+    // which prayer is next. A second fetcher here would be a second set of
+    // times to disagree with.
+    property var prayerDays: null
+    property string prayerError: ""
+
+    Process {
+        id: prayerReq
+
+        running: false
+        command: [Quickshell.env("HOME") + "/.dotfiles/bin/deen-prayer-today"]
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const parsed = JSON.parse(this.text);
+                    deenRoot.prayerDays = parsed && parsed.today ? parsed : null;
+                    deenRoot.prayerError = deenRoot.prayerDays ? "" : "today is not in the cached calendar";
+                } catch (e) {
+                    deenRoot.prayerDays = null;
+                    deenRoot.prayerError = "the prayer cache could not be read";
+                }
+            }
+        }
+
+        onExited: exitCode => {
+            // 3 is "nothing cached yet", which is a state and not a failure:
+            // the widget may simply never have run on this machine.
+            if (exitCode !== 0) {
+                deenRoot.prayerDays = null;
+                deenRoot.prayerError = exitCode === 3 ? "the bar's prayer widget has not cached a month yet" : "the prayer cache could not be read";
+            }
+        }
+    }
+
+    // Today's ayah and today's narration, a pure function of the date inside
+    // `deen` so every machine shows the same pair. The LOCAL date is passed:
+    // a day that turns over at six in the morning is not a day.
+    property var daily: null
+    property string dailyError: ""
+
+    DeenCall {
+        id: dailyReq
+        onLoaded: data => {
+            deenRoot.daily = data;
+            deenRoot.dailyError = "";
+        }
+        onFailed: message => {
+            deenRoot.daily = null;
+            deenRoot.dailyError = message;
+        }
+    }
+
+    property int hifzDueNow: 0
+
+    DeenCall {
+        id: hifzStatsReq
+        onLoaded: data => deenRoot.hifzDueNow = data.due || 0
+    }
+
+    function refreshHome() {
+        prayerReq.running = false;
+        prayerReq.running = true;
+        dailyReq.fetch(["api", "daily", "--date", Qt.formatDate(new Date(), "yyyy-MM-dd")]);
+        // The due count is the one number this page states, so it is asked for
+        // on every visit rather than cached: it changes as you review.
+        hifzStatsReq.fetch(["hifz", "stats"]);
+    }
 
     // ------------------------------------------------------------------ hadith
     // 36,512 narrations in ten collections, on disk, never loaded whole. The
@@ -512,6 +590,10 @@ Scope {
     function didOpen() {
         if (deenRoot.surahs.length === 0)
             surahsReq.fetch(["api", "surahs"]);
+        // The home page is the first thing seen and all three of its answers
+        // are time-sensitive — the countdown, the day's pair, the due count.
+        if (deenRoot.view === "home")
+            refreshHome();
         // The surface is evictable, so a reopen after the grace period starts
         // from nothing and has to ask again; within it, the ayah is still here
         // and asking twice would be a process for an answer we hold.
@@ -586,6 +668,12 @@ Scope {
             surahReq.fetch(["api", "surah", String(num)]);
         else
             deenRoot.mushafSurah = num;
+    }
+
+    // `qs ipc call deen home` — back to the landing page.
+    function home() {
+        show();
+        deenRoot.view = "home";
     }
 
     // `qs ipc call deen duas` — the day's adhkar, on the morning chapter.
@@ -716,11 +804,34 @@ Scope {
                 height: deenRoot.style.ui(76)
                 z: 1
 
+                // THE LOGO IS THE WAY HOME, which is the web's oldest
+                // convention and the reason the home page needs no chip of its
+                // own in the row on the right: the mark that says where you are
+                // is also the one that takes you back to the front of it.
                 Row {
+                    id: brand
+
                     anchors.left: parent.left
                     anchors.leftMargin: deenRoot.style.pagePad
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: deenRoot.style.ui(11)
+                    opacity: brandHover.hovered && deenRoot.view !== "home" ? 0.78 : 1
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: deenRoot.style.normal
+                            easing.type: deenRoot.style.easing
+                        }
+                    }
+
+                    HoverHandler {
+                        id: brandHover
+                        cursorShape: deenRoot.view === "home" ? Qt.ArrowCursor : Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        onTapped: deenRoot.view = "home"
+                    }
 
                     Text {
                         textFormat: Text.PlainText
@@ -898,6 +1009,29 @@ Scope {
                     onPlayFrom: reference => deenRoot.playFrom(reference)
                     onPlayChapter: deenRoot.playChapter()
                     onStopPlayback: deenRoot.stopPlayback()
+                }
+
+                HomeScreen {
+                    id: homeScreen
+
+                    anchors.fill: parent
+                    visible: deenRoot.view === "home"
+                    style: deenRoot.style
+                    prayer: deenRoot.prayerDays
+                    prayerError: deenRoot.prayerError
+                    daily: deenRoot.daily
+                    dailyError: deenRoot.dailyError
+                    hifzDue: deenRoot.hifzDueNow
+                    onReciteRequested: deenRoot.view = "recite"
+                    onMemoriseRequested: deenRoot.memorise()
+                    onDuasRequested: chapter => {
+                        deenRoot.duaChapter = chapter;
+                        deenRoot.view = "duas";
+                    }
+                    onHadithRequested: deenRoot.view = "hadith"
+                    onReadRequested: surah => deenRoot.readSurah(surah)
+                    onPlayRequested: reference => deenRoot.playAudio(reference)
+                    onOpenRequested: url => deenRoot.openUrl(url)
                 }
 
                 HadithScreen {

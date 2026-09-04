@@ -43,7 +43,7 @@ Button {
     // that lost its text.
     readonly property bool iconOnly: root.text.length === 0 && root.iconText.length > 0
 
-    implicitHeight: root.compact ? root.style.ui(34) : root.style.ui(42)
+    implicitHeight: root.compact ? root.style.rowControl : root.style.ui(42)
     implicitWidth: root.iconOnly ? root.implicitHeight : Math.max(root.compact ? root.style.ui(76) : root.style.ui(104), contentRow.implicitWidth + (root.compact ? root.style.ui(22) : root.style.ui(30)))
     leftPadding: root.compact ? root.style.ui(11) : root.style.ui(15)
     rightPadding: root.leftPadding

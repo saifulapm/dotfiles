@@ -1018,6 +1018,13 @@ ShellRoot {
             return "ok";
         }
 
+        // `qs ipc call deen home` — the landing page.
+        function home(): string {
+            shell.dismissBarPanels();
+            deenLoader.summon("home");
+            return "ok";
+        }
+
         // `qs ipc call deen duas` — the day's adhkar, on the morning chapter.
         function duas(): string {
             shell.dismissBarPanels();

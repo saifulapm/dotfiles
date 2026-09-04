@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Today's and tomorrow's prayer rows, from the calendar the bar already caches.
+#
+#   {"today": {...aladhan row...}, "tomorrow": {...}}
+#
+# THE ISLAMIC HUB READS PRAYER TIMES, IT DOES NOT FETCH THEM. The bar's prayer
+# widget owns that calendar: it is the thing that has to tick while the hub is
+# closed, it caches a month at a time, and it is the only place the latitude,
+# method and Asr school are configured (shell.json's widget settings). A second
+# fetcher in the hub would be a second set of times to disagree with.
+#
+# Which is also why this greps the cache by DATE rather than by file name: the
+# name carries the method and school (`2026-9-m1s1.json`) and the hub has no way
+# to know either. Every cached month is slurped and today's row is the one whose
+# gregorian date matches, so the answer is right whatever the settings are.
+#
+# Exits 3 when nothing is cached yet — the widget has never run, or never
+# succeeded — which the hub reports as "not cached yet" rather than as an error.
+set -uo pipefail
+
+dir="${XDG_CACHE_HOME:-$HOME/.cache}/qshell/prayer"
+
+ls "$dir"/*.json >/dev/null 2>&1 || exit 3
+
+exec jq -s \
+  --arg today "$(date +%d-%m-%Y)" \
+  --arg tomorrow "$(date -d tomorrow +%d-%m-%Y)" \
+  '[.[].data[]] | {
+     today:    (map(select(.date.gregorian.date == $today))    | first),
+     tomorrow: (map(select(.date.gregorian.date == $tomorrow)) | first)
+   }' \
+  "$dir"/*.json
