@@ -187,6 +187,15 @@ Scope {
         goTo(ref);
     }
 
+    // The recitation pedal, reachable from outside the window as well as from
+    // the button and Space. A keybind can start a recitation without the hub
+    // having the keyboard, which is the difference between "press Recite, then
+    // start reciting" and just reciting.
+    function pedal() {
+        show();
+        recite.toggleRecording();
+    }
+
     FloatingWindow {
         id: panel
 

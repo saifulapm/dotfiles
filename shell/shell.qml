@@ -1003,6 +1003,13 @@ ShellRoot {
             deenLoader.summon("reciteAyah", [reference]);
             return "ok";
         }
+
+        // `qs ipc call deen pedal` — start the recitation, or end it. One verb
+        // for both so a single keybind can drive a whole attempt.
+        function pedal(): string {
+            deenLoader.summon("pedal");
+            return "ok";
+        }
     }
 
     // The disk speed test, reached from the menu (System > Disk Speed Test).
