@@ -274,10 +274,35 @@ set_band() {
     # A band change only takes effect on reassociation. If the radio cannot come
     # back up on the requested band, put the previous setting back and reconnect
     # rather than leaving the machine stranded offline.
+    # The regulatory domain is read at THIS point on purpose: while still
+    # associated it is whatever the AP's beacon claims, and that is the value
+    # the pre-flight check in set_band used.
+    local domain_while_up domain_while_down
+    domain_while_up=$(reg_domain)
+
     if ! nmcli connection up "$profile" >/dev/null 2>&1; then
+        # Sampled BEFORE reconnecting, while the radio is still unassociated —
+        # this is the domain that actually governed the attempt.
+        domain_while_down=$(reg_domain)
+
         nmcli connection modify "$profile" 802-11-wireless.band "$previous" >/dev/null
         nmcli connection up "$profile" >/dev/null 2>&1 || true
-        echo "Error: could not connect on ${target}; reverted to previous band." >&2
+
+        # THE DEADLOCK, worth naming because nothing else in the system does.
+        # A card takes its regulatory domain from the AP it is associated with,
+        # and loses it the moment it disassociates. If the AP's 5 GHz channel
+        # is legal only under the domain that AP grants, then the permission to
+        # use it exists solely while already connected to it — and changing
+        # band requires disconnecting. The supplicant then scans a channel it
+        # may not transmit on, finds nothing, and NetworkManager gives up after
+        # ~25 s with the misleading `ssid-not-found`.
+        if [[ -n $domain_while_down && $domain_while_up != "$domain_while_down" ]]; then
+            echo "Error: could not connect on ${target}; reverted to previous band." >&2
+            echo "  The regulatory domain was ${domain_while_up} while connected but ${domain_while_down} once the radio dropped, and the AP's ${target}GHz channel is not permitted under ${domain_while_down}." >&2
+            echo "  Nothing here can fix that: the permission only exists while already associated. Move the AP's ${target}GHz radio to a channel ${domain_while_down} allows." >&2
+        else
+            echo "Error: could not connect on ${target}; reverted to previous band." >&2
+        fi
         exit 1
     fi
 }
