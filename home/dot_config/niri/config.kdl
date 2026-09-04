@@ -141,18 +141,46 @@ output "eDP-1" {
     }
 }
 
-// The NUC's display. niri's auto-scale heuristic reads its DPI and picks a
-// fractional scale, which is wrong for this monitor at this viewing distance
-// — pin it to 1 (2026-08-10). Mode stays auto: only the scale was ever wrong.
+// THE TWO DESK MONITORS ARE SCALED TO A CONSTANT APPARENT SIZE, not to a
+// constant pixel density (2026-09-04). Both were previously set by eye —
+// DP-3 pinned to 1 on 2026-08-10, HDMI-A-1 to 1.1 on 2026-08-12 — and both
+// came out too small, which is what finally got measured rather than judged:
+//
+//   panel     px          mm        ppi  scale  base 12px  at    apparent
+//   eDP-1     2560x1600   286x179   227  1.5    2.01 mm    50cm   13.8'
+//   DP-3      3840x2160   700x390   139  1      2.19 mm    75cm   10.0'  -27%
+//   HDMI-A-1  3840x2160   ~600x340  163  1.1    2.06 mm    65cm   10.9'  -21%
+//
+// The three panels were within 10% of each other in MILLIMETRES and a quarter
+// apart in what the eye actually receives, because a 32" monitor sits half a
+// metre further away than a laptop. Density is the wrong invariant for a desk;
+// arc-minutes is the right one. Matching eDP-1's 13.8' wants 1.38 on the NUC
+// and 1.33 on the mini.
+//
+// Both cost desktop room and that is the trade: DP-3 gives up a third of its
+// rows and columns, and still has 2560x1440 — half as much again as the
+// MacBook it now matches.
+//
+// The `physical_size` in `niri msg --json outputs` is where the millimetres
+// come from and it is trustworthy on both machines (700x390 and 286x179,
+// checked against the stated diagonals). The viewing distances are estimates,
+// and they are the only soft number here — if a monitor moves, redo the sum.
+//
+// This deliberately does NOT touch the Islamic Hub, whose type was the
+// original complaint. Its `boost` is derived from the window's LOGICAL size,
+// so raising the output scale multiplies the device pixels and divides boost
+// by the same factor: the ayah stays at ~63 device px either way. The hub was
+// never the small thing — measured, it renders 47% LARGER on these two
+// screens than on the MacBook. Everything that is not the hub was the gap.
 output "DP-3" {
-    scale 1
+    scale 1.5
 }
 
-// The Mac mini's display (BenQ MA270U, 3840x2160 at 27" → 163 DPI). 1 is a
-// touch too small at this viewing distance and 1.25 gives up too much room —
-// 1.1 lands between them (2026-08-12). Mode stays auto.
+// The Mac mini's display (BenQ MA270U, 3840x2160 at 27" → 163 DPI).
+// 1.3333333 and not 1.333: four thirds divides 3840 and 2160 exactly, landing
+// the logical size on 2880x1620 instead of 2880.7x1620.4.
 output "HDMI-A-1" {
-    scale 1.1
+    scale 1.3333333
 }
 
 // Settings that influence how windows are positioned and sized.
