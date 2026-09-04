@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# playwright-cli — hand Playwright's bundled Chromium the fractional-scaling
+# flags the desktop browser gets, then get out of the way.
+#
+# Playwright spawns its own chromium out of ~/.cache/ms-playwright, so it never
+# goes through /usr/bin/chromium-browser and never sees CHROMIUM_USER_FLAGS.
+# It is already on native Wayland — measured: with no flags niri attributes the
+# window to the real chrome pid and libwayland is mapped; only
+# --ozone-platform=x11 moves the window onto Xwayland. What it misses is
+# WaylandPerSurfaceScale/WaylandUiScale, so on this 1.5-scale output it renders
+# at 1x and the compositor bilinear-upscales it. That blur is what reads as
+# "playwright is running under XWayland".
+#
+# The config lives in ~/.config/playwright/cli.config.json because
+# playwright-cli resolves its default config strictly against the cwd
+# (path.resolve(".playwright", "cli.config.json")) with no upward search and no
+# home fallback, so a machine-wide default needs this wrapper to pass --config.
+#
+# Only `open` and `attach` accept --config; passing it to any other subcommand
+# is an error, hence the subcommand test. A project's own .playwright/
+# cli.config.json wins, and so does an explicit --config, so this only fills in
+# a default nobody else supplied.
+#
+# The config sets --enable-features rather than appending to it: chromium keeps
+# switches in a map, so a second --enable-features replaces the first instead of
+# merging. Playwright's own CDPScreenshotNewSurface is therefore repeated in the
+# value to keep it alive. If a playwright upgrade changes its default feature
+# set, that list needs the same edit.
+set -euo pipefail
+
+real=$HOME/.local/share/pnpm/bin/playwright-cli
+config=${XDG_CONFIG_HOME:-$HOME/.config}/playwright/cli.config.json
+
+# First non-option token is the subcommand: the global session flag is spelled
+# -s=<name>, so anything leading with - is not it.
+subcommand=""
+explicit_config=false
+for arg in "$@"; do
+  case $arg in
+    --config | --config=*) explicit_config=true ;;
+    -*) ;;
+    *) [[ -n $subcommand ]] || subcommand=$arg ;;
+  esac
+done
+
+if [[ -f $config ]] &&
+  [[ $subcommand == open || $subcommand == attach ]] &&
+  [[ $explicit_config == false ]] &&
+  [[ ! -f .playwright/cli.config.json ]]; then
+  exec "$real" "$@" --config "$config"
+fi
+
+exec "$real" "$@"

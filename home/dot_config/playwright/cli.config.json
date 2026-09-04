@@ -1,0 +1,10 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "launchOptions": {
+      "args": [
+        "--enable-features=CDPScreenshotNewSurface,WaylandPerSurfaceScale,WaylandUiScale"
+      ]
+    }
+  }
+}
