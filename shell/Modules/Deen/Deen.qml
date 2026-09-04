@@ -1,8 +1,8 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Window
 import Quickshell
 import Quickshell.Io
+import "components"
 import "screens"
 
 // The Islamic hub: recite an ayah and be told which words were right.
@@ -115,16 +115,29 @@ Scope {
     }
 
     property var ayah: null
+    // The same call already carries the word list with its tajweed spans, so
+    // the Recite screen colours the rules while you can still act on them.
+    property var ayahWords: []
     property string loadError: ""
+
+    // The surah's row out of the 114, so a screen can say "AL-FAATIHA" instead
+    // of "surah 1". Empty until `api surahs` lands, which is one call per open.
+    readonly property var reciteSurah: {
+        if (!deenRoot.ayah || deenRoot.surahs.length === 0)
+            return null;
+        return deenRoot.surahs.find(x => x.n === deenRoot.ayah.s) || null;
+    }
 
     DeenCall {
         id: ayahReq
         onLoaded: data => {
             deenRoot.ayah = data.ayah || null;
+            deenRoot.ayahWords = data.words || [];
             deenRoot.loadError = "";
         }
         onFailed: message => {
             deenRoot.ayah = null;
+            deenRoot.ayahWords = [];
             deenRoot.loadError = message;
         }
     }
@@ -237,6 +250,16 @@ Scope {
 
     function enrolSurah(n) {
         hifzWriteReq.fetch(["hifz", "add", String(n)]);
+        // Adding a surah from the Read screen changed a number on a screen you
+        // are not looking at, and answered with nothing at all.
+        const row = deenRoot.surahs.find(x => x.n === Number(n));
+        deenRoot.notify(row ? (row.en + " added to Memorise") : "Added to Memorise");
+    }
+
+    // A receipt you glance at and forget. `toast` lives inside the window, so
+    // this is the handle the screens reach it through.
+    function notify(message) {
+        toast.show(message);
     }
 
     // ------------------------------------------------------------ open/close
@@ -306,8 +329,14 @@ Scope {
     }
 
     // `qs ipc call deen recite 2:255` — open straight onto an ayah.
+    //
+    // It sets the view too, which it did not: called while the hub sat on the
+    // reader it changed the ayah behind a screen that does not show one, and
+    // the pedal then recorded against an invisible Recite screen. The other two
+    // entry points always did this; this one was the odd one out.
     function reciteAyah(ref) {
         show();
+        deenRoot.view = "recite";
         goTo(ref);
     }
 
@@ -362,9 +391,20 @@ Scope {
         // Shortcuts rather than Keys.onPressed: Qt consults the shortcut map
         // before delivering a key, so Escape works even while the reference
         // field has focus. Dekho verified the same precedence.
+        // A sheet in front of the page gets Escape first. It cannot claim the
+        // key itself: a Shortcut outranks key delivery, which is exactly why
+        // Escape closes the hub from inside a text field, and the same
+        // precedence would close the whole window out from under an open
+        // surah list.
         Shortcut {
             sequence: "Escape"
-            onActivated: deenRoot.hide()
+            onActivated: {
+                if (mushaf.sheetOpen) {
+                    mushaf.closeSheet();
+                    return;
+                }
+                deenRoot.hide();
+            }
         }
 
         // Space is the recitation pedal — start, then stop — but ONLY when the
@@ -382,45 +422,133 @@ Scope {
             anchors.fill: parent
             focus: true
 
-            // The screen strip. Two rooms so far; it is a Row rather than a
-            // TabBar because the hub will grow more of them than a tab bar
-            // reads well with, and this is what the row becomes.
-            Row {
-                id: nav
+            // The glow, and it is the FIRST child of the window for a reason.
+            // It has to reach past the header band or its dissolve lands as a
+            // hard horizontal line, and the band it reaches into belongs to the
+            // screen below — so drawn inside the chrome, which does not clip,
+            // its bottom gradient painted the page colour straight over the
+            // reader's own title row. Behind everything, it is a background.
+            AmbientBackground {
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: chrome.height * 2.2
+                style: deenRoot.style
+                pageWidth: keyRoot.width
+                pageHeight: keyRoot.height
+            }
+
+            // THE HEADER BAND, which is the piece the hub did not have. Before
+            // it, three flat QtQuick.Controls Buttons floated at the top of an
+            // empty window and the module had no identity of its own on screen
+            // — the same shape as a preferences dialog. This is Dekho's, and
+            // for the same reason: a hub is a place, and a place says its name.
+            Item {
+                id: chrome
 
                 anchors.top: parent.top
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.topMargin: deenRoot.style.ui(10)
-                spacing: deenRoot.style.ui(6)
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: deenRoot.style.ui(76)
                 z: 1
 
-                Repeater {
-                    model: [
-                        {
-                            id: "recite",
-                            label: "Recite"
-                        },
-                        {
-                            id: "mushaf",
-                            label: "Read"
-                        },
-                        {
-                            id: "hifz",
-                            label: "Memorise"
-                        }
-                    ]
+                Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: deenRoot.style.pagePad
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: deenRoot.style.ui(11)
 
-                    delegate: Button {
-                        required property var modelData
-                        text: modelData.label
-                        flat: deenRoot.view !== modelData.id
-                        onClicked: deenRoot.view = modelData.id
+                    Text {
+                        textFormat: Text.PlainText
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "󱠧"  // md-mosque, the same glyph the bar's prayer widget wears
+                        color: deenRoot.style.accent
+                        font.family: deenRoot.style.fontFamily
+                        font.pixelSize: deenRoot.style.type(26)
                     }
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: deenRoot.style.ui(1)
+
+                        Text {
+                            textFormat: Text.PlainText
+                            text: "DEEN"
+                            color: deenRoot.style.brightFg
+                            font.family: deenRoot.style.fontFamily
+                            font.pixelSize: deenRoot.style.type(15)
+                            font.weight: Font.Bold
+                            font.letterSpacing: 1.5
+                        }
+
+                        Text {
+                            textFormat: Text.PlainText
+                            text: "QURAN · RECITATION"
+                            color: deenRoot.style.muted
+                            font.family: deenRoot.style.fontFamily
+                            font.pixelSize: deenRoot.style.type(8)
+                            font.letterSpacing: 0.7
+                        }
+                    }
+                }
+
+                // The screen strip. A Row of chips rather than a TabBar because
+                // the hub will grow more rooms than a tab bar reads well with,
+                // and this is what the row becomes.
+                Row {
+                    id: nav
+
+                    anchors.right: parent.right
+                    anchors.rightMargin: deenRoot.style.pagePad
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: deenRoot.style.ui(5)
+
+                    Repeater {
+                        model: [
+                            {
+                                id: "recite",
+                                label: "RECITE"
+                            },
+                            {
+                                id: "mushaf",
+                                label: "READ"
+                            },
+                            {
+                                id: "hifz",
+                                label: "MEMORISE"
+                            }
+                        ]
+
+                        delegate: GlassButton {
+                            required property var modelData
+
+                            style: deenRoot.style
+                            text: modelData.label
+                            compact: true
+                            // `primary`, not `selected`, and it is the one
+                            // place this module reads omakade's vocabulary
+                            // loosely. `selected` is a 0.12 wash over 0.045 —
+                            // enough to mark one chip in a filter row, not
+                            // enough to say which of three rooms you are
+                            // standing in, which is the only thing the header
+                            // has to answer.
+                            primary: deenRoot.view === modelData.id
+                            onClicked: deenRoot.view = modelData.id
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: deenRoot.style.hairline
+                    color: deenRoot.style.alpha(deenRoot.style.muted, 0.16)
                 }
             }
 
             Item {
-                anchors.top: nav.bottom
+                anchors.top: chrome.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
@@ -433,22 +561,28 @@ Scope {
                     style: deenRoot.style
                     reference: deenRoot.reference
                     ayah: deenRoot.ayah
+                    words: deenRoot.ayahWords
+                    surah: deenRoot.reciteSurah
                     loadError: deenRoot.loadError
                     reciter: deenRoot.reciteReciter
                     onReferenceChanged_: ref => deenRoot.goTo(ref)
                 }
 
                 MushafScreen {
+                    id: mushaf
+
                     anchors.fill: parent
                     visible: deenRoot.view === "mushaf"
                     style: deenRoot.style
                     surah: deenRoot.surahMeta
+                    surahs: deenRoot.surahs
                     ayahs: deenRoot.surahAyahs
                     words: deenRoot.surahWords
                     basmala: deenRoot.surahBasmala
                     loadError: deenRoot.mushafError
                     playing: deenRoot.playing
                     onSurahStepped: delta => deenRoot.mushafSurah = Math.max(1, Math.min(114, deenRoot.mushafSurah + delta))
+                    onSurahPicked: n => deenRoot.mushafSurah = n
                     onPlay: reference => deenRoot.playAudio(reference)
                     onEnrol: reference => deenRoot.enrolSurah(reference)
                 }
@@ -460,6 +594,7 @@ Scope {
                     visible: deenRoot.view === "hifz"
                     style: deenRoot.style
                     queue: deenRoot.hifzQueue
+                    surahs: deenRoot.surahs
                     totalDue: deenRoot.hifzTotalDue
                     enrolled: deenRoot.hifzEnrolled
                     loadError: deenRoot.hifzError
@@ -467,6 +602,12 @@ Scope {
                     onGraded: (reference, grade, accuracy) => deenRoot.gradeCard(reference, grade, accuracy)
                     onEnrol: reference => deenRoot.enrolSurah(reference)
                 }
+            }
+
+            Toast {
+                id: toast
+
+                style: deenRoot.style
             }
         }
     }

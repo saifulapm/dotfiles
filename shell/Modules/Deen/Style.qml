@@ -41,6 +41,9 @@ QtObject {
     readonly property color panel: theme.surface1
     readonly property color raised: theme.surface2
     readonly property color fg: theme.textPrimary
+    // The step above `fg`, for the few things that have to win against it: a
+    // primary button's label, a stat tile's figure.
+    readonly property color brightFg: theme.col("ansi.bright-white")
     readonly property color muted: theme.textMuted
     readonly property color accent: theme.accent
     readonly property color green: theme.okColor
@@ -136,6 +139,19 @@ QtObject {
         default:
             return style.fg;
         }
+    }
+
+    // One word, coloured by its rule spans, as rich text INSIDE a single Text.
+    // It lives here rather than in the two files that draw words because it is
+    // a pure function of the colours above, and because the reader and the
+    // Recite card had already grown a copy each.
+    function wordHtml(segments) {
+        let out = "";
+        for (let i = 0; i < segments.length; i++) {
+            const seg = segments[i];
+            out += seg.r ? ('<font color="' + tajweedColor(seg.r) + '">' + seg.t + "</font>") : seg.t;
+        }
+        return out;
     }
 
     readonly property var tajweedLegend: [

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import "../components"
 
 // Recite an ayah; be told which words were right.
 //
@@ -21,6 +22,11 @@ FocusScope {
     // owns the data and the screens present it, which is the split Dekho draws
     // and the reason none of its screens instantiate a request of their own.
     required property var ayah
+    // The word list beside it, carrying the tajweed spans. Same call, so it
+    // costs nothing to draw.
+    required property var words
+    // The surah's row out of the 114, for a name instead of a number.
+    required property var surah
     required property string loadError
     // One recitation attempt, owned by the root for the same reason (a screen
     // cannot see a type in the directory above it).
@@ -64,147 +70,205 @@ FocusScope {
         // Sits above centre: the block grows downward as a verdict and its
         // footnote appear, and a truly centred column would shift the ayah
         // every time it did.
-        y: Math.max(screen.style.pagePad, (parent.height - height) * 0.32)
+        y: Math.max(screen.style.pagePad, (parent.height - height) * 0.3)
         width: Math.min(parent.width - screen.style.pagePad * 2, screen.style.ui(900))
-        spacing: screen.style.ui(18)
+        spacing: screen.style.ui(20)
 
         // ------------------------------------------------------------- toolbar
-        Row {
-            spacing: screen.style.ui(10)
+        // The stepper and the field are one cluster on the left; the ayah's
+        // name is the caption on the right, because the name is what tells you
+        // where you are and the numbers are what you use to move.
+        Item {
             width: parent.width
+            height: refField.height
 
-            Button {
-                text: "◀"
-                enabled: !screen.busy
-                onClicked: screen.referenceChanged_("prev")
-            }
-
-            TextField {
-                id: refField
-                width: screen.style.ui(120)
-                text: screen.reference
-                enabled: !screen.busy
-                font.family: screen.style.fontFamily
-                font.pixelSize: screen.style.type(13)
-                onAccepted: screen.referenceChanged_(text)
-            }
-
-            Button {
-                text: "▶"
-                enabled: !screen.busy
-                onClicked: screen.referenceChanged_("next")
-            }
-
-            Label {
+            Row {
+                anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: screen.ayah ? ("Surah " + screen.ayah.s + ", ayah " + screen.ayah.a) : ""
-                color: screen.style.muted
-                font.family: screen.style.fontFamily
-                font.pixelSize: screen.style.type(12)
+                spacing: screen.style.ui(8)
+
+                GlassButton {
+                    style: screen.style
+                    iconText: "◀"
+                    compact: true
+                    enabled: !screen.busy
+                    Accessible.name: "Previous ayah"
+                    onClicked: screen.referenceChanged_("prev")
+                }
+
+                RefField {
+                    id: refField
+
+                    width: screen.style.ui(128)
+                    height: screen.style.ui(34)
+                    style: screen.style
+                    text: screen.reference
+                    enabled: !screen.busy
+                    onAccepted: screen.referenceChanged_(text)
+                    onEscaped: screen.forceActiveFocus()
+                }
+
+                GlassButton {
+                    style: screen.style
+                    iconText: "▶"
+                    compact: true
+                    enabled: !screen.busy
+                    Accessible.name: "Next ayah"
+                    onClicked: screen.referenceChanged_("next")
+                }
             }
-        }
 
-        // ---------------------------------------------------------- the ayah
-        // Before a check this is the plain text; after one it is the aligned
-        // words, coloured. The words come from the RESULT rather than from
-        // splitting the ayah here, because deen drops tokens that normalise
-        // away and its indices count the tokens it kept — splitting again in
-        // QML would eventually disagree with it about which word is which.
-        // The ayah is the hero, so it gets the one raised surface on the page.
-        // A plain Rectangle, not a rounded clip: rounding a filled rect is
-        // free, rounding its contents would cost a framebuffer.
-        Rectangle {
-            width: parent.width
-            height: ayahFlow.height + screen.style.ui(44)
-            visible: screen.ayah !== null
-            color: screen.style.panel
-            radius: screen.style.radiusLg
-            border.width: screen.style.hairline
-            border.color: screen.style.alpha(screen.style.muted, 0.18)
+            Column {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: screen.style.ui(2)
 
-            Flow {
-                id: ayahFlow
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.right: parent.right
+                    text: screen.surah ? screen.surah.en.toUpperCase() : ""
+                    color: screen.style.brightFg
+                    font.family: screen.style.fontFamily
+                    font.pixelSize: screen.style.type(12)
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: 1.1
+                }
 
-                anchors.centerIn: parent
-                width: parent.width - screen.style.ui(44)
-                layoutDirection: Qt.RightToLeft
-                spacing: screen.style.ui(12)
-
-                Repeater {
-                    model: screen.verdict ? screen.verdict.words : (screen.ayah ? String(screen.ayah.ar).split(/\s+/) : [])
-
-                    delegate: Label {
-                        required property var modelData
-
-                        readonly property bool aligned: screen.verdict !== null
-                        readonly property string op: aligned ? String(modelData.op) : "plain"
-                        // An `extra` word was said but is not in the ayah, so it has
-                        // no reference text to show — render what was heard instead.
-                        readonly property string shown: aligned ? (modelData.reference || modelData.heard) : String(modelData)
-
-                        text: shown
-                        color: aligned ? screen.style.wordColor(op) : screen.style.fg
-                        font.family: screen.style.arabicFamily
-                        font.pixelSize: screen.style.type(30)
-                        // Uthmani text is dense with marks; the default leading
-                        // collides them with the line above at this size.
-                        lineHeight: 1.7
-                        opacity: op === "extra" ? 0.55 : 1
-
-                        ToolTip.visible: hover.hovered && aligned && op !== "ok"
-                        ToolTip.text: {
-                            if (op === "missed")
-                                return "not heard";
-                            if (op === "extra")
-                                return "heard, but not in this ayah";
-                            return "heard: " + modelData.heard;
-                        }
-
-                        HoverHandler {
-                            id: hover
-                        }
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.right: parent.right
+                    text: {
+                        if (!screen.ayah)
+                            return "";
+                        const total = screen.surah ? (" of " + screen.surah.count) : "";
+                        return "AYAH " + screen.ayah.a + total;
                     }
+                    color: screen.style.muted
+                    font.family: screen.style.fontFamily
+                    font.pixelSize: screen.style.type(9)
+                    font.letterSpacing: 0.7
                 }
             }
         }
 
-        // -------------------------------------------------------- translation
-        Label {
+        // ---------------------------------------------------------- the ayah
+        // The hero, and the one raised surface on the page. Tajweed coloured
+        // until a recitation is scored, then coloured by the verdict — see
+        // AyahSurface for why those two never share the text.
+        AyahSurface {
             width: parent.width
             visible: screen.ayah !== null
-            text: screen.ayah ? screen.ayah.bn : ""
-            color: screen.style.muted
-            wrapMode: Text.WordWrap
-            font.family: screen.style.fontFamily
-            font.pixelSize: screen.style.type(13)
+            style: screen.style
+            verdict: screen.verdict
+            words: screen.words
+            plain: screen.ayah ? String(screen.ayah.ar) : ""
         }
 
-        Label {
+        // -------------------------------------------------------- translation
+        // Two languages, each under its own name in small caps. Unlabelled they
+        // were two grey paragraphs of different lengths and it was not obvious
+        // that the second was the same sentence again.
+        Column {
             width: parent.width
             visible: screen.ayah !== null
-            text: screen.ayah ? screen.ayah.en : ""
-            color: screen.style.alpha(screen.style.muted, 0.75)
-            wrapMode: Text.WordWrap
-            font.family: screen.style.fontFamily
-            font.pixelSize: screen.style.type(12)
+            spacing: screen.style.ui(14)
+
+            Repeater {
+                // Sized against the ayah above them rather than against the
+                // rest of the shell. A translation set at the bar's 11 or 12 px
+                // under Arabic at 30 reads as a footnote to it, and the whole
+                // reason both languages are on the page is that the user cannot
+                // yet read the first one.
+                model: [
+                    {
+                        tag: "বাংলা",
+                        key: "bn",
+                        size: 15,
+                        dim: 1.0
+                    },
+                    {
+                        tag: "ENGLISH",
+                        key: "en",
+                        size: 14,
+                        dim: 0.75
+                    }
+                ]
+
+                delegate: Column {
+                    required property var modelData
+
+                    width: parent.width
+                    spacing: screen.style.ui(4)
+
+                    Text {
+                        textFormat: Text.PlainText
+                        text: modelData.tag
+                        color: screen.style.alpha(screen.style.muted, 0.6)
+                        font.family: screen.style.fontFamily
+                        font.pixelSize: screen.style.type(8)
+                        font.weight: Font.DemiBold
+                        font.letterSpacing: 1.2
+                    }
+
+                    Text {
+                        textFormat: Text.PlainText
+                        width: parent.width
+                        text: screen.ayah ? screen.ayah[modelData.key] : ""
+                        color: screen.style.alpha(screen.style.muted, modelData.dim)
+                        wrapMode: Text.WordWrap
+                        font.family: screen.style.fontFamily
+                        font.pixelSize: screen.style.type(modelData.size)
+                    }
+                }
+            }
         }
 
         // ------------------------------------------------------------- action
         Row {
             spacing: screen.style.ui(14)
 
-            Button {
-                id: recordButton
+            GlassButton {
+                style: screen.style
+                primary: true
                 enabled: screen.ayah !== null && screen.reciter.state_ !== "checking"
+                iconText: screen.reciter.state_ === "recording" ? "󰓛" : "󰍬"  // md-stop / md-microphone
                 text: screen.reciter.state_ === "recording" ? "Stop" : "Recite"
                 onClicked: screen.toggleRecording()
             }
 
-            Label {
+            // The one thing on the page that has to be visible from across the
+            // room: whether the microphone is open. A label saying "Listening"
+            // is a label; a pulse is a state.
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: screen.reciter.state_ === "recording"
+                width: screen.style.ui(10)
+                height: width
+                radius: width / 2
+                color: screen.style.red
+
+                SequentialAnimation on opacity {
+                    running: screen.reciter.state_ === "recording"
+                    loops: Animation.Infinite
+                    NumberAnimation {
+                        to: 0.25
+                        duration: screen.style.slow
+                        easing.type: screen.style.easing
+                    }
+                    NumberAnimation {
+                        to: 1.0
+                        duration: screen.style.slow
+                        easing.type: screen.style.easing
+                    }
+                }
+            }
+
+            Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 color: screen.style.muted
                 font.family: screen.style.fontFamily
-                font.pixelSize: screen.style.type(12)
+                font.pixelSize: screen.style.type(11)
                 text: {
                     switch (screen.reciter.state_) {
                     case "recording":
@@ -221,44 +285,56 @@ FocusScope {
         }
 
         // ------------------------------------------------------------- result
-        Label {
-            visible: screen.result !== null
-            font.family: screen.style.fontFamily
-            font.pixelSize: screen.style.type(15)
-            color: screen.style.fg
-            text: {
-                if (!screen.result)
-                    return "";
-                // An empty transcription is silence, not a wrong recitation —
-                // deen returns "" when VAD heard no speech, and saying "0 of 4
-                // words" to someone whose microphone was muted sends them
-                // looking for a mistake in their recitation.
-                if (!String(screen.result.heard).trim())
-                    return "Nothing was heard — check the microphone and try again";
-                return screen.result.correct + " of " + screen.result.total + " words";
-            }
+        // A fraction of something, drawn as one. The fill carries the verdict,
+        // so a poor recitation reads as poor before the number is read — and it
+        // uses the SAME three colours the words above it are painted in, which
+        // is what makes the bar and the ayah one statement instead of two.
+        MeterRow {
+            width: parent.width
+            visible: screen.verdict !== null
+            style: screen.style
+            label: "Words correct"
+            value: screen.result && screen.result.total > 0 ? screen.result.correct / screen.result.total : 0
+            valueText: screen.result ? (screen.result.correct + " of " + screen.result.total + " · " + Math.round(value * 100) + "%") : ""
+            fillColor: value >= 0.9 ? screen.style.green : value >= 0.6 ? screen.style.yellow : screen.style.red
         }
 
-        Label {
+        // A recitation that did not happen has no meter and no word colours —
+        // only this. Telling someone whose microphone was muted that they got
+        // every word of the Fatiha wrong is the one failure mode that matters.
+        Text {
+            textFormat: Text.PlainText
+            width: parent.width
+            visible: screen.reciter.heardNothing
+            wrapMode: Text.WordWrap
+            text: "Nothing was heard — check the microphone and try again"
+            color: screen.style.yellow
+            font.family: screen.style.fontFamily
+            font.pixelSize: screen.style.type(12)
+        }
+
+        Text {
+            textFormat: Text.PlainText
             visible: text !== ""
             width: parent.width
             wrapMode: Text.WordWrap
             text: screen.error || screen.loadError
             color: screen.style.red
             font.family: screen.style.fontFamily
-            font.pixelSize: screen.style.type(12)
+            font.pixelSize: screen.style.type(11)
         }
 
         // The honest footnote, and it stays on screen rather than living in a
         // README nobody opens. See docs/deen-2026-09-04.md §4b.
-        Label {
+        Text {
+            textFormat: Text.PlainText
             visible: screen.result !== null
             width: parent.width
             wrapMode: Text.WordWrap
             text: "This checks the words, not tajweed — articulation like ص/س or ض/د is not judged."
             color: screen.style.alpha(screen.style.muted, 0.7)
             font.family: screen.style.fontFamily
-            font.pixelSize: screen.style.type(11)
+            font.pixelSize: screen.style.type(10)
         }
     }
 }
