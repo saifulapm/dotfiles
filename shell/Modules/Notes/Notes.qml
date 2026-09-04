@@ -446,6 +446,7 @@ Scope {
 
                     Text {
                         id: searchGlyph
+                        textFormat: Text.PlainText
                         anchors.left: parent.left
                         anchors.leftMargin: notesRoot.theme.space(2.5)
                         anchors.verticalCenter: parent.verticalCenter
@@ -505,6 +506,7 @@ Scope {
 
                 Text {
                     id: footer
+                    textFormat: Text.PlainText
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -574,6 +576,7 @@ Scope {
 
                             Text {
                                 id: stageGlyph
+                                textFormat: Text.PlainText
                                 visible: stageChip.visible && !stageThumb.visible
                                 anchors.left: parent.left
                                 anchors.leftMargin: notesRoot.theme.space(2)
@@ -608,6 +611,7 @@ Scope {
                                 color: stageCancelMouse.containsMouse ? notesRoot.theme.alpha(notesRoot.theme.error, 0.22) : "transparent"
 
                                 Text {
+                                    textFormat: Text.PlainText
                                     anchors.centerIn: parent
                                     text: "󰅖"
                                     color: stageCancelMouse.containsMouse ? notesRoot.theme.error : notesRoot.theme.textMuted
@@ -766,6 +770,7 @@ Scope {
                             border.color: row.noteDone ? notesRoot.theme.accent : notesRoot.theme.textMuted
 
                             Text {
+                                textFormat: Text.PlainText
                                 anchors.centerIn: parent
                                 visible: row.noteDone
                                 text: "󰄬"
@@ -823,6 +828,7 @@ Scope {
 
                                 Text {
                                     id: fileGlyph
+                                    textFormat: Text.PlainText
                                     anchors.left: parent.left
                                     anchors.top: parent.top
                                     visible: row.noteAttach !== "" && !row.noteIsImage
@@ -863,6 +869,7 @@ Scope {
                             visible: rowMouse.containsMouse || delMouse.containsMouse
 
                             Text {
+                                textFormat: Text.PlainText
                                 anchors.centerIn: parent
                                 text: "󰅖"
                                 color: delMouse.containsMouse ? notesRoot.theme.error : notesRoot.theme.textMuted
@@ -888,6 +895,7 @@ Scope {
                     visible: displayModel.count === 0
 
                     Text {
+                        textFormat: Text.PlainText
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         text: "󰎞"

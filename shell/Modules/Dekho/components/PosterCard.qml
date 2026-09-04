@@ -172,6 +172,7 @@ FocusScope {
         }
 
         Text {
+            textFormat: Text.PlainText
             visible: artwork.status !== Image.Ready
             anchors.centerIn: parent
             text: root.title.substring(0, 1).toUpperCase()
@@ -208,6 +209,7 @@ FocusScope {
             spacing: root.style.ui(5)
 
             Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 text: root.title.toUpperCase()
                 color: root.style.brightFg
@@ -251,6 +253,7 @@ FocusScope {
 
             Text {
                 id: statusText
+                textFormat: Text.PlainText
 
                 anchors.centerIn: parent
                 text: root.status.toUpperCase()
@@ -304,6 +307,7 @@ FocusScope {
         spacing: root.style.ui(3)
 
         Text {
+            textFormat: Text.PlainText
             width: parent.width
             text: root.title
             color: root.style.fg
@@ -318,6 +322,7 @@ FocusScope {
             spacing: root.style.ui(7)
 
             Text {
+                textFormat: Text.PlainText
                 visible: root.subtitle !== ""
                 text: root.subtitle
                 color: root.style.muted
@@ -325,12 +330,14 @@ FocusScope {
                 font.pixelSize: root.style.type(10)
             }
             Text {
+                textFormat: Text.PlainText
                 visible: root.subtitle !== "" && root.detail !== ""
                 text: "·"
                 color: root.style.alpha(root.style.fg, 0.32)
                 font.pixelSize: root.style.type(10)
             }
             Text {
+                textFormat: Text.PlainText
                 visible: root.detail !== ""
                 text: root.detail
                 color: root.style.muted

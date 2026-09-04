@@ -36,6 +36,7 @@ Rectangle {
 
     Text {
         id: label
+        textFormat: Text.PlainText
 
         anchors.centerIn: parent
         text: toast.message

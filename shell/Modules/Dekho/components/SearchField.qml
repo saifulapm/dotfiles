@@ -50,6 +50,7 @@ TextField {
     }
 
     Text {
+        textFormat: Text.PlainText
         anchors.left: parent.left
         anchors.leftMargin: field.style.ui(13)
         anchors.verticalCenter: parent.verticalCenter

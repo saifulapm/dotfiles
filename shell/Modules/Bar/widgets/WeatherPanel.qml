@@ -158,6 +158,7 @@ BarPanel {
 
                 Text {
                     id: tempBig
+                    textFormat: Text.PlainText
                     text: panel.weather.reportTempNum || "—"
                     color: panel.theme.textPrimary
                     // Hero read-out: deliberately outside the font scale.

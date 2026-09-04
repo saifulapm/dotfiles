@@ -58,6 +58,7 @@ BarButton {
 
             Text {
                 id: badgeText
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 text: Math.min(rootItem.shelf.items.length, 9)
                 color: rootItem.theme.textOnAccent

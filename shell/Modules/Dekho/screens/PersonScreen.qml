@@ -120,6 +120,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     anchors.centerIn: parent
                     visible: screen.photoPath === ""
                     text: screen.person ? Model.initials(screen.person.name) : "?"
@@ -150,6 +151,7 @@ Item {
             }
 
             Text {
+                textFormat: Text.PlainText
                 Layout.fillWidth: true
                 text: screen.person ? String(screen.person.name || "") : (screen.error !== "" ? "That person did not answer" : "Loading…")
                 color: screen.style.brightFg
@@ -161,6 +163,7 @@ Item {
             }
 
             Text {
+                textFormat: Text.PlainText
                 Layout.fillWidth: true
                 visible: text !== ""
                 text: {
@@ -183,6 +186,7 @@ Item {
             }
 
             Text {
+                textFormat: Text.PlainText
                 Layout.fillWidth: true
                 visible: text !== ""
                 text: screen.person && screen.person.place_of_birth ? String(screen.person.place_of_birth) : ""
@@ -194,6 +198,7 @@ Item {
             }
 
             Text {
+                textFormat: Text.PlainText
                 Layout.fillWidth: true
                 Layout.topMargin: screen.style.ui(6)
                 visible: screen.error !== ""
@@ -209,6 +214,7 @@ Item {
             // is here to answer "what else have they been in", and the grid
             // beside it is that answer.
             Text {
+                textFormat: Text.PlainText
                 Layout.fillWidth: true
                 Layout.topMargin: screen.style.ui(6)
                 text: screen.person ? String(screen.person.biography || "") : ""
@@ -243,6 +249,7 @@ Item {
             spacing: screen.style.ui(10)
 
             Text {
+                textFormat: Text.PlainText
                 text: "FILMOGRAPHY  ·  " + screen.credits.length
                 color: screen.style.brightFg
                 font.family: screen.style.fontFamily

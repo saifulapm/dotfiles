@@ -113,6 +113,7 @@ Item {
 
         Text {
             id: badgeLabel
+            textFormat: Text.PlainText
             anchors.centerIn: parent
             text: badge.label
             color: root.badgeTextColor

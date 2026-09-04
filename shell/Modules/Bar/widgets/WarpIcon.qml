@@ -137,6 +137,7 @@ Item {
         anchors.bottom: parent.bottom
 
         Text {
+            textFormat: Text.PlainText
             anchors.centerIn: parent
             text: "!"
             color: root.badgeTextColor

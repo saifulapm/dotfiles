@@ -82,6 +82,7 @@ Item {
             }
 
             Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, Math.round(bar.width * 0.4))
                 // The label is the title once there is one; before that, the

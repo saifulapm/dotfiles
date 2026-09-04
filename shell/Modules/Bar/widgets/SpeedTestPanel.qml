@@ -438,6 +438,7 @@ PanelWindow {
             spacing: 0
 
             Text {
+                textFormat: Text.PlainText
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: dial.reading < 10 ? dial.reading.toFixed(1) : Math.round(dial.reading).toString()
                 color: root.onScrim

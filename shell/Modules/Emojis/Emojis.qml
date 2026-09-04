@@ -308,6 +308,7 @@ Scope {
                             current: emojisRoot.cursorActive && cell.index === emojisRoot.selectedIndex
 
                             Text {
+                                textFormat: Text.PlainText
                                 anchors.centerIn: parent
                                 text: cell.emoji
                                 // No font.family on purpose: the glyphs

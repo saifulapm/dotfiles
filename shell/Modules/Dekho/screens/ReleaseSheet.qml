@@ -55,6 +55,7 @@ ModalSheet {
             Layout.fillWidth: true
 
             Text {
+                textFormat: Text.PlainText
                 text: "WHICH RELEASE?"
                 color: sheet.style.brightFg
                 font.family: sheet.style.fontFamily
@@ -73,6 +74,7 @@ ModalSheet {
         }
 
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             text: {
                 if (sheet.error)
@@ -168,6 +170,7 @@ ModalSheet {
                     spacing: sheet.style.ui(4)
 
                     Text {
+                        textFormat: Text.PlainText
                         width: parent.width
                         text: row.isAuto ? "Let dekho decide" : String(row.rel.title || "")
                         color: sheet.style.brightFg
@@ -178,6 +181,7 @@ ModalSheet {
                     }
 
                     Text {
+                        textFormat: Text.PlainText
                         width: parent.width
                         text: row.isAuto ? "BEST RELEASE THAT PROVES IT CAN STREAM" : String(row.rel.quality || "").toUpperCase() + "  ·  " + String(row.rel.size || "?") + "  ·  " + (Number(row.rel.seeders) || 0) + " SEEDERS" + (row.rel.audio ? "  ·  " + String(row.rel.audio).toUpperCase() : "")
                         // The dual-audio label is what someone scanning for
@@ -191,6 +195,7 @@ ModalSheet {
             }
 
             Text {
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 visible: !sheet.loading && sheet.rows.length === 0 && filterField.text !== ""
                 text: "No release matched that filter"

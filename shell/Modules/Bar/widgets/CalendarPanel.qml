@@ -272,6 +272,7 @@ BarPanel {
 
             Text {
                 id: heroDate
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 text: Qt.formatDate(panel.today, "MMMM d")
                 color: heroMouse.containsMouse ? panel.theme.accent : panel.theme.textPrimary

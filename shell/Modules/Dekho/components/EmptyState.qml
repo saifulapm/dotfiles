@@ -21,6 +21,7 @@ Column {
     spacing: style.ui(12)
 
     Text {
+        textFormat: Text.PlainText
         anchors.horizontalCenter: parent.horizontalCenter
         text: empty.glyph
         color: empty.style.accent
@@ -29,6 +30,7 @@ Column {
     }
 
     Text {
+        textFormat: Text.PlainText
         anchors.horizontalCenter: parent.horizontalCenter
         text: empty.title
         color: empty.style.fg
@@ -38,6 +40,7 @@ Column {
     }
 
     Text {
+        textFormat: Text.PlainText
         width: Math.min(implicitWidth, empty.parent ? empty.parent.width * 0.6 : implicitWidth)
         anchors.horizontalCenter: parent.horizontalCenter
         visible: empty.message !== ""

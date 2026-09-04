@@ -93,6 +93,7 @@ FocusScope {
         // way a contacts app answers the same gap — a broken-image mark would
         // read as a failure rather than as an absence.
         Text {
+            textFormat: Text.PlainText
             anchors.centerIn: parent
             visible: photo.status !== Image.Ready
             text: Model.initials(root.name)
@@ -138,6 +139,7 @@ FocusScope {
         spacing: root.style.ui(3)
 
         Text {
+            textFormat: Text.PlainText
             width: parent.width
             text: root.name
             color: root.activeFocus ? root.style.accent : root.style.fg
@@ -149,6 +151,7 @@ FocusScope {
         }
 
         Text {
+            textFormat: Text.PlainText
             width: parent.width
             visible: root.character !== ""
             text: root.character

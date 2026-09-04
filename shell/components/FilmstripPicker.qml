@@ -448,6 +448,7 @@ Scope {
 
         Text {
             id: selectedLabel
+            textFormat: Text.PlainText
             anchors.top: carousel.bottom
             anchors.topMargin: pickerRoot.theme.space(4)
             anchors.horizontalCenter: carousel.horizontalCenter
@@ -467,6 +468,7 @@ Scope {
 
         Text {
             id: filterLabel
+            textFormat: Text.PlainText
             visible: pickerRoot.filterText !== ""
             anchors.top: selectedLabel.bottom
             anchors.topMargin: pickerRoot.theme.space(2)

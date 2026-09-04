@@ -194,6 +194,7 @@ Item {
             }
 
             Text {
+                textFormat: Text.PlainText
                 anchors.horizontalCenter: parent.horizontalCenter
                 color: root.textColor
                 font.family: root.theme.fontMono
@@ -291,6 +292,7 @@ Item {
             }
 
             Text {
+                textFormat: Text.PlainText
                 anchors.fill: passwordInput
                 text: root.authenticatingPassword ? "Checking…" : (root.failureMessage.length > 0 ? root.failureMessage : root.placeholderText)
                 visible: passwordInput.text.length === 0
@@ -309,6 +311,7 @@ Item {
             // icon in the same spot.
             Text {
                 id: fingerprintIcon
+                textFormat: Text.PlainText
                 objectName: "fingerprintIndicator"
                 anchors.right: parent.right
                 anchors.rightMargin: root.outlineThickness + 18

@@ -25,6 +25,7 @@ Rectangle {
         spacing: tile.style.ui(7)
 
         Text {
+            textFormat: Text.PlainText
             text: tile.label
             color: tile.style.muted
             font.family: tile.style.fontFamily
@@ -32,6 +33,7 @@ Rectangle {
             font.weight: Font.DemiBold
         }
         Text {
+            textFormat: Text.PlainText
             width: parent.width
             text: tile.value
             color: tile.style.brightFg

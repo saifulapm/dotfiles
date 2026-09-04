@@ -63,7 +63,13 @@ Rectangle {
     readonly property bool singleLineToast: sanitizedBody.length === 0 && actionRow.count === 0
     readonly property bool collapseRedundantIcon: singleLineToast && !hasGlyph && summaryStartsWithGlyph
     readonly property string sanitizedBody: Logic.sanitizeBody(body, app, appIcon)
-    readonly property string styledBody: sanitizedBody.replace(/\r\n|\r|\n/g, "<br/>")
+    // The newline rewrite moved INTO Logic.styledBody, which strips image tags
+    // again after it. Doing it here was a hole: the rewrite inserts `<br/>`
+    // into text the stripper chose to keep, and a kept tag may hold a `<` of
+    // its own, so `<x` + newline + `<img src=…>` — one harmless tag named `x`
+    // to both the stripper and Qt — became `<x<br/>` plus a live image tag
+    // that was never in the input.
+    readonly property string styledBody: Logic.styledBody(body, app, appIcon)
 
     // Their urgency ladder: critical borrows the urgent colour, low dims,
     // everything else takes the accent. It colours the countdown rail and,
@@ -189,6 +195,7 @@ Rectangle {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     anchors.centerIn: parent
                     visible: root.hasGlyph && smallIconImage.status !== Image.Ready
                     text: root.glyph
@@ -199,6 +206,7 @@ Rectangle {
             }
 
             Text {
+                textFormat: Text.PlainText
                 Layout.alignment: Qt.AlignVCenter
                 visible: root.compactGlyph
                 text: root.glyph
@@ -347,6 +355,7 @@ Rectangle {
         }
 
         Text {
+            textFormat: Text.PlainText
             anchors.centerIn: parent
             text: "✕"
             color: closeArea.containsMouse ? root.theme.notifications.text : root.theme.notifications.textMuted

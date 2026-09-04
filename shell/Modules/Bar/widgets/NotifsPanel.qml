@@ -504,6 +504,7 @@ BarPanel {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     anchors.centerIn: parent
                     visible: rowImage.status !== Image.Ready
                     text: notifRow.hasGlyph ? notifRow.entry.glyph : "󰂚"

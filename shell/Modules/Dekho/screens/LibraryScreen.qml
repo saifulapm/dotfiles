@@ -130,6 +130,7 @@ Item {
                 spacing: library.style.ui(11)
 
                 Text {
+                    textFormat: Text.PlainText
                     anchors.verticalCenter: parent.verticalCenter
                     text: "󰎁"
                     color: library.style.accent
@@ -142,6 +143,7 @@ Item {
                     spacing: library.style.ui(1)
 
                     Text {
+                        textFormat: Text.PlainText
                         text: "DEKHO"
                         color: library.style.brightFg
                         font.family: library.style.fontFamily
@@ -155,6 +157,7 @@ Item {
                     // and the mode already has its own caption two rows down, so
                     // repeating it here would be the same word twice.
                     Text {
+                        textFormat: Text.PlainText
                         text: "MOVIES & TV"
                         color: library.style.muted
                         font.family: library.style.fontFamily
@@ -287,6 +290,7 @@ Item {
             }
 
             Text {
+                textFormat: Text.PlainText
                 visible: library.width >= library.style.ui(1100)
                 text: library.castName !== "" ? library.castName.toUpperCase() : library.modeCaption
                 color: library.style.fg
@@ -296,6 +300,7 @@ Item {
                 font.letterSpacing: 0.7
             }
             Text {
+                textFormat: Text.PlainText
                 visible: library.width >= library.style.ui(1100)
                 text: library.items.length + (library.items.length === 1 ? " TITLE" : " TITLES")
                 color: library.style.muted
@@ -303,6 +308,7 @@ Item {
                 font.pixelSize: library.style.type(9)
             }
             Text {
+                textFormat: Text.PlainText
                 visible: library.width >= library.style.ui(1100) && library.loading
                 text: "LOADING"
                 color: library.style.accent
@@ -327,6 +333,7 @@ Item {
             }
 
             Text {
+                textFormat: Text.PlainText
                 visible: library.width > library.style.ui(930)
                 text: "ENTER  OPEN   ·   ^F  SEARCH   ·   ESC  BACK"
                 color: library.style.alpha(library.style.fg, 0.42)
@@ -341,6 +348,7 @@ Item {
             spacing: library.style.ui(6)
 
             Text {
+                textFormat: Text.PlainText
                 text: "FILTER"
                 color: library.style.muted
                 font.family: library.style.fontFamily
@@ -390,6 +398,7 @@ Item {
         }
 
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             visible: library.errorText !== ""
             text: library.errorText

@@ -67,6 +67,7 @@ Button {
         anchors.centerIn: parent
 
         Text {
+            textFormat: Text.PlainText
             anchors.verticalCenter: parent.verticalCenter
             visible: root.iconText.length > 0
             text: root.iconText
@@ -76,6 +77,7 @@ Button {
         }
 
         Text {
+            textFormat: Text.PlainText
             anchors.verticalCenter: parent.verticalCenter
             text: root.text
             color: root.enabled ? (root.primary ? root.style.brightFg : root.style.fg) : root.style.alpha(root.style.fg, 0.35)

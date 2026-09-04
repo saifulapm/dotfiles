@@ -1015,6 +1015,7 @@ Scope {
                     // The filter, as a label: append-only, so there is nothing
                     // to put a caret in.
                     Text {
+                        textFormat: Text.PlainText
                         visible: !pickerRoot.fieldEditable
                         anchors.left: parent.left
                         anchors.right: fieldHint.left
@@ -1031,6 +1032,7 @@ Scope {
                     // The placeholder for the editable field, which a TextInput
                     // cannot draw itself.
                     Text {
+                        textFormat: Text.PlainText
                         visible: pickerRoot.fieldEditable && pickerRoot.fieldText === ""
                         anchors.left: parent.left
                         anchors.right: fieldHint.left
@@ -1265,6 +1267,7 @@ Scope {
 
                                 Text {
                                     id: sideGlyph
+                                    textFormat: Text.PlainText
                                     anchors.left: parent.left
                                     anchors.leftMargin: pickerRoot.theme.space(2)
                                     anchors.verticalCenter: parent.verticalCenter
@@ -1468,6 +1471,7 @@ Scope {
 
                             Text {
                                 id: rowGlyph
+                                textFormat: Text.PlainText
                                 anchors.left: parent.left
                                 anchors.leftMargin: pickerRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
@@ -1479,6 +1483,7 @@ Scope {
 
                             Text {
                                 id: rowTick
+                                textFormat: Text.PlainText
                                 anchors.right: parent.right
                                 anchors.rightMargin: pickerRoot.theme.space(3)
                                 anchors.verticalCenter: parent.verticalCenter
@@ -1627,6 +1632,7 @@ Scope {
                                 }
 
                                 Text {
+                                    textFormat: Text.PlainText
                                     anchors.centerIn: parent
                                     visible: !previewImage.visible
                                     text: previewPane.entry ? Model.glyphFor(previewPane.entry.name, previewPane.entry.isDir) : ""

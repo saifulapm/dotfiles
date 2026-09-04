@@ -147,6 +147,7 @@ Item {
         spacing: playback.style.ui(16)
 
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             text: playback.label
             color: playback.style.brightFg
@@ -195,6 +196,7 @@ Item {
                 // and drops the colour, because the colour was carrying as much
                 // of the meaning as the words were.
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     text: playback.endedCleanly ? playback.endedLabel : playback.headline
                     color: playback.endedCleanly ? playback.style.muted : playback.colorFor(playback.session ? playback.session.kind : "status")
@@ -246,6 +248,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     visible: playback.playing && !playback.ended
                     text: "mpv has it. This panel can close — playback runs on its own, and where you stop is remembered."
@@ -262,6 +265,7 @@ Item {
                 // it does record it on shutdown; a trailer's is not, and saying
                 // otherwise would be inventing a feature.
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     visible: playback.endedCleanly
                     text: !playback.playing ? "The run ended before mpv started. Nothing was watched." : playback.isTrailer ? "mpv closed. A trailer is not recorded as watching the title." : "mpv closed. Where you stopped is remembered — the title offers Resume."
@@ -272,6 +276,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     visible: playback.error !== ""
                     text: playback.error
@@ -304,6 +309,7 @@ Item {
         }
 
         Text {
+            textFormat: Text.PlainText
             Layout.topMargin: playback.style.ui(8)
             text: "PROGRESS"
             color: playback.style.muted

@@ -391,6 +391,7 @@ BarPanel {
                 // one of the two named kinds — without it a row can only say
                 // "failed" and the reason lives in a journal nobody opens.
                 Text {
+                    textFormat: Text.PlainText
                     visible: row.isFailed && !row.isConflict && row.unit && row.unit.error !== ""
                     width: parent.width
                     text: row.unit ? row.unit.error : ""

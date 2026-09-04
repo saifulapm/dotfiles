@@ -24,6 +24,7 @@ Column {
 
         Text {
             id: nameText
+            textFormat: Text.PlainText
 
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
@@ -36,6 +37,7 @@ Column {
 
         Text {
             id: figureText
+            textFormat: Text.PlainText
 
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter

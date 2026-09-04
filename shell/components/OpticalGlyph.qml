@@ -37,6 +37,10 @@ Item {
 
     Text {
         id: glyph
+        // Same reason as StyledText: Qt's AutoText sniffs for markup. A glyph
+        // slot is usually a literal, but tray items and MPRIS players hand us
+        // their own strings, and a rich-text glyph is never wanted.
+        textFormat: Text.PlainText
         anchors.centerIn: parent
         anchors.horizontalCenterOffset: {
             const tight = metrics.tightBoundingRect;

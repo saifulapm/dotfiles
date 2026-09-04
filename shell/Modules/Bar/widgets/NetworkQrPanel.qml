@@ -189,6 +189,7 @@ PanelWindow {
                 // The passphrase only enters shell memory when it is asked for,
                 // and the panel drops it again when this card closes.
                 Text {
+                    textFormat: Text.PlainText
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.showingQr && root.secured
                     text: root.passwordError !== "" ? root.passwordError : root.passwordVisible ? root.password : "Show password"

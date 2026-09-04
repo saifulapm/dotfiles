@@ -389,6 +389,7 @@ Item {
                     }
 
                     Text {
+                        textFormat: Text.PlainText
                         visible: coverArtwork.status !== Image.Ready
                         anchors.centerIn: parent
                         text: screen.title ? String(screen.title.title || "◇").substring(0, 1).toUpperCase() : "◇"
@@ -435,6 +436,7 @@ Item {
                     spacing: screen.style.ui(7)
 
                     Text {
+                        textFormat: Text.PlainText
                         text: "CREW"
                         color: screen.style.muted
                         font.family: screen.style.fontFamily
@@ -465,6 +467,7 @@ Item {
                 spacing: screen.style.ui(16)
 
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     text: screen.title ? (screen.title.title || "Unknown title") : (screen.error !== "" ? "That title did not answer" : "Loading…")
                     color: screen.style.brightFg
@@ -478,6 +481,7 @@ Item {
                     spacing: screen.style.ui(10)
 
                     Text {
+                        textFormat: Text.PlainText
                         text: screen.title ? Model.kindLabel(screen.title.kind).toUpperCase() : ""
                         color: screen.style.accent
                         font.family: screen.style.fontFamily
@@ -485,6 +489,7 @@ Item {
                         font.weight: Font.DemiBold
                     }
                     Text {
+                        textFormat: Text.PlainText
                         visible: screen.title !== null && screen.title.year
                         text: "·"
                         color: screen.style.alpha(screen.style.fg, 0.4)
@@ -495,6 +500,7 @@ Item {
                     // over a bright backdrop is a year you cannot read — it was
                     // invisible on the first build's Spider-Man backdrop.
                     Text {
+                        textFormat: Text.PlainText
                         text: screen.title && screen.title.year ? String(screen.title.year) : ""
                         color: screen.style.fg
                         font.family: screen.style.fontFamily
@@ -503,6 +509,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     visible: screen.error !== ""
                     text: screen.error
@@ -539,6 +546,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     Layout.maximumWidth: screen.style.ui(720)
                     visible: text !== ""
@@ -551,6 +559,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     Layout.maximumWidth: screen.style.ui(720)
                     text: screen.title ? String(screen.title.overview || "") : ""
@@ -570,6 +579,7 @@ Item {
                     spacing: screen.style.ui(7)
 
                     Text {
+                        textFormat: Text.PlainText
                         text: "SEASON"
                         color: screen.style.muted
                         font.family: screen.style.fontFamily
@@ -628,6 +638,7 @@ Item {
                     spacing: screen.style.ui(9)
 
                     Text {
+                        textFormat: Text.PlainText
                         text: "GENRES"
                         color: screen.style.brightFg
                         font.family: screen.style.fontFamily
@@ -703,6 +714,7 @@ Item {
                         Layout.fillWidth: true
 
                         Text {
+                            textFormat: Text.PlainText
                             text: "EPISODES"
                             color: screen.style.brightFg
                             font.family: screen.style.fontFamily
@@ -714,6 +726,7 @@ Item {
                             Layout.fillWidth: true
                         }
                         Text {
+                            textFormat: Text.PlainText
                             text: screen.loadingEpisodes ? "LOADING" : "SEASON " + Model.pad2(screen.season) + "  ·  " + screen.episodes.length
                             color: screen.style.accent
                             font.family: screen.style.fontFamily
@@ -808,6 +821,7 @@ Item {
                                             spacing: screen.style.ui(3)
 
                                             Text {
+                                                textFormat: Text.PlainText
                                                 Layout.fillWidth: true
                                                 text: episodeCard.modelData.name || Model.episodeCode(episodeCard.modelData.season, episodeCard.modelData.episode)
                                                 color: screen.style.brightFg
@@ -817,6 +831,7 @@ Item {
                                                 elide: Text.ElideRight
                                             }
                                             Text {
+                                                textFormat: Text.PlainText
                                                 Layout.fillWidth: true
                                                 text: String(episodeCard.modelData.overview || "")
                                                 color: screen.style.muted
@@ -827,6 +842,7 @@ Item {
                                                 elide: Text.ElideRight
                                             }
                                             Text {
+                                                textFormat: Text.PlainText
                                                 text: Model.episodeCode(episodeCard.modelData.season, episodeCard.modelData.episode) + (Model.durationLabel(episodeCard.modelData.runtime) ? "  ·  " + Model.durationLabel(episodeCard.modelData.runtime).toUpperCase() : "") + (episodeCard.modelData.air_date ? "  ·  AIRED " + Model.dateLabel(episodeCard.modelData.air_date).toUpperCase() : "")
                                                 color: episodeCard.isResumePoint ? screen.style.accent : screen.style.alpha(screen.style.fg, 0.45)
                                                 font.family: screen.style.fontFamily
@@ -861,6 +877,7 @@ Item {
                     visible: screen.castList.length > 0
 
                     Text {
+                        textFormat: Text.PlainText
                         text: "CAST"
                         color: screen.style.brightFg
                         font.family: screen.style.fontFamily
@@ -899,6 +916,7 @@ Item {
                     visible: screen.similarList.length > 0
 
                     Text {
+                        textFormat: Text.PlainText
                         text: "MORE LIKE THIS"
                         color: screen.style.brightFg
                         font.family: screen.style.fontFamily

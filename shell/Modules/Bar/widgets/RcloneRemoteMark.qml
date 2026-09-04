@@ -75,6 +75,7 @@ Item {
 
         Text {
             id: badgeLabel
+            textFormat: Text.PlainText
             anchors.centerIn: parent
             text: "!"
             color: root.badgeTextColor

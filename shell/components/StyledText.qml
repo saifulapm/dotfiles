@@ -22,6 +22,22 @@ import QtQuick
 Text {
     id: root
 
+    // PLAIN BY DEFAULT, and this is a security property rather than a style
+    // one. Qt's default is Text.AutoText, which SNIFFS the string and renders
+    // anything that looks like markup as rich text — so a wifi SSID, a window
+    // title, a notification summary, a track name or a filename containing
+    // `<img src="http://host/x">` makes the shell issue that GET with no user
+    // action, and `<font color=…>` lets a sender repaint our chrome.
+    // Practically every string this primitive draws comes from somewhere we
+    // do not control, and the ~245 call sites cannot each be trusted to think
+    // about it, so the safe answer is the default and rich text is opt-in.
+    //
+    // Exactly ONE site opts out today: NotificationCard's body, which is
+    // deliberately Text.StyledText because it rewrites newlines to <br/> —
+    // and that is also the one string with a dedicated sanitiser in front of
+    // it (NotificationLogic.sanitizeBody). Any future opt-out owes the same.
+    textFormat: Text.PlainText
+
     enum Role {
         Micro,      // 0.667 -> 8 px  — badge counts, the smallest legible mark
         Caption,    // 0.75  -> 9 px  — UPPERCASE section captions, hero meta

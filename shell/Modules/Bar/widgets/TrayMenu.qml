@@ -155,6 +155,7 @@ BarPanel {
 
         Text {
             id: backGlyph
+            textFormat: Text.PlainText
 
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: parent.left
@@ -282,6 +283,7 @@ BarPanel {
 
                     Text {
                         id: checkGlyph
+                        textFormat: Text.PlainText
 
                         visible: !menuRow.modelData.isSeparator && menuRow.modelData.buttonType !== QsMenuButtonType.None
                         anchors.verticalCenter: parent.verticalCenter
@@ -326,6 +328,7 @@ BarPanel {
 
                     Text {
                         id: submenuGlyph
+                        textFormat: Text.PlainText
 
                         visible: !menuRow.modelData.isSeparator && menuRow.modelData.hasChildren
                         anchors.verticalCenter: parent.verticalCenter

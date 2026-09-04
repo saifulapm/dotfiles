@@ -374,6 +374,7 @@ Scope {
                         height: parent.height
 
                         Text {
+                            textFormat: Text.PlainText
                             // Sit the glyph's ink flush in the column, centered
                             // when the column is wider than this particular
                             // glyph.
@@ -413,6 +414,7 @@ Scope {
                     }
 
                     Text {
+                        textFormat: Text.PlainText
                         visible: osdRoot.message !== ""
                         width: osdRoot.hasProgress ? osdRoot.valueWidth : osdRoot.messageWidth
                         // The readout hugs the card edge so a short percentage

@@ -96,6 +96,7 @@ BarButton {
 
             Text {
                 id: badgeLabel
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 text: "!"
                 color: rootItem.bar ? rootItem.bar.barBackground : rootItem.theme.surface1

@@ -453,6 +453,7 @@ Scope {
 
                             Text {
                                 id: chipLabel
+                                textFormat: Text.PlainText
                                 anchors.centerIn: parent
                                 text: parent.modelData.label
                                 color: pickerRoot.theme.textPrimary
@@ -483,6 +484,7 @@ Scope {
                     border.width: 1
 
                     Text {
+                        textFormat: Text.PlainText
                         anchors.centerIn: parent
                         text: "‹ Prev"
                         color: pickerRoot.theme.textPrimary
@@ -509,6 +511,7 @@ Scope {
                     anchors.verticalCenter: parent.verticalCenter
 
                     Text {
+                        textFormat: Text.PlainText
                         visible: pickerRoot.isLoading
                         anchors.verticalCenter: parent.verticalCenter
                         text: "󰑓" // md-refresh, spun below
@@ -525,6 +528,7 @@ Scope {
                     }
 
                     Text {
+                        textFormat: Text.PlainText
                         anchors.verticalCenter: parent.verticalCenter
                         text: pickerRoot.isLoading ? "Loading…" : `Page ${pickerRoot.currentPage} / ${pickerRoot.totalPages}`
                         color: pickerRoot.theme.textPrimary
@@ -547,6 +551,7 @@ Scope {
                     border.width: 1
 
                     Text {
+                        textFormat: Text.PlainText
                         anchors.centerIn: parent
                         text: "Next ›"
                         color: pickerRoot.theme.textPrimary
