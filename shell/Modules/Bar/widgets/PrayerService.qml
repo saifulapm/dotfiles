@@ -15,7 +15,14 @@ import Quickshell.Io
 // (method=1), the convention the Islamic Foundation Bangladesh follows; the
 // widget's inline settings in shell.json override all of it:
 //   { "id": "prayer", "latitude": 23.8, "longitude": 90.4, "method": 1,
-//     "notify": true }
+//     "school": 1, "notify": true }
+//
+// `school` is the Asr juristic rule and it is SEPARATE from `method`: 0 is
+// Shafi'i (shadow = object length), 1 is Hanafi (shadow = twice it). Aladhan
+// defaults to 0 when the parameter is absent, which is how this widget spent
+// its first months announcing an Asr an hour early for a Hanafi user — 15:26
+// against the mosque's 16:27 in Dhaka on the day this was fixed. Bangladesh is
+// Hanafi, so the default here is 1.
 QtObject {
     id: root
 
@@ -24,6 +31,7 @@ QtObject {
     readonly property real latitude: settings && isFinite(Number(settings.latitude)) ? Number(settings.latitude) : 23.8103
     readonly property real longitude: settings && isFinite(Number(settings.longitude)) ? Number(settings.longitude) : 90.4125
     readonly property int method: settings && isFinite(Number(settings.method)) ? Number(settings.method) : 1
+    readonly property int school: settings && isFinite(Number(settings.school)) ? Number(settings.school) : 1
     readonly property bool notifyEnabled: !settings || settings.notify !== false
 
     // The month table: { "DD-MM-YYYY": { timings: {...}, hijri: "..." } }.
@@ -158,12 +166,15 @@ QtObject {
             cache_dir="\${XDG_CACHE_HOME:-$HOME/.cache}/qshell/prayer"
             mkdir -p "$cache_dir"
             get_month() {
-                local y="$1" m="$2" f="$cache_dir/$1-$2.json"
+                # The cache key carries method and school: both change the
+                # timings, and a file named by date alone would go on serving
+                # the old rule for up to a month after the setting moved.
+                local y="$1" m="$2" f="$cache_dir/$1-$2-m${root.method}s${root.school}.json"
                 if [[ ! -s $f ]]; then
                     # -L: the calendar endpoint 302s to /calendar/YYYY/M.
                     # The jq gate keeps an error page out of the month cache
                     # — a bad cache file would wedge the widget for a month.
-                    curl -fsSL --max-time 20 "https://api.aladhan.com/v1/calendar?latitude=${root.latitude}&longitude=${root.longitude}&method=${root.method}&month=$m&year=$y" -o "$f.tmp" \
+                    curl -fsSL --max-time 20 "https://api.aladhan.com/v1/calendar?latitude=${root.latitude}&longitude=${root.longitude}&method=${root.method}&school=${root.school}&month=$m&year=$y" -o "$f.tmp" \
                         && jq -e '.data | length > 0' "$f.tmp" >/dev/null 2>&1 \
                         && mv "$f.tmp" "$f" || rm -f "$f.tmp"
                 fi
