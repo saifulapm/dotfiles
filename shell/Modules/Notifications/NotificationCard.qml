@@ -31,21 +31,36 @@ Rectangle {
     // Actions as the server reports them; the container passes the live
     // notification's list, or nothing for a replayed history row.
     property var actions: []
-    // The persisted qshell-exec-argv hint, when the container has one. Rows
-    // whose argv carries subject files (Taildrop, ytdlp — see
-    // Logic.dragPaths) make the whole card a drag source.
+    // The persisted qshell-exec-argv hint, when the container has one — the
+    // first place Logic.dragPaths looks for the files a toast is about.
     property string execArgv: ""
+    // What the service saw on the clipboard when a "copied to clipboard"
+    // notification arrived. Only consulted for those; see Logic.dragPayload.
+    property string clipboardText: ""
     // Remaining share of this toast's lifetime, 1 → 0. Drives the countdown
     // rail along the bottom edge; a lifetime of 0 (critical) hides it.
     property real progress: 1
     property bool showCountdown: false
 
     readonly property bool hovered: hoverTracker.hovered
-    // Files this notification is about; non-empty makes the card draggable.
-    // The container holds the toast's expiry while this is active — an
+    // What dragging this card hands over. EVERY notification is a drag source
+    // now, not just the two that carry files: the file it is about, else what
+    // it just put on the clipboard, else what it says (Logic.dragPayload).
+    // The container holds the toast's expiry while a drag is active — an
     // Automatic drag moves the pointer grab off the card, so hover alone
     // would let the countdown remove the drag source mid-flight.
-    readonly property var dragPaths: Logic.dragPaths(execArgv, image)
+    readonly property var dragPayload: Logic.dragPayload({
+        execArgv: execArgv,
+        image: image,
+        appIcon: appIcon,
+        app: app,
+        summary: summary,
+        body: body
+    }, clipboardText)
+    readonly property var dragPaths: dragPayload.paths
+    // A payload with nothing in it is not a drag source — a toast with no
+    // body, no summary and no file has nothing to give.
+    readonly property bool draggable: dragPayload.text.length > 0
     readonly property bool dragActive: cardDrag.active
 
     signal closeRequested
@@ -116,29 +131,36 @@ Rectangle {
         id: hoverTracker
         // Grab the drag pixmap on HOVER — the grab is asynchronous and must
         // be done before the press that starts the drag (the Shelf's note).
-        onHoveredChanged: if (hovered && root.dragPaths.length > 0)
+        onHoveredChanged: if (hovered && root.draggable)
             root.grabToImage(result => {
                 root.Drag.imageSource = result.url;
             })
     }
 
     // The Shelf rows' verified drag-out recipe: Automatic platform drag,
-    // uri-list + plain paths, DragHandler alongside the click MouseArea —
-    // the handler only takes the grab once the press actually moves, so
-    // click (copy / default action) and right-click (close) are untouched.
-    // A Taildrop arrival drags straight onto the Shelf tray icon, the notes
-    // edge, or any application.
+    // uri-list + plain text, DragHandler alongside the click MouseArea — the
+    // handler only takes the grab once the press actually moves, so click
+    // (copy / default action) and right-click (close) are untouched.
+    //
+    // A screenshot or a Taildrop arrival drags straight onto the Shelf tray
+    // icon, the notes edge, or any application; anything else drags as text,
+    // which the Shelf turns into a clip file and every text field accepts.
+    // text/uri-list is offered ONLY when there are files: an empty uri-list
+    // still advertises the type, and a drop target that prefers URIs would
+    // take it and receive nothing.
     Drag.dragType: Drag.Automatic
     Drag.supportedActions: Qt.CopyAction
-    Drag.mimeData: ({
-            "text/uri-list": Logic.dragUriList(root.dragPaths),
-            "text/plain": root.dragPaths.join("\n")
-        })
+    Drag.mimeData: root.dragPaths.length > 0 ? {
+        "text/uri-list": Logic.dragUriList(root.dragPaths),
+        "text/plain": root.dragPayload.text
+    } : {
+        "text/plain": root.dragPayload.text
+    }
     Drag.active: cardDrag.active
 
     DragHandler {
         id: cardDrag
-        enabled: root.dragPaths.length > 0
+        enabled: root.draggable
         target: null
     }
 

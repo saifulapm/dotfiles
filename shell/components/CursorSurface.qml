@@ -34,9 +34,16 @@ Rectangle {
     // fill already says it, so those rows have never drawn an outline and
     // must not start.
     property bool bordered: true
+    // What the surface looks like when nothing is pointing at it. Default
+    // transparent, so every existing site is unchanged; the notification
+    // center tints a row that has not been seen yet. It is the LAST branch
+    // rather than a layer underneath on purpose — a child rectangle would
+    // paint over the hover and cursor fills, which are the parent's own
+    // colour, and hovering a tinted row would then do nothing visible.
+    property color restingColor: "transparent"
 
     radius: root.theme.radius(0.75)
-    color: root.current ? root.theme.alpha(root.theme.accent, 0.18) : (root.pressed ? root.theme.alpha(root.theme.textPrimary, 0.12) : (root.hasCursor ? root.theme.alpha(root.theme.textPrimary, 0.06) : "transparent"))
+    color: root.current ? root.theme.alpha(root.theme.accent, 0.18) : (root.pressed ? root.theme.alpha(root.theme.textPrimary, 0.12) : (root.hasCursor ? root.theme.alpha(root.theme.textPrimary, 0.06) : root.restingColor))
     border.width: root.bordered ? root.theme.borderWidth : 0
     border.color: root.bordered && root.hasCursor ? root.theme.alpha(root.theme.accent, 0.6) : "transparent"
 

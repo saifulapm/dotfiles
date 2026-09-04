@@ -68,19 +68,68 @@ QtObject {
         dnd = !dnd;
     }
 
+    // Whether an arriving toast also plays its sound-theme event. Persisted
+    // beside DND in the same file, for the same reasons.
+    property bool soundEnabled: true
+    onSoundEnabledChanged: {
+        if (!hydrating)
+            scheduleHistorySave();
+    }
+
+    function setSound(value) {
+        soundEnabled = !!value;
+    }
+
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+    }
+
+    // Per-sender silence: apps whose notifications are recorded but never
+    // toast, sound, or count toward the bell. See NotificationLogic.muteRules
+    // for why these match as substrings.
+    property var mutedApps: []
+    onMutedAppsChanged: {
+        if (!hydrating)
+            scheduleHistorySave();
+    }
+
+    function isMuted(app) {
+        return Logic.isMutedApp(mutedApps, app);
+    }
+
+    function muteApp(app) {
+        mutedApps = Logic.addMuteRule(mutedApps, app);
+    }
+
+    function unmuteApp(app) {
+        mutedApps = Logic.removeMuteRule(mutedApps, app);
+    }
+
     // popupModel  — the on-screen toast stack.
     // pendingModel — received but not yet seen by the user. Anything DND
     //                suppresses lands here and stays until reviewed; anything
     //                that pops up also lives here until its toast goes away.
-    // pastModel   — already seen on screen, kept for a short replay window.
+    // pastModel   — already seen on screen, kept until it ages out.
     readonly property ListModel popupModel: ListModel {}
     readonly property ListModel pendingModel: ListModel {}
     readonly property ListModel pastModel: ListModel {}
 
-    readonly property int historyCap: 100
+    readonly property int historyCap: 1000
     readonly property int historyReplayLimit: 5
-    // Past is a rolling "recently" window, swept once a minute.
-    readonly property int pastTtlMs: 15 * 60 * 1000
+    // Retention, per bucket: an entry goes when it is older than this OR when
+    // historyCap newer ones exist. Both limits, because either alone fails in
+    // one direction — an age limit lets a notification storm keep thousands
+    // of rows, and a count limit alone keeps a quiet machine's notifications
+    // for years.
+    //
+    // Thirty days is the number both durable-history plugins in the
+    // marketplace settled on (jankeesvw's and ritechoice23's), and it is a
+    // deliberate PRIVACY setting as much as a storage one: this file is every
+    // notification body received, two-factor codes and chat messages
+    // included. Shortening it is the lever that limits what a stolen disk
+    // gives up.
+    readonly property int historyKeepDays: 30
+    readonly property double historyKeepMs: historyKeepDays * 24 * 60 * 60 * 1000
 
     readonly property int lowPopupDuration: 5000
     readonly property int normalPopupDuration: 8000
@@ -217,8 +266,17 @@ QtObject {
             transient = false;
         }
         const ephemeral = Logic.isEphemeralApp(String(notification.appName || ""));
+        // A muted sender is silenced the same way DND silences everything,
+        // and through the same escape hatch — shouldBypassDnd, which passes
+        // our own `qshell` notifications and a critical `notify-send`. So a
+        // mute can never hide the shell's own crash toast. It deliberately
+        // does NOT exempt a third-party sender's own "critical": that flag is
+        // set by the app being muted, and an app that can promote itself out
+        // of a mute is not muted. Same rule DND already lives by.
+        const silenced = (dnd || isMuted(notification.appName)) && !shouldBypassDnd(notification);
+
         if (transient || ephemeral) {
-            if (dnd && !shouldBypassDnd(notification)) {
+            if (silenced) {
                 delete liveRefs[snapshot.originalId];
                 notification.tracked = false;
                 return;
@@ -227,21 +285,94 @@ QtObject {
             return;
         }
 
+        // A muted sender's record still lands in history — the point of the
+        // mute is not to be interrupted, and a searchable record costs
+        // nothing — but it goes STRAIGHT TO PAST rather than to pending.
+        // Pending is what the bell counts, so routing a muted app there would
+        // trade a toast for a badge and silence nothing.
+        if (isMuted(notification.appName) && !shouldBypassDnd(notification)) {
+            addToPast(snapshot);
+            maybeCacheImage(snapshot);
+            delete liveRefs[snapshot.originalId];
+            notification.tracked = false;
+            return;
+        }
+
         // Pending first, unconditionally. DND only suppresses the toast — the
         // record still has to land somewhere the user can review later.
         addToPending(snapshot);
         maybeCacheImage(snapshot);
 
-        if (dnd && !shouldBypassDnd(notification)) {
+        if (silenced) {
             delete liveRefs[snapshot.originalId];
             notification.tracked = false;
             return;
         }
 
         pushPopup(snapshot);
+        playSound(snapshot);
+    }
+
+    // ---------------------------------------------------------------- sound
+    //
+    // One canberra call per toast, so the installed sound theme decides what
+    // a notification sounds like. Fire-and-forget: a Process bound to the
+    // service would serialize a burst into a queue of stale beeps, and
+    // execDetached is exactly the "start it and stop caring" shape this
+    // needs. Cheap enough not to need one — the binary exits on its own.
+    //
+    // Only ever called from the fresh-toast path: a shell restart replaying
+    // the popups that were on screen must not sound them again, and neither
+    // must the history replay keybinding.
+    function playSound(snapshot) {
+        if (!soundEnabled || !snapshot)
+            return;
+        Quickshell.execDetached(["canberra-gtk-play", "-i", Logic.soundEventFor(snapshot.urgency, NotificationUrgency.Critical, NotificationUrgency.Low)]);
+    }
+
+    // ------------------------------------------------------ drag clipboard
+    //
+    // What a "copied to clipboard" toast is talking about, so dragging that
+    // toast hands over the thing itself rather than the sentence announcing
+    // it. Captured when the notification ARRIVES, which is the only moment
+    // the clipboard is guaranteed to still hold it — every one of our own
+    // copy scripts runs wl-copy and then notifies, and by the time someone
+    // drags the toast they may well have copied something else.
+    //
+    // In memory only, and deliberately NOT a snapshot role: a role would be
+    // written to notifications.json, and putting clipboard contents into a
+    // thirty-day on-disk archive is exactly the thing the retention note
+    // warns about.
+    property string clipboardText: ""
+    readonly property int clipboardTextCap: 64 * 1024
+
+    function captureClipboardText() {
+        if (clipboardReadProc.running)
+            return;
+        // Cleared BEFORE the read rather than on its failure. wl-paste exits
+        // non-zero whenever the clipboard holds no text at all — which is the
+        // common case here, since niri's own screenshot puts a PNG on it — and
+        // keeping the last successful read would let a toast hand over
+        // whatever was copied ten minutes ago. Empty is correct: dragPayload
+        // falls back to the notification's body.
+        clipboardText = "";
+        clipboardReadProc.running = true;
+    }
+
+    property Process clipboardReadProc: Process {
+        // --type text/plain so an image-only clipboard fails cleanly and
+        // leaves the last text alone rather than yielding binary.
+        command: ["wl-paste", "--no-newline", "--type", "text/plain"]
+        running: false
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: root.clipboardText = text.length > root.clipboardTextCap ? text.substring(0, root.clipboardTextCap) : text
+        }
     }
 
     function pushPopup(snapshot) {
+        if (Logic.isClipboardNotification(snapshot.summary, snapshot.body))
+            captureClipboardText();
         persistPopupFile(snapshot);
         // Qt.callLater keeps the model from being mutated while a Repeater is
         // mid-incubation.
@@ -323,14 +454,31 @@ QtObject {
         Qt.callLater(function () {
             root.removeByOriginalId(root.pendingModel, snapshot.originalId);
             root.pendingModel.insert(0, snapshot);
-            while (root.pendingModel.count > root.historyCap) {
-                const evicted = root.pendingModel.get(root.pendingModel.count - 1);
-                if (evicted)
-                    root.maybeDeleteCachedImages(evicted);
-                root.pendingModel.remove(root.pendingModel.count - 1);
-            }
+            root.capModel(root.pendingModel);
             root.scheduleHistorySave();
         });
+    }
+
+    // Straight into the seen bucket, without ever having been on screen —
+    // the muted-sender path. Same insert-and-cap shape as addToPending.
+    function addToPast(snapshot) {
+        Qt.callLater(function () {
+            root.removeByOriginalId(root.pastModel, snapshot.originalId);
+            root.pastModel.insert(0, snapshot);
+            root.capModel(root.pastModel);
+            root.scheduleHistorySave();
+        });
+    }
+
+    // Evict from the tail until the model is within historyCap, taking each
+    // evicted row's cached images with it.
+    function capModel(model) {
+        while (model.count > historyCap) {
+            const evicted = model.get(model.count - 1);
+            if (evicted)
+                maybeDeleteCachedImages(evicted);
+            model.remove(model.count - 1);
+        }
     }
 
     // Called when a popup goes away (timer expired, or the user dismissed or
@@ -344,12 +492,7 @@ QtObject {
                 const snapshot = root.snapshotFromRow(entry);
                 root.pendingModel.remove(i);
                 root.pastModel.insert(0, snapshot);
-                while (root.pastModel.count > root.historyCap) {
-                    const evicted = root.pastModel.get(root.pastModel.count - 1);
-                    if (evicted)
-                        root.maybeDeleteCachedImages(evicted);
-                    root.pastModel.remove(root.pastModel.count - 1);
-                }
+                root.capModel(root.pastModel);
                 root.scheduleHistorySave();
                 return;
             }
@@ -388,12 +531,7 @@ QtObject {
                 root.pendingModel.remove(0);
                 root.pastModel.insert(0, snapshot);
             }
-            while (root.pastModel.count > root.historyCap) {
-                const evicted = root.pastModel.get(root.pastModel.count - 1);
-                if (evicted)
-                    root.maybeDeleteCachedImages(evicted);
-                root.pastModel.remove(root.pastModel.count - 1);
-            }
+            root.capModel(root.pastModel);
             root.scheduleHistorySave();
         });
     }
@@ -531,6 +669,68 @@ QtObject {
 
     function dismissAll() {
         clearPopups();
+        clearPending();
+        clearPast();
+    }
+
+    // ------------------------------------------------ history by identity
+    //
+    // The center shows both buckets merged and sorted by time, so a row there
+    // has no index into either model. These take the row itself and find it:
+    // the epoch-qualified originalId plus the timestamp, which is the same
+    // pair restorePopups already trusts to recognise a popup it has seen.
+    // originalId alone is not enough — a replaced notification keeps its id.
+    function indexOfEntry(model, entry) {
+        if (!entry)
+            return -1;
+        for (let i = 0; i < model.count; i++) {
+            const row = model.get(i);
+            if (row && row.originalId === entry.originalId && row.timestamp === entry.timestamp)
+                return i;
+        }
+        return -1;
+    }
+
+    function dismissEntry(entry) {
+        const pendingIndex = indexOfEntry(pendingModel, entry);
+        if (pendingIndex >= 0) {
+            dismissPending(pendingIndex);
+            return true;
+        }
+        const pastIndex = indexOfEntry(pastModel, entry);
+        if (pastIndex >= 0) {
+            dismissPast(pastIndex);
+            return true;
+        }
+        return false;
+    }
+
+    function markEntrySeen(entry) {
+        if (entry && indexOfEntry(pendingModel, entry) >= 0)
+            markSeenByOriginalId(entry.originalId);
+    }
+
+    // Everything that arrived in [from, to) — the panel's per-day CLEAR.
+    function clearRange(from, to) {
+        let removed = 0;
+        function sweep(model) {
+            for (let i = model.count - 1; i >= 0; i--) {
+                const entry = model.get(i);
+                if (!entry || !(entry.timestamp >= from && entry.timestamp < to))
+                    continue;
+                maybeDeleteCachedImages(entry);
+                model.remove(i);
+                removed += 1;
+            }
+        }
+        sweep(pendingModel);
+        sweep(pastModel);
+        if (removed > 0)
+            scheduleHistorySave();
+        return removed;
+    }
+
+    function clearHistory() {
         clearPending();
         clearPast();
     }
@@ -764,8 +964,23 @@ QtObject {
         deleteImageProc.running = true;
     }
 
+    // 0700, and chmod as well as mkdir -m so directories that already exist
+    // from before this were tightened too — `mkdir -m` only applies its mode
+    // to a directory it actually creates.
+    //
+    // Worth the two extra syscalls because of what retention changed: this
+    // tree used to hold fifteen minutes of notifications and now holds thirty
+    // days of them, bodies included. That is every two-factor code and every
+    // chat message received in a month, and it was mode 0644 in a 0755
+    // directory. Same reasoning as the two durable-history plugins in the
+    // marketplace, both of which are 0700/0600 for exactly this.
+    // The history file's own 0600 is set once, here, rather than after every
+    // save: FileView writes atomically through QSaveFile, which carries the
+    // existing target's permissions onto its replacement, so the mode
+    // survives each flush instead of resetting to the umask. (Verified on
+    // this machine — see docs/notifications-2026-09-04.md.)
     property Process ensureDirsProc: Process {
-        command: ["mkdir", "-p", root.stateDir, root.popupStateDir, root.imageCacheDir]
+        command: ["bash", "-c", 'mkdir -p -m 700 "$1" "$2" "$3" && chmod 700 "$1" "$2" "$3" && [ -e "$4" ] && chmod 600 "$4" || true', "--", root.stateDir, root.popupStateDir, root.imageCacheDir, root.historyPath]
         running: false
     }
 
@@ -835,8 +1050,10 @@ QtObject {
         // The JSON travels as an argument, not through shell interpolation,
         // so summaries/bodies with quotes or backticks can't break the
         // command. The mkdir guards notifications that arrive before
-        // ensureDirsProc has run.
-        enqueuePopupFileJob(["bash", "-c", "mkdir -p \"$1\" && printf '%s\\n' \"$2\" > \"$1/$3\"", "--", popupStateDir, Logic.serializePopup(snapshot, NotificationUrgency.Normal), Logic.popupFileName(snapshot)]);
+        // ensureDirsProc has run — and carries the same umask, so a popup
+        // that beats the service's own mkdir does not create the directory
+        // world-readable and leave it that way.
+        enqueuePopupFileJob(["bash", "-c", "umask 077 && mkdir -p \"$1\" && printf '%s\\n' \"$2\" > \"$1/$3\"", "--", popupStateDir, Logic.serializePopup(snapshot, NotificationUrgency.Normal), Logic.popupFileName(snapshot)]);
     }
 
     function deletePopupFileFor(row) {
@@ -942,30 +1159,44 @@ QtObject {
         onTriggered: root.flushHistory()
     }
 
-    property Timer pastPruneTimer: Timer {
-        interval: 60 * 1000
+    // Hourly, not the minute this used to run at: the cutoff is thirty days
+    // out, so a minute's precision bought nothing and cost a wakeup every
+    // minute for the life of the session. An entry can outlive its retention
+    // by up to an hour, which is the right trade for a 30-day window.
+    // triggeredOnStart matters more than the interval — a machine that is
+    // suspended most of the day prunes when it wakes.
+    property Timer historyPruneTimer: Timer {
+        interval: 60 * 60 * 1000
         repeat: true
         running: true
         triggeredOnStart: true
-        onTriggered: root.prunePast()
+        onTriggered: root.pruneHistory()
     }
 
-    function prunePast() {
-        if (pastModel.count === 0)
-            return;
-        const cutoff = Date.now() - pastTtlMs;
-        let removed = false;
-        for (let i = pastModel.count - 1; i >= 0; i--) {
-            const entry = pastModel.get(i);
-            if (entry && entry.timestamp && entry.timestamp < cutoff) {
-                if (entry.image)
-                    maybeDeleteCachedImages(entry);
-                pastModel.remove(i);
-                removed = true;
-            }
-        }
-        if (removed)
+    // Both buckets, not just past: once history is durable, an unseen entry
+    // from six weeks ago is as stale as a seen one, and leaving pending
+    // unswept would let the bell carry a badge nothing can age out.
+    function pruneHistory() {
+        const cutoff = Date.now() - historyKeepMs;
+        const removed = pruneModel(pendingModel, cutoff) + pruneModel(pastModel, cutoff);
+        if (removed > 0)
             scheduleHistorySave();
+    }
+
+    function pruneModel(model, cutoff) {
+        let removed = 0;
+        for (let i = model.count - 1; i >= 0; i--) {
+            const entry = model.get(i);
+            // A row with no timestamp cannot be aged out — it would be
+            // deleted on the first sweep after every restart. Older files
+            // predate the role; leave them to the count cap.
+            if (!entry || !entry.timestamp || entry.timestamp >= cutoff)
+                continue;
+            maybeDeleteCachedImages(entry);
+            model.remove(i);
+            removed += 1;
+        }
+        return removed;
     }
 
     function scheduleHistorySave() {
@@ -996,11 +1227,13 @@ QtObject {
             return;
         }
 
-        if (parsed.dnd !== null) {
-            hydrating = true;
+        hydrating = true;
+        if (parsed.dnd !== null)
             dnd = parsed.dnd;
-            hydrating = false;
-        }
+        if (parsed.sound !== null)
+            soundEnabled = parsed.sound;
+        mutedApps = parsed.muted;
+        hydrating = false;
 
         // Newest-first on disk; append in order so the models match.
         Qt.callLater(function () {
@@ -1040,8 +1273,10 @@ QtObject {
             return out;
         }
         historyFile.setText(JSON.stringify({
-            version: 2,
+            version: 3,
             dnd: dnd,
+            sound: soundEnabled,
+            muted: Logic.muteRules(mutedApps),
             pending: dump(pendingModel),
             past: dump(pastModel)
         }, null, 2) + "\n");
@@ -1093,12 +1328,48 @@ QtObject {
             return root.popupModel.count;
         }
 
+        function sound(): string {
+            root.toggleSound();
+            return root.soundEnabled ? "on" : "off";
+        }
+
+        function setSound(value: string): string {
+            const v = String(value || "").toLowerCase();
+            root.setSound(v === "true" || v === "1" || v === "on" || v === "yes");
+            return root.soundEnabled ? "on" : "off";
+        }
+
+        // Takes the app name as the notification reports it — `notifs muted`
+        // is how you find out what to pass.
+        function mute(app: string): string {
+            const name = String(app || "").trim();
+            if (!name)
+                return "none";
+            root.muteApp(name);
+            return "ok";
+        }
+
+        function unmute(app: string): string {
+            const name = String(app || "").trim();
+            if (!name)
+                return "none";
+            root.unmuteApp(name);
+            return "ok";
+        }
+
+        function muted(): string {
+            return JSON.stringify(root.mutedApps);
+        }
+
         function status(): string {
             return JSON.stringify({
                 dnd: root.dnd,
+                sound: root.soundEnabled,
+                muted: root.mutedApps,
                 popups: root.popupModel.count,
                 pending: root.pendingModel.count,
                 past: root.pastModel.count,
+                keepDays: root.historyKeepDays,
                 historyLoaded: root.historyLoaded
             });
         }

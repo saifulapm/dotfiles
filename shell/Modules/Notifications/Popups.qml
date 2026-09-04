@@ -179,6 +179,7 @@ Scope {
                             image: cardSlot.image
                             glyph: cardSlot.glyph
                             execArgv: cardSlot.execArgv
+                            clipboardText: popupsRoot.notifs.clipboardText
                             urgency: cardSlot.urgency
                             timestamp: cardSlot.timestamp
                             // A replayed history row has no live notification

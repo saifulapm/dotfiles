@@ -209,22 +209,61 @@ function parseExecArgv(value) {
     return parsed;
 }
 
-// Files a notification is ABOUT, for dragging out of its card. Derived from
-// the exec-argv hint rather than declared as its own hint, so it works on
-// every row exec-argv already reaches — live toasts, replayed history, rows
-// restored across a shell restart. Only commands whose arguments ARE the
-// subject files qualify: yazi-yank-clipboard (Taildrop arrivals) and mpv
-// (the ytdlp download toast). An allowlist, not "any absolute argument" —
-// crash-watch's argv carries the crashed binary's path, and a crash toast
-// must not drag /usr/bin/foo around. Falls back to a file-backed image (a
-// screenshot toast drags the shot); icon-theme names and image:// provider
-// URLs have no file behind them.
+// Files a notification is ABOUT, for dragging out of its card — the first and
+// strongest of the three payloads dragPayload can produce.
+//
+// The first source is the exec-argv hint rather than a hint of its own, so it
+// works on every row exec-argv already reaches: live toasts, replayed
+// history, rows restored across a shell restart. Only commands whose
+// arguments ARE the subject files qualify: yazi-yank-clipboard (Taildrop
+// arrivals) and mpv (the ytdlp download toast). An allowlist, not "any
+// absolute argument" — crash-watch's argv carries the crashed binary's path,
+// and a crash toast must not drag /usr/bin/foo around.
 var DRAG_CARRIERS = {
     "yazi-yank-clipboard": true,
     "mpv": true
 };
 
-function dragPaths(execArgv, image) {
+// An absolute path, or "" for an icon-theme name, an image:// provider URL,
+// or anything else with no file behind it.
+function localFile(value) {
+    var v = String(value || "");
+    if (v.indexOf("file://") === 0)
+        v = decodeURIComponent(v.substring(7));
+    return v.charAt(0) === "/" ? v : "";
+}
+
+// Absolute app_icon paths that are DECORATION rather than a file the
+// notification is about. Two kinds, and both have to be excluded before
+// app_icon can be treated as a subject:
+//
+//   - Icon-theme assets. A sender that names its icon by path rather than by
+//     theme name hands over /usr/share/icons/…/thunderbird.png, and dragging
+//     a notification must not scatter application icons around.
+//   - Anything under /tmp. Chromium-family senders pass the AVATAR as an
+//     app_icon file in a scoped temporary directory they delete when the
+//     notification closes (the same behaviour Notifs.qml caches around), so
+//     every web-chat notification would otherwise drag the sender's profile
+//     picture. That is never what someone dragging a message wants, and the
+//     file is gone moments later anyway.
+//
+// Deliberately a path test rather than a sender test: a web notification's
+// app_name is the origin ("web.whatsapp.com"), so isChromiumDerived does not
+// recognise it, and the thing that identifies an avatar is where it lives.
+var ICON_ASSET_HINTS = ["/icons/", "/pixmaps/", "/share/app-info/"];
+
+function isDecorationPath(path) {
+    var p = String(path || "");
+    if (p.indexOf("/tmp/") === 0)
+        return true;
+    for (var i = 0; i < ICON_ASSET_HINTS.length; i++) {
+        if (p.indexOf(ICON_ASSET_HINTS[i]) !== -1)
+            return true;
+    }
+    return false;
+}
+
+function dragPaths(execArgv, image, appIcon) {
     var argv = parseExecArgv(execArgv);
     if (argv && DRAG_CARRIERS[argv[0].split("/").pop()]) {
         var paths = [];
@@ -235,12 +274,83 @@ function dragPaths(execArgv, image) {
         if (paths.length > 0)
             return paths;
     }
-    var img = String(image || "");
-    if (img.indexOf("file://") === 0)
-        img = decodeURIComponent(img.substring(7));
-    if (img.charAt(0) === "/")
+
+    // The notification's own image, which is what the hint is for.
+    var img = localFile(image);
+    if (img)
         return [img];
+
+    // ...then app_icon, which is how niri hands over a screenshot: its
+    // "Screenshot captured" notification leaves `image` empty and puts the
+    // saved PNG in app_icon so the toast can preview it. Reading only `image`
+    // is why a screenshot toast was not draggable.
+    var icon = localFile(appIcon);
+    if (icon && !isDecorationPath(icon))
+        return [icon];
+
     return [];
+}
+
+// A notification announcing that something is now ON the clipboard — ours all
+// say so in as many words ("Copied text to clipboard", "…copied to clipboard",
+// "Clipboard from tailnet"), and so does anyone else's.
+//
+// Word-bounded so a message that merely contains "copies" or a filename with
+// "clipboard" in it does not qualify.
+function isClipboardNotification(summary, body) {
+    return /\b(copied|clipboard)\b/i.test(String(summary || "") + "\n" + String(body || ""));
+}
+
+// The body as PLAIN text, for dropping into something that wanted text.
+//
+// The card renders the body as markup, so a text payload has to be the text
+// without it: every tag goes, and the five XML entities libnotify senders
+// escape come back. `&amp;` is unescaped LAST or `&amp;lt;` would decode
+// twice and produce a `<` the sender never wrote.
+function dragText(summary, body, app, appIcon) {
+    var text = sanitizeBody(body, app, appIcon).replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&apos;/g, "'").replace(/&amp;/g, "&").trim();
+    // A notification with no body at all is carried by its summary — a toast
+    // that says only "Build failed" should still drop those two words.
+    return text || String(summary || "").trim();
+}
+
+// What dragging a notification hands over, in the order the user asked for:
+// the file it is about, else what it just put on the clipboard, else what it
+// says.
+//
+// clipboardText is passed in rather than read here because reading it is
+// asynchronous and this file has to stay free of QML types; the service
+// captures it when a clipboard notification ARRIVES, which is also the only
+// moment the clipboard is guaranteed to still hold what the toast is talking
+// about.
+function dragPayload(entry, clipboardText) {
+    var e = entry || {};
+
+    var paths = dragPaths(e.execArgv, e.image, e.appIcon);
+    if (paths.length > 0)
+        return {
+            kind: "files",
+            paths: paths,
+            text: paths.join("\n")
+        };
+
+    if (isClipboardNotification(e.summary, e.body)) {
+        var clip = String(clipboardText || "");
+        if (clip)
+            return {
+                kind: "clipboard",
+                paths: [],
+                text: clip
+            };
+        // No clipboard text to hand over — an image-only clipboard, or a read
+        // that failed. Fall through to the body rather than dragging nothing.
+    }
+
+    return {
+        kind: "text",
+        paths: [],
+        text: dragText(e.summary, e.body, e.app, e.appIcon)
+    };
 }
 
 // Same wire format as the Shelf's uriList: file:// URIs, CRLF-joined,
@@ -332,6 +442,8 @@ function parseHistory(raw, normalUrgency, historyCap) {
             empty: true,
             error: false,
             dnd: null,
+            sound: null,
+            muted: [],
             pending: [],
             past: [],
             hadDuplicates: false
@@ -351,6 +463,10 @@ function parseHistory(raw, normalUrgency, historyCap) {
             empty: false,
             error: false,
             dnd: parsed && typeof parsed.dnd === "boolean" ? parsed.dnd : null,
+            // null, not false, so a file written before sounds existed keeps
+            // the service's own default instead of being read as "off".
+            sound: parsed && typeof parsed.sound === "boolean" ? parsed.sound : null,
+            muted: muteRules(parsed ? parsed.muted : null),
             pending: pendingDeduped.slice(0, cap).map(function (entry) {
                 return historyEntry(entry, normalUrgency);
             }),
@@ -365,6 +481,8 @@ function parseHistory(raw, normalUrgency, historyCap) {
             error: true,
             errorMessage: String(e),
             dnd: null,
+            sound: null,
+            muted: [],
             pending: [],
             past: [],
             hadDuplicates: false
@@ -411,6 +529,221 @@ function recentHistoryRows(pending, past, limit, normalUrgency) {
         return (b.timestamp || 0) - (a.timestamp || 0);
     });
     return out.slice(0, max);
+}
+
+// ------------------------------------------------------------ mute rules
+//
+// A per-sender silence, sitting between DND's all-or-nothing and living with
+// an app that pings all day.
+//
+// Matched as a case-insensitive SUBSTRING rather than by equality, because
+// `app_name` is not a stable identifier: the same program names itself
+// differently depending on how it was started ("Vesktop" from a desktop
+// entry, "vesktop" from a shell), and Electron senders drift between
+// releases. Equality rules go stale silently — the app keeps notifying and
+// the rule looks like it is on. The cost is that a short rule matches
+// broadly ("sig" would also catch "signal-desktop-beta"), which is tolerable
+// only because a rule is never typed: it is always created FROM a
+// notification's own app name, so it is as specific as the sender that made
+// it. (The shape is abran-labs/omarchy-notification-center's Rules.js; the
+// reasoning is theirs and it holds here for the same reason.)
+function muteRules(value) {
+    if (!value || typeof value === "string" || typeof value.length !== "number")
+        return [];
+    var out = [];
+    for (var i = 0; i < value.length; i++) {
+        var rule = String(value[i] || "").trim();
+        if (rule && out.indexOf(rule) === -1)
+            out.push(rule);
+    }
+    return out;
+}
+
+function isMutedApp(rules, app) {
+    var name = String(app || "").toLowerCase();
+    if (!name)
+        return false;
+    var list = muteRules(rules);
+    for (var i = 0; i < list.length; i++) {
+        if (name.indexOf(list[i].toLowerCase()) !== -1)
+            return true;
+    }
+    return false;
+}
+
+function addMuteRule(rules, app) {
+    var rule = String(app || "").trim();
+    var list = muteRules(rules);
+    if (!rule)
+        return list;
+    for (var i = 0; i < list.length; i++) {
+        if (list[i].toLowerCase() === rule.toLowerCase())
+            return list;
+    }
+    return list.concat([rule]);
+}
+
+function removeMuteRule(rules, app) {
+    var rule = String(app || "").trim().toLowerCase();
+    var list = muteRules(rules);
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+        if (list[i].toLowerCase() !== rule)
+            out.push(list[i]);
+    }
+    return out;
+}
+
+// ---------------------------------------------------------- day sections
+//
+// History is grouped by the day an entry arrived on. The names are spelled
+// out rather than formatted because Quickshell's QML engine ships no
+// ECMA-402 — `Intl is not defined`, measured in the real engine while
+// porting the world clock — so there is no toLocaleDateString(locale) to
+// call, and this file has to give the same answer under node anyway.
+var WEEKDAY_NAMES = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+var MONTH_NAMES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+// Local midnight, which is what "a day" means to someone reading the panel.
+// Deliberately not UTC days: a notification at 01:00 belongs to the day the
+// user was awake for, not to whatever UTC calls it.
+function startOfDay(ms) {
+    var d = new Date(Number(ms) || 0);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+}
+
+// The half-open range [from, to) covering the day a timestamp falls in —
+// what the panel's per-day CLEAR acts on.
+function dayBounds(timestamp) {
+    var from = startOfDay(timestamp);
+    // Not from + 86400000: a DST boundary makes a local day 23 or 25 hours
+    // long, and a fixed step would either leak an hour into the next day or
+    // leave an hour of this one unclearable.
+    var next = new Date(from);
+    next.setDate(next.getDate() + 1);
+    return {
+        from: from,
+        to: next.getTime()
+    };
+}
+
+function daySection(timestamp, nowMs) {
+    var day = startOfDay(timestamp);
+    var today = startOfDay(nowMs);
+    if (day === today)
+        return "TODAY";
+
+    // Step back a calendar day at a time for the same DST reason as above.
+    var yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (day === yesterday.getTime())
+        return "YESTERDAY";
+
+    var week = new Date(today);
+    week.setDate(week.getDate() - 6);
+    var when = new Date(day);
+    // Within the last week a weekday name is the fastest thing to read; past
+    // that it stops being unambiguous and the date has to appear.
+    if (day > week.getTime())
+        return WEEKDAY_NAMES[when.getDay()];
+
+    var label = when.getDate() + " " + MONTH_NAMES[when.getMonth()];
+    if (when.getFullYear() !== new Date(today).getFullYear())
+        label += " " + when.getFullYear();
+    return label;
+}
+
+// ----------------------------------------------------------- history view
+//
+// Free-text filter over the three fields a person actually remembers: who
+// sent it, what it was called, what it said. Case-insensitive substring, and
+// every whitespace-separated term has to hit somewhere, so "signal aisha"
+// narrows instead of widening.
+function matchesQuery(entry, query) {
+    var text = String(query || "").trim().toLowerCase();
+    if (!text)
+        return true;
+    var e = entry || {};
+    var hay = (String(e.app || "") + "\n" + String(e.summary || "") + "\n" + String(e.body || "")).toLowerCase();
+    var terms = text.split(/\s+/);
+    for (var i = 0; i < terms.length; i++) {
+        if (terms[i] && hay.indexOf(terms[i]) === -1)
+            return false;
+    }
+    return true;
+}
+
+// The notification center's list: both buckets merged, newest first, day
+// sections attached.
+//
+// Merged rather than stacked (unseen above seen, which is what this panel
+// showed while history only lived 15 minutes) because durable history makes
+// stacking read wrong: a three-day-old unseen entry would sit above
+// everything that arrived today. Unseen becomes a per-row mark instead of a
+// section, which is also what makes a chronological list possible at all.
+//
+// `section` is set only on the row that OPENS a day, with `sectionCount`
+// carrying that day's total, so the delegate can draw a header without the
+// view having to look at its neighbours.
+function centerRows(pending, past, query, nowMs) {
+    var merged = [];
+    var i;
+    for (i = 0; i < (pending || []).length; i++) {
+        if (matchesQuery(pending[i], query))
+            merged.push({ entry: pending[i], unseen: true });
+    }
+    for (i = 0; i < (past || []).length; i++) {
+        if (matchesQuery(past[i], query))
+            merged.push({ entry: past[i], unseen: false });
+    }
+
+    merged.sort(function (a, b) {
+        var delta = (b.entry.timestamp || 0) - (a.entry.timestamp || 0);
+        // Same millisecond: show the one still awaiting review first.
+        return delta !== 0 ? delta : (a.unseen === b.unseen ? 0 : (a.unseen ? -1 : 1));
+    });
+
+    var now = Number(nowMs) || Date.now();
+    var out = [];
+    var openIndex = -1;
+    var current = null;
+    for (i = 0; i < merged.length; i++) {
+        var label = daySection(merged[i].entry.timestamp, now);
+        var row = {
+            entry: merged[i].entry,
+            unseen: merged[i].unseen,
+            section: "",
+            sectionCount: 0
+        };
+        if (label !== current) {
+            current = label;
+            row.section = label;
+            openIndex = out.length;
+        }
+        out.push(row);
+        out[openIndex].sectionCount += 1;
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------- sound
+//
+// freedesktop sound-naming-spec event ids, so the theme decides what a
+// notification sounds like and we only decide which event it is. Urgency is
+// the only axis worth splitting on: a critical toast that sounded like a
+// chat message would be a critical toast nobody looks up for.
+//
+// The enum values arrive as arguments rather than being read from
+// NotificationUrgency, the way shouldBypassDnd already takes its own — this
+// file has to give the same answers under node, where that enum does not
+// exist.
+function soundEventFor(urgency, criticalUrgency, lowUrgency) {
+    if (urgency === criticalUrgency)
+        return "dialog-warning";
+    if (urgency === lowUrgency)
+        return "message";
+    return "message-new-instant";
 }
 
 // ---------------------------------------------------- popup persistence
@@ -635,12 +968,27 @@ if (typeof module !== "undefined") {
         parseExecArgv: parseExecArgv,
         dragPaths: dragPaths,
         dragUriList: dragUriList,
+        localFile: localFile,
+        isDecorationPath: isDecorationPath,
+        isClipboardNotification: isClipboardNotification,
+        dragText: dragText,
+        dragPayload: dragPayload,
         shouldRenderCompactGlyph: shouldRenderCompactGlyph,
         snapshotOf: snapshotOf,
         historyEntry: historyEntry,
         dedupeByOriginalId: dedupeByOriginalId,
         parseHistory: parseHistory,
         recentHistoryRows: recentHistoryRows,
+        muteRules: muteRules,
+        isMutedApp: isMutedApp,
+        addMuteRule: addMuteRule,
+        removeMuteRule: removeMuteRule,
+        startOfDay: startOfDay,
+        dayBounds: dayBounds,
+        daySection: daySection,
+        matchesQuery: matchesQuery,
+        centerRows: centerRows,
+        soundEventFor: soundEventFor,
         popupEntry: popupEntry,
         popupFileName: popupFileName,
         serializePopup: serializePopup,
