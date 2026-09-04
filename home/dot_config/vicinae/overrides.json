@@ -4,6 +4,10 @@
     "system_info": false
   },
   "favicon_service": "none",
+  "//tray": "Vicinae started shipping a StatusNotifier icon and turns it on by default. The bar's tray is for things with state worth watching; a launcher bound to a key has none, and its menu duplicates what the launcher already does.",
+  "tray": {
+    "enabled": false
+  },
   "search_files_in_root": false,
   "close_on_focus_loss": true,
   "pop_to_root_on_close": true,
