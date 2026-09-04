@@ -175,21 +175,22 @@ FocusScope {
 
             Repeater {
                 // Sized against the ayah above them rather than against the
-                // rest of the shell. A translation set at the bar's 11 or 12 px
-                // under Arabic at 30 reads as a footnote to it, and the whole
-                // reason both languages are on the page is that the user cannot
-                // yet read the first one.
+                // rest of the shell — the argument this screen made first and
+                // `Style.prose` now makes for every screen: a translation set at
+                // the bar's 11 or 12 px under Arabic at 30 reads as a footnote
+                // to it, and the whole reason both languages are on the page is
+                // that the user cannot yet read the first one. The two are the
+                // same size now, which is what was asked for; the Bangla had
+                // been a point larger.
                 model: [
                     {
                         tag: "বাংলা",
                         key: "bn",
-                        size: 15,
                         dim: 1.0
                     },
                     {
                         tag: "ENGLISH",
                         key: "en",
-                        size: 14,
                         dim: 0.75
                     }
                 ]
@@ -217,7 +218,7 @@ FocusScope {
                         color: screen.style.alpha(screen.style.muted, modelData.dim)
                         wrapMode: Text.WordWrap
                         font.family: screen.style.fontFamily
-                        font.pixelSize: screen.style.type(modelData.size)
+                        font.pixelSize: screen.style.prose
                     }
                 }
             }

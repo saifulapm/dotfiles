@@ -478,7 +478,7 @@ FocusScope {
                     color: screen.style.muted
                     wrapMode: Text.WordWrap
                     font.family: screen.style.fontFamily
-                    font.pixelSize: screen.style.type(13)
+                    font.pixelSize: screen.style.prose
                 }
 
                 Text {
@@ -488,7 +488,7 @@ FocusScope {
                     color: screen.style.alpha(screen.style.muted, 0.7)
                     wrapMode: Text.WordWrap
                     font.family: screen.style.fontFamily
-                    font.pixelSize: screen.style.type(12)
+                    font.pixelSize: screen.style.prose
                 }
             }
         }

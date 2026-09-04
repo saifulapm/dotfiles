@@ -197,6 +197,16 @@ QtObject {
     readonly property int slow: theme.motion.slow
     readonly property int easing: theme.motion.easing
 
+    // ONE SIZE FOR EVERY TRANSLATION IN THE HUB — English, Bangla and the
+    // transliterations alike. They were 11, 12, 13, 14 and 15 across five
+    // screens, which is what happens when each page is tuned against the
+    // Arabic above it rather than against the others. The Recite screen had
+    // already made the argument in a comment: a translation set at the bar's
+    // 11 or 12 px under Arabic at 30 reads as a footnote to it, and the whole
+    // reason both languages are on the page is that the reader cannot yet read
+    // the first one.
+    readonly property int prose: type(14)
+
     // THE PAGE'S MEASURE — how wide the reading column is allowed to get.
     // Four screens had this literal, which meant widening the page was four
     // edits and a chance to miss one. The hadith cards are what set it: a

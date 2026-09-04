@@ -330,7 +330,7 @@ FocusScope {
                             wrapMode: Text.WordWrap
                             color: screen.style.muted
                             font.family: screen.style.fontFamily
-                            font.pixelSize: screen.style.type(12)
+                            font.pixelSize: screen.style.prose
                         }
 
                         Text {
@@ -341,7 +341,7 @@ FocusScope {
                             wrapMode: Text.WordWrap
                             color: screen.style.alpha(screen.style.muted, 0.72)
                             font.family: screen.style.fontFamily
-                            font.pixelSize: screen.style.type(11)
+                            font.pixelSize: screen.style.prose
                         }
 
                         Text {
@@ -423,7 +423,7 @@ FocusScope {
                             wrapMode: Text.WordWrap
                             color: screen.style.alpha(screen.style.fg, 0.9)
                             font.family: screen.style.fontFamily
-                            font.pixelSize: screen.style.type(12)
+                            font.pixelSize: screen.style.prose
                             maximumLineCount: 9
                             elide: Text.ElideRight
                         }
@@ -436,7 +436,7 @@ FocusScope {
                             wrapMode: Text.WordWrap
                             color: screen.style.muted
                             font.family: screen.style.fontFamily
-                            font.pixelSize: screen.style.type(11)
+                            font.pixelSize: screen.style.prose
                             maximumLineCount: 6
                             elide: Text.ElideRight
                         }

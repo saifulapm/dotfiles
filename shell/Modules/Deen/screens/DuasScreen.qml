@@ -414,7 +414,7 @@ FocusScope {
                     color: screen.style.alpha(screen.style.fg, 0.9)
                     wrapMode: Text.WordWrap
                     font.family: screen.style.fontFamily
-                    font.pixelSize: screen.style.type(12)
+                    font.pixelSize: screen.style.prose
                     // Not italicised, though it wants to be: the theme's UI
                     // face draws an italic `l` as a script ell, and
                     // `Alhamdulillahi` is mostly ells.
@@ -428,7 +428,7 @@ FocusScope {
                     color: screen.style.muted
                     wrapMode: Text.WordWrap
                     font.family: screen.style.fontFamily
-                    font.pixelSize: screen.style.type(13)
+                    font.pixelSize: screen.style.prose
                 }
             }
 

@@ -168,19 +168,22 @@ FocusScope {
 
         ScrollBar.vertical: ScrollBar {}
 
+        // FULL WIDTH, STACKED: the citation, then Arabic, then English, then
+        // Bangla. The first version put Arabic and the translation in two
+        // columns, which is right for an ayah and wrong here — a narration is a
+        // paragraph, and two paragraph-shaped columns of forty characters each
+        // read as newspaper print with a gutter of nothing between them. Down
+        // the page each language gets the whole measure, and they arrive in the
+        // order you would read them in.
         delegate: Item {
             id: row
 
             required property var modelData
 
             readonly property var h: row.modelData.hadith
-            readonly property real contentWidth: width - screen.style.ui(28)
-            readonly property bool wide: contentWidth >= screen.style.ui(660)
-            readonly property real arabicWidth: row.wide ? Math.round(row.contentWidth * 0.42) : row.contentWidth
-            readonly property real proseWidth: row.wide ? row.contentWidth - row.arabicWidth - screen.style.ui(26) : row.contentWidth
 
             width: list.width - screen.style.ui(16)
-            height: Math.max(prose.y + prose.height, arabic.y + arabic.height) + screen.style.ui(16)
+            height: body.height + screen.style.ui(28)
 
             Rectangle {
                 anchors.fill: parent
@@ -200,14 +203,15 @@ FocusScope {
             }
 
             Column {
-                id: prose
+                id: body
 
                 anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.leftMargin: screen.style.ui(14)
-                anchors.topMargin: screen.style.ui(12)
-                width: row.proseWidth
-                spacing: screen.style.ui(7)
+                anchors.rightMargin: screen.style.ui(14)
+                anchors.topMargin: screen.style.ui(14)
+                spacing: screen.style.ui(10)
 
                 // The citation leads, because it is what makes the rest usable.
                 Flow {
@@ -245,13 +249,23 @@ FocusScope {
                 Text {
                     textFormat: Text.PlainText
                     width: parent.width
+                    text: row.h.ar
+                    horizontalAlignment: Text.AlignRight
+                    wrapMode: Text.WordWrap
+                    color: screen.style.fg
+                    font.family: screen.style.arabicFamily
+                    font.pixelSize: screen.style.type(19)
+                    lineHeight: 1.15
+                }
+
+                Text {
+                    textFormat: Text.PlainText
+                    width: parent.width
                     text: row.h.en
                     color: screen.style.alpha(screen.style.fg, 0.92)
                     wrapMode: Text.WordWrap
                     font.family: screen.style.fontFamily
-                    // A narration is a paragraph you read, not a caption you
-                    // glance at — this and the Bangla under it are the screen.
-                    font.pixelSize: screen.style.type(14)
+                    font.pixelSize: screen.style.prose
                 }
 
                 Text {
@@ -262,7 +276,7 @@ FocusScope {
                     color: screen.style.muted
                     wrapMode: Text.WordWrap
                     font.family: screen.style.fontFamily
-                    font.pixelSize: screen.style.type(13)
+                    font.pixelSize: screen.style.prose
                 }
 
                 // A citation you cannot check is an assertion. This is the
@@ -275,24 +289,6 @@ FocusScope {
                     compact: true
                     onClicked: screen.opened(row.modelData.url)
                 }
-            }
-
-            Text {
-                id: arabic
-                textFormat: Text.PlainText
-
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.rightMargin: screen.style.ui(14)
-                anchors.topMargin: screen.style.ui(12)
-                width: row.arabicWidth
-                horizontalAlignment: Text.AlignRight
-                wrapMode: Text.WordWrap
-                text: row.h.ar
-                color: screen.style.fg
-                font.family: screen.style.arabicFamily
-                font.pixelSize: screen.style.type(17)
-                lineHeight: 1.15
             }
         }
     }

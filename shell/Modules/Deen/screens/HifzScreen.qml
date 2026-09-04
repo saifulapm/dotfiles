@@ -201,7 +201,7 @@ FocusScope {
             color: screen.style.muted
             wrapMode: Text.WordWrap
             font.family: screen.style.fontFamily
-            font.pixelSize: screen.style.type(14)
+            font.pixelSize: screen.style.prose
         }
 
         // ------------------------------------------------------------- action
