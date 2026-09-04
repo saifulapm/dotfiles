@@ -123,8 +123,19 @@ BarPanel {
     // gates on NM's own two flags, so with no URI configured every row below
     // simply does not appear — no false "you have internet", no false portal.
     // Turning it on means a periodic HTTP probe to a third party, which is a
-    // privacy decision rather than a technical one; packages/manifest.toml
-    // carries the one-file opt-in and the reasoning.
+    // privacy decision rather than a technical one and was declined 2026-09-04
+    // for sitting badly beside the DNS shield. If a hotel portal ever makes it
+    // worth it, ONE root-owned file switches everything below on:
+    //
+    //   /etc/NetworkManager/conf.d/20-connectivity.conf
+    //   [connectivity]
+    //   uri=http://ping.archlinux.org/nm-check.txt
+    //   interval=300
+    //
+    // then `systemctl reload NetworkManager`. Point `uri` at a host on the
+    // tailnet serving any short static file to get the detection without
+    // telling a third party when you connect — a captive portal intercepts it
+    // just the same, which is the whole mechanism.
     readonly property bool connectivityChecksEnabled: networkManagerAvailable && Networking.canCheckConnectivity && Networking.connectivityCheckEnabled
     readonly property string connectivity: Model.connectivityState(kind, Networking.connectivity, ({
             None: NetworkConnectivity.None,

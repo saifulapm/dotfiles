@@ -366,6 +366,26 @@ arch = "all"
 why = "Provides `dnf copr`, which the install script needs to enable the quickshell and mise COPRs — Fedora minimal does not ship it. The script also self-bootstraps it before the copr loop (chicken-and-egg); this entry keeps the inventory honest"
 
 [[pkg]]
+# ACCEPTED RISK, reviewed 2026-09-04 (omarchy 95b791af/bebe19bc/bafc9a10):
+# /etc/chromium/policies/managed is owned by this user, not root, so any code
+# running as you can rewrite enterprise browser policy — including
+# ExtensionInstallForcelist, which force-installs an extension that can read
+# every page. That is a real escalation of blast radius from "runs as you" to
+# "reads your browsing", and it is deliberate rather than an oversight.
+#
+# It is user-owned because bin/theme-apply rewrites color.json on EVERY theme
+# change, so a root-owned directory needs either a sudoers-granted helper
+# (upstream's answer, bafc9a10) or dropping the browser theme colour entirely.
+# User decision 2026-09-04: keep the colour, take the risk, and do NOT add a
+# sudoers grant — this repo has no others (bin/network-dns deliberately calls
+# neither sudo nor pkexec) and one narrow grant is still a new privileged
+# surface to maintain. Note our exposure is already narrower than the bug
+# upstream fixed: the directory is user-owned, never world-writable, and the
+# parent chain (/etc/chromium, /etc/chromium/policies) is root-owned 755.
+#
+# If this is ever reconsidered, the cheap fix is dropping color.json: the
+# static extensions.json can be written under sudo at apply time only, and the
+# directory goes back to root.
 name = "chromium"
 category = "core"
 arch = "all"
