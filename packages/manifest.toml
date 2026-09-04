@@ -185,6 +185,24 @@ arch = "all"
 why = "Bangla DISPLAY coverage. NOTHING installed here covered lang=bn (verified `fc-list :lang=bn` empty on 2026-08-06), so every Bangla codepoint rendered as a tofu box everywhere — terminal included, since neither Maple Mono nor Adwaita Sans carries Bengali. Still wanted after the fcitx removal above: reading Bangla and typing it are separate problems, and Bangla arrives from web pages, filenames and messages whether or not there is an input method. 165 KB. Appended to the sans/serif/mono chains by the repo's fontconfig policy so it only ever draws the codepoints the chosen family cannot"
 
 [[pkg]]
+name = "google-noto-naskh-arabic-vf-fonts"
+category = "core"
+arch = "all"
+why = "Arabic DISPLAY coverage — the Bangla story above, repeated (found 2026-09-04). The only face answering lang=ar was Droid Arabic Kufi, a decorative display font that arrived as somebody's weak dependency and carries no harakat at all, so Quranic Arabic rendered as loose marks over missing letters. Naskh is the body-text Arabic style and the sibling of the Bengali variable font above; appended to the sans/serif/mono chains by the repo's fontconfig policy so it only ever draws what the chosen family cannot. NOTE WHAT THIS DOES NOT FIX, because it is the tempting wrong conclusion: foot shapes individual grapheme clusters, never text runs, and implements no bidi whatsoever (foot's own CHANGELOG, 'foot only shapes individual graphemes, not entire text runs'), so in the TERMINAL Arabic still arrives letter-isolated and in reverse order with this installed. Verified by screenshot both ways. Qt, GTK and Chromium shape and reorder for themselves and need nothing more than this package; the terminal additionally needs [[pkg]] fribidi upstream of it"
+
+[[pkg]]
+name = "twitter-twemoji-fonts"
+category = "core"
+arch = "all"
+why = "Emoji for the TERMINAL only, and only because of a file-format gap. fcft — foot's font library — reads bitmap and COLRv0 colour tables but rejects COLRv1 outright, logging 'Noto-COLRv1.ttf: skipping, COLRv1 not supported' once per foot start, and Fedora's google-noto-color-emoji-fonts ships COLRv1 and nothing else. So every emoji was a tofu box in foot while rendering perfectly in Chromium and the Qt shell, which was reported as 'some icon not supported' (2026-09-04; Nerd Font icons were never affected, all 29 ranges still draw). Twemoji is CBDT, a bitmap table FreeType draws directly — verified in foot including flags and ZWJ sequences, which need grapheme shaping too. Named in templates/foot.ini.tmpl rather than the fontconfig policy, and placed AFTER the symbols font, so no other app's emoji look changes and no terminal icon changes appearance. Retire this the day fcft learns COLRv1"
+
+[[pkg]]
+name = "fribidi"
+category = "core"
+arch = "all"
+why = "The Unicode bidi algorithm as a pipe, and the half of Arabic rendering no font can supply. home/dot_local/share/vicinae/scripts/quran-verse.sh pipes its Arabic through `fribidi --nopad --nobreak --reordernsm` before printing, because foot does neither bidi reordering nor cursive joining of its own (see [[pkg]] google-noto-naskh-arabic-vf-fonts) and fribidi does both — logical-to-visual order AND substitution of the joined Arabic presentation forms. --reordernsm is load-bearing, not decorative: without it the reversal drags every harakat in front of its base letter. Claimed here from mere dependency status, where an autoremove could have taken it out from under the script"
+
+[[pkg]]
 name = "google-noto-serif-vf-fonts"
 category = "core"
 arch = "all"

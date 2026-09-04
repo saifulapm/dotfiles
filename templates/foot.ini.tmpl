@@ -25,7 +25,26 @@
 # Sized to match the text font so the icon cell lines up. Bold/italic inherit
 # this list automatically — foot.ini(5) again: with font-bold et al unset, the
 # bold/italic variants of "the regular font(s) specified in font" are used.
-font={{font.mono}}:size={{font.foot-pt}}, Symbols Nerd Font Mono:size={{font.foot-pt}}
+#
+# The third entry is emoji, and it is here rather than in the fontconfig policy
+# because the bug it fixes is foot's alone. fcft reads bitmap and COLRv0 colour
+# tables but rejects COLRv1 outright — `Noto-COLRv1.ttf: skipping, COLRv1 not
+# supported`, one journal line per foot start — and Fedora's Noto Color Emoji
+# ships COLRv1 and nothing else, so every emoji was a tofu box in the terminal
+# while rendering perfectly in Chromium and the Qt shell. Twemoji is CBDT, a
+# bitmap table FreeType draws directly. Naming it only here leaves the rest of
+# the desktop on Noto, where COLRv1 already works: 50-qshell.conf's accept-lists
+# are untouched. It sits AFTER the symbols font on purpose — Nerd Font keeps
+# every codepoint it already drew, so no terminal icon changes appearance.
+#
+# Arabic is deliberately NOT named here. 50-qshell.conf appends Noto Naskh
+# Arabic to every pattern, and foot's dynamic fontconfig fallback finds it (the
+# same path that was reaching Droid Arabic Kufi before that font existed), so
+# pinning it would only cost another face loaded per window. Note the font is
+# the smaller half of that fix: foot shapes grapheme clusters, not text runs,
+# and does no bidi, so Arabic must be run through `fribidi` before it is
+# printed — see vicinae's quran-verse.sh.
+font={{font.mono}}:size={{font.foot-pt}}, Symbols Nerd Font Mono:size={{font.foot-pt}}, Twemoji:size={{font.foot-pt}}
 line-height={{font.foot-line-height}}px
 include=~/.config/foot/theme.ini
 
