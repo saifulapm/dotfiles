@@ -1,8 +1,12 @@
 import Quickshell.Io
 
-// One `deen api …` call site, the same shape as Dekho's ApiRequest.
+// One `deen …` call site, the same shape as Dekho's ApiRequest.
 //
-// `deen api` answers with exactly one JSON object on stdout and puts its
+// The argv is the WHOLE command after `deen`, not just the part after
+// `deen api` — `hifz` and `audio` are top-level verbs, and a wrapper that
+// assumed `api` sent `deen api hifz due` and got a clap parse error back.
+//
+// Every deen verb answers with exactly one JSON object on stdout and puts its
 // diagnostics on stderr, so success is "stdout parsed" and nothing here has to
 // interpret log text. A verb that fails still prints `{"error": …}` and exits
 // non-zero; both paths land on failed().
@@ -31,7 +35,7 @@ Process {
         lastError = "";
         // --pdeathsig: a shell that dies mid-call must not leave the child
         // holding the 4 MB text file open with nobody to answer.
-        command = ["setpriv", "--pdeathsig", "TERM", "--", "deen", "api"].concat(args);
+        command = ["setpriv", "--pdeathsig", "TERM", "--", "deen"].concat(args);
         running = true;
     }
 
@@ -66,8 +70,12 @@ Process {
             req.lastError = "deen is not installed — run `chezmoi apply` to build it";
             req.failed(req.lastError);
         } else {
-            const line = String(err.text || "").trim().split("\n").pop();
-            req.lastError = line || ("deen api " + req.lastArgs.join(" ") + " failed");
+            // clap puts the real complaint on the FIRST line and "For more
+            // information, try '--help'." on the last, so a naive tail shows
+            // the one line that says nothing.
+            const lines = String(err.text || "").trim().split("\n").filter(l => l.trim() !== "");
+            const line = lines.find(l => l.startsWith("error:")) || lines[0] || "";
+            req.lastError = line || ("deen " + req.lastArgs.join(" ") + " failed");
             req.failed(req.lastError);
         }
 

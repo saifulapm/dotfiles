@@ -40,14 +40,18 @@ Scope {
         windowHeight: panel.height
     }
 
-    // Which room you are in: "recite" or "mushaf".
+    // Which room you are in: "recite", "mushaf" or "hifz".
     property string view: "recite"
 
     // The mushaf is only worth a 1.16 MB Al-Baqarah parse once you actually
     // open it, so the first switch is what fetches it rather than the open.
     onViewChanged: {
         if (deenRoot.view === "mushaf" && deenRoot.surahAyahs.length === 0)
-            surahReq.fetch(["surah", String(deenRoot.mushafSurah)]);
+            surahReq.fetch(["api", "surah", String(deenRoot.mushafSurah)]);
+        // The due list is time-sensitive in a way the text is not, so this one
+        // is refetched on every visit rather than cached.
+        if (deenRoot.view === "hifz")
+            refreshHifz();
     }
 
     // ------------------------------------------------------------ the ayah
@@ -105,7 +109,7 @@ Scope {
         deenRoot.reference = String(text || "").trim();
     }
 
-    DeenApi {
+    DeenCall {
         id: surahsReq
         onLoaded: data => deenRoot.surahs = data.surahs || []
     }
@@ -113,7 +117,7 @@ Scope {
     property var ayah: null
     property string loadError: ""
 
-    DeenApi {
+    DeenCall {
         id: ayahReq
         onLoaded: data => {
             deenRoot.ayah = data.ayah || null;
@@ -125,7 +129,7 @@ Scope {
         }
     }
 
-    onReferenceChanged: ayahReq.fetch(["ayah", deenRoot.reference])
+    onReferenceChanged: ayahReq.fetch(["api", "ayah", deenRoot.reference])
 
     // -------------------------------------------------------------- the mushaf
     // A whole surah, words included, in one call — `api surah` carries them for
@@ -138,7 +142,7 @@ Scope {
     property string surahBasmala: ""
     property string mushafError: ""
 
-    DeenApi {
+    DeenCall {
         id: surahReq
         onLoaded: data => {
             deenRoot.surahMeta = data.surah || null;
@@ -154,7 +158,7 @@ Scope {
         }
     }
 
-    onMushafSurahChanged: surahReq.fetch(["surah", String(deenRoot.mushafSurah)])
+    onMushafSurahChanged: surahReq.fetch(["api", "surah", String(deenRoot.mushafSurah)])
 
     // ------------------------------------------------------------------ audio
     // `deen audio` caches and answers with a path; mpv plays it. Two programs
@@ -175,6 +179,66 @@ Scope {
         onExited: deenRoot.playing = ""
     }
 
+    // ------------------------------------------------------------------- hifz
+    // One Reciter per screen, owned here because a screen cannot see a type in
+    // the directory above it — the same reason every DeenApi lives here. They
+    // are separate instances so a verdict on the Recite screen is not the one
+    // the review is being graded from.
+    readonly property var reciteReciter: Reciter {
+        reference: deenRoot.reference
+    }
+
+    readonly property var hifzReciter: Reciter {}
+
+    property var hifzQueue: []
+    property int hifzTotalDue: 0
+    property int hifzEnrolled: 0
+    property string hifzError: ""
+
+    DeenCall {
+        id: hifzReq
+        onLoaded: data => {
+            if (data.due !== undefined) {
+                deenRoot.hifzQueue = data.due || [];
+                deenRoot.hifzTotalDue = data.total_due || 0;
+                deenRoot.hifzEnrolled = data.enrolled || 0;
+                hifzScreen.position = 0;
+            } else if (data.enrolled !== undefined) {
+                // An add or a grade: the queue it was computed against is now
+                // stale, so ask again rather than patching it here.
+                deenRoot.hifzEnrolled = data.enrolled;
+            }
+            deenRoot.hifzError = "";
+        }
+        onFailed: message => deenRoot.hifzError = message
+    }
+
+    // A second request object: a grade and the refresh that follows it are two
+    // calls, and queueing them through one would make the refresh wait on a
+    // request that has already been superseded.
+    DeenCall {
+        id: hifzWriteReq
+        onLoaded: () => deenRoot.refreshHifz()
+        onFailed: message => deenRoot.hifzError = message
+    }
+
+    function refreshHifz() {
+        hifzReq.fetch(["hifz", "due", "--limit", "40"]);
+    }
+
+    function gradeCard(reference, grade, accuracy) {
+        const args = ["hifz", "grade", reference, grade];
+        // -1 means the card was graded without a recitation ("Show me"), and a
+        // made-up accuracy would poison the trend.
+        if (accuracy >= 0)
+            args.push("--accuracy", String(accuracy));
+        hifzWriteReq.fetch(args);
+    }
+
+    function enrolSurah(n) {
+        hifzWriteReq.fetch(["hifz", "add", String(n)]);
+    }
+
     // ------------------------------------------------------------ open/close
     function show() {
         if (panel.visible) {
@@ -190,12 +254,12 @@ Scope {
 
     function didOpen() {
         if (deenRoot.surahs.length === 0)
-            surahsReq.fetch(["surahs"]);
+            surahsReq.fetch(["api", "surahs"]);
         // The surface is evictable, so a reopen after the grace period starts
         // from nothing and has to ask again; within it, the ayah is still here
         // and asking twice would be a process for an answer we hold.
         if (!deenRoot.ayah)
-            ayahReq.fetch(["ayah", deenRoot.reference]);
+            ayahReq.fetch(["api", "ayah", deenRoot.reference]);
         Qt.callLater(() => keyRoot.forceActiveFocus());
     }
 
@@ -205,6 +269,7 @@ Scope {
         // recording down and puts the microphone back the way it found it —
         // which matters more than the result nobody will now read.
         recite.stop();
+        hifzScreen.reciter.stop();
     }
 
     // Toggle means three things for a toplevel: not open → open, open but not
@@ -252,9 +317,16 @@ Scope {
         deenRoot.view = "mushaf";
         const num = Math.max(1, Math.min(114, Number(n) || 1));
         if (deenRoot.mushafSurah === num)
-            surahReq.fetch(["surah", String(num)]);
+            surahReq.fetch(["api", "surah", String(num)]);
         else
             deenRoot.mushafSurah = num;
+    }
+
+    // `qs ipc call deen memorise` — go straight to what is due.
+    function memorise() {
+        show();
+        deenRoot.view = "hifz";
+        refreshHifz();
     }
 
     // The recitation pedal, reachable from outside the window as well as from
@@ -263,7 +335,10 @@ Scope {
     // start reciting" and just reciting.
     function pedal() {
         show();
-        recite.toggleRecording();
+        if (deenRoot.view === "hifz")
+            hifzScreen.toggleRecording();
+        else
+            recite.toggleRecording();
     }
 
     FloatingWindow {
@@ -297,8 +372,8 @@ Scope {
         // "1:1" would begin a recording.
         Shortcut {
             sequence: "Space"
-            enabled: !recite.editingReference
-            onActivated: recite.toggleRecording()
+            enabled: !recite.editingReference && deenRoot.view !== "mushaf"
+            onActivated: deenRoot.view === "hifz" ? hifzScreen.toggleRecording() : recite.toggleRecording()
         }
 
         FocusScope {
@@ -328,6 +403,10 @@ Scope {
                         {
                             id: "mushaf",
                             label: "Read"
+                        },
+                        {
+                            id: "hifz",
+                            label: "Memorise"
                         }
                     ]
 
@@ -355,6 +434,7 @@ Scope {
                     reference: deenRoot.reference
                     ayah: deenRoot.ayah
                     loadError: deenRoot.loadError
+                    reciter: deenRoot.reciteReciter
                     onReferenceChanged_: ref => deenRoot.goTo(ref)
                 }
 
@@ -370,6 +450,22 @@ Scope {
                     playing: deenRoot.playing
                     onSurahStepped: delta => deenRoot.mushafSurah = Math.max(1, Math.min(114, deenRoot.mushafSurah + delta))
                     onPlay: reference => deenRoot.playAudio(reference)
+                    onEnrol: reference => deenRoot.enrolSurah(reference)
+                }
+
+                HifzScreen {
+                    id: hifzScreen
+
+                    anchors.fill: parent
+                    visible: deenRoot.view === "hifz"
+                    style: deenRoot.style
+                    queue: deenRoot.hifzQueue
+                    totalDue: deenRoot.hifzTotalDue
+                    enrolled: deenRoot.hifzEnrolled
+                    loadError: deenRoot.hifzError
+                    reciter: deenRoot.hifzReciter
+                    onGraded: (reference, grade, accuracy) => deenRoot.gradeCard(reference, grade, accuracy)
+                    onEnrol: reference => deenRoot.enrolSurah(reference)
                 }
             }
         }

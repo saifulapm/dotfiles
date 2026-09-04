@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import Quickshell.Io
 
 // Recite an ayah; be told which words were right.
 //
@@ -23,101 +22,33 @@ FocusScope {
     // and the reason none of its screens instantiate a request of their own.
     required property var ayah
     required property string loadError
+    // One recitation attempt, owned by the root for the same reason (a screen
+    // cannot see a type in the directory above it).
+    required property var reciter
 
     signal referenceChanged_(string ref)
 
-    // "idle" | "recording" | "checking" | "done" | "error"
-    property string state_: "idle"
-    property var result: null
-    property string error: ""
-
-    readonly property bool busy: state_ === "recording" || state_ === "checking"
-
-    // A result worth PAINTING, which is not the same as a result.
-    //
-    // When VAD hears no speech deen returns an empty transcription, and the
-    // aligner — correctly — reports every word of the ayah as missed. Painting
-    // that verdict puts the whole ayah in red under the words "nothing was
-    // heard", which tells someone whose microphone was muted that they got
-    // every word wrong. A recitation that did not happen has no verdict, so
-    // the text stays plain and only the message speaks.
-    readonly property var verdict: (result && String(result.heard).trim()) ? result : null
+    readonly property var result: reciter.result
+    readonly property var verdict: reciter.verdict
+    readonly property bool busy: reciter.busy
+    readonly property string error: reciter.error
 
     // True while the reference field holds the keyboard, so the window's Space
     // shortcut can stand down — otherwise typing a space into "1:1" would start
     // a recording instead.
     readonly property bool editingReference: refField.activeFocus
 
-    // A new ayah invalidates the last verdict — leaving it up would paint one
-    // ayah's word colours over another's text.
-    onAyahChanged: {
-        screen.result = null;
-        screen.error = "";
-        if (screen.state_ !== "recording" && screen.state_ !== "checking")
-            screen.state_ = "idle";
-    }
-
-    function start() {
-        if (busy)
-            return;
-        screen.result = null;
-        screen.error = "";
-        screen.state_ = "recording";
-        reciteProc.command = ["setpriv", "--pdeathsig", "TERM", "--", "deen", "recite", screen.reference];
-        reciteProc.stdinEnabled = true;
-        reciteProc.running = true;
+    function toggleRecording() {
+        reciter.toggle();
     }
 
     function stop() {
-        if (screen.state_ !== "recording")
-            return;
-        screen.state_ = "checking";
-        // EOF on stdin is the stop. deen then transcribes, which is the second
-        // or two this state covers.
-        reciteProc.stdinEnabled = false;
+        reciter.stop();
     }
 
-    function toggleRecording() {
-        if (screen.state_ === "recording")
-            stop();
-        else if (!busy)
-            start();
-    }
-
-    Process {
-        id: reciteProc
-
-        running: false
-        stdout: StdioCollector {
-            id: reciteOut
-            waitForEnd: true
-        }
-        stderr: StdioCollector {
-            id: reciteErr
-            waitForEnd: true
-        }
-
-        onExited: exitCode => {
-            let parsed = null;
-            try {
-                parsed = JSON.parse(String(reciteOut.text || ""));
-            } catch (e) {
-                parsed = null;
-            }
-            if (parsed && !parsed.error) {
-                screen.result = parsed;
-                screen.state_ = "done";
-                return;
-            }
-            screen.state_ = "error";
-            if (parsed && parsed.error)
-                screen.error = String(parsed.error);
-            else if (exitCode === 127 || exitCode === 126)
-                screen.error = "deen is not installed — run `chezmoi apply` to build it";
-            else
-                screen.error = String(reciteErr.text || "").trim().split("\n").pop() || "recitation failed";
-        }
-    }
+    // A new ayah invalidates the last verdict — leaving it up would paint one
+    // ayah's word colours over another's text.
+    onAyahChanged: reciter.reset()
 
     // ------------------------------------------------------------------ layout
     //
@@ -264,8 +195,8 @@ FocusScope {
 
             Button {
                 id: recordButton
-                enabled: screen.ayah !== null && screen.state_ !== "checking"
-                text: screen.state_ === "recording" ? "Stop" : "Recite"
+                enabled: screen.ayah !== null && screen.reciter.state_ !== "checking"
+                text: screen.reciter.state_ === "recording" ? "Stop" : "Recite"
                 onClicked: screen.toggleRecording()
             }
 
@@ -275,7 +206,7 @@ FocusScope {
                 font.family: screen.style.fontFamily
                 font.pixelSize: screen.style.type(12)
                 text: {
-                    switch (screen.state_) {
+                    switch (screen.reciter.state_) {
                     case "recording":
                         return "Listening — press Stop, or Space, when you have finished";
                     case "checking":

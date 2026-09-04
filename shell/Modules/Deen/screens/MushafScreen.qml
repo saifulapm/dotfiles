@@ -26,6 +26,7 @@ FocusScope {
 
     signal surahStepped(int delta)
     signal play(string reference)
+    signal enrol(string surah)
 
     // The ayah currently sounding, so its row can say so. Cleared by the owner.
     property string playing: ""
@@ -76,6 +77,13 @@ FocusScope {
                 color: screen.style.fg
                 font.family: screen.style.fontFamily
                 font.pixelSize: screen.style.type(14)
+            }
+
+            Button {
+                flat: true
+                text: "+ Memorise"
+                enabled: screen.surah !== null
+                onClicked: screen.enrol(String(screen.surah.n))
             }
 
             Label {
