@@ -722,6 +722,9 @@ Scope {
     // DST boundary it schedules itself — nothing to scope to visibility.
     function prayerService() {
         return sharedService("prayer", prayerServiceComponent, {
+            // Salat mode needs the notification service to silence and
+            // un-silence the desktop around a prayer.
+            notifs: barRoot.shell.notifs,
             settings: Qt.binding(() => barRoot.inlineEntryFor("prayer"))
         });
     }

@@ -15,7 +15,8 @@ import Quickshell.Io
 // (method=1), the convention the Islamic Foundation Bangladesh follows; the
 // widget's inline settings in shell.json override all of it:
 //   { "id": "prayer", "latitude": 23.8, "longitude": 90.4, "method": 1,
-//     "school": 1, "notify": true }
+//     "school": 1, "notify": true, "nudge": 10,
+//     "sound": false, "salatMode": false, "salatModeMinutes": 15 }
 //
 // `school` is the Asr juristic rule and it is SEPARATE from `method`: 0 is
 // Shafi'i (shadow = object length), 1 is Hanafi (shadow = twice it). Aladhan
@@ -28,11 +29,25 @@ QtObject {
 
     property var settings: null
 
+    // The notification service, for salat mode. Null is fine and means the
+    // feature is simply unavailable — the widget must not depend on it.
+    property var notifs: null
+
     readonly property real latitude: settings && isFinite(Number(settings.latitude)) ? Number(settings.latitude) : 23.8103
     readonly property real longitude: settings && isFinite(Number(settings.longitude)) ? Number(settings.longitude) : 90.4125
     readonly property int method: settings && isFinite(Number(settings.method)) ? Number(settings.method) : 1
     readonly property int school: settings && isFinite(Number(settings.school)) ? Number(settings.school) : 1
     readonly property bool notifyEnabled: !settings || settings.notify !== false
+
+    // Minutes of warning before each prayer. 0 turns it off. On by default:
+    // it is one toast, and it is the one that gets you there in time.
+    readonly property int nudgeMinutes: settings && isFinite(Number(settings.nudge)) ? Number(settings.nudge) : 10
+    // true, "bell", or a path to play. Falsy means silent, which is the
+    // default — see playAdhan().
+    readonly property var adhanSound: settings ? (settings.sound !== undefined ? settings.sound : false) : false
+    // Off by default — see beginSalatMode().
+    readonly property bool salatModeEnabled: settings ? settings.salatMode === true : false
+    readonly property int salatModeMinutes: settings && isFinite(Number(settings.salatModeMinutes)) ? Number(settings.salatModeMinutes) : 15
 
     // The month table: { "DD-MM-YYYY": { timings: {...}, hijri: "..." } }.
     property var days: ({})
@@ -50,6 +65,7 @@ QtObject {
     // Notified prayers, keyed "date|name" — the minute tick fires the
     // notification when a prayer's minute arrives, once.
     property string lastNotifiedKey: ""
+    property string lastNudgeKey: ""
 
     readonly property var order: ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
     // Sunrise is a boundary, not a prayer — listed in the panel, never
@@ -129,10 +145,24 @@ QtObject {
         return lines.join("\n");
     }
 
-    // Fire the notification on the minute a prayer arrives.
+    // Fire the notification on the minute a prayer arrives, and the nudge some
+    // minutes before it.
+    //
+    // BOTH GO OUT AS `-a qshell`, WHICH IS WHAT MAKES THEM SURVIVE DND. The
+    // notification service's bypass passes our own sender by name (see
+    // Notifs.qml's routeNotification), so a prayer call is not silenced by a
+    // Do Not Disturb the user set — and, more to the point, not by the one
+    // salat mode sets below.
     onNowMinuteChanged: {
-        if (!notifyEnabled || !today)
+        if (!today)
             return;
+        if (notifyEnabled)
+            checkArrival();
+        if (nudgeMinutes > 0)
+            checkNudge();
+    }
+
+    function checkArrival() {
         for (const name of prayers) {
             if (minutesOf(today.timings[name]) !== nowMinute)
                 continue;
@@ -141,7 +171,76 @@ QtObject {
                 return;
             lastNotifiedKey = key;
             Quickshell.execDetached(["notify-send", "-a", "qshell", "🕌 " + name, "It is " + fmt(today.timings[name])]);
+            playAdhan();
+            beginSalatMode();
             return;
+        }
+    }
+
+    // The one that actually gets you to pray. A toast at the moment a prayer
+    // starts tells you that you are already late to begin; ten minutes of
+    // warning is the difference between meaning to and going.
+    function checkNudge() {
+        for (const name of prayers) {
+            const t = minutesOf(today.timings[name]);
+            if (t < 0 || t - nudgeMinutes !== nowMinute)
+                continue;
+            const key = dateKey(nowDate) + "|" + name;
+            if (key === lastNudgeKey)
+                return;
+            lastNudgeKey = key;
+            Quickshell.execDetached(["notify-send", "-a", "qshell", "🕌 " + name + " in " + nudgeMinutes + " min", fmt(today.timings[name])]);
+            return;
+        }
+    }
+
+    // ---------------------------------------------------------------- adhan
+    // `sound: true` rings the freedesktop bell that is already on every
+    // machine here; `sound: "/path/to/adhan.mp3"` plays that instead. Nothing
+    // is downloaded — which muezzin you want to hear five times a day is not a
+    // choice a dotfiles repo should make for you.
+    function playAdhan() {
+        if (!adhanSound)
+            return;
+        if (adhanSound === true || adhanSound === "bell") {
+            Quickshell.execDetached(["paplay", "/usr/share/sounds/freedesktop/stereo/complete.oga"]);
+            return;
+        }
+        Quickshell.execDetached(["setpriv", "--pdeathsig", "TERM", "--", "mpv", "--no-video", "--really-quiet", String(adhanSound)]);
+    }
+
+    // ------------------------------------------------------------ salat mode
+    // Silence the desktop for the length of a prayer, then put it back.
+    //
+    // OFF BY DEFAULT, deliberately. A toast is additive and is what a prayer
+    // widget is for; muting notifications is a side effect on unrelated
+    // software, and a call you miss because your shell quietly decided to is a
+    // worse failure than a toast you did not want.
+    //
+    // The restore only fires if DND is still where we left it. Toggling it by
+    // hand during the window is a decision, and a timer that stomps it fifteen
+    // minutes later would be the widget arguing with the user.
+    property bool salatModeArmed: false
+
+    function beginSalatMode() {
+        if (!salatModeEnabled || !notifs || salatModeMinutes <= 0)
+            return;
+        if (notifs.dnd)
+            return;      // already silent by the user's own choice; leave it
+        salatModeArmed = true;
+        notifs.setDnd(true);
+        salatModeTimer.interval = salatModeMinutes * 60000;
+        salatModeTimer.restart();
+    }
+
+    readonly property Timer salatModeTimer: Timer {
+        repeat: false
+        onTriggered: {
+            if (!root.salatModeArmed)
+                return;
+            root.salatModeArmed = false;
+            if (root.notifs && root.notifs.dnd)
+                root.notifs.setDnd(false);
         }
     }
 
