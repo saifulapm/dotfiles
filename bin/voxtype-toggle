@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # voxtype-toggle — start the dictation daemon on demand, then toggle recording.
-# What the niri binds (Mod+Ctrl+X, F9) spawn instead of `voxtype record toggle`.
+# What a double-tap of Alt spawns (packages/src/qshell-dshift.c), and what the
+# bar widget and panel call, instead of `voxtype record toggle`.
 #
 # WHY: voxtype's daemon PRELOADS its whisper model at startup rather than
 # per utterance, so leaving it running costs the whole model resident. Measured
@@ -26,7 +27,7 @@
 # binary carries no LISTEN_FDS/sd_listen support to be activated on.
 #
 # voxtype.service is `systemctl --user disable`d so nothing starts it at login;
-# voxtype-idle-stop.timer stops it again after ~10 min idle. The bar is
+# voxtype-idle-stop.timer stops it again after ~90 s idle. The bar is
 # unaffected either way: Dictation.qml is only `active` while recording or
 # transcribing, so a stopped daemon and an idle one look identical.
 set -uo pipefail
@@ -41,6 +42,20 @@ state="$runtime/state"
 if ! command -v voxtype >/dev/null 2>&1; then
   command -v notify-send >/dev/null &&
     notify-send -u critical "Dictation" "voxtype is not installed on this machine"
+  exit 0
+fi
+
+# Never START a dictation under the session lock. This guard is new with
+# Alt-Alt and exists BECAUSE of it: the old niri binds could not fire while
+# locked, but qshell-dshift reads evdev directly and does not care what the
+# compositor is showing — so without this, two taps at a locked screen would
+# open the microphone and transcribe into whatever gets focus at unlock.
+#
+# Only the START leg is blocked. A lock that lands mid-dictation must still be
+# stoppable, and stopping is the safe direction in every case. Same check
+# bin/notes-quick-capture makes, for the same reason.
+if [[ "$(cat "$state" 2>/dev/null)" != "recording" ]] &&
+  [[ "$(qs ipc call lock isLocked 2>/dev/null)" == "true" ]]; then
   exit 0
 fi
 
@@ -67,6 +82,37 @@ if [[ ! -e $state ]]; then
       notify-send -u critical "Dictation" "voxtype daemon failed to start"
     exit 1
   fi
+fi
+
+# Everything below is the START leg only. Reading the state tells the two legs
+# apart: a STOP must neither reopen the microphone (bin/voxtype-mic-gate's
+# waiter already owns closing it) nor stamp a fresh take over the one whose
+# transcript is about to arrive.
+if [[ "$(cat "$state" 2>/dev/null)" != "recording" ]]; then
+  # The microphone is muted at rest on this machine, so without this the
+  # daemon records digital silence. Full reasoning in bin/voxtype-mic-gate;
+  # this runs BEFORE the toggle because the source has to be live before the
+  # daemon opens the capture stream.
+  voxtype-mic-gate open
+
+  # Stamp the take for bin/voxtype-capture, which sees only the transcript and
+  # could otherwise report neither how long it took nor where it went. Two
+  # lines: epoch, then the focused window's app_id. This is the recording-start
+  # hook we cannot install — `voxtype config set` rejects
+  # output.pre_recording_command — done at the one place every dictation here
+  # passes through.
+  #
+  # app_id only, never the title: the title of the window you dictate into is
+  # far more revealing than the name of the program, and the panel only ever
+  # buckets by program.
+  app=""
+  if command -v niri >/dev/null 2>&1; then
+    # Bounded, and failure is silent: a wedged compositor must not hold up a
+    # keypress, and an unattributed take is still a take.
+    app="$(timeout 0.3 niri msg --json focused-window 2>/dev/null |
+      jq -r '.app_id // ""' 2>/dev/null)" || app=""
+  fi
+  printf '%s\n%s\n' "$(date +%s)" "$app" >"$runtime/take-start" 2>/dev/null || true
 fi
 
 exec voxtype record toggle

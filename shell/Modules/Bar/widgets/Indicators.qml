@@ -65,7 +65,14 @@ Item {
     readonly property bool alwaysShow: setting("alwaysShow", false) === true
     property bool areaHovered: false
     property bool itemHovered: false
-    readonly property bool revealInactive: alwaysShow || areaHovered || itemHovered || (bar && bar.centerSectionRevealHeld === true && bar.centerHoverRevealSuppressed !== true)
+    // An indicator whose panel is open holds the reveal open. Panels anchor to
+    // the glyph that opened them, and opening one SUPPRESSES the bar's centre
+    // hover reveal — so without this the container would slide shut under the
+    // card the moment the pointer left, collapsing the anchor to zero width
+    // and leaving the panel pointing at nothing. Dictation is the first
+    // indicator to carry a panel, which is why this only appears now.
+    property bool panelHeld: false
+    readonly property bool revealInactive: alwaysShow || panelHeld || areaHovered || itemHovered || (bar && bar.centerSectionRevealHeld === true && bar.centerHoverRevealSuppressed !== true)
 
     // Ids currently reported active, clock-side first.
     property var activeIds: []
@@ -107,6 +114,12 @@ Item {
         } else {
             hideTimer.restart();
         }
+    }
+
+    function setIndicatorPanelHeld(held) {
+        panelHeld = held;
+        if (!held)
+            hideTimer.restart();
     }
 
     // ------------------------------------------------- active block ordering

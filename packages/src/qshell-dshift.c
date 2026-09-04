@@ -1,13 +1,25 @@
-// qshell-dshift: double-tap-Shift watcher for the Notes quick capture
-// (Copper's shift-shift summon, on a compositor that cannot bind modifier
-// taps — niri binds are key chords only).
+// qshell-dshift: double-tap-modifier watcher, on a compositor that cannot bind
+// modifier taps — niri binds are key chords only.
+//
+//   Shift Shift  →  ~/.dotfiles/bin/notes-quick-capture   (Copper's summon)
+//   Alt Alt      →  ~/.dotfiles/bin/voxtype-toggle        (start/stop dictation)
 //
 // Reads /dev/input keyboards (read-only, never grabs — every key still
-// reaches the compositor and apps), detects two clean Shift taps within
-// TAP_WINDOW_MS, and spawns ~/.dotfiles/bin/notes-quick-capture. A "clean
-// tap" is Shift pressed and released with no other key in between, so
-// Shift+letter typing never fires; any other key press also resets the
-// pair, so type-Shift-type-Shift never fires either.
+// reaches the compositor and apps), detects two clean taps of the SAME
+// modifier within TAP_WINDOW_MS, and spawns that modifier's script. A "clean
+// tap" is the modifier pressed and released with no other key in between, so
+// Shift+letter and Alt+Tab never fire; any other key press also resets the
+// pair, so type-Shift-type-Shift never fires either. The modifiers reset each
+// other too — Shift-then-Alt is a chord, not half of two pairs.
+//
+// THE NAME IS HISTORICAL. It watched only Shift when it was written
+// (2026-08-13); Alt-Alt joined it 2026-09-04 when the voxtype keybinds moved
+// off Mod+Ctrl+X / F9. Extending this rather than shipping a second watcher is
+// the whole point: the event stream, the poll loop and the device rescan are
+// already here, and a second always-on service would double the wakeups on
+// every keystroke to read the same events again. Renaming the binary would
+// mean renaming the unit, which leaves an orphaned enabled service on every
+// machine that already has the old one — not worth it for a filename.
 //
 // Written in C for the resident cost: this is an always-on user service,
 // and it idles under 1 MB where a python watcher parks ~10 MB. Built by
@@ -31,6 +43,29 @@
 
 #define MAX_DEVS 32
 #define TAP_WINDOW_MS 400
+
+// One watched modifier: its two keycodes, the script its double-tap runs, and
+// the state machine for the pair in progress.
+typedef struct {
+    int lcode;
+    int rcode;
+    const char *script; // relative to $HOME
+    int down;           // one of the two is currently held
+    int clean;          // no other key seen since it went down
+    int64_t last_end;   // when the previous clean tap released, 0 if none
+} tap_t;
+
+static tap_t taps[] = {
+    {KEY_LEFTSHIFT, KEY_RIGHTSHIFT, "/.dotfiles/bin/notes-quick-capture", 0, 0, 0},
+    // Alt rather than a chord because it is the one modifier a hand can hit
+    // twice without leaving the home position, and dictation is started far
+    // more often than anything else bound here. Both Alts count, matching
+    // Shift: AltGr is safe because it is only ever used as a chord, which the
+    // clean-tap rule already rejects.
+    {KEY_LEFTALT, KEY_RIGHTALT, "/.dotfiles/bin/voxtype-toggle", 0, 0, 0},
+};
+
+#define NTAPS ((int)(sizeof(taps) / sizeof(taps[0])))
 
 static struct pollfd fds[MAX_DEVS + 1]; // [0] is the inotify fd
 static int nfds = 1;
@@ -82,13 +117,24 @@ static int64_t now_ms(void) {
     return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
-static void fire(void) {
+static void fire(const char *relative) {
     if (fork() == 0) {
         const char *home = getenv("HOME");
         char script[512];
-        snprintf(script, sizeof(script), "%s/.dotfiles/bin/notes-quick-capture", home ? home : "");
+        snprintf(script, sizeof(script), "%s%s", home ? home : "", relative);
         execl(script, script, (char *)NULL);
         _exit(127);
+    }
+}
+
+// Any key that is not part of modifier `except` breaks every pending pair it
+// is not part of. Passing -1 means "a plain key: break all of them".
+static void reset_others(int except) {
+    for (int i = 0; i < NTAPS; i++) {
+        if (i == except)
+            continue;
+        taps[i].clean = 0;
+        taps[i].last_end = 0;
     }
 }
 
@@ -102,10 +148,6 @@ int main(void) {
     fds[0].events = POLLIN;
 
     scan_devices();
-
-    int shift_down = 0;       // a Shift key is currently held
-    int tap_clean = 0;        // no other key seen since it went down
-    int64_t last_tap_end = 0; // when the last clean tap released
 
     for (;;) {
         if (poll(fds, (nfds_t)nfds, -1) < 0)
@@ -139,33 +181,43 @@ int main(void) {
                     // invisible to the key path. Plain motion (REL_X/Y) is
                     // deliberately NOT a reset — hands drift between taps.
                     if (ev[k].type == EV_REL && (ev[k].code == REL_WHEEL || ev[k].code == REL_HWHEEL || ev[k].code == REL_WHEEL_HI_RES || ev[k].code == REL_HWHEEL_HI_RES)) {
-                        tap_clean = 0;
-                        last_tap_end = 0;
+                        reset_others(-1);
                         continue;
                     }
                     if (ev[k].type != EV_KEY || ev[k].value == 2) // ignore autorepeat
                         continue;
-                    int is_shift = ev[k].code == KEY_LEFTSHIFT || ev[k].code == KEY_RIGHTSHIFT;
-                    if (!is_shift) {
+
+                    int which = -1;
+                    for (int m = 0; m < NTAPS; m++)
+                        if (ev[k].code == taps[m].lcode || ev[k].code == taps[m].rcode)
+                            which = m;
+
+                    if (which < 0) {
                         // Any other key (including mouse buttons) breaks
-                        // both the tap in progress and the pending pair.
-                        tap_clean = 0;
-                        last_tap_end = 0;
+                        // every tap in progress and every pending pair.
+                        reset_others(-1);
                         continue;
                     }
+
+                    // A watched modifier is still "another key" to the OTHER
+                    // watched modifiers: Shift-then-Alt is a chord, and must
+                    // not leave half a Shift pair armed behind it.
+                    reset_others(which);
+
+                    tap_t *tap = &taps[which];
                     if (ev[k].value == 1) {
-                        shift_down = 1;
-                        tap_clean = 1;
-                    } else if (ev[k].value == 0 && shift_down) {
-                        shift_down = 0;
-                        if (!tap_clean)
+                        tap->down = 1;
+                        tap->clean = 1;
+                    } else if (ev[k].value == 0 && tap->down) {
+                        tap->down = 0;
+                        if (!tap->clean)
                             continue;
                         int64_t t = now_ms();
-                        if (last_tap_end && t - last_tap_end <= TAP_WINDOW_MS) {
-                            last_tap_end = 0;
-                            fire();
+                        if (tap->last_end && t - tap->last_end <= TAP_WINDOW_MS) {
+                            tap->last_end = 0;
+                            fire(tap->script);
                         } else {
-                            last_tap_end = t;
+                            tap->last_end = t;
                         }
                     }
                 }

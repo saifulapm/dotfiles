@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# voxtype-mic-gate — open the microphone for the length of one dictation, then
+# put it back exactly as it was.
+#
+# WHY THIS EXISTS. The default source on this machine is muted
+# (`wpctl get-volume @DEFAULT_AUDIO_SOURCE@` → "Volume: 0.70 [MUTED]"), which
+# is the right resting state for a laptop microphone and the state the bar's
+# Mic widget and XF86AudioMicMute both maintain. voxtype does not know or care:
+# it opens the capture stream, PipeWire hands it a muted source, and it records
+# DIGITAL SILENCE. Measured 2026-09-04 through voxtype-audio-bridge: muted, all
+# 138 frames of a recording came back `peak: 0.000`; unmuted, 144 of 147 frames
+# were non-zero and peaked at 0.203. So every dictation since the mic was last
+# muted transcribed nothing — or worse, since `vad.enabled` is false, whatever
+# whisper hallucinates onto silence.
+#
+# Unmuting permanently is the wrong fix: the mute IS the privacy posture. So
+# the microphone opens when a dictation starts and closes when it ends, which
+# is a stronger posture than leaving it live, not a weaker one.
+#
+# WHY NOT A voxtype HOOK. `output.pre_recording_command` is exactly the right
+# place and voxtype runs it on every recording path — but `voxtype config set`
+# rejects the key (not in the settable schema on 1.0.1, verified), and the only
+# other way in is hand-editing an unmanaged config.toml. bin/voxtype-toggle is
+# the single entry point every dictation on this machine goes through anyway —
+# both niri binds and the bar widget spawn it — so the gate hangs off that.
+#
+# THE CLOSE IS OWNED BY THE OPEN. `open` unmutes and then forks a waiter that
+# closes the gate once the daemon leaves recording/transcribing. Putting the
+# close on the stop keypress instead would miss every other way a recording
+# ends: the 60 s max_duration ceiling, `record cancel`, a daemon that dies
+# mid-utterance. Waiting on the state file catches all of them.
+#
+# The saved state file is the whole lock: `close` is a no-op without it, so a
+# second waiter, a stray idle-stop sweep, and a manual call are all idempotent.
+set -uo pipefail
+
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/voxtype"
+state="$runtime/state"
+saved="$runtime/mic-mute-was"
+# Meeting mode runs a SEPARATE state machine: the daemon leaves `state` on
+# "idle" for the whole of a meeting and tracks it in this file instead
+# (verified 2026-09-04). Without watching both, the gate would shut the
+# microphone five seconds into an hour-long recording.
+meeting="$runtime/meeting_state"
+
+# True while the daemon is capturing for any reason.
+capturing() {
+  [[ -e $state && "$(cat "$state" 2>/dev/null)" == "recording" ]] && return 0
+  in_meeting
+}
+
+in_meeting() {
+  [[ -e $meeting ]] || return 1
+  case "$(head -1 "$meeting" 2>/dev/null)" in
+  recording | paused) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+# Ceiling for the waiter. audio.max_duration_secs is 60 and small.en needs a
+# few seconds per minute of speech on this M2, so 300 s is far past any real
+# dictation. Reaching it means the daemon wedged, and closing the gate anyway
+# is the safe end of that.
+wait_secs=300
+
+command -v wpctl >/dev/null 2>&1 || exit 0
+
+case "${1:-}" in
+open)
+  # Only the FIRST open records the prior state. A re-entrant open (a double
+  # keypress, a widget click racing a keybind) must not overwrite "was muted"
+  # with the "unmuted" we just set, which would leave the mic live forever.
+  if [[ ! -e $saved ]]; then
+    mkdir -p "$runtime" 2>/dev/null || exit 0
+    if wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | grep -q MUTED; then
+      echo 1 >"$saved"
+    else
+      echo 0 >"$saved"
+    fi
+    wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0 2>/dev/null || true
+  fi
+
+  # setsid so the waiter outlives the keybind's spawn, and a full detach so
+  # niri is not holding a pipe open for five minutes.
+  setsid "$0" _wait >/dev/null 2>&1 </dev/null &
+  ;;
+
+close)
+  [[ -e $saved ]] || exit 0
+  # Read then remove, so two racing closers cannot both restore-and-clear.
+  want="$(cat "$saved" 2>/dev/null)"
+  rm -f "$saved"
+  # Explicitly not `[[ ... ]] && wpctl`: that leaves the script exiting 1 on
+  # the perfectly ordinary path where the microphone was already live before
+  # the dictation, and a close that reports failure for succeeding is a trap
+  # for the next caller.
+  if [[ $want == 1 ]]; then
+    wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 1 2>/dev/null || true
+  fi
+  exit 0
+  ;;
+
+_wait)
+  # Poll rather than watch: the state file is rewritten in place by the daemon,
+  # so an inotify watch would need re-arming on every transition anyway, and
+  # 200 ms is imperceptible against a dictation.
+  #
+  # TWO PHASES, because the gate is opened BEFORE `voxtype record toggle` runs
+  # — the microphone has to be live before the daemon opens the capture stream,
+  # or the first syllables are the silence this whole script exists to prevent.
+  # That means the state file still reads "idle" when the waiter starts, so a
+  # single "wait while recording" loop would close the gate instantly.
+
+  # Phase 1: wait for the capture to begin. Five seconds is generous against a
+  # signal that normally lands in milliseconds; if it never arrives the toggle
+  # failed and an open gate is just a live microphone nobody asked for.
+  started=0
+  for _ in $(seq 1 25); do
+    sleep 0.2
+    capturing || continue
+    started=1
+    break
+  done
+
+  # Phase 2: hold only while the microphone is actually being read.
+  # "transcribing" is whisper's turn, not the microphone's, so the gate shuts
+  # the moment a dictation ends rather than at the end of the whole utterance.
+  if ((started)); then
+    deadline=$(($(date +%s) + wait_secs))
+    while :; do
+      sleep 0.2
+      # A vanished state file means the daemon exited: nothing is capturing,
+      # and the gate must not wait on a process that is gone.
+      [[ -e $state ]] || break
+      if in_meeting; then
+        # A meeting has an explicit stop and legitimately runs for hours, so
+        # the ceiling below must not apply to it — push it forward instead.
+        deadline=$(($(date +%s) + wait_secs))
+      elif ! capturing; then
+        break
+      fi
+      (($(date +%s) < deadline)) || break
+    done
+  fi
+  exec "$0" close
+  ;;
+
+*)
+  echo "usage: voxtype-mic-gate open|close" >&2
+  exit 2
+  ;;
+esac

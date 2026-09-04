@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""voxtype-facts — one JSON snapshot of everything the bar's dictation panel shows.
+
+WHY ONE COMMAND. The panel wants nine readings that live in six places: the
+daemon's state file, `voxtype status`, `voxtype info accel|models`, `voxtype
+config schema`, systemd, /proc, wpctl, and the dictation log. Asking QML to
+spawn six processes and reconcile six arrival orders on every panel open is
+how a panel gets slow and half-drawn; one blob arrives at once or not at all.
+This is the same shape as bin/ports and bin/network-status.
+
+MEASURED OR ABSENT, NEVER GUESSED. Every reading here is taken; one that
+cannot be taken is omitted or null, so the panel can say "not known" instead
+of showing a confident zero. `info accel` is the sharpest example — it is the
+only thing that reports whether acceleration ACTUALLY happened, as opposed to
+what the config asked for.
+
+CHEAP ENOUGH TO RUN ON EVERY OPEN. Timed on the M2 2026-09-04: status 0.01s,
+info accel 0.02s, info models 0.00s, config schema 0.00s, systemctl 0.01s. The
+panel therefore takes a fresh snapshot on open and after every action rather
+than polling — the live state already arrives on the follower stream that
+feeds the bar indicator, and nothing else here changes without someone asking
+for it.
+"""
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}") / "voxtype"
+HERE = Path(__file__).resolve().parent
+
+# Every subprocess is bounded. A wedged daemon or a stalled journal read must
+# degrade one reading, not hang the panel open.
+TIMEOUT = 4
+
+
+def run(args):
+    """stdout of a command, or None. None is the 'not known' this file trades in."""
+    try:
+        out = subprocess.run(args, capture_output=True, text=True, timeout=TIMEOUT)
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout.strip()
+
+
+def run_json(args):
+    raw = run(args)
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def unit_facts():
+    """systemd's view plus the daemon's actual resident size.
+
+    The unit is reported separately from the daemon because a unit sitting in
+    `failed` has no daemon status to report at all, and that is worth showing
+    rather than folding into "not running".
+    """
+    facts = {"active": None, "pid": 0, "rssMb": 0}
+    raw = run(["systemctl", "--user", "show", "voxtype.service",
+               "-p", "ActiveState", "-p", "MainPID"])
+    if not raw:
+        return facts
+    for line in raw.splitlines():
+        key, _, value = line.partition("=")
+        if key == "ActiveState":
+            facts["active"] = value
+        elif key == "MainPID":
+            facts["pid"] = int(value or 0)
+
+    # VmRSS rather than anything systemd reports: the whole point of the
+    # on-demand daemon is the preloaded whisper model's resident size, and
+    # that is the number bin/voxtype-toggle's reasoning is written against.
+    if facts["pid"]:
+        try:
+            for line in Path(f"/proc/{facts['pid']}/status").read_text().splitlines():
+                if line.startswith("VmRSS:"):
+                    facts["rssMb"] = round(int(line.split()[1]) / 1024)
+                    break
+        except Exception:
+            pass
+    return facts
+
+
+def schema_facts():
+    """Current values and the choices the panel is allowed to offer.
+
+    Read from `config schema --json` rather than from config.toml: it reports
+    the RESOLVED value (what the daemon would use), carries the enum choices,
+    and is the same surface `config set` validates against, so the panel can
+    never offer a value the setter would reject.
+    """
+    schema = run_json(["voxtype", "config", "schema", "--json"])
+    if not schema:
+        return {}, {}, {}
+    values = {}
+    choices = {}
+    for key in schema.get("keys") or []:
+        values[key.get("key")] = key.get("value")
+        if key.get("choices"):
+            choices[key.get("key")] = key["choices"]
+    # The running daemon's version, which is NOT the binary's after an
+    # in-place upgrade: a rename leaves the old process on the old inode. The
+    # chezmoi script restarts it, but a hand `voxtype check-update` does not,
+    # and a panel reporting the new version's settings against a daemon still
+    # running the old one would be reporting intent as fact.
+    stale = {
+        "daemonVersion": schema.get("daemon_version"),
+        "daemonVersionDiffers": schema.get("daemon_version_differs") is True,
+    }
+    return values, choices, stale
+
+
+def model_names(engine):
+    """Installed-or-downloadable models for the ACTIVE engine only.
+
+    `info models --json` lists all eight engines; offering models for an
+    engine this binary was not built with would be offering a switch that
+    cannot be thrown.
+    """
+    got = run_json(["voxtype", "info", "models", "--json"])
+    if not got:
+        return []
+    entry = (got.get("engines") or {}).get(engine) or {}
+    return [
+        {"name": m.get("name"), "installed": bool(m.get("installed"))}
+        for m in entry.get("models") or []
+        if m.get("name")
+    ]
+
+
+def gpu_present():
+    """Whether this machine has a GPU voxtype could ever use.
+
+    This exists to keep `info accel` honest. On aarch64 upstream ships CPU-only
+    binaries — INSTALL.md says so outright ("No CUDA, MIGraphX, or Vulkan
+    support on arm64") — and `info accel` still reports state `cpu-fallback`
+    there. On a machine with a GPU that is a real warning: acceleration was
+    asked for and did not happen. On this one there is nothing to fall back
+    FROM, and painting it as a fault would be crying wolf on every panel open.
+    """
+    got = run_json(["voxtype", "info", "variants", "--json"])
+    if not got:
+        return None
+    gpus = got.get("gpus") or {}
+    return any(bool(v) for v in gpus.values())
+
+
+def mic_muted():
+    """Whether the default source is muted — tri-state, because 'no wpctl' is
+    not 'not muted'. The bar's gate opens this for the length of a recording;
+    the panel shows it so the resting state is visible rather than surprising."""
+    raw = run(["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"])
+    if raw is None:
+        return None
+    return "MUTED" in raw
+
+
+def main():
+    values, choices, stale = schema_facts()
+    engine = values.get("engine") or "whisper"
+
+    state = None
+    try:
+        state = (RUNTIME / "state").read_text().strip() or None
+    except Exception:
+        pass
+
+    capture = run_json([str(HERE / "voxtype-capture"), "status"]) or {}
+
+    json.dump({
+        "version": (run(["voxtype", "--version"]) or "").replace("voxtype", "").strip() or None,
+        **stale,
+        # The daemon's own state file, the same source the bar indicator's
+        # follower reads, so the panel and the bar can never disagree.
+        "state": state,
+        "unit": unit_facts(),
+        "engine": engine,
+        "model": values.get(f"{engine}.model"),
+        "language": values.get(f"{engine}.language"),
+        "languages": choices.get(f"{engine}.language") or [],
+        "models": model_names(engine),
+        "outputMode": values.get("output.mode"),
+        "vad": values.get("vad.enabled"),
+        "pauseMedia": values.get("audio.pause_media"),
+        "accel": run_json(["voxtype", "info", "accel", "--json"]),
+        "gpuPresent": gpu_present(),
+        "micMuted": mic_muted(),
+        "capture": capture,
+    }, sys.stdout)
+    sys.stdout.write("\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

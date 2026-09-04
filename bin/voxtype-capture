@@ -1,0 +1,348 @@
+#!/usr/bin/env python3
+"""voxtype-capture — voxtype's post_process hook, and the owner of the dictation log.
+
+WHAT IT IS. voxtype types a transcript into the focused window and then
+forgets it. There is no history, no "what did I dictate yesterday", and no way
+to recover a paragraph that landed in the wrong window because the focus moved
+while whisper was still thinking. This hook is the fix: every finished
+transcript passes through here on its way to the keyboard, and one JSONL line
+per dictation stays behind.
+
+WHY post_process AND NOT A WATCHER. The daemon has exactly one place a third
+party can see finished text: `output.post_process.command`, a filter that
+receives the transcript on stdin and whose stdout is what actually gets typed.
+That makes this script load-bearing — a crash here would eat the dictation —
+so the passthrough is the FIRST thing it does and the log is written after,
+inside a guard that can only lose the log line, never the text. voxtype also
+falls back to the original transcript if we exit nonzero or time out, which is
+the second net under the same rule.
+
+It is also the only hook we can set: `voxtype config set` accepts
+`output.post_process.command` but rejects `output.pre_recording_command` and
+`output.post_output_command` (they parse from the file but are not in the
+settable schema, verified on 1.0.1). So the recording-start half of the story
+— the take stamp and the mic unmute — lives in bin/voxtype-toggle instead,
+which is the single entry point every dictation goes through anyway.
+
+TWO STORES, DELIBERATELY. `dictation.jsonl` holds the transcripts and is
+pruned; `dictation-days.json` holds a per-day rollup and is not. Stats that
+vanish when the 501st dictation prunes the 1st would be worse than no stats,
+and a day's totals cost ~60 bytes against a day's transcripts at ~10 KB.
+
+PRIVACY. Everything you have ever dictated is in one file, so it is 0600 in
+$XDG_STATE_HOME, never leaves the machine, and `clear` really deletes.
+`pause` stops new lines without unwiring the hook.
+"""
+
+import json
+import os
+import re
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+# Unpinned transcripts kept. 500 is roughly a month of heavy dictation; the
+# per-day rollup below is what remembers anything older, so this bound costs
+# stats nothing.
+HISTORY_MAX = 500
+# Days kept in the rollup — two weeks for the chart, the rest as headroom so a
+# machine left off for a fortnight still draws a full one.
+DAYS_MAX = 42
+# A transcript longer than this is a runaway, not a dictation: max_duration_secs
+# is 60, which no human fills with 20k characters. Truncating bounds the file
+# against a hallucinating model looping on silence.
+TEXT_MAX = 20000
+
+# Whisper's silence hallucinations. Fed a recording with no real speech in it,
+# whisper does not return an empty string — it returns one of these, and
+# without this filter voxtype types it into whatever window has focus.
+#
+# THIS LIST IS UPSTREAM'S, copied verbatim from voxtype's
+# src/transcribe/sliding_window.rs HALLUCINATION_PATTERNS along with its
+# normalisation (lowercase, strip surrounding space, strip trailing .,!?).
+# Upstream drops these already — but only on the streaming path, and
+# push-to-talk does not go through it. So this is their filter on the code path
+# they did not wire it to, not a guess of ours.
+#
+# WHY IT IS NEEDED EVEN WITH VAD ON. VAD rejects a recording with no detected
+# speech, and it does catch the fully silent case. It does not catch a laptop
+# microphone in a quiet room: measured 2026-09-04, 4 of 6 silent takes at the
+# default threshold still had Silero find a "speech" segment, and whisper
+# hallucinated on every one of them ("Thank you.", "Thanks for watching!").
+# Raising the threshold to 0.7 made it worse, not better.
+#
+# THE COST, stated plainly: a deliberate one-word "Thank you." dictation is
+# dropped too. That is why a dropped transcript is still LOGGED — the panel
+# shows it, so nothing is silently destroyed, only silently not typed.
+HALLUCINATIONS = {
+    "you", "the", "i", "a", "it", "is", "and", "to",
+    "thank you", "thanks", "bye", "okay",
+    "thank you for watching", "thanks for watching",
+    "please subscribe", "subscribe",
+    "thank you very much", "you're welcome",
+    "good night", "good bye", "see you next time",
+    "subtitles by the amara.org community",
+}
+
+
+def is_hallucination(text):
+    """Upstream's check: lowercase, strip surrounding space, strip trailing .,!?"""
+    return text.strip().lower().rstrip(".,!?").strip() in HALLUCINATIONS
+
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "qshell"
+HISTORY = STATE_DIR / "dictation.jsonl"
+DAYS = STATE_DIR / "dictation-days.json"
+PINS = STATE_DIR / "dictation-pins.json"
+PAUSED = STATE_DIR / "dictation-paused"
+
+RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}") / "voxtype"
+# Written by bin/voxtype-toggle when it starts a recording: epoch seconds on
+# the first line, the focused window's app_id on the second.
+TAKE_START = RUNTIME / "take-start"
+
+# Fixed buckets, matched on app_id tokens rather than loose substrings so
+# "code" does not also claim "vscodium-insiders-thing". Everything unmatched is
+# Other rather than its own bucket: a chart with forty one-take slices answers
+# nothing. Tuned for what is actually on this machine (foot, chromium, emacs).
+DESTINATIONS = (
+    (("chromium", "chrome", "firefox", "brave", "zen", "librewolf", "vivaldi"), "Browser"),
+    (("emacs", "emacsclient", "nvim", "neovide", "helix", "hx", "code", "codium", "zed"), "Editor"),
+    (("foot", "kitty", "alacritty", "ghostty", "wezterm", "footclient"), "Terminal"),
+    (("slack", "discord", "signal", "telegram", "element", "whatsapp", "thunderbird"), "Chat"),
+)
+
+
+def bucket(app):
+    """Map an app_id to a destination bucket. Unknown and empty both go to Other."""
+    tokens = set(re.findall(r"[a-z0-9]+", (app or "").lower()))
+    if not tokens:
+        return "Other"
+    for needles, name in DESTINATIONS:
+        if tokens.intersection(needles):
+            return name
+    return "Other"
+
+
+def read_json(path, fallback):
+    """Parse a JSON file, or hand back the fallback. A corrupt store is not an
+    error worth failing a dictation over — it is a store we rebuild."""
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return fallback
+
+
+def write_json(path, data):
+    """Atomic replace, so a reader (the panel polls these) never sees a half
+    file and a crash mid-write cannot leave a truncated one."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data))
+    os.chmod(tmp, 0o600)
+    tmp.replace(path)
+
+
+def read_history():
+    if not HISTORY.exists():
+        return []
+    rows = []
+    for line in HISTORY.read_text(errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except Exception:
+            continue
+        if isinstance(row, dict) and "id" in row:
+            rows.append(row)
+    return rows
+
+
+def write_history(rows):
+    tmp = HISTORY.with_suffix(".jsonl.tmp")
+    tmp.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+    os.chmod(tmp, 0o600)
+    tmp.replace(HISTORY)
+
+
+def pins():
+    got = read_json(PINS, [])
+    return set(got) if isinstance(got, list) else set()
+
+
+def take_start():
+    """(seconds recorded, app_id) for the take that just finished, or (None, "").
+
+    None rather than 0 when the stamp is missing: a dictation triggered by
+    something other than bin/voxtype-toggle (a bare `voxtype record start`)
+    has no measured duration, and "not known" must not read as "instant" in
+    the day's total.
+    """
+    try:
+        lines = TAKE_START.read_text().splitlines()
+        started = float(lines[0])
+        app = lines[1].strip() if len(lines) > 1 else ""
+    except Exception:
+        return None, ""
+    elapsed = time.time() - started
+    # A stamp older than the daemon's own ceiling belongs to an abandoned take
+    # — `record cancel` ends a recording without ever reaching post_process, so
+    # it leaves its stamp behind. Drop the app_id with the duration rather than
+    # attributing this dictation to the window the abandoned one was aimed at.
+    if not 0 <= elapsed <= 600:
+        return None, ""
+    return round(elapsed, 2), app
+
+
+def roll_up(day, secs, words):
+    """Fold one take into the per-day totals, then trim to the window."""
+    days = read_json(DAYS, {})
+    if not isinstance(days, dict):
+        days = {}
+    entry = days.get(day) or {}
+    days[day] = {
+        "takes": int(entry.get("takes") or 0) + 1,
+        "secs": round(float(entry.get("secs") or 0) + (secs or 0), 2),
+        "words": int(entry.get("words") or 0) + words,
+    }
+    for stale in sorted(days)[:-DAYS_MAX]:
+        days.pop(stale, None)
+    write_json(DAYS, days)
+
+
+def log(text, dropped=False):
+    """Append one record. Called after the transcript has been passed on (or not)."""
+    if PAUSED.exists():
+        return
+    secs, app = take_start()
+    now = datetime.now().astimezone()
+    stripped = text.strip()
+    record = {
+        "id": int(now.timestamp() * 1000),
+        "at": now.isoformat(timespec="seconds"),
+        "secs": secs,
+        "words": len(stripped.split()),
+        "chars": len(stripped),
+        "app": app,
+        "dest": bucket(app),
+        "text": stripped[:TEXT_MAX],
+    }
+    if dropped:
+        record["dropped"] = True
+    rows = read_history()
+    rows.append(record)
+    keep = pins()
+    # Prune the oldest UNPINNED rows only. Pinned ones are the phrases someone
+    # deliberately kept, so they outlive the window by construction.
+    while len([r for r in rows if r["id"] not in keep]) > HISTORY_MAX:
+        for i, r in enumerate(rows):
+            if r["id"] not in keep:
+                rows.pop(i)
+                break
+        else:
+            break
+    write_history(rows)
+    # A dropped hallucination is not dictation, so it does not go in the day's
+    # totals: counting it would put talk time and a words-per-minute rate on a
+    # recording where nobody said anything. It stays in the history above,
+    # which is the store that answers "what happened", not "what did I say".
+    if not dropped:
+        roll_up(now.strftime("%Y-%m-%d"), secs, record["words"])
+
+
+def hook():
+    """The post_process contract: stdin is the transcript, stdout is what gets typed."""
+    text = sys.stdin.read()
+    dropped = is_hallucination(text)
+    # Passthrough FIRST and flushed, so the dictation is safely on its way
+    # before this script does anything that could fail.
+    #
+    # Unless it is a silence hallucination, where printing NOTHING is the
+    # suppression: voxtype types our stdout, so an empty stdout types nothing.
+    # That only holds with `fallback_on_empty = false` in config.toml — with
+    # the default `true`, voxtype answers an empty hook by typing the original
+    # text instead, and this whole branch would be a no-op. run_after_01 sets
+    # that key and says so.
+    if not dropped:
+        sys.stdout.write(text)
+    sys.stdout.flush()
+    try:
+        if text.strip():
+            log(text, dropped)
+    except Exception as e:
+        # Never fail the dictation over the log. Stderr goes to the daemon's
+        # journal, where a broken hook is findable without being fatal.
+        print(f"voxtype-capture: log failed: {e}", file=sys.stderr)
+    finally:
+        # One stamp serves one take. Leaving it would let the NEXT dictation
+        # inherit this one's duration if it were started outside voxtype-toggle.
+        TAKE_START.unlink(missing_ok=True)
+
+
+def main():
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    argv = sys.argv[1:]
+    cmd = argv[0] if argv else "hook"
+
+    if cmd == "hook":
+        hook()
+        return 0
+
+    if cmd == "pin" or cmd == "unpin":
+        if len(argv) < 2:
+            print("usage: voxtype-capture pin|unpin <id>", file=sys.stderr)
+            return 2
+        keep = pins()
+        if cmd == "unpin":
+            keep.discard(int(argv[1]))
+        else:
+            keep.add(int(argv[1]))
+        write_json(PINS, sorted(keep))
+        return 0
+
+    if cmd == "delete":
+        if len(argv) < 2:
+            print("usage: voxtype-capture delete <id>", file=sys.stderr)
+            return 2
+        target = int(argv[1])
+        write_history([r for r in read_history() if r["id"] != target])
+        keep = pins()
+        keep.discard(target)
+        write_json(PINS, sorted(keep))
+        return 0
+
+    if cmd == "clear":
+        # Pinned rows survive a clear; `clear --all` is the one that does not,
+        # because "delete everything" has to be sayable without hunting pins.
+        if "--all" in argv:
+            HISTORY.unlink(missing_ok=True)
+            PINS.unlink(missing_ok=True)
+        else:
+            keep = pins()
+            write_history([r for r in read_history() if r["id"] in keep])
+        return 0
+
+    if cmd in ("pause", "resume"):
+        if cmd == "pause":
+            PAUSED.touch(mode=0o600)
+        else:
+            PAUSED.unlink(missing_ok=True)
+        return 0
+
+    if cmd == "status":
+        rows = read_history()
+        print(json.dumps({
+            "paused": PAUSED.exists(),
+            "count": len(rows),
+            "pinned": len(pins()),
+            "days": read_json(DAYS, {}),
+        }))
+        return 0
+
+    print(f"voxtype-capture: unknown command '{cmd}'", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

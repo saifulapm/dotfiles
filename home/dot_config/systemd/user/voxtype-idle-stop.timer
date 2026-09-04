@@ -2,13 +2,20 @@
 Description=Periodic idle check for the voxtype dictation daemon
 
 [Timer]
-# Two minutes is fine-grained without being costly: with the daemon stopped the
-# check is one stat() on a path that does not exist and exits immediately, and
-# the 10 min idle window it enforces is what actually decides when RAM comes
-# back. No persistence — this only matters while a session is running.
-OnStartupSec=2min
-OnUnitActiveSec=2min
-RandomizedDelaySec=20s
+# 45 s, down from 2 min on 2026-09-04 when the idle window dropped to 90 s. The
+# period has to stay BELOW the window or the timer becomes the thing that
+# decides when RAM comes back: a 2 min tick against a 90 s window would reap
+# somewhere between 90 s and 3.5 min, which is not the window anyone asked for.
+#
+# Ticking more often is close to free. With the daemon stopped — the common
+# case, and more common now — the check is one stat() on a path that does not
+# exist, and it exits immediately. No persistence: this only matters while a
+# session is running.
+OnStartupSec=45s
+OnUnitActiveSec=45s
+# Small against a 45 s period. Its job is only to avoid landing on the same
+# instant as every other user timer, not to spread the load meaningfully.
+RandomizedDelaySec=10s
 
 [Install]
 WantedBy=timers.target

@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# voxtype-meeting — one key for the whole of meeting mode: start, pause-resume,
+# stop. What Mod+Alt+M spawns and what the bar's dictation panel calls.
+#
+# WHY A WRAPPER, the same three reasons bin/voxtype-toggle has one:
+#   * the daemon is stopped when idle, and `voxtype meeting start` does not
+#     start it — it needs a running daemon the way `record toggle` does;
+#   * the microphone may be muted at rest, and a meeting recorded through a
+#     muted source is an hour of digital silence;
+#   * neither of those belongs in a keybind.
+#
+# MEETING MODE IS A SECOND STATE MACHINE. The daemon leaves the dictation
+# `state` file on "idle" for the entire length of a meeting and tracks it in
+# `meeting_state` instead — a two-line file, `status\nmeeting_id`, rewritten on
+# every transition. Everything here reads that file, and so do the two scripts
+# that would otherwise wreck a meeting: bin/voxtype-idle-stop would have reaped
+# the daemon after ten minutes of "idle", and bin/voxtype-mic-gate would have
+# shut the microphone five seconds in.
+#
+# TOGGLE SEMANTICS: idle → start, recording → stop, paused → resume. Pausing is
+# deliberately not on this key — it is the rarer intent, and a single key that
+# sometimes pauses and sometimes stops is a key you cannot trust mid-call. The
+# panel has explicit Pause and Stop buttons.
+set -uo pipefail
+
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/voxtype"
+state="$runtime/state"
+meeting="$runtime/meeting_state"
+
+say() { command -v notify-send >/dev/null && notify-send -a voxtype "Meeting" "$1"; }
+
+status() { head -1 "$meeting" 2>/dev/null || echo idle; }
+
+if ! command -v voxtype >/dev/null 2>&1; then
+  say "voxtype is not installed on this machine"
+  exit 0
+fi
+
+action="${1:-toggle}"
+current="$(status)"
+
+# Never START a meeting under the session lock, for the reason
+# bin/voxtype-toggle has the same guard: Mod+Alt+M is a niri bind and cannot
+# fire while locked, but the panel button and any script can, and an hour of
+# recording nobody asked for is worse than a stray dictation. Stopping and
+# pausing stay available — a lock landing mid-meeting is ordinary.
+if [[ $current != recording && $current != paused ]] &&
+  [[ "$(qs ipc call lock isLocked 2>/dev/null)" == "true" ]]; then
+  exit 0
+fi
+
+case "$action" in
+toggle)
+  case "$current" in
+  recording) action=stop ;;
+  paused) action=resume ;;
+  *) action=start ;;
+  esac
+  ;;
+esac
+
+case "$action" in
+start)
+  # Same readiness dance as bin/voxtype-toggle: the state file appearing is the
+  # daemon's own signal that the model is loaded, and `systemctl start` returns
+  # long before that on a Type=simple unit.
+  if [[ ! -e $state ]]; then
+    systemctl --user start voxtype.service
+    for _ in $(seq 1 100); do
+      [[ -e $state ]] && break
+      sleep 0.05
+    done
+    if [[ ! -e $state ]]; then
+      say "daemon failed to start"
+      exit 1
+    fi
+  fi
+
+  # Before the capture stream opens, not after.
+  voxtype-mic-gate open
+
+  # Titled by the clock. `voxtype meeting label` renames a speaker and the
+  # transcript keeps the id, so a better title is something to add afterwards
+  # rather than something to prompt for on a keypress.
+  if voxtype meeting start --title "Meeting $(date '+%Y-%m-%d %H:%M')" >/dev/null 2>&1; then
+    say "Recording. Mod+Alt+M again to stop."
+  else
+    say "could not start — check: voxtype meeting status"
+    exit 1
+  fi
+  ;;
+
+stop)
+  # Asynchronous: the CLI answers "stop requested" and the daemon finishes the
+  # last chunk afterwards, so meeting_state still reads "recording" for a few
+  # seconds. Nothing here waits on it — the panel watches the file.
+  if voxtype meeting stop >/dev/null 2>&1; then
+    say "Stopped. Transcript in voxtype meeting list."
+  else
+    say "nothing to stop"
+  fi
+  ;;
+
+pause | resume)
+  voxtype meeting "$action" >/dev/null 2>&1 &&
+    say "$([[ $action == pause ]] && echo Paused || echo Resumed)"
+  ;;
+
+*)
+  echo "usage: voxtype-meeting [toggle|start|stop|pause|resume]" >&2
+  exit 2
+  ;;
+esac

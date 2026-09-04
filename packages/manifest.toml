@@ -1646,11 +1646,11 @@ why  = "Screenshot annotation — bin/screenshot-annotate opens the clipboard im
 
 [[tool]]
 name = "voxtype"
-via  = "home/.chezmoiscripts/run_after_01-voxtype.sh (github.com/peteonrails/voxtype release binary, pinned v0.7.5, per-arch + per-CPU-feature asset, sha256-verified) → ~/.local/bin/voxtype, then `voxtype setup --download --model small.en` and `voxtype setup systemd` from the same script"
-why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows and what Mod+Ctrl+X / F9 drive"
+via  = "home/.chezmoiscripts/run_after_01-voxtype.sh (github.com/peteonrails/voxtype release binaries, pinned v1.0.1, per-arch + per-CPU-feature asset, sha256-verified) → ~/.local/bin/voxtype plus ~/.local/bin/voxtype-audio-bridge, then `voxtype setup --download --model small.en`, `voxtype setup systemd` and the bin/voxtype-capture hook wiring from the same script"
+why  = "Push-to-talk voice-to-text; what the bar's dictation indicator, panel and OSD follow and what a double-tap of Alt drives"
 
-# Notes on the voxtype entry above (v0.7.5, hand-installed on the M2
-# 2026-08-06, scripted for every machine 2026-08-11):
+# Notes on the voxtype entry above (hand-installed on the M2 2026-08-06,
+# scripted for every machine 2026-08-11, bumped 0.7.5 → 1.0.1 2026-09-04):
 #
 #   * Fedora does not package it — `dnf search voxtype` finds nothing — so it
 #     is a single user-local binary: an 11 MB stripped aarch64 ELF in
@@ -1665,18 +1665,148 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     installer. run_after_01-voxtype.sh downloads the asset for the machine,
 #     checks it against upstream's SHA256SUMS.txt, pulls the model and writes
 #     the unit — guarded per step, so it no-ops on a machine that already has
-#     them and never overwrites a binary on disk.
-#     Version PINNED at v0.7.5 rather than resolved through the GitHub API
-#     like run_after_10's tools: v1.0.0-rc1 (2026-06-04) is the "latest"
-#     release and ships macos-universal ONLY, no linux asset at all, so a
-#     latest-resolving fetch would install nothing. Recheck when a 1.0 with
-#     linux binaries lands.
+#     them.
+#     Version PINNED at v1.0.1 rather than resolved through the GitHub API
+#     like run_after_10's tools, because the pin is a FLOOR the shell depends
+#     on: the bar's dictation panel is built on `config schema --json`,
+#     `config get/set` and `info accel|models|engines --json`, none of which
+#     exist before 1.0.0. The older note here said 0.7.5 was the last release
+#     with any linux asset — that was true of v1.0.0-rc1 (macos-universal
+#     only) and stopped being true at v1.0.0 (2026-08-29), which ships both our
+#     arches. 1.1.0 is left alone while it is in rc; its headline features
+#     (OSD style packages, OpenVINO NPU) are for a frontend and hardware we do
+#     not have.
+#     The script now REINSTALLS on a version mismatch instead of only filling
+#     in a missing binary. That reverses an earlier deliberate choice ("never
+#     overwrite a binary on disk", so `voxtype check-update` was not stomped),
+#     and the reason is the floor above: with QML built against a 1.x CLI,
+#     whatever happens to be on disk is not a version anything can rely on.
+#     Keeping a hand-upgrade means bumping VERSION in the script.
+#     A SECOND BINARY comes with it: voxtype-audio-bridge, the sidecar the
+#     dictation OSD's waveform reads. The daemon broadcasts 16-byte audio
+#     frames at 100 Hz on $XDG_RUNTIME_DIR/voxtype/audio.sock and quickshell
+#     cannot read a unix socket, so upstream's bridge re-emits them as one
+#     NDJSON line per frame on stdout for a QML Process. Its asset name is
+#     arch-only — no CPU-feature split — and a failed fetch costs the waveform
+#     and nothing else, so it warns rather than failing the install.
 #     Asset choice is per CPU, not just per arch: upstream builds whisper.cpp
 #     per feature level and ships no baseline x86_64 binary, so the script
 #     picks x86_64-avx512 / x86_64-avx2 from /proc/cpuinfo and warns (rather
 #     than installing a SIGILL) on a pre-AVX2 box. aarch64 has one CPU build.
 #     The -onnx assets are deliberately not used — that swaps the engine to
 #     Parakeet, a model decision rather than a packaging one.
+#   * THE MICROPHONE IS MUTED AT REST, and until 2026-09-04 that meant every
+#     dictation recorded DIGITAL SILENCE. The default source here is the Asahi
+#     j493 mic filter-chain, and `wpctl get-volume @DEFAULT_AUDIO_SOURCE@`
+#     reports "[MUTED]" — the resting state the bar's Mic widget and
+#     XF86AudioMicMute both maintain, and the right one for a laptop. voxtype
+#     neither knows nor cares: it opens the capture stream and PipeWire hands
+#     it a muted source. Measured through voxtype-audio-bridge: muted, all 138
+#     frames of a recording came back peak 0.000; unmuted, 144 of 147 frames
+#     were non-zero, peaking at 0.203. With `vad.enabled` false (the default),
+#     that silence is not even an empty transcript — it is whatever whisper
+#     hallucinates onto it.
+#     bin/voxtype-mic-gate is the fix, and it unmutes for the length of ONE
+#     recording rather than permanently: the mute IS the privacy posture, and
+#     a microphone that opens on the dictation key and closes when recording
+#     ends is a stronger posture than a live one, not a weaker one. The close
+#     is owned by the open (a forked waiter on the state file), so it also
+#     covers `record cancel`, the 60 s max_duration ceiling and a daemon that
+#     dies mid-utterance; bin/voxtype-idle-stop sweeps as a net every 2 min in
+#     case the waiter itself is killed.
+#     `output.pre_recording_command` is where this belongs and voxtype runs it
+#     on every recording path — but `voxtype config set` REJECTS that key
+#     (parses from the file, absent from the settable schema, verified on
+#     1.0.1), and config.toml is not chezmoi-managed. bin/voxtype-toggle is
+#     the single entry point every dictation here goes through — both niri
+#     binds and the bar widget spawn it — so the gate hangs off that instead.
+#   * THE DICTATION LOG. `output.post_process.command` (the one hook `config
+#     set` does accept) is pointed at bin/voxtype-capture, a passthrough filter
+#     that types the transcript back out unchanged and keeps a copy. That is
+#     what gives the bar panel a history to search and a per-day talk-time to
+#     chart; voxtype itself keeps nothing. Two stores on purpose:
+#     dictation.jsonl is pruned to 500 unpinned transcripts, dictation-days.json
+#     is a ~60-byte-a-day rollup that is not, so stats do not vanish with the
+#     501st dictation. Both 0600 under $XDG_STATE_HOME/qshell.
+#     Being load-bearing on the typing path is the risk, so the passthrough is
+#     the first thing the script does and every failure below it is caught:
+#     verified that an unwritable store still types the transcript and exits 0.
+#     `voxtype config unset output.post_process.command` is BROKEN upstream on
+#     1.0.1 — it removes `command` and leaves an empty `[output.post_process]`
+#     table, fails its own validate-after-write and rolls back — so the way to
+#     stop logging is `voxtype-capture pause`, not an unset.
+#   * VAD IS ON since 2026-09-04, and it is not a nicety. With it off, whisper
+#     does not return an empty string for a silent recording — it hallucinates
+#     one, and voxtype types it. Measured on a 10 s silent take:
+#       VAD off   14.5 s wall, 16.8 s of CPU, typed "Thank you."
+#       VAD on    10.2 s wall,  0.25 s of CPU, typed nothing
+#     so it is worth 67x the CPU and the whole class of wrong paste. The model
+#     is Silero, 868 KB (`voxtype setup vad` → ggml-silero-vad.bin), against
+#     small.en's 466 MB — free by comparison. `vad.backend` is left at `auto`,
+#     which picks Silero for whisper and the model-free energy detector for the
+#     ONNX engines; writing "whisper" would be a second place to remember.
+#     Verified both directions: a silent take is rejected, and real speech
+#     (poor speaker-to-mic audio at that) still transcribes, so the default
+#     threshold of 0.5 is not too aggressive here. If a quiet voice ever gets
+#     dropped, `voxtype config set vad.threshold 0.3` is the knob — lower is
+#     more sensitive.
+#     THE REJECTION IS SILENT: the daemon logs it at DEBUG, plays a Cancelled
+#     sound only if `audio.feedback.enabled` is true (it is false here), and
+#     otherwise just returns to idle. So a dropped dictation looks like a
+#     dictation that produced nothing, because that is what it is.
+#   * COST, MEASURED 2026-09-04 (the question "does voxtype eat CPU/RAM"):
+#       at rest, no dictation in ~90 s    daemon STOPPED. 0 MB, 0 CPU.
+#                                         Only `voxtype status --follow`
+#                                         (4.2 MB, 0.06 s over a shell
+#                                         lifetime) and qshell-dshift (1.2 MB).
+#       daemon up, idle                   498 MB RSS (486 MB of it the model),
+#                                         0.04 s CPU per 30 s = 0.13%.
+#       transcribing 10 s of audio        882 MB PEAK RSS, 16.8 s of CPU across
+#                                         ~3.7 of the 8 cores, for ~4.5 s.
+#     The peak is the number to know: whisper.cpp roughly doubles the resident
+#     model while decoding, so a dictation briefly costs ~880 MB on a 7.3 GB
+#     laptop. It falls back to ~500 MB immediately and to zero when the idle
+#     timer reaps the daemon, which is exactly why the on-demand arrangement
+#     exists. VAD removes that spike entirely for accidental activations.
+#     The pieces added with the panel are all noise by comparison:
+#     voxtype-audio-bridge 3.6 MB and 0.00 s of CPU for a whole recording
+#     (100 Hz of 16-byte frames is nothing), bin/voxtype-capture 0.02 s per
+#     dictation, bin/voxtype-facts 0.12 s per panel open.
+#   * MEETING MODE IS ON (2026-09-04) and is a SECOND STATE MACHINE — the fact
+#     to know before touching anything here. The daemon leaves the dictation
+#     `state` file on "idle" for the ENTIRE length of a meeting and tracks it in
+#     $XDG_RUNTIME_DIR/voxtype/meeting_state instead, a two-line `status\nid`
+#     file. That broke two of our scripts before it was noticed:
+#     bin/voxtype-idle-stop would read "idle for ten minutes" partway through an
+#     hour-long meeting and stop the daemon underneath it, and bin/voxtype-mic-gate
+#     would shut the microphone five seconds in. Both watch meeting_state now.
+#     The idle-stop guard confirms the claim against STORAGE (`meeting show
+#     <id>`, which answers "Meeting not found" for a deleted id) rather than
+#     `meeting status`, which reads the same file and just repeats it. A stuck
+#     "recording" claim is reachable — deleting a meeting while it is still
+#     recording leaves the daemon logging "Meeting not found" on every stop and
+#     the file frozen — and a daemon restart clears it.
+#     Driven by bin/voxtype-meeting (Mod+Alt+M, the panel's MEETING row), and
+#     the bar's dictation indicator lights for a meeting as well as a dictation
+#     because an hour of recording is otherwise invisible.
+#     First `meeting start` downloads a 523 KB GTCRN speech-enhancement model.
+#   * PREFERENCES, set once and never corrected (unlike the post_process hook,
+#     which is drift-corrected on every apply). The test is the schema's
+#     `file_value`: null means the key is absent from config.toml, anything
+#     else means somebody chose it — `config get` cannot answer this because it
+#     reports the RESOLVED value and an unset bool reads the same as an
+#     explicit false.
+#       whisper.initial_prompt       names the vocabulary actually dictated
+#                                    here, which is the documented fix for the
+#                                    "restot Postger SQL" failure below
+#       audio.feedback.enabled       synthesised tones, nothing to download.
+#                                    The Cancelled tone is the point: a VAD
+#                                    rejection was otherwise SILENT
+#       output.shift_enter_newlines  Enter submits in Claude Code and Slack, so
+#                                    a dictated multi-line message used to fire
+#                                    off at the first line break
+#     whisper.eager_processing was offered and declined — it changes chunk
+#     boundaries, so it wants an accuracy test rather than a flag flip.
 #   * `voxtype setup --download --model X` REWRITES config.toml's model= as
 #     part of downloading (verified 2026-08-11), so the script guards on the
 #     model FILE being absent, not on `setup check`. A machine where the model
@@ -1714,7 +1844,7 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     uptime, all of it the startup load.
 #     So voxtype.service is `systemctl --user disable`d (nothing starts it at
 #     login) and bin/voxtype-toggle starts it on the keybind instead, with
-#     voxtype-idle-stop.timer stopping it after ~10 min idle — the same
+#     voxtype-idle-stop.timer stopping it after ~90 s idle — the same
 #     arrangement as this machine's on-demand database containers. Measured
 #     wrapper latency: 0.23 s cold (daemon down), 0.01 s warm. Full reasoning
 #     lives in bin/voxtype-toggle; the guard logic is in bin/voxtype-idle-stop
@@ -1780,12 +1910,31 @@ why  = "Push-to-talk voice-to-text; what the bar's dictation indicator follows a
 #     That file's mtime is also what bin/voxtype-idle-stop ages: the daemon
 #     rewrites it on every transition, so "idle" plus mtime age is exactly
 #     "idle for N seconds", and no separate bookkeeping is needed.
+#   * ALT-ALT IS THE ONLY WAY IN since 2026-09-04. The niri binds (Mod+Ctrl+X,
+#     F9) were removed on request in favour of a double-tap of a bare Alt,
+#     which niri cannot express — a bind is a key chord plus repeat /
+#     cooldown-ms / allow-when-locked / allow-inhibiting /
+#     hotkey-overlay-title and nothing else, with no tap and no release binds.
+#     So the tap is detected in packages/src/qshell-dshift.c, the evdev watcher
+#     that already owns Shift-Shift for the notes capture; adding a second
+#     modifier there costs nothing measurable (1232 kB resident after, 1280 kB
+#     before) where a second watcher would double the wakeups on every
+#     keystroke to read the same event stream twice.
+#     ONE CONSEQUENCE WORTH KNOWING: an evdev watcher does not care what the
+#     compositor is showing, so unlike a niri bind it fires under the session
+#     lock. bin/voxtype-toggle therefore refuses to START while locked (it will
+#     still stop a dictation the lock landed on top of), the same guard
+#     bin/notes-quick-capture has always carried.
+#     Verified 2026-09-04 by driving uinput with ydotool (wtype is invisible to
+#     evdev, so it cannot test this): Alt-Alt starts and stops, and all five
+#     near-misses stay inert — Alt+key chords, a single tap, two taps 700 ms
+#     apart, Shift-then-Alt and Alt-then-Shift.
 #   * voxtype's own evdev hotkey ([hotkey] key = SCROLLLOCK) needs the user in
-#     the `input` group and is inert here; the niri binds (Mod+Ctrl+X, F9 →
-#     bin/voxtype-toggle) are what drive it instead, which is upstream's
-#     documented compositor-keybinding mode. They spawn the wrapper rather than
-#     `voxtype record toggle` because that subcommand does NOT start a stopped
-#     daemon — it fails with "Voxtype daemon is not running". Socket activation
+#     the `input` group and is inert here; bin/voxtype-toggle is what drives
+#     recording instead, which is upstream's documented compositor-keybinding
+#     mode. It is spawned rather than `voxtype record toggle` because that
+#     subcommand does NOT start a stopped daemon — it fails with "Voxtype
+#     daemon is not running". Socket activation
 #     (the mysql/postgres/redis pattern here) is impossible for the same
 #     reason it needs a wrapper at all: record start/stop is SIGUSR1/SIGUSR2 to
 #     the pidfile, not a connection, and the binary has no LISTEN_FDS support.

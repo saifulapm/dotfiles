@@ -9,12 +9,72 @@
 # arrangement lives in bin/voxtype-toggle.
 set -uo pipefail
 
-# Ten minutes, matching the podman DB containers' idle window. Override with
-# VOXTYPE_IDLE_SECS to tune without editing the unit.
-idle_secs="${VOXTYPE_IDLE_SECS:-600}"
+# Ninety seconds, down from ten minutes on 2026-09-04. The long window was
+# copied from the podman DB containers, where a cold start costs seconds and
+# lingering genuinely pays. It does not pay here: a cold start was measured at
+# 0.165 / 0.196 / 0.164 s against 0.007 s warm, and it lands BEFORE recording
+# begins, so the whole cost of having reaped the daemon is a sixth of a second
+# you spend not having started speaking yet. Ten minutes of ~510 MB resident
+# was buying that sixth of a second, which is a bad trade on a 7.3 GB laptop.
+#
+# Not shorter, because a burst — dictate, read it, dictate again — should stay
+# warm, and 90 s covers reading a paragraph and going again.
+#
+# Override with VOXTYPE_IDLE_SECS to tune without editing the unit. Keep the
+# timer's period BELOW this (it is 45 s): with a period longer than the window
+# it is the timer, not this number, that decides when RAM comes back.
+idle_secs="${VOXTYPE_IDLE_SECS:-90}"
 
 runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/voxtype"
 state="$runtime/state"
+
+# A meeting holds the daemon open, and it does NOT move the state file this
+# script ages: the daemon leaves `state` on "idle" for the whole of a meeting
+# and tracks it in meeting_state instead (verified 2026-09-04). Without this
+# guard, every check below would read "idle for ten minutes" partway through an
+# hour-long recording and stop the daemon underneath it — losing the meeting.
+# "paused" counts as in-progress for the same reason a paused recording is not
+# an abandoned one.
+#
+# The file is checked FIRST because it is free, but it is not trusted on its
+# own: it can get stuck claiming "recording" forever if a meeting's stored row
+# disappears underneath the daemon (seen 2026-09-04 — deleting a meeting that
+# was still recording left the daemon logging "Meeting not found" on every stop
+# attempt and the file frozen at "recording"). A stuck claim would mean this
+# script never reaps the daemon again, parking ~500 MB silently.
+#
+# So the claim is confirmed against STORAGE, using the meeting id on line 2.
+# `voxtype meeting status` is NOT a cross-check — it reads this very file and
+# will happily repeat whatever it says. `meeting show <id>` goes to the
+# meetings database, and answers "Meeting not found" for an id that is gone.
+# It exits 0 either way, so the output is what gets read, not the status.
+# One 0.01 s process every two minutes, and only while a meeting looks live.
+meeting="$runtime/meeting_state"
+case "$(head -1 "$meeting" 2>/dev/null)" in
+recording | paused)
+  meeting_id="$(sed -n 2p "$meeting" 2>/dev/null)"
+  if [[ -n $meeting_id ]]; then
+    # Captured, then matched — NOT piped into `grep -q`. Under `set -o
+    # pipefail`, grep -q closes the pipe on its first match, voxtype dies of
+    # SIGPIPE, and the pipeline reports failure even though the match
+    # succeeded; the negation then reads "id is fine" for an id that is gone.
+    # That inverted this guard on the first attempt and is the same
+    # pipefail/grep -q trap already recorded against the omarchy scripts.
+    show="$(voxtype meeting show "$meeting_id" 2>&1 | tr '[:upper:]' '[:lower:]')"
+    [[ $show != *"not found"* ]] && exit 0
+  fi
+  ;;
+esac
+
+# Safety net for the microphone gate. bin/voxtype-mic-gate opens the mic for a
+# dictation and forks a waiter that closes it again, and that waiter covers
+# every ordinary ending — stop, cancel, the 60 s ceiling, a daemon that exits.
+# What it cannot cover is being killed itself, and the failure mode there is a
+# microphone left live, so a sweep that already runs every two minutes says so
+# out loud rather than leaving it to chance. A no-op unless a gate is open.
+if [[ ! -e $state || "$(cat "$state" 2>/dev/null)" != "recording" ]]; then
+  voxtype-mic-gate close 2>/dev/null || true
+fi
 
 # No state file means no daemon: voxtype removes it on shutdown (verified).
 # This is the common case once the daemon has been stopped, and it is why a

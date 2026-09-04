@@ -380,6 +380,7 @@ ShellRoot {
         onTriggered: {
             backgroundLoader.wake();
             osdLoader.wake();
+            dictationOsdLoader.wake();
             polkitLoader.wake();
             notesEdgeLoader.wake();
             if (shell.notifs.everNotified)
@@ -648,6 +649,24 @@ ShellRoot {
         surfaceProps: ({
                 theme: shell.theme,
                 audio: shell.audio
+            })
+    }
+
+    // The dictation card. Separate from the OSD pill above because it is a
+    // state you are in rather than a change that just happened — its own
+    // reasoning is at the top of DictationOsd.qml.
+    //
+    // It takes the bar's shared voxtype follower rather than starting a second
+    // one, which is also what makes waking this the moment the follower is
+    // guaranteed to exist: the service used to appear only if a bar happened
+    // to carry the dictation indicator, and an OSD that works only when a
+    // glyph is on the bar would be a surprise.
+    SurfaceLoader {
+        id: dictationOsdLoader
+        surfaceSource: shell.moduleRoot + "/Modules/Osd/DictationOsd.qml"
+        surfaceProps: ({
+                theme: shell.theme,
+                dictation: bar.dictationService()
             })
     }
 

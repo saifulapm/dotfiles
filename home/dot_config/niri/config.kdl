@@ -824,25 +824,33 @@ binds {
     // Reminders moved to the launcher (Set/Show/Clear Reminders script
     // commands) when the 3-modifier binds left (2026-08-26).
 
-    // Voice dictation (voxtype), state shown by the bar's dictation indicator.
-    // Omarchy's own toggle chord is SUPER+CTRL+X; Ctrl+X is free here.
+    // Voice dictation has NO BIND HERE, deliberately. It is Alt-Alt, a
+    // double-tap of a bare modifier, which niri cannot express: a bind is a
+    // key chord plus repeat / cooldown-ms / allow-when-locked /
+    // allow-inhibiting / hotkey-overlay-title and nothing else
+    // (niri-config/src/binds.rs), with no release binds and no tap binds. So
+    // the tap is detected in packages/src/qshell-dshift.c, the same evdev
+    // watcher that owns Shift-Shift for the notes capture, and it spawns
+    // bin/voxtype-toggle from there.
     //
-    // Their second bind is F9 as push-to-talk — press starts, and a separate
-    // `release = true` bind stops. niri has no release binds: a bind takes
-    // repeat, cooldown-ms, allow-when-locked, allow-inhibiting and
-    // hotkey-overlay-title, and nothing else (niri-config/src/binds.rs), so
-    // hold-to-talk cannot be expressed. F9 is therefore a second toggle, which
-    // is also why both binds set repeat=false — key repeat on a toggle would
-    // flap the recorder while the key is held.
-    // These spawn bin/voxtype-toggle rather than `voxtype record toggle`
-    // because the daemon is no longer running when idle: it preloads its
-    // whisper model, which costs 486 MB resident for nothing, so it is
-    // disabled at login and stopped again after ~10 min idle by
-    // voxtype-idle-stop.timer. The wrapper starts it (0.20 s) and then
-    // toggles; `voxtype record toggle` on its own just errors when the daemon
-    // is down. Full reasoning in bin/voxtype-toggle.
-    Mod+Ctrl+X repeat=false hotkey-overlay-title="Toggle Dictation" { spawn "voxtype-toggle"; }
-    F9 repeat=false hotkey-overlay-title="Toggle Dictation" { spawn "voxtype-toggle"; }
+    // Meeting mode DOES get a chord, unlike dictation: it is a deliberate
+    // once-a-call action rather than a reflex, so a two-modifier bind is the
+    // right weight for it and burning the Alt-Alt tap on it would be wrong.
+    // Mod+Ctrl+M is cliamp, hence Alt. Toggles: idle starts, recording stops,
+    // paused resumes. The wrapper handles the on-demand daemon and the mic,
+    // exactly as bin/voxtype-toggle does — see bin/voxtype-meeting.
+    Mod+Alt+M repeat=false hotkey-overlay-title="Toggle Meeting Recording" { spawn "voxtype-meeting"; }
+
+    // Mod+Ctrl+X (omarchy's chord) and F9 lived here until 2026-09-04 and were
+    // removed on request — Alt-Alt is the only way in now. Worth knowing if
+    // you ever want a chord back: the wrapper is the entry point either way,
+    // so a bind is one line, and the reason it spawns bin/voxtype-toggle
+    // rather than `voxtype record toggle` is that the daemon is not running
+    // when idle (it preloads a 486 MB model, so it is disabled at login and
+    // reaped after ~90 s by voxtype-idle-stop.timer) and the microphone is
+    // muted at rest. The wrapper starts one, opens the other, and stamps the
+    // take; a bare toggle would fail on the first and record silence on the
+    // second. Full reasoning in bin/voxtype-toggle.
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
