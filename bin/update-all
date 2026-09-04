@@ -178,6 +178,13 @@ update_src "$HOME/.local/src/libinput-gestures" "$HOME/.local/bin/libinput-gestu
 # dekho's build is the long one here (librqbit), so it only ever runs when
 # origin actually moved — which is the point of the check.
 update_src "$HOME/.local/src/dekho" "$HOME/.local/bin/dekho" dekho
+# deen is the opposite: four small crates, no HTTP client and no ML runtime,
+# because the Quran text is on disk and transcription shells out to voxtype. It
+# gets the same lane anyway — the Quran does not change but the CLI does, and a
+# machine whose hub is a front end for a stale binary is the failure this lane
+# exists to prevent. The text and the model are NOT refreshed by this: they are
+# fetched once by run_after_49 and guarded on their own files.
+update_src "$HOME/.local/src/deen" "$HOME/.local/bin/deen" deen
 
 # -------------------------------------------------------------------- apply
 say "chezmoi apply (reinstalls everything removed above)"

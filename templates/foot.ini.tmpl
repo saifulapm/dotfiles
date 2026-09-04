@@ -43,7 +43,8 @@
 # pinning it would only cost another face loaded per window. Note the font is
 # the smaller half of that fix: foot shapes grapheme clusters, not text runs,
 # and does no bidi, so Arabic must be run through `fribidi` before it is
-# printed — see vicinae's quran-verse.sh.
+# printed — as `deen api ayah 1:6 | jq -r .ayah.ar` needs. (This used to point
+# at vicinae's quran-verse.sh, retired 2026-09-05.)
 font={{font.mono}}:size={{font.foot-pt}}, Symbols Nerd Font Mono:size={{font.foot-pt}}, Twemoji:size={{font.foot-pt}}
 line-height={{font.foot-line-height}}px
 include=~/.config/foot/theme.ini
