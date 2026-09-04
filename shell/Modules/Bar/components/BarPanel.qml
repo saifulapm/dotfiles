@@ -164,6 +164,14 @@ PanelWindow {
     Rectangle {
         id: card
 
+        // The handle PanelHint looks for. It lives on the CARD, not on the
+        // overlay, because a hint walks up from the control it describes and
+        // the overlay is a SIBLING of the content rather than an ancestor —
+        // a walk looking for the overlay itself never meets it, silently
+        // falls back to anchor-relative placement, and the hint runs off the
+        // card edge. The card is on that path; the overlay hangs off it.
+        property Item panelHintOverlay: hintOverlay
+
         x: {
             if (!panelWindow.barVertical)
                 return Math.max(panelWindow.theme.space(2), Math.min(panelWindow.anchorCenterX - width / 2, panelWindow.width - width - panelWindow.theme.space(2)));
@@ -263,6 +271,24 @@ PanelWindow {
                     spacing: panelWindow.theme.space(2)
                 }
             }
+        }
+
+        // Where PanelHint puts itself, and the reason it can be trusted to
+        // land on top. QML stacking is per-parent: a hint parented to the
+        // control it describes sits inside one row of contentColumn, and
+        // EVERY LATER ROW paints over it whatever z it asks for — which is
+        // exactly what a tooltip must never do. One overlay declared after
+        // the content, filling the card, gives every hint the same single
+        // stacking context, and the card's own `clip: true` then becomes the
+        // bound a hint should honour rather than the thing that truncates it.
+        //
+        // Not `anchors.fill: card` — the content is inset by cardContent's
+        // margins and a hint clamped to the very edge would touch the border.
+        Item {
+            id: hintOverlay
+            anchors.fill: parent
+            anchors.margins: panelWindow.theme.space(1.5)
+            z: 90
         }
 
         // On top of the content, like the Rectangle border it replaces.
