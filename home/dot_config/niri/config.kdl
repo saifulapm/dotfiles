@@ -578,6 +578,17 @@ window-rule {
     open-maximized true
 }
 
+// The shell's deen hub (shell/Modules/Deen/Deen.qml, "Islamic Hub" in the
+// launcher): recite an ayah and be told which words were right. Same shape and
+// the same reasoning as the dekho rule above — app-id AND title because every
+// Quickshell toplevel is `org.quickshell`, and maximized rather than
+// fullscreen so the bar and any floating window stay above it. The title is
+// `windowTitle` in Deen.qml; the two are a matched pair.
+window-rule {
+    match app-id=r#"^org\.quickshell$"# title="^Islamic Hub$"
+    open-maximized true
+}
+
 // omarchy's floating-window tag (system.lua) also covers the media viewers:
 // mpv, imv and Evince open floating at the same 875×600 — zathura joins them
 // as the Evince replacement. omacalc floats in omarchy untagged — no forced

@@ -464,6 +464,11 @@ ShellRoot {
         dekhoLoader.summon("toggle");
     }
 
+    function toggleDeen() {
+        dismissBarPanels();
+        deenLoader.summon("toggle");
+    }
+
     // What the hot-edge strip calls on a right-edge hover. The strip stays
     // reachable past the card's 10 px niri gap while the panel is open, so the
     // same gesture that summoned it dismisses it: move away from the edge and
@@ -954,6 +959,50 @@ ShellRoot {
         id: dekhoStopper
         running: false
         command: [Quickshell.env("HOME") + "/.dotfiles/bin/dekho-play", "--stop"]
+    }
+
+    // The Islamic hub (github.com/saifulapm/deen): recite an ayah and be told
+    // which words were right. Evictable, and there is no Services/Deen.qml to
+    // go with it — nothing about reciting needs to be true while the panel is
+    // closed, which is exactly the split Dekho draws. Prayer times are the
+    // opposite and stay in the bar.
+    //
+    // A real window rather than a layer surface, for the same reason Dekho is:
+    // it is a thing you sit in front of and resize, not an overlay.
+    SurfaceLoader {
+        id: deenLoader
+        evictable: true
+        surfaceSource: shell.moduleRoot + "/Modules/Deen/Deen.qml"
+        surfaceProps: ({
+                theme: shell.theme
+            })
+    }
+
+    IpcHandler {
+        target: "deen"
+
+        function toggle(): string {
+            shell.toggleDeen();
+            return "ok";
+        }
+
+        function show(): string {
+            shell.dismissBarPanels();
+            deenLoader.summon("show");
+            return "ok";
+        }
+
+        function hide(): string {
+            deenLoader.deliver("hide");
+            return "ok";
+        }
+
+        // `qs ipc call deen recite 2:255` — open straight onto an ayah.
+        function recite(reference: string): string {
+            shell.dismissBarPanels();
+            deenLoader.summon("reciteAyah", [reference]);
+            return "ok";
+        }
     }
 
     // The disk speed test, reached from the menu (System > Disk Speed Test).

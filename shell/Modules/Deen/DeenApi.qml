@@ -1,0 +1,80 @@
+import Quickshell.Io
+
+// One `deen api …` call site, the same shape as Dekho's ApiRequest.
+//
+// `deen api` answers with exactly one JSON object on stdout and puts its
+// diagnostics on stderr, so success is "stdout parsed" and nothing here has to
+// interpret log text. A verb that fails still prints `{"error": …}` and exits
+// non-zero; both paths land on failed().
+//
+// A request that arrives while one is in flight is QUEUED rather than
+// restarting the Process — an exit from a restarted run would arrive with no
+// way to tell which call it belonged to.
+Process {
+    id: req
+
+    property var lastArgs: []
+    property var queuedArgs: null
+    property bool inFlight: false
+    property string lastError: ""
+
+    signal loaded(var data)
+    signal failed(string message)
+
+    function fetch(args) {
+        if (inFlight) {
+            queuedArgs = args;
+            return;
+        }
+        lastArgs = args;
+        inFlight = true;
+        lastError = "";
+        // --pdeathsig: a shell that dies mid-call must not leave the child
+        // holding the 4 MB text file open with nobody to answer.
+        command = ["setpriv", "--pdeathsig", "TERM", "--", "deen", "api"].concat(args);
+        running = true;
+    }
+
+    running: false
+
+    stdout: StdioCollector {
+        id: out
+        waitForEnd: true
+    }
+
+    stderr: StdioCollector {
+        id: err
+        waitForEnd: true
+    }
+
+    onExited: exitCode => {
+        req.inFlight = false;
+
+        let parsed = null;
+        try {
+            parsed = JSON.parse(String(out.text || ""));
+        } catch (e) {
+            parsed = null;
+        }
+
+        if (parsed && parsed.error) {
+            req.lastError = String(parsed.error);
+            req.failed(req.lastError);
+        } else if (parsed) {
+            req.loaded(parsed);
+        } else if (exitCode === 127 || exitCode === 126) {
+            req.lastError = "deen is not installed — run `chezmoi apply` to build it";
+            req.failed(req.lastError);
+        } else {
+            const line = String(err.text || "").trim().split("\n").pop();
+            req.lastError = line || ("deen api " + req.lastArgs.join(" ") + " failed");
+            req.failed(req.lastError);
+        }
+
+        if (req.queuedArgs !== null) {
+            const next = req.queuedArgs;
+            req.queuedArgs = null;
+            req.fetch(next);
+        }
+    }
+}
