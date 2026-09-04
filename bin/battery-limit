@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# battery-limit — the charge cap, as one verb.
+#
+#   battery-limit [status|on|off|toggle] [--json]
+#
+# Stopping the charge below 100% is the single biggest thing you can do for a
+# lithium battery's calendar life, and this laptop's is already down to ~83%
+# of design capacity at 359 cycles. The cap holds it at 80% and lets it fall
+# to 75% before topping up again — the 5% hysteresis is the point, because a
+# cap with no gap micro-cycles the pack all day trying to sit exactly on the
+# line.
+#
+# WHY UPower AND NOT sysfs, which is what every plugin in the marketplace
+# reaches for. The kernel attribute
+# /sys/class/power_supply/macsmc-battery/charge_control_end_threshold is
+# root-owned 0644, so writing it directly means one of: a pkexec password
+# prompt per change (battery-limiter), a udev rule loosening the permissions
+# on a hardware control (juicemaxx, power-manager), or a root daemon. UPower
+# already owns this attribute and exposes it properly:
+#
+#   * org.freedesktop.UPower.Device.EnableChargeThreshold(b) does the write,
+#     and its polkit action org.freedesktop.UPower.enable-charging-limit is
+#     `allow_active=yes` — the logged-in seat user is authorised with NO
+#     password and no agent prompt.
+#   * UPower PERSISTS the on/off state itself, in
+#     /var/lib/upower/charging-threshold-status, and re-applies it at boot.
+#     There is nothing for this repo to install in /etc, no tmpfiles.d line
+#     and no unit, to make the cap survive a reboot.
+#
+# So this script owns no state at all. It is a face over two D-Bus calls.
+#
+# WHERE 75/80 COMES FROM, since nothing here sets it: UPower reads the pair
+# from a udev property CHARGE_LIMIT="start,end", seeded by its own hwdb at
+# /usr/lib/udev/hwdb.d/60-upower-battery.hwdb, whose stock entry is
+# `battery:*:*:dmi:* → CHARGE_LIMIT=75,80`. To change it, drop a local
+# override at /etc/udev/hwdb.d/61-battery-local.hwdb, then `systemd-hwdb
+# update` and `udevadm trigger -p /sys/class/power_supply/macsmc-battery`
+# (upstream documents exactly this in the stock file). Deliberately NOT done
+# here: 80 is the value worth having, and leaving it stock means this feature
+# installs nothing privileged anywhere.
+#
+# The whole thing is gated on the CAPABILITY, never on a hostname: a machine
+# whose UPower reports no battery with ChargeThresholdSupported simply has no
+# charge cap, which is the correct answer for the Mac mini and the NUC and
+# stays correct if the fleet changes.
+set -uo pipefail
+
+readonly UPOWER=org.freedesktop.UPower
+readonly DEV_IFACE=org.freedesktop.UPower.Device
+
+die() {
+  echo "battery-limit: $*" >&2
+  exit 1
+}
+
+command -v busctl >/dev/null 2>&1 || die "busctl is missing (systemd should provide it)"
+
+# `busctl get-property` prints "<type> <value>" — "b true", "u 80". Everything
+# below wants just the value.
+prop() {
+  local out
+  out="$(busctl --system get-property "$UPOWER" "$1" "$DEV_IFACE" "$2" 2>/dev/null)" || return 1
+  printf '%s\n' "${out#* }"
+}
+
+# The first battery UPower says supports a charge threshold. Enumerating and
+# asking is the only honest test — DisplayDevice is a synthetic aggregate and
+# does not carry the threshold properties, so it cannot be used here.
+find_device() {
+  local dev
+  while IFS= read -r dev; do
+    case "$dev" in
+    */battery_*) ;;
+    *) continue ;;
+    esac
+    [ "$(prop "$dev" ChargeThresholdSupported 2>/dev/null)" = "true" ] || continue
+    printf '%s\n' "$dev"
+    return 0
+  done < <(busctl --system tree "$UPOWER" --list 2>/dev/null | grep '/devices/')
+  return 1
+}
+
+# Kernel-only facts UPower does not publish, read straight from sysfs. All
+# optional: a field the kernel does not answer is simply absent.
+sysfs_battery() {
+  local c
+  for c in /sys/class/power_supply/*; do
+    [ -r "$c/type" ] || continue
+    [ "$(cat "$c/type" 2>/dev/null)" = "Battery" ] || continue
+    [ "$(cat "$c/present" 2>/dev/null)" = "1" ] || continue
+    printf '%s\n' "$c"
+    return 0
+  done
+  return 1
+}
+
+read_or_empty() {
+  [ -r "$1" ] || return 0
+  tr -d '[:space:]' <"$1"
+}
+
+set_enabled() {
+  local dev want
+  want="$1"
+  dev="$(find_device)" || die "no battery with charge-threshold support on this machine"
+  # No sudo and no agent prompt: the polkit action is allow_active=yes. A
+  # FAILURE here is therefore real (no seat, or a policy override), not a
+  # missing password, so it is worth reporting rather than swallowing.
+  busctl --system call "$UPOWER" "$dev" "$DEV_IFACE" EnableChargeThreshold b "$want" >/dev/null 2>&1 \
+    || die "UPower refused the change — check: busctl --system call $UPOWER $dev $DEV_IFACE EnableChargeThreshold b $want"
+}
+
+action="${1:-status}"
+json=0
+[ "${2:-}" = "--json" ] && json=1
+
+case "$action" in
+on | enable)
+  set_enabled true
+  ;;
+off | disable)
+  set_enabled false
+  ;;
+toggle)
+  dev="$(find_device)" || die "no battery with charge-threshold support on this machine"
+  [ "$(prop "$dev" ChargeThresholdEnabled)" = "true" ] && set_enabled false || set_enabled true
+  ;;
+status) ;;
+*)
+  echo "Usage: battery-limit [status|on|off|toggle] [--json]" >&2
+  exit 1
+  ;;
+esac
+
+# Every verb falls through to a status report, so a caller that just changed
+# something reads the result back without a second process.
+dev="$(find_device 2>/dev/null)"
+if [ -z "$dev" ]; then
+  # Not an error: "this machine has no charge cap" is a legitimate answer and
+  # a panel asking must not get a failing exit for it.
+  [ "$json" -eq 1 ] && echo '{"supported":false}' || echo "unsupported"
+  exit 0
+fi
+
+enabled="$(prop "$dev" ChargeThresholdEnabled)"
+start="$(prop "$dev" ChargeStartThreshold)"
+end="$(prop "$dev" ChargeEndThreshold)"
+batt="$(sysfs_battery)"
+cycles=""
+full=""
+design=""
+if [ -n "$batt" ]; then
+  cycles="$(read_or_empty "$batt/cycle_count")"
+  full="$(read_or_empty "$batt/charge_full")"
+  design="$(read_or_empty "$batt/charge_full_design")"
+fi
+
+if [ "$json" -eq 1 ]; then
+  printf '{"supported":true,"enabled":%s,"start":%s,"end":%s,"cycles":%s,"chargeFull":%s,"chargeFullDesign":%s}\n' \
+    "${enabled:-false}" "${start:-0}" "${end:-0}" "${cycles:-0}" "${full:-0}" "${design:-0}"
+else
+  if [ "$enabled" = "true" ]; then
+    echo "on — charges to ${end}%, resumes below ${start}%"
+  else
+    echo "off — charges to 100%"
+  fi
+fi

@@ -12,10 +12,14 @@
 #   load               1 / 5 / 15 minute load averages
 #   temperature        best available temperature reading
 #   temperature_label  what that reading is measuring
-#   cycles             battery charge cycles
-#   threshold          charge limit, "N%" or "start-end%"
-#   health             battery health as the kernel reports it
-#   power_profiles     available | missing
+#   cycles                  battery charge cycles
+#   threshold               charge limit, "N%" or "start-end%"
+#   charge_limit_supported  1 when the battery can cap its charge at all
+#   charge_limit_enabled    1 while a cap is actually holding
+#   health                  battery health as the kernel reports it
+#   capacity_health         charge_full / charge_full_design, percent
+#   health_history          "<total>|<date>,<health>,<cycles> …" daily log
+#   power_profiles          available | missing
 #
 # Every key is optional: a machine that cannot answer one simply omits it.
 
@@ -179,8 +183,73 @@ battery_stats() {
         fi
     fi
 
+    # The charge cap's real state, as opposed to the sysfs values above, which
+    # only say what the thresholds WOULD be. UPower owns the on/off flag (see
+    # bin/battery-limit for why it and not sysfs), and a cap that is off reads
+    # as 100/100 in sysfs — indistinguishable from hardware that cannot cap at
+    # all. The panel needs to tell those apart to decide between showing a
+    # switch and showing nothing.
+    #
+    # `charge_control_end_threshold` being present IS the support test here.
+    # Asking UPower over D-Bus would be more authoritative but costs a busctl
+    # round trip on a probe that runs every 5 s while the panel is open, and
+    # the two cannot disagree: UPower only exposes the threshold interface for
+    # a battery exporting this attribute.
+    if [[ -n $end ]]; then
+        printf 'charge_limit_supported\t1\n'
+        # 100/100 is the kernel's "no cap"; anything else is a live cap.
+        if [[ $end == "100" && ( -z $start || $start == "100" ) ]]; then
+            printf 'charge_limit_enabled\t0\n'
+        else
+            printf 'charge_limit_enabled\t1\n'
+            # Both ends as raw numbers as well as the formatted `threshold`
+            # above: the panel says "stopping at 80%" in one place and
+            # "resumes below 75%" in another, and neither should be reached
+            # by picking a display string apart.
+            printf 'charge_limit_end\t%s\n' "$end"
+            [[ -n $start ]] && printf 'charge_limit_start\t%s\n' "$start"
+        fi
+    fi
+
     health=$(read_or_empty "$battery/health")
     [[ -n $health ]] && printf 'health\t%s\n' "$health"
+
+    # Capacity health as a ratio, which is the number that actually means
+    # something and which the kernel's own `health` string ("Good") does not
+    # carry. Same pair battery-health-log records daily.
+    full=$(read_or_empty "$battery/charge_full")
+    design=$(read_or_empty "$battery/charge_full_design")
+    if [[ -z $full || -z $design ]]; then
+        full=$(read_or_empty "$battery/energy_full")
+        design=$(read_or_empty "$battery/energy_full_design")
+    fi
+    if [[ -n $full && -n $design ]] && ((design > 0)); then
+        awk -v f="$full" -v d="$design" 'BEGIN { printf "capacity_health\t%.1f\n", (f / d) * 100 }'
+    fi
+}
+
+# ----------------------------------------------------------- health history
+# The daily log bin/battery-health-log keeps, handed to the panel as ONE line
+# so it needs no file reader of its own:
+#
+#   health_history  <days>|<date>,<health>,<cycles> <date>,<health>,<cycles> …
+#
+# Capped at the most recent 400 samples (over a year): the panel draws a
+# sparkline a couple of hundred pixels wide, so more points than that are
+# invisible, and this string rides a 5 s probe.
+health_history() {
+    local log="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/battery-health.tsv"
+    [[ -r $log ]] || return 0
+    awk -F'\t' '
+        NF >= 3 && $1 ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/ { rows[n++] = $1 "," $2 "," $3 }
+        END {
+            if (n == 0) exit
+            start = (n > 400) ? n - 400 : 0
+            out = ""
+            for (i = start; i < n; i++) out = out (out == "" ? "" : " ") rows[i]
+            printf "health_history\t%d|%s\n", n, out
+        }
+    ' "$log"
 }
 
 read_or_empty() {
@@ -212,4 +281,5 @@ memory_stats
 load_stats
 temperature_stats
 battery_stats
+health_history
 profile_availability

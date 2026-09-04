@@ -1,0 +1,20 @@
+[Unit]
+Description=Record one line of battery health history
+Documentation=file:%h/.dotfiles/bin/battery-health-log
+# The capability gate, and the reason no machine list appears anywhere in this
+# feature: a glob condition means the Mac mini and the NUC never start this
+# unit, and a future machine with a battery gets it without an edit here.
+# ConditionPathExistsGlob (not ConditionPathExists) because the battery's
+# name is hardware-specific — macsmc-battery here, BAT0 on most x86 laptops.
+ConditionPathExistsGlob=/sys/class/power_supply/*/charge_full_design
+
+[Service]
+Type=oneshot
+ExecStart=%h/.dotfiles/bin/battery-health-log
+# Reads four sysfs files and appends a line; it has no business doing anything
+# else, and a runaway here would be a runaway on battery.
+Nice=19
+IOSchedulingClass=idle
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%S/qshell

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
@@ -38,7 +39,11 @@ BarPanel {
 
     readonly property real batteryFraction: Model.batteryFraction(device)
     readonly property int pct: Math.round(batteryFraction * 100)
-    readonly property bool chargeThresholdActive: Model.chargeThresholdActive(device, onBattery, states)
+    // systemInfo is passed so a cap that is switched OFF settles this
+    // outright — without it the heuristic can read a genuinely slow charge as
+    // a held one. Absent (before the first probe lands) it degrades to
+    // exactly the old behaviour.
+    readonly property bool chargeThresholdActive: Model.chargeThresholdActive(device, onBattery, states, systemInfo)
     readonly property bool fullyCharged: present && device.state === UPowerDeviceState.FullyCharged && !chargeThresholdActive
     readonly property bool discharging: present && onBattery
     readonly property bool batteryFull: fullyCharged || (!discharging && batteryFraction >= 1)
@@ -83,6 +88,52 @@ BarPanel {
     // ------------------------------------------------------- system vitals
     property var systemInfo: ({})
     readonly property bool profilesAvailable: String(systemInfo.power_profiles || "") !== "missing"
+
+    // --------------------------------------------------------- charge cap
+    // The cap and the health log, both riding the same system-stats probe
+    // rather than adding a process of their own. `supported` is the entire
+    // MacBook-only gate: the Mac mini and the NUC have no battery that can
+    // cap, so every row below is simply absent there — no hostname test
+    // exists anywhere in this feature.
+    readonly property var chargeCap: Model.chargeLimit(systemInfo)
+    readonly property var healthHistory: Model.parseHealthHistory(systemInfo.health_history)
+    readonly property var healthTrend: Model.healthTrend(healthHistory)
+    readonly property var sparkPoints: Model.sparklinePoints(healthHistory)
+    readonly property string capacityHealthText: systemInfo.capacity_health !== undefined ? systemInfo.capacity_health + "%" : ""
+
+    // True from the click until the probe behind it confirms, so the switch
+    // dims instead of appearing to do nothing: bin/battery-limit returns as
+    // soon as UPower accepts the call, but the sysfs values this panel reads
+    // take a moment to follow.
+    property bool capBusy: false
+
+    function toggleChargeCap() {
+        if (!chargeCap.supported || capBusy)
+            return;
+        capBusy = true;
+        capProc.command = [binDir + "battery-limit", chargeCap.enabled ? "off" : "on"];
+        capProc.running = true;
+    }
+
+    Process {
+        id: capProc
+        onExited: {
+            panel.refresh();
+            // One more probe after the settle window: UPower writes sysfs
+            // asynchronously and the immediate re-probe above can still catch
+            // the old values.
+            capSettle.restart();
+        }
+    }
+
+    Timer {
+        id: capSettle
+        interval: 600
+        onTriggered: {
+            panel.capBusy = false;
+            panel.refresh();
+        }
+    }
 
     function applyStats(raw) {
         const next = Model.parseKeyValue(raw);
@@ -336,9 +387,170 @@ BarPanel {
                 labelColor: panel.theme.textMuted
 
                 labelOpacity: 1
-                visible: !panel.chargeThresholdActive && panel.systemInfo.threshold !== undefined
+                // Only where the cap cannot be switched from this panel —
+                // with the CHARGE LIMIT section below present, a second row
+                // repeating the same number is noise.
+                visible: !panel.chargeThresholdActive && !panel.chargeCap.supported && panel.systemInfo.threshold !== undefined
                 label: "Charge limit"
                 value: panel.systemInfo.threshold || "—"
+            }
+        }
+    }
+
+    Separator {
+        theme: panel.theme
+        visible: panel.chargeCap.supported
+    }
+
+    // -------------------------------------------------------- charge limit
+    // The one control in this panel that changes the hardware. It writes
+    // through bin/battery-limit, which drives UPower's EnableChargeThreshold
+    // over D-Bus — a polkit action marked allow_active=yes, so the toggle
+    // costs no password and no prompt, and UPower persists the choice across
+    // reboots in /var/lib/upower/charging-threshold-status. Nothing here has
+    // any state to keep.
+    Column {
+        visible: panel.chargeCap.supported
+        width: parent.width
+        spacing: panel.theme.space(2)
+
+        SectionHeader {
+            theme: panel.theme
+            width: parent.width
+            label: "CHARGE LIMIT"
+            // The live range while it holds; the header stays quiet when off
+            // rather than announcing a meaningless "100%".
+            value: panel.chargeCap.enabled ? panel.chargeCap.text : ""
+        }
+
+        Item {
+            width: parent.width
+            implicitHeight: Math.max(capLabels.implicitHeight, capSwitch.implicitHeight) + panel.theme.space(1)
+
+            Column {
+                id: capLabels
+                anchors.left: parent.left
+                anchors.right: capSwitch.left
+                anchors.rightMargin: panel.theme.space(2)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: panel.theme.space(0.25)
+
+                StyledText {
+                    theme: panel.theme
+                    width: parent.width
+                    text: panel.chargeCap.enabled ? "Stopping at " + panel.chargeCap.end + "%" : "Charging to 100%"
+                    elide: Text.ElideRight
+                }
+
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    muted: true
+
+                    width: parent.width
+                    // The honest reason, both ways round. A cap is a trade —
+                    // runtime for calendar life — and the panel should say
+                    // which side it is currently on. The resume band is worth
+                    // naming because a cap with no gap would micro-cycle the
+                    // pack all day trying to sit exactly on the line.
+                    text: {
+                        if (!panel.chargeCap.enabled)
+                            return "Full runtime. The pack ages faster held at 100%.";
+                        const band = panel.chargeCap.start > 0 ? "Resumes below " + panel.chargeCap.start + "%. " : "";
+                        return band + "Sparing the pack; unplug-and-go runtime is capped too.";
+                    }
+                    wrapMode: Text.WordWrap
+                }
+            }
+
+            PanelSwitch {
+                id: capSwitch
+                theme: panel.theme
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                checked: panel.chargeCap.enabled
+                busy: panel.capBusy
+                hint: panel.chargeCap.enabled ? "Charge to 100% again" : "Stop charging at 80%"
+                onToggled: panel.toggleChargeCap()
+            }
+        }
+    }
+
+    Separator {
+        theme: panel.theme
+        visible: panel.chargeCap.supported
+    }
+
+    // ------------------------------------------------------ health history
+    // What bin/battery-health-log has accumulated, one line a day. The
+    // section exists as soon as there is a log at all — on day one it says
+    // "Tracking since …", which is the truthful thing to show and also tells
+    // the user the logging is running.
+    Column {
+        visible: panel.chargeCap.supported && panel.healthHistory.total > 0
+        width: parent.width
+        spacing: panel.theme.space(1.5)
+
+        SectionHeader {
+            theme: panel.theme
+            width: parent.width
+            label: "CAPACITY HEALTH"
+            value: panel.capacityHealthText
+        }
+
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Small
+            muted: !panel.healthTrend.ready
+
+            width: parent.width
+            text: panel.healthTrend.text
+            elide: Text.ElideRight
+        }
+
+        // Plotted against real dates, so a stretch with the machine switched
+        // off reads as the flat gap it was rather than being compressed away.
+        // A plain Item owns the geometry and the Shape merely fills it. The
+        // Shape must NOT be the sized element: it derives its own implicit
+        // size from its contents, so a path binding that reads the Shape's
+        // height is a binding loop — which is exactly what the first version
+        // of this did, and Qt says so at runtime rather than misdrawing.
+        Item {
+            id: sparkBox
+
+            visible: panel.sparkPoints.length >= 2
+            width: parent.width
+            height: panel.theme.space(10)
+
+            // Half the stroke, top and bottom, so a sample sitting at either
+            // extreme is not clipped in half by its own line width.
+            readonly property real inset: 2
+
+            Shape {
+                anchors.fill: parent
+                // The default renderer flattens a 1.5px line into something
+                // ragged at this size; the curve renderer antialiases it.
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeWidth: 1.5
+                    strokeColor: panel.theme.accent
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.RoundJoin
+
+                    PathPolyline {
+                        path: {
+                            const pts = panel.sparkPoints;
+                            const w = sparkBox.width;
+                            const h = sparkBox.height - sparkBox.inset * 2;
+                            const out = [];
+                            for (let i = 0; i < pts.length; i++)
+                                out.push(Qt.point(pts[i].x * w, sparkBox.inset + pts[i].y * h));
+                            return out;
+                        }
+                    }
+                }
             }
         }
     }

@@ -1,0 +1,21 @@
+[Unit]
+Description=Daily battery health history sample
+# Repeated on the timer as well as the service: a timer whose condition passes
+# would otherwise sit armed on a machine that can never satisfy the service.
+ConditionPathExistsGlob=/sys/class/power_supply/*/charge_full_design
+
+[Timer]
+# Daily, and Persistent so a laptop that was asleep or shut down at the firing
+# time takes its sample on the next boot instead of losing the day entirely —
+# which for a once-a-day log is the difference between a continuous history
+# and one full of holes.
+OnCalendar=daily
+Persistent=true
+# The sample is a ratio of two slow-moving numbers, so the exact minute is
+# worth nothing and colliding with every other daily timer on the machine is
+# worth less than nothing.
+RandomizedDelaySec=30m
+AccuracySec=1h
+
+[Install]
+WantedBy=timers.target
