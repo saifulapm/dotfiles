@@ -30,10 +30,18 @@ FocusScope {
     signal surahStepped(int delta)
     signal surahPicked(int n)
     signal play(string reference)
+    signal playFrom(string reference)
+    signal playSurah
+    signal stopPlayback
     signal enrol(string surah)
 
     // The ayah currently sounding, so its row can say so. Cleared by the owner.
     property string playing: ""
+    // Whether that is one ayah on its own or a surah reciting itself. The
+    // difference is what tapping a number means: "just this one" when nothing
+    // is playing, "carry on from here" when something is.
+    required property bool playingSurah
+
     // The window owns Escape (a Shortcut outranks key delivery, which is how
     // Escape closes the hub from inside a text field), so it has to be told
     // when there is a sheet in front of the page for Escape to mean instead.
@@ -41,6 +49,47 @@ FocusScope {
 
     function closeSheet() {
         picker.open = false;
+    }
+
+    // THE PAGE FOLLOWS THE RECITATION. Without this the highlight moves down a
+    // list you are not looking at any more, which is the same as no highlight
+    // at all — the point of playing a whole surah is to read along with it.
+    //
+    // Animated rather than jumped, because `positionViewAtIndex` sets contentY
+    // outright and a page that teleports every eight seconds is worse company
+    // than one that does not move. The trick is to let it do the arithmetic,
+    // take the answer, put the page back, and animate to it.
+    //
+    // It stands down while you are dragging or flicking: a reader who has
+    // scrolled away is reading something else, and a list that hauls itself
+    // back is arguing.
+    onPlayingChanged: screen.followPlaying()
+
+    function followPlaying() {
+        if (screen.playing === "" || list.dragging || list.flicking)
+            return;
+        const index = (screen.ayahs || []).findIndex(a => (a.s + ":" + a.a) === screen.playing);
+        if (index < 0)
+            return;
+        const from = list.contentY;
+        list.positionViewAtIndex(index, ListView.Center);
+        const to = list.contentY;
+        // A theme shipping `duration = 0` stops the motion here as it does
+        // everywhere else in the module — the page still arrives.
+        if (screen.style.slow <= 0 || Math.abs(to - from) < 1)
+            return;
+        list.contentY = from;
+        follow.to = to;
+        follow.restart();
+    }
+
+    NumberAnimation {
+        id: follow
+
+        target: list
+        property: "contentY"
+        duration: screen.style.slow
+        easing.type: screen.style.easing
     }
 
     // HEADER AND LIST ARE ANCHORED SIBLINGS, NOT A COLUMN. A Column sizes
@@ -100,6 +149,20 @@ FocusScope {
                     text: screen.surah ? (screen.surah.n + " · " + screen.surah.en.toUpperCase()) : "SURAHS"
                     Accessible.name: "Browse surahs"
                     onClicked: picker.open = true
+                }
+
+                // Recite the whole surah. The primary action on this screen:
+                // tapping a word answers "how does this one sound", and this
+                // answers "how does the whole thing sound", which is the
+                // question someone relearning to read is actually asking.
+                GlassButton {
+                    style: screen.style
+                    primary: true
+                    iconText: screen.playingSurah ? "󰓛" : "󰐊"  // md-stop / md-play
+                    text: screen.playingSurah ? "Stop" : "Play"
+                    enabled: (screen.ayahs || []).length > 0
+                    Accessible.name: screen.playingSurah ? "Stop the recitation" : "Recite the whole surah"
+                    onClicked: screen.playingSurah ? screen.stopPlayback() : screen.playSurah()
                 }
             }
 
@@ -203,7 +266,10 @@ FocusScope {
         visible: screen.basmala !== ""
         text: screen.basmala
         horizontalAlignment: Text.AlignHCenter
-        color: screen.style.alpha(screen.style.fg, basmalaHover.hovered ? 1.0 : 0.8)
+        // It is the first thing a surah recitation says, so it is the first
+        // thing that lights up. `1:1` because Al-Fatiha's opening ayah IS the
+        // Basmala, which is also why this line is empty on that surah.
+        color: screen.playing === "1:1" ? screen.style.accent : screen.style.alpha(screen.style.fg, basmalaHover.hovered ? 1.0 : 0.8)
         font.family: screen.style.arabicFamily
         font.pixelSize: screen.style.type(24)
 
@@ -344,7 +410,7 @@ FocusScope {
                 }
 
                 TapHandler {
-                    onTapped: screen.play(row.reference)
+                    onTapped: screen.playingSurah ? screen.playFrom(row.reference) : screen.play(row.reference)
                 }
             }
 

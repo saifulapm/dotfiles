@@ -171,7 +171,12 @@ Scope {
         }
     }
 
-    onMushafSurahChanged: surahReq.fetch(["api", "surah", String(deenRoot.mushafSurah)])
+    onMushafSurahChanged: {
+        // A queue of references belongs to one surah. Changing surah while it
+        // plays would go on reciting the old one under the new one's text.
+        stopPlayback();
+        surahReq.fetch(["api", "surah", String(deenRoot.mushafSurah)]);
+    }
 
     // ------------------------------------------------------------------ audio
     // `deen audio` caches and answers with a path; mpv plays it. Two programs
@@ -179,17 +184,115 @@ Scope {
     // mpv knows how to make a sound.
     property string playing: ""
 
+    // CONTINUOUS PLAYBACK IS A LIST OF REFERENCES AND AN INDEX INTO IT, not a
+    // playlist handed to mpv. One `mpv file1 file2 …` would play a surah
+    // gaplessly and tell us nothing about where it had got to — and knowing
+    // which ayah is sounding is the entire point, because it is what highlights
+    // the line and scrolls the page. One process per ayah costs a few hundred
+    // milliseconds between them, which is a pause a recitation has anyway.
+    property var playQueue: []
+    property int playIndex: -1
+    readonly property bool playingSurah: deenRoot.playIndex >= 0
+
+    // A surah whose audio will not fetch must not spin through 286 ayat in a
+    // second. Three failures in a row and it gives up.
+    property int playFailures: 0
+
+    /// One reference, on its own — a word, or an ayah tapped while nothing is
+    /// playing. Cancels any surah in progress rather than fighting it for the
+    /// speakers.
     function playAudio(reference) {
+        deenRoot.playIndex = -1;
+        deenRoot.playQueue = [];
+        startAudio(reference);
+    }
+
+    function startAudio(reference) {
         deenRoot.playing = reference;
         audioProc.running = false;
         audioProc.command = ["setpriv", "--pdeathsig", "TERM", "--", "bash", "-c", 'p=$(deen audio "$1" | jq -r .path 2>/dev/null) && [ -n "$p" ] && exec mpv --no-video --really-quiet "$p"', "deen-audio", reference];
         audioProc.running = true;
     }
 
+    /// Recite the whole surah, Basmala first where there is one — because that
+    /// is how a surah is recited, and `deen` already tells us which surahs have
+    /// one (Al-Fatiha's is its first ayah, At-Tawbah has none).
+    function playSurah() {
+        const refs = (deenRoot.surahBasmala !== "" ? ["1:1"] : []).concat(deenRoot.surahAyahs.map(a => a.s + ":" + a.a));
+        if (refs.length === 0)
+            return;
+        deenRoot.playQueue = refs;
+        deenRoot.playFailures = 0;
+        deenRoot.playIndex = 0;
+        startAudio(refs[0]);
+        prefetch(1);
+    }
+
+    /// Move a running recitation to another ayah. Tapping a number while the
+    /// surah plays means "from here", not "just this one".
+    function playFrom(reference) {
+        const i = deenRoot.playQueue.indexOf(reference);
+        if (i < 0) {
+            playAudio(reference);
+            return;
+        }
+        deenRoot.playFailures = 0;
+        deenRoot.playIndex = i;
+        startAudio(reference);
+        prefetch(i + 1);
+    }
+
+    function stopPlayback() {
+        // THE INDEX IS CLEARED FIRST, and the order is load-bearing: `onExited`
+        // advances the queue, and an empty index is the only thing that tells
+        // it this exit was a stop rather than the end of an ayah.
+        deenRoot.playIndex = -1;
+        deenRoot.playQueue = [];
+        audioProc.running = false;
+        deenRoot.playing = "";
+    }
+
+    /// Fetch the next ayah's audio while this one plays, so a second listen has
+    /// no gap at all. `deen audio` caches and answers a path; ignoring the path
+    /// is the whole of the prefetch.
+    function prefetch(i) {
+        if (i < 0 || i >= deenRoot.playQueue.length)
+            return;
+        prefetchProc.running = false;
+        prefetchProc.command = ["setpriv", "--pdeathsig", "TERM", "--", "deen", "audio", deenRoot.playQueue[i]];
+        prefetchProc.running = true;
+    }
+
     Process {
         id: audioProc
+
         running: false
-        onExited: deenRoot.playing = ""
+
+        onExited: exitCode => {
+            // A newer play already took the process over — this is the corpse
+            // of the one it replaced, and it does not get to clear the
+            // highlight belonging to its successor.
+            if (audioProc.running)
+                return;
+            deenRoot.playing = "";
+            if (!deenRoot.playingSurah)
+                return;
+            deenRoot.playFailures = exitCode === 0 ? 0 : deenRoot.playFailures + 1;
+            const next = deenRoot.playIndex + 1;
+            if (deenRoot.playFailures >= 3 || next >= deenRoot.playQueue.length) {
+                deenRoot.stopPlayback();
+                return;
+            }
+            deenRoot.playIndex = next;
+            deenRoot.startAudio(deenRoot.playQueue[next]);
+            deenRoot.prefetch(next + 1);
+        }
+    }
+
+    Process {
+        id: prefetchProc
+
+        running: false
     }
 
     // ------------------------------------------------------------------- hifz
@@ -293,6 +396,9 @@ Scope {
         // which matters more than the result nobody will now read.
         recite.stop();
         hifzScreen.reciter.stop();
+        // A surah reciting itself to a closed window is the same bug as a
+        // microphone left open, in the other direction.
+        stopPlayback();
     }
 
     // Toggle means three things for a toplevel: not open → open, open but not
@@ -581,9 +687,13 @@ Scope {
                     basmala: deenRoot.surahBasmala
                     loadError: deenRoot.mushafError
                     playing: deenRoot.playing
+                    playingSurah: deenRoot.playingSurah
                     onSurahStepped: delta => deenRoot.mushafSurah = Math.max(1, Math.min(114, deenRoot.mushafSurah + delta))
                     onSurahPicked: n => deenRoot.mushafSurah = n
                     onPlay: reference => deenRoot.playAudio(reference)
+                    onPlayFrom: reference => deenRoot.playFrom(reference)
+                    onPlaySurah: deenRoot.playSurah()
+                    onStopPlayback: deenRoot.stopPlayback()
                     onEnrol: reference => deenRoot.enrolSurah(reference)
                 }
 
