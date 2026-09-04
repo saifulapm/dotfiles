@@ -40,7 +40,7 @@ Scope {
         windowHeight: panel.height
     }
 
-    // Which room you are in: "recite", "mushaf", "hifz" or "duas".
+    // Which room you are in: "recite", "mushaf", "hifz", "duas" or "hadith".
     property string view: "recite"
 
     // The mushaf is only worth a 1.16 MB Al-Baqarah parse once you actually
@@ -57,6 +57,15 @@ Scope {
         // after — the book does not change while the hub is open.
         if (deenRoot.view === "duas" && deenRoot.duaList.length === 0)
             duaReq.fetch(["dua", "list"]);
+        // The corpus is 104 MB and is never handed over whole — this asks only
+        // for the ten collection names, which is what the filter row draws.
+        if (deenRoot.view === "hadith") {
+            if (deenRoot.hadithCollections.length === 0)
+                hadithMetaReq.fetch(["hadith", "collections"]);
+            // The search line is this screen's subject, so it starts with the
+            // keyboard rather than waiting to be clicked.
+            Qt.callLater(() => hadithScreen.takeFocus());
+        }
     }
 
     // ------------------------------------------------------------ the ayah
@@ -212,6 +221,79 @@ Scope {
     }
 
     onDuaChapterChanged: stopPlayback()
+
+    // ------------------------------------------------------------------ hadith
+    // 36,512 narrations in ten collections, on disk, never loaded whole. The
+    // shell asks two questions of it — what are the collections, and what
+    // matches this phrase — and draws exactly what comes back: no ranking of
+    // our own, no summary, and the grades kept under the names of the scholars
+    // who gave them.
+    property var hadithSource: null
+    property var hadithCollections: []
+    property var hadithHits: []
+    property int hadithTotal: 0
+    property string hadithQuery: ""
+    property string hadithCollection: ""
+    property bool hadithSearching: false
+    property string hadithError: ""
+
+    DeenCall {
+        id: hadithMetaReq
+        onLoaded: data => {
+            deenRoot.hadithSource = data.source || null;
+            deenRoot.hadithCollections = data.collections || [];
+            deenRoot.hadithError = "";
+        }
+        onFailed: message => deenRoot.hadithError = message
+    }
+
+    // A second request object, for the reason the hifz screen has one: a search
+    // must not queue behind the collections call that opened the screen.
+    DeenCall {
+        id: hadithSearchReq
+        onLoaded: data => {
+            deenRoot.hadithHits = data.hits || [];
+            deenRoot.hadithTotal = data.total || 0;
+            deenRoot.hadithSearching = false;
+            deenRoot.hadithError = "";
+        }
+        onFailed: message => {
+            deenRoot.hadithHits = [];
+            deenRoot.hadithTotal = 0;
+            deenRoot.hadithSearching = false;
+            deenRoot.hadithError = message;
+        }
+    }
+
+    function searchHadith(query) {
+        deenRoot.hadithQuery = String(query || "").trim();
+        if (deenRoot.hadithQuery === "") {
+            deenRoot.hadithHits = [];
+            deenRoot.hadithTotal = 0;
+            deenRoot.hadithSearching = false;
+            return;
+        }
+        const args = ["hadith", "search", deenRoot.hadithQuery, "--limit", "40"];
+        if (deenRoot.hadithCollection !== "")
+            args.push("--collection", deenRoot.hadithCollection);
+        deenRoot.hadithSearching = true;
+        hadithSearchReq.fetch(args);
+    }
+
+    /// Narrowing to a collection re-asks the same question rather than
+    /// filtering what is on screen: the answer was capped at forty, so hiding
+    /// rows from it would show four Bukhari hits when there are two hundred.
+    function setHadithCollection(slug) {
+        deenRoot.hadithCollection = slug;
+        if (deenRoot.hadithQuery !== "")
+            searchHadith(deenRoot.hadithQuery);
+    }
+
+    /// Through app-run, not execDetached alone: a child of the shell dies with
+    /// the next shell restart, and Notifs.qml documents the same trap.
+    function openUrl(url) {
+        Quickshell.execDetached(["app-run", "xdg-open", String(url)]);
+    }
 
     // ------------------------------------------------------------------ audio
     // `deen audio` caches and answers with a path; mpv plays it. Two programs
@@ -512,6 +594,15 @@ Scope {
         deenRoot.view = "duas";
     }
 
+    // `qs ipc call deen hadith "seeking forgiveness"` — search from anywhere.
+    function hadith(query) {
+        show();
+        deenRoot.view = "hadith";
+        const q = String(query || "").trim();
+        if (q !== "")
+            searchHadith(q);
+    }
+
     // `qs ipc call deen memorise` — go straight to what is due.
     function memorise() {
         show();
@@ -582,7 +673,10 @@ Scope {
         // "1:1" would begin a recording.
         Shortcut {
             sequence: "Space"
-            enabled: !recite.editingReference && deenRoot.view !== "mushaf" && deenRoot.view !== "duas"
+            // Named rather than excluded: every room added since has been one
+            // more `!==` on this line, and the hadith screen would have been
+            // the one where a space in the search box starts a recording.
+            enabled: !recite.editingReference && (deenRoot.view === "recite" || deenRoot.view === "hifz")
             onActivated: deenRoot.view === "hifz" ? hifzScreen.toggleRecording() : recite.toggleRecording()
         }
 
@@ -690,6 +784,10 @@ Scope {
                             {
                                 id: "duas",
                                 label: "DUAS"
+                            },
+                            {
+                                id: "hadith",
+                                label: "HADITH"
                             }
                         ]
 
@@ -800,6 +898,25 @@ Scope {
                     onPlayFrom: reference => deenRoot.playFrom(reference)
                     onPlayChapter: deenRoot.playChapter()
                     onStopPlayback: deenRoot.stopPlayback()
+                }
+
+                HadithScreen {
+                    id: hadithScreen
+
+                    anchors.fill: parent
+                    visible: deenRoot.view === "hadith"
+                    style: deenRoot.style
+                    source: deenRoot.hadithSource
+                    collections: deenRoot.hadithCollections
+                    hits: deenRoot.hadithHits
+                    total: deenRoot.hadithTotal
+                    query: deenRoot.hadithQuery
+                    collection: deenRoot.hadithCollection
+                    searching: deenRoot.hadithSearching
+                    loadError: deenRoot.hadithError
+                    onSearched: q => deenRoot.searchHadith(q)
+                    onCollectionPicked: slug => deenRoot.setHadithCollection(slug)
+                    onOpened: url => deenRoot.openUrl(url)
                 }
             }
 

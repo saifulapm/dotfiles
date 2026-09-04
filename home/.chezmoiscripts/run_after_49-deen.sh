@@ -23,6 +23,7 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 data="$HOME/.local/share/deen/quran.json"
 duas="$HOME/.local/share/deen/duas.json"
+hadith="$HOME/.local/share/deen/hadith"
 model_dir="$HOME/.local/share/voxtype/models"
 model="$model_dir/ggml-quran-base-q8.bin"
 src="$HOME/.local/src/deen"
@@ -87,6 +88,23 @@ if [ ! -s "$duas" ] && [ -x "$src/scripts/fetch-duas" ]; then
   else
     rm -f "$duas.tmp"
     warn "could not fetch the duas — the hub's Duas screen will say so; rerun a chezmoi apply"
+  fi
+fi
+
+# ------------------------------------------------------------------ the hadith
+# Ten collections in Arabic, English and Bangla — 36,512 narrations, 104 MB on
+# disk and about ten minutes to fetch, which is why it is guarded on its own
+# directory and why the message says what is happening. Nothing refreshes it.
+#
+# Guarded on collections.json rather than on the directory: the fetch writes one
+# file per collection as it goes, so a run killed halfway leaves a directory
+# that exists and is wrong, and only the manifest is written last.
+if [ ! -s "$hadith/collections.json" ] && [ -x "$src/scripts/fetch-hadith" ]; then
+  echo "deen: fetching the hadith corpus (104 MB, once — this takes a few minutes)"
+  if ! "$src/scripts/fetch-hadith" "$hadith" >/dev/null 2>&1; then
+    # Deliberately left in place rather than deleted: the fetch is idempotent
+    # per collection, so a second apply resumes instead of starting over.
+    warn "could not fetch the hadith corpus — the hub's Hadith screen will say so; rerun a chezmoi apply"
   fi
 fi
 

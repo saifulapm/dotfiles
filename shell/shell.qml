@@ -1025,6 +1025,13 @@ ShellRoot {
             return "ok";
         }
 
+        // `qs ipc call deen hadith "seeking forgiveness"` — search the corpus.
+        function hadith(query: string): string {
+            shell.dismissBarPanels();
+            deenLoader.summon("hadith", [query]);
+            return "ok";
+        }
+
         // `qs ipc call deen pedal` — start the recitation, or end it. One verb
         // for both so a single keybind can drive a whole attempt.
         function pedal(): string {
