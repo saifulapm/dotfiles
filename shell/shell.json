@@ -9,6 +9,15 @@
     "enabled": true,
     "dir": "~/.local/state/qshell/sync/model-usage"
   },
+  "prayer": {
+    "latitude": 23.8103,
+    "longitude": 90.4125,
+    "method": 1,
+    "school": 1,
+    "nudge": 10,
+    "jamaat": {},
+    "offsets": {}
+  },
   "bar": {
     "position": "top",
     "transparent": false,

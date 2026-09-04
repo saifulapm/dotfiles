@@ -725,7 +725,13 @@ Scope {
             // Salat mode needs the notification service to silence and
             // un-silence the desktop around a prayer.
             notifs: barRoot.shell.notifs,
-            settings: Qt.binding(() => barRoot.inlineEntryFor("prayer"))
+            // ONE PRAYER CONFIG FOR THE WHOLE SHELL. It lives at shell.json's
+            // root, not in this widget's inline entry, because the Islamic
+            // hub's home page shows the same times and a second copy of the
+            // latitude would be a second set of times to disagree with. The
+            // inline entry still wins for anything it names, so an existing
+            // widget-level setting keeps working.
+            settings: Qt.binding(() => Object.assign({}, (barRoot.shell.config && barRoot.shell.config.prayer) || ({}), barRoot.inlineEntryFor("prayer") || ({})))
         });
     }
 

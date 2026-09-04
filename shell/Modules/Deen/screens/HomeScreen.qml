@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import "../components"
+import "../../../Services/PrayerTimes.js" as PrayerTimes
 
 // The page the hub opens on: what time it is in the day's worship, one ayah,
 // one narration, and the four things worth doing next.
@@ -19,6 +20,11 @@ FocusScope {
     required property var style
     // {today, tomorrow} — two rows of the aladhan calendar the bar caches.
     required property var prayer
+    // shell.json's root `prayer` block. The masjid's jamaat times and offsets
+    // live there, and this page applies them through the same function the
+    // bar's widget does — so the countdown here and the notification there
+    // cannot say different things.
+    required property var prayerConfig
     required property string prayerError
     // {date, ayah, surah, hadith} from `deen api daily`.
     required property var daily
@@ -56,24 +62,21 @@ FocusScope {
         onTriggered: screen.readClock()
     }
 
-    // The five prayers, and sunrise — which is not one of them but is when Fajr
-    // ends, so a page about the day's shape has to show it.
-    readonly property var prayerNames: ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
-    readonly property var dayNames: ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
+    readonly property var prayerNames: PrayerTimes.PRAYERS
+    readonly property var dayNames: PrayerTimes.DAY
 
-    // "16:27 (+06)" → 987. The timezone suffix is aladhan's and is the same for
-    // every row, so it carries no information the clock does not already have.
     function minutesOf(text) {
-        const m = /^\s*(\d{1,2}):(\d{2})/.exec(String(text || ""));
-        return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+        return PrayerTimes.minutesOf(text);
     }
 
     function clockText(text) {
-        const m = /^\s*(\d{1,2}:\d{2})/.exec(String(text || ""));
-        return m ? m[1] : "—";
+        const t = PrayerTimes.clock(text);
+        return t === "" ? "—" : t;
     }
 
-    readonly property var timings: screen.prayer && screen.prayer.today ? screen.prayer.today.timings : null
+    // Already the masjid's times where the config names them.
+    readonly property var timings: screen.prayer && screen.prayer.today ? PrayerTimes.effective(screen.prayer.today.timings, screen.prayerConfig) : null
+    readonly property var timingsTomorrow: screen.prayer && screen.prayer.tomorrow ? PrayerTimes.effective(screen.prayer.tomorrow.timings, screen.prayerConfig) : null
 
     // The next prayer, and after Isha that is tomorrow's Fajr — taken from
     // TOMORROW'S row rather than today's, because a Fajr that moves a minute a
@@ -91,7 +94,7 @@ FocusScope {
                     tomorrow: false
                 };
         }
-        const t = screen.prayer && screen.prayer.tomorrow ? screen.prayer.tomorrow.timings : null;
+        const t = screen.timingsTomorrow;
         const fajr = t ? screen.minutesOf(t.Fajr) : -1;
         if (fajr < 0)
             return null;
@@ -144,7 +147,7 @@ FocusScope {
 
             anchors.horizontalCenter: parent.horizontalCenter
             y: screen.style.ui(20)
-            width: Math.min(page.width - screen.style.pagePad * 2, screen.style.ui(980))
+            width: Math.min(page.width - screen.style.pagePad * 2, screen.style.measure)
             spacing: screen.style.ui(14)
 
             // ------------------------------------------------------ the hero
@@ -252,7 +255,10 @@ FocusScope {
 
                                 width: (times.width - screen.style.ui(8) * 5) / 6
                                 style: screen.style
-                                label: modelData.toUpperCase()
+                                // A time that came from the config is marked,
+                                // because a masjid's jamaat time should not be
+                                // mistaken for one this machine calculated.
+                                label: modelData.toUpperCase() + (PrayerTimes.overridden(modelData, screen.prayerConfig) ? " ·" : "")
                                 value: screen.timings ? screen.clockText(screen.timings[modelData]) : "—"
                                 valueColor: screen.next && !screen.next.tomorrow && screen.next.name === modelData ? screen.style.accent : screen.style.brightFg
                             }

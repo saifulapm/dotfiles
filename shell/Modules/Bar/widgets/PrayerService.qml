@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../../../Services/PrayerTimes.js" as PrayerTimes
 
 // Prayer times service — the aladhan.com calendar for one month, cached on
 // disk, walked by a minute clock. ONE instance however many screens carry
@@ -94,25 +95,32 @@ QtObject {
     }
     readonly property string hijriToday: today ? String(today.hijri || "") : ""
 
+    // WHAT THE MASJID PRAYS, NOT WHAT THE ALMANAC CALCULATES. The config may
+    // pin a jamaat time or shift a calculated one, and everything below reads
+    // these rather than the raw table — the bar, the tooltip, the panel, the
+    // arrival notification and the nudge, so none of them can disagree.
+    readonly property var timingsToday: PrayerTimes.effective(root.today ? root.today.timings : null, root.settings)
+    readonly property var timingsTomorrow: PrayerTimes.effective(root.tomorrow ? root.tomorrow.timings : null, root.settings)
+
     // The next PRAYER from now — after Isha it is tomorrow's Fajr.
     readonly property var next: {
         if (!today)
             return null;
         for (const name of prayers) {
-            const t = minutesOf(today.timings[name]);
+            const t = minutesOf(root.timingsToday[name]);
             if (t > nowMinute)
                 return {
                     name: name,
-                    time: fmt(today.timings[name]),
+                    time: fmt(root.timingsToday[name]),
                     minutes: t - nowMinute,
                     tomorrow: false
                 };
         }
         if (tomorrow) {
-            const t = minutesOf(tomorrow.timings["Fajr"]);
+            const t = minutesOf(root.timingsTomorrow["Fajr"]);
             return {
                 name: "Fajr",
-                time: fmt(tomorrow.timings["Fajr"]),
+                time: fmt(root.timingsTomorrow["Fajr"]),
                 minutes: (1440 - nowMinute) + t,
                 tomorrow: true
             };
@@ -139,7 +147,7 @@ QtObject {
         if (next)
             lines.push("Next: " + next.name + " " + next.time + " (" + countdownText(next.minutes) + ")");
         for (const name of order)
-            lines.push(name + "  " + fmt(today.timings[name]));
+            lines.push(name + "  " + fmt(root.timingsToday[name]));
         if (hijriToday)
             lines.push(hijriToday);
         return lines.join("\n");
@@ -164,13 +172,13 @@ QtObject {
 
     function checkArrival() {
         for (const name of prayers) {
-            if (minutesOf(today.timings[name]) !== nowMinute)
+            if (minutesOf(root.timingsToday[name]) !== nowMinute)
                 continue;
             const key = dateKey(nowDate) + "|" + name;
             if (key === lastNotifiedKey)
                 return;
             lastNotifiedKey = key;
-            Quickshell.execDetached(["notify-send", "-a", "qshell", "🕌 " + name, "It is " + fmt(today.timings[name])]);
+            Quickshell.execDetached(["notify-send", "-a", "qshell", "🕌 " + name, "It is " + fmt(root.timingsToday[name])]);
             playAdhan();
             beginSalatMode();
             return;
@@ -182,14 +190,14 @@ QtObject {
     // warning is the difference between meaning to and going.
     function checkNudge() {
         for (const name of prayers) {
-            const t = minutesOf(today.timings[name]);
+            const t = minutesOf(root.timingsToday[name]);
             if (t < 0 || t - nudgeMinutes !== nowMinute)
                 continue;
             const key = dateKey(nowDate) + "|" + name;
             if (key === lastNudgeKey)
                 return;
             lastNudgeKey = key;
-            Quickshell.execDetached(["notify-send", "-a", "qshell", "🕌 " + name + " in " + nudgeMinutes + " min", fmt(today.timings[name])]);
+            Quickshell.execDetached(["notify-send", "-a", "qshell", "🕌 " + name + " in " + nudgeMinutes + " min", fmt(root.timingsToday[name])]);
             return;
         }
     }

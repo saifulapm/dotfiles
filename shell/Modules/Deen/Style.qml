@@ -197,6 +197,13 @@ QtObject {
     readonly property int slow: theme.motion.slow
     readonly property int easing: theme.motion.easing
 
+    // THE PAGE'S MEASURE — how wide the reading column is allowed to get.
+    // Four screens had this literal, which meant widening the page was four
+    // edits and a chance to miss one. The hadith cards are what set it: a
+    // narration is a paragraph beside its Arabic, and 980 left both columns
+    // reading as newspaper columns on a desk monitor.
+    readonly property int measure: ui(1180)
+
     // THE HEIGHT OF ONE CONTROL IN A ROW OF THEM. Chips and compact buttons sit
     // side by side all over this module — a citation chip beside a Listen
     // button, a grade chip beside a sunnah.com link — and they were 26 and 34,

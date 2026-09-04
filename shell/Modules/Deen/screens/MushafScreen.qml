@@ -103,7 +103,7 @@ FocusScope {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: screen.style.ui(20)
-        width: Math.min(parent.width - screen.style.pagePad * 2, screen.style.ui(980))
+        width: Math.min(parent.width - screen.style.pagePad * 2, screen.style.measure)
         spacing: screen.style.ui(14)
 
         // ------------------------------------------------------------ header

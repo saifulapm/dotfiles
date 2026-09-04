@@ -26,6 +26,10 @@ Scope {
     id: deenRoot
 
     required property var theme
+    // shell.json's root `prayer` block — the same one the bar's widget reads.
+    // Optional: a hub summoned by something that does not know about it still
+    // shows the calculated times.
+    property var prayerConfig: ({})
 
     // Open is the window's own visibility, not a flag kept beside it — niri's
     // close-window (Mod+Q) unmaps a toplevel by WRITING visible=false, which
@@ -1018,6 +1022,7 @@ Scope {
                     visible: deenRoot.view === "home"
                     style: deenRoot.style
                     prayer: deenRoot.prayerDays
+                    prayerConfig: deenRoot.prayerConfig
                     prayerError: deenRoot.prayerError
                     daily: deenRoot.daily
                     dailyError: deenRoot.dailyError

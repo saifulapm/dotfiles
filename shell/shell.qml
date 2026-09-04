@@ -973,8 +973,13 @@ ShellRoot {
         id: deenLoader
         evictable: true
         surfaceSource: shell.moduleRoot + "/Modules/Deen/Deen.qml"
+        // The prayer block travels with the theme: the hub's home page shows
+        // today's times and must read the SAME config the bar does. Applied
+        // when the surface is created, so an edit lands the next time the hub
+        // is opened — which is also when the bar has already picked it up.
         surfaceProps: ({
-                theme: shell.theme
+                theme: shell.theme,
+                prayerConfig: (shell.config && shell.config.prayer) || ({})
             })
     }
 

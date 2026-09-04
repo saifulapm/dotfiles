@@ -54,7 +54,7 @@ FocusScope {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: screen.style.ui(20)
-        width: Math.min(parent.width - screen.style.pagePad * 2, screen.style.ui(980))
+        width: Math.min(parent.width - screen.style.pagePad * 2, screen.style.measure)
         spacing: screen.style.ui(12)
 
         SearchLine {
@@ -249,7 +249,9 @@ FocusScope {
                     color: screen.style.alpha(screen.style.fg, 0.92)
                     wrapMode: Text.WordWrap
                     font.family: screen.style.fontFamily
-                    font.pixelSize: screen.style.type(12)
+                    // A narration is a paragraph you read, not a caption you
+                    // glance at — this and the Bangla under it are the screen.
+                    font.pixelSize: screen.style.type(14)
                 }
 
                 Text {
@@ -260,7 +262,7 @@ FocusScope {
                     color: screen.style.muted
                     wrapMode: Text.WordWrap
                     font.family: screen.style.fontFamily
-                    font.pixelSize: screen.style.type(12)
+                    font.pixelSize: screen.style.type(13)
                 }
 
                 // A citation you cannot check is an assertion. This is the
