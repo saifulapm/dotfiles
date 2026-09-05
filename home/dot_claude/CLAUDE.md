@@ -12,3 +12,6 @@
   Context7 CLI instead of guessing or web-searching:
   `npx ctx7@latest library <name> "<query>"`, then
   `npx ctx7@latest docs <libraryId> "<query>"`.
+- Never spawn subagents, agent teams, or workflows (no Agent, Workflow, or
+  team tools) — with Fable they burn tokens fast. Do research and work
+  directly in the main session; use plain WebSearch/WebFetch for lookups.
