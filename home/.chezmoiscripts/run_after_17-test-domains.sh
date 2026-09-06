@@ -93,7 +93,17 @@ if [ -n "$serve_iface" ]; then
   printf 'interface=%s\nexcept-interface=lo\n' "$serve_iface" >>"$tmp/dnsmasq.conf"
 fi
 if [ -n "$has_profile" ]; then
-  printf '# The one upstream: the uBlockDNS client.\nserver=127.0.0.1\n' >>"$tmp/dnsmasq.conf"
+  # cache-size=0 is deliberate, not a performance oversight (2026-09-06).
+  # On a helper this dnsmasq is a two-line ROUTER — *.test locally, everything
+  # else to the uBlockDNS client on 127.0.0.1 — and the client behind it keeps
+  # its own cache. A second cache in front of it therefore buys almost nothing
+  # and costs the one thing that matters here: uBlockDNS answers a block with
+  # a 300 s TTL, so a cache at this layer went on serving 0.0.0.0 for five
+  # minutes after bin/dns-filter unblocked a category, to every device on the
+  # LAN. Forwarding straight through makes the panel's toggles land at once.
+  # The cost is a loopback round trip per query on an office that does well
+  # under one query a second.
+  printf '# The one upstream: the uBlockDNS client.\nserver=127.0.0.1\ncache-size=0\n' >>"$tmp/dnsmasq.conf"
 fi
 
 cat >"$tmp/resolved.conf" <<'EOF'

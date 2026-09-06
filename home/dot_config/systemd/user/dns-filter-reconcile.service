@@ -1,0 +1,8 @@
+[Unit]
+Description=Re-block uBlockDNS categories whose timed unblock has expired
+
+[Service]
+Type=oneshot
+ExecStart=%h/.dotfiles/bin/dns-filter reconcile
+Nice=19
+IOSchedulingClass=idle

@@ -92,37 +92,116 @@ function heroMeta(st) {
         return "Client down — network on AdGuard fallback";
     if (st.blockTest !== "" && st.blockTest !== "0.0.0.0")
         return "Chain up but NOT blocking — check rules";
-    return "Degraded — see rows";
+    return "Degraded — check the chain";
 }
 
-function rows(st) {
-    if (!st)
+// ---------------------------------------------------------------- categories
+// The toggle half of the widget, fed by `dns-filter status --json` (see
+// bin/dns-filter for the API this stands on). Kept apart from the chain probe
+// above on purpose: the chain is local and answers in milliseconds, while this
+// is a round trip to uBlockDNS, and folding the two would have made the panel
+// open at the speed of the network.
+
+// The script always emits parseable JSON, including for its own failures, so
+// null here means something ate the output entirely — a missing binary, a
+// machine with no profile — not a filter that is off.
+function parseFilters(raw) {
+    const text = String(raw || "").trim();
+    if (text === "")
+        return null;
+    try {
+        const value = JSON.parse(text);
+        return value && typeof value === "object" ? value : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Local wall-clock HH:MM. Deliberately not Qt.formatDateTime: this file is a
+// .pragma library and has no QML context to borrow one from.
+function untilText(epoch) {
+    const at = Number(epoch) || 0;
+    if (at <= 0)
+        return "";
+    const d = new Date(at * 1000);
+    return "until " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+
+function categoryRows(filters) {
+    if (!filters || !filters.ok || !Array.isArray(filters.categories))
         return [];
-    const laptop = laptopVerdict(st);
-    return [{
-            label: "Filtering client",
-            detail: "ublockdns.service — 127.0.0.1:53",
-            ok: st.client === "active" && st.bindClient,
-            state: st.client === "active" ? (st.bindClient ? "Active" : "Active, port missing") : st.client || "unknown"
-        }, {
-            label: "Forwarder",
-            detail: "dnsmasq — 127.0.0.2, *.test stays local",
-            ok: st.dnsmasq === "active" && st.bindFwd,
-            state: st.dnsmasq === "active" ? (st.bindFwd ? "Active" : "Active, port missing") : st.dnsmasq || "unknown"
-        }, {
-            label: "Serving the LAN",
-            detail: st.lanBound.length > 0 ? st.lanBound.join(", ") + ":53 — point the router's DNS here" : st.lanIps.length > 0 ? st.lanIps.join(", ") + " has no listener" : "no ~/.config/dns-helper/serve",
-            ok: st.lanBound.length > 0 || st.lanIps.length === 0,
-            state: st.lanBound.length > 0 ? "Listening" : st.lanIps.length > 0 ? "Interface up, not bound" : "Self-filter only"
-        }, {
-            label: "Live block test",
-            detail: "youtube.com through the client",
-            ok: st.blockTest === "0.0.0.0",
-            state: st.blockTest === "0.0.0.0" ? "Blocked" : (st.blockTest === "" ? "No answer" : "RESOLVING — " + st.blockTest)
-        }, {
-            label: "This laptop",
-            detail: st.laptopDns === "" ? "no DNS server known" : "using " + st.laptopDns,
-            ok: laptop === "filtered",
-            state: laptop === "filtered" ? "Filtered" : laptop === "fallback" ? "AdGuard fallback" : laptop === "bypassed" ? "Bypassed" : "Unknown"
-        }];
+    return filters.categories.map(function (c) {
+        const until = Number(c.until) || 0;
+        return {
+            id: String(c.id),
+            label: String(c.label),
+            on: c.on === true,
+            until: until,
+            // Three states worth distinguishing, because "off" and "off until
+            // half past" are very different things to see on a family filter.
+            caption: c.on === true ? "Blocked" : (until > 0 ? "Open " + untilText(until) : "Not blocked")
+        };
+    });
+}
+
+// Domains punched through every blocklist with an `@@||domain^` rule. Listed
+// in the panel, each with its own remove button, because a hole you cannot
+// see is a hole you never close — t.co had to be opened for X's links to work
+// at all (2026-09-06).
+function allowedList(filters) {
+    if (!filters || !filters.ok)
+        return [];
+    return Array.isArray(filters.allowed) ? filters.allowed : [];
+}
+
+function categoriesSummary(filters) {
+    if (!filters)
+        return "";
+    if (!filters.ok)
+        return filters.error ? String(filters.error) : "Could not read the filters";
+    const rows = categoryRows(filters);
+    const open = rows.filter(function (r) {
+        return !r.on;
+    });
+    if (open.length === 0)
+        return "ALL ON";
+    return open.length + " OPEN";
+}
+
+// The header's right-hand verdict. This is the single fact the five CHAIN
+// rows existed to deliver — everything else in them described the machine's
+// role on the LAN, which never changed between one panel open and the next.
+//
+// `laptopVerdict` is the honest source: a machine can have a perfectly
+// healthy chain and still be resolving through Google because somebody
+// switched it in the network panel, and that is exactly the state worth
+// showing at the top.
+function deviceStatus(st) {
+    if (!st)
+        return {
+            label: "…",
+            ok: true
+        };
+    switch (laptopVerdict(st)) {
+    case "filtered":
+        return {
+            label: "FILTERED",
+            ok: true
+        };
+    case "fallback":
+        return {
+            label: "FALLBACK",
+            ok: false
+        };
+    case "bypassed":
+        return {
+            label: "BYPASSED",
+            ok: false
+        };
+    default:
+        return {
+            label: "UNKNOWN",
+            ok: false
+        };
+    }
 }

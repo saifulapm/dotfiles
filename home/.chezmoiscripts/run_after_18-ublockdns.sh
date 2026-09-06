@@ -27,6 +27,22 @@ warn() { echo "ublockdns: $*" >&2; }
 profile=$(head -1 "$HOME/.config/dns-helper/profile" 2>/dev/null | tr -cd 'a-z0-9')
 [ -n "$profile" ] || exit 0
 
+# The account token (the 4-word one from `pass show uBlockDNS/key`) is
+# OPTIONAL for filtering but load-bearing for how fast a rule change lands:
+# it subscribes the client to the account's rules stream, which is what makes
+# it flush its own DNS cache the moment bin/dns-filter flips a category
+# instead of serving the old answer for the rest of a 300 s TTL. Without it
+# the client still filters, just with a lag the panel's toggles would wear.
+#
+# It goes to /etc, not ~/.config, because the unit runs ProtectHome=yes — and
+# to a FILE rather than -token on the command line, so it stays out of argv
+# and out of `systemctl cat`. 0600 root; the sha256 beside it is the
+# world-readable marker this script compares against, since it cannot read
+# the token back to check whether it changed.
+token=$(head -1 "$HOME/.config/dns-helper/token" 2>/dev/null | tr -d '[:space:]')
+token_sha=""
+[ -n "$token" ] && token_sha=$(printf '%s' "$token" | sha256sum | awk '{print $1}')
+
 UBLOCKDNS_VERSION="v0.3.0"
 UBLOCKDNS_SHA256_ARM64="fa5c07aad44677028890f10b0b4bb5f54dba9a30bc5a90469be6e9461d0b0c33"
 UBLOCKDNS_SHA256_AMD64="cbd5739169cec68c13ba310f6cd12d273f6832309cbe70702c450688ff1eb0c4"
@@ -87,7 +103,7 @@ Description=uBlockDNS DoH filtering client (127.0.0.1:53)
 After=network.target dnsmasq.service
 
 [Service]
-ExecStart=/usr/local/bin/ublockdns run -profile @PROFILE@
+ExecStart=/usr/local/bin/ublockdns run -profile @PROFILE@@TOKENFLAG@
 Environment=UBLOCKDNS_NO_AUTOUPDATE=1
 Restart=on-failure
 RestartSec=3
@@ -101,17 +117,45 @@ ReadWritePaths=/etc/ublockdns /var/log
 WantedBy=multi-user.target
 EOF
 sed -i "s|@PROFILE@|$profile|" "$tmp/ublockdns.service"
+if [ -n "$token" ]; then
+  sed -i "s|@TOKENFLAG@| -token-file /etc/ublockdns/token|" "$tmp/ublockdns.service"
+else
+  sed -i "s|@TOKENFLAG@||" "$tmp/ublockdns.service"
+fi
 chmod 0644 "$tmp"/ublockdns.service
+
+# Rotating the token changes neither the unit nor its enablement, so it needs
+# its own staleness test — and its own restart, since `enable --now` on an
+# already-running unit would leave the client holding the old one.
+token_stale=""
+if [ -n "$token" ] && [ "$(cat /etc/ublockdns/token.sha256 2>/dev/null)" != "$token_sha" ]; then
+  token_stale=yes
+  printf '%s\n' "$token" >"$tmp/token"
+  printf '%s\n' "$token_sha" >"$tmp/token.sha256"
+fi
 
 # is-active in the gate, 17's lesson: a unit that enabled but failed to
 # start must keep being retried by later applies, not pass silently.
-if stale "$tmp/ublockdns.service" /etc/systemd/system/ublockdns.service \
+unit_stale=""
+stale "$tmp/ublockdns.service" /etc/systemd/system/ublockdns.service && unit_stale=yes
+
+if [ -n "$unit_stale" ] || [ -n "$token_stale" ] \
   || ! systemctl is-enabled --quiet ublockdns 2>/dev/null \
   || ! systemctl is-active --quiet ublockdns 2>/dev/null; then
-  add "install -D -m 0644 '$tmp/ublockdns.service' /etc/systemd/system/ublockdns.service"
   add "mkdir -p /etc/ublockdns"
+  if [ -n "$token_stale" ]; then
+    add "install -m 0600 '$tmp/token' /etc/ublockdns/token"
+    add "install -m 0644 '$tmp/token.sha256' /etc/ublockdns/token.sha256"
+  fi
+  add "install -D -m 0644 '$tmp/ublockdns.service' /etc/systemd/system/ublockdns.service"
   add "systemctl daemon-reload"
   add "systemctl enable --now ublockdns.service"
+  # Only when the CONTENT changed: try-restart is a no-op on a stopped unit,
+  # and restarting the client drops LAN DNS for about a second, so it must not
+  # ride along on an apply that merely re-asserted enablement.
+  if [ -n "$unit_stale" ] || [ -n "$token_stale" ]; then
+    add "systemctl try-restart ublockdns.service"
+  fi
 fi
 
 # The LAN cannot query a closed port. The query side is unprivileged
