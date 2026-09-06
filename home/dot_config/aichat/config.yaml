@@ -13,27 +13,17 @@ keybindings: vi
 wrap: 150
 
 # ---- function-calling ----
-# INERT until functions/ is built, which is why use_tools is null rather than
-# the mac's 'fs'. aichat reads tool declarations from functions/functions.json,
-# and that file is BUILD OUTPUT: `argc build` in ~/.config/aichat/functions
-# generates it from functions/tools.txt. Neither is in this repo — tools.txt is
-# gitignored by the vendored llm-functions tree, and argc was dropped from
-# run_after_09-cargo-tools.sh (f487249) once nothing called it.
+# GONE, deliberately (user decision 2026-09-06). The whole functions/ tree —
+# the vendored sigoden/llm-functions checkout, its 25 tools and 8 agents — was
+# deleted with it, so there is no functions_dir for aichat to read and nothing
+# for function_calling, mapping_tools or use_tools to name.
 #
-# aichat does not complain about this; it silently sends no tools (verified
-# 2026-09-06), so `use_tools: 'fs'` would have been a claim the config could
-# not keep. Worth knowing: the mac's own tools.txt listed get_current_weather
-# and execute_command — never the five fs_* tools this mapping names — so this
-# line has not done anything on either machine.
-#
-# To turn it on: put argc back in cargo-tools, write functions/tools.txt with
-# the tools wanted, run `argc build`, then set use_tools back to 'fs'. Note
-# what that grants — fs_write and fs_rm hand filesystem writes to whichever
-# provider pxy's routing happens to pick.
-function_calling: true
-mapping_tools:
-  fs: 'fs_cat,fs_ls,fs_mkdir,fs_rm,fs_write'
-use_tools: null
+# It had never worked on this machine in any case: declarations live in
+# functions/functions.json, which is `argc build` output from a gitignored
+# tools.txt, and argc left cargo-tools in f487249. Restoring it would mean
+# putting argc back, writing tools.txt and running the build — and the three
+# custom agents (laravel, shopify, shadcn) are in git history at f65c173 if
+# they are ever wanted again.
 
 # ---- session ----
 save_session: true

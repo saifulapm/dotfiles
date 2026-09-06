@@ -13,10 +13,17 @@
 #   * audio-heal          146f867  .service, .timer, 99-homepod-raop.conf
 #   * aichat              212e40c  99 links: the whole ~/.config/aichat tree,
 #                                  its kak autoload file and a fish function.
-#                                  ALREADY SWEPT — and aichat was restored on
-#                                  2026-09-06, so those paths are live links
-#                                  again and this predicate correctly ignores
-#                                  them (they resolve).
+#                                  ALREADY SWEPT, then restored 2026-09-06 —
+#                                  config.yaml, the kak file and the fish
+#                                  function are live links again and this
+#                                  predicate correctly ignores them.
+#                                  The functions/ subtree came back and went
+#                                  again the SAME DAY (llm-functions dropped,
+#                                  user decision), so ~85 more links under
+#                                  ~/.config/aichat/functions are this sweep's
+#                                  to clear — including the nested agent and
+#                                  tool directories the rmdir walk below exists
+#                                  for.
 #   * screensaver         c6f621b  foot/screensaver.ini
 #                         f69d82b  qshell/screensaver-quotes.txt
 #   * text-size           b857b32  fish completion — the actively harmful one
