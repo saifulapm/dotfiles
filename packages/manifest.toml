@@ -1013,6 +1013,18 @@ arch = "all"
 why = "Containers for Laravel/Node work; 16K-page-size validation on Asahi is a scheduled step before dev setup is called done"
 
 [[pkg]]
+name = "podman-compose"
+category = "dev"
+arch = "all"
+why = "The compose provider (user decision 2026-09-06). `podman compose` is only a dispatcher: with nothing on PATH it exits 125 with 'looking up compose provider failed', so every `docker compose` line in a project README or plan was dead on this machine even though podman itself was fine. Fedora's docker-compose (the real Go compose v2, 42 MB installed) was the alternative, and is what podman picks FIRST when both are present — the search order is docker-compose's cli-plugin paths, then docker-compose on PATH, then podman-compose (read off the 7-error message podman prints when it finds none). It was declined because it speaks only the Docker API, so it needs podman.socket lit and DOCKER_HOST exported: daemon-shaped, always-on state on a box whose whole dev-services design (below) is that nothing idles. podman-compose is 764 KB of python, drives the podman CLI directly, stays rootless and needs no socket. It does NOT provide the hyphenated `docker-compose` command — only `podman compose` and (via podman-docker) `docker compose` reach it; a project still on the v1 spelling wants the docker-compose package instead. Distinct from dev-services below: that is the standing mysql/postgres/redis/mailpit set this machine always has, this is for the compose files that ship inside a project"
+
+[[pkg]]
+name = "podman-docker"
+category = "dev"
+arch = "all"
+why = "The `docker` command name (user decision 2026-09-06). 89 KB noarch: a /usr/bin/docker shell script that execs podman, man-page links, a tmpfiles.d rule and a profile.d snippet — no daemon, no second engine, nothing left running. Earns its place because project READMEs, Makefiles and agent-written plans say `docker`, and rewriting each one to `podman` is a per-project edit redone on every fresh clone. Pairs with podman-compose above — `docker compose up` becomes `podman compose up` becomes podman-compose. The shim prints 'Emulate Docker CLI using podman…' to stderr on EVERY invocation unless a nodocker marker exists; dot_config/containers/nodocker is that marker, and without it 'runs unchanged' is false for anything that reads stderr. The shim checks $XDG_CONFIG_HOME/containers/nodocker as well as /etc/containers/nodocker (read out of the rpm's own /usr/bin/docker), which is why this needs no root and no script — an earlier run_after_54 doing a pkexec `touch /etc/containers/nodocker` was deleted the same day for that reason. What it does NOT give is a LISTENING Docker API socket: the tmpfiles.d rule does symlink %t/docker.sock to %t/podman/podman.sock, and /etc/profile.d/podman-docker.sh does export DOCKER_HOST, but both dangle until `systemctl --user enable --now podman.socket` actually creates the socket — deliberately not enabled, because nothing here dials it yet. Note the profile.d half never fires on this machine anyway: the login shell is fish, which does not source /etc/profile.d/*.sh, so DOCKER_HOST would have to be set in fish/conf.d if a testcontainers-style tool ever needs it"
+
+[[pkg]]
 name = "just"
 category = "dev"
 arch = "all"
