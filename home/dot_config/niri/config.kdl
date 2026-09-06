@@ -180,7 +180,7 @@ output "DP-3" {
 // 1.3333333 and not 1.333: four thirds divides 3840 and 2160 exactly, landing
 // the logical size on 2880x1620 instead of 2880.7x1620.4.
 output "HDMI-A-1" {
-    scale 1.3333333
+    scale 1.1
 }
 
 // Settings that influence how windows are positioned and sized.
