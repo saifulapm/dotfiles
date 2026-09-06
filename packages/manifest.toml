@@ -50,7 +50,7 @@ why  = "lazygit is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (l
 name = "vicinae"
 category = "shell"
 arch = "all"
-why = "The launcher: app launch, clipboard history, script commands — replaced the in-shell Launcher/Menu/Clipboard pickers 2026-08-26. Runs as vicinae.service with --no-extension-runtime (no node); config layered via VICINAE_OVERRIDES; themed by theme-apply (vicinae-theme.toml.tmpl)"
+why = "The launcher: app launch, clipboard history, script commands — replaced the in-shell Launcher/Menu/Clipboard pickers 2026-08-26. Runs as vicinae.service; config layered via VICINAE_OVERRIDES; themed by theme-apply (vicinae-theme.toml.tmpl). Ran --no-extension-runtime until 2026-09-06, when vicinae/youtube — a real TypeScript extension, built per machine by run_after_53 — made the resident node process worth its 75-95 MB (docs/youtube-2026-09-06.md §2 weighs it against the dmenu alternative)"
 
 [[pkg]]
 name = "foot"
@@ -1595,7 +1595,7 @@ why  = "Screenshot + annotation overlay (user ask 2026-08-11, tobi's omasnap por
 [[tool]]
 name = "node"
 via  = "mise install node — version pinned as node = \"lts\" in the chezmoi-managed ~/.config/mise/config.toml (run_after_03-dev-toolchain.sh)"
-why  = "Node runtime, version-managed per decision 2026-08-05; .nvmrc/.node-version detection enabled there too (mise disables idiomatic version files by default)"
+why  = "Node runtime, version-managed per decision 2026-08-05; .nvmrc/.node-version detection enabled there too (mise disables idiomatic version files by default). SECOND, NON-DEVELOPMENT CONSUMER since 2026-09-06: vicinae's TypeScript extension runtime. vicinae.service dropped --no-extension-runtime for vicinae/youtube, and the server starts ~/.local/share/mise/shims/node as a resident extension manager (75-95 MB RSS measured) — so node is no longer only a thing projects need, it is a desktop dependency, and a machine where `mise install node` failed loses the YouTube commands from the launcher"
 
 [[tool]]
 name = "pnpm"

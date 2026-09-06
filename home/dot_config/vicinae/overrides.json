@@ -96,5 +96,8 @@
       }
     }
   },
-  "fallbacks": []
+  "//fallbacks": "What the root search offers when nothing matches what was typed — the only way an arbitrary phrase becomes a command. Empty since the switch because the stock entry was files:search and the files provider is off above. vicinae/youtube:search takes the slot: typing a song title now ends in \"Search on YouTube\" rather than nothing, which is the whole point of the extension. Ids are what `vicinae cmd ls` prints, and an id that does not resolve is ignored rather than fatal — so a machine mid-apply, with the extension not yet built, just has no fallback.",
+  "fallbacks": [
+    "@saiful/youtube:search"
+  ]
 }
