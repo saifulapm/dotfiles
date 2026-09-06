@@ -295,46 +295,6 @@ BarPanel {
         }
     }
 
-    // --------------------------------------------------------------- footer
-    Item {
-        width: parent.width
-        implicitHeight: dashboardChip.implicitHeight
-
-        ChipSurface {
-            id: dashboardChip
-
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            theme: panel.theme
-            implicitWidth: panel.theme.space(8)
-            implicitHeight: panel.theme.space(7)
-            pointerOver: dashboardMouse.containsMouse
-
-            OpticalGlyph {
-                anchors.centerIn: parent
-                text: "󰖟"
-                color: panel.theme.textPrimary
-                pixelSize: panel.theme.fontPx(1.0)
-            }
-
-            MouseArea {
-                id: dashboardMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: panel.dnsshield.openDashboard()
-            }
-
-            PanelHint {
-                theme: panel.theme
-                visible: dashboardMouse.containsMouse
-                anchor: dashboardChip
-                above: true
-                text: "Open dashboard"
-            }
-        }
-    }
-
     // ----------------------------------------------------------- components
     // A category, its state sentence, the chips that open it for a while, and
     // the switch. The whole row is the target for the plain on/off — the
