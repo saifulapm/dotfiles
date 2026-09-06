@@ -4,7 +4,6 @@
 
 alias c "clear"
 alias k kak_session # per-directory kakoune daemon+client (bin/kak_session)
-alias et "emacsclient -t" # terminal Emacs via the running daemon
 alias reload "exec fish"
 alias cd zd
 alias ll "lsd -l"
