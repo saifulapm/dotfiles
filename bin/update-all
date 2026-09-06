@@ -186,6 +186,10 @@ update_src "$HOME/.local/src/dekho" "$HOME/.local/bin/dekho" dekho
 # refreshed by this: they are fetched once by run_after_49 and guarded on their
 # own files.
 update_src "$HOME/.local/src/deen" "$HOME/.local/bin/deen" deen
+# kak-ansi is the cheapest build in this list — one C file, no libraries — and
+# it tracks upstream's `develop`, which is its default branch. update_src reads
+# the branch off the checkout, so nothing here has to name it.
+update_src "$HOME/.local/src/kak-ansi" "$HOME/.local/bin/kak-ansi-filter" kak-ansi
 
 # -------------------------------------------------------------------- apply
 say "chezmoi apply (reinstalls everything removed above)"

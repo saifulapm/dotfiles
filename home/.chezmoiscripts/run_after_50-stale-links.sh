@@ -12,7 +12,18 @@
 # remembering, which is the point):
 #   * audio-heal          146f867  .service, .timer, 99-homepod-raop.conf
 #   * aichat              212e40c  99 links: the whole ~/.config/aichat tree,
-#                                  its kak autoload file and a fish function
+#                                  its kak autoload file and a fish function.
+#                                  ALREADY SWEPT, then restored 2026-09-06 —
+#                                  config.yaml, the kak file and the fish
+#                                  function are live links again and this
+#                                  predicate correctly ignores them.
+#                                  The functions/ subtree came back and went
+#                                  again the SAME DAY (llm-functions dropped,
+#                                  user decision), so ~85 more links under
+#                                  ~/.config/aichat/functions are this sweep's
+#                                  to clear — including the nested agent and
+#                                  tool directories the rmdir walk below exists
+#                                  for.
 #   * screensaver         c6f621b  foot/screensaver.ini
 #                         f69d82b  qshell/screensaver-quotes.txt
 #   * text-size           b857b32  fish completion — the actively harmful one
@@ -82,13 +93,10 @@ fi
 
 [ "$removed" -gt 0 ] && echo "stale-links: removed $removed dangling symlink(s) into the repo"
 
-# aichat's binary, which 212e40c meant to retire and did not: the commit
-# dropped the config, the kak plugin, the fish widget and the prebuilt-binary
-# INSTALL, but nothing uninstalled the copy already sitting in ~/.local/bin.
-# Guarded on the path so a deliberate reinstall is not fought over on every
-# apply — if it comes back on purpose, drop this block with it.
-if [ -f "$HOME/.local/bin/aichat" ]; then
-  rm -f "$HOME/.local/bin/aichat" && echo "stale-links: removed the orphaned aichat binary (212e40c retired it)"
-fi
+# The aichat binary-removal block that stood here is GONE (2026-09-06), taken
+# out under its own instruction: it said "if it comes back on purpose, drop
+# this block with it", and aichat came back on purpose. Left in place it would
+# have deleted ~/.local/bin/aichat at the end of every single apply, moments
+# after run_after_10 reinstalled it.
 
 exit 0

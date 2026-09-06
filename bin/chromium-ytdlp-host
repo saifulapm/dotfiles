@@ -7,6 +7,12 @@
 # `qs ipc call osd -- show` — the `--` dodges the qs CLI's own `show`
 # subcommand), and the finishing toast opens the file in mpv when clicked.
 # Keeps omarchy's com.omarchy.ytdlp name — the extension calls it by string.
+#
+# SECOND CALLER since 2026-09-06: bin/youtube runs the `--download` half
+# directly for the vicinae YouTube extension, with `--audio` for the audio
+# track alone. Nothing about the native messaging protocol is involved on that
+# path — it wants the OSD progress bar, the forged-filename guard and the
+# clickable completion toast, and none of that is worth a second copy of.
 set -euo pipefail
 
 export PATH="$HOME/.dotfiles/bin:/usr/local/bin:/usr/bin:$PATH"
@@ -86,7 +92,16 @@ title_from_file() {
 }
 
 download_url() {
-  local url="$1"
+  local url="$1" mode="${2:-}"
+
+  # --audio keeps the audio stream and throws the video away. `best` rather
+  # than a named codec because YouTube already serves opus: naming mp3 or
+  # opus here would re-encode a lossy source into a lossy target for nothing.
+  # The second caller (bin/youtube download --audio, for the vicinae YouTube
+  # extension) is the only one that passes it; the browser extension has no
+  # audio button and reaches none of this.
+  local -a fmt=()
+  [[ $mode == "--audio" ]] && fmt=(--extract-audio --audio-format best)
 
   mkdir -p "$DOWNLOAD_DIR"
 
@@ -135,7 +150,7 @@ download_url() {
   done < <(PYTHONUNBUFFERED=1 yt-dlp --no-playlist --no-simulate \
     --quiet --no-warnings --no-exec --no-exec-before-download --progress --newline \
     --progress-template $'download:QSHELL_PROG\t%(progress._percent_str)s' \
-    --paths "$DOWNLOAD_DIR" -o '%(title)s.%(ext)s' \
+    "${fmt[@]}" --paths "$DOWNLOAD_DIR" -o '%(title)s.%(ext)s' \
     --print $'after_move:QSHELL_FILE\t%(filepath)s' \
     --print $'after_move:QSHELL_TITLE\t%(title)j' \
     -- "$url" 2>&1)
@@ -184,8 +199,10 @@ main() {
   local length payload url
 
   # Detached worker half: actually runs yt-dlp and fires the notifications.
+  # `--download <url> [--audio]` — the trailing flag is how bin/youtube asks
+  # for the audio track alone.
   if [[ ${1:-} == "--download" ]]; then
-    download_url "$2"
+    download_url "$2" "${3:-}"
   fi
 
   length=$(head -c4 | od -An -v -tu4 --endian=little | tr -d ' ')

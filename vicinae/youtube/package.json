@@ -1,0 +1,75 @@
+{
+  "name": "youtube",
+  "title": "YouTube",
+  "description": "Search YouTube and play the result in mpv, or queue it in cliamp",
+  "icon": "icon.svg",
+  "author": "saiful",
+  "license": "MIT",
+  "platforms": ["Linux"],
+  "commands": [
+    {
+      "name": "search",
+      "title": "Search on YouTube",
+      "description": "Search YouTube and play a result in mpv",
+      "mode": "view",
+      "icon": "icon.svg",
+      "keywords": ["youtube", "yt", "video", "watch", "music", "mpv"],
+      "arguments": [
+        {
+          "name": "query",
+          "type": "text",
+          "placeholder": "Search YouTube",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "library",
+      "title": "YouTube Library",
+      "description": "Watch later and recently played YouTube videos",
+      "mode": "view",
+      "icon": "icon.svg",
+      "keywords": ["youtube", "yt", "history", "watch later", "saved"]
+    }
+  ],
+  "preferences": [
+    {
+      "name": "quality",
+      "type": "dropdown",
+      "title": "Video quality",
+      "description": "Height cap handed to mpv. Soft: a video with nothing at or below this still plays.",
+      "required": false,
+      "default": "1080",
+      "data": [
+        { "title": "2160p", "value": "2160" },
+        { "title": "1440p", "value": "1440" },
+        { "title": "1080p", "value": "1080" },
+        { "title": "720p", "value": "720" },
+        { "title": "480p", "value": "480" },
+        { "title": "360p", "value": "360" }
+      ]
+    },
+    {
+      "name": "pageSize",
+      "type": "dropdown",
+      "title": "Results per page",
+      "description": "How many results one search fetches. Load More adds another page.",
+      "required": false,
+      "default": "20",
+      "data": [
+        { "title": "10", "value": "10" },
+        { "title": "20", "value": "20" },
+        { "title": "30", "value": "30" },
+        { "title": "50", "value": "50" }
+      ]
+    }
+  ],
+  "dependencies": {
+    "@vicinae/api": "0.28.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "19.1.17",
+    "typescript": "5.9.2"
+  }
+}

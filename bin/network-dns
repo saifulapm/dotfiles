@@ -141,6 +141,19 @@ set_connection_dns() {
     done < <(nm_get UUID,TYPE,NAME connection show)
 }
 
+# Switching resolvers does NOT invalidate what the old one already answered:
+# resolved keeps every cached record for the rest of its TTL, and uBlockDNS
+# hands out its blocks with a TTL of 300 s. So the first five minutes after
+# "Google" still resolved youtube.com to 0.0.0.0 out of cache, which is what
+# made switching feel like it needed a browser restart to take (2026-09-06).
+# One unprivileged call fixes it — no polkit, ~3 ms.
+#
+# Chromium keeps a host cache of its own that nothing outside the browser can
+# flush; it honours TTL, so it catches up on its own within about a minute.
+flush_caches() {
+    resolvectl flush-caches 2>/dev/null || true
+}
+
 # A modified profile only publishes its DNS on reapply; without this the change
 # lands in the stored connection and nothing else happens until the next
 # reconnect.
@@ -197,6 +210,7 @@ Custom | custom)
 esac
 
 reapply_active_connections
+flush_caches
 
 if ((${#modify_failures[@]} > 0)); then
     echo "Error: DNS not changed on ${#modify_failures[@]} profile(s): ${modify_failures[*]}" >&2

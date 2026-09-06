@@ -1,0 +1,523 @@
+#!/bin/bash
+# dns-filter — turn uBlockDNS filter categories on and off, optionally for a
+# fixed stretch of time. The write half of the DNS Shield widget, whose panel
+# shells out to `status --json`, `on`, and `off`.
+#
+# WHY THIS EXISTS. Until now the only way to watch YouTube was to point the
+# machine at Google/Cloudflare (network-dns), which (a) unfilters everything,
+# not just YouTube, (b) only helps the ONE device you switched, and (c) leaves
+# every cache in the chain holding the old 0.0.0.0 answer. Toggling the rule
+# at the source fixes all three: the account profile is what the home OpenWrt
+# router, the office mini and every roaming client all resolve through, so one
+# PUT reaches the whole family at once.
+#
+# THE API. Undocumented, read off the dashboard bundle (ublockdns.com/assets)
+# and verified by hand 2026-09-06:
+#   POST /api/auth                 {token}     → ubd_session cookie, 1 year
+#   GET  /api/profile/<id>                     → the whole config object
+#   PUT  /api/profile/<id>         {lists, custom_rules, dns_provider,
+#                                   preset_id, policy_modules}
+# PUT replaces the object wholesale — there is no PATCH for it — so every
+# change here is read-modify-write under a lock, never a blind write. The
+# server no-ops a semantically identical body (rules_version does not move),
+# which is what makes `on` when already on free.
+#
+# It being undocumented is the standing risk: uBlockDNS can change this shape
+# without warning. Every failure mode therefore reports rather than guesses,
+# and `status --json` always emits parseable JSON so the panel degrades to a
+# message instead of an empty widget.
+#
+#   dns-filter                       what is blocked right now
+#   dns-filter status [--json]       same, machine-readable for the panel
+#   dns-filter on  <category>        start blocking (cancels any timer)
+#   dns-filter off <category> [for]  stop blocking, e.g. `off youtube 30m`
+#   dns-filter allow <domain>        punch one domain through every blocklist
+#   dns-filter unallow <domain>      take the hole back out
+#   dns-filter allowed               what is currently allowed
+#   dns-filter reconcile             re-block anything whose time is up
+#
+# Categories: youtube social adult gambling
+set -uo pipefail
+
+API="https://ublockdns.com/api"
+CONFIG_DIR="$HOME/.config/dns-helper"
+STATE_DIR="$HOME/.local/state/dns-helper"
+PROFILE_FILE="$CONFIG_DIR/profile"
+TOKEN_FILE="$CONFIG_DIR/token"
+SESSION="$STATE_DIR/session"
+LOCK="$STATE_DIR/lock"
+
+# The four categories, and the two different mechanisms behind them.
+#
+# social/adult/gambling are the service's own "policy modules" — a boolean
+# each in policy_modules, backed by a HaGeZi list the server maintains.
+#
+# youtube is not a module (the service has no YouTube module) — it is the
+# hand-written custom_rules group below, which is what was typed into the
+# dashboard by hand when the block was first set up. It is a GROUP, not one
+# rule: the apps and the TV clients resolve googlevideo/ytimg/youtubei
+# directly and keep playing if you only remove youtube.com.
+#
+# NOT in the group, and deliberately: ||mask.icloud.com^ and
+# ||mask-h2.icloud.com^ also live in custom_rules, but they block iCloud
+# Private Relay, which is a BYPASS route around the whole filter rather than
+# anything to do with YouTube. Unblocking YouTube for half an hour must not
+# quietly open the tunnel that makes every other rule optional, so those two
+# are never touched here.
+YOUTUBE_RULES='["||youtube.com^","||youtu.be^","||googlevideo.com^","||ytimg.com^","||youtubekids.com^","||youtube-nocookie.com^","||youtubei.googleapis.com^"]'
+
+# Allow rules. The service parses custom_rules as ABP
+# (filterListGroups-ClKgaVws.js in the dashboard bundle): `@@||domain^` is an
+# exception, `||domain^` and a bare domain are blocks. An exception beats every
+# one of the 46 blocklists, which is the whole point — it is how you rescue a
+# domain a list is wrong about without turning the list off.
+ALLOW_RE='^@@\|\|(.+)\^$'
+
+MODULE_social="social-apps"
+MODULE_adult="adult-content"
+MODULE_gambling="gambling"
+
+LABEL_youtube="YouTube"
+LABEL_social="Social apps"
+LABEL_adult="Adult content"
+LABEL_gambling="Gambling"
+
+CATEGORIES=(youtube social adult gambling)
+
+die() {
+    echo "dns-filter: $*" >&2
+    exit 1
+}
+
+is_category() {
+    local c
+    for c in "${CATEGORIES[@]}"; do
+        [[ $1 == "$c" ]] && return 0
+    done
+    return 1
+}
+
+# ------------------------------------------------------------------ session
+# The session cookie is good for a year, so the normal path costs no auth
+# round-trip at all. api() re-authenticates once on a 401 and retries, which
+# covers both "never logged in" and "cookie finally expired" without either
+# being a special case the caller has to know about.
+authenticate() {
+    local token
+    token=$(head -1 "$TOKEN_FILE" 2>/dev/null | tr -d '[:space:]')
+    [[ -n $token ]] || die "no account token — put the 4-word token from \`pass show uBlockDNS/key\` in $TOKEN_FILE"
+
+    mkdir -p "$STATE_DIR"
+    local code
+    code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' -c "$SESSION" \
+        -X POST "$API/auth" \
+        -H 'Content-Type: application/json' \
+        --data "$(jq -cn --arg t "$token" '{token:$t}')" 2>/dev/null)
+    [[ $code == 200 ]] || die "login failed (HTTP $code) — is the token in $TOKEN_FILE current?"
+    chmod 600 "$SESSION" 2>/dev/null || true
+}
+
+# api <method> <path> [body-file] — prints the response body, dies on failure.
+api() {
+    local method=$1 path=$2 body=${3:-} out code
+    out=$(mktemp)
+
+    _call() {
+        if [[ -n $body ]]; then
+            curl -sS -m 25 -b "$SESSION" -c "$SESSION" -o "$out" -w '%{http_code}' \
+                -X "$method" "$API$path" \
+                -H 'Content-Type: application/json' --data @"$body" 2>/dev/null
+        else
+            curl -sS -m 25 -b "$SESSION" -c "$SESSION" -o "$out" -w '%{http_code}' \
+                -X "$method" "$API$path" 2>/dev/null
+        fi
+    }
+
+    code=$(_call)
+    if [[ $code == 401 || $code == 403 ]]; then
+        authenticate
+        code=$(_call)
+    fi
+
+    if [[ $code != 200 ]]; then
+        local detail
+        detail=$(head -c 200 "$out" 2>/dev/null | tr -d '\n')
+        rm -f "$out"
+        die "$method $path failed (HTTP ${code:-none})${detail:+ — $detail}"
+    fi
+    cat "$out"
+    rm -f "$out"
+}
+
+# Prints the id, or nothing. Deliberately does NOT die: it is only ever
+# called from inside $( ), where an exit would end the subshell and let the
+# caller carry on with an empty id. The callers below check it instead.
+profile_id() {
+    head -1 "$PROFILE_FILE" 2>/dev/null | tr -cd 'a-z0-9'
+}
+
+require_profile() {
+    local id
+    id=$(profile_id)
+    [[ -n $id ]] || die "no profile id in $PROFILE_FILE — this machine is not on the family DNS"
+    echo "$id"
+}
+
+# ------------------------------------------------------------------- deadlines
+# One file per timed unblock, holding the epoch second it expires. The file,
+# not the systemd timer, is the source of truth: a transient timer dies with a
+# reboot or a suspend-through-the-deadline, and a family filter that fails OPEN
+# because the laptop slept is the one outcome worth engineering against.
+# `reconcile` closes it again, and runs from the panel probe and a timer.
+until_file() { echo "$STATE_DIR/until-$1"; }
+
+deadline_of() {
+    local f
+    f=$(until_file "$1")
+    local v
+    v=$(head -1 "$f" 2>/dev/null | tr -cd '0-9')
+    echo "${v:-0}"
+}
+
+clear_deadline() {
+    rm -f "$(until_file "$1")"
+    systemctl --user stop "dns-filter-restore-$1.timer" 2>/dev/null || true
+}
+
+# Takes what a person would paste — a bare host, a full URL, a trailing slash,
+# mixed case — and prints the bare domain. Returns nonzero rather than dying,
+# because it is called from $( ) where a die() would only kill the subshell.
+normalize_domain() {
+    local d=${1,,}
+    d=${d#http://}
+    d=${d#https://}
+    d=${d%%/*}
+    d=${d%%\?*}
+    d=${d%%:*}
+    d=${d#.}
+    d=${d%.}
+    [[ $d =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]] || return 1
+    echo "$d"
+}
+
+# Accepts 30m / 2h / 45min / 90s / a bare number of minutes. Prints seconds.
+parse_duration() {
+    local raw=${1,,} n unit
+    [[ $raw =~ ^([0-9]+)(s|m|min|h|hr)?$ ]] || die "cannot read duration '$1' — use 30m, 2h, 90s"
+    n=${BASH_REMATCH[1]}
+    unit=${BASH_REMATCH[2]:-m}
+    case "$unit" in
+    s) echo "$n" ;;
+    m | min) echo $((n * 60)) ;;
+    h | hr) echo $((n * 3600)) ;;
+    esac
+}
+
+# ---------------------------------------------------------------------- caches
+# What actually makes a toggle visible, and how fast.
+#
+#   uBlockDNS server   instant — the PUT is the change.
+#   the local client   instant, but ONLY because ublockdns.service now runs
+#                      with -token-file: the account token subscribes it to
+#                      the rules stream, and the client flushes its own cache
+#                      on every rules_version bump (run_after_18).
+#   dnsmasq            instant — it forwards to the client with cache-size=0
+#                      on helper machines (run_after_17), precisely so there
+#                      is no second cache to go stale here.
+#   systemd-resolved   this call. Without it a blocked answer sits for the
+#                      rest of its 300 s TTL and the toggle looks broken.
+#   the browser        NOT reachable from here. Chromium keeps its own host
+#                      cache; it honours TTL, so it catches up within seconds
+#                      to a minute. This is the one layer no script can flush.
+flush_caches() {
+    resolvectl flush-caches 2>/dev/null || true
+}
+
+# ------------------------------------------------------------------ read state
+# Both toggles are derived from the live config, never from a local cache:
+# the dashboard, another machine, or a hand-edited rule can change it behind
+# our back, and a panel that shows a stale switch is worse than no panel.
+fetch_config() {
+    local id
+    id=$(require_profile) || exit 1
+    api GET "/profile/$id"
+}
+
+category_is_on() { # <category> <config-json>
+    local cat=$1 cfg=$2
+    case "$cat" in
+    youtube)
+        # On iff EVERY rule of the group is present. A partial group is a
+        # half-open block (the apps still play), so it reads as off and one
+        # `on` repairs it.
+        jq -e --argjson want "$YOUTUBE_RULES" \
+            '[.custom_rules[]] as $have | $want | all(. as $r | $have | index($r) != null)' \
+            <<<"$cfg" >/dev/null
+        ;;
+    *)
+        local mv="MODULE_$cat"
+        jq -e --arg m "${!mv}" '.policy_modules[$m] == true' <<<"$cfg" >/dev/null
+        ;;
+    esac
+}
+
+# ----------------------------------------------------------------- write state
+# The one read-modify-write, shared by the category toggles and the allowlist.
+# Whole-object PUT means a blind write would clobber whatever else changed, so
+# every caller re-reads first, under flock.
+#
+# preset_id is forced to "custom": once the modules diverge from a named preset
+# the dashboard calls the profile custom, and sending back a stale preset id
+# would let the server re-derive the modules from the preset and undo us.
+mutate_config() { # <jq-program> [jq-args...]
+    local prog=$1
+    shift
+    local cfg body id
+
+    id=$(require_profile) || exit 1
+    cfg=$(fetch_config) || exit 1
+    cfg=$(jq "$@" "$prog" <<<"$cfg") || die "could not build the new config"
+
+    body=$(mktemp)
+    jq -c '{lists, custom_rules, dns_provider, preset_id: "custom", policy_modules}' <<<"$cfg" >"$body"
+    api PUT "/profile/$id" "$body" >/dev/null
+    rm -f "$body"
+    flush_caches
+}
+
+apply_category() { # <category> <on|off>
+    local cat=$1 want=$2
+
+    case "$cat" in
+    youtube)
+        if [[ $want == on ]]; then
+            # Union, order preserved, so the icloud-mask rules, the allowlist
+            # and anything added by hand in the dashboard survive untouched.
+            mutate_config '.custom_rules = (.custom_rules + ($add - .custom_rules))' \
+                --argjson add "$YOUTUBE_RULES"
+        else
+            mutate_config '.custom_rules = (.custom_rules - $drop)' \
+                --argjson drop "$YOUTUBE_RULES"
+        fi
+        ;;
+    *)
+        local mv="MODULE_$cat"
+        mutate_config '.policy_modules[$m] = $v' \
+            --arg m "${!mv}" \
+            --argjson v "$([[ $want == on ]] && echo true || echo false)"
+        ;;
+    esac
+}
+
+# Every allowed domain, one per line, read from the live config.
+allowed_domains() { # <config-json>
+    jq -r '.custom_rules[] | select(startswith("@@||")) | ltrimstr("@@||") | rtrimstr("^")' <<<"$1"
+}
+
+with_lock() {
+    mkdir -p "$STATE_DIR"
+    exec 9>"$LOCK"
+    flock -w 30 9 || die "another dns-filter run is holding the lock"
+}
+
+# ------------------------------------------------------------------- commands
+cmd_on() {
+    local cat=$1
+    is_category "$cat" || die "unknown category '$cat' — one of: ${CATEGORIES[*]}"
+    with_lock
+    clear_deadline "$cat"
+    apply_category "$cat" on
+    local lv="LABEL_$cat"
+    echo "${!lv}: blocking"
+}
+
+cmd_off() {
+    local cat=$1 dur=${2:-} secs=0
+    is_category "$cat" || die "unknown category '$cat' — one of: ${CATEGORIES[*]}"
+    # `|| exit` is load-bearing: parse_duration's die() runs in this command
+    # substitution's subshell, so without it a typo'd duration left secs empty
+    # and the unblock silently became PERMANENT — the one bug in here that
+    # fails toward "the filter is off and nobody knows".
+    if [[ -n $dur ]]; then
+        secs=$(parse_duration "$dur") || exit 1
+    fi
+
+    with_lock
+    apply_category "$cat" off
+
+    local lv="LABEL_$cat"
+    if ((secs > 0)); then
+        mkdir -p "$STATE_DIR"
+        echo $(($(date +%s) + secs)) >"$(until_file "$cat")"
+        # --on-active is the prompt path; the deadline file above is the one
+        # that survives a reboot. --collect so a failed run does not leave a
+        # dead transient unit behind to block the next one.
+        systemctl --user stop "dns-filter-restore-$cat.timer" 2>/dev/null || true
+        systemd-run --user --quiet --collect \
+            --on-active="${secs}s" \
+            --unit="dns-filter-restore-$cat" \
+            "$HOME/.dotfiles/bin/dns-filter" on "$cat" 2>/dev/null ||
+            echo "dns-filter: could not arm the restore timer — reconcile will catch it" >&2
+        echo "${!lv}: open until $(date -d "@$(deadline_of "$cat")" '+%H:%M')"
+    else
+        clear_deadline "$cat"
+        echo "${!lv}: not blocking"
+    fi
+}
+
+cmd_allow() {
+    local raw=${1:-} domain
+    [[ -n $raw ]] || die "usage: dns-filter allow <domain>"
+    domain=$(normalize_domain "$raw") || die "'$raw' does not look like a domain name"
+
+    with_lock
+    # `[$r] - .custom_rules` is empty when the rule is already there, so a
+    # repeat allow is a no-op the server does not even record.
+    mutate_config '.custom_rules = (.custom_rules + ([$r] - .custom_rules))' \
+        --arg r "@@||$domain^"
+    echo "Allowed: $domain — now beats every blocklist"
+}
+
+cmd_unallow() {
+    local raw=${1:-} domain
+    [[ -n $raw ]] || die "usage: dns-filter unallow <domain>"
+    domain=$(normalize_domain "$raw") || die "'$raw' does not look like a domain name"
+
+    with_lock
+    mutate_config '.custom_rules = (.custom_rules - [$r])' --arg r "@@||$domain^"
+    echo "No longer allowed: $domain — back to whatever the lists say"
+}
+
+cmd_allowed() {
+    local cfg list
+    cfg=$(fetch_config) || exit 1
+    list=$(allowed_domains "$cfg")
+    if [[ -z $list ]]; then
+        echo "Nothing is allowed through the blocklists."
+    else
+        echo "$list"
+    fi
+}
+
+# Re-block anything past its deadline. Cheap and side-effect-free when there
+# is nothing to do — no token, no network, no API call — which is what lets
+# the panel call it on every open.
+cmd_reconcile() {
+    local cat now due=()
+    now=$(date +%s)
+    for cat in "${CATEGORIES[@]}"; do
+        local d
+        d=$(deadline_of "$cat")
+        ((d > 0 && now >= d)) && due+=("$cat")
+    done
+    # return, NOT exit: cmd_status calls this first, and an exit here would
+    # take the whole run down before it printed anything.
+    ((${#due[@]} > 0)) || return 0
+
+    with_lock
+    for cat in "${due[@]}"; do
+        if apply_category "$cat" on; then
+            clear_deadline "$cat"
+            local lv="LABEL_$cat"
+            echo "${!lv}: time up, blocking again"
+        fi
+    done
+}
+
+cmd_status() {
+    local json=${1:-} cfg cat now rows=()
+    cmd_reconcile >/dev/null 2>&1 || true
+
+    if ! cfg=$(fetch_config 2>/tmp/dns-filter-err.$$); then
+        local err
+        err=$(tr -d '\n' </tmp/dns-filter-err.$$ | head -c 200)
+        rm -f /tmp/dns-filter-err.$$
+        if [[ $json == --json ]]; then
+            jq -cn --arg e "${err:-could not reach uBlockDNS}" \
+                '{ok:false, error:$e, categories:[], allowed:[]}'
+            exit 0
+        fi
+        die "${err:-could not reach uBlockDNS}"
+    fi
+    rm -f /tmp/dns-filter-err.$$
+
+    now=$(date +%s)
+    for cat in "${CATEGORIES[@]}"; do
+        local on until label lv
+        on=false
+        category_is_on "$cat" "$cfg" && on=true
+        until=$(deadline_of "$cat")
+        # A deadline in the past has not been enforced yet; report it as
+        # expired (0) rather than showing a countdown that already ran out.
+        ((until > 0 && until <= now)) && until=0
+        lv="LABEL_$cat"
+        label=${!lv}
+        rows+=("$(jq -cn --arg id "$cat" --arg label "$label" \
+            --argjson on "$on" --argjson until "$until" \
+            '{id:$id, label:$label, on:$on, until:$until}')")
+    done
+
+    if [[ $json == --json ]]; then
+        printf '%s\n' "${rows[@]}" |
+            jq -sc --argjson allowed "$(allowed_domains "$cfg" | jq -Rsc 'split("\n") | map(select(length > 0))')" \
+                '{ok:true, error:"", categories:., allowed:$allowed}'
+    else
+        for cat in "${CATEGORIES[@]}"; do
+            local mark until lv
+            lv="LABEL_$cat"
+            if category_is_on "$cat" "$cfg"; then mark="blocked"; else mark="open"; fi
+            until=$(deadline_of "$cat")
+            if ((until > now)); then
+                printf '%-14s %s until %s\n' "${!lv}" "$mark" "$(date -d "@$until" '+%H:%M')"
+            else
+                printf '%-14s %s\n' "${!lv}" "$mark"
+            fi
+        done
+        # An allowlist nobody can see is how a hole stays open for a year.
+        # A plain `if`, not `[[ ]] && printf`: this is the last command in the
+        # script, so the && form would exit 1 whenever nothing is allowed.
+        local allowed
+        allowed=$(allowed_domains "$cfg" | paste -sd' ' -)
+        if [[ -n $allowed ]]; then
+            printf '\nAllowed through: %s\n' "$allowed"
+        fi
+    fi
+}
+
+usage() {
+    echo "Usage: dns-filter [status [--json] | on <category> | off <category> [duration]" >&2
+    echo "                  | allow <domain> | unallow <domain> | allowed | reconcile]" >&2
+    echo "       categories: ${CATEGORIES[*]}" >&2
+}
+
+command -v jq >/dev/null 2>&1 || die "jq is required"
+
+case "${1:-status}" in
+status) cmd_status "${2:-}" ;;
+on)
+    [[ -n ${2:-} ]] || {
+        usage
+        exit 1
+    }
+    cmd_on "$2"
+    ;;
+off)
+    [[ -n ${2:-} ]] || {
+        usage
+        exit 1
+    }
+    cmd_off "$2" "${3:-}"
+    ;;
+allow) cmd_allow "${2:-}" ;;
+unallow) cmd_unallow "${2:-}" ;;
+allowed) cmd_allowed ;;
+reconcile) cmd_reconcile ;;
+-h | --help | help)
+    usage
+    exit 0
+    ;;
+*)
+    usage
+    exit 1
+    ;;
+esac

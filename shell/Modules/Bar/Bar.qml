@@ -910,6 +910,7 @@ Scope {
             "workspaces": workspacesComponent,
             "clock": clockComponent,
             "window": windowComponent,
+            "media": mediaComponent,
             "audio": audioComponent,
             "mic": micComponent,
             "network": networkComponent,
@@ -2181,6 +2182,14 @@ Scope {
         ActiveWindow {
             theme: barRoot.theme
             niri: barRoot.niri
+        }
+    }
+
+    Component {
+        id: mediaComponent
+        MediaWidget {
+            theme: barRoot.theme
+            media: barRoot.shell.media
         }
     }
 

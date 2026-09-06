@@ -12,13 +12,23 @@
 # which is precisely the failure being avoided. Qt costs nothing on this
 # machine — quickshell already pulls Qt 6 in.
 #
-# Resolved through lookPath instead of hardcoded so the file written by a
+# Since 2026-09-06 that choice is made per REQUEST rather than once here, by
+# bin/pinentry-auto. The Qt-always rule broke the headless case exactly as
+# hard as the curses-always rule broke the browser one: the agent inherits the
+# graphical session's WAYLAND_DISPLAY, so `pass` over SSH drew its dialog on
+# the NUC's own monitor and the SSH session hung until it timed out, with
+# nobody in the room to answer. pinentry-auto reads PINENTRY_USER_DATA (set to
+# `curses` for SSH sessions by fish conf.d/15-gpg.fish) and falls back to the
+# display check — so browserpass, which has neither a tty nor that variable,
+# still gets Qt.
+#
+# Resolved through a path test instead of hardcoded so the file written by a
 # background apply — which cannot sudo, so run_before_00 installed nothing —
 # still names a pinentry that EXISTS. gpg-agent pointed at a missing binary
 # does not fall back, it fails the operation, and that would break gpg for
-# everything rather than just for pass. The next terminal apply rewrites this
-# line to pinentry-qt.
-{{ if lookPath "pinentry-qt" }}pinentry-program {{ lookPath "pinentry-qt" }}{{ else }}pinentry-program /usr/bin/pinentry{{ end }}
+# everything rather than just for pass.
+{{ $auto := printf "%s/.dotfiles/bin/pinentry-auto" .chezmoi.homeDir -}}
+{{ if stat $auto }}pinentry-program {{ $auto }}{{ else if lookPath "pinentry-qt" }}pinentry-program {{ lookPath "pinentry-qt" }}{{ else }}pinentry-program /usr/bin/pinentry{{ end }}
 
 # Cache for the life of the session — 400 days, which on a machine that is
 # switched off nightly means "until the next boot".

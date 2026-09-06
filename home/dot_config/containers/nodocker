@@ -1,0 +1,10 @@
+# Quiets the podman-docker shim (2026-09-06). /usr/bin/docker, the script
+# podman-docker installs, checks for this file and /etc/containers/nodocker
+# before writing "Emulate Docker CLI using podman." to stderr on EVERY
+# invocation. Without it, anything that pipes, greps or fails a build on
+# docker's stderr sees output a real Docker would never produce — which is
+# the one thing the shim exists to avoid.
+#
+# Only existence is tested, never content, so this comment is free. The
+# per-user path is deliberate over the /etc one: it needs no root, so a
+# plain `chezmoi apply` lands it on every machine with nothing to authorize.

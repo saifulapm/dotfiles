@@ -50,7 +50,7 @@ why  = "lazygit is not in Fedora repos; this COPR builds f44 aarch64 + x86_64 (l
 name = "vicinae"
 category = "shell"
 arch = "all"
-why = "The launcher: app launch, clipboard history, script commands — replaced the in-shell Launcher/Menu/Clipboard pickers 2026-08-26. Runs as vicinae.service with --no-extension-runtime (no node); config layered via VICINAE_OVERRIDES; themed by theme-apply (vicinae-theme.toml.tmpl)"
+why = "The launcher: app launch, clipboard history, script commands — replaced the in-shell Launcher/Menu/Clipboard pickers 2026-08-26. Runs as vicinae.service; config layered via VICINAE_OVERRIDES; themed by theme-apply (vicinae-theme.toml.tmpl). Ran --no-extension-runtime until 2026-09-06, when vicinae/youtube — a real TypeScript extension, built per machine by run_after_53 — made the resident node process worth its 75-95 MB (docs/youtube-2026-09-06.md §2 weighs it against the dmenu alternative)"
 
 [[pkg]]
 name = "foot"
@@ -1013,6 +1013,18 @@ arch = "all"
 why = "Containers for Laravel/Node work; 16K-page-size validation on Asahi is a scheduled step before dev setup is called done"
 
 [[pkg]]
+name = "podman-compose"
+category = "dev"
+arch = "all"
+why = "The compose provider (user decision 2026-09-06). `podman compose` is only a dispatcher: with nothing on PATH it exits 125 with 'looking up compose provider failed', so every `docker compose` line in a project README or plan was dead on this machine even though podman itself was fine. Fedora's docker-compose (the real Go compose v2, 42 MB installed) was the alternative, and is what podman picks FIRST when both are present — the search order is docker-compose's cli-plugin paths, then docker-compose on PATH, then podman-compose (read off the 7-error message podman prints when it finds none). It was declined because it speaks only the Docker API, so it needs podman.socket lit and DOCKER_HOST exported: daemon-shaped, always-on state on a box whose whole dev-services design (below) is that nothing idles. podman-compose is 764 KB of python, drives the podman CLI directly, stays rootless and needs no socket. It does NOT provide the hyphenated `docker-compose` command — only `podman compose` and (via podman-docker) `docker compose` reach it; a project still on the v1 spelling wants the docker-compose package instead. Distinct from dev-services below: that is the standing mysql/postgres/redis/mailpit set this machine always has, this is for the compose files that ship inside a project"
+
+[[pkg]]
+name = "podman-docker"
+category = "dev"
+arch = "all"
+why = "The `docker` command name (user decision 2026-09-06). 89 KB noarch: a /usr/bin/docker shell script that execs podman, man-page links, a tmpfiles.d rule and a profile.d snippet — no daemon, no second engine, nothing left running. Earns its place because project READMEs, Makefiles and agent-written plans say `docker`, and rewriting each one to `podman` is a per-project edit redone on every fresh clone. Pairs with podman-compose above — `docker compose up` becomes `podman compose up` becomes podman-compose. The shim prints 'Emulate Docker CLI using podman…' to stderr on EVERY invocation unless a nodocker marker exists; dot_config/containers/nodocker is that marker, and without it 'runs unchanged' is false for anything that reads stderr. The shim checks $XDG_CONFIG_HOME/containers/nodocker as well as /etc/containers/nodocker (read out of the rpm's own /usr/bin/docker), which is why this needs no root and no script — an earlier run_after_54 doing a pkexec `touch /etc/containers/nodocker` was deleted the same day for that reason. What it does NOT give is a LISTENING Docker API socket: the tmpfiles.d rule does symlink %t/docker.sock to %t/podman/podman.sock, and /etc/profile.d/podman-docker.sh does export DOCKER_HOST, but both dangle until `systemctl --user enable --now podman.socket` actually creates the socket — deliberately not enabled, because nothing here dials it yet. Note the profile.d half never fires on this machine anyway: the login shell is fish, which does not source /etc/profile.d/*.sh, so DOCKER_HOST would have to be set in fish/conf.d if a testcontainers-style tool ever needs it"
+
+[[pkg]]
 name = "just"
 category = "dev"
 arch = "all"
@@ -1595,7 +1607,7 @@ why  = "Screenshot + annotation overlay (user ask 2026-08-11, tobi's omasnap por
 [[tool]]
 name = "node"
 via  = "mise install node — version pinned as node = \"lts\" in the chezmoi-managed ~/.config/mise/config.toml (run_after_03-dev-toolchain.sh)"
-why  = "Node runtime, version-managed per decision 2026-08-05; .nvmrc/.node-version detection enabled there too (mise disables idiomatic version files by default)"
+why  = "Node runtime, version-managed per decision 2026-08-05; .nvmrc/.node-version detection enabled there too (mise disables idiomatic version files by default). SECOND, NON-DEVELOPMENT CONSUMER since 2026-09-06: vicinae's TypeScript extension runtime. vicinae.service dropped --no-extension-runtime for vicinae/youtube, and the server starts ~/.local/share/mise/shims/node as a resident extension manager (75-95 MB RSS measured) — so node is no longer only a thing projects need, it is a desktop dependency, and a machine where `mise install node` failed loses the YouTube commands from the launcher"
 
 [[tool]]
 name = "pnpm"
@@ -2055,8 +2067,8 @@ why  = "laravel new <app> scaffolder (user decision 2026-08-07, Herd workflow pa
 
 [[tool]]
 name = "prebuilt-binaries"
-via  = "run_after_10-prebuilt-binaries.sh — GitHub release binaries into ~/.local/bin: watchexec, hurl, cloudflared, stripe, ouch (added 2026-08-07 for the yazi config port — its cargo build needs libclang, so the release binary is the mechanism), usql (added 2026-08-07 for the mac config port — the regular not _static variant: common drivers at half the size; linux-arm64 asset verified against the GitHub API. dprint deliberately NOT here: it is already a pnpm global via run_after_08. aichat + yek removed 2026-08-07: aichat dropped from the port, yek existed only as its git document loader), jj + witr (added 2026-08-08, user picks off the new-tooling sweep — see the two notes below), yazi + ya (moved here off COPR lihaohong/yazi 2026-08-18 — see the note below)"
-why  = "Fedora packages none of these; all ship both aarch64 and x86_64 linux release assets (asset names verified against the GitHub API 2026-08-07, jj/witr 2026-08-08, yazi 2026-08-18). Chosen over cargo builds for the heavy ones (hurl needs libxml)"
+via  = "run_after_10-prebuilt-binaries.sh — GitHub release binaries into ~/.local/bin: watchexec, hurl, cloudflared, stripe, ouch (added 2026-08-07 for the yazi config port — its cargo build needs libclang, so the release binary is the mechanism), usql (added 2026-08-07 for the mac config port — the regular not _static variant: common drivers at half the size; linux-arm64 asset verified against the GitHub API. dprint deliberately NOT here: it is already a pnpm global via run_after_08), aichat + yek (removed 2026-08-07, RESTORED 2026-09-06 on the user's ask — aichat is back as a full config port, yek is its `git:` document loader and exists for nothing else; assets re-verified against the GitHub API that day, aichat v0.30.0 musl and mohsen1/yek v0.25.5 gnu, bodo-run/yek being a redirect the API follows only with -L), jj + witr (added 2026-08-08, user picks off the new-tooling sweep — see the two notes below), yazi + ya (moved here off COPR lihaohong/yazi 2026-08-18 — see the note below)"
+why  = "Fedora packages none of these; all ship both aarch64 and x86_64 linux release assets (asset names verified against the GitHub API 2026-08-07, jj/witr 2026-08-08, yazi 2026-08-18, aichat/yek 2026-09-06). Chosen over cargo builds for the heavy ones (hurl needs libxml, aichat a full TLS stack)"
 
 # jj (Jujutsu) v0.44.0 — git-compatible VCS. Taken as an ADDITION to git, not a
 # replacement: since 0.39 `jj git init --colocate` is the default, so it drives
@@ -2144,6 +2156,11 @@ why  = "The four extensions the mac run.sh documents: stacked PRs, workflow stat
 name = "kakoune"
 via  = "run_after_11-kakoune-fork.sh — clone github.com/saifulapm/kakoune into ~/.local/src/kakoune, make -C src, install to ~/.local (bin/kak + share/kak)"
 why  = "The user's own fork with built-in treesitter — NOT Fedora's kakoune package, which would fight it on PATH and lacks the treesitter integration the kak config's ts_* faces feed"
+
+[[tool]]
+name = "kak-ansi"
+via  = "run_after_52-kak-ansi.sh — clone github.com/eraserhd/kak-ansi into ~/.local/src/kak-ansi (default branch is `develop`, not master), make, install kak-ansi-filter to ~/.local/bin. No new packages: gcc-c++ and make are already declared for the kakoune fork. `just update-all` rolls it forward through the source-build sweep (added 2026-09-06)"
+why  = "The helper binary kak/autoload/tools/ansi.kak has always called — it hardcodes ~/.local/bin/kak-ansi-filter — and which nothing on this machine ever installed, so ansi-render was a silent no-op and colored output arrived as literal \\e[0;32m. tools/fifo.kak calls ansi-enable on every fifo buffer, so this is what makes the aichat, make, grep, composer and php-artisan wrappers readable. Built from source because upstream ships no release binaries at all: one C file, a two-line Makefile, nothing to link against. The mac ran the same build by hand from .dotfiles/scripts/kak-ansi.sh (clone to /tmp, cp, rm -rf); the checkout is kept here instead, because a throwaway clone can never be rolled forward"
 
 [[tool]]
 name = "oma-apps"

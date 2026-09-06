@@ -1,0 +1,267 @@
+#!/usr/bin/env bash
+# youtube — search YouTube and hand the result to a player, from anywhere.
+#
+# The engine behind the vicinae extension in vicinae/youtube (a yeetube port:
+# type a query, pick from a list of real results, press Enter, watch). Every
+# capability lives HERE rather than in the extension's TypeScript, for the
+# reason the rest of this repo puts its logic in bin/: the extension is one
+# face on it. `youtube search gotye | jq` works in a terminal with the vicinae
+# server stopped, which is what makes this debuggable at all — a bad search is
+# a bad yt-dlp invocation, and you can see it.
+#
+# WHY A SEARCH URL AND NOT ytsearch:. `yt-dlp "ytsearch20:query"` is the
+# obvious spelling and it is what bin/music uses, but it can only ever return
+# YouTube's default relevance ordering of videos. The results page takes an
+# &sp= filter code — an opaque base64 protobuf — that selects the sort AND the
+# result type, and yt-dlp passes the whole URL through to InnerTube untouched.
+# VERIFIED 2026-09-06, because "the parameter is accepted" and "the parameter
+# is honoured" are different claims: sp=EgIQAg== returns channels where the
+# same query returns videos, sp=EgIQAw== returns playlists, and the view-count
+# sort puts a 699M-view video first where relevance opens with 4M. One code
+# path for all seven filters, and ytsearch: is then never needed.
+#
+# WHY --flat-playlist. The search page already carries title, channel,
+# duration, view count and a thumbnail for every hit; without the flag yt-dlp
+# would visit all twenty watch pages to re-derive what it was just handed.
+# 2 s versus a minute, and nothing here needs a format list — mpv resolves the
+# stream itself at play time, by which point the user has chosen one video.
+#
+# WHY BOTH PLAYERS ARE MPV. `audio` was meant to be bin/music — cliamp owns
+# the MPRIS name the bar and the media keys talk to, and it queues rather than
+# interrupting, which is what you want for a song. It cannot: cliamp fails to
+# resolve YouTube on this machine (see cmd_audio, measured). mpv-mpris is
+# installed, so an audio-only mpv keeps the media-key and bar integration and
+# loses only the queue, and cmd_audio records the one-line swap back.
+#
+#   youtube search <query> [--limit N] [--offset N] [--filter F]
+#   youtube channel <url> [--limit N] [--offset N]
+#   youtube play <url> [title]        video, in mpv
+#   youtube audio <url> [title]       audio only, in mpv (single slot)
+#   youtube download <url> [--audio]  into ~/Videos (or ~/Music)
+#
+# search/channel print ONE json array on stdout — see to_json() for the shape.
+# --filter is one of: relevance date views rating live playlist channel.
+set -euo pipefail
+
+export PATH="$HOME/.dotfiles/bin:$HOME/.local/bin:$PATH"
+
+QUALITY="${YOUTUBE_QUALITY:-1080}"
+
+die() {
+  echo "youtube: $*" >&2
+  exit 1
+}
+
+usage() {
+  sed -n '/^#   youtube search/,/^#   youtube download/p' "$0" | sed 's/^#   /  /'
+}
+
+# YouTube's own filter codes, as they appear in the &sp= of a results URL.
+# The four sorts also pin the type to "video", which is why sorting and
+# filtering are one option here rather than two that could contradict.
+filter_code() {
+  case "$1" in
+  relevance) echo 'CAASAhAB' ;;
+  date) echo 'CAISAhAB' ;;
+  views) echo 'CAMSAhAB' ;;
+  rating) echo 'CAESAhAB' ;;
+  live) echo 'EgJAAQ%3D%3D' ;;
+  playlist) echo 'EgIQAw%3D%3D' ;;
+  channel) echo 'EgIQAg%3D%3D' ;;
+  *) return 1 ;;
+  esac
+}
+
+# A search result is one of three things and the caller has to be able to tell
+# them apart: a video plays, a playlist plays as a queue, a channel opens.
+# yt-dlp's own discriminator is ie_key — "Youtube" for a watch page,
+# "YoutubeTab" for anything with a tab bar — and the /playlist? in the URL
+# splits that second group.
+#
+# `.thumbnails[-1]` is the largest YouTube offered; empty arrays and absent
+# fields are normalised to null so the consumer only checks for one thing.
+to_json() {
+  jq -s '[ .[] | {
+    kind: (
+      if .ie_key == "YoutubeTab" then
+        (if (.url // "") | test("/playlist\\?") then "playlist" else "channel" end)
+      else "video" end
+    ),
+    id: .id,
+    url: .url,
+    title: (.title // "Untitled"),
+    channel: (.channel // .uploader),
+    channelUrl: (.channel_url // .uploader_url),
+    duration: .duration,
+    views: .view_count,
+    live: (.live_status == "is_live"),
+    subscribers: .channel_follower_count,
+    description: .description,
+    thumbnail: (.thumbnails // [] | if length > 0 then .[-1].url else null end)
+  } ]'
+}
+
+# One request, whatever the caller is listing. --ignore-errors so a single
+# unavailable entry cannot empty the whole page, and stderr is kept (not
+# routed to /dev/null) so a genuine breakage — yt-dlp aging out against a
+# YouTube change is the standing risk here — is visible to whoever ran this.
+#
+# yt-dlp's exit status is deliberately ignored: with --ignore-errors it
+# reports failure for a skipped entry as readily as for a dead search, and
+# the honest test of "did this work" is whether any JSON came back.
+fetch() {
+  local url="$1" limit="$2" offset="$3" out
+  out="$(yt-dlp --flat-playlist --dump-json --no-warnings --ignore-errors \
+    --playlist-start "$((offset + 1))" --playlist-end "$((offset + limit))" \
+    -- "$url" 2>/dev/null || true)"
+  [[ -n $out ]] || { echo '[]'; return 0; }
+  to_json <<<"$out"
+}
+
+cmd_search() {
+  local limit=20 offset=0 filter=relevance query=() code encoded
+  while (($# > 0)); do
+    case "$1" in
+    --limit) limit="$2"; shift 2 ;;
+    --offset) offset="$2"; shift 2 ;;
+    --filter) filter="$2"; shift 2 ;;
+    --) shift; query+=("$@"); break ;;
+    *) query+=("$1"); shift ;;
+    esac
+  done
+
+  ((${#query[@]} > 0)) || die "search needs a query"
+  code="$(filter_code "$filter")" || die "unknown filter: $filter"
+  # @uri, not manual escaping: a query is arbitrary text and "R&B" would
+  # otherwise close the parameter and drop everything after the ampersand.
+  encoded="$(jq -rn --arg q "${query[*]}" '$q|@uri')"
+
+  fetch "https://www.youtube.com/results?search_query=${encoded}&sp=${code}" "$limit" "$offset"
+}
+
+cmd_channel() {
+  local limit=20 offset=0 url=""
+  while (($# > 0)); do
+    case "$1" in
+    --limit) limit="$2"; shift 2 ;;
+    --offset) offset="$2"; shift 2 ;;
+    *) url="$1"; shift ;;
+    esac
+  done
+
+  [[ -n $url ]] || die "channel needs a channel url"
+  # A channel URL alone resolves to the Home tab, which is a curated set of
+  # shelves rather than a list of videos; /videos is the plain reverse
+  # chronological upload list this wants.
+  [[ $url == *"/videos" ]] || url="${url%/}/videos"
+
+  fetch "$url" "$limit" "$offset"
+}
+
+# THE PLAYER CLIENT PIN IS LOAD-BEARING, not tuning. mpv's ytdl hook lets
+# yt-dlp pick its own default client and that default does not work from this
+# machine: MEASURED 2026-09-06, an unpinned mpv dies on every video with
+# "Unable to download API page: [SSL: TLSV1_ALERT_INTERNAL_ERROR]" while the
+# same yt-dlp resolves the same URL fine on its own — so it is the client, not
+# the network. web_embedded plays. This is the SECOND time this exact pin has
+# been needed here: packages/manifest.toml's [[tool]] dekho entry records it
+# for the trailer path in 2026-08-20 (there the symptom was a 403 rather than
+# a TLS alert, and `tv`, `ios` and `web` were ruled out alongside the
+# default). When playback breaks, re-test the pin before anything else.
+YTDL_CLIENT='youtube:player_client=web_embedded'
+
+cmd_play() {
+  local url="${1:-}" title="${2:-}"
+  [[ -n $url ]] || die "play needs a url"
+
+  notify-send -a qshell "󰗃 Playing" "${title:-$url}" >/dev/null 2>&1 || true
+
+  # app-run, not a bare mpv: this is normally called from vicinae's extension
+  # runtime, and a child of that dies with it. As its own transient unit under
+  # app-graphical.slice the film outlives a launcher restart — the same reason
+  # bin/dekho-play records at length for the shell.
+  #
+  # --force-window=immediate because resolving a YouTube stream takes seconds
+  # and a player that shows nothing in the meantime reads as a failed click.
+  # The height cap is a ?-prefixed soft constraint, so a video that has no
+  # stream at or below it still plays at whatever it does have.
+  exec app-run mpv \
+    --force-window=immediate \
+    --ytdl-format="bestvideo[height<=?${QUALITY}]+bestaudio/best" \
+    --ytdl-raw-options=extractor-args="$YTDL_CLIENT" \
+    -- "$url"
+}
+
+cmd_audio() {
+  local url="${1:-}" title="${2:-}"
+  [[ -n $url ]] || die "audio needs a url"
+
+  # WHY NOT CLIAMP, which is where `music <url>` would put this and which owns
+  # the MPRIS name the bar and the media keys already talk to: cliamp cannot
+  # resolve YouTube on this machine. MEASURED 2026-09-06 — `music <url>` on
+  # both a music video and a conference talk leaves the player at "No tracks
+  # loaded" with `ERR: resolving youtube …` in its own UI, so the URL never
+  # reaches a playlist at all. That is the yt-dlp/cookies breakage
+  # packages/manifest.toml's [[pkg]] yt-dlp entry has recorded since
+  # 2026-08-18, not something this script can route around.
+  #
+  # mpv loses the queue and the library, and keeps the rest: mpv-mpris is
+  # installed, so an audio-only mpv still exports org.mpris.MediaPlayer2.mpv
+  # and the bar's media widget and the XF86Audio* keys drive it exactly as
+  # they drive cliamp. When cliamp's YouTube resolution comes back, `exec
+  # music "$url"` is the one-line swap that undoes this.
+  notify-send -a qshell "󰎇 Playing audio" "${title:-$url}" >/dev/null 2>&1 || true
+
+  # A FIXED UNIT NAME, unlike the video path: a second video window beside the
+  # first is a normal thing to want, two songs playing over each other never
+  # is. Stopping the previous unit first makes audio a single slot — the same
+  # "one playback at a time" bin/dekho-play enforces for films. That is also
+  # why this cannot go through app-run, which deliberately randomises the unit
+  # name so launches never collide.
+  systemctl --user stop youtube-audio.service >/dev/null 2>&1 || true
+  exec systemd-run --user --quiet --collect \
+    --slice=app-graphical.slice --unit=youtube-audio \
+    -- mpv --no-video --ytdl-format="bestaudio/best" \
+    --ytdl-raw-options=extractor-args="$YTDL_CLIENT" \
+    -- "$url"
+}
+
+cmd_download() {
+  local url="" audio=0
+  while (($# > 0)); do
+    case "$1" in
+    --audio) audio=1; shift ;;
+    *) url="$1"; shift ;;
+    esac
+  done
+  [[ -n $url ]] || die "download needs a url"
+
+  # bin/chromium-ytdlp-host is already this machine's yt-dlp download worker —
+  # OSD progress bar, the forged-filename guard on the printed path, and a
+  # clickable completion toast that opens the file. Its name is where it came
+  # from (the browser extension's native messaging host), not what it can do,
+  # and its --download half takes a URL from anywhere. Reusing it is the whole
+  # reason downloads here are one line instead of a second copy of that logic.
+  # setsid -f so the download outlives whatever asked for it, exactly as the
+  # native messaging host detaches its own worker.
+  if ((audio)); then
+    setsid -f env "QSHELL_YTDLP_DIR=${QSHELL_YTDLP_AUDIO_DIR:-$HOME/Music}" \
+      chromium-ytdlp-host --download "$url" --audio >/dev/null 2>&1
+  else
+    setsid -f chromium-ytdlp-host --download "$url" >/dev/null 2>&1
+  fi
+}
+
+for dep in yt-dlp jq; do
+  command -v "$dep" >/dev/null 2>&1 || die "$dep not found on PATH"
+done
+
+case "${1:-}" in
+-h | --help | help | "") usage ;;
+search) shift; cmd_search "$@" ;;
+channel) shift; cmd_channel "$@" ;;
+play) shift; cmd_play "$@" ;;
+audio) shift; cmd_audio "$@" ;;
+download) shift; cmd_download "$@" ;;
+*) die "unknown command: $1 (try --help)" ;;
+esac

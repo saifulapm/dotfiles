@@ -1,0 +1,21 @@
+[Unit]
+Description=Periodic check for expired uBlockDNS unblocks
+
+# The backstop behind `dns-filter off <category> <duration>`, which arms a
+# transient systemd-run timer for the restore. That timer does not survive a
+# reboot, a logout, or a suspend straight through its deadline — and the way
+# this fails is the wrong way round: the category stays OPEN. The deadline
+# file under ~/.local/state/dns-helper is the real record, and `reconcile`
+# enforces it, so the worst case becomes "a few minutes late" instead of
+# "until somebody notices".
+#
+# Costs nothing when there is nothing to do: with no deadline file on disk,
+# reconcile exits before it reads a token or opens a socket. The panel calls
+# it too, on every open.
+[Timer]
+OnStartupSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,47 @@
+#!/bin/bash
+# gpg-unlock — prime gpg-agent's passphrase cache, so everything that quietly
+# depends on `pass` starts working: imapnotify@icloud, mbsync via
+# mail-sync.timer, msmtp's passwordeval, browserpass, bin/dns-filter's token.
+#
+# WHY IT EXISTS. The agent's cache is memory-only and dies with the session
+# (see gpg-agent.conf), so a machine that has just been powered on has a LOCKED
+# agent and every one of those is failing until a human types the passphrase
+# once. On a machine with a screen that happens by itself — imapnotify draws
+# pinentry about half a second into the graphical session. On a headless box
+# nobody ever answers it, and the failures are silent.
+#
+# So the fish config calls this on interactive SSH login (conf.d/15-gpg.fish),
+# which is the only place left to ask. Run it by hand any time.
+#
+# There is no "unlock" verb in gpg — a key is cached as a side effect of being
+# used — so this decrypts one entry from the store and throws the plaintext
+# away. Any entry primes the same key.
+set -uo pipefail
+
+STORE="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
+
+[ -d "$STORE" ] || exit 0
+command -v gpg >/dev/null 2>&1 || exit 0
+
+# Any entry will do — they share one key. `head -1` closes the pipe on the
+# first hit, so a big store costs no more than a small one.
+entry=$(find "$STORE" -name '*.gpg' -type f 2>/dev/null | head -1)
+[ -n "$entry" ] || exit 0
+
+# --pinentry-mode=error makes gpg FAIL instead of prompting, which is how this
+# asks "is it already cached?" without drawing anything. Silent success here is
+# the common case and the whole reason the login hook is cheap.
+if gpg --batch --quiet --no-tty --pinentry-mode=error --decrypt "$entry" >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Locked. Say so before the prompt appears, because an unexplained passphrase
+# box on login is alarming, and make the escape hatch obvious.
+echo "gpg-agent is locked — unlock it to start mail, pass and the filters (Ctrl-C to skip)." >&2
+if gpg --quiet --decrypt "$entry" >/dev/null 2>&1; then
+    echo "gpg-agent unlocked." >&2
+    exit 0
+fi
+
+echo "gpg-agent still locked." >&2
+exit 1

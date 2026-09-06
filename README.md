@@ -163,6 +163,9 @@ after the first apply.
   matching wallpapers live in our own `saifulapm/wallpapers` repo and land in
   `~/.local/share/qshell/backgrounds` (plus your own `~/Pictures/Wallpapers`).
 - `templates/` — theme fan-out targets (foot, GTK, niri, yazi, tmux, oma).
+- `vicinae/` — TypeScript source for the vicinae extensions, one directory
+  each. Not chezmoi-managed: `run_after_53-vicinae-extensions.sh` builds each
+  into `~/.local/share/vicinae/extensions/` with `vici build`.
 - `bench/` — measured numbers from `just bench`; performance is the product.
 - `docs/` — one dated note per non-obvious change, with the measurements and
   the decisions that did not survive contact.

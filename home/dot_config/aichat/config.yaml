@@ -1,0 +1,167 @@
+# pxy is the only client: the local LLM proxy (packages/manifest.toml: pxy)
+# that every agent CLI on this machine already speaks to on 127.0.0.1:4100.
+# The mac's five direct clients (github/jina/cloudflare/openrouter/groq) are
+# deliberately NOT here — each needed an API key, and pxy holds those in the
+# pass store instead, so nothing secret has to reach this public repo.
+# `general` matches pxy's own [launch] default.
+model: pxy:general
+
+# ---- behavior ----
+stream: true
+save: true
+keybindings: vi
+wrap: 150
+
+# ---- function-calling ----
+# GONE, deliberately (user decision 2026-09-06). The whole functions/ tree —
+# the vendored sigoden/llm-functions checkout, its 25 tools and 8 agents — was
+# deleted with it, so there is no functions_dir for aichat to read and nothing
+# for function_calling, mapping_tools or use_tools to name.
+#
+# It had never worked on this machine in any case: declarations live in
+# functions/functions.json, which is `argc build` output from a gitignored
+# tools.txt, and argc left cargo-tools in f487249. Restoring it would mean
+# putting argc back, writing tools.txt and running the build — and the three
+# custom agents (laravel, shopify, shadcn) are in git history at f65c173 if
+# they are ever wanted again.
+
+# ---- session ----
+save_session: true
+compress_threshold: 100000  # under pxy:general's 128K, leaving room for the summary
+summarize_prompt: 'Create a concise summary of our conversation focusing on key topics, decisions, and any ongoing tasks or context that should be preserved for future reference. Keep it under 300 words.'
+summary_prompt: 'Previous conversation summary: '
+
+# ---- RAG ----
+# See [RAG-Guide](https://github.com/sigoden/aichat/wiki/RAG-Guide) for more details.
+# pxy serves /v1/embeddings too (src/server.rs), so RAG works — it is only the
+# mac's github:text-embedding-3-large that had to go with its client.
+#
+# Note these models are INVISIBLE in `aichat --list-models` and in pxy's own
+# /v1/models: pxy deliberately keeps embedding ids out of the chat catalog
+# (config.rs, "kept out of the chat catalog"). The list is in pxy's
+# config.toml under each provider's `embedding_models`, not discoverable from
+# the API, which is why the working ones are written down in `clients` below.
+rag_embedding_model: pxy:tencent/kinfra-text-embedding-4b
+rag_reranker_model: null         # Specifies the reranker model used for sorting retrieved documents
+rag_top_k: 8                     # Specifies the number of documents to retrieve for answering queries
+rag_chunk_size: 2000             # Defines the size of chunks for document processing in characters
+rag_chunk_overlap: 200          # Defines the overlap between chunks
+# Defines the query structure using variables like __CONTEXT__ and __INPUT__ to tailor searches to specific needs
+rag_template: |
+  Answer the query based on the context while respecting the rules. (user query, some textual context and rules, all inside xml tags)
+
+  <context>
+  __CONTEXT__
+  </context>
+
+  <rules>
+  - If you do not know, just say so.
+  - If you are not sure, ask for clarification.
+  - Answer in the same language as the user query.
+  - If the context appears unreadable or of poor quality, tell the user then answer as best as you can.
+  - If the answer is not in the context but you think you know the answer, explain that to the user then answer with your own knowledge.
+  - Answer directly and without using xml tags.
+  </rules>
+
+  <user_query>
+  __INPUT__
+  </user_query>
+
+# Define document loaders to control how RAG and `.file`/`--file` load files of specific formats.
+document_loaders:
+  pdf: 'pdftotext $1 -'
+  docx: 'pandoc --to plain $1'
+  pptx: 'pandoc --to plain $1'                  # PowerPoint presentations
+  odt: 'pandoc --to plain $1'                   # OpenDocument text
+  rtf: 'pandoc --to plain $1'                   # Rich Text Format
+  xlsx: 'pandoc --to plain $1'                  # Excel files
+  csv: 'cat $1'                                 # CSV files (already text)
+  json: 'cat $1'                                # JSON files
+  yaml: 'cat $1'                                # YAML files
+  yml: 'cat $1'                                 # YAML files
+  html: 'pandoc --to plain $1'                  # HTML files
+  htm: 'pandoc --to plain $1'                   # HTML files
+  xml: 'pandoc --to plain $1'                   # XML files
+  md: 'cat $1'                                  # Markdown (already text)
+  jpg: 'tesseract $1 stdout'
+  jpeg: 'tesseract $1 stdout'
+  png: 'tesseract $1 stdout'
+  # the mac's `jina:` URL loader is dropped with the jina client — it carried
+  # the key in the header, and there is no key here.
+  git: >
+    sh -c "yek $1 --json | jq '[.[] | { path: .filename, contents: .content }]'"
+
+# ---- apperence ----
+highlight: true
+theme: dark
+
+# ---- misc ----
+save_shell_history: true
+sync_models_url: https://raw.githubusercontent.com/sigoden/aichat/refs/heads/main/models.yaml
+
+# The chat models are pxy's five routing GROUPS, not individual models: a group
+# is the whole point of the proxy — it fails over free-first down an ordered
+# list of ~30 providers, so pinning `pxy:opencode-go/glm-5.3-flash` would throw
+# the quota handling away. Pinning still WORKS when it is wanted, though: pxy
+# serves every id it routes to, and aichat happily sends an undeclared model
+# name (verified 2026-09-06 — `-m pxy:opencode-go/glm-5.3-flash` answered).
+#
+# Declared inline because aichat resolves model metadata from its registry by
+# client name, and `pxy` is not in upstream's models.yaml. Chat sizes are what
+# /v1/models reports. supports_vision is left off: a group can land on any
+# provider in its list and most are text-only.
+#
+# The embedding models are the ones pxy's config.toml actually has keys for,
+# and they carry their MEASURED batch ceiling (all probed 2026-09-06 against
+# the live daemon). That number is the load-bearing one: aichat batches chunks
+# when building a RAG, and alibaba rejects anything over 10 with a 400 —
+# `batch size is invalid, it should not be larger than 10` — which would fail
+# an index part-way through rather than at the first request. tencent and
+# nvidia both took 100. tencent-vl's two multimodal ids are deliberately not
+# here; they are a different job.
+clients:
+- type: openai-compatible
+  name: pxy
+  api_base: http://127.0.0.1:4100/v1
+  api_key: pxy-local                              # [server].api_key in pxy's config.toml, not a secret
+  models:
+    - name: general                               # pxy's own [launch] default
+      max_input_tokens: 128000
+      max_output_tokens: 16384
+      supports_function_calling: true
+    - name: credit
+      max_input_tokens: 1000000
+      max_output_tokens: 8192
+      supports_function_calling: true
+    - name: plans
+      max_input_tokens: 128000
+      max_output_tokens: 16384
+      supports_function_calling: true
+    - name: promo
+      max_input_tokens: 262144
+      max_output_tokens: 16384
+      supports_function_calling: true
+    - name: quota
+      max_input_tokens: 512000
+      max_output_tokens: 16384
+      supports_function_calling: true
+    # tencent — the rag_embedding_model default: widest vector (2560), batch
+    # 100, and its provider budget is a token pool rather than a request rate.
+    - name: tencent/kinfra-text-embedding-4b
+      type: embedding
+      max_tokens_per_chunk: 8192
+      default_chunk_size: 2000
+      max_batch_size: 100
+    # nvidia — 2048 dims, batch 100. Its provider carries rpm = 40, which a
+    # large index can reach; batches of 100 keep the request count low.
+    - name: nvidia/nvidia/nemotron-3-embed-1b
+      type: embedding
+      max_tokens_per_chunk: 8192
+      default_chunk_size: 2000
+      max_batch_size: 100
+    # alibaba — 1024 dims. TEN, not 100: measured, see the note above.
+    - name: alibaba/text-embedding-v4
+      type: embedding
+      max_tokens_per_chunk: 8192
+      default_chunk_size: 2000
+      max_batch_size: 10

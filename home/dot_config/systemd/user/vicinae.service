@@ -1,10 +1,26 @@
 [Unit]
 Description=Vicinae launcher daemon (qshell-managed)
 # Shadows the packaged /usr/lib/systemd/user/vicinae.service: ours is
-# session-scoped like every other desktop unit here, runs without the
-# TypeScript extension runtime (no resident node process — the only
-# extensions in use are native: apps, clipboard, script commands), and
-# layers declarative config over whatever the GUI writes to settings.json.
+# session-scoped like every other desktop unit here, and layers declarative
+# config over whatever the GUI writes to settings.json.
+#
+# --no-extension-runtime WAS here until 2026-09-06, and the reason it was is
+# still true: the runtime is a resident node process, MEASURED at 75-95 MB
+# RSS, and for as long as every extension in use was native (apps, clipboard,
+# script commands) it bought nothing. vicinae/youtube changed the arithmetic —
+# a result list with thumbnails, a live search and an action panel is a
+# TypeScript extension or it is nothing, and vicinae's dmenu (the zero-node
+# alternative, and what bin/menu-select uses) takes plain newline text with no
+# per-row icon or metadata at all. docs/youtube-2026-09-06.md §2 has the
+# comparison. Turn the flag back on and the launcher keeps working; the two
+# YouTube commands simply stop being listed.
+#
+# node itself comes from mise (~/.local/share/mise/shims/node, on the user
+# manager's PATH via niri-session's import-environment), so it is whatever
+# `node = "lts"` in ~/.config/mise/config.toml currently resolves to. Not
+# pinned with VICINAE_NODE_BIN deliberately: vicinae already finds it, and a
+# variable naming a path that a mise change could invalidate is a new way to
+# break rather than a guard against one.
 PartOf=graphical-session.target
 After=graphical-session.target
 Requisite=graphical-session.target
@@ -12,7 +28,7 @@ Requisite=graphical-session.target
 [Service]
 Type=simple
 Slice=session.slice
-ExecStart=/usr/bin/vicinae server --replace --no-extension-runtime
+ExecStart=/usr/bin/vicinae server --replace
 # overrides.json (chezmoi-managed) then the theme-generated fragment
 # (bin/theme-apply): later files win, so the active theme's font/rounding
 # ride on top of the static config.
