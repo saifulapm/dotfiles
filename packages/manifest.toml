@@ -2146,6 +2146,11 @@ via  = "run_after_11-kakoune-fork.sh — clone github.com/saifulapm/kakoune into
 why  = "The user's own fork with built-in treesitter — NOT Fedora's kakoune package, which would fight it on PATH and lacks the treesitter integration the kak config's ts_* faces feed"
 
 [[tool]]
+name = "kak-ansi"
+via  = "run_after_52-kak-ansi.sh — clone github.com/eraserhd/kak-ansi into ~/.local/src/kak-ansi (default branch is `develop`, not master), make, install kak-ansi-filter to ~/.local/bin. No new packages: gcc-c++ and make are already declared for the kakoune fork. `just update-all` rolls it forward through the source-build sweep (added 2026-09-06)"
+why  = "The helper binary kak/autoload/tools/ansi.kak has always called — it hardcodes ~/.local/bin/kak-ansi-filter — and which nothing on this machine ever installed, so ansi-render was a silent no-op and colored output arrived as literal \\e[0;32m. tools/fifo.kak calls ansi-enable on every fifo buffer, so this is what makes the aichat, make, grep, composer and php-artisan wrappers readable. Built from source because upstream ships no release binaries at all: one C file, a two-line Makefile, nothing to link against. The mac ran the same build by hand from .dotfiles/scripts/kak-ansi.sh (clone to /tmp, cp, rm -rf); the checkout is kept here instead, because a throwaway clone can never be rolled forward"
+
+[[tool]]
 name = "oma-apps"
 via  = "run_after_13-oma-apps.sh — clone omacom-io/{omacalc,omawrite,omacut}, sed the two omarchy theme-path literals in src/backend.cpp to ~/.local/state/qshell/oma-theme.toml, qmake6 + make, install to ~/.local/bin"
 why  = "Omarchy's Qt Quick calculator, writing app and video trimmer (user decision 2026-08-07, all three). MIT-licensed. omacalc and omawrite watch a 5-key colors.toml (mode/background/foreground/accent/selection) and re-tint live; templates/oma-theme.toml.tmpl emits exactly that file from the active theme on every theme-apply, so they follow this desktop's theme system natively. omacut has no theme-watch code at its pinned revision (verified 2026-08-07 — the sed is a harmless no-op there; re-check on upstream bumps). omacut's export hardcodes libx264, so it needs the RPM Fusion ffmpeg (entry above) — with that in place it builds fully unpatched"
