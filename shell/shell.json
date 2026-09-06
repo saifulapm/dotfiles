@@ -25,7 +25,8 @@
     "left": [
       "launcher",
       "workspaces",
-      "window"
+      "window",
+      "media"
     ],
     "center": [
       "indicators",

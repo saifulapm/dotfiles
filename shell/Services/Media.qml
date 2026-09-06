@@ -30,7 +30,7 @@ import "MediaModel.js" as MediaModel
 // surface keeps our `stop` verb — niri's XF86AudioStop bind predates this
 // service and keeps working.
 //
-// THE BAR WIDGET THIS USED TO FEED IS GONE (2026-08-18): Media.qml and
+// THE BAR WIDGET THIS USED TO FEED WAS GONE (2026-08-18): Media.qml and
 // MediaPanel.qml were removed with bin/radio and bin/music when cliamp became
 // the music player, and the service was deliberately kept. It has three other
 // consumers, all of which would have broken with it — every XF86Audio* bind
@@ -39,6 +39,14 @@ import "MediaModel.js" as MediaModel
 // activePlayer straight off this ladder. Nothing here knows or cares that the
 // player answering is now usually cliamp; to this layer it is one more MPRIS
 // name beside a browser tab and mpv.
+//
+// A FOURTH CONSUMER SINCE 2026-09-06, and a partial reversal of that removal:
+// Modules/Bar/widgets/MediaWidget.qml, which reads hasMedia/title/artist and
+// calls runAction and stopPlayback. The 2026-08-18 argument was that cliamp
+// has its own window, so a bar row said nothing new — and bin/youtube's
+// `audio` verb is `mpv --no-video`, a player with NO window, which that
+// argument never covered. The new widget is narrower on purpose: no art, no
+// progress, no panel, and no bar space at all unless something is playing.
 QtObject {
     id: root
 
