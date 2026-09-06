@@ -13,7 +13,7 @@
 
 # The vendor command a new agent runs. claude is amx's own default; it is here
 # to be found, not because it differs.
-agent = "claude"
+agent = "pi"
 
 # How many live agents `new` allows before it refuses. Five panes is about what
 # fits a screen worth watching, and the refusal is the point — the limit exists
