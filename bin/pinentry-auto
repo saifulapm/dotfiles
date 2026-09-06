@@ -1,0 +1,45 @@
+#!/bin/sh
+# pinentry-auto — hand gpg-agent a passphrase prompt that can actually be seen
+# from wherever the request came from. Named by
+# home/private_dot_gnupg/private_gpg-agent.conf.tmpl as pinentry-program.
+#
+# THE PROBLEM. gpg-agent is a daemon started by the graphical session, and it
+# spawns pinentry with ITS OWN environment, not the client's. On a headless
+# box that means the agent still holds WAYLAND_DISPLAY from the tty1 session,
+# so `pass` run over SSH drew a pinentry-qt dialog on the NUC's physical
+# monitor and the SSH session simply hung until it timed out. Measured
+# 2026-09-06: exit 124, and pinentry-qt alive on wayland-1 the whole time with
+# nobody in the room.
+#
+# A plain display check cannot fix that on its own — the stale WAYLAND_DISPLAY
+# is present either way, and `gpg-connect-agent updatestartuptty` does not
+# clear it (also verified). PINENTRY_USER_DATA is what does: gpg forwards it
+# from the client, through the agent, into pinentry's environment, so it is the
+# one channel that honestly reports where the request came from. The fish
+# config sets it to `curses` for SSH sessions.
+#
+# Both halves of the old behaviour are preserved. browserpass is spawned by
+# Chromium with no controlling tty and no PINENTRY_USER_DATA, so it falls to
+# the display check and still gets the Qt dialog — which is the whole reason
+# pinentry-qt was chosen over the curses default in the first place.
+#
+# Falls back rather than failing: gpg-agent pointed at a missing binary does
+# not degrade, it fails the operation, which would break gpg for everything.
+
+QT=/usr/bin/pinentry-qt
+CURSES=/usr/bin/pinentry-curses
+[ -x "$QT" ] || QT=/usr/bin/pinentry
+[ -x "$CURSES" ] || CURSES=/usr/bin/pinentry
+
+# An explicit request from the client wins over any guess.
+case "${PINENTRY_USER_DATA:-}" in
+*curses* | *tty*) exec "$CURSES" "$@" ;;
+*gui* | *qt*) exec "$QT" "$@" ;;
+esac
+
+# No word from the client: a display means somebody can see a dialog.
+if [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+    exec "$QT" "$@"
+fi
+
+exec "$CURSES" "$@"
