@@ -39,7 +39,40 @@ profile=$(head -1 "$HOME/.config/dns-helper/profile" 2>/dev/null | tr -cd 'a-z0-
 # and out of `systemctl cat`. 0600 root; the sha256 beside it is the
 # world-readable marker this script compares against, since it cannot read
 # the token back to check whether it changed.
-token=$(head -1 "$HOME/.config/dns-helper/token" 2>/dev/null | tr -d '[:space:]')
+token_file="$HOME/.config/dns-helper/token"
+
+# The user-side copy is untracked (this repo is PUBLIC) and was hand-placed
+# per machine, which is precisely how the macbook and the nuc ended up
+# filtering with no token at all: the client came up fine without one, so
+# nothing complained until bin/dns-filter and the DNS Shield panel died on
+# every call with "no account token". Restore it from the password store
+# instead, on any machine that is already a filter client.
+#
+# Only when it is MISSING, never a rewrite: this cannot tell a rotated token
+# from a locked key, and clobbering a good file on a machine whose agent
+# happens to be cold is worse than the stale read it would be fixing.
+#
+# --pinentry-mode=error for run_after_43's reason — an unattended apply must
+# never block. It succeeds when gpg-agent already holds the key and fails
+# instantly when it does not, and a machine with no store yet just warns.
+if [ ! -s "$token_file" ] && command -v pass >/dev/null 2>&1; then
+  # sed -n 1p, never head -1: head closes the pipe at the first line and
+  # SIGPIPEs pass, which pipefail then reports as a failure for a secret that
+  # was read perfectly well.
+  from_pass=$(PASSWORD_STORE_GPG_OPTS=--pinentry-mode=error \
+    timeout 10 pass show uBlockDNS/key 2>/dev/null | sed -n '1p' | tr -d '[:space:]')
+  if [ -n "$from_pass" ]; then
+    mkdir -p "$(dirname "$token_file")"
+    (umask 077 && printf '%s\n' "$from_pass" >"$token_file")
+    echo "ublockdns: account token restored from pass to $token_file"
+  else
+    warn "no token in $token_file, and uBlockDNS/key is not readable without a"
+    warn "  prompt — dns-filter and the DNS Shield panel will fail here until"
+    warn "  the gpg key is unlocked and this reruns (or bin/secrets-restore)"
+  fi
+fi
+
+token=$(head -1 "$token_file" 2>/dev/null | tr -d '[:space:]')
 token_sha=""
 [ -n "$token" ] && token_sha=$(printf '%s' "$token" | sha256sum | awk '{print $1}')
 
