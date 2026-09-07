@@ -501,7 +501,12 @@ bisync_unit() { # id, localDir, remoteDir, forceMaxFiles, extraArgs...
   # Applied to every bisync pair, not just notes: screenshots can collide the
   # same way (two machines, one timestamped filename) and the stranding it
   # causes is identical.
-  local -a policy=(--conflict-resolve newer --conflict-loser pathname)
+  # --max-lock: a run killed mid-flight (the power cut of 2026-09-07) leaves a
+  # lock whose default expiry is two centuries out, and every later round dies
+  # on it — --recover only skips the --resync, it does not clear the lock.
+  # rclone renews the lock while a run is live and a round takes ~45s, so 5m
+  # only ever overtakes a dead one.
+  local -a policy=(--conflict-resolve newer --conflict-loser pathname --max-lock 5m)
   err="$(rclone bisync "$local_dir" "$remote_dir" --resilient --recover "${policy[@]}" "$@" 2>&1 >/dev/null)" || rc=$?
   ((rc == 0)) && return 0
 
