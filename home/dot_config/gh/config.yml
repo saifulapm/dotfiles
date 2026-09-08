@@ -4,24 +4,36 @@
 # over hosts.yml — safe there because tokens lived in the macOS Keychain. On
 # this desktop there is no keyring (gnome-keyring is deliberately absent), so
 # gh stores tokens INSIDE hosts.yml and the copy trick would wipe them. The
-# alias below uses gh's native account switching instead.
+# aliases below use gh's native account switching instead.
 #
-# ONE ACCOUNT since 2026-08-21 (user: "I am not using those"). The work
-# (Cool9977) and main (saiful408) aliases are gone. They came across with the
-# mac config and were never logged in on any of these three boxes, so `gh
-# work` and `gh main` could only ever fail on an account gh had never heard
-# of — a config that describes a setup that does not exist is worse than no
-# config, because it reads as a working feature. Restoring one is this alias
-# line plus a token in pass; nothing else depends on them.
+# TWO ACCOUNTS since 2026-09-09: saifulapm (personal, and the one deliberately
+# left ACTIVE) and lareysbd (commercial). gh holds both in hosts.yml at once
+# and forever — "switching" moves a pointer, it never logs anything out — but
+# only the active account answers a bare `gh` command, so a `gh pr list` in a
+# PRIVATE lareysbd repo 404s until `gh lareys`. That switch is the ONLY thing
+# either alias does; nothing about it expires or needs redoing.
 #
-# AUTH IS A CLASSIC PAT FROM `pass` (github/cli-token), NOT `gh auth login`.
-# That flow authorizes a single OAuth App, so a fresh login on the second of
-# three machines leaves the first answering 401 Bad credentials with nothing
-# to announce it — the token carries no expiry, so it looks valid until it is
-# refused. bin/secrets-restore installs the PAT; run_after_43-gh-auth.sh
-# reinstalls it on any apply where gh has stopped having a working one. The
-# full reasoning is on the gh entry in packages/manifest.toml.
+# git is deliberately not part of that: the url.insteadOf rules in
+# ~/.gitconfig route every lareysbd/* remote through its own ssh key, so
+# clone/fetch/push are correct no matter which account is active. Only the API
+# side (gh pr/issue/repo/api) follows the pointer.
+#
+# The old work (Cool9977) and main (saiful408) aliases were removed 2026-08-21
+# ("I am not using those"): they had never been logged in on any of these
+# boxes, so they could only ever fail on an account gh had never heard of,
+# while reading as a working feature.
+#
+# AUTH IS A CLASSIC PAT PER ACCOUNT, FROM `pass` — github/cli-token for
+# saifulapm, github/cli-token-lareysbd for lareysbd — NOT `gh auth login`'s
+# OAuth flow. That flow authorizes a single OAuth App, so a fresh login on the
+# second of three machines leaves the first answering 401 Bad credentials with
+# nothing to announce it: the token carries no expiry, so it looks valid right
+# up until it is refused. bin/secrets-restore installs both, and
+# run_after_43-gh-auth.sh repairs them PER ACCOUNT on any apply — a dead
+# lareysbd token must not drag the working saifulapm one through a reinstall,
+# and vice versa. Full reasoning on the gh entry in packages/manifest.toml.
 git_protocol: ssh
 aliases:
     personal: '!gh auth switch --user saifulapm && gh auth setup-git && gh auth status'
+    lareys: '!gh auth switch --user lareysbd && gh auth setup-git && gh auth status'
 version: "1"

@@ -54,6 +54,27 @@
 	helper = 
 	helper = !/usr/bin/gh auth git-credential
 
+# Two GitHub accounts are authenticated at once since 2026-09-09 (saifulapm
+# personal, lareysbd commercial — see ~/.config/gh/config.yml). Which one a
+# git operation uses has to follow the REPO, not whichever account gh happens
+# to have active, or the failure mode is a push that 403s in the middle of
+# work for a reason nothing on screen explains.
+#
+# These rewrites make the URL decide. Every lareysbd/* remote — in any of the
+# three forms `gh repo clone`, a copied browser URL, or an old clone can
+# produce — is dialled through the github.com-lareys ssh alias, which
+# IdentitiesOnly-pins it to the commercial key. Nothing to switch and nothing
+# to remember; the rule travels to every machine with this file.
+#
+# Rewriting only affects the URL git DIALS, never what is written into
+# .git/config, so a clone still shows its canonical github.com remote.
+# Commit identity is deliberately untouched: one email everywhere (user pick,
+# 2026-09-09), so there is no includeIf and no second [user] block.
+[url "git@github.com-lareys:lareysbd/"]
+	insteadOf = git@github.com:lareysbd/
+	insteadOf = https://github.com/lareysbd/
+	insteadOf = ssh://git@github.com/lareysbd/
+
 [interactive]
   diffFilter = delta --color-only --features=interactive
 

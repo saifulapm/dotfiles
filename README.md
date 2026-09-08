@@ -108,14 +108,33 @@ after the first apply.
   second of three machines leaves the first answering `401 Bad credentials`
   with nothing to announce it: the token carries no expiry, so it looks valid
   right up until it is refused. It is a classic PAT with **No expiration** and
-  every scope instead, kept in `pass` as `github/cli-token`, installed by
-  `bin/secrets-restore` and reinstalled by `run_after_43-gh-auth.sh` on any
-  apply where gh has stopped having a working one — so `update-all` repairs a
-  revoked token by itself. Rotating it is `pass edit github/cli-token` +
-  `pass git push`, then a re-run on the other boxes; never a second
-  `gh auth login`, which is the thing that breaks them. One account only
-  (saifulapm) — the work/main aliases were never logged in here and are gone.
-  The gh extensions still want a rerun of `chezmoi apply` once auth lands.
+  every scope instead, installed by `bin/secrets-restore` and reinstalled by
+  `run_after_43-gh-auth.sh` on any apply where gh has stopped having a working
+  one — so `update-all` repairs a revoked token by itself. Rotating one is
+  `pass edit <entry>` + `pass git push`, then a re-run on the other boxes;
+  never a second `gh auth login`, which is the thing that breaks them.
+
+  **Two accounts since 2026-09-09**, one PAT each: `github/cli-token`
+  (saifulapm, personal) and `github/cli-token-lareysbd` (commercial). gh holds
+  both in `hosts.yml` permanently — switching moves a pointer, it never logs
+  anything out — so "always authenticated on every machine" needs nothing but
+  the store, which already syncs. Both scripts install and repair **per
+  account**: a bare `gh auth status` exits 1 when either is unhealthy, so one
+  dead token must not be allowed to condemn the other. saifulapm is left
+  active; `gh lareys` and `gh personal` move the pointer, and that only
+  affects the API side (`gh pr`, `gh issue`, `gh api`).
+
+  git needs no switching at all. The commercial account has its own key
+  (`~/.ssh/id_ed25519_lareys`, travelling in the hub blob with the rest of
+  `~/.ssh`) behind the `github.com-lareys` alias, and `url.insteadOf` rules in
+  `~/.gitconfig` rewrite every `lareysbd/*` remote onto it — in whichever of
+  the three URL forms it was written. Both github Host blocks carry
+  `IdentitiesOnly` so that with two GitHub keys in one agent, the account you
+  authenticate as stays a property of the URL instead of of key order. Commit
+  identity is one email everywhere on purpose, so GitHub still attributes
+  those commits to saifulapm; ownership and push auth are what separate the
+  accounts. The gh extensions still want a rerun of `chezmoi apply` once auth
+  lands.
 - First login for each agent CLI: `claude`, `codex`, `copilot`. `fx` only if
   you want it on Vercel's gateway (`fx login`) or on a subscription
   (`fx provider codex|grok`) — `pxy launch fx` needs neither.
