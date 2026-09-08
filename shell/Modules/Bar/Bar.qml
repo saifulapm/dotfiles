@@ -2174,6 +2174,8 @@ Scope {
         id: clockComponent
         Clock {
             theme: barRoot.theme
+            // For the minimap strip under the label (MinimapStrip.qml).
+            niri: barRoot.niri
         }
     }
 

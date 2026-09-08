@@ -12,6 +12,11 @@ import "ClockModel.js" as Model
 BarButton {
     id: rootItem
 
+    // The niri service, for the minimap strip under the label; and the screen
+    // whose workspace that strip draws (injected by the bar's WidgetSlot).
+    required property var niri
+    property string screenName: ""
+
     // A vertical bar gets its own format and its own ring — a run of text
     // does not fit a 28 px column, so the label becomes a stack of short
     // lines (omarchy's verticalFormat / verticalFormatAlt settings and their
@@ -137,6 +142,60 @@ BarButton {
                 pixelSize: modelData.length > 3 ? Math.round(rootItem.theme.fontPx(1.0) * 0.9) : rootItem.theme.fontPx(1.0)
                 color: rootItem.contentColor
                 colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
+            }
+        }
+    }
+
+    // The minimap, worn by the clock rather than given a slot of its own: a
+    // rail of pills on the bar's inner edge under the date and time, one per
+    // column of this screen's workspace.
+    //
+    // `parent` is set on purpose. Declared children land in BarButton's
+    // content Row, which would put the strip BESIDE the label; the strip is
+    // chrome under the text, so it is reparented onto the button itself and
+    // positioned there. It paints inside the slot the label already claims,
+    // so the clock's width — and the bar's center anchor — never move for it.
+    MinimapStrip {
+        id: minimap
+
+        // The open-panel pill lives 2 px off the same edge and is as wide as
+        // the label, so with the calendar open the two would merge into one
+        // thick accent bar and the columns would be unreadable. The panel is
+        // the state the user is looking at while it is open; the rail comes
+        // back when it closes.
+        readonly property bool panelOpen: rootItem.bar && rootItem.bar.activePanel && rootItem.bar.activePanel.anchorItem === rootItem
+        // Which screen edge the bar is on; "top" until a bar is injected,
+        // which is also what the widget renders as until then.
+        readonly property string edge: rootItem.bar ? rootItem.bar.position : "top"
+
+        parent: rootItem
+        theme: rootItem.theme
+        niri: rootItem.niri
+        screenName: rootItem.screenName
+        screenWidth: rootItem.bar && rootItem.bar.screen ? rootItem.bar.screen.width : 0
+        pillColor: rootItem.contentColor
+        vertical: rootItem.vertical
+        // As long as the face it belongs to: the label's width on a
+        // horizontal bar, the stack's height on a vertical one.
+        budget: rootItem.vertical ? Math.max(40, rootItem.height) : Math.max(40, rootItem.labelWidth)
+        // Flush with the bar's inner edge — the one facing the desktop — so
+        // it reads as a border the bar wears rather than a mark floating by
+        // the text: it underlines a top bar, overlines a bottom one, and runs
+        // down the desktop-facing side of a bar on its side.
+        //
+        // Placed with x/y rather than anchors, deliberately. The strip starts
+        // life in BarButton's content Row (see `parent` above), and a Row
+        // refuses horizontal anchors on its children — the anchor is dropped
+        // there and does not come back when the reparent lands, which put the
+        // vertical rail against the screen edge instead of the desktop one.
+        x: rootItem.vertical ? (edge === "left" ? rootItem.width - width : 0) : Math.round((rootItem.width - width) / 2)
+        y: rootItem.vertical ? Math.round((rootItem.height - height) / 2) : (edge === "bottom" ? 0 : rootItem.height - height)
+        opacity: panelOpen ? 0 : 1
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: rootItem.theme.motion.standard
+                easing.type: rootItem.theme.motion.easing
             }
         }
     }

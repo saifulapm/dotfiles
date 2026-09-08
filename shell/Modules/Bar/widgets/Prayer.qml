@@ -36,9 +36,12 @@ BarButton {
             openPanel();
     }
 
+    readonly property color markColor: prayer.imminent ? theme.accent : barFg
+
     Row {
         id: content
         anchors.centerIn: parent
+        visible: !rootItem.vertical
         spacing: 5
 
         OpticalGlyph {
@@ -54,13 +57,60 @@ BarButton {
             theme: rootItem.theme
             anchors.verticalCenter: parent.verticalCenter
             text: rootItem.prayer.barText
-            color: rootItem.prayer.imminent ? rootItem.theme.accent : rootItem.barFg
+            color: rootItem.markColor
             font.pixelSize: rootItem.theme.fontPx(0.917)
         }
     }
 
+    // "Asr 16:25" as the vertical bar takes it: name, hour, colon, minutes.
+    // The name is cut to three letters because a 28 px column fits no more —
+    // Maghrib is legible at no size that fits — and the time is split the way
+    // the clock's vertical format splits its own (HH / — / mm) rather than
+    // shrunk to a 8 px "16:25" nobody can read (user call 2026-09-08).
+    readonly property var verticalLines: {
+        const next = prayer.next;
+        if (!next)
+            return [];
+        const parts = String(next.time).split(":");
+        return [String(next.name).slice(0, 3), parts[0] || "", ":", parts[1] || ""];
+    }
+
+    // The vertical face. One icon-sized line each, optically centered like a
+    // glyph is — the same treatment the clock's stack gets, so the two read
+    // as one column of marks rather than two typographies.
+    Column {
+        id: verticalContent
+        anchors.centerIn: parent
+        visible: rootItem.vertical
+
+        OpticalGlyph {
+            width: rootItem.barSize
+            height: 18
+            text: "󱠧" // md-mosque
+            pixelSize: 13
+            color: rootItem.prayer.imminent ? rootItem.theme.accent : Qt.darker(rootItem.barFg, 1.25)
+            colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
+        }
+
+        Repeater {
+            model: rootItem.verticalLines
+
+            OpticalGlyph {
+                required property string modelData
+
+                width: rootItem.barSize
+                height: 20
+                text: modelData
+                fontFamily: rootItem.theme.fontMono
+                pixelSize: rootItem.theme.fontPx(0.917)
+                color: rootItem.markColor
+                colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
+            }
+        }
+    }
+
     fixedWidth: vertical ? -1 : content.implicitWidth + 12
-    fixedHeight: vertical ? content.implicitHeight + 10 : -1
+    fixedHeight: vertical ? verticalContent.implicitHeight + 10 : -1
 
     PanelLoader {
         id: panelLoader

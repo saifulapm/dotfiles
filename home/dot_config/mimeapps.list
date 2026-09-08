@@ -1,7 +1,7 @@
 # Default applications (xdg-mime). Modeled on omarchy's
 # default/applications/mimeapps.list, adapted to this setup: kak (not nvim)
-# for text, yazi-in-foot (not Nautilus) for directories, chromium-browser
-# (Fedora's desktop id) for the web. Without these pins xdg-open falls back to
+# for text, yazi-in-foot (not Nautilus) for directories, chromium (via
+# bin/browser-open) for the web. Without these pins xdg-open falls back to
 # the desktop-file cache, which resolved images to Chromium (observed
 # 2026-08-07) and would let any newly installed app steal pdf/video.
 # mailto: is deliberately unset — no mail app decision yet.
@@ -22,8 +22,15 @@ image/jxl=imv.desktop
 
 application/pdf=org.pwmt.zathura.desktop
 
-x-scheme-handler/http=chromium-browser.desktop
-x-scheme-handler/https=chromium-browser.desktop
+# Not chromium-browser.desktop: chromium hands a forwarded URL to whichever
+# browser window it activated last, which with one workspace per project is
+# regularly a window three workspaces away. browser-open.desktop wraps
+# bin/browser-open, which puts the tab in THIS workspace's browser window and
+# opens one here when there is none. text/html joins them so a local page
+# opened from yazi lands in the same place.
+x-scheme-handler/http=browser-open.desktop
+x-scheme-handler/https=browser-open.desktop
+text/html=browser-open.desktop
 x-scheme-handler/claude-cli=claude-code-url-handler.desktop
 
 video/mp4=mpv.desktop

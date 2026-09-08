@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Web Browser (this workspace)
+Comment=Open links in the chromium window on the current niri workspace
+Exec=browser-open %U
+Icon=chromium-browser
+Terminal=false
+Categories=Network;WebBrowser;
+MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;
+StartupNotify=false
+# Out of the launcher on purpose: this entry exists to be the http(s)
+# default (mimeapps.list), not to be picked from a menu — Chromium's own
+# entry is still the one that opens a browser.
+NoDisplay=true

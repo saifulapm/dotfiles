@@ -11,12 +11,13 @@ QtObject {
     // Workspace objects as niri sends them: id, idx, name, output,
     // is_active, is_focused, is_urgent, active_window_id.
     property var workspaces: []
-    // window id -> { title, appId }. Mutated IN PLACE on per-window events —
-    // cloning the whole map per title change was steady GC pressure (S3) —
-    // so the property's own change signal only fires for the full
-    // WindowsChanged snapshot. windowsRevision is the change signal for
-    // mutations: anything DERIVING from the map must reference it (the two
-    // bindings below do); imperative readers at event time (Notifs'
+    // window id -> { title, appId, workspaceId, floating, column, tile,
+    // tileWidth }. Mutated IN PLACE on per-window events — cloning the whole
+    // map per title change was steady GC pressure (S3) — so the property's
+    // own change signal only fires for the full WindowsChanged snapshot.
+    // windowsRevision is the change signal for mutations: anything DERIVING
+    // from the map must reference it (the two bindings below do, and so does
+    // the minimap widget); imperative readers at event time (Notifs'
     // click-to-focus) just read the live map.
     property var windows: ({})
     property int windowsRevision: 0
@@ -100,6 +101,36 @@ QtObject {
         requestSocket.connected = true;
     }
 
+    // One window as the map holds it. Everything past `appId` is what the
+    // minimap draws: which workspace the window is on, and where it sits in
+    // that workspace's scrolling layout. niri's pos_in_scrolling_layout is
+    // [column, tile-within-column], both 1-based, and null for a floating
+    // window — which is also how `column: 0` reads downstream: not in the
+    // scrolling layout, so not a pill.
+    function windowEntry(w) {
+        const entry = {
+            title: w.title || "",
+            appId: w.app_id || "",
+            workspaceId: w.workspace_id !== undefined && w.workspace_id !== null ? w.workspace_id : -1,
+            floating: w.is_floating === true,
+            column: 0,
+            tile: 0,
+            tileWidth: 0
+        };
+        applyLayout(entry, w.layout);
+        return entry;
+    }
+
+    // The layout half on its own: WindowLayoutsChanged pushes (id, layout)
+    // pairs rather than whole windows, so a column resize or a move does not
+    // re-send the title.
+    function applyLayout(entry, layout) {
+        const pos = layout ? layout.pos_in_scrolling_layout : null;
+        entry.column = pos ? pos[0] : 0;
+        entry.tile = pos ? pos[1] : 0;
+        entry.tileWidth = layout && layout.tile_size ? layout.tile_size[0] : 0;
+    }
+
     function handleEvent(ev) {
         const kind = Object.keys(ev)[0];
         const p = ev[kind];
@@ -137,10 +168,7 @@ QtObject {
                 const next = {};
                 let focused = null;
                 for (const w of p.windows) {
-                    next[w.id] = {
-                        title: w.title || "",
-                        appId: w.app_id || ""
-                    };
+                    next[w.id] = windowEntry(w);
                     if (w.is_focused)
                         focused = w.id;
                 }
@@ -152,13 +180,23 @@ QtObject {
         case "WindowOpenedOrChanged":
             {
                 const w = p.window;
-                windows[w.id] = {
-                    title: w.title || "",
-                    appId: w.app_id || ""
-                };
+                windows[w.id] = windowEntry(w);
                 windowsRevision++;
                 if (w.is_focused)
                     focusedWindowId = w.id;
+                break;
+            }
+        case "WindowLayoutsChanged":
+            {
+                // [[id, layout], …] — every window whose tile moved or
+                // resized, which niri sends for the whole workspace when one
+                // column changes.
+                for (const change of p.changes) {
+                    const entry = windows[change[0]];
+                    if (entry)
+                        applyLayout(entry, change[1]);
+                }
+                windowsRevision++;
                 break;
             }
         case "WindowClosed":
