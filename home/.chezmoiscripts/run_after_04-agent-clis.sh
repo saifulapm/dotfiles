@@ -81,8 +81,18 @@ fi
 # ~200 MB into ~/.local/share/pi-node and installed pi under that — a second
 # node runtime this repo does not manage, on a PATH nothing adds, so the guard
 # below never saw the pi it had just installed and every apply reran it.
+#
+# The guard tests the ACTIVE node's bin dir, not `command -v pi` (fixed
+# 2026-09-10). pi is an npm global, so it lives in one node version's
+# lib/node_modules and a version bump installs a fresh empty one — `node =
+# "lts"` moved 24.20.0 -> 24.21.0 overnight and took pi with it. The mise shims
+# dir is on PATH (fish conf.d/00-env.fish), and the shim mise generated for pi
+# back on 24.20.0 outlives the package it points at, so `command -v pi` kept
+# answering with the shim while `pi --help` died on "No version is set for shim:
+# pi" — a break no `chezmoi apply` could repair, because the stale shim satisfied
+# the guard every time.
 if command -v mise >/dev/null 2>&1 && mise which node >/dev/null 2>&1; then
-  if ! mise exec -- sh -c 'command -v pi' >/dev/null 2>&1; then
+  if [ ! -x "$(mise where node)/bin/pi" ]; then
     mise exec -- sh -c 'curl -fsSL https://pi.dev/install.sh | sh' \
       && echo "agent-clis: pi installed" \
       || warn "pi install failed"
