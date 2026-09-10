@@ -1,0 +1,15 @@
+# The service half of qshell-sync-goals.path. The sleep is the debounce:
+# ticking three tasks in a row writes the store three times in a burst, and
+# three seconds folds that into one round instead of queueing one per tick
+# (the path unit cannot re-trigger while this runs; a write during the round
+# fires one more, which the idempotent merge ends). bin/qshell-sync's flock
+# keeps this from interleaving with the 15-minute timer's full round.
+[Unit]
+Description=Goals sync round after a store change
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/sleep 3
+ExecStart=%h/.dotfiles/bin/qshell-sync --only goals
+Nice=19
+IOSchedulingClass=idle

@@ -119,7 +119,7 @@ machine="$(cat "$HOME/.config/qshell/machine" 2>/dev/null || true)"
 hub_json=null
 
 # Canonical order — the panel renders the units in exactly this sequence.
-units_all=(history fish-history model-usage screenshots notes ssh memory)
+units_all=(history fish-history model-usage screenshots notes goals ssh memory)
 
 unit_label() {
   case "$1" in
@@ -128,6 +128,7 @@ unit_label() {
   model-usage) echo "AI usage" ;;
   screenshots) echo "Screenshots" ;;
   notes) echo "Notes" ;;
+  goals) echo "Goals" ;;
   ssh) echo "SSH keys" ;;
   memory) echo "AI memory" ;;
   *) echo "$1" ;;
@@ -663,6 +664,33 @@ sync_notes() {
   unit_ok notes "$(tail -n 1 <<<"$merge_out")${att_note:+ — $att_note}"
 }
 
+# The goal store: one small JSON file, push-own / pull-others then a merge on
+# per-goal AND per-task identity. Deliberately NOT a bisync like screenshots
+# or memory — bisync resolves a two-machine conflict by picking a whole file,
+# so ticking task 3 on the laptop and task 5 on the mini inside one 15-minute
+# window would keep one file and set the other aside. Both ticks have to
+# survive, so identity lives inside the file and bin/goals-merge owns it.
+#
+# Same push-before-pull trade-off the notes and fish-history units take: the
+# hub copy of THIS machine's file converges toward the union one round late,
+# and one writer per hub file still holds. A fresh machine has no local file
+# to push, pulls the others, and the merge writes its first store from them.
+sync_goals() {
+  local goals_dir="$state_dir/goals"
+  local stage="$sync_dir/goals-machines"
+  mkdir -p "$goals_dir" "$stage"
+  push_pull goals "$goals_dir/goals.json" "$remote/goals-v1/machines" "$machine.json" "$stage" || return 0
+  shopt -s nullglob
+  local foreign=("$stage"/*.json)
+  shopt -u nullglob
+  local merge_out=""
+  if ! merge_out="$("$here/goals-merge" "$goals_dir/goals.json" "${foreign[@]}" 2>&1)"; then
+    unit_fail goals "merge: $(head -n 1 <<<"${merge_out:-merge failed}")"
+    return 0
+  fi
+  unit_ok goals "$(tail -n 1 <<<"$merge_out")"
+}
+
 # The mem store: one small markdown file per item, plus a per-project
 # project.toml, plan.md and status.md. A normal round is a handful of
 # modifications — prune archives in place rather than deleting, so the
@@ -711,6 +739,7 @@ for id in "${selected[@]}"; do
   model-usage) sync_model_usage ;;
   screenshots) sync_screenshots ;;
   notes) sync_notes ;;
+  goals) sync_goals ;;
   ssh) sync_ssh ;;
   memory) sync_memory ;;
   esac

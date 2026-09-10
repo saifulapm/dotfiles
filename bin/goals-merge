@@ -1,0 +1,121 @@
+#!/usr/bin/env node
+// goals-merge <local-goals.json> [<foreign-goals.json>...] — union goal
+// stores by goal id. Ours; the cross-machine half of qshell-sync's goals
+// unit, the same role notes-merge plays for the note store.
+//
+// The semantics live in ONE place: shell/Modules/Bar/widgets/GoalsModel.js,
+// the exact file the goals widget and its panel run, required here under node
+// (it carries a module.exports tail for this). So the panel and the sync
+// round can never disagree about what a goal, a task or a merge is.
+//
+// The merge is two-level and that is the whole point of it existing. Goals
+// union by id with newest-updatedAt winning the scalar fields, but the TASKS
+// inside a surviving goal union by their own id with their own updatedAt —
+// otherwise ticking task 3 on the laptop and task 5 on the mini would lose
+// one of the two ticks, which is exactly the kind of silent loss that makes
+// someone stop trusting a tracker. mergeStores also restores the "at most one
+// active goal" invariant, deterministically, so two machines that each
+// started something different converge on the same winner instead of
+// ping-ponging.
+//
+// The merged result is written back to <local-goals.json> only when it
+// differs — an idle round must not touch the file, because the service's
+// FileView watches it and a needless write would churn the bar.
+//
+// The write is temp + rename in the store dir, and only lands if the store
+// still reads exactly as it did when the merge started — the panel can tick a
+// task mid-merge (its FileView writes are atomic renames too) and
+// last-writer-wins here would silently drop that tick. Same honest caveat as
+// notes-merge: the recheck-then-rename narrows the window, it does not close
+// it. A store that will not hold still after a few tries is left alone; the
+// next round merges it.
+//
+// A foreign file that will not read or parse is skipped with a warning, not
+// fatal: one machine publishing garbage must not stop the others converging.
+// Exit is 0 with a one-line summary (qshell-sync's unit detail), nonzero only
+// when the local store cannot be read or written.
+
+"use strict";
+
+const fs = require("node:fs");
+const path = require("node:path");
+const Model = require(path.join(__dirname, "..", "shell", "Modules", "Bar", "widgets", "GoalsModel.js"));
+
+const args = process.argv.slice(2);
+if (args.length < 1 || args[0] === "-h" || args[0] === "--help") {
+    console.error("usage: goals-merge <local-goals.json> [<foreign-goals.json>...]");
+    process.exit(2);
+}
+
+const localPath = args[0];
+
+function readOrEmpty(file) {
+    try {
+        return fs.readFileSync(file, "utf8");
+    } catch (e) {
+        if (e.code === "ENOENT")
+            return "";
+        throw e;
+    }
+}
+
+const foreignLists = [];
+for (const file of args.slice(1)) {
+    try {
+        foreignLists.push(Model.parseStore(fs.readFileSync(file, "utf8")));
+    } catch (e) {
+        console.error(`goals-merge: skipping unreadable ${file}: ${e.message}`);
+    }
+}
+
+// A crash between write and rename leaves a temp behind; sweep any older than
+// an hour so the store dir cannot collect them.
+try {
+    const dir = path.dirname(localPath);
+    for (const name of fs.readdirSync(dir)) {
+        if (!name.startsWith(".tmp-goals-merge-"))
+            continue;
+        const full = path.join(dir, name);
+        if (Date.now() - fs.statSync(full).mtimeMs > 60 * 60 * 1000)
+            fs.rmSync(full, { force: true });
+    }
+} catch (e) {}
+
+let localRaw = "";
+let merged = null;
+let written = false;
+const ATTEMPTS = 3;
+for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    localRaw = readOrEmpty(localPath);
+    merged = Model.mergeStores([Model.parseStore(localRaw)].concat(foreignLists), Date.now());
+    const out = Model.serialize(merged);
+    if (out === localRaw)
+        break;
+
+    const tmp = path.join(path.dirname(localPath), `.tmp-goals-merge-${process.pid}`);
+    fs.mkdirSync(path.dirname(localPath), { recursive: true });
+    fs.writeFileSync(tmp, out);
+    if (readOrEmpty(localPath) !== localRaw) {
+        fs.rmSync(tmp, { force: true });
+        continue;
+    }
+    fs.renameSync(tmp, localPath);
+    written = true;
+    break;
+}
+
+if (merged === null || (!written && Model.serialize(merged) !== localRaw)) {
+    console.error("goals-merge: store kept changing underneath, deferred to the next round");
+    console.log("deferred — store busy");
+    process.exit(0);
+}
+
+const live = Model.liveGoals(merged);
+const active = Model.activeGoal(merged);
+const tombs = merged.length - live.length;
+const detail = active ? `${active.name} ${Model.progress(active).done}/${Model.progress(active).total}` : "no active goal";
+console.log(detail +
+    (live.length > 1 ? `, ${live.length} goal(s)` : "") +
+    (tombs > 0 ? `, ${tombs} tombstone(s)` : "") +
+    (foreignLists.length > 0 ? `, ${foreignLists.length} machine(s) merged` : "") +
+    (written ? "" : " — unchanged"));

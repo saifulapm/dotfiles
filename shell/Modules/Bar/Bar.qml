@@ -694,6 +694,15 @@ Scope {
         return sharedService("pass", passServiceComponent, {});
     }
 
+    // No gate: the goals service watches one JSON file and runs a 60 s timer
+    // that only re-stamps `nowMs` for the countdown — no process, no network,
+    // the same allowance HubSyncService's clock takes. Gating it on
+    // visibility would buy nothing and would leave the deadline stale in the
+    // tooltip, which is the one number the widget exists to keep honest.
+    function goalsService() {
+        return sharedService("goals", goalsServiceComponent, {});
+    }
+
     // No gate: the ports service starts nothing on its own — it probes at
     // startup, a slow presence poll while the bar is visible, and 2 s only
     // while its panel is open (the approved exception, enforced in the
@@ -860,6 +869,11 @@ Scope {
     }
 
     Component {
+        id: goalsServiceComponent
+        GoalsService {}
+    }
+
+    Component {
         id: btBatteryServiceComponent
         BtBatteryService {}
     }
@@ -936,6 +950,7 @@ Scope {
             "prayer": prayerComponent,
             "shelf": shelfComponent,
             "drives": drivesComponent,
+            "goals": goalsComponent,
             "ports": portsComponent,
             "pass": passComponent,
             "devservices": devservicesComponent,
@@ -2394,6 +2409,14 @@ Scope {
         Ports {
             theme: barRoot.theme
             ports: barRoot.portsService()
+        }
+    }
+
+    Component {
+        id: goalsComponent
+        Goals {
+            theme: barRoot.theme
+            goals: barRoot.goalsService()
         }
     }
 

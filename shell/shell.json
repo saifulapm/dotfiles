@@ -25,6 +25,7 @@
     "left": [
       "launcher",
       "workspaces",
+      "goals",
       "window",
       "media"
     ],

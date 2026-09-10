@@ -1,0 +1,23 @@
+# Fires a goals-only sync round shortly after the store changes, so a task
+# ticked here reaches the other machines in seconds instead of waiting out the
+# 15-minute timer. The notes path unit's twin, and the reasoning transfers
+# whole: PathChanged (not PathModified) because the panel and bin/goals-merge
+# both write atomically — temp + rename — and PathChanged is the trigger that
+# fires on a move-into-place.
+#
+# This matters more for goals than for notes. The point of the widget is that
+# the number in the bar is true, and a ratio that is a quarter of an hour stale
+# on the machine you just walked over to is exactly the kind of small lie that
+# makes someone stop trusting the thing.
+#
+# The round's own merge write re-fires this once, harmlessly: that second round
+# finds the store already merged, writes nothing, and the loop stops there
+# (goals-merge is idempotent by contract — see its header).
+[Unit]
+Description=Goals sync on store change
+
+[Path]
+PathChanged=%h/.local/state/qshell/goals/goals.json
+
+[Install]
+WantedBy=default.target
