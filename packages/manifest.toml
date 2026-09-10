@@ -113,6 +113,30 @@ arch = "x86_64"
 why = "VAAPI (iHD) for the NUC's Raptor Lake iGPU. libva was installed with no driver behind it, so hardware decode was unavailable and every decode fell back to CPU. Survivable at 1080p — 10-bit HEVC benchmarked here at 25x realtime, 300 frames in 0.49 s on the i5-13420H — but the monitor on this desk is a 4K M32UC and 4K HEVC has nothing like that headroom. Lives in RPM Fusion NONFREE, which 00-install-packages now bootstraps (x86_64 only) alongside the -free release rpm; user decision 2026-08-11. There is no free alternative for this GPU: libva-intel-driver in -free is the old i965 for pre-Skylake parts, and Mesa's VA state tracker has no Intel backend, so mesa-va-drivers-freeworld does nothing here. arch=x86_64, NOT all: the filter is a literal `p.get(\"arch\", \"all\") in (\"all\", uname -m)`, and on the aarch64 laptop this name resolves to nothing — which --skip-unavailable would survive, but the rpm -q sweep at the end of that script WITHHOLDS THE STATE HASH for anything that did not land, so every future apply there would re-run the whole package pass forever"
 
 [[pkg]]
+name = "libva-devel"
+category = "dev"
+arch = "aarch64"
+why = "Build dep for the AVD VA-API bridge (run_after_54-avd-decode.sh): meson takes both the driver ABI and the install driverdir (/usr/lib64/dri) from libva's pkg-config, so without the headers the bridge silently is not built and hardware decode stays off. The aarch64 counterpart to [[pkg]] intel-media-driver — same problem, opposite architecture: libva present with no driver behind it. arch=aarch64 for the SAME state-hash reason spelled out there"
+
+[[pkg]]
+name = "meson"
+category = "dev"
+arch = "aarch64"
+why = "Build system for both halves of AVD hardware decode (run_after_54-avd-decode.sh) — avd-fw and libva-v4l2_request are both meson projects, and avd-fw's meson.build errors out unless it is invoked with a --cross-file, so there is no make fallback to reach for. ninja-build is already here as a dep of other things but is NOT claimed separately: meson hard-requires it, unlike the weak-dep traps in [[pkg]] pipewire and [[pkg]] rtkit. arch=aarch64 because nothing on the NUC builds a meson project"
+
+[[pkg]]
+name = "arm-none-eabi-gcc-cs"
+category = "dev"
+arch = "aarch64"
+why = "Cross compiler for the AVD firmware (run_after_54-avd-decode.sh). avd-fw is Cortex-M3 code that runs ON the decoder block, not on the CPU, so the host toolchain cannot touch it — avd-fw's own cross file names arm-none-eabi-gcc and nothing else. THE COST IS THE POINT OF THIS NOTE: 1.4 GB installed to produce six blobs totalling ~390 KB, on a machine that will rebuild them approximately never (the firmware is kernel-independent, so no kernel upgrade invalidates it). It is carried anyway because the alternative is worse in this repo's terms: copr:jannau/test-builds has a succeeded fedora-44-aarch64 avd-fw build, but that COPR describes itself as 'test builds do not use', and committing prebuilt blobs would put unauditable binaries in a public repo that has no other. If the 1.4 GB ever matters, the honest swap is vendor/ carrying the avd-fw SOURCE and this entry going away in favour of a hand-run build. arch=aarch64: the NUC has no Apple decoder"
+
+[[pkg]]
+name = "arm-none-eabi-binutils-cs"
+category = "dev"
+arch = "aarch64"
+why = "The other half of the AVD firmware toolchain. Named separately from [[pkg]] arm-none-eabi-gcc-cs because the build needs it for TWO reasons, only one of which the compiler drags in: the assembler/linker, and arm-none-eabi-objcopy, which avd-fw's cross file substitutes for llvm-objcopy to flatten each .elf into a padded raw blob. A machine with only the compiler builds every .elf and produces no .bin"
+
+[[pkg]]
 name = "iwlwifi-mvm-firmware"
 category = "core"
 arch = "x86_64"

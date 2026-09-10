@@ -31,13 +31,18 @@ the workflow trio (mem/workflow/hub) and the three oma apps from source,
 multi-PHP (php82/83/84 beside system 8.5), on-demand podman dev services
 (mysql/postgres/redis/mailpit) and `https://<project>.test` domains, applies
 the chromium policy, disables suspend everywhere, opens the dufs port,
-fetches fonts (pinned externals) + the theme wallpapers (from our own
-saifulapm/wallpapers repo) and bootstraps the default theme.
+builds the Apple Video Decoder firmware and its VA-API bridge so the two Macs
+decode H.264/HEVC/VP9 in hardware (`docs/avd-decode-2026-09-10.md` — Fedora
+packages neither), fetches fonts (pinned externals) + the theme wallpapers
+(from our own saifulapm/wallpapers repo) and bootstraps the default theme.
 
 Expect the first apply to take a while — it compiles kakoune, **Emacs 31
 (from source, the longest single step)**, dekho (which links a whole
 BitTorrent stack), ~10 cargo crates and three Qt apps, and pre-pulls ~1.5 GB
-of container images. sudo's timestamp expires
+of container images. On the Macs it also pulls a 1.4 GB bare-metal ARM cross
+toolchain, used once to build ~390 KB of AVD firmware and then idle — the
+manifest entry for `arm-none-eabi-gcc-cs` argues that cost and names the swap
+if it ever stops being worth it. sudo's timestamp expires
 between the root-needing steps, so **the password prompt returns several
 times across the run** — the prompts surface mid build-output, so stay near
 the keyboard rather than leaving it unattended. If anything fails mid-way
