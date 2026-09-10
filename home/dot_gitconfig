@@ -75,6 +75,16 @@
 	insteadOf = https://github.com/lareysbd/
 	insteadOf = ssh://git@github.com/lareysbd/
 
+# The personal half of the same rule, added 2026-09-09 after an https remote in
+# amx 403'd: saifulapm/* was not being rewritten, so the URL reached the
+# [credential] helper above and authenticated as whichever gh account was
+# ACTIVE — lareysbd that day. Sending those remotes down the plain github.com
+# alias lets the URL decide here too. No `git@github.com:saifulapm/` line: that
+# form already dials the right alias, and rewriting it to itself is a loop.
+[url "git@github.com:saifulapm/"]
+	insteadOf = https://github.com/saifulapm/
+	insteadOf = ssh://git@github.com/saifulapm/
+
 [interactive]
   diffFilter = delta --color-only --features=interactive
 
