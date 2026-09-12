@@ -1,5 +1,6 @@
-# amx — coding agents as tmux panes. Ten keys and nothing else; this file
-# spells out the five that are a decision and leaves the four dials unset.
+# amx — coding agents as tmux panes. Twelve keys and nothing else; this file
+# spells out every one, the five that are a decision set, the rest left at
+# what amx does on its own or, for the dials, left out on purpose.
 #
 # A chezmoi SYMLINK, unlike cliamp's config, and safe to be one for the reason
 # that one is not: amx only ever READS this file (src/config.rs
@@ -9,16 +10,24 @@
 # because losing an agent to a stray comma is the worse outcome.
 #
 # Unknown keys are warned about and ignored, so this file outliving the version
-# that wrote it is survivable in both directions.
+# that wrote it is survivable in both directions. The repository keeps the same
+# file with the defaults written out at assets/config.toml.
 
-# The vendor command a new agent runs. claude is amx's own default; it is here
-# to be found, not because it differs.
+# The vendor command a new agent runs. claude is amx's own default; pi is the
+# one this machine runs, and everything below that names a dial is pi's.
 agent = "pi"
 
-# How many live agents `new` allows before it refuses. Five panes is about what
+# How many live agents `new` allows in one project before it refuses, counted
+# over the agents whose pane still answers for them. Five panes is about what
 # fits a screen worth watching, and the refusal is the point — the limit exists
 # so a runaway loop cannot quietly start a twentieth.
 max_agents = 5
+
+# A ceiling over every project on the machine at once. Left out on purpose:
+# max_agents is a project's own number, and the machine is as busy as the
+# projects on it ask between them. Set it when a bare `amx` on the wall should
+# refuse a spawn over all of them together.
+# max_total = 10
 
 # Give new agents their own git worktree. On for the reason the worktrees exist:
 # two agents editing one checkout is the failure this whole tool is arranged to
@@ -30,13 +39,36 @@ worktrees = true
 # the same notification daemon the bar uses.
 notifications = true
 
-# Answer claude's folder-trust screen for the worktrees amx cuts, by writing
-# claude's own trust store. OFF, which is amx's default and a deliberate one:
-# that store is claude's file, and the flag is the consent a write to somebody
-# else's config stands behind. Flip it to true if the trust prompt on every
-# fresh worktree becomes the thing that wastes the time — it is a real cost of
-# worktrees = true, just not one to opt into silently.
+# Answer the vendor's folder-trust screen for the worktrees amx cuts. For pi
+# that is --approve on the pane's argv, trusting that folder for that one run
+# and writing nothing; for claude it is a write to claude's own trust store,
+# which outlives the agent. OFF, which is amx's default and a deliberate one:
+# the flag is the consent a write to somebody else's config stands behind.
+# Flip it to true if the trust prompt on every fresh worktree becomes the thing
+# that wastes the time — it is a real cost of worktrees = true, just not one to
+# opt into silently.
 trust = false
+
+# The three dials amx can start an agent on are deliberately ABSENT rather than
+# set. Absent means amx passes no flag and the vendor makes its own choice,
+# which is what should happen until there is a reason it should not — there is
+# no value here that means "default", so writing one is always a decision.
+#
+# For pi: model is open, a provider/id pattern such as
+# "anthropic/claude-sonnet-4"; effort is pi's --thinking, one of off, minimal,
+# low, medium, high, xhigh, max; and pi has no permission dial, so a
+# permission set here is warned about and dropped.
+#
+#   model = "anthropic/claude-sonnet-4"
+#   effort = "high"
+#   permission = "plan"           # claude only
+
+# What writes the one line a finished turn is worth, and what a working turn
+# is about every three minutes. Absent means the row says what the agent said,
+# not what a second model would have written about it, and nothing is spent.
+# Only the view runs it; the command runs where the agent ran, with the answer
+# on stdin and $AMX_ID naming the agent, and its first printed line is the row.
+#   summary_command = "pi -p 'Sum this up in eight words. Answer with the words alone.'"
 
 # The palette, by name. "qshell" is the theme bin/theme-apply renders to
 # ~/.config/amx/themes/qshell.toml from templates/amx-theme.toml.tmpl, so amx
@@ -50,15 +82,30 @@ trust = false
 # one set of tokens.
 theme = "qshell"
 
-# The four dials amx can start an agent on are deliberately ABSENT rather than
-# set. Absent means amx passes no flag and the vendor makes its own choice,
-# which is what should happen until there is a reason it should not — there is
-# no value here that means "default", so writing one is always a decision.
+# Seconds an idle agent nobody is watching keeps its pane, an hour as amx has
+# it. A pi at its prompt holds a couple of hundred megabytes to do nothing
+# with, so after this long the pane goes and the record stays — the row turns
+# from ✻ to the dot — and enter, attach or resume starts the agent again where
+# it left off. A pane somebody is attached to or has pinned is never taken.
+# 0 turns the parking off and a pane stands until the agent is stopped.
+park_after = 3600
+
+# One table per harness, named after the command it runs: claude and pi today,
+# codex or opencode the day amx has an entry for them. `amx new --model X`
+# picks the harness whose list holds X — the configured agent's list is asked
+# first, then the rest in amx's order — and refuses a word nobody lists, so
+# nobody types --agent. A table that sets neither list says nothing.
 #
-#   model = "opus"                  # the model a new agent starts on
-#   permission = "acceptEdits"      # the permission mode it starts in
-#   effort = "high"                 # the reasoning effort it starts at
-#   summary_command = "..."         # what writes the one line a finished turn
-#                                   # is worth; absent means the row says what
-#                                   # the agent said, not what a second model
-#                                   # would have written about it
+# models is the list that answers for this harness. Left out, claude's is its
+# four aliases (fable, opus, sonnet, haiku) and pi's is `pi --list-models`,
+# read as provider/id and cached under ~/.local/state/amx/models for an hour.
+# args is what every agent this harness runs carries on its argv, however it
+# was picked; a dial stands down for a flag written here.
+
+[claude]
+# models = ["fable", "opus", "sonnet", "haiku"]
+# args = ["--dangerously-skip-permissions"]
+
+[pi]
+# models = ["opencode/muse-spark-1.3-contributor-free"]
+# args = []

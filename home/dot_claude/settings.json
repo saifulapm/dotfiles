@@ -11,6 +11,7 @@
     "CLAUDE_CODE_NO_FLICKER": "1",
     "CLAUDE_CODE_SCROLL_SPEED": "1",
     "ENABLE_PROMPT_CACHING_1H": "1",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
     "WORKFLOW_AGENT": "1"
   },
   "attribution": {
@@ -90,6 +91,14 @@
         "hooks": [
           {
             "type": "command",
+            "command": "mem context || true"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "/home/saiful/.local/bin/amx _hook"
           }
         ]
@@ -111,6 +120,26 @@
           {
             "type": "command",
             "command": "/home/saiful/.local/bin/amx _hook"
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mem context --brief --hook-json --session-id \"$CLAUDE_CODE_SESSION_ID\" || true"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mem precompact --hook-json || true"
           }
         ]
       }
@@ -157,5 +186,13 @@
   "theme": "custom:qshell",
   "verbose": false,
   "switchModelsOnFlag": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "modelSettings": {
+    "claude-fable-5-1": {
+      "effortLevel": "medium"
+    },
+    "claude-opus-5": {
+      "effortLevel": "high"
+    }
+  }
 }
