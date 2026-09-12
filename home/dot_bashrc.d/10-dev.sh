@@ -26,3 +26,11 @@ case ":$PATH:" in
   *":$HOME/.cargo/bin:"*) ;;
   *) export PATH="$HOME/.cargo/bin:$PATH" ;;
 esac
+
+# The Android SDK (run_after_56-mobile-toolchain.sh): AGP reads ANDROID_HOME
+# where a checkout has no local.properties, and adb lives in platform-tools.
+export ANDROID_HOME="$HOME/Android/Sdk"
+case ":$PATH:" in
+  *":$ANDROID_HOME/platform-tools:"*) ;;
+  *) export PATH="$ANDROID_HOME/platform-tools:$PATH" ;;
+esac

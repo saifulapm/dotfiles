@@ -34,6 +34,10 @@ set -gx GOBIN "$XDG_DATA_HOME/go/bin"
 
 # pnpm
 set -gx PNPM_HOME "$HOME/.local/share/pnpm"
+# The Android SDK (run_after_56-mobile-toolchain.sh): AGP reads ANDROID_HOME
+# where a checkout has no local.properties, which a fresh worktree never has,
+# and dactyl's linker shims and android/oracle.sh find the NDK and adb by it.
+set -gx ANDROID_HOME "$HOME/Android/Sdk"
 
 # npm — give the web-login opener a launcher that returns immediately. npm
 # awaits the browser process it spawns (npm-profile's webAuthOpener runs the
@@ -93,6 +97,7 @@ fish_add_path -g "$PNPM_HOME" "$PNPM_HOME/bin"
 fish_add_path -g "$HOME/.config/composer/vendor/bin"
 fish_add_path -g "$GOBIN"
 fish_add_path -g "$HOME/.dotfiles/bin"
+fish_add_path -g "$ANDROID_HOME/platform-tools"
 
 # mise shims — node/pnpm/deno for NON-interactive contexts: fish scripts, and
 # the login-shell env that niri-session imports into the systemd user manager

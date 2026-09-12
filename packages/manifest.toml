@@ -896,6 +896,24 @@ arch = "all"
 why = "Rust toolchain manager; rust-analyzer installed as a rustup component (see [[tool]])"
 
 [[pkg]]
+name = "java-25-openjdk-devel"
+category = "dev"
+arch = "all"
+why = "JDK for the Android host of the dactyl engine (github.com/lareysbd/dactyl): Gradle 9.7 and AGP 9.4 run on it, its JVM unit tests load the engine's JNI library through it, and sdkmanager is a Java launcher, so run_after_56-mobile-toolchain.sh installs no SDK until this has landed. 25 because dactyl's CI pins temurin 25 (actions/setup-java), so a local green means what a CI green means. Installed by hand on the MacBook 2026-09-02; declared 2026-09-13 when the NUC turned out to have none"
+
+[[pkg]]
+name = "clang"
+category = "dev"
+arch = "all"
+why = "Links Rust for the Android targets on the Macs: the NDK ships x86_64 host binaries only, so dactyl's android/linker-*.sh shims run the distribution's clang against the NDK sysroot there (on the NUC the NDK's own clang runs and this sits idle). Declared for all three so the shims and run_after_56's check behave the same everywhere"
+
+[[pkg]]
+name = "lld"
+category = "dev"
+arch = "all"
+why = "The linker behind those shims' -fuse-ld=lld; the NDK's lld is x86_64 too. Same reasoning as clang"
+
+[[pkg]]
 name = "golang"
 category = "dev"
 arch = "all"
@@ -1647,6 +1665,26 @@ why  = "Shopify apps + themes; Node-based — aarch64 compatibility to be verifi
 name = "rust-analyzer"
 via  = "rustup component add rust-analyzer"
 why  = "Rust language server for eglot"
+
+[[tool]]
+name = "android-sdk"
+via  = "run_after_56-mobile-toolchain.sh → ~/Android/Sdk: the command-line tools (pinned zip, sha256-checked), platforms;android-37.0, build-tools;37.0.0 and ndk;29.0.14206865 through sdkmanager with the licences accepted non-interactively, platform-tools (adb) riding along as sdkmanager's own dependency; on the Macs Google's x86_64 aapt2 and zipalign are swapped for the Commit451 arm64 builds (sha256-checked) and ~/.gradle/gradle.properties points AGP at that aapt2. The same versions dactyl's android/setup-toolchain.sh installs and its CI job uses; the two scripts are kept in step by hand. 00-env.fish and dot_bashrc.d/10-dev.sh export ANDROID_HOME and put platform-tools on PATH"
+why  = "Builds and tests the dactyl engine's Android host on the desk (host-android/gradlew, the JVM unit tests, the debug APK) instead of only in CI, which since 2026-09-08 runs on a published release or by hand. AGP reads ANDROID_HOME where a checkout has no local.properties, which a fresh git worktree never has"
+
+[[tool]]
+name = "gradle"
+via  = "run_after_56-mobile-toolchain.sh → ~/.local/opt/gradle-9.7.1 (pinned, sha256 from the distribution's own .sha256 file)"
+why  = "Bootstraps a Gradle wrapper for a project that has none yet; dactyl's own builds go through its checked-in gradlew, which fetches its own distribution"
+
+[[tool]]
+name = "rust-android-targets"
+via  = "rustup target add aarch64-linux-android x86_64-linux-android (run_after_56-mobile-toolchain.sh)"
+why  = "The two ABIs the dactyl engine's JNI library is built for (android/build-so.sh); the linker shims in that repo find the NDK under ANDROID_HOME"
+
+[[tool]]
+name = "swift"
+via  = "run_after_56-mobile-toolchain.sh → swiftly 1.1.3 (pinned tarball from download.swift.org) initialised with --platform fedora39 into ~/.local/share/swiftly, toolchain 6.3.3 installed with --post-install-file so no sudo runs inside an apply, and marked in use; only swift and swiftc are linked into ~/.local/bin, because swiftly's bin dir also proxies clang, lld and lldb and would shadow the distribution's on PATH"
+why  = "`swift test` on Linux for the dactyl engine's iOS host: its Foundation-only targets (services, assets, app sources, the decoder) prove on the desk, nothing UIKit does, so this is the only iOS proof short of the macOS CI job. fedora39 because swift.org publishes no newer Fedora toolchain; it runs on 44 (MacBook since 2026-09-02, NUC 2026-09-13)"
 
 [[tool]]
 name = "nerd-font-symbols"

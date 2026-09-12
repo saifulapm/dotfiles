@@ -23,7 +23,9 @@ That run asks which machine this is, then: installs every package in
 `/etc/dnf/dnf.conf`; COPRs, Remi PHP SCLs and RPM Fusion ffmpeg bootstrap
 themselves), sets up tty1 autologin, registers the shell's file-chooser
 portal, installs the dev toolchain (node via mise, pnpm via corepack, rust
-via rustup, Shopify CLI), the agent CLIs (claude, codex, copilot, pi, fx),
+via rustup, Shopify CLI), the mobile toolchain (Android SDK, NDK and
+build-tools, Gradle, the Rust Android targets, Swift via swiftly — see
+`docs/mobile-toolchain-2026-09-13.md`), the agent CLIs (claude, codex, copilot, pi, fx),
 the pnpm/cargo/go/composer tool sets, prebuilt binaries (watchexec, hurl,
 cloudflared, stripe, ouch, usql, satty), builds the kakoune fork, dekho, amx,
 the workflow trio (mem/workflow/hub) and the three oma apps from source,

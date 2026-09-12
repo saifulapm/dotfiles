@@ -116,6 +116,30 @@ if [ -d "$skills_src" ]; then
     && echo "workflow: linked ${linked} skill(s) from $skills_src"
 fi
 
+# ------------------------------------------------------------------- hooks
+# The three git hook stubs, symlinked into ~/.config/git/hooks/, where
+# dot_gitconfig's core.hooksPath points every repo on the machine. The same
+# dev-box rule as the skills: the working copy's stubs where it exists, the
+# built checkout's everywhere else. Only a symlink or a missing entry is ever
+# replaced; a real file there is somebody's own hook. Until 2026-09-13 this
+# had been done by hand on the MacBook and nowhere else, and since the stubs
+# fail open by design, the NUC's gate stood open without a word.
+hooks_src="$src/hooks"
+[ -d "$HOME/Sites/github/workflow/hooks" ] \
+  && hooks_src="$HOME/Sites/github/workflow/hooks"
+if [ -d "$hooks_src" ]; then
+  mkdir -p "$HOME/.config/git/hooks"
+  for hook in pre-commit commit-msg pre-push; do
+    dest="$HOME/.config/git/hooks/$hook"
+    [ "$(readlink "$dest" 2>/dev/null)" = "$hooks_src/$hook" ] && continue
+    if [ -L "$dest" ] || [ ! -e "$dest" ]; then
+      ln -sfn "$hooks_src/$hook" "$dest" && echo "workflow: linked git hook $hook"
+    else
+      warn "$dest is a real file — leaving it alone"
+    fi
+  done
+fi
+
 # --------------------------------------------------------------------- hub
 # The unit is a chezmoi symlink (dot_config/systemd/user/hub.service),
 # ConditionPathExists-gated on the binary. NOT enabled here: hub listens on a
