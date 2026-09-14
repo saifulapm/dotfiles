@@ -45,9 +45,7 @@
   "global_shortcuts": {
     "toggle": ""
   },
-  "favorites": [
-    "clipboard:history"
-  ],
+  "//favorites": "Deliberately NOT set here, unlike every other root-list knob in this file. An overrides key replaces the array wholesale, so pinning favourites declaratively also *unpins* anything absent — which silently reverted the launcher's own Add/Remove Favorite action, and made clipboard:history reappear after every removal (2026-09-14). Favourites are the one part of the root list that is worth changing in the moment, from the item itself, so they stay vicinae-owned in settings.json. A fresh machine simply starts with none.",
   "providers": {
     "files": {
       "enabled": false
