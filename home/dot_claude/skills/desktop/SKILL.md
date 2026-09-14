@@ -7,8 +7,16 @@ description: "Full control of Saiful's Linux desktop (Fedora Asahi + niri + quic
 
 This is Saiful's **live session**, not a sandbox. You share keyboard focus,
 clipboard, and windows with a person who may be typing at the same time.
-Everything below is verified on this machine (niri 26.04, quickshell 0.3,
-eDP-1 at 1706x1066 logical / scale 1.5, qshell bar = top 26px strip).
+Everything below is verified on this machine (niri 26.04, quickshell 0.3).
+
+**Screen geometry is not fixed here — read it, never assume it.** Which output
+is live changes (this desk drives an external monitor), and the qshell bar is
+themeable and movable to any screen edge. Before the first `grim -g` of a
+session:
+
+```sh
+niri msg -j outputs | jq -r '.[] | "\(.name) \(.logical.width)x\(.logical.height) @\(.logical.scale)"'
+```
 
 ## Golden rules
 
@@ -62,12 +70,21 @@ bug — re-verify at fullscreen / re-read the real state, then retest once.
 
 ## Seeing the screen
 
-- Region: `grim -s 1 -g "X,Y WxH" /tmp/s.png` then Read. Screen is
-  0,0 1706x1066; bar is `0,0 1706x26`; tiled windows sit below the bar with
-  10px gaps (a full tile is ~1687x1021 starting near 10,36).
-- Window geometry is NOT available from IPC (`tile_pos_in_workspace_view` is
-  null; nirisnap verified window-region capture impossible on niri). For a
-  whole-window shot use the compositor:
+- Region: `grim -s 1 -g "X,Y WxH" /tmp/s.png` then Read. Take W/H from the
+  `niri msg -j outputs` call above — a crop computed from remembered numbers
+  lands on the wrong window and costs two captures instead of one. niri
+  `gaps 10` (config.kdl) applies between columns and to the screen edge, so a
+  full tile is `10,(bar+10) (W-20)x(H-bar-20)`. Derive the bar's extent
+  instead of assuming a top strip — it is themeable and movable:
+  `bar = H - tile_h - 2*gap`, with
+  `tile_h = niri msg -j windows | jq '.[0].layout.tile_size[1]'`.
+- Centred overlays (vicinae, qshell cards) are at `x=(W-cardW)/2`,
+  `y=(H-cardH)/2` — e.g. vicinae's card is its configured
+  `launcher_window.size` in `~/.config/vicinae/overrides.json`.
+- Window *size* IS in IPC (`layout.tile_size` / `window_size`), but its
+  *position* is not (`tile_pos_in_workspace_view` is null; nirisnap verified
+  window-region capture impossible on niri) — which is why a tiled window's
+  x still cannot be computed. For a whole-window shot use the compositor:
   `niri msg action screenshot-window` → newest file in `~/Pictures/Screenshots/`
   (`ls -t ~/Pictures/Screenshots | head -1`). Prefer a region crop when you
   know where to look.
