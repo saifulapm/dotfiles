@@ -95,7 +95,7 @@ input {
 
     // Focus windows and outputs automatically when moving the mouse into them.
     // "0%" = only when it would not scroll the view (omarchy: follow_mouse 1).
-    focus-follows-mouse max-scroll-amount="0%"
+    // focus-follows-mouse max-scroll-amount="0%"
 }
 
 // macOS has four assignable hot corners; niri's can only ever toggle the
@@ -114,7 +114,7 @@ input {
 gestures {
     hot-corners {
         // off
-        top-left
+        // top-left
         bottom-left
         // top-right     — Notifications/Popups.qml
         // bottom-right  — Notes/NotesEdge.qml right-edge strip
@@ -130,7 +130,7 @@ output "eDP-1" {
     // Pinned to what niri was auto-picking anyway (2560x1600 at 227 DPI →
     // logical 1706x1066), so an upstream heuristic change can't reshape the
     // desktop.
-    scale 1.5
+    scale 1.25
 
     // On the small panel, new windows take the full width instead of the
     // global half-width default in the layout section below — per-output
@@ -174,7 +174,7 @@ output "eDP-1" {
 // never the small thing — measured, it renders 47% LARGER on these two
 // screens than on the MacBook. Everything that is not the hub was the gap.
 output "DP-3" {
-    scale 1.5
+    scale 1.0
 }
 
 // The Mac mini's display (BenQ MA270U, 3840x2160 at 27" → 163 DPI). The sum
@@ -187,7 +187,7 @@ output "DP-3" {
 // until it restarts or this file's output config changes — so trying a scale
 // costs nothing and never edits anything. Retype it here to make it stick.
 output "HDMI-A-1" {
-    scale 1.1
+    scale 1.0
 }
 
 // Settings that influence how windows are positioned and sized.
