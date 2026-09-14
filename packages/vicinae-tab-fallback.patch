@@ -1,0 +1,91 @@
+diff --git a/src/server/src/internal/keyboard/keybind-manager.cpp b/src/server/src/internal/keyboard/keybind-manager.cpp
+index f55cece06..6913475d0 100644
+--- a/src/server/src/internal/keyboard/keybind-manager.cpp
++++ b/src/server/src/internal/keyboard/keybind-manager.cpp
+@@ -29,6 +29,13 @@ static const std::unordered_map<Keybind, KeybindInfo> &keybindInfos() {
+ 		.icon = "cog",
+ 		.dflt = Keyboard::Shortcut(Qt::Key_Comma, Qt::ControlModifier)
+ 	}},
++	{Keybind::ActivateFallback, KeybindInfo{
++		.id = "activate-fallback",
++		.name = QCoreApplication::translate("keybind-manager", "Activate First Fallback"),
++		.description = QCoreApplication::translate("keybind-manager", "Run the first fallback command with the current search text, without having to select it in the list"),
++		.icon = "arrow-right",
++		.dflt = Keyboard::Shortcut(Qt::Key_Tab)
++	}},
+ 	{Keybind::OpenAction, KeybindInfo{
+ 		.id = "action.open",
+ 		.name = QCoreApplication::translate("keybind-manager", "Generic Open Action"),
+diff --git a/src/server/src/internal/keyboard/keybind.hpp b/src/server/src/internal/keyboard/keybind.hpp
+index c7c8573f2..f721e6b2b 100644
+--- a/src/server/src/internal/keyboard/keybind.hpp
++++ b/src/server/src/internal/keyboard/keybind.hpp
+@@ -5,6 +5,7 @@ enum class Keybind : uint8_t {
+   ToggleActionPanel = 0,
+   OpenSearchAccessorySelector,
+   OpenSettings,
++  ActivateFallback,
+ 
+   // common action keybinds
+   OpenAction,
+diff --git a/src/server/src/qml/root-search-model.cpp b/src/server/src/qml/root-search-model.cpp
+index d0423cbe8..4af0d6505 100644
+--- a/src/server/src/qml/root-search-model.cpp
++++ b/src/server/src/qml/root-search-model.cpp
+@@ -185,6 +185,21 @@ void RootSearchModel::refreshCalculator() {
+   }
+ }
+ 
++bool RootSearchModel::activateFirstFallback() {
++  for (int row = 0, rows = rowCount(); row < rows; ++row) {
++    int sourceIdx = -1;
++    int itemIdx = -1;
++    if (!dataItemAt(row, sourceIdx, itemIdx)) continue;
++    if (sources().at(sourceIdx) != m_fallbackSource || itemIdx != 0) continue;
++
++    setSelectedIndex(row);
++    activateSelected();
++    return true;
++  }
++
++  return false;
++}
++
+ void RootSearchModel::setSelectedIndex(int index) {
+   QString oldId = m_lastCompleterItemId;
+   SectionListModel::setSelectedIndex(index);
+diff --git a/src/server/src/qml/root-search-model.hpp b/src/server/src/qml/root-search-model.hpp
+index 8e6fc21b9..d2fda6e88 100644
+--- a/src/server/src/qml/root-search-model.hpp
++++ b/src/server/src/qml/root-search-model.hpp
+@@ -28,6 +28,11 @@ public:
+   Q_INVOKABLE void setFilter(const QString &text);
+   void setSelectedIndex(int index) override;
+ 
++  /**
++   * Returns false when no fallback section is shown, so the key press stays unhandled.
++   */
++  bool activateFirstFallback();
++
+   const RootItem *selectedRootItem() const;
+ 
+ private:
+diff --git a/src/server/src/qml/root-view-host.cpp b/src/server/src/qml/root-view-host.cpp
+index b13b0ca01..47c2e0141 100644
+--- a/src/server/src/qml/root-view-host.cpp
++++ b/src/server/src/qml/root-view-host.cpp
+@@ -1,4 +1,5 @@
+ #include "root-view-host.hpp"
++#include "internal/keyboard/keyboard.hpp"
+ #include "lib/figura/src/utils.hpp"
+ #include "root-search-model.hpp"
+ #include "section-source.hpp"
+@@ -115,6 +116,8 @@ bool RootViewHost::inputFilter(QKeyEvent *event) {
+ 
+   if (!event->modifiers() && event->key() == Qt::Key_Space) { return tryAliasFastTrack(); }
+ 
++  if (Keyboard::Shortcut(Keybind::ActivateFallback) == event) { return m_model->activateFirstFallback(); }
++
+   // wrapped navigation is incompatible with overriding key up, so we disable history in that case
+   const bool activatableHistory =
+       !cfg.wrapNavigation && m_model->selectedIndex() == m_model->nextSelectableIndex(-1, 1);

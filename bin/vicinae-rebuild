@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# vicinae-rebuild — build vicinae from source with our patch applied and
+# install it into ~/.local, so every machine gets the Tab keybind.
+#
+# Why a local build (2026-09-10): vicinae has no way to express "run the
+# fallback command" as a keybind — its Keybind enum is a closed list of 22
+# actions with no 'run this command' among them — so an arbitrary phrase typed
+# into root search can only reach a fallback by arrowing down past every match.
+# Raycast binds that to Tab and calls it Quick AI.
+# packages/vicinae-tab-fallback.patch adds ActivateFallback (default Tab) as a
+# real keybind, so it shows up in the settings UI and stays rebindable.
+#
+# The COPR package STAYS INSTALLED on purpose: bin/vicinae-serve falls back to
+# /usr/bin/vicinae whenever this build is missing, so a machine that has not
+# built yet still has a launcher.
+#
+#   vicinae-rebuild              build, install, restart (force)
+#   vicinae-rebuild --if-needed  same, but a no-op when already current
+#                                (what run_after_53-vicinae-build calls)
+#   vicinae-rebuild --check      print state, touch nothing, need no root
+#   vicinae-rebuild --undo       remove the local build, fall back to packaged
+set -uo pipefail
+
+SRC="$HOME/.local/src/vicinae"
+PREFIX="$HOME/.local"
+SERVER="$PREFIX/libexec/vicinae/vicinae-server"
+STAMP="$HOME/.local/state/vicinae-build.stamp"
+ROOT="${CHEZMOI_WORKING_TREE:-$HOME/.dotfiles}"
+PATCH="$ROOT/packages/vicinae-tab-fallback.patch"
+
+# The upstream tag we build. Kept equal to what the COPR ships so the only
+# difference from the package is the patch; `--check` shouts when they drift,
+# because a patch written against one tree is not guaranteed to apply to the
+# next (three of the five files it touches moved between v0.28.1 and main).
+TAG="v0.28.1"
+
+warn() { echo "vicinae-rebuild: $*" >&2; }
+say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
+
+# Slurp then match. `strings … | grep -q` looks right and is not: grep exits at
+# the first hit, strings dies of SIGPIPE, and with pipefail that reads as a
+# failed pipeline — reporting NO on a binary that does carry the patch.
+has_patch() {
+  local syms
+  syms=$(strings "$SERVER" 2>/dev/null || true)
+  grep -qx activate-fallback <<<"$syms"
+}
+
+want_stamp() {
+  printf '%s %s\n' "$TAG" "$(sha256sum "$PATCH" 2>/dev/null | cut -d' ' -f1)"
+}
+
+case "${1:-}" in
+--check)
+  printf 'packaged:      %s\n' "$(rpm -q vicinae 2>/dev/null || echo 'not installed')"
+  printf 'unit runs:     %s\n' "$(systemctl --user show vicinae -p ExecStart --value 2>/dev/null | sed -n 's/.*argv\[\]=\([^ ]*\).*/\1/p')"
+  if [ -x "$PREFIX/bin/vicinae" ]; then
+    printf 'local build:   %s\n' "$("$PREFIX/bin/vicinae" version 2>/dev/null | head -1)"
+    printf 'patch applied: %s\n' "$(has_patch && echo yes || echo NO)"
+  else
+    printf 'local build:   absent (vicinae-serve falls back to /usr/bin/vicinae)\n'
+  fi
+  printf 'built from:    %s\n' "$(cat "$STAMP" 2>/dev/null || echo 'no stamp')"
+  printf 'wanted:        %s\n' "$(want_stamp)"
+  pkgver=$(rpm -q --qf '%{VERSION}' vicinae 2>/dev/null || true)
+  [ -n "$pkgver" ] && [ "v$pkgver" != "$TAG" ] &&
+    warn "COPR moved to v$pkgver but we build $TAG — bump TAG in this script and re-test the patch"
+  exit 0
+  ;;
+--undo)
+  say "removing the local build"
+  rm -rf "$PREFIX/bin/vicinae" "$PREFIX/libexec/vicinae" "$STAMP"
+  systemctl --user restart vicinae 2>/dev/null || true
+  echo "done — vicinae-serve now execs /usr/bin/vicinae"
+  exit 0
+  ;;
+--if-needed)
+  if [ -x "$PREFIX/bin/vicinae" ] && has_patch && [ "$(cat "$STAMP" 2>/dev/null)" = "$(want_stamp)" ]; then
+    exit 0
+  fi
+  ;;
+esac
+
+[ -r "$PATCH" ] || { warn "patch not found at $PATCH"; exit 1; }
+for dep in git cmake ninja clang-format; do
+  command -v "$dep" >/dev/null 2>&1 || { warn "$dep missing — install the build deps first (packages/manifest.toml)"; exit 1; }
+done
+
+# rev-parse, not [ -d .git ]: a clone killed mid-transfer must not satisfy the
+# check forever (same guard as run_after_29-nirisnap).
+if ! git -C "$SRC" rev-parse HEAD >/dev/null 2>&1; then
+  say "cloning vicinae"
+  rm -rf "$SRC"
+  mkdir -p "$(dirname "$SRC")"
+  git clone --quiet https://github.com/vicinaehq/vicinae.git "$SRC" || { warn "clone failed"; exit 1; }
+fi
+
+say "checking out $TAG with the patch"
+git -C "$SRC" fetch --quiet --tags origin 2>/dev/null || true
+git -C "$SRC" checkout --quiet --force "$TAG" || { warn "checkout $TAG failed"; exit 1; }
+# --force above discards a previous run's patch, so the tree is always pristine
+# here and the patch always applies to the same bytes it was generated from.
+git -C "$SRC" apply "$PATCH" || { warn "patch did not apply to $TAG"; exit 1; }
+
+# USE_SYSTEM_CMARK_GFM=OFF: Fedora ships no cmark-gfm-devel and the tree
+# vendors it. INSTALL_MODULES_LOAD_CONFIG=OFF: kernel modules-load.d config
+# does nothing in a user prefix.
+say "configuring"
+cmake -GNinja -DCMAKE_BUILD_TYPE=Release \
+  -DUSE_SYSTEM_CMARK_GFM=OFF \
+  -DINSTALL_MODULES_LOAD_CONFIG=OFF \
+  -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+  -B "$SRC/build" "$SRC" >/dev/null || { warn "configure failed"; exit 1; }
+
+say "building (several minutes on a cold tree)"
+cmake --build "$SRC/build" || { warn "build failed"; exit 1; }
+
+say "installing into $PREFIX"
+cmake --install "$SRC/build" >/dev/null || { warn "install failed"; exit 1; }
+
+# CONFIGURE-TIME LANDMINE, not an install one: vicinae's CMakeLists runs
+#   file(REMOVE_RECURSE ${VICINAE_THEME_DIR})
+# where VICINAE_THEME_DIR is ${CMAKE_INSTALL_PREFIX}/share/vicinae/themes. With
+# a ~/.local prefix that is the very directory bin/theme-apply renders
+# qshell.toml into, so the configure step above DELETED the active theme and
+# the launcher would come back wearing a stock one.
+say "re-rendering the qshell theme (configure wiped the theme dir)"
+command -v theme-apply >/dev/null 2>&1 && { theme-apply >/dev/null 2>&1 || warn "theme-apply failed — run it by hand"; }
+
+mkdir -p "$(dirname "$STAMP")"
+want_stamp >"$STAMP"
+
+say "restarting the launcher"
+systemctl --user daemon-reload 2>/dev/null || true
+systemctl --user restart vicinae 2>/dev/null || true
+sleep 2
+systemctl --user is-active --quiet vicinae || warn "vicinae did not come up — journalctl --user -u vicinae -n 30"
+
+say "done"
+"$0" --check

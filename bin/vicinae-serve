@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# What vicinae.service actually runs. Picks the patched local build when it is
+# there, the packaged binary when it is not.
+#
+# The indirection exists because the patch (Tab activates the first fallback
+# command — packages/vicinae-tab-fallback.patch) ships as SOURCE in this repo
+# and is compiled per machine by run_after_53-vicinae-build. That build takes
+# minutes and can legitimately not have happened yet: a fresh box mid-apply, a
+# machine that applied offline, a build that failed. Naming
+# ~/.local/bin/vicinae directly in the unit would turn every one of those into
+# a restart-looping unit and NO LAUNCHER AT ALL, to gain a keybind. So the
+# packaged /usr/bin/vicinae stays installed as the floor, and this script is
+# the one line that decides.
+#
+# Consequence worth knowing: a machine where the build silently failed still
+# has a working launcher, just without Tab. `vicinae-rebuild --check` is what
+# tells the two apart.
+set -euo pipefail
+
+local_bin="$HOME/.local/bin/vicinae"
+
+if [ -x "$local_bin" ]; then
+  exec "$local_bin" "$@"
+fi
+
+exec /usr/bin/vicinae "$@"

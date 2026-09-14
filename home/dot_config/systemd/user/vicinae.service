@@ -28,7 +28,14 @@ Requisite=graphical-session.target
 [Service]
 Type=simple
 Slice=session.slice
-ExecStart=/usr/bin/vicinae server --replace
+# bin/vicinae-serve, not a binary path: it execs the patched local build
+# (~/.local/bin/vicinae, Tab activates the first fallback command — see
+# packages/vicinae-tab-fallback.patch) when run_after_53-vicinae-build has
+# produced one, and the packaged /usr/bin/vicinae when it has not. Naming
+# either path directly here would be wrong in one direction or the other: the
+# packaged one never picks up the patch, and the local one turns a fresh or
+# failed build into a restart-looping unit and no launcher at all.
+ExecStart=%h/.dotfiles/bin/vicinae-serve server --replace
 # overrides.json (chezmoi-managed) then the theme-generated fragment
 # (bin/theme-apply): later files win, so the active theme's font/rounding
 # ride on top of the static config.

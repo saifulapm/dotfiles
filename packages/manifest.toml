@@ -1581,6 +1581,45 @@ category = "dev"
 arch = "all"
 why = "KDE's LayerShellQt, headers + runtime lib — nirisnap maps its capture overlay as an exclusive layer surface through it (installed 2026-08-11 for the port)"
 
+# ---- vicinae build deps (2026-09-10) ----
+# Building vicinae from source instead of taking the COPR binary, to carry a
+# local patch: Tab activates the first fallback command from root search (the
+# Raycast Quick AI gesture, which upstream has no keybind for — its Keybind
+# enum has no "run this command" action). Source at ~/.local/src/vicinae,
+# pinned to the v0.28.1 tag so it matches what the COPR shipped.
+# All three are -devel headers ONLY, each at the exact version of the runtime
+# already installed — no upgrade, so [[tool]] qt6-hold's guard is unaffected.
+
+[[pkg]]
+name = "qt6-qtsvg-devel"
+category = "dev"
+arch = "all"
+why = "Qt6::Svg headers/cmake config — vicinae's server CMakeLists lists Svg in its REQUIRED Qt6 components and configure dies without it. THE ONE PACKAGE HERE THAT NEEDS `--setopt=excludepkgs=` to install, because bin/qt6-hold excludes qt6-* while quickshell's private-API link is at risk. That hold is about ABI-breaking UPGRADES (6.11.1 → 6.11.2 killed qs); this is headers for the qt6-qtsvg 6.11.2-1.fc44 already installed, same NEVRA, so nothing moves. Pin the version when installing or a future dnf could pull a newer qt6 through the open exclude"
+
+[[pkg]]
+name = "kf6-syntax-highlighting-devel"
+category = "dev"
+arch = "all"
+why = "KF6::SyntaxHighlighting headers — vicinae uses it for code-block highlighting in rendered markdown; USE_SYSTEM_KF6 defaults ON on Linux. Building it from source instead (USE_SYSTEM_KF6=OFF) only trades this for extra-cmake-modules, so the system lib is the smaller claim. Runtime kf6-syntax-highlighting 6.29.0 was already installed"
+
+[[pkg]]
+name = "qtkeychain-qt6-devel"
+category = "dev"
+arch = "all"
+why = "qt6keychain headers — vicinae stores extension OAuth tokens through it (USE_SYSTEM_QT_KEYCHAIN defaults ON; the source-build path needs libsecret-devel instead). Fedora's name is qtkeychain-qt6-devel, NOT qt6-qtkeychain-devel (that does not exist). Runtime qtkeychain-qt6 0.16.0 was already linked by the COPR binary"
+
+[[pkg]]
+name = "xcb-util-keysyms-devel"
+category = "dev"
+arch = "all"
+why = "X11::xcb_keysyms — vicinae's server CMakeLists does an unconditional `find_package(X11 REQUIRED)` for its X11 window-manager backend and links xcb_keysyms, with no option to opt out. Dead weight on a niri box (the wayland backend is what actually runs) but the generate step fails without it. libxcb-devel was already present; this is the missing half"
+
+[[pkg]]
+name = "libqalculate-devel"
+category = "dev"
+arch = "all"
+why = "libqalculate/Calculator.h — vicinae's calculator service compiles a qalculate backend in unconditionally. Invisible to a CMake dependency audit: there is no find_package for it, the header is just included, so it only surfaced as a compile error 404 files into the build. Runtime libqalculate 5.9.0 was already installed (the COPR binary links it)"
+
 [[pkg]]
 name = "dua-cli"
 category = "core"
@@ -1635,6 +1674,11 @@ why  = "THE music player, replacing bin/radio + bin/music + the bar's media widg
 name = "dekho"
 via  = "run_after_42-dekho.sh — shallow clone of github.com/saifulapm/dekho (own project) into ~/.local/src/dekho, `cargo build --release` into ~/.local/bin/dekho. Guarded on the binary because the first build links librqbit and takes several minutes; bin/update-all's update_src advances the checkout and drops the binary when origin moves, and the apply after it rebuilds. NOT built from ~/Sites/github/dekho — that is the development checkout and may sit mid-change on an unpushed branch, and every machine must run the same pushed revision. The TMDB key arrives separately as home/.chezmoitemplates/dekho.toml.age rendered to ~/.config/dekho/config.toml (0600): a machine with no age key gets the binary and no config, the same phase-1 behaviour the mail templates have, and the public repo never carries the key in clear. Runtime deps, both already declared: mpv (playback, and the trailer player) and yt-dlp (mpv's ytdl hook resolves the YouTube trailer `dekho trailer` hands it). dekho needs nothing else — it is its own torrent client and its own TMDB client. THE TRAILER PATH IS FRAGILE and the reason yt-dlp must stay fresh here as well as for cliamp: measured 2026-08-20, mpv's default YouTube player client (ANDROID_VR) 403s on the media URL, as do `tv`, `ios` and `web`; `web_embedded` and `mweb` play without cookies, and dekho pins the working one through --ytdl-raw-options. When trailers stop playing, that pin is the first thing to re-test"
 why  = "The shell's Movies & TV hub (Mod+Ctrl+Alt+M, `qs ipc call dekho toggle`, Menu > Movies & TV) is a front end for this binary and nothing else. shell/Modules/Dekho draws every listing from `dekho api` — search, trending, discover, genres, languages, title (which now carries cast, crew, tagline, the trailer URL and similar titles), episodes, person, videos, history, cache, prefetch — and narrates a playback from the NDJSON `dekho play --json` writes, which is why the shell holds no TMDB key and speaks no HTTP itself. Playback is deliberately NOT a child of the shell: bin/dekho-play starts `dekho play` as a transient systemd user unit so a shell restart (KillMode=control-group) cannot kill a film in progress. Watch position lives in ~/.local/state/dekho/history.json, written by dekho from mpv's own IPC, and is what the hub's Continue-watching rail and the Resume button read"
+
+[[tool]]
+name = "vicinae"
+via  = "bin/vicinae-rebuild — clone of github.com/vicinaehq/vicinae into ~/.local/src/vicinae pinned to tag v0.28.1 (the version the COPR shipped, so the only difference from the package is the patch), packages/vicinae-tab-fallback.patch applied, CMake+Ninja into ~/.local: vicinae in bin/, the five helpers in libexec/vicinae/. Built on every machine by home/.chezmoiscripts/run_after_53-vicinae-build.sh, which calls `vicinae-rebuild --if-needed` — a no-op unless the installed server is missing the patch or the stamp (~/.local/state/vicinae-build.stamp = tag + patch sha256) has moved, so editing the patch triggers exactly one rebuild on the next apply everywhere. THE COPR PACKAGE DELIBERATELY STAYS INSTALLED as the floor: the unit runs bin/vicinae-serve, a two-branch wrapper that execs ~/.local/bin/vicinae when the build exists and /usr/bin/vicinae when it does not. Naming either path directly in the unit is wrong in one direction or the other — the packaged one never picks up the patch, and the local one turns a fresh box mid-apply, an offline apply or a failed build into a restart-looping unit and NO LAUNCHER AT ALL, to gain one keybind. `vicinae-rebuild --check` prints what can silently drift: which binary the unit runs, its version, whether the built server carries the patch, and whether the COPR has moved past the pinned tag (it warns if so, because a patch written against one tree is not guaranteed to apply to the next — three of the five files it touches had already moved between v0.28.1 and main when this was written). `vicinae-rebuild --undo` deletes the local build and falls back. Build deps, all of them -devel headers matching an already-installed runtime so nothing upgraded: qt6-qtsvg-devel (needs `--setopt=excludepkgs=` past bin/qt6-hold, see its [[pkg]]), kf6-syntax-highlighting-devel, qtkeychain-qt6-devel, libqalculate-devel, xcb-util-keysyms-devel. Configured with USE_SYSTEM_CMARK_GFM=OFF because Fedora ships no cmark-gfm-devel and the tree vendors it, and INSTALL_MODULES_LOAD_CONFIG=OFF because kernel modules-load.d config is meaningless in a user prefix. TWO TRAPS, both found the hard way on 2026-09-10: (1) vicinae's CMakeLists calls `file(REMOVE_RECURSE ${VICINAE_THEME_DIR})` at CONFIGURE time, and with a ~/.local prefix that is the same directory bin/theme-apply renders qshell.toml into — so every configure deletes the active vicinae theme, which is why vicinae-rebuild re-runs theme-apply before restarting; (2) ~/.local/libexec/vicinae/vicinae-input-server has NO capabilities, while the packaged /usr/libexec one carries `cap_dac_override=ep` (upstream's `make postbuild` sets it, rpm preserves it). Our server resolves helpers next to itself, so it uses the uncapped one — anything needing that privilege is degraded until `sudo setcap cap_dac_override+ep ~/.local/libexec/vicinae/vicinae-input-server` is run, AND re-run after every rebuild, since the install overwrites the binary. Currently moot here: overrides.json disables the snippets provider and global_shortcuts.toggle is empty (niri owns the launcher keybind), so nothing on this machine exercises it — verified uncapped 2026-09-10 with the launcher working normally"
+why  = "Tab from root search runs the first fallback command with whatever was typed — Raycast's Quick AI gesture, which vicinae has no way to express in config: its Keybind enum (src/server/src/internal/keyboard/keybind.hpp) is a closed list of 22 actions with no 'run this command' among them, so `keybinds` can rebind Tab but has nothing to bind it TO. Without it an arbitrary phrase can only reach a fallback by arrowing past every match — typing `chrom` puts the fallback at row 4, behind three real results. The patch adds ActivateFallback as a proper keybind (id activate-fallback, default Tab, shows up in the settings UI and is rebindable) and implements it next to the existing Space alias-fast-track in RootViewHost::inputFilter, which was already the template for exactly this shape. Verified on the desk 2026-09-10 both ways: `chrom` + Tab lands in the YouTube fallback carrying the query, and Tab at an empty root — where no fallback section is drawn — changes nothing at all, because activateFirstFallback() returns false and the key press passes through. NOT sent upstream (user decision 2026-09-14: keep it ours rather than carry a PR and wait on a maintainer's view of whether Tab should be the default; the port to main was written and format-checked before that call, so if it is ever wanted the work is in this file's history) — so the patch is permanently this repo's to maintain, and the thing that will break it is an upstream refactor, not a rejection. The tag is pinned for exactly that reason: bumping it is a deliberate step that means re-testing the patch applies, not something an apply does silently"
 
 [[tool]]
 name = "librepods"
