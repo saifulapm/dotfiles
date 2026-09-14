@@ -10,7 +10,7 @@
 # a second per embedded chunk and minutes per reranked query. The fork at
 # github.com/saifulapm/qmd, branch remote-models, adds an OpenAI-compatible
 # backend and index.yml points it at pxy — embeds in seconds, no 2 GB of
-# model downloads. Until upstream takes it (PR.md in the fork), every
+# model downloads. Until upstream takes it (tobi/qmd#954), every
 # machine builds the fork:
 #
 #   clone/fetch the branch into ~/.local/share/qmd/src
