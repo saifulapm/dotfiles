@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# What Mod+Space runs: toggle the launcher, but always arrive at root search.
+#
+# Why this is not just `vicinae toggle` any more (2026-09-14):
+# pop_to_root_on_close went FALSE in vicinae/overrides.json so that Alt+Space
+# can resume the last view. With it true, NavigationController::applyPopToRoot
+# resolves the pending PopToRootType::Default to Immediate and unwinds the view
+# stack the instant the window hides — there is never anything to come back to.
+# False resolves it to Suspended instead, the stack survives, and every open
+# reopens where you left off. Right for Alt+Space, wrong for the key you press
+# to start something new.
+#
+# vicinae://open?popToRoot=true is the one deeplink that does both halves in a
+# single round trip — it calls popToRoot() before showWindow(), and
+# PopToRootOptions::clearSearch defaults to true, so the previous query goes
+# with the stack. What it will not do is close: the handler bails with "Already
+# opened" when the window is up, because it is an open, not a toggle. Hence the
+# branch — `vicinae state open` exits 0 when the window is open — so Mod+Space
+# on a visible launcher still dismisses it, exactly as it did before.
+set -euo pipefail
+
+if vicinae state open; then
+  exec vicinae close
+fi
+
+exec vicinae deeplink 'vicinae://open?popToRoot=true'

@@ -15,7 +15,52 @@
 # Consequence worth knowing: a machine where the build silently failed still
 # has a working launcher, just without Tab. `vicinae-rebuild --check` is what
 # tells the two apart.
+#
+# It also sizes the launcher, because this is the one place that runs once per
+# session with a compositor to ask. See write_size below.
 set -euo pipefail
+
+# vicinae's launcher_window.size is two ints of logical pixels and nothing else
+# — Size in src/server/src/config/config.hpp has no ratio, no "relative to
+# screen", no per-output form — so one number cannot serve both a 1706x1066
+# laptop desktop and the Mac mini's 3840x2160 one. 760x470 was picked on the
+# MacBook, where it covers 44% of the width; the same numbers on the mini cover
+# 20%, which is the "vicinae looks very small" report.
+#
+# So derive it: 44% of the focused output, clamped to [760..1150] wide and
+# [470..700] tall. The ratio is what the MacBook already had, the floor keeps
+# small panels at the size they were tuned for, and the cap stops a 4K desktop
+# from turning the launcher into something you have to look around — 1150x700
+# is 30% of 3840x2160. The mini and any 1440p/4K NUC land on the cap; 1080p
+# lands on 845x475, a touch above the floor, under its own power.
+#
+# Written before the exec, not after, for two reasons. The config manager only
+# QFileSystemWatcher::addPath()s a file it could read, so a fragment that
+# appears later in the session is watched but not merged. And a monitor change
+# mid-session is rare on the machines that need this (mini and NUC are fixed to
+# one desk) — plug a different panel in and `systemctl --user restart vicinae`
+# re-derives. A missing fragment is only a qWarning in Manager::load, so a
+# machine without niri, or one where this fails, keeps the overrides.json
+# fallback rather than losing its config.
+write_size() {
+  local out fragment="$HOME/.local/state/qshell/vicinae-size.json"
+
+  # Write through a temp file: the watcher wakes on any change and half a JSON
+  # document is a parse error, which aborts the WHOLE reload (Manager::load
+  # propagates an import failure up through loadUser), not just this fragment.
+  out=$(niri msg -j focused-output 2>/dev/null | jq -c '
+    def clamp($lo; $hi): if . < $lo then $lo elif . > $hi then $hi else . end;
+    .logical | {launcher_window: {size: {
+      width:  (.width  * 0.44 | round | clamp(760; 1150)),
+      height: (.height * 0.44 | round | clamp(470;  700))
+    }}}' 2>/dev/null) || return 0
+
+  [ -n "$out" ] || return 0
+  mkdir -p "${fragment%/*}"
+  printf '%s\n' "$out" >"$fragment.tmp" && mv "$fragment.tmp" "$fragment"
+}
+
+write_size
 
 local_bin="$HOME/.local/bin/vicinae"
 

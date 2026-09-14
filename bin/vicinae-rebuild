@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# vicinae-rebuild — build vicinae from source with our patch applied and
-# install it into ~/.local, so every machine gets the Tab keybind.
+# vicinae-rebuild — build vicinae from source with our patches applied and
+# install it into ~/.local, so every machine gets the Tab keybind, the
+# full-width detail pane and a detail pane that follows its tail.
 #
 # Why a local build (2026-09-10): vicinae has no way to express "run the
 # fallback command" as a keybind — its Keybind enum is a closed list of 22
@@ -9,6 +10,27 @@
 # Raycast binds that to Tab and calls it Quick AI.
 # packages/vicinae-tab-fallback.patch adds ActivateFallback (default Tab) as a
 # real keybind, so it shows up in the settings UI and stays rebindable.
+#
+# Why the second one (2026-09-14): a List that shows a detail always gives 35%
+# of the card to the item list — detailRatio is hardcoded in
+# GenericListView.qml and never wired to the extension model. vicinae/ai-ask's
+# chat renders the whole conversation in that detail, so those 35% were a
+# column of question rows repeating what the transcript already said.
+# packages/vicinae-full-width-detail.patch adds a `hideListPane` prop that
+# collapses the list and gives the detail the full width. It needs no change to
+# @vicinae/api: the extension reconciler forwards every unknown prop verbatim
+# and the C++ parses with error_on_unknown_keys=false, so the prop rides along
+# on an unpatched client and is simply ignored by an unpatched server.
+#
+# Why the third (2026-09-14, docs/vicinae-ai-extensibility-2026-09-14.md §1.3):
+# the markdown pane tail-follows a stream only while the new text is a strict
+# prefix-extension of the old AND the view is already at the bottom; anything
+# else resets it to the top and it never follows again. A resumed chat
+# therefore opened at its first turn and streamed the follow-up out of sight.
+# packages/vicinae-list-tail-follow.patch adds a `followTail` prop on List that
+# jumps to the bottom on reset and keeps following, and routes Up/Down to the
+# detail when the list pane is hidden (with hideListPane there is nothing to
+# select, so the transcript was wheel-only). Same unknown-prop mechanism.
 #
 # The COPR package STAYS INSTALLED on purpose: bin/vicinae-serve falls back to
 # /usr/bin/vicinae whenever this build is missing, so a machine that has not
@@ -26,7 +48,17 @@ PREFIX="$HOME/.local"
 SERVER="$PREFIX/libexec/vicinae/vicinae-server"
 STAMP="$HOME/.local/state/vicinae-build.stamp"
 ROOT="${CHEZMOI_WORKING_TREE:-$HOME/.dotfiles}"
-PATCH="$ROOT/packages/vicinae-tab-fallback.patch"
+
+# Every packages/vicinae-*.patch, in glob (i.e. sorted) order. Three today:
+# the Tab keybind (disjoint from the others), the full-width detail pane, and
+# the tail-follow, which builds on the full-width one and so is NAMED to sort
+# after it (list-… > full-…). One file each rather than one combined patch — a
+# patch that stops applying to a newer tag can then be dropped or rewritten on
+# its own. To regenerate one: check out the tag, apply the patches before it,
+# commit that as a scratch commit, make the change, `git diff HEAD`.
+shopt -s nullglob
+PATCHES=("$ROOT"/packages/vicinae-*.patch)
+shopt -u nullglob
 
 # The upstream tag we build. Kept equal to what the COPR ships so the only
 # difference from the package is the patch; `--check` shouts when they drift,
@@ -43,11 +75,15 @@ say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 has_patch() {
   local syms
   syms=$(strings "$SERVER" 2>/dev/null || true)
-  grep -qx activate-fallback <<<"$syms"
+  # One marker per patch: the keybind id, and the Q_PROPERTY names moc writes
+  # into the metaobject string table. A binary carrying only some of them is a
+  # half-applied build, which is exactly what this is here to catch.
+  grep -qx activate-fallback <<<"$syms" && grep -qx hideListPane <<<"$syms" &&
+    grep -qx followTail <<<"$syms"
 }
 
 want_stamp() {
-  printf '%s %s\n' "$TAG" "$(sha256sum "$PATCH" 2>/dev/null | cut -d' ' -f1)"
+  printf '%s %s\n' "$TAG" "$(cat "${PATCHES[@]}" 2>/dev/null | sha256sum | cut -d' ' -f1)"
 }
 
 case "${1:-}" in
@@ -81,7 +117,7 @@ case "${1:-}" in
   ;;
 esac
 
-[ -r "$PATCH" ] || { warn "patch not found at $PATCH"; exit 1; }
+[ "${#PATCHES[@]}" -gt 0 ] || { warn "no patches found in $ROOT/packages"; exit 1; }
 for dep in git cmake ninja clang-format; do
   command -v "$dep" >/dev/null 2>&1 || { warn "$dep missing — install the build deps first (packages/manifest.toml)"; exit 1; }
 done
@@ -95,12 +131,14 @@ if ! git -C "$SRC" rev-parse HEAD >/dev/null 2>&1; then
   git clone --quiet https://github.com/vicinaehq/vicinae.git "$SRC" || { warn "clone failed"; exit 1; }
 fi
 
-say "checking out $TAG with the patch"
+say "checking out $TAG with ${#PATCHES[@]} patch(es)"
 git -C "$SRC" fetch --quiet --tags origin 2>/dev/null || true
 git -C "$SRC" checkout --quiet --force "$TAG" || { warn "checkout $TAG failed"; exit 1; }
-# --force above discards a previous run's patch, so the tree is always pristine
-# here and the patch always applies to the same bytes it was generated from.
-git -C "$SRC" apply "$PATCH" || { warn "patch did not apply to $TAG"; exit 1; }
+# --force above discards a previous run's patches, so the tree is always
+# pristine here and each patch applies to the same bytes it was generated from.
+for patch in "${PATCHES[@]}"; do
+  git -C "$SRC" apply "$patch" || { warn "patch did not apply to $TAG: ${patch##*/}"; exit 1; }
+done
 
 # USE_SYSTEM_CMARK_GFM=OFF: Fedora ships no cmark-gfm-devel and the tree
 # vendors it. INSTALL_MODULES_LOAD_CONFIG=OFF: kernel modules-load.d config

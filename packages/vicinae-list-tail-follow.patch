@@ -1,0 +1,218 @@
+diff --git a/src/server/src/extend/list-model.hpp b/src/server/src/extend/list-model.hpp
+index e30083578..7585c4417 100644
+--- a/src/server/src/extend/list-model.hpp
++++ b/src/server/src/extend/list-model.hpp
+@@ -45,6 +45,14 @@ struct ListModel {
+    * detail is the content and the list exists only to own the action panel.
+    */
+   bool hideListPane = false;
++  /**
++   * Keep the detail panel scrolled to its end: jump to the bottom when its
++   * markdown is replaced, and follow every append. For a detail that is a
++   * live transcript, where the newest text is always at the bottom and a
++   * rewrite (a resumed conversation, a status line that changes) would
++   * otherwise park the view at the top.
++   */
++  bool followTail = false;
+   std::string navigationTitle;
+   std::string searchPlaceholderText;
+   std::optional<std::string> onSelectionChanged;
+diff --git a/src/server/src/extend/model-deser.cpp b/src/server/src/extend/model-deser.cpp
+index 737e9392b..dbbedc69b 100644
+--- a/src/server/src/extend/model-deser.cpp
++++ b/src/server/src/extend/model-deser.cpp
+@@ -348,6 +348,7 @@ struct ListModelWire {
+   bool throttle = false;
+   bool isShowingDetail = false;
+   bool hideListPane = false;
++  bool followTail = false;
+   std::string navigationTitle;
+   std::string searchBarPlaceholder;
+   std::optional<std::string> onSelectionChange;
+@@ -837,6 +838,7 @@ static ListModel toListModel(ListModelWire &w) {
+   m.throttle = w.throttle;
+   m.isShowingDetail = w.isShowingDetail;
+   m.hideListPane = w.hideListPane;
++  m.followTail = w.followTail;
+   m.navigationTitle = std::move(w.navigationTitle);
+   m.searchPlaceholderText = std::move(w.searchBarPlaceholder);
+   m.onSelectionChanged = std::move(w.onSelectionChange);
+diff --git a/src/server/src/qml/extension-list-model.cpp b/src/server/src/qml/extension-list-model.cpp
+index 720881c0f..29c40b983 100644
+--- a/src/server/src/qml/extension-list-model.cpp
++++ b/src/server/src/qml/extension-list-model.cpp
+@@ -99,6 +99,7 @@ ExtensionListModel::ExtensionListModel(NotifyFn notify, QObject *parent)
+ void ExtensionListModel::setExtensionData(const ListModel &model, bool resetSelection) {
+   bool const wasShowingDetail = m_model.isShowingDetail;
+   bool const wasHidingListPane = m_model.hideListPane;
++  bool const wasFollowingTail = m_model.followTail;
+   m_model = model;
+   m_placeholder = QString::fromStdString(model.searchPlaceholderText);
+ 
+@@ -148,6 +149,7 @@ void ExtensionListModel::setExtensionData(const ListModel &model, bool resetSele
+ 
+   if (wasShowingDetail != m_model.isShowingDetail) emit isShowingDetailChanged();
+   if (wasHidingListPane != m_model.hideListPane) emit hideListPaneChanged();
++  if (wasFollowingTail != m_model.followTail) emit followTailChanged();
+ 
+   refreshCurrentDetail();
+ 
+@@ -218,6 +220,8 @@ bool ExtensionListModel::isShowingDetail() const { return m_model.isShowingDetai
+ 
+ bool ExtensionListModel::hideListPane() const { return m_model.hideListPane; }
+ 
++bool ExtensionListModel::followTail() const { return m_model.followTail; }
++
+ QString ExtensionListModel::detailMarkdown() const { return m_detailMarkdown; }
+ 
+ void ExtensionListModel::onSelectionCleared() {
+diff --git a/src/server/src/qml/extension-list-model.hpp b/src/server/src/qml/extension-list-model.hpp
+index 776690571..e2f91ca8f 100644
+--- a/src/server/src/qml/extension-list-model.hpp
++++ b/src/server/src/qml/extension-list-model.hpp
+@@ -56,6 +56,7 @@ class ExtensionListModel : public SectionListModel {
+   Q_PROPERTY(ImageUrl emptyIcon READ emptyIcon NOTIFY emptyViewChanged)
+   Q_PROPERTY(bool isShowingDetail READ isShowingDetail NOTIFY isShowingDetailChanged)
+   Q_PROPERTY(bool hideListPane READ hideListPane NOTIFY hideListPaneChanged)
++  Q_PROPERTY(bool followTail READ followTail NOTIFY followTailChanged)
+   Q_PROPERTY(QString detailMarkdown READ detailMarkdown NOTIFY detailChanged)
+   Q_PROPERTY(QVariantList detailMetadata READ detailMetadata NOTIFY detailChanged)
+ 
+@@ -75,6 +76,7 @@ public:
+ 
+   bool isShowingDetail() const;
+   bool hideListPane() const;
++  bool followTail() const;
+   QString detailMarkdown() const;
+   QVariantList detailMetadata() const { return m_detailMetadata; }
+ 
+@@ -82,6 +84,7 @@ signals:
+   void detailChanged();
+   void isShowingDetailChanged();
+   void hideListPaneChanged();
++  void followTailChanged();
+   void emptyViewChanged();
+ 
+ protected:
+diff --git a/src/server/src/qml/qml/ExtensionView.qml b/src/server/src/qml/qml/ExtensionView.qml
+index 38b95f575..05ae31377 100644
+--- a/src/server/src/qml/qml/ExtensionView.qml
++++ b/src/server/src/qml/qml/ExtensionView.qml
+@@ -71,10 +71,21 @@ Item {
+     Component {
+         id: listComponent
+         Item {
++            // With the list pane hidden there is nothing for Up/Down to
++            // select, so they scroll the detail instead — as they do in the
++            // root Detail view.
+             function moveUp() {
++                if (listView.hideListPane && listView.detailItem) {
++                    listView.detailItem.scrollUp();
++                    return true;
++                }
+                 return listView.moveUp();
+             }
+             function moveDown() {
++                if (listView.hideListPane && listView.detailItem) {
++                    listView.detailItem.scrollDown();
++                    return true;
++                }
+                 return listView.moveDown();
+             }
+             function moveSectionUp() {
+@@ -159,10 +170,19 @@ Item {
+                     hasContent: root.host.contentModel.detailMarkdown !== ""
+                     metadata: root.host.contentModel.detailMetadata
+ 
++                    function scrollUp() {
++                        detailText.scrollUp();
++                    }
++                    function scrollDown() {
++                        detailText.scrollDown();
++                    }
++
+                     MarkdownText {
++                        id: detailText
+                         anchors.fill: parent
+                         topPadding: 6
+                         markdown: root.host.contentModel.detailMarkdown
++                        followTail: root.host.contentModel.followTail ?? false
+                     }
+                 }
+             }
+diff --git a/src/server/src/qml/qml/GenericListView.qml b/src/server/src/qml/qml/GenericListView.qml
+index 0e3e9c9b3..c0e6c28b0 100644
+--- a/src/server/src/qml/qml/GenericListView.qml
++++ b/src/server/src/qml/qml/GenericListView.qml
+@@ -30,6 +30,9 @@ Item {
+     // Give the detail the full width and collapse the item list beside it, for
+     // lists whose rows carry nothing the detail does not already show.
+     property bool hideListPane: false
++    // The loaded detail, for a host that wants to scroll it in place of a
++    // list it has hidden.
++    readonly property alias detailItem: detailLoader.item
+ 
+     property string emptyTitle: qsTr("No results")
+     property string emptyDescription: ""
+diff --git a/src/server/src/qml/qml/markdown/MarkdownText.qml b/src/server/src/qml/qml/markdown/MarkdownText.qml
+index 1a086c5db..efbd64ce8 100644
+--- a/src/server/src/qml/qml/markdown/MarkdownText.qml
++++ b/src/server/src/qml/qml/markdown/MarkdownText.qml
+@@ -9,6 +9,7 @@ Item {
+     property int contentPadding: 12
+     property int topPadding: contentPadding
+     property string fontFamily: ""
++    property bool followTail: false
+     implicitHeight: view.contentHeight
+     property alias contentHeight: view.contentHeight
+ 
+@@ -30,6 +31,7 @@ Item {
+         contentPadding: root.contentPadding
+         topPadding: root.topPadding
+         fontFamily: root.fontFamily
++        followTail: root.followTail
+     }
+ 
+     onMarkdownChanged: mdModel.setMarkdown(markdown)
+diff --git a/src/server/src/qml/qml/markdown/MarkdownView.qml b/src/server/src/qml/qml/markdown/MarkdownView.qml
+index 58140d694..24a22145f 100644
+--- a/src/server/src/qml/qml/markdown/MarkdownView.qml
++++ b/src/server/src/qml/qml/markdown/MarkdownView.qml
+@@ -13,6 +13,9 @@ Item {
+     property string fontFamily: ""
+     property alias contentHeight: flickable.contentHeight
+     property var selectionController: null
++    // Stick to the end: a replaced document opens at its bottom, and every
++    // append is followed, even from a position that is not the bottom.
++    property bool followTail: false
+     property bool _autoScroll: false
+     focus: true
+ 
+@@ -78,7 +81,11 @@ Item {
+ 
+         onContentHeightChanged: {
+             if (root._autoScroll) {
+-                root._autoScroll = false;
++                // Stays armed while following: after a reset the height
++                // settles over several changes as blocks are created, and
++                // one jump would land short.
++                if (!root.followTail)
++                    root._autoScroll = false;
+                 contentY = Math.max(0, contentHeight - height + bottomMargin);
+             }
+         }
+@@ -311,12 +318,12 @@ Item {
+         target: root.model
+         function onBlocksAppended() {
+             let atBottom = flickable.contentHeight <= flickable.height || flickable.contentY + flickable.height >= flickable.contentHeight - 2;
+-            root._autoScroll = atBottom;
++            root._autoScroll = atBottom || root.followTail;
+         }
+         function onModelReset() {
+             root._controller.clearSelection();
+             flickable.contentY = 0;
+-            root._autoScroll = false;
++            root._autoScroll = root.followTail;
+         }
+     }
+ }

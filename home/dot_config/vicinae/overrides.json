@@ -10,7 +10,8 @@
   },
   "search_files_in_root": false,
   "close_on_focus_loss": true,
-  "pop_to_root_on_close": true,
+  "//pop_to_root_on_close": "FALSE since 2026-09-14, and the pair of launcher keybinds in niri's config.kdl depends on it. True made the launcher amnesiac in a way close_on_focus_loss turns into a daily cost: focusing any other window closes it, and closing with this true unwinds the whole view stack on the spot, so glancing at the browser mid-task threw the task away. False makes the close suspend the stack instead, Alt+Space reopens exactly what was on screen, and bin/vicinae-launch gives Mod+Space its fresh root back with an explicit popToRoot.",
+  "pop_to_root_on_close": false,
   "escape_key_behavior": "close_window",
   "keybinding": "vim",
   "font": {
@@ -35,6 +36,7 @@
       "keyboard_interactivity": "on_demand",
       "layer": "top"
     },
+    "//size": "The fallback only. bin/vicinae-serve derives the real size from the focused output before it execs the server and writes it to the vicinae-size.json fragment, which rides last in VICINAE_OVERRIDES and wins — these numbers are what a machine gets when niri cannot be asked. They are also the floor that derivation clamps to, being what the MacBook's 1706x1066 logical desktop works out to.",
     "size": {
       "width": 760,
       "height": 470
@@ -96,8 +98,9 @@
       }
     }
   },
-  "//fallbacks": "What the root search offers when nothing matches what was typed — the only way an arbitrary phrase becomes a command. Empty since the switch because the stock entry was files:search and the files provider is off above. vicinae/youtube:search takes the slot: typing a song title now ends in \"Search on YouTube\" rather than nothing, which is the whole point of the extension. Ids are what `vicinae cmd ls` prints, and an id that does not resolve is ignored rather than fatal — so a machine mid-apply, with the extension not yet built, just has no fallback.",
+  "//fallbacks": "What the root search offers when nothing matches what was typed — the only way an arbitrary phrase becomes a command. Empty since the switch because the stock entry was files:search and the files provider is off above. Order is what matters now that there are two: Tab (the ActivateFallback keybind from packages/vicinae-tab-fallback.patch) runs the FIRST entry, so vicinae/ai-ask:ask holds it and any typed phrase is a question answered in place, Raycast's Quick AI. vicinae/youtube:search stays second, still reachable by arrowing down to it. Ids are what `vicinae cmd ls` prints, and an id that does not resolve is ignored rather than fatal — so a machine mid-apply, with the extension not yet built, just has no fallback.",
   "fallbacks": [
+    "@saiful/ai-ask:ask",
     "@saiful/youtube:search"
   ]
 }

@@ -36,10 +36,12 @@ Slice=session.slice
 # packaged one never picks up the patch, and the local one turns a fresh or
 # failed build into a restart-looping unit and no launcher at all.
 ExecStart=%h/.dotfiles/bin/vicinae-serve server --replace
-# overrides.json (chezmoi-managed) then the theme-generated fragment
-# (bin/theme-apply): later files win, so the active theme's font/rounding
-# ride on top of the static config.
-Environment=VICINAE_OVERRIDES=%h/.config/vicinae/overrides.json:%h/.local/state/qshell/vicinae-overrides.json
+# overrides.json (chezmoi-managed), then the theme-generated fragment
+# (bin/theme-apply), then the monitor-derived launcher size (written by
+# vicinae-serve just above, right before it execs): later files win, so the
+# active theme's font/rounding and this display's window size ride on top of
+# the static config.
+Environment=VICINAE_OVERRIDES=%h/.config/vicinae/overrides.json:%h/.local/state/qshell/vicinae-overrides.json:%h/.local/state/qshell/vicinae-size.json
 Restart=on-failure
 RestartSec=2
 # Apps launched from vicinae must survive a launcher restart.

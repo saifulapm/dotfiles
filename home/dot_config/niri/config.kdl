@@ -771,7 +771,15 @@ binds {
     // the tmux bind above; a bare `herdr` attaches to (or starts) its
     // persistent server, herdr's own equivalent of new-session -A.
     Mod+Ctrl+Return hotkey-overlay-title="Terminal: herdr" { spawn "launch-or-focus" "herdr-main" "foot-run" "--app-id=herdr-main" "herdr"; }
-    Mod+Space hotkey-overlay-title="Launcher" { spawn "vicinae" "toggle"; }
+    // Two ways in, because pop_to_root_on_close is false (see
+    // vicinae/overrides.json): the launcher now keeps its view stack when it
+    // closes, so "where you left off" is a thing that exists and both answers
+    // to it are wanted. Mod+Space is the one you press to START something and
+    // always lands on an empty root search; Alt+Space reopens the view that
+    // was on screen when the window went away — which, with
+    // close_on_focus_loss, is every time you touch another window.
+    Mod+Space hotkey-overlay-title="Launcher" { spawn "vicinae-launch"; }
+    Alt+Space hotkey-overlay-title="Launcher: resume" { spawn "vicinae" "toggle"; }
     // Omarchy's SUPER+ALT+SPACE apps-menu bind (b92510f). Our menu has no
     // app rows — its Apps row hands off to the launcher, as Mod+D does — so
     // this summons the launcher directly.
