@@ -1,0 +1,24 @@
+[Unit]
+Description=Re-index and re-embed the qmd collections
+Documentation=file:%h/.dotfiles/docs/qmd-2026-09-14.md
+ConditionPathExists=%h/.local/share/mise/shims/qmd
+
+[Service]
+Type=oneshot
+# The shim, not the node bin dir: `node = "lts"` in mise moves between
+# versions and takes every npm global with it (run_after_04's pi note); the
+# shim always resolves to whatever qmd the current node has. `update` walks
+# the collections and re-indexes changed files; `embed` computes vectors for
+# whatever has none. No `pull`: the models are pxy's (index.yml), there is
+# nothing to download.
+ExecStart=%h/.local/share/mise/shims/qmd update
+ExecStart=%h/.local/share/mise/shims/qmd embed
+# Embedding goes to pxy in batches of ten chunks, four requests in flight, so
+# the work is network-bound and light on the machine; Nice/idle still keep it
+# off the desktop's back. A run with nothing new takes seconds.
+Nice=19
+IOSchedulingClass=idle
+# Measured 2026-09-14: the full corpus (8,858 docs, 12,280 chunks) embedded
+# from scratch in 5 m 13 s; hourly runs embed only what changed. Room for a
+# slow provider, and well under qmd's own 30-minute embed session cap.
+TimeoutStartSec=30m

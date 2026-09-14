@@ -1,0 +1,20 @@
+[Unit]
+Description=Hourly refresh of the qmd document index
+# Repeated on the timer as well as the service, so a machine that never gets
+# qmd (run_after_56-qmd.sh skipped: no node) does not sit with an armed
+# timer whose service can never start.
+ConditionPathExists=%h/.local/share/mise/shims/qmd
+
+[Timer]
+# Hourly: the mem store gains log lines all day and the docs change daily;
+# an hour behind is invisible to a question asked in the launcher, and a
+# tighter loop would run the embedding models for nothing most of the time.
+OnCalendar=hourly
+# Persistent, so a laptop that slept through the hour refreshes on wake
+# rather than waiting for the next one.
+Persistent=true
+RandomizedDelaySec=10m
+AccuracySec=15m
+
+[Install]
+WantedBy=timers.target

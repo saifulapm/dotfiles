@@ -1,0 +1,79 @@
+# qmd (tobi/qmd) — local hybrid search over documents: BM25 + vectors + LLM
+# rerank in one SQLite file. This is its whole configuration: which
+# directories are collections, and which models it uses. Managed here so
+# every machine indexes the same things; the index itself is a cache
+# (~/.cache/qmd/index.sqlite) rebuilt by run_after_56-qmd.sh.
+#
+# qmd rewrites this file itself on `qmd collection add` / `qmd context add`,
+# through the symlink, so an addition made by hand on one machine is a repo
+# change to commit, not a local drift.
+#
+# Who reads the index: the AI Chat command in vicinae/ai-ask, over MCP
+# (`qmd mcp`, registered in dot_config/vicinae/ai-ask-mcp.json), and
+# `qmd query "…" --json` from a shell. Design and rationale:
+# docs/vicinae-ai-extensibility-2026-09-14.md §2.4.
+# Every collection carries a `context`: qmd returns it beside each hit, and
+# its README calls that the feature that lets a model pick the right document.
+# Paths are absolute and /home/saiful because qmd writes them back that way;
+# every machine here is the same user.
+collections:
+  dotfiles-docs:
+    path: /home/saiful/.dotfiles/docs
+    pattern: "**/*.md"
+    context:
+      "/": "Saiful's dotfiles design notes: one dated markdown file per feature of this Fedora Asahi + niri + quickshell desktop, explaining what was built and why."
+  # The `mem` store (bin mem, "the system of record for AI workflow state"):
+  # ~8,000 records — facts, rulings, handoffs, questions and answers, logs,
+  # plus each project's wiki, plan, roadmap and status. mem has its own
+  # full-text search; this adds vectors and reranking over the same files,
+  # so "what did we decide about X" finds the ruling worded differently.
+  # Records are TOML-fronted (+++), which qmd does not parse: the ULID is the
+  # title and the frontmatter is part of the text. Logs are five of the eight
+  # thousand and one line each; they are the timeline and stay in.
+  mem:
+    path: /home/saiful/.local/share/mem/store
+    pattern: "**/*.md"
+    context:
+      "/": "Saiful's mem store: durable facts, rulings, session handoffs, questions and answers, and one-line log entries from AI coding sessions, grouped by project (amx, shopify_apps, workflow, splitroute, dactyl, poshra, pawsome …). Each record's TOML header gives kind, project, machine and date."
+      "/global": "Facts and rulings that apply to every project."
+  # Design docs and READMEs of the code under ~/Sites, which is two levels
+  # deep (github/<repo>, tries/<repo>, laravel/<app> …), hence the `*/*/`:
+  # a repo's own README, agent files and docs/ tree, and nothing below that.
+  # `**/README.md` pulled in 1,817 files, most of them the READMEs of code
+  # vendored under omniroute/references and kojev-tv; this pattern gives 265.
+  project-docs:
+    path: /home/saiful/Sites
+    pattern: "*/*/README.md,*/*/CLAUDE.md,*/*/HANDOFF.md,*/*/docs/**/*.md"
+    context:
+      "/": "Design notes, READMEs and agent handoffs of Saiful's projects under ~/Sites: github/* are his own repos (omniroute is pxy, the LLM proxy; poshra; celld; ftcapp; dekho), shopify-* are store themes and apps, tries/* are experiments."
+  # The dotfiles as code, for "where is X configured": scripts, units, shell
+  # and QML. Off by default for unscoped queries — a question about a design
+  # decision should not drown in config lines — and scoped in with
+  # `-c dotfiles` or the MCP `collections` parameter when the question is
+  # about the machinery.
+  dotfiles:
+    path: /home/saiful/.dotfiles
+    pattern: "bin/**,home/**/*.{sh,fish,qml,toml,kdl,json,service,timer,socket,path,tmpl,conf},vicinae/*/src/**/*.{ts,tsx},packages/*.{toml,patch,conf}"
+    ignore:
+      - "docs/**"
+      - "vicinae/*/node_modules/**"
+    includeByDefault: false
+    context:
+      "/": "Saiful's dotfiles repository (chezmoi, source under home/): bin/ holds the scripts, home/dot_config the configs (niri, quickshell in qshell/, fish, systemd user units, vicinae), home/.chezmoiscripts the per-machine install steps, vicinae/ the launcher extensions, packages/ the dnf manifest and vicinae patches."
+# The models are pxy's, not local GGUF files: `openai:` URIs go to the
+# OpenAI-compatible backend that the fork run_after_56 installs adds
+# (docs/qmd-2026-09-14.md §4). Without a GPU the stock models embed at a
+# second per chunk and rerank in minutes; through pxy the whole corpus embeds
+# in minutes and a query answers in seconds. `text-embedding-v4` is DashScope
+# (1024-d, batches of 10); `auto` reranks via pxy's chain (voyage, jina);
+# `general` is the chat group, and `reasoning_effort: none` stops its
+# nemotron member from spending the whole budget thinking and returning an
+# empty expansion. The key is pxy's local token from dot_config/pxy/config.toml.
+models:
+  embed: openai:text-embedding-v4
+  generate: openai:general
+  rerank: openai:auto
+  openai_base_url: http://127.0.0.1:4100/v1
+  openai_api_key: pxy-local
+  openai_generate_params:
+    reasoning_effort: none
