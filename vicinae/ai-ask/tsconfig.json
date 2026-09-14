@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    // "bundler", not "node": @earendil-works/pi-ai publishes its API
+    // implementations as `exports` subpaths, which classic node10 resolution
+    // cannot read. Nothing is emitted from here anyway — `vici build` runs
+    // esbuild and produces the CJS bundle — so this describes how the bundler
+    // resolves, which is exactly what "bundler" means. It requires a module
+    // setting of esnext/preserve rather than commonjs.
+    "module": "esnext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*", "vicinae-env.d.ts"]
+}

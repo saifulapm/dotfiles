@@ -1,0 +1,6 @@
+# package-lock.json is COMMITTED, deliberately: the build script runs
+# `npm ci` on every machine, and without a lock the three dev dependencies
+# would float and a typecheck could pass here and fail on the mini.
+node_modules/
+# Written by `vici build` from the manifest on every build.
+vicinae-env.d.ts

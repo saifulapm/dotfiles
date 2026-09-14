@@ -1,0 +1,158 @@
+{
+  "name": "ai-ask",
+  "title": "AI",
+  "description": "Ask a question from the root search, or hold a conversation, through the local pxy proxy",
+  "icon": "icon.svg",
+  "author": "saiful",
+  "license": "MIT",
+  "platforms": [
+    "Linux"
+  ],
+  "commands": [
+    {
+      "name": "ask",
+      "title": "Ask AI",
+      "description": "Answer the typed question with a model, streamed into a detail view",
+      "mode": "view",
+      "icon": "icon.svg",
+      "keywords": [
+        "ai",
+        "ask",
+        "llm",
+        "chat",
+        "gpt",
+        "claude",
+        "pxy"
+      ],
+      "arguments": [
+        {
+          "name": "question",
+          "type": "text",
+          "placeholder": "Ask anything",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "chat",
+      "title": "AI Chat",
+      "description": "Hold a conversation with a model, with follow-ups and saved history",
+      "mode": "view",
+      "icon": "icon.svg",
+      "keywords": [
+        "ai",
+        "chat",
+        "llm",
+        "conversation",
+        "gpt",
+        "claude",
+        "pxy"
+      ],
+      "arguments": [
+        {
+          "name": "question",
+          "type": "text",
+          "placeholder": "Ask anything",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "imagine",
+      "title": "Imagine",
+      "description": "Generate an image from a description through pxy, kept in a grid with everything generated before",
+      "mode": "view",
+      "icon": "icon.svg",
+      "keywords": [
+        "ai",
+        "image",
+        "picture",
+        "generate",
+        "imagine",
+        "flux",
+        "pxy"
+      ],
+      "arguments": [
+        {
+          "name": "prompt",
+          "type": "text",
+          "placeholder": "Describe an image",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "video",
+      "title": "Video",
+      "description": "Render a short video from a description through pxy; takes minutes, kept in a list with earlier renders",
+      "mode": "view",
+      "icon": "icon.svg",
+      "keywords": [
+        "ai",
+        "video",
+        "generate",
+        "render",
+        "pxy"
+      ],
+      "arguments": [
+        {
+          "name": "prompt",
+          "type": "text",
+          "placeholder": "Describe a video",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "preferences": [
+    {
+      "name": "webTools",
+      "type": "checkbox",
+      "title": "Tools",
+      "label": "Web search and page fetching in AI Chat",
+      "description": "Lets the chat model call web_search and fetch_url, served by pxy's search and fetch providers. Ask AI (the Tab command) never uses tools.",
+      "required": false,
+      "default": true
+    },
+    {
+      "name": "model",
+      "type": "dropdown",
+      "title": "Model",
+      "description": "A pxy group, not a single model: each is a failover chain tried in order. General starts at ollama.com's hosted nemotron (a cloud API with a key, not a local daemon) and falls over to Cloudflare.",
+      "required": false,
+      "default": "general",
+      "data": [
+        {
+          "title": "General",
+          "value": "general"
+        },
+        {
+          "title": "Promo",
+          "value": "promo"
+        },
+        {
+          "title": "Credit",
+          "value": "credit"
+        },
+        {
+          "title": "Plans",
+          "value": "plans"
+        },
+        {
+          "title": "Quota",
+          "value": "quota"
+        }
+      ]
+    }
+  ],
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.85.1",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@vicinae/api": "0.28.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "19.1.17",
+    "typescript": "5.9.2"
+  }
+}

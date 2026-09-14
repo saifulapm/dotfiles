@@ -1,0 +1,13 @@
+{
+  "//": "MCP servers the AI Chat command (vicinae/ai-ask) may call, one entry per server, keyed by a short id that prefixes its tool names in the transcript (qmd__query). Read by src/capabilities/servers.ts on every launch of the chat — no rebuild to change it — and spawned over stdio the first time a message is sent, so a server that is not needed costs nothing. `enabled: false` is the off switch; a server whose command is missing is reported in a toast and skipped rather than failing the message. Keys starting with // are comments. Design and rationale: docs/vicinae-ai-extensibility-2026-09-14.md §2.4. A server's `description` is appended to each of its tool descriptions — for what the server does not say about itself but the model needs, such as qmd's collection names.",
+  "qmd": {
+    "//": "tobi/qmd (Saiful's fork, branch remote-models) — hybrid BM25 + vector + rerank search over the collections in dot_config/qmd/index.yml, with pxy serving the embedding, rerank and expansion models. Installed and indexed on every machine by run_after_56-qmd.sh; spawned here over stdio so the index stays open between calls.",
+    "command": "qmd",
+    "args": [
+      "mcp"
+    ],
+    "title": "Local documents",
+    "enabled": true,
+    "description": "Collections (exact names for `collections`, or leave it unset to search the defaults): dotfiles-docs = design notes of Saiful's desktop dotfiles; mem = the record of AI coding sessions across his projects (facts, rulings, handoffs, logs); project-docs = READMEs and docs of the repos under ~/Sites; dotfiles = the dotfiles as code, searched only when named. Prefer the plain `query` string: expansion and reranking run on fast remote models and answer in a few seconds, and reranking is what picks the right record among similar ones. Use `searches` only to add your own keyword (lex) or question (vec) phrasings."
+  }
+}
