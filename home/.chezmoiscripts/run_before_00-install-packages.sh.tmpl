@@ -86,7 +86,24 @@ import sys, tomllib
 m = tomllib.load(open(sys.argv[1], "rb"))
 arch = sys.argv[2]
 for p in m.get("pkg", []):
-    if p.get("arch", "all") in ("all", arch):
+    if not p.get("held") and p.get("arch", "all") in ("all", arch):
+        print(p["name"])
+PY
+)
+
+# held = true: packages bin/qt6-hold HIDES from dnf. That hold writes
+# `excludepkgs=qt6-*` into dnf.conf while quickshell's private-API link is at
+# risk, so a qt6-* package named in the bulk install below is simply not
+# there — and --skip-unavailable skips it in silence, forever. These get
+# their own pass further down with the exclude cleared and the version
+# pinned, which leaves the hold doing its actual job (blocking an ABI-
+# breaking qt6 UPGRADE) while still letting matching headers land.
+mapfile -t held < <(python3 - "$manifest" "$arch" <<'PY'
+import sys, tomllib
+m = tomllib.load(open(sys.argv[1], "rb"))
+arch = sys.argv[2]
+for p in m.get("pkg", []):
+    if p.get("held") and p.get("arch", "all") in ("all", arch):
         print(p["name"])
 PY
 )
@@ -196,8 +213,27 @@ fi
 sudo dnf install --setopt=install_weak_deps=False --skip-unavailable -y "${pkgs[@]}" \
   || { echo "install-packages: dnf transaction failed — nothing recorded, rerun 'chezmoi apply' in a terminal" >&2; exit 0; }
 
+# The held packages (see the parse above), in a transaction of their own.
+# THE VERSION PIN IS THE WHOLE POINT: `--setopt=excludepkgs=` reopens every
+# qt6-* package for this one dnf call, so without a pin the solver could walk
+# the machine straight into the upgrade bin/qt6-hold exists to prevent.
+# Pinning to the installed qt6-qtbase VERSION — not its release, the qt6
+# subpackages share an upstream version but not a release tag (qt6-qtbase
+# 6.11.2-2 beside qt6-qtsvg 6.11.2-1 here) — asks for exactly the headers
+# matching what is already on disk, so nothing moves.
+if [ "${#held[@]}" -gt 0 ]; then
+  qtver="$(rpm -q --qf '%{VERSION}' qt6-qtbase 2>/dev/null || true)"
+  if [ -z "$qtver" ]; then
+    echo "install-packages: qt6-qtbase not installed — held packages skipped (nothing to pin to)" >&2
+  else
+    sudo dnf install --setopt=excludepkgs= --setopt=install_weak_deps=False \
+      --skip-unavailable -y "${held[@]/%/-$qtver}" \
+      || echo "install-packages: held-package transaction failed — the rpm sweep below names what is short" >&2
+  fi
+fi
+
 missing=()
-for p in "${pkgs[@]}"; do
+for p in "${pkgs[@]}" "${held[@]}"; do
   rpm -q "$p" >/dev/null 2>&1 || missing+=("$p")
 done
 if [ "${#missing[@]}" -gt 0 ]; then

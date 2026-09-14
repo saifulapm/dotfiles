@@ -14,9 +14,12 @@
 #
 # The decision, re-evaluated on every run:
 #   no quickshell installed         → RELEASE (nothing to protect)
+#   the installed quickshell starts → RELEASE (the COPR has caught up and we
+#                                     are already running the fixed pair —
+#                                     see the clause for why this was missing)
 #   a quickshell upgrade is pending → RELEASE (the COPR has rebuilt; let qt6
 #                                     and quickshell move in one transaction)
-#   otherwise                       → HOLD
+#   otherwise                       → HOLD (qs is broken and no rebuild yet)
 #
 # So the hold lifts itself as soon as a rebuilt package appears: nobody has
 # to remember this file exists. Qt security updates ARE being skipped while
@@ -100,6 +103,25 @@ reason=""
 if ! have_qs_pkg; then
   want=release
   reason="quickshell is not installed"
+elif qs_runs; then
+  # THE CLAUSE THIS SCRIPT SHIPPED WITHOUT (added 2026-09-15). Below, "no
+  # quickshell upgrade pending" was read as "the COPR has not rebuilt yet" and
+  # held. It means that OR the rebuild already landed and is what we are
+  # running — and check-upgrade cannot tell those apart. This machine sat in
+  # the second state for ~12 days: qt6-qtbase 6.11.2-2, the very upgrade that
+  # killed qs, with the rebuilt quickshell 0.3.1-2 installed on top of it and
+  # starting fine, still holding qt6 and still skipping Qt security updates —
+  # the one thing the header above says must not happen.
+  #
+  # A qs that starts against the qt6 actually on disk IS the COPR having
+  # caught up, so the hold has nothing left to protect and comes off. That
+  # makes this guard REACTIVE rather than preventive: a future private-API
+  # break lands before the hold returns, instead of being fenced off. The
+  # trade is deliberate — bin/qshell-rebuild did not exist during the original
+  # incident and does now, so the cost of taking a bad qt6 is one rebuild,
+  # while the cost of the old behaviour was every Qt CVE, forever.
+  want=release
+  reason="the installed quickshell starts against $(rpm -q qt6-qtbase) — the breakage this guarded is over"
 else
   # check-upgrade: 100 = an upgrade is available, 0 = none. The exclusion
   # only ever names qt6-*, so quickshell's own availability is unaffected by

@@ -13,6 +13,13 @@
 #   name     — dnf package name
 #   category — core | shell | dev | optional
 #   arch     — all | aarch64 | x86_64   (install only on matching machines)
+#   held     — true for a package bin/qt6-hold's `excludepkgs=qt6-*` hides from
+#              dnf. The bulk transaction cannot see those at all, and its
+#              --skip-unavailable skips them in silence, so the install script
+#              gives them a pass of their own with the exclude cleared and the
+#              version pinned to the installed qt6-qtbase. Omit it everywhere
+#              else — an unheld package in that pass would be an upgrade
+#              nobody asked for.
 #   why      — one-line justification; a package with no honest justification
 #              does not get installed.
 
@@ -1587,14 +1594,40 @@ why = "KDE's LayerShellQt, headers + runtime lib — nirisnap maps its capture o
 # Raycast Quick AI gesture, which upstream has no keybind for — its Keybind
 # enum has no "run this command" action). Source at ~/.local/src/vicinae,
 # pinned to the v0.28.1 tag so it matches what the COPR shipped.
-# All three are -devel headers ONLY, each at the exact version of the runtime
+# All of them are -devel headers ONLY, each at the version of the runtime
 # already installed — no upgrade, so [[tool]] qt6-hold's guard is unaffected.
+#
+# THE THREE qt6-* ONES CARRY held = true (2026-09-15). Until then this section
+# named only qt6-qtsvg-devel and called it "the one package that needs
+# --setopt=excludepkgs=" — and nothing in the install path ever passed that
+# flag, so on a held machine dnf could not see the package, --skip-unavailable
+# skipped it without a word, and `cmake` died at "Failed to find required Qt
+# component Svg". The other two were missing from this file outright: the
+# build only ever worked because `bin/qshell-rebuild` runs `dnf builddep
+# quickshell`, which drags GuiPrivate and ShaderTools in as a side effect. A
+# machine that never rebuilt quickshell could not build vicinae at all —
+# which is exactly what this desktop was doing, silently, since 2026-09-10.
 
 [[pkg]]
 name = "qt6-qtsvg-devel"
 category = "dev"
 arch = "all"
-why = "Qt6::Svg headers/cmake config — vicinae's server CMakeLists lists Svg in its REQUIRED Qt6 components and configure dies without it. THE ONE PACKAGE HERE THAT NEEDS `--setopt=excludepkgs=` to install, because bin/qt6-hold excludes qt6-* while quickshell's private-API link is at risk. That hold is about ABI-breaking UPGRADES (6.11.1 → 6.11.2 killed qs); this is headers for the qt6-qtsvg 6.11.2-1.fc44 already installed, same NEVRA, so nothing moves. Pin the version when installing or a future dnf could pull a newer qt6 through the open exclude"
+held = true
+why = "Qt6::Svg headers/cmake config — vicinae's server CMakeLists lists Svg in its REQUIRED Qt6 components and configure dies without it. Held: bin/qt6-hold excludes qt6-* while quickshell's private-API link is at risk. That hold is about ABI-breaking UPGRADES (6.11.1 → 6.11.2 killed qs); this is headers for the qt6-qtsvg already installed, same upstream version, so nothing moves"
+
+[[pkg]]
+name = "qt6-qtbase-private-devel"
+category = "dev"
+arch = "all"
+held = true
+why = "Qt6::GuiPrivate — vicinae's server CMakeLists lists GuiPrivate among its REQUIRED Qt6 components (it reaches into Qt's private platform API for the Wayland surface), and there is no option to opt out. Held for the same reason as qt6-qtsvg-devel. Was never declared here: it arrived on the mac as a side effect of `dnf builddep quickshell` inside bin/qshell-rebuild, which is why the build worked there and nowhere else"
+
+[[pkg]]
+name = "qt6-qtshadertools-devel"
+category = "dev"
+arch = "all"
+held = true
+why = "Qt6::ShaderTools — REQUIRED alongside GuiPrivate in the same find_package call; it supplies qsb, which bakes the QML shaders at build time. Held for the same reason as qt6-qtsvg-devel, and undeclared here for the same reason as qt6-qtbase-private-devel"
 
 [[pkg]]
 name = "kf6-syntax-highlighting-devel"
@@ -1619,6 +1652,12 @@ name = "libqalculate-devel"
 category = "dev"
 arch = "all"
 why = "libqalculate/Calculator.h — vicinae's calculator service compiles a qalculate backend in unconditionally. Invisible to a CMake dependency audit: there is no find_package for it, the header is just included, so it only surfaced as a compile error 404 files into the build. Runtime libqalculate 5.9.0 was already installed (the COPR binary links it)"
+
+[[pkg]]
+name = "clang-tools-extra"
+category = "dev"
+arch = "all"
+why = "clang-format, which bin/vicinae-rebuild requires before it will build (`for dep in git cmake ninja clang-format`). Undeclared until 2026-09-15 and installed only where it had been put by hand, so this desktop had git, cmake and ninja and still bailed HERE — the first of its two blockers, before configure ever ran to hit the qt6 headers. NOT a CMake dependency: nothing in the configure or build path invokes it, it only appears in upstream's `make format` target. Kept as a real dep rather than dropped from the check (user call 2026-09-15) because regenerating a packages/vicinae-*.patch against a new tag means formatting the change the way upstream's .clang-format prescribes. clang and clang-libs were already installed"
 
 [[pkg]]
 name = "dua-cli"
@@ -1677,7 +1716,7 @@ why  = "The shell's Movies & TV hub (Mod+Ctrl+Alt+M, `qs ipc call dekho toggle`,
 
 [[tool]]
 name = "vicinae"
-via  = "bin/vicinae-rebuild — clone of github.com/vicinaehq/vicinae into ~/.local/src/vicinae pinned to tag v0.28.1 (the version the COPR shipped, so the only difference from the package is the patch), packages/vicinae-tab-fallback.patch applied, CMake+Ninja into ~/.local: vicinae in bin/, the five helpers in libexec/vicinae/. Built on every machine by home/.chezmoiscripts/run_after_53-vicinae-build.sh, which calls `vicinae-rebuild --if-needed` — a no-op unless the installed server is missing the patch or the stamp (~/.local/state/vicinae-build.stamp = tag + patch sha256) has moved, so editing the patch triggers exactly one rebuild on the next apply everywhere. THE COPR PACKAGE DELIBERATELY STAYS INSTALLED as the floor: the unit runs bin/vicinae-serve, a two-branch wrapper that execs ~/.local/bin/vicinae when the build exists and /usr/bin/vicinae when it does not. Naming either path directly in the unit is wrong in one direction or the other — the packaged one never picks up the patch, and the local one turns a fresh box mid-apply, an offline apply or a failed build into a restart-looping unit and NO LAUNCHER AT ALL, to gain one keybind. `vicinae-rebuild --check` prints what can silently drift: which binary the unit runs, its version, whether the built server carries the patch, and whether the COPR has moved past the pinned tag (it warns if so, because a patch written against one tree is not guaranteed to apply to the next — three of the five files it touches had already moved between v0.28.1 and main when this was written). `vicinae-rebuild --undo` deletes the local build and falls back. Build deps, all of them -devel headers matching an already-installed runtime so nothing upgraded: qt6-qtsvg-devel (needs `--setopt=excludepkgs=` past bin/qt6-hold, see its [[pkg]]), kf6-syntax-highlighting-devel, qtkeychain-qt6-devel, libqalculate-devel, xcb-util-keysyms-devel. Configured with USE_SYSTEM_CMARK_GFM=OFF because Fedora ships no cmark-gfm-devel and the tree vendors it, and INSTALL_MODULES_LOAD_CONFIG=OFF because kernel modules-load.d config is meaningless in a user prefix. TWO TRAPS, both found the hard way on 2026-09-10: (1) vicinae's CMakeLists calls `file(REMOVE_RECURSE ${VICINAE_THEME_DIR})` at CONFIGURE time, and with a ~/.local prefix that is the same directory bin/theme-apply renders qshell.toml into — so every configure deletes the active vicinae theme, which is why vicinae-rebuild re-runs theme-apply before restarting; (2) ~/.local/libexec/vicinae/vicinae-input-server has NO capabilities, while the packaged /usr/libexec one carries `cap_dac_override=ep` (upstream's `make postbuild` sets it, rpm preserves it). Our server resolves helpers next to itself, so it uses the uncapped one — anything needing that privilege is degraded until `sudo setcap cap_dac_override+ep ~/.local/libexec/vicinae/vicinae-input-server` is run, AND re-run after every rebuild, since the install overwrites the binary. Currently moot here: overrides.json disables the snippets provider and global_shortcuts.toggle is empty (niri owns the launcher keybind), so nothing on this machine exercises it — verified uncapped 2026-09-10 with the launcher working normally"
+via  = "bin/vicinae-rebuild — clone of github.com/vicinaehq/vicinae into ~/.local/src/vicinae pinned to tag v0.28.1 (the version the COPR shipped, so the only difference from the package is the patch), packages/vicinae-tab-fallback.patch applied, CMake+Ninja into ~/.local: vicinae in bin/, the five helpers in libexec/vicinae/. Built on every machine by home/.chezmoiscripts/run_after_53-vicinae-build.sh, which calls `vicinae-rebuild --if-needed` — a no-op unless the installed server is missing the patch or the stamp (~/.local/state/vicinae-build.stamp = tag + patch sha256) has moved, so editing the patch triggers exactly one rebuild on the next apply everywhere. THE COPR PACKAGE DELIBERATELY STAYS INSTALLED as the floor: the unit runs bin/vicinae-serve, a two-branch wrapper that execs ~/.local/bin/vicinae when the build exists and /usr/bin/vicinae when it does not. Naming either path directly in the unit is wrong in one direction or the other — the packaged one never picks up the patch, and the local one turns a fresh box mid-apply, an offline apply or a failed build into a restart-looping unit and NO LAUNCHER AT ALL, to gain one keybind. `vicinae-rebuild --check` prints what can silently drift: which binary the unit runs, its version, whether the built server carries the patch, and whether the COPR has moved past the pinned tag (it warns if so, because a patch written against one tree is not guaranteed to apply to the next — three of the five files it touches had already moved between v0.28.1 and main when this was written). `vicinae-rebuild --undo` deletes the local build and falls back. Build deps, all of them -devel headers matching an already-installed runtime so nothing upgraded: qt6-qtsvg-devel, qt6-qtbase-private-devel and qt6-qtshadertools-devel (all three `held = true` — bin/qt6-hold hides qt6-* from dnf, so they install in the exclude-cleared pinned pass in run_before_00; see the section header above for how this went unnoticed from 2026-09-10 to 2026-09-15), kf6-syntax-highlighting-devel, qtkeychain-qt6-devel, libqalculate-devel, xcb-util-keysyms-devel, plus clang-tools-extra for the clang-format this script checks for. Configured with USE_SYSTEM_CMARK_GFM=OFF because Fedora ships no cmark-gfm-devel and the tree vendors it, and INSTALL_MODULES_LOAD_CONFIG=OFF because kernel modules-load.d config is meaningless in a user prefix. TWO TRAPS, both found the hard way on 2026-09-10: (1) vicinae's CMakeLists calls `file(REMOVE_RECURSE ${VICINAE_THEME_DIR})` at CONFIGURE time, and with a ~/.local prefix that is the same directory bin/theme-apply renders qshell.toml into — so every configure deletes the active vicinae theme, which is why vicinae-rebuild re-runs theme-apply before restarting; (2) ~/.local/libexec/vicinae/vicinae-input-server has NO capabilities, while the packaged /usr/libexec one carries `cap_dac_override=ep` (upstream's `make postbuild` sets it, rpm preserves it). Our server resolves helpers next to itself, so it uses the uncapped one — anything needing that privilege is degraded until `sudo setcap cap_dac_override+ep ~/.local/libexec/vicinae/vicinae-input-server` is run, AND re-run after every rebuild, since the install overwrites the binary. Currently moot here: overrides.json disables the snippets provider and global_shortcuts.toggle is empty (niri owns the launcher keybind), so nothing on this machine exercises it — verified uncapped 2026-09-10 with the launcher working normally"
 why  = "Tab from root search runs the first fallback command with whatever was typed — Raycast's Quick AI gesture, which vicinae has no way to express in config: its Keybind enum (src/server/src/internal/keyboard/keybind.hpp) is a closed list of 22 actions with no 'run this command' among them, so `keybinds` can rebind Tab but has nothing to bind it TO. Without it an arbitrary phrase can only reach a fallback by arrowing past every match — typing `chrom` puts the fallback at row 4, behind three real results. The patch adds ActivateFallback as a proper keybind (id activate-fallback, default Tab, shows up in the settings UI and is rebindable) and implements it next to the existing Space alias-fast-track in RootViewHost::inputFilter, which was already the template for exactly this shape. Verified on the desk 2026-09-10 both ways: `chrom` + Tab lands in the YouTube fallback carrying the query, and Tab at an empty root — where no fallback section is drawn — changes nothing at all, because activateFirstFallback() returns false and the key press passes through. NOT sent upstream (user decision 2026-09-14: keep it ours rather than carry a PR and wait on a maintainer's view of whether Tab should be the default; the port to main was written and format-checked before that call, so if it is ever wanted the work is in this file's history) — so the patch is permanently this repo's to maintain, and the thing that will break it is an upstream refactor, not a rejection. The tag is pinned for exactly that reason: bumping it is a deliberate step that means re-testing the patch applies, not something an apply does silently"
 
 [[tool]]
