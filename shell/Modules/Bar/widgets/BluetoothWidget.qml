@@ -19,8 +19,10 @@ BarIcon {
     // service was never created.
     property BtBatteryService btbattery: null
 
-    // BlueZ's own figure where a device publishes one, AAP where it does not
-    // (AirPods only ever appear in the second half — see BtBatteryService).
+    // BlueZ's own figure where a device publishes one; otherwise the shared
+    // reader, which carries AAP for Apple audio and the HID accessory's own
+    // level from UPower (see BtBatteryService — a Magic Keyboard or Trackpad
+    // is only ever in that second half, never in BlueZ).
     function batteryTextFor(device) {
         if (!device)
             return "";

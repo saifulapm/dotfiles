@@ -947,9 +947,11 @@ BarPanel {
         readonly property bool forgetAvailable: (sectionName === "known" || sectionName === "connected") && !isDiscovered
         readonly property bool showForgetButton: forgetAvailable && (rowMouse.containsMouse || rowSelected)
 
-        // Per-pod levels read over AAP, live while the device is connected.
-        // Reading btbattery.byAddress through the service's accessor keeps this
-        // binding subscribed, so a level change repaints the row.
+        // One figure per device for the row: per-pod levels read over AAP for
+        // Apple audio, and the HID accessory's own level from UPower for a
+        // keyboard or trackpad — BtBatteryService merges both behind this
+        // accessor, which is also what keeps this binding subscribed, so a
+        // level change from either source repaints the row.
         readonly property var aapBattery: panel.btbattery && dev && dev.address ? panel.btbattery.batteryFor(dev.address) : null
 
         readonly property string statusText: {
@@ -960,9 +962,11 @@ BarPanel {
             if (action === "disconnecting" || devState === BluetoothDeviceState.Disconnecting)
                 return "Disconnecting…";
             if (isConnected) {
-                // AAP first: it carries a figure per pod plus the case, where
-                // BlueZ's Battery1 would carry one number at best — and for
-                // AirPods carries nothing at all.
+                // BtBatteryService's figure first: it carries one per pod plus
+                // the case over AAP, and the HID accessory's level from UPower,
+                // where BlueZ's Battery1 would carry one number at best — and
+                // for AirPods, a Magic Keyboard or a Magic Trackpad carries
+                // nothing at all.
                 const aapText = Model.batteryText(aapBattery);
                 if (aapText !== "")
                     return aapText;

@@ -98,13 +98,17 @@ function deviceRow(d) {
     };
 }
 
-// AAP battery readings (bin/bluetooth-battery, held by BtBatteryService) as one
-// status line. Fixed slot order so the text never reshuffles between updates,
-// and a charging component carries the md-battery-charging glyph — AirPods
-// charge one pod at a time in the case, so per-component is the honest place
-// for it. "single" is what a lone pod (or a Beats-style one-piece) reports and
-// needs no label; the others are prefixed because two bare figures side by side
-// would not say which pod is which.
+// One figure per device, from whichever source has one. AAP readings
+// (bin/bluetooth-battery, held by BtBatteryService) carry per-pod detail, and
+// for a HID accessory — a Magic Keyboard or Trackpad — the same service
+// reaches into UPower instead, where the kernel's power_supply already holds
+// the level BlueZ never publishes. Both arrive in this shape, so the text is
+// rendered once: fixed slot order so it never reshuffles between updates, and
+// a charging component carries the md-battery-charging glyph — AirPods charge
+// one pod at a time in the case, so per-component is the honest place for it.
+// "single" is what a lone pod (or a Beats-style one-piece, or a HID
+// accessory's one battery) reports and needs no label; the others are prefixed
+// because two bare figures side by side would not say which pod is which.
 var BATTERY_SLOTS = [{
     key: "single",
     label: ""

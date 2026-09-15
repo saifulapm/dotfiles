@@ -1,21 +1,34 @@
 #!/bin/bash
 # havit-guard — fix the HAVIT LITE NC01H's connect-time AVRCP wedge without
-# ever touching audio that is playing.
+# touching audio that is playing.
 #
 # The wedge: the headset connects, A2DP comes up, but AVRCP never does —
 # MediaControl1.Connected stays false and the "(AVRCP)" uinput device never
 # appears, so the shell's media buttons are dead. One bluetoothctl
 # disconnect/connect fixes it, and the wedge is born at connect time — so
-# that is the only moment this guard acts. The old audio-heal timer polled
-# for it around the clock and cycled the connection mid-movie; a movie is
-# worth more than working headset buttons, so here a live stream always
-# wins: if anything is playing, the guard stands down and waits for the
-# next signal.
+# that is the only moment this guard acts.
+#
+# BEHAVIOUR CHANGED 2026-09-15, and the reversal is the interesting part.
+#
+# The original rule was "a live stream always wins": if anything was playing
+# inside the 12 s settle window, the guard stood down and left the wedge for
+# the rest of the session. That was written to stop the old audio-heal timer
+# cycling the connection mid-movie. It was measured to be backwards for how
+# this headset is actually used: on 2026-09-15 it stood down three times in a
+# row — "AVRCP down but a stream is live" at 16:43:12, :24, :36 — because the
+# pattern is *power the headset on, press play*, so audio is always live
+# inside the window and the wedge always survived. The buttons were dead for
+# the whole session, and one manual disconnect/reconnect fixed them. A guard
+# that never fires is not protecting the movie, it is just not a guard.
+#
+# So the stream no longer outranks the wedge: if AVRCP has not settled, the
+# connection is cycled whether audio is live or not, at the cost of a ~2 s
+# gap. The once-per-5-minute cooldown stays, which is what actually prevents
+# a loop — a headset that wedges on every connect still cannot be bounced.
 #
 # Mechanics: follow the device's PropertiesChanged signals, and on each one
 # give AVRCP 12 s to settle (it is legitimately down for a moment right
-# after a connect) before judging it. Cycle at most once per 5 min so a
-# headset that wedges on every connect cannot be bounced in a loop.
+# after a connect) before judging it.
 
 set -u
 
@@ -41,16 +54,16 @@ check() {
     sleep 12
     bluetoothctl info "$HAVIT" 2>/dev/null | grep -q "Connected: yes" || return
     avrcp_ok && return
-    if busy; then
-        echo "AVRCP down but a stream is live — standing down"
-        return
-    fi
     if [[ -f "$COOLDOWN" ]] \
         && (($(date +%s) - $(stat -c %Y "$COOLDOWN") < 300)); then
         return
     fi
     touch "$COOLDOWN"
-    echo "AVRCP never settled after connect — cycling connection"
+    if busy; then
+        echo "AVRCP down after connect and a stream is already live — cycling anyway (2026-09-15 rule)"
+    else
+        echo "AVRCP never settled after connect — cycling connection"
+    fi
     bluetoothctl disconnect "$HAVIT" >/dev/null
     sleep 3
     bluetoothctl connect "$HAVIT" >/dev/null
