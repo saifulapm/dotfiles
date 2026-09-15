@@ -45,3 +45,6 @@ end
 
 # opencode
 fish_add_path /home/saiful/.opencode/bin
+
+# Pi
+fish_add_path "/home/saiful/.local/share/mise/installs/node/24.21.0/bin"

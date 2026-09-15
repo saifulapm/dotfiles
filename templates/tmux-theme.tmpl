@@ -43,5 +43,13 @@ set -g status-left " #[fg={{text.muted}}]#S #[fg={{text.muted}}]/ #[fg={{text.mu
 set -g window-status-current-format "#[fg={{accent.error}}]●"
 set -g window-status-format "○"
 
-# Right: the current pane's directory, ~ when it is $HOME.
-set -g status-right "#[fg={{text.muted}}]#{?#{==:#{pane_current_path},#{HOME}},~, #{=/-23/…:#{b:pane_current_path}}} "
+# Right: how many agents amx has moving and stuck, then the current pane's
+# directory, ~ when it is $HOME.
+#
+# `amx statusline` prints ✽<moving> ⚠<stuck> as plain bytes — no colour of its
+# own, deliberately, because it lands inside a line that is not amx's — and
+# prints nothing at all when neither count is worth saying. So the segment is
+# coloured here, and the accent is warn rather than text.muted: these counts
+# are only ever on screen when there is something to go and look at, while the
+# directory beside them is always there. An idle machine costs one space.
+set -g status-right "#[fg={{accent.warn}}]#(amx statusline)#[fg={{text.muted}}] #{?#{==:#{pane_current_path},#{HOME}},~, #{=/-23/…:#{b:pane_current_path}}} "

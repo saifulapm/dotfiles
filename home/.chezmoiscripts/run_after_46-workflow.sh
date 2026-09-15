@@ -18,11 +18,9 @@
 # revision, so there is no state in which one of them is stale and the others
 # are not, and one guard is therefore the honest number.
 #
-# The skills are symlinked rather than copied (amx's SKILL.md is copied — this
-# is the deliberate difference): seven skill directories that co-evolve with
-# three binaries must not be able to drift from the revision that built them.
-# A copy would need hand-refreshing seven times and would silently describe a
-# binary that is no longer installed.
+# The skills and the git hook stubs are copies `workflow doctor --fix` writes
+# from the binary they ride in, so a machine's copies match its installed
+# workflow by construction; the doctor block below runs it on every apply.
 set -uo pipefail
 
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -78,42 +76,21 @@ if [ ! -x "$HOME/.local/bin/workflow" ]; then
   fi
 fi
 
-# ------------------------------------------------------------------ skills
-# Seven symlinks into the checkout's skills/, so a session loads exactly the
-# instructions that match the installed binaries.
-#
-# THE DEV BOX IS THE EXCEPTION, and it is resolved here rather than left as a
-# caveat the way pxy's and amx's are: on the machine where ~/Sites/github/
-# workflow is the working copy, the links point THERE, so editing a skill
-# takes effect in the next session instead of after a push and an update-all.
-# Every other machine gets the built checkout. Both are the same repo; only
-# the revision differs, and on the dev box the working copy is the one that
-# should win.
-skills_src="$src/skills"
-[ -d "$HOME/Sites/github/workflow/skills" ] \
-  && skills_src="$HOME/Sites/github/workflow/skills"
-
-if [ -d "$skills_src" ]; then
-  mkdir -p "$HOME/.claude/skills"
-  for skill in "$skills_src"/*/; do
-    skill="${skill%/}" # the glob's trailing slash, off the link target
-    name="$(basename "$skill")"
-    dest="$HOME/.claude/skills/$name"
-    # Only ever replace a symlink or a missing entry. A real directory there
-    # is somebody's own skill (or a chezmoi-managed one like amx/ and
-    # desktop/) and is never clobbered by this loop.
-    if [ -L "$dest" ] || [ ! -e "$dest" ]; then
-      # Quiet when it already points where it should: this loop runs on every
-      # apply so that a skill added upstream appears without ceremony, and an
-      # apply that changed nothing should say nothing.
-      [ "$(readlink "$dest" 2>/dev/null)" = "$skill" ] && continue
-      ln -sfn "$skill" "$dest" && linked=$((${linked:-0} + 1))
-    else
-      warn "$dest is a real directory — leaving it alone"
-    fi
-  done
-  [ "${linked:-0}" -gt 0 ] \
-    && echo "workflow: linked ${linked} skill(s) from $skills_src"
+# ------------------------------------------------------------ doctor --fix
+# The eight skills and the three git hook stubs ride inside the workflow
+# binary since m1-harness (2026-09-15): `workflow doctor --fix` writes copies
+# into ~/.claude/skills, ~/.agents/skills (pi, codex and opencode read it) and
+# ~/.config/git/hooks, and `workflow doctor` reports a copy that drifted from
+# the binary. A copy matches the installed binary by construction, which is
+# what the symlink loop this replaced was for -- and the loop never delivered
+# the hook stubs to any machine but the dev box. `mem doctor --fix` writes
+# mem's pi extension the same way. Both say nothing when nothing changed.
+if command -v workflow >/dev/null 2>&1; then
+  workflow doctor --fix >/dev/null 2>&1 \
+    || warn "workflow doctor --fix left findings -- run \`workflow doctor\` by hand"
+fi
+if command -v mem >/dev/null 2>&1; then
+  mem doctor --fix >/dev/null 2>&1 || true
 fi
 
 # ------------------------------------------------------------------- hooks
