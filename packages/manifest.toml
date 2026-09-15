@@ -126,6 +126,12 @@ arch = "aarch64"
 why = "Build dep for the AVD VA-API bridge (run_after_54-avd-decode.sh): meson takes both the driver ABI and the install driverdir (/usr/lib64/dri) from libva's pkg-config, so without the headers the bridge silently is not built and hardware decode stays off. The aarch64 counterpart to [[pkg]] intel-media-driver — same problem, opposite architecture: libva present with no driver behind it. arch=aarch64 for the SAME state-hash reason spelled out there"
 
 [[pkg]]
+name = "libdrm-devel"
+category = "dev"
+arch = "aarch64"
+why = "The other hard dependency of the AVD VA-API bridge: libva-v4l2_request's meson.build line 13 is a bare `dependency('libdrm')`, so setup ABORTS without libdrm.pc — no compile is even attempted. Missed when [[pkg]] libva-devel was added on 2026-09-10 because the Mac mini that feature was built and benchmarked on already had libdrm-devel from something else; nothing installed requires it (`repoquery --whatrequires 'pkgconfig(libdrm)'` is empty), so it was ambient there and simply absent on the laptop. Caught 2026-09-15 when update-all warned `VA driver build failed — try by hand in ~/.local/src/libva-v4l2_request-1.3` on macbook-m2: the firmware half had succeeded (blobs installed, /dev/video0 bound), but no driver landed in /usr/lib64/dri and mpv's hwdec=vaapi had nothing behind it. Runtime libdrm is already present via Mesa; only the headers were missing. arch=aarch64 for the same state-hash reason spelled out under [[pkg]] intel-media-driver"
+
+[[pkg]]
 name = "meson"
 category = "dev"
 arch = "aarch64"
