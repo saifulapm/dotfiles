@@ -10,32 +10,14 @@
     "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
     "WORKFLOW_AGENT": "1"
   },
-  "promptCacheTtl": "1h",
-  "subagentPromptCacheTtl": "1h",
-  "effortLevel": "high",
-  "modelSettings": {
-    "claude-fable-5-1": {
-      "effortLevel": "medium"
-    },
-    "claude-opus-5": {
-      "effortLevel": "high"
-    }
-  },
-  "fallbackModel": [
-    "opus"
-  ],
-  "disableAgentView": true,
-  "disableRemoteControl": true,
-  "awaySummaryEnabled": false,
-  "includeGitInstructions": false,
   "attribution": {
     "commit": "",
     "pr": "",
     "sessionUrl": false,
     "commitTrailers": false
   },
+  "includeGitInstructions": false,
   "permissions": {
-    "defaultMode": "auto",
     "allow": [
       "Bash(git status:*)",
       "Bash(git diff:*)",
@@ -72,86 +54,19 @@
       "Read(~/.ssh/**)",
       "Read(~/.config/gh/hosts.yml)",
       "Read(~/.netrc)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
+  "fallbackModel": [
+    "opus"
+  ],
   "hooks": {
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/saiful/.local/bin/amx _hook"
-          }
-        ]
-      }
-    ],
-    "PermissionDenied": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/saiful/.local/bin/amx _hook"
-          }
-        ]
-      }
-    ],
-    "PermissionRequest": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/saiful/.local/bin/amx _hook"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/saiful/.local/bin/amx _hook"
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "mem context || true"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/saiful/.local/bin/amx _hook"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/saiful/.local/bin/amx _hook"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/saiful/.local/bin/amx _hook"
           }
         ]
       }
@@ -184,21 +99,46 @@
     ],
     "baseRef": "fresh"
   },
+  "disableAgentView": true,
+  "disableRemoteControl": true,
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.py",
     "refreshInterval": 10
   },
+  "extraKnownMarketplaces": {
+    "amx": {
+      "source": {
+        "source": "github",
+        "repo": "saifulapm/amx"
+      }
+    }
+  },
   "sandbox": {
     "enabled": false
   },
   "spinnerTipsEnabled": false,
-  "prefersReducedMotion": true,
+  "promptCacheTtl": "1h",
+  "subagentPromptCacheTtl": "1h",
+  "effortLevel": "xhigh",
+  "modelSettings": {
+    "claude-fable-5-1": {
+      "effortLevel": "medium"
+    },
+    "claude-opus-5": {
+      "effortLevel": "high"
+    }
+  },
+  "awaySummaryEnabled": false,
   "tui": "fullscreen",
   "voice": {
     "enabled": true,
     "mode": "hold"
   },
+  "prefersReducedMotion": true,
   "skipDangerousModePermissionPrompt": true,
-  "theme": "custom:qshell"
+  "theme": "custom:qshell",
+  "enabledPlugins": {
+    "amx@amx": true
+  }
 }
