@@ -160,10 +160,16 @@ after the first apply.
   `rclone copy iCloud:.dotfiles/home/.cloudflared ~/.cloudflared --include
   cert.pem --include '*.json'` then `chmod 600 ~/.cloudflared/cert.pem
   ~/.cloudflared/*.json`. Without them the tunnel will not start.
-- `~/.config/fish/conf.d/99-local.fish` — machine-local API keys
-  (CONTEXT7_API_KEY, …), deliberately unmanaged because the repo is public.
-  Copy it from another machine or re-create it; fish sources it only if it
-  exists, so nothing breaks without it.
+- Context7 (`npx ctx7@latest`) — nothing to do by hand any more. The key is
+  `pass AI/context7/main` and `bin/secrets-restore` renders it into
+  `~/.config/context7/credentials.json`, which ctx7 reads when
+  `$CONTEXT7_API_KEY` is unset. This replaced `conf.d/99-local.fish`
+  (deleted 2026-09-16), an unmanaged file that held the key on one laptop and
+  reached no other machine — the failure this list exists to prevent. The
+  five other keys it carried (github/jina/cloudflare/openrouter/groq) had no
+  reader left: `aichat/config.yaml` dropped those direct clients and pxy holds
+  their keys now. Without the credential ctx7 still answers, on anonymous
+  rate limits.
 - intelephense licence — the paid key's only backup sits in
   `iCloud:.dotfiles/config/zed/settings.json` (zed itself was rejected for
   this desktop). Place it in `~/intelephense/licence.txt` for the language

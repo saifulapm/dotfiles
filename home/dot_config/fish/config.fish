@@ -1,8 +1,10 @@
 # fish config (managed by chezmoi — edit in ~/.dotfiles/home/dot_config/fish/)
 # Port of the mac zsh setup (iCloud .dotfiles/config/zsh), 2026-08-07.
 # Env/PATH/aliases live in conf.d/*.fish (fish sources those BEFORE this file);
-# functions autoload from functions/. Machine-local overrides (secrets):
-# conf.d/99-local.fish, deliberately NOT chezmoi-managed.
+# functions autoload from functions/. No conf.d/99-local.fish any more (deleted
+# 2026-09-16): the one key it still carried is now ~/.config/context7/
+# credentials.json, rendered from `pass`, so nothing here needs an unmanaged
+# file that only ever existed on the machine it was typed on.
 
 # ─── niri on tty1 ────────────────────────────────────────────────────────────
 # Autologin lands a login shell here (see run_before_01-autologin.sh.tmpl).
