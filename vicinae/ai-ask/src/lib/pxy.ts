@@ -1,6 +1,6 @@
-import { getPreferenceValues } from "@vicinae/api";
 import type { AssistantMessage, Context, Model, Usage } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/api/openai-completions";
+import { getPreferenceValues } from "@vicinae/api";
 import type { AgentTool, Step } from "./tools";
 
 // pxy, Saiful's local LLM proxy (home/dot_config/pxy/config.toml), spoken to
@@ -57,7 +57,7 @@ export type Event =
   | { type: "done"; reason: "stop" | "length" };
 
 export function model(): string {
-  return getPreferenceValues<Preferences>().model ?? "general";
+  return getPreferenceValues<Preferences>().model ?? "aaa";
 }
 
 /** pxy's failover groups, mirroring the `model` preference in package.json.
@@ -65,11 +65,11 @@ export function model(): string {
  *  bundle `vici build` produces, and the chat's dropdown needs the list at
  *  runtime to offer a per-conversation override of the preference. */
 export const GROUPS = [
-  { value: "general", title: "General" },
-  { value: "promo", title: "Promo" },
-  { value: "credit", title: "Credit" },
-  { value: "plans", title: "Plans" },
-  { value: "quota", title: "Quota" },
+  { value: "deepseek", title: "Deepseek" },
+  { value: "muse", title: "Muse" },
+  { value: "glm", title: "GLM" },
+  { value: "gpt", title: "GPT" },
+  { value: "qwen", title: "Qwen" },
 ];
 
 /** A pxy group described as a pi-ai model. The id is a GROUP name, not a real
@@ -130,15 +130,15 @@ function toContext(messages: Message[], group: string): Context {
       message.role === "user"
         ? { role: "user", content: message.content, timestamp: Date.now() }
         : {
-            role: "assistant",
-            content: [{ type: "text", text: message.content }],
-            api: "openai-completions",
-            provider: "pxy",
-            model: group,
-            usage: NO_USAGE,
-            stopReason: "stop",
-            timestamp: Date.now(),
-          },
+          role: "assistant",
+          content: [{ type: "text", text: message.content }],
+          api: "openai-completions",
+          provider: "pxy",
+          model: group,
+          usage: NO_USAGE,
+          stopReason: "stop",
+          timestamp: Date.now(),
+        }
     ),
   };
 }
@@ -172,7 +172,8 @@ export async function* ask(
   const context = toContext(messages, group);
   if (tools.length) {
     context.tools = tools;
-    context.systemPrompt += " Use tools only when the answer depends on something you cannot know, and answer as soon as you have enough; do not keep searching to confirm.";
+    context.systemPrompt +=
+      " Use tools only when the answer depends on something you cannot know, and answer as soon as you have enough; do not keep searching to confirm.";
   }
 
   for (let round = 0; round <= TOOL_ROUNDS; round++) {
