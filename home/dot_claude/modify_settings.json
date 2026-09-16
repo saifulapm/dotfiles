@@ -1,3 +1,23 @@
+#!/usr/bin/env bash
+# ~/.claude/settings.json — a modify_ script rather than a plain source file,
+# for the reason spelled out in home/dot_pi/agent/modify_settings.json: this
+# repo applies in symlink mode, and Claude Code writes to this file. `/config`
+# writes theme, `/plugin` writes enabledPlugins, `/permissions` appends allow
+# rules. As a symlink into ~/.dotfiles every one of those left the repo dirty —
+# and it is exactly why run_after_45-amx.sh refuses to run `amx doctor --fix`,
+# which would write amx's seven hooks straight through the symlink into the
+# source tree. That refusal can be revisited now: a --fix lands on a real file.
+#
+# chezmoi writes a real file for a modify_ script and feeds the current one in
+# on stdin, so Claude owns the file day to day and this owns the keys below.
+# Anything Claude adds that is not named here survives apply untouched.
+#
+# The trade is that this config can no longer be edited live: edit here, then
+# `chezmoi apply`.
+set -euo pipefail
+
+managed=$(
+  cat <<'JSON'
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "cleanupPeriodDays": 90,
@@ -142,3 +162,13 @@
     "amx@amx": true
   }
 }
+JSON
+)
+
+# Empty stdin is a machine where Claude has never run, so merge onto {}.
+current=$(cat)
+[ -n "$current" ] || current='{}'
+
+# `*` is jq's recursive object merge: nested objects combine, scalars and
+# arrays are replaced outright by the right-hand side.
+printf '%s' "$current" | jq --argjson managed "$managed" '. * $managed'

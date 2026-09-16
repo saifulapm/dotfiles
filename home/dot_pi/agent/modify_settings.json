@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# ~/.pi/agent/settings.json — a modify_ script rather than a plain source file,
+# because this repo applies in symlink mode and pi WRITES to this file.
+#
+# A plain source file lands as a symlink into ~/.dotfiles (that is what
+# mode = "symlink" in chezmoi.toml does, and what ~/.claude/settings.json used
+# to be). pi's settings-manager persists on every ctrl+l model switch
+# (setDefaultModelAndProvider), every shift+tab thinking cycle
+# (setDefaultThinkingLevel) and every version bump (setLastChangelogVersion) —
+# so through a symlink, ordinary use of pi would leave the repo dirty. The same
+# trap run_after_45-amx.sh refuses to walk into for claude's hooks.
+#
+# A modify_ script is exempt from symlink mode: chezmoi writes a real file, and
+# feeds the current one in on stdin. So pi owns the file day to day and this
+# owns the keys below — apply forces them back and leaves everything else
+# (lastChangelogVersion above all) exactly as pi left it.
+#
+# The trade is that this is the one config in the repo you cannot edit live:
+# edit here, then `chezmoi apply`. Editing ~/.pi/agent/settings.json by hand
+# works until the next apply overwrites the key.
+#
+# lastChangelogVersion is deliberately absent — pinning it would re-show the
+# changelog after every pi upgrade.
+#
+# theme "qshell" and provider "pxy" name things that are NOT in this repo:
+# ~/.pi/agent/themes/qshell.json is unmanaged, and extensions/pxy.ts is
+# rewritten by `pxy launch pi` on every launch. On a fresh machine pi falls
+# back until those exist.
+set -euo pipefail
+
+managed=$(
+  cat <<'JSON'
+{
+  "theme": "qshell",
+  "defaultProvider": "pxy",
+  "defaultModel": "plans",
+  "defaultThinkingLevel": "medium",
+  "hideThinkingBlock": true,
+  "quietStartup": true,
+  "defaultProjectTrust": "never",
+  "collapseChangelog": true,
+  "enableInstallTelemetry": false,
+  "tuiMode": "fullscreen",
+  "fullscreenExitOutput": "resume-hint",
+  "fullscreenScrollbar": "hidden",
+  "steeringMode": "all",
+  "followUpMode": "all",
+  "defaultTools": ["bash", "edit", "write", "ls", "find", "grep", "read"]
+}
+JSON
+)
+
+# Empty stdin is a machine where pi has never run, so merge onto {}.
+current=$(cat)
+[ -n "$current" ] || current='{}'
+
+# `*` is jq's recursive object merge: nested objects combine, scalars and
+# arrays are replaced outright by the right-hand side.
+printf '%s' "$current" | jq --argjson managed "$managed" '. * $managed'

@@ -185,7 +185,14 @@ after the first apply.
 
 ## Layout
 
-- `home/` — the chezmoi source root (`.chezmoiroot`), symlink mode.
+- `home/` — the chezmoi source root (`.chezmoiroot`), symlink mode. Edit the
+  live config and you edit this repo. The exception is a config its own agent
+  writes back to — `~/.claude/settings.json`, `~/.pi/agent/settings.json` —
+  where a symlink would mean a repo dirtied by ordinary use. Those are
+  `modify_` scripts, exempt from symlink mode: chezmoi writes a real file and
+  merges the keys the script names over whatever is there, so the agent keeps
+  its own state and this repo keeps the settings. Edit those in `home/`, then
+  `chezmoi apply`.
 - `shell/` — the Quickshell shell (`~/.config/quickshell` symlinks here).
 - `bin/` — helper scripts, on PATH via `fish/conf.d/00-env.fish` (and
   `dot_bashrc.d/10-dev.sh` for bash contexts).

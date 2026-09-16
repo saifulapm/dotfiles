@@ -9,12 +9,25 @@
 #
 # Nothing here runs `amx doctor --fix`, which is the one thing the README tells
 # a person to run after installing. It wires amx's seven hooks into
-# ~/.claude/settings.json — and that file is a chezmoi symlink into this repo,
-# so a --fix would write the hooks THROUGH the symlink into the source tree and
-# leave the repo dirty on every machine that applied. The hooks are checked in
-# instead (home/dot_claude/settings.json, seven entries pointing at
+# ~/.claude/settings.json. The hooks are checked in instead
+# (home/dot_claude/modify_settings.json, seven entries pointing at
 # ~/.local/bin/amx) and arrive with the rest of the config. `amx doctor` still
 # reports honestly; it just has nothing left to repair.
+#
+# THE ORIGINAL REASON FOR THAT REFUSAL IS GONE as of 2026-09-16: settings.json
+# used to be a chezmoi symlink into this repo, so a --fix wrote the hooks
+# THROUGH the symlink into the source tree and left the repo dirty on every
+# machine that applied. It is a modify_ script now, so chezmoi writes a real
+# file and a --fix lands on disk where it belongs. The hooks stay checked in
+# because that is still how a fresh machine gets them before amx ever runs.
+#
+# amx's pi extension is checked in for the same reason and has no such escape:
+# home/dot_pi/agent/extensions/amx.ts, a verbatim copy of the assets/pi/amx.ts
+# compiled into the binary. Nothing here writes it, so without the copy a fresh
+# machine gets no pi wiring at all. It is a plain source file and therefore a
+# symlink into this repo — when an amx upgrade changes that asset, a
+# `amx doctor --fix` WILL write the new one into the source tree. That is the
+# intended way the update arrives; commit it.
 #
 # Runtime deps are already declared elsewhere: tmux 3.2+ (the [[pkg]] entry —
 # earlier tmux cannot address panes by id), git for the worktrees `new` cuts,
