@@ -15,7 +15,7 @@ models = [
   "amd/DeepSeek-V4-Flash",
 ]
 
-[groups.deepseek-model]
+[groups.deepseek]
 name = "DeepSeek"
 reasoning = true
 models = [
@@ -24,7 +24,7 @@ models = [
   "tokenharbor/deepseek-v4.1-flash",
   "aihubmix/deepseek-v4.1-flash",
   "zenmux/deepseek/deepseek-v4.1-flash",
-  "deepseek/deepseek-flash",
+  "deepseek-ai/deepseek-flash",
 ]
 
 [groups.muse]
@@ -88,7 +88,7 @@ models = [
   { id = "gemma4:31b", context_length = 262144, reasoning = true },
 ]
 
-[providers.deepseek]
+[providers.deepseek-ai]
 base_url = "https://api.deepseek.com/anthropic/v1/messages"
 format = "anthropic"
 auth_header = "x-api-key"
