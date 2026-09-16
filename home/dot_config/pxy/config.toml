@@ -5,74 +5,75 @@ providers_whitelist = []
 port = 4100
 api_key = "pxy-local"
 
-[groups.general]
-name = "General"
+[groups.aaa]
+name = "AAA"
 models = [
   "ollama/nemotron-3-nano:30b",
-  "cloudflare/@cf/meta/llama-4-scout-17b-16e-instruct",
-]
-
-[groups.promo]
-name = "Promo"
-models = [
+  "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
   "opencode-zen/muse-spark-1.3-contributor-free",
-  "gmicloud/MiniMaxAI/MiniMax-M3",
-  "commandcode/minimax/minimax-m3-free",
-  "tokenharbor/mimo-v2.5",
-  "tokenharbor/deepseek-v4-flash",
+  "cloudflare/@cf/meta/llama-4-scout-17b-16e-instruct",
+  "amd/DeepSeek-V4-Flash",
 ]
 
-[groups.credit]
-name = "Credit"
+[groups.deepseek-model]
+name = "DeepSeek"
+reasoning = true
 models = [
-  "deepseek/deepseek-v4-flash-vision-exp",
-  "aihubmix/glm-5.3-flash",
-  "zenmux/z-ai/glm-5.3-flash",
-  "meta/muse-spark-1.3-contributor",
-  "zenmux/meta/muse-spark-1.3-contributor",
-  "agentrouter-openai/gpt-5.6-sol",
-  "agentrouter-openai/glm-5.3",
-  "agentrouter/claude-opus-5",
-  "tabitoken/claude-opus-5",
-  "gorouter/claude-opus-5",
+  "opencode-go/deepseek-flash",
+  "commandcode/deepseek/deepseek-v4.1-flash",
+  "tokenharbor/deepseek-v4.1-flash",
+  "aihubmix/deepseek-v4.1-flash",
+  "zenmux/deepseek/deepseek-v4.1-flash",
+  "deepseek/deepseek-flash",
 ]
 
-[groups.plans]
-name = "Plans"
+[groups.muse]
+name = "Muse"
+reasoning = true
 models = [
   "opencode-go/muse-spark-1.3-contributor",
   "commandcode/meta/muse-spark-1.3-contributor",
-  "opencode-go/deepseek-v4-flash",
-  "commandcode/z-ai/glm-5.3-flash",
-  "tokenharbor/glm-5.3-flash",
-  "commandcode/Qwen/Qwen3.8-Flash",
-  "tokenharbor/qwen3.8-flash",
-  "commandcode/gpt-5.6-luna",
-  "tokenharbor/gpt-5.6-luna",
-  "opencode-go/qwen3.8-flash",
-  "opencode-go/mimo-v2.5-pro",
-  "opencode-go/glm-5.3-flash",
-  "opencode-go/gpt-5.6-luna",
-  "opencode-go/hy3",
-  "opencode-go/y4-preview",
-  "opencode-go/deepseek-v4-flash-vision-exp",
+  "tokenharbor/muse-spark-1-3",
+  "aihubmix/muse-spark-1.3",
+  "zenmux/meta/muse-spark-1.3-contributor",
+  "meta/muse-spark-1.3-contributor",
 ]
 
-[groups.quota]
-name = "Quota"
+[groups.glm]
+name = "GLM"
+reasoning = true
 models = [
-  # "nvidia/moonshotai/kimi-k3",
-  "cloudflare/@cf/zai-org/glm-5.3-flash",
-  "alibaba/qwen3.8-max",
-  "tencent/glm-5.3-flash",
-  "tokenrouter/z-ai/glm-5.3-free",
-  "openadapter/free/minimax-m3",
-  "agnes/agnes-2.5-flash",
-  "bai/glm-5.3-flash",
+  "opencode-go/glm-5.3-flash",
+  "commandcode/z-ai/glm-5.3-flash",
+  "tokenharbor/glm-5.3-flash",
+  "aihubmix/glm-5.3-flash",
+  "zenmux/z-ai/glm-5.3-flash",
+]
+
+[groups.gpt]
+name = "GPT"
+reasoning = true
+models = [
+  "opencode-go/gpt-5.6-luna",
+  "commandcode/gpt-5.6-luna",
+  "tokenharbor/gpt-5.6-luna",
+  "aihubmix/gpt-5.6-luna",
+  "zenmux/openai/gpt-5.6-luna",
+]
+
+[groups.qwen]
+name = "Qwen"
+reasoning = true
+models = [
+  "opencode-go/qwen3.8-flash",
+  "commandcode/Qwen/Qwen3.8-Flash",
+  "tokenharbor/qwen3.8-flash",
+  "aihubmix/qwen3.8-flash",
+  "zenmux/qwen/qwen3.8-flash",
 ]
 
 [launch]
-model = "general"
+model = "aaa"
 
 # ---------------------------------------------------------------------------
 # API-key providers (base URLs from OmniRoute registry, docs/06)
@@ -81,10 +82,10 @@ model = "general"
 base_url = "https://ollama.com/v1/chat/completions"
 api_key = { pass = "AI/ollama/main" }
 models = [
-  { id = "nemotron-3-nano:30b", context_length = 1048576 },
-  { id = "nemotron-3-super", context_length = 262144 },
-  { id = "nemotron-3-ultra", context_length = 262144 },
-  { id = "gemma4:31b", context_length = 262144 },
+  { id = "nemotron-3-nano:30b", context_length = 1048576, reasoning = true },
+  { id = "nemotron-3-super", context_length = 262144, reasoning = true },
+  { id = "nemotron-3-ultra", context_length = 262144, reasoning = true },
+  { id = "gemma4:31b", context_length = 262144, reasoning = true },
 ]
 
 [providers.deepseek]
@@ -95,46 +96,18 @@ balance_url = "https://api.deepseek.com/user/balance"
 models_url = "https://api.deepseek.com/models"
 api_key = { pass = "AI/deepseek/main" }
 models = [
-  { id = "deepseek-v4-flash-vision-exp", context_length = 1000000, max_output_tokens = 8192 },
-  { id = "deepseek-v4-flash", context_length = 1000000, max_output_tokens = 8192 },
-  { id = "deepseek-v4-pro", context_length = 1000000, max_output_tokens = 8192 },
+  { id = "deepseek-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "deepseek-v4-pro", context_length = 1000000, reasoning = true },
 ]
 
-# AMD Radeon Cloud (developer.amd.com.cn) — 4 FREE models on AMD GPUs.
-# Serves both dialects (/chat/completions and /messages). OPENAI is chosen
-# deliberately: MiniCPM5-1B leaks literal <think> tags into `content` whenever
-# a reply is TRUNCATED mid-thought, and pxy's parse_think_tags only ever runs
-# on OpenAI-format upstreams. Measured 2026-09-03 with "Say OK": at
-# max_tokens=50 the raw tags appear 3/3 straight from AMD and 0/3 through pxy;
-# at max_tokens=250 the model closes the block and neither side leaks. Over
-# /messages those tags would reach the client as ordinary assistant text and
-# be replayed as history every turn. The models are OpenAI-native anyway;
-# /messages is AMD's own translation layer.
-# All 4 tool-call, verified live 2026-09-03 (deepseek-v4-flash needed a retry —
-# see the 429 note). Two are vision-capable (deepseek-v4-flash-vision-exp,
-# qwen3.8-flash-next) per /models.
-# ⚠️ "Limited Free" means a REAL budget, and /v1/usage publishes it:
-# rpm_limit 20 (hence the limits block — not a guess) and
-# daily_cost_limit_usd 1, on a rolling 24h window (daily_reset_at). Usage is
-# denominated in "points"/notional USD, not billed — there is no card on the
-# account, so past the cap requests stop rather than charge.
-# ⚠️ Its 429 is a GLOBAL, shared concurrency pool, not our quota:
-# "Model 'X' is at its concurrency limit (64); please retry later or use
-# another model" (code model_concurrency_rate_limit_exceeded). It arrives in
-# under a second and clears on its own, so ordinary cooldown+failover is the
-# right response — no error rule needed. NOTE the envelope is nested one level
-# deeper than the OpenAI norm: {"detail":{"error":{...}}}.
-# Latency is uneven (a .com.cn host): most calls are 1-4s, but deepseek-v4-flash
-# was seen at 31s once.
 [providers.amd]
 base_url = "https://developer.amd.com.cn/radeon/api/v1/chat/completions"
 balance_url = "https://developer.amd.com.cn/radeon/api/v1/usage"
 api_key = { pass = "AI/amd/main" }
 models = [
-  { id = "DeepSeek-V4-Flash", context_length = 1048576, tool_call = true, free = true },
-  { id = "DeepSeek-V4-Flash-Vision-Exp", context_length = 1048576, tool_call = true, free = true },
-  { id = "Qwen3.8-Flash-Next", context_length = 262144, tool_call = true, free = true },
-  { id = "MiniCPM5-1B", context_length = 131072, tool_call = true, free = true },
+  { id = "DeepSeek-V4-Flash", context_length = 1048576, reasoning = true, free = true },
+  { id = "DeepSeek-V4-Flash-Vision-Exp", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"], free = true },
+  { id = "Qwen3.8-Flash-Next", context_length = 262144, reasoning = true, effort = ["low", "medium", "xhigh"], free = true },
 ]
 [providers.amd.limits]
 rpm = 20
@@ -145,10 +118,8 @@ format = "anthropic"
 models_url = "https://api.meta.ai/v1/models"
 api_key = { pass = "AI/facebook/main" }
 models = [
-  { id = "muse-spark-1.3-contributor", context_length = 1048576, max_output_tokens = 262144 },
-  { id = "muse-spark-1.2-contributor", context_length = 1048576, max_output_tokens = 262144 },
-  { id = "muse-spark-1.3", context_length = 1048576, max_output_tokens = 262144 },
-  { id = "muse-spark-1.2", context_length = 1048576, max_output_tokens = 262144 },
+  { id = "muse-spark-1.3", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh", "max"] },
+  { id = "muse-spark-1.3-contributor", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
 ]
 
 [providers.meta.media]
@@ -164,9 +135,10 @@ balance_url = "https://openrouter.ai/api/v1/credits"
 api_key = { pass = "AI/openrouter/main" }
 headers = { HTTP-Referer = "http://localhost", X-Title = "pxy" }
 models = [
-  { id = "nvidia/nemotron-3.5-lightning:free", context_length = 1000000 },
-  { id = "thinkingmachines/inkling:free", context_length = 1048576 },
-  { id = "z-ai/glm-5.2:free", context_length = 256000 },
+  { id = "nvidia/nemotron-3-ultra-550b-a55b:free", context_length = 1000000, reasoning = true, effort = ["none", "medium", "high"] },
+  { id = "nvidia/nemotron-3.5-lightning:free", context_length = 1000000, reasoning = true, effort = ["none", "high"] },
+  { id = "thinkingmachines/inkling-small:free", context_length = 1048576, reasoning = true },
+  { id = "dots-studio/dots-3-note-preview:free", context_length = 512000, reasoning = true, effort = ["none", "high"] },
 ]
 
 [providers.openrouter.limits]
@@ -181,22 +153,25 @@ api_key = { pass = "AI/aihubmix/main" }
 balance_url = "https://aihubmix.com/api/user/self"
 balance_key = { pass = "AI/aihubmix/manage" }
 models = [
-  { id = "glm-5.3-flash", context_length = 1048576 },
-  { id = "glm-5.3", context_length = 1048576 },
-  { id = "hy4-preview", context_length = 1048576 },
+  { id = "deepseek-v4.1-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "gpt-5.6-luna", context_length = 1050000, reasoning = true, effort = ["none", "low", "medium", "high", "xhigh", "max"] },
+  { id = "muse-spark-1.3", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh", "max"] },
+  { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "qwen3.8-max", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
 ]
 
 # [TODO] Promo till Sep 6
-[providers.gmicloud]
-base_url = "https://api.gmi-serving.com/v1/messages"
-format = "anthropic"
-auth_header = "x-api-key"
-models_url = "https://api.gmi-serving.com/v1/models"
-api_key = { pass = "AI/gmicloud/main" }
-models = [
-  { id = "MiniMaxAI/MiniMax-M3", context_length = 1048576 },
-  { id = "MiniMaxAI/MiniMax-M2.7", context_length = 196608 },
-]
+# [providers.gmicloud]
+# base_url = "https://api.gmi-serving.com/v1/messages"
+# format = "anthropic"
+# auth_header = "x-api-key"
+# models_url = "https://api.gmi-serving.com/v1/models"
+# api_key = { pass = "AI/gmicloud/main" }
+# models = [
+#   { id = "MiniMaxAI/MiniMax-M3", context_length = 1048576, reasoning = true },
+#   { id = "MiniMaxAI/MiniMax-M2.7", context_length = 196608, reasoning = true },
+# ]
 
 [providers.cloudflare]
 base_url = "https://api.cloudflare.com/client/v4/accounts/0a937759fca2672765c005345aebe060/ai/v1/chat/completions"
@@ -204,8 +179,8 @@ api_key = { pass = "AI/cloudflare-ai/main" }
 models_url = "https://api.cloudflare.com/client/v4/accounts/0a937759fca2672765c005345aebe060/ai/models/search?per_page=200&task=Text%20Generation"
 id_field = "name"
 models = [
-  { id = "@cf/meta/llama-4-scout-17b-16e-instruct", context_length = 128000 },
-  { id = "@cf/zai-org/glm-5.3-flash", context_length = 1048576 },
+  { id = "@cf/meta/llama-4-scout-17b-16e-instruct", context_length = 128000, reasoning = false },
+  { id = "@cf/zai-org/glm-5.3-flash", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
 ]
 [providers.cloudflare.limits]
 rpm = 10
@@ -237,13 +212,7 @@ daily_requests = 30
 base_url = "https://opencode.ai/zen/v1/chat/completions"
 headers = { User-Agent = "opencode/latest/1.18.21/cli" }
 models = [
-  { id = "muse-spark-1.3-contributor-free", context_length = 1048576 },
-  { id = "deepseek-v4-flash-free", context_length = 1000000 },
-  { id = "laguna-s-2.1-free", context_length = 1048576 },
-  { id = "mimo-v2.5-free", context_length = 1048576 },
-  { id = "nemotron-3-ultra-free", context_length = 262144 },
-  { id = "nemotron-3.5-lightning-free", context_length = 262144 },
-  { id = "ling-3.0-flash-fin-free", context_length = 262144 },
+  { id = "muse-spark-1.3-contributor-free", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
 ]
 [[providers.opencode-zen.accounts]]
 name = "github"
@@ -258,23 +227,12 @@ base_url = "https://opencode.ai/zen/go/v1/chat/completions"
 balance_url = "https://opencode.ai/zen/go/v1/usage"
 headers = { User-Agent = "opencode/latest/1.18.21/cli" }
 models = [
-  { id = "deepseek-v4-flash", context_length = 1000000 },
-  { id = "deepseek-v4-flash-vision-exp", context_length = 1000000 },
-  { id = "deepseek-v4-pro", context_length = 1000000 },
-  { id = "glm-5.3", context_length = 1048576 },
-  { id = "glm-5.3-flash", context_length = 1048576 },
-  { id = "gpt-5.6-luna", context_length = 1000000 },
-  { id = "grok-4.6", context_length = 500000 },
-  { id = "hy3", context_length = 256000 },
-  { id = "hy4-preview", context_length = 1048576 },
-  { id = "kimi-k2.7-code", context_length = 262144 },
-  { id = "kimi-k3", context_length = 1048576 },
-  { id = "longcat-2.0", context_length = 1048756 },
-  { id = "mimo-v2.5-pro", context_length = 1048576 },
-  { id = "minimax-m3", context_length = 1000000 },
-  { id = "muse-spark-1.3-contributor", context_length = 1048576 },
-  { id = "qwen3.8-flash", context_length = 1000000 },
-  { id = "qwen3.8-max", context_length = 1000000 },
+  { id = "deepseek-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "gpt-5.6-luna", context_length = 1050000, reasoning = true, effort = ["none", "low", "medium", "high", "xhigh", "max"] },
+  { id = "muse-spark-1.3-contributor", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
+  { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "qwen3.8-max", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
 ]
 [[providers.opencode-go.accounts]]
 name = "github"
@@ -288,40 +246,23 @@ base_url = "https://api.commandcode.ai/provider/v1/chat/completions"
 balance_url = "https://api.commandcode.ai/alpha/billing/credits"
 api_key = { pass = "AI/commandcode/main" }
 models = [
-  { id = "MiniMaxAI/MiniMax-M3", context_length = 1000000 },
-  { id = "Qwen/Qwen3.8-Flash", context_length = 1000000 },
-  { id = "Qwen/Qwen3.8-Max", context_length = 1000000 },
-  { id = "deepseek/deepseek-v4-flash", context_length = 1000000 },
-  { id = "deepseek/deepseek-v4-flash-vision-exp", context_length = 1000000 },
-  { id = "deepseek/deepseek-v4-pro", context_length = 1000000 },
-  { id = "gpt-5.6-luna", context_length = 1050000 },
-  { id = "gpt-5.6-sol", context_length = 1050000 },
-  { id = "meta/muse-spark-1.3-contributor", context_length = 1048576 },
-  { id = "minimax/minimax-m3-free", context_length = 1000000 },
-  { id = "moonshotai/Kimi-K3", context_length = 1000000 },
-  { id = "nvidia/nemotron-3-ultra-550b-a55b", context_length = 1000000 },
-  { id = "poolside/laguna-s-2.1-free", context_length = 256000 },
-  { id = "tencent/hy3-paid", context_length = 262144 },
-  { id = "tencent/hy4-preview", context_length = 1048576 },
-  { id = "thinkingmachines/inkling", context_length = 256000 },
-  { id = "thinkingmachines/inkling-small", context_length = 1000000 },
-  { id = "xai/grok-4.6", context_length = 500000 },
-  { id = "xiaomi/mimo-v2.5-pro", context_length = 1000000 },
-  { id = "z-ai/glm-5.3-flash", context_length = 1048576 },
-  { id = "zai-org/GLM-5.3", context_length = 1000000 },
+  { id = "deepseek/deepseek-v4.1-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "gpt-5.6-luna", context_length = 1050000, reasoning = true, effort = ["none", "low", "medium", "high", "xhigh", "max"] },
+  { id = "meta/muse-spark-1.3-contributor", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
+  { id = "z-ai/glm-5.3-flash", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "Qwen/Qwen3.8-Max-0902", context_length = 1000000, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
+  { id = "Qwen/Qwen3.8-Flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
 ]
 
 [providers.tokenharbor]
 base_url = "https://tokenharbor.ai/v1/chat/completions"
 api_key = { pass = "AI/tokenharbor/main" }
 models = [
-  { id = "deepseek-v4-flash", context_length = 262144 },
-  { id = "deepseek-v4-flash:free", context_length = 262144 },
-  { id = "glm-5.3-flash", context_length = 1000000 },
-  { id = "gpt-5.6-luna", context_length = 1000000 },
-  { id = "mimo-v2.5", context_length = 1048576 },
-  { id = "mimo-v2.5-pro", context_length = 1048576 },
-  { id = "qwen3.8-flash", context_length = 1000000 },
+  { id = "deepseek-v4.1-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "gpt-5.6-luna", context_length = 1050000, reasoning = true, effort = ["none", "low", "medium", "high", "xhigh", "max"] },
+  { id = "muse-spark-1-3", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
+  { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
 ]
 
 [providers.zenmux]
@@ -330,32 +271,20 @@ api_key = { pass = "AI/zenmux/main" }
 balance_url = "https://zenmux.ai/api/v1/management/payg/balance"
 balance_key = { cmd = 'set -e; k=$(pass show AI/zenmux/manage | head -1); test -n "$k"; printf "Bearer %s" "$k"' }
 models = [
-  { id = "deepseek/deepseek-v4-flash", context_length = 1000000 },
-  { id = "deepseek/deepseek-v4-flash-vision-exp", context_length = 1000000 },
-  { id = "deepseek/deepseek-v4-pro", context_length = 1000000 },
-  { id = "google/gemini-3.8-flash", context_length = 1048576 },
-  { id = "meta/muse-spark-1.3", context_length = 1048576 },
-  { id = "meta/muse-spark-1.3-contributor", context_length = 1048576 },
-  { id = "minimax/minimax-m3", context_length = 1000000 },
-  { id = "moonshotai/kimi-k3", context_length = 1048576 },
-  { id = "openai/gpt-5.6-luna", context_length = 1050000 },
-  { id = "openai/gpt-5.6-sol", context_length = 1050000 },
-  { id = "openai/gpt-5.6-terra", context_length = 1050000 },
-  { id = "qwen/qwen3.8-flash", context_length = 1000000 },
-  { id = "qwen/qwen3.8-max", context_length = 1000000 },
-  { id = "qwen/qwen3.8-max-0902", context_length = 1000000 },
-  { id = "x-ai/grok-4.6", context_length = 500000 },
-  { id = "xiaomi/mimo-v2.5-pro", context_length = 1048576 },
-  { id = "z-ai/glm-5.3", context_length = 1000000 },
-  { id = "z-ai/glm-5.3-flash", context_length = 1000000 },
+  { id = "deepseek/deepseek-v4.1-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "meta/muse-spark-1.3-contributor", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
+  { id = "openai/gpt-5.6-luna", context_length = 1050000, reasoning = true, effort = ["none", "low", "medium", "high", "xhigh", "max"] },
+  { id = "qwen/qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "qwen/qwen3.8-max", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "z-ai/glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
 ]
 
 [providers.mistral]
 base_url = "https://api.mistral.ai/v1/chat/completions"
 api_key = { pass = "AI/mistral/main" }
 models = [
-  { id = "codestral-latest", context_length = 256000 },
-  { id = "mistral-code-latest", context_length = 256000 },
+  { id = "codestral-latest", context_length = 256000, reasoning = false },
+  { id = "mistral-code-latest", context_length = 256000, reasoning = false },
 ]
 [providers.mistral.media]
 transcription_url = "https://api.mistral.ai/v1/audio/transcriptions"
@@ -366,12 +295,9 @@ base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completi
 embeddings_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/embeddings"
 api_key = { pass = "AI/alibaba/global" }
 models = [
-  { id = "ZHIPU/GLM-5.3", context_length = 1048576 },
-  { id = "deepseek-v4-flash-0731", context_length = 1000000 },
-  { id = "deepseek-v4-pro-0813", context_length = 1000000 },
-  { id = "qwen3.8-flash", context_length = 1000000 },
-  { id = "qwen3.8-max", context_length = 1000000 },
-  { id = "qwen3.8-max-0902", context_length = 991808 },
+  { id = "deepseek-v4.1-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "qwen3.8-max-0902", context_length = 1000000, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
 ]
 embedding_models = ["qwen3.7-text-embedding", "text-embedding-v4"]
 [providers.alibaba.limits]
@@ -431,7 +357,13 @@ headers = { User-Agent = "claude-cli/2.1.241 (external, cli)" }
 discover = false
 models = [
   { id = "gpt-5.6-sol", context_length = 1050000 },
-  { id = "glm-5.3", context_length = 1048576 },
+  # `effort` here is the upstream's own answer, not models.dev's: probed
+  # 2026-09-16 with reasoning_effort="medium" (pi's default) and it 400s with
+  # 该模型始终思考，不支持关闭思考；请使用 low、high 或 max — always thinks,
+  # cannot be turned off, takes those three. A client that reads this list
+  # never sends the "medium" that would burn this candidate; one that ignores
+  # it gets a 400 and ordinary failover, which is what happened before.
+  { id = "glm-5.3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
 ]
 
 [providers.tabitoken]
@@ -472,10 +404,10 @@ rpm = 10
 base_url = "https://api.openadapter.in/v1/chat/completions"
 api_key = { pass = "AI/openadapter/main" }
 models = [
-  { id = "free/glm-5-2", context_length = 256000 },
+  { id = "free/glm-5-2", context_length = 256000, effort = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] },
   { id = "free/inkling", context_length = 1048576 },
   { id = "free/minimax-m3", context_length = 1048576 },
-  { id = "free/nemotron-3-ultra-550b-a55b", context_length = 1000000 },
+  { id = "free/nemotron-3-ultra-550b-a55b", context_length = 1000000, reasoning = true, effort = ["none", "medium", "high"] },
 ]
 [providers.openadapter.limits]
 daily_requests = 50
@@ -486,7 +418,7 @@ rpm = 5
 base_url = "https://apihub.agnes-ai.com/v1/chat/completions"
 api_key = { pass = "AI/agnes/main" }
 models = [
-  { id = "agnes-2.5-flash", context_length = 512000 },
+  { id = "agnes-2.5-flash", context_length = 512000, reasoning = true },
   { id = "agnes-2.5-pro", context_length = 128000 },
 ]
 [providers.agnes.limits]
@@ -504,10 +436,10 @@ video_models = ["agnes-video-2.5-flash"]
 base_url = "https://api.b.ai/v1/chat/completions"
 api_key = { pass = "AI/bai/main" }
 models = [
-  { id = "glm-5.3-flash", context_length = 1000000 },
-  { id = "hy3", context_length = 256000 },
-  { id = "mimo-v2.5", context_length = 1048576 },
-  { id = "qwen3.8-flash", context_length = 1000000 },
+  { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "hy3", context_length = 256000, reasoning = true, effort = ["none", "low", "high"] },
+  { id = "mimo-v2.5", context_length = 1048576, reasoning = true },
+  { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
 ]
 [providers.bai.limits]
 rpm = 8
@@ -517,16 +449,16 @@ base_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/chat/completions"
 embeddings_url = "https://tokenhub-intl.tencentcloudmaas.com/v1/embeddings"
 api_key = { pass = "AI/tencent/main" }
 models = [
-  { id = "deepseek-v4-flash-0731", context_length = 1000000 },
-  { id = "deepseek-v4-pro-0813", context_length = 1000000 },
-  { id = "deepseek/deepseek-v4-flash-vision-exp", context_length = 1000000 },
-  { id = "glm-5.3", context_length = 1048576 },
-  { id = "glm-5.3-flash", context_length = 1000000 },
-  { id = "hy3", context_length = 256000 },
-  { id = "hy4-preview", context_length = 1048576 },
-  { id = "kimi-k3", context_length = 1048576 },
-  { id = "mimo-v2.5-pro", context_length = 1048576 },
-  { id = "minimax-m3", context_length = 1000000 },
+  { id = "deepseek-v4-flash-0731", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "deepseek-v4-pro-0813", context_length = 1000000, reasoning = true, effort = ["high", "max"] },
+  { id = "deepseek/deepseek-v4-flash-vision-exp", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "glm-5.3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "hy3", context_length = 256000, reasoning = true, effort = ["none", "low", "high"] },
+  { id = "hy4-preview", context_length = 1048576, reasoning = true, effort = ["none", "high"] },
+  { id = "kimi-k3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "mimo-v2.5-pro", context_length = 1048576, reasoning = true },
+  { id = "minimax-m3", context_length = 1000000, reasoning = true },
 ]
 embedding_models = ["kinfra-text-embedding-0.6b", "kinfra-text-embedding-4b"]
 [providers.tencent.limits]
@@ -542,8 +474,8 @@ embedding_models = ["kinfra-vl-embedding-2b", "kinfra-vl-embedding-8b"]
 # base_url = "https://api.z.ai/api/paas/v4/chat/completions"
 # api_key = { pass = "AI/zai/main" }
 # models = [
-#   { id = "glm-4.7-flash", context_length = 200000, tool_call = true },
-#   { id = "glm-4.5-flash", context_length = 128000, tool_call = true },
+#   { id = "glm-4.7-flash", context_length = 200000 },
+#   { id = "glm-4.5-flash", context_length = 128000 },
 #   { id = "glm-4.6v-flash", context_length = 200000 },
 # ]
 # [providers.zai.limits]
@@ -552,7 +484,7 @@ embedding_models = ["kinfra-vl-embedding-2b", "kinfra-vl-embedding-8b"]
 # [providers.inception]
 # base_url = "https://api.inceptionlabs.ai/v1/chat/completions"
 # api_key = { pass = "AI/inception/main" }
-# models = [{ id = "mercury-2", context_length = 128000, tool_call = true }]
+# models = [{ id = "mercury-2", context_length = 128000 }]
 # [providers.inception.limits]
 # total_tokens = 100000000
 
@@ -604,7 +536,7 @@ rpm = 40
 base_url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 api_key = { pass = "AI/google/main" }
 models = [
-  { id = "models/gemini-3.8-flash", context_length = 1048576 },
+  { id = "models/gemini-3.8-flash", context_length = 1048576, reasoning = true, effort = ["low", "medium", "high"] },
 ]
 [providers.google.limits]
 rpm = 8

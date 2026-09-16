@@ -36,7 +36,7 @@
         "id": "clock",
         "birthYear": 1991,
         "lifeExpectancy": 70,
-        "format": "dddd h:mm AP"
+        "format": "ddd d MMM h:mm AP"
       },
       {
         "id": "timezones",
