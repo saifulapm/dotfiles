@@ -3,8 +3,8 @@
 # The mac's five direct clients (github/jina/cloudflare/openrouter/groq) are
 # deliberately NOT here — each needed an API key, and pxy holds those in the
 # pass store instead, so nothing secret has to reach this public repo.
-# `general` matches pxy's own [launch] default.
-model: pxy:general
+# `aaa` matches pxy's own [launch] default.
+model: pxy:aaa
 
 # ---- behavior ----
 stream: true
@@ -27,7 +27,7 @@ wrap: 150
 
 # ---- session ----
 save_session: true
-compress_threshold: 100000  # under pxy:general's 128K, leaving room for the summary
+compress_threshold: 100000  # under pxy:aaa's 128K, leaving room for the summary
 summarize_prompt: 'Create a concise summary of our conversation focusing on key topics, decisions, and any ongoing tasks or context that should be preserved for future reference. Keep it under 300 words.'
 summary_prompt: 'Previous conversation summary: '
 
@@ -99,7 +99,7 @@ theme: dark
 save_shell_history: true
 sync_models_url: https://raw.githubusercontent.com/sigoden/aichat/refs/heads/main/models.yaml
 
-# The chat models are pxy's five routing GROUPS, not individual models: a group
+# The chat models are pxy's six routing GROUPS, not individual models: a group
 # is the whole point of the proxy — it fails over free-first down an ordered
 # list of ~30 providers, so pinning `pxy:opencode-go/glm-5.3-flash` would throw
 # the quota handling away. Pinning still WORKS when it is wanted, though: pxy
@@ -125,24 +125,28 @@ clients:
   api_base: http://127.0.0.1:4100/v1
   api_key: pxy-local                              # [server].api_key in pxy's config.toml, not a secret
   models:
-    - name: general                               # pxy's own [launch] default
+    - name: aaa                                   # pxy's own [launch] default
       max_input_tokens: 128000
       max_output_tokens: 16384
       supports_function_calling: true
-    - name: credit
+    - name: deepseek
       max_input_tokens: 1000000
-      max_output_tokens: 8192
-      supports_function_calling: true
-    - name: plans
-      max_input_tokens: 128000
       max_output_tokens: 16384
       supports_function_calling: true
-    - name: promo
-      max_input_tokens: 262144
+    - name: muse
+      max_input_tokens: 1048576
       max_output_tokens: 16384
       supports_function_calling: true
-    - name: quota
-      max_input_tokens: 512000
+    - name: glm
+      max_input_tokens: 1000000
+      max_output_tokens: 16384
+      supports_function_calling: true
+    - name: gpt
+      max_input_tokens: 1050000
+      max_output_tokens: 16384
+      supports_function_calling: true
+    - name: qwen
+      max_input_tokens: 1000000
       max_output_tokens: 16384
       supports_function_calling: true
     # tencent — the rag_embedding_model default: widest vector (2560), batch

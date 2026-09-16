@@ -65,6 +65,7 @@ export function model(): string {
  *  bundle `vici build` produces, and the chat's dropdown needs the list at
  *  runtime to offer a per-conversation override of the preference. */
 export const GROUPS = [
+  { value: "aaa", title: "AAA" },
   { value: "deepseek", title: "Deepseek" },
   { value: "muse", title: "Muse" },
   { value: "glm", title: "GLM" },

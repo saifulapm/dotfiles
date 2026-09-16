@@ -233,6 +233,7 @@ models = [
   { id = "muse-spark-1.3-contributor", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
   { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
   { id = "qwen3.8-max", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "union-alpha", context_length = 262144, reasoning = false },
 ]
 [[providers.opencode-go.accounts]]
 name = "github"

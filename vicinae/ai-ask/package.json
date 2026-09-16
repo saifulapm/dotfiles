@@ -118,29 +118,33 @@
       "name": "model",
       "type": "dropdown",
       "title": "Model",
-      "description": "A pxy group, not a single model: each is a failover chain tried in order. General starts at ollama.com's hosted nemotron (a cloud API with a key, not a local daemon) and falls over to Cloudflare.",
+      "description": "A pxy group, not a single model: each is a failover chain tried in order. AAA starts at ollama.com's hosted nemotron (a cloud API with a key, not a local daemon) and falls over to Cloudflare.",
       "required": false,
-      "default": "general",
+      "default": "aaa",
       "data": [
         {
-          "title": "General",
-          "value": "general"
+          "title": "AAA",
+          "value": "aaa"
         },
         {
-          "title": "Promo",
-          "value": "promo"
+          "title": "DeepSeek",
+          "value": "deepseek"
         },
         {
-          "title": "Credit",
-          "value": "credit"
+          "title": "Muse",
+          "value": "muse"
         },
         {
-          "title": "Plans",
-          "value": "plans"
+          "title": "GLM",
+          "value": "glm"
         },
         {
-          "title": "Quota",
-          "value": "quota"
+          "title": "GPT",
+          "value": "gpt"
+        },
+        {
+          "title": "Qwen",
+          "value": "qwen"
         }
       ]
     }

@@ -65,7 +65,7 @@ export default function Command(
           group,
           controller.signal,
         )) {
-          // VERIFIED against the default `general` group (hosted ollama,
+          // VERIFIED against the default `aaa` group (hosted ollama,
           // nemotron-3-nano): it reasons for several seconds before the first
           // word of the answer — a blank pane if only content is read. That is
           // why reasoning is its own channel rather than something to skip.
@@ -181,7 +181,7 @@ function render(question: string, group: string, turn: Turn, showReasoning: bool
     ].join("\n");
   }
 
-  // The provider is the point of surfacing this at all: `general` is a
+  // The provider is the point of surfacing this at all: `aaa` is a
   // failover chain, and whether the answer came from ollama.com or a cloud
   // provider several links down the chain is not otherwise visible.
   const head = `\`${turn.provider ? `${group} · ${turn.provider}` : group}\``;
