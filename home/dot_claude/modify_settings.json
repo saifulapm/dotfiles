@@ -132,7 +132,8 @@ managed=$(
       "node_modules",
       "vendor"
     ],
-    "baseRef": "fresh"
+    "baseRef": "fresh",
+    "bgIsolation": "none"
   },
   "disableAgentView": true,
   "disableRemoteControl": true,

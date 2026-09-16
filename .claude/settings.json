@@ -1,13 +1,4 @@
 {
-  "skillOverrides": {
-    "implement": "off",
-    "mem": "off",
-    "orchestrate": "off",
-    "plan": "off",
-    "review": "off",
-    "route": "off",
-    "unslop": "off"
-  },
   "worktree": {
     "bgIsolation": "none"
   }
