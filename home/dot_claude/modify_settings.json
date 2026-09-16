@@ -3,10 +3,15 @@
 # for the reason spelled out in home/dot_pi/agent/modify_settings.json: this
 # repo applies in symlink mode, and Claude Code writes to this file. `/config`
 # writes theme, `/plugin` writes enabledPlugins, `/permissions` appends allow
-# rules. As a symlink into ~/.dotfiles every one of those left the repo dirty —
-# and it is exactly why run_after_45-amx.sh refuses to run `amx doctor --fix`,
-# which would write amx's seven hooks straight through the symlink into the
-# source tree. That refusal can be revisited now: a --fix lands on a real file.
+# rules. As a symlink into ~/.dotfiles every one of those left the repo dirty.
+#
+# amx's keys are gone from here (2026-09-16). It wired seven hooks into this
+# file and shipped a plugin through a github marketplace, and both are
+# `amx setup claude`'s now: a directory under ~/.claude/skills/amx that claude
+# loads as amx@skills-dir, and nothing in anybody's settings. Leaving
+# extraKnownMarketplaces behind would have re-cloned the whole amx repository
+# into ~/.claude/plugins on the next apply — twelve gigabytes of it on this
+# machine, one copy having caught target/.
 #
 # chezmoi writes a real file for a modify_ script and feeds the current one in
 # on stdin, so Claude owns the file day to day and this owns the keys below.
@@ -126,14 +131,6 @@ managed=$(
     "command": "~/.claude/statusline.py",
     "refreshInterval": 10
   },
-  "extraKnownMarketplaces": {
-    "amx": {
-      "source": {
-        "source": "github",
-        "repo": "saifulapm/amx"
-      }
-    }
-  },
   "sandbox": {
     "enabled": false
   },
@@ -157,10 +154,7 @@ managed=$(
   },
   "prefersReducedMotion": true,
   "skipDangerousModePermissionPrompt": true,
-  "theme": "custom:qshell",
-  "enabledPlugins": {
-    "amx@amx": true
-  }
+  "theme": "custom:qshell"
 }
 JSON
 )

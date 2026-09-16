@@ -8,7 +8,8 @@
 # (setDefaultModelAndProvider), every shift+tab thinking cycle
 # (setDefaultThinkingLevel) and every version bump (setLastChangelogVersion) —
 # so through a symlink, ordinary use of pi would leave the repo dirty. The same
-# trap run_after_45-amx.sh refuses to walk into for claude's hooks.
+# trap run_after_45-amx.sh used to refuse to walk into for claude's hooks,
+# back when amx wired them into a settings file at all.
 #
 # A modify_ script is exempt from symlink mode: chezmoi writes a real file, and
 # feeds the current one in on stdin. So pi owns the file day to day and this
@@ -27,8 +28,9 @@
 #   provider "pxy"  run_after_36-pxy.sh generates extensions/pxy.ts from the
 #                   pxy checkout's contrib/pi-pxy.ts, so a bare `pi` has the
 #                   provider without anyone running `pxy launch pi`
-#   amx, mem        extensions/amx.ts is checked in; mem's is written by
-#                   `mem doctor --fix` in run_after_46-workflow.sh
+#   amx, mem        amx's extensions/amx.ts is written by `amx setup pi` in
+#                   run_after_45-amx.sh; mem's by `mem doctor --fix` in
+#                   run_after_46-workflow.sh
 #   theme "qshell"  NOT WIRED — ~/.pi/agent/themes/qshell.json is unmanaged, so
 #                   a fresh machine falls back to pi's default theme
 set -euo pipefail

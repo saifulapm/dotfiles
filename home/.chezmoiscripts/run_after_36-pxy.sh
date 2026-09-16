@@ -33,10 +33,11 @@ src="$HOME/.local/src/pxy"
 #
 # GENERATED rather than checked into this repo on purpose: it is written from
 # the same checkout the binary was built from, so the extension can never be a
-# version out of step with the pxy it calls. amx's pi extension is checked in
-# (home/dot_pi/agent/extensions/amx.ts) only because nothing on a fresh
-# machine writes that one; mem's is written by `mem doctor --fix`, which
-# run_after_46-workflow.sh runs on every apply. Three extensions, three
+# version out of step with the pxy it calls. amx's is written by `amx setup
+# pi`, which run_after_45-amx.sh runs on every apply — it was checked in until
+# 2026-09-16, and being both checked in and written is how a copy goes a
+# version stale without saying so. mem's is written by `mem doctor --fix`,
+# which run_after_46-workflow.sh runs on every apply. Three extensions, three
 # owners, none of them two.
 #
 # Watch out for ~/.pi/agent/models.json: a providers.pxy key left there by the

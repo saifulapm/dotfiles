@@ -45,7 +45,7 @@ fi
 # to the rc file for $SHELL — which here is fish, whose config.fish is a
 # chezmoi symlink INTO THIS REPO. That append would land in the source tree
 # and leave the repo dirty on every machine that applied: the same trap
-# documented at run_after_45-amx for `amx doctor --fix`. With ~/.local/bin
+# run_after_45-amx documents for the wiring amx writes. With ~/.local/bin
 # exported above the check passes and no rc file is touched (verified
 # 2026-08-26 — install ran, `git status` stayed clean).
 #
