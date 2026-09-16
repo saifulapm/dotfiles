@@ -38,7 +38,7 @@ managed=$(
 {
   "theme": "qshell",
   "defaultProvider": "pxy",
-  "defaultModel": "plans",
+  "defaultModel": "muse",
   "defaultThinkingLevel": "medium",
   "hideThinkingBlock": true,
   "quietStartup": true,
