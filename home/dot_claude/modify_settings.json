@@ -115,7 +115,17 @@ managed=$(
           }
         ]
       }
-    ]
+    ],
+    "Stop": [
+  		{
+        "hooks": [
+          {
+            "type": "command",
+    				"command": "mem session-check --session-id \"$CLAUDE_CODE_SESSION_ID\" --hook-json || true"
+          }
+        ]
+      }
+		]
   },
   "worktree": {
     "symlinkDirectories": [
