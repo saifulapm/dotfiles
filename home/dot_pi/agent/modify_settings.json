@@ -22,10 +22,15 @@
 # lastChangelogVersion is deliberately absent — pinning it would re-show the
 # changelog after every pi upgrade.
 #
-# theme "qshell" and provider "pxy" name things that are NOT in this repo:
-# ~/.pi/agent/themes/qshell.json is unmanaged, and extensions/pxy.ts is
-# rewritten by `pxy launch pi` on every launch. On a fresh machine pi falls
-# back until those exist.
+# The four things these keys name arrive by four different routes, none of
+# them this file:
+#   provider "pxy"  run_after_36-pxy.sh generates extensions/pxy.ts from the
+#                   pxy checkout's contrib/pi-pxy.ts, so a bare `pi` has the
+#                   provider without anyone running `pxy launch pi`
+#   amx, mem        extensions/amx.ts is checked in; mem's is written by
+#                   `mem doctor --fix` in run_after_46-workflow.sh
+#   theme "qshell"  NOT WIRED — ~/.pi/agent/themes/qshell.json is unmanaged, so
+#                   a fresh machine falls back to pi's default theme
 set -euo pipefail
 
 managed=$(

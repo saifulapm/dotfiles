@@ -19,7 +19,69 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 warn() { echo "pxy: $*" >&2; }
 
+src="$HOME/.local/src/pxy"
+
+# ------------------------------------------------------------ pi extension
+# `pxy launch pi` writes ~/.pi/agent/extensions/pxy.ts, and it is the ONLY
+# thing that writes it — so a pi started by hand gets no pxy provider at all,
+# while home/dot_pi/agent/modify_settings.json names "pxy" as defaultProvider
+# on every machine. This does what launch does, minus the launch: the
+# extension ships in the pxy repo as contrib/pi-pxy.ts with two placeholders,
+# and src/launch.rs install_pi_extension fills them with `{base_url}/v1` and
+# the path of the running pxy. Both are known here — the port from the
+# config.toml this repo already owns, the path from where we install.
+#
+# GENERATED rather than checked into this repo on purpose: it is written from
+# the same checkout the binary was built from, so the extension can never be a
+# version out of step with the pxy it calls. amx's pi extension is checked in
+# (home/dot_pi/agent/extensions/amx.ts) only because nothing on a fresh
+# machine writes that one; mem's is written by `mem doctor --fix`, which
+# run_after_46-workflow.sh runs on every apply. Three extensions, three
+# owners, none of them two.
+#
+# Watch out for ~/.pi/agent/models.json: a providers.pxy key left there by the
+# pre-extension merge shadows this file silently (launch.rs says so outright),
+# because models.json overrides compose ABOVE registered providers.
+write_pi_extension() {
+  tpl="$src/contrib/pi-pxy.ts"
+  out="$HOME/.pi/agent/extensions/pxy.ts"
+  cfg="$HOME/.config/pxy/config.toml"
+
+  [ -r "$tpl" ] || {
+    warn "contrib/pi-pxy.ts missing (checkout older than the extension) — pi extension not written"
+    return
+  }
+
+  port=$(sed -n 's/^port *= *\([0-9]\{1,\}\).*/\1/p' "$cfg" 2>/dev/null | head -1)
+  [ -n "$port" ] || {
+    warn "no [server] port in $cfg — pi extension not written"
+    return
+  }
+
+  mkdir -p "$(dirname "$out")"
+  tmp=$(mktemp "$out.XXXXXX") || return
+  sed -e "s|__PXY_BASE_URL__|http://127.0.0.1:$port/v1|" \
+      -e "s|__PXY_BIN__|$HOME/.local/bin/pxy|" "$tpl" >"$tmp"
+
+  # A placeholder pxy grew since this was written would otherwise ship as a
+  # literal __PXY_*__ inside live TypeScript.
+  if grep -q '__PXY_[A-Z_]*__' "$tmp"; then
+    rm -f "$tmp"
+    warn "unsubstituted placeholder in pi-pxy.ts — pi extension not written; run \`pxy launch pi\` once and teach this script the new one"
+    return
+  fi
+
+  # Quiet when nothing changed, like workflow's and mem's doctors.
+  if cmp -s "$tmp" "$out"; then
+    rm -f "$tmp"
+    return
+  fi
+  chmod 644 "$tmp"
+  mv "$tmp" "$out" && echo "pxy: wrote the pi extension to $out"
+}
+
 if [ -x "$HOME/.local/bin/pxy" ]; then
+  write_pi_extension
   exit 0
 fi
 
@@ -28,7 +90,6 @@ command -v cargo >/dev/null 2>&1 || {
   exit 0
 }
 
-src="$HOME/.local/src/pxy"
 # rev-parse, not [ -d .git ]: a clone killed mid-transfer must not satisfy
 # the check forever (same guard as nirisaver and the kakoune fork).
 if ! git -C "$src" rev-parse HEAD >/dev/null 2>&1; then
@@ -46,6 +107,8 @@ if (cd "$src" && CARGO_TARGET_DIR=build/rust cargo build --release --quiet); the
   install -m755 "$src/build/rust/release/pxy" "$HOME/.local/bin/pxy" \
     || { warn "install failed"; exit 0; }
   echo "pxy: installed to ~/.local/bin/pxy"
+  # After the install, not before: the extension names the binary it calls.
+  write_pi_extension
 else
   warn "build failed — try by hand: cd $src && CARGO_TARGET_DIR=build/rust cargo build --release"
   exit 0
