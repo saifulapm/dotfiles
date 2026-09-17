@@ -91,6 +91,7 @@ models = [
 [providers.deepseek-ai]
 base_url = "https://api.deepseek.com/anthropic/v1/messages"
 format = "anthropic"
+requires_reasoning_replay = true
 auth_header = "x-api-key"
 balance_url = "https://api.deepseek.com/user/balance"
 models_url = "https://api.deepseek.com/models"
@@ -617,3 +618,12 @@ name = "firecrawl"
 kind = "firecrawl-scrape"
 api_key = { pass = "AI/firecrawl/main" }
 monthly_requests = 200
+
+# ---------------------------------------------------------------------------
+# Request artifact capture — errors only. Failed attempts land in
+# ~/.local/share/pxy/captures (0600), bounded to 500 files / 24h.
+# Inspect with `pxy captures`, clear with `pxy captures --clean`.
+# ---------------------------------------------------------------------------
+[capture]
+enabled = true
+on_error = true

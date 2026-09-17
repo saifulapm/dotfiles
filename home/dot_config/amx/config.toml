@@ -24,7 +24,7 @@ agent = "claude"
 # How many live agents in a project before `new` refuses. Counted over the
 # agents whose pane still answers for them, in the project the new one would
 # run in: a repository at its cap refuses nothing in the next one.
-max_agents = 12
+max_agents = 15
 
 # A ceiling over every project on the machine at once. Left out, there is
 # none: a machine is as busy as the projects on it ask between them.
@@ -33,7 +33,7 @@ max_agents = 12
 # Give each agent its own git worktree. Two agents editing one checkout is the
 # failure amx is arranged to avoid; `amx new --no-worktree` is the escape for
 # one spawn.
-worktrees = true
+worktrees = false
 
 # Where a notice about the transitions worth interrupting for goes: an agent
 # that finished, or one stuck waiting on an answer. "desktop" is the desktop's
@@ -89,7 +89,7 @@ theme = "qshell"
 # long the pane goes and the record stays; enter, attach or resume starts the
 # agent again where it left off. A pane somebody is attached to or has pinned
 # is never taken. 0 turns this off.
-park_after = 3600
+park_after = 600
 
 # What a fresh worktree is furnished with before its pane starts, so an agent's
 # first turn goes on the task rather than on an install or a failed test. Paths
@@ -201,5 +201,5 @@ CLAUDE_CODE_ENABLE_AWAY_SUMMARY = "0"
 DISABLE_COST_WARNINGS = "1"
 
 [pi]
-# models = ["anthropic/claude-opus-4-1", "openai/gpt-5"]
+models = ["deepseek", "glm", "muse", "gpt", "qwen"]
 args = ["--approve"]
