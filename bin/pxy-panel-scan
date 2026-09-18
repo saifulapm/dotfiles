@@ -2,7 +2,7 @@
 """Gather everything the pxy bar panel shows into one JSON object.
 
 Sources, all pxy's own: `pxy status --json [--remote]` (usage, limits,
-cooldowns, route pin, the group list), one `pxy explain <group> --json` per
+cooldowns, the per-group route pins, the group list), one `pxy explain <group> --json` per
 group (that group's live walk order with per-candidate verdicts, pin
 included), `pxy models --json` (the full catalog for the picker's search), and
 a healthz probe for the daemon light.
@@ -119,8 +119,8 @@ def main():
     # re-scan after pinning must not overwrite them with local-caps-only rows.
     "remoteIncluded": with_remote,
     "daemon": {"active": False, "port": 0, "modelCount": 0},
-    "routePin": None,
-    "routePinActive": False,
+    # group name -> {"model", "active"}; a group with no pin has no entry
+    "routePins": {},
     "groups": [],
     # group name -> that group's walk order (the panel's ROUTE rows)
     "chains": {},
@@ -142,8 +142,11 @@ def main():
     print(json.dumps(out, separators=(",", ":")))
     return
 
-  out["routePin"] = status.get("routePin")
-  out["routePinActive"] = bool(status.get("routePinActive"))
+  out["routePins"] = {
+    str(p["group"]): {"model": str(p.get("model") or ""), "active": bool(p.get("active"))}
+    for p in (status.get("routePins") or [])
+    if p.get("group")
+  }
   out["groups"] = status.get("groups") or []
   out["cooldowns"] = status.get("cooldowns") or []
   port = int(status.get("port") or 0)
