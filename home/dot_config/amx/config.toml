@@ -26,6 +26,14 @@ agent = "claude"
 # run in: a repository at its cap refuses nothing in the next one.
 max_agents = 15
 
+# How deep a chain of agents may go. The default is 1: a spawn at the second
+# level is refused. Raised to 3 on 2026-09-18 because a `workflow run` started
+# from inside an amx orchestrator dispatches its worker as that session's child
+# (depth 1) and its reader as the worker's child (depth 2), which the default
+# refused -- the reader could never be had and every task failed on its
+# reading. Three covers the orchestrator, its worker and its reader.
+subagent_depth = 3
+
 # A ceiling over every project on the machine at once. Left out, there is
 # none: a machine is as busy as the projects on it ask between them.
 # max_total = 10
