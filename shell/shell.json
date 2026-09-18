@@ -36,7 +36,7 @@
         "id": "clock",
         "birthYear": 1991,
         "lifeExpectancy": 70,
-        "format": "ddd d MMM h:mm AP"
+        "format": "d MMMM 'W'ww yyyy"
       },
       {
         "id": "timezones",
@@ -53,8 +53,8 @@
     "right": [
       "tray",
       "mail",
-      "ai",
       "kb",
+      "ai",
       "pxy",
       "devservices",
       "dufs",

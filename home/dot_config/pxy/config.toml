@@ -71,9 +71,13 @@ models = [
   "zenmux/qwen/qwen3.8-flash",
 ]
 
+[groups.jev]
+name = "Jev"
+models = [
+  "vercel/typesafe-ai/jev",
+]
+
 [launch]
-# deepseek, not aaa: every aaa member sits outside providers_whitelist, so
-# aaa resolves to nothing while the whitelist is on (2026-09-18).
 model = "deepseek"
 
 # ---------------------------------------------------------------------------
@@ -200,18 +204,6 @@ transcription_models = ["@cf/openai/whisper-large-v3-turbo"]
 speech_models = ["@cf/deepgram/aura-2-en", "@cf/myshell-ai/melotts"]
 daily_requests = 30
 
-# opencode.ai emailed 2026-09-03: requests were arriving with NO user agent and
-# no `x-opencode-session`, and from 2026-09-06 a missing session header "may
-# error". pxy now sends `x-opencode-session` on every provider whose NAME
-# starts with "opencode" (the same rule the opencode CLI uses) — the client's
-# own id when it sends one, otherwise a conversation-stable fingerprint, never
-# a per-request UUID: opencode routes on this value, so a fresh id each turn
-# would scatter one conversation across upstreams and lose every cache hit.
-# The User-Agent below is Saiful's call: it claims the opencode CLI's identity
-# (real format `opencode/<version>`, from session/llm/request.ts, and the CLI
-# also sends `x-opencode-client: cli`) rather than an honest pxy/0.1.0. Bump
-# the version when upstream moves — packages/opencode/package.json was 1.18.31
-# on 2026-09-18.
 [providers.opencode-zen]
 base_url = "https://opencode.ai/zen/v1/chat/completions"
 headers = { User-Agent = "opencode/1.18.31", x-opencode-client = "cli" }
@@ -239,7 +231,6 @@ models = [
   { id = "muse-spark-1.3-contributor", format = "responses", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
   { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
   { id = "qwen3.8-max", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
-  { id = "union-alpha", context_length = 262144, reasoning = false },
 ]
 [[providers.opencode-go.accounts]]
 name = "github"
@@ -587,7 +578,7 @@ models = [
 
 [providers.jina]
 api_key = { pass = "AI/jina-reader/main" }
-discover = false
+models_url = "https://api.jina.ai/v1/models"
 [providers.jina.media]
 rerank_url = "https://api.jina.ai/v1/rerank"
 rerank_models = ["jina-reranker-v2-base-multilingual"]
@@ -631,6 +622,47 @@ name = "firecrawl"
 kind = "firecrawl-scrape"
 api_key = { pass = "AI/firecrawl/main" }
 monthly_requests = 200
+
+# ---------------------------------------------------------------------------
+# Server tools pxy runs itself (wiki:server-tools). A model calls a reserved
+# function, pxy runs it and feeds the result back in the same turn. The
+# `defaults` tables ride EVERY client turn (pi, claude, codex, opencode) with
+# no plugin; a client that declares a tool itself keeps its own declaration.
+# fusion, search_models and image_generation stay opt-in per request: a panel
+# of three plus an analyst on a routine coding turn is cost, not help.
+# ---------------------------------------------------------------------------
+[server_tools]
+enabled = ["web_search", "web_fetch", "datetime", "search_models", "image_generation", "advisor", "subagent", "fusion"]
+max_tool_calls = 10
+# Three cheap, fast, different-family panelists; the strongest model analyses.
+fusion_panel = ["deepseek", "glm", "qwen"]
+fusion_analyst = "gpt"
+
+[server_tools.defaults.datetime]
+timezone = "Asia/Dhaka"
+
+[server_tools.defaults.web_search]
+max_results = 5
+max_total_results = 20
+max_characters = 2000
+
+[server_tools.defaults.web_fetch]
+max_content_tokens = 25000
+blocked_domains = ["localhost", "127.0.0.1"]
+
+# A stronger model to consult mid-generation; the executor decides when.
+[server_tools.defaults.advisor]
+model = "gpt"
+instructions = "You are a senior staff engineer advising another model mid-task. Be decisive and concrete: name the approach, the pitfalls, and what to verify. No preamble."
+max_completion_tokens = 4000
+
+# A cheap, fast worker for self-contained subtasks, with the web tools.
+[server_tools.defaults.subagent]
+model = "qwen"
+instructions = "You are a fast, focused worker. Complete the task exactly as described and return only the requested output."
+tools = [{ type = "pxy:web_search" }, { type = "pxy:web_fetch" }]
+max_tool_calls = 6
+max_completion_tokens = 8000
 
 # ---------------------------------------------------------------------------
 # Request artifact capture — errors only. Failed attempts land in
