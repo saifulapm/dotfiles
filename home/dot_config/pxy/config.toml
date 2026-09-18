@@ -1,5 +1,5 @@
 # pxy config
-providers_whitelist = []
+providers_whitelist = ["opencode-go", "commandcode", "deepseek-ai", "tokenharbor", "zenmux", "aihubmix"]
 
 [server]
 port = 4100
@@ -9,8 +9,7 @@ api_key = "pxy-local"
 name = "AAA"
 models = [
   "ollama/nemotron-3-nano:30b",
-  "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
-  "opencode-zen/muse-spark-1.3-contributor-free",
+  "openrouter/openrouter/free",
   "cloudflare/@cf/meta/llama-4-scout-17b-16e-instruct",
   "amd/DeepSeek-V4-Flash",
 ]
@@ -136,6 +135,7 @@ balance_url = "https://openrouter.ai/api/v1/credits"
 api_key = { pass = "AI/openrouter/main" }
 headers = { HTTP-Referer = "http://localhost", X-Title = "pxy" }
 models = [
+  { id = "openrouter/free", context_length = 200000, reasoning = true },
   { id = "nvidia/nemotron-3-ultra-550b-a55b:free", context_length = 1000000, reasoning = true, effort = ["none", "medium", "high"] },
   { id = "nvidia/nemotron-3.5-lightning:free", context_length = 1000000, reasoning = true, effort = ["none", "high"] },
   { id = "thinkingmachines/inkling-small:free", context_length = 1048576, reasoning = true },
@@ -380,17 +380,17 @@ models = [
   { id = "claude-opus-5-thinking", context_length = 1000000 },
 ]
 
-[providers.gorouter]
-format = "anthropic"
-base_url = "https://gorouter.app/v1/messages"
-balance_url = "https://gorouter.app/v1/dashboard/billing/usage"
-auth_header = "x-api-key"
-api_key = { pass = "AI/gorouter/main" }
-discover = false
-models = [
-  { id = "claude-opus-5", context_length = 1000000 },
-  { id = "claude-opus-5-thinking", context_length = 1000000 },
-]
+# [providers.gorouter]
+# format = "anthropic"
+# base_url = "https://gorouter.app/v1/messages"
+# balance_url = "https://gorouter.app/v1/dashboard/billing/usage"
+# auth_header = "x-api-key"
+# api_key = { pass = "AI/gorouter/main" }
+# discover = false
+# models = [
+#   { id = "claude-opus-5", context_length = 1000000 },
+#   { id = "claude-opus-5-thinking", context_length = 1000000 },
+# ]
 
 [providers.tokenrouter]
 base_url = "https://api.tokenrouter.com/v1/chat/completions"
@@ -542,6 +542,14 @@ models = [
 ]
 [providers.google.limits]
 rpm = 8
+
+[providers.vercel]
+base_url = "https://ai-gateway.vercel.sh/v1/chat/completions"
+api_key = { pass = "AI/vercel-gateway/main" }
+balance_url = "https://ai-gateway.vercel.sh/v1/credits"
+models = [
+  { id = "typesafe-ai/jev", context_length = 128000, reasoning = false },
+]
 
 # [providers.elevenlabs]
 # api_key = { pass = "AI/elevenlabs/main" }
