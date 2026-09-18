@@ -9,7 +9,7 @@ import "PxyModel.js" as Model
 // launched with a group name as its model, and the group walks its list until
 // one candidate serves. The panel shows any group's live walk order with
 // per-candidate verdicts, active cooldowns, and every provider's limits, and
-// pins one model ahead of whichever chain a request asks for.
+// pins one model ahead of one group's chain — a pin is that group's alone.
 //
 // All data comes from one bin/pxy-panel-scan run (which shells out to the
 // pxy CLI); pinning runs `pxy route`, so the CLI and this panel can never
@@ -26,8 +26,9 @@ BarIcon {
     property bool refreshing: false
     property bool daemonActive: false
     property int modelCount: 0
-    property string routePin: ""
-    property bool routePinActive: false
+    // group name -> {model, active}; a group with no pin has no entry. A
+    // stale pin (model dropped from the catalog) is present but inactive.
+    property var routePins: ({})
     // [{name, size}] and name -> walk order; every group is scanned at once, so
     // switching chips is instant and can't show a stale chain.
     property var groups: []
@@ -43,6 +44,13 @@ BarIcon {
         return (chains && chains[group]) || [];
     }
 
+    // The group's pin record, or null when it follows its chain.
+    function pinOf(group) {
+        return (routePins && routePins[group]) || null;
+    }
+
+    readonly property int pinnedCount: Object.keys(routePins || {}).length
+
     // A route/restart action in flight; rows stay clickable but the panel
     // shows the spinner through `refreshing`.
     property bool acting: false
@@ -57,8 +65,8 @@ BarIcon {
     tooltipText: {
         if (!daemonActive)
             return "pxy · daemon down";
-        if (routePin !== "" && routePinActive)
-            return "pxy · pinned " + Model.modelName(routePin);
+        if (pinnedCount > 0)
+            return "pxy · " + pinnedCount + " group(s) pinned";
         return "pxy · " + groups.length + " group(s), chain priority";
     }
 
@@ -71,14 +79,14 @@ BarIcon {
         scanProc.running = true;
     }
 
-    // `pxy route <id>` / `pxy route --clear`, then a quick re-scan: only the
-    // route and the walk order changed, the balances didn't.
-    function pin(modelId) {
-        runAction(["route", modelId]);
+    // `pxy route <group> <id>` / `pxy route <group> --clear`, then a quick
+    // re-scan: only that group's walk order changed, the balances didn't.
+    function pin(group, modelId) {
+        runAction(["route", group, modelId]);
     }
 
-    function clearPin() {
-        runAction(["route", "--clear"]);
+    function clearPin(group) {
+        runAction(["route", group, "--clear"]);
     }
 
     function restartDaemon() {
@@ -111,8 +119,7 @@ BarIcon {
                 return;
             daemonActive = !!(data.daemon && data.daemon.active);
             modelCount = data.daemon ? Number(data.daemon.modelCount || 0) : 0;
-            routePin = String(data.routePin || "");
-            routePinActive = data.routePinActive === true;
+            routePins = data.routePins || {};
             groups = data.groups || [];
             chains = data.chains || {};
             cooldowns = data.cooldowns || [];

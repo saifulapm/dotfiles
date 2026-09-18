@@ -9,9 +9,10 @@ import "PxyModel.js" as Model
 // group to look at, and without a query the rows ARE that group's chain, in
 // the order a request would walk it, each with its verdict (eligible, or why
 // it would be skipped). Typing filters the whole catalog instead, so anything
-// pxy serves is pinnable. Clicking (or Enter) pins that model — one pin leads
-// every group's chain, which stays behind it as fallback — and the top row
-// clears the pin. COOLDOWNS lists who is benched and for how long; LIMITS one
+// pxy serves is pinnable. Clicking (or Enter) pins that model into the group
+// on screen — the pin leads that group's chain, which stays behind it as
+// fallback, and no other group notices — and the top row clears that group's
+// pin. COOLDOWNS lists who is benched and for how long; LIMITS one
 // meter per provider, fullest first, so "which model should I use" has an
 // answer at a glance.
 BarPanel {
@@ -44,6 +45,8 @@ BarPanel {
         const found = (pxy.groups || []).find(g => String(g.name) === group);
         return found ? String(found.label || found.name) : group;
     }
+    // The pin of the group on screen: {model, active} or null.
+    readonly property var groupPin: pxy.pinOf(group)
     readonly property var picker: Model.pickerRows(groupChain, pxy.models, query, maxRows)
     // The synthetic "clear pin" row leads the unfiltered list; while searching
     // it would only push real matches down.
@@ -89,9 +92,9 @@ BarPanel {
         if (!row)
             return;
         if (row.isGroup)
-            panel.pxy.clearPin();
+            panel.pxy.clearPin(panel.group);
         else
-            panel.pxy.pin(row.id);
+            panel.pxy.pin(panel.group, row.id);
         panel.query = "";
         searchField.text = "";
     }
@@ -123,10 +126,8 @@ BarPanel {
             if (!panel.pxy.daemonActive)
                 return "DAEMON DOWN";
             let route = panel.pxy.groups.length + " GROUPS · CHAIN PRIORITY";
-            if (panel.pxy.routePin !== "")
-                // A stale pin (model dropped from the catalog) is ignored by
-                // routing; saying "PINNED" here would lie about the walk.
-                route = panel.pxy.routePinActive ? "PINNED · " + Model.modelName(panel.pxy.routePin).toUpperCase() : "PIN STALE · CHAIN PRIORITY";
+            if (panel.pxy.pinnedCount > 0)
+                route = panel.pxy.groups.length + " GROUPS · " + panel.pxy.pinnedCount + " PINNED";
             return route + " · " + panel.pxy.modelCount + " MODELS";
         }
         metaColor: panel.pxy.daemonActive ? panel.theme.textMuted : panel.theme.error
@@ -193,6 +194,7 @@ BarPanel {
                 // `name` stays the routable id everything else keys on.
                 readonly property string label: String(groupTab.modelData.label || groupTab.modelData.name)
                 readonly property bool selected: panel.group === groupTab.name
+                readonly property bool pinned: panel.pxy.pinOf(groupTab.name) !== null
 
                 theme: panel.theme
                 width: groupSwitch.cellWidth
@@ -205,7 +207,9 @@ BarPanel {
                     theme: panel.theme
                     role: StyledText.Small
                     anchors.centerIn: parent
-                    text: groupTab.label
+                    // md-pin after the label: which groups are steered is
+                    // visible without clicking through every tab.
+                    text: groupTab.label + (groupTab.pinned ? " 󰐃" : "")
                     color: groupTab.selected ? panel.theme.accent : panel.theme.textPrimary
                 }
 
@@ -227,7 +231,7 @@ BarPanel {
         theme: panel.theme
         width: parent.width
         inputFont: panel.theme.fontMono
-        placeholder: "Search all " + panel.pxy.models.length + " models — Enter pins one ahead of every chain"
+        placeholder: "Search all " + panel.pxy.models.length + " models — Enter pins one into “" + panel.groupLabel + "”"
 
         onTextEdited: text => panel.query = text
         onAccepted: panel.choose(panel.listRows[Math.min(panel.rowIndex, panel.listRows.length - 1)])
@@ -324,8 +328,10 @@ BarPanel {
             // The list shows the first rows and SCROLLS for the rest (the
             // viewport is 4 models tall), so the count is information, not a
             // promise of hidden rows.
-            return panel.groupChain.length + " candidates in “" + panel.groupLabel
-                + "” — scroll the list; a pinned model leads, the chain stays as fallback.";
+            const tail = panel.groupPin
+                ? (panel.groupPin.active ? "the pin leads, the chain stays as fallback." : "the pin is STALE (not in the catalog), chain order applies.")
+                : "a pin here steers only this group.";
+            return panel.groupChain.length + " candidates in “" + panel.groupLabel + "” — " + tail;
         }
         visible: text !== ""
         wrapMode: Text.WordWrap
@@ -503,7 +509,7 @@ BarPanel {
 
         readonly property bool rowSelected: panel.rowIndex === rowIndex
         readonly property bool isGroup: !!row && row.isGroup === true
-        readonly property bool isCurrent: isGroup ? panel.pxy.routePin === "" : (!!row && row.pinned === true)
+        readonly property bool isCurrent: isGroup ? panel.groupPin === null : (!!row && row.pinned === true)
         readonly property bool eligible: isGroup || !row || row.eligible !== false
 
         hasCursor: rowSelected
@@ -582,7 +588,7 @@ BarPanel {
                     width: parent.width
                     text: {
                         if (routeRow.isGroup)
-                            return panel.pxy.routePin === "" ? "" : "Clear the pin — every group follows its configured chain again";
+                            return panel.groupPin === null ? "" : "Clear the pin — “" + panel.groupLabel + "” follows its configured chain again";
                         return Model.rowSubtitle(routeRow.row);
                     }
                     elide: Text.ElideRight
