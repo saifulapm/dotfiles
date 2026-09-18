@@ -206,12 +206,13 @@ daily_requests = 30
 # a per-request UUID: opencode routes on this value, so a fresh id each turn
 # would scatter one conversation across upstreams and lose every cache hit.
 # The User-Agent below is Saiful's call: it claims the opencode CLI's identity
-# (real format `opencode/<channel>/<version>/<client>`, from their
-# installation/index.ts) rather than an honest pxy/0.1.0. Bump the version when
-# the local CLI moves — `opencode --version` was 1.18.21 when this was set.
+# (real format `opencode/<version>`, from session/llm/request.ts, and the CLI
+# also sends `x-opencode-client: cli`) rather than an honest pxy/0.1.0. Bump
+# the version when upstream moves — packages/opencode/package.json was 1.18.31
+# on 2026-09-18.
 [providers.opencode-zen]
 base_url = "https://opencode.ai/zen/v1/chat/completions"
-headers = { User-Agent = "opencode/latest/1.18.21/cli" }
+headers = { User-Agent = "opencode/1.18.31", x-opencode-client = "cli" }
 models = [
   { id = "muse-spark-1.3-contributor-free", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
 ]
@@ -226,7 +227,7 @@ api_key = { pass = "AI/opencode-go/google" }
 [providers.opencode-go]
 base_url = "https://opencode.ai/zen/go/v1/chat/completions"
 balance_url = "https://opencode.ai/zen/go/v1/usage"
-headers = { User-Agent = "opencode/latest/1.18.21/cli" }
+headers = { User-Agent = "opencode/1.18.31", x-opencode-client = "cli" }
 models = [
   { id = "deepseek-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
   { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
