@@ -72,7 +72,9 @@ models = [
 ]
 
 [launch]
-model = "aaa"
+# deepseek, not aaa: every aaa member sits outside providers_whitelist, so
+# aaa resolves to nothing while the whitelist is on (2026-09-18).
+model = "deepseek"
 
 # ---------------------------------------------------------------------------
 # API-key providers (base URLs from OmniRoute registry, docs/06)
@@ -589,7 +591,7 @@ rerank_url = "https://api.jina.ai/v1/rerank"
 rerank_models = ["jina-reranker-v2-base-multilingual"]
 
 [media]
-image = ["cloudflare/@cf/black-forest-labs/flux-1-schnell", "agnes/agnes-image-2.1-flash"]
+image = ["cloudflare/@cf/black-forest-labs/flux-1-schnell", "agnes/agnes-image-2.5-flash"]
 transcription = [
   "groq/whisper-large-v3-turbo",
   "mistral/voxtral-mini-latest",
