@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Action, ActionPanel, Icon, Keyboard, List } from "@vicinae/api";
-import { GROUPS, ask, model } from "./pxy";
+import { GROUPS, ask, listModels, model } from "./pxy";
 import { type Step, closeTools, enabledTools } from "./tools";
 import { type Turn, assistantMarkdown, hasReasoning, newTurn, quote, toMessages } from "./answer";
 import {
@@ -31,6 +31,12 @@ export function ChatView({ initialTurns, initialQuestion, initialModel }: Props)
   const [pending, setPending] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
   const [history, setHistory] = useState<Conversation[]>([]);
+  // The dropdown's rows come from pxy itself, so a renamed group needs no
+  // rebuild; GROUPS carries it until the fetch answers.
+  const [models, setModels] = useState(GROUPS);
+  useEffect(() => {
+    listModels().then(setModels);
+  }, []);
 
   // The stream writes turns from inside an async loop that outlives the render
   // it started in, so it cannot read them from state without seeing whatever
@@ -275,7 +281,7 @@ export function ChatView({ initialTurns, initialQuestion, initialModel }: Props)
       searchBarPlaceholder={turns.length ? "Ask a follow-up…" : "Ask anything"}
       searchBarAccessory={
         <List.Dropdown tooltip="Model" value={group} onChange={setGroup}>
-          {GROUPS.map((g) => (
+          {models.map((g) => (
             <List.Dropdown.Item key={g.value} title={g.title} value={g.value} />
           ))}
         </List.Dropdown>

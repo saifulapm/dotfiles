@@ -60,10 +60,10 @@ export function model(): string {
   return getPreferenceValues<Preferences>().model ?? "chat";
 }
 
-/** pxy's failover groups, mirroring the `model` preference in package.json.
+/** The dropdown's fallback list, mirroring the `model` preference in
+ *  package.json, used until `listModels()` answers or when pxy is down.
  *  Duplicated rather than imported: the manifest is not reachable from the
- *  bundle `vici build` produces, and the chat's dropdown needs the list at
- *  runtime to offer a per-conversation override of the preference. */
+ *  bundle `vici build` produces. */
 export const GROUPS = [
   { value: "chat", title: "Chat (alias: free chain)" },
   { value: "default", title: "Default (alias: coding chain)" },
@@ -74,6 +74,28 @@ export const GROUPS = [
   { value: "gpt", title: "GPT" },
   { value: "qwen", title: "Qwen" },
 ];
+
+/** Every routable name pxy serves that is not a single provider/model: the
+ *  aliases and the groups, in the order /v1/models lists them (groups first,
+ *  aliases after), so a group renamed in pxy's config shows up here on the
+ *  next open with no edit to this extension. Falls back to GROUPS when pxy
+ *  does not answer. */
+export async function listModels(): Promise<{ value: string; title: string }[]> {
+  try {
+    const res = await fetch(`${ENDPOINT}/models`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return GROUPS;
+    const body = (await res.json()) as { data?: { id: string; display_name?: string }[] };
+    const rows = (body.data ?? [])
+      .filter((m) => !m.id.includes("/"))
+      .map((m) => ({ value: m.id, title: m.display_name && m.display_name !== m.id ? `${m.id} (${m.display_name})` : m.id }));
+    return rows.length ? rows : GROUPS;
+  } catch {
+    return GROUPS;
+  }
+}
 
 /** A pxy group described as a pi-ai model. The id is a GROUP name, not a real
  *  model — pxy resolves it through a failover chain — so the catalogue fields
