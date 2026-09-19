@@ -2,7 +2,19 @@
 # The four aaa members (ollama, openrouter, cloudflare, amd) are free chat
 # providers for aichat, vicinae and qmd, not coding subscriptions; they are
 # whitelisted so [groups.aaa] resolves.
-providers_whitelist = ["opencode-go", "commandcode", "deepseek-ai", "tokenharbor", "zenmux", "aihubmix", "jina", "ollama", "openrouter", "cloudflare", "amd"]
+providers_whitelist = [
+  "opencode-go",
+  "commandcode",
+  "deepseek-ai",
+  "tokenharbor",
+  "zenmux",
+  "aihubmix",
+  "jina",
+  "ollama",
+  "openrouter",
+  "cloudflare",
+  "amd",
+]
 
 [server]
 port = 4100
@@ -650,10 +662,10 @@ models = [
   { id = "jina-ocr-v1", context_length = 32768, max_output_tokens = 8192, reasoning = false, tool_call = false },
 ]
 embedding_models = [
-  "jina-embeddings-v5-text-small",   # 1024d, 32K, multilingual text
-  "jina-embeddings-v5-text-nano",    # 768d, 8K, cheapest text
-  "jina-embeddings-v5-omni-small",   # text + image + video + audio, 1024d
-  "jina-code-embeddings-1.5b",       # code retrieval
+  "jina-embeddings-v5-text-small", # 1024d, 32K, multilingual text
+  "jina-embeddings-v5-text-nano", # 768d, 8K, cheapest text
+  "jina-embeddings-v5-omni-small", # text + image + video + audio, 1024d
+  "jina-code-embeddings-1.5b", # code retrieval
 ]
 [providers.jina.media]
 rerank_url = "https://api.jina.ai/v1/rerank"
@@ -707,7 +719,21 @@ monthly_requests = 200
 # of three plus an analyst on a routine coding turn is cost, not help.
 # ---------------------------------------------------------------------------
 [server_tools]
-enabled = ["web_search", "web_fetch", "datetime", "search_models", "image_generation", "advisor", "subagent", "fusion", "tool_search", "describe_image", "memory", "find_docs", "verify"]
+enabled = [
+  "web_search",
+  "web_fetch",
+  "datetime",
+  "search_models",
+  "image_generation",
+  "advisor",
+  "subagent",
+  "fusion",
+  "tool_search",
+  "describe_image",
+  "memory",
+  "find_docs",
+  "verify",
+]
 max_tool_calls = 10
 # Three cheap, fast, different-family panelists; the strongest model analyses.
 fusion_panel = ["deepseek", "glm", "qwen"]
@@ -727,7 +753,7 @@ blocked_domains = ["localhost", "127.0.0.1"]
 
 # A stronger model to consult mid-generation; the executor decides when.
 [server_tools.defaults.advisor]
-model = "gpt"
+model = "muse"
 instructions = "You are a senior staff engineer advising another model mid-task. Be decisive and concrete: name the approach, the pitfalls, and what to verify. No preamble."
 max_completion_tokens = 4000
 

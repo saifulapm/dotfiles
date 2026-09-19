@@ -192,7 +192,7 @@ diff = "delta --paging=always"
 
 [claude]
 # models = ["opus", "sonnet"]
-# args = ["--add-dir", "/srv/shared"]
+args = ["--allow-dangerously-skip-permissions"]
 # [claude.env]
 # CLAUDE_CONFIG_DIR = "~/.claude-work"
 
@@ -209,5 +209,5 @@ CLAUDE_CODE_ENABLE_AWAY_SUMMARY = "0"
 DISABLE_COST_WARNINGS = "1"
 
 [pi]
-models = ["deepseek", "glm", "muse", "gpt", "qwen"]
+models = ["deepseek", "glm", "muse", "gpt", "qwen", "grok", "kimi"]
 args = ["--approve"]
