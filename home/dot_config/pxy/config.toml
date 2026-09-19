@@ -15,7 +15,7 @@ models = [
 ]
 
 [groups.deepseek]
-name = "DeepSeek"
+name = "DS"
 reasoning = true
 models = [
   "opencode-go/deepseek-flash",
@@ -42,11 +42,11 @@ models = [
 name = "GLM"
 reasoning = true
 models = [
+  "commandcode/z-ai/glm-5.3-flashx",
+  "tokenharbor/glm-5.3-flashx",
   "opencode-go/glm-5.3-flash",
-  "commandcode/z-ai/glm-5.3-flash",
-  "tokenharbor/glm-5.3-flash",
-  "aihubmix/glm-5.3-flash",
-  "zenmux/z-ai/glm-5.3-flash",
+  "aihubmix/glm-5.3-flashx",
+  "zenmux/z-ai/glm-5.3-flashx",
 ]
 
 [groups.gpt]
@@ -66,16 +66,40 @@ reasoning = true
 models = [
   "opencode-go/qwen3.8-flash",
   "commandcode/Qwen/Qwen3.8-Flash",
-  "tokenharbor/qwen3.8-flash",
   "aihubmix/qwen3.8-flash",
+  "tokenharbor/qwen3.8-flash",
   "zenmux/qwen/qwen3.8-flash",
 ]
 
-[groups.jev]
-name = "Jev"
+[groups.grok]
+name = "Grok"
+reasoning = true
 models = [
-  "vercel/typesafe-ai/jev",
+  "opencode-go/grok-4.6",
+  "commandcode/xai/grok-4.6",
+  "tokenharbor/grok-4.6",
+  "aihubmix/grok-4.6",
+  "zenmux/x-ai/grok-4.6",
 ]
+
+[groups.kimi]
+name = "Kimi"
+reasoning = true
+models = [
+  "opencode-go/kimi-k3",
+  "commandcode/moonshotai/Kimi-K3",
+  "tokenharbor/kimi-k3",
+  "aihubmix/kimi-k3",
+  "zenmux/moonshotai/kimi-k3",
+]
+
+# Jev is an evaluation model, not a chat model: the gateway 400s it on
+# /v1/chat/completions. It becomes a `[media] systemone` chain and
+# `[providers.vercel.media]` capability when m14-verify-jev lands
+# (wiki:jev, fact of 2026-09-19).
+# [groups.jev]
+# name = "Jev"
+# models = ["vercel/typesafe-ai/jev"]
 
 [launch]
 model = "deepseek"
@@ -153,6 +177,9 @@ rpm = 20
 daily_requests = 1000
 reset = "00:00"
 reset_tz = "UTC"
+[providers.openrouter.media]
+systemone_url = "https://openrouter.ai/api/alpha/decisions"
+systemone_models = ["typesafe/jev-1.13"]
 
 [providers.aihubmix]
 base_url = "https://aihubmix.com/v1/chat/completions"
@@ -162,10 +189,14 @@ balance_key = { pass = "AI/aihubmix/manage" }
 models = [
   { id = "deepseek-v4.1-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
   { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "glm-5.3-flashx", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
   { id = "gpt-5.6-luna", context_length = 1050000, reasoning = true, effort = ["none", "low", "medium", "high", "xhigh", "max"] },
   { id = "muse-spark-1.3", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh", "max"] },
   { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
   { id = "qwen3.8-max", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "qwen3.8-omni-flash", context_length = 991808, reasoning = true, effort = ["none", "high"] },
+  { id = "grok-4.6", context_length = 500000, reasoning = true, effort = ["low", "medium", "high", "xhigh"] },
+  { id = "kimi-k3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
 ]
 
 # [TODO] Promo till Sep 6
@@ -231,6 +262,8 @@ models = [
   { id = "muse-spark-1.3-contributor", format = "responses", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
   { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
   { id = "qwen3.8-max", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "grok-4.6", context_length = 500000, reasoning = true, effort = ["low", "medium", "high", "xhigh"] },
+  { id = "kimi-k3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
 ]
 [[providers.opencode-go.accounts]]
 name = "github"
@@ -248,8 +281,11 @@ models = [
   { id = "gpt-5.6-luna", context_length = 1050000, reasoning = true, effort = ["none", "low", "medium", "high", "xhigh", "max"] },
   { id = "meta/muse-spark-1.3-contributor", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
   { id = "z-ai/glm-5.3-flash", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "z-ai/glm-5.3-flashx", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
   { id = "Qwen/Qwen3.8-Max-0902", context_length = 1000000, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
   { id = "Qwen/Qwen3.8-Flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "xai/grok-4.6", context_length = 500000, reasoning = true, effort = ["low", "medium", "high", "xhigh"] },
+  { id = "moonshotai/Kimi-K3", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
 ]
 
 [providers.tokenharbor]
@@ -260,7 +296,10 @@ models = [
   { id = "gpt-5.6-luna", context_length = 1050000, reasoning = true, effort = ["none", "low", "medium", "high", "xhigh", "max"] },
   { id = "muse-spark-1-3", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
   { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "glm-5.3-flashx", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
   { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
+  { id = "grok-4.6", context_length = 500000, reasoning = true, effort = ["low", "medium", "high", "xhigh"] },
+  { id = "kimi-k3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
 ]
 
 [providers.zenmux]
@@ -275,6 +314,9 @@ models = [
   { id = "qwen/qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
   { id = "qwen/qwen3.8-max", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
   { id = "z-ai/glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "z-ai/glm-5.3-flashx", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "x-ai/grok-4.6", context_length = 500000, reasoning = true, effort = ["low", "medium", "high", "xhigh"] },
+  { id = "moonshotai/kimi-k3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
 ]
 
 [providers.mistral]
@@ -452,6 +494,7 @@ models = [
   { id = "deepseek/deepseek-v4-flash-vision-exp", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
   { id = "glm-5.3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
   { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
+  { id = "glm-5.3-flashx", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
   { id = "hy3", context_length = 256000, reasoning = true, effort = ["none", "low", "high"] },
   { id = "hy4-preview", context_length = 1048576, reasoning = true, effort = ["none", "high"] },
   { id = "kimi-k3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
@@ -543,9 +586,12 @@ rpm = 8
 base_url = "https://ai-gateway.vercel.sh/v1/chat/completions"
 api_key = { pass = "AI/vercel-gateway/main" }
 balance_url = "https://ai-gateway.vercel.sh/v1/credits"
-models = [
-  { id = "typesafe-ai/jev", context_length = 128000, reasoning = false },
-]
+models = []
+# Jev, Typesafe's System One model (wiki:jev), for verify and web_search re-ranking.
+[providers.vercel.media]
+kind = "vercel"
+systemone_url = "https://ai-gateway.vercel.sh/v4/ai/evaluation-model"
+systemone_models = ["typesafe-ai/jev"]
 
 # [providers.elevenlabs]
 # api_key = { pass = "AI/elevenlabs/main" }
@@ -594,6 +640,7 @@ transcription = [
 speech = ["cloudflare/@cf/deepgram/aura-2-en", "elevenlabs/eleven_turbo_v2_5"]
 rerank = ["voyage/rerank-2.5-lite", "jina/jina-reranker-v2-base-multilingual"]
 video = "agnes/agnes-video-v2.0"
+systemone = ["vercel/typesafe-ai/jev", "openrouter/typesafe/jev-1.13"]
 
 [[search.providers]]
 name = "brave"
@@ -632,7 +679,7 @@ monthly_requests = 200
 # of three plus an analyst on a routine coding turn is cost, not help.
 # ---------------------------------------------------------------------------
 [server_tools]
-enabled = ["web_search", "web_fetch", "datetime", "search_models", "image_generation", "advisor", "subagent", "fusion"]
+enabled = ["web_search", "web_fetch", "datetime", "search_models", "image_generation", "advisor", "subagent", "fusion", "tool_search", "describe_image", "memory", "find_docs", "verify"]
 max_tool_calls = 10
 # Three cheap, fast, different-family panelists; the strongest model analyses.
 fusion_panel = ["deepseek", "glm", "qwen"]
@@ -663,6 +710,19 @@ instructions = "You are a fast, focused worker. Complete the task exactly as des
 tools = [{ type = "pxy:web_search" }, { type = "pxy:web_fetch" }]
 max_tool_calls = 6
 max_completion_tokens = 8000
+
+# Current library docs out of Context7, cached a week (wiki:find-docs).
+[server_tools.defaults.find_docs]
+max_tokens = 4000
+
+# One claim against one passage through Jev; evidence, never a gate (wiki:jev).
+[server_tools.defaults.verify]
+abstain_below = 0.5
+
+# Re-rank web_search hits with Jev: one extra 70-500 ms call per search.
+[server_tools.jev]
+rerank_web_search = true
+rerank_min = 0.3
 
 # ---------------------------------------------------------------------------
 # Request artifact capture — errors only. Failed attempts land in
