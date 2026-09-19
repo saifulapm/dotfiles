@@ -719,6 +719,10 @@ max_tokens = 4000
 [server_tools.defaults.verify]
 abstain_below = 0.5
 
+# find_docs' Context7 account key: anonymous calls share a per-IP cap of 200.
+[server_tools.context7]
+api_key = { pass = "AI/context7/main" }
+
 # Re-rank web_search hits with Jev: one extra 70-500 ms call per search.
 [server_tools.jev]
 rerank_web_search = true
