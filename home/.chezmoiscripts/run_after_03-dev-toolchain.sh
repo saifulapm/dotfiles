@@ -53,6 +53,13 @@ if command -v mise >/dev/null 2>&1; then
     mise exec -- pnpm add -g --allow-build=esbuild @shopify/cli && echo "dev-toolchain: shopify CLI installed" \
       || warn "shopify CLI install failed"
   fi
+  # esbuild, bare on PATH: what `celld dev` and `celld deploy` bundle a Worker
+  # with (10-prebuilt-binaries installs celld itself). @shopify/cli's copy
+  # sits inside its own node_modules and is no use to celld.
+  if [ ! -x "$PNPM_HOME/bin/esbuild" ] && mise exec -- sh -c 'command -v pnpm' >/dev/null 2>&1; then
+    mise exec -- pnpm add -g --allow-build=esbuild esbuild && echo "dev-toolchain: esbuild installed" \
+      || warn "esbuild install failed"
+  fi
 else
   warn "mise not on PATH — was 00-install-packages skipped? node/pnpm/shopify not installed"
 fi

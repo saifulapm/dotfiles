@@ -1751,6 +1751,16 @@ via  = "pnpm add -g @shopify/cli"
 why  = "Shopify apps + themes; Node-based — aarch64 compatibility to be verified at install time"
 
 [[tool]]
+name = "celld"
+via  = "run_after_10-prebuilt-binaries.sh — upstream's celld.dev/install.sh into ~/.local/lib/celld/releases/<tag>/, ~/.local/bin/celld a symlink to it (CELLD_VERSION=vX.Y.Z reruns are a rollback)"
+why  = "Deno's self-hosted, Cloudflare-compatible runtime — Workers, Durable Objects, KV, D1, R2, Queues, Workflows, Cron — that ebdify runs on and develops against with `celld dev` (user call 2026-09-19). Apache-2.0 single binary; Linux x86_64 and aarch64 and Apple Silicon upstream"
+
+[[tool]]
+name = "esbuild"
+via  = "pnpm add -g esbuild (run_after_03-dev-toolchain.sh)"
+why  = "`celld dev` and `celld deploy` bundle the Worker with whichever esbuild is on PATH; without one both refuse to start"
+
+[[tool]]
 name = "rust-analyzer"
 via  = "rustup component add rust-analyzer"
 why  = "Rust language server for eglot"

@@ -2,8 +2,9 @@
 # Tools Fedora does not package whose upstreams ship linux binaries for both
 # our arches (asset names verified against the GitHub API 2026-08-07, jj and
 # witr 2026-08-08, lazysql 2026-08-08, herdr 2026-08-10, yazi and cliamp
-# 2026-08-18, aichat and yek re-verified 2026-09-06): watchexec, hurl, aichat,
-# cloudflared, stripe, ouch, yek, usql, jj, witr, lazysql, herdr, yazi, cliamp.
+# 2026-08-18, aichat and yek re-verified 2026-09-06, celld 2026-09-19): watchexec,
+# hurl, aichat, cloudflared, stripe, ouch, yek, usql, jj, witr, lazysql, herdr,
+# yazi, cliamp, celld.
 # Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
 #
 # GitHub's unauthenticated API allows 60 requests/hour per IP — thirteen here
@@ -325,6 +326,20 @@ if ! command -v cliamp >/dev/null 2>&1; then
     warn "cliamp install failed (download failed or checksum did not match)"
   fi
   rm -rf "$tmp"
+fi
+
+# celld — Deno's self-hosted, Cloudflare-compatible runtime (Workers, Durable
+# Objects, KV, D1, R2, Queues, Workflows, Cron) that ebdify runs on (user call
+# 2026-09-19). Upstream's install.sh is the mechanism: it resolves the latest
+# tag through the releases/latest redirect (no API call), lands the binary in
+# ~/.local/lib/celld/releases/<tag>/ and swaps ~/.local/bin/celld as a symlink
+# to it, so a rerun with CELLD_VERSION pinned is a rollback. Linux x86_64,
+# Linux aarch64 and Apple Silicon builds upstream — every machine here.
+# `celld dev` and `celld deploy` need esbuild on PATH; 03-dev-toolchain
+# installs it through pnpm.
+if [ ! -x "$bindir/celld" ]; then
+  curl -fsSL https://celld.dev/install.sh | CELLD_INSTALL_ROOT="$HOME/.local" sh >/dev/null \
+    && echo "prebuilt: installed celld" || warn "celld install failed"
 fi
 
 exit 0
