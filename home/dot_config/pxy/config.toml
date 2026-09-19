@@ -1,5 +1,8 @@
 # pxy config
-providers_whitelist = ["opencode-go", "commandcode", "deepseek-ai", "tokenharbor", "zenmux", "aihubmix", "jina"]
+# The four aaa members (ollama, openrouter, cloudflare, amd) are free chat
+# providers for aichat, vicinae and qmd, not coding subscriptions; they are
+# whitelisted so [groups.aaa] resolves.
+providers_whitelist = ["opencode-go", "commandcode", "deepseek-ai", "tokenharbor", "zenmux", "aihubmix", "jina", "ollama", "openrouter", "cloudflare", "amd"]
 
 [server]
 port = 4100
@@ -103,6 +106,8 @@ models = [
 
 [launch]
 model = "deepseek"
+# Claude's haiku slot: cheap subscription reasoning group.
+small_model = "qwen"
 
 # ---------------------------------------------------------------------------
 # API-key providers (base URLs from OmniRoute registry, docs/06)
@@ -648,14 +653,12 @@ rerank_models = ["jina-reranker-v3.5"]
 [media]
 image = ["cloudflare/@cf/black-forest-labs/flux-1-schnell", "agnes/agnes-image-2.5-flash"]
 transcription = [
-  "groq/whisper-large-v3-turbo",
   "mistral/voxtral-mini-latest",
   "cloudflare/@cf/openai/whisper-large-v3-turbo",
-  "elevenlabs/scribe_v1",
 ]
-speech = ["cloudflare/@cf/deepgram/aura-2-en", "elevenlabs/eleven_turbo_v2_5"]
+speech = ["cloudflare/@cf/deepgram/aura-2-en"]
 rerank = ["jina/jina-reranker-v3.5"]
-video = "agnes/agnes-video-v2.0"
+video = "agnes/agnes-video-2.5-flash"
 systemone = ["vercel/typesafe-ai/jev", "openrouter/typesafe/jev-1.13"]
 
 [[search.providers]]
@@ -728,6 +731,12 @@ max_tool_calls = 6
 max_completion_tokens = 8000
 
 # Current library docs out of Context7, cached a week (wiki:find-docs).
+# The one whitelisted model that takes images (LiteLLM day-0 post, 2026-09-19);
+# jina-ocr-v1 reads a page image for mode = "ocr".
+[server_tools.defaults.describe_image]
+model = "aihubmix/qwen3.8-omni-flash"
+ocr_model = "jina/jina-ocr-v1"
+
 [server_tools.defaults.find_docs]
 max_tokens = 4000
 
