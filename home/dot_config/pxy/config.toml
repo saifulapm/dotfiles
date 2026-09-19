@@ -104,6 +104,12 @@ models = [
 # name = "Jev"
 # models = ["vercel/typesafe-ai/jev"]
 
+# Stable names for client configs (aichat, qmd, pi, vicinae) that cannot list
+# models: point them here and rename groups freely.
+[aliases]
+chat = "aaa"
+default = "deepseek"
+
 [launch]
 model = "deepseek"
 # Claude's haiku slot: cheap subscription reasoning group.

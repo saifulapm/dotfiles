@@ -120,8 +120,16 @@
       "title": "Model",
       "description": "A pxy group, not a single model: each is a failover chain tried in order. AAA starts at ollama.com's hosted nemotron (a cloud API with a key, not a local daemon) and falls over to Cloudflare.",
       "required": false,
-      "default": "aaa",
+      "default": "chat",
       "data": [
+        {
+          "title": "Chat (alias: free chain)",
+          "value": "chat"
+        },
+        {
+          "title": "Default (alias: coding chain)",
+          "value": "default"
+        },
         {
           "title": "AAA",
           "value": "aaa"

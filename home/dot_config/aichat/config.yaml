@@ -3,8 +3,9 @@
 # The mac's five direct clients (github/jina/cloudflare/openrouter/groq) are
 # deliberately NOT here — each needed an API key, and pxy holds those in the
 # pass store instead, so nothing secret has to reach this public repo.
-# `aaa` matches pxy's own [launch] default.
-model: pxy:aaa
+# `chat` is a pxy alias ([aliases] in dot_config/pxy/config.toml), so the
+# group behind it can move without touching this file.
+model: pxy:chat
 
 # ---- behavior ----
 stream: true
@@ -27,7 +28,7 @@ wrap: 150
 
 # ---- session ----
 save_session: true
-compress_threshold: 100000  # under pxy:aaa's 128K, leaving room for the summary
+compress_threshold: 100000  # under pxy:chat's 128K, leaving room for the summary
 summarize_prompt: 'Create a concise summary of our conversation focusing on key topics, decisions, and any ongoing tasks or context that should be preserved for future reference. Keep it under 300 words.'
 summary_prompt: 'Previous conversation summary: '
 
@@ -99,12 +100,16 @@ theme: dark
 save_shell_history: true
 sync_models_url: https://raw.githubusercontent.com/sigoden/aichat/refs/heads/main/models.yaml
 
-# The chat models are pxy's six routing GROUPS, not individual models: a group
-# is the whole point of the proxy — it fails over free-first down an ordered
-# list of ~30 providers, so pinning `pxy:opencode-go/glm-5.3-flash` would throw
-# the quota handling away. Pinning still WORKS when it is wanted, though: pxy
-# serves every id it routes to, and aichat happily sends an undeclared model
-# name (verified 2026-09-06 — `-m pxy:opencode-go/glm-5.3-flash` answered).
+# The chat models are pxy's two ALIASES (`chat`, the free general-purpose
+# chain; `default`, the coding chain), not groups or individual models: an
+# alias is a stable name pxy resolves to whichever group is behind it today,
+# so a group rename in pxy's config never reaches this file. A group is the
+# whole point of the proxy — it fails over free-first down an ordered list of
+# providers, so pinning `pxy:opencode-go/glm-5.3-flash` would throw the quota
+# handling away. Pinning still WORKS when it is wanted, though: pxy serves
+# every id it routes to (groups included), and aichat happily sends an
+# undeclared model name (verified 2026-09-06 — `-m pxy:opencode-go/glm-5.3-flash`
+# answered).
 #
 # Declared inline because aichat resolves model metadata from its registry by
 # client name, and `pxy` is not in upstream's models.yaml. Chat sizes are what
@@ -125,27 +130,11 @@ clients:
   api_base: http://127.0.0.1:4100/v1
   api_key: pxy-local                              # [server].api_key in pxy's config.toml, not a secret
   models:
-    - name: aaa                                   # pxy's own [launch] default
+    - name: chat                                  # alias: the free chat chain
       max_input_tokens: 128000
       max_output_tokens: 16384
       supports_function_calling: true
-    - name: deepseek
-      max_input_tokens: 1000000
-      max_output_tokens: 16384
-      supports_function_calling: true
-    - name: muse
-      max_input_tokens: 1048576
-      max_output_tokens: 16384
-      supports_function_calling: true
-    - name: glm
-      max_input_tokens: 1000000
-      max_output_tokens: 16384
-      supports_function_calling: true
-    - name: gpt
-      max_input_tokens: 1050000
-      max_output_tokens: 16384
-      supports_function_calling: true
-    - name: qwen
+    - name: default                               # alias: pxy's [launch] model
       max_input_tokens: 1000000
       max_output_tokens: 16384
       supports_function_calling: true

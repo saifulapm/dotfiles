@@ -66,12 +66,12 @@ collections:
 # second per chunk and rerank in minutes; through pxy the whole corpus embeds
 # in minutes and a query answers in seconds. `text-embedding-v4` is DashScope
 # (1024-d, batches of 10); `auto` reranks via pxy's chain (voyage, jina);
-# `aaa` is the chat group, and `reasoning_effort: none` stops its
+# `chat` is pxy's alias for the free chat group, and `reasoning_effort: none` stops its
 # nemotron member from spending the whole budget thinking and returning an
 # empty expansion. The key is pxy's local token from dot_config/pxy/config.toml.
 models:
   embed: openai:text-embedding-v4
-  generate: openai:aaa
+  generate: openai:chat
   rerank: openai:auto
   openai_base_url: http://127.0.0.1:4100/v1
   openai_api_key: pxy-local

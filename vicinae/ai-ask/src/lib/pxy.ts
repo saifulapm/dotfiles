@@ -57,7 +57,7 @@ export type Event =
   | { type: "done"; reason: "stop" | "length" };
 
 export function model(): string {
-  return getPreferenceValues<Preferences>().model ?? "aaa";
+  return getPreferenceValues<Preferences>().model ?? "chat";
 }
 
 /** pxy's failover groups, mirroring the `model` preference in package.json.
@@ -65,6 +65,8 @@ export function model(): string {
  *  bundle `vici build` produces, and the chat's dropdown needs the list at
  *  runtime to offer a per-conversation override of the preference. */
 export const GROUPS = [
+  { value: "chat", title: "Chat (alias: free chain)" },
+  { value: "default", title: "Default (alias: coding chain)" },
   { value: "aaa", title: "AAA" },
   { value: "deepseek", title: "Deepseek" },
   { value: "muse", title: "Muse" },
