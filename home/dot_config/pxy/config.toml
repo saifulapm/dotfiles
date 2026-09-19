@@ -1,5 +1,5 @@
 # pxy config
-providers_whitelist = ["opencode-go", "commandcode", "deepseek-ai", "tokenharbor", "zenmux", "aihubmix"]
+providers_whitelist = ["opencode-go", "commandcode", "deepseek-ai", "tokenharbor", "zenmux", "aihubmix", "jina"]
 
 [server]
 port = 4100
@@ -622,12 +622,28 @@ systemone_models = ["typesafe-ai/jev"]
 # rerank_url = "https://api.voyageai.com/v1/rerank"
 # rerank_models = ["rerank-2.5-lite", "rerank-2.5"]
 
+# Jina Search Foundation (probed live 2026-09-19): chat completions serves
+# exactly one model, jina-ocr-v1, which reads exactly one page image per
+# request, so it is the OCR leg of the file-parser plugin and nothing else.
+# Embeddings and rerank take bare ids; the newest of each family is listed.
 [providers.jina]
+base_url = "https://api.jina.ai/v1/chat/completions"
+embeddings_url = "https://api.jina.ai/v1/embeddings"
 api_key = { pass = "AI/jina-reader/main" }
 models_url = "https://api.jina.ai/v1/models"
+discover = false
+models = [
+  { id = "jina-ocr-v1", context_length = 32768, max_output_tokens = 8192, reasoning = false, tool_call = false },
+]
+embedding_models = [
+  "jina-embeddings-v5-text-small",   # 1024d, 32K, multilingual text
+  "jina-embeddings-v5-text-nano",    # 768d, 8K, cheapest text
+  "jina-embeddings-v5-omni-small",   # text + image + video + audio, 1024d
+  "jina-code-embeddings-1.5b",       # code retrieval
+]
 [providers.jina.media]
 rerank_url = "https://api.jina.ai/v1/rerank"
-rerank_models = ["jina-reranker-v2-base-multilingual"]
+rerank_models = ["jina-reranker-v3.5"]
 
 [media]
 image = ["cloudflare/@cf/black-forest-labs/flux-1-schnell", "agnes/agnes-image-2.5-flash"]
@@ -638,7 +654,7 @@ transcription = [
   "elevenlabs/scribe_v1",
 ]
 speech = ["cloudflare/@cf/deepgram/aura-2-en", "elevenlabs/eleven_turbo_v2_5"]
-rerank = ["voyage/rerank-2.5-lite", "jina/jina-reranker-v2-base-multilingual"]
+rerank = ["jina/jina-reranker-v3.5"]
 video = "agnes/agnes-video-v2.0"
 systemone = ["vercel/typesafe-ai/jev", "openrouter/typesafe/jev-1.13"]
 
@@ -733,6 +749,10 @@ rerank_min = 0.3
 # ~/.local/share/pxy/captures (0600), bounded to 500 files / 24h.
 # Inspect with `pxy captures`, clear with `pxy captures --clean`.
 # ---------------------------------------------------------------------------
+[plugins.file_parser]
+# Scanned pages are rasterised and read by this model, one page per call.
+ocr_model = "jina/jina-ocr-v1"
+
 [capture]
 enabled = true
 on_error = true
