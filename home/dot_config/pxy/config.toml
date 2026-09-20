@@ -50,7 +50,6 @@ reasoning = true
 models = [
   "opencode-go/muse-spark-1.3-contributor",
   "commandcode/meta/muse-spark-1.3-contributor",
-  "tokenharbor/muse-spark-1-3",
   "aihubmix/muse-spark-1.3",
   "zenmux/meta/muse-spark-1.3-contributor",
   "meta/muse-spark-1.3-contributor",
@@ -61,7 +60,6 @@ name = "GLM"
 reasoning = true
 models = [
   "commandcode/z-ai/glm-5.3-flashx",
-  "tokenharbor/glm-5.3-flashx",
   "opencode-go/glm-5.3-flash",
   "aihubmix/glm-5.3-flashx",
   "zenmux/z-ai/glm-5.3-flashx",
@@ -95,7 +93,6 @@ reasoning = true
 models = [
   "opencode-go/grok-4.6",
   "commandcode/xai/grok-4.6",
-  "tokenharbor/grok-4.6",
   "aihubmix/grok-4.6",
   "zenmux/x-ai/grok-4.6",
 ]
@@ -106,7 +103,6 @@ reasoning = true
 models = [
   "opencode-go/kimi-k3",
   "commandcode/moonshotai/Kimi-K3",
-  "tokenharbor/kimi-k3",
   "aihubmix/kimi-k3",
   "zenmux/moonshotai/kimi-k3",
 ]
@@ -288,7 +284,10 @@ models = [
   { id = "muse-spark-1.3-contributor", format = "responses", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
   { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
   { id = "qwen3.8-max", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
-  { id = "grok-4.6", context_length = 500000, reasoning = true, effort = ["low", "medium", "high", "xhigh"] },
+  # Responses wire only, same as the two above (verified 2026-09-20): on
+  # chat/completions the google account answers "not supported for format
+  # oa-compat" and the github account 503s with "Endpoint is unavailable".
+  { id = "grok-4.6", format = "responses", context_length = 500000, reasoning = true, effort = ["low", "medium", "high", "xhigh"] },
   { id = "kimi-k3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
 ]
 [[providers.opencode-go.accounts]]
@@ -317,15 +316,16 @@ models = [
 [providers.tokenharbor]
 base_url = "https://tokenharbor.ai/v1/chat/completions"
 api_key = { pass = "AI/tokenharbor/main" }
+# Only the four models the current plan covers. muse-spark-1-3, glm-5.3-flashx,
+# grok-4.6 and kimi-k3 all answer 402 "isn't included in your current
+# subscription" (probed 2026-09-20), and that 402 cools down the WHOLE
+# provider for an hour — one fall-through would take the four working models
+# with it. Re-add them if the plan changes.
 models = [
   { id = "deepseek-v4.1-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"], free = true },
   { id = "gpt-5.6-luna", context_length = 1050000, reasoning = true, effort = ["none", "low", "medium", "high", "xhigh", "max"] },
-  { id = "muse-spark-1-3", context_length = 1048576, reasoning = true, effort = ["minimal", "low", "medium", "high", "xhigh"] },
   { id = "glm-5.3-flash", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
-  { id = "glm-5.3-flashx", context_length = 1000000, reasoning = true, effort = ["low", "high", "max"] },
   { id = "qwen3.8-flash", context_length = 1000000, reasoning = true, effort = ["low", "medium", "xhigh"] },
-  { id = "grok-4.6", context_length = 500000, reasoning = true, effort = ["low", "medium", "high", "xhigh"] },
-  { id = "kimi-k3", context_length = 1048576, reasoning = true, effort = ["low", "high", "max"] },
 ]
 
 [providers.zenmux]
