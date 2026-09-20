@@ -36,6 +36,9 @@ BarIcon {
     property var cooldowns: []
     property var limits: []
     property var models: []
+    // The last day's per-leg rows (`pxy status --json`'s stats object): totals,
+    // per model/provider/agent/requested, served tool calls, top errors.
+    property var stats: ({})
     property string statusText: ""
 
     readonly property string firstGroup: groups.length > 0 ? String(groups[0].name) : ""
@@ -65,9 +68,11 @@ BarIcon {
     tooltipText: {
         if (!daemonActive)
             return "pxy · daemon down";
-        if (pinnedCount > 0)
-            return "pxy · " + pinnedCount + " group(s) pinned";
-        return "pxy · " + groups.length + " group(s), chain priority";
+        const route = pinnedCount > 0 ? pinnedCount + " group(s) pinned" : groups.length + " group(s), chain priority";
+        const legs = Number((stats && stats.legs) || 0);
+        // 24h of traffic beside the wiring: the tooltip is read far more often
+        // than the panel is opened.
+        return legs > 0 ? "pxy · " + route + " · " + legs + " legs/24h" : "pxy · " + route;
     }
 
     // -------------------------------------------------------------- actions
@@ -129,6 +134,7 @@ BarIcon {
             if (data.remoteIncluded === true || limits.length === 0)
                 limits = data.limits || [];
             models = data.models || [];
+            stats = data.stats || ({});
             statusText = String(data.statusText || "");
             scanned = true;
         } catch (e) {

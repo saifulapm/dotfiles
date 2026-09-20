@@ -17,6 +17,11 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+# Sibling module: pxy's per-leg rows for this tab (latency, failures,
+# cache share, server-tool cost). Absent pxy, every field comes back empty.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pxy_agent_stats import agent_stats
+
 
 def local_day(value):
   if value is None:
@@ -478,6 +483,9 @@ out = {
   "activeDays": len(active_days),
   "activeDates": sorted(active_days),
   "modelUsage": model_usage,
+  # Latency, failures, cache share and tool cost for this agent's pxy
+  # traffic today — the half an agent's own logs cannot report.
+  "pxyStats": agent_stats(agent="codex"),
   "usageStatusText": usage_status,
   "authHelpText": usage_help,
 }

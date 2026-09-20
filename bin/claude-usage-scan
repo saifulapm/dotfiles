@@ -20,6 +20,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+# Sibling module: pxy's per-leg rows for this tab (latency, failures,
+# cache share, server-tool cost). Absent pxy, every field comes back empty.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pxy_agent_stats import agent_stats
+
 
 def expand_path(value: str) -> Path:
     return Path(os.path.expandvars(os.path.expanduser(value))).resolve()
@@ -177,6 +182,10 @@ def scan(projects_path: Path) -> dict[str, Any]:
         "todayTokensByModel": today_tokens,
         "recentDays": recent_days,
         "modelUsage": usage_by_model,
+        # Claude Code counts its own tokens from the responses; what it
+        # cannot see is how the routing behind pxy performed. Its turns
+        # are tagged agent=claude, so this is that slice.
+        "pxyStats": agent_stats(agent="claude"),
         "totalPrompts": prompts,
         "totalSessions": len(sessions),
         # Days with any recorded usage, for the all-time "N days" summary.

@@ -559,6 +559,9 @@ function displayProvider(provider, aggregate) {
         totalSessions: synced ? merged.totalSessions : provider.totalSessions,
         activeDays: synced ? merged.activeDays : provider.activeDays,
         modelUsage: synced ? merged.modelUsage : provider.modelUsage,
+        // Always this machine's: a median measured on another device's
+        // network is not this one's, and neither is its error rate.
+        pxyStats: provider.pxyStats === undefined ? ({}) : provider.pxyStats,
         syncEnabled: synced,
         syncDeviceCount: synced ? Number(merged.deviceCount || 0) : 0
     };
@@ -669,11 +672,16 @@ function modelTotal(bucket) {
 // scale-to-peak the day chart uses for its busiest day.
 function modelRows(p) {
     const usageByModel = p ? (p.modelUsage || {}) : {};
+    // What pxy measured for the same model today, keyed by the same bare id
+    // the scans bucket by. Empty for a tab whose traffic never went through
+    // pxy, and the row simply carries no measurement then.
+    const measured = p && p.pxyStats ? (p.pxyStats.models || {}) : {};
     const rows = [];
     for (const id in usageByModel) {
         rows.push({
             name: friendlyModelName(id),
-            total: modelTotal(usageByModel[id])
+            total: modelTotal(usageByModel[id]),
+            detail: pxyModelDetail(pxyMeasurement(measured, id))
         });
     }
     rows.sort((a, b) => b.total - a.total);
@@ -697,4 +705,95 @@ function dayName(date) {
     if (isNaN(parsed.getTime()))
         return String(date || "");
     return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][parsed.getDay()];
+}
+
+// ------------------------------------------------------- pxy measurements
+// pxy records every upstream call it makes. An agent's own logs know what it
+// spent; these are the facts only the proxy sees — how long the model took,
+// how often it failed, how much of the prompt came back from cache, and what
+// the tools it ran cost.
+
+// A tab's own log may call a model "glm-5.3" or "zenmux/glm-5.3" depending on
+// whether it saw the id pxy routed to or the one pxy answered with; the
+// measurements are keyed by the bare id, so try both.
+function pxyMeasurement(measured, id) {
+    const key = String(id || "");
+    if (measured[key])
+        return measured[key];
+    const slash = key.indexOf("/");
+    return slash >= 0 ? measured[key.slice(slash + 1)] : null;
+}
+
+function pxyFormatMs(ms) {
+    const n = Number(ms || 0);
+    if (n <= 0)
+        return "";
+    if (n >= 10000)
+        return Math.round(n / 1000) + "s";
+    if (n >= 1000)
+        return (n / 1000).toFixed(1) + "s";
+    return Math.round(n) + "ms";
+}
+
+// A rate that stays out of the way when it is zero: a column of "0%" is noise
+// and blank already reads as none.
+function pxyRate(part, whole) {
+    const w = Number(whole || 0);
+    if (w <= 0)
+        return "";
+    const v = Number(part || 0) / w;
+    if (v <= 0)
+        return "";
+    return (v * 100).toFixed(v < 0.1 ? 1 : 0) + "%";
+}
+
+// "1.4s · 68% cached · 9% err" for one model's day, or "" when pxy never
+// routed it.
+function pxyModelDetail(stat) {
+    if (!stat || Number(stat.legs || 0) === 0)
+        return "";
+    const bits = [];
+    const p50 = pxyFormatMs(stat.p50Ms);
+    if (p50)
+        bits.push(p50);
+    const cached = pxyRate(stat.cacheReadTokens, stat.inputTokens);
+    if (cached)
+        bits.push(cached + " cached");
+    const err = pxyRate(stat.errors, stat.legs);
+    if (err)
+        bits.push(err + " err");
+    return bits.join(" · ");
+}
+
+// One line over the tab: what pxy carried for it today.
+function pxySummary(p) {
+    const s = p ? (p.pxyStats || {}) : {};
+    if (Number(s.legs || 0) === 0)
+        return "";
+    const bits = [s.legs + (Number(s.legs) === 1 ? " leg" : " legs") + " through pxy"];
+    const p50 = pxyFormatMs(s.p50Ms);
+    if (p50)
+        bits.push("p50 " + p50);
+    const cached = pxyRate(s.cacheReadTokens, s.inputTokens);
+    if (cached)
+        bits.push(cached + " cached");
+    const err = pxyRate(s.errors, s.legs);
+    if (err)
+        bits.push(err + " errors");
+    return bits.join("  ·  ");
+}
+
+// Served tool calls for this tab, busiest first; failures are the only part
+// worth acting on, so they are named.
+function pxyToolRows(p) {
+    const tools = p && p.pxyStats ? (p.pxyStats.tools || []) : [];
+    return tools.slice().sort((a, b) => Number(b.calls) - Number(a.calls)).slice(0, 6).map(t => ({
+        name: t.name,
+        calls: Number(t.calls || 0),
+        errors: Number(t.errors || 0),
+        // Mean rather than a median: the JSON carries total time, and for a
+        // tool "how long does a call take" is the question.
+        detail: pxyFormatMs(Number(t.totalMs || 0) / Math.max(1, Number(t.calls || 0)))
+            + (Number(t.errors || 0) > 0 ? "  ·  " + t.errors + " failed" : "")
+    }));
 }

@@ -48,6 +48,14 @@ BarPanel {
     // The pin of the group on screen: {model, active} or null.
     readonly property var groupPin: pxy.pinOf(group)
     readonly property var picker: Model.pickerRows(groupChain, pxy.models, query, maxRows)
+    // The last day's legs, keyed by "provider/model": the route rows read
+    // their own latency and error rate out of this.
+    readonly property var statsByModel: Model.statsByModel(pxy.stats)
+    readonly property int statLegs: Number((pxy.stats && pxy.stats.legs) || 0)
+
+    function statFor(id) {
+        return statsByModel[String(id || "")] || null;
+    }
     // The synthetic "clear pin" row leads the unfiltered list; while searching
     // it would only push real matches down.
     readonly property var listRows: (query === "" ? [
@@ -337,6 +345,129 @@ BarPanel {
         wrapMode: Text.WordWrap
     }
 
+    // ---------------------------------------------------------- activity
+    // What the router actually did in the last day, from pxy's per-leg rows:
+    // the summary, the models that carried the traffic, what the served tools
+    // cost, and what kept failing. It sits under the route list because it
+    // explains those rows — a candidate's latency and error rate are the two
+    // facts the walk order cannot show.
+    Separator {
+        theme: panel.theme
+        visible: panel.statLegs > 0
+    }
+
+    Column {
+        visible: panel.statLegs > 0
+        width: parent.width
+        spacing: panel.theme.space(1)
+
+        SectionHeader {
+            theme: panel.theme
+            width: parent.width
+            label: "ACTIVITY · 24H"
+        }
+
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Caption
+            mono: true
+            muted: true
+            width: parent.width
+            text: Model.activitySummary(panel.pxy.stats)
+            wrapMode: Text.WordWrap
+        }
+
+        Repeater {
+            model: Model.activityRows(panel.pxy.stats, 5)
+
+            Item {
+                id: activityRow
+
+                required property var modelData
+
+                width: parent.width
+                height: activityName.implicitHeight + panel.theme.space(1)
+
+                StyledText {
+                    id: activityName
+                    theme: panel.theme
+                    role: StyledText.Small
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: activityDetail.left
+                    anchors.rightMargin: panel.theme.space(2)
+                    text: Model.modelName(activityRow.modelData.name)
+                    elide: Text.ElideRight
+                }
+
+                StyledText {
+                    id: activityDetail
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+                    muted: true
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: Model.activityDetail(activityRow.modelData)
+                }
+            }
+        }
+
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Caption
+            muted: true
+            width: parent.width
+            visible: text !== ""
+            text: {
+                const line = Model.toolsLine(panel.pxy.stats);
+                return line === "" ? "" : "tools: " + line;
+            }
+            wrapMode: Text.WordWrap
+        }
+
+        // The failures, folded by reason. COOLING DOWN below says who is
+        // benched right now; this says what has been going wrong, including
+        // the errors that never earned a cooldown.
+        Repeater {
+            model: Model.topErrors(panel.pxy.stats, 3)
+
+            Item {
+                id: errorRow
+
+                required property var modelData
+
+                width: parent.width
+                height: errorReason.implicitHeight + panel.theme.space(1)
+
+                StyledText {
+                    id: errorReason
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: errorCount.left
+                    anchors.rightMargin: panel.theme.space(2)
+                    text: errorRow.modelData.reason
+                    elide: Text.ElideRight
+                    color: panel.theme.error
+                }
+
+                StyledText {
+                    id: errorCount
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+                    muted: true
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "×" + errorRow.modelData.count + "  " + Model.modelName(errorRow.modelData.lastCandidate)
+                }
+            }
+        }
+    }
+
     // --------------------------------------------------------- cooldowns
     Separator {
         theme: panel.theme
@@ -589,7 +720,7 @@ BarPanel {
                     text: {
                         if (routeRow.isGroup)
                             return panel.groupPin === null ? "" : "Clear the pin — “" + panel.groupLabel + "” follows its configured chain again";
-                        return Model.rowSubtitle(routeRow.row);
+                        return Model.rowSubtitle(routeRow.row, panel.statFor(routeRow.row ? routeRow.row.id : ""));
                     }
                     elide: Text.ElideRight
                 }

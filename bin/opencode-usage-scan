@@ -17,11 +17,17 @@ Two sources, same output contract as the codex/copilot scanners:
 
 import json
 import os
+import sys
 import shutil
 import sqlite3
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# Sibling module: pxy's per-leg rows for this tab (latency, failures,
+# cache share, server-tool cost). Absent pxy, every field comes back empty.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pxy_agent_stats import agent_stats
 
 DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 
@@ -198,6 +204,9 @@ print(json.dumps({
   "activeDays": len(active_days),
   "activeDates": sorted(active_days),
   "modelUsage": model_usage,
+  # Latency, failures, cache share and tool cost for this agent's pxy
+  # traffic today — the half an agent's own logs cannot report.
+  "pxyStats": agent_stats(agent="opencode"),
   "extraLimits": extra_limits,
   "tierLabel": "Go × 2",
   "usageStatusText": status_text,

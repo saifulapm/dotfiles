@@ -15,10 +15,16 @@ the credit pool they draw from, so it rides along as a third meter.
 
 import json
 import os
+import sys
 import shutil
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# Sibling module: pxy's per-leg rows for this tab (latency, failures,
+# cache share, server-tool cost). Absent pxy, every field comes back empty.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pxy_agent_stats import agent_stats
 
 PROVIDER = "commandcode"
 
@@ -172,6 +178,9 @@ print(json.dumps({
   "activeDays": len(active_days),
   "activeDates": sorted(active_days),
   "modelUsage": model_usage,
+  # Command Code reaches its models only through pxy, so the slice is that
+  # provider's rather than an agent's.
+  "pxyStats": agent_stats(provider="commandcode"),
   "rateLimitPercent": primary["percent"] if primary else -1,
   "rateLimitLabel": primary["label"] if primary else "",
   "rateLimitResetAt": primary["resetAt"] if primary else "",

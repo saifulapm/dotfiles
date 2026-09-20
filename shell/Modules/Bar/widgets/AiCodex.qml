@@ -57,6 +57,10 @@ Item {
     property int activeDays: 0
     property var activeDates: []
     property var modelUsage: ({})
+    // pxy's per-leg rows for this tab today: latency, failures, cache
+    // share and served-tool cost. Machine-local — a median from another
+    // device's network is not this one's, so it never syncs.
+    property var pxyStats: ({})
 
     // Bumped whenever a scan lands; the widget publishes a new sync snapshot
     // off this (omarchy's Main.qml watches the same property).
@@ -94,6 +98,7 @@ Item {
             provider.activeDays = data.activeDays || 0;
             provider.activeDates = data.activeDates || [];
             provider.modelUsage = data.modelUsage || ({});
+            provider.pxyStats = data.pxyStats || ({});
 
             provider.rateLimitPercent = data.rateLimitPercent === undefined || data.rateLimitPercent === null ? -1 : data.rateLimitPercent;
             provider.rateLimitLabel = data.rateLimitLabel || "";

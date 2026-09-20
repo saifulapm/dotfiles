@@ -22,6 +22,10 @@ BarPanel {
     readonly property var provider: usage.provider
     readonly property var limits: usage.limits
     readonly property var models: Model.modelRows(provider)
+    // What pxy measured for this tab today. Empty for a provider whose
+    // traffic never goes through the proxy, and every block below hides.
+    readonly property var pxyTools: Model.pxyToolRows(provider)
+    readonly property string pxyLine: Model.pxySummary(provider)
     readonly property var days: provider ? (provider.recentDays || []) : []
     readonly property real peak: Math.max(1, Model.weekPeak(provider))
 
@@ -477,6 +481,19 @@ BarPanel {
             label: "TOKENS BY MODEL"
         }
 
+        // The same traffic as the rows below, measured rather than counted:
+        // pxy times every call it routes and records how it ended.
+        StyledText {
+            theme: panel.theme
+            role: StyledText.Caption
+            mono: true
+            muted: true
+            width: parent.width
+            visible: panel.pxyLine !== ""
+            text: panel.pxyLine
+            wrapMode: Text.WordWrap
+        }
+
         Repeater {
             model: panel.models
 
@@ -518,11 +535,27 @@ BarPanel {
                     role: StyledText.Small
                     anchors.left: parent.left
                     anchors.leftMargin: panel.theme.space(2)
-                    anchors.right: modelTokens.left
+                    anchors.right: modelMeasured.visible ? modelMeasured.left : modelTokens.left
                     anchors.rightMargin: panel.theme.space(2)
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelRow.modelData.name
                     elide: Text.ElideRight
+                }
+
+                // How the model BEHAVED, between what it is called and what it
+                // cost: latency, cache share, failures. Blank unless pxy
+                // routed this model today.
+                StyledText {
+                    id: modelMeasured
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+                    muted: true
+                    anchors.right: modelTokens.left
+                    anchors.rightMargin: panel.theme.space(2)
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: text !== ""
+                    text: modelRow.modelData.detail || ""
                 }
 
                 StyledText {
@@ -535,6 +568,55 @@ BarPanel {
                     anchors.rightMargin: panel.theme.space(2)
                     anchors.verticalCenter: parent.verticalCenter
                     text: panel.fmt(modelRow.modelData.total)
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------- server tools
+    // Tools pxy ran on this tab's behalf — a web_search or a find_docs is a
+    // call the model made and the proxy served, so it costs time here and
+    // appears in no agent's own log.
+    Column {
+        visible: panel.pxyTools.length > 0
+        width: parent.width
+        spacing: panel.theme.space(1)
+
+        SectionHeader {
+            theme: panel.theme
+            width: parent.width
+            label: "SERVER TOOLS · TODAY"
+        }
+
+        Repeater {
+            model: panel.pxyTools
+
+            Item {
+                id: toolRow
+
+                required property var modelData
+
+                width: parent.width
+                height: toolName.implicitHeight + panel.theme.space(1)
+
+                StyledText {
+                    id: toolName
+                    theme: panel.theme
+                    role: StyledText.Small
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: toolRow.modelData.name + "  ×" + toolRow.modelData.calls
+                    color: toolRow.modelData.errors > 0 ? panel.theme.error : panel.theme.textPrimary
+                }
+
+                StyledText {
+                    theme: panel.theme
+                    role: StyledText.Caption
+                    mono: true
+                    muted: true
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: toolRow.modelData.detail
                 }
             }
         }

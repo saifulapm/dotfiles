@@ -2,7 +2,8 @@
 """Gather everything the pxy bar panel shows into one JSON object.
 
 Sources, all pxy's own: `pxy status --json [--remote]` (usage, limits,
-cooldowns, the per-group route pins, the group list), one `pxy explain <group> --json` per
+cooldowns, the per-group route pins, the group list, and the last day's
+per-leg stats), one `pxy explain <group> --json` per
 group (that group's live walk order with per-candidate verdicts, pin
 included), `pxy models --json` (the full catalog for the picker's search), and
 a healthz probe for the daemon light.
@@ -127,6 +128,10 @@ def main():
     "cooldowns": [],
     "limits": [],
     "models": [],
+    # pxy's per-leg rows for the last 24h, exactly as `pxy status --json`
+    # carries them: totals, per model/provider/agent/requested, server-tool
+    # calls, and the failures folded by reason.
+    "stats": {},
     "statusText": "",
   }
   if not os.path.exists(PXY):
@@ -149,6 +154,7 @@ def main():
   }
   out["groups"] = status.get("groups") or []
   out["cooldowns"] = status.get("cooldowns") or []
+  out["stats"] = status.get("stats") or {}
   port = int(status.get("port") or 0)
   out["daemon"]["port"] = port
 

@@ -157,10 +157,13 @@ function rowCaption(row) {
     return bits.join(" · ");
 }
 
-// The whole line under a model: what it IS (provider, context window) before
-// how it is doing (skip reason, price, chains). The two stable facts lead so
-// the column reads down consistently while verdicts change underneath.
-function rowSubtitle(row) {
+// The whole line under a model: what it IS (provider, context window), then
+// how it HAS BEEN (the last day's latency and error rate, when pxy has legs
+// for it), then how it is doing right now (skip reason, price, chains). The
+// two stable facts lead so the column reads down consistently while verdicts
+// change underneath; measured behaviour sits between them, because "this one
+// answers in 1.4s and never fails today" is what decides a pin.
+function rowSubtitle(row, stat) {
     if (!row)
         return "";
     const bits = [];
@@ -170,10 +173,141 @@ function rowSubtitle(row) {
     const ctx = contextLabel(row.context);
     if (ctx)
         bits.push(ctx);
+    const measured = statLabel(stat);
+    if (measured)
+        bits.push(measured);
     const caption = rowCaption(row);
     if (caption)
         bits.push(caption);
     return bits.join("  ·  ");
+}
+
+// ----------------------------------------------------------------- stats
+// `pxy status --json` carries the last day's per-leg rows under `stats`: one
+// entry per model, provider, agent and requested id, plus the served tool
+// calls and the failures folded by reason. Nothing here polls — the numbers
+// are as fresh as the scan that brought them.
+
+// Model entries keyed by "provider/model", which is exactly the id the route
+// rows and the catalogue use.
+function statsByModel(stats) {
+    const out = {};
+    const rows = (stats && stats.models) || [];
+    for (let i = 0; i < rows.length; i++)
+        out[String(rows[i].name)] = rows[i];
+    return out;
+}
+
+// 1.4s / 620ms / "" — the same shape `pxy stats` prints.
+function formatMs(ms) {
+    const n = Number(ms || 0);
+    if (n <= 0)
+        return "";
+    if (n >= 10000)
+        return Math.round(n / 1000) + "s";
+    if (n >= 1000)
+        return (n / 1000).toFixed(1) + "s";
+    return Math.round(n) + "ms";
+}
+
+// 2.1M / 84k / 900, as the CLI writes token counts.
+function formatTokens(n) {
+    const v = Number(n || 0);
+    if (v >= 1e6)
+        return (v / 1e6).toFixed(1) + "M";
+    if (v >= 1000)
+        return Math.round(v / 1000) + "k";
+    return String(Math.round(v));
+}
+
+function ratio(part, whole) {
+    const w = Number(whole || 0);
+    return w > 0 ? Number(part || 0) / w : 0;
+}
+
+// A percentage that only appears when it is not zero: an error column full of
+// "0%" reads as noise, and blank already means "none".
+function formatRate(x) {
+    const v = Number(x || 0);
+    if (v <= 0)
+        return "";
+    return (v * 100).toFixed(v < 0.1 ? 1 : 0) + "%";
+}
+
+// "1.4s · 9% err" for one model's last day, or "" when pxy has no legs for
+// it. Latency comes from the legs that answered, so a model whose every
+// attempt failed shows the error rate alone.
+function statLabel(stat) {
+    if (!stat || Number(stat.legs || 0) === 0)
+        return "";
+    const bits = [];
+    const p50 = formatMs(stat.p50Ms);
+    if (p50)
+        bits.push(p50);
+    const err = formatRate(ratio(stat.errors, stat.legs));
+    if (err)
+        bits.push(err + " err");
+    if (bits.length === 0)
+        bits.push(stat.legs + " legs");
+    return bits.join(" · ");
+}
+
+// The right-hand column of an activity row: what it cost and how it behaved.
+function activityDetail(stat) {
+    if (!stat)
+        return "";
+    const bits = [stat.legs + (Number(stat.legs) === 1 ? " leg" : " legs")];
+    const tokens = Number(stat.inputTokens || 0) + Number(stat.outputTokens || 0);
+    if (tokens > 0)
+        bits.push(formatTokens(tokens));
+    const p50 = formatMs(stat.p50Ms);
+    if (p50)
+        bits.push(p50);
+    const err = formatRate(ratio(stat.errors, stat.legs));
+    if (err)
+        bits.push(err);
+    return bits.join("  ·  ");
+}
+
+// The one-line summary over the whole window.
+function activitySummary(stats) {
+    if (!stats || Number(stats.legs || 0) === 0)
+        return "";
+    const bits = [
+        stats.legs + (Number(stats.legs) === 1 ? " leg" : " legs"),
+        formatTokens(stats.inputTokens) + " in / " + formatTokens(stats.outputTokens) + " out"
+    ];
+    const cached = formatRate(ratio(stats.cacheReadTokens, stats.inputTokens));
+    if (cached)
+        bits.push(cached + " cached");
+    const err = formatRate(ratio(stats.errors, stats.legs));
+    if (err)
+        bits.push(err + " errors");
+    const p50 = formatMs(stats.p50Ms);
+    if (p50)
+        bits.push("p50 " + p50);
+    return bits.join("  ·  ");
+}
+
+// Served tool calls as one line: busiest first, failures called out because
+// that is the only part worth acting on.
+function toolsLine(stats) {
+    const rows = ((stats && stats.tools) || []).slice().sort((a, b) => Number(b.calls) - Number(a.calls));
+    if (rows.length === 0)
+        return "";
+    return rows.slice(0, 6).map(t => {
+        const failed = Number(t.errors || 0);
+        return t.name + " " + t.calls + (failed > 0 ? " (" + failed + " failed)" : "");
+    }).join("  ·  ");
+}
+
+// Top models by traffic, as activity rows.
+function activityRows(stats, limit) {
+    return ((stats && stats.models) || []).slice(0, limit || 5);
+}
+
+function topErrors(stats, limit) {
+    return ((stats && stats.topErrors) || []).slice(0, limit || 3);
 }
 
 function formatSeconds(s) {
