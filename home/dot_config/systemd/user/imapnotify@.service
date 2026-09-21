@@ -29,18 +29,6 @@ RestartSec=30
 # The watcher only ever spawns mail-sync, which does the real work at idle
 # priority itself. Nothing here should compete with the editor.
 Nice=10
-{{- if eq .machine "nuc" }}
-# The NUC's graphical session has no human in front of it, so the pinentry
-# described above is drawn on a monitor in an empty room — and gpg-agent
-# serialises ALL requests behind one prompt, so that unanswered dialog freezes
-# gpg for the whole machine until it times out, then the Restart loop draws the
-# next one (2026-09-21: one per ~60 s after a headless boot, and `ssh nuc` hung
-# on its own gpg-unlock). bin/pinentry-auto reads this and fails the request
-# instead of prompting. The watcher was failing its logins either way; this
-# only stops it taking the lock down with it, so the SSH login can unlock the
-# agent — which is the one prompt on this box a human ever answers.
-Environment=PINENTRY_USER_DATA=error
-{{- end }}
 
 [Install]
 WantedBy=graphical-session.target

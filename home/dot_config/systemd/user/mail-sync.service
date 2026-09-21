@@ -19,11 +19,3 @@ IOSchedulingClass=idle
 # every later sync needs. mbsync's own Timeout is 120s per operation; this is
 # the backstop for the whole run.
 TimeoutStartSec=10min
-{{- if eq .machine "nuc" }}
-# Same reason as imapnotify@.service: nobody is sitting at the NUC, so the
-# pinentry this would draw hangs on an empty screen while holding gpg-agent's
-# one prompt lock, which is what made `ssh nuc` freeze on its own gpg-unlock.
-# bin/pinentry-auto fails the request instead. A sync that cannot read the
-# password logs and exits; the next one after an SSH unlock succeeds.
-Environment=PINENTRY_USER_DATA=error
-{{- end }}
