@@ -32,7 +32,20 @@ CURSES=/usr/bin/pinentry-curses
 [ -x "$CURSES" ] || CURSES=/usr/bin/pinentry
 
 # An explicit request from the client wins over any guess.
+#
+# `error` means "I am a background job and there is no human to ask" — exiting
+# without speaking assuan makes gpg-agent fail the operation immediately. What
+# it BUYS is the agent's pinentry lock: the agent serialises every request
+# behind one prompt, so a dialog nobody answers freezes gpg for the whole
+# machine, not just for the job that asked. Measured on the NUC 2026-09-21,
+# which is why this case exists: imapnotify and mail-sync woke a locked agent
+# every ~60 s after a headless boot, each drew a pinentry-qt on the monitor in
+# the empty room, and an SSH login's gpg-unlock — including the
+# --pinentry-mode=error probe that is supposed to be free — blocked for as long
+# as one of them was alive (8 s timeout hit; 0 s after pkill pinentry-qt).
+# Those jobs were already failing; now they fail without taking the lock.
 case "${PINENTRY_USER_DATA:-}" in
+*error*) exit 1 ;;
 *curses* | *tty*) exec "$CURSES" "$@" ;;
 *gui* | *qt*) exec "$QT" "$@" ;;
 esac
