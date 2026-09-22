@@ -9,16 +9,12 @@
   a real file — and `systemctl --user enable imapnotify@icloud.service`
   recorded the link's target, so the rename left the instance pointing at a
   path that no longer existed and systemd called it not-found (2026-09-21,
-  on the NUC, which is why this file exists). A drop-in that is present or
-  absent moves nothing. */ -}}
-{{ if ne .machine "nuc" }}
-{{/* The mail units must not draw a passphrase prompt on a machine with nobody
-     in front of the screen; everywhere else that prompt is how the agent gets
-     unlocked at boot. See the drop-ins for the whole story. */}}
-.config/systemd/user/imapnotify@.service.d
-.config/systemd/user/mail-sync.service.d
-{{ end }}
+  on the NUC, which is how that was learned). A drop-in that is present or
+  absent moves nothing.
 
+  No machine-conditional entries at the moment: the NUC's mail pinentry
+  opt-out lived here until 2026-09-22, when the NUC became a machine somebody
+  sits at and it stopped having a reason to differ from the laptops. */ -}}
 {{/* Python bytecode from the jev skill's scripts importing _jev.py as a
      module. It appears in the source dir the moment a script runs, and
      chezmoi would otherwise try to manage — and prompt about — a cache. */}}

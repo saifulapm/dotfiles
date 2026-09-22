@@ -54,9 +54,13 @@ command -v notmuch >/dev/null 2>&1 || { log "notmuch not installed"; exit 1; }
 # browserpass causes), and it is why these units are session-tied: outside a
 # graphical session there would be nowhere to draw it.
 #
-# Not on the NUC, where the graphical session exists but the human does not:
-# mail-sync.service sets PINENTRY_USER_DATA=error there, so this fails instead
-# of hanging on a prompt in an empty room. See the comment in that unit.
+# The NUC opted out of that prompt between 2026-09-21 and 2026-09-22, while it
+# was a box nobody sat at; it is attended now and behaves like the laptops
+# again. A machine that goes back to running headless needs the opt-out back
+# (PINENTRY_USER_DATA=error, which bin/pinentry-auto still honours), or a
+# locked agent will draw a dialog into an empty room and hold the agent's
+# single pinentry lock while it waits — which freezes gpg machine-wide, SSH
+# logins included.
 start=$(date +%s)
 
 if ! mbsync -c "$HOME/.mbsyncrc" icloud >>"$LOG" 2>&1; then

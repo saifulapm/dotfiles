@@ -43,7 +43,12 @@ CURSES=/usr/bin/pinentry-curses
 # the empty room, and an SSH login's gpg-unlock — including the
 # --pinentry-mode=error probe that is supposed to be free — blocked for as long
 # as one of them was alive (8 s timeout hit; 0 s after pkill pinentry-qt).
-# Those jobs were already failing; now they fail without taking the lock.
+# Those jobs were already failing; this makes them fail without taking the lock.
+#
+# No unit sets it today — the NUC's mail drop-ins were dropped 2026-09-22 when
+# it became a machine somebody sits at. Kept because the next headless box
+# needs exactly this, and it is the one knob that stops one unanswered dialog
+# from taking gpg down for everything.
 case "${PINENTRY_USER_DATA:-}" in
 *error*) exit 1 ;;
 *curses* | *tty*) exec "$CURSES" "$@" ;;
