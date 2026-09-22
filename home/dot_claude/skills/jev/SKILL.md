@@ -1,0 +1,112 @@
+---
+name: jev
+description: "Judge what is on screen without reading it into context. Use when a page snapshot, a widget tree or a terminal pane would otherwise be dumped into the conversation just to answer one question: which element is the checkout button, did the order go through, is the right row selected, is this safe to press. Triggers: 'which element', 'find the button', 'is the page showing', 'did it work', 'check the page', 'verify on screen', 'which widget', 'is the selection right', plus any before-you-click safety check."
+---
+
+# jev — ask a typed question instead of reading the screen
+
+`scripts/jev` turns one surface into text, asks Typesafe's Jev (through
+`pxy ask`), and prints the answer alone. A real page snapshot runs to a
+megabyte; judging it this way costs about **$0.0005** and puts nothing in
+context. Measured on this machine, 2026-09-22.
+
+This is **opt-in**. The desktop and playwright-cli channels are unchanged and
+remain the default; reach for `jev` when the cheaper channels can't answer and
+the expensive one is "read the whole thing".
+
+## Where it sits
+
+```
+command output / jq / grep   →   jev   →   read the snapshot   →   OCR   →   screenshot
+    free, deterministic         ~$0        expensive context
+```
+
+**Never put `jev` ahead of something deterministic.** If `jq`, `grep` or an
+exit code already answers, that is the answer. Jev is for the judgement calls
+in between — and for the cases where the only alternative is reading 25 KB of
+YAML to find one ref.
+
+## The four subcommands
+
+```sh
+jev pick  "<intent>" [-s SESSION] [--grep RE]   # a ref on the live playwright page
+jev check "<claim>"  [-s SESSION]               # judge the live page
+jev gui   <app> "<intent>" [--grep RE]          # a widget name, over the a11y bus
+jev pane  <session> "<claim>"                   # judge a tmux pane, selection marked
+```
+
+`jev` with no arguments prints its full usage.
+
+```sh
+ref=$(jev pick "the element that opens the site search" -s mysession --grep search)
+playwright-cli -s=mysession fill "$ref" "Ada Lovelace" --submit
+
+jev check "the order was placed successfully" -s mysession && echo confirmed
+jev gui gtk3-widget-factory "the button that closes the window"   # → Close
+jev pane agent-build "the highlighted row is the dekho-sync unit"
+```
+
+`pick` prints a ref, `gui` prints a widget name that `gui click` takes (its
+full line, with coordinates and state flags, goes to stderr), `check` and
+`pane` print a probability.
+
+## Exit codes — 3 is not "no"
+
+| code | meaning | what to do |
+|---|---|---|
+| 0 | answered | use it |
+| 1 | error | the chain or the surface is broken; read the stderr |
+| 2 | `check`/`pane`: the claim is false | act on "no" |
+| **3** | **abstained** | **look yourself** — do not read it as "no" |
+
+Abstention means the winner was too weak, too close to the runner-up, or the
+target is not on this screen at all. It is the guard working, not a failure.
+Both failure codes are falsy, so `jev check "…" && act` also declines to act
+when the chain is down.
+
+## Thresholds
+
+`--min` is the probability below which it declines; `--margin` (pick/gui) is
+the lead over the runner-up it wants. Defaults: **0.55 / 0.15** for picking a
+target, **0.70** for believing a claim — an assertion at 0.51 is not an
+assertion. Tune on false negatives before false positives.
+
+A real abstention, worth knowing by shape: asked for "the control that
+switches to the third page" across gtk3-widget-factory's 95 named widgets,
+Jev answered 0.40 against a runner-up of 0.39, confidence 0.39. The app has
+two such controls. All three guards caught it and it abstained. That is the
+jarbon 0.49-vs-0.47 case — the one that renders as a confident banner if
+nobody checks the margin.
+
+## What it cannot do
+
+- **It cannot see.** No image input, ever. These subcommands feed it text;
+  a question about colour, spacing or anything absent from the a11y tree
+  needs a screenshot and your own eyes.
+- **It cannot count or do arithmetic.** Totals, sums and "how many" belong in
+  code. Ask it what kind of thing it is looking at, not how many.
+- **It cannot write.** Anything that produces text is still your job.
+- **255 options.** `pick` spends one on `none_of_these`, so 254 candidates.
+  Over that it refuses rather than keeping the first 254 — a target Jev was
+  never shown cannot be reported missing, so a silent trim comes back
+  confident and wrong. Narrow with `--grep`, or use `playwright-cli find`.
+- **~32k tokens**, not the 64k Typesafe documents — that is the ceiling of
+  the gateway pxy reaches. State above `MAX_STATE` is trimmed head-first and
+  says so on stderr; the tail is then not being judged.
+- **~450 ms per call** from here, so a loop runs at about two decisions a
+  second. Ask every question in one call, never five calls of one question —
+  extra questions are nearly free, extra calls are not.
+
+## How it reads a pane
+
+`tmux capture-pane -p` strips colour, so the selection is invisible and no
+question about it can be answered. `jev pane` captures with `-e` and rewrites
+reverse-video runs as `» selected «` before asking — deterministic
+preprocessing, so the model is reading a marker rather than inferring one from
+escape codes. This is the channel for "is the highlight on the row I think it
+is" before any destructive keystroke.
+
+## Requires
+
+`pxy` on PATH with a live `[media] systemone` chain (`pxy ask --help`), and
+for `jev gui`, the desktop skill's `scripts/gui`.
