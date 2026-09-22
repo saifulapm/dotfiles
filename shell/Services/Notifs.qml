@@ -918,6 +918,11 @@ QtObject {
         imageCacheProc.running = true;
     }
 
+    // Emitted when a row's contents change while the model's count does not.
+    // Every other edit adds or removes a row, so a reader can watch the two
+    // models' own countChanged; this is the one that would slip past it.
+    signal rowsMutated
+
     function rewriteCachedImage(targetUri, originalId, timestamp, role) {
         function rewrite(model) {
             for (let i = 0; i < model.count; i++) {
@@ -930,7 +935,10 @@ QtObject {
             return false;
         }
 
-        return rewrite(pendingModel) || rewrite(pastModel);
+        if (!(rewrite(pendingModel) || rewrite(pastModel)))
+            return false;
+        rowsMutated();
+        return true;
     }
 
     // Deletions queue up: a Process that is already running silently ignores

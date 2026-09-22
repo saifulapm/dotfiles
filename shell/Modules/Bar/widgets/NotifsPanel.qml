@@ -44,15 +44,64 @@ BarPanel {
     // Snapshots, so they stay valid across model edits; the merge, sort,
     // filter and day sectioning all happen in NotificationLogic, where node
     // can test them.
-    readonly property var rows: {
+    //
+    // Assigned from a zero-interval timer rather than written as a binding on
+    // the two models, which is what this was until 2026-09-22. The service
+    // edits its models ONE ROW AT A TIME — clearRange sweeps a day, markAllSeen
+    // migrates the whole pending bucket on close, capModel evicts the tail —
+    // and a binding re-evaluated eagerly on every one of those removals:
+    // snapshot every row of both models across the QML/C++ boundary, sort,
+    // section, and reset the ListView behind it, whose model is a plain JS
+    // array and so rebuilds wholesale. Clearing a day that held 1833
+    // notifications was 1833 rebuilds of an 1859-row list, and the shell was
+    // frozen for minutes. Nothing can fire a timer until the sweep hands the
+    // event loop back, so a burst of edits now costs exactly one rebuild.
+    property var rows: []
+
+    function rebuildRows() {
         const pending = [];
         for (let i = 0; i < notifs.pendingModel.count; i++)
             pending.push(notifs.snapshotFromRow(notifs.pendingModel.get(i)));
         const past = [];
         for (let j = 0; j < notifs.pastModel.count; j++)
             past.push(notifs.snapshotFromRow(notifs.pastModel.get(j)));
-        return Logic.centerRows(pending, past, query, dayNow);
+        rows = Logic.centerRows(pending, past, query, dayNow);
     }
+
+    Timer {
+        id: rowsRebuild
+        interval: 0
+        onTriggered: panel.rebuildRows()
+    }
+
+    // countChanged covers every edit that adds or removes a row. The one edit
+    // that changes a row in place without touching the count is the service
+    // swapping a sender's image path for its cached copy, which is what
+    // rowsMutated announces — a snapshot left holding the original would be
+    // pointing at a file only the sender owns.
+    Connections {
+        target: panel.notifs.pendingModel
+        function onCountChanged() {
+            rowsRebuild.restart();
+        }
+    }
+
+    Connections {
+        target: panel.notifs.pastModel
+        function onCountChanged() {
+            rowsRebuild.restart();
+        }
+    }
+
+    Connections {
+        target: panel.notifs
+        function onRowsMutated() {
+            rowsRebuild.restart();
+        }
+    }
+
+    onQueryChanged: rowsRebuild.restart()
+    onDayNowChanged: rowsRebuild.restart()
 
     // How tall the list may grow: whatever is left of the screen once the
     // card's fixed rows have taken theirs.
@@ -215,6 +264,12 @@ BarPanel {
         nowMs = Date.now();
         dayNow = nowMs;
         query = "";
+        // Clearing the query only SCHEDULES a rebuild, and the cursor below
+        // needs the list the panel is about to show, not the one the last
+        // search left behind — so take the rebuild now and let the timer it
+        // was about to run find nothing to do.
+        rebuildRows();
+        rowsRebuild.stop();
         cursorActive = false;
         cursorIndex = panel.rows.length > 0 ? 0 : -1;
     }
