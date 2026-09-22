@@ -109,6 +109,45 @@ It does not gate benign actions on authorisation — clicking around to find
 something is ordinary work, and a guard that stopped for it would be turned
 off within a day. Its job is the irreversible ones.
 
+## `browse` — a whole goal, not one question
+
+`scripts/browse` runs the loop: snapshot → one Jev call → act → repeat, for
+the navigation that otherwise costs ten turns each carrying a snapshot.
+
+```sh
+browse "<goal>" <url> [--fill LABEL=TEXT]... [-s SESSION]
+                      [--max-steps N] [--max-seconds N]
+```
+
+One request per step asks *which action*, *is the goal met* and *is this
+stuck* together, so a step is one round trip, not three. Bounded at 20 steps
+and 90 s, and it stops when the same action twice changes nothing.
+
+```sh
+browse "find the Blue widget using the search box" http://site.test \
+       --fill "Search parts=Blue widget"
+# 1. type into the searchbox 'Search parts'
+# 2. press Enter to submit the field just filled
+# 3. click the link 'Blue widget'
+# done: goal met
+```
+
+**It navigates and reads; it does not transact.** A target whose label looks
+like a commit point — pay, order, checkout, delete, submit, send — ends the
+run and hands back, and Enter is refused outright on any page that carries
+one. Verified against a fixture: asked to "buy the blue widget" it chose
+*Buy now* and then declined to click it; asked to apply a coupon on a page
+with *Place order*, it filled the field and refused the Enter.
+
+That is a keyword gate, not a judgement — Jev is asked which action to take,
+and cannot be asked whether an action is reversible before it has chosen one.
+For a single deliberate destructive action, use `jev guard`, which is the
+semantic check, and drive it yourself.
+
+Jev cannot write, so typed text comes from `--fill` (the label is matched as
+a substring). A field with no matching `--fill` stops the run and names the
+flag it wanted. Exit **0** goal met, **3** stopped, **1** error.
+
 ## What it cannot do
 
 - **It cannot see.** No image input, ever. These subcommands feed it text;

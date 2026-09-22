@@ -1,0 +1,259 @@
+#!/usr/bin/env python3
+"""browse — drive a page toward a goal, one Jev decision per step.
+
+For the navigation that costs an agent ten turns and a snapshot each: logging
+in, walking to a settings page, finding the record. `browse` runs that loop in
+one call and hands back where it ended up, so the intermediate pages are never
+read into the conversation.
+
+  browse "<goal>" <url> [--fill LABEL=TEXT]... [-s SESSION]
+                        [--max-steps N] [--max-seconds N]
+
+Each step is ONE request: which action, is the goal met, is this stuck — Jev
+answers all three in parallel, so a step costs one round trip (~450 ms here),
+not three.
+
+  browse "find the page about Ada Lovelace" https://en.wikipedia.org \\
+         --fill "search=Ada Lovelace"
+
+It navigates and reads. **It does not transact.** Any target whose label looks
+like a commit point — pay, order, checkout, delete, submit, send — stops the
+loop and hands back, because Jev cannot be asked "is this reversible" about an
+action it has not chosen yet, and guessing is not good enough for the ones
+that matter. For a single deliberate action of that kind, use `jev guard` and
+drive it yourself.
+
+Jev cannot write text, so anything typed has to come from --fill; a field with
+no matching --fill stops the loop and says which one it wanted.
+
+Exit: 0 the goal was met · 3 stopped (stuck, out of budget, needs text, or a
+commit point) · 1 error.
+"""
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _jev import ROLE_OPS, ask_many, die, page, page_elements  # noqa: E402
+
+DONE = "__done__"
+SCROLL = "__scroll__"
+ENTER = "__enter__"
+BACK = "__back__"
+
+GOAL_MET = 0.90
+STUCK = 0.85
+MAX_STEPS = 20
+MAX_SECONDS = 90
+
+# Labels that mean "this is where it becomes real". Deliberately broad: a
+# false stop costs one handover, a false proceed costs an order.
+COMMIT = re.compile(
+    r"\b(buy|pay|payment|purchase|order|checkout|place\s+order|delete|remove|"
+    r"destroy|confirm|send|post|publish|subscribe|unsubscribe|transfer|"
+    r"withdraw|book|reserve|submit|apply\s+now|sign\s*out|log\s*out)\b",
+    re.I,
+)
+
+QUESTIONS = {
+    "goal_met": {
+        "type": "noul",
+        "instructions": (
+            "The stated goal is already satisfied by the page described in the "
+            "state. Judge only what the state shows, not what is likely next."
+        ),
+    },
+    "stuck": {
+        "type": "noul",
+        "instructions": (
+            "This run cannot make further progress toward the goal: the same "
+            "page keeps coming back, or nothing available leads any closer."
+        ),
+    },
+}
+
+
+def options(elements, fills):
+    """The indexed action space: one entry per element, with its operation.
+
+    A combobox is only offered when a --fill names it, because selecting one
+    needs a value and Jev cannot invent one.
+    """
+    out = {}
+    for ref, (role, label) in elements.items():
+        op = ROLE_OPS.get(role)
+        if op == "select" and match_fill(label, fills) is None:
+            continue
+        verb = {"click": "click", "type": "type into", "select": "choose in"}[op]
+        out[ref] = f"{verb} the {role} {label!r}"
+    return out
+
+
+def match_fill(label, fills):
+    for key, value in fills.items():
+        if key.lower() in label.lower():
+            return value
+    return None
+
+
+def signature(elements):
+    return tuple(sorted(elements))
+
+
+def act(session, ref, elements, fills):
+    """Carry out one chosen action. Returns None, or a reason to stop."""
+    role, label = elements[ref]
+    op = ROLE_OPS[role]
+    if op == "click":
+        page(session, "click", ref)
+        return None
+    text = match_fill(label, fills)
+    if text is None:
+        return (
+            f"the field {label!r} needs text and Jev cannot write it — "
+            f'rerun with --fill "{label.split()[0] if label.split() else label}=..."'
+        )
+    page(session, "select" if op == "select" else "fill", ref, text)
+    return None
+
+
+def run(goal, url, fills, session, max_steps, max_seconds):
+    page(session, "goto", url)
+    started = time.monotonic()
+    trace = []
+    last = None
+
+    for step in range(1, max_steps + 1):
+        if time.monotonic() - started > max_seconds:
+            return stop(trace, f"out of time after {max_seconds}s", session)
+
+        elements = page_elements(session)
+        if not elements:
+            return stop(trace, "the page has no interactive elements", session)
+        where = where_now(session)
+        actions = options(elements, fills)
+        if len(actions) > 250:
+            return stop(trace, f"{len(actions)} controls is past what one choice takes", session)
+
+        actions[DONE] = "the goal is already met, stop here"
+        actions[SCROLL] = "scroll down to reveal more of the page"
+        actions[BACK] = "go back to the previous page"
+        if last and ROLE_OPS.get(elements.get(last, ("", ""))[0]) == "type":
+            actions[ENTER] = "press Enter to submit the field just filled"
+
+        state = (
+            f"Goal:\n{goal}\n\nCurrent page:\n{where}\n\n"
+            f"Steps so far:\n" + ("\n".join(trace) or "(none)")
+        )
+        answers = ask_many(
+            state,
+            {
+                **QUESTIONS,
+                "action": {
+                    "type": "choice",
+                    "instructions": (
+                        "Which single action moves closest to the goal from this "
+                        "page? Choose the one that makes progress, not one that "
+                        "repeats what the steps so far already did."
+                    ),
+                    "criteria": actions,
+                },
+            },
+        )
+        if answers["goal_met"]["noul"] >= GOAL_MET:
+            return stop(trace, "goal met", session, ok=True)
+        if answers["stuck"]["noul"] >= STUCK:
+            return stop(trace, "Jev reports the run is stuck", session)
+
+        choice = answers["action"]["choice"]
+        note = f"{step}. {actions[choice]}"
+        print(f"browse: {note}", file=sys.stderr)
+
+        if choice == DONE:
+            return stop(trace, "Jev chose to stop", session, ok=True)
+        if choice in (SCROLL, BACK):
+            page(session, "mousewheel", "0", "600") if choice == SCROLL else page(session, "go-back")
+            trace.append(note)
+            last = None
+            continue
+        if choice == ENTER:
+            # Enter on a page that also carries a commit control is how an
+            # unattended loop places an order by accident.
+            risky = [lbl for _, lbl in elements.values() if COMMIT.search(lbl)]
+            if risky:
+                return stop(trace, f"Enter here could trigger {risky[0]!r}", session)
+            page(session, "press", "Enter")
+            trace.append(note)
+            last = None
+            continue
+
+        label = elements[choice][1]
+        if COMMIT.search(label):
+            return stop(trace, f"{label!r} is a commit point — handing back", session)
+
+        before = signature(elements)
+        reason = act(session, choice, elements, fills)
+        if reason:
+            return stop(trace, reason, session)
+        trace.append(note)
+        # Same action, same page, twice: the loop is spinning.
+        if last == choice and signature(page_elements(session)) == before:
+            return stop(trace, f"{actions[choice]} changed nothing, twice", session)
+        last = choice
+
+    return stop(trace, f"out of steps after {max_steps}", session)
+
+
+def where_now(session):
+    """The page's identity, as a line rather than as escaped JSON."""
+    raw = page(session, "eval", "JSON.stringify({url:location.href,title:document.title})", expect=True)
+    try:
+        at = json.loads(json.loads(raw))
+        return f"{at['title']} — {at['url']}"
+    except (ValueError, KeyError, TypeError):
+        return raw.strip()
+
+
+def stop(trace, reason, session, ok=False):
+    print(f"{'done' if ok else 'stopped'}: {reason}")
+    print(f"at: {where_now(session)}")
+    if trace:
+        print("steps:")
+        for line in trace:
+            print(f"  {line}")
+    return 0 if ok else 3
+
+
+def main(argv):
+    ap = argparse.ArgumentParser(prog="browse", add_help=False)
+    ap.add_argument("-h", "--help", action="store_true")
+    ap.add_argument("goal", nargs="?")
+    ap.add_argument("url", nargs="?")
+    ap.add_argument("--fill", action="append", default=[], metavar="LABEL=TEXT")
+    ap.add_argument("-s", "--session")
+    ap.add_argument("--max-steps", type=int, default=MAX_STEPS)
+    ap.add_argument("--max-seconds", type=int, default=MAX_SECONDS)
+    args = ap.parse_args(argv)
+    if args.help or not args.goal or not args.url:
+        print(__doc__.strip())
+        return 0 if args.help else 1
+
+    fills = {}
+    for pair in args.fill:
+        if "=" not in pair:
+            die(f"--fill takes LABEL=TEXT, not {pair!r}")
+        key, value = pair.split("=", 1)
+        fills[key.strip()] = value
+    return run(args.goal, args.url, fills, args.session, args.max_steps, args.max_seconds)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except subprocess.CalledProcessError as e:
+        die(str(e))
