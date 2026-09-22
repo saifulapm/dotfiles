@@ -55,16 +55,27 @@ niri msg -j outputs | jq -r '.[] | "\(.name) \(.logical.width)x\(.logical.height
 
 `gui` and `mouse` (same scripts dir) print their full usage with no arguments.
 
+**`jev` sits across all four**, on PATH, and answers a question *about* a
+surface without that surface entering the conversation — a real page snapshot
+is 1.2 MB, and `jev` costs about $0.0005 to read it and hand back one ref or
+one probability. **Reach for it whenever the honest alternative is dumping a
+snapshot, a widget tree or a pane into context to answer one question.** It
+never goes ahead of something `jq` or `grep` already answers. `jev --help`,
+and the `jev` skill for the whole reference.
+
 ## The loop — every interaction, any app type
 
 ```
-- [ ] 1. Pick the cheapest channel that answers the question:
-        command/curl output → gui/web/tmux/IPC text → OCR → region screenshot
+- [ ] 1. Pick the cheapest channel that answers the question: command/curl
+        output → gui/web/tmux/IPC text → jev → OCR → region screenshot
 - [ ] 2. Before input: verify the target (focused window id, active pane,
-        highlighted row) — never assume state carried over from a prior call
+        highlighted row) — never assume state carried over from a prior call.
+        `jev pane <session> "<claim>"` reads a highlight without the SGR
+        regex; `jev guard` vets a destructive keystroke before you send it
 - [ ] 3. Act in one atomic burst (focus+verify+type in a single Bash call)
 - [ ] 4. Verify the effect through the cheapest channel before concluding —
-        a failed interaction is usually your targeting, not the app
+        a failed interaction is usually your targeting, not the app.
+        `jev check "<claim>"` settles a page claim without reading the page
 - [ ] 5. Revert what you touched: windows, sessions, focus, files, settings
 ```
 
@@ -268,11 +279,26 @@ the config; later commands find the running session on their own:
 playwright-cli --config ~/.config/playwright-cli/config.json open <url>
 playwright-cli snapshot            # a11y tree with refs (e3, e6…) — 1.2 MB on a real page
 playwright-cli find "Add to cart"  # search the page instead of dumping it
-jev pick "the add-to-cart button"  # or have it picked: prints one ref, reads none
 playwright-cli click e6 · fill e3 "text" · press Enter
 playwright-cli console             # errors without a screenshot
 playwright-cli close-all           # always
 ```
+
+**Do not `snapshot` to find one element.** A real page is 1.2 MB of YAML and
+reading it to locate a ref is the single most expensive habit on this
+machine. Two commands replace it, both on PATH:
+
+```sh
+ref=$(jev pick "the add-to-cart button" --grep cart)   # → e6, page never read
+jev check "the order was placed" && echo confirmed     # → exit 0/2, page never read
+jev-browse "reach the open issues list" https://github.com/org/repo
+```
+
+`jev pick` needs `--grep` on a big page (it refuses past 254 candidates
+rather than guess). `jev-browse` walks a multi-step goal in one call and
+hands back where it landed — it navigates and reads, and stops at anything
+that looks like a commit point. The `playwright-cli` skill is the vendor's
+own file and says nothing about these; this block is the pairing.
 
 The config pins Fedora's chromium (`launchOptions.executablePath`) —
 without `--config`, `open` dies looking for `/opt/google/chrome/chrome`,
