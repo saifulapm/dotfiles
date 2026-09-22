@@ -171,10 +171,16 @@ flag it wanted. Exit **0** goal met, **3** stopped, **1** error.
 
 `tmux capture-pane -p` strips colour, so the selection is invisible and no
 question about it can be answered. `jev pane` captures with `-e` and rewrites
-reverse-video runs as `» selected «` before asking — deterministic
-preprocessing, so the model is reading a marker rather than inferring one from
+the highlighted run as `» selected «` before asking — deterministic
+preprocessing, so the model reads a marker rather than inferring one from
 escape codes. This is the channel for "is the highlight on the row I think it
 is" before any destructive keystroke.
+
+A row counts as highlighted if it is reverse-video **or** has a background
+colour, because which one a TUI uses is not something a caller can be asked
+to know: fzf uses bold plus `48;5;236` and no reverse video at all. Against a
+live fzf over systemd units it reads the selected row at 0.97, the adjacent
+row at 0.01, and follows the selection as it moves.
 
 ## Requires
 

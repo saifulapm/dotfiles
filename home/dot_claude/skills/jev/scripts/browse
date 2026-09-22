@@ -94,6 +94,44 @@ def options(elements, fills):
     return out
 
 
+FITS = 250  # leaves room for done/scroll/back/enter under Jev's 255
+STOPWORDS = {
+    "the", "a", "an", "to", "for", "of", "on", "in", "and", "or", "page",
+    "reach", "find", "go", "open", "click", "that", "with", "is", "it",
+}
+
+
+def narrow(actions, goal):
+    """Keep the action space inside one choice question.
+
+    Real pages blow the cap routinely — playwright.dev's API sidebar alone is
+    1,563 controls — so an unnarrowed loop would stop on every docs site. The
+    ranking is deterministic: how many of the goal's own words a label
+    carries, ties broken by document order. Unlike `jev pick`, dropping a
+    candidate here is recoverable: the loop is bounded, it can scroll or go
+    back, and it gets another look next step.
+    """
+    if len(actions) <= FITS:
+        return actions
+    words = {w for w in re.findall(r"\w+", goal.lower()) if w not in STOPWORDS}
+    order = list(actions)
+    ranked = sorted(
+        order,
+        key=lambda ref: (
+            -sum(w in actions[ref].lower() for w in words),
+            order.index(ref),
+        ),
+    )
+    kept = ranked[:FITS]
+    hits = sum(1 for ref in kept if any(w in actions[ref].lower() for w in words))
+    print(
+        f"browse: {len(actions)} controls, keeping {FITS} ({hits} match the goal's "
+        "wording) — the rest are not offered this step",
+        file=sys.stderr,
+    )
+    return {ref: actions[ref] for ref in kept}
+
+
 def match_fill(label, fills):
     for key, value in fills.items():
         if key.lower() in label.lower():
@@ -133,40 +171,39 @@ def run(goal, url, fills, session, max_steps, max_seconds):
             return stop(trace, f"out of time after {max_seconds}s", session)
 
         elements = page_elements(session)
-        if not elements:
-            return stop(trace, "the page has no interactive elements", session)
         where = where_now(session)
-        actions = options(elements, fills)
-        if len(actions) > 250:
-            return stop(trace, f"{len(actions)} controls is past what one choice takes", session)
+        actions = narrow(options(elements, fills), goal)
 
-        actions[DONE] = "the goal is already met, stop here"
-        actions[SCROLL] = "scroll down to reveal more of the page"
-        actions[BACK] = "go back to the previous page"
-        if last and ROLE_OPS.get(elements.get(last, ("", ""))[0]) == "type":
-            actions[ENTER] = "press Enter to submit the field just filled"
+        # "Have we arrived?" is asked from the page alone, so it is asked even
+        # when the action space is unusable. Checking the options first once
+        # reported a failure on a run that had already landed on the right
+        # page (playwright.dev: two correct steps, then 1,563 controls).
+        questions = dict(QUESTIONS)
+        if actions:
+            actions[DONE] = "the goal is already met, stop here"
+            actions[SCROLL] = "scroll down to reveal more of the page"
+            actions[BACK] = "go back to the previous page"
+            if last and ROLE_OPS.get(elements.get(last, ("", ""))[0]) == "type":
+                actions[ENTER] = "press Enter to submit the field just filled"
+            questions["action"] = {
+                "type": "choice",
+                "instructions": (
+                    "Which single action moves closest to the goal from this "
+                    "page? Choose the one that makes progress, not one that "
+                    "repeats what the steps so far already did."
+                ),
+                "criteria": actions,
+            }
 
         state = (
             f"Goal:\n{goal}\n\nCurrent page:\n{where}\n\n"
             f"Steps so far:\n" + ("\n".join(trace) or "(none)")
         )
-        answers = ask_many(
-            state,
-            {
-                **QUESTIONS,
-                "action": {
-                    "type": "choice",
-                    "instructions": (
-                        "Which single action moves closest to the goal from this "
-                        "page? Choose the one that makes progress, not one that "
-                        "repeats what the steps so far already did."
-                    ),
-                    "criteria": actions,
-                },
-            },
-        )
+        answers = ask_many(state, questions)
         if answers["goal_met"]["noul"] >= GOAL_MET:
             return stop(trace, "goal met", session, ok=True)
+        if not actions:
+            return stop(trace, "no usable control on this page", session)
         if answers["stuck"]["noul"] >= STUCK:
             return stop(trace, "Jev reports the run is stuck", session)
 

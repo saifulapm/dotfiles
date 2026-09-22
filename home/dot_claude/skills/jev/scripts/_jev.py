@@ -119,6 +119,24 @@ def cap(criteria, grep=None):
             die(f"no candidate matched --grep {grep!r} — widen it, or drop it")
     if not criteria:
         die("no interactive candidates on this surface")
+
+    # Two candidates with the same role and label are the same choice as far
+    # as anyone asking can tell, and offering both only splits the vote
+    # between them: playwright.dev lists `locator.fill()` twice, which put
+    # 0.17 and 0.11 on the right answer and handed the escape option 0.68.
+    seen, deduped = {}, {}
+    for ref, what in criteria.items():
+        if what in seen:
+            continue
+        seen[what] = ref
+        deduped[ref] = what
+    if len(deduped) < len(criteria):
+        print(
+            f"jev: {len(criteria) - len(deduped)} duplicate labels folded into "
+            "the first of each",
+            file=sys.stderr,
+        )
+    criteria = deduped
     if len(criteria) > MAX_OPTIONS:
         die(
             f"{len(criteria)} candidates, and Jev takes {MAX_OPTIONS} — narrow them "
@@ -201,22 +219,59 @@ def pane_text(session):
 
     lines = []
     for line in p.stdout.splitlines():
-        buf, reverse, pos = [], False, 0
+        buf, lit, pos = [], False, 0
+        state = {"reverse": False, "bg": False}
         for m in SGR.finditer(line):
             buf.append(line[pos : m.start()])
-            codes = [c for c in m.group(1).split(";") if c] or ["0"]
-            now = reverse
-            for code in codes:
-                if code == "7":
-                    now = True
-                elif code in ("0", "27"):
-                    now = False
-            if now != reverse:
+            apply_sgr(state, m.group(1))
+            now = state["reverse"] or state["bg"]
+            if now != lit:
                 buf.append("»" if now else "«")
-                reverse = now
+                lit = now
             pos = m.end()
         buf.append(line[pos:])
-        if reverse:
+        if lit:
             buf.append("«")
-        lines.append(ANSI.sub("", "".join(buf)))
+        # A close followed straight by an open has no unmarked character
+        # between them: one run that the terminal happened to restate, not
+        # two. fzf restates it between the gutter glyph and the label.
+        lines.append(ANSI.sub("", "".join(buf)).replace("«»", ""))
     return "\n".join(lines)
+
+
+def apply_sgr(state, params):
+    """Fold one SGR sequence into the highlight state.
+
+    A terminal marks the selected row either by reversing it or by giving it
+    a background, and which one is not a detail a caller can be asked to know
+    — fzf uses bold plus `48;5;236` and never reverse video, so watching for
+    reverse alone saw no selection at all on it. Foreground colour is ignored:
+    it is how TUIs colour ordinary text.
+
+    The extended-colour forms carry their own parameters (`38;5;N`,
+    `48;2;R;G;B`), so they have to be consumed rather than read one number at
+    a time, or the `5` in `48;5;236` reads as blink and the `48` never
+    reaches the background.
+    """
+    codes = [c for c in params.split(";") if c] or ["0"]
+    i = 0
+    while i < len(codes):
+        code = codes[i]
+        if code in ("38", "48"):
+            extended = codes[i + 1] if i + 1 < len(codes) else ""
+            width = {"5": 3, "2": 5}.get(extended, 1)
+            if code == "48":
+                state["bg"] = True
+            i += width
+            continue
+        if code == "0":
+            state["reverse"] = state["bg"] = False
+        elif code == "7":
+            state["reverse"] = True
+        elif code == "27":
+            state["reverse"] = False
+        elif code == "49":
+            state["bg"] = False
+        elif code.isdigit() and (40 <= int(code) <= 47 or 100 <= int(code) <= 107):
+            state["bg"] = True
+        i += 1
