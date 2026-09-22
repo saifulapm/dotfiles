@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""browse — drive a page toward a goal, one Jev decision per step.
+"""jev-browse — drive a page toward a goal, one Jev decision per step.
 
 For the navigation that costs an agent ten turns and a snapshot each: logging
-in, walking to a settings page, finding the record. `browse` runs that loop in
+in, walking to a settings page, finding the record. It runs that loop in
 one call and hands back where it ended up, so the intermediate pages are never
 read into the conversation.
 
-  browse "<goal>" <url> [--fill LABEL=TEXT]... [-s SESSION]
+  jev-browse "<goal>" <url> [--fill LABEL=TEXT]... [-s SESSION]
                         [--max-steps N] [--max-seconds N]
 
 Each step is ONE request: which action, is the goal met, is this stuck — Jev
 answers all three in parallel, so a step costs one round trip (~450 ms here),
 not three.
 
-  browse "find the page about Ada Lovelace" https://en.wikipedia.org \\
+  jev-browse "find the page about Ada Lovelace" https://en.wikipedia.org \\
          --fill "search=Ada Lovelace"
 
 It navigates and reads. **It does not transact.** Any target whose label looks
@@ -267,7 +267,7 @@ def stop(trace, reason, session, ok=False):
 
 
 def main(argv):
-    ap = argparse.ArgumentParser(prog="browse", add_help=False)
+    ap = argparse.ArgumentParser(prog="jev-browse", add_help=False)
     ap.add_argument("-h", "--help", action="store_true")
     ap.add_argument("goal", nargs="?")
     ap.add_argument("url", nargs="?")

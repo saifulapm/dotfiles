@@ -24,7 +24,7 @@ Jev cannot see. It reads the text these subcommands produce, so a question
 about colour, layout or anything absent from the a11y tree needs a screenshot
 instead. It cannot count or do arithmetic either: check totals in code.
 
-To drive a whole goal rather than answer one question, see `browse`.
+To drive a whole goal rather than answer one question, see `jev-browse`.
 """
 
 import argparse

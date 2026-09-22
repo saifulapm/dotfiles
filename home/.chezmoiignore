@@ -18,3 +18,8 @@
 .config/systemd/user/imapnotify@.service.d
 .config/systemd/user/mail-sync.service.d
 {{ end }}
+
+{{/* Python bytecode from the jev skill's scripts importing _jev.py as a
+     module. It appears in the source dir the moment a script runs, and
+     chezmoi would otherwise try to manage — and prompt about — a cache. */}}
+.claude/skills/jev/scripts/__pycache__

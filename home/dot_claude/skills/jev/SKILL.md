@@ -5,10 +5,14 @@ description: "Judge what is on screen without reading it into context. Use when 
 
 # jev — ask a typed question instead of reading the screen
 
-`scripts/jev` turns one surface into text, asks Typesafe's Jev (through
-`pxy ask`), and prints the answer alone. A real page snapshot runs to a
-megabyte; judging it this way costs about **$0.0005** and puts nothing in
-context. Measured on this machine, 2026-09-22.
+`jev` turns one surface into text, asks Typesafe's Jev (through `pxy ask`),
+and prints the answer alone. A real page snapshot runs to a megabyte; judging
+it this way costs about **$0.0005** and puts nothing in context. Measured on
+this machine, 2026-09-22.
+
+`jev` and `jev-browse` are on PATH (symlinked from `~/.dotfiles/bin`), so call
+them by name from any directory — unlike the desktop skill's `gui` and
+`mouse`, which need their full path.
 
 This is **opt-in**. The desktop and playwright-cli channels are unchanged and
 remain the default; reach for `jev` when the cheaper channels can't answer and
@@ -109,13 +113,13 @@ It does not gate benign actions on authorisation — clicking around to find
 something is ordinary work, and a guard that stopped for it would be turned
 off within a day. Its job is the irreversible ones.
 
-## `browse` — a whole goal, not one question
+## `jev-browse` — a whole goal, not one question
 
-`scripts/browse` runs the loop: snapshot → one Jev call → act → repeat, for
+`jev-browse` runs the loop: snapshot → one Jev call → act → repeat, for
 the navigation that otherwise costs ten turns each carrying a snapshot.
 
 ```sh
-browse "<goal>" <url> [--fill LABEL=TEXT]... [-s SESSION]
+jev-browse "<goal>" <url> [--fill LABEL=TEXT]... [-s SESSION]
                       [--max-steps N] [--max-seconds N]
 ```
 
@@ -124,7 +128,7 @@ stuck* together, so a step is one round trip, not three. Bounded at 20 steps
 and 90 s, and it stops when the same action twice changes nothing.
 
 ```sh
-browse "find the Blue widget using the search box" http://site.test \
+jev-browse "find the Blue widget using the search box" http://site.test \
        --fill "Search parts=Blue widget"
 # 1. type into the searchbox 'Search parts'
 # 2. press Enter to submit the field just filled
