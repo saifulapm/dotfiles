@@ -26,13 +26,15 @@ exit code already answers, that is the answer. Jev is for the judgement calls
 in between — and for the cases where the only alternative is reading 25 KB of
 YAML to find one ref.
 
-## The four subcommands
+## The subcommands
 
 ```sh
 jev pick  "<intent>" [-s SESSION] [--grep RE]   # a ref on the live playwright page
 jev check "<claim>"  [-s SESSION]               # judge the live page
 jev gui   <app> "<intent>" [--grep RE]          # a widget name, over the a11y bus
 jev pane  <session> "<claim>"                   # judge a tmux pane, selection marked
+jev guard "<action>" --asked "<request>" \
+          (--pane S | --page [-s S] | --context F)   # before you press
 ```
 
 `jev` with no arguments prints its full usage.
@@ -77,6 +79,35 @@ Jev answered 0.40 against a runner-up of 0.39, confidence 0.39. The app has
 two such controls. All three guards caught it and it abstained. That is the
 jarbon 0.49-vs-0.47 case — the one that renders as a confident banner if
 nobody checks the margin.
+
+## `jev guard` — the check before a destructive keystroke
+
+Asks three questions in one call and answers with an exit code: **0 proceed,
+3 stop and ask the user**. `--asked` is required, and it is the point — you
+have to state the mandate, and Jev judges whether the action is inside it.
+
+```sh
+jev guard "press 'r' to restart the dekho-sync unit" \
+  --asked "restart the dekho-sync service" --pane agent-build || ask-first
+```
+
+An action it reads as consequential (≥0.35 — a deliberately low bar) must
+also be clearly authorised (≥0.85) *and* certainly targeted (≥0.85). An
+ordinary action only has to be aimed at the right thing (≥0.55).
+
+Both incidents recorded in the desktop skill, replayed against it:
+
+| case | verdict | numbers |
+|---|---|---|
+| restart, but the highlight is stuck on another row | **STOP** | target 0.05 |
+| restart, highlight on the intended row | proceed | target 0.94, auth 0.90 |
+| Right+Return moving DNS to Cloudflare, having been asked only to *look* | **STOP** | conseq 0.62, auth 0.05 |
+| delete the exact file the user named | proceed | conseq 0.83, target 0.97, auth 0.95 |
+| delete, but aimed at the neighbouring file | **STOP** | target 0.04 |
+
+It does not gate benign actions on authorisation — clicking around to find
+something is ordinary work, and a guard that stopped for it would be turned
+off within a day. Its job is the irreversible ones.
 
 ## What it cannot do
 

@@ -10,6 +10,8 @@ and never enters the agent's context.
   jev check <claim>  [-s SESSION]               judge the live playwright page
   jev gui   <app> <intent> [--grep RE]          a widget name, over the a11y bus
   jev pane  <session> <claim>                   judge a tmux pane, selection marked
+  jev guard <action> --asked <request>          before you press: is this safe?
+            (--pane S | --page [-s S] | --context F)
 
 Common: --min P (answer only above this probability) · --margin D (pick/gui:
 abstain when the winner leads by less than D) · --json (the whole answer).
@@ -78,23 +80,31 @@ def run(cmd):
     return p.stdout
 
 
+def trim(state):
+    if len(state) <= MAX_STATE:
+        return state
+    # The head is kept, so anything below the fold is not being judged.
+    print(
+        f"jev: state trimmed to the first {MAX_STATE:,} of {len(state):,} chars "
+        "(the gateway's token ceiling) — the answer does not account for the rest",
+        file=sys.stderr,
+    )
+    return state[:MAX_STATE]
+
+
+def need_pxy():
+    if not shutil.which("pxy"):
+        die("pxy is not on PATH — the systemone chain lives there")
+
+
 def ask(verb, instructions, state, criteria=None, min_p=None, margin=None, as_json=False):
     """Shell out to `pxy ask`, which owns the thresholds and the exit codes.
 
     Returns (exit code, stdout). Stderr is forwarded as it is: that is where
     pxy says why it abstained, and the caller should see it either way.
     """
-    if not shutil.which("pxy"):
-        die("pxy is not on PATH — the systemone chain lives there")
-    if len(state) > MAX_STATE:
-        # The head is kept, so anything below the fold is not being judged.
-        print(
-            f"jev: state trimmed to the first {MAX_STATE:,} of {len(state):,} chars "
-            "(the gateway's token ceiling) — the answer does not account for the rest",
-            file=sys.stderr,
-        )
-        state = state[:MAX_STATE]
-
+    need_pxy()
+    state = trim(state)
     scratch = []
     try:
         handle = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
@@ -121,6 +131,90 @@ def ask(verb, instructions, state, criteria=None, min_p=None, margin=None, as_js
     finally:
         for path in scratch:
             os.unlink(path)
+
+
+def ask_many(state, questions):
+    """Several questions about one state, in one call.
+
+    Jev answers every question in a request in parallel, so the questions are
+    nearly free and the round trip is not: asking three separately would cost
+    three times the latency and tell us the same thing.
+    """
+    need_pxy()
+    body = {"model": "auto", "state": trim(state), "questions": questions}
+    p = subprocess.run(
+        ["pxy", "ask", "raw"], input=json.dumps(body), capture_output=True, text=True
+    )
+    if p.returncode != 0:
+        die(f"pxy ask raw failed: {(p.stderr or p.stdout).strip()}")
+    return json.loads(p.stdout)
+
+
+# The gate, in the shape fka.dev's computer-use loop uses: a low bar to call
+# something consequential (erring toward caution), a high bar to call it
+# authorised. An action that cannot be undone has to clear both.
+CONSEQUENTIAL = 0.35
+TARGET_SURE = 0.85
+AUTHORISED = 0.85
+TARGET_ORDINARY = 0.55
+
+GUARD_QUESTIONS = {
+    "consequential": {
+        "type": "noul",
+        "instructions": (
+            "Carrying out the stated action now would have a material effect that "
+            "is hard or impossible to undo — sending, paying, ordering, deleting, "
+            "overwriting, submitting, changing a system or network setting, or "
+            "ending the session."
+        ),
+    },
+    "target_matches": {
+        "type": "noul",
+        "instructions": (
+            "The thing that would actually receive the action — the highlighted "
+            "row, the focused field, the named element — is the same thing the "
+            "stated action says it is aimed at."
+        ),
+    },
+    "authorised": {
+        "type": "noul",
+        "instructions": (
+            "The user's request, quoted in the state, actually asks for this "
+            "specific action. Answer no if the action goes beyond what was asked, "
+            "even when it seems helpful or follows naturally from it."
+        ),
+    },
+}
+
+
+def guard(action, asked, surface):
+    state = (
+        f"The user asked for:\n{asked}\n\n"
+        f"The action about to be carried out:\n{action}\n\n"
+        f"The surface it would act on:\n{surface}"
+    )
+    a = ask_many(state, GUARD_QUESTIONS)
+    p = {k: a[k]["noul"] for k in GUARD_QUESTIONS}
+    verdict = (
+        f"consequential={p['consequential']:.2f} "
+        f"target_matches={p['target_matches']:.2f} "
+        f"authorised={p['authorised']:.2f}"
+    )
+
+    stop = []
+    if p["consequential"] >= CONSEQUENTIAL:
+        if p["authorised"] < AUTHORISED:
+            stop.append("this was not clearly asked for and cannot be undone")
+        if p["target_matches"] < TARGET_SURE:
+            stop.append("the target is not certain enough for an irreversible action")
+    elif p["target_matches"] < TARGET_ORDINARY:
+        stop.append("the action would land on something other than its stated target")
+
+    if stop:
+        print(f"jev guard: STOP — {'; '.join(stop)} ({verdict})", file=sys.stderr)
+        return 3
+    print(f"jev guard: proceed ({verdict})", file=sys.stderr)
+    return 0
 
 
 def cap(criteria, grep):
@@ -298,6 +392,14 @@ def build_parser():
     p.add_argument("claim")
     thresholds(p, MIN_CLAIM, False)
 
+    p = sub.add_parser("guard", add_help=False)
+    p.add_argument("action")
+    p.add_argument("--asked", required=True, help="what the user actually asked for")
+    p.add_argument("--pane", help="judge against this tmux pane")
+    p.add_argument("--page", action="store_true", help="judge against the live page")
+    p.add_argument("-s", "--session")
+    p.add_argument("--context", help="judge against this file")
+
     return ap
 
 
@@ -364,6 +466,21 @@ def main(argv):
         code, out = ask("check", args.claim, state, None, args.min, None, args.json)
         sys.stdout.write(out)
         return code
+
+    if args.cmd == "guard":
+        chosen = [bool(args.pane), args.page, bool(args.context)]
+        if sum(chosen) != 1:
+            die("guard needs exactly one of --pane, --page or --context")
+        if args.pane:
+            surface = PANE_LEGEND + pane_text(args.pane)
+        elif args.page:
+            surface = page_text(args.session)
+        else:
+            try:
+                surface = Path(args.context).read_text()
+            except OSError as e:
+                die(f"reading {args.context}: {e}")
+        return guard(args.action, args.asked, surface)
 
     return 1
 
