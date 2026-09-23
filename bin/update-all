@@ -195,6 +195,18 @@ update_src "$HOME/.local/src/kak-ansi" "$HOME/.local/bin/kak-ansi-filter" kak-an
 say "chezmoi apply (reinstalls everything removed above)"
 chezmoi apply || warn "chezmoi apply failed"
 
+# ------------------------------------------------------ cargo dev shadows
+# ~/.cargo/bin sits before ~/.local/bin on PATH, so a `cargo install --path .`
+# left over from development (mem, workflow, ...) keeps winning over the copy
+# the source builds above just refreshed. Uninstall any cargo package that
+# owns a binary also present in ~/.local/bin.
+say "cargo dev shadows"
+while read -r pkg bin; do
+  [ -x "$HOME/.local/bin/$bin" ] || continue
+  echo "  $bin: ~/.cargo/bin shadows ~/.local/bin — uninstalling cargo package $pkg"
+  cargo uninstall --quiet "$pkg" || warn "cargo uninstall $pkg failed"
+done < <(cargo install --list | awk '/^[^ ]/ { pkg = $1; next } { print pkg, $1 }')
+
 # --------------------------------------------------------------- toolchains
 say "toolchains"
 mise up || warn "mise up failed"
@@ -241,6 +253,11 @@ fi
 # The channel comes from ~/.fx (stable unless someone chose dev by hand).
 if command -v fx >/dev/null 2>&1; then
   fx upgrade --json </dev/null || warn "fx upgrade failed"
+fi
+# pi's install guard (run_after_04) only fires when pi is missing, so the
+# apply never moves its version; `pi update --all` bumps pi and its packages.
+if command -v pi >/dev/null 2>&1; then
+  pi update --all </dev/null || warn "pi update failed"
 fi
 # codex ships no update verb worth scripting — rerun its installer by hand
 # when needed (run_after_04 has the URL).
