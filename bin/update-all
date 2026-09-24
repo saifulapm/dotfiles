@@ -203,6 +203,7 @@ chezmoi apply || warn "chezmoi apply failed"
 say "cargo dev shadows"
 while read -r pkg bin; do
   [ -x "$HOME/.local/bin/$bin" ] || continue
+  [ -e "$HOME/.cargo/bin/$bin" ] || continue
   echo "  $bin: ~/.cargo/bin shadows ~/.local/bin — uninstalling cargo package $pkg"
   cargo uninstall --quiet "$pkg" || warn "cargo uninstall $pkg failed"
 done < <(cargo install --list | awk '/^[^ ]/ { pkg = $1; next } { print pkg, $1 }')
