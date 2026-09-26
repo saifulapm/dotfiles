@@ -92,6 +92,7 @@ set -gx OZONE_PLATFORM wayland
 
 # PATH — fish_add_path prepends and dedups; safe to re-run every shell.
 fish_add_path -g "$HOME/.local/bin"
+fish_add_path -g "$HOME/.opencode/bin"  # opencode's installer has no dir option
 fish_add_path -g "$HOME/.cargo/bin"
 fish_add_path -g "$PNPM_HOME" "$PNPM_HOME/bin"
 fish_add_path -g "$HOME/.config/composer/vendor/bin"

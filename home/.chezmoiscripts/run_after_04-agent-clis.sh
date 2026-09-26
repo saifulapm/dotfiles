@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# The agent CLIs this desktop actually uses: claude, codex and copilot feed
-# the bar's model-usage widget; pi is swept by bin/codex-usage-scan; fx feeds
-# neither widget nor sweep and is here on its own merits. All are user-local
-# installs (no root), each guarded so re-runs no-op. Their LOGINS are
-# interactive and deliberately not scripted — each CLI asks on first run.
+# The agent CLIs this desktop actually uses: claude, codex, copilot and
+# opencode feed the bar's model-usage widget; pi is swept by
+# bin/codex-usage-scan; fx feeds neither widget nor sweep and is here on its
+# own merits. All are user-local installs (no root), each guarded so re-runs
+# no-op. Their LOGINS are interactive and deliberately not scripted — each CLI
+# asks on first run.
 #
 # voxtype (dictation) used to be wired up at the end of this script because it
 # was a hand install. It is scripted now — binary, model and systemd unit —
@@ -33,6 +34,17 @@ if ! command -v copilot >/dev/null 2>&1; then
   curl -fsSL https://gh.io/copilot-install | bash \
     && echo "agent-clis: copilot installed (run 'copilot' once to log in)" \
     || warn "copilot install failed"
+fi
+
+# opencode installs to ~/.opencode/bin (not configurable), which fish puts on
+# PATH in conf.d/00-env.fish. --no-modify-path because otherwise the installer
+# appends a fish_add_path line to config.fish — a symlink into this repo (the
+# trap the fx note below describes). The guard tests the path directly since
+# this script's PATH does not include that dir.
+if [ ! -x "$HOME/.opencode/bin/opencode" ]; then
+  curl -fsSL https://opencode.ai/v2/install | bash -s -- --no-modify-path \
+    && echo "agent-clis: opencode installed (run 'opencode' once to log in)" \
+    || warn "opencode install failed"
 fi
 
 # fx (Vercel Labs, written in Zig) — a model-agnostic agent harness: `fx` for

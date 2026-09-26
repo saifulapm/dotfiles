@@ -25,7 +25,7 @@ themselves), sets up tty1 autologin, registers the shell's file-chooser
 portal, installs the dev toolchain (node via mise, pnpm via corepack, rust
 via rustup, Shopify CLI), the mobile toolchain (Android SDK, NDK and
 build-tools, Gradle, the Rust Android targets, Swift via swiftly — see
-`docs/mobile-toolchain-2026-09-13.md`), the agent CLIs (claude, codex, copilot, pi, fx),
+`docs/mobile-toolchain-2026-09-13.md`), the agent CLIs (claude, codex, copilot, opencode, pi, fx),
 the pnpm/cargo/go/composer tool sets, prebuilt binaries (watchexec, hurl,
 cloudflared, stripe, ouch, usql, satty), builds the kakoune fork, dekho, amx,
 the workflow trio (mem/workflow/hub) and the three oma apps from source,
@@ -142,7 +142,7 @@ after the first apply.
   those commits to saifulapm; ownership and push auth are what separate the
   accounts. The gh extensions still want a rerun of `chezmoi apply` once auth
   lands.
-- First login for each agent CLI: `claude`, `codex`, `copilot`. `fx` only if
+- First login for each agent CLI: `claude`, `codex`, `copilot`, `opencode`. `fx` only if
   you want it on Vercel's gateway (`fx login`) or on a subscription
   (`fx provider codex|grok`) — `pxy launch fx` needs neither.
 - `rclone config` — once per remote, per machine: the iCloud remote

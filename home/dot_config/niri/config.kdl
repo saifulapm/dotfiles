@@ -410,8 +410,6 @@ prefer-no-csd
 // Hide the cursor while typing and after 5 s idle.
 cursor {
     xcursor-size 24
-    hide-when-typing
-    hide-after-inactive-ms 5000
 }
 
 // You can change the path where screenshots are saved.
