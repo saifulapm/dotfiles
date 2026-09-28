@@ -53,18 +53,38 @@ flock 9
 # (and every non-shell consumer) reads.
 #
 # Wallpaper choice: bin/background-next owns the candidate list and the cycle,
-# and reads the theme name written here first — so switching themes lands on
-# the new theme's first image and re-applying the active one advances to its
-# next, omarchy-style. --peek chooses without writing; the write comes after
-# the IPC push so the shell's file watch sees a path it already transitioned
-# to and de-duplicates.
+# and reads the theme name written here first — so re-applying the active
+# theme advances to its next image, omarchy-style. Switching themes restores
+# the wallpaper that theme last showed (omarchy b63374f3): the outgoing
+# theme's wallpaper is remembered in theme-backgrounds/<name>, and a theme
+# with no memory (or a remembered file that is gone) lands on its first image.
+# --peek chooses without writing; the write comes after the IPC push so the
+# shell's file watch sees a path it already transitioned to and de-duplicates.
 old_bg=""
 [[ -f $state_dir/background ]] && old_bg="$(<"$state_dir/background")"
+prev_theme=""
+[[ -f $name_file ]] && prev_theme="$(<"$name_file")"
+
+# The state file for a theme name, refusing names that could escape the dir.
+theme_bg_file() {
+  [[ -n $1 && ${1##*/} == "$1" && $1 != "." && $1 != ".." ]] || return 1
+  printf '%s\n' "$state_dir/theme-backgrounds/$1"
+}
+
+if bg_file="$(theme_bg_file "$prev_theme")" && [[ -f $old_bg ]]; then
+  mkdir -p "$state_dir/theme-backgrounds"
+  printf '%s\n' "$old_bg" >"$bg_file"
+fi
 
 printf '%s\n' "$1" >"$name_file.tmp"
 mv "$name_file.tmp" "$name_file"
 
-next_bg="$("$root/bin/background-next" --peek || true)"
+next_bg=""
+if [[ $prev_theme != "$1" ]] && bg_file="$(theme_bg_file "$1")" && [[ -f $bg_file ]]; then
+  next_bg="$(<"$bg_file")"
+  [[ -f $next_bg ]] || next_bg=""
+fi
+[[ -n $next_bg ]] || next_bg="$("$root/bin/background-next" --peek || true)"
 
 if ! timeout 2 qs ipc call background themeTransition "$old_bg" "$next_bg" "$(base64 -w 0 "$src")" >/dev/null 2>&1; then
   # Degradation path — shell dead, absent, or predating the IPC surface. The
