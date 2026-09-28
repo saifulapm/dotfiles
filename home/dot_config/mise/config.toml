@@ -6,6 +6,7 @@
 [tools]
 node = "lts"     # resolves to the current LTS major at install time
 deno = "latest"
+"npm:cf" = "latest"   # Cloudflare CLI (omarchy a389bd18 installs it via a `mise use -g` wrapper)
 
 [settings]
 # Let mise honor .nvmrc / .node-version / package.json devEngines in project

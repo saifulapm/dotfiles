@@ -90,6 +90,13 @@ if command -v mise >/dev/null 2>&1 && ! mise which deno >/dev/null 2>&1; then
     || warn "mise deno install failed"
 fi
 
+# ─── cf, the Cloudflare CLI (mise npm backend, same file as deno) ────────────
+if command -v mise >/dev/null 2>&1 && ! mise which cf >/dev/null 2>&1; then
+  mise install npm:cf >/dev/null 2>&1 \
+    && echo "cli-tools: cf installed via mise" \
+    || warn "mise npm:cf install failed"
+fi
+
 # ─── laravel installer (composer global — `laravel new`, Herd parity) ────────
 if command -v composer >/dev/null 2>&1 && [ ! -e "$HOME/.config/composer/vendor/bin/laravel" ]; then
   composer global require --quiet laravel/installer >/dev/null 2>&1 \

@@ -2155,6 +2155,11 @@ via  = "mise install deno — pinned as deno = \"latest\" in the chezmoi-managed
 why  = "Deno runtime from the mac list; mise already manages node, one mechanism for both"
 
 [[tool]]
+name = "cf"
+via  = "mise install npm:cf — declared as \"npm:cf\" = \"latest\" in the chezmoi-managed ~/.config/mise/config.toml (run_after_08-cli-tools.sh); `mise up` in update-all keeps it current"
+why  = "Cloudflare's CLI (npm cf, github.com/cloudflare/cf; user decision 2026-09-28, port of omarchy a389bd18). Upstream installs it as a lazy ~/.local/bin wrapper that runs `mise use -g npm:cf` on first call — that would rewrite our chezmoi-managed mise config, so it is a plain [tools] entry here instead"
+
+[[tool]]
 name = "cargo-cli-tools"
 via  = "run_after_09-cargo-tools.sh — cargo install: sd, skim, television, dufs, hop-kak, kak-popup, dedoc; from git: kakoune-lsp (no crates.io release, no aarch64 linux binary — checked 2026-08-07) and wayfreeze (user ask 2026-08-07: frozen-frame region capture; screenshot-annotate/-ocr + screenrecord's slurp picks gate on its presence, nothing packages it anywhere). herdr moved to run_after_10 prebuilt (974fc11); ripdrag dropped 2026-08-18 with its gtk4-devel build dependency — it was yazi's <C-n> drag-out hand, and yazi 26.8.15 does drag-and-drop natively in kitty (run_after_39 uninstalls both); ttfx dropped 2026-08-17 — [[tool]] nirisaver links the crate instead of shelling out to the binary, so nothing installed here ran it any more; sunsetr dropped 2026-09-04 with the whole night-light feature (run_after_44-sunsetr-remove.sh uninstalls it) — see below"
 why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-lsp was in Fedora once, retired by F44). sd/skim(sk)/television(tv)/dufs are mac-list CLI (argc dropped 2026-08-10 — nothing in this repo ever called it); kakoune-lsp + hop-kak + kak-popup + dedoc are what the kak config actually calls (checked 2026-08-07: popup wraps tinker/yazi/lazygit/gitui/fzf, goto-w is hop, lsp.kak boots kak-lsp, docs pipes dedoc). kak-tree-sitter deliberately absent — the kakoune fork has treesitter built in"
