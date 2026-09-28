@@ -13,10 +13,12 @@ deno = "latest"
 # these instead of mise.toml.
 idiomatic_version_file_enable_tools = ["node"]
 
-# All projects live under ~/Sites (created by run_after_15-user-dirs.sh) —
-# trust their mise configs automatically instead of prompting `mise trust`
-# per repo.
-trusted_config_paths = ["~/Sites"]
+# Projects live under ~/Sites (created by run_after_15-user-dirs.sh) — trust
+# their mise configs automatically instead of prompting `mise trust` per repo.
+# Listed per subdirectory, NOT ~/Sites itself: that would also trust
+# ~/Sites/tries, where `try clone` drops third-party repos whose mise.toml
+# (env, hooks, tasks) would then run on cd. Those still prompt.
+trusted_config_paths = ["~/Sites/github", "~/Sites/laravel", "~/Sites/shopify_themes"]
 
 [settings.node]
 # Run `corepack enable` after every node install, so the pnpm shim survives
