@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import Quickshell.Wayland
 import "../../components"
 import "OsdModel.js" as OsdModel
@@ -237,7 +238,7 @@ Scope {
     // can raise any OSD kind: `qs ipc call osd show '{"icon":"brightness",
     // "value":40}'`. brightnessUp/brightnessDown/status are ours and stay —
     // the niri brightness binds and the status probe call them.
-    property IpcHandler ipc: IpcHandler {
+    property IpcHandler ipc: ShellIpc {
         target: "osd"
 
         function show(payloadJson: string): string {

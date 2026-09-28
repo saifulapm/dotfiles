@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import Quickshell.Wayland
 
 // Idle service, ported from omarchy's idle plugin.
@@ -450,7 +451,7 @@ QtObject {
         }
     }
 
-    readonly property IpcHandler ipc: IpcHandler {
+    readonly property IpcHandler ipc: ShellIpc {
         target: "idle"
 
         function status(): string {

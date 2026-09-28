@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 
 // Background-blur switch. Off by default; nothing anywhere requests blur
 // until the flag file exists, so the disabled path costs one file watcher.
@@ -267,7 +268,7 @@ QtObject {
         Component.onCompleted: running = true
     }
 
-    readonly property IpcHandler ipc: IpcHandler {
+    readonly property IpcHandler ipc: ShellIpc {
         target: "blur"
 
         function status(): string {

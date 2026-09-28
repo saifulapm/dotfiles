@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
+import qs.Commons
 import qs.Services
 import qs.Modules.Bar
 import qs.Modules.Shelf
@@ -683,7 +684,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "polkit"
 
         function status(): string {
@@ -723,7 +724,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "filepicker"
 
         // Called by bin/qshell-portal with the flattened portal request; the
@@ -748,7 +749,7 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "emojis"
 
         function toggle(): string {
@@ -768,7 +769,7 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "shelf"
 
         function toggle(): string {
@@ -809,7 +810,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "reminders"
 
         function toggle(): string {
@@ -850,7 +851,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "notes"
 
         function toggle(): string {
@@ -902,7 +903,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "dekho"
 
         function toggle(): string {
@@ -983,7 +984,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "deen"
 
         function toggle(): string {
@@ -1065,7 +1066,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "diskspeedtest"
 
         function show(): string {
@@ -1093,7 +1094,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "theme"
 
         // A nudge for bin/theme-set, so a theme change does not depend on the
@@ -1135,7 +1136,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "wallpaper"
 
         function toggle(): string {
@@ -1164,7 +1165,7 @@ ShellRoot {
             })
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "wallhaven"
 
         function toggle(): string {
@@ -1184,7 +1185,7 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "lock"
 
         function lock(): string {
@@ -1289,7 +1290,42 @@ ShellRoot {
     // The `media` IPC target (niri's XF86 media keys) lives inside
     // Services/Media.qml, beside the player selection it drives.
 
-    IpcHandler {
+    // ------------------------------------------------------------ IPC socket
+    //
+    // bin/qs-call reaches the shell here first: a `qs ipc` client costs ~45 ms
+    // to start per call, socat ~5 ms (omarchy c231097d). A request is target,
+    // function and arguments separated by unit separators and ended by a
+    // record separator. The reply is "OK" and the output, or "SKIP" when
+    // nothing ran (no such target or function, or the wrong number of
+    // arguments), which qs-call hands to `qs ipc` for its exact answer. Only
+    // ShellIpc-declared functions are reachable (IpcRegistry). The socket sits
+    // in XDG_RUNTIME_DIR (0700, the user's alone) and is named per Wayland
+    // display, so the nested dev shell (`just dev`) gets its own.
+    readonly property string ipcSocketPath: Quickshell.env("XDG_RUNTIME_DIR") + "/qshell-" + Quickshell.env("WAYLAND_DISPLAY") + ".sock"
+
+    SocketServer {
+        active: Quickshell.env("XDG_RUNTIME_DIR") !== "" && Quickshell.env("WAYLAND_DISPLAY") !== ""
+        path: shell.ipcSocketPath
+
+        handler: Socket {
+            id: connection
+
+            parser: SplitParser {
+                splitMarker: "\u001e"
+                onRead: function (data) {
+                    var fields = String(data).split("\u001f");
+                    var result = fields.length >= 2 ? IpcRegistry.call(fields[0], fields[1], fields.slice(2)) : {
+                        ran: false
+                    };
+                    connection.write(result.ran ? "OK\u001f" + result.output + "\u001e" : "SKIP\u001e");
+                    connection.flush();
+                    connection.connected = false;
+                }
+            }
+        }
+    }
+
+    ShellIpc {
         target: "shell"
 
         function ping(): string {

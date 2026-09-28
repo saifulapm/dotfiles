@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import "MediaModel.js" as MediaModel
@@ -609,7 +610,7 @@ QtObject {
     // this service and keep their names. The source verbs are theirs:
     // sourceNext/sourcePrevious re-point the selection, sourceSwitch also
     // transfers playback.
-    property IpcHandler ipc: IpcHandler {
+    property IpcHandler ipc: ShellIpc {
         target: "media"
 
         function status(): string {

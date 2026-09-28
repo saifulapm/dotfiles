@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import Quickshell.Bluetooth
 import "../components"
 import "BluetoothModel.js" as Model
@@ -124,7 +125,7 @@ BarIcon {
     // 667d2d2). They route through the bar, which ranks surfaces by open
     // panel then niri focus. NOTE: `qs ipc call bluetooth show` needs `--`
     // before the verb — the CLI parses a bare `show` as its own subcommand.
-    IpcHandler {
+    ShellIpc {
         target: "bluetooth"
         enabled: rootItem.bar !== null && Quickshell.screens.length > 0 && rootItem.bar.screen === Quickshell.screens[0]
 

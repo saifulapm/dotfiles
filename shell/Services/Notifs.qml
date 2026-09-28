@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import Quickshell.Services.Notifications
 import "../Modules/Notifications/NotificationLogic.js" as Logic
 
@@ -1304,7 +1305,7 @@ QtObject {
     }
 
     // ---------------------------------------------------------------- IPC
-    property IpcHandler ipc: IpcHandler {
+    property IpcHandler ipc: ShellIpc {
         target: "notifs"
 
         // Kept from before the parity port: toggles, and says which way.

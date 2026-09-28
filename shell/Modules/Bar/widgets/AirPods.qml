@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import "../components"
 import "BluetoothModel.js" as Model
 
@@ -96,7 +97,7 @@ BarIcon {
     // `qs ipc call airpods -- toggle` for a keybind; noise verbs so a bind
     // can switch modes without opening anything (anc|transparency|adaptive|
     // off). Pinned to the first screen the way bluetooth's target is.
-    IpcHandler {
+    ShellIpc {
         target: "airpods"
         enabled: rootItem.bar !== null && Quickshell.screens.length > 0 && rootItem.bar.screen === Quickshell.screens[0]
 

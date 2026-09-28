@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import Quickshell.Wayland
 import "widgets"
 import "BarModel.js" as BarModel
@@ -304,7 +305,7 @@ Scope {
         Component.onCompleted: reload()
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "bar"
 
         // NOTE: `qs ipc call bar show` prints the target listing — the

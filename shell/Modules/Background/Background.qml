@@ -3,6 +3,7 @@ import QtQuick.Effects
 import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import Quickshell.Wayland
 
 // Wallpaper — full port of omarchy's background plugin: the new
@@ -164,7 +165,7 @@ Scope {
         onLoadFailed: backgroundRoot.clearBackground()
     }
 
-    IpcHandler {
+    ShellIpc {
         target: "background"
 
         function refresh(): string {
