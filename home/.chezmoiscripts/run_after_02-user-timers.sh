@@ -6,8 +6,9 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer qmd-refresh.timer qshell.service emacs.service mempressure.service clipboard-sync.service imapnotify@icloud.service
-# Also DISABLES voxtype.service — see the block near the end of this file.
+# unit-list: vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer qmd-refresh.timer qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service
+# Also DISABLES voxtype.service — see the block near the end of this file —
+# and stops the retired emacs.service on machines that still run it.
 set -euo pipefail
 
 # ssh-agent.socket: Fedora's packaged agent unit — socket activation, so
@@ -91,18 +92,16 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
       || echo "user units: start qshell/mempressure/clipboard-sync/imapnotify failed — check systemctl --user status qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service" >&2
   fi
   echo "user units: qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service enabled"
-  # emacs.service (ours — shadows the emacs-pgtk rpm unit) has the same
-  # Requisite=graphical-session.target gate: enable always, start only
-  # inside a session. --no-block because a first start bootstraps every
-  # :ensure package (minutes) and the apply must not hang on it;
-  # warn-don't-abort like the loop above.
-  systemctl --user enable emacs.service 2>/dev/null \
-    || echo "user units: enable emacs.service failed — check systemctl --user status emacs.service" >&2
-  if systemctl --user -q is-active graphical-session.target; then
-    systemctl --user start --no-block emacs.service 2>/dev/null \
-      || echo "user units: start emacs.service failed — check systemctl --user status emacs.service" >&2
+  # emacs.service is retired (mail and feeds moved to Kakoune, 2026-09-28).
+  # A machine that ran it still has it enabled, now pointing at a unit file
+  # this repo no longer ships, plus the local-build drop-in bin/rebuild-emacs
+  # wrote. Stop and disable it, drop the drop-in; a no-op everywhere else.
+  if systemctl --user -q is-enabled emacs.service 2>/dev/null \
+    || systemctl --user -q is-active emacs.service 2>/dev/null; then
+    systemctl --user disable --now emacs.service 2>/dev/null \
+      && echo "user units: emacs.service stopped and disabled (retired)"
   fi
-  echo "user units: emacs.service enabled"
+  rm -rf "$HOME/.config/systemd/user/emacs.service.d"
   # voxtype.service is the one unit here that must be OFF. Its daemon PRELOADS
   # the whisper model rather than loading it per utterance — 486 MB resident
   # for small.en, measured — so leaving it enabled parks half a gigabyte on a

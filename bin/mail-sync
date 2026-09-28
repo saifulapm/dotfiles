@@ -4,7 +4,7 @@
 # The single entry point for "get mail now", called from three places:
 #   * imapnotify-icloud.service, within ~1s of iCloud announcing new mail
 #   * mail-sync.timer, every 15 min, as the fallback for a dead IDLE session
-#   * by hand, and from Emacs (`G` in notmuch), when you are impatient
+#   * by hand, and from Kakoune (`G` in a mail buffer), when you are impatient
 #
 # All three run the same two commands in the same order. The interesting work
 # is not here — it is in ~/.config/notmuch/hooks/post-new, which turns freshly
@@ -72,14 +72,14 @@ if ! mbsync -c "$HOME/.mbsyncrc" icloud >>"$LOG" 2>&1; then
 fi
 
 # `notmuch new` runs the post-new hook, which does the HEY routing, publishes
-# the bar counts, refreshes Emacs and raises the notification.
+# the bar counts, refreshes Kakoune and raises the notification.
 if ! notmuch new --quiet >>"$LOG" 2>&1; then
     log "notmuch new failed"
     exit 1
 fi
 
 # ── phone parity: tags -> IMAP folders ──────────────────────────────────────
-# Everything above this line is the mailbox as Emacs sees it. What follows is
+# Everything above this line is the mailbox as Kakoune sees it. What follows is
 # the only part the iPhone can see, because IMAP has folders and no tags: mail
 # that is not screened-in Imbox mail is moved OUT of INBOX, which is what makes
 # the Screener's promise ("an unscreened stranger cannot buzz you") hold on a
@@ -97,7 +97,7 @@ fi
 # A post-new hook cannot do this itself: it would have to call `notmuch new` to
 # repair the index it just invalidated, and that re-enters the hook. Leaving
 # the reindex to the next sync is worse still — for up to fifteen minutes
-# (the timer interval) Emacs would be unable to open a moved message.
+# (the timer interval) Kakoune would be unable to open a moved message.
 #
 # The second `notmuch new` deliberately runs the full hook rather than
 # --no-hooks: the folder sync's reverse pass converts folder moves made on the

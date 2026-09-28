@@ -34,8 +34,8 @@ primary_email={{ $primary }}
 #     this line absent the reply came from the iCloud address, with it present
 #     from the address the mail was delivered to).
 #   * `notmuch search from:` / to: knows what counts as "me".
-#   * the Emacs sender picker offers them (notmuch-mua-prompt-for-sender
-#     builds its list from primary_email + other_email).
+#   * the From picker in a Kakoune draft (' f) offers them — `kak-mail
+#     identities` builds its list from primary_email + other_email.
 #
 # Notmuch wants one semicolon-separated string; the source of truth is a TOML
 # LIST in the age-encrypted .chezmoitemplates/mail-identities.toml.age, kept
@@ -71,7 +71,7 @@ exclude_tags=deleted;spam
 
 [maildir]
 # Propagate notmuch's unread/flagged state into Maildir filename flags, which
-# mbsync then pushes back to iCloud. This is what makes "read in Emacs" show
+# mbsync then pushes back to iCloud. This is what makes "read in Kakoune" show
 # up as read on the iPhone — the cheapest slice of phone parity there is, and
 # it needs no file moving at all.
 synchronize_flags=true

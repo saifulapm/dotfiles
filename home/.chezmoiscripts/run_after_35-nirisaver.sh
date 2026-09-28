@@ -11,9 +11,9 @@
 # crate generates its own protocol bindings, dispatches wl_keyboard by hand
 # rather than taking smithay-client-toolkit's xkbcommon default, and bundles
 # the font it draws with. That last set is load-bearing rather than incidental:
-# libxkbcommon-devel is on this machine only because gtk3-devel and
-# qt6-qtbase-devel drag it in, so a build that started needing it would work
-# here and fail on a machine without them. nirisaver's CI asserts the built
+# libxkbcommon-devel is on this machine only because qt6-qtbase-devel drags
+# it in, so a build that started needing it would work here and fail on a
+# machine without it. nirisaver's CI asserts the built
 # binary links nothing but libc, libm and libgcc.
 set -uo pipefail
 

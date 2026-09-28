@@ -2,14 +2,9 @@
 # the homebrew/Herd/DBngin/Java/bun blocks are mac-only and deliberately gone
 # (and Bun stays gone everywhere: pnpm, never Bun).
 
-# Editor: kak outside Emacs (mac parity). Inside Emacs, Emacs wires
-# with-editor/emacsclient itself — exporting here would clobber that.
-# ALTERNATE_EDITOR="" makes emacsclient -a "" auto-start a daemon.
-set -gx ALTERNATE_EDITOR ""
-if test -z "$INSIDE_EMACS"
-    set -gx EDITOR kak
-    set -gx VISUAL kak
-end
+# Editor: kak (mac parity).
+set -gx EDITOR kak
+set -gx VISUAL kak
 
 # XDG
 set -gx XDG_CACHE_HOME "$HOME/.cache"

@@ -3,8 +3,8 @@ import Quickshell
 import "../components"
 import "../../../components"
 
-// Mail — the unread Imbox count on the bar, from the HEY-style mail setup in
-// ~/.config/emacs (lisp/hey-notmuch.md). The data has existed since the day
+// Mail — the unread Imbox count on the bar, from the HEY-style mail setup
+// (bin/kak-mail, kak/autoload/tools/mail.kak). The data has existed since the day
 // that setup shipped: the notmuch post-new hook publishes every box's count to
 // ~/.local/state/qshell/mail.json after every sync, and until now nothing read
 // it.

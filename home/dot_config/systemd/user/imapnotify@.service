@@ -1,7 +1,7 @@
 [Unit]
 Description=IMAP IDLE watcher for %i (goimapnotify)
 Documentation=https://gitlab.com/shackra/goimapnotify
-# Session-tied, the emacs.service/qshell.service shape. This is not just
+# Session-tied, the qshell.service shape. This is not just
 # tidiness: the watcher shells out to `pass`, and a LOCKED gpg-agent answers
 # by drawing a pinentry-qt dialog. Outside a graphical session there is
 # nowhere to draw it, so the daemon would block on a prompt no one can see

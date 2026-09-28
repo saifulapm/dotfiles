@@ -4,11 +4,12 @@
 # Runs after every `notmuch new`, i.e. after every IDLE-triggered sync and
 # every timer sweep. Its whole job is to turn "a pile of newly indexed
 # messages" into "mail that is already in the right HEY box", so that opening
-# Emacs never means sorting.
+# the mail boxes never means sorting.
 #
 # The HEY idea this implements: you screen a SENDER once, and that decision
-# routes all their future mail forever. Emacs writes those decisions into the
-# .db files below (lisp/hey-notmuch.el); this hook applies them.
+# routes all their future mail forever. The Kakoune front end writes those
+# decisions into the .db files below (bin/kak-mail hey …); this hook applies
+# them.
 #
 # `tag:new` is the marker for "indexed by the run that just happened" —
 # notmuch adds it via new.tags in the config, and step 9 is the only thing
@@ -20,7 +21,7 @@
 # and tag:new stranded, which poisons the NEXT run too. Every step is
 # independently survivable, failures are logged, and step 9 always runs.
 #
-# Files this reads, all written by the Emacs side (lisp/hey-*.el) and none of
+# Files this reads, all written by bin/kak-mail (or by hand) and none of
 # them ever committed anywhere — every one is a list of who mails you:
 #
 #   screened.db  thefeed.db  spam.db      one address per line
@@ -228,8 +229,8 @@ fi
 # message in any thread containing a match for the inner query. Scoped to
 # tag:new, so this only ever touches the handful that just arrived.
 #
-# `unread` is deliberately NOT cleared — the same decision the Emacs side
-# makes (hey-thread.el) and the same one `a` (archive) makes. Read state is
+# `unread` is deliberately NOT cleared — the same decision `a` (archive)
+# makes. Read state is
 # mirrored into the maildir filename and pushed to iCloud by mbsync, and a
 # rule that silently marks mail read on your phone is a rule you would come
 # to distrust. Out of the inbox is enough: every box query requires tag:inbox.
@@ -245,8 +246,10 @@ notmuch tag +muted -inbox -- 'tag:new and thread:{tag:muted}' 2>>"$LOG"
 #                                    what the Screener exists to prevent, and
 #                                    it is how autoresponders become a spam
 #                                    confirmation service.
-#   * once per address, ever       — until you turn Away off, which is when
-#                                    Emacs deletes away-replied.db.
+#   * once per address, ever       — until you turn Away off: delete
+#                                    both `away` and away-replied.db.
+#                                    (There is no command for Away since the
+#                                    Emacs front end went; it is the file.)
 #   * never to a list              — List-Id/List-Post/List-Unsubscribe or
 #                                    Precedence: bulk. Replying to a mailing
 #                                    list means replying to everyone on it.
@@ -429,17 +432,10 @@ cat >"$tmp" <<JSON
 JSON
 mv "$tmp" "$STATE_DIR/mail.json"
 
-# ─────────────────────── 11. tell Emacs, tell the user ───────────────────────
-# The daemon is already running (emacs.service); refresh whatever notmuch
-# buffers are open so the Imbox is current the moment you switch to it.
-if command -v emacsclient >/dev/null 2>&1; then
-    emacsclient --suppress-output --eval \
-        '(when (fboundp (quote notmuch-refresh-all-buffers)) (notmuch-refresh-all-buffers))' \
-        >/dev/null 2>&1 &
-fi
-# Kakoune: every session that has mail.kak loaded refreshes its open boxes
-# and lists (kak/autoload/tools/mail.kak). `try` because a session is free
-# not to have it.
+# ────────────────────── 11. tell Kakoune, tell the user ──────────────────────
+# Every Kakoune session that has mail.kak loaded refreshes its open boxes and
+# lists (kak/autoload/tools/mail.kak), so the Imbox is current the moment you
+# switch to it. `try` because a session is free not to have it.
 if command -v kak >/dev/null 2>&1; then
     for s in $(kak -l 2>/dev/null); do
         printf 'try %%{ mail-refresh-all }\n' | kak -p "$s" >/dev/null 2>&1 &

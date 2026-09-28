@@ -1,7 +1,7 @@
 {{- $mail := fromToml (includeTemplate "mail-identities.toml" .) -}}
 {{- $primary := index $mail "primary" -}}
 {{- if $primary -}}
-# mbsync (isync) — IMAP <-> Maildir sync for the HEY-style Emacs mail setup.
+# mbsync (isync) — IMAP <-> Maildir sync for the HEY-style mail setup.
 # packages/manifest.toml: isync. Read by `mbsync -a`, by bin/mail-sync and by
 # imapnotify-icloud.service on every IDLE event.
 #

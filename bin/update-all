@@ -12,9 +12,6 @@
 # IS the staleness check (fast no-op when current), where rm+apply would
 # force a full rebuild even when nothing changed.
 #
-# `update-all --emacs` additionally rebuilds Emacs 31 from the branch tip
-# (bin/rebuild-emacs — the long one, native compilation throughout).
-#
 # Deliberately NOT here:
 #   * podman dev images (mysql/postgres/redis/mailpit) — a major-version pull
 #     can strand the data dirs; bump those by hand, deliberately.
@@ -24,9 +21,6 @@
 #     decision with conflicts to review (NIRI.md in the fork), not an update.
 #     The source-build check below rebuilds only when the FORK's main moved.
 set -uo pipefail
-
-WITH_EMACS=0
-[ "${1:-}" = "--emacs" ] && WITH_EMACS=1
 
 STATE="$HOME/.local/state/qshell/update-all"
 mkdir -p "$STATE"
@@ -240,15 +234,6 @@ cargo install --quiet --git https://github.com/Jappie3/wayfreeze --locked \
 # crate now (nirisaver), so it rides that source build's Cargo.lock. An
 # already-installed ~/.cargo/bin/ttfx is left alone — removing it is a user
 # call, and nothing here calls it.
-
-# ------------------------------------------------------------------- emacs
-if [ "$WITH_EMACS" = 1 ]; then
-  say "emacs 31 (branch tip rebuild)"
-  "$HOME/.dotfiles/bin/rebuild-emacs" || warn "emacs rebuild failed"
-else
-  echo
-  echo "  (skipping the Emacs 31 rebuild — pass --emacs to include it)"
-fi
 
 # ------------------------------------------------------------ small updaters
 say "gh extensions"

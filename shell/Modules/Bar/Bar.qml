@@ -777,7 +777,7 @@ Scope {
 
     // No gate: the mail service watches the one state file the notmuch post-new
     // hook publishes counts to, and starts a process only when a click asks for
-    // one (the presence probe, a sync, the emacsclient that opens a box). There
+    // one (the presence probe, a sync, the mail-open that opens a box). There
     // is no cadence to scope to visibility.
     function mailService() {
         return sharedService("mail", mailServiceComponent, {});

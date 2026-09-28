@@ -2,8 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Mail service — the reader half of the HEY-style mail setup that lives in
-// ~/.config/emacs (lisp/hey-notmuch.md): everything the bar mark and the panel
+// Mail service — the reader half of the HEY-style mail setup (bin/kak-mail,
+// kak/autoload/tools/mail.kak): everything the bar mark and the panel
 // know about the boxes. ONE instance however many screens carry the widget
 // (S2).
 //

@@ -936,130 +936,13 @@ why = "Go toolchain, single system version (learning Go; per-project pinning via
 name = "gopls"
 category = "dev"
 arch = "all"
-why = "Go language server for eglot"
-
-[[pkg]]
-name = "emacs-pgtk"
-category = "dev"
-arch = "all"
-why = "The /usr/bin fallback editor (30.2 stable) — the daemon actually runs the Emacs 31 build (emacs-31 release branch) from bin/rebuild-emacs in ~/.local (user ask 2026-08-07; run_after_20 builds it on a fresh box, a systemd drop-in retargets ExecStart — same two-tier shape as the Arch box's emacs-wayland + rebuild-emacs). Pure-GTK Wayland-native with native compilation (links libgccjit) — stock Fedora 44, no COPR needed (verified 2026-08-05). Runs as a session-tied daemon: dot_config/systemd/user/emacs.service shadows this rpm's default.target unit, which would start before niri-session's env import (no WAYLAND_DISPLAY for pgtk frames, sparse PATH handed to eglot's servers). Config is the separate saifulapm/emacs.d repo cloned to ~/.config/emacs by run_before_04 — never pulled by the apply, it's a living repo pushed from that checkout"
-
-# Emacs 31 build deps — bin/rebuild-emacs compiles the emacs-31 release
-# branch (master is already 32.0.50) into ~/.local
-# (run_after_20 on a fresh box; manual reruns roll forward). systemd-devel
-# is load-bearing, not nice-to-have: emacs.service is Type=notify and a
-# build without libsystemd never reports ready — the daemon would be killed
-# at TimeoutStartSec. The image libs mirror what the emacs-pgtk rpm itself
-# builds against; skipping one silently drops that format from doc-view /
-# image-mode in the 31 build.
-
-[[pkg]]
-name = "autoconf"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: autogen.sh regenerates configure from a git checkout"
-
-[[pkg]]
-name = "texinfo"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: makeinfo, required when building from git (no pregenerated docs in the repo)"
-
-[[pkg]]
-name = "gtk3-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: the PGTK frontend — --with-pgtk configures against gtk+-3.0"
-
-[[pkg]]
-name = "gnutls-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: TLS for url.el/package.el — configure hard-requires it by default"
-
-[[pkg]]
-name = "libgccjit-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep AND runtime: --with-native-compilation links libgccjit, and .eln compilation at runtime needs the headers + driver too"
-
-[[pkg]]
-name = "libtree-sitter-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: --with-tree-sitter (Fedora's name for tree-sitter-devel; ships tree-sitter.pc)"
-
-[[pkg]]
-name = "systemd-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: libsystemd for sd_notify — the Type=notify unit is dead without it (daemon killed at start timeout)"
-
-[[pkg]]
-name = "ncurses-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: terminfo for emacsclient -t / -nw frames"
-
-[[pkg]]
-name = "harfbuzz-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: the shaper — without it PGTK falls back to unshapen font rendering"
-
-[[pkg]]
-name = "libxml2-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: libxml-parse-html-region (eww, notmuch HTML mail). Already on disk as a transitive dep — declared because rebuild-emacs needs it directly"
-
-[[pkg]]
-name = "sqlite-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: built-in sqlite3 support (multisession.el, org-roam-style packages)"
-
-[[pkg]]
-name = "giflib-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: GIF support in image-mode"
-
-[[pkg]]
-name = "libjpeg-turbo-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: JPEG support in image-mode"
-
-[[pkg]]
-name = "libpng-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: PNG support in image-mode"
-
-[[pkg]]
-name = "libtiff-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: TIFF support in image-mode (doc-view intermediate format)"
+why = "Go language server — kakoune-lsp's default server for Go"
 
 [[pkg]]
 name = "libwebp-devel"
 category = "dev"
 arch = "all"
-why = "Emacs 31 build dep: WebP support in image-mode"
-
-[[pkg]]
-name = "librsvg2-devel"
-category = "dev"
-arch = "all"
-why = "Emacs 31 build dep: SVG rendering — modern UI packages (kind-icon, svg-lib) draw with it"
-
-[[pkg]]
-name = "enchant2-devel"
-category = "dev"
-arch = "all"
-why = "Jinx (the Emacs spell checker) is not a plain elisp package — it compiles its own jinx-mod.so against Enchant on first activation, so it needs enchant.h and enchant-2.pc, not just the runtime lib. Undeclared until 2026-08-09, when a fresh Jinx activation died with 'fatal error: enchant.h: No such file or directory': the runtime enchant2 was only ever on disk transitively and the -devel side was never pulled at all. Jinx misreports this as 'Jinx: pkgconf or pkg-config not found', which sends you hunting the wrong package — jinx.el wraps the `pkgconf --cflags --libs enchant-2` call in a bare condition-case, so a missing .pc file (no -devel) and a missing pkgconf binary print the same line; pkgconf itself was present the whole time. No dictionary needs declaring alongside it: enchant2 pulls libhunspell-1.7.so.0 from Fedora's hunspell, which hard-Requires hunspell-en-US, so US English lands even under this repo's global install_weak_deps=False (the en-GB/en-AU/en-CA dicts on this box came from libreoffice-langpack-en, and Jinx defaults to en_US regardless). Distinct from aspell/aspell-en further down — that pair serves terminal tools and Emacs's built-in ispell; Enchant is the separate engine Jinx talks to"
+why = "Hype build dep: it links -lwebpdemux -lwebp (run_after_58-hype-monologue)"
 
 [[pkg]]
 name = "podman"
@@ -1089,7 +972,7 @@ why = "Task runner for the repo justfile (dev/fmt/bench/apply)"
 name = "qt6-qtdeclarative-devel"
 category = "dev"
 arch = "all"
-why = "Ships qmlls (eglot) and qmlformat (pre-commit hook) — the only package providing them on Fedora"
+why = "Ships qmlls and qmlformat (pre-commit hook) — the only package providing them on Fedora"
 
 [[pkg]]
 name = "qt6-qtconnectivity-devel"
@@ -1332,7 +1215,7 @@ why = "Shell script linter (capital S in the Fedora name); used across this repo
 name = "aspell"
 category = "shell"
 arch = "all"
-why = "Spell checker from the mac list; enchant/hunspell already serve the GUI side on the Arch list — aspell is what terminal tools and Emacs ispell reach for"
+why = "Spell checker from the mac list; enchant/hunspell already serve the GUI side on the Arch list — aspell is what terminal tools reach for"
 
 [[pkg]]
 name = "aspell-en"
@@ -1472,7 +1355,7 @@ why = "Fast Python package/project manager, from both lists"
 name = "helix"
 category = "dev"
 arch = "all"
-why = "Terminal fallback editor (Emacs stays primary). CORRECTION 2026-08-07: Fedora 44 ships /usr/bin/hx after all (the /usr/bin/helix claim was the Arch package); the interim `hx` alias is gone from the fish config"
+why = "Terminal fallback editor (kak stays primary). CORRECTION 2026-08-07: Fedora 44 ships /usr/bin/hx after all (the /usr/bin/helix claim was the Arch package); the interim `hx` alias is gone from the fish config"
 
 [[pkg]]
 name = "helix-parsers"
@@ -1514,7 +1397,7 @@ why = "Wayland image viewer, from the Arch list"
 name = "ghostscript"
 category = "optional"
 arch = "all"
-why = "PostScript/PDF rendering — Emacs doc-view and imagemagick PDF ops shell out to gs"
+why = "PostScript/PDF rendering — imagemagick PDF ops shell out to gs"
 
 [[pkg]]
 name = "poppler-utils"
@@ -1685,8 +1568,9 @@ why = "Interactive disk-usage TUI (omarchy's Disk Usage launcher, user-picked 20
 
 # ------------------------------------------------------------------ mail
 # Added 2026-08-17, user-approved item by item. The HEY.com-style email
-# workflow in Emacs (~/.config/emacs/lisp/hey-notmuch.el, ported from the
-# macOS setup): mbsync pulls, notmuch indexes and tags, msmtp sends. One
+# workflow, in Kakoune since 2026-09-28 (bin/kak-mail + kak/autoload/tools/
+# mail.kak; first built in Emacs, ported from the macOS setup): mbsync pulls,
+# notmuch indexes and tags, msmtp sends. One
 # iCloud account for now. The address itself is NOT written in cleartext
 # anywhere in this repo — it lives in home/.chezmoitemplates/
 # mail-identities.toml.age, age-encrypted to the chezmoi recipient, and the
@@ -1710,13 +1594,13 @@ why = "Provides mbsync — bidirectional IMAP <-> Maildir sync, the thing that a
 name = "notmuch"
 category = "core"
 arch = "all"
-why = "The index, the tag store, and the query language — the whole HEY box model is notmuch tags (tag:inbox+screened = Imbox, tag:thefeed = The Feed, tag:ledger/* = Paper Trail) and its post-new hook is where sender routing, Bubble Up sweeps and recycling run. Chosen over mu/mu4e because tags are first-class and arbitrary here (mu4e leans on maildir folders, which would force a file move per HEY box and put every routing decision on the network), and because notmuch's query syntax is the single biggest win over HEY's plain-text search box. Fedora ships 0.40 = CLI + libnotmuch only; the Emacs interface is the `notmuch` ELPA package, ALREADY installed in ~/.config/emacs/elpa. Fedora has no notmuch-emacs package — do not go looking for one"
+why = "The index, the tag store, and the query language — the whole HEY box model is notmuch tags (tag:inbox+screened = Imbox, tag:thefeed = The Feed, tag:ledger/* = Paper Trail) and its post-new hook is where sender routing, Bubble Up sweeps and recycling run. Chosen over mu/mu4e because tags are first-class and arbitrary here (mu4e leans on maildir folders, which would force a file move per HEY box and put every routing decision on the network), and because notmuch's query syntax is the single biggest win over HEY's plain-text search box. Fedora ships 0.40 = CLI + libnotmuch only, which is all the Kakoune front end (bin/kak-mail) drives"
 
 [[pkg]]
 name = "msmtp"
 category = "core"
 arch = "all"
-why = "SMTP sending. Emacs message-mode drives it as its sendmail-program and picks the account from the From: header (-a icloud), so adding a second account later is one msmtprc block and one line of elisp, with no Emacs-side SMTP state. Preferred over Emacs's built-in smtpmail because msmtp blocks in its own process instead of freezing the daemon that is also the editor, and because the same binary serves anything else on this machine that wants to send mail. Config chezmoi-managed at home/private_dot_msmtprc; password from `pass` through passwordeval"
+why = "SMTP sending. bin/kak-mail pipes each message to `msmtp -a icloud --read-envelope-from -t`, so the envelope sender follows the From: header and every iCloud+ alias sends as itself; adding a second account later is one msmtprc block. The same binary serves anything else on this machine that wants to send mail. Config chezmoi-managed at home/private_dot_msmtprc; password from `pass` through passwordeval"
 
 # ------------------------------------------------------------------ non-dnf tools
 # Installed by chezmoi scripts / declared externals, recorded here so the
@@ -1775,7 +1659,7 @@ why  = "`celld dev` and `celld deploy` bundle the Worker with whichever esbuild 
 [[tool]]
 name = "rust-analyzer"
 via  = "rustup component add rust-analyzer"
-why  = "Rust language server for eglot"
+why  = "Rust language server (kak lsp.kak)"
 
 [[tool]]
 name = "android-sdk"
@@ -1805,7 +1689,7 @@ why  = "Bar/OSD/terminal icon glyphs; not packaged in Fedora. Symbols-only (~2 M
 [[tool]]
 name = "maple-mono"
 via  = "chezmoi external → ~/.local/share/fonts/maple-mono (github.com/subframe7536/maple-font v7.9 MapleMono-TTF.zip, pinned + sha256)"
-why  = "The coding font — terminal, Emacs, and everything else resolving `monospace`, which home/dot_config/fontconfig/conf.d/50-qshell.conf pins to it. User decision 2026-08-06, and deliberately NOT switchable from the Font menu (that picker moves the UI font only). Fedora packages no Maple Mono. The plain TTF build (1.8 MB, ligatures on) rather than MapleMono-NF (21 MB): icon glyphs already come from the symbols-only Nerd Font above, so the patched build would buy nothing. MapleMonoNL-* is the same font without ligatures if that is ever wanted; the -CN builds add Chinese and are ~160 MB"
+why  = "The coding font — terminal, kak, and everything else resolving `monospace`, which home/dot_config/fontconfig/conf.d/50-qshell.conf pins to it. User decision 2026-08-06, and deliberately NOT switchable from the Font menu (that picker moves the UI font only). Fedora packages no Maple Mono. The plain TTF build (1.8 MB, ligatures on) rather than MapleMono-NF (21 MB): icon glyphs already come from the symbols-only Nerd Font above, so the patched build would buy nothing. MapleMonoNL-* is the same font without ligatures if that is ever wanted; the -CN builds add Chinese and are ~160 MB"
 
 # Agent CLIs — all installed by run_onchange_after_04-agent-clis.sh (guarded,
 # user-local, no root). Their logins are interactive and deliberately not
@@ -1837,7 +1721,7 @@ name = "fx"
 via  = "curl -fsSL https://fx.sh/setup.sh | bash → ~/.local/bin/fx (prebuilt tarball from releases.fx.sh, latest stable). Thereafter `fx upgrade` is its own updater and bin/update-all runs it"
 why  = "fx (Vercel Labs, Zig) — a model-agnostic coding agent harness, added 2026-08-26. The fifth CLI here and the only one that is NOT in the bar's model-usage widget and NOT swept by a usage scanner: it keeps its own numbers (`fx usage`) under ~/.fx and nothing reads them. It earns its place through pxy instead — `pxy launch fx` was already an arm of `pxy launch` before fx was installed on any machine, wiring FX_GATEWAY_BASE_URL/FX_GATEWAY_CHAT_URL at 127.0.0.1:4100 plus pxy's own api_key, which short-circuits fx's credential chain: the proxy's ~30 providers answer with no Vercel account and no gateway traffic leaving the box. Bare `fx` instead wants `fx login` (Vercel AI Gateway) or `fx provider codex|grok` to ride a subscription already logged in — interactive, first-run, not scripted. State lives in ~/.fx (settings.json, sessions, mcp.json, usage); on Linux that file holds the API key in plaintext, so it is deliberately unmanaged and must never enter this repo. INSTALLER HAZARD, handled in run_after_04: setup.sh appends a PATH line to config.fish when ~/.local/bin is not already on PATH, and config.fish is a chezmoi symlink into the source tree — the script's `export PATH` at the top is what keeps that append from firing"
 
-# Editor note: the editor is Emacs (emacs-pgtk above). `vi` comes from
+# Editor note: the editor is kak (the Kakoune fork, run_after_11). `vi` comes from
 # vim-minimal, which Fedora minimal always ships — vim-enhanced (`vim`) is
 # deliberately NOT installed; bash history shows `vim` failing and the user
 # falling back to `vi` for one quick edit, which is exactly what vi is for.
@@ -2200,7 +2084,7 @@ why  = "Fedora packages none of these (all verified missing 2026-08-07; kakoune-
 
 [[tool]]
 name = "nirisaver"
-via  = "run_after_35-nirisaver.sh — clone of github.com/saifulapm/nirisaver into ~/.local/src/nirisaver, cargo-built into ~/.local/bin/nirisaver. Ours outright, not a fork of anything: a plain `main`, no upstream remote, nothing to rebase. `just update-all` carries it: the source-build sweep fetches origin, and a moved HEAD drops the binary so the apply behind it rebuilds — push and the next update-all lands it here. Needs nothing but the rustup cargo — no [[pkg]] entry backs it: it generates its own Wayland protocol bindings, dispatches wl_keyboard by hand instead of taking smithay-client-toolkit's xkbcommon default (which would want libxkbcommon-devel, present here only because gtk3-devel and qt6-qtbase-devel pull it in), links ttfx as a crate rather than shelling out to it, and bundles JetBrains Mono so no system font has to be readable. Its CI asserts the binary links nothing but libc/libm/libgcc, so that stays true"
+via  = "run_after_35-nirisaver.sh — clone of github.com/saifulapm/nirisaver into ~/.local/src/nirisaver, cargo-built into ~/.local/bin/nirisaver. Ours outright, not a fork of anything: a plain `main`, no upstream remote, nothing to rebase. `just update-all` carries it: the source-build sweep fetches origin, and a moved HEAD drops the binary so the apply behind it rebuilds — push and the next update-all lands it here. Needs nothing but the rustup cargo — no [[pkg]] entry backs it: it generates its own Wayland protocol bindings, dispatches wl_keyboard by hand instead of taking smithay-client-toolkit's xkbcommon default (which would want libxkbcommon-devel, present here only because qt6-qtbase-devel pulls it in), links ttfx as a crate rather than shelling out to it, and bundles JetBrains Mono so no system font has to be readable. Its CI asserts the binary links nothing but libc/libm/libgcc, so that stays true"
 why  = "The screensaver (user decision 2026-08-17). Replaces a foot window running bin/screensaver: no terminal, no pty resize wait, no animator child process, no window-rule — one wlr-layer-shell overlay per output, damaging only the cells that changed. Written from scratch rather than carried as a patch series on someone else's launcher, which is what it was until 2026-08-17: the rebase tax was buying nothing, because every interesting part here (the quote layout, the two-buffer scheme niri's release timing forces, damage reported against the screen rather than the buffer, a hold that costs zero scheduler ticks) had already diverged from anything upstream did. Two buffers at 3414x2134 is 57 MiB of the 73 MiB it holds resident; smoke and beams cost another ~150-200 MB of engine state at this canvas size and `exclude-effects` is the lever if that ever matters"
 
 [[tool]]
@@ -2292,7 +2176,7 @@ why  = "Fedora packages none of these; all ship both aarch64 and x86_64 linux re
 [[tool]]
 name = "pnpm-globals"
 via  = "run_after_08-cli-tools.sh — pnpm add -g: typescript, typescript-language-server, @vtsls/language-server, intelephense, @astrojs/language-server, @biomejs/biome, dprint, rustywind, @ast-grep/cli, prettier, vscode-langservers-extracted, @olrtg/emmet-language-server (prettier, vscode-langservers-extracted and @olrtg/emmet-language-server added 2026-08-07 for the helix/kak config port; bin/eslint-language-server shims the kak-lsp name onto vscode-eslint-language-server), agent-browser (added 2026-08-07 for the mac config port — see the note below), @tailwindcss/language-server (added 2026-08-08, user pick: Tailwind class completion/hover for the shadcn/React and Blade work — rustywind only sorts classes, it completes nothing)"
-why  = "The mac's language servers (eglot + kak-lsp point at them) plus the npm-shipped formatters/linters Fedora lacks (biome, dprint, rustywind, ast-grep), and — since 2026-08-07 — the agent-browser CLI justified in the note below. Lands in PNPM_HOME/bin, already on PATH"
+why  = "The mac's language servers (kak-lsp points at them) plus the npm-shipped formatters/linters Fedora lacks (biome, dprint, rustywind, ast-grep), and — since 2026-08-07 — the agent-browser CLI justified in the note below. Lands in PNPM_HOME/bin, already on PATH"
 
 # agent-browser rides the array above rather than getting its own install
 # mechanism — it is a plain Node CLI and pnpm is already the package manager.

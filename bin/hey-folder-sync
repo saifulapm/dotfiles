@@ -6,7 +6,7 @@
 # So on the iPhone there are no boxes: every screened-in mail, every newsletter,
 # every receipt and — the part that actually hurts — every unscreened stranger
 # lands in one INBOX and lights up the lock screen. The Screener's entire
-# promise ("an unscreened stranger cannot buzz you") holds in Emacs and is
+# promise ("an unscreened stranger cannot buzz you") holds on the desktop and is
 # worth nothing on the device you carry.
 #
 # THE FIX, and note that it is not really about folders. iOS Mail only raises

@@ -19,7 +19,7 @@
   safecrlf = warn
   # No core.editor on purpose (the mac set vim): core.editor outranks
   # $VISUAL/$EDITOR, and here the environment is the source of truth —
-  # kak outside Emacs, with-editor's emacsclient inside (00-env.fish).
+  # kak (00-env.fish).
   pager = delta
   hooksPath = /home/saiful/.config/git/hooks
 
@@ -41,7 +41,7 @@
   # replay recorded conflict resolutions — pays off with pull.rebase above
   enabled = true
 [merge]
-  # zdiff3 adds the merge base to conflict hunks; kak/emacs both render it
+  # zdiff3 adds the merge base to conflict hunks; kak renders it
   conflictStyle = zdiff3
 [diff]
   algorithm = histogram
