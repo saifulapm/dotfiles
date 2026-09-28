@@ -268,7 +268,9 @@ define-command extra-paste-system -docstring 'paste from the system clipboard' %
 # -------------------------
 # Open URL
 # -------------------------
-declare-option str url_open_cmd 'open %s'
+# %s is replaced by the URL, already shell-quoted. xdg-open on Linux, which
+# hands http(s) to bin/browser-open (this workspace's chromium); open on macOS.
+declare-option str url_open_cmd %sh{ [ "$(uname)" = Darwin ] && echo 'open %s' || echo 'xdg-open %s' }
 define-command -docstring "Open the URL the cursor is on with url_open_cmd." url-open %{
     evaluate-commands -save-regs 'ab' %{
         set-register b 'https?://(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)'
@@ -281,7 +283,10 @@ define-command -docstring "Open the URL the cursor is on with url_open_cmd." url
             evaluate-commands %sh{
                 # strip trailing punctuation
                 clean_url="$(echo "$kak_reg_a" | sed 's/[][(){}.,;!?]*$//')"
-                if eval "$(printf "$kak_opt_url_open_cmd" "$clean_url")" >/dev/null 2>&1; then
+                # The URL goes in as "$1", never spliced into the eval: a raw
+                # `&` in a query string would background the command there.
+                set -- "$clean_url"
+                if eval "$(printf "$kak_opt_url_open_cmd" '"$1"')" >/dev/null 2>&1 </dev/null; then
                     echo "info -title 'URL Opened' '$clean_url'"
                 else
                     echo "fail 'url_open_cmd failed!'"
