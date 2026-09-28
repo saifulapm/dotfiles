@@ -1,0 +1,133 @@
+# elfeed-kak subscriptions — the source of truth (ADR-0004); the database at
+# ~/.local/share/elfeed-kak/db.sqlite only holds fetched entries and read
+# state. Ported from the elfeed-feeds list in ~/.config/emacs/init.el.
+
+[settings]
+default_filter    = "#50 +unread"
+# B opens the entry in mpv — stands in for elfeed-tube-mpv on YouTube feeds.
+secondary_browser = "mpv"
+title_min_width   = 45
+
+[[feed]]
+url  = "https://nullprogram.com/feed/"
+tags = ["blog", "emacs"]
+
+[[feed]]
+url  = "https://nedroid.com/feed/"
+tags = ["webcomic"]
+
+[[feed]]  # t3dotgg
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCbRP3c757lWg9M-U7TyEkXA"
+tags = ["youtube", "webdev"]
+
+[[feed]]  # mattpocockuk
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCswG6FSbgZjbWtdf_hMLaow"
+tags = ["youtube", "typescript", "ai"]
+
+[[feed]]  # PinakiBhattacharya
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCUbtdbJRpaXiUI_IlBOvPpA"
+tags = ["youtube", "politics", "bangla"]
+
+[[feed]]  # AILABS-393
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCelfWQr9sXVMTvBzviPGlFw"
+tags = ["youtube", "ai"]
+
+[[feed]]  # protesilaos
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UC0uTPqBCFIpZxlz_Lv1tk_g"
+tags = ["youtube", "emacs"]
+
+[[feed]]  # flutterdev
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCwXdFgeE9KYzlDdR7TG9cMw"
+tags = ["youtube", "flutter"]
+
+[[feed]]  # aiDotEngineer
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCLKPca3kwwd-B59HNr-_lvA"
+tags = ["youtube", "ai"]
+
+[[feed]]  # KothaHokOhetuk
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCJvXIbdkzLzLNQNaTL6EgbQ"
+tags = ["youtube", "entertainment", "bangla"]
+
+[[feed]]  # AndrejKarpathy
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCXUPKJO5MZQN11PqgIvyuvQ"
+tags = ["youtube", "ai"]
+
+[[feed]]  # Fireship
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA"
+tags = ["youtube", "webdev"]
+
+[[feed]]  # devopstoolbox
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCYeiozh-4QwuC1sjgCmB92w"
+tags = ["youtube", "devops"]
+
+[[feed]]  # karthink
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCbh_g91w0T6OYp40xFrtnhA"
+tags = ["youtube", "emacs"]
+
+[[feed]]  # xenodium
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UC1HNvqTpK24NjOh6VsHxdfw"
+tags = ["youtube", "emacs"]
+
+[[feed]]  # ReactConfOfficial
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UC1hOCRBN2mnXgN5reSoO3pQ"
+tags = ["youtube", "react"]
+
+[[feed]]  # EliasHossain
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UClURnTgQiQpldGhtD4Fc7JQ"
+tags = ["youtube", "politics"]
+
+[[feed]]  # antfu
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCbzoLT8wqhI3iOAz1Nq0pvw"
+tags = ["youtube", "webdev"]
+
+[[feed]]  # andrew-burgess
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCH7Ulw-HEr62_SUzCC9K8oQ"
+tags = ["youtube", "webdev"]
+
+[[feed]]  # LearnwithSumit
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCFM3gG5IHfogarxlKcIHCAg"
+tags = ["youtube", "webdev", "bangla"]
+
+[[feed]]  # rich_harris
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UC1irENajwVYATt9hf5rfWRQ"
+tags = ["youtube", "webdev"]
+
+[[feed]]  # ryansolid
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCLLVlcmcCP4CUe7xSqVEnxw"
+tags = ["youtube", "webdev"]
+
+[[feed]]  # beyondfireship
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UC2Xd-TjJByJyK2w1zNwY0zQ"
+tags = ["youtube", "webdev"]
+
+[[feed]]  # PlayStation
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UC-2Y8dQb0S6DtpxNgAKoJKA"
+tags = ["youtube", "gaming"]
+
+[[feed]]  # nunomaduro
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCO_hYZF2gb_CyG5sA7ArlGg"
+tags = ["youtube", "php"]
+
+[[feed]]  # iamkhalidfarhan
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCb-d2dCbEt_T-d3qf3oMICw"
+tags = ["youtube", "bangla"]
+
+[[feed]]  # FilmiIndian
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCeiAKuJGZrIjYvaq0nMwbJg"
+tags = ["youtube", "entertainment", "hindi"]
+
+[[feed]]  # ABHIKAREVIEW
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCPWqbr91cfbtLHZrHM5GItg"
+tags = ["youtube", "entertainment", "hindi"]
+
+[[feed]]  # PlabonWorld
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCyNJTXvvD-1gWzjC59Oc_Mg"
+tags = ["youtube", "entertainment", "bangla"]
+
+[[feed]]  # Achirar_goppo_shoppo
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCXzR5V9OMvhfoZPPv8g-VCw"
+tags = ["youtube", "entertainment", "bangla"]
+
+[[feed]]  # faporbaz_fun
+url  = "https://www.youtube.com/feeds/videos.xml?channel_id=UCjqJ_NnTvCJFAXmLWntHgFg"
+tags = ["youtube", "entertainment", "bangla"]
