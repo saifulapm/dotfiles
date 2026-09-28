@@ -212,7 +212,15 @@ done < <(cargo install --list | awk '/^[^ ]/ { pkg = $1; next } { print pkg, $1 
 
 # --------------------------------------------------------------- toolchains
 say "toolchains"
+# A node bump lands AFTER the apply above, in a fresh empty lib/node_modules,
+# and pi/qmd (npm globals, guarded on the active node's bin dir by
+# run_after_04/56) only come back on the next apply — so run it again here.
+node_before="$(mise where node 2>/dev/null)"
 mise up || warn "mise up failed"
+if [ "$(mise where node 2>/dev/null)" != "$node_before" ]; then
+  say "chezmoi apply (node moved — reinstalls npm globals)"
+  chezmoi apply || warn "chezmoi apply failed"
+fi
 rustup update || warn "rustup update failed"
 
 # -------------------------------------------------------------- cargo tools
