@@ -25,3 +25,10 @@ trusted_config_paths = ["~/Sites/github", "~/Sites/laravel", "~/Sites/shopify_th
 # an lts major bump instead of silently vanishing. Node ≥ 25 stops bundling
 # corepack — revisit this mechanism when lts resolves to 26 (Oct 2026).
 corepack = true
+
+[settings.upgrade]
+# mise ships this ON: `mise up` (run by bin/update-all) deletes the old
+# install dir the moment a tool upgrades — out from under processes still
+# executing from it (omarchy 889b22dd: Claude Code re-execs itself by
+# absolute path). Old versions cost disk until pruned deliberately.
+auto_prune = false
