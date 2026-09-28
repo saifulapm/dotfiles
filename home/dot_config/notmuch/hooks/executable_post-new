@@ -437,6 +437,14 @@ if command -v emacsclient >/dev/null 2>&1; then
         '(when (fboundp (quote notmuch-refresh-all-buffers)) (notmuch-refresh-all-buffers))' \
         >/dev/null 2>&1 &
 fi
+# Kakoune: every session that has mail.kak loaded refreshes its open boxes
+# and lists (kak/autoload/tools/mail.kak). `try` because a session is free
+# not to have it.
+if command -v kak >/dev/null 2>&1; then
+    for s in $(kak -l 2>/dev/null); do
+        printf 'try %%{ mail-refresh-all }\n' | kak -p "$s" >/dev/null 2>&1 &
+    done
+fi
 
 # Notify ONLY for screened-in mail. This is the whole point of the Screener:
 # an unscreened stranger must never be allowed to buzz you. Mirrors HEY, where

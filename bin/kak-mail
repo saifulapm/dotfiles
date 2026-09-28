@@ -1,0 +1,616 @@
+#!/usr/bin/env python3
+"""kak-mail — the engine behind kak/autoload/tools/mail.kak.
+
+Replaces the Emacs notmuch front end (~/.config/emacs/lisp/hey-notmuch.el).
+Everything below the UI is unchanged and not this file's business: mbsync,
+goimapnotify, the notmuch post-new router, hey-folder-sync and msmtp keep
+running exactly as before. This only reads notmuch, renders text for Kakoune
+buffers, sends through msmtp, and writes the same HEY decision files the
+Emacs commands wrote, in the same formats — the post-new hook reads them.
+
+Subcommands (the kak side is the only intended caller):
+  boxes [--maps]              box list with counts, or kak `map` lines for J
+  query NAME                  the notmuch query of a box (qshell uses names)
+  list --out F [--unthreaded] QUERY   render a list into F, print `mail_ids`
+  show --out F QUERY          render a thread into F, print `mail_msgs`, mark read
+  links QUERY                 URLs in a message, one per line
+  attachments QUERY           `PART: name (type)` per attachment
+  save QUERY PART             attachment → ~/Downloads (never overwrites)
+  identities                  sender identities, one per line
+  compose new|reply|replyall|forward [QUERY]   write a draft, print its path
+  header FILE set|add NAME VALUE   edit a draft's headers (From, Attach)
+  send FILE                   send a draft via msmtp, file it in Sent, delete it
+  hey ACTION [--arg A] QUERY...   the HEY routing actions (see HEY below)
+"""
+
+import email.policy
+import mimetypes
+import os
+import re
+import secrets
+import subprocess
+import sys
+import time
+import unicodedata
+from email.message import EmailMessage
+from email.utils import formatdate, getaddresses, make_msgid, parseaddr
+import json
+
+HOME = os.path.expanduser("~")
+DB_DIR = os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "hey-mail")
+DRAFTS = os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "kak-mail", "drafts")
+SENT_FOLDER = "icloud/Sent Messages"
+MSMTP_ACCOUNT = "icloud"
+
+# The HEY boxes, in HEY's order — ported verbatim from notmuch-saved-searches
+# in hey-notmuch.el. The queries match the vocabulary the post-new hook
+# writes: change one, change both. The names are also what qshell's mail
+# widget stores (MailService.qml `boxes`), so keep them stable.
+# (key, name, query, unthreaded)
+BOXES = [
+    ("i", "Imbox", "tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled", False),
+    ("y", "Prev. Seen", "tag:inbox and tag:screened and tag:unread and tag:seen", False),
+    # Unthreaded, alone among the boxes: the Screener is a list of decisions
+    # about PEOPLE, and one sender threading a year of notifications into one
+    # conversation would otherwise hijack it (see the Emacs comment).
+    ("s", "Screener", "tag:inbox and tag:unread and not tag:screened", True),
+    ("f", "The Feed", "tag:thefeed and tag:unread", False),
+    ("p", "Paper Trail", "tag:/^ledger\\//", False),
+    ("l", "Reply Later", "tag:replylater", False),
+    ("a", "Set Aside", "tag:setaside", False),
+    ("b", "Bubbled Up", "tag:bubbled and tag:unread", False),
+    ("I", "Read", "tag:inbox and tag:screened and not tag:unread", False),
+    ("n", "Notes", "tag:note", False),
+    ("m", "Muted", "tag:muted", False),
+    ("t", "Sent", "tag:sent", False),
+    ("e", "Everything", "*", False),
+]
+LIST_LIMIT = 500
+
+
+def nm(*args, stdin=None):
+    return subprocess.run(["notmuch", *args], input=stdin, capture_output=True,
+                          text=True, check=True).stdout
+
+
+def kq(s):
+    """Quote for Kakoune: single quotes, embedded ones doubled."""
+    return "'" + s.replace("'", "''") + "'"
+
+
+def die(msg):
+    print(f"kak-mail: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def box(name):
+    for b in BOXES:
+        if b[1] == name:
+            return b
+    return None
+
+
+# ───────────────────────────── text layout ─────────────────────────────
+
+def width(s):
+    w = 0
+    for ch in s:
+        if unicodedata.combining(ch) or unicodedata.category(ch) in ("Mn", "Me", "Cf"):
+            continue
+        w += 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+    return w
+
+
+def fit(s, n):
+    """Truncate/pad S to exactly N display cells."""
+    s = s.replace("\t", " ").replace("\n", " ")
+    out, w = "", 0
+    for ch in s:
+        cw = width(ch)
+        if w + cw > n:
+            break
+        out, w = out + ch, w + cw
+    return out + " " * (n - w)
+
+
+def fmt_date(ts):
+    t, now = time.localtime(ts), time.localtime()
+    if t[:3] == now[:3]:
+        return time.strftime("%H:%M", t)
+    if t.tm_year == now.tm_year:
+        return time.strftime("%b %d", t)
+    return time.strftime("%Y-%m-%d", t)
+
+
+def row(ts, who, subject, tags):
+    return f"{fmt_date(ts):<10} {fit(who, 22)} {subject}  [{' '.join(tags)}]"
+
+
+# ───────────────────────────── boxes / lists ─────────────────────────────
+
+def cmd_boxes(args):
+    if args[:1] == ["--maps"]:
+        for key, name, _, _ in BOXES:
+            print(f"map global mail-jump {kq(key)} {kq(':mail-box %{' + name + '}<ret>')} -docstring {kq(name)}")
+        return
+    counts = nm("count", "--batch", stdin="\n".join(b[2] for b in BOXES) + "\n").split()
+    for (key, name, _, _), n in zip(BOXES, counts):
+        print(f" {key}  {name:<12} {n:>5}")
+
+
+def cmd_query(args):
+    b = box(args[0])
+    print(b[2] if b else args[0])
+
+
+def cmd_list(args):
+    out, flat, words = None, False, []
+    it = iter(args)
+    for a in it:
+        if a == "--out":
+            out = next(it)
+        elif a == "--unthreaded":
+            flat = True
+        else:
+            words.append(a)
+    query = " ".join(words)
+    b = box(query)
+    unthreaded = b[3] if b else flat
+    q = b[2] if b else query
+    ids, lines = [], []
+    if unthreaded:
+        msgs = []
+
+        def walk(nodes):
+            for node in nodes:
+                if isinstance(node, list):
+                    walk(node)
+                elif isinstance(node, dict) and "id" in node:
+                    if node.get("match"):
+                        msgs.append(node)
+        walk(json.loads(nm("show", "--format=json", "--body=false", "--entire-thread=false", q)))
+        msgs.sort(key=lambda m: -m["timestamp"])
+        for m in msgs[:LIST_LIMIT]:
+            h = m["headers"]
+            name, addr = parseaddr(h.get("From", ""))
+            ids.append("id:" + m["id"])
+            lines.append(row(m["timestamp"], name or addr, h.get("Subject", ""), m["tags"]))
+    else:
+        for t in json.loads(nm("search", "--format=json", f"--limit={LIST_LIMIT}", q)):
+            ids.append("thread:" + t["thread"])
+            count = f" ({t['matched']}/{t['total']})" if t["total"] > 1 else ""
+            lines.append(row(t["timestamp"], t["authors"], t["subject"] + count, t["tags"]))
+    with open(out, "w") as f:
+        f.write("\n".join(lines) + ("\n" if lines else f"(nothing in {query})\n"))
+    print("set-option buffer mail_ids " + " ".join(kq(i) for i in ids))
+
+
+# ───────────────────────────── thread view ─────────────────────────────
+
+def html_to_text(html, links=True):
+    # lynx never fetches anything, so remote images and trackers stay blocked —
+    # the same stance as notmuch-show-text/html-blocked-images "." in Emacs.
+    # Links come out as a numbered reference list, like shr's; a quoted reply
+    # drops the list (links=False) — nobody wants forty tracker URLs quoted back.
+    r = subprocess.run(["lynx", "-dump", "-stdin", "-force_html", "-nomargins",
+                        "-display_charset=utf-8", "-assume_charset=utf-8", "-width=100",
+                        *([] if links else ["-nolist"])],
+                       input=html, capture_output=True, text=True)
+    return r.stdout
+
+
+def body_text(parts, attachments, links=True):
+    """Readable text of a MIME tree; attachments collected as (id, name, type)."""
+    out = []
+    for p in parts:
+        ct = p.get("content-type", "").lower()
+        c = p.get("content")
+        if p.get("filename") or (p.get("content-disposition") == "attachment"):
+            attachments.append((p["id"], p.get("filename") or "unnamed", ct))
+        elif ct == "multipart/alternative" and isinstance(c, list):
+            plain = [q for q in c if q.get("content-type", "").lower() == "text/plain" and (q.get("content") or "").strip()]
+            html = [q for q in c if q.get("content-type", "").lower() == "text/html"]
+            if plain:
+                out.append(plain[0]["content"])
+            elif html:
+                out.append(html_to_text(html[0].get("content") or "", links))
+            else:
+                out.append(body_text(c, attachments, links))
+        elif ct.startswith("multipart/") and isinstance(c, list):
+            out.append(body_text(c, attachments, links))
+        elif ct == "message/rfc822" and isinstance(c, list):
+            for inner in c:
+                h = inner.get("headers", {})
+                out.append("---------- attached message ----------\n" +
+                           "".join(f"{k}: {h[k]}\n" for k in ("From", "Date", "Subject") if k in h) + "\n" +
+                           body_text(inner.get("body", []), attachments, links))
+        elif ct == "text/plain":
+            out.append(c or "")
+        elif ct == "text/html":
+            out.append(html_to_text(c or "", links))
+        elif ct.startswith("text/") and isinstance(c, str):
+            out.append(c)
+    return "\n".join(s.rstrip("\n") + "\n" for s in out if s)
+
+
+def thread_messages(query):
+    msgs = []
+
+    def walk(nodes):
+        for node in nodes:
+            if isinstance(node, list):
+                walk(node)
+            elif isinstance(node, dict) and "id" in node:
+                msgs.append(node)
+    walk(json.loads(nm("show", "--format=json", "--include-html", "--entire-thread=true", query)))
+    return msgs
+
+
+def render_message(m):
+    h = m["headers"]
+    atts = []
+    body = body_text(m.get("body", []), atts)
+    head = "".join(f"{k}: {h[k]}\n" for k in ("From", "To", "Cc", "Date", "Subject") if h.get(k))
+    head += f"Tags: {' '.join(m['tags'])}\n"
+    tail = "".join(f"[attachment {i}: {name} ({ct})]\n" for i, name, ct in atts)
+    return head + "\n" + body + ("\n" + tail if tail else "")
+
+
+def cmd_show(args):
+    out, query = args[1], " ".join(args[2:])
+    msgs = thread_messages(query)
+    lines, marks = [], []
+    for m in msgs:
+        marks.append(f"{len(lines) + 1}:{m['id']}")
+        lines.append("━" * 72)
+        lines.extend(render_message(m).rstrip("\n").split("\n"))
+        lines.append("")
+    with open(out, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    # Opening a thread reads it, as notmuch-show does in Emacs.
+    nm("tag", "-unread", "--", query)
+    print("set-option buffer mail_msgs " + " ".join(kq(x) for x in marks))
+
+
+def cmd_links(args):
+    """links ID — the URLs in one message, deduplicated, in reading order."""
+    text = render_message(one_message(message_of(args[0])))
+    urls = re.findall(r"https?://[^\s<>\"')\]]+", text)
+    print("\n".join(dict.fromkeys(u.rstrip(".,;:!?") for u in urls)))
+
+
+def cmd_attachments(args):
+    """attachments ID — one `PART: name (type)` line per attachment."""
+    atts = []
+    body_text(one_message(message_of(args[0])).get("body", []), atts)
+    for part, name, ct in atts:
+        print(f"{part}: {name} ({ct})")
+
+
+def cmd_save(args):
+    """save ID PART — write an attachment to ~/Downloads, print its path.
+    An existing file is never overwritten: name (1).ext, name (2).ext, …"""
+    msg_id, part = message_of(args[0]), int(args[1])
+    atts = []
+    body_text(one_message(msg_id).get("body", []), atts)
+    name = next((n for p, n, _ in atts if p == part), None)
+    if name is None:
+        die(f"no attachment {part}")
+    folder = os.path.join(HOME, "Downloads")
+    os.makedirs(folder, exist_ok=True)
+    stem, ext = os.path.splitext(os.path.basename(name) or "attachment")
+    path, n = os.path.join(folder, stem + ext), 1
+    while os.path.exists(path):
+        path, n = os.path.join(folder, f"{stem} ({n}){ext}"), n + 1
+    data = subprocess.run(["notmuch", "show", f"--part={part}", "id:" + msg_id],
+                          capture_output=True, check=True).stdout
+    with open(path, "wb") as f:
+        f.write(data)
+    print(path)
+
+
+# ───────────────────────────── compose / send ─────────────────────────────
+
+def identities():
+    name = nm("config", "get", "user.name").strip()
+    addrs = [nm("config", "get", "user.primary_email").strip()]
+    addrs += [a for a in nm("config", "get", "user.other_email").split() if a]
+    return [f"{name} <{a}>" if name else a for a in addrs]
+
+
+def nametag():
+    try:
+        with open(os.path.join(DB_DIR, "nametag")) as f:
+            s = f.read().strip()
+        return f"\n\n-- \n{s}\n" if s else "\n"
+    except FileNotFoundError:
+        return "\n"
+
+
+def quote(text):
+    return "".join("> " + l if l.strip() else ">\n" for l in text.splitlines(True)) + "\n"
+
+
+def one_message(msg_id):
+    return next(m for m in thread_messages("id:" + msg_id) if m["id"] == msg_id)
+
+
+def message_of(query):
+    """Bare Message-Id for QUERY: an id: as given, a thread: by its newest
+    message — the one the list row is showing."""
+    if query.startswith("id:"):
+        return query[3:]
+    ids = nm("search", "--output=messages", "--sort=newest-first", "--limit=1", query).split()
+    if not ids:
+        die(f"no message for {query}")
+    return ids[0].removeprefix("id:")
+
+
+def cmd_compose(args):
+    kind = args[0]
+    headers, body = [], ""
+    if kind == "new":
+        headers = [("From", identities()[0]), ("To", ""), ("Subject", "")]
+    elif kind in ("reply", "replyall"):
+        msg_id = message_of(args[1])
+        r = json.loads(nm("reply", "--format=json",
+                          "--reply-to=" + ("all" if kind == "replyall" else "sender"), "id:" + msg_id))
+        rh = r["reply-headers"]
+        # notmuch spells it "In-reply-to"; send keys off the canonical name.
+        rh = {k.lower(): v for k, v in rh.items()}
+        headers = [(k, rh[k.lower()]) for k in ("From", "To", "Cc", "Subject", "In-Reply-To", "References")
+                   if rh.get(k.lower())]
+        orig = one_message(msg_id)
+        oh = orig["headers"]
+        body = (f"\n\nOn {oh.get('Date', '')}, {oh.get('From', '')} wrote:\n" +
+                quote(body_text(orig.get("body", []), [], links=False)))
+    elif kind == "forward":
+        msg_id = message_of(args[1])
+        orig = one_message(msg_id)
+        oh = orig["headers"]
+        subj = oh.get("Subject", "")
+        headers = [("From", identities()[0]), ("To", ""),
+                   ("Subject", subj if subj.lower().startswith("fwd:") else "Fwd: " + subj)]
+        atts = []
+        text = body_text(orig.get("body", []), atts)
+        # Carry the original's attachments along as Attach: pseudo-headers, the
+        # same mechanism a hand-added attachment uses, so send has one path.
+        os.makedirs(DRAFTS, exist_ok=True)
+        for part_id, name, _ in atts:
+            path = os.path.join(DRAFTS, f"fwd-{secrets.token_hex(4)}-{os.path.basename(name)}")
+            with open(path, "wb") as f:
+                f.write(subprocess.run(["notmuch", "show", f"--part={part_id}", "id:" + msg_id],
+                                       capture_output=True, check=True).stdout)
+            headers.append(("Attach", path))
+        body = ("\n\n---------- Forwarded message ----------\n" +
+                "".join(f"{k}: {oh[k]}\n" for k in ("From", "Date", "Subject", "To") if oh.get(k)) +
+                "\n" + text)
+    else:
+        die(f"unknown compose kind: {kind}")
+    os.makedirs(DRAFTS, exist_ok=True)
+    path = os.path.join(DRAFTS, time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3) + ".eml")
+    with open(path, "w") as f:
+        f.write("".join(f"{k}: {v}\n" for k, v in headers) + body + nametag())
+    print(path)
+
+
+def parse_draft(text):
+    head, _, body = text.partition("\n\n")
+    headers = []
+    for line in head.splitlines():
+        if line[:1] in (" ", "\t") and headers:
+            headers[-1] = (headers[-1][0], headers[-1][1] + " " + line.strip())
+        elif ":" in line:
+            k, v = line.split(":", 1)
+            headers.append((k.strip(), v.strip()))
+    return headers, body
+
+
+def cmd_header(args):
+    """header FILE set|add NAME VALUE — edit a draft's header block in place."""
+    path, op, name, value = args
+    if name.lower() == "attach":
+        value = os.path.abspath(os.path.expanduser(value))
+        if not os.path.isfile(value):
+            die(f"no such file: {value}")
+    with open(path) as f:
+        head, sep, body = f.read().partition("\n\n")
+    lines = head.split("\n")
+    if op == "set":
+        lines = [l for l in lines if not l.lower().startswith(name.lower() + ":")]
+        lines.insert(0, f"{name}: {value}")
+    else:
+        lines.append(f"{name}: {value}")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + (sep or "\n\n") + body)
+
+
+def cmd_send(args):
+    path = args[0]
+    with open(path) as f:
+        headers, body = parse_draft(f.read())
+    msg = EmailMessage(policy=email.policy.SMTP)
+    attach = []
+    for k, v in headers:
+        if k.lower() == "attach":
+            attach.append(os.path.expanduser(v))
+        elif v:
+            msg[k] = v
+    if not any(msg.get(h) for h in ("To", "Cc", "Bcc")):
+        die("no recipients (To/Cc/Bcc all empty)")
+    if not msg.get("From"):
+        die("no From header")
+    domain = parseaddr(msg["From"])[1].rpartition("@")[2] or None
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=domain)
+    msg.set_content(body)
+    for a in attach:
+        if not os.path.isfile(a):
+            die(f"attachment not found: {a}")
+        ctype = mimetypes.guess_type(a)[0] or "application/octet-stream"
+        maintype, subtype = ctype.split("/", 1)
+        with open(a, "rb") as f:
+            msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(a))
+    raw = msg.as_bytes()
+    # -t: recipients from To/Cc/Bcc (msmtp strips Bcc); envelope-from from
+    # the From header, so every iCloud+ alias sends as itself.
+    r = subprocess.run(["msmtp", "-a", MSMTP_ACCOUNT, "--read-envelope-from", "-t"],
+                       input=raw, capture_output=True)
+    if r.returncode != 0:
+        die("msmtp: " + (r.stderr.decode(errors="replace").strip().splitlines() or ["failed"])[-1])
+    # File the sent copy — notmuch-fcc-dirs "icloud/Sent Messages" +sent -inbox -unread -new.
+    subprocess.run(["notmuch", "insert", f"--folder={SENT_FOLDER}", "+sent", "-inbox", "-unread", "-new"],
+                   input=raw, check=True)
+    irt = msg.get("In-Reply-To", "").strip().strip("<>")
+    if irt:
+        subprocess.run(["notmuch", "tag", "+replied", "--", "id:" + irt])
+    for a in attach:
+        if os.path.dirname(a) == DRAFTS:
+            os.unlink(a)
+    os.unlink(path)
+    print(f"sent to {', '.join(a for _, a in getaddresses([msg.get('To', ''), msg.get('Cc', '')]) if a)}")
+
+
+# ───────────────────────────── HEY actions ─────────────────────────────
+# Ported from hey-notmuch.el; tags and .db line formats are identical, because
+# the post-new hook applies these files to every new message.
+
+def db_path(db):
+    os.makedirs(DB_DIR, exist_ok=True)
+    return os.path.join(DB_DIR, db)
+
+
+def db_add(db, line):
+    with open(db_path(db), "a") as f:
+        f.write(line + "\n")
+
+
+def db_drop(db, needle):
+    """Remove lines containing NEEDLE; written via rename so the post-new hook
+    never reads a half-written routing table (suffix distinct from the hook's
+    own `.tmp' and Emacs's `.emacs-tmp')."""
+    path = db_path(db)
+    if not os.path.exists(path):
+        return
+    with open(path) as f:
+        lines = f.readlines()
+    keep = [l for l in lines if needle not in l]
+    if len(keep) != len(lines):
+        with open(path + ".kak-tmp", "w") as f:
+            f.writelines(keep)
+        os.replace(path + ".kak-tmp", path)
+
+
+def sanitize(name, what):
+    clean = re.sub(r"[^A-Za-z0-9_-]", "", name or "")
+    if not clean:
+        die(f"{what} must contain a letter, digit, - or _")
+    return clean
+
+
+def sender(query):
+    """The sender to decide on: newest sender of QUERY that is not you."""
+    mine = {parseaddr(i)[1].lower() for i in identities()}
+    for a in nm("address", "--output=sender", "--output=address", query).split():
+        if a.lower() not in mine:
+            return a.lower()
+    die(f"no sender found for {query}")
+
+
+def tag(query, *changes):
+    nm("tag", *changes, "--", query)
+
+
+def cmd_hey(args):
+    action, arg = args[0], None
+    rest = args[1:]
+    if rest[:1] == ["--arg"]:
+        arg, rest = rest[1], rest[2:]
+    queries = rest
+    if not queries:
+        die("no message selected")
+    done = []
+    if action in ("screen-in", "feed", "papertrail", "screen-out", "unscreen", "autofile", "recycle"):
+        for addr in dict.fromkeys(sender(q) for q in queries):
+            frm = "from:" + addr
+            if action == "screen-in":
+                tag(frm, "+screened")
+                db_add("screened.db", addr)
+            elif action == "feed":
+                tag(frm, "+thefeed", "+archived", "-inbox")
+                db_add("thefeed.db", addr)
+            elif action == "papertrail":
+                cat = sanitize(arg, "Category")
+                tag(frm, f"+ledger/{cat}", "+archived", "-inbox", "-unread")
+                db_add("ledger.db", f"{cat} {addr}")
+            elif action == "screen-out":
+                tag(frm, "+spam", "+deleted", "+archived", "-inbox", "-unread", "-screened")
+                db_add("spam.db", addr)
+            elif action == "unscreen":
+                for db in ("screened.db", "thefeed.db", "spam.db", "ledger.db", "autofile.db", "recycle.db"):
+                    db_drop(db, addr)
+                tag(frm, "-screened", "-thefeed", "-spam", "-deleted", "-bubble", "+inbox")
+            elif action == "autofile":
+                label = sanitize(arg, "Label")
+                db_add("autofile.db", f"{addr} {label}")
+                tag(frm, f"+label/{label}")
+            elif action == "recycle":
+                if arg not in ("30", "90", "730"):
+                    die("recycle days must be 30, 90 or 730")
+                db_add("recycle.db", f"{addr} {arg}")
+            done.append(addr)
+    elif action in ("reply-later", "set-aside", "clear", "bubble", "archive"):
+        threads = dict.fromkeys(t.removeprefix("thread:")
+                                for t in nm("search", "--output=threads", " or ".join(f"({q})" for q in queries)).split())
+        when = None
+        if action == "bubble":
+            r = subprocess.run(["date", "-d", arg or "", "+%s"], capture_output=True, text=True)
+            if r.returncode != 0 or not arg:
+                die(f"cannot read a time from {arg!r} (try: tomorrow 9am, next friday, 3 days)")
+            when = int(r.stdout)
+            if when <= time.time():
+                die("that time is already past")
+        for tid in threads:
+            q = "thread:" + tid
+            if action == "reply-later":
+                tag(q, "+replylater")
+            elif action == "set-aside":
+                tag(q, "+setaside")
+            elif action == "clear":
+                tag(q, "-replylater", "-setaside", "-bubbled")
+            elif action == "archive":
+                tag(q, "-inbox", "+archived")
+            elif action == "bubble":
+                db_add("bubble.db", f"{tid} {when}")
+                tag(q, "+bubble", "-inbox", "-unread", "-bubbled")
+        done = [f"{len(threads)} thread(s)"]
+        if when:
+            done.append(time.strftime("until %a %d %b %H:%M", time.localtime(when)))
+    elif action == "sender":
+        print(sender(queries[0]))
+        return
+    else:
+        die(f"unknown action: {action}")
+    print(f"{action}: {', '.join(done)}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        die("usage: kak-mail <boxes|query|list|show|identities|compose|send|hey> …")
+    cmd, args = sys.argv[1], sys.argv[2:]
+    fn = {
+        "boxes": cmd_boxes, "query": cmd_query, "list": cmd_list, "show": cmd_show,
+        "identities": lambda a: print("\n".join(identities())),
+        "links": cmd_links, "attachments": cmd_attachments, "save": cmd_save,
+        "compose": cmd_compose, "header": cmd_header, "send": cmd_send, "hey": cmd_hey,
+    }.get(cmd)
+    if not fn:
+        die(f"unknown command: {cmd}")
+    try:
+        fn(args)
+    except subprocess.CalledProcessError as e:
+        die(f"{' '.join(e.cmd[:2])}: {(e.stderr or '').strip() or 'failed'}")
+
+
+if __name__ == "__main__":
+    main()

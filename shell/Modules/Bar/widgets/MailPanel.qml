@@ -7,10 +7,9 @@ import "../../../components"
 // now" as the headline control, then one row per box, count on the right.
 //
 // The boxes are listed in hey-notmuch.el's order, which is HEY's own, so this
-// card and the notmuch hello screen read alike. Clicking a row opens that box
-// in the running Emacs daemon and raises its window — see MailService's
-// openBox, which is where the emacsclient invocation and the reason it needs
-// the compositor's help are written down.
+// card and the Kakoune box list read alike. Clicking a row opens that box in
+// the Kakoune mail window and raises it — see MailService's openBox and
+// bin/mail-open.
 //
 // The cursor model is the family's single-highlight one: j/k and the arrows
 // walk the rows, Enter opens, s syncs, m opens the hello screen, r re-reads the
@@ -61,7 +60,7 @@ BarPanel {
         openRow(selectedBox());
     }
 
-    // Raising Emacs puts a window over wherever this card is hanging, so the
+    // Raising the mail window puts it over wherever this card is hanging, so the
     // card has to go with it: a panel left open would sit on top of the box it
     // just asked for.
     function openRow(box) {
@@ -274,7 +273,7 @@ BarPanel {
         muted: true
 
         width: parent.width
-        text: "The notmuch post-new hook publishes these after every sync — about a second after mail arrives, because a push connection holds the mailbox open. Click a box to open it in Emacs."
+        text: "The notmuch post-new hook publishes these after every sync — about a second after mail arrives, because a push connection holds the mailbox open. Click a box to open it in Kakoune."
         wrapMode: Text.WordWrap
     }
 
@@ -294,7 +293,7 @@ BarPanel {
 
     // ----------------------------------------------------------- components
     // No per-row hover hint: every one of the nine rows does the same thing, so
-    // nine copies of "Open in Emacs" would be noise, and a hint on the first or
+    // nine copies of "Open in Kakoune" would be noise, and a hint on the first or
     // last row has nowhere to hang that does not cover the header or the footer.
     // The pointer cursor and the footer sentence carry it instead.
     component BoxRow: CursorSurface {

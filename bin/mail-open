@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# mail-open [BOX] — raise the mail window, optionally showing one HEY box.
+#
+# The mail UI is Kakoune (kak/autoload/tools/mail.kak) in a dedicated foot
+# window, app-id "kak-mail", attached to a kak session named "mail" whose
+# client is named "mail". A second press reuses that window: the box is
+# switched over `kak -p` and the window focused through niri — the same
+# raise-then-focus the Emacs version needed, for the same reason (nothing
+# inside the client can raise a Wayland window). Used by
+# the qshell mail widget (MailService.qml), which passes box names from
+# kak-mail's BOXES.
+set -uo pipefail
+
+box=${1:-}
+cmd=mail
+[ -n "$box" ] && cmd="mail-box %{$box}"
+
+id=$(niri msg --json windows 2>/dev/null \
+  | jq -r '[.[] | select(.app_id == "kak-mail")] | sort_by(.id) | last | .id // empty')
+if [ -n "$id" ] && kak -l | grep -qx mail; then
+  printf 'evaluate-commands -client mail %%{ %s }\n' "$cmd" | kak -p mail
+  exec niri msg action focus-window --id "$id"
+fi
+if ! kak -l | grep -qx mail; then
+  setsid kak -d -s mail </dev/null >/dev/null 2>&1 &
+  for _ in 1 2 3 4 5 6 7 8 9 10; do kak -l | grep -qx mail && break; sleep 0.2; done
+fi
+exec foot-run --app-id=kak-mail kak -c mail -e "try %{ rename-client mail }; $cmd"

@@ -752,14 +752,6 @@ binds {
     Mod+E hotkey-overlay-title="File Manager: yazi" { spawn "kitty-run" "--class=qshell-float-yazi" "yazi"; }
     // omarchy: SUPER+SHIFT+N editor — $EDITOR (kak) in a foot window.
     Mod+Shift+N hotkey-overlay-title="Editor: kak" { spawn "foot-run" "kak"; }
-    // Emacs: raise the daemon's existing frame or make one — the same
-    // emacsclient invocation as the emacs.desktop override, so the key and
-    // the launcher entry behave identically (user ask 2026-08-07).
-    // launch-or-focus first: emacsclient --reuse-frame reuses a FRAME inside
-    // Emacs but does not reliably raise the niri window under Wayland —
-    // focusing through the compositor does, and the emacsclient path still
-    // runs when no Emacs window exists yet.
-    Mod+N hotkey-overlay-title="Editor: Emacs" { spawn "launch-or-focus" "emacs" "emacsclient" "--reuse-frame" "--alternate-editor="; }
     // omarchy: SUPER+ALT+RETURN tmux terminal — attach-or-create "main".
     // The "main" tmux session is a singleton by design (new-session -A), so
     // the window is too: a distinct app-id lets launch-or-focus raise the

@@ -26,7 +26,7 @@ import Quickshell.Io
 // ScreenRecording and AiClaude have with theirs.
 //
 // The only processes started here are the ones a click asks for: one presence
-// probe at startup, `mail-sync` on demand, and the emacsclient that opens a box.
+// probe at startup, `mail-sync` on demand, and the mail-open that opens a box.
 QtObject {
     id: root
 
@@ -67,10 +67,10 @@ QtObject {
     // draws them. Three fields, and each is a contract with a different file:
     //
     //   key     the field in mail.json, written by the post-new hook
-    //   search  the :name in `notmuch-saved-searches`, which is what the
-    //           emacsclient form looks the query up by. It must match the
-    //           elisp string to the character — "Prev. Seen", not "Previously
-    //           Seen" — because a miss falls back to the hello screen.
+    //   search  the box name in BOXES in bin/kak-mail, which is what
+    //           mail-open looks the query up by. It must match to the
+    //           character — "Prev. Seen", not "Previously Seen" — because a
+    //           miss is read as a raw notmuch query and lists nothing.
     //   label   what this panel calls it, which is free to be the longer word
     //
     // `bundled` is in mail.json and is deliberately NOT a row. A bundled sender
@@ -211,138 +211,36 @@ QtObject {
     property string _syncError: ""
 
     // ------------------------------------------------------- opening a box
-    // Open a box in the running Emacs daemon (emacs.service) and raise its
-    // window. Worked out and measured on this machine, 2026-08-17 — none of
-    // this is guessed at:
+    // The mail UI is Kakoune (kak/autoload/tools/mail.kak); bin/mail-open
+    // raises its window (app-id "kak-mail") or starts one, and switches it to
+    // the box. The names in `boxes` are the box names kak-mail knows (BOXES in
+    // bin/kak-mail), so a box is opened by name and its query and threading
+    // stay defined in one place.
     //
-    //  * There is no CLI for "open saved search X". `notmuch-jump-search` is
-    //    the interactive `J`, and it reads a key from the user. So the form
-    //    does what notmuch-jump does: find the box in `notmuch-saved-searches`
-    //    by :name and dispatch on its :search-type, which is why this file
-    //    stores the search NAME and not the query — the query would have to be
-    //    kept in step with the elisp by hand, and the :search-type would be
-    //    lost (the Screener is unthreaded, alone among the boxes, and drawing
-    //    it as a tree buries fifteen read advisories on top of four unread
-    //    ones). Verified: the four boxes tried land in
-    //    *notmuch-saved-tree-Imbox*, *notmuch-saved-unthreaded-Screener*,
-    //    *notmuch-saved-search-Paper Trail* and *notmuch-saved-tree-Bubbled
-    //    Up* — the same buffers `J i`, `J s`, `J p` and `J b` produce, named by
-    //    notmuch itself from the saved search it matched.
-    //
-    //  * The daemon normally has NO graphical frame: its one frame is the
-    //    initial terminal, `display-graphic-p` nil. `(make-frame
-    //    '((window-system . pgtk)))` makes one that outlives the client.
-    //    `emacsclient --reuse-frame --no-wait --eval` also makes one, and then
-    //    the server deletes it the instant the client exits — the frame flashed
-    //    up and was gone before the eval's value reached the terminal.
-    //
-    //  * `select-frame-set-input-focus` does NOT raise the niri window.
-    //    Measured: focus was on a foot terminal, the form ran and reported the
-    //    Emacs frame selected, and focus was still on foot. That is the same
-    //    finding the Mod+N bind records in niri/config.kdl, and the reason it
-    //    reaches for the compositor as well. So the second half of the script
-    //    asks niri.
-    //
-    //  * bin/launch-or-focus is that bind's helper and its window lookup is the
-    //    line below (newest matching window wins), but the tool itself is not
-    //    used here: its other half launches `emacsclient --reuse-frame` when it
-    //    finds no window, and by that point the eval has already guaranteed a
-    //    frame — the launch would only leave a second, blocking emacsclient
-    //    behind. The app_id match is exact rather than launch-or-focus's
-    //    word-bounded regex because the pattern is not user input here: a pgtk
-    //    Emacs frame is app_id "emacs", verified in `niri msg -j windows`.
-    //
-    // What this does NOT beat, and cannot: focus-follows-mouse. Traced on the
-    // event stream — `Window focus changed: Some(37)` lands, the Emacs window is
-    // scrolled into view, and then focusing a column moved a DIFFERENT window
-    // under the still-stationary pointer, so niri handed focus straight back to
-    // it (`Window focus changed: Some(36)`). The window is raised and on screen
-    // either way; whether it keeps the keyboard depends on where the pointer was
-    // left, which is the same deal every focus-window action on this desktop
-    // gets. Warping the pointer from a bar widget would be a worse cure than the
-    // disease. Activating a row from the keyboard (Enter) has no such problem.
-    //
-    //  * The daemon is started through SYSTEMD, and emacsclient is explicitly
-    //    stopped from starting one. Two versions of this were wrong before it,
-    //    both found by stopping emacs.service and clicking a row:
-    //
-    //      1. `emacsclient --alternate-editor=` — which runs `emacs --daemon`
-    //         from PATH. PATH's `emacs` here is the emacs-pgtk rpm (30.2) while
-    //         emacs.service runs %h/.local/bin/emacs (the 31 build from
-    //         bin/rebuild-emacs), so a click forked a SECOND, older Emacs beside
-    //         the one this config targets — and without the login-shell
-    //         environment the unit's own comment explains it needs. Worse, it
-    //         was born in qshell.service's cgroup, where KillMode=control-group
-    //         SIGTERMs it on the next `qshell-relaunch`: a bar widget would have
-    //         become the owner of the user's editor, and restarting the shell
-    //         would have taken Emacs down with it.
-    //      2. Dropping the flag — which changed nothing, because
-    //         ALTERNATE_EDITOR="" is exported session-wide
-    //         (fish/conf.d/00-env.fish, and niri-session imports it into the
-    //         user manager's environment) precisely so that a bare emacsclient
-    //         auto-starts a daemon. Verified: emacs.service stayed inactive and
-    //         a rogue `emacs --daemon` appeared anyway.
-    //
-    //    Hence `env -u ALTERNATE_EDITOR`: the fallback has to be taken away
-    //    before systemd can be the only thing that owns the daemon. `systemctl
-    //    --user start` is unconditional and idempotent — 8 ms of D-Bus on an
-    //    already-running unit, measured — so there is no branch to get wrong,
-    //    and a unit that genuinely cannot start reports that on the panel's
-    //    error line instead of quietly forking an Emacs nobody asked for.
-    readonly property string raiseScript: ["systemctl --user start emacs.service >/dev/null 2>&1", 'env -u ALTERNATE_EDITOR emacsclient --eval "$1" >/dev/null || exit 1', "id=$(niri msg --json windows | jq -r '[.[] | select(.app_id == \"emacs\")] | sort_by(.id) | last | .id // empty')", '[ -n "$id" ] && exec niri msg action focus-window --id "$id"'].join("\n")
-
-    // One preamble, two bodies: "reuse the daemon's graphical frame or make
-    // one, then select it" is the same for every destination, and only the last
-    // form differs. `(require 'notmuch)` because the package is deferred behind
-    // `:commands` — on a daemon nobody has pressed C-c m in yet, notmuch is not
-    // loaded and `notmuch-unthreaded` is not defined.
-    function frameForm(body) {
-        return "(progn (require (quote notmuch)) (let ((f (or (seq-find (function display-graphic-p) (frame-list)) (make-frame (quote ((window-system . pgtk))))))) (select-frame-set-input-focus f) " + body + "))";
-    }
-
-    // The saved-search name is interpolated into an elisp string literal. It is
-    // never shell-quoted and does not need to be: the form is handed to bash as
-    // "$1" and to emacsclient as one argv entry, so elisp's own quoting is the
-    // only layer there is — and the names are the nine literals in `boxes`
-    // above, not anything a user can type.
-    function boxForm(searchName) {
-        return frameForm('(let* ((s (seq-find (lambda (e) (equal (plist-get e :name) "' + searchName + '")) notmuch-saved-searches)) (q (and s (plist-get s :query)))) (if (null s) (notmuch) (pcase (plist-get s :search-type) ((quote tree) (notmuch-tree q)) ((quote unthreaded) (notmuch-unthreaded q)) (_ (notmuch-search q)))))');
-    }
-
+    // The window is started through footclient, so it belongs to the foot
+    // server rather than to this Process: restarting the shell does not take
+    // the mail window down with it.
     function openBox(box) {
         if (!installed || !box)
             return;
-        _open(boxForm(String(box.search || "")));
+        _open([String(box.search || "")]);
     }
 
-    // The hello screen — every box plus the Bundles section, which is the one
-    // thing in mail.json that no row here can reach.
+    // The box list with every count.
     function openHome() {
         if (!installed)
             return;
-        _open(frameForm("(notmuch)"));
+        _open([]);
     }
 
-    // No progress message, deliberately. The panel closes the instant a row is
-    // activated — it has to, or the card would be left lying on top of the
-    // window it just raised — so anything written here would be drawn for one
-    // frame and then thrown away with the card. `lastError` is the exception and
-    // is NOT cleared on success: it survives to the next panel open, so a click
-    // that could not reach Emacs is answered the next time the panel is looked
-    // at rather than silently.
-    //
-    // The cost of closing straight away is that a click which has to bring the
-    // daemon up through systemd (about 9 seconds, measured) is nine silent
-    // seconds before the window appears. Accepted: emacs.service is
-    // session-tied and normally already running, so the ordinary click is a
-    // couple of hundred milliseconds, and a card that hangs around waiting is
-    // worse in the common case than a quiet one is in the rare case.
-    function _open(form) {
+    // The panel closes the instant a row is activated, so there is no progress
+    // line; `lastError` survives to the next panel open instead.
+    function _open(args) {
         if (openProcess.running)
             return;
         lastError = "";
         _openError = "";
-        openProcess.command = cmd(["bash", "-c", root.raiseScript, "hey-mail-open", form]);
+        openProcess.command = cmd(["mail-open"].concat(args));
         openProcess.running = true;
     }
 
@@ -423,7 +321,7 @@ QtObject {
         onExited: exitCode => {
             if (exitCode !== 0) {
                 root.actionStatus = "";
-                root.lastError = root.elideStatus(String(openStderr.text || root._openError || "") || "could not reach Emacs (exit " + exitCode + ")");
+                root.lastError = root.elideStatus(String(openStderr.text || root._openError || "") || "could not open mail (exit " + exitCode + ")");
             }
         }
     }
