@@ -172,8 +172,12 @@ supervise() {
   shift
   state_write "$file"
 
+  # libx264 otherwise keeps the capture's full-chroma input and writes High
+  # 4:4:4, which browsers, QuickTime, phones and chat apps refuse to play —
+  # every recording on the Macs (no VAAPI encoder) came out that way.
   local status=0 encoder_args=(-c "$codec" -p "b=$bitrate")
   [[ $codec == *_vaapi ]] && encoder_args+=(-d /dev/dri/renderD128)
+  [[ $codec == libx264 ]] && encoder_args+=(-x yuv420p)
   wf-recorder -y -f "$file" "${encoder_args[@]}" -r "$framerate" "$@" \
     >>"$log_file" 2>&1 || status=$?
 
@@ -182,7 +186,7 @@ supervise() {
   # One retry on the encoder that exists everywhere, then give up honestly.
   if ((status != 0)) && [[ ! -s $file ]] && [[ $codec != libx264 ]]; then
     status=0
-    wf-recorder -y -f "$file" -c libx264 -p "b=$bitrate" -r "$framerate" "$@" \
+    wf-recorder -y -f "$file" -c libx264 -x yuv420p -p "b=$bitrate" -r "$framerate" "$@" \
       >>"$log_file" 2>&1 || status=$?
   fi
 
