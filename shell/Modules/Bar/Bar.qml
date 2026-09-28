@@ -747,6 +747,8 @@ Scope {
 
     function timezonesService() {
         return sharedService("timezones", timezonesServiceComponent, {
+            shellRoot: barRoot.shell,
+            weatherService: Qt.binding(() => barRoot.widgetConfigured("weather") ? barRoot.weatherService() : null),
             settings: Qt.binding(() => barRoot.inlineEntryFor("timezones"))
         });
     }

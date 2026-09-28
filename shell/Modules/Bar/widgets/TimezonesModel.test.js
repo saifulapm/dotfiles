@@ -271,5 +271,63 @@ test("no zones is a sentence, not a crash", () => {
     assert.equal(Model.tooltipText([], null, NOON_UTC), "World clock — no zones configured");
 });
 
+// ------------------------------------------------------------ 12-hour clock
+
+test("12-hour time drops the zero and adds the meridiem", () => {
+    assert.equal(Model.clockText(newYork, NOON_UTC, false), "8:00 AM");
+    assert.equal(Model.clockText(dhaka, NOON_UTC, false), "6:00 PM");
+    assert.equal(Model.clockText(dhaka, Date.UTC(2026, 7, 21, 18, 5, 0), false), "12:05 AM");
+    assert.equal(Model.clockText(dhaka, NOON_UTC, true), "18:00");
+});
+
+test("grid cells read 1-12 on the 12-hour clock", () => {
+    assert.deepEqual([0, 9, 12, 23].map(h => Model.hourText(h, false)), ["12", "9", "12", "11"]);
+    assert.deepEqual([0, 9, 23].map(h => Model.hourText(h, true)), ["00", "09", "23"]);
+});
+
+// ------------------------------------------------------------------ weather
+
+const TAB = [
+    "# comment\tline\tAsia/Dhaka",
+    "BD\t+2343+09025\tAsia/Dhaka",
+    "GB,GG,IM,JE\t+513030-0000731\tEurope/London",
+    "US\t+404251-0740023\tAmerica/New_York\tEastern (most areas)"
+].join("\n");
+
+test("zone1970.tab coordinates decode both ISO 6709 precisions", () => {
+    assert.deepEqual(Model.zoneTabCoords(TAB, "Asia/Dhaka"), { lat: 23.7167, lon: 90.4167 });
+    assert.deepEqual(Model.zoneTabCoords(TAB, "Europe/London"), { lat: 51.5083, lon: -0.1253 });
+    assert.deepEqual(Model.zoneTabCoords(TAB, "America/New_York"), { lat: 40.7142, lon: -74.0064 });
+    assert.equal(Model.zoneTabCoords(TAB, "UTC"), null);
+});
+
+test("every city goes in one request", () => {
+    const url = Model.forecastUrl([{ lat: 23.7, lon: 90.4 }, { lat: 51.5, lon: -0.1 }]);
+    assert.ok(url.includes("&latitude=23.7,51.5&longitude=90.4,-0.1"));
+});
+
+test("forecasts parse from an array or a single object, in key order", () => {
+    const one = { current: { temperature_2m: 14.8, weather_code: 3, is_day: 0 } };
+    const two = { current: { temperature_2m: 35, weather_code: 0, is_day: 1 } };
+    assert.deepEqual(Model.parseForecast(JSON.stringify([two, one]), ["a", "b"], 5), {
+        a: { c: 35, code: 0, day: true, at: 5 },
+        b: { c: 14.8, code: 3, day: false, at: 5 }
+    });
+    assert.deepEqual(Object.keys(Model.parseForecast(JSON.stringify(one), ["x"], 5)), ["x"]);
+    assert.deepEqual(Model.parseForecast("offline", ["x"], 5), {});
+});
+
+test("weather is fresh for twenty minutes", () => {
+    assert.equal(Model.weatherStale(undefined, 0), true);
+    assert.equal(Model.weatherStale({ at: 0 }, Model.WEATHER_TTL_MS - 1), false);
+    assert.equal(Model.weatherStale({ at: 0 }, Model.WEATHER_TTL_MS), true);
+});
+
+test("temperatures round in either unit, and nothing is nothing", () => {
+    assert.equal(Model.tempText(14.8, false), "15°C");
+    assert.equal(Model.tempText(14.8, true), "59°F");
+    assert.equal(Model.tempText(undefined, true), "");
+});
+
 console.log(failures === 0 ? "\nall passed" : `\n${failures} failed`);
 process.exit(failures === 0 ? 0 : 1);

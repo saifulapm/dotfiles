@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "TimezonesModel.js" as Model
+import "WeatherModel.js" as WeatherModel
 
 // Timezones service — the world clock's zone list and their current offsets.
 // ONE instance however many screens carry the widget (S2); created at the bar
@@ -26,6 +27,49 @@ QtObject {
     // The widget's inline shell.json entry, e.g.
     //   {"id": "timezones", "zones": ["Europe/London", "America/New_York"]}
     property var settings: ({})
+    // Injected by the bar root: the shell (for updateEntryInline), and the
+    // weather service when that widget is configured, whose unit choice the
+    // weather column follows until units are flipped here.
+    property var shellRoot: null
+    property var weatherService: null
+
+    // Panel display choices, persisted in the same inline entry as the zones
+    // (Elsewhen's hour24/units keys). 24-hour stays the default: it is what
+    // the panel always showed.
+    readonly property bool hour24: !settings || settings.hour24 !== false
+    readonly property bool imperial: {
+        const units = String(settings && settings.units || "").toUpperCase();
+        if (units === "F" || units === "C")
+            return units === "F";
+        return weatherService ? weatherService.useImperial : WeatherModel.localeUsesImperial(Qt.locale().name);
+    }
+
+    function toggleHour24() {
+        persistSettings({
+            hour24: !hour24
+        });
+    }
+
+    function toggleUnits() {
+        persistSettings({
+            units: imperial ? "C" : "F"
+        });
+    }
+
+    // WeatherService.persistSettings, for this entry.
+    function persistSettings(values) {
+        const entry = {
+            id: "timezones"
+        };
+        for (const key in settings) {
+            if (key !== "id")
+                entry[key] = settings[key];
+        }
+        for (const key in values)
+            entry[key] = values[key];
+        if (shellRoot && typeof shellRoot.updateEntryInline === "function")
+            shellRoot.updateEntryInline("timezones", entry);
+    }
 
     property bool probed: false
     // At least one configured zone resolved. A widget configured with no
@@ -113,6 +157,54 @@ QtObject {
         transitionTimer.interval = Math.min(deltaMs + 1000, maxInterval);
         transitionTimer.reArm = deltaMs > maxInterval;
         transitionTimer.start();
+    }
+
+    // ------------------------------------------------------------ weather
+    // Current conditions per city, for the panel's weather column. Fetched
+    // only when the panel opens (no cadence of its own), for the cities whose
+    // reading is older than Model.WEATHER_TTL_MS, all in one request. Kept
+    // here rather than in the panel so the cache outlives panel eviction.
+    // A failed fetch changes nothing: rows without a reading show no weather.
+    property var weather: ({}) // zone -> { c, code, day, at }
+
+    function refreshWeather() {
+        if (weatherProc.running)
+            return;
+        // zone1970.tab is read on the first open, not at shell start.
+        if (zoneTab.path === "") {
+            zoneTab.path = "/usr/share/zoneinfo/zone1970.tab";
+            return; // onLoaded comes back here
+        }
+        const tab = zoneTab.text();
+        const now = Date.now();
+        const keys = [];
+        const points = [];
+        for (const zone of zones) {
+            const at = Model.zoneTabCoords(tab, zone.zone);
+            if (at && Model.weatherStale(weather[zone.zone], now)) {
+                keys.push(zone.zone);
+                points.push(at);
+            }
+        }
+        if (keys.length === 0)
+            return;
+        weatherProc.keys = keys;
+        weatherProc.command = ["curl", "-fsS", "--max-time", "8", Model.forecastUrl(points)];
+        weatherProc.running = true;
+    }
+
+    readonly property FileView zoneTab: FileView {
+        path: ""
+        printErrors: false
+        onLoaded: root.refreshWeather()
+    }
+
+    readonly property Process weatherProc: Process {
+        property var keys: []
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: root.weather = Object.assign({}, root.weather, Model.parseForecast(text, root.weatherProc.keys, Date.now()))
+        }
     }
 
     function elideStatus(text) {

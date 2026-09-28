@@ -84,9 +84,20 @@ function padTwo(value) {
     return (value < 10 ? "0" : "") + value;
 }
 
-function clockText(zone, nowMs) {
+// 24-hour unless hour24 is exactly false, so every existing caller keeps the
+// "08:05" it always had. 12-hour reads "8:05 AM", as the bar clock does.
+function clockText(zone, nowMs, hour24) {
     var wall = wallClock(zone, nowMs);
-    return padTwo(wall.getUTCHours()) + ":" + padTwo(wall.getUTCMinutes());
+    var hour = wall.getUTCHours();
+    if (hour24 !== false)
+        return padTwo(hour) + ":" + padTwo(wall.getUTCMinutes());
+    return (hour % 12 || 12) + ":" + padTwo(wall.getUTCMinutes()) + (hour < 12 ? " AM" : " PM");
+}
+
+// A grid cell's number: "08" on the 24-hour clock, "8" on the 12-hour one,
+// where the cell is too narrow for a meridiem and the shading says day or night.
+function hourText(hour, hour24) {
+    return hour24 === false ? String(hour % 12 || 12) : padTwo(hour);
 }
 
 function hourOf(zone, nowMs) {
@@ -250,6 +261,86 @@ function tooltipText(zones, home, nowMs) {
     return lines.join("\n");
 }
 
+// ---------------------------------------------------------------- weather
+// Per-city current conditions for the panel's weather column, after
+// omarchy's Elsewhen (its Model.js weather block): coordinates from
+// zone1970.tab, one batched Open-Meteo request, a 20-minute freshness window.
+
+var WEATHER_TTL_MS = 20 * 60 * 1000;
+
+// The zone's representative city from zone1970.tab (ISO 6709) — Elsewhen's
+// offline fallback, and here the whole lookup: a row's label IS that city
+// ("Asia/Dhaka" -> Dhaka), so a geocoder could only agree with it or be wrong.
+// Zones with no city (UTC) have no line, and get no weather.
+function zoneTabCoords(tabText, zone) {
+    var lines = String(tabText || "").split("\n");
+    for (var i = 0; i < lines.length; i++) {
+        var parts = lines[i].split("\t");
+        if (lines[i].charAt(0) === "#" || parts.length < 3 || parts[2] !== zone)
+            continue;
+        var m = /^([+-])(\d{2})(\d{2})(\d{2})?([+-])(\d{3})(\d{2})(\d{2})?$/.exec(parts[1]);
+        if (!m)
+            return null;
+        return {
+            lat: Math.round(isoDegrees(m[1], m[2], m[3], m[4]) * 1e4) / 1e4,
+            lon: Math.round(isoDegrees(m[5], m[6], m[7], m[8]) * 1e4) / 1e4
+        };
+    }
+    return null;
+}
+
+function isoDegrees(sign, d, mm, ss) {
+    return (sign === "-" ? -1 : 1) * (Number(d) + Number(mm) / 60 + Number(ss || 0) / 3600);
+}
+
+// Every point in ONE request: Open-Meteo takes comma-separated coordinate
+// lists and answers with an array in request order.
+function forecastUrl(points) {
+    return "https://api.open-meteo.com/v1/forecast?current=temperature_2m,weather_code,is_day&temperature_unit=celsius" + "&latitude=" + points.map(function (p) {
+        return p.lat;
+    }).join(",") + "&longitude=" + points.map(function (p) {
+        return p.lon;
+    }).join(",");
+}
+
+// { key: { c, code, day, at } }. One point comes back as an object, several
+// as an array; anything unparseable is simply no weather.
+function parseForecast(text, keys, nowMs) {
+    var payload;
+    try {
+        payload = JSON.parse(text);
+    } catch (e) {
+        return {};
+    }
+    if (!Array.isArray(payload))
+        payload = [payload];
+    var out = {};
+    for (var i = 0; i < keys.length && i < payload.length; i++) {
+        var current = (payload[i] && payload[i].current) || {};
+        if (current.temperature_2m === undefined || current.temperature_2m === null)
+            continue;
+        out[keys[i]] = {
+            c: current.temperature_2m,
+            code: current.weather_code,
+            day: current.is_day !== 0,
+            at: nowMs
+        };
+    }
+    return out;
+}
+
+function weatherStale(entry, nowMs) {
+    return !entry || nowMs - entry.at >= WEATHER_TTL_MS;
+}
+
+function tempText(celsius, imperial) {
+    if (celsius === undefined || celsius === null || !isFinite(Number(celsius)))
+        return "";
+    if (imperial)
+        return Math.round(Number(celsius) * 9 / 5 + 32) + "°F";
+    return Math.round(Number(celsius)) + "°C";
+}
+
 if (typeof module !== "undefined") {
     module.exports = {
         BUSINESS_END: BUSINESS_END,
@@ -258,23 +349,30 @@ if (typeof module !== "undefined") {
         GRID_AFTER: GRID_AFTER,
         GRID_BEFORE: GRID_BEFORE,
         GRID_COLUMNS: GRID_COLUMNS,
+        WEATHER_TTL_MS: WEATHER_TTL_MS,
         HOUR_MS: HOUR_MS,
         PEAK_WINDOWS: PEAK_WINDOWS,
         clockText: clockText,
         dayDelta: dayDelta,
         dayDeltaText: dayDeltaText,
         earliestTransition: earliestTransition,
+        forecastUrl: forecastUrl,
         grid: grid,
         gridInstants: gridInstants,
         gridRow: gridRow,
         homeZone: homeZone,
         hourOf: hourOf,
+        hourText: hourText,
         isBusinessHour: isBusinessHour,
         isPeakInstant: isPeakInstant,
         labelFor: labelFor,
+        parseForecast: parseForecast,
         parseRows: parseRows,
         relativeText: relativeText,
+        tempText: tempText,
         tooltipText: tooltipText,
-        wallClock: wallClock
+        wallClock: wallClock,
+        weatherStale: weatherStale,
+        zoneTabCoords: zoneTabCoords
     };
 }
