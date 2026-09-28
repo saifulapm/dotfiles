@@ -56,14 +56,17 @@ BarIndicator {
         outputFile = String(data.file || "");
     }
 
-    // Upstream's click rule exactly: stop while recording, otherwise hand
-    // over to the recording commands — theirs opens a menu submenu, ours
-    // opens the launcher pre-filtered to the Record script commands.
-    onTapped: {
+    // Any click stops a recording. Idle, a left click starts a region recording
+    // straight away (user's call, 2026-09-28 — the launcher detour read as
+    // broken); right click keeps the launcher pre-filtered to the Record
+    // script commands for the full-screen and audio variants.
+    onTapped: function (button) {
         if (rootItem.recording)
             Quickshell.execDetached([rootItem.binPath, "stop"]);
-        else
+        else if (button === Qt.RightButton)
             Quickshell.execDetached(["vicinae", "open", "-q", "Record"]);
+        else
+            Quickshell.execDetached([rootItem.binPath, "--region"]);
     }
 
     Component.onCompleted: refresh()

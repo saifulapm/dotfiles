@@ -78,13 +78,17 @@ glyph="󰻂" # md-record_circle, the indicator's glyph
 output_dir="${QSHELL_SCREENRECORD_DIR:-${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts}"
 
 codec="${QSHELL_SCREENRECORD_CODEC:-}"
-if [[ -z $codec ]]; then
-  if compgen -G '/usr/lib64/dri*/*_drv_video.so' >/dev/null && [[ -e /dev/dri/renderD128 ]]; then
-    codec=h264_vaapi
-  else
-    codec=libx264
-  fi
-fi
+# The gate is a one-frame VAAPI ENCODE, not a driver file: the Macs gained
+# asahi_drv_video.so for hardware decode (run_after_54), which has no encode
+# entrypoint, and wf-recorder SIGABRTs on it — a crash toast on every
+# recording before the fallback. ffmpeg fails the same probe cleanly (~0.16 s).
+# Probed in the supervisor only, so `status` (the bar's read) never pays it.
+vaapi_encodes() {
+  [[ -e /dev/dri/renderD128 ]] && command -v ffmpeg >/dev/null 2>&1 &&
+    ffmpeg -hide_banner -loglevel quiet -init_hw_device vaapi=va:/dev/dri/renderD128 \
+      -f lavfi -i nullsrc=s=64x64 -frames:v 1 -vf format=nv12,hwupload \
+      -c:v h264_vaapi -f null - </dev/null
+}
 bitrate="${QSHELL_SCREENRECORD_BITRATE:-8000000}"
 framerate="${QSHELL_SCREENRECORD_FRAMERATE:-30}"
 
@@ -171,6 +175,10 @@ supervise() {
   local file="$1"
   shift
   state_write "$file"
+
+  if [[ -z $codec ]]; then
+    if vaapi_encodes; then codec=h264_vaapi; else codec=libx264; fi
+  fi
 
   # libx264 otherwise keeps the capture's full-chroma input and writes High
   # 4:4:4, which browsers, QuickTime, phones and chat apps refuse to play —
