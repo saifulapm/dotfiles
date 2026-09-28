@@ -67,6 +67,12 @@ ShellRoot {
     property Media media: Media {
         osd: osdLoader.item
     }
+    // The internal panel's brightness keys, stepped in process (the
+    // `brightness` IPC target); external outputs still go to the script.
+    property BrightnessKeys brightnessKeys: BrightnessKeys {
+        niri: shell.niri
+        osd: osdLoader.item
+    }
     // Cross-machine snapshot sync. Inert until shell.json's root `sync` block
     // points it at a shared directory, so it costs one /etc/hostname read
     // until then.

@@ -942,8 +942,12 @@ binds {
     // Mac mini's HDMI monitor gains working brightness keys. The script
     // raises the OSD itself (incl. the Shift/Alt variants that used to skip
     // it); the old `osd brightnessUp/Down` IPC stays as a compat path.
-    XF86MonBrightnessUp allow-when-locked=true { spawn "brightness-display" "+5%"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "brightness-display" "5%-"; }
+    // The plain up/down keys step an internal panel inside the shell
+    // (Services/BrightnessKeys.qml, omarchy d3fb0284: ~100 ms → a few ms per
+    // press); an external output is handed back to the script by the shell,
+    // and the `||` covers a shell that is not running at all.
+    XF86MonBrightnessUp allow-when-locked=true { spawn-sh "qs-call brightness raise || brightness-display +5%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "qs-call brightness lower || brightness-display 5%-"; }
     // omarchy's brightness extremes and precise ±1% steps.
     Shift+XF86MonBrightnessUp   allow-when-locked=true { spawn "brightness-display" "100%"; }
     Shift+XF86MonBrightnessDown allow-when-locked=true { spawn "brightness-display" "1%"; }
