@@ -52,8 +52,7 @@ use_ddc_display() {
 show_osd() {
   ((no_osd)) && return 0
   command -v qs >/dev/null 2>&1 || return 0
-  # `show` collides with a qs CLI subcommand — the `--` is load-bearing.
-  qs ipc call osd -- show "{\"icon\":\"brightness\",\"value\":$1,\"progressText\":\"$1%\"}" >/dev/null 2>&1 || true
+  qs-call osd show "{\"icon\":\"brightness\",\"value\":$1,\"progressText\":\"$1%\"}" >/dev/null 2>&1 || true
 }
 
 if (($# == 0)); then

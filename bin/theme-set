@@ -86,7 +86,7 @@ if [[ $prev_theme != "$1" ]] && bg_file="$(theme_bg_file "$1")" && [[ -f $bg_fil
 fi
 [[ -n $next_bg ]] || next_bg="$("$root/bin/background-next" --peek || true)"
 
-if ! timeout 2 qs ipc call background themeTransition "$old_bg" "$next_bg" "$(base64 -w 0 "$src")" >/dev/null 2>&1; then
+if ! timeout 2 qs-call background themeTransition "$old_bg" "$next_bg" "$(base64 -w 0 "$src")" >/dev/null 2>&1; then
   # Degradation path — shell dead, absent, or predating the IPC surface. The
   # palette will land through the theme.toml file watch (or the next shell
   # start), the wallpaper through the state file, in no particular order; the
@@ -106,7 +106,7 @@ mv "$state.tmp" "$state"
 # failure mode is silent: the shell keeps the old palette until it restarts,
 # with nothing in the log to say why. Best-effort and after the move, so a dead
 # or absent shell costs a timeout and the watch still covers a hand edit.
-timeout 2 qs ipc call theme reload >/dev/null 2>&1 || true
+timeout 2 qs-call theme reload >/dev/null 2>&1 || true
 
 # No candidates just means no wallpaper change. Never abort here: the shell
 # has already accepted the transition, and the app fan-out below must still

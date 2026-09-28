@@ -781,11 +781,11 @@ binds {
     // Omarchy's SUPER+ALT+SPACE apps-menu bind (b92510f). Our menu has no
     // app rows — its Apps row hands off to the launcher, as Mod+D does — so
     // this summons the launcher directly.
-    Mod+Shift+T hotkey-overlay-title="Switch Theme" { spawn "qs" "ipc" "call" "theme" "toggle"; }
+    Mod+Shift+T hotkey-overlay-title="Switch Theme" { spawn "qs-call" "theme" "toggle"; }
     // Omarchy's own emoji bind (SUPER+CTRL+E). Their commented-out
     // SUPER+PERIOD alternative is unavailable here: Mod+Period is niri's
     // expel-window-from-column.
-    Mod+Ctrl+E hotkey-overlay-title="Pick an Emoji" { spawn "qs" "ipc" "call" "emojis" "toggle"; }
+    Mod+Ctrl+E hotkey-overlay-title="Pick an Emoji" { spawn "qs-call" "emojis" "toggle"; }
     // Omarchy's own clipboard bind (SUPER+CTRL+V), which is also the only key
     // left: Mod+V is toggle-window-floating and Mod+Shift+V is
     // switch-focus-between-floating-and-tiling, both niri defaults we keep.
@@ -793,10 +793,10 @@ binds {
     // The Notes quick-capture panel (Modules/Notes, our Copper): same panel
     // the right-edge hover summons; the key is a toggle. Ctrl+grave was
     // free — Mod+grave is niri's within-app window switcher above.
-    Ctrl+grave hotkey-overlay-title="Notes" { spawn "qs" "ipc" "call" "notes" "toggle"; }
+    Ctrl+grave hotkey-overlay-title="Notes" { spawn "qs-call" "notes" "toggle"; }
     // Omarchy has no keybind for their background switcher at all (menu only);
     // Mod+Ctrl+B was the free key next to the other picker binds.
-    Mod+Ctrl+B hotkey-overlay-title="Pick a Wallpaper" { spawn "qs" "ipc" "call" "wallpaper" "toggle"; }
+    Mod+Ctrl+B hotkey-overlay-title="Pick a Wallpaper" { spawn "qs-call" "wallpaper" "toggle"; }
     // Omarchy: SUPER+CTRL+B summons their bluetooth panel — that chord is the
     // wallpaper picker above (established first, kept), so bluetooth takes
     // the Shift variant. Same toggle semantics as theirs, on the ported
@@ -804,9 +804,9 @@ binds {
     // The rest of omarchy's SUPER+CTRL panel chords, same letters, on the
     // bar's summon-widget IPC (focused-output-first, like their
     // summonBarWidget).
-    Mod+Ctrl+A hotkey-overlay-title="Audio Panel" { spawn "qs" "ipc" "call" "bar" "open" "audio"; }
-    Mod+Ctrl+W hotkey-overlay-title="Network Panel" { spawn "qs" "ipc" "call" "bar" "open" "network"; }
-    Mod+Ctrl+P hotkey-overlay-title="Power Panel" { spawn "qs" "ipc" "call" "bar" "open" "battery"; }
+    Mod+Ctrl+A hotkey-overlay-title="Audio Panel" { spawn "qs-call" "bar" "open" "audio"; }
+    Mod+Ctrl+W hotkey-overlay-title="Network Panel" { spawn "qs-call" "bar" "open" "network"; }
+    Mod+Ctrl+P hotkey-overlay-title="Power Panel" { spawn "qs-call" "bar" "open" "battery"; }
     // omarchy: SUPER+SHIFT+CTRL+A agent — the bar's AI panel.
     // The widgets ported from the omarchy plugin marketplace (2026-08-21) are
     // reachable by position through Mod+Ctrl+<n> below; the letters above
@@ -852,15 +852,15 @@ binds {
     // omarchy: SUPER+BACKSPACE toggles the focused window's transparency
     // (against the 0.985/0.96 opacity rules below).
     Mod+BackSpace hotkey-overlay-title="Toggle Window Opacity" { toggle-window-rule-opacity; }
-    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "ipc" "call" "lock" "lock"; }
+    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs-call" "lock" "lock"; }
     // Omarchy's notification binds all hang off comma (dismiss last on
     // SUPER+comma, history on SUPER+SHIFT+ALT+comma). Mod+Comma is niri's
     // consume-window-into-column, a default we keep, so dismiss-last takes
     // the Alt variant — which is their invokeLast chord, left unbound here
     // because clicking a toast already invokes its default action.
-    Mod+Alt+Comma hotkey-overlay-title="Dismiss Last Notification" { spawn "qs" "ipc" "call" "notifs" "dismissOne"; }
-    Mod+Shift+Comma hotkey-overlay-title="Dismiss All Notifications" { spawn "qs" "ipc" "call" "notifs" "dismissAll"; }
-    Mod+Ctrl+Comma hotkey-overlay-title="Toggle Do Not Disturb" { spawn "qs" "ipc" "call" "notifs" "toggleDnd"; }
+    Mod+Alt+Comma hotkey-overlay-title="Dismiss Last Notification" { spawn "qs-call" "notifs" "dismissOne"; }
+    Mod+Shift+Comma hotkey-overlay-title="Dismiss All Notifications" { spawn "qs-call" "notifs" "dismissAll"; }
+    Mod+Ctrl+Comma hotkey-overlay-title="Toggle Do Not Disturb" { spawn "qs-call" "notifs" "toggleDnd"; }
     // Ours: the review panel over the same history the replay bind pops as
     // toasts — the last free chord in the comma family.
 
@@ -871,7 +871,7 @@ binds {
     // Omarchy: SUPER+ESCAPE — taken by niri's toggle-keyboard-shortcuts-inhibit;
     // the power key opens the system menu instead, which is also their bind.
     XF86PowerOff hotkey-overlay-title="Power" { spawn "vicinae" "open" "-q" "shut"; }
-    Mod+Shift+Space hotkey-overlay-title="Toggle the Bar" { spawn "qs" "ipc" "call" "bar" "toggle"; }
+    Mod+Shift+Space hotkey-overlay-title="Toggle the Bar" { spawn "qs-call" "bar" "toggle"; }
     // Omarchy: SUPER+CTRL+I — taken by niri's move-column-to-workspace-up.
     // Reminders moved to the launcher (Set/Show/Clear Reminders script
     // commands) when the 3-modifier binds left (2026-08-26).
@@ -923,18 +923,18 @@ binds {
     Alt+XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.01-"; }
 
     // Media keys route through the shell's MPRIS service (no playerctl).
-    XF86AudioPlay        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "playPause"; }
+    XF86AudioPlay        allow-when-locked=true { spawn "qs-call" "media" "playPause"; }
     // Omarchy's Alt variants of the play key step tracks.
-    Alt+XF86AudioPlay       allow-when-locked=true { spawn "qs" "ipc" "call" "media" "next"; }
-    Alt+Shift+XF86AudioPlay allow-when-locked=true { spawn "qs" "ipc" "call" "media" "previous"; }
-    XF86AudioStop        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "stop"; }
-    XF86AudioPrev        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "previous"; }
-    XF86AudioNext        allow-when-locked=true { spawn "qs" "ipc" "call" "media" "next"; }
+    Alt+XF86AudioPlay       allow-when-locked=true { spawn "qs-call" "media" "next"; }
+    Alt+Shift+XF86AudioPlay allow-when-locked=true { spawn "qs-call" "media" "previous"; }
+    XF86AudioStop        allow-when-locked=true { spawn "qs-call" "media" "stop"; }
+    XF86AudioPrev        allow-when-locked=true { spawn "qs-call" "media" "previous"; }
+    XF86AudioNext        allow-when-locked=true { spawn "qs-call" "media" "next"; }
     // The dedicated pause key (omarchy binds it alongside play)…
-    XF86AudioPause       allow-when-locked=true { spawn "qs" "ipc" "call" "media" "playPause"; }
+    XF86AudioPause       allow-when-locked=true { spawn "qs-call" "media" "playPause"; }
     // …and their Shift variants rotate which player the media keys control.
-    Shift+XF86AudioPause allow-when-locked=true { spawn "qs" "ipc" "call" "media" "sourceSwitch"; }
-    Shift+XF86AudioPlay  allow-when-locked=true { spawn "qs" "ipc" "call" "media" "sourceSwitch"; }
+    Shift+XF86AudioPause allow-when-locked=true { spawn "qs-call" "media" "sourceSwitch"; }
+    Shift+XF86AudioPlay  allow-when-locked=true { spawn "qs-call" "media" "sourceSwitch"; }
 
     // All brightness keys route through bin/brightness-display (omarchy gap
     // item 1, their omarchy-brightness-display port): internal panels ride
@@ -1255,7 +1255,7 @@ binds {
 // the machine looking awake while it isn't. The logind half (lid/suspend
 // keys ignored, sleep targets masked) is run_after_18-no-suspend.sh.
 switch-events {
-    lid-close { spawn "sh" "-c" "qs ipc call lock lock; niri msg action power-off-monitors; brightness-keyboard off"; }
+    lid-close { spawn "sh" "-c" "qs-call lock lock; niri msg action power-off-monitors; brightness-keyboard off"; }
     lid-open { spawn "sh" "-c" "niri msg action power-on-monitors; brightness-keyboard restore"; }
 }
 

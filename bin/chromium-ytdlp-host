@@ -4,8 +4,8 @@
 # Port of omarchy-chromium-ytdlp-host: the extension sends
 # {url}; a detached worker runs yt-dlp into ~/Videos while the shell's OSD
 # draws one in-place progress bar (their omarchy-osd calls become our
-# `qs ipc call osd -- show` — the `--` dodges the qs CLI's own `show`
-# subcommand), and the finishing toast opens the file in mpv when clicked.
+# `qs-call osd show`, over the shell's own socket), and the finishing
+# toast opens the file in mpv when clicked.
 # Keeps omarchy's com.omarchy.ytdlp name — the extension calls it by string.
 #
 # SECOND CALLER since 2026-09-06: bin/youtube runs the `--download` half
@@ -28,11 +28,11 @@ valid_url() {
 }
 
 osd_progress() {
-  qs ipc call osd -- show "{\"icon\":\"󰇚\",\"value\":$1,\"progressText\":\"$1%\",\"duration\":8000}" >/dev/null 2>&1 || true
+  qs-call osd show "{\"icon\":\"󰇚\",\"value\":$1,\"progressText\":\"$1%\",\"duration\":8000}" >/dev/null 2>&1 || true
 }
 
 osd_close() {
-  qs ipc call osd close >/dev/null 2>&1 || true
+  qs-call osd close >/dev/null 2>&1 || true
 }
 
 # The click action rides along as a JSON argv (Notifs.runExecAction runs it as
@@ -131,7 +131,7 @@ download_url() {
       intpct=${pct%%.*}
       intpct=${intpct//[^0-9]/}
       [[ -n $intpct && $intpct != "$last" ]] || continue
-      # ~4 redraws/sec — every update spawns a qs ipc client.
+      # ~4 redraws/sec — every update spawns a qs-call client.
       er=$EPOCHREALTIME
       nowms=$((${er%[.,]*} * 1000 + 10#${er##*[.,]} / 1000))
       ((nowms - lastms >= 250)) || continue

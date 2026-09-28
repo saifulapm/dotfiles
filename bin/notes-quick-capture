@@ -12,7 +12,7 @@
 set -uo pipefail
 
 # Never act under the session lock — the panel would open beneath it.
-[ "$(qs ipc call lock isLocked 2>/dev/null)" = "true" ] && exit 0
+[ "$(qs-call lock isLocked 2>/dev/null)" = "true" ] && exit 0
 
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell/notes"
 hash_file="$state_dir/last-capture.sha1"
@@ -34,7 +34,7 @@ if [ -n "${sel//[$'\t\r\n ']/}" ]; then
         # permanently classify this selection as captured while no note
         # exists (review 2026-08-13). Bash substring, not cut -c: character
         # slicing must not split multibyte UTF-8 mid-sequence.
-        if qs ipc call notes add "$sel" >/dev/null 2>&1; then
+        if qs-call notes add "$sel" >/dev/null 2>&1; then
             printf %s "$hash" >"$hash_file"
             preview="$(printf %s "$sel" | tr '\n\t' '  ')"
             notify-send -a qshell -t 2000 -- "Noted" "${preview:0:60}"
@@ -45,4 +45,4 @@ fi
 
 # Toggle, not show: with nothing new to capture the key behaves exactly
 # like Ctrl+grave — shift-shift again puts the panel away.
-exec qs ipc call notes toggle >/dev/null
+exec qs-call notes toggle >/dev/null

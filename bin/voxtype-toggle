@@ -55,7 +55,7 @@ fi
 # stoppable, and stopping is the safe direction in every case. Same check
 # bin/notes-quick-capture makes, for the same reason.
 if [[ "$(cat "$state" 2>/dev/null)" != "recording" ]] &&
-  [[ "$(qs ipc call lock isLocked 2>/dev/null)" == "true" ]]; then
+  [[ "$(qs-call lock isLocked 2>/dev/null)" == "true" ]]; then
   exit 0
 fi
 

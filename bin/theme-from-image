@@ -418,7 +418,7 @@ try {
         # this call (Background.qml setPendingTheme), so the theme.toml
         # publish below is silent — the palette applies on the reveal's
         # first frame instead of from the file-watch.
-        if ! timeout 2 qs ipc call background themeTransition \\
+        if ! timeout 2 qs-call background themeTransition \\
             "$old_bg" \\
             "$TOML_WALLPAPER" \\
             "$TOML_B64" >/dev/null 2>&1; then

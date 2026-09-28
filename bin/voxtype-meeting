@@ -45,7 +45,7 @@ current="$(status)"
 # recording nobody asked for is worse than a stray dictation. Stopping and
 # pausing stay available — a lock landing mid-meeting is ordinary.
 if [[ $current != recording && $current != paused ]] &&
-  [[ "$(qs ipc call lock isLocked 2>/dev/null)" == "true" ]]; then
+  [[ "$(qs-call lock isLocked 2>/dev/null)" == "true" ]]; then
   exit 0
 fi
 

@@ -236,7 +236,7 @@ fire_reminder() { # id message
 open_interactive() {
   # `qs ipc call <target> show` is swallowed by quickshell's CLI (it prints the
   # target listing instead of calling), so the summon route is toggle.
-  qs ipc call reminders toggle >/dev/null 2>&1 ||
+  qs-call reminders toggle >/dev/null 2>&1 ||
     echo "reminder: the shell is not running" >&2
 }
 
