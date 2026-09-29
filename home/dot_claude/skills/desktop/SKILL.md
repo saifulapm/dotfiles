@@ -18,6 +18,14 @@ session:
 niri msg -j outputs | jq -r '.[] | "\(.name) \(.logical.width)x\(.logical.height) @\(.logical.scale)"'
 ```
 
+**Over SSH** (`$SSH_CONNECTION` set) you drive the machine you are logged
+into, not the one the user sits at — fish's `conf.d/05-ssh-desktop.fish`
+imports `WAYLAND_DISPLAY`/`NIRI_SOCKET` from the live niri session, so every
+tool below works unchanged. No `NIRI_SOCKET` means no graphical session is up
+there; say so rather than working around it. The user is probably not at that
+screen, so check `qs ipc call lock status` before any input — never type
+into a locked screen — and tell them what you left open on it.
+
 ## Golden rules
 
 1. **Text before pixels.** `tmux capture-pane`, `niri msg -j …`, `qs ipc`,
