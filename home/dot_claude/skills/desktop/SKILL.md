@@ -319,16 +319,19 @@ policy, `chromium/policies/extensions.json`) — real cookies, real logins,
 real extensions:
 
 ```sh
-PLAYWRIGHT_MCP_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-  playwright-cli attach --extension=chromium     # session name: chromium
+playwright-cli attach --extension=chromium     # session name: chromium
 playwright-cli --s=chromium goto https://…       # then drive as usual
 playwright-cli --s=chromium detach               # NEVER `close`/`close-all`
 ```
 
-The env var is load-bearing: without it the extension path looks for
-Google Chrome (`~/.config/google-chrome`), which does not exist here.
-Their browser must already be running — launch it with `app-run
-chromium-browser` if not. **`detach` leaves their browser alive; `close`
+The `bin/playwright-cli` wrapper sets
+`PLAYWRIGHT_MCP_EXECUTABLE_PATH=/usr/bin/chromium-browser` (without it the
+extension path looks for Google Chrome, which does not exist here). Locally
+their browser must already be running — launch it with `app-run
+chromium-browser` if not — and they click the extension's Allow. **Over SSH
+the wrapper does both**: starts chromium if it is down and passes the
+extension's own token (`playwright-extension-token`), so attach is approved
+with nobody at the screen — it works on a locked screen too. **`detach` leaves their browser alive; `close`
 and `close-all` would shut it, taking their tabs with it.** Never navigate
 their session somewhere destructive, and never quote private page content
 into a reply that doesn't need it.

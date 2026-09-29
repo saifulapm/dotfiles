@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""playwright-extension-token — print this machine's Playwright Extension token.
+
+The extension auto-approves `playwright-cli attach --extension` when the
+relay passes PLAYWRIGHT_MCP_EXTENSION_TOKEN equal to the `auth-token` it keeps
+in its own localStorage (connect.js: `token === getOrCreateAuthToken()`). That
+token is random per browser profile, so every machine has its own — read it
+from the profile on disk instead of copying it around.
+
+Chromium keeps localStorage in LevelDB: recent writes in the *.log journal,
+older ones in snappy-compressed *.ldb tables. No LevelDB/snappy module is
+installed here, so both formats are walked by hand below; the entry with the
+highest sequence number wins. The token only exists after the extension's
+connect page has run once (any earlier attach creates it). Exit 1 = none yet.
+
+  playwright-extension-token [profile-dir]   default ~/.config/chromium/Default
+"""
+
+import glob
+import os
+import struct
+import sys
+
+EXT = "mmlmfjhmonkocbjadbfplnigmagldckm"
+KEY = f"_chrome-extension://{EXT}\x00\x01auth-token".encode()
+
+
+def varint(b, i):
+    v = shift = 0
+    while True:
+        c = b[i]
+        i += 1
+        v |= (c & 0x7F) << shift
+        if c < 0x80:
+            return v, i
+        shift += 7
+
+
+def unsnappy(b):
+    n, i = varint(b, 0)
+    out = bytearray()
+    while i < len(b):
+        tag = b[i]
+        i += 1
+        kind = tag & 3
+        if kind == 0:  # literal
+            ln = tag >> 2
+            if ln >= 60:
+                extra = ln - 59
+                ln = int.from_bytes(b[i:i + extra], "little")
+                i += extra
+            ln += 1
+            out += b[i:i + ln]
+            i += ln
+            continue
+        if kind == 1:
+            ln = ((tag >> 2) & 7) + 4
+            off = ((tag >> 5) << 8) | b[i]
+            i += 1
+        elif kind == 2:
+            ln = (tag >> 2) + 1
+            off = int.from_bytes(b[i:i + 2], "little")
+            i += 2
+        else:
+            ln = (tag >> 2) + 1
+            off = int.from_bytes(b[i:i + 4], "little")
+            i += 4
+        for _ in range(ln):  # byte-wise: copies may overlap themselves
+            out.append(out[-off])
+    return bytes(out[:n])
+
+
+def block_entries(block):
+    """(key, value) pairs of one table block, prefix-compressed keys undone."""
+    restarts = struct.unpack_from("<I", block, len(block) - 4)[0]
+    end = len(block) - 4 - 4 * restarts
+    i, key = 0, b""
+    while i < end:
+        shared, i = varint(block, i)
+        unshared, i = varint(block, i)
+        vlen, i = varint(block, i)
+        key = key[:shared] + block[i:i + unshared]
+        i += unshared
+        yield key, block[i:i + vlen]
+        i += vlen
+
+
+def read_block(data, off, size):
+    raw, kind = data[off:off + size], data[off + size]
+    return unsnappy(raw) if kind == 1 else raw
+
+
+def table_entries(path):
+    """(seq, type, user_key, value) from an .ldb table."""
+    data = open(path, "rb").read()
+    footer = data[-48:]
+    _, i = varint(footer, 0)  # metaindex handle, unused
+    _, i = varint(footer, i)
+    ioff, i = varint(footer, i)
+    isize, i = varint(footer, i)
+    for _, handle in block_entries(read_block(data, ioff, isize)):
+        off, j = varint(handle, 0)
+        size, _ = varint(handle, j)
+        for ikey, value in block_entries(read_block(data, off, size)):
+            tag = int.from_bytes(ikey[-8:], "little")
+            yield tag >> 8, tag & 0xFF, ikey[:-8], value
+
+
+def log_entries(path):
+    """(seq, type, user_key, value) from a .log journal of WriteBatches."""
+    data = open(path, "rb").read()
+    records, frag = [], b""
+    for blk in range(0, len(data), 32768):
+        i, end = blk, min(blk + 32768, len(data))
+        while i + 7 <= end:
+            length, rtype = struct.unpack_from("<HB", data, i + 4)
+            if rtype == 0:  # zero padding to the block end
+                break
+            frag += data[i + 7:i + 7 + length]
+            if rtype in (1, 4):  # FULL or LAST
+                records.append(frag)
+                frag = b""
+            elif rtype == 2:  # FIRST
+                frag = data[i + 7:i + 7 + length]
+            i += 7 + length
+    for rec in records:
+        seq, count = struct.unpack_from("<QI", rec, 0)
+        i = 12
+        for n in range(count):
+            kind = rec[i]
+            i += 1
+            klen, i = varint(rec, i)
+            key = rec[i:i + klen]
+            i += klen
+            value = b""
+            if kind == 1:
+                vlen, i = varint(rec, i)
+                value = rec[i:i + vlen]
+                i += vlen
+            yield seq + n, kind, key, value
+
+
+def main():
+    profile = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/.config/chromium/Default")
+    db = os.path.join(profile, "Local Storage", "leveldb")
+    best = None
+    for path in glob.glob(os.path.join(db, "*.ldb")) + glob.glob(os.path.join(db, "*.log")):
+        reader = log_entries if path.endswith(".log") else table_entries
+        try:
+            for seq, kind, key, value in reader(path):
+                if key == KEY and (best is None or seq > best[0]):
+                    best = (seq, kind, value)
+        except (IndexError, struct.error):
+            continue  # a file mid-write or mid-compaction; the rest still count
+    if best is None or best[1] != 1:
+        sys.exit(1)
+    value = best[2]  # Chromium prefixes the encoding: 1 = Latin-1, 0 = UTF-16LE
+    print(value[1:].decode("latin-1" if value[:1] == b"\x01" else "utf-16-le"))
+
+
+if __name__ == "__main__":
+    main()

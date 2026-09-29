@@ -35,13 +35,45 @@ config=${XDG_CONFIG_HOME:-$HOME/.config}/playwright/cli.config.json
 # -s=<name>, so anything leading with - is not it.
 subcommand=""
 explicit_config=false
+extension=false
 for arg in "$@"; do
   case $arg in
     --config | --config=*) explicit_config=true ;;
+    --extension | --extension=*) extension=true ;;
     -*) ;;
     *) [[ -n $subcommand ]] || subcommand=$arg ;;
   esac
 done
+
+# attach --extension drives the user's own chromium. Playwright looks for
+# Google Chrome unless told otherwise, and there is no Linux arm64 Chrome.
+# Over SSH nobody is at the screen to click the extension's "Allow", so pass
+# the extension's own token (auto-approve, user pick 2026-09-29) and start
+# chromium ourselves: left to playwright, it would be a child of the CLI
+# daemon instead of its own app-run unit.
+if [[ $subcommand == attach && $extension == true ]]; then
+  export PLAYWRIGHT_MCP_EXECUTABLE_PATH=${PLAYWRIGHT_MCP_EXECUTABLE_PATH:-/usr/bin/chromium-browser}
+  if [[ -n ${SSH_CONNECTION:-} ]]; then
+    # SingletonLock -> <host>-<pid> of the running browser; the socket beside
+    # it outlives a killed chromium, so it can't answer "is it up".
+    chromium_up() {
+      local lock
+      lock=$(readlink "$HOME/.config/chromium/SingletonLock" 2>/dev/null) &&
+        kill -0 "${lock##*-}" 2>/dev/null
+    }
+    if ! chromium_up; then
+      app-run chromium-browser
+      for _ in {1..50}; do
+        chromium_up && break
+        sleep 0.2
+      done
+    fi
+    if [[ -z ${PLAYWRIGHT_MCP_EXTENSION_TOKEN:-} ]] &&
+      token=$(playwright-extension-token); then
+      export PLAYWRIGHT_MCP_EXTENSION_TOKEN=$token
+    fi
+  fi
+fi
 
 if [[ -f $config ]] &&
   [[ $subcommand == open || $subcommand == attach ]] &&
