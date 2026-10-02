@@ -31,10 +31,12 @@ managed=$(
     "CLAUDE_CODE_AUTO_CONNECT_IDE": "false",
     "CLAUDE_CODE_DISABLE_CRON": "1",
     "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
+    "DISABLE_ERROR_REPORTING": "1",
+    "DISABLE_AUTOUPDATER": "1",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
     "WORKFLOW_AGENT": "1"
   },
+  "advisorModel": "fable",
   "attribution": {
     "commit": "",
     "pr": "",
@@ -70,7 +72,10 @@ managed=$(
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
       "Bash(gh release list:*)",
-      "Bash(redis-cli:*)"
+      "Bash(redis-cli:*)",
+      "Bash(playwright-cli:*)",
+      "Bash(jev:*)",
+      "Bash(tmux:*)"
     ],
     "deny": [
       "Read(./.env)",
@@ -148,15 +153,19 @@ managed=$(
   "spinnerTipsEnabled": false,
   "promptCacheTtl": "1h",
   "subagentPromptCacheTtl": "1h",
-  "effortLevel": "xhigh",
+  "effortLevel": "high",
   "modelSettings": {
-    "claude-fable-5-1": {
-      "effortLevel": "medium"
+    "claude-opus-5-5": {
+      "effortLevel": "high"
     },
-    "claude-opus-5": {
+    "claude-sonnet-5-5": {
+      "effortLevel": "high"
+    },
+    "claude-fable-5-1": {
       "effortLevel": "high"
     }
   },
+  "autoContinueAtUsageLimit": true,
   "awaySummaryEnabled": false,
   "tui": "fullscreen",
   "voice": {
@@ -175,5 +184,13 @@ current=$(cat)
 [ -n "$current" ] || current='{}'
 
 # `*` is jq's recursive object merge: nested objects combine, scalars and
-# arrays are replaced outright by the right-hand side.
-printf '%s' "$current" | jq --argjson managed "$managed" '. * $managed'
+# arrays are replaced outright by the right-hand side. A key the managed block
+# stops carrying therefore survives in the file until it is deleted here:
+# CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC turned off feature-flag fetching,
+# which the advisor tool needs, and `claude-opus-5` never matched Opus 5.5
+# (its canonical name is claude-opus-5-5), so Opus 5.5 ran at its default
+# medium effort.
+printf '%s' "$current" | jq --argjson managed "$managed" '
+  del(.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC)
+  | del(.modelSettings["claude-opus-5"])
+  | . * $managed'

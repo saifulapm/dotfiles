@@ -1,10 +1,14 @@
 # amx — the config, with the defaults written out. Saiful's copy, refreshed
-# from the shipped assets/config.toml at 0.3.0 on 2026-09-14.
+# from the shipped assets/config.toml (amx 0.1.0) on 2026-09-14 and re-read
+# against the source on 2026-10-03.
 #
-# Five keys stand away from the defaults, and each says why beside itself:
-# agent = claude, notifications = both, trust = true, theme = qshell, and a
-# diff read through delta. Everything else here is amx's own answer, written
-# out so the next change is an edit rather than a lookup.
+# The keys that stand away from the shipped defaults each say why beside
+# themselves: max_agents = 15 (default 5), max_total = 6 (default none),
+# subagent_depth = 3 (default 2), worktrees = false (default true),
+# notifications = both, trust = true, theme = qshell, park_after = 600
+# (default 3600), a diff read through delta, and the harness tables at the
+# end. Everything else here is amx's own answer, written out so the next
+# change is an edit rather than a lookup.
 #
 # A copy nobody edits runs exactly as no file at all would: every value here is
 # the one amx uses when the key is left out. Twenty-two keys, the keys you bind
@@ -35,8 +39,10 @@ max_agents = 15
 subagent_depth = 3
 
 # A ceiling over every project on the machine at once. Left out, there is
-# none: a machine is as busy as the projects on it ask between them.
-# max_total = 10
+# none: a machine is as busy as the projects on it ask between them. Six on
+# this laptop (7.3 GB): the engine's worker slots plus a lead or two and a
+# dogfood session. Ten on the mini and the nuc once measured.
+max_total = 6
 
 # Give each agent its own git worktree. Two agents editing one checkout is the
 # failure amx is arranged to avoid; `amx new --no-worktree` is the escape for
@@ -211,3 +217,16 @@ DISABLE_COST_WARNINGS = "1"
 [pi]
 models = ["deepseek", "glm", "muse", "gpt", "qwen", "grok", "kimi"]
 args = ["--approve"]
+
+# The commit gate (workflow hook) arms itself for an agent marked
+# WORKFLOW_AGENT. Claude sessions carry it from Claude's own settings file;
+# pi, codex and opencode set nothing of their own, so every agent amx starts
+# on them is marked here.
+[pi.env]
+WORKFLOW_AGENT = "1"
+
+[codex.env]
+WORKFLOW_AGENT = "1"
+
+[opencode.env]
+WORKFLOW_AGENT = "1"
