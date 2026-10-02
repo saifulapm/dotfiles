@@ -1,0 +1,19 @@
+# Global git ignore (core.excludesFile). Agent and tool files never belong in a
+# product repository; they are ignored here so no repo needs a line for them
+# and nothing an agent writes can be tracked by accident. Knowledge lives in mem.
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.agents/
+.cursor/
+.scratch/
+.e2e/
+.amx/
+.mcp.json
+opencode.json
+opencode.jsonc
+skills-lock.json
+.playwright-cli/
+**/agent-memory/
+**/agent-memory-local/
