@@ -137,7 +137,7 @@ managed=$(
       "node_modules",
       "vendor"
     ],
-    "baseRef": "fresh",
+    "baseRef": "head",
     "bgIsolation": "none"
   },
   "disableAgentView": true,
