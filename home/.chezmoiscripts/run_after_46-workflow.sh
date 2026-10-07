@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # workflow (github.com/saifulapm/workflow) — the solo development workflow:
-# three Rust binaries out of one checkout, plus the session-facing skills that
-# carry them into a Claude Code session.
+# three Rust binaries out of one checkout, plus the skills, subagents and git
+# hook stubs that carry them into a Claude Code session.
 #
-#   mem       the system of record — facts, rulings, logs, handoffs, blocking
-#             questions, and a wiki of design pages, kept outside every project
-#   workflow  the gate and the orchestrator — verify, lint-msg, review-needed,
-#             plan-driven run, status, reap, park/resume, doctor
-#   hub       a web view over mem's question queue, tailnet-only, so a blocking
-#             question can be answered from a phone
+#   mem       the system of record — facts, rulings, logs, handoffs, questions,
+#             roadmaps, plan pages and a wiki of spec pages, kept outside every
+#             project
+#   workflow  hygiene and lint-msg behind the git hooks, `install`, and `go`,
+#             which starts a milestone's orchestrator
+#   hub       a web view over mem, tailnet-only, so a phone can follow every
+#             project, read its plans and answer its questions
 #
 # Ours outright, same shape as run_after_45-amx and run_after_36-pxy: clone into
 # ~/.local/src/workflow, cargo-build, install into ~/.local/bin. THREE binaries
@@ -18,9 +19,8 @@
 # revision, so there is no state in which one of them is stale and the others
 # are not, and one guard is therefore the honest number.
 #
-# The skills and the git hook stubs are copies `workflow doctor --fix` writes
-# from the binary they ride in, so a machine's copies match its installed
-# workflow by construction; the doctor block below runs it on every apply.
+# The skills, the subagents and the git hook stubs ride inside the workflow
+# binary; `workflow install` writes them on every apply (see below).
 set -uo pipefail
 
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -76,45 +76,33 @@ if [ ! -x "$HOME/.local/bin/workflow" ]; then
   fi
 fi
 
-# ------------------------------------------------------------ doctor --fix
-# The eight skills and the three git hook stubs ride inside the workflow
-# binary since m1-harness (2026-09-15): `workflow doctor --fix` writes copies
-# into ~/.claude/skills, ~/.agents/skills (pi, codex and opencode read it) and
-# ~/.config/git/hooks, and `workflow doctor` reports a copy that drifted from
-# the binary. A copy matches the installed binary by construction, which is
-# what the symlink loop this replaced was for -- and the loop never delivered
-# the hook stubs to any machine but the dev box. `mem doctor --fix` writes
-# mem's pi extension the same way. Both say nothing when nothing changed.
+# ----------------------------------------------------------------- install
+# `workflow install` writes the skills into ~/.claude/skills and
+# ~/.agents/skills (pi, codex and opencode read it), the subagents into
+# ~/.claude/agents and the three git hook stubs into ~/.config/git/hooks, where
+# dot_gitconfig's core.hooksPath points every repo, and removes what older
+# builds installed. The copies match the installed binary by construction.
+# `mem doctor --fix` writes mem's pi extension the same way. Both say nothing
+# when nothing changed.
 if command -v workflow >/dev/null 2>&1; then
-  workflow doctor --fix >/dev/null 2>&1 \
-    || warn "workflow doctor --fix left findings -- run \`workflow doctor\` by hand"
+  workflow install >/dev/null 2>&1 \
+    || warn "workflow install failed -- an older build? run \`just update-all\`"
 fi
 if command -v mem >/dev/null 2>&1; then
   mem doctor --fix >/dev/null 2>&1 || true
 fi
 
-# ------------------------------------------------------------------- hooks
-# The three git hook stubs, symlinked into ~/.config/git/hooks/, where
-# dot_gitconfig's core.hooksPath points every repo on the machine. The same
-# dev-box rule as the skills: the working copy's stubs where it exists, the
-# built checkout's everywhere else. Only a symlink or a missing entry is ever
-# replaced; a real file there is somebody's own hook. Until 2026-09-13 this
-# had been done by hand on the MacBook and nowhere else, and since the stubs
-# fail open by design, the NUC's gate stood open without a word.
-hooks_src="$src/hooks"
-[ -d "$HOME/Sites/github/workflow/hooks" ] \
-  && hooks_src="$HOME/Sites/github/workflow/hooks"
-if [ -d "$hooks_src" ]; then
-  mkdir -p "$HOME/.config/git/hooks"
-  for hook in pre-commit commit-msg pre-push; do
-    dest="$HOME/.config/git/hooks/$hook"
-    [ "$(readlink "$dest" 2>/dev/null)" = "$hooks_src/$hook" ] && continue
-    if [ -L "$dest" ] || [ ! -e "$dest" ]; then
-      ln -sfn "$hooks_src/$hook" "$dest" && echo "workflow: linked git hook $hook"
-    else
-      warn "$dest is a real file — leaving it alone"
-    fi
-  done
+# ------------------------------------------------------- the retired engine
+# workflow.service ran `workflow serve`, the engine the 2026-10-07 rebuild
+# removed. chezmoi leaves a deleted source file's target in place, so a machine
+# that had the unit still has it, enabled and restarting a verb that no longer
+# exists. Stop it and take the file away, once.
+unit="$HOME/.config/systemd/user/workflow.service"
+if [ -e "$unit" ] || [ -L "$unit" ]; then
+  systemctl --user disable --now workflow.service >/dev/null 2>&1 || true
+  rm -f "$unit"
+  systemctl --user daemon-reload
+  echo "workflow: removed the retired workflow.service"
 fi
 
 # --------------------------------------------------------------------- hub
