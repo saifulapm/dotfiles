@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# screen — the computer-use action set over this desktop, in screenshot space.
+#
+#   screen shot                          whole screen, 1280 px wide → /tmp/desk/shot.png
+#   screen zoom X0 Y0 X1 Y1              that box at native resolution → /tmp/desk/zoom.png
+#   screen move X Y                      hover
+#   screen click X Y [left|right|middle] [COUNT]   COUNT 2 = double, 3 = triple
+#   screen drag X1 Y1 X2 Y2              press at 1, release at 2 (needs ydotoold)
+#   screen scroll X Y up|down|left|right [N]       N wheel notches (default 3)
+#   screen type TEXT                     literal text at keyboard focus
+#   screen key COMBO [REPEAT]            ctrl+s · Return · super+t · shift+Tab
+#
+# Every X/Y is a pixel in the LAST `screen shot` image, never a logical
+# coordinate, so a shot must come first; it records the scale it used and
+# every later action converts through it. A point outside that image is
+# refused, not clamped — moving it into range would act where the caller did
+# not point. Pointer work goes through scripts/mouse, which keeps the
+# hot-corner and notes-strip clamps.
+#
+# Refuses all input while the screen is locked, and `type`/`key` while a
+# terminal has focus: keystrokes there run as commands. Drive terminals with
+# tmux instead. Under the nested dev compositor set WAYLAND_DISPLAY=wayland-2
+# and MOUSE_SCREEN=WxH as the desktop skill says; both pass straight through.
+
+set -euo pipefail
+
+usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+die() { echo "screen: $*" >&2; exit 1; }
+
+DIR=/tmp/desk
+STATE=$DIR/state
+SHOT_W=1280
+MOUSE="$(dirname "$(readlink -f "$0")")/mouse"
+
+int() { [[ $1 =~ ^-?[0-9]+$ ]] || die "not an integer: $1"; }
+
+geometry() { # same output scripts/mouse drives: the rightmost
+    if [[ -n "${MOUSE_SCREEN:-}" ]]; then
+        echo "0 0 ${MOUSE_SCREEN%x*} ${MOUSE_SCREEN#*x}"
+    else
+        niri msg -j outputs | jq -r '
+            [.[] | .logical | select(. != null)] | max_by(.x + .width)
+            | "\(.x) \(.y) \(.width) \(.height)"'
+    fi
+}
+
+load() {
+    [[ -f $STATE ]] || die "no shot yet — run 'screen shot' first"
+    read -r OX OY W H SW SH <"$STATE"
+}
+
+# Screenshot pixel → global logical pixel, refusing points off the image.
+# A third argument "edge" admits x == width / y == height: a box's far corner.
+to_logical() {
+    int "$1"; int "$2"
+    local e=0; [[ ${3:-} == edge ]] && e=1
+    ((0 <= $1 && $1 < SW + e && 0 <= $2 && $2 < SH + e)) || die "[$1, $2] is outside the ${SW}x${SH} shot"
+    LX=$((OX + $1 * W / SW)) LY=$((OY + $2 * H / SH))
+}
+
+unlocked() {
+    [[ "$(qs ipc call lock status 2>/dev/null)" != locked ]] || die "screen is locked — no input"
+}
+
+no_terminal() {
+    local app
+    app=$(niri msg -j focused-window | jq -r '.app_id // ""')
+    case "${app,,}" in
+    foot | footclient | alacritty | kitty | *ghostty* | *wezterm* | *konsole* | *terminal*)
+        die "focused window is a terminal ($app) — keystrokes would run as commands; use tmux" ;;
+    esac
+}
+
+cmd=${1:-}
+[[ -n $cmd ]] || usage
+shift
+
+case "$cmd" in
+shot)
+    mkdir -p "$DIR"
+    read -r OX OY W H < <(geometry) || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
+    SH=$((H * SHOT_W / W))
+    grim -g "$OX,$OY ${W}x$H" -s "$(awk "BEGIN { print $SHOT_W / $W }")" "$DIR/shot.png"
+    # grim rounds the scaled size; record what it actually wrote.
+    read -r SW SH < <(file "$DIR/shot.png" | sed -n 's/.*, \([0-9]*\) x \([0-9]*\),.*/\1 \2/p')
+    echo "$OX $OY $W $H $SW $SH" >"$STATE"
+    echo "$DIR/shot.png ${SW}x$SH"
+    ;;
+zoom)
+    [[ $# -eq 4 ]] || usage
+    load
+    to_logical "$1" "$2"; X0=$LX Y0=$LY
+    to_logical "$3" "$4" edge; X1=$LX Y1=$LY
+    ((X1 > X0 && Y1 > Y0)) || die "zoom box must run top-left to bottom-right"
+    # Native scale, so small text survives; the box is the caller's to keep small.
+    grim -g "$X0,$Y0 $((X1 - X0))x$((Y1 - Y0))" "$DIR/zoom.png"
+    echo "$DIR/zoom.png"
+    ;;
+move)
+    [[ $# -eq 2 ]] || usage
+    load; unlocked; to_logical "$1" "$2"
+    "$MOUSE" to "$LX" "$LY"
+    ;;
+click)
+    [[ $# -ge 2 && $# -le 4 ]] || usage
+    load; unlocked; to_logical "$1" "$2"
+    button=${3:-left} count=${4:-1}
+    [[ $button =~ ^(left|right|middle)$ ]] || die "button: left, right or middle"
+    [[ $count =~ ^[1-3]$ ]] || die "count: 1 to 3"
+    "$MOUSE" click "$LX" "$LY" "$button"
+    for ((i = 1; i < count; i++)); do wlrctl pointer click "$button"; done
+    ;;
+drag)
+    [[ $# -eq 4 ]] || usage
+    load; unlocked
+    to_logical "$1" "$2"; X1=$LX Y1=$LY
+    to_logical "$3" "$4"
+    "$MOUSE" drag "$X1" "$Y1" "$LX" "$LY"
+    ;;
+scroll)
+    [[ $# -ge 3 && $# -le 4 ]] || usage
+    load; unlocked; to_logical "$1" "$2"
+    n=${4:-3}
+    [[ $n =~ ^[0-9]+$ ]] && ((n >= 1 && n <= 30)) || die "notches: 1 to 30"
+    "$MOUSE" to "$LX" "$LY"
+    d=$((n * 15)) # one wheel notch is 15 axis units
+    case "$3" in
+    up) wlrctl pointer scroll "-$d" 0 ;;
+    down) wlrctl pointer scroll "$d" 0 ;;
+    left) wlrctl pointer scroll 0 "-$d" ;;
+    right) wlrctl pointer scroll 0 "$d" ;;
+    *) die "direction: up, down, left or right" ;;
+    esac
+    ;;
+type)
+    [[ $# -eq 1 ]] || usage
+    unlocked; no_terminal
+    wtype -- "$1"
+    ;;
+key)
+    [[ $# -ge 1 && $# -le 2 ]] || usage
+    unlocked; no_terminal
+    repeat=${2:-1}
+    [[ $repeat =~ ^[0-9]+$ ]] && ((repeat >= 1 && repeat <= 50)) || die "repeat: 1 to 50"
+    IFS=+ read -ra parts <<<"$1"
+    key=${parts[-1]}
+    case "${key,,}" in # the names models reach for that are not X keysyms
+    enter) key=Return ;; esc) key=Escape ;; backspace) key=BackSpace ;;
+    del) key=Delete ;; pageup | pgup) key=Page_Up ;; pagedown | pgdn) key=Page_Down ;;
+    space) key=space ;; tab) key=Tab ;;
+    esac
+    args=()
+    for m in "${parts[@]:0:${#parts[@]}-1}"; do
+        case "${m,,}" in
+        ctrl | control) args+=(-M ctrl) ;; shift) args+=(-M shift) ;;
+        alt) args+=(-M alt) ;; super | meta | cmd | win | logo) args+=(-M logo) ;;
+        *) die "modifier: ctrl, shift, alt or super (got $m)" ;;
+        esac
+    done
+    up=()
+    for ((i = ${#args[@]} - 1; i >= 1; i -= 2)); do up+=(-m "${args[i]}"); done
+    for ((i = 0; i < repeat; i++)); do wtype "${args[@]}" -k "$key" "${up[@]}"; done
+    ;;
+*)
+    usage
+    ;;
+esac

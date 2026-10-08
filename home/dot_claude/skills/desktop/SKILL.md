@@ -63,6 +63,16 @@ into a locked screen — and tell them what you left open on it.
 
 `gui` and `mouse` (same scripts dir) print their full usage with no arguments.
 
+**A visual GUI job with no text channel → the `desktop-operator` subagent.**
+When the only way through is pixels (no a11y tree, a canvas, a dialog `gui`
+cannot see) and it takes more than a shot or two, delegate it instead of
+screenshotting here: Haiku 5.5 runs the look → act loop on its own
+screenshots and hands back a few lines. Its brief must name the goal, what
+counts as done, and every text it may type and commit action it may take —
+it stops at anything not authorised. It drives `scripts/screen` (the
+computer-use action set — `shot`, `zoom`, `click`, `key`… — in screenshot
+pixels), which you can use the same way.
+
 **`jev` sits across all four**, on PATH, and answers a question *about* a
 surface without that surface entering the conversation — a real page snapshot
 is 1.2 MB, and `jev` costs about $0.0005 to read it and hand back one ref or
