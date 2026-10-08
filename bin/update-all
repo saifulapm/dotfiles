@@ -187,6 +187,14 @@ update_src "$HOME/.local/src/deen" "$HOME/.local/bin/deen" deen
 # the branch off the checkout, so nothing here has to name it.
 update_src "$HOME/.local/src/kak-ansi" "$HOME/.local/bin/kak-ansi-filter" kak-ansi
 
+# ------------------------------------------------------------- pnpm globals
+# run_after_03/08/32 only `pnpm add -g` what is missing, so the apply never
+# moves a pnpm global's version. --latest, like every lane here: majors too.
+# Before the apply on purpose — run_after_32 refreshes the playwright-cli
+# skill when the binary is newer than it, which this update makes it.
+say "pnpm globals"
+mise exec -- pnpm update -g --latest || warn "pnpm update -g failed"
+
 # -------------------------------------------------------------------- apply
 say "chezmoi apply (reinstalls everything removed above)"
 chezmoi apply || warn "chezmoi apply failed"
