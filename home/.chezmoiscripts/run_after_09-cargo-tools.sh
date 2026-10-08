@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CLI tools Fedora does not package, built once with the rustup-managed cargo
 # (03-dev-toolchain installs it). Guarded per binary, so only a fresh machine
-# pays the compile time (the first run is long — nine crates); after that this
+# pays the compile time (the first run is long — ten crates); after that this
 # is a no-op. Failures warn and continue: one crate's build break must not
 # block the rest or the apply.
 #
@@ -47,6 +47,15 @@ for bin in "${!CRATES[@]}"; do
     && echo "cargo-tools: installed ${CRATES[$bin]}" \
     || warn "cargo install ${CRATES[$bin]} failed"
 done
+
+# ast-grep gets its own line because it needs --bin: the crate also ships
+# `sg`, which would shadow shadow-utils' /usr/bin/sg from ~/.cargo/bin.
+if [ ! -x "$HOME/.cargo/bin/ast-grep" ]; then
+  echo "cargo-tools: building ast-grep (first run only — this can take a while)"
+  cargo install --quiet --locked --bin ast-grep ast-grep \
+    && echo "cargo-tools: installed ast-grep" \
+    || warn "cargo install ast-grep failed"
+fi
 
 # kakoune-lsp publishes NO crates.io release and its GitHub binaries cover
 # x86_64-linux-musl + darwin only — no aarch64 linux (checked 2026-08-07).

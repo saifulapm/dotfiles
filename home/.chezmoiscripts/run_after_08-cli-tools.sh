@@ -39,7 +39,6 @@ declare -A PNPM_PKGS=(
   [biome]="@biomejs/biome"
   [dprint]="dprint"
   [rustywind]="rustywind"
-  [ast-grep]="@ast-grep/cli"
   [prettier]="prettier"
   [vscode-eslint-language-server]="vscode-langservers-extracted"
   [emmet-language-server]="@olrtg/emmet-language-server"
@@ -63,23 +62,14 @@ else
   warn "pnpm not available (mise/node missing?) — pnpm globals skipped"
 fi
 
-# @ast-grep/cli ships TWO bins: `ast-grep` and the short alias `sg`. The short
-# one SHADOWS /usr/bin/sg (shadow-utils' "run a command under a different
-# group") because PNPM_HOME/bin is ahead of /usr/bin on PATH — so `sg input -c
-# …` silently runs ast-grep, which fails with "unrecognized subcommand 'input'"
-# and sends you hunting the wrong bug. Hit 2026-08-11 starting ydotoold without
-# a re-login (see run_after_31-ydotool.sh, which documents exactly that
-# invocation). ast-grep itself prints "`sg` is deprecated, use `ast-grep`", so
-# dropping the alias costs nothing; `ast-grep` in the same directory is
-# untouched.
-#
-# Outside the install loop above, and unguarded by any "did we just install it"
-# check, because pnpm recreates the shim on every install or update of the
-# package — this has to run on every apply to stay removed.
-if [ -e "$PNPM_HOME/bin/sg" ]; then
-  rm -f "$PNPM_HOME/bin/sg" \
-    && echo "cli-tools: removed pnpm's sg shim (it shadowed /usr/bin/sg; use ast-grep)" \
-    || warn "could not remove $PNPM_HOME/bin/sg"
+# ast-grep comes from cargo since 2026-10-08 (run_after_09): pnpm 11 blocks
+# the package's postinstall, so its launcher printed two warning lines on
+# every call. A machine that still has the pnpm copy drops it here, with its
+# `sg` shim, which shadowed shadow-utils' /usr/bin/sg.
+if [ -e "$PNPM_HOME/bin/ast-grep" ] || [ -e "$PNPM_HOME/bin/sg" ]; then
+  mise exec -- pnpm remove -g @ast-grep/cli >/dev/null 2>&1
+  rm -f "$PNPM_HOME/bin/sg"
+  echo "cli-tools: removed pnpm's ast-grep (run_after_09 builds it with cargo)"
 fi
 
 # ─── deno (mise, same mechanism as node; version declared in the ────────────

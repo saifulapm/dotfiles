@@ -27,7 +27,7 @@ define-command -params 1..4 -docstring %{
             filetype="$4"
 
             # Build sg command based on provided arguments
-            cmd="sg --color=ansi --heading=always --pattern '$pattern'"
+            cmd="ast-grep --color=ansi --heading=always --pattern '$pattern'"
 
             if [ -n "$rewrite" ]; then
                 cmd="$cmd --rewrite '$rewrite'"
@@ -55,8 +55,8 @@ define-command -hidden sg-execute-command -params 1 %{
             trap - INT QUIT
 
             # Check if sg command exists
-            if ! command -v sg >/dev/null 2>&1; then
-                echo "Error: 'sg' command not found. Please install ast-grep or ensure it's in your PATH."
+            if ! command -v ast-grep >/dev/null 2>&1; then
+                echo "Error: 'ast-grep' command not found. Please install ast-grep or ensure it's in your PATH."
                 exit 1
             fi
 
@@ -98,7 +98,7 @@ define-command -hidden sg-jump %{
             set-register c %sh{
                 if [ -n "$kak_reg_b" ]; then
                     # If line number exists, filter by both file and line
-                    result=$(eval sg run "$kak_opt_last_sg_command" --json=pretty | \
+                    result=$(eval ast-grep run "$kak_opt_last_sg_command" --json=pretty | \
                     jq -r --arg file "$kak_reg_a" --argjson line "$kak_reg_b" \
                     '.[] | .range.start.line += 1 | .range.end.line += 1 | 
                     select(.file == $file and .range.start.line <= $line and .range.end.line >= $line) | 
@@ -113,7 +113,7 @@ define-command -hidden sg-jump %{
                     fi
                 else
                     # If no line number, get first selection for the file
-                    result=$(eval sg run "$kak_opt_last_sg_command" --json=pretty | \
+                    result=$(eval ast-grep run "$kak_opt_last_sg_command" --json=pretty | \
                     jq -r --arg file "$kak_reg_a" \
                     '.[] | .range.start.line += 1 | .range.end.line += 1 | 
                     select(.file == $file) | 

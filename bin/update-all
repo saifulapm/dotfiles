@@ -226,6 +226,8 @@ say "cargo tools"
 for crate in sd skim television dufs hop-kak kak-popup dedoc; do
   cargo install --quiet "$crate" || warn "cargo update $crate failed"
 done
+cargo install --quiet --locked --bin ast-grep ast-grep \
+  || warn "cargo update ast-grep failed"
 cargo install --quiet --git https://github.com/kakoune-lsp/kakoune-lsp --locked \
   || warn "cargo update kakoune-lsp failed"
 cargo install --quiet --git https://github.com/Jappie3/wayfreeze --locked \
