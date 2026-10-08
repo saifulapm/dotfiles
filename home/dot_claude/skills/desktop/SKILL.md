@@ -97,6 +97,15 @@ and the `jev` skill for the whole reference.
 - [ ] 5. Revert what you touched: windows, sessions, focus, files, settings
 ```
 
+**Which one, measured on this machine (2026-10-08):** a single question is
+fastest by hand — `gui click` 0.3 s, `jev pick` ~2 s, `jev check`/`jev gui`
+1.5–3.5 s, `jev pane` 0.7–1 s, a one-click `jev-browse` 6.5 s. A job of
+several steps goes to a Haiku operator: `browser-operator` 16–25 s for a
+search-and-read or a signed-in lookup, `desktop-operator` 24–50 s for a
+pixel-driven GUI job. They cost more wall time than one jev call but take
+the whole loop — and every snapshot and screenshot — out of your context,
+and they can type and quote what they read, which jev cannot.
+
 If an interaction "did nothing", suspect steps 2–3 before reporting an app
 bug — re-verify at fullscreen / re-read the real state, then retest once.
 
@@ -268,7 +277,10 @@ effect happened without a screenshot. Substring matching: `gui click files
 Save` is enough.
 
 Limits, and what to do instead: apps absent from `gui apps` don't export
-a11y (drive them with wtype/wlrctl as usual); Electron/Chromium need
+a11y, and neither do apps listed there whose `gui tree` comes back empty —
+Qt Quick apps such as omacalc register but expose no widgets, even with
+`QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1` (verified 2026-10-08). Drive both with
+`scripts/screen`, or hand the job to `desktop-operator`; Electron/Chromium need
 `--force-renderer-accessibility` to appear; a widget with no action still
 gives you coordinates to click.
 
@@ -377,12 +389,16 @@ browser.
 
 ## The qshell shell — qs ipc
 
-`qs ipc show` lists everything. Targets you'll actually use:
-`launcher` `menu` (`open <route>`, e.g. `menu open toggle.profile`) `notifs`
+`qs ipc show` lists everything. Targets you'll actually use: `notifs`
 (status/dismiss/dnd) `media` (playPause/next/previous/status) `theme`
-`background` (set/current) `clipboard` `emojis` `osd` `idle`
-(stayAwake/status) `bar` (`open <widgetId>` opens a panel) `lock` (state
-only — see Never-do) `filepicker` `wallpaper` `bluetooth`.
+`background` (set/current) `emojis` `osd` `idle` (stayAwake/status) `bar`
+(`open <widgetId>` opens a panel) `lock` (state only — see Never-do)
+`filepicker` `wallpaper` `wallhaven` `notes` `bluetooth`.
+
+The launcher, the command menu and clipboard history are **vicinae**, not
+the shell (`launcher`/`menu`/`clipboard` targets were retired in 1af38b7):
+`vicinae toggle` · `vicinae deeplink vicinae://launch/clipboard/history` ·
+`vicinae open -q <query>`. Its card is centred — see Seeing the screen.
 
 Quirks (all verified): `qs ipc call <target> show` prints a listing instead
 of calling — use `qs ipc call <target> -- show` or `toggle`. The shell never
