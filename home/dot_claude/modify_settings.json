@@ -51,6 +51,7 @@ managed=$(
     "DISABLE_ERROR_REPORTING": "1",
     "DISABLE_AUTOUPDATER": "1",
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5",
     "WORKFLOW_AGENT": "1"
   },
   "advisorModel": "fable",
@@ -216,6 +217,10 @@ current=$(cat)
 # artifact-capabilities and workflow-authoring stay on: the Artifact and
 # Workflow tools load them before they act. syncClaudeAiSkills stops the
 # claude.ai skills landing in ~/.claude/skills/synced; claude.ai keeps them.
+#
+# ANTHROPIC_DEFAULT_HAIKU_MODEL pins the haiku alias to Haiku 5.5 (2026-10-08):
+# Claude Code's built-in helper agents still resolved it to Haiku 4.5, which
+# costs ten times as much per input token and scores far lower.
 printf '%s' "$current" | jq --argjson managed "$managed" '
   del(.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC)
   | del(.modelSettings["claude-opus-5"])
