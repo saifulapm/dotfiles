@@ -152,7 +152,6 @@ managed=$(
   },
   "spinnerTipsEnabled": false,
   "promptCacheTtl": "1h",
-  "subagentPromptCacheTtl": "1h",
   "effortLevel": "high",
   "modelSettings": {
     "claude-opus-5-5": {
@@ -189,8 +188,12 @@ current=$(cat)
 # CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC turned off feature-flag fetching,
 # which the advisor tool needs, and `claude-opus-5` never matched Opus 5.5
 # (its canonical name is claude-opus-5-5), so Opus 5.5 ran at its default
-# medium effort.
+# medium effort. subagentPromptCacheTtl went back to the 5-minute default on
+# 2026-10-08: an hour-long write costs 2x where a 5-minute one costs 1.25x, and
+# in two weeks only 15 subagent calls came more than five minutes after the
+# last one, so the hour cost about a third more than it saved.
 printf '%s' "$current" | jq --argjson managed "$managed" '
   del(.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC)
   | del(.modelSettings["claude-opus-5"])
+  | del(.subagentPromptCacheTtl)
   | . * $managed'
