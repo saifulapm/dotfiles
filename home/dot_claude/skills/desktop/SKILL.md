@@ -284,6 +284,13 @@ That, not difficulty, picks the channel:**
 | repeatable checks, before/after comparisons | a bug only their logged-in session reproduces |
 | anything unattended | a tab they already have open |
 
+**A multi-step web job → the `browser-operator` subagent** (Haiku 5.5): it
+drives `playwright-cli` itself, in either session by the rule below, and
+hands back a few lines — no snapshot or screenshot reaches you. Its brief
+must name the goal, what counts as done, whether their login is needed, and
+every text it may type and commit action it may take. A single lookup is
+still cheaper by hand with `jev pick`/`jev check`.
+
 One tool does both — `playwright-cli`. Default hard to `open`: isolated,
 headless, repeatable, and it never touches their profile. Escalate to
 `attach` only when the task is impossible without their identity — and
