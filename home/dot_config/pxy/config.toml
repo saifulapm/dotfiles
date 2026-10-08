@@ -1,6 +1,6 @@
 # pxy config
 # The four aaa members (ollama, openrouter, cloudflare, amd) are free chat
-# providers for aichat, vicinae and qmd, not coding subscriptions; they are
+# providers for aichat and vicinae, not coding subscriptions; they are
 # whitelisted so [groups.aaa] resolves.
 providers_whitelist = [
   "opencode-go",
@@ -115,7 +115,7 @@ models = [
 # name = "Jev"
 # models = ["vercel/typesafe-ai/jev"]
 
-# Stable names for client configs (aichat, qmd, pi, vicinae) that cannot list
+# Stable names for client configs (aichat, pi, vicinae) that cannot list
 # models: point them here and rename groups freely.
 [aliases]
 chat = "aaa"

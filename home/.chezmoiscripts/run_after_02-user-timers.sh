@@ -6,9 +6,10 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer qmd-refresh.timer qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service
+# unit-list: vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service
 # Also DISABLES voxtype.service — see the block near the end of this file —
-# and stops the retired emacs.service on machines that still run it.
+# and stops the retired emacs.service and qmd-refresh.timer on machines that
+# still run them.
 set -euo pipefail
 
 # ssh-agent.socket: Fedora's packaged agent unit — socket activation, so
@@ -39,10 +40,6 @@ set -euo pipefail
 # homepod-sink.service and havit-guard.service are safe everywhere: the sink
 # host sleeps unless the machine holds an office-LAN address, and the guard
 # idles on dbus signals for one specific headset that never appears elsewhere.
-# qmd-refresh.timer keeps the local document index (docs/qmd-2026-09-14.md)
-# fresh; its service carries ConditionPathExists on the qmd binary, which
-# run_after_56-qmd.sh installs later in the same apply, so on a fresh machine
-# the timer arms here and its first firing after 56 does the work.
 # battery-health-log.timer is safe everywhere for a different reason — it
 # carries ConditionPathExistsGlob on a battery's charge_full_design, so the
 # Mac mini and the NUC arm a timer that never runs anything. That is the gate
@@ -52,7 +49,7 @@ set -euo pipefail
 # and exits when there is none, so a machine that has never unblocked a
 # category — or has no family DNS profile at all — arms a timer that does
 # nothing. See the unit for why the transient restore timer needs a backstop.
-units=(vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer qmd-refresh.timer)
+units=(vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently
@@ -102,6 +99,21 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
       && echo "user units: emacs.service stopped and disabled (retired)"
   fi
   rm -rf "$HOME/.config/systemd/user/emacs.service.d"
+  # qmd-refresh.timer is retired with qmd (2026-10-08). Its unit files are
+  # dangling links by now (run_after_50 sweeps them later in this apply), so
+  # is-enabled cannot be trusted: disable quietly, then drop the wants link
+  # by hand, which run_after_50 never matches — it points into ~/.config,
+  # not into the repo. A no-op on a machine that never had it.
+  if [ -e "$HOME/.config/systemd/user/timers.target.wants/qmd-refresh.timer" ] \
+    || [ -L "$HOME/.config/systemd/user/timers.target.wants/qmd-refresh.timer" ]; then
+    systemctl --user disable --now qmd-refresh.timer qmd-refresh.service >/dev/null 2>&1 || true
+    rm -f "$HOME/.config/systemd/user/timers.target.wants/qmd-refresh.timer"
+    systemctl --user daemon-reload 2>/dev/null || true
+    # A stop on a not-found unit leaves it listed as failed, which would
+    # keep the user manager degraded until the next login.
+    systemctl --user reset-failed qmd-refresh.timer qmd-refresh.service 2>/dev/null || true
+    echo "user units: qmd-refresh.timer stopped and disabled (retired)"
+  fi
   # voxtype.service is the one unit here that must be OFF. Its daemon PRELOADS
   # the whisper model rather than loading it per utterance — 486 MB resident
   # for small.en, measured — so leaving it enabled parks half a gigabyte on a

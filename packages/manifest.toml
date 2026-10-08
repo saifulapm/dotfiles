@@ -942,7 +942,7 @@ why = "Go language server — kakoune-lsp's default server for Go"
 name = "libwebp-devel"
 category = "dev"
 arch = "all"
-why = "Hype build dep: it links -lwebpdemux -lwebp (run_after_58-hype-monologue)"
+why = "Hype build dep: it links -lwebpdemux -lwebp (run_after_58-hype)"
 
 [[pkg]]
 name = "podman"
@@ -1457,13 +1457,13 @@ why = "Qt Multimedia — omacut's .pro declares QT += multimedia (video preview)
 name = "zlib-ng-compat-devel"
 category = "dev"
 arch = "all"
-why = "zlib.h — [[tool]] hype-monologue: hype.pro links -lz (PPTX export writes zip containers). Was on disk undeclared, pulled in only transitively by freetype-devel/libpng-devel and friends; claimed 2026-09-28 so the build does not depend on that chain"
+why = "zlib.h — [[tool]] hype: hype.pro links -lz (PPTX export writes zip containers). Was on disk undeclared, pulled in only transitively by freetype-devel/libpng-devel and friends; claimed 2026-09-28 so the build does not depend on that chain"
 
 [[pkg]]
 name = "source-highlight"
 category = "optional"
 arch = "all"
-why = "GNU source-highlight CLI — [[tool]] hype-monologue: Hype runs `source-highlight --out-format=html-css` for every fenced code block (runtime, not a link dep; upstream PKGBUILD depends on it). Without it code slides render unhighlighted. Was on disk undeclared; claimed 2026-09-28"
+why = "GNU source-highlight CLI — [[tool]] hype: Hype runs `source-highlight --out-format=html-css` for every fenced code block (runtime, not a link dep; upstream PKGBUILD depends on it). Without it code slides render unhighlighted. Was on disk undeclared; claimed 2026-09-28"
 
 # gtk4-devel was here until 2026-08-18. Its ONLY job was giving cargo the
 # headers to build ripdrag (gtk4-sys), and ripdrag went the day yazi got native
@@ -2230,9 +2230,9 @@ via  = "run_after_13-oma-apps.sh — clone omacom-io/{omacalc,omawrite,omacut}, 
 why  = "Omarchy's Qt Quick calculator, writing app and video trimmer (user decision 2026-08-07, all three). MIT-licensed. omacalc and omawrite watch a 5-key colors.toml (mode/background/foreground/accent/selection) and re-tint live; templates/oma-theme.toml.tmpl emits exactly that file from the active theme on every theme-apply, so they follow this desktop's theme system natively. omacut has no theme-watch code at its pinned revision (verified 2026-08-07 — the sed is a harmless no-op there; re-check on upstream bumps). omacut's export hardcodes libx264, so it needs the RPM Fusion ffmpeg (entry above) — with that in place it builds fully unpatched"
 
 [[tool]]
-name = "hype-monologue"
-via  = "run_after_58-hype-monologue.sh — clone github.com/omacom/{hype,monologue} (tracking main, like the oma apps; main was the v0.4.3 / v0.2.0 release commits when added) into ~/.local/src, upstream's bin/build (qmake6 + make), install the binary to ~/.local/bin and pkgbuild/'s .desktop + .svg verbatim into ~/.local/share/{applications,icons/hicolor/scalable/apps}. `just update-all` rolls both forward through its source-build sweep"
-why  = "Omarchy's Markdown presentation app (Hype) and one-key webcam recorder (Monologue), MIT (user decision 2026-09-28, omarchy gap report). Build deps: qt6-qtbase-devel, qt6-qtdeclarative-devel, qt6-qtmultimedia-devel, libwebp-devel, zlib-ng-compat-devel (Hype), pulseaudio-libs-devel (Monologue); runtime ffmpeg (both) and source-highlight (Hype's code blocks). Neither links Qt private API (no *-private in QT +=, zero Qt_6.x_PRIVATE_API symbols), so qt6 patch bumps do not break them the way they break quickshell. UNPATCHED theme paths: both read ~/.local/state/omarchy/current/theme/colors.toml (Hype: background/foreground/accent/selection/lighter_background/active_border_color/red + rounding from theme/hyprland.conf; Monologue: accent only) and fall back to built-in colours"
+name = "hype"
+via  = "run_after_58-hype.sh — clone github.com/omacom/hype (tracking main, like the oma apps; main was the v0.4.3 release commit when added) into ~/.local/src, upstream's bin/build (qmake6 + make), install the binary to ~/.local/bin and pkgbuild/'s .desktop + .svg verbatim into ~/.local/share/{applications,icons/hicolor/scalable/apps}. `just update-all` rolls it forward through its source-build sweep"
+why  = "Omarchy's Markdown presentation app, MIT (user decision 2026-09-28, omarchy gap report). Build deps: qt6-qtbase-devel, qt6-qtdeclarative-devel, qt6-qtmultimedia-devel, libwebp-devel, zlib-ng-compat-devel; runtime ffmpeg and source-highlight (code blocks). No Qt private API (no *-private in QT +=, zero Qt_6.x_PRIVATE_API symbols), so qt6 patch bumps do not break it the way they break quickshell. UNPATCHED theme path: reads ~/.local/state/omarchy/current/theme/colors.toml (background/foreground/accent/selection/lighter_background/active_border_color/red + rounding from theme/hyprland.conf) and falls back to built-in colours. Monologue, omarchy's webcam recorder, was built alongside it until 2026-10-08 (removed, user decision)"
 
 [[tool]]
 name = "chromium-config"

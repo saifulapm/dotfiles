@@ -10,8 +10,8 @@ import type { AgentTool, Capability } from "../lib/tools";
 //
 // stdio and not HTTP because the server is a child of this worker: it lives
 // as long as the chat does and dies with it, and nothing has to be daemonised
-// or port-managed. For qmd that also means its ~2 GB of GGUF models load once
-// per conversation instead of once per call.
+// or port-managed. A server with a costly start-up pays it once per
+// conversation instead of once per call.
 
 export type ServerConfig = {
   command: string;
@@ -20,12 +20,12 @@ export type ServerConfig = {
   title?: string;
   enabled?: boolean;
   /** Appended to every tool description: what the server does not say
-   *  about itself but the model needs — qmd's collection names, say. */
+   *  about itself but the model needs — a search server's collection names, say. */
   description?: string;
 };
 
-// qmd's reranked query took over a minute on this CPU while the embedding
-// service was running, and the SDK's default request timeout is 60 s. A
+// A local search server's reranked query has taken over a minute on this
+// CPU, and the SDK's default request timeout is 60 s. A
 // tool call is abortable by Stop anyway, so the timeout only has to catch a
 // server that hung.
 const CALL_TIMEOUT_MS = 5 * 60 * 1000;
@@ -70,8 +70,8 @@ export function mcpServer(id: string, config: ServerConfig): Capability & { clos
               undefined,
               { signal, timeout: CALL_TIMEOUT_MS },
             );
-            // Text, or an embedded resource — qmd's `get` answers with the
-            // document as a resource block, uri + mimeType + text — and a
+            // Text, or an embedded resource — a server's `get` may answer with
+            // the document as a resource block, uri + mimeType + text — and a
             // placeholder for anything else (an image, say).
             const blocks = (result.content ?? []) as Array<{
               type: string;

@@ -169,7 +169,6 @@ update_src "$HOME/.local/src/omacalc" "$HOME/.local/bin/omacalc" omacalc
 update_src "$HOME/.local/src/omacut" "$HOME/.local/bin/omacut" omacut
 update_src "$HOME/.local/src/omawrite" "$HOME/.local/bin/omawrite" omawrite
 update_src "$HOME/.local/src/hype" "$HOME/.local/bin/hype" hype
-update_src "$HOME/.local/src/monologue" "$HOME/.local/bin/monologue" monologue
 update_src "$HOME/.local/src/kakfeed" "$HOME/.local/bin/elfeed-kak" elfeed-kak
 update_src "$HOME/.local/src/libinput-gestures" "$HOME/.local/bin/libinput-gestures" libinput-gestures
 # dekho's build is the long one here (librqbit), so it only ever runs when
@@ -208,8 +207,8 @@ done < <(cargo install --list | awk '/^[^ ]/ { pkg = $1; next } { print pkg, $1 
 # --------------------------------------------------------------- toolchains
 say "toolchains"
 # A node bump lands AFTER the apply above, in a fresh empty lib/node_modules,
-# and pi/qmd (npm globals, guarded on the active node's bin dir by
-# run_after_04/56) only come back on the next apply — so run it again here.
+# and pi (an npm global, guarded on the active node's bin dir by
+# run_after_04) only comes back on the next apply — so run it again here.
 node_before="$(mise where node 2>/dev/null)"
 mise up || warn "mise up failed"
 if [ "$(mise where node 2>/dev/null)" != "$node_before" ]; then

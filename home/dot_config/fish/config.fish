@@ -45,8 +45,8 @@ if status is-interactive
     end
 end
 
-# Pi — the global npm bins (pi, qmd) live only in the lts node install, so a
-# project pinning another node via .nvmrc would hide them from the shims (and
+# Pi — the global npm bin (pi) lives only in the lts node install, so a
+# project pinning another node via .nvmrc would hide it from the shims (and
 # make the shim auto-install that node). mise's `lts` alias symlink follows
 # upgrades; a hard-coded version dir did not survive `mise up`.
 fish_add_path "$HOME/.local/share/mise/installs/node/lts/bin"
