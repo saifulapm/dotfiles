@@ -134,7 +134,7 @@ update_src() { # <src-dir> <installed-binary> <label>
   local src="$1" bin="$2" label="$3"
   if ! git -C "$src" rev-parse HEAD >/dev/null 2>&1; then
     echo "  $label: no checkout — the apply will clone and build"
-    rm -f "$bin"
+    [ -z "$bin" ] || rm -f "$bin"
     return
   fi
   local branch
@@ -149,8 +149,12 @@ update_src() { # <src-dir> <installed-binary> <label>
   fi
   echo "  $label: $(git -C "$src" rev-parse --short HEAD) → $(git -C "$src" rev-parse --short FETCH_HEAD) — rebuilding on apply"
   git -C "$src" reset -q --hard FETCH_HEAD
-  rm -f "$bin"
+  [ -z "$bin" ] || rm -f "$bin"
 }
+# The skills clone has no binary: run_after_59 links into the checkout, so the
+# reset above IS the update, and the apply links what it gained and prunes
+# what it dropped.
+update_src "$HOME/.local/src/skills" "" skills
 update_src "$HOME/.local/src/kakoune" "$HOME/.local/bin/kak" kakoune-fork
 update_src "$HOME/.local/src/nirisnap" "$HOME/.local/bin/omasnap" nirisnap
 update_src "$HOME/.local/src/nirisaver" "$HOME/.local/bin/nirisaver" nirisaver
