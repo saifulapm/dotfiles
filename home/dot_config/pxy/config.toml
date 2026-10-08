@@ -107,14 +107,6 @@ models = [
   "zenmux/moonshotai/kimi-k3",
 ]
 
-# Jev is an evaluation model, not a chat model: the gateway 400s it on
-# /v1/chat/completions. It becomes a `[media] systemone` chain and
-# `[providers.vercel.media]` capability when m14-verify-jev lands
-# (wiki:jev, fact of 2026-09-19).
-# [groups.jev]
-# name = "Jev"
-# models = ["vercel/typesafe-ai/jev"]
-
 # Stable names for client configs (aichat, pi, vicinae) that cannot list
 # models: point them here and rename groups freely.
 [aliases]
@@ -199,9 +191,6 @@ rpm = 20
 daily_requests = 1000
 reset = "00:00"
 reset_tz = "UTC"
-[providers.openrouter.media]
-systemone_url = "https://openrouter.ai/api/alpha/decisions"
-systemone_models = ["typesafe/jev-1.13"]
 
 [providers.aihubmix]
 base_url = "https://aihubmix.com/v1/chat/completions"
@@ -626,11 +615,6 @@ base_url = "https://ai-gateway.vercel.sh/v1/chat/completions"
 api_key = { pass = "AI/vercel-gateway/main" }
 balance_url = "https://ai-gateway.vercel.sh/v1/credits"
 models = []
-# Jev, Typesafe's System One model (wiki:jev), for verify and web_search re-ranking.
-[providers.vercel.media]
-kind = "vercel"
-systemone_url = "https://ai-gateway.vercel.sh/v4/ai/evaluation-model"
-systemone_models = ["typesafe-ai/jev"]
 
 # [providers.elevenlabs]
 # api_key = { pass = "AI/elevenlabs/main" }
@@ -693,7 +677,6 @@ transcription = [
 speech = ["cloudflare/@cf/deepgram/aura-2-en"]
 rerank = ["jina/jina-reranker-v3.5"]
 video = "agnes/agnes-video-2.5-flash"
-systemone = ["vercel/typesafe-ai/jev", "openrouter/typesafe/jev-1.13"]
 
 [[search.providers]]
 name = "brave"
@@ -745,7 +728,6 @@ enabled = [
   "describe_image",
   "memory",
   "find_docs",
-  "verify",
 ]
 max_tool_calls = 10
 # Three cheap, fast, different-family panelists; the strongest model analyses.
@@ -788,18 +770,9 @@ ocr_model = "jina/jina-ocr-v1"
 [server_tools.defaults.find_docs]
 max_tokens = 4000
 
-# One claim against one passage through Jev; evidence, never a gate (wiki:jev).
-[server_tools.defaults.verify]
-abstain_below = 0.5
-
 # find_docs' Context7 account key: anonymous calls share a per-IP cap of 200.
 [server_tools.context7]
 api_key = { pass = "AI/context7/main" }
-
-# Re-rank web_search hits with Jev: one extra 70-500 ms call per search.
-[server_tools.jev]
-rerank_web_search = true
-rerank_min = 0.3
 
 # ---------------------------------------------------------------------------
 # Request artifact capture — errors only. Failed attempts land in

@@ -31,9 +31,9 @@ into a locked screen — and tell them what you left open on it.
 1. **Text before pixels.** `tmux capture-pane`, `niri msg -j …`, `qs ipc`,
    and command output are free; screenshots cost real money. Screenshot only
    when a question is genuinely visual. When the text is free but *reading*
-   it is not — a megabyte of page snapshot to find one ref — the `jev` skill
-   judges it for a fraction of a cent and hands back the answer alone. It
-   never goes ahead of something `jq` or `grep` already answers.
+   it is not — a megabyte of page snapshot to find one ref — search it
+   (`playwright-cli find`, `grep` the snapshot file, `gui tree | grep`)
+   instead of dumping it, or hand the job to an operator subagent.
 2. **Never capture the full screen at native scale.** Always
    `grim -s 1 -g "X,Y WxH" /tmp/shot.png` — the smallest region that answers
    the question. `-s 1` maps image pixels 1:1 to logical/pointer coordinates.
@@ -73,38 +73,25 @@ it stops at anything not authorised. It drives `scripts/screen` (the
 computer-use action set — `shot`, `zoom`, `click`, `key`… — in screenshot
 pixels), which you can use the same way.
 
-**`jev` sits across all four**, on PATH, and answers a question *about* a
-surface without that surface entering the conversation — a real page snapshot
-is 1.2 MB, and `jev` costs about $0.0005 to read it and hand back one ref or
-one probability. **Reach for it whenever the honest alternative is dumping a
-snapshot, a widget tree or a pane into context to answer one question.** It
-never goes ahead of something `jq` or `grep` already answers. `jev --help`,
-and the `jev` skill for the whole reference.
-
 ## The loop — every interaction, any app type
 
 ```
 - [ ] 1. Pick the cheapest channel that answers the question: command/curl
-        output → gui/web/tmux/IPC text → jev → OCR → region screenshot
+        output → gui/web/tmux/IPC text → OCR → region screenshot
 - [ ] 2. Before input: verify the target (focused window id, active pane,
-        highlighted row) — never assume state carried over from a prior call.
-        `jev pane <session> "<claim>"` reads a highlight without the SGR
-        regex; `jev guard` vets a destructive keystroke before you send it
+        highlighted row) — never assume state carried over from a prior call
 - [ ] 3. Act in one atomic burst (focus+verify+type in a single Bash call)
 - [ ] 4. Verify the effect through the cheapest channel before concluding —
-        a failed interaction is usually your targeting, not the app.
-        `jev check "<claim>"` settles a page claim without reading the page
+        a failed interaction is usually your targeting, not the app
 - [ ] 5. Revert what you touched: windows, sessions, focus, files, settings
 ```
 
 **Which one, measured on this machine (2026-10-08):** a single question is
-fastest by hand — `gui click` 0.3 s, `jev pick` ~2 s, `jev check`/`jev gui`
-1.5–3.5 s, `jev pane` 0.7–1 s, a one-click `jev-browse` 6.5 s. A job of
+fastest by hand — `gui click` 0.3 s, `playwright-cli find` 0.5 s. A job of
 several steps goes to a Haiku operator: `browser-operator` 16–25 s for a
 search-and-read or a signed-in lookup, `desktop-operator` 24–50 s for a
-pixel-driven GUI job. They cost more wall time than one jev call but take
-the whole loop — and every snapshot and screenshot — out of your context,
-and they can type and quote what they read, which jev cannot.
+pixel-driven GUI job. They take the whole loop — and every snapshot and
+screenshot — out of your context.
 
 If an interaction "did nothing", suspect steps 2–3 before reporting an app
 bug — re-verify at fullscreen / re-read the real state, then retest once.
@@ -151,9 +138,6 @@ bug — re-verify at fullscreen / re-read the real state, then retest once.
   your tool calls can move focus at any moment (they answer you mid-turn).
 - **grim BEFORE pressing Return inside qshell panels.** Blind Right+Return in
   the network panel once switched the user's DNS to Cloudflare. Look, then press.
-  `jev guard "<what the keystroke does>" --asked "<what was actually asked
-  for>" --context <the shot's OCR>` answers that in one call — replayed
-  against this exact incident it stops on authorised=0.05.
 
 ## Mouse — scripts/mouse (wlrctl to point, ydotool to hold)
 
@@ -233,10 +217,7 @@ tmux kill-session -t agent-x                  # always
   and a bare-`[7m` match misses it (that miss once produced a false
   "selection vanished" bug report). Selection is often sticky on an old
   row, not the row you assume (that once armed a destructive action on the
-  wrong list item — caught just in time). `jev pane <session> "the
-  highlighted row is <X>"` asks that question without the regex: it marks
-  the reverse-video run itself, then judges it. Replayed against that
-  incident it answers 0.01 for the intended row and 0.98 for the stuck one.
+  wrong list item — caught just in time).
 - Fast typed strings can outrun a TUI's input handling (palettes,
   autocomplete): type, pause, then Enter — and re-capture between steps.
 - tmux pane → screen coords for clicking: `display-message -p -t %N
@@ -301,7 +282,7 @@ drives `playwright-cli` itself, in either session by the rule below, and
 hands back a few lines — no snapshot or screenshot reaches you. Its brief
 must name the goal, what counts as done, whether their login is needed, and
 every text it may type and commit action it may take. A single lookup is
-still cheaper by hand with `jev pick`/`jev check`.
+still cheaper by hand with `find`.
 
 One tool does both — `playwright-cli`. Default hard to `open`: isolated,
 headless, repeatable, and it never touches their profile. Escalate to
@@ -321,21 +302,18 @@ playwright-cli console             # errors without a screenshot
 playwright-cli close-all           # always
 ```
 
-**Do not `snapshot` to find one element.** A real page is 1.2 MB of YAML and
-reading it to locate a ref is the single most expensive habit on this
-machine. Two commands replace it, both on PATH:
+**Do not read a snapshot to find one element.** A real page is 1.2 MB of
+YAML and reading it to locate a ref is the single most expensive habit on
+this machine. Every action already writes the snapshot to a file under
+`.playwright-cli/` and prints its path — search that instead:
 
 ```sh
-ref=$(jev pick "the add-to-cart button" --grep cart)   # → e6, page never read
-jev check "the order was placed" && echo confirmed     # → exit 0/2, page never read
-jev-browse "reach the open issues list" https://github.com/org/repo
+playwright-cli find "Add to cart"                        # matching nodes + refs
+grep -n -i 'button.*cart' .playwright-cli/page-*.yml | tail -5
 ```
 
-`jev pick` needs `--grep` on a big page (it refuses past 254 candidates
-rather than guess). `jev-browse` walks a multi-step goal in one call and
-hands back where it landed — it navigates and reads, and stops at anything
-that looks like a commit point. The `playwright-cli` skill is the vendor's
-own file and says nothing about these; this block is the pairing.
+Snapshot lines start with the node's role (`- button "Add to cart"`), so
+never anchor a pattern with `^`.
 
 The config pins Fedora's chromium (`launchOptions.executablePath`) —
 without `--config`, `open` dies looking for `/opt/google/chrome/chrome`,

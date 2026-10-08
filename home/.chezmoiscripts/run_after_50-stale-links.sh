@@ -55,9 +55,12 @@ declare -a parents=()
 
 # Bounded on purpose. These are the only trees chezmoi deploys into with
 # symlinks; sweeping $HOME wholesale would drag in caches, build trees and
-# every project checkout for no gain.
+# every project checkout for no gain. ~/.claude is named by its two linked
+# subtrees, not whole — its projects/ holds every session transcript. The
+# jev skill (removed 2026-10-08) is what showed it was missing.
 roots=()
-for root in "$HOME/.config" "$HOME/.local/share" "$HOME/.local/state" "$HOME/.local/bin"; do
+for root in "$HOME/.config" "$HOME/.local/share" "$HOME/.local/state" "$HOME/.local/bin" \
+  "$HOME/.claude/skills" "$HOME/.claude/agents"; do
   [ -d "$root" ] && roots+=("$root")
 done
 

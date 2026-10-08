@@ -5,6 +5,5 @@ bench/.last-qs.log
 # per-directory agent memory, auto-populated by claude code reviews
 **/.claude/
 
-# python bytecode, from importing bin/otp-import as a module while testing,
-# and from the jev skill's scripts sharing _jev.py
+# python bytecode, from importing bin/otp-import as a module while testing
 __pycache__/

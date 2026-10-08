@@ -15,7 +15,3 @@
   No machine-conditional entries at the moment: the NUC's mail pinentry
   opt-out lived here until 2026-09-22, when the NUC became a machine somebody
   sits at and it stopped having a reason to differ from the laptops. */ -}}
-{{/* Python bytecode from the jev skill's scripts importing _jev.py as a
-     module. It appears in the source dir the moment a script runs, and
-     chezmoi would otherwise try to manage — and prompt about — a cache. */}}
-.claude/skills/jev/scripts/__pycache__

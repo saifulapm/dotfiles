@@ -92,7 +92,6 @@ managed=$(
       "Bash(gh release list:*)",
       "Bash(redis-cli:*)",
       "Bash(playwright-cli:*)",
-      "Bash(jev:*)",
       "Bash(tmux:*)"
     ],
     "deny": [

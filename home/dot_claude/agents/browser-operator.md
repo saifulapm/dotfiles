@@ -53,14 +53,11 @@ the snapshot: a real page is a megabyte. Instead:
   Snapshot lines start with the node's role (`- rowheader "Born"`), so
   never anchor a pattern with `^`; match the text itself.
 - `grep -n -i 'button.*save' .playwright-cli/page-<latest>.yml | head`.
-- `jev pick "the add-to-cart button" --grep cart -s op` → one ref, page
-  unread; `jev check "the order list shows 3 rows" -s op` → exit 0 true,
-  2 false, 3 unsure (look yourself).
 - `playwright-cli -s=op screenshot --filename=/tmp/browse/s.png` and Read
   it when the question is visual (layout, colour, an image, a chart).
 
 Refs (`e6`) go stale after the page changes: re-find after each navigation.
-Verify each effect — the URL, a `find`, a `jev check` — before the next step.
+Verify each effect — the URL, a `find` — before the next step.
 
 ## What you may do without asking
 
