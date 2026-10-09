@@ -137,17 +137,7 @@ managed=$(
           }
         ]
       }
-    ],
-    "Stop": [
-  		{
-        "hooks": [
-          {
-            "type": "command",
-    				"command": "mem session-check --session-id \"$CLAUDE_CODE_SESSION_ID\" --hook-json || true"
-          }
-        ]
-      }
-		]
+    ]
   },
   "worktree": {
     "symlinkDirectories": [
@@ -220,8 +210,12 @@ current=$(cat)
 # ANTHROPIC_DEFAULT_HAIKU_MODEL pins the haiku alias to Haiku 5.5 (2026-10-08):
 # Claude Code's built-in helper agents still resolved it to Haiku 4.5, which
 # costs ten times as much per input token and scores far lower.
+#
+# The Stop hook (`mem session-check`) went on 2026-10-09: of 240 nudges, 7 were
+# followed by a mem write, and every one woke the model for another turn.
 printf '%s' "$current" | jq --argjson managed "$managed" '
   del(.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC)
   | del(.modelSettings["claude-opus-5"])
   | del(.subagentPromptCacheTtl)
+  | del(.hooks.Stop)
   | . * $managed'
