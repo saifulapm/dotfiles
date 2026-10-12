@@ -406,7 +406,7 @@ Scope {
                             anchors.fill: parent
                             source: slice.sourceActivated && slice.imagePath ? "file://" + slice.imagePath.split("/").map(encodeURIComponent).join("/") : ""
                             fillMode: Image.PreserveAspectCrop
-                            // Both callers hand this a 1536px cached
+                            // Both callers hand this a 1152px cached
                             // thumbnail (bin/wallpaper-thumbs — omarchy's
                             // thumbnail cache rebuilt on ffmpeg), so this
                             // decode is cheap. Decoded at the expanded
@@ -419,8 +419,11 @@ Scope {
                             // materializes a 4K source before downscaling
                             // (~110 MiB transient across a browse, measured
                             // 2026-08-09 — the reason the thumbnails exist).
-                            sourceSize.width: Math.ceil(pickerRoot.expandedWidth * Screen.devicePixelRatio)
-                            sourceSize.height: Math.ceil(pickerRoot.expandedHeight * Screen.devicePixelRatio)
+                            // Capped at 1.5x (user call, 2026-10-13): full
+                            // DPR 2 peaked a browse at +246 MiB; 1.5x keeps
+                            // the preview near-sharp at a fraction of that.
+                            sourceSize.width: Math.ceil(pickerRoot.expandedWidth * Math.min(Screen.devicePixelRatio, 1.5))
+                            sourceSize.height: Math.ceil(pickerRoot.expandedHeight * Math.min(Screen.devicePixelRatio, 1.5))
                             asynchronous: true
                             cache: true
                             smooth: true
