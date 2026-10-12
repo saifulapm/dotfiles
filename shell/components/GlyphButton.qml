@@ -20,8 +20,12 @@ Rectangle {
     signal hovered
     signal activated
 
-    implicitWidth: theme.space(8)
-    implicitHeight: theme.space(7)
+    // Square, whole and odd, so the highlight is not wider than tall and an
+    // icon glyph (usually an odd number of pixels wide) has the same space on
+    // both sides (omarchy be052339). Kept at our row height rather than their
+    // 22 px minimum.
+    implicitWidth: theme.space(7) | 1
+    implicitHeight: implicitWidth
     radius: theme.radius(0.75)
     color: glyphHover.hovered && glyphButton.enabled ? theme.alpha(theme.textPrimary, 0.08) : theme.surface2
     border.width: theme.borderWidth
@@ -30,7 +34,10 @@ Rectangle {
 
     OpticalGlyph {
         id: buttonGlyph
-        anchors.centerIn: parent
+        // Snapped to whole pixels so the glyph doesn't round away from
+        // the fill's centre (omarchy be052339).
+        x: Math.round((parent.width - width) / 2)
+        y: Math.round((parent.height - height) / 2)
         text: glyphButton.glyph
         color: glyphButton.busy ? glyphButton.theme.accent : glyphButton.theme.textPrimary
         pixelSize: glyphButton.glyphSize

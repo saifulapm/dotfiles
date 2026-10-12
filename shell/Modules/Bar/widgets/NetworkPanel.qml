@@ -1991,11 +1991,18 @@ BarPanel {
         signal activated
 
         anchors.verticalCenter: parent.verticalCenter
-        implicitWidth: panel.theme.space(8)
-        implicitHeight: panel.theme.space(7)
+        // Square, whole and odd, so the highlight is not wider than tall and
+        // an icon glyph (usually an odd number of pixels wide) has the same
+        // space on both sides (omarchy be052339). Kept at our row height
+        // rather than their 22 px minimum.
+        implicitWidth: panel.theme.space(7) | 1
+        implicitHeight: implicitWidth
 
         OpticalGlyph {
-            anchors.centerIn: parent
+            // Snapped to whole pixels so the glyph doesn't round away from
+            // the fill's centre (omarchy be052339).
+            x: Math.round((parent.width - width) / 2)
+            y: Math.round((parent.height - height) / 2)
             text: heroAction.glyph
             color: panel.theme.textPrimary
             pixelSize: panel.theme.fontPx(1.15)
