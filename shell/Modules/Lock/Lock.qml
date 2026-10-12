@@ -63,6 +63,15 @@ Scope {
     // engages (realizeLockTarget only emits on the unlock branch), so a binding
     // on `sessionLock.locked` alone reads a stale false for the whole session.
     readonly property bool locked: lockRequested || sessionLock.locked || sessionLock.secure
+
+    // Decisions read the lock state afresh (omarchy d1a614ce). The binding
+    // above has been seen reading true long after an unlock, with
+    // lockRequested and secure both false and the desktop plainly visible —
+    // the idle lock stage then took the session for locked and never locked
+    // it. The binding stays for what only needs change notifications.
+    function currentlyLocked() {
+        return lockRequested || sessionLock.locked || sessionLock.secure;
+    }
     readonly property bool secure: sessionLock.secure
     readonly property bool authenticating: authenticatingPassword || fingerprintAuthenticating
     // Whether we are the reason the monitors are off. omarchy fires their wake
@@ -220,7 +229,7 @@ Scope {
     }
 
     function finishUnlock() {
-        if (!locked && !lockRequested)
+        if (!currentlyLocked())
             return;
         lockRequested = false;
         pendingSessionLock = false;

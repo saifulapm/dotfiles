@@ -536,14 +536,18 @@ ShellRoot {
         const item = lockLoader.item;
         if (item === null)
             return;
-        if (item.locked || item.previewVisible)
+        if (item.currentlyLocked() || item.previewVisible)
             return;
         Qt.callLater(() => lockLoader.release());
     }
 
     // For anything that must not re-lock an already locked session (the idle
-    // service's lock stage).
-    readonly property bool locked: lockLoader.item !== null && lockLoader.item.locked
+    // service's lock stage). A function reading the lock's live state, not a
+    // binding chained through the loader: see Lock.qml's currentlyLocked().
+    function currentlyLocked() {
+        const item = lockLoader.item;
+        return item !== null && item.currentlyLocked();
+    }
 
     // Whether the lock screen may power the panel off. False on the Mac mini,
     // whose 4K60 output goes through Apple's DP2HDMI bridge: a modeset there
@@ -1199,11 +1203,11 @@ ShellRoot {
         }
 
         function status(): string {
-            return shell.locked ? "locked" : "unlocked";
+            return shell.currentlyLocked() ? "locked" : "unlocked";
         }
 
         function isLocked(): string {
-            return shell.locked ? "true" : "false";
+            return shell.currentlyLocked() ? "true" : "false";
         }
 
         // Everything the lock knows about itself, for diagnosing a lock that
@@ -1217,7 +1221,7 @@ ShellRoot {
             const l = lockLoader.item;
             return JSON.stringify({
                 loaded: true,
-                locked: l.locked,
+                locked: l.currentlyLocked(),
                 requested: l.lockRequested,
                 pending: l.pendingSessionLock,
                 secure: l.secure,

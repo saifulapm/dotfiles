@@ -185,7 +185,7 @@ QtObject {
     }
 
     function launchScreensaver() {
-        if (shellRoot.locked) {
+        if (shellRoot.currentlyLocked()) {
             logEvent("screensaver", "skipped-locked");
             return;
         }
@@ -222,7 +222,7 @@ QtObject {
         // The lock surface steals focus, so the screensaver would notice and
         // exit within a second anyway — the kill just skips the overlap.
         killScreensaver();
-        if (shellRoot.locked) {
+        if (shellRoot.currentlyLocked()) {
             logEvent("lock-skipped", "already locked");
             return;
         }
