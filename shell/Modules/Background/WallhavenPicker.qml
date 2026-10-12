@@ -201,8 +201,13 @@ Scope {
         if (lines.length === 0) {
             // Empty response (API failure or genuine empty result set) —
             // keep the previous items visible so a transient blip doesn't
-            // blank the strip. Don't cache an empty page either.
+            // blank the strip. Don't cache an empty page either. A first
+            // load has nothing worth keeping, though: settle the strip on an
+            // empty set, or it stays unsettled and FilmstripPicker takes
+            // only Escape — no retyping, no Ctrl+S to another source.
             pendingKey = "";
+            if (!strip.loaded)
+                strip.setItems([], 0);
             return;
         }
 
