@@ -13,9 +13,9 @@
 # ~/.local/bin is on the session PATH).
 #
 # UNPATCHED, unlike the oma apps: it reads the omarchy theme from
-# ~/.local/state/omarchy/current/theme/colors.toml and falls back to built-in
-# colours without it. Pointing it at this desktop's theme is a separate,
-# unapproved decision.
+# ~/.local/state/omarchy/current/theme/colors.toml. Since 2026-10-13
+# theme-apply renders that file from the active theme (for disktree, user
+# decision), so Hype follows this desktop's theme switcher without a patch.
 #
 # It does not link Qt's private API (no *-private in QT +=), so a Fedora qt6
 # patch bump does not break it the way it breaks quickshell. Deps, all in

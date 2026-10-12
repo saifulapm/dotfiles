@@ -384,6 +384,10 @@ const OUTPUTS = {
   ],
   "niri-theme.kdl.tmpl": [path.join(HOME, ".local/state/qshell/niri-theme.kdl")],
   "oma-theme.toml.tmpl": [path.join(HOME, ".local/state/qshell/oma-theme.toml")],
+  // omarchy's own palette file, which their apps read unpatched: disktree
+  // (gpui-omarchy) and Hype. Both watch it and retint live. theme.name, its
+  // sibling, is written below the loop.
+  "omarchy-colors.toml.tmpl": [path.join(HOME, ".local/state/omarchy/current/theme/colors.toml")],
   // yazi renders as a FLAVOR plus a two-line theme.toml that selects it. The
   // flavor is the only form that carries a tmTheme, and the tmTheme is what
   // colours the code preview — the one surface that never followed the theme
@@ -443,6 +447,17 @@ for (const [tmplName, dests] of Object.entries(OUTPUTS)) {
 }
 if (missing.length) console.warn("theme-apply: tokens missing from theme:",
   [...new Set(missing)].join(", "))
+
+// omarchy's current/theme.name, beside the colors.toml rendered above.
+// gpui-omarchy shows it as the theme's name. omarchy keeps the slug there, and
+// so does our own theme.name, which theme-set and theme-from-image write before
+// they run this script.
+{
+  let name = ""
+  try { name = fs.readFileSync(path.join(HOME, ".local/state/qshell/theme.name"), "utf8").trim() } catch (e) { /* no theme set yet */ }
+  if (!name) name = String(tokens["meta.name"] || "")
+  if (name) writeAtomic(path.join(HOME, ".local/state/omarchy/current/theme.name"), name + "\n")
+}
 
 // ---- GTK light/dark polarity ----
 // Two channels, because neither covers everything: gsettings is what
