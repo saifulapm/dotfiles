@@ -364,6 +364,28 @@ Scope {
         function closePanel(): string {
             return barRoot.closeAllPanels() ? "ok" : "no panel open";
         }
+
+        // Omarchy's `omarchy-bar set <id> <key> <value>`, for the clock-format
+        // picker (their 5ec8bd30; ours is the vicinae script
+        // shell-clock-format.sh): `qs ipc call bar setSetting clock format
+        // 'HH:mm'`. Goes through the widget's own persistSettings — the path
+        // its right-click cycle takes — so shell.json is written the same way.
+        // String values only. One copy is enough: every screen's copy reloads
+        // from the written config.
+        function setSetting(widgetId: string, key: string, value: string): string {
+            for (const b of barRoot.screenBars) {
+                for (const slot of b.moduleSlots) {
+                    const item = slot && slot.widgetId === widgetId ? slot.activeItem : null;
+                    if (item && typeof item.persistSettings === "function") {
+                        item.persistSettings({
+                            [key]: value
+                        });
+                        return "ok";
+                    }
+                }
+            }
+            return "no widget with settings: " + widgetId;
+        }
     }
 
     // The per-screen bar windows, registered so the IPC verbs above can

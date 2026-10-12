@@ -113,5 +113,20 @@ test("the heading names its month from a noon that always exists", () => {
     assert.match(panelSource, /viewDate: new Date\(viewYear, viewMonth, 1, 12\)/);
 });
 
+// The vicinae clock-format picker carries its own copy of the presets (with
+// omarchy's labels); it has to offer exactly what the right-click cycles.
+test("the clock-format picker lists the same presets as the cycle", () => {
+    const { execFileSync } = require("node:child_process");
+    const script = path.join(__dirname, "../../../../home/dot_local/share/vicinae/scripts/executable_shell-clock-format.sh");
+    const lines = fs.readFileSync(script, "utf8").split("\n").filter(line => /^\s*(formats|labels)=\(/.test(line));
+    const lists = lines.map(line => execFileSync("bash", ["-c", 'eval "$1"; printf "%s\\0" "${formats[@]:-}" "${labels[@]:-}"', "_", line.trim()], { encoding: "utf8" }).split("\0").filter(Boolean));
+    // vertical formats, vertical labels, horizontal formats, horizontal labels
+    assert.equal(lists.length, 4);
+    assert.deepEqual(lists[0], plain(Model.clockFormats(true)));
+    assert.deepEqual(lists[2], plain(Model.clockFormats(false)));
+    assert.equal(lists[1].length, lists[0].length);
+    assert.equal(lists[3].length, lists[2].length);
+});
+
 console.log(failures === 0 ? "\nall ClockModel tests passed" : `\n${failures} failing`);
 process.exit(failures === 0 ? 0 : 1);
