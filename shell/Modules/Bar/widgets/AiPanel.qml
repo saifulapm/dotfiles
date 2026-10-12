@@ -29,12 +29,13 @@ BarPanel {
     readonly property var days: provider ? (provider.recentDays || []) : []
     readonly property real peak: Math.max(1, Model.weekPeak(provider))
 
-    // Countdowns and the "today" row read this instead of Date.now() so the
-    // panel keeps telling the truth while it sits open — including across
-    // midnight.
-    property double nowMs: Date.now()
+    // Countdowns, rolled-over windows and the "today" row read this instead
+    // of Date.now() so the panel keeps telling the truth while it sits open —
+    // including across midnight. It is the widget's clock, so the limits and
+    // the hero's alarm colour move with it.
+    readonly property double nowMs: usage.nowMs
 
-    onPanelOpened: nowMs = Date.now()
+    onPanelOpened: usage.nowMs = Date.now()
 
     // Cheap enough to keep running while open: it only re-evaluates text
     // bindings, and a stale "resets in 2h" is worse than a timer.
@@ -42,7 +43,7 @@ BarPanel {
         interval: 30000
         running: panel.opened
         repeat: true
-        onTriggered: panel.nowMs = Date.now()
+        onTriggered: panel.usage.nowMs = Date.now()
     }
 
     // Their key model: left/right switch provider, r refreshes.
@@ -240,6 +241,12 @@ BarPanel {
                 width: parent.width
                 spacing: panel.theme.space(1.5)
 
+                // Numbers kept past a failed check say how old they are on
+                // hover (omarchy d21e5810).
+                HoverHandler {
+                    id: limitHover
+                }
+
                 Item {
                     width: parent.width
                     height: limitLabel.implicitHeight
@@ -321,7 +328,11 @@ BarPanel {
 
                     text: {
                         const remaining = Model.resetMsFor(limitRow.modelData, panel.nowMs);
-                        return remaining > 0 ? "Resets in " + Model.formatDuration(remaining) : "";
+                        const lines = remaining > 0 ? ["Resets in " + Model.formatDuration(remaining)] : [];
+                        const age = limitHover.hovered ? Model.staleAgeText(panel.provider, panel.nowMs) : "";
+                        if (age !== "")
+                            lines.push(age);
+                        return lines.join("  ·  ");
                     }
                 }
             }

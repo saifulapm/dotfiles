@@ -233,23 +233,27 @@ function windowSubtitle(label) {
     return plain === windowTitle(label) ? "" : plain;
 }
 
-function limitWindow(label, percent, resetAt) {
+// A window whose reset time has passed reads as an untouched allowance: 0%,
+// with no reset time, since the next rolling window's is not known until a
+// fresh probe says (omarchy d21e5810).
+function limitWindow(label, percent, resetAt, nowMs) {
+    const open = limitWindowOpen(resetAt, nowMs);
     return {
         title: windowTitle(label),
         subtitle: windowSubtitle(label),
-        percent: Number(percent),
-        resetAt: String(resetAt || "")
+        percent: open ? Number(percent) : 0,
+        resetAt: open ? String(resetAt || "") : ""
     };
 }
 
-function limitWindows(p) {
+function limitWindows(p, nowMs) {
     if (!p)
         return [];
     const out = [];
     if (p.rateLimitPercent >= 0)
-        out.push(limitWindow(p.rateLimitLabel, p.rateLimitPercent, p.rateLimitResetAt));
+        out.push(limitWindow(p.rateLimitLabel, p.rateLimitPercent, p.rateLimitResetAt, nowMs));
     if (p.secondaryRateLimitPercent >= 0)
-        out.push(limitWindow(p.secondaryRateLimitLabel, p.secondaryRateLimitPercent, p.secondaryRateLimitResetAt));
+        out.push(limitWindow(p.secondaryRateLimitLabel, p.secondaryRateLimitPercent, p.secondaryRateLimitResetAt, nowMs));
     // Windows a provider knows the shape of itself — Claude's model-scoped
     // allowances, which have no fixed pair of properties to live in and are
     // already titled by their collector. Appended rather than parsed, and
@@ -260,11 +264,12 @@ function limitWindows(p) {
         for (let i = 0; i < extra.length; i++) {
             const w = extra[i];
             if (w && w.percent >= 0) {
+                const open = limitWindowOpen(w.resetAt, nowMs);
                 out.push({
                     title: String(w.title || "Limit"),
                     subtitle: String(w.subtitle || ""),
-                    percent: Number(w.percent),
-                    resetAt: String(w.resetAt || "")
+                    percent: open ? Number(w.percent) : 0,
+                    resetAt: open ? String(w.resetAt || "") : ""
                 });
             }
         }
@@ -287,10 +292,9 @@ function bindingWindow(windows) {
 // Whether a window's allowance is still the one being drawn from (omarchy
 // c8fb5be). A percentage outlives the probe that measured it, but only until
 // its window rolls over: past the reset, the figure describes a period that
-// is over, and pinning a stale 78% on an allowance that is now untouched is
-// worse than showing nothing. A window with no reset time, or one that will
-// not parse, is kept — an unreadable timestamp is no reason to throw away a
-// real number.
+// is over, and a stale 78% would misreport an allowance that is now untouched.
+// A window with no reset time, or one that will not parse, is kept — an
+// unreadable timestamp is no reason to throw away a real number.
 function limitWindowOpen(resetAt, nowMs) {
     const raw = String(resetAt || "");
     if (raw === "")
@@ -306,6 +310,19 @@ function resetMsFor(window, nowMs) {
         return -1;
     const ms = new Date(window.resetAt).getTime();
     return isFinite(ms) ? ms - nowMs : -1;
+}
+
+// The hover line on a limit kept past a failed check (omarchy d21e5810):
+// how old the numbers are. Empty while they are current.
+function staleAgeText(p, nowMs) {
+    if (!p || !p.limitsStale)
+        return "";
+    const fetchedAt = Number(p.limitsFetchedAtMs || 0);
+    if (!(fetchedAt > 0))
+        return "Last updated time unavailable";
+    if (nowMs - fetchedAt > 60000)
+        return "Last updated " + formatDuration(nowMs - fetchedAt) + " ago";
+    return "Last updated less than a minute ago";
 }
 
 function formatDuration(ms) {
@@ -547,6 +564,10 @@ function displayProvider(provider, aggregate) {
         // limit is Anthropic's own number for THIS account, not a count to
         // merge across devices. Only Claude publishes any.
         extraLimits: provider.extraLimits === undefined ? [] : provider.extraLimits,
+        // Whether those windows were kept past a failed or impossible check,
+        // and when they were measured. Only Claude tracks either.
+        limitsStale: provider.limitsStale === true,
+        limitsFetchedAtMs: provider.limitsFetchedAtMs === undefined ? 0 : provider.limitsFetchedAtMs,
         tierLabel: provider.tierLabel,
         usageStatusText: provider.usageStatusText,
         authHelpText: provider.authHelpText,
@@ -800,6 +821,9 @@ function pxyToolRows(p) {
 
 if (typeof module !== "undefined") {
     module.exports = {
-        formatTier: formatTier
+        formatTier: formatTier,
+        limitWindows: limitWindows,
+        staleAgeText: staleAgeText,
+        displayProvider: displayProvider
     };
 }

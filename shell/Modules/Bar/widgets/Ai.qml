@@ -64,7 +64,11 @@ BarIcon {
     }
     readonly property var provider: providers.length > 0 ? providers[providerIndex] : null
 
-    readonly property var limits: Model.limitWindows(provider)
+    // Windows past their reset read 0% against this. It moves on each
+    // refresh and, while the panel is open, on the panel's own tick; the bar
+    // alarm otherwise waits for the next refresh (no polling here).
+    property double nowMs: Date.now()
+    readonly property var limits: Model.limitWindows(provider, nowMs)
     readonly property var headline: Model.bindingWindow(limits)
     readonly property bool alarming: !!headline && headline.percent >= 0.9
     readonly property bool refreshing: allProviders.some(p => p.refreshing)
@@ -77,6 +81,7 @@ BarIcon {
     }
 
     function refresh() {
+        nowMs = Date.now();
         for (let i = 0; i < allProviders.length; i++) {
             if (allProviders[i].enabled)
                 allProviders[i].refresh(true);

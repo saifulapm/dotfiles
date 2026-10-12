@@ -46,6 +46,12 @@ Item {
     // providers, which publish nothing of the kind.
     property var extraLimits: []
 
+    // Windows kept past a failed or impossible check are stale; the panel
+    // says how old they are on hover (omarchy d21e5810). A failed re-check of
+    // numbers measured in the last 15 minutes still describes the account.
+    property bool limitsStale: false
+    property double limitsFetchedAtMs: 0
+
     property string usageStatusText: ""
     property string authHelpText: "Run `claude auth login` to restore authoritative usage."
 
@@ -126,11 +132,12 @@ Item {
         if (!tokenUsable) {
             // Only the Claude Code CLI can mint a fresh token — this just
             // reads the file it writes — so a machine left alone long enough
-            // finds the saved one lapsed. Keep the last windows that have not
-            // since reset rather than wiping the section (omarchy c8fb5be):
-            // the transport-failure path below already keeps them, and an
-            // expired sign-in is no better a reason to discard real numbers.
-            dropRolledOverLimits();
+            // finds the saved one lapsed. Keep the last windows rather than
+            // wiping the section (omarchy c8fb5be): the transport-failure
+            // path below already keeps them, and an expired sign-in is no
+            // better a reason to discard real numbers. A window whose reset
+            // has passed reads 0% (AiModel's limitWindow, d21e5810).
+            limitsStale = hasLimits;
             const expired = credentials.accessToken !== "";
             usageStatusText = expired ? "Claude session expired" : "Waiting for auth";
             if (expired)
@@ -160,6 +167,8 @@ Item {
                     provider.secondaryRateLimitLabel = limits.secondaryRateLimitLabel;
                     provider.secondaryRateLimitResetAt = limits.secondaryRateLimitResetAt;
                     provider.extraLimits = limits.extraLimits || [];
+                    provider.limitsStale = false;
+                    provider.limitsFetchedAtMs = Date.now();
                     provider.usageStatusText = "";
                     provider.finishRefresh();
                     return;
@@ -168,6 +177,8 @@ Item {
 
             // Keep the last good windows on screen; only say what went wrong.
             // Status 0 is a transport failure — no route, no DNS, no server.
+            const age = Date.now() - provider.limitsFetchedAtMs;
+            provider.limitsStale = provider.hasLimits && !(provider.limitsFetchedAtMs > 0 && age >= 0 && age < 900000);
             provider.usageStatusText = "Claude limits unavailable";
             provider.authHelpText = xhr.status === 0 ? "Couldn't reach Anthropic's usage endpoint. Local Claude Code stats are still shown." : (xhr.status === 429 ? "Anthropic's usage endpoint is rate limiting checks right now. Local Claude Code stats are still shown." : "Anthropic's usage endpoint returned status " + xhr.status + ". Local Claude Code stats are still shown.");
             provider.finishRefresh();
@@ -176,27 +187,6 @@ Item {
     }
 
     readonly property bool hasLimits: rateLimitPercent >= 0 || secondaryRateLimitPercent >= 0 || (extraLimits && extraLimits.length > 0)
-
-    // Keeps whatever is still current and drops the rest, window by window:
-    // an account can hold a rolled-over session alongside a weekly that has
-    // not, and clearing both would throw away the live one.
-    function dropRolledOverLimits() {
-        const nowMs = Date.now();
-        if (!Model.limitWindowOpen(rateLimitResetAt, nowMs)) {
-            rateLimitPercent = -1;
-            rateLimitResetAt = "";
-        }
-        if (!Model.limitWindowOpen(secondaryRateLimitResetAt, nowMs)) {
-            secondaryRateLimitPercent = -1;
-            secondaryRateLimitResetAt = "";
-        }
-        const kept = [];
-        for (let i = 0; i < (extraLimits || []).length; i++) {
-            if (Model.limitWindowOpen(extraLimits[i].resetAt, nowMs))
-                kept.push(extraLimits[i]);
-        }
-        extraLimits = kept;
-    }
 
     function finishRefresh() {
         refreshing = probing || scanning;
