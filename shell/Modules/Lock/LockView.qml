@@ -77,6 +77,14 @@ Item {
         return "file://" + encoded + "?v=" + backgroundVersion;
     }
 
+    // Waking a DPMS-blanked display can stall the compositor for seconds while
+    // the monitor modesets, so the wake key's release arrives late and client-side
+    // key repeat floods the field with that character. A held key has no business
+    // typing a password; only holding Backspace/Delete to clear stays useful.
+    function dropsAutoRepeat(key) {
+        return key !== Qt.Key_Backspace && key !== Qt.Key_Delete;
+    }
+
     function forcePasswordFocus() {
         passwordInput.forceActiveFocus();
     }
@@ -284,6 +292,10 @@ Item {
 
                 Keys.onPressed: event => {
                     root.wakeRequested();
+                    if (event.isAutoRepeat && root.dropsAutoRepeat(event.key)) {
+                        event.accepted = true;
+                        return;
+                    }
                     if (event.key === Qt.Key_Escape || (event.modifiers & Qt.ControlModifier && event.key === Qt.Key_U)) {
                         root.passwordTextEdited("");
                         event.accepted = true;
