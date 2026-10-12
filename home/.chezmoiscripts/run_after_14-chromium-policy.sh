@@ -8,10 +8,9 @@
 # chmod a+rw — same effect for theme-apply, not world-writable.
 #
 # The same dirs also get the repo's static policy
-# (chromium/policies/extensions.json): ExtensionInstallForcelist with uBlock
-# Origin Lite, so a fresh machine's browser installs it from the Web Store on
-# first launch and keeps it auto-updated. Lite, not classic uBlock Origin:
-# classic is Manifest V2, which Chromium 139+ cannot load at all.
+# (chromium/policies/extensions.json): ExtensionInstallForcelist with the
+# Playwright extension, so a fresh machine's browser installs it from the Web
+# Store on first launch and keeps it auto-updated.
 #
 # Same root policy as 00-install-packages: sudo can only prompt from a
 # terminal, background applies skip loudly and the next terminal apply lands
