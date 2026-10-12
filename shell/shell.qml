@@ -628,6 +628,14 @@ ShellRoot {
             if (!lockLoader.item.previewVisible)
                 shell.releaseLockIfIdle();
         }
+        // onLockedChanged never fires while the binding is stuck at true.
+        function onUnlocked() {
+            shell.releaseLockIfIdle();
+        }
+        function onSecureChanged() {
+            if (!lockLoader.item.secure)
+                shell.releaseLockIfIdle();
+        }
     }
 
     // Popup UI loads on the first notification and stays; window is visible
@@ -1092,11 +1100,10 @@ ShellRoot {
     }
 
     // The two filmstrip pickers are the heaviest surfaces in the shell —
-    // a browse of both peaks ~250 MiB of tile decodes, every tile at the
-    // preview's physical size (Qt reports DPR 2 on this 1.25x panel;
-    // measured 2026-10-13, ~70 MiB back at 768 px), where bin/wallpaper-thumbs
-    // keeps it from being raw 4K decodes — and the rarest-used, so both
-    // evict after the grace period (~60 MiB stays in the pixmap cache).
+    // a browse of both peaks ~165 MiB RSS of tile decodes at the 1.5x cap
+    // (~250 MiB at full DPR 2, ~70 MiB at 768 px; measured 2026-10-13),
+    // where bin/wallpaper-thumbs keeps it from being raw 4K decodes — and
+    // the rarest-used, so both evict after the grace period.
     SurfaceLoader {
         id: themesLoader
         evictable: true

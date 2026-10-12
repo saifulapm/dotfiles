@@ -73,6 +73,9 @@ Scope {
         return lockRequested || sessionLock.locked || sessionLock.secure;
     }
     readonly property bool secure: sessionLock.secure
+    // Fired at the end of every unlock, so shell.qml can release this module
+    // without waiting for `locked` to change — a stale binding never does.
+    signal unlocked
     readonly property bool authenticating: authenticatingPassword || fingerprintAuthenticating
     // Whether we are the reason the monitors are off. omarchy fires their wake
     // helper on every pointer motion; a niri DPMS action per mouse move is a
@@ -241,6 +244,7 @@ Scope {
         sessionLock.locked = false;
         logEvent("unlocked");
         runWake();
+        unlocked();
     }
 
     function forceUnlock() {
