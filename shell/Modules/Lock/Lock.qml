@@ -542,7 +542,7 @@ Scope {
 
     Process {
         id: fingerprintCheckProc
-        command: ["bash", "-c", "if [[ -f \"$1\" ]] && command -v fprintd-list >/dev/null 2>&1 && fprintd-list \"$USER\" 2>/dev/null | grep -qi finger; then echo yes; else echo no; fi", "bash", lockRoot.pamDir + "/qshell-lock-fingerprint"]
+        command: ["bash", "-c", "if [[ -f \"$1\" ]] && command -v fprintd-list >/dev/null 2>&1 && LC_ALL=C fprintd-list \"$USER\" 2>/dev/null | grep -qE '^[[:space:]]*-[[:space:]]*#[0-9]+:'; then echo yes; else echo no; fi", "bash", lockRoot.pamDir + "/qshell-lock-fingerprint"]
         stdout: StdioCollector {
             id: fingerprintCheckStdout
             waitForEnd: true
