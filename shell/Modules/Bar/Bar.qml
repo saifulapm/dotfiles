@@ -2053,7 +2053,9 @@ Scope {
         // The open-panel pill: an accent bar on the widget's inner edge — the
         // one facing the desktop — so it underlines a top bar, overlines a
         // bottom one, and points inward from a left or right one. It reads as
-        // pointing at the panel that opened.
+        // pointing at the panel that opened. Centred with floor, not round:
+        // snapping toward the start of the slot matches how native glyphs
+        // render (omarchy 68099878).
         Rectangle {
             readonly property int inset: 2
 
@@ -2063,8 +2065,8 @@ Scope {
             width: barRoot.vertical ? 2 : slot.panelIndicatorExtent
             height: barRoot.vertical ? slot.panelIndicatorExtent : 2
             radius: Math.min(width, height) / 2
-            x: barRoot.vertical ? (barRoot.position === "left" ? parent.width - width - inset : inset) : Math.round((parent.width - width) / 2)
-            y: barRoot.vertical ? Math.round((parent.height - height) / 2) : (barRoot.position === "top" ? parent.height - height - inset : inset)
+            x: barRoot.vertical ? (barRoot.position === "left" ? parent.width - width - inset : inset) : Math.floor((parent.width - width) / 2)
+            y: barRoot.vertical ? Math.floor((parent.height - height) / 2) : (barRoot.position === "top" ? parent.height - height - inset : inset)
             z: 50
 
             Behavior on opacity {

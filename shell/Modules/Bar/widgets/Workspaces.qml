@@ -100,15 +100,25 @@ Item {
                 }
 
                 StyledText {
+                    id: wsLabel
                     theme: rootItem.theme
                     role: StyledText.BodyLarge
                     mono: true
 
                     anchors.verticalCenter: parent.verticalCenter
+                    // Figure-height centred, like the clock (omarchy
+                    // e73c4d86/27a3feff): the line box keeps room for
+                    // descenders, so centring it sets the digit high.
+                    anchors.verticalCenterOffset: (wsMetrics.descent - wsMetrics.ascent + wsMetrics.tightBoundingRect("0").height) / 2
                     visible: !wsButton.ws || wsButton.ws.is_active !== true
                     text: wsButton.ws ? String(wsButton.ws.name || wsButton.ws.idx) : ""
                     color: wsButton.contentColor
                     renderType: Text.NativeRendering
+                }
+
+                FontMetrics {
+                    id: wsMetrics
+                    font: wsLabel.font
                 }
             }
         }

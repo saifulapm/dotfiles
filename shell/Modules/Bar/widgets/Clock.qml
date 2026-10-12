@@ -112,15 +112,26 @@ BarButton {
     }
 
     StyledText {
+        id: label
         theme: rootItem.theme
         role: StyledText.BodyLarge
         mono: true
 
         anchors.verticalCenter: parent.verticalCenter
+        // Centering the line box puts the figures above the bar's middle,
+        // since the box keeps room for descenders. Center the figure height
+        // instead, so the label lines up with the icons beside it (omarchy
+        // e73c4d86/27a3feff).
+        anchors.verticalCenterOffset: rootItem.displayText.indexOf("\n") !== -1 ? 0 : (labelMetrics.descent - labelMetrics.ascent + labelMetrics.tightBoundingRect("0").height) / 2
         visible: !rootItem.vertical
         color: rootItem.contentColor
         renderType: Text.NativeRendering
         text: rootItem.displayText
+    }
+
+    FontMetrics {
+        id: labelMetrics
+        font: label.font
     }
 
     // The vertical face: one icon-slot-tall line per format line, optically
