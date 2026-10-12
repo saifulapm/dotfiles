@@ -204,7 +204,7 @@ notify_received() { # name...
   # `--` before the summary: the body is built out of names chosen by whoever
   # sent the files, and one starting with a dash would otherwise be read by
   # notify-send's option parser rather than shown.
-  notify-send -a Taildrop \
+  notify-send -a Taildrop -u critical \
     "$(exec_argv_hint "${exec_argv[@]}")" \
     -- "$glyph $title" "$body" >/dev/null 2>&1 || true
 }
