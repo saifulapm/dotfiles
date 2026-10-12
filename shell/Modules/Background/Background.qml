@@ -51,6 +51,41 @@ Scope {
         return path ? "file://" + String(path).split("/").map(encodeURIComponent).join("/") : "";
     }
 
+    // The desktop must never be left without a wallpaper (omarchy 1ac31e55):
+    // the state file can name an image run_after_27-wallpapers has since
+    // removed. A path that stops loading is replaced by the first candidate
+    // bin/background-next lists (the theme's first background — their
+    // fallback for a dangling link). Only a different path is taken, so a
+    // file that is there but unreadable cannot loop. Shell-side only, like
+    // theirs: the state file keeps the dead path, and the next cycle starts
+    // an unknown current at the first image anyway. A background chosen while
+    // the lookup runs wins over what it finds.
+    property string failedBackground: ""
+    property int recoverVersion: -1
+
+    function recoverBackground(failedPath) {
+        if (!failedPath || failedPath !== displayedBackground)
+            return;
+        failedBackground = failedPath;
+        if (recoverProc.running)
+            return;
+        recoverVersion = backgroundVersion;
+        recoverProc.running = true;
+    }
+
+    function finishRecovery(path) {
+        path = String(path || "").trim();
+        const failedPath = failedBackground;
+        failedBackground = "";
+        if (recoverVersion !== backgroundVersion) {
+            recoverBackground(failedPath);
+            return;
+        }
+        if (!path || path === failedPath)
+            return;
+        setBackground(path, true);
+    }
+
     function setBackground(path, instant) {
         transitionBackground("", path, instant, false);
     }
@@ -67,6 +102,7 @@ Scope {
             return;
         currentBackground = path;
         backgroundVersion += 1;
+        failedBackground = "";
         revealStartedVersion = -1;
 
         revealAnimation.stop();
@@ -163,6 +199,16 @@ Scope {
         }
         onFileChanged: reload()
         onLoadFailed: backgroundRoot.clearBackground()
+    }
+
+    // --list's first row, not --peek: --peek answers the image AFTER a
+    // current that is still listed, and the fallback is the first one.
+    Process {
+        id: recoverProc
+        command: ["bash", "-c", '"$1" --list | head -n 1 | cut -f1', "resolve", Quickshell.env("HOME") + "/.dotfiles/bin/background-next"]
+        stdout: StdioCollector {
+            onStreamFinished: backgroundRoot.finishRecovery(text)
+        }
     }
 
     ShellIpc {
@@ -295,6 +341,8 @@ Scope {
                 sourceSize.width: wall.decodeWidth
                 sourceSize.height: wall.decodeHeight
                 onStatusChanged: {
+                    if (status === Image.Error)
+                        backgroundRoot.recoverBackground(backgroundRoot.displayedBackground);
                     if (status === Image.Ready && backgroundRoot.finishingTransition) {
                         backgroundRoot.incomingBackground = "";
                         backgroundRoot.oldBackground = "";
