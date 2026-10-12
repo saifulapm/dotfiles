@@ -15,7 +15,12 @@ import "AudioModel.js" as Model
 // cursor, j/k walk it, h/l adjust the slider it sits on, Enter activates and
 // m mutes. Every list is a snapshot refreshed off a settle timer — PipeWire
 // can drop nodes while quickshell is dispatching the removal, and rebuilding
-// a Repeater from that signal path is what destabilizes their service.
+// a Repeater from that signal path is what destabilizes their service. The
+// snapshots hold primitive rows (id + name), never the PwNode itself: a row
+// that is the node is a QObject Qt dereferences without a null check while it
+// builds the delegate, and a graph teardown with the panel open (WirePlumber
+// restart, Bluetooth profile switch, a DAC unplugged) segfaulted the shell
+// (omarchy c9faea7c). Every delegate resolves its own node through nodeFor().
 BarPanel {
     id: panel
 
@@ -84,7 +89,8 @@ BarPanel {
 
     readonly property var audioStreams: panel.candidateStreams.filter(n => n.audio)
 
-    // Repeaters read these snapshots, never the live PipeWire model.
+    // Repeaters read these snapshots of {id, name} rows, never the live
+    // PipeWire model.
     property var displaySinks: []
     property var displaySources: []
     property var displayStreams: []
@@ -123,10 +129,25 @@ BarPanel {
     function refreshModels() {
         if (!panel.opened)
             return;
-        panel.displaySinks = Model.listSnapshot(panel.audioSinks);
-        panel.displaySources = Model.listSnapshot(panel.audioSources);
-        panel.displayStreams = Model.listSnapshot(panel.audioStreams);
+        panel.displaySinks = Model.rowSnapshot(panel.audioSinks);
+        panel.displaySources = Model.rowSnapshot(panel.audioSources);
+        panel.displayStreams = Model.rowSnapshot(panel.audioStreams);
         panel.clampCursor();
+    }
+
+    // A row that outlives its node resolves to null, or to a node PipeWire
+    // recreated under the same id and name; every binding below guards for
+    // null, and a row that never held the node cannot dangle.
+    function nodeFor(row) {
+        if (!row)
+            return null;
+        const all = panel.nodes;
+        for (let i = 0; i < all.length; i++) {
+            const n = all[i];
+            if (n && n.id === row.id && String(n.name || "") === row.name)
+                return n;
+        }
+        return null;
     }
 
     // Dummy Output (auto_null) is what PipeWire parks the default on while
@@ -243,8 +264,10 @@ BarPanel {
         return Model.nodeLabel(node);
     }
 
+    // This and StreamRow's isActive read the other streams' node properties,
+    // so they take the live list — displayStreams carries primitives now.
     function streamLabel(node) {
-        return Model.streamLabel(node, panel.mprisPlayers, panel.displayStreams);
+        return Model.streamLabel(node, panel.mprisPlayers, panel.audioStreams);
     }
 
     // Speaker ladder in the Material Design range: the FontAwesome glyphs
@@ -390,7 +413,7 @@ BarPanel {
             return;
         }
         if (panel.focusSection === "streams" && panel.selectedIndex >= 0 && panel.selectedIndex < panel.displayStreams.length) {
-            const stream = panel.displayStreams[panel.selectedIndex];
+            const stream = panel.nodeFor(panel.displayStreams[panel.selectedIndex]);
             if (stream && stream.audio)
                 panel.writeVolume(stream, stream.audio.volume + delta, 1.5);
         }
@@ -405,23 +428,23 @@ BarPanel {
             if (panel.selectedIndex === -1)
                 panel.toggleOutputMute();
             else
-                panel.setDefaultSink(panel.displaySinks[panel.selectedIndex]);
+                panel.setDefaultSink(panel.nodeFor(panel.displaySinks[panel.selectedIndex]));
             return;
         }
         if (panel.focusSection === "input") {
             if (panel.selectedIndex === -1)
                 panel.toggleInputMute();
             else
-                panel.setDefaultSource(panel.displaySources[panel.selectedIndex]);
+                panel.setDefaultSource(panel.nodeFor(panel.displaySources[panel.selectedIndex]));
             return;
         }
         if (panel.focusSection === "streams" && panel.selectedIndex >= 0)
-            panel.toggleMute(panel.displayStreams[panel.selectedIndex]);
+            panel.toggleMute(panel.nodeFor(panel.displayStreams[panel.selectedIndex]));
     }
 
     function muteAtCursor() {
         if (panel.focusSection === "streams" && panel.selectedIndex >= 0 && panel.selectedIndex < panel.displayStreams.length)
-            panel.toggleMute(panel.displayStreams[panel.selectedIndex]);
+            panel.toggleMute(panel.nodeFor(panel.displayStreams[panel.selectedIndex]));
         else if (panel.focusSection === "input")
             panel.toggleInputMute();
         else
@@ -613,12 +636,12 @@ BarPanel {
                         required property int index
 
                         width: sections.width
-                        node: modelData
+                        node: panel.nodeFor(modelData)
                         rowIndex: index
                         section: "output"
-                        glyph: Model.sinkGlyph(modelData)
-                        isActive: panel.sink === modelData
-                        onActivated: panel.setDefaultSink(modelData)
+                        glyph: Model.sinkGlyph(node)
+                        isActive: !!node && panel.sink === node
+                        onActivated: panel.setDefaultSink(node)
                     }
                 }
             }
@@ -688,12 +711,12 @@ BarPanel {
                         required property int index
 
                         width: sections.width
-                        node: modelData
+                        node: panel.nodeFor(modelData)
                         rowIndex: index
                         section: "input"
-                        glyph: Model.sourceGlyph(modelData)
-                        isActive: panel.source === modelData
-                        onActivated: panel.setDefaultSource(modelData)
+                        glyph: Model.sourceGlyph(node)
+                        isActive: !!node && panel.source === node
+                        onActivated: panel.setDefaultSource(node)
                     }
                 }
             }
@@ -723,7 +746,7 @@ BarPanel {
                         required property int index
 
                         width: sections.width
-                        node: modelData
+                        node: panel.nodeFor(modelData)
                         rowIndex: index
                     }
                 }
@@ -802,7 +825,7 @@ BarPanel {
 
         readonly property real streamVolume: node && node.audio ? node.audio.volume : 0
         readonly property bool streamMuted: node && node.audio ? node.audio.muted : false
-        readonly property bool isActive: Model.streamRepresentsPlayer(node, panel.activePlayer, panel.mprisPlayers, panel.displayStreams)
+        readonly property bool isActive: Model.streamRepresentsPlayer(node, panel.activePlayer, panel.mprisPlayers, panel.audioStreams)
 
         hasCursor: panel.cursorActive && panel.focusSection === "streams" && panel.selectedIndex === rowIndex
         onHasCursorChanged: if (hasCursor)
