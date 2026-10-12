@@ -624,6 +624,17 @@ try { execSync("pkill -SIGUSR1 -x kitty", { stdio: "ignore" }) } catch (e) { /* 
 // No binary or no running server both land in the catch and are fine.
 try { execSync("vicinae theme set qshell", { stdio: "ignore", timeout: 3000 }) } catch (e) { /* not installed / not running */ }
 
+// tmux: ~/.tmux.conf sources theme.conf only at server start, so a running
+// server keeps the old borders and status colours until it is told to read
+// the file again (omarchy 21b8766c syncs it the same way: one source-file).
+// Every line in it is `set -g`, so one call covers all sessions. Detached and
+// bounded, so a wedged server can never hold up a theme switch (omarchy
+// b96b9c59); with no server running, tmux just exits with an error nobody reads.
+try {
+  execSync("timeout 2s tmux source-file -q ~/.config/tmux/theme.conf >/dev/null 2>&1 &",
+    { stdio: "ignore", shell: "/bin/bash" })
+} catch (e) { /* bash missing; nothing else lands here */ }
+
 // ---- kakoune theme: converted from the rendered helix theme ----
 // bin/helix-to-kak.js (the mac dotfiles converter, resurrected) is the
 // single source of the kak face mapping — kak mirrors helix exactly rather
