@@ -379,6 +379,7 @@ QtObject {
         // mid-incubation.
         Qt.callLater(function () {
             root.removePopupsByOriginalId(snapshot.originalId, Logic.popupFileName(snapshot));
+            root.removeDuplicatePopups(snapshot);
             root.popupModel.insert(0, snapshot);
             while (root.popupModel.count > root.popupCap)
                 root.overflowPopup(root.popupModel.count - 1);
@@ -403,6 +404,49 @@ QtObject {
             if (Logic.popupFileName(row) !== keepFileName)
                 deletePopupFileFor(row);
             popupModel.remove(i);
+        }
+    }
+
+    // A notification repeating a toast already on screen takes its place, the
+    // same way a replaces_id update would: the newest copy stays, its timer
+    // starts fresh, and the superseded copy is dismissed at the server so its
+    // sender stops holding it open (omarchy de63134b).
+    //
+    // Only toasts with a live notification behind them qualify. Upstream
+    // also tests isRestoredRow; here a restored or replayed row has no
+    // liveRefs entry by construction (its epoch belongs to a dead session, or
+    // its notification was already closed), so the ref check covers both.
+    // Upstream also compares against the notification's current content in
+    // case a replaces_id update landed while the insert was deferred; here
+    // such an update re-enters pushPopup with a fresh snapshot (see
+    // scheduleLiveRefresh), so the check re-runs on what it says now.
+    //
+    // History keeps a single entry too, which upstream gets for free (its
+    // history is archived toasts) and we do not: the superseded copy's
+    // pending row goes with it, so the bell counts one and the center lists
+    // one. Past as well, for a toast whose row was marked seen while it was
+    // still on screen. The newer copy's own row is already queued by
+    // addToPending, under its own originalId.
+    function removeDuplicatePopups(snapshot) {
+        for (let i = popupModel.count - 1; i >= 0; i--) {
+            const row = popupModel.get(i);
+            if (!Logic.isDuplicatePopup(row, snapshot))
+                continue;
+            const originalId = row.originalId;
+            const ref = liveRefs[originalId];
+            if (!ref)
+                continue;
+            deletePopupFileFor(row);
+            popupModel.remove(i);
+            removeByOriginalId(pendingModel, originalId);
+            removeByOriginalId(pastModel, originalId);
+            scheduleHistorySave();
+            try {
+                if (ref.tracked)
+                    ref.dismiss();
+            } catch (e) {
+                // Object already torn down by the server — nothing to dismiss.
+            }
         }
     }
 

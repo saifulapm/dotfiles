@@ -455,5 +455,33 @@ test("the uri-list wire format is unchanged", () => {
     assert.equal(Logic.dragUriList(["/a", "/b"]), "file:///a\r\nfile:///b\r\n");
 });
 
+// ------------------------------------------------- duplicate collapse
+const heyReminder = { originalId: 20, app: "Chromium", summary: "Interview", body: "Today, 11:00 AM" };
+
+test("the same message from the same sender under a new id is a duplicate", () => {
+    assert.equal(Logic.isDuplicatePopup(heyReminder, Object.assign({}, heyReminder, { originalId: 21 })), true);
+});
+
+test("a same-id update is left to the replaces_id path", () => {
+    assert.equal(Logic.isDuplicatePopup(heyReminder, heyReminder), false);
+});
+
+test("a different body, or the same text from another sender, is kept", () => {
+    assert.equal(Logic.isDuplicatePopup(heyReminder, Object.assign({}, heyReminder, { originalId: 21, body: "Today, 2:00 PM" })), false);
+    assert.equal(Logic.isDuplicatePopup(heyReminder, Object.assign({}, heyReminder, { originalId: 21, app: "Slack" })), false);
+});
+
+test("same-text toasts that preview and open different files are kept", () => {
+    const a = { originalId: 30, app: "screenrecord", summary: "Screen recording saved", body: "", image: "/tmp/a.png", execArgv: '["mpv","--","/tmp/a.mp4"]' };
+    const b = { originalId: 31, app: "screenrecord", summary: "Screen recording saved", body: "", image: "/tmp/b.png", execArgv: '["mpv","--","/tmp/b.mp4"]' };
+    assert.equal(Logic.isDuplicatePopup(a, b), false);
+});
+
+test("a missing role and an empty one compare equal, and junk is never a duplicate", () => {
+    assert.equal(Logic.isDuplicatePopup({ originalId: 1, app: "x", summary: "s" }, { originalId: 2, app: "x", summary: "s", body: "", image: "", execArgv: "" }), true);
+    assert.equal(Logic.isDuplicatePopup(null, heyReminder), false);
+    assert.equal(Logic.isDuplicatePopup(heyReminder, undefined), false);
+});
+
 console.log(failures === 0 ? "\nall NotificationLogic tests passed" : `\n${failures} failing`);
 process.exit(failures === 0 ? 0 : 1);
