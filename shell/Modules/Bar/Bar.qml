@@ -1377,11 +1377,13 @@ Scope {
             }
 
             // ------------------------------------------- indicator reveal
-            // Omarchy's center-section hover, ported: their center module
-            // list fills the whole bar surface behind the left/right
-            // sections, so the pointer anywhere on the bar reveals the
-            // collapsed indicators — which is the only way to reach them
-            // when nothing is active and the widget has no width of its own.
+            // Omarchy's center-section hover, ported: the pointer anywhere on
+            // the bar before the center anchor (left of the clock, above it
+            // on a vertical bar) reveals the collapsed indicators — which is
+            // the only way to reach them when nothing is active and the
+            // widget has no width of its own. Past the clock it does not
+            // (omarchy e86c8f1a); the hover area is the first child of each
+            // bar layout below.
             // The 120 ms release debounce is theirs; the suppression while a
             // widget panel is open replaces the per-panel opt-outs their
             // clock and weather panels set by hand.
@@ -1550,6 +1552,19 @@ Scope {
                 Item {
                     anchors.fill: parent
 
+                    // Under every widget; hover only, so presses still reach
+                    // the gesture area and the widgets.
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: barRoot.centerAnchorIndex >= 0 ? centerAnchorSlot.left : parent.right
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+
+                        HoverHandler {
+                            onHoveredChanged: panel.setCenterSectionHovered(hovered)
+                        }
+                    }
+
                     Row {
                         anchors.left: parent.left
                         anchors.leftMargin: 8
@@ -1631,6 +1646,17 @@ Scope {
 
                 Item {
                     anchors.fill: parent
+
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.bottom: barRoot.centerAnchorIndex >= 0 ? centerAnchorSlotVertical.top : parent.bottom
+
+                        HoverHandler {
+                            onHoveredChanged: panel.setCenterSectionHovered(hovered)
+                        }
+                    }
 
                     Column {
                         anchors.top: parent.top
@@ -1865,10 +1891,6 @@ Scope {
             barWindow.clearTooltip();
             barRoot.beginBarMove(barWindow.screen);
             barRoot.updateBarMove(barWindow.windowScreenPoint(gestureArea.mapToItem(null, x, y)));
-        }
-
-        HoverHandler {
-            onHoveredChanged: gestureArea.barWindow.setCenterSectionHovered(hovered)
         }
 
         onPressed: mouse => {
