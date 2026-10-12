@@ -92,7 +92,16 @@ Scope {
 
     function setItems(next, index) {
         items = Array.isArray(next) ? next : [];
-        selectedIndex = Math.max(0, Math.min(items.length - 1, index || 0));
+        let selected = Math.max(0, Math.min(items.length - 1, index || 0));
+        // A refresh under an active filter keeps the selection inside it
+        // (omarchy a8e09b9c), by updateFilter's rule. Not in search mode:
+        // there filterText is the caller's query, not a substring filter.
+        if (!externalQueryMode) {
+            const first = PickerModel.nextSelectedIndexForFilter(items, selected, filterText);
+            if (first >= 0)
+                selected = first;
+        }
+        selectedIndex = selected;
         loaded = true;
         Qt.callLater(() => {
             if (pickerRoot.open)
@@ -233,6 +242,18 @@ Scope {
 
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: event => {
+                // Until the strip settles it still holds the previous open's
+                // items (prepare() keeps them while the list reloads), so
+                // Enter here would apply a tile nobody can see — omarchy
+                // fcf9eeb5: only let the user back out. Ahead of chord, so a
+                // caller's chord cannot act on the stale set either.
+                if (!pickerRoot.layoutSettled) {
+                    if (event.key === Qt.Key_Escape) {
+                        pickerRoot.cancel();
+                        event.accepted = true;
+                    }
+                    return;
+                }
                 pickerRoot.chord(event);
                 if (event.accepted)
                     return;
