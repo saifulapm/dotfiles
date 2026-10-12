@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# browser-handoff — hand a command line to the running chromium directly.
+#
+# Port of omarchy-cmd-browser-handoff (97a9fce5). With chromium already
+# running, every launch started a second browser process only to pass its
+# command line over the profile's singleton socket and exit. This sends it
+# there itself and fails when no browser acknowledges it, so the caller can
+# launch one instead (via app-run, as before).
+#
+#   browser-handoff <browser-command> [browser-args...]
+#
+# A handed-off launch never gets an app-run unit of its own — but neither did
+# the second process's work: the window always belonged to the running
+# browser, in that browser's unit.
+set -uo pipefail
+
+config="${XDG_CONFIG_HOME:-$HOME/.config}"
+
+# Only the packaged launcher: a wrapper in its place may pick a profile or add
+# flags of its own, which only running it can honour. Fedora's
+# /usr/bin/chromium-browser is itself a script (upstream's list is the bare
+# binaries), but it is the package's own — like upstream's brave-origin entry
+# — and adds only CHROMIUM_USER_FLAGS, vetted below, plus fixed distro flags
+# the running browser already has.
+case $(type -P "$1") in
+/usr/bin/chromium-browser) profile=chromium ;;
+*) exit 1 ;;
+esac
+shift
+
+# Upstream vets the Arch flags file; Fedora's wrapper reads none and takes the
+# CHROMIUM_USER_FLAGS environment variable instead (environment.d/60-chromium.conf).
+# Read from the user manager, not from the caller: that is the environment
+# app-run launched the running browser with, and the one the fallback would
+# launch with. The running browser already has the process flags we ship; any
+# other flag may be meant for each launch, and a data directory from the
+# environment is another browser, so leave those to the launcher. With no
+# user flags the wrapper falls back to /etc/chromium/chromium.conf, which is
+# not ours to vouch for.
+env=$(systemctl --user show-environment -o json 2>/dev/null) || exit 1
+[[ -z $(jq -r '(.CHROME_USER_DATA_DIR // "") + (.CHROME_CONFIG_HOME // "")' <<<"$env") ]] || exit 1
+user_flags=$(jq -r '.CHROMIUM_USER_FLAGS // empty' <<<"$env")
+[[ -n $user_flags ]] || exit 1
+set -f # split the flags exactly as the wrapper's unquoted $CHROMIUM_FLAGS does
+for flag in $user_flags; do
+  [[ $flag =~ ^--((ozone-platform|ozone-platform-hint|password-store|enable-features|disable-features|load-extension|force-color-profile)=.*|no-default-browser-check)$ ]] || exit 1
+done
+set +f
+
+for arg in "$@"; do
+  [[ $arg == --user-data-dir* ]] && exit 1
+done
+
+# The socket lives in a /tmp dir, which another user could recreate once a
+# crashed browser's is cleaned away, so only a socket of our own gets the URL.
+socket="$config/$profile/SingletonSocket"
+[[ -S $socket && -O $socket ]] || exit 1
+
+reply=$({
+  printf 'START\0%s\0browser' "$PWD"
+  # Guarded where upstream is not: printf runs its format once even with no
+  # arguments, which would hand over one empty argument (a bare browser-open).
+  (($#)) && printf '\0%s' "$@"
+} | socat -t2 - "UNIX-CONNECT:$socket" 2>/dev/null)
+
+[[ $reply == "ACK" ]]

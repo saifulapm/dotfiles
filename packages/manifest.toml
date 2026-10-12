@@ -1433,7 +1433,7 @@ why = "Media metadata CLI — the yazi config's 'Media info' reveal opener pipes
 name = "socat"
 category = "optional"
 arch = "all"
-why = "Socket relay — the yazi config's add-sub opener feeds subtitles to a running mpv via /tmp/mpv.sock (user-approved 2026-08-07 for this concrete use after declining the generic misc-utils group)"
+why = "Socket relay — the yazi config's add-sub opener feeds subtitles to a running mpv via /tmp/mpv.sock (user-approved 2026-08-07 for this concrete use after declining the generic misc-utils group); bin/browser-handoff also hands browser and web-app launches to the running chromium over its SingletonSocket (falls back to app-run without it)"
 
 [[pkg]]
 name = "ffmpeg"

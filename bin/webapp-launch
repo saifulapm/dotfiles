@@ -22,6 +22,9 @@ if [[ -n $id ]]; then
   exec niri msg action focus-window --id "$id" >/dev/null
 fi
 
-# Via app-run: its own transient unit under app-graphical.slice (a running
-# chromium adopts the app window and the unit exits — --collect reaps it).
-exec app-run chromium-browser --app="$url" >/dev/null 2>&1
+# Straight to the running chromium when there is one (bin/browser-handoff).
+# Otherwise via app-run: its own transient unit under app-graphical.slice (a
+# running chromium adopts the app window and the unit exits — --collect
+# reaps it).
+browser-handoff chromium-browser --app="$url" ||
+  exec app-run chromium-browser --app="$url" >/dev/null 2>&1

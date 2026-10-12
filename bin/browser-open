@@ -45,9 +45,13 @@ if [[ -n $workspace ]]; then
 fi
 
 if [[ -z $target ]]; then
-  # Via app-run, like every other launch here: its own transient unit under
-  # app-graphical.slice, so a leaking tab cannot take the shell down with it.
-  exec app-run "$APP_ID" --new-window "$@" >/dev/null 2>&1
+  # Straight to the running browser when there is one (bin/browser-handoff);
+  # otherwise via app-run, like every other launch here: its own transient
+  # unit under app-graphical.slice, so a leaking tab cannot take the shell
+  # down with it.
+  browser-handoff "$APP_ID" --new-window "$@" ||
+    exec app-run "$APP_ID" --new-window "$@" >/dev/null 2>&1
+  exit 0
 fi
 
 niri msg action focus-window --id "$target" >/dev/null
@@ -55,11 +59,13 @@ niri msg action focus-window --id "$target" >/dev/null
 # The handoff races the activation: chromium picks its window when the URL
 # arrives, so the URL must not arrive before the compositor has told chromium
 # it is focused. Wait for niri to report the focus (typically the first pass),
-# then a beat for chromium to process the activation it was just sent.
+# then a beat for chromium to process the activation it was just sent. That
+# beat is the whole margin now: the handoff skips the ~165 ms a second
+# browser process used to spend starting up before chromium heard the URL.
 for _ in $(seq 20); do
   [[ $(niri msg --json focused-window 2>/dev/null | jq -r '.id // empty') == "$target" ]] && break
   sleep 0.025
 done
 sleep 0.1
 
-exec app-run "$APP_ID" "$@" >/dev/null 2>&1
+browser-handoff "$APP_ID" "$@" || exec app-run "$APP_ID" "$@" >/dev/null 2>&1
