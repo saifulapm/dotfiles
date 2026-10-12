@@ -34,7 +34,7 @@ if status is-interactive
     end
 
     # Prompt, directory jumper, television fuzzy finder
-    command -q starship; and starship init fish | source
+    command -q starship; and starship init fish --print-full-init | source
     command -q zoxide; and zoxide init fish | source
     command -q tv; and tv init fish | source
 
