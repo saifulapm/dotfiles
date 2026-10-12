@@ -2,12 +2,12 @@
 # Tools Fedora does not package whose upstreams ship linux binaries for both
 # our arches (asset names verified against the GitHub API 2026-08-07, jj and
 # witr 2026-08-08, lazysql 2026-08-08, herdr 2026-08-10, yazi and cliamp
-# 2026-08-18, aichat and yek re-verified 2026-09-06, celld 2026-09-19): watchexec,
-# hurl, aichat, cloudflared, stripe, ouch, yek, usql, jj, witr, lazysql, herdr,
-# yazi, cliamp, celld.
+# 2026-08-18, aichat and yek re-verified 2026-09-06, celld 2026-09-19, disktree
+# 2026-10-13): watchexec, hurl, aichat, cloudflared, stripe, ouch, yek, usql,
+# jj, witr, lazysql, herdr, yazi, cliamp, celld, disktree.
 # Everything lands in ~/.local/bin; guarded per binary; warn-don't-abort.
 #
-# GitHub's unauthenticated API allows 60 requests/hour per IP — thirteen here
+# GitHub's unauthenticated API allows 60 requests/hour per IP — fourteen here
 # (witr's man page is a second call to the same repo; cliamp makes none, see
 # its block), and only on a run where something is actually missing
 # (fully-guarded runs make no requests).
@@ -326,6 +326,53 @@ if ! command -v cliamp >/dev/null 2>&1; then
     warn "cliamp install failed (download failed or checksum did not match)"
   fi
   rm -rf "$tmp"
+fi
+
+# disktree — a disk-usage treemap for omarchy (tobi/disktree, MIT, Rust +
+# GPUI), next to dua-cli rather than replacing it (user call 2026-10-13). This
+# block lays the three files out the same way the tarball's install.sh and
+# `make install` do: the binary, the hicolor .svg, and a .desktop made from
+# disktree.desktop.in with @BINDIR@ and @VERSION@ filled in. It is written out
+# here instead of running install.sh, because fetch_tar keeps only one file.
+# The .desktop also registers disktree for inode/directory. That adds a second
+# "Open with" entry and does not change the default, which mimeapps.list sets.
+#
+# The tarball is checked against the .sha256 asset published next to it. It
+# needs Vulkan at runtime (Mesa's, which Asahi ships too). The colors come
+# from omarchy's colors.toml, which theme-apply renders on every switch, and
+# disktree retints live when that file changes.
+if [ ! -x "$bindir/disktree" ]; then
+  url="$(latest_asset tobi/disktree "^disktree-.*-${arch}-linux\\.tar\\.gz$")"
+  if [ -z "$url" ]; then
+    warn "disktree: no release asset matched disktree-*-${arch}-linux.tar.gz"
+  else
+    tmp="$(mktemp -d)"
+    if curl -fsSL -o "$tmp/disktree.tar.gz" "$url" \
+      && curl -fsSL -o "$tmp/disktree.sha256" "$url.sha256" \
+      && expected="$(awk '{ print $1; exit }' "$tmp/disktree.sha256")" \
+      && [ -n "$expected" ] \
+      && [ "$(sha256sum "$tmp/disktree.tar.gz" | cut -d' ' -f1)" = "$expected" ] \
+      && tar -xzf "$tmp/disktree.tar.gz" -C "$tmp" \
+      && dt="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d -name 'disktree-*' -print -quit)" \
+      && [ -x "$dt/disktree" ]; then
+      appdir="$HOME/.local/share/applications"
+      icondir="$HOME/.local/share/icons/hicolor/scalable/apps"
+      install -d "$appdir" "$icondir"
+      install -m644 "$dt/disktree.svg" "$icondir/disktree.svg"
+      sed -e "s|@BINDIR@|$bindir|" -e "s|@VERSION@|$(cat "$dt/VERSION")|" \
+        "$dt/disktree.desktop.in" >"$appdir/disktree.desktop"
+      chmod 644 "$appdir/disktree.desktop"
+      # The binary goes last, because update-all and the guard above both look
+      # at it. Seeing it means the other two files are already in place.
+      install -m755 "$dt/disktree" "$bindir/disktree.part" \
+        && mv "$bindir/disktree.part" "$bindir/disktree" \
+        && echo "prebuilt: installed disktree"
+      rm -f "$bindir/disktree.part"
+    else
+      warn "disktree install failed (download failed or checksum did not match)"
+    fi
+    rm -rf "$tmp"
+  fi
 fi
 
 # celld — Deno's self-hosted, Cloudflare-compatible runtime (Workers, Durable

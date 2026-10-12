@@ -89,6 +89,9 @@ declare -A PREBUILT=(
   [herdr]=herdrdev/herdr
   [yazi]=sxyazi/yazi
   [cliamp]=bjarneo/cliamp
+  # disktree: dropping the binary is enough, because run_after_10 rewrites
+  # the .desktop and the icon whenever it reinstalls the binary.
+  [disktree]=tobi/disktree
   # yt-dlp shadows the rpm from ~/.local/bin, so `command -v` below always
   # succeeds whether or not OUR copy exists — which is fine: the staleness
   # check still fires, and removing ~/.local/bin/yt-dlp is what run_after_10
