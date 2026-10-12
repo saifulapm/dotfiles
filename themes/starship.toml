@@ -1,0 +1,56 @@
+# Starship — ported from omarchy (MIT).
+# Colors: omarchy. Character (shape/motion): ours, see bin/theme-port-omarchy.
+# Upstream adapted it from Erik Johansson's Starship To Orbit
+# (github.com/erikrjohansson/omarchy-starship-to-orbit-theme).
+
+[meta]
+name = "Starship"
+mode = "dark"
+preset = "shaded"
+
+[surface]
+"0" = "#161618"
+"1" = "#1c1c1e"
+"2" = "#2c2c2e"
+"3" = "#3d3d3f"
+
+[text]
+primary = "#ffffff"
+muted = "#8e8e93"
+inverse = "#0e0e10"
+
+[accent]
+accent = "#ff9f0a"
+error = "#ff5f4a"
+warn = "#ffc27a"
+ok = "#ff9f0a"
+
+[ansi]
+black = "#161618"
+red = "#ff5f4a"
+green = "#ff9f0a"
+yellow = "#ffc27a"
+blue = "#8fb8de"
+magenta = "#ff8fa3"
+cyan = "#a6dcef"
+white = "#f5f5f7"
+bright-black = "#8e8e93"
+bright-red = "#ff8373"
+bright-green = "#ffb340"
+bright-yellow = "#ffd8a8"
+bright-blue = "#b5d0ea"
+bright-magenta = "#ffb3c1"
+bright-cyan = "#cdeefa"
+bright-white = "#ffffff"
+
+[shape]
+radius = 8
+border-width = 1
+
+[motion]
+duration = 150
+easing = "standard"
+
+# Gradient border: accent.accent into accent.error across the frame.
+[border]
+active = "#ff9f0a #ff5f4a 45deg"
