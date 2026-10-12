@@ -49,7 +49,17 @@ say "dnf packages"
 # rebuilt quickshell is available). Then verify, so a shell that broke anyway
 # is reported here instead of at the next reboot.
 qt6-hold --refresh || warn "qt6-hold could not set the qt6 hold"
-sudo dnf upgrade --refresh || warn "dnf upgrade failed"
+# A full upgrade that went through leaves nothing for the bar's update badge
+# to show, so clear it now rather than leave it stale until the next
+# qshell-updates.timer run, up to 6 h away. Cleared, not rechecked: the
+# upgrade just installed what the badge counted (held qt6 included —
+# qt6-hold's excludepkgs hides it from check-updates too). The widget reads
+# a missing file as zero, the same rm its own click path does.
+if sudo dnf upgrade --refresh; then
+  rm -f "$HOME/.local/state/qshell/updates"
+else
+  warn "dnf upgrade failed"
+fi
 qt6-hold --verify || warn "quickshell is broken against the installed Qt — run: qshell-rebuild"
 
 # ----------------------------------------------- prebuilt release binaries
