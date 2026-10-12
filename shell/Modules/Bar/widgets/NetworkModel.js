@@ -73,6 +73,30 @@ function signalPercent(network) {
     return Math.round((network.signalStrength || 0) * 100);
 }
 
+// The connected network's own strength comes from the access points
+// Quickshell grouped under its SSID. When it has none (an OWE transition-mode
+// network between scans files the in-use access point under its hidden
+// "_owetm_" twin), fall back to the strength NetworkManager reports for the
+// access point in use.
+function connectedSignalStrength(networkStrength, activeApSignal) {
+    const strength = Math.round((networkStrength || 0) * 100);
+    if (strength > 0)
+        return strength;
+    return activeApSignal > 0 ? activeApSignal : strength;
+}
+
+// Reads `nmcli -t -f IN-USE,SIGNAL device wifi list` output, where the in-use
+// access point is the row marked "*".
+function parseActiveApSignal(raw) {
+    const lines = String(raw || "").split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+        const match = /^\*:(\d+)$/.exec(lines[i].trim());
+        if (match)
+            return parseInt(match[1], 10);
+    }
+    return -1;
+}
+
 // --------------------------------------------------------------- formatting
 function formatHeaderSpeed(mbps) {
     const v = parseInt(mbps, 10);
@@ -461,6 +485,8 @@ if (typeof module !== "undefined") {
     module.exports = {
         wifiIconFor: wifiIconFor,
         signalPercent: signalPercent,
+        connectedSignalStrength: connectedSignalStrength,
+        parseActiveApSignal: parseActiveApSignal,
         connectivityState: connectivityState,
         connectionIcon: connectionIcon,
         CAPTIVE_PORTAL_URL: CAPTIVE_PORTAL_URL,

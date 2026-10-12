@@ -84,5 +84,59 @@ test("the portal URL is plain http, and fixed", () => {
     assert.ok(!/^https/.test(Model.CAPTIVE_PORTAL_URL));
 });
 
+// OWE transition mode (omarchy 18328559): between scans NetworkManager files
+// the in-use access point under the hidden "_owetm_" SSID and drops the active
+// profile from the device's AvailableConnections, so Quickshell lists no
+// connected network. The bar and panel trust the device's own state and read
+// the in-use AP's strength instead of flickering to disconnected.
+const fs = require("node:fs");
+const path = require("node:path");
+const panelSource = fs.readFileSync(path.join(__dirname, "NetworkPanel.qml"), "utf8");
+const widgetSource = fs.readFileSync(path.join(__dirname, "NetworkWidget.qml"), "utf8");
+
+test("the panel keeps Wi-Fi while the device is connected but no network is listed", () => {
+    const kind = panelSource.match(/readonly property string kind: \{[\s\S]*?\n {4}\}/);
+    assert.ok(kind, "panel has a kind binding");
+    const listed = kind[0].indexOf("panel.connectedWifiNetwork)");
+    const device = kind[0].indexOf("panel.wifiDevice.connected)");
+    assert.ok(device > 0, "kind falls back to the device state");
+    assert.ok(listed > 0 && listed < device, "the listed network is preferred first");
+});
+
+test("the bar icon counts a connected device as online", () => {
+    assert.match(widgetSource, /wifiUp: wifiNetwork !== null \|\| \(wifiDevice !== null && wifiDevice\.connected\)/);
+    assert.match(widgetSource, /!wifiUp\)\s*\n\s*return "󰤮"/);
+});
+
+test("the connectivity key follows the device, not the SSID", () => {
+    const key = panelSource.match(/readonly property string connectionKey: .*/);
+    assert.ok(key && !/connectedWifiNetwork/.test(key[0]));
+});
+
+test("the connected network's own strength wins", () => {
+    assert.equal(Model.connectedSignalStrength(0.8, 40), 80);
+});
+
+test("with no strength of its own, the in-use access point's is used", () => {
+    assert.equal(Model.connectedSignalStrength(0, 67), 67);
+    assert.equal(Model.connectedSignalStrength(undefined, 67), 67);
+});
+
+test("no strength when the in-use access point is unknown", () => {
+    assert.equal(Model.connectedSignalStrength(0, -1), 0);
+});
+
+test("nmcli's in-use row is parsed, and only that row", () => {
+    assert.equal(Model.parseActiveApSignal(" :82\n*:67\n :50\n"), 67);
+    assert.equal(Model.parseActiveApSignal(" :82\n"), -1);
+    assert.equal(Model.parseActiveApSignal(""), -1);
+    assert.equal(Model.parseActiveApSignal(undefined), -1);
+});
+
+test("the in-use read never triggers a scan, and only runs while needed", () => {
+    assert.match(widgetSource, /"--rescan", "no"/);
+    assert.match(widgetSource, /running: rootItem\.needsActiveApSignal/);
+});
+
 console.log(failures === 0 ? "\nall NetworkModel tests passed" : `\n${failures} failing`);
 process.exit(failures === 0 ? 0 : 1);

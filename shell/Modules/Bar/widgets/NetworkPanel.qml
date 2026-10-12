@@ -103,10 +103,19 @@ BarPanel {
         return null;
     }
 
+    // The widget's reading, which falls back to the in-use access point's
+    // strength when the connected network has none of its own.
+    readonly property int signalPercent: anchorItem && anchorItem.signalPercent !== undefined ? anchorItem.signalPercent : Model.signalPercent(connectedWifiNetwork)
+
     readonly property string kind: {
         if (panel.wiredDevice && panel.wiredDevice.connected)
             return "ethernet";
         if (panel.connectedWifiNetwork)
+            return "wifi";
+        // An OWE transition-mode network drops out of the list between scans
+        // while the link stays up; trust the device then (omarchy 18328559,
+        // and see NetworkWidget.qml's wifiUp).
+        if (panel.wifiDevice && panel.wifiDevice.connected)
             return "wifi";
         return "disconnected";
     }
@@ -147,8 +156,11 @@ BarPanel {
     readonly property bool restricted: hasCaptivePortal || connectivity === "limited"
 
     // Re-probe when the connection itself changes; NM's own schedule covers
-    // the rest of the time.
-    readonly property string connectionKey: kind + ":" + (info.iface || "") + ":" + (connectedWifiNetwork ? connectedWifiNetwork.name : "")
+    // the rest of the time. Keyed on the device rather than the SSID: on an
+    // OWE transition-mode network the listed network comes and goes with
+    // every scan while the link stays up, and a real network switch already
+    // passes through "disconnected".
+    readonly property string connectionKey: kind + ":" + (info.iface || "")
     onConnectionKeyChanged: Qt.callLater(checkConnectivity)
 
     function checkConnectivity() {
@@ -1468,7 +1480,7 @@ BarPanel {
                 icon: OpticalGlyph {
                     // A link that carries packets but not the internet must
                     // not draw the same as a working one.
-                    text: Model.connectionIcon(panel.kind, Model.signalPercent(panel.connectedWifiNetwork), panel.connectivity)
+                    text: Model.connectionIcon(panel.kind, panel.signalPercent, panel.connectivity)
                     color: panel.theme.textPrimary
                     opacity: panel.networkManagerAvailable ? 1 : 0.5
                     pixelSize: panel.theme.fontPx(1.6)
