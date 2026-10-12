@@ -20,11 +20,16 @@ input {
             // from org.freedesktop.locale1. You can control these using
             // localectl set-x11-keymap.
 
-            // omarchy's compose setup (input.lua: kb_options): CapsLock is
-            // the Compose key; plain CapsLock moves to pressing both Shifts
-            // at once (and clears itself the same way). Delete this line to
-            // fall back to the localectl defaults.
-            options "compose:caps,shift:both_capslock_cancel"
+            // omarchy's compose setup (input.lua: kb_options, 1b5222be): Caps
+            // Lock is Caps Lock, and Shift + Caps Lock is the Compose key.
+            // Stock XKB has no such option; ~/.config/xkb (chezmoi:
+            // home/dot_config/xkb) defines it. niri fixes its xkb search
+            // paths at the session's first keymap compile, so a newly
+            // created dir needs a re-login.
+            // Without it libxkbcommon logs the option as unrecognized and
+            // Caps Lock stays plain.
+            // Delete this line to fall back to the localectl defaults.
+            options "omarchy:shift_caps_compose"
         }
 
         // Enable numlock on startup, omitting this setting disables it.

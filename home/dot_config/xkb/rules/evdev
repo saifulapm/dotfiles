@@ -1,0 +1,8 @@
+// omarchy's own XKB option (1b5222be), installed per user instead of in
+// /etc/xkb: libxkbcommon reads ~/.config/xkb before /etc/xkb and the system
+// rules, which supply everything else, and niri compiles its keymap through
+// libxkbcommon with those default paths.
+! include %S/evdev
+
+! option = symbols
+  omarchy:shift_caps_compose = +omarchy(shift_caps_compose)
