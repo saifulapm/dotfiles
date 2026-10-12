@@ -238,32 +238,43 @@ QtObject {
         run(["touch", idleFlagPath]);
         logEvent("idle-cycle-start", "screensaver=" + screensaverTimeoutSeconds + " lock=" + lockTimeoutSeconds);
 
+        // Set this cycle's deadlines once: a bound interval would restart a
+        // pending timer from the moment shell.json changes, locking early or
+        // late (omarchy 3839d0b4). A change takes effect from the next cycle.
         if (keyboardStageEnabled) {
             if (keyboardDelaySeconds === 0)
                 dimKeyboard();
-            else
+            else {
+                keyboardTimer.interval = keyboardDelaySeconds * 1000;
                 keyboardTimer.restart();
+            }
         }
 
         if (screensaverStageEnabled) {
             if (screensaverDelaySeconds === 0)
                 launchScreensaver();
-            else
+            else {
+                screensaverTimer.interval = screensaverDelaySeconds * 1000;
                 screensaverTimer.restart();
+            }
         }
 
         if (blankStageEnabled) {
             if (blankDelaySeconds === 0)
                 powerOffMonitors();
-            else
+            else {
+                blankTimer.interval = blankDelaySeconds * 1000;
                 blankTimer.restart();
+            }
         }
 
         if (lockStageEnabled) {
             if (lockDelaySeconds === 0)
                 lockNow("lock-timeout-immediate");
-            else
+            else {
+                lockTimer.interval = lockDelaySeconds * 1000;
                 lockTimer.restart();
+            }
         }
     }
 
@@ -352,6 +363,13 @@ QtObject {
         });
     }
 
+    // With every stage at 0 (or stay-awake on) the monitor stops reporting,
+    // so nothing else would end a running cycle — a dimmed keyboard or dark
+    // panel would stay that way (omarchy 3cebdc34). Stay-awake already
+    // cancels in applyStayAwake; a second cancel is a no-op.
+    onIdleEnabledChanged: if (!idleEnabled)
+        cancelIdleCycle("disabled")
+
     readonly property IdleMonitor idleMonitor: IdleMonitor {
         enabled: root.idleEnabled
         // Seconds (quickshell's IdleMonitor.timeout).
@@ -362,19 +380,17 @@ QtObject {
     }
 
     readonly property Timer keyboardTimer: Timer {
-        interval: root.keyboardDelaySeconds * 1000
         repeat: false
         onTriggered: {
-            if (root.idleEnabled && root.idledThisCycle)
+            if (root.idleEnabled && root.idledThisCycle && root.keyboardStageEnabled)
                 root.dimKeyboard();
         }
     }
 
     readonly property Timer screensaverTimer: Timer {
-        interval: root.screensaverDelaySeconds * 1000
         repeat: false
         onTriggered: {
-            if (root.idleEnabled && root.idledThisCycle)
+            if (root.idleEnabled && root.idledThisCycle && root.screensaverStageEnabled)
                 root.launchScreensaver();
         }
     }
@@ -399,19 +415,17 @@ QtObject {
     }
 
     readonly property Timer blankTimer: Timer {
-        interval: root.blankDelaySeconds * 1000
         repeat: false
         onTriggered: {
-            if (root.idleEnabled && root.idledThisCycle)
+            if (root.idleEnabled && root.idledThisCycle && root.blankStageEnabled)
                 root.powerOffMonitors();
         }
     }
 
     readonly property Timer lockTimer: Timer {
-        interval: root.lockDelaySeconds * 1000
         repeat: false
         onTriggered: {
-            if (root.idleEnabled && root.idledThisCycle)
+            if (root.idleEnabled && root.idledThisCycle && root.lockStageEnabled)
                 root.lockNow("lock-timeout");
         }
     }
