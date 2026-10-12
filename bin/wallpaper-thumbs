@@ -3,25 +3,29 @@
 # ImageMagick, rebuilt on ffmpeg (which IS installed here; magick is not).
 #
 # Reads wallpaper paths on stdin, one per line, and prints one line per input:
-# the path of a 768px-wide JPEG thumbnail, generated into the cache on first
+# the path of a 1536px-wide JPEG thumbnail, generated into the cache on first
 # sight, or the original path when the thumbnail cannot be made (missing
 # source, no ffmpeg, decode failure). Callers never need to distinguish.
 #
-# Why 768: the widest the filmstrip ever draws a tile
-# (FilmstripPicker.qml expandedWidth). Decoding the originals instead cost
+# Why 1536: the filmstrip's widest tile (FilmstripPicker.qml expandedWidth,
+# 768 logical px) at up to 2x display scale — omarchy's thumbnail size, and
+# what keeps the preview sharp on this 1.25-1.5x panel (e5663c7e). Decoding
+# the originals instead cost
 # ~110 MiB of transient RSS per theme-switcher browse (measured 2026-08-09):
 # Qt's PNG handler has no scaled-decode path, so a 5120x3414 wallpaper fully
 # materializes (~67 MiB RGBA) before its downscale. A cached thumbnail is
-# ~60 KiB and decodes in one step.
+# ~130 KiB and decodes in one step.
 #
-# Keyed by sha1(path:mtime:size), so an edited or refetched source gets a
-# fresh thumbnail and the stale key is simply never asked for again. The
+# Keyed by sha1(path:mtime:size:width), so an edited or refetched source gets
+# a fresh thumbnail and the stale key is simply never asked for again — and
+# so did every 768px thumbnail when the width went to 1536. The
 # backgrounds tree is wiped and refetched wholesale (run_after_27-wallpapers),
 # which strands the old keys — the >90-day prune below collects them; an
 # actively-used thumbnail it removes regenerates on the next picker open.
 set -uo pipefail
 
 cache="$HOME/.cache/qshell/wallpaper-thumbs"
+width=1536
 mkdir -p "$cache" 2>/dev/null || cache=""
 
 have_ffmpeg=1
@@ -41,7 +45,7 @@ while IFS= read -r src; do
     printf '%s\n' "$src"
     continue
   fi
-  key="$(printf '%s:%s' "$src" "$meta" | sha1sum | cut -d' ' -f1)"
+  key="$(printf '%s:%s:%s' "$src" "$meta" "$width" | sha1sum | cut -d' ' -f1)"
   thumb="$cache/$key.jpg"
   if [ ! -s "$thumb" ]; then
     # Generated beside the target and renamed in (omarchy f075a78): a run
@@ -52,9 +56,9 @@ while IFS= read -r src; do
     # A killed run's leftover .part is collected by the same prune.
     tmp="$thumb.$$.part"
     # -frames:v 1 makes an animated GIF/WebP contribute its first frame;
-    # 'min(768,iw)' never upscales a source already narrower than a tile.
+    # 'min(width,iw)' never upscales a source already narrower than a tile.
     if ! ffmpeg -v error -y -i "$src" -frames:v 1 \
-      -vf "scale='min(768,iw)':-2" -q:v 4 -f mjpeg "$tmp" </dev/null 2>/dev/null \
+      -vf "scale='min($width,iw)':-2" -q:v 4 -f mjpeg "$tmp" </dev/null 2>/dev/null \
       || [ ! -s "$tmp" ] || ! mv -f "$tmp" "$thumb" 2>/dev/null; then
       rm -f "$tmp" "$thumb" 2>/dev/null
       printf '%s\n' "$src"

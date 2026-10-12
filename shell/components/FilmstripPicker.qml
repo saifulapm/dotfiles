@@ -406,16 +406,21 @@ Scope {
                             anchors.fill: parent
                             source: slice.sourceActivated && slice.imagePath ? "file://" + slice.imagePath.split("/").map(encodeURIComponent).join("/") : ""
                             fillMode: Image.PreserveAspectCrop
-                            // Both callers hand this a 768px cached
+                            // Both callers hand this a 1536px cached
                             // thumbnail (bin/wallpaper-thumbs — omarchy's
-                            // ImageMagick cache rebuilt on ffmpeg), so this
-                            // decode is cheap. The sourceSize cap stays for
-                            // the fallback rows where the helper had to echo
-                            // the original: Qt's PNG decode still fully
+                            // thumbnail cache rebuilt on ffmpeg), so this
+                            // decode is cheap. Decoded at the expanded
+                            // card's PHYSICAL size (omarchy e5663c7e): at
+                            // 768 logical px the preview was upscaled — Qt
+                            // renders this fractional panel at DPR 2. The
+                            // cap also covers the fallback rows where the
+                            // helper had to echo the original: Qt's PNG
+                            // decode still fully
                             // materializes a 4K source before downscaling
                             // (~110 MiB transient across a browse, measured
                             // 2026-08-09 — the reason the thumbnails exist).
-                            sourceSize.width: pickerRoot.expandedWidth
+                            sourceSize.width: Math.ceil(pickerRoot.expandedWidth * Screen.devicePixelRatio)
+                            sourceSize.height: Math.ceil(pickerRoot.expandedHeight * Screen.devicePixelRatio)
                             asynchronous: true
                             cache: true
                             smooth: true

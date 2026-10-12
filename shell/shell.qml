@@ -1092,9 +1092,11 @@ ShellRoot {
     }
 
     // The two filmstrip pickers are the heaviest surfaces in the shell —
-    // a browse latches ~30 MiB of 768 px tile decodes (bin/wallpaper-thumbs
-    // keeps that from being ~110 MiB of raw 4K decode) — and the
-    // rarest-used, so both evict after the grace period.
+    // a browse of both peaks ~250 MiB of tile decodes, every tile at the
+    // preview's physical size (Qt reports DPR 2 on this 1.25x panel;
+    // measured 2026-10-13, ~70 MiB back at 768 px), where bin/wallpaper-thumbs
+    // keeps it from being raw 4K decodes — and the rarest-used, so both
+    // evict after the grace period (~60 MiB stays in the pixmap cache).
     SurfaceLoader {
         id: themesLoader
         evictable: true

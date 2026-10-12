@@ -103,7 +103,7 @@ const list = names.map(name => {
   }
 })
 
-// Swap each preview for its 768px cached thumbnail (bin/wallpaper-thumbs) in
+// Swap each preview for its 1536px cached thumbnail (bin/wallpaper-thumbs) in
 // one batch call. The previews are the raw wallpapers — 4K-8K sources whose
 // full decode cost the switcher ~110 MiB of transient RSS per browse before
 // this (measured 2026-08-09). The helper echoes the original for anything it
