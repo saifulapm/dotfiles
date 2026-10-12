@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -86,25 +87,216 @@ def empty_bucket() -> dict[str, int]:
     }
 
 
-def iter_jsonl_files(projects_path: Path):
-    if not projects_path.is_dir():
-        return
-    yield from projects_path.rglob("*.jsonl")
+# Transcripts are append-only, and most of the corpus never changes between
+# runs, so the scan keeps a per-file index (omarchy 75250d37, #8313): the
+# unique usage records already parsed out of each file plus the byte offset
+# they end at. A file whose size and mtime match the index is not opened; a
+# file that grew is read from the stored offset; anything else (truncated,
+# rewritten, replaced, unknown) is read from the start. Without it every run
+# re-parsed the whole history — 4.2 GB here — and the cost grew for the life
+# of the machine.
+
+INDEX_VERSION = 1
+
+# How much of each end of what was read the index remembers a hash of, so a
+# file replaced or rewritten with more than it had is not mistaken for an
+# append.
+INDEX_HEAD_BYTES = 4096
 
 
-def scan(projects_path: Path) -> dict[str, Any]:
+# Records hold local days, so an index is only true in the timezone that
+# wrote it; after a change every transcript is read again.
+def index_zone() -> list[Any]:
+    return [os.environ.get("TZ"), list(time.tzname), time.timezone, time.altzone]
+
+
+def number(value: Any) -> int:
+    try:
+        n = float(value or 0)
+        return round(n) if n == n else 0
+    except Exception:
+        return 0
+
+
+def load_index(index_file: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(index_file.read_text(encoding="utf-8"))
+        if (
+            isinstance(data, dict)
+            and data.get("version") == INDEX_VERSION
+            and data.get("zone") == index_zone()
+            and isinstance(data.get("files"), dict)
+        ):
+            return data["files"]
+    except Exception:
+        pass
+    return {}
+
+
+# What was already read, by its first and last few kilobytes: a transcript
+# rewritten in place rather than appended to changes one or the other.
+def read_digest(path: Path, length: int) -> str:
+    digest = hashlib.sha1()
+    with path.open("rb") as handle:
+        digest.update(handle.read(min(length, INDEX_HEAD_BYTES)))
+        handle.seek(max(0, length - INDEX_HEAD_BYTES))
+        digest.update(handle.read(min(length, INDEX_HEAD_BYTES)))
+    return digest.hexdigest()
+
+
+def parse_usage_records(path: Path, entry: dict[str, Any] | None) -> dict[str, Any]:
+    """Return the index entry for one transcript, reusing `entry` where the file
+    only grew. Records are [key, model, day, input, output, cacheRead,
+    cacheWrite, session]; `day` is None when the line carries no timestamp."""
+    stat = path.stat()
+    size = stat.st_size
+    mtime = stat.st_mtime_ns
+
+    if entry and entry.get("size") == size and entry.get("mtime") == mtime:
+        return entry
+
+    # Only the same file, grown past what was read with what was read still in
+    # place, is an append. A transcript replaced by a larger one is a new file,
+    # and one rewritten in place has a different start or end.
+    if (
+        entry
+        and size > number(entry.get("size"))
+        and entry.get("file") == [stat.st_dev, stat.st_ino]
+        and entry.get("head") == read_digest(path, number(entry.get("offset")))
+    ):
+        records = list(entry.get("records") or [])
+        offset = number(entry.get("offset"))
+        line_number = number(entry.get("lines"))
+    else:
+        records = []
+        offset = 0
+        line_number = 0
+
+    # A streamed response is several lines sharing one message id, and the
+    # first line's output_tokens is a placeholder while the last carries the
+    # real count (#10606). Keep each message's line with the highest output
+    # count (the last one read wins a tie), whole: a response that fell back
+    # to another model mid-stream has lines that are separate snapshots, and
+    # mixing fields across them over-counts cache tokens and credits the
+    # wrong model.
+    positions = {record[0]: index for index, record in enumerate(records)}
+    with path.open("rb") as handle:
+        handle.seek(offset)
+        for raw in handle:
+            if not raw.endswith(b"\n"):
+                # A line still being written; pick it up whole next time.
+                break
+            offset += len(raw)
+            line_number += 1
+
+            # Cheap pre-filter before JSON parsing. Matches the old rg
+            # search and keeps files with unrelated lines inexpensive.
+            if b'"usage":' not in raw:
+                continue
+
+            try:
+                parsed = json.loads(raw.decode("utf-8", errors="replace"))
+            except Exception:
+                continue
+
+            message = parsed.get("message") if isinstance(parsed.get("message"), dict) else {}
+            if parsed.get("type") != "assistant" and message.get("role") != "assistant":
+                continue
+
+            usage = message.get("usage") or parsed.get("usage")
+            if not isinstance(usage, dict):
+                continue
+
+            message_id = message.get("id") or parsed.get("messageId") or ""
+            key = str(message_id) if message_id else f"{path}:{parsed.get('uuid') or parsed.get('requestId') or line_number}"
+
+            input_tokens = usage_token(usage, "input_tokens", "inputTokens")
+            output_tokens = usage_token(usage, "output_tokens", "outputTokens")
+            cache_read = usage_token(usage, "cache_read_input_tokens", "cacheReadInputTokens")
+            cache_write = usage_token(usage, "cache_creation_input_tokens", "cacheCreationInputTokens")
+            # Before the dedup, so a zero-usage first line does not claim the
+            # id and hide a later line with real usage.
+            if input_tokens + output_tokens + cache_read + cache_write <= 0:
+                continue
+
+            held = positions.get(key)
+            if held is not None and output_tokens < records[held][4]:
+                continue
+
+            timestamp = parsed.get("timestamp") or message.get("timestamp")
+            record = [
+                key,
+                str(message.get("model") or parsed.get("model") or "claude"),
+                local_date_from_timestamp(timestamp) if timestamp is not None else None,
+                input_tokens,
+                output_tokens,
+                cache_read,
+                cache_write,
+                str(parsed.get("sessionId") or path),
+            ]
+            if held is None:
+                positions[key] = len(records)
+                records.append(record)
+            else:
+                records[held] = record
+
+    return {
+        "size": size,
+        "file": [stat.st_dev, stat.st_ino],
+        "mtime": mtime,
+        "head": read_digest(path, offset),
+        "offset": offset,
+        "lines": line_number,
+        "records": records,
+    }
+
+
+def scan(projects_path: Path, index_file: Path | None = None) -> dict[str, Any]:
+    previous = load_index(index_file) if index_file else {}
+    current: dict[str, Any] = {}
+
+    # Directory order, as before: when one API message shows up in several
+    # transcripts with the same output count, the last file visited wins, and
+    # the numbers must not move because the scan got faster.
+    order: list[str] = []
+    unreadable_count = 0
+    unreadable_examples: list[str] = []
+    files = projects_path.rglob("*.jsonl") if projects_path.is_dir() else []
+    for path in files:
+        key = str(path)
+        try:
+            current[key] = parse_usage_records(path, previous.get(key))
+        except Exception as exc:
+            unreadable_count += 1
+            if len(unreadable_examples) < 3:
+                unreadable_examples.append(f"{path}: {exc}")
+            # What was read before is still true of the file.
+            if key in previous:
+                current[key] = previous[key]
+        if key in current:
+            order.append(key)
+
+    if unreadable_count:
+        examples = "; ".join(unreadable_examples)
+        print(f"Ignoring {unreadable_count} unreadable Claude project files (examples: {examples})", file=sys.stderr)
+
+    if index_file and current != previous:
+        try:
+            write_json(index_file, {"version": INDEX_VERSION, "zone": index_zone(), "files": current})
+        except Exception as exc:
+            print(f"Could not write Claude scan index {index_file}: {exc}", file=sys.stderr)
+
+    return summarize_records(current, order)
+
+
+def summarize_records(indexed: dict[str, Any], order: list[str]) -> dict[str, Any]:
     today = local_date_string()
     recent_dates = recent_date_strings()
     recent = {day: {"date": day, "messageCount": 0} for day in recent_dates}
 
-    # One record per message id: [model, day, input, output, cacheRead,
-    # cacheWrite, session]. Claude Code writes a streamed response as several
-    # lines sharing one message id, and the first line's output_tokens is a
-    # placeholder while the last carries the real count (omarchy 75250d37,
-    # #10606). Keep the line with the highest output count, the last one read
-    # winning a tie, and keep it whole: a response that fell back to another
-    # model mid-stream has lines that are separate snapshots, and mixing
-    # fields across them over-counts cache tokens and credits the wrong model.
+    # One API message can show up in several transcripts (a resumed session
+    # carries the earlier ones). As within a file, the record with the highest
+    # output count wins, the last one visited breaking a tie.
     seen: dict[str, list[Any]] = {}
     sessions: set[str] = set()
     active_days: set[str] = set()
@@ -114,62 +306,17 @@ def scan(projects_path: Path) -> dict[str, Any]:
     prompts = 0
     today_prompt_count = 0
     today_token_total = 0
-    malformed_lines = 0
-    scanned_files = 0
 
-    for path in iter_jsonl_files(projects_path) or []:
-        scanned_files += 1
-        try:
-            with path.open("r", encoding="utf-8", errors="replace") as handle:
-                for line_number, line in enumerate(handle, 1):
-                    # Cheap pre-filter before JSON parsing. Matches the old rg
-                    # search and keeps files with unrelated lines inexpensive.
-                    if '"usage":' not in line:
-                        continue
+    for key in order:
+        for record in indexed[key].get("records") or []:
+            held = seen.get(record[0])
+            if held is not None and record[4] < held[4]:
+                continue
+            seen[record[0]] = record
 
-                    try:
-                        entry = json.loads(line)
-                    except Exception:
-                        malformed_lines += 1
-                        continue
-
-                    message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
-                    if entry.get("type") != "assistant" and message.get("role") != "assistant":
-                        continue
-
-                    usage = message.get("usage") or entry.get("usage")
-                    if not isinstance(usage, dict):
-                        continue
-
-                    message_id = message.get("id") or entry.get("messageId") or ""
-                    unique_key = str(message_id) if message_id else f"{path}:{entry.get('uuid') or entry.get('requestId') or line_number}"
-
-                    input_tokens = usage_token(usage, "input_tokens", "inputTokens")
-                    output_tokens = usage_token(usage, "output_tokens", "outputTokens")
-                    cache_read = usage_token(usage, "cache_read_input_tokens", "cacheReadInputTokens")
-                    cache_write = usage_token(usage, "cache_creation_input_tokens", "cacheCreationInputTokens")
-                    # Before the dedup, so a zero-usage first line does not
-                    # claim the id and hide a later line with real usage.
-                    if input_tokens + output_tokens + cache_read + cache_write <= 0:
-                        continue
-
-                    held = seen.get(unique_key)
-                    if held is not None and output_tokens < held[3]:
-                        continue
-
-                    seen[unique_key] = [
-                        str(message.get("model") or entry.get("model") or "claude"),
-                        local_date_from_timestamp(entry.get("timestamp") or message.get("timestamp")),
-                        input_tokens,
-                        output_tokens,
-                        cache_read,
-                        cache_write,
-                        str(entry.get("sessionId") or path),
-                    ]
-        except Exception as exc:
-            print(f"Ignoring unreadable Claude project file {path}: {exc}", file=sys.stderr)
-
-    for model, day, input_tokens, output_tokens, cache_read, cache_write, session_key in seen.values():
+    for _, model, day, input_tokens, output_tokens, cache_read, cache_write, session_key in seen.values():
+        if day is None:
+            day = today
         total = input_tokens + output_tokens + cache_read + cache_write
         sessions.add(session_key)
         active_days.add(day)
@@ -213,38 +360,61 @@ def scan(projects_path: Path) -> dict[str, Any]:
         "activeDays": len(active_days),
         "activeDates": sorted(active_days),
         "dailyActivity": recent_days,
-        "scannedFiles": scanned_files,
-        "malformedLines": malformed_lines,
+        "scannedFiles": len(order),
     }
 
 
-def cache_paths(projects_path: Path) -> tuple[Path, Path]:
+def cache_paths(projects_path: Path) -> tuple[Path, Path, Path]:
     cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "omarchy" / "model-usage"
     cache_root.mkdir(parents=True, exist_ok=True)
     digest = hashlib.sha1(str(projects_path).encode("utf-8")).hexdigest()[:16]
-    return cache_root / f"claude-projects-{digest}.json", cache_root / f"claude-projects-{digest}.lock"
+    stem = f"claude-projects-{digest}"
+    return cache_root / f"{stem}.json", cache_root / f"{stem}.lock", cache_root / f"{stem}.index.json"
 
 
 def read_fresh_cache(path: Path, max_age_seconds: int) -> str | None:
     if max_age_seconds <= 0 or not path.exists():
         return None
     try:
-        if time.time() - path.stat().st_mtime <= max_age_seconds:
+        # A negative age means the mtime is in the future: the clock moved
+        # backwards since the write, so the cache's freshness cannot be
+        # trusted (omarchy #9956).
+        age = time.time() - path.stat().st_mtime
+        if 0 <= age <= max_age_seconds:
             return path.read_text(encoding="utf-8")
     except Exception:
         return None
     return None
 
 
+def write_json(path: Path, payload: dict[str, Any]) -> str:
+    # A temp name unique to this writer: the shell-start scan and a panel open
+    # can run two scanners at once, and a shared temp path means the second
+    # replace finds the first one's file already moved away.
+    output = json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n"
+    handle_fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(handle_fd, "w", encoding="utf-8") as handle:
+            handle.write(output)
+        # mkstemp opens at 0600; these caches were world-readable before.
+        tmp.chmod(0o644)
+        tmp.replace(path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+    return output
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("projects_path", nargs="?", default="~/.claude/projects")
     parser.add_argument("--cache-seconds", type=int, default=20)
-    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--force", action="store_true", help="rescan every transcript from scratch, ignoring the cache and index")
     args = parser.parse_args()
 
     projects_path = expand_path(args.projects_path)
-    cache_file, lock_file = cache_paths(projects_path)
+    cache_file, lock_file, index_file = cache_paths(projects_path)
 
     if not args.force:
         cached = read_fresh_cache(cache_file, args.cache_seconds)
@@ -259,12 +429,10 @@ def main() -> int:
             if cached is not None:
                 print(cached, end="" if cached.endswith("\n") else "\n")
                 return 0
+        else:
+            index_file.unlink(missing_ok=True)
 
-        summary = scan(projects_path)
-        output = json.dumps(summary, separators=(",", ":"), sort_keys=True) + "\n"
-        tmp = cache_file.with_suffix(".json.tmp")
-        tmp.write_text(output, encoding="utf-8")
-        tmp.replace(cache_file)
+        output = write_json(cache_file, scan(projects_path, index_file))
         print(output, end="")
     return 0
 
