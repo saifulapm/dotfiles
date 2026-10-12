@@ -19,9 +19,9 @@
 # node without clipboard-serve just refuses the connection instantly. One
 # LocalAPI status call per copy, nothing polls.
 #
-# What never leaves the machine: empty selections, anything over 1 MiB, and
-# password-manager selections — the same two markers clipboard-capture
-# honours (wl-paste's CLIPBOARD_STATE=sensitive and the KDE hint).
+# What never leaves the machine: empty selections, anything over 1 MiB,
+# password-manager selections (wl-paste's CLIPBOARD_STATE=sensitive and the
+# KDE x-kde-passwordManagerHint type), and a copy whose read did not finish.
 set -uo pipefail
 
 runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -30,13 +30,17 @@ max_bytes=1048576
 
 tmp=$(mktemp -p "$runtime" clipboard-push.XXXXXX) || exit 0
 trap 'rm -f "$tmp"' EXIT
-cat >"$tmp"
+# The clipboard owner streams the copy and can stall without closing its end,
+# and while this script waits wl-paste --watch handles no further copies, so
+# the read is bounded and a copy cut off at the deadline is dropped, not sent
+# half-read (omarchy b9e0ac4f).
+timeout 2s cat >"$tmp" || exit 0
 
 [[ -s $tmp ]] || exit 0
 (($(stat -c %s "$tmp") <= max_bytes)) || exit 0
 
 [[ ${CLIPBOARD_STATE:-} == sensitive ]] && exit 0
-types=$(wl-paste --list-types 2>/dev/null || true)
+types=$(timeout 2s wl-paste --list-types 2>/dev/null || true)
 grep -qx 'x-kde-passwordManagerHint' <<<"$types" && exit 0
 
 # The copy we just received from a peer — pushing it back out is the echo.

@@ -233,18 +233,22 @@ Scope {
         return "ok";
     }
 
+    // Every wl-paste is bounded (omarchy b9e0ac4f): a clipboard owner that
+    // stalls without closing its end would keep clipProc running, and every
+    // later add would answer "busy". A text read cut off at the deadline is
+    // dropped rather than shelved half-read.
     readonly property Process clipProc: Process {
         command: ["bash", "-c", `
             set -uo pipefail
             dir="${shelfRoot.clipsDir}"
             mkdir -p "$dir"
-            types="$(wl-paste --list-types 2>/dev/null || true)"
+            types="$(timeout 2s wl-paste --list-types 2>/dev/null || true)"
             if grep -q '^image/png' <<<"$types"; then
                 f="$dir/clip-$(date +%s).png"
-                wl-paste --type image/png >"$f" 2>/dev/null && [[ -s $f ]] && printf '%s' "$f" && exit 0
+                timeout 2s wl-paste --type image/png >"$f" 2>/dev/null && [[ -s $f ]] && printf '%s' "$f" && exit 0
                 rm -f "$f"; exit 0
             fi
-            text="$(wl-paste --no-newline --type text 2>/dev/null || true)"
+            text="$(timeout 2s wl-paste --no-newline --type text 2>/dev/null)" || exit 0
             [[ -n $text ]] || exit 0
             f="$dir/clip-$(date +%s).txt"
             printf '%s' "$text" >"$f" && printf '%s' "$f"

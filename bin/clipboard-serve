@@ -92,7 +92,9 @@ if [[ $method == GET ]]; then
   # --no-newline: the body is the clipboard's bytes, not a printout of them.
   # No text on the clipboard (or no Wayland session) is an empty 200, not an
   # error — the pulling side just gets nothing.
-  wl-paste --no-newline --type text >"$tmp" 2>/dev/null || : >"$tmp"
+  # Bounded, like every clipboard read here: a stalled owner would hold this
+  # handler open, and a read cut off at the deadline counts as nothing.
+  timeout 2s wl-paste --no-newline --type text >"$tmp" 2>/dev/null || : >"$tmp"
   printf 'HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %s\r\nConnection: close\r\n\r\n' \
     "$(stat -c %s "$tmp")"
   cat "$tmp"
@@ -179,7 +181,7 @@ notify_arrival() {
 # Skip the copy when the clipboard already holds these bytes — a relay of
 # something we sent, back at its origin. This check, not .last, is what
 # guarantees every relay chain terminates.
-if cmp -s "$tmp" <(wl-paste --no-newline --type text 2>/dev/null); then
+if cmp -s "$tmp" <(timeout 2s wl-paste --no-newline --type text 2>/dev/null); then
   # Still toast a phone post: the sender pressed a button and the content IS
   # here — that it already was is not their problem.
   [[ -n $relay ]] || notify_arrival
