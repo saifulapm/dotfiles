@@ -589,18 +589,18 @@ function heroMeta(p) {
     return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
-// Claude's tier rules, taken from the credentials file: a rateLimitTier like
-// `default_claude_max_20x` becomes "Max 20x", otherwise the subscriptionType
-// is title-cased.
+// Claude's tier rules, taken from the credentials file. The rate-limit tier
+// names the ceiling, not the plan: a Team premium seat runs on
+// `default_claude_max_5x` while paying for Team. Lead with the subscription and
+// keep the multiplier as its qualifier, so Max still reads "Max 5x" and a Team
+// seat reads "Team 5x" rather than passing as Max (omarchy 75250d37, #11109).
 function formatTier(subscriptionType, rateLimitTier) {
-    if (!rateLimitTier)
-        return subscriptionType || "";
-    const match = String(rateLimitTier).match(/max_(\d+x)/i);
-    if (match)
-        return "Max " + match[1];
-    if (subscriptionType)
-        return String(subscriptionType).charAt(0).toUpperCase() + String(subscriptionType).slice(1);
-    return "";
+    const subscription = String(subscriptionType || "");
+    const plan = subscription ? subscription.charAt(0).toUpperCase() + subscription.slice(1) : "";
+    const match = rateLimitTier ? String(rateLimitTier).match(/max_(\d+x)/i) : null;
+    if (!match)
+        return plan;
+    return (plan || "Max") + " " + match[1];
 }
 
 // The `plan` widget setting, as written in shell.json, rendered as a label.
@@ -796,4 +796,10 @@ function pxyToolRows(p) {
         detail: pxyFormatMs(Number(t.totalMs || 0) / Math.max(1, Number(t.calls || 0)))
             + (Number(t.errors || 0) > 0 ? "  ·  " + t.errors + " failed" : "")
     }));
+}
+
+if (typeof module !== "undefined") {
+    module.exports = {
+        formatTier: formatTier
+    };
 }
