@@ -8,7 +8,7 @@ import Quickshell.Wayland
 
 // Wallpaper — full port of omarchy's background plugin: the new
 // image is drawn behind a slanted parallelogram mask whose edge sweeps out
-// from the screen's center (420 ms InOutCubic), the old image underneath
+// from the screen's center (840 ms InOutCubic), the old image underneath
 // until the sweep passes, per screen. A theme pushed with the transition is
 // held until the reveal's first frame, so the palette and the wallpaper land
 // together; a 300 ms fallback timer applies it anyway when a reveal never
@@ -218,7 +218,7 @@ Scope {
         property: "revealProgress"
         from: 0
         to: 1
-        duration: backgroundRoot.theme.motion.crossfade
+        duration: backgroundRoot.theme.motion.reveal
         easing.type: backgroundRoot.theme.motion.easingSmooth
         onFinished: {
             if (backgroundRoot.incomingBackground) {
@@ -351,7 +351,7 @@ Scope {
                 anchors.fill: parent
                 visible: false
                 // The mask FBO is screen-sized; keep it allocated only for
-                // the 420 ms the reveal actually samples it (same gate as
+                // the 840 ms the reveal actually samples it (same gate as
                 // incomingLayer above).
                 layer.enabled: backgroundRoot.incomingBackground !== "" && backgroundRoot.revealProgress < 1
 

@@ -454,6 +454,11 @@ QtObject {
         // simply 420/150: the number they already were at the default token.
         readonly property int crossfade: root.time(2.8)
 
+        // The wallpaper's own wipe, split off crossfade when omarchy slowed
+        // its reveal to 840 ms (7f95505d) and left everything else at 420.
+        // The bar's fade still lands inside the wipe; it just finishes first.
+        readonly property int reveal: root.time(5.6)
+
         // The theme's own curve: "snap" -> OutQuint, "spring" -> OutBack,
         // otherwise OutCubic. Twenty-one sites had hardcoded Easing.OutCubic,
         // which is only coincidentally right — it is what this resolves to at
