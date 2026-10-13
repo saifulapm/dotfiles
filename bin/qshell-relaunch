@@ -34,6 +34,9 @@ force=0
 if ((!force)) && [[ $(timeout 2 qs ipc call lock isLocked 2>/dev/null) == "true" ]]; then
   echo "qshell-relaunch: the session is locked — restarting would force a re-auth." >&2
   echo "                 Unlock first, or pass --force." >&2
+  # stderr goes nowhere from vicinae's silent script commands.
+  notify-send -a qshell -t 6000 "Shell not relaunched" \
+    "The session reads as locked. Unlock first, or run qshell-relaunch --force." >/dev/null 2>&1 || true
   exit 1
 fi
 

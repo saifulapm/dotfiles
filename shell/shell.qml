@@ -549,6 +549,11 @@ ShellRoot {
         return item !== null && item.currentlyLocked();
     }
 
+    function sessionLocked() {
+        const item = lockLoader.item;
+        return item !== null && item.sessionLocked();
+    }
+
     // Whether the lock screen may power the panel off. False on the Mac mini,
     // whose 4K60 output goes through Apple's DP2HDMI bridge: a modeset there
     // takes ~8 s (`set_digital_out_mode finished:7892` in dmesg) and the
@@ -1211,12 +1216,15 @@ ShellRoot {
             return shell.lockSession() ? "ok" : "missing-pam";
         }
 
+        // Lock.qml's sessionLocked(), not currentlyLocked(): these answer
+        // whether the user is behind a lock, and quickshell can leave its own
+        // `locked` stuck true after an unlock.
         function status(): string {
-            return shell.currentlyLocked() ? "locked" : "unlocked";
+            return shell.sessionLocked() ? "locked" : "unlocked";
         }
 
         function isLocked(): string {
-            return shell.currentlyLocked() ? "true" : "false";
+            return shell.sessionLocked() ? "true" : "false";
         }
 
         // Everything the lock knows about itself, for diagnosing a lock that
@@ -1230,7 +1238,8 @@ ShellRoot {
             const l = lockLoader.item;
             return JSON.stringify({
                 loaded: true,
-                locked: l.currentlyLocked(),
+                locked: l.sessionLocked(),
+                held: l.currentlyLocked(),
                 requested: l.lockRequested,
                 pending: l.pendingSessionLock,
                 secure: l.secure,

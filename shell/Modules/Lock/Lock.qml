@@ -69,8 +69,23 @@ Scope {
     // lockRequested and secure both false and the desktop plainly visible —
     // the idle lock stage then took the session for locked and never locked
     // it. The binding stays for what only needs change notifications.
+    //
+    // Reading afresh is not enough on its own: on 2026-10-13 the fresh read
+    // was stuck too. A start re-armed a stranded lock, the output flapped,
+    // the user unlocked, and `sessionLock.locked` itself kept reading true —
+    // quickshell's manager still held a lock object the compositor no longer
+    // honoured. This stays the broad answer anyway: releasing the module or
+    // skipping finishUnlock while that object exists is the unsafe direction.
     function currentlyLocked() {
         return lockRequested || sessionLock.locked || sessionLock.secure;
+    }
+
+    // Whether the user is actually behind the lock: one asked for and not yet
+    // unlocked, or one the compositor confirms. Leaves out the stuck
+    // `sessionLock.locked` above, so `lock isLocked` stops telling
+    // bin/qshell-relaunch the session is locked when it plainly is not.
+    function sessionLocked() {
+        return lockRequested || sessionLock.secure;
     }
     readonly property bool secure: sessionLock.secure
     // Fired at the end of every unlock, so shell.qml can release this module
