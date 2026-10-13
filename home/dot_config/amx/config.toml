@@ -101,7 +101,7 @@ theme = "qshell"
 # long the pane goes and the record stays; enter, attach or resume starts the
 # agent again where it left off. A pane somebody is attached to or has pinned
 # is never taken. 0 turns this off.
-park_after = 600
+park_after = 1800
 
 # What a fresh worktree is furnished with before its pane starts, so an agent's
 # first turn goes on the task rather than on an install or a failed test. Paths
