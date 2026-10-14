@@ -95,11 +95,16 @@ managed=$(
       "Bash(tmux:*)"
     ],
     "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
       "Read(**/*.pem)",
       "Read(~/.ssh/**)",
+      "Read(~/.gnupg/**)",
       "Read(~/.config/gh/hosts.yml)",
+      "Read(~/.config/rclone/rclone.conf)",
+      "Read(~/.config/.wrangler/**)",
+      "Read(~/.config/cloudflare/**)",
+      "Read(~/.npmrc)",
       "Read(~/.netrc)"
     ],
     "defaultMode": "auto"
@@ -148,7 +153,8 @@ managed=$(
     "bgIsolation": "none"
   },
   "disableAgentView": true,
-  "disableRemoteControl": true,
+  "disableRemoteControl": false,
+  "inputNeededNotifEnabled": true,
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.py",
@@ -210,6 +216,19 @@ current=$(cat)
 # ANTHROPIC_DEFAULT_HAIKU_MODEL pins the haiku alias to Haiku 5.5 (2026-10-08):
 # Claude Code's built-in helper agents still resolved it to Haiku 4.5, which
 # costs ten times as much per input token and scores far lower.
+#
+# Remote Control is on again (2026-10-15): workflow go starts orchestrators
+# with --remote-control, so each run shows in the Claude app under its machine,
+# and inputNeededNotifEnabled pushes to the phone when one waits on a question
+# or a permission prompt. It is false rather than deleted because the merge
+# below would keep the old true. Require trusted devices is on for the account.
+# The deny list covers nested .env files (./ matched the root only), the gpg
+# key behind pass, and the rclone, wrangler, cloudflare and npm tokens.
+#
+# Re-measured 2026-10-15 over 844 subagents on the mini and the nuc: 0.16-0.22%
+# of their calls came after a 5-60 minute gap, so a 1h subagent cache would
+# cost 9-12% more of their spend. A subagent's cache stays warm while it keeps
+# calling, however long it runs; the orchestrator, which waits, is already 1h.
 #
 # The Stop hook (`mem session-check`) went on 2026-10-09: of 240 nudges, 7 were
 # followed by a mem write, and every one woke the model for another turn.
