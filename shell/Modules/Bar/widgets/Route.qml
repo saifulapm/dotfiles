@@ -8,7 +8,7 @@ import "RouteModel.js" as Model
 // device, and the waiting count beside it in the accent while any wait. The mark draws only what
 // the agent's route file says; with no file it hides.
 //
-// Left click opens the panel with the two choices.
+// Left click opens the panel with the three choices.
 BarButton {
     id: rootItem
 
@@ -23,7 +23,7 @@ BarButton {
     readonly property string badgeText: Model.badge(route.state)
 
     visible: Model.visible(route.state)
-    tooltipText: "Questions: " + (route.state.route === "device" ? "Device" : "Phone") + ", " + Model.waitingLine(route.state)
+    tooltipText: "Questions: " + (route.state.route === "device" ? "Device" : route.state.route === "dulali" ? "Dulali" : "Phone") + ", " + Model.waitingLine(route.state)
 
     onTapped: {
         if (panelLoader.status === Loader.Null)

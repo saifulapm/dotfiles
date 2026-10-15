@@ -3,8 +3,8 @@ import "../components"
 import "../../../components"
 import "RouteModel.js" as Model
 
-// Route panel: where the workflow hub sends its questions. Two choices, Phone
-// and this Device, with the current one marked; when another machine holds
+// Route panel: where the workflow hub sends its questions. Three choices, Phone,
+// this Device and Dulali, with the current one marked; when another machine holds
 // Device the hero says which. A click runs `workflow route <choice>` and the
 // marking follows the agent's next write of the route file, not the click.
 BarPanel {
@@ -22,7 +22,7 @@ BarPanel {
         theme: panel.theme
         width: parent.width
         title: "Question route"
-        meta: panel.current === "phone" ? "Questions go to Phone" : (panel.current === "elsewhere" ? "Questions go to " + Model.elsewhereLabel(panel.state, panel.route.machine) : "Questions go to " + Model.deviceLabel(panel.state, panel.route.machine))
+        meta: panel.current === "phone" ? "Questions go to Phone" : panel.current === "dulali" ? "Questions go to Dulali" : (panel.current === "elsewhere" ? "Questions go to " + Model.elsewhereLabel(panel.state, panel.route.machine) : "Questions go to " + Model.deviceLabel(panel.state, panel.route.machine))
         metaFamily: panel.theme.fontUi
         metaWeight: Font.Normal
         metaLetterSpacing: 0
@@ -52,6 +52,14 @@ BarPanel {
             selected: panel.current === "device"
             enabled: !panel.route.routeProcess.running
             onClicked: panel.route.setRoute("device")
+        }
+
+        PanelButton {
+            theme: panel.theme
+            label: "Dulali"
+            selected: panel.current === "dulali"
+            enabled: !panel.route.routeProcess.running
+            onClicked: panel.route.setRoute("dulali")
         }
     }
 

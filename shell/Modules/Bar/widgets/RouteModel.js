@@ -6,7 +6,7 @@
 // The input is $XDG_RUNTIME_DIR/workflow-route.json, which the workflow agent
 // rewrites whole every 5 s:
 //
-//     {"route":"phone"|"device","machine":<string|null>,"waiting":<int>,"hub":"<url>","self":"<name>"}
+//     {"route":"phone"|"device"|"dulali","machine":<string|null>,"waiting":<int>,"hub":"<url>","self":"<name>"}
 //
 // `self` is this machine as the hub names it (its tailnet name, e.g. "mini"),
 // which is not always qshell's own name for it (e.g. "mac-mini-m2"); when
@@ -21,6 +21,7 @@
 
 var PHONE_GLYPH = "󰄜"; // md-cellphone
 var DEVICE_GLYPH = "󰍹"; // md-monitor
+var DULALI_GLYPH = "\u{f06a9}"; // md-robot
 
 // A file that is absent, unparseable or names an unknown route means the
 // agent is not running or predates the route, so the glyph hides.
@@ -33,7 +34,7 @@ function parseState(raw) {
     }
     if (!data || typeof data !== "object" || Array.isArray(data))
         return { valid: false };
-    if (data.route !== "phone" && data.route !== "device")
+    if (data.route !== "phone" && data.route !== "device" && data.route !== "dulali")
         return { valid: false };
     var waiting = Math.floor(Number(data.waiting) || 0);
     return {
@@ -51,6 +52,8 @@ function visible(state) {
 }
 
 function glyph(state) {
+    if (visible(state) && state.route === "dulali")
+        return DULALI_GLYPH;
     return visible(state) && state.route === "device" ? DEVICE_GLYPH : PHONE_GLYPH;
 }
 
@@ -58,7 +61,7 @@ function badge(state) {
     return visible(state) && state.waiting > 0 ? String(state.waiting) : "";
 }
 
-// "phone", "device" (this machine) or "elsewhere" (Device on another machine).
+// "phone", "dulali", "device" (this machine) or "elsewhere" (Device on another machine).
 // A device route with no machine named is read as this one's.
 // This machine's name as the hub knows it, else qshell's.
 function here(state, thisMachine) {
@@ -71,6 +74,8 @@ function currentChoice(state, thisMachine) {
     thisMachine = here(state, thisMachine);
     if (state.route === "phone")
         return "phone";
+    if (state.route === "dulali")
+        return "dulali";
     return state.machine === "" || state.machine === thisMachine ? "device" : "elsewhere";
 }
 
@@ -93,5 +98,5 @@ function hubUrl(state) {
 
 // The agent names this machine itself, so Device takes no argument here.
 function commandFor(choice) {
-    return ["workflow", "route", choice === "device" ? "device" : "phone"];
+    return ["workflow", "route", choice === "device" || choice === "dulali" ? choice : "phone"];
 }

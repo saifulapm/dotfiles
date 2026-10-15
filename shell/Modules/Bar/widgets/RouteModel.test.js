@@ -34,6 +34,7 @@ function plain(value) {
 
 const PHONE = "󰄜"; // md-cellphone
 const DESKTOP = "󰍹"; // md-monitor
+const ROBOT = "\u{f06a9}"; // md-robot
 
 test("device held by this machine draws the desktop glyph with a count", () => {
     const state = Model.parseState('{"route":"device","machine":"mac-mini-m2","waiting":2,"hub":"http://hub:7700"}');
@@ -86,6 +87,14 @@ test("a missing or garbage file hides the glyph", () => {
 test("each choice runs the workflow route command by argv", () => {
     assert.deepEqual(plain(Model.commandFor("phone")), ["workflow", "route", "phone"]);
     assert.deepEqual(plain(Model.commandFor("device")), ["workflow", "route", "device"]);
+});
+
+test("dulali route is visible, draws the robot glyph and is the current choice", () => {
+    const state = Model.parseState('{"route":"dulali","machine":null,"waiting":1,"hub":"http://hub:7700","self":"mini"}');
+    assert.equal(Model.visible(state), true);
+    assert.equal(Model.glyph(state), ROBOT);
+    assert.equal(Model.currentChoice(state, "mac-mini-m2"), "dulali");
+    assert.deepEqual(plain(Model.commandFor("dulali")), ["workflow", "route", "dulali"]);
 });
 
 if (failures > 0) {
