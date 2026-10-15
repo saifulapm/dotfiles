@@ -107,7 +107,7 @@ remote="Dropbox:qshell-sync"
 # The mem store syncs with the one hub on the VPS instead, as user mem over
 # Tailscale SSH: the system ssh logs in, so no key or rclone remote is set
 # up. The Dropbox copy at $remote/memory takes no more writes.
-memory_remote=":sftp,ssh='ssh -o BatchMode=yes mem@dulali',shell_type=unix,md5sum_command=md5sum,sha1sum_command=sha1sum:/srv/mem/store"
+memory_remote=":sftp,ssh='ssh -o BatchMode=yes mem@dulali',shell_type=unix,md5sum_command=md5sum,sha1sum_command=sha1sum,known_hosts_file=~/.ssh/known_hosts:/srv/mem/store"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell"
 sync_dir="$state_dir/sync"
 hist_dir="$sync_dir/history"
