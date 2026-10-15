@@ -717,7 +717,9 @@ sync_memory() {
   # force_max 5: a store with a couple of files IS "100% changed" the first few
   # rounds, which is arithmetic rather than evidence (the notes unit's recorded
   # failure). A real store is far bigger, so the check still means something.
-  bisync_unit memory "$mem_dir" "$memory_remote" 5 --filters-file "$filters" || return 0
+  # --checkers 32: listing the store's ~27k files over sftp is most of a
+  # round, and 32 directories at once take it from 32 s to 21 s (2026-10-15).
+  bisync_unit memory "$mem_dir" "$memory_remote" 5 --filters-file "$filters" --checkers 32 || return 0
   local items
   items="$(find "$mem_dir" -name '*.md' -type f 2>/dev/null | wc -l)"
   unit_ok memory "$items item(s)${bisync_note:+ — $bisync_note}"
