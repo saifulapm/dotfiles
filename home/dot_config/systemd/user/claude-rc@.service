@@ -17,6 +17,11 @@ WorkingDirectory=%h/Sites/github/%i
 # pre-created in the folder itself: that would sit in the checkout an
 # orchestrator works in, so every session goes into its own worktree.
 ExecStart=%h/.local/bin/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir
+# A stop or a plain kill (SIGTERM) lets the server withdraw from claude.ai,
+# and the restart is serving again in about 7 s. A SIGKILL or a crash leaves
+# its claim on the folder at Anthropic's end: each restart is refused ("This
+# folder is already served") and retries a minute later until the claim
+# lapses, about 3 minutes after the kill (measured 2026-10-15).
 Restart=always
 RestartSec=5
 
