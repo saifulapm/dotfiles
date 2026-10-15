@@ -46,6 +46,16 @@ test("device held by this machine draws the desktop glyph with a count", () => {
     assert.equal(Model.hubUrl(state), "http://hub:7700");
 });
 
+test("the agent's own name for this machine wins over qshell's", () => {
+    const state = Model.parseState('{"route":"device","machine":"mini","waiting":0,"hub":"http://hub:7700","self":"mini"}');
+    assert.equal(Model.currentChoice(state, "mac-mini-m2"), "device");
+    assert.equal(Model.deviceLabel(state, "mac-mini-m2"), "Device (mini)");
+    assert.equal(Model.elsewhereLabel(state, "mac-mini-m2"), "");
+    const nuc = Model.parseState('{"route":"device","machine":"nuc","waiting":0,"self":"mini"}');
+    assert.equal(Model.currentChoice(nuc, "mac-mini-m2"), "elsewhere");
+    assert.equal(Model.elsewhereLabel(nuc, "mac-mini-m2"), "Device (nuc)");
+});
+
 test("phone route draws the phone glyph with no badge", () => {
     const state = Model.parseState('{"route":"phone","machine":null,"waiting":0}');
     assert.equal(Model.visible(state), true);

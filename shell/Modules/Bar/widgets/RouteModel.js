@@ -6,7 +6,11 @@
 // The input is $XDG_RUNTIME_DIR/workflow-route.json, which the workflow agent
 // rewrites whole every 5 s:
 //
-//     {"route":"phone"|"device","machine":<string|null>,"waiting":<int>,"hub":"<url>"}
+//     {"route":"phone"|"device","machine":<string|null>,"waiting":<int>,"hub":"<url>","self":"<name>"}
+//
+// `self` is this machine as the hub names it (its tailnet name, e.g. "mini"),
+// which is not always qshell's own name for it (e.g. "mac-mini-m2"); when
+// present it is the name compared with `machine`.
 //
 // The bar draws only what that file says. A click runs `workflow route ...`
 // and waits for the agent's rewrite, so two machines changing the route at
@@ -37,7 +41,8 @@ function parseState(raw) {
         route: data.route,
         machine: typeof data.machine === "string" ? data.machine : "",
         waiting: waiting > 0 ? waiting : 0,
-        hub: typeof data.hub === "string" ? data.hub : ""
+        hub: typeof data.hub === "string" ? data.hub : "",
+        self: typeof data.self === "string" ? data.self : ""
     };
 }
 
@@ -55,15 +60,22 @@ function badge(state) {
 
 // "phone", "device" (this machine) or "elsewhere" (Device on another machine).
 // A device route with no machine named is read as this one's.
+// This machine's name as the hub knows it, else qshell's.
+function here(state, thisMachine) {
+    return state && state.self ? state.self : thisMachine;
+}
+
 function currentChoice(state, thisMachine) {
     if (!visible(state))
         return "";
+    thisMachine = here(state, thisMachine);
     if (state.route === "phone")
         return "phone";
     return state.machine === "" || state.machine === thisMachine ? "device" : "elsewhere";
 }
 
 function deviceLabel(state, thisMachine) {
+    thisMachine = here(state, thisMachine);
     return thisMachine ? "Device (" + thisMachine + ")" : "Device";
 }
 
