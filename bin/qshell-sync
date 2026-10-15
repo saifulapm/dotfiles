@@ -518,7 +518,11 @@ bisync_unit() { # id, localDir, remoteDir, forceMaxFiles, extraArgs...
   if grep -q -i -e "--resync" -e "cannot find prior" <<<"$err"; then
     resynced=true
     run_rclone mkdir "$remote_dir" || true
-    if run_rclone bisync "$local_dir" "$remote_dir" --resync --resilient --recover "${policy[@]}" "$@"; then
+    # --resync-mode newer, as --conflict-resolve is: by default a resync keeps
+    # the local side of every file that differs, so a machine bootstrapping
+    # against a store others had moved on put its older copies back over
+    # theirs (the mem store's move to dulali, 2026-10-15, lost two plan ticks).
+    if run_rclone bisync "$local_dir" "$remote_dir" --resync --resync-mode newer --resilient --recover "${policy[@]}" "$@"; then
       bisync_note="bootstrapped with --resync"
       return 0
     fi
