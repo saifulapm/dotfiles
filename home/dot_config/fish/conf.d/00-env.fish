@@ -21,6 +21,11 @@ set -gx XDG_STATE_HOME "$HOME/.local/state"
 # fork merges in separately. Twin: environment.d/56-helix-runtime.conf.
 set -gx HELIX_RUNTIME /usr/lib64/helix/runtime
 
+# The Claude app's push gate: no push while qshell's presence marker exists.
+# A login shell, an SSH one included, never reads environment.d. Twin:
+# environment.d/70-claude-presence.conf.
+set -gx CLAUDE_CLIENT_PRESENCE_FILE "$XDG_RUNTIME_DIR/qshell-present"
+
 # Go — XDG-homed like the mac. Source of truth is ~/.config/go/env (go reads
 # it in every context — bash scripts, systemd); these exports agree with it
 # and just make shells explicit.
