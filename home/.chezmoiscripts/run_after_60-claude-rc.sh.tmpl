@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# The Remote Control servers (dot_config/systemd/user/claude-rc@.service), one
+# per repo folder, run on the Mac mini only: it is the machine that stays awake,
+# and a phone-started session must land where the repo's orchestrators run.
+# Every other machine disables any instance it has, so the Code tab never lists
+# a laptop that has gone to sleep. One more repo is one more name in `repos`.
+# Runs on every apply; enable --now on an enabled unit is a no-op.
+set -uo pipefail
+
+state="$(systemctl --user is-system-running 2>/dev/null || true)"
+if [ "$state" != "running" ] && [ "$state" != "degraded" ]; then
+  echo "claude-rc: no user systemd session, skipped" >&2
+  exit 0
+fi
+systemctl --user daemon-reload
+
+{{ if eq .machine "mac-mini-m2" -}}
+repos=(workflow dulali lathe legalpoint-agent shopify_themes shopify_apps)
+for repo in "${repos[@]}"; do
+  systemctl --user enable --now "claude-rc@$repo.service" 2>/dev/null \
+    || echo "claude-rc: enable --now claude-rc@$repo failed — check systemctl --user status claude-rc@$repo" >&2
+done
+echo "claude-rc: ${repos[*]} enabled"
+{{- else -}}
+# An enabled instance is a link in a .wants folder; list-unit-files names only
+# the template.
+for link in "$HOME"/.config/systemd/user/*.wants/claude-rc@*.service; do
+  [ -L "$link" ] || continue
+  unit="$(basename "$link")"
+  systemctl --user disable --now "$unit" && echo "claude-rc: $unit disabled (the mini serves them)"
+done
+{{- end }}
