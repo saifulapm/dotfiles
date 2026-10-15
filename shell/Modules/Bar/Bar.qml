@@ -812,6 +812,15 @@ Scope {
         return sharedService("sync", hubSyncServiceComponent, {});
     }
 
+    // No gate: the route service watches the workflow agent's route file and
+    // starts a process only on a click. The machine id is a binding because
+    // Sync reads ~/.config/qshell/machine asynchronously.
+    function routeService() {
+        return sharedService("route", routeServiceComponent, {
+            machine: Qt.binding(() => barRoot.shell.sync.detectedMachine)
+        });
+    }
+
     // Keyed by widget id, not by type: "icloud" and "dropbox" are two
     // remotes, so they keep two services — one per remote, not per screen.
     function rcloneService(id, defaults) {
@@ -929,6 +938,11 @@ Scope {
     }
 
     Component {
+        id: routeServiceComponent
+        RouteService {}
+    }
+
+    Component {
         id: weatherServiceComponent
         WeatherService {}
     }
@@ -983,6 +997,7 @@ Scope {
             "dufs": dufsComponent,
             "mail": mailComponent,
             "sync": hubSyncComponent,
+            "route": routeComponent,
             "icloud": icloudComponent,
             "dropbox": dropboxComponent,
             "tailscale": tailscaleComponent,
@@ -2514,6 +2529,14 @@ Scope {
         HubSync {
             theme: barRoot.theme
             sync: barRoot.hubSyncService()
+        }
+    }
+
+    Component {
+        id: routeComponent
+        Route {
+            theme: barRoot.theme
+            route: barRoot.routeService()
         }
     }
 

@@ -65,6 +65,7 @@
       "icloud",
       "dropbox",
       "sync",
+      "route",
       "dnsshield",
       "warp",
       "tailscale",
