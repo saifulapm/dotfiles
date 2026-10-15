@@ -5,14 +5,16 @@ import "RouteModel.js" as Model
 
 // Route: where the workflow hub sends its questions, as one bar button. A
 // phone mark while they go to the phone, a monitor mark while they go to a
-// device, and an accent count badge while any wait. The mark draws only what
+// device, and the waiting count beside it in the accent while any wait. The mark draws only what
 // the agent's route file says; with no file it hides.
 //
 // Left click opens the panel with the two choices.
 BarButton {
     id: rootItem
 
-    fixedWidth: vertical ? -1 : 27
+    // A fixed slot for the mark alone; with a count beside it the row sizes
+    // the button.
+    fixedWidth: vertical || badgeText !== "" ? -1 : 27
     fixedHeight: vertical ? 27 : -1
 
     // The shared service, injected by the bar's registry.
@@ -45,32 +47,19 @@ BarButton {
             color: rootItem.barFg
             colorAnimationEnabled: !rootItem.bar || rootItem.bar.foregroundAnimationEnabled === true
         }
+    }
 
-        // HubSync's corner badge, carrying the waiting count in the accent.
-        Rectangle {
-            id: badge
+    // The waiting count beside the mark, at the bar's own small size: a
+    // corner pill at this scale is too small to read.
+    StyledText {
+        theme: rootItem.theme
+        role: StyledText.Small
+        mono: true
 
-            visible: rootItem.badgeText !== ""
-            width: Math.max(height, badgeLabel.implicitWidth + 3)
-            height: Math.max(7, parent.height * 0.42)
-            radius: height / 2
-            color: rootItem.theme.accent
-            border.width: 1
-            border.color: rootItem.bar ? rootItem.bar.barBackground : rootItem.theme.surface1
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-
-            Text {
-                id: badgeLabel
-                textFormat: Text.PlainText
-                anchors.centerIn: parent
-                text: rootItem.badgeText
-                color: rootItem.bar ? rootItem.bar.barBackground : rootItem.theme.surface1
-                font.family: rootItem.theme.fontUi
-                font.pixelSize: Math.max(6, badge.height * 0.72)
-                font.bold: true
-            }
-        }
+        anchors.verticalCenter: parent.verticalCenter
+        visible: rootItem.badgeText !== "" && !rootItem.vertical
+        text: rootItem.badgeText
+        color: rootItem.theme.accent
     }
 
     PanelLoader {
