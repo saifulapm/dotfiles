@@ -1,0 +1,19 @@
+[Unit]
+Description=workflow agent: report this machine's runs to the one hub and carry out its commands
+# Every 5 s it tells the hub on dulali this machine's amx agents and
+# checkouts, and runs the sync, start and resume the hub hands back. It
+# starts orchestrators in scopes of their own, so stopping this unit never
+# stops a run. A machine not yet paired (`workflow agent pair <link>` with a
+# link from `hub pair` on dulali) skips the unit instead of failing it.
+ConditionPathExists=%h/.local/state/workflow/agent-token
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/bin/workflow agent
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

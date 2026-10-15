@@ -106,19 +106,30 @@ if [ -e "$unit" ] || [ -L "$unit" ]; then
 fi
 
 # --------------------------------------------------------------------- hub
-# The unit is a chezmoi symlink (dot_config/systemd/user/hub.service),
-# ConditionPathExists-gated on the binary. NOT enabled here: hub listens on a
-# socket, and switching a network service on across every machine should be a
-# per-machine decision, not a side effect of an apply. What this does do is
-# keep a hub that is ALREADY running running — a rebuild above replaced the
-# binary under it, and the old process is still the old build until restarted.
-#
-# Gated on `rebuilt`, not just on hub being active: without that this bounces
-# the service on every apply, which is a running process interrupted for no
-# reason several times a day.
-if [ "$rebuilt" = 1 ] && systemctl --user is-active --quiet hub 2>/dev/null; then
+# The hub runs once, on dulali (vps/ in the workflow repo), and every machine
+# reports to it through workflow-agent.service. The hub each machine used to
+# run retires here: its unit, its state (pairings, the doorbell's seen file)
+# and its config with the siblings links, and its tailnet mapping on :8787.
+unit="$HOME/.config/systemd/user/hub.service"
+if [ -e "$unit" ] || [ -L "$unit" ]; then
+  systemctl --user disable --now hub.service >/dev/null 2>&1 || true
+  rm -f "$unit"
   systemctl --user daemon-reload
-  systemctl --user restart hub && echo "workflow: hub restarted on the new build"
+  tailscale serve --http=8787 off >/dev/null 2>&1 || true
+  rm -rf "$HOME/.local/state/hub" "$HOME/.config/hub"
+  echo "workflow: retired this machine's hub; the one hub is on dulali"
+fi
+
+# The agent is a client, not a listener, so it runs wherever it is paired.
+# Pairing is once per machine: `workflow agent pair <link>`, the link from
+# `hub pair <machine>` on dulali.
+if [ -f "$HOME/.local/state/workflow/agent-token" ]; then
+  systemctl --user daemon-reload
+  if [ "$rebuilt" = 1 ]; then
+    systemctl --user restart workflow-agent.service
+  fi
+  systemctl --user enable --now workflow-agent.service >/dev/null 2>&1 &&
+    echo "workflow: agent reporting to the one hub"
 fi
 
 exit 0
