@@ -68,6 +68,13 @@ QtObject {
     // the defect it exists to prevent. Swept at startup: a flag left by a
     // shell that died mid-cycle would otherwise read as idle for ever.
     readonly property string idleFlagPath: stateDir + "/idle"
+    // The opposite question, for the Claude app: present exactly while the
+    // session is unlocked and the idle cycle has not started. It is what
+    // CLAUDE_CLIENT_PRESENCE_FILE names (environment.d/70-claude-presence.conf),
+    // and Claude Code sends no push while it exists. In the runtime dir, so a
+    // reboot clears it, and qshell.service removes it when the shell stops: a
+    // stale marker would silence the phone with nobody at the desk.
+    readonly property string presencePath: Quickshell.env("XDG_RUNTIME_DIR") + "/qshell-present"
 
     // Upstream's defaults (their Service.qml); `blank` is ours and stays off
     // unless shell.json asks for it. `keyboard` (2026-08-26, the omarchy
@@ -119,6 +126,7 @@ QtObject {
     readonly property bool idleEnabled: stayAwakeLoaded && !stayAwake && firstIdleTimeoutSeconds > 0
 
     property bool idledThisCycle: false
+    property bool presenceWanted: false
     property bool monitorsPoweredOff: false
     property string lastEvent: "starting"
 
@@ -236,6 +244,7 @@ QtObject {
             return;
         idledThisCycle = true;
         run(["touch", idleFlagPath]);
+        syncPresence();
         logEvent("idle-cycle-start", "screensaver=" + screensaverTimeoutSeconds + " lock=" + lockTimeoutSeconds);
 
         // Set this cycle's deadlines once: a bound interval would restart a
@@ -291,6 +300,22 @@ QtObject {
         powerOnMonitors();
         idledThisCycle = false;
         run(["rm", "-f", idleFlagPath]);
+        syncPresence();
+    }
+
+    // Called on every change to the idle cycle or the lock. One writer, so a
+    // touch and a rm fired together (a lock as the first key after idle) land
+    // in the order they were asked for.
+    function syncPresence() {
+        presenceWanted = !idledThisCycle && !shellRoot.sessionLocked();
+        if (!presenceWriter.running)
+            writePresence();
+    }
+
+    function writePresence() {
+        presenceWriter.wrote = presenceWanted;
+        presenceWriter.command = ["bash", "-c", presenceWanted ? "touch \"$1\"" : "rm -f \"$1\"", "qshell-presence", presencePath];
+        presenceWriter.running = true;
     }
 
     function handleIdleChanged() {
@@ -451,8 +476,19 @@ QtObject {
     // because service construction order is undefined).
     readonly property Process stateDirProc: Process {
         command: ["bash", "-c", "mkdir -p \"$1\" && rm -f \"$1/idle\"", "qshell-idle-state", Quickshell.env("HOME") + "/.local/state/qshell"]
-        onExited: root.stayAwakeFlag.reload()
+        onExited: {
+            root.stayAwakeFlag.reload();
+            root.syncPresence();
+        }
         Component.onCompleted: running = true
+    }
+
+    readonly property Process presenceWriter: Process {
+        property bool wrote: false
+        onExited: {
+            if (wrote !== root.presenceWanted)
+                root.writePresence();
+        }
     }
 
     readonly property Process stayAwakeWriter: Process {

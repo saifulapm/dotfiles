@@ -515,8 +515,10 @@ ShellRoot {
     // truthfully, so it blocks for the (first-use-only) load.
     function lockSession() {
         lockLoader.wake();
-        if (lockLoader.item.lock())
+        if (lockLoader.item.lock()) {
+            shell.idle.syncPresence();
             return true;
+        }
         releaseLockIfIdle();
         return false;
     }
@@ -625,9 +627,12 @@ ShellRoot {
 
     Connections {
         target: lockLoader.item
+        // Each of these can be the last word on an unlock, so each brings
+        // the presence marker (Services/Idle.qml) back in step.
         function onLockedChanged() {
             if (!lockLoader.item.locked)
                 shell.releaseLockIfIdle();
+            shell.idle.syncPresence();
         }
         function onPreviewVisibleChanged() {
             if (!lockLoader.item.previewVisible)
@@ -636,10 +641,12 @@ ShellRoot {
         // onLockedChanged never fires while the binding is stuck at true.
         function onUnlocked() {
             shell.releaseLockIfIdle();
+            shell.idle.syncPresence();
         }
         function onSecureChanged() {
             if (!lockLoader.item.secure)
                 shell.releaseLockIfIdle();
+            shell.idle.syncPresence();
         }
     }
 
