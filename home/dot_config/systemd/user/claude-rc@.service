@@ -1,0 +1,24 @@
+[Unit]
+Description=Claude Code Remote Control server for %i
+# One server per repo folder: the Claude app's Code tab lists it by the
+# folder's name, and a session started there from the phone gets a git
+# worktree of its own. The instance is the folder under ~/Sites/github; a repo
+# that lives elsewhere says so in a drop-in (claude-rc@lathe.service.d). A
+# machine without the folder skips the unit instead of failing it.
+ConditionPathIsDirectory=%h/Sites/github/%i
+# Server mode exits after about 10 minutes without network, and a long
+# outage would otherwise use up the default restart burst and leave the unit
+# failed for good. No limit: it retries every 5 s until the network is back.
+StartLimitIntervalSec=0
+
+[Service]
+WorkingDirectory=%h/Sites/github/%i
+# bypassPermissions, as workflow go's orchestrators run. No session is
+# pre-created in the folder itself: that would sit in the checkout an
+# orchestrator works in, so every session goes into its own worktree.
+ExecStart=%h/.local/bin/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
