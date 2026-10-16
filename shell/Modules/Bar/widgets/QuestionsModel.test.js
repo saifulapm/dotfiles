@@ -125,6 +125,16 @@ test("Send with a screenshot puts the flag before the separator", () => {
     ]);
 });
 
+test("a card names the asking machine by its short tailnet name", () => {
+    const file = JSON.stringify({ self: "mini.tail.ts.net", questions: [
+        { id: "A1", project: "p", machine: "nuc.taila27604.ts.net", text: "t", options: [], person: true, popup: true },
+        { id: "A2", project: "p", machine: "macbook.taila27604.ts.net:8790", text: "t", options: [], person: true, popup: true },
+        { id: "A3", project: "p", machine: "100.101.46.37:8789", text: "t", options: [], person: true, popup: true },
+    ] });
+    const machines = Model.parseState(file).questions.map((q) => q.machine);
+    assert.equal(JSON.stringify(machines), JSON.stringify(["nuc", "macbook", "100.101.46.37:8789"]));
+});
+
 if (failures > 0) {
     console.log(`\n${failures} failing`);
     process.exit(1);

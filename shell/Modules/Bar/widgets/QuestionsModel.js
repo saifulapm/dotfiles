@@ -17,6 +17,14 @@
 
 // A file that is absent, unparseable or has no question list means no hub
 // runs here, and the bar falls back to the route file's count.
+// The hub names machines by MagicDNS host, perhaps with a port; a card
+// shows the first label only. An address stays whole.
+function shortMachine(host) {
+    if (/^[0-9.:]+$/.test(host))
+        return host;
+    return host.split(".")[0].split(":")[0];
+}
+
 function parseState(raw) {
     var data = null;
     try {
@@ -34,7 +42,7 @@ function parseState(raw) {
         questions.push({
             id: q.id,
             project: typeof q.project === "string" ? q.project : "",
-            machine: typeof q.machine === "string" ? q.machine : "",
+            machine: typeof q.machine === "string" ? shortMachine(q.machine) : "",
             text: typeof q.text === "string" ? q.text : "",
             options: Array.isArray(q.options) ? q.options.filter(function (o) {
                 return typeof o === "string";
