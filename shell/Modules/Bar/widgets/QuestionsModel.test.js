@@ -136,6 +136,20 @@ test("Send with three attachments repeats the flag in their order", () => {
     ]);
 });
 
+test("Send is enabled by text, by an attachment, or both, never by neither", () => {
+    assert.equal(Model.canSend("ok", []), true);
+    assert.equal(Model.canSend("", ["/run/a.png"]), true);
+    assert.equal(Model.canSend("ok", ["/run/a.png"]), true);
+    assert.equal(Model.canSend("", []), false);
+    assert.equal(Model.canSend("  \n\t ", []), false);
+});
+
+test("Send with images and no text answers with an empty string", () => {
+    assert.deepEqual(plain(Model.answerArgv("AAAA1111", "", ["/run/a.png"])), [
+        "mem", "answer", "--by", "popup", "--screenshot", "/run/a.png", "--", "AAAA1111", ""
+    ]);
+});
+
 test("attachments keep their order, skip repeats and drop by index", () => {
     let list = Model.attach([], ["/run/a.png"]);
     list = Model.attach(list, ["/home/s/b.jpg", "/run/a.png", "/home/s/c.png"]);

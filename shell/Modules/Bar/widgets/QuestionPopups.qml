@@ -247,6 +247,11 @@ Scope {
                             if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
                                 popupsRoot.questions.paste();
                                 event.accepted = true;
+                            } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ShiftModifier)) {
+                                // Shift+Enter sends; a plain Enter is a new line.
+                                if (sendButton.enabled)
+                                    sendButton.clicked();
+                                event.accepted = true;
                             }
                         }
                         onCursorRectangleChanged: {
@@ -261,7 +266,7 @@ Scope {
                             role: StyledText.BodyLarge
                             muted: true
                             visible: replyInput.text === ""
-                            text: "Your answer. Ctrl+V attaches images."
+                            text: "Your answer. Ctrl+V attaches images, Shift+Enter sends."
                         }
                     }
                 }
@@ -348,7 +353,7 @@ Scope {
                         theme: popupsRoot.theme
                         label: "Send"
                         selected: true
-                        enabled: replyInput.text.trim() !== "" && !popupsRoot.answering
+                        enabled: Model.canSend(replyInput.text, popupsRoot.questions.attachments) && !popupsRoot.answering
                         onClicked: popupsRoot.questions.answer(popupsRoot.questions.modalId, replyInput.text, popupsRoot.questions.attachments)
                     }
                 }

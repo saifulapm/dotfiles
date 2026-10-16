@@ -106,6 +106,12 @@ function modalFor(id, state) {
 }
 
 // `--` ends mem's options, so an answer that starts with a dash stays text.
+// A reply needs words or at least one image; mem takes an empty answer
+// when images carry it.
+function canSend(text, attachments) {
+    return String(text).trim() !== "" || attachments.length > 0;
+}
+
 // mem takes --screenshot once per attachment, in the order given.
 function answerArgv(id, text, attachments) {
     var argv = ["mem", "answer", "--by", "popup"];
