@@ -6,32 +6,15 @@
 # workflow entries in pass skips quietly, and the unit stays off there.
 set -uo pipefail
 
-# Root, by whichever route this run can reach (the ladder of 19-dufs-firewall).
-run_root() {
-  if sudo -n true 2>/dev/null; then
-    sudo "$@"
-  elif [ -t 0 ] && sudo -v 2>/dev/null; then
-    sudo "$@"
-  elif command -v pkexec >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
-    echo "hub-local: asking for authorization on screen…" >&2
-    timeout 180 pkexec "$@"
-  else
-    return 1
-  fi
-}
-
-# Port 8789 from the tailnet's addresses only; the tailnet ACL narrows it to
-# the hub port from Saiful's devices and cloud sessions, and every request
-# still needs the peer token.
-rule='rule family="ipv4" source address="100.64.0.0/10" port port="8789" protocol="tcp" accept'
-if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null &&
-  ! firewall-cmd --query-rich-rule="$rule" >/dev/null 2>&1; then
-  if run_root /bin/sh -c "firewall-cmd --quiet --add-rich-rule='$rule' \
-      && firewall-cmd --quiet --permanent --add-rich-rule='$rule'"; then
-    echo "hub-local: TCP 8789 open to the tailnet (runtime + permanent)"
-  else
-    echo "hub-local: not authorized — 8789 stays closed to other machines (rerun 'chezmoi apply' in a terminal)" >&2
-  fi
+# Port 8789 on this machine's tailnet address, handed to the hub on
+# loopback by tailscaled itself: no firewall rule and no root (the user is
+# tailscale's operator), and the port never faces another network. The
+# tailnet ACL narrows who may dial it; every request still needs the peer
+# token.
+if command -v tailscale >/dev/null 2>&1 &&
+  ! tailscale serve status 2>/dev/null | grep -q 'tcp://localhost:8789\|127.0.0.1:8789'; then
+  tailscale serve --bg --tcp 8789 tcp://localhost:8789 >/dev/null ||
+    echo "hub-local: tailscale serve --tcp 8789 failed; other machines cannot reach this hub" >&2
 fi
 
 command -v pass >/dev/null || exit 0
