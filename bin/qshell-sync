@@ -711,6 +711,13 @@ sync_goals() {
 sync_memory() {
   local mem_dir="$HOME/.local/share/mem/store"
   local filters="$HOME/.config/qshell/memory-filters.txt"
+  # `workflow switch` moved this machine onto the Cloudflare store: mem
+  # shares every write through the local hub, and a bisync with dulali
+  # would only race it.
+  if [[ -e ${XDG_STATE_HOME:-$HOME/.local/state}/mem/share/switched ]]; then
+    unit_skip memory "switched to the store"
+    return 0
+  fi
   mkdir -p "$mem_dir"
   # Fixed at bootstrap on purpose: rclone hashes the filters FILE and demands a
   # --resync when it changes, so the excludes have to be right on day one.
