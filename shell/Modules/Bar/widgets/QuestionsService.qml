@@ -28,14 +28,17 @@ QtObject {
     property var dismissed: ({})
     readonly property var popups: Model.popups(state, dismissed)
 
-    // The Reply modal: which question, and the image attached to the reply.
+    // The Reply modal: which question, and the images attached to the reply,
+    // in the order they were added.
     property string modalId: ""
     readonly property var modalQuestion: Model.modalFor(modalId, state)
-    property string screenshot: ""
+    property var attachments: []
     // The modal steps aside while the file picker is up.
     property bool capturing: false
-    // Where a pasted image is being written.
+    // Where a pasted image is being written, and the number the next pasted
+    // image's path takes, so no paste overwrites another.
     property string pendingShot: ""
+    property int shotCount: 0
 
     // Ctrl+V found text: the modal's text box pastes it at the cursor.
     signal textPasteWanted
@@ -55,7 +58,7 @@ QtObject {
 
     function openModal(id) {
         if (modalId !== id)
-            screenshot = "";
+            attachments = [];
         modalId = id;
         // A picker that never answers would leave the modal hidden;
         // Reply... brings it back.
@@ -64,23 +67,27 @@ QtObject {
 
     function closeModal() {
         modalId = "";
-        screenshot = "";
+        attachments = [];
         capturing = false;
         errorId = "";
     }
 
-    function answer(id, text, screenshotPath) {
+    function answer(id, text, paths) {
         if (answerProcess.running)
             return;
         answeringId = id;
         errorId = "";
         lastError = "";
-        answerProcess.command = ["setpriv", "--pdeathsig", "TERM", "--"].concat(Model.answerArgv(id, text, screenshotPath));
+        answerProcess.command = ["setpriv", "--pdeathsig", "TERM", "--"].concat(Model.answerArgv(id, text, paths));
         answerProcess.running = true;
     }
 
-    // Ctrl+V in the modal: an image on the clipboard, or a copied png or
-    // jpeg file, becomes the attachment; anything else pastes as text.
+    function detach(index) {
+        attachments = Model.detach(attachments, index);
+    }
+
+    // Ctrl+V in the modal: an image on the clipboard, or copied png or jpeg
+    // files, join the attachments; anything else pastes as text.
     function paste() {
         if (pasteTypes.running || pasteSave.running || pasteUri.running)
             return;
@@ -95,9 +102,8 @@ QtObject {
         capturing = true;
         shellRoot.pickFile(Model.pickerRequest(), paths => {
             capturing = false;
-            const path = Model.pickedImage(paths);
-            if (path !== "" && modalId === id)
-                screenshot = path;
+            if (modalId === id)
+                attachments = Model.attach(attachments, Model.pickedImages(paths));
         });
     }
 
@@ -166,7 +172,7 @@ QtObject {
                 return;
             const action = Model.pasteAction(pasteTypesOut.text);
             if (action.kind === "image") {
-                root.pendingShot = Model.shotPath(Quickshell.env("XDG_RUNTIME_DIR"), root.modalId, action.mime);
+                root.pendingShot = Model.shotPath(Quickshell.env("XDG_RUNTIME_DIR"), root.modalId, root.shotCount++, action.mime);
                 root.pasteSave.command = ["sh", "-c", root.saveScript, "qshell-question", root.pendingShot, action.mime];
                 root.pasteSave.running = true;
             } else if (action.kind === "file") {
@@ -190,10 +196,7 @@ QtObject {
                 root.fail(root.modalId, "could not read the image on the clipboard");
                 return;
             }
-            // Cleared first: a second paste reuses the path, and the
-            // thumbnail reloads only when its source changes.
-            root.screenshot = "";
-            root.screenshot = root.pendingShot;
+            root.attachments = Model.attach(root.attachments, [root.pendingShot]);
         }
     }
 
@@ -205,9 +208,9 @@ QtObject {
             waitForEnd: true
         }
         onExited: exitCode => {
-            const path = exitCode === 0 ? Model.imageFromUriList(pasteUriOut.text) : "";
-            if (path !== "")
-                root.screenshot = path;
+            const paths = exitCode === 0 ? Model.imagesFromUriList(pasteUriOut.text) : [];
+            if (paths.length > 0)
+                root.attachments = Model.attach(root.attachments, paths);
             else
                 root.textPasteWanted();
         }

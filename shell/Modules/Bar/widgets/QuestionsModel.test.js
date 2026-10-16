@@ -110,19 +110,38 @@ test("the modal keeps its question only while that question rings here", () => {
 });
 
 test("an option click answers with the option by argv", () => {
-    assert.deepEqual(plain(Model.answerArgv("AAAA1111", "yes", "")), ["mem", "answer", "--by", "popup", "--", "AAAA1111", "yes"]);
+    assert.deepEqual(plain(Model.answerArgv("AAAA1111", "yes", [])), ["mem", "answer", "--by", "popup", "--", "AAAA1111", "yes"]);
 });
 
 test("Send passes untrusted text through unchanged", () => {
     const text = "-rf \"quoted\" 'single' $(whoami) `x`\nsecond line: ঠিক আছে ✓";
-    assert.deepEqual(plain(Model.answerArgv("AAAA1111", text, "")), ["mem", "answer", "--by", "popup", "--", "AAAA1111", text]);
-    assert.deepEqual(plain(Model.answerArgv("AAAA1111", "--help", "")), ["mem", "answer", "--by", "popup", "--", "AAAA1111", "--help"]);
+    assert.deepEqual(plain(Model.answerArgv("AAAA1111", text, [])), ["mem", "answer", "--by", "popup", "--", "AAAA1111", text]);
+    assert.deepEqual(plain(Model.answerArgv("AAAA1111", "--help", [])), ["mem", "answer", "--by", "popup", "--", "AAAA1111", "--help"]);
 });
 
-test("Send with a screenshot puts the flag before the separator", () => {
-    assert.deepEqual(plain(Model.answerArgv("AAAA1111", "see this", "/run/user/1000/qshell-question-AAAA1111.png")), [
-        "mem", "answer", "--by", "popup", "--screenshot", "/run/user/1000/qshell-question-AAAA1111.png", "--", "AAAA1111", "see this"
+test("Send with one attachment puts its flag before the separator", () => {
+    assert.deepEqual(plain(Model.answerArgv("AAAA1111", "see this", ["/run/user/1000/qshell-question-AAAA1111-0.png"])), [
+        "mem", "answer", "--by", "popup", "--screenshot", "/run/user/1000/qshell-question-AAAA1111-0.png", "--", "AAAA1111", "see this"
     ]);
+});
+
+test("Send with three attachments repeats the flag in their order", () => {
+    const text = "-x \"all three\"\nঠিক";
+    assert.deepEqual(plain(Model.answerArgv("AAAA1111", text, ["/run/b.png", "/home/s/a b.jpg", "/run/a.png"])), [
+        "mem", "answer", "--by", "popup",
+        "--screenshot", "/run/b.png",
+        "--screenshot", "/home/s/a b.jpg",
+        "--screenshot", "/run/a.png",
+        "--", "AAAA1111", text
+    ]);
+});
+
+test("attachments keep their order, skip repeats and drop by index", () => {
+    let list = Model.attach([], ["/run/a.png"]);
+    list = Model.attach(list, ["/home/s/b.jpg", "/run/a.png", "/home/s/c.png"]);
+    assert.deepEqual(plain(list), ["/run/a.png", "/home/s/b.jpg", "/home/s/c.png"]);
+    assert.deepEqual(plain(Model.detach(list, 1)), ["/run/a.png", "/home/s/c.png"]);
+    assert.deepEqual(plain(Model.detach(list, 5)), ["/run/a.png", "/home/s/b.jpg", "/home/s/c.png"]);
 });
 
 test("a card names the asking machine by its short tailnet name", () => {
@@ -145,31 +164,31 @@ test("Ctrl+V takes a png first, then any image, then a copied file, then text", 
     assert.deepEqual(plain(Model.pasteAction("application/x-unknown")), { kind: "none" });
 });
 
-test("a pasted image lands at the question's shot path with its own extension", () => {
-    assert.equal(Model.shotPath("/run/user/1000", "7A48KQAA", "image/png"), "/run/user/1000/qshell-question-7A48KQAA.png");
-    assert.equal(Model.shotPath("/run/user/1000", "7A48KQAA", "image/jpeg"), "/run/user/1000/qshell-question-7A48KQAA.jpg");
-    assert.equal(Model.shotPath("/run/user/1000", "../../x/7A48", "image/png"), "/run/user/1000/qshell-question-x7A48.png");
+test("each pasted image gets its own numbered path with its own extension", () => {
+    assert.equal(Model.shotPath("/run/user/1000", "7A48KQAA", 0, "image/png"), "/run/user/1000/qshell-question-7A48KQAA-0.png");
+    assert.equal(Model.shotPath("/run/user/1000", "7A48KQAA", 1, "image/jpeg"), "/run/user/1000/qshell-question-7A48KQAA-1.jpg");
+    assert.equal(Model.shotPath("/run/user/1000", "../../x/7A48", 2, "image/png"), "/run/user/1000/qshell-question-x7A48-2.png");
 });
 
-test("a copied file attaches when it is a png or jpeg", () => {
-    assert.equal(Model.imageFromUriList("file:///home/saiful/Pictures/Screen%20Shot%201.PNG\r\n"), "/home/saiful/Pictures/Screen Shot 1.PNG");
-    assert.equal(Model.imageFromUriList("# comment\nfile:///tmp/a.txt\nfile:///tmp/b.jpeg\n"), "/tmp/b.jpeg");
-    assert.equal(Model.imageFromUriList("file:///tmp/notes.txt"), "");
-    assert.equal(Model.imageFromUriList("https://example.com/a.png"), "");
-    assert.equal(Model.imageFromUriList(""), "");
+test("copied files attach when they are png or jpeg", () => {
+    assert.deepEqual(plain(Model.imagesFromUriList("file:///home/saiful/Pictures/Screen%20Shot%201.PNG\r\n")), ["/home/saiful/Pictures/Screen Shot 1.PNG"]);
+    assert.deepEqual(plain(Model.imagesFromUriList("# comment\nfile:///tmp/a.txt\nfile:///tmp/b.jpeg\nfile:///tmp/c.png\n")), ["/tmp/b.jpeg", "/tmp/c.png"]);
+    assert.deepEqual(plain(Model.imagesFromUriList("file:///tmp/notes.txt")), []);
+    assert.deepEqual(plain(Model.imagesFromUriList("https://example.com/a.png")), []);
+    assert.deepEqual(plain(Model.imagesFromUriList("")), []);
 });
 
-test("the file button asks the shell's picker for one png or jpeg", () => {
+test("the file button asks the shell's picker for any number of png or jpeg", () => {
     assert.deepEqual(plain(Model.pickerRequest()), {
-        title: "Attach an image",
+        title: "Attach images",
         mode: "open",
-        multiple: false,
+        multiple: true,
         directory: false,
         filters: [{ name: "Images", globs: ["*.png", "*.jpg", "*.jpeg"], mimes: ["image/png", "image/jpeg"] }]
     });
-    assert.equal(Model.pickedImage(["/home/saiful/a.jpg", "/home/saiful/b.png"]), "/home/saiful/a.jpg");
-    assert.equal(Model.pickedImage(["/home/saiful/a.gif"]), "");
-    assert.equal(Model.pickedImage([]), "");
+    assert.deepEqual(plain(Model.pickedImages(["/home/saiful/a.jpg", "/home/saiful/x.gif", "/home/saiful/b.png"])), ["/home/saiful/a.jpg", "/home/saiful/b.png"]);
+    assert.deepEqual(plain(Model.pickedImages([])), []);
+    assert.deepEqual(plain(Model.pickedImages(null)), []);
 });
 
 test("the thumbnail's url survives a # or ? in the image's path", () => {

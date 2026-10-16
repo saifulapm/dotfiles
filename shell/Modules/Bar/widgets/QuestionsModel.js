@@ -106,11 +106,29 @@ function modalFor(id, state) {
 }
 
 // `--` ends mem's options, so an answer that starts with a dash stays text.
-function answerArgv(id, text, screenshotPath) {
+// mem takes --screenshot once per attachment, in the order given.
+function answerArgv(id, text, attachments) {
     var argv = ["mem", "answer", "--by", "popup"];
-    if (screenshotPath)
-        argv.push("--screenshot", screenshotPath);
+    for (var i = 0; i < attachments.length; i++)
+        argv.push("--screenshot", attachments[i]);
     return argv.concat(["--", id, text]);
+}
+
+// The reply's attachments: new paths go on the end, and a path already
+// attached is not attached twice.
+function attach(list, paths) {
+    var next = list.slice();
+    for (var i = 0; i < paths.length; i++) {
+        if (next.indexOf(paths[i]) === -1)
+            next.push(paths[i]);
+    }
+    return next;
+}
+
+function detach(list, index) {
+    return list.filter(function (_, i) {
+        return i !== index;
+    });
 }
 
 // Ctrl+V in the Reply modal reads `wl-paste --list-types` and takes, in
@@ -136,11 +154,12 @@ function pasteAction(typesText) {
     return { kind: "none" };
 }
 
-// One file per question in the runtime dir. The id and the extension keep
-// only letters and digits, so neither can name another path.
-function shotPath(dir, id, mime) {
+// One file per pasted image in the runtime dir, numbered by `n` so a second
+// paste does not overwrite the first. The id and the extension keep only
+// letters and digits, so neither can name another path.
+function shotPath(dir, id, n, mime) {
     var ext = String(mime).replace(/^image\//, "").replace(/[^A-Za-z0-9]/g, "");
-    return dir + "/qshell-question-" + String(id).replace(/[^A-Za-z0-9]/g, "") + "." + (ext === "jpeg" ? "jpg" : ext);
+    return dir + "/qshell-question-" + String(id).replace(/[^A-Za-z0-9]/g, "") + "-" + n + "." + (ext === "jpeg" ? "jpg" : ext);
 }
 
 var IMAGE_GLOBS = ["*.png", "*.jpg", "*.jpeg"];
@@ -149,34 +168,35 @@ function isImage(path) {
     return /\.(png|jpe?g)$/i.test(path);
 }
 
-// The first local png or jpeg in a text/uri-list, as a path.
-function imageFromUriList(text) {
+// The local png and jpeg files in a text/uri-list, as paths.
+function imagesFromUriList(text) {
     var lines = String(text || "").split(/\r?\n/);
+    var paths = [];
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i].trim();
         if (line.indexOf("file://") !== 0)
             continue;
         var path = decodeURIComponent(line.replace(/^file:\/\/[^\/]*/, ""));
         if (isImage(path))
-            return path;
+            paths.push(path);
     }
-    return "";
+    return paths;
 }
 
 // The request the shell's own FilePicker takes, in the portal's flattened
 // shape, minus the FIFO an in-shell caller does not need.
 function pickerRequest() {
     return {
-        title: "Attach an image",
+        title: "Attach images",
         mode: "open",
-        multiple: false,
+        multiple: true,
         directory: false,
         filters: [{ name: "Images", globs: IMAGE_GLOBS, mimes: ["image/png", "image/jpeg"] }]
     };
 }
 
-function pickedImage(paths) {
-    return paths && paths.length > 0 && isImage(paths[0]) ? paths[0] : "";
+function pickedImages(paths) {
+    return (paths || []).filter(isImage);
 }
 
 // A picked file's name may hold a # or ?, which a bare "file://" + path

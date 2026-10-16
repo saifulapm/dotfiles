@@ -261,40 +261,54 @@ Scope {
                             role: StyledText.BodyLarge
                             muted: true
                             visible: replyInput.text === ""
-                            text: "Your answer. Ctrl+V attaches an image."
+                            text: "Your answer. Ctrl+V attaches images."
                         }
                     }
                 }
             }
 
-            Row {
+            // The attachments in the order mem gets them, each with its own
+            // remove.
+            Flow {
+                width: parent.width
+                visible: popupsRoot.questions.attachments.length > 0
                 spacing: popupsRoot.theme.space(1.5)
 
-                PanelButton {
-                    theme: popupsRoot.theme
-                    anchors.verticalCenter: parent.verticalCenter
-                    label: "file"
-                    enabled: !popupsRoot.answering
-                    onClicked: popupsRoot.questions.pickFile()
-                }
+                Repeater {
+                    model: popupsRoot.questions.attachments
 
-                Image {
-                    visible: popupsRoot.questions.screenshot !== ""
-                    width: popupsRoot.theme.space(32)
-                    height: popupsRoot.theme.space(18)
-                    fillMode: Image.PreserveAspectFit
-                    // A second paste reuses the question's path, so it must
-                    // not come from the cache.
-                    cache: false
-                    source: Model.fileUrl(popupsRoot.questions.screenshot)
-                }
+                    Rectangle {
+                        id: tile
 
-                PanelButton {
-                    theme: popupsRoot.theme
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: popupsRoot.questions.screenshot !== ""
-                    label: "remove"
-                    onClicked: popupsRoot.questions.screenshot = ""
+                        required property string modelData
+                        required property int index
+
+                        width: popupsRoot.theme.space(32)
+                        height: popupsRoot.theme.space(18)
+                        radius: popupsRoot.theme.radius(0.75)
+                        color: popupsRoot.theme.surface2
+                        border.width: popupsRoot.theme.borderWidth
+                        border.color: popupsRoot.theme.surface3
+
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: popupsRoot.theme.borderWidth
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            cache: false
+                            source: Model.fileUrl(tile.modelData)
+                        }
+
+                        GlyphButton {
+                            theme: popupsRoot.theme
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            anchors.margins: popupsRoot.theme.space(0.5)
+                            glyph: "✕"
+                            hint: "Remove this image"
+                            onActivated: popupsRoot.questions.detach(tile.index)
+                        }
+                    }
                 }
             }
 
@@ -318,6 +332,13 @@ Scope {
 
                     PanelButton {
                         theme: popupsRoot.theme
+                        label: "file"
+                        enabled: !popupsRoot.answering
+                        onClicked: popupsRoot.questions.pickFile()
+                    }
+
+                    PanelButton {
+                        theme: popupsRoot.theme
                         label: "Cancel"
                         onClicked: popupsRoot.questions.closeModal()
                     }
@@ -328,7 +349,7 @@ Scope {
                         label: "Send"
                         selected: true
                         enabled: replyInput.text.trim() !== "" && !popupsRoot.answering
-                        onClicked: popupsRoot.questions.answer(popupsRoot.questions.modalId, replyInput.text, popupsRoot.questions.screenshot)
+                        onClicked: popupsRoot.questions.answer(popupsRoot.questions.modalId, replyInput.text, popupsRoot.questions.attachments)
                     }
                 }
             }
