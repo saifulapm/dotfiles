@@ -15,6 +15,8 @@ QtObject {
     id: root
 
     required property var theme
+    // shell.qml, for its own FilePicker.
+    property var shellRoot: null
 
     readonly property string statePath: Quickshell.env("XDG_RUNTIME_DIR") + "/hub-questions.json"
 
@@ -26,13 +28,17 @@ QtObject {
     property var dismissed: ({})
     readonly property var popups: Model.popups(state, dismissed)
 
-    // The Reply modal: which question, and the png attached to the reply.
+    // The Reply modal: which question, and the image attached to the reply.
     property string modalId: ""
     readonly property var modalQuestion: Model.modalFor(modalId, state)
     property string screenshot: ""
-    // The modal steps aside while slurp or the file dialog is up, so it is
-    // neither in the shot nor over the dialog.
+    // The modal steps aside while the file picker is up.
     property bool capturing: false
+    // Where a pasted image is being written.
+    property string pendingShot: ""
+
+    // Ctrl+V found text: the modal's text box pastes it at the cursor.
+    signal textPasteWanted
 
     property string answeringId: ""
     property string errorId: ""
@@ -51,7 +57,7 @@ QtObject {
         if (modalId !== id)
             screenshot = "";
         modalId = id;
-        // A file dialog that never answers would leave the modal hidden;
+        // A picker that never answers would leave the modal hidden;
         // Reply... brings it back.
         capturing = false;
     }
@@ -73,38 +79,26 @@ QtObject {
         answerProcess.running = true;
     }
 
-    // One png per question in the runtime dir; the id is reduced to its
-    // letters and digits so a strange id cannot name another path.
-    function shotPath() {
-        return Quickshell.env("XDG_RUNTIME_DIR") + "/qshell-question-" + modalId.replace(/[^A-Za-z0-9]/g, "") + ".png";
-    }
-
-    function grabRegion() {
-        if (capturing)
+    // Ctrl+V in the modal: an image on the clipboard, or a copied png or
+    // jpeg file, becomes the attachment; anything else pastes as text.
+    function paste() {
+        if (pasteTypes.running || pasteSave.running || pasteUri.running)
             return;
         errorId = "";
-        // Cleared first: a new shot reuses the path, and the thumbnail only
-        // reloads when its source changes.
-        screenshot = "";
+        pasteTypes.running = true;
+    }
+
+    function pickFile() {
+        if (!shellRoot || capturing)
+            return;
+        const id = modalId;
         capturing = true;
-        slurpProcess.running = true;
-    }
-
-    // wl-paste writes only to stdout, and a png is binary, so a fixed sh
-    // script redirects it. Its one argument is the path shotPath() built.
-    function pasteImage() {
-        if (pasteProcess.running)
-            return;
-        errorId = "";
-        screenshot = "";
-        pasteProcess.command = ["sh", "-c", 'wl-paste --type image/png > "$1" || { rm -f "$1"; exit 1; }', "qshell-question", shotPath()];
-        pasteProcess.running = true;
-    }
-
-    function pickedFile(path) {
-        capturing = false;
-        if (path !== "")
-            screenshot = path;
+        shellRoot.pickFile(Model.pickerRequest(), paths => {
+            capturing = false;
+            const path = Model.pickedImage(paths);
+            if (path !== "" && modalId === id)
+                screenshot = path;
+        });
     }
 
     function fail(id, message) {
@@ -159,45 +153,63 @@ QtObject {
         }
     }
 
-    readonly property Process slurpProcess: Process {
+    readonly property Process pasteTypes: Process {
         running: false
-        command: ["slurp"]
+        command: ["wl-paste", "--list-types"]
         stdout: StdioCollector {
-            id: slurpOut
+            id: pasteTypesOut
             waitForEnd: true
         }
-        // slurp exits 1 when the selection is cancelled with Esc.
+        // wl-paste exits 1 on an empty clipboard: nothing to paste.
         onExited: exitCode => {
-            const geometry = String(slurpOut.text || "").trim();
-            if (exitCode !== 0 || geometry === "") {
-                root.capturing = false;
+            if (exitCode !== 0)
+                return;
+            const action = Model.pasteAction(pasteTypesOut.text);
+            if (action.kind === "image") {
+                root.pendingShot = Model.shotPath(Quickshell.env("XDG_RUNTIME_DIR"), root.modalId, action.mime);
+                root.pasteSave.command = ["sh", "-c", root.saveScript, "qshell-question", root.pendingShot, action.mime];
+                root.pasteSave.running = true;
+            } else if (action.kind === "file") {
+                root.pasteUri.running = true;
+            } else if (action.kind === "text") {
+                root.textPasteWanted();
+            }
+        }
+    }
+
+    // wl-paste writes only to stdout and an image is binary, so a fixed sh
+    // script redirects it. Its arguments are the shot path and the type the
+    // clipboard offered.
+    readonly property string saveScript: 'wl-paste --type "$2" > "$1" || { rm -f "$1"; exit 1; }'
+
+    readonly property Process pasteSave: Process {
+        running: false
+        command: []
+        onExited: exitCode => {
+            if (exitCode !== 0) {
+                root.fail(root.modalId, "could not read the image on the clipboard");
                 return;
             }
-            root.grimProcess.command = ["grim", "-g", geometry, root.shotPath()];
-            root.grimProcess.running = true;
+            // Cleared first: a second paste reuses the path, and the
+            // thumbnail reloads only when its source changes.
+            root.screenshot = "";
+            root.screenshot = root.pendingShot;
         }
     }
 
-    readonly property Process grimProcess: Process {
+    readonly property Process pasteUri: Process {
         running: false
-        command: []
-        onExited: exitCode => {
-            root.capturing = false;
-            if (exitCode === 0)
-                root.screenshot = command[command.length - 1];
-            else
-                root.fail(root.modalId, "grim exited " + exitCode);
+        command: ["wl-paste", "--no-newline", "--type", "text/uri-list"]
+        stdout: StdioCollector {
+            id: pasteUriOut
+            waitForEnd: true
         }
-    }
-
-    readonly property Process pasteProcess: Process {
-        running: false
-        command: []
         onExited: exitCode => {
-            if (exitCode === 0)
-                root.screenshot = command[command.length - 1];
+            const path = exitCode === 0 ? Model.imageFromUriList(pasteUriOut.text) : "";
+            if (path !== "")
+                root.screenshot = path;
             else
-                root.fail(root.modalId, "no image on the clipboard");
+                root.textPasteWanted();
         }
     }
 

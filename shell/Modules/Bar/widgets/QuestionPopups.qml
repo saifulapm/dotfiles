@@ -1,8 +1,8 @@
 import QtQuick
-import QtQuick.Dialogs
 import Quickshell
 import Quickshell.Wayland
 import "../../../components"
+import "QuestionsModel.js" as Model
 
 // The questions ringing on this machine: a stack of cards top-center under
 // the bar (the notification toasts own the top-right corner), and the Reply
@@ -169,11 +169,14 @@ Scope {
             Qt.callLater(() => replyInput.forceActiveFocus())
 
         // A fresh question starts with an empty box; the box itself outlives
-        // the modal hiding for a screenshot, so the draft does too.
+        // the modal hiding for the file picker, so the draft does too.
         Connections {
             target: popupsRoot.questions
             function onModalIdChanged() {
                 replyInput.text = "";
+            }
+            function onTextPasteWanted() {
+                replyInput.paste();
             }
         }
 
@@ -238,6 +241,14 @@ Scope {
                         font.pixelSize: popupsRoot.theme.fontPx(1.0)
                         selectByMouse: true
                         Keys.onEscapePressed: popupsRoot.questions.closeModal()
+                        // The service reads the clipboard first: an image
+                        // attaches, and text comes back here as a paste.
+                        Keys.onPressed: event => {
+                            if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
+                                popupsRoot.questions.paste();
+                                event.accepted = true;
+                            }
+                        }
                         onCursorRectangleChanged: {
                             if (cursorRectangle.y < replyFlick.contentY)
                                 replyFlick.contentY = cursorRectangle.y;
@@ -250,7 +261,7 @@ Scope {
                             role: StyledText.BodyLarge
                             muted: true
                             visible: replyInput.text === ""
-                            text: "Your answer"
+                            text: "Your answer. Ctrl+V attaches an image."
                         }
                     }
                 }
@@ -261,46 +272,27 @@ Scope {
 
                 PanelButton {
                     theme: popupsRoot.theme
-                    label: "grab region"
-                    enabled: !popupsRoot.answering
-                    onClicked: popupsRoot.questions.grabRegion()
-                }
-
-                PanelButton {
-                    theme: popupsRoot.theme
-                    label: "paste"
-                    enabled: !popupsRoot.answering
-                    onClicked: popupsRoot.questions.pasteImage()
-                }
-
-                PanelButton {
-                    theme: popupsRoot.theme
+                    anchors.verticalCenter: parent.verticalCenter
                     label: "file"
                     enabled: !popupsRoot.answering
-                    onClicked: {
-                        popupsRoot.questions.capturing = true;
-                        fileDialog.open();
-                    }
+                    onClicked: popupsRoot.questions.pickFile()
                 }
-            }
-
-            Row {
-                visible: popupsRoot.questions.screenshot !== ""
-                spacing: popupsRoot.theme.space(1.5)
 
                 Image {
+                    visible: popupsRoot.questions.screenshot !== ""
                     width: popupsRoot.theme.space(32)
                     height: popupsRoot.theme.space(18)
                     fillMode: Image.PreserveAspectFit
-                    // The grab and paste paths are reused per question, so
-                    // a second shot must not come from the cache.
+                    // A second paste reuses the question's path, so it must
+                    // not come from the cache.
                     cache: false
-                    source: popupsRoot.questions.screenshot !== "" ? "file://" + popupsRoot.questions.screenshot : ""
+                    source: Model.fileUrl(popupsRoot.questions.screenshot)
                 }
 
                 PanelButton {
                     theme: popupsRoot.theme
                     anchors.verticalCenter: parent.verticalCenter
+                    visible: popupsRoot.questions.screenshot !== ""
                     label: "remove"
                     onClicked: popupsRoot.questions.screenshot = ""
                 }
@@ -341,14 +333,5 @@ Scope {
                 }
             }
         }
-    }
-
-    FileDialog {
-        id: fileDialog
-
-        title: "Attach a screenshot"
-        nameFilters: ["PNG images (*.png)"]
-        onAccepted: popupsRoot.questions.pickedFile(decodeURIComponent(String(selectedFile).replace(/^file:\/\//, "")))
-        onRejected: popupsRoot.questions.pickedFile("")
     }
 }

@@ -112,3 +112,75 @@ function answerArgv(id, text, screenshotPath) {
         argv.push("--screenshot", screenshotPath);
     return argv.concat(["--", id, text]);
 }
+
+// Ctrl+V in the Reply modal reads `wl-paste --list-types` and takes, in
+// order: a png, any other image, a copied file (text/uri-list), then text.
+function pasteAction(typesText) {
+    var types = String(typesText || "").split("\n").map(function (t) {
+        return t.trim();
+    }).filter(function (t) {
+        return t !== "";
+    });
+    if (types.indexOf("image/png") !== -1)
+        return { kind: "image", mime: "image/png" };
+    for (var i = 0; i < types.length; i++) {
+        if (types[i].indexOf("image/") === 0)
+            return { kind: "image", mime: types[i] };
+    }
+    if (types.indexOf("text/uri-list") !== -1)
+        return { kind: "file" };
+    for (var j = 0; j < types.length; j++) {
+        if (types[j].indexOf("text/") === 0 || types[j] === "UTF8_STRING" || types[j] === "STRING" || types[j] === "TEXT")
+            return { kind: "text" };
+    }
+    return { kind: "none" };
+}
+
+// One file per question in the runtime dir. The id and the extension keep
+// only letters and digits, so neither can name another path.
+function shotPath(dir, id, mime) {
+    var ext = String(mime).replace(/^image\//, "").replace(/[^A-Za-z0-9]/g, "");
+    return dir + "/qshell-question-" + String(id).replace(/[^A-Za-z0-9]/g, "") + "." + (ext === "jpeg" ? "jpg" : ext);
+}
+
+var IMAGE_GLOBS = ["*.png", "*.jpg", "*.jpeg"];
+
+function isImage(path) {
+    return /\.(png|jpe?g)$/i.test(path);
+}
+
+// The first local png or jpeg in a text/uri-list, as a path.
+function imageFromUriList(text) {
+    var lines = String(text || "").split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (line.indexOf("file://") !== 0)
+            continue;
+        var path = decodeURIComponent(line.replace(/^file:\/\/[^\/]*/, ""));
+        if (isImage(path))
+            return path;
+    }
+    return "";
+}
+
+// The request the shell's own FilePicker takes, in the portal's flattened
+// shape, minus the FIFO an in-shell caller does not need.
+function pickerRequest() {
+    return {
+        title: "Attach an image",
+        mode: "open",
+        multiple: false,
+        directory: false,
+        filters: [{ name: "Images", globs: IMAGE_GLOBS, mimes: ["image/png", "image/jpeg"] }]
+    };
+}
+
+function pickedImage(paths) {
+    return paths && paths.length > 0 && isImage(paths[0]) ? paths[0] : "";
+}
+
+// A picked file's name may hold a # or ?, which a bare "file://" + path
+// would read as a fragment or a query.
+function fileUrl(path) {
+    return path ? "file://" + path.split("/").map(encodeURIComponent).join("/") : "";
+}

@@ -827,7 +827,8 @@ Scope {
     // with the route widget, which shows its count.
     function questionsService() {
         return sharedService("questions", questionsServiceComponent, {
-            theme: barRoot.theme
+            theme: barRoot.theme,
+            shellRoot: barRoot.shell
         });
     }
 

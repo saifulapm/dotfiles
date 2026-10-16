@@ -135,6 +135,48 @@ test("a card names the asking machine by its short tailnet name", () => {
     assert.equal(JSON.stringify(machines), JSON.stringify(["nuc", "macbook", "100.101.46.37:8789"]));
 });
 
+test("Ctrl+V takes a png first, then any image, then a copied file, then text", () => {
+    assert.deepEqual(plain(Model.pasteAction("text/plain\nimage/jpeg\nimage/png\n")), { kind: "image", mime: "image/png" });
+    assert.deepEqual(plain(Model.pasteAction("image/webp\ntext/html")), { kind: "image", mime: "image/webp" });
+    assert.deepEqual(plain(Model.pasteAction("x-special/gnome-copied-files\ntext/uri-list\ntext/plain;charset=utf-8")), { kind: "file" });
+    assert.deepEqual(plain(Model.pasteAction("text/plain;charset=utf-8\nUTF8_STRING")), { kind: "text" });
+    assert.deepEqual(plain(Model.pasteAction("UTF8_STRING")), { kind: "text" });
+    assert.deepEqual(plain(Model.pasteAction("")), { kind: "none" });
+    assert.deepEqual(plain(Model.pasteAction("application/x-unknown")), { kind: "none" });
+});
+
+test("a pasted image lands at the question's shot path with its own extension", () => {
+    assert.equal(Model.shotPath("/run/user/1000", "7A48KQAA", "image/png"), "/run/user/1000/qshell-question-7A48KQAA.png");
+    assert.equal(Model.shotPath("/run/user/1000", "7A48KQAA", "image/jpeg"), "/run/user/1000/qshell-question-7A48KQAA.jpg");
+    assert.equal(Model.shotPath("/run/user/1000", "../../x/7A48", "image/png"), "/run/user/1000/qshell-question-x7A48.png");
+});
+
+test("a copied file attaches when it is a png or jpeg", () => {
+    assert.equal(Model.imageFromUriList("file:///home/saiful/Pictures/Screen%20Shot%201.PNG\r\n"), "/home/saiful/Pictures/Screen Shot 1.PNG");
+    assert.equal(Model.imageFromUriList("# comment\nfile:///tmp/a.txt\nfile:///tmp/b.jpeg\n"), "/tmp/b.jpeg");
+    assert.equal(Model.imageFromUriList("file:///tmp/notes.txt"), "");
+    assert.equal(Model.imageFromUriList("https://example.com/a.png"), "");
+    assert.equal(Model.imageFromUriList(""), "");
+});
+
+test("the file button asks the shell's picker for one png or jpeg", () => {
+    assert.deepEqual(plain(Model.pickerRequest()), {
+        title: "Attach an image",
+        mode: "open",
+        multiple: false,
+        directory: false,
+        filters: [{ name: "Images", globs: ["*.png", "*.jpg", "*.jpeg"], mimes: ["image/png", "image/jpeg"] }]
+    });
+    assert.equal(Model.pickedImage(["/home/saiful/a.jpg", "/home/saiful/b.png"]), "/home/saiful/a.jpg");
+    assert.equal(Model.pickedImage(["/home/saiful/a.gif"]), "");
+    assert.equal(Model.pickedImage([]), "");
+});
+
+test("the thumbnail's url survives a # or ? in the image's path", () => {
+    assert.equal(Model.fileUrl("/home/saiful/shots/bug #2?.png"), "file:///home/saiful/shots/bug%20%232%3F.png");
+    assert.equal(Model.fileUrl(""), "");
+});
+
 if (failures > 0) {
     console.log(`\n${failures} failing`);
     process.exit(1);
