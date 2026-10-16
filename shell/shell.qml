@@ -754,6 +754,13 @@ ShellRoot {
             })
     }
 
+    // The same chooser for a caller inside the shell: done(paths) gets the
+    // answer, [] for cancelled.
+    function pickFile(request, done) {
+        filePickerLoader.wake();
+        filePickerLoader.item.pickFor(request, done);
+    }
+
     ShellIpc {
         target: "filepicker"
 

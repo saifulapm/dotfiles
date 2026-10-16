@@ -246,12 +246,24 @@ Scope {
         }
         if (!req || String(req.fifo || "") === "")
             return "error";
+        enqueue(req);
+        return "ok";
+    }
+
+    // A caller inside the shell (the question modal's file button) takes the
+    // answer as done(paths), [] for cancelled, instead of through a FIFO.
+    function pickFor(req, done) {
+        enqueue(Object.assign({}, req, {
+            done: done
+        }));
+    }
+
+    function enqueue(req) {
         const next = queue.slice();
         next.push(req);
         queue = next;
         if (next.length === 1)
             startRequest();
-        return "ok";
     }
 
     function startRequest() {
@@ -298,7 +310,10 @@ Scope {
         // portal service, and answering must not depend on the shell keeping a
         // child alive. `timeout` covers a reader that died between the request
         // and the answer, where the open() for write would block forever.
-        Quickshell.execDetached(["setpriv", "--pdeathsig", "TERM", "--", "timeout", "10", "sh", "-c", 'printf "%s\\n" "$1" > "$2"', "qshell-picker", answer, String(req.fifo)]);
+        if (typeof req.done === "function")
+            req.done(chosen);
+        else
+            Quickshell.execDetached(["setpriv", "--pdeathsig", "TERM", "--", "timeout", "10", "sh", "-c", 'printf "%s\\n" "$1" > "$2"', "qshell-picker", answer, String(req.fifo)]);
 
         const next = queue.slice(1);
         queue = next;
