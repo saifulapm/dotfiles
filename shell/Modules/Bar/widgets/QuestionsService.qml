@@ -51,6 +51,9 @@ QtObject {
         if (modalId !== id)
             screenshot = "";
         modalId = id;
+        // A file dialog that never answers would leave the modal hidden;
+        // Reply... brings it back.
+        capturing = false;
     }
 
     function closeModal() {
