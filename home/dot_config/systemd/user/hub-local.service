@@ -1,0 +1,19 @@
+[Unit]
+Description=hub local: this machine's local hub, for questions and answers between machines
+# Local hubs reach each other on port 8789 over the tailnet, with the peer
+# token; mem reaches this one on its own socket. The tokens come from
+# ~/.config/hub/local.env, which run_after_39-hub-local.sh writes from pass,
+# so a machine without that file skips the unit instead of failing it.
+ConditionPathExists=%h/.config/hub/local.env
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=%h/.config/hub/local.env
+ExecStart=%h/.local/bin/hub local
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
