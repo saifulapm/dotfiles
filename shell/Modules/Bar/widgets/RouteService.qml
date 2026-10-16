@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "RouteModel.js" as Model
+import "QuestionsModel.js" as QuestionsModel
 
 // Question-route service: where the workflow hub sends its questions, Phone
 // or this Device, and how many wait. ONE instance however many screens carry
@@ -22,6 +23,10 @@ QtObject {
     readonly property string statePath: Quickshell.env("XDG_RUNTIME_DIR") + "/workflow-route.json"
 
     property var state: Model.parseState("")
+    // The local hub's questions, bound by the bar. Their count wins over the
+    // route file's while the hub writes its question file.
+    property var questions: null
+    readonly property int waiting: QuestionsModel.waitingCount(questions ? questions.state : null, state)
     property bool present: false
     property string lastError: ""
 

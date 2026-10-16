@@ -20,10 +20,10 @@ BarButton {
     // The shared service, injected by the bar's registry.
     required property RouteService route
 
-    readonly property string badgeText: Model.badge(route.state)
+    readonly property string badgeText: Model.badge(route.waiting)
 
     visible: Model.visible(route.state)
-    tooltipText: "Questions: " + (route.state.route === "device" ? "Device" : route.state.route === "dulali" ? "Dulali" : "Phone") + ", " + Model.waitingLine(route.state)
+    tooltipText: "Questions: " + (route.state.route === "device" ? "Device" : route.state.route === "dulali" ? "Dulali" : "Phone") + ", " + Model.waitingLine(route.waiting)
 
     onTapped: {
         if (panelLoader.status === Loader.Null)

@@ -817,7 +817,17 @@ Scope {
     // Sync reads ~/.config/qshell/machine asynchronously.
     function routeService() {
         return sharedService("route", routeServiceComponent, {
-            machine: Qt.binding(() => barRoot.shell.sync.detectedMachine)
+            machine: Qt.binding(() => barRoot.shell.sync.detectedMachine),
+            questions: barRoot.questionsService()
+        });
+    }
+
+    // No gate: the questions service watches the local hub's question file
+    // and starts a process only on an answer or a screenshot. It comes up
+    // with the route widget, which shows its count.
+    function questionsService() {
+        return sharedService("questions", questionsServiceComponent, {
+            theme: barRoot.theme
         });
     }
 
@@ -940,6 +950,11 @@ Scope {
     Component {
         id: routeServiceComponent
         RouteService {}
+    }
+
+    Component {
+        id: questionsServiceComponent
+        QuestionsService {}
     }
 
     Component {

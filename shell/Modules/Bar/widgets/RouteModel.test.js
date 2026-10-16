@@ -40,10 +40,10 @@ test("device held by this machine draws the desktop glyph with a count", () => {
     const state = Model.parseState('{"route":"device","machine":"mac-mini-m2","waiting":2,"hub":"http://hub:7700"}');
     assert.equal(Model.visible(state), true);
     assert.equal(Model.glyph(state), DESKTOP);
-    assert.equal(Model.badge(state), "2");
+    assert.equal(Model.badge(state.waiting), "2");
     assert.equal(Model.currentChoice(state, "mac-mini-m2"), "device");
     assert.equal(Model.deviceLabel(state, "mac-mini-m2"), "Device (mac-mini-m2)");
-    assert.equal(Model.waitingLine(state), "2 waiting");
+    assert.equal(Model.waitingLine(state.waiting), "2 waiting");
     assert.equal(Model.hubUrl(state), "http://hub:7700");
 });
 
@@ -61,10 +61,10 @@ test("phone route draws the phone glyph with no badge", () => {
     const state = Model.parseState('{"route":"phone","machine":null,"waiting":0}');
     assert.equal(Model.visible(state), true);
     assert.equal(Model.glyph(state), PHONE);
-    assert.equal(Model.badge(state), "");
+    assert.equal(Model.badge(state.waiting), "");
     assert.equal(Model.currentChoice(state, "mac-mini-m2"), "phone");
     assert.equal(Model.deviceLabel(state, "mac-mini-m2"), "Device (mac-mini-m2)");
-    assert.equal(Model.waitingLine(state), "0 waiting");
+    assert.equal(Model.waitingLine(state.waiting), "0 waiting");
 });
 
 test("device held by another machine names that machine, and Device here is still a choice", () => {

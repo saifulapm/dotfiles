@@ -57,8 +57,10 @@ function glyph(state) {
     return visible(state) && state.route === "device" ? DEVICE_GLYPH : PHONE_GLYPH;
 }
 
-function badge(state) {
-    return visible(state) && state.waiting > 0 ? String(state.waiting) : "";
+// `waiting` is QuestionsModel.waitingCount: the hub's question file when one
+// exists, else this file's own count.
+function badge(waiting) {
+    return waiting > 0 ? String(waiting) : "";
 }
 
 // "phone", "dulali", "device" (this machine) or "elsewhere" (Device on another machine).
@@ -88,8 +90,8 @@ function elsewhereLabel(state, thisMachine) {
     return currentChoice(state, thisMachine) === "elsewhere" ? "Device (" + state.machine + ")" : "";
 }
 
-function waitingLine(state) {
-    return (visible(state) ? state.waiting : 0) + " waiting";
+function waitingLine(waiting) {
+    return waiting + " waiting";
 }
 
 function hubUrl(state) {

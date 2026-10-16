@@ -85,7 +85,7 @@ BarPanel {
             theme: panel.theme
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            text: Model.waitingLine(panel.state)
+            text: Model.waitingLine(panel.route.waiting)
         }
 
         PanelButton {
