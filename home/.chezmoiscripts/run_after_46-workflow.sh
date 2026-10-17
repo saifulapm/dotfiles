@@ -32,12 +32,6 @@ src="$HOME/.local/src/workflow"
 # ---------------------------------------------------------------- binaries
 # Guarded on `workflow` alone; see the header. update-all drops that one
 # binary when origin moves, and this block rebuilds all three.
-#
-# rebuilt tracks whether THIS run replaced the binaries, because the hub
-# restart at the bottom must fire on a rebuild and not on the many applies
-# that change nothing — bouncing a running service on every `chezmoi apply`
-# is a cost with no cause.
-rebuilt=0
 if [ ! -x "$HOME/.local/bin/workflow" ]; then
   if ! command -v cargo >/dev/null 2>&1; then
     warn "cargo missing (03-dev-toolchain skipped?) — skipping"
@@ -72,7 +66,6 @@ if [ ! -x "$HOME/.local/bin/workflow" ]; then
   done
   if [ "$built" = 1 ]; then
     echo "workflow: installed mem, workflow and hub to ~/.local/bin"
-    rebuilt=1
   fi
 fi
 
@@ -120,16 +113,15 @@ if [ -e "$unit" ] || [ -L "$unit" ]; then
   echo "workflow: retired this machine's hub; the one hub is on dulali"
 fi
 
-# The agent is a client, not a listener, so it runs wherever it is paired.
-# Pairing is once per machine: `workflow agent pair <link>`, the link from
-# `hub pair <machine>` on dulali.
-if [ -f "$HOME/.local/state/workflow/agent-token" ]; then
+# The agent reported to the one hub on dulali, which is gone: the local hub
+# (hub-local.service) reports to the store on Cloudflare instead. The agent
+# retires here: its unit and its pairing token.
+unit="$HOME/.config/systemd/user/workflow-agent.service"
+if [ -e "$unit" ] || [ -L "$unit" ] || [ -f "$HOME/.local/state/workflow/agent-token" ]; then
+  systemctl --user disable --now workflow-agent.service >/dev/null 2>&1 || true
+  rm -f "$unit" "$HOME/.local/state/workflow/agent-token"
   systemctl --user daemon-reload
-  if [ "$rebuilt" = 1 ]; then
-    systemctl --user restart workflow-agent.service
-  fi
-  systemctl --user enable --now workflow-agent.service >/dev/null 2>&1 &&
-    echo "workflow: agent reporting to the one hub"
+  echo "workflow: retired workflow-agent; the local hub reports to the store"
 fi
 
 exit 0
