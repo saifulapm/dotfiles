@@ -5,7 +5,9 @@
 # boot (workflow cloud-setup), so a new build reaches cloud sessions with no
 # new setup script; and on the workflow repo's public cloud-bins release,
 # where the setup bakes them from, since claude.ai gives the setup none of
-# the store's secrets. The mini only: one machine publishes. Cloud VMs are
+# the store's secrets. Beside them goes workflow-skills.tar.gz, the workflow
+# skills and agents, which the cloud's mem also takes once a boot. The mini
+# only: one machine publishes. Cloud VMs are
 # x86_64 and every machine here is arm64, so this is a cross build, with
 # cargo-zigbuild and a zig pinned in its own venv (the manifest keeps zig off
 # every machine; its note says why). After 46-workflow advances and builds the
@@ -61,6 +63,14 @@ for name in mem hub; do
     hub share put-bin "$name-x86_64.sha256" "$sum" >/dev/null) ||
     { warn "putting $name-x86_64 in the store failed; the next apply tries again"; exit 0; }
 done
+# The same bytes for the same skills, so the sum moves only when one does.
+bundle=$state/workflow-skills.tar.gz
+tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$src" -cf - skills agents |
+  gzip -n >"$bundle" &&
+  printf '%s  workflow-skills.tar.gz\n' "$(sha256sum "$bundle" | cut -d' ' -f1)" >"$bundle.sha256" &&
+  (set -a && . "$env" && hub share put-bin workflow-skills.tar.gz "$bundle" >/dev/null &&
+    hub share put-bin workflow-skills.tar.gz.sha256 "$bundle.sha256" >/dev/null) ||
+  { warn "putting the workflow skills in the store failed; the next apply tries again"; exit 0; }
 # The release is created once and keeps only the newest build.
 repo=saifulapm/workflow
 assets=$state/release
