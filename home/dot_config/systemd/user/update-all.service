@@ -1,0 +1,10 @@
+[Unit]
+Description=Roll this machine forward: dotfiles, tools, workflow and chezmoi apply, without dnf
+
+[Service]
+Type=oneshot
+# --unattended skips dnf, whose sudo needs a password, and never prompts.
+ExecStart=%h/.dotfiles/bin/update-all --unattended
+Nice=19
+IOSchedulingClass=idle
+TimeoutStartSec=2h

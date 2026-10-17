@@ -6,7 +6,7 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service
+# unit-list: vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer update-all.timer qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service
 # Also DISABLES voxtype.service — see the block near the end of this file —
 # and stops the retired emacs.service and qmd-refresh.timer on machines that
 # still run them.
@@ -49,7 +49,10 @@ set -euo pipefail
 # and exits when there is none, so a machine that has never unblocked a
 # category — or has no family DNS profile at all — arms a timer that does
 # nothing. See the unit for why the transient restore timer needs a backstop.
-units=(vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer)
+# update-all.timer runs bin/update-all --unattended once a day, so every
+# machine picks up pushed dotfiles and tools (workflow's three binaries among
+# them) with nobody typing a command; dnf stays a run by hand.
+units=(vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer update-all.timer)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently

@@ -20,7 +20,24 @@
 #   * nirisnap upstream syncs — rebasing the port onto tobi's omasnap is a
 #     decision with conflicts to review (NIRI.md in the fork), not an update.
 #     The source-build check below rebuilds only when the FORK's main moved.
+#
+# --unattended is update-all.timer's run: it skips dnf, whose sudo needs a
+# password nobody is there to type, and never prompts. A target edited since
+# chezmoi last wrote it is skipped with an error instead of overwritten, and
+# waits for a run by hand.
 set -uo pipefail
+
+unattended=
+[ "${1:-}" = --unattended ] && unattended=1
+apply() {
+  if [ -n "$unattended" ]; then
+    # A locked gpg-agent fails every pass call quietly instead of drawing a
+    # pinentry on the screen at 05:00; a warm one still answers.
+    PASSWORD_STORE_GPG_OPTS=--pinentry-mode=error chezmoi apply --no-tty --keep-going </dev/null
+  else
+    chezmoi apply
+  fi
+}
 
 STATE="$HOME/.local/state/qshell/update-all"
 mkdir -p "$STATE"
@@ -42,6 +59,7 @@ elif ! git -C "$HOME/.dotfiles" pull --ff-only; then
 fi
 
 # ----------------------------------------------------------------- dnf / rpm
+if [ -z "$unattended" ]; then
 say "dnf packages"
 # BEFORE the upgrade, because the whole question is whether qt6 may move in
 # THIS transaction: quickshell links Qt's private API and a patch release can
@@ -61,6 +79,7 @@ else
   warn "dnf upgrade failed"
 fi
 qt6-hold --verify || warn "quickshell is broken against the installed Qt — run: qshell-rebuild"
+fi
 
 # ----------------------------------------------- prebuilt release binaries
 # Tag-file staleness: compare the repo's latest release tag against the one
@@ -214,7 +233,7 @@ mise exec -- pnpm update -g --latest || warn "pnpm update -g failed"
 
 # -------------------------------------------------------------------- apply
 say "chezmoi apply (reinstalls everything removed above)"
-chezmoi apply || warn "chezmoi apply failed"
+apply || warn "chezmoi apply failed"
 
 # ------------------------------------------------------ cargo dev shadows
 # ~/.cargo/bin sits before ~/.local/bin on PATH, so a `cargo install --path .`
@@ -238,7 +257,7 @@ node_before="$(mise where node 2>/dev/null)"
 mise up || warn "mise up failed"
 if [ "$(mise where node 2>/dev/null)" != "$node_before" ]; then
   say "chezmoi apply (node moved — reinstalls npm globals)"
-  chezmoi apply || warn "chezmoi apply failed"
+  apply || warn "chezmoi apply failed"
 fi
 rustup update || warn "rustup update failed"
 
