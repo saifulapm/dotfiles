@@ -28,6 +28,7 @@ managed=$(
   "cleanupPeriodDays": 90,
   "skillListingBudgetFraction": 0.02,
   "syncClaudeAiSkills": false,
+  "disableClaudeAiConnectors": true,
   "skillOverrides": {
     "schedule": "off",
     "init": "off",
@@ -212,6 +213,9 @@ current=$(cat)
 # artifact-capabilities and workflow-authoring stay on: the Artifact and
 # Workflow tools load them before they act. syncClaudeAiSkills stops the
 # claude.ai skills landing in ~/.claude/skills/synced; claude.ai keeps them.
+# disableClaudeAiConnectors keeps claude.ai's connectors out of the terminal
+# sessions (2026-10-18): local Claude called the Mem connector, a second road
+# to the store beside the mem CLI and its replica. claude.ai chat keeps them.
 #
 # ANTHROPIC_DEFAULT_HAIKU_MODEL pins the haiku alias to Haiku 5.5 (2026-10-08):
 # Claude Code's built-in helper agents still resolved it to Haiku 4.5, which
