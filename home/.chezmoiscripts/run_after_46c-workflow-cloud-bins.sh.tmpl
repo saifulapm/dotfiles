@@ -1,0 +1,63 @@
+{{ if eq .machine "mac-mini-m2" -}}
+#!/usr/bin/env bash
+# The x86_64 mem and hub that cloud sessions run, built here and put in the
+# store's /store/dl, each beside a .sha256 that the cloud's mem checks once a
+# boot (workflow cloud-setup), so a new build reaches cloud sessions with no
+# new setup script. The mini only: one machine publishes. Cloud VMs are
+# x86_64 and every machine here is arm64, so this is a cross build, with
+# cargo-zigbuild and a zig pinned in its own venv (the manifest keeps zig off
+# every machine; its note says why). After 46-workflow advances and builds the
+# checkout, and only when the checkout's revision is not the one last put.
+set -uo pipefail
+
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+
+warn() { echo "workflow-cloud-bins: $*" >&2; }
+
+src=$HOME/.local/src/workflow
+env=$HOME/.config/hub/local.env
+state=$HOME/.local/state/workflow
+stamp=$state/cloud-bins-rev
+zig=$HOME/.local/share/workflow/zig
+ziglang=0.17.0
+target=x86_64-unknown-linux-musl
+
+rev=$(git -C "$src" rev-parse HEAD 2>/dev/null) || exit 0
+# The store's keys are workflow switch's (46b); a machine not switched yet
+# has nowhere to put them.
+grep -qs '^HUB_STORE_TOKEN=' "$env" || exit 0
+[ "$(cat "$stamp" 2>/dev/null)" = "$rev" ] && exit 0
+command -v hub >/dev/null 2>&1 || { warn "no hub binary yet — skipping"; exit 0; }
+
+if ! command -v cargo-zigbuild >/dev/null 2>&1; then
+  cargo install --quiet --locked cargo-zigbuild || { warn "cargo install cargo-zigbuild failed"; exit 0; }
+fi
+if ! rustup target list --installed 2>/dev/null | grep -qx "$target"; then
+  rustup target add "$target" >/dev/null || { warn "rustup target add $target failed"; exit 0; }
+fi
+if ! "$zig/bin/python" -m ziglang version 2>/dev/null | grep -qx "$ziglang"; then
+  { uv venv -q --clear "$zig" && uv pip install -q --python "$zig/bin/python" "ziglang==$ziglang"; } ||
+    { warn "installing ziglang $ziglang into $zig failed"; exit 0; }
+fi
+
+echo "workflow-cloud-bins: building mem and hub for $target at ${rev:0:7}"
+for crate in mem hub; do
+  (cd "$src/$crate" && PATH="$zig/bin:$PATH" CARGO_TARGET_DIR="$src/build/x86" \
+    cargo zigbuild --release --quiet --target "$target") ||
+    { warn "building $crate for $target failed"; exit 0; }
+done
+
+mkdir -p "$state"
+# Each binary goes up before its sum, so a cloud mem that sees the new sum
+# finds the new binary.
+for name in mem hub; do
+  file=$src/build/x86/$target/release/$name
+  sum=$state/$name-x86_64.sha256
+  printf '%s  %s-x86_64\n' "$(sha256sum "$file" | cut -d' ' -f1)" "$name" >"$sum"
+  (set -a && . "$env" && hub share put-bin "$name-x86_64" "$file" >/dev/null &&
+    hub share put-bin "$name-x86_64.sha256" "$sum" >/dev/null) ||
+    { warn "putting $name-x86_64 in the store failed; the next apply tries again"; exit 0; }
+done
+printf '%s\n' "$rev" >"$stamp"
+echo "workflow-cloud-bins: mem and hub for x86_64 at ${rev:0:7} are in the store"
+{{ end -}}
