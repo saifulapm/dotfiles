@@ -4,7 +4,7 @@
 # `mise install <tool>`, which reads this file without editing it.
 
 [tools]
-node = "lts"     # resolves to the current LTS major at install time
+node = "24.21.0"     # resolves to the current LTS major at install time
 deno = "latest"
 "npm:cf" = "latest"   # Cloudflare CLI (omarchy a389bd18 installs it via a `mise use -g` wrapper)
 
