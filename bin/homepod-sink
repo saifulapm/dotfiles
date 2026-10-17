@@ -35,6 +35,15 @@
 # set-environment RAOP_LOG_LEVEL=3`), restart this unit, reproduce, then unset
 # and restart. Nothing in this file changes; the unit passes the manager's
 # environment through to the script.
+#
+# User-Agent (2026-10-17): the HomePod on software 27.0 answers the very
+# first RTSP OPTIONS with 403 unless the User-Agent is an Apple sender's —
+# `iTunes/<ver>` or `AirPlay/<ver>`, and the version is checked too
+# (AirPlay/409.16 passes, AirPlay/409.160 and AirPlay/1.0 are refused). The
+# module hard-codes `PipeWire/<version>` with no property to override it, so
+# the child loads a copy with that string swapped, in place, for an accepted
+# one of the same length, from a private module dir. It is rebuilt on every
+# start, so a pipewire update is picked up by the next restart.
 
 set -uo pipefail
 
@@ -43,6 +52,8 @@ DESC="HomePod (Office)"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/homepod-sink"
 CONF="${XDG_RUNTIME_DIR:-/tmp}/homepod-raop.conf"
 LOG_LEVEL="${RAOP_LOG_LEVEL:-2}"
+SYS_MODS=/usr/lib64/pipewire-0.3
+MODS="${XDG_RUNTIME_DIR:-/tmp}/homepod-modules"
 mkdir -p "$STATE"
 
 is_office() {
@@ -77,6 +88,25 @@ resolve() {
             "timeout 0.3 bash -c 'echo > /dev/tcp/$base.{}/7000' 2>/dev/null && echo $base.{}")
     done
     return 1
+}
+
+# Build $MODS: symlinks to every system module, except raop-sink, which is
+# a copy with its User-Agent swapped. Each replacement was tested against
+# the HomePod.
+patch_raop() {
+    local so="$SYS_MODS/libpipewire-module-raop-sink.so" ua rep
+    ua=$(grep -ao 'PipeWire/[0-9][0-9.]*' "$so" | head -1)
+    case ${#ua} in
+        14) rep="AirPlay/409.16" ;;
+        15) rep="AirPlay/620.8.2" ;;
+        16) rep="AirPlay/409.16.1" ;;
+        *) return 1 ;;
+    esac
+    rm -rf "$MODS" && mkdir -p "$MODS" || return 1
+    ln -s "$SYS_MODS"/*.so "$MODS"/
+    rm "$MODS/libpipewire-module-raop-sink.so"
+    sed "s|$ua|$rep|" "$so" >"$MODS/libpipewire-module-raop-sink.so"
+    grep -aq "$rep" "$MODS/libpipewire-module-raop-sink.so"
 }
 
 sink_present() {
@@ -126,8 +156,14 @@ context.modules = [
 ]
 EOF
 
+moddir="$MODS"
+if ! patch_raop; then
+    echo "could not patch the RAOP User-Agent — the HomePod will answer 403"
+    moddir="$SYS_MODS"
+fi
+
 echo "hosting RAOP sink for $ip (log level $LOG_LEVEL)"
-pipewire -c "$CONF" &
+PIPEWIRE_MODULE_DIR="$moddir" pipewire -c "$CONF" &
 child=$!
 
 sleep 5
