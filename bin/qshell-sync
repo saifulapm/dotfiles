@@ -14,7 +14,7 @@
 #     local merge step over what the pull brings (bin/fish-history-merge,
 #     bin/notes-merge).
 #
-#   bisync — screenshots, notes attachments, memory
+#   bisync — screenshots, notes attachments
 #     Edited on every machine, and a delete must propagate, so neither end can
 #     be declared the writer. The first run (and recovery after an interrupted
 #     one) needs --resync, which this script does by itself when bisync asks.
@@ -104,15 +104,6 @@
 set -euo pipefail
 
 remote="Dropbox:qshell-sync"
-# The mem store syncs with the one hub on the VPS instead, as user mem: the
-# system ssh logs in with the key every machine has, so no rclone remote is
-# set up. The Dropbox copy at $remote/memory takes no more writes.
-# disable_hashcheck: each hash is an md5sum over a fresh ssh login, and
-# dulali's sshd drops logins past MaxStartups (10 at once). A dropped hash
-# made bisync judge identical copies different, so it renamed both to
-# .conflict1/.conflict2, which mem never reads: 51 items vanished from the
-# hub on 2026-10-15. Size and modtime are what bisync compares anyway.
-memory_remote=":sftp,ssh='ssh -o BatchMode=yes mem@dulali',shell_type=unix,disable_hashcheck=true,known_hosts_file=~/.ssh/known_hosts:/srv/mem/store"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qshell"
 sync_dir="$state_dir/sync"
 hist_dir="$sync_dir/history"
@@ -128,7 +119,7 @@ machine="$(cat "$HOME/.config/qshell/machine" 2>/dev/null || true)"
 hub_json=null
 
 # Canonical order — the panel renders the units in exactly this sequence.
-units_all=(history fish-history model-usage screenshots notes goals ssh memory)
+units_all=(history fish-history model-usage screenshots notes goals ssh)
 
 unit_label() {
   case "$1" in
@@ -139,7 +130,6 @@ unit_label() {
   notes) echo "Notes" ;;
   goals) echo "Goals" ;;
   ssh) echo "SSH keys" ;;
-  memory) echo "AI memory" ;;
   *) echo "$1" ;;
   esac
 }
@@ -679,7 +669,7 @@ sync_notes() {
 
 # The goal store: one small JSON file, push-own / pull-others then a merge on
 # per-goal AND per-task identity. Deliberately NOT a bisync like screenshots
-# or memory — bisync resolves a two-machine conflict by picking a whole file,
+# — bisync resolves a two-machine conflict by picking a whole file,
 # so ticking task 3 on the laptop and task 5 on the mini inside one 15-minute
 # window would keep one file and set the other aside. Both ticks have to
 # survive, so identity lives inside the file and bin/goals-merge owns it.
@@ -702,46 +692,6 @@ sync_goals() {
     return 0
   fi
   unit_ok goals "$(tail -n 1 <<<"$merge_out")"
-}
-
-# The mem store: one small markdown file per item, plus a per-project
-# project.toml, plan.md and status.md. A normal round is a handful of
-# modifications — prune archives in place rather than deleting, so the
-# --max-delete guard is never approached.
-sync_memory() {
-  local mem_dir="$HOME/.local/share/mem/store"
-  local filters="$HOME/.config/qshell/memory-filters.txt"
-  # `workflow switch` moved this machine onto the Cloudflare store: mem
-  # shares every write through the local hub, and a bisync with dulali
-  # would only race it.
-  if [[ -e ${XDG_STATE_HOME:-$HOME/.local/state}/mem/share/switched ]]; then
-    unit_skip memory "switched to the store"
-    return 0
-  fi
-  mkdir -p "$mem_dir"
-  # Fixed at bootstrap on purpose: rclone hashes the filters FILE and demands a
-  # --resync when it changes, so the excludes have to be right on day one.
-  # In-flight writes are same-dir dot-temps; *.partial is rclone's own.
-  if [[ ! -f $filters ]]; then
-    mkdir -p "$(dirname "$filters")"
-    printf -- '- .tmp-*\n- *.partial\n' >"$filters"
-  fi
-  # force_max 5: a store with a couple of files IS "100% changed" the first few
-  # rounds, which is arithmetic rather than evidence (the notes unit's recorded
-  # failure). A real store is far bigger, so the check still means something.
-  # --checkers 4 --transfers 2: every sftp connection is an ssh login, and
-  # two machines at 32 checkers went past dulali's MaxStartups (see above).
-  bisync_unit memory "$mem_dir" "$memory_remote" 5 --filters-file "$filters" --checkers 4 --transfers 2 || return 0
-  # A conflict copy is an item mem cannot see: say so instead of "ok".
-  local conflicts
-  conflicts="$(find "$mem_dir" -name '*.conflict[0-9]*' -type f 2>/dev/null | wc -l)"
-  if ((conflicts > 0)); then
-    unit_fail memory "$conflicts conflict file(s) in the store, which mem does not read: find $mem_dir -name '*.conflict*'"
-    return 0
-  fi
-  local items
-  items="$(find "$mem_dir" -name '*.md' -type f 2>/dev/null | wc -l)"
-  unit_ok memory "$items item(s)${bisync_note:+ — $bisync_note}"
 }
 
 # The blob unit: bin/ssh-hub-sync owns the compare, the crypto and the
@@ -770,7 +720,6 @@ for id in "${selected[@]}"; do
   notes) sync_notes ;;
   goals) sync_goals ;;
   ssh) sync_ssh ;;
-  memory) sync_memory ;;
   esac
   write_status true "$id"
 done

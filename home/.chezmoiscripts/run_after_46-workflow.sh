@@ -8,8 +8,9 @@
 #             project
 #   workflow  hygiene and lint-msg behind the git hooks, `install`, and `go`,
 #             which starts a milestone's orchestrator
-#   hub       a web view over mem, tailnet-only, so a phone can follow every
-#             project, read its plans and answer its questions
+#   hub       `hub local`, this machine's local hub (hub-local.service): it
+#             shares mem through the store on Cloudflare, rings questions
+#             and runs Start and Resume
 #
 # Ours outright, same shape as run_after_45-amx and run_after_36-pxy: clone into
 # ~/.local/src/workflow, cargo-build, install into ~/.local/bin. THREE binaries
@@ -66,6 +67,8 @@ if [ ! -x "$HOME/.local/bin/workflow" ]; then
   done
   if [ "$built" = 1 ]; then
     echo "workflow: installed mem, workflow and hub to ~/.local/bin"
+    # A running local hub keeps the old binary until it restarts.
+    systemctl --user try-restart hub-local.service >/dev/null 2>&1 || true
   fi
 fi
 
@@ -99,10 +102,9 @@ if [ -e "$unit" ] || [ -L "$unit" ]; then
 fi
 
 # --------------------------------------------------------------------- hub
-# The hub runs once, on dulali (vps/ in the workflow repo), and every machine
-# reports to it through workflow-agent.service. The hub each machine used to
-# run retires here: its unit, its state (pairings, the doorbell's seen file)
-# and its config with the siblings links, and its tailnet mapping on :8787.
+# The web hub each machine used to run retires here: its unit, its state
+# (pairings, the doorbell's seen file) and its config with the siblings
+# links, and its tailnet mapping on :8787. The hub web runs on Cloudflare.
 unit="$HOME/.config/systemd/user/hub.service"
 if [ -e "$unit" ] || [ -L "$unit" ]; then
   systemctl --user disable --now hub.service >/dev/null 2>&1 || true
@@ -114,12 +116,14 @@ if [ -e "$unit" ] || [ -L "$unit" ]; then
 fi
 
 # The agent reported to the one hub on dulali, which is gone: the local hub
-# (hub-local.service) reports to the store on Cloudflare instead. The agent
-# retires here: its unit and its pairing token.
+# (hub-local.service) reports to the store on Cloudflare instead, and the
+# workflow binary no longer has the command. The agent retires here: its
+# unit and its pairing with dulali.
 unit="$HOME/.config/systemd/user/workflow-agent.service"
-if [ -e "$unit" ] || [ -L "$unit" ] || [ -f "$HOME/.local/state/workflow/agent-token" ]; then
+pairing="$HOME/.local/state/workflow/agent"
+if [ -e "$unit" ] || [ -L "$unit" ] || [ -f "$pairing-token" ] || [ -f "$pairing-hub" ]; then
   systemctl --user disable --now workflow-agent.service >/dev/null 2>&1 || true
-  rm -f "$unit" "$HOME/.local/state/workflow/agent-token"
+  rm -f "$unit" "$pairing-token" "$pairing-hub"
   systemctl --user daemon-reload
   echo "workflow: retired workflow-agent; the local hub reports to the store"
 fi

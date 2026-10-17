@@ -23,8 +23,6 @@ var UNIT_GLYPHS = {
     "notes": "󰦨" // md-note_text
     ,
     "ssh": "󰌆" // md-key
-    ,
-    "memory": "󰧡" // md-brain
 };
 
 // What each unit is for, in one line — the panel shows it where a unit has
@@ -35,8 +33,7 @@ var UNIT_BLURBS = {
     "model-usage": "What the AI widget counts",
     "screenshots": "~/Pictures/Screenshots, both ways",
     "notes": "The notes panel's store, merged by note id",
-    "ssh": "~/.ssh as one encrypted blob",
-    "memory": "The mem store, both ways"
+    "ssh": "~/.ssh as one encrypted blob"
 };
 
 // Where each unit's content sits on THIS machine, relative to $HOME — what
@@ -59,8 +56,7 @@ var UNIT_DIRS = {
     "model-usage": ".local/state/qshell/sync/model-usage",
     "screenshots": "Pictures/Screenshots",
     "notes": ".local/state/qshell/notes",
-    "ssh": ".ssh",
-    "memory": ".local/share/mem/store"
+    "ssh": ".ssh"
 };
 
 function unitGlyph(id) {

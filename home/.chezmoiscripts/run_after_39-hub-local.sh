@@ -2,8 +2,11 @@
 # The local hub's tokens, from pass into ~/.config/hub/local.env (0600), which
 # hub-local.service reads: the peer token every local hub shares, and the
 # workflow Slack app's two tokens and Saiful's member id once they exist. An
-# env file, not a flag, so no token is in argv. A machine without the
-# workflow entries in pass skips quietly, and the unit stays off there.
+# env file, not a flag, so no token is in argv. Every other line in the file
+# stays as it was: the store's keys are `workflow switch`'s, which
+# run_after_47-workflow-store runs once the binaries are built. A machine
+# without the workflow entries in pass skips quietly, and the unit stays off
+# there.
 set -uo pipefail
 
 # Port 8789 on this machine's tailnet address, handed to the hub on
@@ -31,6 +34,7 @@ chmod 600 "$new"
   v=$(pass show workflow/slack-app-token 2>/dev/null) && printf 'SLACK_APP_TOKEN=%s\n' "$v"
   v=$(pass show workflow/slack-user-id 2>/dev/null || pass show dulali/slack-user-id 2>/dev/null) &&
     printf 'SLACK_USER_ID=%s\n' "$v"
+  [ -f "$env" ] && grep -Ev '^(HUB_PEER_TOKEN|SLACK_BOT_TOKEN|SLACK_APP_TOKEN|SLACK_USER_ID)=' "$env"
 } >"$new"
 
 changed=
