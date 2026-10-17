@@ -4,8 +4,8 @@
 //
 // RouteModel.js is a `.pragma library` file, which node cannot parse, so it is
 // evaluated in a fresh context with that one line stripped; its top-level
-// functions land on the context. Covers the map from the workflow agent's
-// route file to what the bar glyph and its panel draw.
+// functions land on the context. Covers the map from the local hub's route
+// file to what the bar glyph and its panel draw.
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -34,7 +34,6 @@ function plain(value) {
 
 const PHONE = "󰄜"; // md-cellphone
 const DESKTOP = "󰍹"; // md-monitor
-const ROBOT = "\u{f06a9}"; // md-robot
 
 test("device held by this machine draws the desktop glyph with a count", () => {
     const state = Model.parseState('{"route":"device","machine":"mac-mini-m2","waiting":2,"hub":"http://hub:7700"}');
@@ -44,7 +43,7 @@ test("device held by this machine draws the desktop glyph with a count", () => {
     assert.equal(Model.currentChoice(state, "mac-mini-m2"), "device");
     assert.equal(Model.deviceLabel(state, "mac-mini-m2"), "Device (mac-mini-m2)");
     assert.equal(Model.waitingLine(state.waiting), "2 waiting");
-    assert.equal(Model.hubUrl(state), "http://hub:7700");
+    assert.equal(Model.hubUrl(state), "https://hub.on-rexa.com");
 });
 
 test("the agent's own name for this machine wins over qshell's", () => {
@@ -89,12 +88,17 @@ test("each choice runs the workflow route command by argv", () => {
     assert.deepEqual(plain(Model.commandFor("device")), ["workflow", "route", "device"]);
 });
 
-test("dulali route is visible, draws the robot glyph and is the current choice", () => {
-    const state = Model.parseState('{"route":"dulali","machine":null,"waiting":1,"hub":"http://hub:7700","self":"mini"}');
-    assert.equal(Model.visible(state), true);
-    assert.equal(Model.glyph(state), ROBOT);
-    assert.equal(Model.currentChoice(state, "mac-mini-m2"), "dulali");
-    assert.deepEqual(plain(Model.commandFor("dulali")), ["workflow", "route", "dulali"]);
+test("the hub's tailnet hosts read as short machine names", () => {
+    const state = Model.parseState('{"route":"device","machine":"mini.taila27604.ts.net","self":"mini.taila27604.ts.net"}');
+    assert.equal(Model.currentChoice(state, "mac-mini-m2"), "device");
+    assert.equal(Model.deviceLabel(state, "mac-mini-m2"), "Device (mini)");
+    const nuc = Model.parseState('{"route":"device","machine":"nuc.taila27604.ts.net:8790","self":"mini.taila27604.ts.net"}');
+    assert.equal(Model.elsewhereLabel(nuc, "mac-mini-m2"), "Device (nuc)");
+});
+
+test("dulali is no longer a route: the glyph hides and a click asks for phone", () => {
+    assert.equal(Model.visible(Model.parseState('{"route":"dulali","machine":null}')), false);
+    assert.deepEqual(plain(Model.commandFor("dulali")), ["workflow", "route", "phone"]);
 });
 
 if (failures > 0) {

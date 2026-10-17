@@ -3,28 +3,35 @@
 // Question-route parsing and phrasing for the route widget: the pure data the
 // service, the glyph and the panel read, with no Process and no state.
 //
-// The input is $XDG_RUNTIME_DIR/workflow-route.json, which the workflow agent
-// rewrites whole every 5 s:
+// The input is $XDG_RUNTIME_DIR/workflow-route.json, which this machine's
+// local hub rewrites whole at its start and on every change of route:
 //
-//     {"route":"phone"|"device"|"dulali","machine":<string|null>,"waiting":<int>,"hub":"<url>","self":"<name>"}
+//     {"route":"phone"|"device","machine":<host|null>,"self":"<host>"}
 //
-// `self` is this machine as the hub names it (its tailnet name, e.g. "mini"),
-// which is not always qshell's own name for it (e.g. "mac-mini-m2"); when
-// present it is the name compared with `machine`.
+// `machine` and `self` are local hubs' hosts (e.g. "mini.taila27604.ts.net",
+// with ":<port>" off the usual port), read here as their first label ("mini"),
+// which is not always qshell's own name for the machine (e.g. "mac-mini-m2");
+// when present `self` is the name compared with `machine`.
 //
 // The bar draws only what that file says. A click runs `workflow route ...`
-// and waits for the agent's rewrite, so two machines changing the route at
-// once both end on whatever the hub holds.
+// and waits for the hub's rewrite, so two machines changing the route at
+// once both end on whatever the local hubs settle on.
 //
 // Glyphs are Material Design marks from the installed Symbols Nerd Font,
 // checked present with `fc-list :charset=<cp>`.
 
 var PHONE_GLYPH = "󰄜"; // md-cellphone
 var DEVICE_GLYPH = "󰍹"; // md-monitor
-var DULALI_GLYPH = "\u{f06a9}"; // md-robot
+// The hub web, which "open hub" opens.
+var HUB_URL = "https://hub.on-rexa.com";
+
+// A host's first label, without a port: "mini.taila27604.ts.net:8790" -> "mini".
+function shortMachine(host) {
+    return host.split(".")[0].split(":")[0];
+}
 
 // A file that is absent, unparseable or names an unknown route means the
-// agent is not running or predates the route, so the glyph hides.
+// local hub is not running or predates the route, so the glyph hides.
 function parseState(raw) {
     var data = null;
     try {
@@ -34,16 +41,15 @@ function parseState(raw) {
     }
     if (!data || typeof data !== "object" || Array.isArray(data))
         return { valid: false };
-    if (data.route !== "phone" && data.route !== "device" && data.route !== "dulali")
+    if (data.route !== "phone" && data.route !== "device")
         return { valid: false };
     var waiting = Math.floor(Number(data.waiting) || 0);
     return {
         valid: true,
         route: data.route,
-        machine: typeof data.machine === "string" ? data.machine : "",
+        machine: typeof data.machine === "string" ? shortMachine(data.machine) : "",
         waiting: waiting > 0 ? waiting : 0,
-        hub: typeof data.hub === "string" ? data.hub : "",
-        self: typeof data.self === "string" ? data.self : ""
+        self: typeof data.self === "string" ? shortMachine(data.self) : ""
     };
 }
 
@@ -52,8 +58,6 @@ function visible(state) {
 }
 
 function glyph(state) {
-    if (visible(state) && state.route === "dulali")
-        return DULALI_GLYPH;
     return visible(state) && state.route === "device" ? DEVICE_GLYPH : PHONE_GLYPH;
 }
 
@@ -63,7 +67,7 @@ function badge(waiting) {
     return waiting > 0 ? String(waiting) : "";
 }
 
-// "phone", "dulali", "device" (this machine) or "elsewhere" (Device on another machine).
+// "phone", "device" (this machine) or "elsewhere" (Device on another machine).
 // A device route with no machine named is read as this one's.
 // This machine's name as the hub knows it, else qshell's.
 function here(state, thisMachine) {
@@ -76,8 +80,6 @@ function currentChoice(state, thisMachine) {
     thisMachine = here(state, thisMachine);
     if (state.route === "phone")
         return "phone";
-    if (state.route === "dulali")
-        return "dulali";
     return state.machine === "" || state.machine === thisMachine ? "device" : "elsewhere";
 }
 
@@ -95,10 +97,10 @@ function waitingLine(waiting) {
 }
 
 function hubUrl(state) {
-    return visible(state) ? state.hub : "";
+    return visible(state) ? HUB_URL : "";
 }
 
-// The agent names this machine itself, so Device takes no argument here.
+// The local hub names this machine itself, so Device takes no argument here.
 function commandFor(choice) {
-    return ["workflow", "route", choice === "device" || choice === "dulali" ? choice : "phone"];
+    return ["workflow", "route", choice === "device" ? choice : "phone"];
 }

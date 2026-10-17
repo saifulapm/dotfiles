@@ -8,11 +8,11 @@ import "QuestionsModel.js" as QuestionsModel
 // or this Device, and how many wait. ONE instance however many screens carry
 // the widget.
 //
-// The workflow agent owns the truth and writes it to
-// $XDG_RUNTIME_DIR/workflow-route.json every 5 s; this service only watches
-// that file. Setting the route runs `workflow route <choice>`, which posts to
-// the hub and rewrites the same file on success, so the glyph changes when
-// the file does and never on the click alone.
+// This machine's local hub owns the truth and writes it to
+// $XDG_RUNTIME_DIR/workflow-route.json at its start and on every change; this
+// service only watches that file. Setting the route runs `workflow route
+// <choice>`, which tells the local hub, and the hub rewrites the same file, so
+// the glyph changes when the file does and never on the click alone.
 QtObject {
     id: root
 
@@ -52,7 +52,7 @@ QtObject {
             root.present = true;
             root.state = Model.parseState(text());
         }
-        // No file means the agent is not running here, which hides the glyph.
+        // No file means the local hub is not running here, which hides the glyph.
         onLoadFailed: {
             root.present = false;
             root.state = Model.parseState("");
@@ -61,8 +61,8 @@ QtObject {
     }
 
     // A FileView on a path that does not exist yet never sees it appear, and
-    // the agent may start after the shell. So while the file is absent it is
-    // re-read on the agent's own 5 s cadence; once it exists the watch takes
+    // the local hub may start after the shell. So while the file is absent it
+    // is re-read every 5 s; once it exists the watch takes
     // over and this stops. A file read, no process.
     readonly property Timer absentPoll: Timer {
         interval: 5000

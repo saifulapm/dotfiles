@@ -6,9 +6,9 @@ import "RouteModel.js" as Model
 // Route: where the workflow hub sends its questions, as one bar button. A
 // phone mark while they go to the phone, a monitor mark while they go to a
 // device, and the waiting count beside it in the accent while any wait. The mark draws only what
-// the agent's route file says; with no file it hides.
+// the local hub's route file says; with no file it hides.
 //
-// Left click opens the panel with the three choices.
+// Left click opens the panel with the two choices.
 BarButton {
     id: rootItem
 
@@ -23,7 +23,7 @@ BarButton {
     readonly property string badgeText: Model.badge(route.waiting)
 
     visible: Model.visible(route.state)
-    tooltipText: "Questions: " + (route.state.route === "device" ? "Device" : route.state.route === "dulali" ? "Dulali" : "Phone") + ", " + Model.waitingLine(route.waiting)
+    tooltipText: "Questions: " + (route.state.route === "device" ? "Device" : "Phone") + ", " + Model.waitingLine(route.waiting)
 
     onTapped: {
         if (panelLoader.status === Loader.Null)

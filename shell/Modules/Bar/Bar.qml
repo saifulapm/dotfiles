@@ -812,7 +812,7 @@ Scope {
         return sharedService("sync", hubSyncServiceComponent, {});
     }
 
-    // No gate: the route service watches the workflow agent's route file and
+    // No gate: the route service watches the local hub's route file and
     // starts a process only on a click. The machine id is a binding because
     // Sync reads ~/.config/qshell/machine asynchronously.
     function routeService() {
