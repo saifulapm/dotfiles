@@ -30,6 +30,7 @@ rev=$(git -C "$src" rev-parse HEAD 2>/dev/null) || exit 0
 grep -qs '^HUB_STORE_TOKEN=' "$env" || exit 0
 [ "$(cat "$stamp" 2>/dev/null)" = "$rev" ] && exit 0
 command -v hub >/dev/null 2>&1 || { warn "no hub binary yet — skipping"; exit 0; }
+command -v gh >/dev/null 2>&1 || { warn "no gh for the cloud-bins release — skipping"; exit 0; }
 
 if ! command -v cargo-zigbuild >/dev/null 2>&1; then
   cargo install --quiet --locked cargo-zigbuild || { warn "cargo install cargo-zigbuild failed"; exit 0; }
