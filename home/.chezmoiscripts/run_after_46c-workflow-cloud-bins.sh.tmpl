@@ -3,7 +3,9 @@
 # The x86_64 mem and hub that cloud sessions run, built here and put in the
 # store's /store/dl, each beside a .sha256 that the cloud's mem checks once a
 # boot (workflow cloud-setup), so a new build reaches cloud sessions with no
-# new setup script. The mini only: one machine publishes. Cloud VMs are
+# new setup script; and on the workflow repo's public cloud-bins release,
+# where the setup bakes them from, since claude.ai gives the setup none of
+# the store's secrets. The mini only: one machine publishes. Cloud VMs are
 # x86_64 and every machine here is arm64, so this is a cross build, with
 # cargo-zigbuild and a zig pinned in its own venv (the manifest keeps zig off
 # every machine; its note says why). After 46-workflow advances and builds the
@@ -58,6 +60,22 @@ for name in mem hub; do
     hub share put-bin "$name-x86_64.sha256" "$sum" >/dev/null) ||
     { warn "putting $name-x86_64 in the store failed; the next apply tries again"; exit 0; }
 done
+# The release is created once and keeps only the newest build.
+repo=saifulapm/workflow
+assets=$state/release
+mkdir -p "$assets"
+for name in mem hub; do
+  cp "$src/build/x86/$target/release/$name" "$assets/$name-x86_64"
+  cp "$state/$name-x86_64.sha256" "$assets/"
+done
+if ! gh release view cloud-bins -R "$repo" >/dev/null 2>&1; then
+  gh release create cloud-bins -R "$repo" --prerelease --title "Cloud binaries" \
+    --notes "The x86_64 mem and hub that cloud sessions run, rebuilt by the mini at every revision of main." >/dev/null ||
+    { warn "creating the cloud-bins release failed; the next apply tries again"; exit 0; }
+fi
+gh release upload cloud-bins -R "$repo" --clobber "$assets"/mem-x86_64 "$assets"/hub-x86_64 \
+  "$assets"/mem-x86_64.sha256 "$assets"/hub-x86_64.sha256 >/dev/null ||
+  { warn "uploading to the cloud-bins release failed; the next apply tries again"; exit 0; }
 printf '%s\n' "$rev" >"$stamp"
-echo "workflow-cloud-bins: mem and hub for x86_64 at ${rev:0:7} are in the store"
+echo "workflow-cloud-bins: mem and hub for x86_64 at ${rev:0:7} are in the store and on the cloud-bins release"
 {{ end -}}
