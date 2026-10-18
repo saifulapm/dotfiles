@@ -59,7 +59,7 @@ export function checkTokens(t) {
 }
 
 const CURVES = {
-  spring: 'spring damping-ratio=0.8 stiffness=600 epsilon=0.0001',
+  spring: 'spring damping-ratio=0.72 stiffness=380 epsilon=0.0001',
   snappy: 'duration-ms 120\n        curve "ease-out-expo"',
   ease: 'duration-ms 200\n        curve "ease-out-cubic"',
   typewriter: 'duration-ms 90\n        curve "linear"',
@@ -68,23 +68,29 @@ const CURVES = {
 
 export function renderNiri(t) {
   const c = t.color;
+  const n = t.niri;
   const frameColor = t.primitive.frame === 'glow' ? c.accent : c.ink;
-  const border = t.primitive.frame === 'none'
+  const border = t.primitive.frame === 'none' || !n.border
     ? 'border {\n        off\n    }'
-    : `border {\n        on\n        width ${t.niri.border}\n        active-color "${frameColor}"\n        inactive-color "${c.muted}"\n    }`;
-  const shadow = {
-    soft: `shadow {\n        on\n        softness 30\n        spread 2\n    }`,
-    'hard-offset': `shadow {\n        on\n        softness 0\n        spread 0\n        offset x=2 y=2\n        color "${c.ink}"\n        inactive-color "${c.muted}"\n    }`,
-    none: 'shadow {\n        off\n    }',
-  }[t.primitive.shadow];
+    : `border {\n        on\n        width ${n.border}\n        active-color "${frameColor}"\n        inactive-color "${n.border_inactive ?? c.muted}"\n    }`;
+  const ring = n.ring_width
+    ? `focus-ring {\n        on\n        width ${n.ring_width}\n        active-color "${n.ring_color ?? c.accent}"\n    }`
+    : 'focus-ring {\n        off\n    }';
+  // The glow of a glow frame is niri's shadow, so the shadow follows the [niri] keys, not the shadow primitive.
+  const [ox, oy] = n.shadow_offset ?? [0, 0];
+  const shadow = n.shadow_color
+    ? [
+      'shadow {', '        on', `        softness ${n.shadow_softness ?? 30}`, `        spread ${n.shadow_spread ?? 0}`,
+      `        offset x=${ox} y=${oy}`, `        color "${n.shadow_color}"`,
+      ...(n.shadow_inactive ? [`        inactive-color "${n.shadow_inactive}"`] : []), '    }',
+    ].join('\n')
+    : 'shadow {\n        off\n    }';
   const radius = t.primitive.corner === 'round' ? 14 : 0;
   const curve = CURVES[t.primitive.motion];
   return `layout {
     gaps ${t.niri.gaps}
     background-color "${c.paper}"
-    focus-ring {
-        off
-    }
+    ${ring}
     ${border}
     ${shadow}
     // Windows start 56 px down and 32 px in, below the margins, as on the approved artboard.

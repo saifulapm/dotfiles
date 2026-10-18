@@ -27,3 +27,14 @@ test('an unknown theme exits non-zero and names it', () => {
     (e) => /theme nope/.test(e.stderr.toString()),
   );
 });
+
+test('every theme renders a niri fragment niri accepts', (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-theme-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  for (const name of ['paper', 'artboard', 'blueprint']) {
+    execFileSync('node', [cli, name], { env: { ...process.env, XDG_STATE_HOME: state } });
+    const config = join(state, 'config.kdl');
+    writeFileSync(config, `include "${join(state, 'dots/theme-out/niri.kdl')}"\n`);
+    execFileSync('niri', ['validate', '-c', config], { stdio: 'pipe' });
+  }
+});

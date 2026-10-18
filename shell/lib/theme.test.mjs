@@ -39,8 +39,7 @@ test('the niri fragment sets the paper as background and the ink frame', () => {
   assert.match(kdl, /background-color "#F1E9D8"/);
   assert.match(kdl, /focus-ring \{\s*off\s*\}/);
   assert.match(kdl, /border \{\s*on\s*width 1\s*active-color "#1C1915"/);
-  assert.match(kdl, /softness 0/);
-  assert.match(kdl, /offset x=2 y=2/);
+  assert.match(kdl, /shadow \{\s*on\s*softness 0\s*spread 0\s*offset x=3 y=3\s*color "#1C1915"/);
   assert.match(kdl, /geometry-corner-radius 0/);
 });
 
@@ -92,4 +91,27 @@ test('a niri colour that is not #RRGGBB or #RRGGBBAA is refused by name', () => 
   const bad = structuredClone(paper);
   bad.niri.shadow_color = 'ink';
   assert.throws(() => validateTheme(bad), /niri\.shadow_color/);
+});
+
+test('Artboard has no border, a 2 px blue focus ring, a soft long shadow and radius 14', () => {
+  const kdl = renderNiri(load('artboard'));
+  assert.match(kdl, /border \{\s*off\s*\}/);
+  assert.match(kdl, /focus-ring \{\s*on\s*width 2\s*active-color "#3D5AFE"/);
+  assert.match(kdl, /shadow \{\s*on\s*softness 40\s*spread 0\s*offset x=0 y=18\s*color "#15171B2E"/);
+  assert.match(kdl, /geometry-corner-radius 14/);
+  assert.match(kdl, /spring damping-ratio=0\.72 stiffness=380/);
+});
+
+test('Blueprint frames the focused window in cyan, the others in #2E5A72, and glows only the focused one', () => {
+  const kdl = renderNiri(load('blueprint'));
+  assert.match(kdl, /border \{\s*on\s*width 1\s*active-color "#7FE3F0"\s*inactive-color "#2E5A72"/);
+  assert.match(kdl, /focus-ring \{\s*off\s*\}/);
+  assert.match(kdl, /shadow \{\s*on\s*softness 18\s*spread 0\s*offset x=0 y=0\s*color "#7FE3F040"\s*inactive-color "#00000000"/);
+  assert.match(kdl, /geometry-corner-radius 0/);
+});
+
+test('a theme without shadow keys gets no shadow', () => {
+  const t = load('paper');
+  delete t.niri.shadow_color;
+  assert.match(renderNiri(t), /shadow \{\s*off\s*\}/);
 });
