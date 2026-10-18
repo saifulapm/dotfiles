@@ -75,6 +75,7 @@ check "Esc answers nothing" eval '! grep -q Q3 "$calls"'
 check "Esc gives the keyboard back" island_focus None
 
 until_ok 6000 mode_is rest
+check "with the questions answered or put away and the hi gone, the island rests" mode_is rest
 mod_i
 until_ok 2000 mode_is calendar
 state=$(island)

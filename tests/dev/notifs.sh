@@ -31,6 +31,7 @@ start=$(now_ms)
 for i in $(seq 1 20); do notify-send "burst $i"; done
 sent=$(($(now_ms) - start))
 until_ok 1000 eval 'notifs | jq -e ".summaries[0] == \"burst 20\"" >/dev/null'
+check "the 20 went out within 1 s (${sent} ms)" test "$sent" -le 1000
 check "20 notifications sent in ${sent} ms all reach the history" eval 'notifs | jq -e "[.summaries[0:20][] | select(startswith(\"burst \"))] | length == 20" >/dev/null'
 check "the island ends showing the 20th" eval 'island | jq -e ".text | test(\"burst 20$\")" >/dev/null'
 
