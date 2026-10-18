@@ -57,6 +57,7 @@ test('the month grid starts on Monday and pads the first and last weeks', () => 
   assert.deepEqual(g.weeks[0], [null, null, null, 1, 2, 3, 4]);
   assert.deepEqual(g.weeks.at(-1), [26, 27, 28, 29, 30, 31, null]);
   assert.equal(g.weeks.length, 5);
+  assert.deepEqual(g.cells, [].concat(...g.weeks));
 });
 
 test('a month that starts on Sunday puts the 1st last in its first week', () => {

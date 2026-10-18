@@ -11,3 +11,14 @@ test('no shared module uses object spread', () => {
     .filter((f) => /\{\s*\.\.\./.test(readFileSync(dir + f, 'utf8')));
   assert.deepEqual(found, []);
 });
+
+// Array.prototype.flat and flatMap are ES2019, which QML's engine lacks, so a binding that calls one throws.
+const qml = new URL('..', import.meta.url).pathname;
+
+test('no shared module or QML file calls flat or flatMap', () => {
+  const files = readdirSync(qml, { recursive: true }).filter((f) => (f.endsWith('.qml') || f.endsWith('.mjs')) && !f.endsWith('.test.mjs'));
+  assert.deepEqual(
+    files.filter((f) => /\.flat(Map)?\(/.test(readFileSync(qml + f, 'utf8'))),
+    [],
+  );
+});

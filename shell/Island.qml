@@ -230,7 +230,7 @@ PanelWindow {
                 width: parent.width
 
                 Repeater {
-                    model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].concat((island.grid?.weeks ?? []).flat())
+                    model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].concat(island.grid?.cells ?? [])
 
                     Rectangle {
                         required property var modelData

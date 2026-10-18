@@ -46,7 +46,7 @@ export function monthGrid(year, month) {
   while (cells.length % 7) cells.push(null);
   const weeks = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-  return { title: `${MONTHS[month]} ${year}`, weeks };
+  return { title: `${MONTHS[month]} ${year}`, weeks, cells };
 }
 
 export function shiftMonth(year, month, by) {
