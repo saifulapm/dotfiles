@@ -81,6 +81,19 @@ ShellRoot {
         id: notifsService
     }
 
+    IpcHandler {
+        target: "notifs"
+
+        function dnd(on: bool): void {
+            notifsService.setDnd(on);
+        }
+
+        function state(): string {
+            const h = notifsService.history;
+            return JSON.stringify({ dnd: notifsService.dnd, count: h.length, summaries: h.map(e => e.summary) });
+        }
+    }
+
     Root.Island {
         id: island
         theme: themeService
