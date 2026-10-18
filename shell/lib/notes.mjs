@@ -30,7 +30,7 @@ export function sectionCommand(text) {
   return m && !m[1].includes('\n') && m[1].trim() ? m[1].trim() : null;
 }
 
-function useSection(store, name) {
+export function useSection(store, name) {
   if (store.sections.some((s) => s.name === name)) return set(store, { activeSection: name });
   const order = Math.max.apply(null, store.sections.map((s) => s.order)) + 1;
   return set(store, { activeSection: name, sections: store.sections.concat([{ name, order }]) });

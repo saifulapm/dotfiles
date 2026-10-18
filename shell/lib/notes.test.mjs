@@ -223,3 +223,10 @@ test('dragging offers one format only', () => {
   assert.deepEqual(dragOffer(mk('a', { text: 'hi', attachments: [PNG] })), { 'text/plain': 'hi' });
   assert.deepEqual(chipOffer(PNG, '/d/files'), { 'text/uri-list': 'file:///d/files/abc123.png' });
 });
+
+test('switching to a section creates it when it is new', async () => {
+  const { useSection } = await import('./notes.mjs');
+  const s = useSection(emptyStore(), 'later');
+  assert.equal(s.activeSection, 'later');
+  assert.deepEqual(useSection(s, 'inbox').sections, s.sections);
+});
