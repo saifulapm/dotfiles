@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+# A UPower laptop battery at 82% on $DBUS_SYSTEM_BUS_ADDRESS; change it with org.dots.FakeUPower.Set(percentage, charging) on /org/freedesktop/UPower.
+import os
+import sys
+
+REAL_SYSTEM_BUS = "unix:path=/run/dbus/system_bus_socket"
+address = os.environ.get("DBUS_SYSTEM_BUS_ADDRESS", "")
+if address in ("", REAL_SYSTEM_BUS):
+    sys.exit("dev-fake-upower: DBUS_SYSTEM_BUS_ADDRESS must be a test bus, not unset or the real system bus")
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+UPOWER = "org.freedesktop.UPower"
+DEVICE = "org.freedesktop.UPower.Device"
+PROPS = "org.freedesktop.DBus.Properties"
+DISPLAY = "/org/freedesktop/UPower/devices/DisplayDevice"
+CHARGING, DISCHARGING, BATTERY = 1, 2, 2
+
+
+class Display(dbus.service.Object):
+    def __init__(self, bus, percentage, charging):
+        super().__init__(bus, DISPLAY)
+        self.props = {
+            "Type": dbus.UInt32(BATTERY),
+            "PowerSupply": dbus.Boolean(True),
+            "Energy": dbus.Double(percentage / 2),
+            "EnergyFull": dbus.Double(50.0),
+            "EnergyRate": dbus.Double(5.0),
+            "TimeToEmpty": dbus.Int64(0),
+            "TimeToFull": dbus.Int64(0),
+            "Percentage": dbus.Double(percentage),
+            "IsPresent": dbus.Boolean(True),
+            "State": dbus.UInt32(CHARGING if charging else DISCHARGING),
+            "Capacity": dbus.Double(100.0),
+            "IconName": dbus.String("battery-good-symbolic"),
+            "NativePath": dbus.String(""),
+            "Model": dbus.String(""),
+        }
+
+    def set(self, percentage, charging):
+        changed = {
+            "Percentage": dbus.Double(percentage),
+            "Energy": dbus.Double(percentage / 2),
+            "State": dbus.UInt32(CHARGING if charging else DISCHARGING),
+        }
+        self.props.update(changed)
+        self.PropertiesChanged(DEVICE, changed, [])
+
+    @dbus.service.method(PROPS, in_signature="ss", out_signature="v")
+    def Get(self, interface, name):
+        return self.props[name]
+
+    @dbus.service.method(PROPS, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        return self.props if interface == DEVICE else {}
+
+    @dbus.service.signal(PROPS, signature="sa{sv}as")
+    def PropertiesChanged(self, interface, changed, invalidated):
+        pass
+
+
+class UPower(dbus.service.Object):
+    def __init__(self, bus, display):
+        super().__init__(bus, "/org/freedesktop/UPower")
+        self.display = display
+        self.props = {"OnBattery": dbus.Boolean(True), "DaemonVersion": dbus.String("1.90.0"), "LidIsClosed": dbus.Boolean(False), "LidIsPresent": dbus.Boolean(True)}
+
+    @dbus.service.method(UPOWER, out_signature="ao")
+    def EnumerateDevices(self):
+        return dbus.Array([], signature="o")
+
+    @dbus.service.method(UPOWER, out_signature="o")
+    def GetDisplayDevice(self):
+        return dbus.ObjectPath(DISPLAY)
+
+    @dbus.service.signal(UPOWER, signature="o")
+    def DeviceAdded(self, path):
+        pass
+
+    @dbus.service.signal(UPOWER, signature="o")
+    def DeviceRemoved(self, path):
+        pass
+
+    @dbus.service.method(PROPS, in_signature="ss", out_signature="v")
+    def Get(self, interface, name):
+        return self.props[name]
+
+    @dbus.service.method(PROPS, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        return self.props if interface == UPOWER else {}
+
+    @dbus.service.signal(PROPS, signature="sa{sv}as")
+    def PropertiesChanged(self, interface, changed, invalidated):
+        pass
+
+    @dbus.service.method("org.dots.FakeUPower", in_signature="db")
+    def Set(self, percentage, charging):
+        self.display.set(percentage, charging)
+        changed = {"OnBattery": dbus.Boolean(not charging)}
+        self.props.update(changed)
+        self.PropertiesChanged(UPOWER, changed, [])
+
+
+DBusGMainLoop(set_as_default=True)
+bus = dbus.bus.BusConnection(address)
+display = Display(bus, 82.0, False)
+upower = UPower(bus, display)
+name = dbus.service.BusName(UPOWER, bus, do_not_queue=True)
+GLib.MainLoop().run()
