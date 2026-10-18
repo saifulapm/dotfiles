@@ -33,7 +33,15 @@ FloatingWindow {
     readonly property string query: search.text
     readonly property var cards: query ? N.search(store, query) : N.sectionNotes(store, store.activeSection)
     readonly property var current: cards[Math.min(selected, cards.length - 1)] ?? null
-    readonly property var picks: N.sectionNames(store).filter(s => s.toLowerCase().indexOf(pickInput.text.trim().toLowerCase()) >= 0)
+    readonly property string typedName: pickInput.text.trim()
+    // An exact name comes first, and a typed name that is no section yet is offered last, so work never lands in homework.
+    readonly property var picks: {
+        const names = N.sectionNames(store);
+        const found = names.filter(s => s.toLowerCase().indexOf(typedName.toLowerCase()) >= 0);
+        const exact = found.filter(s => s === typedName);
+        const rest = exact.concat(found.filter(s => s !== typedName));
+        return typedName && !exact.length ? rest.concat([typedName]) : rest;
+    }
     readonly property var niriWindow: niri.state.windows.find(w => w.title === "Notes" && w.app_id === "org.quickshell") ?? null
     readonly property bool focused: niriWindow?.is_focused ?? false
 
@@ -63,10 +71,13 @@ FloatingWindow {
         niriAction.run(["focus-window-previous"], false);
     }
 
+    // Unpinning a Notes you are not in hides it, as losing focus would have.
     function pin() {
         pinned = !pinned;
         if (pinned && !shown)
             show();
+        else if (!pinned && shown && !focused)
+            hide();
     }
 
     function hide() {
@@ -130,9 +141,8 @@ FloatingWindow {
         pickInput.forceActiveFocus();
     }
 
-    // A typed name that matches no section makes a new one.
     function pick() {
-        const name = picks[pickSelected] ?? pickInput.text.trim();
+        const name = picks[pickSelected];
         if (name) {
             if (picking === "switch") {
                 notes.save(N.useSection(store, name));
@@ -652,7 +662,7 @@ FloatingWindow {
                         required property string modelData
                         required property int index
                         textFormat: Text.PlainText
-                        text: (index === win.pickSelected ? "› " : "  ") + (win.look ? win.look.sectionLabel(modelData) : modelData)
+                        text: (index === win.pickSelected ? "› " : "  ") + (win.look ? win.look.sectionLabel(modelData) : modelData) + (win.store.sections.some(s => s.name === modelData) ? "" : "  +")
                         color: index === win.pickSelected ? (win.c.accent ?? "red") : (win.c.ink ?? "black")
                         font.family: win.look ? win.look.section.font : ""
                         font.pixelSize: 14

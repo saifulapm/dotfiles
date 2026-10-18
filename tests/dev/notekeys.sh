@@ -96,4 +96,19 @@ key d
 until_ok 1000 notes_is ".count == $((n - 1))"
 check "d deletes it, leaving a tombstone" notes_is '[.notes[] | select(.deleted)] | length == 2'
 
+pick_section() {
+  key -M ctrl k -m ctrl
+  until_ok 1000 notes_is '.mode == "picker"'
+  key "$1"
+  [ -z "${2:-}" ] || key -k "$2"
+  key -k Return
+  until_ok 1000 notes_is '.mode == "list"'
+}
+pick_section homework
+pick_section work Down
+check "a typed name that only partly matches can still make its own section" notes_is '.activeSection == "work"'
+pick_section inbox
+pick_section work
+check "an exact section name wins over one that contains it" notes_is '.activeSection == "work"'
+
 exit $((fails > 0))

@@ -69,10 +69,11 @@ typed_ok() { [ "$(cat "$typed" 2>/dev/null)" = "echo ok" ]; }
 until_ok 3000 typed_ok
 check "with Notes pinned, typing echo ok lands in foot" typed_ok
 check "and nothing reached the composer" notes_is '.composer == ""'
-niri msg action spawn -- qs ipc call notes pin
-until_ok 2000 notes_is '.pinned | not'
-niri msg action focus-window-previous
+niri msg action spawn -- foot
+until_ok 5000 foot_up
+mod_shift_n
 until_ok 2000 notes_gone
+check "unpinning Notes while foot has focus hides it" notes_is '(.pinned | not) and (.open | not)'
 timeout 0.5 qs ipc call notes open
 until_ok 3000 notes_focused
 check "qs ipc call notes open shows and focuses Notes" notes_is '.open and .focused'

@@ -42,4 +42,11 @@ capture
 until_ok 2000 notes_is '.count == 2'
 check "a 12,000-character selection is stored as 10,000" notes_is '[.notes[] | .text | length] | max == 10000'
 
+printf '{"notes": [' >"$store"
+wl-copy --primary 'after the store broke'
+sleep 0.3
+capture
+check "a store that does not parse is never saved over" until_ok 1000 island_says 'Notes store unreadable'
+check "and the file is as it was" test "$(cat "$store")" = '{"notes": ['
+
 exit $((fails > 0))

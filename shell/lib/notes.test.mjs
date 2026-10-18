@@ -8,8 +8,9 @@ test('a new store has one inbox section and no notes', () => {
   assert.deepEqual(emptyStore(), { version: 1, activeSection: 'inbox', sections: [{ name: 'inbox', order: 0 }], notes: [] });
 });
 
-test('a missing or broken store file reads as a new store', () => {
-  for (const t of ['', '{', '[]', 'null', '{"version":1}']) assert.deepEqual(parseStore(t), emptyStore());
+test('an empty store file reads as a new store, and a broken one as null, so it is never saved over', () => {
+  for (const t of ['', '  \n']) assert.deepEqual(parseStore(t), emptyStore());
+  for (const t of ['{', '[]', 'null', '{"version":1}', '{"sections":[],"notes":[]}']) assert.equal(parseStore(t), null);
   const s = Object.assign(emptyStore(), { notes: [{ id: 'a', section: 'inbox', text: 'x' }] });
   assert.equal(parseStore(JSON.stringify(s)).notes[0].text, 'x');
 });
@@ -247,4 +248,13 @@ test('the first image of a note is what Y copies', async () => {
   const note = { attachments: [{ sha256: 'cc', name: 'a.pdf', mime: 'application/pdf', size: 1 }, { sha256: 'dd', name: 'b.png', mime: 'image/png', size: 1 }] };
   assert.equal(firstImage(note).sha256, 'dd');
   assert.equal(firstImage({ attachments: [] }), null);
+});
+
+test('a capture equal to the last one is made again once that note is deleted', async () => {
+  const { deleteNotes } = await import('./notes.mjs');
+  const r1 = capture(emptyStore(), 'same', '', T, 'c1');
+  const gone = deleteNotes(r1.store, ['c1'], T + 1);
+  const r2 = capture(gone, 'same', r1.last, T + 2, 'c2');
+  assert.equal(r2.toast, 'Captured');
+  assert.equal(r2.store.notes.filter((n) => !n.deleted).length, 1);
 });

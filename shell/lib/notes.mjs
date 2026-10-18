@@ -6,14 +6,16 @@ const set = (o, fields) => Object.assign({}, o, fields);
 
 export const emptyStore = () => ({ version: 1, activeSection: 'inbox', sections: [{ name: 'inbox', order: 0 }], notes: [] });
 
+// An empty file is a new store; a broken one is null, so nothing ever saves over the notes it holds.
 export function parseStore(text) {
+  if (!text.trim()) return emptyStore();
   let data = null;
   try {
     data = JSON.parse(text);
   } catch (e) {
-    return emptyStore();
+    return null;
   }
-  if (data === null || typeof data !== 'object' || !Array.isArray(data.sections) || !Array.isArray(data.notes) || !data.sections.length) return emptyStore();
+  if (data === null || typeof data !== 'object' || !Array.isArray(data.sections) || !Array.isArray(data.notes) || !data.sections.length) return null;
   return data;
 }
 
@@ -54,7 +56,7 @@ const newest = (a, b) => b.createdAt - a.createdAt;
 export function capture(store, selection, last, now, id) {
   if (!selection.trim()) return { store, toast: 'Nothing selected', last };
   const text = selection.slice(0, CAPTURE_MAX);
-  if (text === last) return { store, toast: 'Already captured', last };
+  if (text === last && store.notes.some((n) => !n.deleted && n.text === text)) return { store, toast: 'Already captured', last };
   return { store: addNote(store, text, now, id), toast: 'Captured', last: text };
 }
 
