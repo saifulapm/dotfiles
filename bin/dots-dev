@@ -23,6 +23,8 @@ export DOTS_RECORDINGS_DIR=$D/recordings
 export DOTS_WORKFLOW=$repo/bin/dev-fake-workflow
 # The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.
 export DOTS_NIRI_BINDS=$repo/home/dot_config/niri/binds.kdl
+# The lock's PAM service accepts only dev/pam-test-password's test password, and pam_exec needs its absolute path.
+export DOTS_PAM_DIR=$D/pam.d
 # TMUX would point every tmux call at the live server and ignore TMUX_TMPDIR.
 unset TMUX
 dconf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/dconf
@@ -62,6 +64,8 @@ trap 'exit 143' TERM
 
 mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME" "$TMUX_TMPDIR" "$DOTS_CHROMIUM_POLICY_DIR" "$PIPEWIRE_RUNTIME_DIR"
 printf 'user-db:%s\n' "$dconf_name" >"$DCONF_PROFILE"
+mkdir -p "$DOTS_PAM_DIR"
+printf 'auth required pam_exec.so expose_authtok quiet %s\naccount required pam_permit.so\n' "$repo/dev/pam-test-password" >"$DOTS_PAM_DIR/dots-lock"
 # Fonts are read, never written, so the user's own stay visible to the nested shell.
 [ -d "$user_data/fonts" ] && ln -s "$user_data/fonts" "$XDG_DATA_HOME/fonts"
 printf '%s\n' "${DOTS_DEV_THEME:-paper}" >"$XDG_STATE_HOME/dots/theme"
