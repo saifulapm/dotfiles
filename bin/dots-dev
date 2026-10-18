@@ -9,6 +9,13 @@ user_data=${XDG_DATA_HOME:-$HOME/.local/share}
 export XDG_STATE_HOME=$D/state XDG_DATA_HOME=$D/data QS_CONFIG_PATH=$repo/shell
 # niri's spawn-at-startup finds bin/dots-dev-shell on PATH.
 export PATH=$repo/bin:$PATH
+# The nested session must never reach the live tmux server, dconf database or Chromium policy dir.
+dconf_name=dots_dev_${D##*-}
+dconf_name=${dconf_name//[^[:alnum:]_]/_}
+export TMUX_TMPDIR=$D/tmux DCONF_PROFILE=$D/dconf-profile DOTS_CHROMIUM_POLICY_DIR=$D/chromium-policy
+# TMUX would point every tmux call at the live server and ignore TMUX_TMPDIR.
+unset TMUX
+dconf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/dconf
 session=
 
 cleanup() {
@@ -20,13 +27,16 @@ cleanup() {
     pkill -TERM -P "$session" -x niri 2>/dev/null || true
     wait "$session" 2>/dev/null || true
   fi
+  tmux kill-server 2>/dev/null || true
+  rm -f "$dconf_dir/$dconf_name" "${XDG_RUNTIME_DIR:-/nonexistent}/dconf/$dconf_name"
   rm -rf "$D"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME"
+mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME" "$TMUX_TMPDIR" "$DOTS_CHROMIUM_POLICY_DIR"
+printf 'user-db:%s\n' "$dconf_name" >"$DCONF_PROFILE"
 # Fonts are read, never written, so the user's own stay visible to the nested shell.
 [ -d "$user_data/fonts" ] && ln -s "$user_data/fonts" "$XDG_DATA_HOME/fonts"
 printf 'paper\n' >"$XDG_STATE_HOME/dots/theme"
