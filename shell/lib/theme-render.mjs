@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
-import { validateTheme, renderNiri, renderFoot } from './theme.mjs';
+import { validateTheme, renderNiri, renderFoot, renderFootOsc } from './theme.mjs';
 import { renderTmux, renderKak, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium } from './apps.mjs';
 
 const name = process.argv[2];
@@ -26,6 +26,7 @@ const files = {
   'shell.json': JSON.stringify(theme, null, 2) + '\n',
   'niri.kdl': renderNiri(theme),
   'foot.ini': renderFoot(theme),
+  'foot.osc': renderFootOsc(theme),
   'tmux.conf': renderTmux(theme),
   'dots.kak': renderKak(theme),
   'yazi-theme.toml': renderYazi(theme),

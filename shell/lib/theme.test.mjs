@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { validateTheme, checkTokens, renderNiri, renderFoot, contrast } from './theme.mjs';
+import { validateTheme, checkTokens, renderNiri, renderFoot, renderFootOsc, contrast } from './theme.mjs';
 
 const paper = parseToml(readFileSync(new URL('../../themes/paper/theme.toml', import.meta.url), 'utf8'));
 
@@ -114,4 +114,11 @@ test('a theme without shadow keys gets no shadow', () => {
   const t = load('paper');
   delete t.niri.shadow_color;
   assert.match(renderNiri(t), /shadow \{\s*off\s*\}/);
+});
+
+test('the foot OSC string sets the 16 colours, then foreground and background', () => {
+  const osc = renderFootOsc(load('blueprint'));
+  assert.ok(osc.startsWith('\x1b]4;0;#1B2B44\x1b\\'));
+  assert.ok(osc.includes('\x1b]4;15;#FFFFFF\x1b\\'));
+  assert.ok(osc.endsWith('\x1b]10;#D6F4F8\x1b\\\x1b]11;#0A1526\x1b\\'));
 });

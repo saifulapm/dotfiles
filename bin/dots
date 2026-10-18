@@ -47,11 +47,72 @@ dots: installed. Next:
 EOF
 }
 
+# Pids of the processes named $1 that run on this Wayland display, so a nested session never reaches the live one.
+session_pids() {
+  local pid
+  for pid in $(pgrep -x "$1"); do
+    grep -qzxF "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}" "/proc/$pid/environ" 2>/dev/null && echo "$pid"
+  done
+}
+
+reload_foot() {
+  local foot child pts
+  for foot in $(session_pids foot); do
+    for child in $(pgrep -P "$foot"); do
+      pts=$(readlink "/proc/$child/fd/0" 2>/dev/null) || continue
+      [[ $pts == /dev/pts/* ]] && cat "$1/foot.osc" >"$pts"
+    done
+  done
+}
+
+reload_kak() {
+  local pid session sessions
+  sessions=$(kak -l 2>/dev/null) || return 0
+  for pid in $(session_pids kak); do
+    # A server without -s is named by its pid.
+    session=$(tr '\0' '\n' <"/proc/$pid/cmdline" | sed -n '/^-s$/{n;p;q}')
+    session=${session:-$pid}
+    grep -qxF "$session" <<<"$sessions" && echo 'colorscheme dots' | kak -p "$session"
+  done
+}
+
+reload_chromium() {
+  local dir=${DOTS_CHROMIUM_POLICY_DIR:-/etc/chromium/policies/managed}
+  [[ -w $dir ]] || return 0
+  cmp -s "$1/chromium.json" "$dir/color.json" || cp "$1/chromium.json" "$dir/color.json"
+  if [[ -n $(session_pids chromium-browse) ]]; then
+    chromium-browser --refresh-platform-policy --no-startup-window >/dev/null 2>&1 &
+  fi
+}
+
+theme() {
+  local name=${1:-} t0=${DOTS_SWITCH_T0:-$(date +%s%3N)}
+  [[ -n $name ]] || die "usage: dots theme <name>"
+  local repo state out from
+  repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+  state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
+  out=$state/theme-out
+  from=$(cat "$state/theme" 2>/dev/null || true)
+  node "$repo/shell/lib/theme-render.mjs" "$name" || exit 1
+  echo "$name" >"$state/theme"
+
+  local scheme=prefer-light
+  [[ $(jq -r .mode "$out/shell.json") == dark ]] && scheme=prefer-dark
+  reload_foot "$out" &
+  { tmux has-session 2>/dev/null && tmux source-file "$out/tmux.conf"; } &
+  { command -v kak >/dev/null && reload_kak; } &
+  gsettings set org.gnome.desktop.interface color-scheme "$scheme" &
+  reload_chromium "$out" &
+  wait
+  printf '{"from":"%s","to":"%s","ms":%d}\n' "$from" "$name" $(($(date +%s%3N) - t0)) >"$state/theme-switch.json"
+}
+
 main() {
   case ${1:-} in
     install) install ;;
+    theme) theme "${2:-}" ;;
     *)
-      echo "usage: dots install" >&2
+      echo "usage: dots install | dots theme <name>" >&2
       exit 2
       ;;
   esac

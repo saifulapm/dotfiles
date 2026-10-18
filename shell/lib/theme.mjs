@@ -127,3 +127,10 @@ export function renderFoot(t) {
   c.ansi.forEach((v, i) => lines.push(`${i < 8 ? 'regular' : 'bright'}${i % 8}=${hex(v)}`));
   return lines.join('\n') + '\n';
 }
+
+// Written to an open foot's pty, so it recolours without a restart (foot-ctlseqs(7): OSC 4, 10, 11).
+export function renderFootOsc(t) {
+  const osc = (body) => `\x1b]${body}\x1b\\`;
+  const c = t.color;
+  return c.ansi.map((v, i) => osc(`4;${i};${v}`)).join('') + osc(`10;${c.ink}`) + osc(`11;${c.surface}`);
+}

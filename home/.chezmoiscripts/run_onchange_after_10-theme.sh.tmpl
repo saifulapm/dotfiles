@@ -1,5 +1,5 @@
 #!/bin/bash
-# theme sources hash:{{ range concat (glob (joinPath .chezmoi.workingTree "themes/*/*")) (glob (joinPath .chezmoi.workingTree "shell/lib/theme*.mjs")) (list (joinPath .chezmoi.workingTree "shell/lib/toml.mjs")) }} {{ include . | sha256sum }}{{ end }}
+# theme sources hash:{{ range concat (glob (joinPath .chezmoi.workingTree "themes/*/*")) (glob (joinPath .chezmoi.workingTree "shell/lib/theme*.mjs")) (list (joinPath .chezmoi.workingTree "shell/lib/apps.mjs")) (list (joinPath .chezmoi.workingTree "shell/lib/toml.mjs")) }} {{ include . | sha256sum }}{{ end }}
 {{ template "lib.sh" . }}
 state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
 mkdir -p "$state"
