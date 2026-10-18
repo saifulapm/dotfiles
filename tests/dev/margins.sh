@@ -10,6 +10,10 @@ niri msg action spawn -- foot
 foot_focused() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot" and .is_focused)' >/dev/null; }
 until_ok 5000 foot_focused
 check "foot is focused" foot_focused
+# Between the margin rule at y=40 and the window top at y=56 there is only paper.
+strip=$(grim -s 1 -t ppm -g "40,44 10x10" - | mean_rgb)
+echo "     margin strip with foot open: $strip"
+check "foot opens below the margins" test "$strip" = "241 233 216"
 
 # foot's shell retitles the window once it starts, so the title is read again on every poll.
 left_is_foot() {

@@ -67,7 +67,16 @@ export function renderNiri(t) {
     }
     ${border}
     ${shadow}
+    // Windows start 56 px down and 32 px in, below the margins, as on the approved artboard.
+    struts {
+        top ${56 - t.niri.gaps}
+        bottom ${28 - t.niri.gaps}
+        left ${32 - t.niri.gaps}
+        right ${32 - t.niri.gaps}
+    }
 }
+
+prefer-no-csd
 
 window-rule {
     geometry-corner-radius ${radius}
