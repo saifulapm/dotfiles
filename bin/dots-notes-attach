@@ -1,0 +1,79 @@
+#!/usr/bin/env node
+// Copies the Wayland clipboard's image or files into an attachments folder, named by sha256, and prints a JSON array of what it did.
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ATTACH_MAX, attachRefusal, attachmentFile } from '../shell/lib/notes.mjs';
+
+const dir = process.argv[2];
+if (!dir) {
+  process.stderr.write('usage: dots-notes-attach <attachments-dir>\n');
+  process.exit(2);
+}
+
+const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+
+// A temp file in the same dir, then rename, so a half-written attachment never has its final name.
+function store(bytes, entry) {
+  mkdirSync(dir, { recursive: true });
+  const final = join(dir, attachmentFile(entry));
+  if (existsSync(final)) return;
+  const tmp = final + '.' + process.pid + '.tmp';
+  try {
+    writeFileSync(tmp, bytes);
+    renameSync(tmp, final);
+  } catch (e) {
+    try { unlinkSync(tmp); } catch {}
+    throw e;
+  }
+}
+
+const mimeOf = (name) => (/\.png$/i.test(name) ? 'image/png' : /\.jpe?g$/i.test(name) ? 'image/jpeg' : 'application/octet-stream');
+
+function attachBytes(bytes, name, mime) {
+  const entry = { sha256: sha256(bytes), name, mime, size: bytes.length };
+  store(bytes, entry);
+  return entry;
+}
+
+function fromFiles(list) {
+  const out = [];
+  for (const line of list.split('\n')) {
+    const url = line.replace(/\r$/, '');
+    if (!url.startsWith('file://')) continue;
+    let path;
+    try { path = fileURLToPath(url); } catch { continue; }
+    let st;
+    try { st = statSync(path); } catch { continue; }
+    if (!st.isFile()) continue;
+    const name = basename(path);
+    if (attachRefusal(st.size)) out.push({ refused: attachRefusal(st.size), name });
+    else out.push(attachBytes(readFileSync(path), name, mimeOf(name)));
+  }
+  return out;
+}
+
+function fromImage(type) {
+  const name = 'pasted.' + (type.split('/')[1].match(/^[a-z0-9]+/) ?? ['bin'])[0];
+  const r = spawnSync('wl-paste', ['--type', type], { maxBuffer: ATTACH_MAX + 1 });
+  if (r.error?.code === 'ENOBUFS') return [{ refused: attachRefusal(ATTACH_MAX + 1), name }];
+  if (r.status !== 0 || !r.stdout.length) return [];
+  return [attachBytes(r.stdout, name, type)];
+}
+
+function main() {
+  const types = spawnSync('wl-paste', ['--list-types'], { encoding: 'utf8' });
+  if (types.status !== 0) return [];
+  const listed = types.stdout.split('\n').map((s) => s.trim()).filter(Boolean);
+  if (listed.includes('text/uri-list')) {
+    const r = spawnSync('wl-paste', ['--type', 'text/uri-list'], { encoding: 'utf8' });
+    return r.status === 0 ? fromFiles(r.stdout) : [];
+  }
+  const images = listed.filter((t) => t.startsWith('image/'));
+  if (!images.length) return [];
+  return fromImage(images.includes('image/png') ? 'image/png' : images[0]);
+}
+
+process.stdout.write(JSON.stringify(main()) + '\n');
