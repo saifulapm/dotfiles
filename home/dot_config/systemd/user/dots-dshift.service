@@ -1,0 +1,11 @@
+[Unit]
+Description=dots double-Shift capture
+PartOf=graphical-session.target
+After=graphical-session.target
+# Restart=always must never give up, however often the watcher dies.
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=%h/.local/bin/dots-dshift
+Restart=always
+RestartSec=500ms

@@ -4,3 +4,4 @@ include "binds.kdl"
 include "rules.kdl"
 
 spawn-at-startup "systemctl" "--user" "start" "dots-shell.service"
+spawn-at-startup "systemctl" "--user" "start" "dots-dshift.service"

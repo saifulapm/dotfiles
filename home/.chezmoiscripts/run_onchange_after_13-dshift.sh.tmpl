@@ -1,0 +1,9 @@
+#!/bin/bash
+# watcher source hash: {{ joinPath .chezmoi.workingTree "bin/dots-dshift.c" | include | sha256sum }}
+{{ template "lib.sh" . }}
+mkdir -p "$HOME/.local/bin"
+gcc -O2 -Wall -o "$HOME/.local/bin/dots-dshift" {{ joinPath .chezmoi.workingTree "bin/dots-dshift.c" | quote }} || die "dshift build failed"
+# The watcher reads /dev/input, which only the input group may do.
+getent group input | grep -q "[:,]$(id -un)\$" || root usermod -aG input "$(id -un)" || die "could not join the input group"
+# Group membership lands at the next login, so an ACL lets the unit read the devices now.
+setfacl -m "u:$(id -un):r" /dev/input/event* 2>/dev/null || true
