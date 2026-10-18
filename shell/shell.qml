@@ -4,7 +4,6 @@ import QtQuick
 import "." as Root
 import "services" as Services
 import "lib/status.mjs" as Status
-import "lib/margins.mjs" as MarginsLib
 
 ShellRoot {
     id: root
@@ -69,36 +68,18 @@ ShellRoot {
         }
     }
 
-    Services.Niri {
-        id: niriService
-    }
-
-    Services.Clock {
-        id: clockService
-    }
-
-    Services.Power {
-        id: powerService
-    }
-
-    Services.Network {
-        id: networkService
-    }
-
+    // The notification server starts with the shell, since a notification sent before it registers is lost.
     Services.Notifs {
         id: notifsService
     }
 
-    Services.Osd {
-        id: osdService
-    }
+    // Everything else but the paper loads after its first frame, so the services and the island never hold that frame back.
+    LazyLoader {
+        active: root.firstFrameMs !== null
 
-    IpcHandler {
-        target: "osd"
-
-        // The brightness keys call this; the step is like 5%+ or 5%-.
-        function brightness(step: string): void {
-            osdService.brightness(step);
+        Root.Desk {
+            theme: themeService
+            notifs: notifsService
         }
     }
 
@@ -134,62 +115,6 @@ ShellRoot {
         }
     }
 
-    Services.Questions {
-        id: questionsService
-    }
-
-    Services.Media {
-        id: mediaService
-    }
-
-    Root.Island {
-        id: island
-        theme: themeService
-        niri: niriService
-        clock: clockService
-        notifs: notifsService
-        questions: questionsService
-        osd: osdService.current
-        playing: mediaService.playing
-    }
-
-    Variants {
-        model: Quickshell.screens
-
-        Root.Margins {
-            required property var modelData
-            screen: modelData
-            theme: themeService
-            niri: niriService
-            clock: clockService
-            power: powerService
-            network: networkService
-            islandWidth: island.boxWidth
-        }
-    }
-
-    IpcHandler {
-        target: "margins"
-
-        // The margins of the output with the focused workspace.
-        function state(): string {
-            const view = niriService.view(niriService.focusedOutput) ?? { idx: 0, app: null, title: null };
-            return JSON.stringify(MarginsLib.marginState(view, clockService.now, { wifi: networkService.wifi, battery: powerService.battery }));
-        }
-    }
-
-    IpcHandler {
-        target: "island"
-
-        function state(): string {
-            const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks } : null;
-            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, since: island.modeSince, focused: island.focused, calendar });
-        }
-
-        function focus(): void {
-            island.focusIsland();
-        }
-    }
 
     // The desktop entry scan starts with the shell, so the launcher's first open does not wait on it.
     readonly property int appCount: DesktopEntries.applications.values.length
