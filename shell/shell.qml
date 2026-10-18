@@ -7,6 +7,11 @@ import "lib/status.mjs" as Status
 import "lib/margins.mjs" as MarginsLib
 
 ShellRoot {
+    id: root
+
+    // Process start to the first paper frame; set once, by the first paper to swap.
+    property var firstFrameMs: null
+
     Services.Theme {
         id: themeService
     }
@@ -18,7 +23,26 @@ ShellRoot {
             required property var modelData
             screen: modelData
             theme: themeService
+            onFirstFrame: {
+                if (root.firstFrameMs !== null)
+                    return;
+                uptime.reload();
+                root.firstFrameMs = Status.processAgeMs(uptime.text(), selfStat.text());
+            }
         }
+    }
+
+    // blockAllReads, so text() after reload() is the uptime of that moment, not the last one.
+    FileView {
+        id: uptime
+        path: "/proc/uptime"
+        blockAllReads: true
+    }
+
+    FileView {
+        id: selfStat
+        path: "/proc/self/stat"
+        blockLoading: true
     }
 
     // Read at call time, so status reports the RSS of that moment.
@@ -39,7 +63,8 @@ ShellRoot {
                 loaded: Root.State.loaded,
                 sync: {},
                 rssKiB: Status.rssKiB(procStatus.text()),
-                timers: Root.State.timers()
+                timers: Root.State.timers(),
+                firstFrameMs: root.firstFrameMs
             });
         }
     }

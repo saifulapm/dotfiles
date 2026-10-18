@@ -5,7 +5,21 @@ import QtQuick
 // The paper behind every window on one output. The flat primitive is a plain fill, so it
 // never redraws unless the theme changes.
 PanelWindow {
+    id: paper
+
     required property var theme
+    property bool swapped: false
+
+    // Emitted once, when this window's first frame reaches the compositor.
+    signal firstFrame
+
+    Connections {
+        target: paper.swapped ? null : paper.contentItem.Window.window
+        function onFrameSwapped() {
+            paper.swapped = true;
+            paper.firstFrame();
+        }
+    }
 
     WlrLayershell.layer: WlrLayer.Background
     WlrLayershell.namespace: "dots-paper"

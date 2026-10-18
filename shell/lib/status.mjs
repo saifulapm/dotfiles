@@ -5,6 +5,13 @@ export function rssKiB(procStatus) {
   return m ? Number(m[1]) : 0;
 }
 
-export function statusJson({ theme, outputs, loaded, sync, rssKiB, timers }) {
-  return JSON.stringify({ theme, outputs, loaded, sync, rssKiB, timers });
+// How long this process has run, from /proc/uptime and /proc/self/stat. Both count from
+// boot, starttime in clock ticks of 10 ms (CLK_TCK is 100 on Linux).
+export function processAgeMs(uptime, selfStat) {
+  const starttime = Number(selfStat.slice(selfStat.lastIndexOf(')') + 2).split(' ')[19]);
+  return Math.round(parseFloat(uptime) * 100 - starttime) * 10;
+}
+
+export function statusJson({ theme, outputs, loaded, sync, rssKiB, timers, firstFrameMs }) {
+  return JSON.stringify({ theme, outputs, loaded, sync, rssKiB, timers, firstFrameMs });
 }
