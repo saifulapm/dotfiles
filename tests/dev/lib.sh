@@ -48,7 +48,27 @@ dev_stop() {
   wait "$dev_pid" 2>/dev/null
   return 0
 }
-trap 'dev_stop; rm -f "$dev_out" "$dev_log"' EXIT
+# A test that needs its own cleanup redefines this; the EXIT trap stays lib.sh's.
+cleanup() { :; }
+# A QML error can break what a surface draws while its state IPC still reads right, so every check reads the journal.
+qml_errors() {
+  journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat 2>/dev/null |
+    grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load configuration|is not a type|Cannot assign|Cannot read propert'
+}
+dev_exit() {
+  local rc=$? errs=
+  [ -n "${DOTS_DEV_UNIT:-}" ] && errs=$(qml_errors)
+  if [ -n "$errs" ]; then
+    echo "FAIL the shell's journal has no QML errors"
+    head -5 <<<"$errs"
+    rc=1
+  fi
+  cleanup
+  dev_stop
+  rm -f "$dev_out" "$dev_log"
+  exit "$rc"
+}
+trap dev_exit EXIT
 
 dev_settled() { grep -q DOTS_DEV_UNIT "$dev_out" || ! kill -0 "$dev_pid" 2>/dev/null; }
 until_ok 15000 dev_settled

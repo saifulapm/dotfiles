@@ -9,7 +9,7 @@ EOF
 chmod +x "$fake/mem"
 PATH=$fake:$PATH
 source "$(dirname "$0")/lib.sh"
-trap 'dev_stop; rm -rf "$fake" "$dev_out" "$dev_log"' EXIT
+cleanup() { rm -rf "$fake"; }
 
 until_ok 5000 shell_status >/dev/null
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }

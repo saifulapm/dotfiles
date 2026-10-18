@@ -4,7 +4,7 @@ source "$(dirname "$0")/lib.sh"
 unset TMUX
 
 broken=$repo/themes/broken
-trap 'rm -rf "$broken"; dev_stop; rm -f "$dev_out" "$dev_log"' EXIT
+cleanup() { rm -rf "$broken"; }
 mkdir -p "$broken"
 grep -v '^paper = "#' "$repo/themes/paper/theme.toml" | sed 's/^name = "paper"/name = "broken"/' >"$broken/theme.toml"
 

@@ -50,7 +50,7 @@ check "Esc hides the launcher and releases the keyboard" launcher_gone
 check "state says open false" state_is '.open == false'
 
 typed=$(mktemp -u)
-trap 'dev_stop; rm -f "$dev_out" "$dev_log" "$typed"' EXIT
+cleanup() { rm -f "$typed"; }
 before=$(niri msg -j windows | jq '[.[].id]')
 niri msg action spawn -- foot -e sh -c "read x; echo \"\$x\" > $typed"
 new_focused() { niri msg -j windows | jq -e --argjson b "$before" 'any(.[]; .is_focused and (.id | IN($b[]) | not))' >/dev/null; }

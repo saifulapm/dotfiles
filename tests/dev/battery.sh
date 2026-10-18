@@ -12,7 +12,7 @@ check "the top-right is just the date ($today)" just_date
 
 "$repo/bin/dev-fake-upower" &
 fake_pid=$!
-trap 'kill "$fake_pid" 2>/dev/null; dev_stop; rm -f "$dev_out" "$dev_log"' EXIT
+cleanup() { kill "$fake_pid" 2>/dev/null; }
 fake_up() { busctl --user status org.freedesktop.UPower >/dev/null 2>&1; }
 until_ok 5000 fake_up
 check "the UPower double owns its name on the nested bus" fake_up
