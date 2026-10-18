@@ -8,8 +8,17 @@ state_is() { launcher_state | jq -e "$1" >/dev/null; }
 # niri does not run binds for keys from wtype's virtual keyboard, so the check spawns the
 # command the Mod+Space bind runs, through niri, with niri's env.
 mod_space() { niri msg action spawn -- qs ipc call launcher toggle; }
-launcher_mapped() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-launcher" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
-launcher_gone() { ! niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-launcher")' >/dev/null; }
+launcher_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-launcher" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
+# The first result row, selected and ink while the launcher is open.
+row_rgb() {
+  local geo
+  geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + (.width / 2 | floor) - 5),\(.y + 257) 10x10"')
+  grim -s 1 -t ppm -g "$geo" - | mean_rgb
+}
+row_is_ink() { local r g b; read -r r g b < <(row_rgb); ((r < 60 && g < 60 && b < 60)); }
+launcher_mapped() { state_is .open && launcher_focus Exclusive && row_is_ink; }
+# Closed, the launcher stays mapped but takes no keyboard and draws nothing.
+launcher_gone() { state_is '.open == false' && launcher_focus None && ! row_is_ink; }
 foot_open() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot")' >/dev/null; }
 # Waits for open number $1 to report its time, and prints it.
 open_ms() {
@@ -22,7 +31,7 @@ check "no window is open yet" test "$(niri msg -j windows | jq length)" = 0
 
 mod_space
 until_ok 3000 launcher_mapped
-check "Mod+Space maps dots-launcher on Overlay with exclusive keyboard" launcher_mapped
+check "Mod+Space shows the launcher with exclusive keyboard" launcher_mapped
 ms1=$(open_ms 1)
 check "status lists launcher in loaded" bash -c 'timeout 0.5 qs ipc call shell status | jq -e "any(.loaded[]; . == \"launcher\")" >/dev/null'
 wtype foot
@@ -39,7 +48,7 @@ until_ok 3000 launcher_mapped
 ms2=$(open_ms 2)
 wtype -k Escape
 until_ok 2000 launcher_gone
-check "Esc unmaps dots-launcher" launcher_gone
+check "Esc hides the launcher and releases the keyboard" launcher_gone
 check "state says open false" state_is '.open == false'
 
 typed=$(mktemp -u)

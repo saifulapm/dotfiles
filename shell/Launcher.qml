@@ -5,8 +5,7 @@ import QtQuick.Layouts
 import "." as Root
 import "lib/launcher.mjs" as Lib
 
-// The launcher in apps mode. It loads on first open and then stays loaded; closing it hides
-// the window, so the layer unmaps and the keyboard goes back to the focused window.
+// Apps mode; stays mapped once loaded, since a remap costs 20 to 30 ms before the first frame.
 PanelWindow {
     id: launcher
 
@@ -37,8 +36,8 @@ PanelWindow {
         opens += 1;
         input.text = "";
         selected = 0;
-        input.forceActiveFocus();
         shown = true;
+        input.forceActiveFocus();
     }
 
     function close() {
@@ -83,7 +82,6 @@ PanelWindow {
         }
     }
 
-    visible: shown
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "dots-launcher"
     WlrLayershell.keyboardFocus: shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
@@ -95,75 +93,121 @@ PanelWindow {
         right: true
     }
     color: "transparent"
+    mask: shown ? null : noInput
 
-    Rectangle {
+    Region {
+        id: noInput
+    }
+
+    Item {
         anchors.fill: parent
-        color: Qt.alpha(c.paper, 0.72)
-    }
+        visible: launcher.shown
 
-    // The hard offset shadow, square like the card.
-    Rectangle {
-        x: card.x + 6
-        y: card.y + 6
-        width: card.width
-        height: card.height
-        color: c.ink
-    }
+        Rectangle {
+            anchors.fill: parent
+            color: Qt.alpha(c.paper, 0.72)
+        }
 
-    Rectangle {
-        id: card
-        x: Math.round((parent.width - width) / 2)
-        y: 168
-        width: 640
-        height: column.implicitHeight
-        color: c.surface
-        border.color: c.ink
-        border.width: 1.5
+        // The hard offset shadow, square like the card.
+        Rectangle {
+            x: card.x + 6
+            y: card.y + 6
+            width: card.width
+            height: card.height
+            color: c.ink
+        }
 
-        ColumnLayout {
-            id: column
-            width: parent.width
-            spacing: 0
+        Rectangle {
+            id: card
+            x: Math.round((parent.width - width) / 2)
+            y: 168
+            width: 640
+            height: column.implicitHeight
+            color: c.surface
+            border.color: c.ink
+            border.width: 1.5
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                Layout.topMargin: 18
-                Layout.bottomMargin: 14
-                spacing: 14
+            ColumnLayout {
+                id: column
+                width: parent.width
+                spacing: 0
 
-                Rectangle {
-                    implicitWidth: chip.implicitWidth + 14
-                    implicitHeight: chip.implicitHeight + 6
-                    color: c.ink
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    Layout.topMargin: 18
+                    Layout.bottomMargin: 14
+                    spacing: 14
+
+                    Rectangle {
+                        implicitWidth: chip.implicitWidth + 14
+                        implicitHeight: chip.implicitHeight + 6
+                        color: c.ink
+                        Text {
+                            id: chip
+                            anchors.centerIn: parent
+                            text: "APPS"
+                            color: c.surface
+                            font.family: fonts.ui
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.4
+                        }
+                    }
+
+                    TextInput {
+                        id: input
+                        Layout.fillWidth: true
+                        color: c.ink
+                        font.family: fonts.display
+                        font.pixelSize: 34
+                        clip: true
+                        focus: true
+                        Keys.onPressed: event => {
+                            const ctrl = event.modifiers & Qt.ControlModifier;
+                            if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_J))
+                                launcher.move(1);
+                            else if (event.key === Qt.Key_Up || (ctrl && event.key === Qt.Key_K))
+                                launcher.move(-1);
+                            else if (event.key === Qt.Key_Tab)
+                                results.forceActiveFocus();
+                            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                                launcher.launch();
+                            else if (event.key === Qt.Key_Escape)
+                                launcher.close();
+                            else
+                                return;
+                            event.accepted = true;
+                        }
+                    }
+
                     Text {
-                        id: chip
-                        anchors.centerIn: parent
-                        text: "APPS"
-                        color: c.surface
+                        text: found.length + " FOUND"
+                        color: c.muted
                         font.family: fonts.ui
                         font.pixelSize: 10
                         font.letterSpacing: 1.4
                     }
                 }
 
-                TextInput {
-                    id: input
+                Rectangle {
                     Layout.fillWidth: true
+                    implicitHeight: 1
                     color: c.ink
-                    font.family: fonts.display
-                    font.pixelSize: 34
-                    clip: true
-                    focus: true
+                }
+
+                // Holds focus after Tab, where plain j/k move and / returns to the query.
+                Item {
+                    id: results
+                    Layout.fillWidth: true
+                    implicitHeight: list.implicitHeight + 16
                     Keys.onPressed: event => {
-                        const ctrl = event.modifiers & Qt.ControlModifier;
-                        if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_J))
+                        if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
                             launcher.move(1);
-                        else if (event.key === Qt.Key_Up || (ctrl && event.key === Qt.Key_K))
+                        else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
                             launcher.move(-1);
-                        else if (event.key === Qt.Key_Tab)
-                            results.forceActiveFocus();
+                        else if (event.key === Qt.Key_Slash)
+                            input.forceActiveFocus();
                         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                             launcher.launch();
                         else if (event.key === Qt.Key_Escape)
@@ -172,127 +216,91 @@ PanelWindow {
                             return;
                         event.accepted = true;
                     }
-                }
 
-                Text {
-                    text: found.length + " FOUND"
-                    color: c.muted
-                    font.family: fonts.ui
-                    font.pixelSize: 10
-                    font.letterSpacing: 1.4
-                }
-            }
+                    Column {
+                        id: list
+                        y: 8
+                        width: parent.width
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 1
-                color: c.ink
-            }
+                        Text {
+                            visible: rows.length === 0
+                            leftPadding: 20
+                            topPadding: 11
+                            bottomPadding: 11
+                            text: "NO MATCH · ↑↓ OR CTRL+J/K MOVE · TAB THEN J/K · ↵ OPEN · ESC CLOSE"
+                            color: c.muted
+                            font.family: fonts.ui
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.2
+                        }
 
-            // Holds focus after Tab, where plain j/k move and / returns to the query.
-            Item {
-                id: results
-                Layout.fillWidth: true
-                implicitHeight: list.implicitHeight + 16
-                Keys.onPressed: event => {
-                    if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
-                        launcher.move(1);
-                    else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
-                        launcher.move(-1);
-                    else if (event.key === Qt.Key_Slash)
-                        input.forceActiveFocus();
-                    else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                        launcher.launch();
-                    else if (event.key === Qt.Key_Escape)
-                        launcher.close();
-                    else
-                        return;
-                    event.accepted = true;
-                }
+                        Repeater {
+                            model: rows
 
-                Column {
-                    id: list
-                    y: 8
-                    width: parent.width
+                            Rectangle {
+                                required property var modelData
+                                required property int index
+                                readonly property bool current: index === launcher.selected
+                                width: list.width
+                                implicitHeight: row.implicitHeight + 22
+                                color: current ? c.ink : "transparent"
 
-                    Text {
-                        visible: rows.length === 0
-                        leftPadding: 20
-                        topPadding: 11
-                        bottomPadding: 11
-                        text: "NO MATCH · ↑↓ OR CTRL+J/K MOVE · TAB THEN J/K · ↵ OPEN · ESC CLOSE"
-                        color: c.muted
-                        font.family: fonts.ui
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.2
-                    }
+                                RowLayout {
+                                    id: row
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 20
+                                    anchors.rightMargin: 20
+                                    spacing: 14
 
-                    Repeater {
-                        model: rows
-
-                        Rectangle {
-                            required property var modelData
-                            required property int index
-                            readonly property bool current: index === launcher.selected
-                            width: list.width
-                            implicitHeight: row.implicitHeight + 22
-                            color: current ? c.ink : "transparent"
-
-                            RowLayout {
-                                id: row
-                                anchors.fill: parent
-                                anchors.leftMargin: 20
-                                anchors.rightMargin: 20
-                                spacing: 14
-
-                                Text {
-                                    text: "▸"
-                                    color: current ? c.accent : "transparent"
-                                    font.family: fonts.ui
-                                    font.pixelSize: 15
-                                }
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: modelData.name
-                                    elide: Text.ElideRight
-                                    color: current ? c.surface : c.ink
-                                    font.family: fonts.ui
-                                    font.pixelSize: 15
-                                    font.weight: current ? Font.Medium : Font.Normal
-                                }
-                                Text {
-                                    Layout.maximumWidth: 260
-                                    text: modelData.genericName
-                                    elide: Text.ElideRight
-                                    color: current ? c.line : c.muted
-                                    font.family: fonts.display
-                                    font.italic: true
-                                    font.pixelSize: 16
+                                    Text {
+                                        text: "▸"
+                                        color: current ? c.accent : "transparent"
+                                        font.family: fonts.ui
+                                        font.pixelSize: 15
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: modelData.name
+                                        elide: Text.ElideRight
+                                        color: current ? c.surface : c.ink
+                                        font.family: fonts.ui
+                                        font.pixelSize: 15
+                                        font.weight: current ? Font.Medium : Font.Normal
+                                    }
+                                    Text {
+                                        Layout.maximumWidth: 260
+                                        text: modelData.genericName
+                                        elide: Text.ElideRight
+                                        color: current ? c.line : c.muted
+                                        font.family: fonts.display
+                                        font.italic: true
+                                        font.pixelSize: 16
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 1
-                color: c.ink
-            }
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 1
+                    color: c.ink
+                }
 
-            Text {
-                Layout.fillWidth: true
-                leftPadding: 20
-                rightPadding: 20
-                topPadding: 12
-                bottomPadding: 12
-                horizontalAlignment: Text.AlignRight
-                text: "J/K · ↵ · ESC"
-                color: c.muted
-                font.family: fonts.ui
-                font.pixelSize: 10
-                font.letterSpacing: 1.2
+                Text {
+                    Layout.fillWidth: true
+                    leftPadding: 20
+                    rightPadding: 20
+                    topPadding: 12
+                    bottomPadding: 12
+                    horizontalAlignment: Text.AlignRight
+                    text: "J/K · ↵ · ESC"
+                    color: c.muted
+                    font.family: fonts.ui
+                    font.pixelSize: 10
+                    font.letterSpacing: 1.2
+                }
             }
         }
     }
