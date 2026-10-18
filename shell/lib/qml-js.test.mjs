@@ -22,3 +22,12 @@ test('no shared module or QML file calls flat or flatMap', () => {
     [],
   );
 });
+
+// String trimStart and trimEnd are ES2019 too; m5's calculator met trimStart in QML.
+test('no shared module or QML file calls trimStart or trimEnd', () => {
+  const files = readdirSync(qml, { recursive: true }).filter((f) => (f.endsWith('.qml') || f.endsWith('.mjs')) && !f.endsWith('.test.mjs'));
+  assert.deepEqual(
+    files.filter((f) => /\.trim(Start|End)\(/.test(readFileSync(qml + f, 'utf8'))),
+    [],
+  );
+});
