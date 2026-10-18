@@ -1,0 +1,4 @@
+#!/bin/bash
+# shader sources hash:{{ range append (glob (joinPath .chezmoi.workingTree "shell/shaders/*.frag")) (joinPath .chezmoi.workingTree "bin/dots-shaders") }} {{ include . | sha256sum }}{{ end }}
+{{ template "lib.sh" . }}
+{{ joinPath .chezmoi.workingTree "bin/dots-shaders" | quote }} || die "shader compile failed"

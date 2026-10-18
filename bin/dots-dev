@@ -39,8 +39,9 @@ mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME" "$TMUX_TMPDIR" "$DOTS_CHROMIUM_
 printf 'user-db:%s\n' "$dconf_name" >"$DCONF_PROFILE"
 # Fonts are read, never written, so the user's own stay visible to the nested shell.
 [ -d "$user_data/fonts" ] && ln -s "$user_data/fonts" "$XDG_DATA_HOME/fonts"
-printf 'paper\n' >"$XDG_STATE_HOME/dots/theme"
-node "$repo/shell/lib/theme-render.mjs" paper
+printf '%s\n' "${DOTS_DEV_THEME:-paper}" >"$XDG_STATE_HOME/dots/theme"
+node "$repo/shell/lib/theme-render.mjs" "${DOTS_DEV_THEME:-paper}"
+"$repo/bin/dots-shaders"
 # The theme-out path changes every run, so the config that includes it is written here.
 cat >"$D/niri.kdl" <<EOF
 include "$repo/dev/niri-dev.kdl"

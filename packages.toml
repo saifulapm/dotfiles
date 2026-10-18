@@ -38,3 +38,8 @@ why = "links home/ into place"
 name = "rsms-inter-fonts"
 arch = "all"
 why = "Inter, the UI face of the Artboard theme"
+
+[[package]]
+name = "qt6-qtshadertools"
+arch = "all"
+why = "qsb, which compiles the paper shaders in shell/shaders"

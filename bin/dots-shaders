@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Compiles shell/shaders/*.frag into the .qsb files Paper.qml loads; qsb is not on PATH.
+set -euo pipefail
+
+repo=$(cd "$(dirname "$0")/.." && pwd)
+out=${XDG_STATE_HOME:-$HOME/.local/state}/dots/shaders
+mkdir -p "$out"
+for f in "$repo"/shell/shaders/*.frag; do
+  /usr/lib64/qt6/bin/qsb --qt6 -o "$out/${f##*/}.qsb" "$f"
+done
