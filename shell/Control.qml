@@ -8,6 +8,7 @@ Item {
     id: control
 
     required property var theme
+    required property var notifs
     property bool shown: false
     property int current: 0
     property int opens: 0
@@ -186,6 +187,7 @@ Item {
                     width: parent.width
                     visible: control.current === 5
                     theme: control.theme
+                    notifs: control.notifs
                 }
             }
 

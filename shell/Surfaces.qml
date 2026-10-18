@@ -143,6 +143,7 @@ PanelWindow {
         active: false
         sourceComponent: Root.Control {
             theme: host.theme
+            notifs: host.notifs
         }
     }
 

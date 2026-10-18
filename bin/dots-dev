@@ -19,6 +19,8 @@ export DOTS_MACHINE=dev
 export DOTS_HUB_QUESTIONS=$D/hub-questions.json PIPEWIRE_RUNTIME_DIR=$D/pw
 # Recordings land in the temp dir, never in ~/Videos.
 export DOTS_RECORDINGS_DIR=$D/recordings
+# workflow route tells every hub, so Control's Route toggle runs a fake that keeps the route here.
+export DOTS_WORKFLOW=$repo/bin/dev-fake-workflow
 # The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.
 export DOTS_NIRI_BINDS=$repo/home/dot_config/niri/binds.kdl
 # TMUX would point every tmux call at the live server and ignore TMUX_TMPDIR.
