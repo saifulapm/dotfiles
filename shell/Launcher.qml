@@ -6,6 +6,7 @@ import "." as Root
 import "lib/launcher.mjs" as Lib
 import "lib/clips.mjs" as Clips
 import "lib/emoji.mjs" as Emoji
+import "lib/notes-look.mjs" as K
 
 // Apps, windows, clipboard, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
 Item {
@@ -62,6 +63,8 @@ Item {
         return [];
     }
     readonly property var rows: found.slice(0, 8)
+    // In apps mode the footer names every prefix; inside a mode it keeps to the moving keys.
+    readonly property string legend: theme.tokens ? K.keyLine(theme.tokens, mode === "apps" ? Lib.LEGEND : Lib.LEGEND.slice(5)) : ""
     readonly property var chipNames: ({ apps: "APPS", windows: "WINDOWS", clipboard: "CLIPBOARD", emoji: "EMOJI", calculator: "CALC", commands: "COMMANDS" })
 
     // mode is clipboard or emoji when a key opened the launcher straight into one.
@@ -124,6 +127,7 @@ Item {
             selected: selected,
             openMs: openMs,
             opens: opens,
+            legend: legend,
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: launcher.Window.active
         });
@@ -365,7 +369,7 @@ Item {
                     topPadding: 12
                     bottomPadding: 12
                     horizontalAlignment: Text.AlignRight
-                    text: "J/K · ↵ · ESC"
+                    text: launcher.legend
                     color: c.muted
                     font.family: fonts.ui
                     font.pixelSize: 10

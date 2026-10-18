@@ -14,6 +14,7 @@ windows_n() { niri msg -j windows | jq length; }
 until_ok 5000 shell_status >/dev/null
 
 open_launcher
+check "the apps footer names the five prefixes" state_is '.legend | ascii_downcase | (contains("windows") and contains("clipboard") and contains("emoji") and contains("calc") and contains("commands"))'
 wtype "= 1440 * 1.25"
 until_ok 3000 state_is '.mode == "calculator" and .results == ["1800"]'
 check "= 1440 * 1.25 shows the single result 1800" state_is '.mode == "calculator" and .results == ["1800"]'

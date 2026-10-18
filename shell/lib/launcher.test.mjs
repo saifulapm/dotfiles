@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rank, parseQuery, windowRows, commandRows, calcRows } from './launcher.mjs';
+import { rank, parseQuery, windowRows, commandRows, calcRows, LEGEND } from './launcher.mjs';
 
 const app = (name, keywords = []) => ({ id: name.toLowerCase(), name, genericName: '', keywords });
 const names = (entries) => entries.map((e) => e.name);
@@ -69,4 +69,10 @@ test('commands filter by name, lock first for lo', () => {
 test('the calculator row is the formatted result, copied on Enter', () => {
   assert.deepEqual(calcRows('1440 * 1.25').map((r) => [r.title, r.copy]), [['1800', '1800']]);
   assert.deepEqual(calcRows('2 +'), []);
+});
+
+test('the apps footer names every prefix, and each one opens its mode', () => {
+  const prefixes = LEGEND.slice(0, 5).map((k) => k[0]);
+  assert.deepEqual(prefixes, ['w', 'v', ':', '=', '>']);
+  assert.deepEqual(prefixes.map((p) => parseQuery(p + ' x').mode), ['windows', 'clipboard', 'emoji', 'calculator', 'commands']);
 });
