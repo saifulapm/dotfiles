@@ -14,15 +14,25 @@ export const msToNextMinute = (d) => 60000 - (d.getSeconds() * 1000 + d.getMilli
 const hasWindow = (v) => v.app !== null || v.title !== null;
 
 // `qs ipc call margins state`: the canonical text, whatever the theme draws on screen.
-export function marginState(view, now) {
+export function marginState(view, now, right) {
   const workspace = pad2(view.idx);
   const app = view.app ?? '';
   const title = view.title ?? '';
   const date = dateText(now);
   return {
     left: { workspace, app, title, text: hasWindow(view) ? `${workspace} · ${app} — ${title}` : workspace },
-    right: { date, text: date },
+    right: { wifi: right.wifi, battery: right.battery, date, text: [right.wifi, right.battery, date].filter((p) => p !== '').join('  ') },
   };
+}
+
+// Quickshell's UPower gives the percentage as 0 to 1.
+export const batteryText = (fraction, charging) => `${Math.round(fraction * 100)}%${charging ? ' charging' : ''}`;
+
+// Each device is { wifi, connected }; no Wi-Fi device means no word at all.
+export function wifiText(devices) {
+  const wifi = devices.filter((d) => d.wifi);
+  if (wifi.length === 0) return '';
+  return wifi.some((d) => d.connected) ? 'wifi' : 'no wifi';
 }
 
 // What follows the bold workspace number on screen.

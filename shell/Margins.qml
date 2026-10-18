@@ -11,9 +11,11 @@ PanelWindow {
     required property var theme
     required property var niri
     required property var clock
+    required property var power
+    required property var network
     required property real islandWidth
     readonly property var view: niri.view(screen.name) ?? { idx: 0, app: null, title: null }
-    readonly property var marginState: M.marginState(view, clock.now)
+    readonly property var marginState: M.marginState(view, clock.now, { wifi: network.wifi, battery: power.battery })
     readonly property real lineEnd: width / 2 - islandWidth / 2 - 8
     readonly property var look: S.marginStyle(theme.tokens)
 
@@ -57,11 +59,26 @@ PanelWindow {
         }
     }
 
-    Label {
+    // A Row skips invisible Labels, so an absent word leaves no gap.
+    Row {
         anchors.right: parent.right
         anchors.rightMargin: 32
         y: 17
-        text: root.marginState.right.text
+        spacing: 20
+
+        Label {
+            text: root.marginState.right.wifi
+            visible: text !== ""
+        }
+
+        Label {
+            text: root.marginState.right.battery
+            visible: text !== ""
+        }
+
+        Label {
+            text: root.marginState.right.date
+        }
     }
 
     Rectangle {

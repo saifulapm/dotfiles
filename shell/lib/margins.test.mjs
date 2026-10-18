@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pad2, dateText, clockText, msToNextMinute, marginState, screenTail } from './margins.mjs';
+import { pad2, dateText, clockText, msToNextMinute, marginState, screenTail, batteryText, wifiText } from './margins.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32, 10, 500);
 
@@ -25,15 +25,15 @@ test('the tick waits until the next minute boundary', () => {
 });
 
 test('the margin state for a focused window', () => {
-  const s = marginState({ idx: 1, app: 'foot', title: '~/Sites/github/dotfiles' }, AT);
+  const s = marginState({ idx: 1, app: 'foot', title: '~/Sites/github/dotfiles' }, AT, { wifi: 'wifi', battery: '82%' });
   assert.equal(
     JSON.stringify(s),
-    '{"left":{"workspace":"01","app":"foot","title":"~/Sites/github/dotfiles","text":"01 · foot — ~/Sites/github/dotfiles"},"right":{"date":"Sun 18 Oct","text":"Sun 18 Oct"}}',
+    '{"left":{"workspace":"01","app":"foot","title":"~/Sites/github/dotfiles","text":"01 · foot — ~/Sites/github/dotfiles"},"right":{"wifi":"wifi","battery":"82%","date":"Sun 18 Oct","text":"wifi  82%  Sun 18 Oct"}}',
   );
 });
 
 test('the margin state for an empty workspace is just its number', () => {
-  const s = marginState({ idx: 2, app: null, title: null }, AT);
+  const s = marginState({ idx: 2, app: null, title: null }, AT, { wifi: '', battery: '' });
   assert.equal(s.left.text, '02');
   assert.equal(s.left.workspace, '02');
 });
@@ -41,4 +41,22 @@ test('the margin state for an empty workspace is just its number', () => {
 test('on screen the number is followed by a dash, the app and the title', () => {
   assert.equal(screenTail({ app: 'foot', title: '~/Sites' }), ' — foot · ~/Sites');
   assert.equal(screenTail({ app: null, title: null }), '');
+});
+
+test('the battery reads its percentage, and says when it is charging', () => {
+  assert.equal(batteryText(0.82, false), '82%');
+  assert.equal(batteryText(0.82, true), '82% charging');
+});
+
+test('the top-right drops the parts that are absent', () => {
+  const view = { idx: 1, app: null, title: null };
+  assert.equal(marginState(view, AT, { wifi: 'no wifi', battery: '' }).right.text, 'no wifi  Sun 18 Oct');
+  assert.equal(marginState(view, AT, { wifi: '', battery: '82% charging' }).right.text, '82% charging  Sun 18 Oct');
+  assert.equal(marginState(view, AT, { wifi: '', battery: '' }).right.text, 'Sun 18 Oct');
+});
+
+test('wifi is named only when there is a Wi-Fi device', () => {
+  assert.equal(wifiText([{ wifi: true, connected: true }]), 'wifi');
+  assert.equal(wifiText([{ wifi: false, connected: true }, { wifi: true, connected: false }]), 'no wifi');
+  assert.equal(wifiText([{ wifi: false, connected: true }]), '');
 });

@@ -77,6 +77,14 @@ ShellRoot {
         id: clockService
     }
 
+    Services.Power {
+        id: powerService
+    }
+
+    Services.Network {
+        id: networkService
+    }
+
     Services.Notifs {
         id: notifsService
     }
@@ -116,6 +124,8 @@ ShellRoot {
             theme: themeService
             niri: niriService
             clock: clockService
+            power: powerService
+            network: networkService
             islandWidth: island.boxWidth
         }
     }
@@ -126,7 +136,7 @@ ShellRoot {
         // The margins of the output with the focused workspace.
         function state(): string {
             const view = niriService.view(niriService.focusedOutput) ?? { idx: 0, app: null, title: null };
-            return JSON.stringify(MarginsLib.marginState(view, clockService.now));
+            return JSON.stringify(MarginsLib.marginState(view, clockService.now, { wifi: networkService.wifi, battery: powerService.battery }));
         }
     }
 
