@@ -38,7 +38,7 @@ test('the niri fragment sets the paper as background and the ink frame', () => {
   const kdl = renderNiri(validateTheme(paper));
   assert.match(kdl, /background-color "#F1E9D8"/);
   assert.match(kdl, /focus-ring \{\s*off\s*\}/);
-  assert.match(kdl, /active-color "#1C1915"/);
+  assert.match(kdl, /border \{\s*on\s*width 1\s*active-color "#1C1915"/);
   assert.match(kdl, /softness 0/);
   assert.match(kdl, /offset x=2 y=2/);
   assert.match(kdl, /geometry-corner-radius 0/);

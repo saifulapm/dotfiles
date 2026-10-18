@@ -14,6 +14,8 @@ check "foot is focused" foot_focused
 strip=$(grim -s 1 -t ppm -g "40,44 10x10" - | mean_rgb)
 echo "     margin strip with foot open: $strip"
 check "foot opens below the margins" test "$strip" = "241 233 216"
+edge=$(grim -s 1 -t ppm -g "32,300 1x10" - | mean_rgb)
+check "niri draws foot's ink frame at x=32 ($edge)" test "$edge" = "28 25 21"
 
 # foot's shell retitles the window once it starts, so the title is read again on every poll.
 left_is_foot() {

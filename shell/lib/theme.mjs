@@ -56,7 +56,7 @@ export function renderNiri(t) {
   const frameColor = t.primitive.frame === 'glow' ? c.accent : c.ink;
   const border = t.primitive.frame === 'none'
     ? 'border {\n        off\n    }'
-    : `border {\n        width ${t.niri.border}\n        active-color "${frameColor}"\n        inactive-color "${c.muted}"\n    }`;
+    : `border {\n        on\n        width ${t.niri.border}\n        active-color "${frameColor}"\n        inactive-color "${c.muted}"\n    }`;
   const shadow = {
     soft: `shadow {\n        on\n        softness 30\n        spread 2\n    }`,
     'hard-offset': `shadow {\n        on\n        softness 0\n        spread 0\n        offset x=2 y=2\n        color "${c.ink}"\n        inactive-color "${c.muted}"\n    }`,
