@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# just dev: a nested niri on its own session bus, running this checkout's shell against a
+# fresh temp state and data dir. Prints the env to reach it once the shell is started.
+set -euo pipefail
+
+repo=$(cd "$(dirname "$0")/.." && pwd)
+D=$(mktemp -d -t dots-dev-XXXXXXXX)
+export DOTS_DEV_DIR=$D DOTS_DEV_UNIT=dots-shell-dev-${D##*-}
+export XDG_STATE_HOME=$D/state XDG_DATA_HOME=$D/data QS_CONFIG_PATH=$repo/shell
+# niri's spawn-at-startup finds bin/dots-dev-shell on PATH.
+export PATH=$repo/bin:$PATH
+session=
+
+cleanup() {
+  trap - EXIT INT TERM
+  # The unit stops first: once niri is gone, qs loses its display and systemd would
+  # restart it every 500 ms.
+  systemctl --user stop "$DOTS_DEV_UNIT" 2>/dev/null || true
+  if [ -n "$session" ]; then
+    # dbus-run-session does not forward signals, so niri gets them directly.
+    pkill -TERM -P "$session" -x niri 2>/dev/null || true
+    wait "$session" 2>/dev/null || true
+  fi
+  rm -rf "$D"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME"
+printf 'paper\n' >"$XDG_STATE_HOME/dots/theme"
+node "$repo/shell/lib/theme-render.mjs" paper
+# The theme-out path changes every run, so the config that includes it is written here.
+cat >"$D/niri.kdl" <<EOF
+include "$repo/dev/niri-dev.kdl"
+include "$XDG_STATE_HOME/dots/theme-out/niri.kdl"
+EOF
+
+dbus-run-session niri -c "$D/niri.kdl" &
+session=$!
+until [ -f "$D/env" ]; do
+  kill -0 "$session" 2>/dev/null || exit 1
+  sleep 0.05
+done
+echo "export DOTS_DEV_DIR=$D"
+cat "$D/env"
+wait "$session"

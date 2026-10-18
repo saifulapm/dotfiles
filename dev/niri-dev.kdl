@@ -1,0 +1,9 @@
+// The nested dev session. bin/dots-dev writes a config that includes this file and then
+// the temp theme-out/niri.kdl, whose path changes every run.
+include "../home/dot_config/niri/binds.kdl"
+
+spawn-at-startup "dots-dev-shell"
+
+hotkey-overlay {
+    skip-at-startup
+}

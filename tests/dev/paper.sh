@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# just dev: a nested niri on its own bus, the Paper paper on every output, and a shell
+# that systemd brings back within 1 s of a kill.
+source "$(dirname "$0")/lib.sh"
+
+check "WAYLAND_DISPLAY is printed" test -n "$WAYLAND_DISPLAY"
+check "NIRI_SOCKET is printed" test -n "$NIRI_SOCKET"
+check "the session bus is its own" test -n "$DBUS_SESSION_BUS_ADDRESS" -a "$DBUS_SESSION_BUS_ADDRESS" != "$live_bus"
+
+until_ok 5000 shell_status >/dev/null
+status=$(shell_status)
+echo "     status: $status"
+pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
+check "the shell process has the nested bus" grep -qzxF "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" "/proc/$pid/environ"
+status_is_m1() { jq -e '.theme == "paper" and (.outputs | length) == 1 and .timers == 0' <<<"$status" >/dev/null; }
+check "status names theme paper, one output, no timers" status_is_m1
+
+paper_layer() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-paper" and .layer == "Background")' >/dev/null; }
+until_ok 3000 paper_layer
+check "dots-paper is on the Background layer" paper_layer
+
+geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + (.width / 2 | floor) - 5),\(.y + (.height / 2 | floor) - 5) 10x10"')
+read -r r g b < <(grim -s 1 -t ppm -g "$geo" - | mean_rgb)
+echo "     centre $geo: $r $g $b"
+near() { (($1 - $2 <= 6 && $2 - $1 <= 6)); }
+centre_is_paper() { near "${r:-0}" 241 && near "${g:-0}" 233 && near "${b:-0}" 216; }
+check "the output centre is #F1E9D8" centre_is_paper
+
+back() { [ "$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")" != "$pid" ] && shell_status >/dev/null; }
+pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
+start=$(now_ms)
+kill -9 "$pid"
+until_ok 3000 back
+elapsed=$(($(now_ms) - start))
+check "status answers again ${elapsed} ms after kill -9" test "$elapsed" -le 1000
+
+dev_stop
+check "the transient unit is gone" test "$(systemctl --user show -p LoadState --value "$DOTS_DEV_UNIT")" = not-found
+check "the temp dir is deleted" test ! -e "$DOTS_DEV_DIR"
+
+exit $((fails > 0))

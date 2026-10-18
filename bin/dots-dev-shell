@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Spawned by the nested niri that bin/dots-dev starts: runs the shell as a transient user
+# unit, so systemd restarts it like the real dots-shell.service. A transient unit gets the
+# user manager's env, which is the live session's, so every variable that points at the
+# nested session is passed on by name.
+set -euo pipefail
+
+systemd-run --user --quiet --collect --unit "$DOTS_DEV_UNIT" \
+  -p Restart=always -p RestartSec=500ms -p StartLimitIntervalSec=0 \
+  -E WAYLAND_DISPLAY -E NIRI_SOCKET -E DBUS_SESSION_BUS_ADDRESS \
+  -E XDG_STATE_HOME -E XDG_DATA_HOME -E QS_CONFIG_PATH \
+  qs
+
+for v in WAYLAND_DISPLAY NIRI_SOCKET DBUS_SESSION_BUS_ADDRESS QS_CONFIG_PATH XDG_STATE_HOME DOTS_DEV_UNIT; do
+  printf 'export %s=%q\n' "$v" "${!v}"
+done >"$DOTS_DEV_DIR/env.tmp"
+# bin/dots-dev waits for env, so it appears whole.
+mv "$DOTS_DEV_DIR/env.tmp" "$DOTS_DEV_DIR/env"

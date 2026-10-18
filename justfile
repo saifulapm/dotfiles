@@ -5,6 +5,10 @@ dev:
 test:
     node --test 'shell/lib/**/*.test.mjs'
 
+# checks that each open a nested niri for a few seconds
+test-dev:
+    tests/dev/run.sh
+
 # speed budgets against a fresh nested session
 bench:
     bin/dots-bench
