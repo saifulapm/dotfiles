@@ -12,3 +12,7 @@ test-dev:
 # speed budgets against a fresh nested session
 bench:
     bin/dots-bench
+
+# dots install twice in a fresh fedora:44 container
+test-install:
+    tests/install/run.sh
