@@ -25,7 +25,10 @@ PanelWindow {
     readonly property var grid: calendar ? I.monthGrid(calendar.year, calendar.month) : null
     readonly property int today: calendar && calendar.year === clock.now.getFullYear() && calendar.month === clock.now.getMonth() ? clock.now.getDate() : 0
     readonly property var notification: notifs.current
-    property var recording: null
+    readonly property real recordingSince: Root.State.recordingSince
+    // Bumped each second while a recording runs, so its counter moves.
+    property real recordingNow: 0
+    readonly property var recording: recordingSince > 0 ? I.recordingText(recordingSince, Math.max(recordingNow, recordingSince)) : null
     property var osd: null
     property var toast: null
     property var playing: null
@@ -101,6 +104,13 @@ PanelWindow {
             island.notice = text;
             noticeTick.restart();
         }
+    }
+
+    Tick {
+        interval: 1000
+        repeat: true
+        running: island.recordingSince > 0
+        onTriggered: island.recordingNow = Date.now()
     }
 
     Tick {

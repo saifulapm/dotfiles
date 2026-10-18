@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -42,7 +42,7 @@ test('each mode reads as one line of text', () => {
   assert.equal(islandText('playing', { playing: { title: 'Track', artist: '' } }, AT), 'Track  14:32');
   assert.equal(islandText('question', { question }, AT), 'Import the feed?  [1] Import now  [2] Later');
   assert.equal(islandText('toast', { toast: 'Captured' }, AT), 'Captured');
-  assert.equal(islandText('recording', { recording: '00:12' }, AT), '● 00:12');
+  assert.equal(islandText('recording', { recording: '00:12' }, AT), 'REC 00:12');
 });
 
 test('the box never grows past 560 px', () => {
@@ -69,4 +69,10 @@ test('the calendar reads as its month, and moving a month crosses the year', () 
   assert.equal(islandText('calendar', { calendar: { year: 2026, month: 9 } }, AT), 'October 2026');
   assert.deepEqual(shiftMonth(2026, 11, 1), { year: 2027, month: 0 });
   assert.deepEqual(shiftMonth(2026, 0, -1), { year: 2025, month: 11 });
+});
+
+test('a recording reads minutes and seconds since it started', () => {
+  assert.equal(recordingText(1000, 1000), '00:00');
+  assert.equal(recordingText(1000, 13999), '00:12');
+  assert.equal(recordingText(0, 61 * 60 * 1000), '61:00');
 });

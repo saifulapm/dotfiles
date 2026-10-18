@@ -12,6 +12,14 @@ export const MAX_WIDTH = 560;
 // Each slot is null when it has nothing to show.
 export const pick = (slots) => PRIORITY.find((k) => slots[k]) ?? 'rest';
 
+const pad = (n) => String(n).padStart(2, '0');
+
+// mm:ss since a recording started; minutes run past 59 rather than adding hours.
+export function recordingText(sinceMs, nowMs) {
+  const s = Math.floor((nowMs - sinceMs) / 1000);
+  return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+}
+
 const joined = (parts) => parts.filter((p) => p).join(' · ');
 
 // `qs ipc call island state` reports this text, whatever the theme draws.
@@ -22,7 +30,7 @@ export function islandText(mode, slots, now) {
     case 'notification':
       return joined([slots.notification.app, slots.notification.summary, slots.notification.body]);
     case 'recording':
-      return `● ${slots.recording}`;
+      return `REC ${slots.recording}`;
     case 'osd':
       return `${slots.osd.kind === 'volume' ? 'Volume' : 'Brightness'} ${slots.osd.value}%`;
     case 'calendar':

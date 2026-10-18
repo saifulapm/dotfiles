@@ -151,6 +151,7 @@ PanelWindow {
         active: false
         sourceComponent: Root.Recorder {
             theme: host.theme
+            screen: host.screen
         }
     }
 
