@@ -80,6 +80,13 @@ check "blueprint to artboard: all artboard by 300 ms ($final)" all_are ${rgb[art
 switch_from artboard paper
 check "artboard to paper: all paper by 300 ms ($final)" all_are ${rgb[paper]}
 
+# Back to paper while the slide to blueprint still runs: paper must be what stays.
+"$repo/bin/dots" theme blueprint >/dev/null
+"$repo/bin/dots" theme paper >/dev/null
+sleep 0.8
+final=$(bands)
+check "paper, blueprint, paper inside one transition ends on paper ($final)" all_are ${rgb[paper]}
+
 timers_one() { shell_status | jq -e '.timers == 1' >/dev/null; }
 check "after the transitions status reports timers 1" timers_one
 

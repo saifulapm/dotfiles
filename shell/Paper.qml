@@ -47,16 +47,17 @@ PanelWindow {
     function take(t) {
         if (!t)
             return;
-        // The first tokens, or the same theme again, replace the paper with no transition.
-        if (!front.tokens || front.tokens.name === t.name) {
-            front.tokens = t;
-            return;
-        }
-        if (kind && !waiting) {
+        // A switch during a transition ends it first, so the comparison below is with what is now on screen.
+        if (kind) {
             slide.stop();
             zoom.stop();
             scan.stop();
             finish();
+        }
+        // The first tokens, or the same theme again, replace the paper with no transition.
+        if (!front.tokens || front.tokens.name === t.name) {
+            front.tokens = t;
+            return;
         }
         kind = ({ snappy: "slide", spring: "zoom", linear: "scan" })[front.tokens.primitive.motion] ?? "cut";
         // The back sheet waits off screen or under the front one, so its shader rebuild never shows.
