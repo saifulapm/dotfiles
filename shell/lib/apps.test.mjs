@@ -19,8 +19,8 @@ test('tmux status line takes the theme colours, lower-case', () => {
 });
 
 test('a throwaway tmux server accepts the fragment', (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'dots-t5-'));
-  const sock = `dots-t5-${process.pid}`;
+  const dir = mkdtempSync(join(tmpdir(), 'dots-apps-'));
+  const sock = `dots-apps-${process.pid}`;
   const tmux = (...a) => execFileSync('tmux', ['-L', sock, ...a], { encoding: 'utf8' });
   t.after(() => {
     try { tmux('kill-server'); } catch {}
@@ -84,4 +84,17 @@ test('no path under home/ mentions kitty, and the links point at theme-out', () 
   const links = files.filter((f) => /\/symlink_(dots\.kak|theme\.toml|gtk\.css|settings\.ini)/.test(f));
   assert.equal(links.length, 6);
   for (const l of links) assert.match(readFileSync(l, 'utf8'), /\.local\/state\/dots\/theme-out\/(dots\.kak|yazi-theme\.toml|gtk\.css|gtk-settings\.ini)\s*$/, l);
+});
+
+test('a running fish takes the new colours at its next prompt', (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-fish-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  const out = join(state, 'dots/theme-out');
+  execFileSync('mkdir', ['-p', out]);
+  writeFileSync(join(out, 'colors.fish'), renderFish(paper));
+  const config = new URL('../../home/dot_config/fish/config.fish', import.meta.url).pathname;
+  // One fish: the config at start, then a new colours file and a prompt, as after dots theme.
+  const script = `source ${config}; echo $fish_color_normal; echo '${renderFish(blueprint).replace(/'/g, "\\'")}' > ${out}/colors.fish; emit fish_prompt; echo $fish_color_normal`;
+  const seen = execFileSync('fish', ['--no-config', '-c', script], { env: { ...process.env, XDG_STATE_HOME: state }, encoding: 'utf8' }).trim().split('\n');
+  assert.deepEqual(seen, [paper.color.ink.slice(1).toLowerCase(), 'd6f4f8']);
 });
