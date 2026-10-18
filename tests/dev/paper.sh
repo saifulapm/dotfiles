@@ -9,11 +9,15 @@ check "the session bus is its own" test -n "$DBUS_SESSION_BUS_ADDRESS" -a "$DBUS
 
 until_ok 5000 shell_status >/dev/null
 status=$(shell_status)
-echo "     status: $status"
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
+real_rss=$(awk '/^VmRSS/ { print $2 }' "/proc/$pid/status")
+echo "     status: $status (VmRSS $real_rss)"
 check "the shell process has the nested bus" grep -qzxF "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" "/proc/$pid/environ"
 status_is_m1() { jq -e '.theme == "paper" and (.outputs | length) == 1 and .timers == 1' <<<"$status" >/dev/null; }
 check "status names theme paper, one output, only the clock tick" status_is_m1
+# The shell is still growing here, so an RSS read one call late is far off.
+rss_now() { local said; said=$(jq .rssKiB <<<"$status"); ((said - real_rss < 2048 && real_rss - said < 2048)); }
+check "status rssKiB is the RSS of that call" rss_now
 
 paper_layer() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-paper" and .layer == "Background")' >/dev/null; }
 until_ok 3000 paper_layer

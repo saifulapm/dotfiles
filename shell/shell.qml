@@ -45,11 +45,11 @@ ShellRoot {
         blockLoading: true
     }
 
-    // Read at call time, so status reports the RSS of that moment.
+    // Read at call time; blockAllReads, or text() after reload() is the previous call's RSS.
     FileView {
         id: procStatus
         path: "/proc/self/status"
-        blockLoading: true
+        blockAllReads: true
     }
 
     IpcHandler {
