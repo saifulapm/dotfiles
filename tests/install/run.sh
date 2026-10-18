@@ -61,6 +61,18 @@ check "\$HOME/.local/state/dots/theme contains paper (got '$theme')" test "$them
 check "\$HOME/.local/state/dots/theme-out/shell.json exists" \
   podman exec "$name" test -f "$home/.local/state/dots/theme-out/shell.json"
 
+check "\$HOME/.local/bin/dots-dshift is executable" podman exec "$name" test -x "$home/.local/bin/dots-dshift"
+
+check "saiful is in the input group" podman exec "$name" bash -c "id -nG saiful | tr ' ' '\n' | grep -qx input"
+
+unit=$(podman exec "$name" readlink -f "$home/.config/systemd/user/dots-dshift.service")
+check "dots-dshift.service links to the repo unit (got '$unit')" \
+  test "$unit" = "$home/Sites/github/dotfiles/home/dot_config/systemd/user/dots-dshift.service"
+check "dots-dshift.service runs %h/.local/bin/dots-dshift" \
+  podman exec "$name" grep -qx 'ExecStart=%h/.local/bin/dots-dshift' "$home/.config/systemd/user/dots-dshift.service"
+
+check "gcc and wl-clipboard are installed" podman exec "$name" rpm -q gcc wl-clipboard
+
 calls=$(podman exec "$name" cat "$log")
 total=$(grep -c . <<<"$calls")
 prompting=$(grep -vc '^-n' <<<"$calls")
