@@ -3,6 +3,7 @@ binds {
     Mod+Shift+Slash hotkey-overlay-title="Show Hotkeys" { show-hotkey-overlay; }
     Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
     Mod+Space hotkey-overlay-title="Launcher" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
+    Mod+Shift+T hotkey-overlay-title="Themes" { spawn "qs" "ipc" "call" "themes" "toggle"; }
     Mod+Q repeat=false hotkey-overlay-title="Close Window" { close-window; }
     Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }
 

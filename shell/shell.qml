@@ -154,4 +154,58 @@ ShellRoot {
             return JSON.stringify({ open: false, mode: "apps", query: "", results: [], selected: 0, openMs: null, opens: 0 });
         }
     }
+
+    // The theme list is read with the shell, so the switcher's first open does not wait on it.
+    property var themeList: []
+
+    FileView {
+        path: themeService.dir + "/theme-out/themes.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                root.themeList = JSON.parse(text());
+            } catch (e) {
+                console.warn("themes: keeping the last good list: " + e.message);
+            }
+        }
+    }
+
+    LazyLoader {
+        id: themesLoader
+
+        Root.Themes {
+            theme: themeService
+            themes: root.themeList
+        }
+    }
+
+    IpcHandler {
+        target: "themes"
+
+        // t0 is taken before the first load, so a cold open's time includes loading.
+        function open(): void {
+            const t0 = Date.now();
+            themesLoader.active = true;
+            themesLoader.item.open(t0);
+        }
+
+        function close(): void {
+            if (themesLoader.item)
+                themesLoader.item.close();
+        }
+
+        function toggle(): void {
+            if (themesLoader.item?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (themesLoader.item)
+                return themesLoader.item.state();
+            return JSON.stringify({ open: false, themes: root.themeList.map(t => t.name), selected: themeService.name, current: themeService.name, openMs: null, opens: 0 });
+        }
+    }
 }
