@@ -89,6 +89,19 @@ ShellRoot {
         id: notifsService
     }
 
+    Services.Osd {
+        id: osdService
+    }
+
+    IpcHandler {
+        target: "osd"
+
+        // The brightness keys call this; the step is like 5%+ or 5%-.
+        function brightness(step: string): void {
+            osdService.brightness(step);
+        }
+    }
+
     IpcHandler {
         target: "notifs"
 
@@ -113,6 +126,7 @@ ShellRoot {
         clock: clockService
         notifs: notifsService
         questions: questionsService
+        osd: osdService.current
     }
 
     Variants {

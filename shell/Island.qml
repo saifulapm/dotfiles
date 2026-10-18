@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import QtQuick.Shapes
 import "." as Root
 import "lib/island.mjs" as I
 import "lib/questions.mjs" as Q
@@ -106,15 +107,15 @@ PanelWindow {
         id: box
         x: island.padSide
         y: 10
-        // A notification is a 440 px card and a question the full 560, as drawn; every other mode is one line as wide as its text.
-        width: island.mode === "notification" ? 440 : island.mode === "question" ? I.MAX_WIDTH : island.mode === "calendar" ? 320 : I.boxWidth(Math.ceil(label.implicitWidth) + 28)
-        height: island.mode === "notification" ? card.implicitHeight + 28 : island.mode === "question" ? ask.implicitHeight + 32 : island.mode === "calendar" ? month.implicitHeight + 32 : 34
+        // As drawn: a 440 px notification card, a 560 px question, a 320 px calendar and a 280 px OSD bar; any other mode is one line as wide as its text.
+        width: ({ notification: 440, question: I.MAX_WIDTH, calendar: 320, osd: 280 })[island.mode] ?? I.boxWidth(Math.ceil(label.implicitWidth) + 28)
+        height: island.mode === "notification" ? card.implicitHeight + 28 : island.mode === "question" ? ask.implicitHeight + 32 : island.mode === "calendar" ? month.implicitHeight + 32 : island.mode === "osd" ? 36 : 34
         tokens: island.theme.tokens
         role: "island"
 
         Text {
             id: label
-            visible: ["notification", "question", "calendar"].indexOf(island.mode) < 0
+            visible: ["notification", "question", "calendar", "osd"].indexOf(island.mode) < 0
             anchors.centerIn: parent
             width: Math.min(implicitWidth, parent.width - 28)
             elide: Text.ElideRight
@@ -123,6 +124,59 @@ PanelWindow {
             font.family: island.theme.tokens?.type.mono ?? ""
             font.pixelSize: 13
             font.weight: Font.Medium
+        }
+
+        Row {
+            visible: island.mode === "osd"
+            x: 14
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
+
+            // A speaker for volume, a sun for brightness, drawn as 16 px strokes in the text colour.
+            Shape {
+                width: 16
+                height: 16
+                anchors.verticalCenter: parent.verticalCenter
+
+                ShapePath {
+                    strokeColor: box.style.text
+                    strokeWidth: 1.5
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.RoundJoin
+
+                    PathSvg {
+                        path: island.osd?.kind === "brightness"
+                            ? "M 11 8 A 3 3 0 1 1 5 8 A 3 3 0 1 1 11 8 M 8 1 L 8 2.5 M 8 13.5 L 8 15 M 1 8 L 2.5 8 M 13.5 8 L 15 8 M 3 3 L 4 4 M 12 12 L 13 13 M 3 13 L 4 12 M 12 4 L 13 3"
+                            : "M 2 6 L 5 6 L 9 2.5 L 9 13.5 L 5 10 L 2 10 Z M 11.5 5.5 Q 13 8 11.5 10.5 M 13.5 3.5 Q 16 8 13.5 12.5"
+                    }
+                }
+            }
+
+            Rectangle {
+                width: 180
+                height: 4
+                radius: 2
+                anchors.verticalCenter: parent.verticalCenter
+                color: Qt.alpha(box.style.text, 0.2)
+
+                Rectangle {
+                    width: parent.width * Math.min(island.osd?.value ?? 0, 100) / 100
+                    height: parent.height
+                    radius: parent.radius
+                    color: box.style.text
+                }
+            }
+
+            Text {
+                width: 36
+                anchors.verticalCenter: parent.verticalCenter
+                horizontalAlignment: Text.AlignRight
+                text: island.osd?.value ?? ""
+                color: box.style.text
+                font.family: island.theme.tokens?.type.mono ?? ""
+                font.pixelSize: 12
+            }
         }
 
         Column {
