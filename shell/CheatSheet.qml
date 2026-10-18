@@ -222,8 +222,8 @@ Item {
                                             font.pixelSize: 11
                                         }
                                         Text {
-                                            textFormat: Text.PlainText
                                             id: keyText
+                                            textFormat: Text.PlainText
                                             text: modelData.key
                                             color: c.ink
                                             font.family: fonts.mono

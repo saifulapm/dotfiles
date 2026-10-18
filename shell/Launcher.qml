@@ -116,8 +116,8 @@ Item {
                         implicitHeight: chip.implicitHeight + 6
                         color: c.ink
                         Text {
-                            textFormat: Text.PlainText
                             id: chip
+                            textFormat: Text.PlainText
                             anchors.centerIn: parent
                             text: "APPS"
                             color: c.surface

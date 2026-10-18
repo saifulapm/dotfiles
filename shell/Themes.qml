@@ -129,8 +129,8 @@ Item {
                         font.letterSpacing: 0.66
                     }
                     Text {
-                        textFormat: Text.PlainText
                         id: currentName
+                        textFormat: Text.PlainText
                         text: "current: " + switcher.theme.name
                         color: c.muted
                         font.family: fonts.ui
@@ -209,8 +209,8 @@ Item {
                                 height: name.height
 
                                 Text {
-                                    textFormat: Text.PlainText
                                     id: name
+                                    textFormat: Text.PlainText
                                     text: card.modelData.name.charAt(0).toUpperCase() + card.modelData.name.slice(1)
                                     color: c.ink
                                     font.family: card.modelData.type.display
@@ -235,8 +235,8 @@ Item {
                     height: hint.height
 
                     Text {
-                        textFormat: Text.PlainText
                         id: hint
+                        textFormat: Text.PlainText
                         text: "j/k or ←/→ choose    ↵ apply (≤ 300 ms)"
                         color: c.muted
                         font.family: fonts.mono

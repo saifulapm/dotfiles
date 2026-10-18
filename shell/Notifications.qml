@@ -165,8 +165,8 @@ Item {
                         border.color: centre.notifs.dnd ? c.accent : c.line
                         border.width: 1
                         Text {
-                            textFormat: Text.PlainText
                             id: chip
+                            textFormat: Text.PlainText
                             anchors.centerIn: parent
                             text: "Do not disturb: " + (centre.notifs.dnd ? "on" : "off")
                             color: centre.notifs.dnd ? c.accent : c.muted
