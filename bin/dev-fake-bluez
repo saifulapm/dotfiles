@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+# A BlueZ adapter hci0 with a paired "Test Headphones" and a new "Test Speaker" on $DBUS_SYSTEM_BUS_ADDRESS; Connect, Disconnect, Pair and RemoveDevice change them.
+import os
+import sys
+
+REAL_SYSTEM_BUS = "unix:path=/run/dbus/system_bus_socket"
+address = os.environ.get("DBUS_SYSTEM_BUS_ADDRESS", "")
+if address in ("", REAL_SYSTEM_BUS):
+    sys.exit("dev-fake-bluez: DBUS_SYSTEM_BUS_ADDRESS must be a test bus, not unset or the real system bus")
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+ADAPTER = "org.bluez.Adapter1"
+DEVICE = "org.bluez.Device1"
+PROPS = "org.freedesktop.DBus.Properties"
+MANAGER = "org.freedesktop.DBus.ObjectManager"
+HCI0 = "/org/bluez/hci0"
+
+
+class Object(dbus.service.Object):
+    def __init__(self, bus, path, interface, props):
+        super().__init__(bus, path)
+        self.path = path
+        self.interface = interface
+        self.props = props
+
+    def managed(self):
+        return {self.interface: dbus.Dictionary(self.props, signature="sv")}
+
+    def change(self, **changed):
+        self.props.update(changed)
+        self.PropertiesChanged(self.interface, dbus.Dictionary(changed, signature="sv"), dbus.Array([], signature="s"))
+
+    @dbus.service.method(PROPS, in_signature="ss", out_signature="v")
+    def Get(self, interface, name):
+        return self.props[name]
+
+    @dbus.service.method(PROPS, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        return dbus.Dictionary(self.props if interface == self.interface else {}, signature="sv")
+
+    @dbus.service.method(PROPS, in_signature="ssv")
+    def Set(self, interface, name, value):
+        self.change(**{name: value})
+
+    @dbus.service.signal(PROPS, signature="sa{sv}as")
+    def PropertiesChanged(self, interface, changed, invalidated):
+        pass
+
+
+class Device(Object):
+    def __init__(self, bus, mac, name, paired):
+        super().__init__(bus, HCI0 + "/dev_" + mac.replace(":", "_"), DEVICE, {
+            "Address": dbus.String(mac),
+            "Name": dbus.String(name),
+            "Alias": dbus.String(name),
+            "Icon": dbus.String("audio-headphones"),
+            "Adapter": dbus.ObjectPath(HCI0),
+            "Paired": dbus.Boolean(paired),
+            "Bonded": dbus.Boolean(paired),
+            "Trusted": dbus.Boolean(paired),
+            "Blocked": dbus.Boolean(False),
+            "WakeAllowed": dbus.Boolean(False),
+            "Connected": dbus.Boolean(False),
+        })
+
+    @dbus.service.method(DEVICE)
+    def Connect(self):
+        self.change(Connected=dbus.Boolean(True))
+
+    @dbus.service.method(DEVICE)
+    def Disconnect(self):
+        self.change(Connected=dbus.Boolean(False))
+
+    @dbus.service.method(DEVICE)
+    def Pair(self):
+        self.change(Paired=dbus.Boolean(True), Bonded=dbus.Boolean(True))
+
+    @dbus.service.method(DEVICE)
+    def CancelPairing(self):
+        pass
+
+
+class Adapter(Object):
+    def __init__(self, bus, root):
+        super().__init__(bus, HCI0, ADAPTER, {
+            "Address": dbus.String("00:00:00:00:00:01"),
+            "Name": dbus.String("dots-fake"),
+            "Alias": dbus.String("dots-fake"),
+            "Powered": dbus.Boolean(True),
+            "Discoverable": dbus.Boolean(False),
+            "DiscoverableTimeout": dbus.UInt32(180),
+            "Discovering": dbus.Boolean(False),
+            "Pairable": dbus.Boolean(True),
+            "PairableTimeout": dbus.UInt32(0),
+        })
+        self.root = root
+
+    @dbus.service.method(ADAPTER)
+    def StartDiscovery(self):
+        self.change(Discovering=dbus.Boolean(True))
+
+    @dbus.service.method(ADAPTER)
+    def StopDiscovery(self):
+        self.change(Discovering=dbus.Boolean(False))
+
+    @dbus.service.method(ADAPTER, in_signature="o")
+    def RemoveDevice(self, path):
+        device = self.root.objects.pop(str(path))
+        device.remove_from_connection()
+        self.root.InterfacesRemoved(path, dbus.Array([DEVICE], signature="s"))
+
+
+class Root(dbus.service.Object):
+    def __init__(self, bus):
+        super().__init__(bus, "/")
+        self.objects = {}
+
+    def add(self, obj):
+        self.objects[obj.path] = obj
+
+    @dbus.service.method(MANAGER, out_signature="a{oa{sa{sv}}}")
+    def GetManagedObjects(self):
+        return {dbus.ObjectPath(p): o.managed() for p, o in self.objects.items()}
+
+    @dbus.service.signal(MANAGER, signature="oa{sa{sv}}")
+    def InterfacesAdded(self, path, interfaces):
+        pass
+
+    @dbus.service.signal(MANAGER, signature="oas")
+    def InterfacesRemoved(self, path, interfaces):
+        pass
+
+
+DBusGMainLoop(set_as_default=True)
+bus = dbus.bus.BusConnection(address)
+root = Root(bus)
+root.add(Adapter(bus, root))
+root.add(Device(bus, "00:00:00:00:00:02", "Test Headphones", True))
+root.add(Device(bus, "00:00:00:00:00:03", "Test Speaker", False))
+name = dbus.service.BusName("org.bluez", bus, do_not_queue=True)
+GLib.MainLoop().run()
