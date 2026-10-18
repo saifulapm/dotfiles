@@ -35,4 +35,23 @@ notify-send "$(printf 'long %.0s' $(seq 1 200))"
 until_ok 1000 eval 'island | jq -e ".text | test(\"long\")" >/dev/null'
 check "a long notification keeps the island within 560 px" width_ok
 
+notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
+notify-send -u critical "battery low"
+until_ok 1000 eval 'island | jq -e ".text | test(\"battery low\")" >/dev/null'
+notify-send "chat ping"
+until_ok 1000 eval 'island | jq -e ".text | test(\"chat ping\")" >/dev/null'
+critical_back() { island | jq -e '.mode == "notification" and (.text | test("battery low"))' >/dev/null; }
+until_ok 7000 critical_back
+check "a critical notification comes back once a newer one's 5 s are up" critical_back
+
+id=$(notify-send -p "download 10%")
+until_ok 1000 eval 'island | jq -e ".text | test(\"download 10%\")" >/dev/null'
+before=$(notifs | jq .count)
+notify-send -r "$id" "download 90%"
+replaced() { island | jq -e '.text | test("download 90%")' >/dev/null; }
+until_ok 1000 replaced
+check "a notification that replaces another shows its new text" replaced
+in_place() { notifs | jq -e --argjson n "$before" '.summaries[0] == "download 90%" and .count == $n and all(.summaries[]; . != "download 10%")' >/dev/null; }
+check "and takes the old one's place in the history" in_place
+
 exit $((fails > 0))

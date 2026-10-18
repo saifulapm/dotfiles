@@ -11,9 +11,11 @@ Scope {
 
     // The island's notification slot, null while none shows.
     property var current: null
+    // The newest critical notification not yet closed; the island goes back to it when a newer one's 5 s are up.
+    property var pinned: null
     // Newest first, at most 200, kept in the state dir across restarts.
     property var history: []
-    // While on, a notification goes to the history only (YR6X5WB1).
+    // While on, a notification goes to the history only, and the island stays at rest.
     property bool dnd: false
     // The live Notification behind each history key, for its actions; dropped with its entry.
     property var live: ({})
@@ -56,11 +58,41 @@ Scope {
     }
 
     // The island is cleared here, not by the closed signal, since after a restart no live object is left.
-    function remove(key) {
+    function show(e) {
+        if (dnd)
+            return;
+        current = e;
+        if (e.critical) {
+            pinned = e;
+            hold.stop();
+        } else {
+            hold.restart();
+        }
+    }
+
+    // Closed by its app, or dismissed here: the island falls back to a pinned critical one, or rests.
+    function gone(key) {
+        if (pinned?.key === key)
+            pinned = null;
         if (current?.key === key) {
-            current = null;
+            current = pinned;
             hold.stop();
         }
+    }
+
+    // A Notify that replaces an earlier one updates that object in place, so its entry is rebuilt under the same key.
+    function replaced(n, key) {
+        const e = entry(n);
+        e.key = key;
+        history = [e].concat(history.filter(h => h.key !== key));
+        save();
+        if (pinned?.key === key && !e.critical)
+            pinned = null;
+        show(e);
+    }
+
+    function remove(key) {
+        gone(key);
         const kept = {};
         for (const k in live) {
             if (k === key)
@@ -75,6 +107,7 @@ Scope {
 
     function clear() {
         current = null;
+        pinned = null;
         hold.stop();
         for (const k in live)
             live[k]?.dismiss();
@@ -120,24 +153,28 @@ Scope {
             n.tracked = true;
             const e = notifs.entry(n);
             notifs.remember(e, n);
-            if (notifs.dnd)
-                return;
-            notifs.current = e;
-            if (e.critical)
-                hold.stop();
-            else
-                hold.restart();
-            // A critical notification leaves only when it is closed, by its app or by a dismiss.
-            n.closed.connect(() => {
-                if (notifs.current?.id === n.id)
-                    notifs.current = null;
-            });
+            notifs.show(e);
+            n.closed.connect(() => notifs.gone(e.key));
+            // A replace sets each field in turn within one call, so the entry is rebuilt once, after the last.
+            let pending = false;
+            const changed = () => {
+                if (pending)
+                    return;
+                pending = true;
+                Qt.callLater(() => {
+                    pending = false;
+                    notifs.replaced(n, e.key);
+                });
+            };
+            n.summaryChanged.connect(changed);
+            n.bodyChanged.connect(changed);
+            n.urgencyChanged.connect(changed);
         }
     }
 
     Root.Tick {
         id: hold
         interval: 5000
-        onTriggered: notifs.current = null
+        onTriggered: notifs.current = notifs.pinned
     }
 }
