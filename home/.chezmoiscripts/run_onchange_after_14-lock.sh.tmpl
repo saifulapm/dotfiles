@@ -1,0 +1,8 @@
+#!/bin/bash
+# pam and logind source hashes: {{ joinPath .chezmoi.workingTree "system/pam.d/dots-lock" | include | sha256sum }} {{ joinPath .chezmoi.workingTree "system/logind.conf.d/dots-lid.conf" | include | sha256sum }}
+{{ template "lib.sh" . }}
+# The lock screen authenticates through its own PAM service.
+root install -D -m 0644 {{ joinPath .chezmoi.workingTree "system/pam.d/dots-lock" | quote }} /etc/pam.d/dots-lock || die "could not install the lock's PAM service"
+root install -D -m 0644 {{ joinPath .chezmoi.workingTree "system/logind.conf.d/dots-lid.conf" | quote }} /etc/systemd/logind.conf.d/dots-lid.conf || die "could not install the lid setting"
+# logind rereads its config on reload, without ending any session; where it is not running, the next boot reads it.
+root systemctl reload systemd-logind 2>/dev/null || log "the lid setting lands at the next boot"
