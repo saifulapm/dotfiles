@@ -59,6 +59,6 @@ test('rows group into the four columns in order, empty ones kept', () => {
 test('a filter matches the title or the key text, ignoring case', () => {
   const rows = parseBinds(binds);
   assert.deepEqual(filterRows(rows, 'theme').map((r) => r.title), ['Themes']);
-  assert.deepEqual(filterRows(rows, 'mod ⇧').map((r) => r.title), ['Themes', 'Pin Notes', 'Quit niri', 'Fullscreen Window']);
+  assert.deepEqual(filterRows(rows, 'mod ⇧').map((r) => r.title), ['Themes', 'Pin Notes', 'Record a Region', 'Quit niri', 'Center Column', 'Fullscreen Window']);
   assert.equal(filterRows(rows, '').length, rows.length);
 });

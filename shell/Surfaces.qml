@@ -14,48 +14,70 @@ PanelWindow {
     readonly property var themes: themesLoader.item
     readonly property var notifications: notifsLoader.item
     readonly property var cheatsheet: cheatsheetLoader.item
-    readonly property bool shown: (launcher?.shown ?? false) || (themes?.shown ?? false) || (notifications?.shown ?? false) || (cheatsheet?.shown ?? false)
+    readonly property var control: controlLoader.item
+    readonly property var recorder: recorderLoader.item
+    readonly property var polkit: polkitLoader.item
+    // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
+    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit]
+    readonly property bool shown: all.some(s => s?.shown ?? false)
+
+    // Only one surface shows at a time.
+    function closeOthers(keep) {
+        for (const s of all) {
+            if (s && s !== keep)
+                s.close();
+        }
+    }
 
     // t0 is taken before the first load, so a cold open's time includes loading.
-    function openLauncher(t0) {
-        themes?.close();
-        notifications?.close();
-        cheatsheet?.close();
+    function openLauncher(t0, mode) {
         launcherLoader.active = true;
-        launcher.open(t0);
+        closeOthers(launcher);
+        launcher.open(t0, mode);
     }
 
     function openThemes(t0) {
-        launcher?.close();
-        notifications?.close();
-        cheatsheet?.close();
         themesLoader.active = true;
+        closeOthers(themes);
         themes.open(t0);
     }
 
     function openNotifs(t0) {
-        launcher?.close();
-        themes?.close();
-        cheatsheet?.close();
         notifsLoader.active = true;
+        closeOthers(notifications);
         notifications.open(t0);
     }
 
     function openCheatsheet(t0) {
-        launcher?.close();
-        themes?.close();
-        notifications?.close();
         cheatsheetLoader.active = true;
+        closeOthers(cheatsheet);
         cheatsheet.open(t0);
+    }
+
+    function openControl(t0) {
+        controlLoader.active = true;
+        closeOthers(control);
+        control.open(t0);
+    }
+
+    function toggleRecorder() {
+        recorderLoader.active = true;
+        if (!recorder.shown && !recorder.recording)
+            closeOthers(recorder);
+        recorder.toggle();
+    }
+
+    // The polkit agent loads this when a request arrives.
+    function loadPolkit() {
+        polkitLoader.active = true;
+        return polkit;
     }
 
     Connections {
         target: host.contentItem.Window.window
         function onFrameSwapped() {
-            host.launcher?.swapped();
-            host.themes?.swapped();
-            host.notifications?.swapped();
-            host.cheatsheet?.swapped();
+            for (const s of host.all)
+                s?.swapped();
         }
     }
 
@@ -110,6 +132,33 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.CheatSheet {
+            theme: host.theme
+        }
+    }
+
+    Loader {
+        id: controlLoader
+        anchors.fill: parent
+        active: false
+        sourceComponent: Root.Control {
+            theme: host.theme
+        }
+    }
+
+    Loader {
+        id: recorderLoader
+        anchors.fill: parent
+        active: false
+        sourceComponent: Root.Recorder {
+            theme: host.theme
+        }
+    }
+
+    Loader {
+        id: polkitLoader
+        anchors.fill: parent
+        active: false
+        sourceComponent: Root.PolkitPrompt {
             theme: host.theme
         }
     }

@@ -3,11 +3,17 @@ binds {
     Mod+Slash hotkey-overlay-title="Cheat Sheet" { spawn "qs" "ipc" "call" "cheatsheet" "toggle"; }
     Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
     Mod+Space hotkey-overlay-title="Launcher" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
+    Mod+V hotkey-overlay-title="Clipboard" { spawn "qs" "ipc" "call" "launcher" "mode" "clipboard"; }
+    Mod+Period hotkey-overlay-title="Emoji" { spawn "qs" "ipc" "call" "launcher" "mode" "emoji"; }
+    Mod+C hotkey-overlay-title="Control" { spawn "qs" "ipc" "call" "control" "toggle"; }
     Mod+Shift+T hotkey-overlay-title="Themes" { spawn "qs" "ipc" "call" "themes" "toggle"; }
     Mod+A hotkey-overlay-title="Notifications" { spawn "qs" "ipc" "call" "notifs" "toggle"; }
     Mod+I hotkey-overlay-title="Island" { spawn "qs" "ipc" "call" "island" "focus"; }
     Mod+N hotkey-overlay-title="Notes" { spawn "qs" "ipc" "call" "notes" "toggle"; }
     Mod+Shift+N hotkey-overlay-title="Pin Notes" { spawn "qs" "ipc" "call" "notes" "pin"; }
+    Mod+Escape hotkey-overlay-title="Lock" { spawn "qs" "ipc" "call" "lock" "lock"; }
+    Mod+Shift+R hotkey-overlay-title="Record a Region" { spawn "qs" "ipc" "call" "record" "toggle"; }
+    Print hotkey-overlay-title="Screenshot" { screenshot; }
     Mod+Q repeat=false hotkey-overlay-title="Close Window" { close-window; }
     Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }
 
@@ -52,5 +58,6 @@ binds {
     XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness Down" { spawn "qs" "ipc" "call" "osd" "brightness" "5%-"; }
 
     Mod+F hotkey-overlay-title="Maximize Column" { maximize-column; }
+    Mod+Shift+C hotkey-overlay-title="Center Column" { center-column; }
     Mod+Shift+F hotkey-overlay-title="Fullscreen Window" { fullscreen-window; }
 }

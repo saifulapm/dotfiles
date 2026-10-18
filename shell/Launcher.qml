@@ -29,11 +29,12 @@ Item {
     readonly property var found: Lib.rank(apps, query)
     readonly property var rows: found.slice(0, 8)
 
-    function open(t0) {
+    // mode is clipboard or emoji when a key opened the launcher straight into one.
+    function open(t0, mode) {
         openT0 = t0;
         openMs = null;
         opens += 1;
-        input.text = "";
+        input.text = ({ clipboard: "v ", emoji: ": " })[mode] || "";
         selected = 0;
         shown = true;
         input.forceActiveFocus();

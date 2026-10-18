@@ -140,6 +140,13 @@ ShellRoot {
                 open();
         }
 
+        // Opens straight into a mode, like clipboard for Mod+V or emoji for Mod+.
+        function mode(name: string): void {
+            const t0 = Date.now();
+            surfacesLoader.active = true;
+            surfacesLoader.item.openLauncher(t0, name);
+        }
+
         function state(): string {
             if (surfacesLoader.item?.launcher)
                 return surfacesLoader.item.launcher.state();
@@ -227,5 +234,63 @@ ShellRoot {
                 return surfacesLoader.item.cheatsheet.state();
             return JSON.stringify({ open: false, rows: 0, groups: [], query: "", openMs: null, opens: 0 });
         }
+    }
+
+    IpcHandler {
+        target: "control"
+
+        // t0 is taken before the first load, so a cold open's time includes loading.
+        function open(): void {
+            const t0 = Date.now();
+            surfacesLoader.active = true;
+            surfacesLoader.item.openControl(t0);
+        }
+
+        function close(): void {
+            surfacesLoader.item?.control?.close();
+        }
+
+        function toggle(): void {
+            if (surfacesLoader.item?.control?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (surfacesLoader.item?.control)
+                return surfacesLoader.item.control.state();
+            return JSON.stringify({ open: false, openMs: null, opens: 0 });
+        }
+    }
+
+    IpcHandler {
+        target: "record"
+
+        // Opens the picker, or stops a recording that is running.
+        function toggle(): void {
+            surfacesLoader.active = true;
+            surfacesLoader.item.toggleRecorder();
+        }
+
+        function state(): string {
+            if (surfacesLoader.item?.recorder)
+                return surfacesLoader.item.recorder.state();
+            return JSON.stringify({ picking: false, recording: false });
+        }
+    }
+
+    Root.Lock {
+        id: lockScope
+        theme: themeService
+    }
+
+    Root.Polkit {
+        surfaces: surfacesLoader
+    }
+
+    Root.Idle {
+        lock: lockScope
+        surfaces: surfacesLoader
     }
 }

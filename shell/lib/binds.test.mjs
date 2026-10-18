@@ -36,3 +36,16 @@ test('the volume keys step the default sink by 5 % and the brightness keys go th
   assert.match(binds, spawns('XF86MonBrightnessUp', ['qs', 'ipc', 'call', 'osd', 'brightness', '5%+']));
   assert.match(binds, spawns('XF86MonBrightnessDown', ['qs', 'ipc', 'call', 'osd', 'brightness', '5%-']));
 });
+
+test('m5 binds open Control, the clipboard and emoji modes, the lock and the recorder', () => {
+  assert.match(binds, spawns('Mod+C', ['qs', 'ipc', 'call', 'control', 'toggle']));
+  assert.match(binds, spawns('Mod+V', ['qs', 'ipc', 'call', 'launcher', 'mode', 'clipboard']));
+  assert.match(binds, spawns('Mod+Period', ['qs', 'ipc', 'call', 'launcher', 'mode', 'emoji']));
+  assert.match(binds, spawns('Mod+Escape', ['qs', 'ipc', 'call', 'lock', 'lock']));
+  assert.match(binds, spawns('Mod+Shift+R', ['qs', 'ipc', 'call', 'record', 'toggle']));
+});
+
+test('Print opens niri screenshot UI and center-column moves to Mod+Shift+C', () => {
+  assert.match(binds, /^\s*Print hotkey-overlay-title="[^"]+" \{ screenshot; \}$/m);
+  assert.match(binds, /^\s*Mod\+Shift\+C hotkey-overlay-title="[^"]+" \{ center-column; \}$/m);
+});

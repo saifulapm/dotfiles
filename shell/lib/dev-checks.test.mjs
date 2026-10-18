@@ -16,3 +16,12 @@ test('no check line in tests/dev redirects its output', () => {
   }
   assert.deepEqual(found, []);
 });
+
+// Two nested sessions at once stretch every timing, so each check waits its turn for one shared lock.
+test('lib.sh takes the nested-check lock before it starts dots-dev, and dots-dev does not inherit it', () => {
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  const lock = lib.search(/flock\s+-w\s+\d+\s+9\b/);
+  const start = lib.search(/"\$repo\/bin\/dots-dev"[^\n]*9>&-/);
+  assert.ok(lock >= 0, 'lib.sh runs flock -w <s> 9');
+  assert.ok(start > lock, 'dots-dev starts after the lock, with fd 9 closed');
+});
