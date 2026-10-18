@@ -43,3 +43,8 @@ why = "Inter, the UI face of the Artboard theme"
 name = "qt6-qtshadertools"
 arch = "all"
 why = "qsb, which compiles the paper shaders in shell/shaders"
+
+[[package]]
+name = "jq"
+arch = "all"
+why = "dots theme and the dev checks read JSON with it"

@@ -11,8 +11,13 @@ gtk_scheme() { gsettings get org.gnome.desktop.interface color-scheme; }
 niri msg action spawn -- foot
 foot_up() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot")' >/dev/null; }
 until_ok 5000 foot_up
+niri msg action spawn -- foot
+two_windows() { test "$(niri msg -j windows | jq length)" = 2; }
+until_ok 5000 two_windows
+focused() { niri msg -j focused-window | jq -r .id; }
 tmux new-session -d -s dots-themes 'sleep 300'
 before=$(windows)
+focus_before=$(focused)
 # Low in foot's window, below the prompt, is only its background.
 inside="200,600 10x10"
 foot_is() { local r g b; read -r r g b < <(grim -s 1 -t ppm -g "$inside" - | mean_rgb); near "$r" "$1" && near "$g" "$2" && near "$b" "$3"; }
@@ -50,5 +55,6 @@ check "GTK prefers light with paper ($(gtk_scheme))" test "$(gtk_scheme)" = "'pr
 until_ok 1000 foot_is 250 246 236
 check "foot is back on Paper's surface" foot_is 250 246 236
 check "every window still has its id" test "$(windows)" = "$before"
+check "the same window keeps focus ($focus_before)" test "$(focused)" = "$focus_before"
 
 exit $((fails > 0))
