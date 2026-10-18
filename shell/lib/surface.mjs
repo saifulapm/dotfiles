@@ -1,0 +1,77 @@
+// How a surface looks under a token set, from its primitives only, so any mix of the menus draws.
+const SOFT = {
+  island: { y: 12, blur: 32, spread: -6, alpha: 0.45 },
+  card: { y: 32, blur: 64, spread: -12, alpha: 0.28 },
+  window: { y: 14, blur: 30, spread: 0, alpha: 0.22 },
+};
+const GLOW = { island: { blur: 8, alpha: 0.35 }, card: { blur: 14, alpha: 0.28 }, window: { blur: 4, alpha: 0.6 } };
+const HARD = { island: 3, card: 6, window: 3 };
+const ROUND = { island: 17, card: 14, window: 10 };
+// The token note's 12 px chamfer on full surfaces; the 34 px island and the previews use the designs' 10.
+const CHAMFER = { island: 10, card: 12, window: 10 };
+// Shadows keep the designs' CSS box-shadow numbers; Surface.qml converts the blur for Qt.
+const NO_SHADOW ={ kind: 'none', x: 0, y: 0, blur: 0, spread: 0, color: 'transparent', alpha: 0 };
+
+function frameOf(p, c, role) {
+  if (role === 'island') return { width: p.frame === 'glow' ? 1 : 0, color: p.frame === 'glow' ? c.accent : c.ink };
+  if (p.frame === 'glow') return { width: 1, color: c.accent };
+  // With no frame the focused card shows a 1.5 px accent selection outline instead.
+  if (p.frame === 'none') return { width: role === 'card' ? 1.5 : 0, color: c.accent };
+  const width = p.frame === 'double' ? 3 : role === 'card' ? 1.5 : 1;
+  return { width, color: p.frame === 'hairline' ? c.line : c.ink };
+}
+
+function shadowOf(p, c, role) {
+  if (p.shadow === 'hard-offset') {
+    const d = HARD[role];
+    return { kind: 'hard', x: d, y: d, blur: 0, spread: 0, color: role === 'island' ? c.accent : c.ink, alpha: 1 };
+  }
+  if (p.shadow === 'soft') {
+    const s = SOFT[role];
+    return { kind: 'soft', x: 0, y: s.y, blur: s.blur, spread: s.spread, color: c.ink, alpha: s.alpha };
+  }
+  if (p.frame === 'glow') return { kind: 'glow', x: 0, y: 0, blur: GLOW[role].blur, spread: 0, color: c.accent, alpha: GLOW[role].alpha };
+  return NO_SHADOW;
+}
+
+export function surfaceStyle(tokens, role) {
+  if (!tokens) {
+    return {
+      fill: 'transparent',
+      text: 'transparent',
+      frame: { width: 0, color: 'transparent' },
+      corner: { radius: 0, chamfer: 0 },
+      shadow: NO_SHADOW,
+      wash: 0,
+      misregistered: false,
+      handles: false,
+      ticks: false,
+    };
+  }
+  const p = tokens.primitive;
+  const c = tokens.color;
+  const inkIsland = role === 'island' && p.frame !== 'glow';
+  return {
+    fill: inkIsland ? c.ink : c.surface,
+    text: inkIsland ? c.paper : c.ink,
+    frame: frameOf(p, c, role),
+    corner: { radius: p.corner === 'round' ? ROUND[role] : 0, chamfer: p.corner === 'cut' ? CHAMFER[role] : 0 },
+    shadow: shadowOf(p, c, role),
+    wash: p.frame === 'none' ? 0.62 : 0.72,
+    misregistered: role === 'island' && p.shadow === 'hard-offset',
+    handles: role === 'card' && p.frame === 'none',
+    ticks: role === 'card' && p.corner === 'cut',
+  };
+}
+
+// Monospace labels read as drafting captions, so they go uppercase and tracked like the designs.
+export function marginStyle(tokens) {
+  const mono = tokens.type.ui === tokens.type.mono;
+  return {
+    font: tokens.type.ui,
+    size: mono ? 11 : 12,
+    caps: mono,
+    tracking: mono ? 1.32 : 0,
+    rules: ['ink', 'hairline', 'double'].includes(tokens.primitive.frame),
+  };
+}
