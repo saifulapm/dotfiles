@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import "." as Root
 import "lib/launcher.mjs" as Lib
 import "lib/clips.mjs" as Clips
+import "lib/emoji.mjs" as Emoji
 
 // Apps, windows, clipboard, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
 Item {
@@ -34,6 +35,9 @@ Item {
     property var windowList: []
     // cliphist list's output as of entering clipboard mode; bin/dots-clip-store writes the same db.
     property string clipList: ""
+    // [emoji, name, group] triples, read from shell/data/emoji.json the first time emoji mode is entered.
+    property var emojiList: []
+    property bool emojiWanted: false
     readonly property string clipDb: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/clips.db"
     // Every mode supplies rows as {title, detail, exec?, copy?}; a new mode adds a case here.
     readonly property var found: {
@@ -42,6 +46,8 @@ Item {
             return Lib.windowRows(windowList, parsed.q);
         case "clipboard":
             return Clips.clipRows(clipList, parsed.q, clipDb);
+        case "emoji":
+            return Emoji.emojiRows(emojiList, parsed.q);
         case "calculator":
             return Lib.calcRows(parsed.q);
         case "commands":
@@ -56,7 +62,6 @@ Item {
         return [];
     }
     readonly property var rows: found.slice(0, 8)
-    readonly property bool hasSource: mode !== "emoji"
     readonly property var chipNames: ({ apps: "APPS", windows: "WINDOWS", clipboard: "CLIPBOARD", emoji: "EMOJI", calculator: "CALC", commands: "COMMANDS" })
 
     // mode is clipboard or emoji when a key opened the launcher straight into one.
@@ -128,6 +133,13 @@ Item {
             lister.running = true;
         if (mode === "clipboard")
             listClips();
+        if (mode === "emoji")
+            emojiWanted = true;
+    }
+
+    FileView {
+        path: launcher.emojiWanted ? Quickshell.shellPath("data/emoji.json") : ""
+        onLoaded: launcher.emojiList = JSON.parse(text())
     }
 
     Process {
@@ -233,7 +245,7 @@ Item {
 
                     Text {
                         textFormat: Text.PlainText
-                        text: hasSource ? found.length + " FOUND" : "NOT YET"
+                        text: found.length + " FOUND"
                         color: c.muted
                         font.family: fonts.ui
                         font.pixelSize: 10
@@ -279,7 +291,7 @@ Item {
                             leftPadding: 20
                             topPadding: 11
                             bottomPadding: 11
-                            text: hasSource ? "NO MATCH · ↑↓ OR CTRL+J/K MOVE · TAB THEN J/K · ↵ OPEN · ESC CLOSE" : "NOT YET"
+                            text: "NO MATCH · ↑↓ OR CTRL+J/K MOVE · TAB THEN J/K · ↵ OPEN · ESC CLOSE"
                             color: c.muted
                             font.family: fonts.ui
                             font.pixelSize: 10
