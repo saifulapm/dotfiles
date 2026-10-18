@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+# A polkit authority on $DBUS_SYSTEM_BUS_ADDRESS that takes one agent's registration; org.dots.FakePolkit.Begin(cookie) asks that agent to authenticate, and Result(cookie) says how it ended.
+import os
+import sys
+
+REAL_SYSTEM_BUS = "unix:path=/run/dbus/system_bus_socket"
+address = os.environ.get("DBUS_SYSTEM_BUS_ADDRESS", "")
+if address in ("", REAL_SYSTEM_BUS):
+    sys.exit("dev-fake-polkit: DBUS_SYSTEM_BUS_ADDRESS must be a test bus, not unset or the real system bus")
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+NAME = "org.freedesktop.PolicyKit1"
+AUTHORITY = "org.freedesktop.PolicyKit1.Authority"
+AGENT = "org.freedesktop.PolicyKit1.AuthenticationAgent"
+FAKE = "org.dots.FakePolkit"
+PROPS = "org.freedesktop.DBus.Properties"
+
+
+class Authority(dbus.service.Object):
+    def __init__(self, bus):
+        super().__init__(bus, "/org/freedesktop/PolicyKit1/Authority")
+        self.bus = bus
+        self.agent = None
+        self.results = {}
+        self.props = {"BackendName": dbus.String("dots-fake"), "BackendVersion": dbus.String("0"), "BackendFeatures": dbus.UInt32(0)}
+
+    @dbus.service.method(AUTHORITY, in_signature="(sa{sv})ss", sender_keyword="sender")
+    def RegisterAuthenticationAgent(self, subject, locale, path, sender=None):
+        self.agent = (sender, path)
+
+    @dbus.service.method(AUTHORITY, in_signature="(sa{sv})ssa{sv}", sender_keyword="sender")
+    def RegisterAuthenticationAgentWithOptions(self, subject, locale, path, options, sender=None):
+        self.agent = (sender, path)
+
+    @dbus.service.method(AUTHORITY, in_signature="(sa{sv})s")
+    def UnregisterAuthenticationAgent(self, subject, path):
+        self.agent = None
+
+    @dbus.service.method(AUTHORITY, in_signature="s(sa{sv})")
+    def AuthenticationAgentResponse(self, cookie, identity):
+        self.results[cookie] = "response"
+
+    @dbus.service.method(AUTHORITY, in_signature="us(sa{sv})")
+    def AuthenticationAgentResponse2(self, uid, cookie, identity):
+        self.results[cookie] = "response"
+
+    @dbus.service.method(PROPS, in_signature="ss", out_signature="v")
+    def Get(self, interface, name):
+        return self.props[name]
+
+    @dbus.service.method(PROPS, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        return self.props if interface == AUTHORITY else {}
+
+    @dbus.service.method(FAKE, out_signature="b")
+    def Registered(self):
+        return self.agent is not None
+
+    # Asks for the running user, as pkexec would for an admin action.
+    @dbus.service.method(FAKE, in_signature="s")
+    def Begin(self, cookie):
+        sender, path = self.agent
+        agent = dbus.Interface(self.bus.get_object(sender, path), AGENT)
+        identity = dbus.Struct(("unix-user", {"uid": dbus.UInt32(os.getuid(), variant_level=1)}), signature="sa{sv}")
+        self.results[cookie] = "pending"
+
+        def done(*_):
+            self.results.setdefault(cookie, "ok")
+            if self.results[cookie] == "pending":
+                self.results[cookie] = "ok"
+
+        def failed(e):
+            self.results[cookie] = e.get_dbus_name()
+
+        agent.BeginAuthentication(
+            "org.dots.test", "Authentication is needed to run true as root", "", dbus.Dictionary({"program": "/usr/bin/true"}, signature="ss"), cookie, dbus.Array([identity], signature="(sa{sv})"),
+            reply_handler=done, error_handler=failed, timeout=600,
+        )
+
+    @dbus.service.method(FAKE, in_signature="s", out_signature="s")
+    def Result(self, cookie):
+        return self.results.get(cookie, "")
+
+
+DBusGMainLoop(set_as_default=True)
+bus = dbus.bus.BusConnection(address)
+authority = Authority(bus)
+name = dbus.service.BusName(NAME, bus, do_not_queue=True)
+GLib.MainLoop().run()

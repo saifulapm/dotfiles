@@ -67,10 +67,11 @@ PanelWindow {
         recorder.toggle();
     }
 
-    // The polkit agent loads this when a request arrives.
-    function loadPolkit() {
+    // The polkit agent calls this when a request arrives.
+    function openPolkit(flow) {
         polkitLoader.active = true;
-        return polkit;
+        closeOthers(polkit);
+        polkit.show(flow);
     }
 
     Connections {
