@@ -12,6 +12,8 @@ Item {
     required property var theme
     property bool shown: false
     property var rows: []
+    // How many row titles are cut short on screen, so a check can tell every bind apart.
+    property int truncated: 0
     readonly property string query: input.text
     readonly property var columns: Lib.groupRows(Lib.filterRows(rows, query))
     property int opens: 0
@@ -48,6 +50,7 @@ Item {
         return JSON.stringify({
             open: shown,
             rows: rows.length,
+            truncated: truncated,
             groups: Lib.GROUPS,
             query: query,
             openMs: openMs,
@@ -207,7 +210,10 @@ Item {
                                             textFormat: Text.PlainText
                                             Layout.maximumWidth: group.width - keyText.implicitWidth - 24
                                             text: modelData.title
-                                            elide: Text.ElideRight
+                                            // Titles wrap rather than elide: Mod+Ctrl+1 to 9 differ only past "Move Column to Workspace".
+                                            wrapMode: Text.Wrap
+                                            onTruncatedChanged: sheet.truncated += truncated ? 1 : -1
+                                            Component.onDestruction: if (truncated) sheet.truncated -= 1
                                             color: c.ink
                                             font.family: fonts.ui
                                             font.pixelSize: 13
