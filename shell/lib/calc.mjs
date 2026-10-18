@@ -9,10 +9,10 @@ function tokens(text) {
     const m = NUMBER.exec(s);
     if (m) {
       out.push(Number(m[0]));
-      s = s.slice(m[0].length).trimStart();
+      s = s.slice(m[0].length).replace(/^\s+/, '');
     } else if ('+-*/%^()'.includes(s[0])) {
       out.push(s[0]);
-      s = s.slice(1).trimStart();
+      s = s.slice(1).replace(/^\s+/, '');
     } else return null;
   }
   return out;

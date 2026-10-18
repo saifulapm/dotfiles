@@ -1,10 +1,11 @@
 import Quickshell
+import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
 import "." as Root
 import "lib/launcher.mjs" as Lib
 
-// Apps mode, drawn in the Surfaces window.
+// Apps, windows, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
 Item {
     id: launcher
 
@@ -26,8 +27,31 @@ Item {
                 keywords: e.keywords,
                 entry: e
             }))
-    readonly property var found: Lib.rank(apps, query)
+    readonly property var parsed: Lib.parseQuery(query)
+    readonly property string mode: parsed.mode
+    // niri's windows as of entering windows mode.
+    property var windowList: []
+    // Every mode supplies rows as {title, detail, exec?, copy?}; a new mode adds a case here.
+    readonly property var found: {
+        switch (mode) {
+        case "windows":
+            return Lib.windowRows(windowList, parsed.q);
+        case "calculator":
+            return Lib.calcRows(parsed.q);
+        case "commands":
+            return Lib.commandRows(parsed.q);
+        case "apps":
+            return Lib.rank(apps, parsed.q).map(a => ({
+                        title: a.name,
+                        detail: a.genericName,
+                        exec: ["niri", "msg", "action", "spawn", "--"].concat(a.entry.command)
+                    }));
+        }
+        return [];
+    }
     readonly property var rows: found.slice(0, 8)
+    readonly property bool hasSource: mode !== "clipboard" && mode !== "emoji"
+    readonly property var chipNames: ({ apps: "APPS", windows: "WINDOWS", clipboard: "CLIPBOARD", emoji: "EMOJI", calculator: "CALC", commands: "COMMANDS" })
 
     // mode is clipboard or emoji when a key opened the launcher straight into one.
     function open(t0, mode) {
@@ -56,21 +80,25 @@ Item {
         selected = Math.max(0, Math.min(rows.length - 1, selected + by));
     }
 
-    // niri spawns the app, so it is niri's child and outlives a shell restart.
+    // An app is spawned through niri, so it is niri's child and outlives a shell restart.
     function launch() {
         const row = rows[selected];
         if (!row)
             return;
-        Quickshell.execDetached(["niri", "msg", "action", "spawn", "--"].concat(row.entry.command));
         close();
+        if (row.exec)
+            Quickshell.execDetached(row.exec);
+        else if (row.copy)
+            Quickshell.execDetached(["wl-copy", row.copy]);
     }
 
     function state() {
         return JSON.stringify({
             open: shown,
-            mode: "apps",
+            mode: mode,
             query: query,
-            results: rows.map(r => r.name),
+            results: rows.map(r => r.title),
+            ids: rows.map(r => r.id ?? null),
             selected: selected,
             openMs: openMs,
             opens: opens
@@ -78,6 +106,26 @@ Item {
     }
 
     onQueryChanged: selected = 0
+    onModeChanged: {
+        if (mode === "windows" && !lister.running)
+            lister.running = true;
+    }
+
+    Process {
+        id: lister
+        command: ["niri", "msg", "-j", "windows"]
+        stdout: StdioCollector {
+            id: listed
+        }
+        onExited: code => {
+            try {
+                launcher.windowList = JSON.parse(listed.text);
+            } catch (e) {
+                console.warn("launcher: niri windows exited " + code + ": " + e.message);
+            }
+        }
+    }
+
     Component.onCompleted: Root.State.loaded.push("launcher")
 
     visible: shown
@@ -120,7 +168,7 @@ Item {
                             id: chip
                             textFormat: Text.PlainText
                             anchors.centerIn: parent
-                            text: "APPS"
+                            text: launcher.chipNames[launcher.mode]
                             color: c.surface
                             font.family: fonts.ui
                             font.pixelSize: 10
@@ -156,7 +204,7 @@ Item {
 
                     Text {
                         textFormat: Text.PlainText
-                        text: found.length + " FOUND"
+                        text: hasSource ? found.length + " FOUND" : "NOT YET"
                         color: c.muted
                         font.family: fonts.ui
                         font.pixelSize: 10
@@ -202,7 +250,7 @@ Item {
                             leftPadding: 20
                             topPadding: 11
                             bottomPadding: 11
-                            text: "NO MATCH · ↑↓ OR CTRL+J/K MOVE · TAB THEN J/K · ↵ OPEN · ESC CLOSE"
+                            text: hasSource ? "NO MATCH · ↑↓ OR CTRL+J/K MOVE · TAB THEN J/K · ↵ OPEN · ESC CLOSE" : "NOT YET"
                             color: c.muted
                             font.family: fonts.ui
                             font.pixelSize: 10
@@ -237,7 +285,7 @@ Item {
                                     Text {
                                         textFormat: Text.PlainText
                                         Layout.fillWidth: true
-                                        text: modelData.name
+                                        text: modelData.title
                                         elide: Text.ElideRight
                                         color: current ? c.surface : c.ink
                                         font.family: fonts.ui
@@ -247,7 +295,7 @@ Item {
                                     Text {
                                         textFormat: Text.PlainText
                                         Layout.maximumWidth: 260
-                                        text: modelData.genericName
+                                        text: modelData.detail
                                         elide: Text.ElideRight
                                         color: current ? c.line : c.muted
                                         font.family: fonts.display
