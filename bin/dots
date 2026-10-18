@@ -30,9 +30,14 @@ install() {
     git clone --branch "$branch" "$repo" "$dir" || die "could not clone $repo ($branch)"
   fi
 
-  local args=()
-  [[ -n ${DOTS_MACHINE:-} ]] && args+=(--promptString "machine=$DOTS_MACHINE")
-  chezmoi init --apply --source "$dir" "${args[@]}" || die "chezmoi apply failed"
+  # chezmoi init rewrites its config and state db every time, so it runs only until the config exists.
+  if [[ -f ${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml ]]; then
+    chezmoi apply || die "chezmoi apply failed"
+  else
+    local args=()
+    [[ -n ${DOTS_MACHINE:-} ]] && args+=(--promptString "machine=$DOTS_MACHINE")
+    chezmoi init --apply --source "$dir" "${args[@]}" || die "chezmoi apply failed"
+  fi
 
   cat <<'EOF'
 dots: installed. Next:
