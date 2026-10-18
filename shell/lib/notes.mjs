@@ -140,3 +140,11 @@ export function attachmentFile(attachment) {
 export const dragOffer = (note) => ({ 'text/plain': note.text });
 
 export const chipOffer = (attachment, dir) => ({ 'text/uri-list': 'file://' + dir + '/' + attachmentFile(attachment) });
+
+export function attachTo(store, id, attachments, now, newId) {
+  if (!attachments.length) return store;
+  const base = id ? store : addNote(store, '', now, newId);
+  return attachments.reduce((s, a) => attach(s, id || newId, a, now), base);
+}
+
+export const firstImage = (note) => note.attachments.find((a) => a.mime.indexOf('image/') === 0) ?? null;

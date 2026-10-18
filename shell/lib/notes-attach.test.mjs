@@ -52,6 +52,9 @@ test('an image over 25 MB is refused and leaves nothing behind', (t) => {
   const c = rig(t);
   c.offer(['image/png'], { 'image/png': Buffer.alloc(OVER) });
   assert.deepEqual(c.run(), [{ refused: 'Attachment over 25 MB', name: 'pasted.png' }]);
+  // One byte over is still over, though it fits the read's buffer.
+  c.offer(['image/png'], { 'image/png': Buffer.alloc(25 * 1024 * 1024 + 1) });
+  assert.deepEqual(c.run(), [{ refused: 'Attachment over 25 MB', name: 'pasted.png' }]);
   assert.deepEqual(readdirSync(c.out), []);
 });
 

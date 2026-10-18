@@ -58,7 +58,7 @@ function fromFiles(list) {
 function fromImage(type) {
   const name = 'pasted.' + (type.split('/')[1].match(/^[a-z0-9]+/) ?? ['bin'])[0];
   const r = spawnSync('wl-paste', ['--type', type], { maxBuffer: ATTACH_MAX + 1 });
-  if (r.error?.code === 'ENOBUFS') return [{ refused: attachRefusal(ATTACH_MAX + 1), name }];
+  if (r.error?.code === 'ENOBUFS' || (r.stdout && attachRefusal(r.stdout.length))) return [{ refused: attachRefusal(ATTACH_MAX + 1), name }];
   if (r.status !== 0 || !r.stdout.length) return [];
   return [attachBytes(r.stdout, name, type)];
 }

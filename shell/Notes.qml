@@ -149,6 +149,10 @@ FloatingWindow {
         const now = Date.now();
         if (ctrl && event.key === Qt.Key_K)
             openPicker("switch");
+        else if (ctrl && event.key === Qt.Key_Y)
+            notes.copyText(N.sectionList(store, store.activeSection));
+        else if (ctrl && event.key === Qt.Key_V)
+            notes.attachClipboard(current ? current.id : null);
         else if (ctrl)
             return false;
         else if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
@@ -176,6 +180,10 @@ FloatingWindow {
             useComposer();
         } else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_6)
             notes.save(N.toggleTag(store, current.id, String(event.key - Qt.Key_0), now));
+        else if (event.key === Qt.Key_Y && shift && N.firstImage(current))
+            notes.copyFile(N.firstImage(current));
+        else if (event.key === Qt.Key_Y && !shift)
+            notes.copyText(current.text);
         else if (event.key === Qt.Key_V)
             mark();
         else if (event.key === Qt.Key_M && shift)
@@ -286,22 +294,72 @@ FloatingWindow {
                         required property int index
                         readonly property bool isSelected: win.mode === "list" && index === win.selected
                         width: parent.width
-                        height: body.implicitHeight + 24
+                        height: content.implicitHeight + 24
                         color: win.marked.indexOf(modelData.id) >= 0 ? (win.c.line ?? "lightgray") : "transparent"
                         border.width: isSelected ? 2 : 1
                         border.color: isSelected ? (win.c.accent ?? "red") : (win.c.ink ?? "black")
 
-                        Text {
-                            id: body
+                        // The body drags its text alone, so an input it is dropped on gets the text, whatever is attached.
+                        MouseArea {
+                            id: bodyDrag
+                            anchors.fill: parent
+                            drag.target: bodyOffer
+                        }
+
+                        Item {
+                            id: bodyOffer
+                            Drag.active: bodyDrag.drag.active
+                            Drag.dragType: Drag.Automatic
+                            Drag.supportedActions: Qt.CopyAction
+                            Drag.mimeData: N.dragOffer(modelData)
+                        }
+
+                        Column {
+                            id: content
                             x: 14
                             y: 12
                             width: parent.width - 28
-                            textFormat: Text.PlainText
-                            wrapMode: Text.Wrap
-                            text: (modelData.todo ? (modelData.done ? "[x] " : "[ ] ") : "") + modelData.text
-                            color: win.c.ink ?? "black"
-                            font.family: win.fonts.ui ?? ""
-                            font.pixelSize: 13
+                            spacing: 8
+
+                            Text {
+                                width: parent.width
+                                visible: text !== ""
+                                textFormat: Text.PlainText
+                                wrapMode: Text.Wrap
+                                text: (modelData.todo ? (modelData.done ? "[x] " : "[ ] ") : "") + modelData.text
+                                color: win.c.ink ?? "black"
+                                font.family: win.fonts.ui ?? ""
+                                font.pixelSize: 13
+                            }
+
+                            Repeater {
+                                model: modelData.attachments
+
+                                // Each chip drags only its own file.
+                                Text {
+                                    id: chip
+                                    required property var modelData
+                                    textFormat: Text.PlainText
+                                    text: modelData.name + " · " + Math.max(1, Math.round(modelData.size / 1024)) + " KB"
+                                    color: win.c.muted ?? "gray"
+                                    font.family: win.fonts.mono ?? ""
+                                    font.pixelSize: 10
+
+                                    MouseArea {
+                                        id: chipDrag
+                                        anchors.fill: parent
+                                        drag.target: chipOffer
+                                    }
+
+                                    Item {
+                                        id: chipOffer
+                                        Drag.active: chipDrag.drag.active
+                                        Drag.dragType: Drag.Automatic
+                                        Drag.supportedActions: Qt.CopyAction
+                                        Drag.mimeData: N.chipOffer(chip.modelData, win.notes.attachments)
+                                    }
+                                }
+                            }
                         }
                     }
                 }

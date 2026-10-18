@@ -230,3 +230,21 @@ test('switching to a section creates it when it is new', async () => {
   assert.equal(s.activeSection, 'later');
   assert.deepEqual(useSection(s, 'inbox').sections, s.sections);
 });
+
+test('attachments go onto the selected note, or onto a new one when there is none', async () => {
+  const { attachTo } = await import('./notes.mjs');
+  const png = { sha256: 'aa', name: 'pasted.png', mime: 'image/png', size: 3 };
+  const jpg = { sha256: 'bb', name: 'x.jpg', mime: 'image/jpeg', size: 4 };
+  const s = compose(emptyStore(), 'text', T, 'n1');
+  assert.deepEqual(attachTo(s, 'n1', [png, jpg], T + 1, 'n2').notes[0].attachments, [png, jpg]);
+  const fresh = attachTo(emptyStore(), null, [png], T, 'n2');
+  assert.deepEqual([fresh.notes[0].id, fresh.notes[0].text, fresh.notes[0].attachments], ['n2', '', [png]]);
+  assert.equal(attachTo(s, null, [], T, 'n3'), s);
+});
+
+test('the first image of a note is what Y copies', async () => {
+  const { firstImage } = await import('./notes.mjs');
+  const note = { attachments: [{ sha256: 'cc', name: 'a.pdf', mime: 'application/pdf', size: 1 }, { sha256: 'dd', name: 'b.png', mime: 'image/png', size: 1 }] };
+  assert.equal(firstImage(note).sha256, 'dd');
+  assert.equal(firstImage({ attachments: [] }), null);
+});
