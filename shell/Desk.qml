@@ -49,6 +49,25 @@ Scope {
         id: mediaService
     }
 
+    Services.Notes {
+        id: notesService
+        onToast: text => island.showToast(text)
+    }
+
+    IpcHandler {
+        target: "notes"
+
+        // The double-Shift watcher calls this; it never opens Notes or touches the clipboard.
+        function capture(): void {
+            notesService.capture();
+        }
+
+        function state(): string {
+            const s = notesService.store;
+            return JSON.stringify({ path: notesService.path, activeSection: s.activeSection, sections: s.sections.map(x => x.name), count: s.notes.filter(n => !n.deleted).length, notes: s.notes });
+        }
+    }
+
     Root.Island {
         id: island
         theme: desk.theme

@@ -13,6 +13,8 @@ export PATH=$repo/bin:$PATH
 dconf_name=dots_dev_${D##*-}
 dconf_name=${dconf_name//[^[:alnum:]_]/_}
 export TMUX_TMPDIR=$D/tmux DCONF_PROFILE=$D/dconf-profile DOTS_CHROMIUM_POLICY_DIR=$D/chromium-policy
+# A fixed machine id names the notes store dev.json, whatever the live chezmoi config says.
+export DOTS_MACHINE=dev
 # Nor the live hub's questions or the live PipeWire.
 export DOTS_HUB_QUESTIONS=$D/hub-questions.json PIPEWIRE_RUNTIME_DIR=$D/pw
 # The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.

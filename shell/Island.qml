@@ -64,6 +64,12 @@ PanelWindow {
         keys.forceActiveFocus();
     }
 
+    // A capture's Captured or a refusal shows for 1.5 s.
+    function showToast(text) {
+        toast = text;
+        toastTick.restart();
+    }
+
     function release() {
         focused = false;
         calendar = null;
@@ -95,6 +101,12 @@ PanelWindow {
             island.notice = text;
             noticeTick.restart();
         }
+    }
+
+    Tick {
+        id: toastTick
+        interval: 1500
+        onTriggered: island.toast = null
     }
 
     Tick {
