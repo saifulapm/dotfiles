@@ -11,7 +11,7 @@ test('every measure within budget reads ok and passes', () => {
   assert.equal(r.over, false);
   assert.deepEqual(r.lines, [
     'first frame   130 ms  ≤ 150 ms   ok',
-    'idle rss      149 MiB ≤ 150 MiB  ok',
+    'idle rss      149 MiB ≤ 170 MiB  ok',
     'panel cold    48 ms   ≤ 50 ms    ok',
     'panel warm    4 ms    ≤ 16 ms    ok',
     'timers        1       = 1        ok',
@@ -27,8 +27,9 @@ test('one measure over its budget reads OVER and fails', () => {
   assert.equal(r.lines[3], 'panel warm    17 ms   ≤ 16 ms    OVER');
 });
 
-test('RSS a KiB over the budget is OVER, not rounded down into it', () => {
-  assert.equal(report({ ...good, rssKiB: 150 * 1024 + 1 }, BUDGETS).over, true);
+test('RSS a KiB over the 170 MiB budget is OVER, not rounded down into it', () => {
+  assert.equal(report({ ...good, rssKiB: 170 * 1024 }, BUDGETS).over, false);
+  assert.equal(report({ ...good, rssKiB: 170 * 1024 + 1 }, BUDGETS).over, true);
 });
 
 test('a timer count other than the budget is OVER either way', () => {
