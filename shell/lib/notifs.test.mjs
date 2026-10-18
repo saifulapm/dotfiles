@@ -66,3 +66,8 @@ test('the selection stays in range after a removal', () => {
   assert.equal(clampSelected(0, 0), 0);
   assert.equal(clampSelected(-1, 3), 0);
 });
+
+test('a store with entries sharing a key keeps only the first, so a dismiss takes one row', () => {
+  const s = parseStore(JSON.stringify({ dnd: false, history: [entry(3), Object.assign(entry(2), { key: 'k3' }), entry(1)] }));
+  assert.deepEqual(s.history.map((e) => e.summary), ['n 3', 'n 1']);
+});

@@ -16,7 +16,9 @@ export function parseStore(text) {
     data = null;
   }
   if (data === null || typeof data !== 'object' || !Array.isArray(data.history)) return { dnd: false, history: [] };
-  return { dnd: data.dnd === true, history: data.history.filter(isEntry).slice(0, LIMIT) };
+  const seen = {};
+  const unique = data.history.filter(isEntry).filter((e) => (seen[e.key] ? false : (seen[e.key] = true)));
+  return { dnd: data.dnd === true, history: unique.slice(0, LIMIT) };
 }
 
 export const storeText = (store) => JSON.stringify({ dnd: store.dnd, history: store.history });
