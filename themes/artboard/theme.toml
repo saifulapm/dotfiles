@@ -1,0 +1,45 @@
+[meta]
+name = "artboard"
+mode = "light"
+
+[color]
+paper = "#E4E6EA"
+ink = "#15171B"
+muted = "#5F6672"
+line = "#E3E6EB"
+surface = "#FFFFFF"
+accent = "#3D5AFE"
+danger = "#D93A3A"
+ok = "#1F8A4C"
+ansi = [
+  "#15171B", "#D93A3A", "#1F8A4C", "#B7791F", "#3D5AFE", "#9B4DCA", "#0E8A9A", "#C9CED6",
+  "#5F6672", "#E5534B", "#2DA05E", "#D69A2D", "#5C76FF", "#B26BDD", "#1BA3B5", "#FFFFFF",
+]
+
+[primitive]
+paper = "dots"
+frame = "none"
+shadow = "soft"
+corner = "round"
+motion = "spring"
+
+[paper]
+spacing = 16
+dot = "#B4BAC4"
+
+[type]
+display = "Inter"
+ui = "Inter"
+mono = "Maple Mono"
+scale = 1.0
+
+[niri]
+gaps = 28
+border = 0
+blur = false
+ring_width = 2
+ring_color = "#3D5AFE"
+shadow_softness = 40
+shadow_spread = 0
+shadow_offset = [0, 18]
+shadow_color = "#15171B2E"

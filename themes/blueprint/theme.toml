@@ -1,0 +1,47 @@
+[meta]
+name = "blueprint"
+mode = "dark"
+
+[color]
+paper = "#0C1A2E"
+ink = "#D6F4F8"
+muted = "#7FA6B8"
+line = "#2E5A72"
+surface = "#0A1526"
+accent = "#7FE3F0"
+danger = "#FFB547"
+ok = "#8FE3A6"
+ansi = [
+  "#1B2B44", "#FF6B6B", "#8FE3A6", "#FFB547", "#6CB4FF", "#C7A2FF", "#7FE3F0", "#D6F4F8",
+  "#2E5A72", "#FF8E8E", "#B2F0C4", "#FFCB7A", "#9ACBFF", "#DBC2FF", "#A8EEF6", "#FFFFFF",
+]
+
+[primitive]
+paper = "grid"
+frame = "glow"
+shadow = "none"
+corner = "cut"
+motion = "linear"
+
+[paper]
+minor = 16
+major = 80
+minor_alpha = 0.05
+major_alpha = 0.13
+
+[type]
+display = "Maple Mono"
+ui = "Maple Mono"
+mono = "Maple Mono"
+scale = 1.0
+
+[niri]
+gaps = 24
+border = 1
+blur = false
+border_inactive = "#2E5A72"
+shadow_softness = 18
+shadow_spread = 0
+shadow_offset = [0, 0]
+shadow_color = "#7FE3F040"
+shadow_inactive = "#00000000"

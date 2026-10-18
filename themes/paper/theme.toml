@@ -17,13 +17,14 @@ ansi = [
 ]
 
 [primitive]
-paper = "flat"
+paper = "grain"
 frame = "ink"
 shadow = "hard-offset"
 corner = "square"
 motion = "snappy"
 
 [paper]
+grain = 0.06
 
 [type]
 display = "Instrument Serif"
@@ -35,3 +36,9 @@ scale = 1.0
 gaps = 24
 border = 1
 blur = false
+border_inactive = "#6A6052"
+shadow_softness = 0
+shadow_spread = 0
+shadow_offset = [3, 3]
+shadow_color = "#1C1915"
+shadow_inactive = "#6A6052"

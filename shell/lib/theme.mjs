@@ -9,6 +9,7 @@ const MENUS = {
 const COLORS = ['paper', 'ink', 'muted', 'line', 'surface', 'accent', 'danger', 'ok'];
 const FONTS = ['Maple Mono', 'Inter', 'Instrument Serif'];
 const HEX = /^#[0-9A-Fa-f]{6}$/;
+const NIRI_COLORS = ['border_inactive', 'ring_color', 'shadow_color', 'shadow_inactive'];
 
 export function validateTheme(doc) {
   const fail = (msg) => { throw new Error(`theme: ${msg}`); };
@@ -27,6 +28,9 @@ export function validateTheme(doc) {
   const type = doc.type ?? fail('missing [type]');
   for (const k of ['display', 'ui', 'mono']) if (!FONTS.includes(type[k])) fail(`type.${k}: "${type[k]}" is not one of ${FONTS.join(', ')}`);
   const niri = doc.niri ?? fail('missing [niri]');
+  for (const k of NIRI_COLORS) {
+    if (k in niri && !/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(niri[k])) fail(`niri.${k}: "${niri[k]}" is not #RRGGBB or #RRGGBBAA`);
+  }
   return {
     name: meta.name,
     mode: meta.mode,
@@ -34,8 +38,19 @@ export function validateTheme(doc) {
     primitive: Object.assign({}, primitive),
     paper: Object.assign({}, doc.paper),
     type: { display: type.display, ui: type.ui, mono: type.mono, scale: type.scale ?? 1 },
-    niri: { gaps: niri.gaps ?? 16, border: niri.border ?? 1, blur: niri.blur ?? false },
+    niri: Object.assign({}, niri, { gaps: niri.gaps ?? 16, border: niri.border ?? 1, blur: niri.blur ?? false }),
   };
+}
+
+// The WCAG contrast ratio of two #RRGGBB colours.
+export function contrast(a, b) {
+  const lum = (hex) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
 }
 
 // The shell's tokens come from shell.json, so they get the same check as theme.toml.

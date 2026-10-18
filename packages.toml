@@ -33,3 +33,8 @@ why = "provides node for the theme renderer and tests"
 name = "chezmoi"
 arch = "all"
 why = "links home/ into place"
+
+[[package]]
+name = "rsms-inter-fonts"
+arch = "all"
+why = "Inter, the UI face of the Artboard theme"
