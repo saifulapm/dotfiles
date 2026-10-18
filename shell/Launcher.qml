@@ -4,8 +4,9 @@ import QtQuick
 import QtQuick.Layouts
 import "." as Root
 import "lib/launcher.mjs" as Lib
+import "lib/clips.mjs" as Clips
 
-// Apps, windows, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
+// Apps, windows, clipboard, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
 Item {
     id: launcher
 
@@ -31,11 +32,16 @@ Item {
     readonly property string mode: parsed.mode
     // niri's windows as of entering windows mode.
     property var windowList: []
+    // cliphist list's output as of entering clipboard mode; bin/dots-clip-store writes the same db.
+    property string clipList: ""
+    readonly property string clipDb: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/clips.db"
     // Every mode supplies rows as {title, detail, exec?, copy?}; a new mode adds a case here.
     readonly property var found: {
         switch (mode) {
         case "windows":
             return Lib.windowRows(windowList, parsed.q);
+        case "clipboard":
+            return Clips.clipRows(clipList, parsed.q, clipDb);
         case "calculator":
             return Lib.calcRows(parsed.q);
         case "commands":
@@ -50,7 +56,7 @@ Item {
         return [];
     }
     readonly property var rows: found.slice(0, 8)
-    readonly property bool hasSource: mode !== "clipboard" && mode !== "emoji"
+    readonly property bool hasSource: mode !== "emoji"
     readonly property var chipNames: ({ apps: "APPS", windows: "WINDOWS", clipboard: "CLIPBOARD", emoji: "EMOJI", calculator: "CALC", commands: "COMMANDS" })
 
     // mode is clipboard or emoji when a key opened the launcher straight into one.
@@ -61,7 +67,18 @@ Item {
         input.text = ({ clipboard: "v ", emoji: ": " })[mode] || "";
         selected = 0;
         shown = true;
-        input.forceActiveFocus();
+        // Mod+V lands on the results so plain j/k move; a second Mod+V keeps the mode, so it lists again here.
+        if (launcher.mode === "clipboard") {
+            listClips();
+            results.forceActiveFocus();
+        } else {
+            input.forceActiveFocus();
+        }
+    }
+
+    function listClips() {
+        if (!clipper.running)
+            clipper.running = true;
     }
 
     function close() {
@@ -109,6 +126,8 @@ Item {
     onModeChanged: {
         if (mode === "windows" && !lister.running)
             lister.running = true;
+        if (mode === "clipboard")
+            listClips();
     }
 
     Process {
@@ -124,6 +143,16 @@ Item {
                 console.warn("launcher: niri windows exited " + code + ": " + e.message);
             }
         }
+    }
+
+    Process {
+        id: clipper
+        command: ["cliphist", "-db-path", launcher.clipDb, "list"]
+        stdout: StdioCollector {
+            id: clipped
+        }
+        // cliphist exits 1 until the first copy creates its db, which is an empty history.
+        onExited: code => launcher.clipList = code === 0 ? clipped.text : ""
     }
 
     Component.onCompleted: Root.State.loaded.push("launcher")
