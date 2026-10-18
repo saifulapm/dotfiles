@@ -15,6 +15,8 @@ dconf_name=${dconf_name//[^[:alnum:]_]/_}
 export TMUX_TMPDIR=$D/tmux DCONF_PROFILE=$D/dconf-profile DOTS_CHROMIUM_POLICY_DIR=$D/chromium-policy
 # Nor the live hub's questions or the live PipeWire.
 export DOTS_HUB_QUESTIONS=$D/hub-questions.json PIPEWIRE_RUNTIME_DIR=$D/pw
+# The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.
+export DOTS_NIRI_BINDS=$repo/home/dot_config/niri/binds.kdl
 # TMUX would point every tmux call at the live server and ignore TMUX_TMPDIR.
 unset TMUX
 dconf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/dconf
