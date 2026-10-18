@@ -92,4 +92,20 @@ until_ok 1000 mode_is rest
 check "Esc closes the calendar" mode_is rest
 check "and gives the keyboard back" island_focus None
 
+# A long header and option must stay inside the card: the strip just right of it, past its 3 px hard shadow, reads as it did before.
+strip_rgb() {
+  local geo
+  geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + (.width / 2 | floor) + 290),\(.y + 10) 30x150"')
+  grim -s 1 -t ppm -g "$geo" - | mean_rgb
+}
+before=$(strip_rgb)
+long=$(printf 'x%.0s' $(seq 1 300))
+jq -n --arg l "$long" '{self: "macbook", questions: [{id: "Q9", project: $l, machine: $l, text: "Long?", options: [$l, "Later"], popup: true}]}' >"$DOTS_HUB_QUESTIONS.tmp"
+mv "$DOTS_HUB_QUESTIONS.tmp" "$DOTS_HUB_QUESTIONS"
+until_ok 2000 mode_is question
+sleep 0.3
+after=$(strip_rgb)
+echo "     right of the card: $before before, $after with the question"
+check "a 300-character header and option stay inside the 560 px card" test "$after" = "$before"
+
 exit $((fails > 0))

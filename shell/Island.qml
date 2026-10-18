@@ -114,8 +114,8 @@ PanelWindow {
         role: "island"
 
         Text {
-            textFormat: Text.PlainText
             id: label
+            textFormat: Text.PlainText
             visible: ["notification", "question", "calendar", "osd"].indexOf(island.mode) < 0
             anchors.centerIn: parent
             width: Math.min(implicitWidth, parent.width - 28)
@@ -265,8 +265,8 @@ PanelWindow {
                 height: monthTitle.implicitHeight
 
                 Text {
-                    textFormat: Text.PlainText
                     id: monthTitle
+                    textFormat: Text.PlainText
                     text: island.grid?.title ?? ""
                     color: box.style.text
                     font.family: island.theme.tokens?.type.ui ?? ""
@@ -336,8 +336,10 @@ PanelWindow {
                 height: where.implicitHeight
 
                 Text {
-                    textFormat: Text.PlainText
                     id: where
+                    textFormat: Text.PlainText
+                    width: parent.width - hint.implicitWidth - 12
+                    elide: Text.ElideRight
                     text: [island.question?.project, island.question?.machine].filter(p => p).join(" · ")
                     color: Qt.alpha(box.style.text, 0.65)
                     font.family: island.theme.tokens?.type.mono ?? ""
@@ -345,6 +347,7 @@ PanelWindow {
                 }
 
                 Text {
+                    id: hint
                     textFormat: Text.PlainText
                     anchors.right: parent.right
                     text: island.focused ? "1-9 pick · r reply · Esc" : "Mod+I to answer"
@@ -379,7 +382,7 @@ PanelWindow {
                         required property string modelData
                         required property int index
                         readonly property bool isReply: index === Math.min(island.question?.options.length ?? 0, 9)
-                        width: chip.implicitWidth + 24
+                        width: Math.min(chip.implicitWidth + 24, ask.width)
                         height: chip.implicitHeight + 12
                         radius: 8
                         color: index === 0 && !isReply ? box.style.text : "transparent"
@@ -387,9 +390,11 @@ PanelWindow {
                         border.color: Qt.alpha(box.style.text, 0.35)
 
                         Text {
-                            textFormat: Text.PlainText
                             id: chip
+                            textFormat: Text.PlainText
                             anchors.centerIn: parent
+                            width: Math.min(implicitWidth, parent.width - 24)
+                            elide: Text.ElideRight
                             text: (parent.isReply ? "r" : parent.index + 1) + " · " + parent.modelData
                             color: parent.index === 0 && !parent.isReply ? box.style.fill : box.style.text
                             font.family: island.theme.tokens?.type.ui ?? ""
