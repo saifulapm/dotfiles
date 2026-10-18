@@ -80,6 +80,28 @@ check "blueprint to artboard: all artboard by 300 ms ($final)" all_are ${rgb[art
 switch_from artboard paper
 check "artboard to paper: all paper by 300 ms ($final)" all_are ${rgb[paper]}
 
+# The zoom pulls the canvas off the screen edges, so the edge band must fade like the middle, never swing back.
+edge_px() { grim -s 1 -t ppm -g "7,600 1x1" - | tail -c3 | od -An -tu1; }
+"$repo/bin/dots" theme artboard >/dev/null
+sleep 0.6
+"$repo/bin/dots" theme blueprint >/dev/null &
+sw=$!
+edge=()
+start=$(now_ms)
+while (($(now_ms) - start < 400)); do edge+=("$(edge_px)"); done
+wait "$sw"
+# Blueprint is darker on every channel, so a red value that rises again after falling is the flash.
+edge_monotonic() {
+  local px r low=999
+  for px in "${edge[@]}"; do
+    read -r r _ <<<"$px"
+    ((r > low + 6)) && return 1
+    ((r < low)) && low=$r
+  done
+  return 0
+}
+check "artboard to blueprint: the screen edge fades without swinging back (${#edge[@]} frames)" edge_monotonic
+
 # Back to paper while the slide to blueprint still runs: paper must be what stays.
 "$repo/bin/dots" theme blueprint >/dev/null
 "$repo/bin/dots" theme paper >/dev/null

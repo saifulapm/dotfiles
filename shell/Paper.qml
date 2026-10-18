@@ -109,11 +109,17 @@ PanelWindow {
     }
     color: "transparent"
 
-    // Fills the edges the zoom pulls the canvas away from.
+    // Fills the edges the zoom pulls the canvas away from, blended like the sheets so the edge never runs ahead.
     Rectangle {
         anchors.fill: parent
         visible: paper.kind === "zoom"
         color: paper.back.tokens?.color.paper ?? "transparent"
+
+        Rectangle {
+            anchors.fill: parent
+            opacity: paper.front.opacity
+            color: paper.front.tokens?.color.paper ?? "transparent"
+        }
     }
 
     Item {
@@ -227,8 +233,10 @@ PanelWindow {
             width: paper.width
             height: paper.height
 
+            // The shader paints the whole sheet, so the fill only shows until it loads; both at once would fade twice.
             Rectangle {
                 anchors.fill: parent
+                visible: effect.item === null
                 color: sheet.tokens?.color.paper ?? "transparent"
             }
 
