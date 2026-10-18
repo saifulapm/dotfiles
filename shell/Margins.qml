@@ -2,8 +2,9 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import "lib/margins.mjs" as M
+import "lib/surface.mjs" as S
 
-// Each margin sits over an ink hairline that stops 8 px short of the island.
+// Each margin sits over an ink hairline that stops 8 px short of the island, when the theme's frame is drawn in ink.
 PanelWindow {
     id: root
 
@@ -14,6 +15,7 @@ PanelWindow {
     readonly property var view: niri.view(screen.name) ?? { idx: 0, app: null, title: null }
     readonly property var marginState: M.marginState(view, clock.now)
     readonly property real lineEnd: width / 2 - islandWidth / 2 - 8
+    readonly property var look: S.marginStyle(theme.tokens)
 
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "dots-margins"
@@ -31,10 +33,10 @@ PanelWindow {
 
     component Label: Text {
         color: root.theme.color.muted ?? "black"
-        font.family: root.theme.tokens?.type.mono ?? ""
-        font.pixelSize: 11
-        font.letterSpacing: 11 * 0.12
-        font.capitalization: Font.AllUppercase
+        font.family: root.look.font
+        font.pixelSize: root.look.size
+        font.letterSpacing: root.look.tracking
+        font.capitalization: root.look.caps ? Font.AllUppercase : Font.MixedCase
     }
 
     Row {
@@ -65,6 +67,7 @@ PanelWindow {
     Rectangle {
         x: 32
         y: 40
+        visible: root.look.rules
         width: Math.max(0, root.lineEnd - 32)
         height: 1
         color: root.theme.color.ink ?? "black"
@@ -73,6 +76,7 @@ PanelWindow {
     Rectangle {
         x: root.width - 32 - width
         y: 40
+        visible: root.look.rules
         width: Math.max(0, root.lineEnd - 32)
         height: 1
         color: root.theme.color.ink ?? "black"

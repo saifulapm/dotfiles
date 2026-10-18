@@ -66,6 +66,7 @@ export function surfaceStyle(tokens, role) {
 
 // Monospace labels read as drafting captions, so they go uppercase and tracked like the designs.
 export function marginStyle(tokens) {
+  if (!tokens) return { font: '', size: 11, caps: true, tracking: 1.32, rules: false };
   const mono = tokens.type.ui === tokens.type.mono;
   return {
     font: tokens.type.ui,

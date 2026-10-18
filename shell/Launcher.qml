@@ -105,27 +105,17 @@ PanelWindow {
 
         Rectangle {
             anchors.fill: parent
-            color: Qt.alpha(c.paper, 0.72)
+            color: Qt.alpha(c.paper, card.style.wash)
         }
 
-        // The hard offset shadow, square like the card.
-        Rectangle {
-            x: card.x + 6
-            y: card.y + 6
-            width: card.width
-            height: card.height
-            color: c.ink
-        }
-
-        Rectangle {
+        Root.Surface {
             id: card
             x: Math.round((parent.width - width) / 2)
             y: 168
             width: 640
             height: column.implicitHeight
-            color: c.surface
-            border.color: c.ink
-            border.width: 1.5
+            tokens: launcher.theme.tokens
+            label: "Launcher"
 
             ColumnLayout {
                 id: column

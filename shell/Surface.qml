@@ -1,0 +1,136 @@
+import QtQuick
+import QtQuick.Effects
+import QtQuick.Shapes
+import "lib/surface.mjs" as S
+
+// The one frame every shell surface draws: fill, frame, shadow, corner and the theme's signature parts.
+Item {
+    id: surface
+
+    property var tokens: null
+    // island, card or window; each has its own shadow and corner numbers in surface.mjs.
+    property string role: "card"
+    // Shown above the top-left corner when the theme draws frame labels.
+    property string label: ""
+    readonly property var style: S.surfaceStyle(tokens, role)
+    readonly property real chamfer: style.corner.chamfer
+    readonly property var shadow: style.shadow
+    readonly property color accent: tokens ? tokens.color.accent : "transparent"
+
+    Rectangle {
+        visible: surface.shadow.kind === "hard" && !surface.chamfer
+        x: surface.shadow.x
+        y: surface.shadow.y
+        width: surface.width
+        height: surface.height
+        radius: surface.style.corner.radius
+        color: surface.shadow.color
+    }
+
+    // Loaded only for themes that blur, so a hard-shadow theme pays for no shader.
+    Loader {
+        active: surface.shadow.kind === "soft" || surface.shadow.kind === "glow"
+        anchors.fill: parent
+        sourceComponent: RectangularShadow {
+            offset.x: surface.shadow.x
+            offset.y: surface.shadow.y
+            // Qt's docs give 1.2 times the CSS blur for the same falloff.
+            blur: surface.shadow.blur * 1.2
+            spread: surface.shadow.spread
+            radius: surface.style.corner.radius || surface.chamfer / 2
+            color: Qt.alpha(surface.shadow.color, surface.shadow.alpha)
+        }
+    }
+
+    Rectangle {
+        visible: !surface.chamfer
+        anchors.fill: parent
+        radius: surface.style.corner.radius
+        color: surface.style.fill
+        border.width: surface.style.frame.width
+        border.color: surface.style.frame.color
+    }
+
+    // A cut corner bevels the top-left and bottom-right, like the designs' clip-path polygons.
+    Loader {
+        active: surface.chamfer > 0
+        anchors.fill: parent
+        sourceComponent: Shape {
+            // CurveRenderer's smoother diagonals cost a warm open 5 to 10 ms more on its first frame.
+            preferredRendererType: Shape.GeometryRenderer
+
+            ShapePath {
+                strokeWidth: 0
+                strokeColor: "transparent"
+                fillColor: surface.shadow.kind === "hard" ? surface.shadow.color : "transparent"
+                PathRectangle {
+                    x: surface.shadow.x
+                    y: surface.shadow.y
+                    width: surface.width
+                    height: surface.height
+                    topLeftRadius: surface.chamfer
+                    bottomRightRadius: surface.chamfer
+                    bevel: true
+                }
+            }
+
+            ShapePath {
+                id: body
+                strokeWidth: surface.style.frame.width
+                strokeColor: surface.style.frame.width ? surface.style.frame.color : "transparent"
+                fillColor: surface.style.fill
+                joinStyle: ShapePath.MiterJoin
+                PathRectangle {
+                    width: surface.width
+                    height: surface.height
+                    topLeftRadius: surface.chamfer
+                    bottomRightRadius: surface.chamfer
+                    bevel: true
+                    strokeAdjustment: body.strokeWidth
+                }
+            }
+        }
+    }
+
+    // Registration ticks just outside the edges, where each chamfer meets them.
+    Repeater {
+        model: surface.style.ticks ? [[surface.chamfer, -6, 1, 4], [-6, surface.chamfer, 4, 1], [surface.width - surface.chamfer - 1, surface.height + 2, 1, 4], [surface.width + 2, surface.height - surface.chamfer - 1, 4, 1]] : []
+
+        Rectangle {
+            required property var modelData
+            x: modelData[0]
+            y: modelData[1]
+            width: modelData[2]
+            height: modelData[3]
+            color: surface.accent
+            opacity: 0.6
+        }
+    }
+
+    // A design tool's selection: four handles centred on the corners and the frame's name above it.
+    Repeater {
+        model: surface.style.handles ? [[0, 0], [1, 0], [0, 1], [1, 1]] : []
+
+        Rectangle {
+            required property var modelData
+            x: modelData[0] * surface.width - 4
+            y: modelData[1] * surface.height - 4
+            z: 1
+            width: 8
+            height: 8
+            color: surface.style.fill
+            border.width: 1.5
+            border.color: surface.accent
+        }
+    }
+
+    Text {
+        visible: surface.style.handles && surface.label !== ""
+        y: -20
+        text: surface.label
+        color: surface.accent
+        font.family: surface.tokens ? surface.tokens.type.ui : ""
+        font.pixelSize: 11
+        font.weight: Font.Medium
+    }
+}

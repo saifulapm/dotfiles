@@ -117,27 +117,17 @@ PanelWindow {
 
         Rectangle {
             anchors.fill: parent
-            color: Qt.alpha(c.paper, 0.72)
+            color: Qt.alpha(c.paper, panel.style.wash)
         }
 
-        // The hard offset shadow, square like the panel.
-        Rectangle {
-            x: panel.x + 6
-            y: panel.y + 6
-            width: panel.width
-            height: panel.height
-            color: c.ink
-        }
-
-        Rectangle {
+        Root.Surface {
             id: panel
             x: Math.round((parent.width - width) / 2)
             y: 168
             width: 1000
             height: column.implicitHeight + 36
-            color: c.surface
-            border.color: c.ink
-            border.width: 1.5
+            tokens: switcher.theme.tokens
+            label: "Themes"
 
             Column {
                 id: column
@@ -206,29 +196,15 @@ PanelWindow {
                                 Repeater {
                                     model: [[24, 150], [188, 84]]
 
-                                    Item {
+                                    // Each preview window is drawn in its own theme's primitives, not the current one's.
+                                    Root.Surface {
                                         required property var modelData
                                         x: modelData[0]
                                         y: 30
                                         width: modelData[1]
                                         height: 118
-
-                                        Rectangle {
-                                            visible: card.tp.shadow !== "none"
-                                            x: card.tp.shadow === "hard-offset" ? 3 : 0
-                                            y: card.tp.shadow === "hard-offset" ? 3 : 8
-                                            width: parent.width
-                                            height: parent.height
-                                            radius: card.radius ? 10 : 0
-                                            color: card.tp.shadow === "hard-offset" ? card.tc.ink : Qt.alpha(card.tc.ink, 0.18)
-                                        }
-                                        Rectangle {
-                                            anchors.fill: parent
-                                            radius: card.radius ? 10 : 0
-                                            color: card.tc.surface
-                                            border.color: card.frameColor
-                                            border.width: card.frameWidth
-                                        }
+                                        tokens: card.modelData
+                                        role: "window"
                                     }
                                 }
 

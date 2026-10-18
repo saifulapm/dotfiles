@@ -1,9 +1,10 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import "." as Root
 import "lib/margins.mjs" as M
 
-// At rest the island is the clock: an ink box with a hard accent shadow 3 px down and right.
+// At rest the island is the clock, a Surface box 10 px below the top edge; the window pads for its shadow.
 PanelWindow {
     id: island
 
@@ -14,6 +15,9 @@ PanelWindow {
     property string notice: ""
     readonly property string text: notice || M.clockText(clock.now)
     readonly property real boxWidth: box.width
+    // Room for the widest shadow, Artboard's soft one, beside and below the box.
+    readonly property int padSide: 32
+    readonly property int padBelow: 44
 
     screen: Quickshell.screens.find(s => s.name === niri.focusedOutput) ?? Quickshell.screens[0]
     WlrLayershell.layer: WlrLayer.Top
@@ -21,10 +25,13 @@ PanelWindow {
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
     anchors.top: true
-    margins.top: 10
-    implicitWidth: box.width + 3
-    implicitHeight: box.height + 3
+    implicitWidth: box.width + 2 * padSide
+    implicitHeight: box.y + box.height + padBelow
     color: "transparent"
+    // Only the box takes clicks, not the shadow around it.
+    mask: Region {
+        item: box
+    }
 
     Connections {
         target: island.theme
@@ -40,25 +47,20 @@ PanelWindow {
         onTriggered: island.notice = ""
     }
 
-    Rectangle {
-        x: 3
-        y: 3
-        width: box.width
-        height: box.height
-        color: island.theme.color.accent ?? "transparent"
-    }
-
-    Rectangle {
+    Root.Surface {
         id: box
-        width: label.implicitWidth + 28
+        x: island.padSide
+        y: 10
+        width: Math.ceil(label.implicitWidth) + 28
         height: 34
-        color: island.theme.color.ink ?? "transparent"
+        tokens: island.theme.tokens
+        role: "island"
 
         Text {
             id: label
             anchors.centerIn: parent
             text: island.text
-            color: island.theme.color.paper ?? "white"
+            color: box.style.text
             font.family: island.theme.tokens?.type.mono ?? ""
             font.pixelSize: 13
             font.weight: Font.Medium

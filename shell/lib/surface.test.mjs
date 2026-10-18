@@ -133,6 +133,7 @@ test('the look follows the primitives, not the name', () => {
 test('before the tokens load a surface draws nothing', () => {
   const s = surfaceStyle(null, 'card');
   assert.deepEqual([s.fill, s.frame.width, s.shadow.kind, s.wash, s.handles, s.ticks], ['transparent', 0, 'none', 0, false, false]);
+  assert.equal(marginStyle(null).rules, false);
 });
 
 test('margins: mono labels are 11 px uppercase over ink rules, others 12 px as written with none', () => {
