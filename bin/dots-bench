@@ -57,6 +57,14 @@ switch_once() {
   until_ok 3000 themes_focus None || die "the switcher never gave the keyboard back"
   jq -r .ms "$switch_json"
 }
+# The budget's RSS is read with every surface opened once on the starting theme (NQ4RZ9C1), before any switch.
+qs ipc call themes open >/dev/null || die "themes open failed"
+until_ok 3000 themes_focus Exclusive || die "the switcher never took the keyboard"
+qs ipc call themes close >/dev/null
+until_ok 3000 themes_focus None || die "the switcher never gave the keyboard back"
+sleep 5
+rss_kib=$(shell_status | jq -r .rssKiB) || die "status did not answer after the opens"
+
 start=$(shell_status | jq -r .theme)
 switch_max=0
 mapfile -t names < <(themes_state | jq -r '.themes[]')
@@ -69,8 +77,8 @@ for to in $(node "$(dirname "$0")/../shell/lib/bench.mjs" cycle "$start" "${name
 done
 
 sleep 5
-status=$(shell_status) || die "status did not answer after the opens"
-rss_kib=$(jq -r .rssKiB <<<"$status")
+status=$(shell_status) || die "status did not answer after the switches"
+switched_kib=$(jq -r .rssKiB <<<"$status")
 timers=$(jq -r .timers <<<"$status")
 
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
@@ -81,4 +89,4 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib"

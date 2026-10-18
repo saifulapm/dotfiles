@@ -14,7 +14,9 @@ export function report(m, b) {
     line('timers', m.timers, '', '=', b.timers, m.timers === b.timers),
     line('theme switch', m.switchMs, 'ms', '≤', b.switchMs, m.switchMs <= b.switchMs),
   ];
-  return { lines: [...checks, `${'idle cpu'.padEnd(13)} ${m.cpu} %`], over: checks.some((l) => l.endsWith('OVER')) };
+  // Every theme's shaders and effects loaded once; reported, not budgeted.
+  const switched = `${'rss switched'.padEnd(13)} ${Math.floor(m.switchedKiB / 1024)} MiB`;
+  return { lines: [...checks, `${'idle cpu'.padEnd(13)} ${m.cpu} %`, switched], over: checks.some((l) => l.endsWith('OVER')) };
 }
 
 // Round the list and back again from start: with three themes that is each of the six ordered pairs once.
@@ -32,8 +34,9 @@ if (process.argv[2] === 'cycle' && import.meta.url === `file://${process.argv[1]
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [firstFrameMs, rssKiB, coldMs, warmMs, timers] = process.argv.slice(2, 7).map(Number);
   const switchMs = Number(process.argv[8]);
+  const switchedKiB = Number(process.argv[9]);
   const env = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
-  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, cpu: process.argv[7] }, {
+  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, cpu: process.argv[7] }, {
     firstFrameMs: env('DOTS_BUDGET_FIRST_FRAME_MS', BUDGETS.firstFrameMs),
     rssMiB: env('DOTS_BUDGET_RSS_MIB', BUDGETS.rssMiB),
     coldMs: env('DOTS_BUDGET_COLD_MS', BUDGETS.coldMs),
