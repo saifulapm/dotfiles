@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
 import { validateTheme, renderNiri, renderFoot } from './theme.mjs';
+import { renderTmux, renderKak, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium } from './apps.mjs';
 
 const name = process.argv[2];
 const file = new URL(`../../themes/${name}/theme.toml`, import.meta.url).pathname;
@@ -21,7 +22,18 @@ try {
 }
 const out = join(process.env.XDG_STATE_HOME || join(homedir(), '.local/state'), 'dots/theme-out');
 mkdirSync(out, { recursive: true });
-const files = { 'shell.json': JSON.stringify(theme, null, 2) + '\n', 'niri.kdl': renderNiri(theme), 'foot.ini': renderFoot(theme) };
+const files = {
+  'shell.json': JSON.stringify(theme, null, 2) + '\n',
+  'niri.kdl': renderNiri(theme),
+  'foot.ini': renderFoot(theme),
+  'tmux.conf': renderTmux(theme),
+  'dots.kak': renderKak(theme),
+  'yazi-theme.toml': renderYazi(theme),
+  'colors.fish': renderFish(theme),
+  'gtk.css': renderGtkCss(theme),
+  'gtk-settings.ini': renderGtkSettings(theme),
+  'chromium.json': renderChromium(theme),
+};
 for (const [f, text] of Object.entries(files)) {
   const path = join(out, f);
   // Rewriting an unchanged file would wake niri's config watcher for nothing.

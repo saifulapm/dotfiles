@@ -1,0 +1,6 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+# dots theme copies chromium.json here as color.json, so the directory belongs to the user.
+command -v chromium-browser >/dev/null || exit 0
+dir=/etc/chromium/policies/managed
+[[ -w $dir ]] || { root mkdir -p "$dir" && root chown "$(id -un)" "$dir"; }

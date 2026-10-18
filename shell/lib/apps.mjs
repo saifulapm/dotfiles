@@ -1,0 +1,144 @@
+// Renders the per-app fragments (tmux, kak, yazi, fish, GTK, Chromium) from a validated theme; pure, no object spread.
+const lower = (s) => s.toLowerCase();
+const rgb = (s) => `rgb:${lower(s).slice(1)}`;
+
+export function renderTmux(t) {
+  const c = t.color;
+  const [ink, muted, line, surface, paper, accent, danger] = [c.ink, c.muted, c.line, c.surface, c.paper, c.accent, c.danger].map(lower);
+  return [
+    `set -g status-style "fg=${ink},bg=${surface}"`,
+    `set -g status-left-style "fg=${accent},bg=${surface}"`,
+    `set -g window-status-style "fg=${muted},bg=${surface}"`,
+    `set -g window-status-current-style "fg=${accent},bg=${surface},bold"`,
+    `set -g pane-border-style "fg=${line}"`,
+    `set -g pane-active-border-style "fg=${accent}"`,
+    `set -g message-style "fg=${ink},bg=${paper}"`,
+    `set -g message-command-style "fg=${danger},bg=${paper}"`,
+    `set -g mode-style "fg=${surface},bg=${accent}"`,
+    '',
+  ].join('\n');
+}
+
+export function renderKak(t) {
+  const c = t.color;
+  const faces = [
+    ['value', `${rgb(c.danger)}`],
+    ['type', `${rgb(c.accent)}`],
+    ['variable', `${rgb(c.ok)}`],
+    ['module', `${rgb(c.ok)}`],
+    ['function', `${rgb(c.accent)}`],
+    ['string', `${rgb(c.ok)}`],
+    ['keyword', `${rgb(c.accent)}+b`],
+    ['operator', `${rgb(c.ink)}`],
+    ['attribute', `${rgb(c.danger)}`],
+    ['comment', `${rgb(c.muted)}+i`],
+    ['documentation', 'comment'],
+    ['meta', `${rgb(c.danger)}`],
+    ['builtin', `${rgb(c.ink)}+b`],
+    ['title', `${rgb(c.accent)}+b`],
+    ['header', `${rgb(c.accent)}`],
+    ['mono', `${rgb(c.ok)}`],
+    ['block', `${rgb(c.danger)}`],
+    ['link', `${rgb(c.accent)}+u`],
+    ['bullet', `${rgb(c.accent)}`],
+    ['list', `${rgb(c.ink)}`],
+    ['Default', `${rgb(c.ink)},${rgb(c.surface)}`],
+    ['PrimarySelection', `${rgb(c.surface)},${rgb(c.accent)}+fg`],
+    ['SecondarySelection', `${rgb(c.surface)},${rgb(c.muted)}+fg`],
+    ['PrimaryCursor', `${rgb(c.surface)},${rgb(c.ink)}+fg`],
+    ['SecondaryCursor', `${rgb(c.surface)},${rgb(c.muted)}+fg`],
+    ['PrimaryCursorEol', `${rgb(c.surface)},${rgb(c.danger)}+fg`],
+    ['SecondaryCursorEol', `${rgb(c.surface)},${rgb(c.muted)}+fg`],
+    ['LineNumbers', `${rgb(c.muted)},${rgb(c.surface)}`],
+    ['LineNumberCursor', `${rgb(c.accent)},${rgb(c.surface)}+b`],
+    ['LineNumbersWrapped', `${rgb(c.line)},${rgb(c.surface)}+i`],
+    ['MenuForeground', `${rgb(c.surface)},${rgb(c.accent)}`],
+    ['MenuBackground', `${rgb(c.ink)},${rgb(c.line)}`],
+    ['MenuInfo', `${rgb(c.muted)}`],
+    ['Information', `${rgb(c.surface)},${rgb(c.danger)}`],
+    ['Error', `${rgb(c.surface)},${rgb(c.danger)}`],
+    ['DiagnosticError', `${rgb(c.danger)}`],
+    ['DiagnosticWarning', `${rgb(c.danger)}`],
+    ['StatusLine', `${rgb(c.ink)},${rgb(c.line)}`],
+    ['StatusLineMode', `${rgb(c.accent)},${rgb(c.line)}+b`],
+    ['StatusLineInfo', `${rgb(c.muted)},${rgb(c.line)}`],
+    ['StatusLineValue', `${rgb(c.ok)},${rgb(c.line)}`],
+    ['StatusCursor', `${rgb(c.surface)},${rgb(c.accent)}`],
+    ['Prompt', `${rgb(c.accent)},${rgb(c.line)}`],
+    ['MatchingChar', `${rgb(c.ink)},${rgb(c.line)}+b`],
+    ['Whitespace', `${rgb(c.line)}+f`],
+    ['BufferPadding', `${rgb(c.line)},${rgb(c.surface)}`],
+  ];
+  return faces.map(([n, v]) => `face global ${n} ${v}`).join('\n') + '\n';
+}
+
+// yazi's names for ANSI slots 0-15; a token equal to a slot is named so a live palette change recolours a running yazi.
+const YAZI_ANSI = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'gray', 'darkgray', 'lightred', 'lightgreen', 'lightyellow', 'lightblue', 'lightmagenta', 'lightcyan', 'white'];
+
+export function renderYazi(t) {
+  const c = t.color;
+  const slots = c.ansi.map(lower);
+  const name = (hex) => { const i = slots.indexOf(lower(hex)); return i < 0 ? lower(hex) : YAZI_ANSI[i]; };
+  const [ink, muted, line, accent, danger, ok] = [c.ink, c.muted, c.line, c.accent, c.danger, c.ok].map(name);
+  // Foot paints the terminal background in surface, so reset follows it live.
+  const surface = lower(c.surface);
+  return [
+    '[mgr]',
+    `cwd = { fg = "${accent}" }`,
+    `hovered = { fg = "${surface}", bg = "${accent}" }`,
+    `border_style = { fg = "${line}" }`,
+    `tab_active = { fg = "${surface}", bg = "${accent}" }`,
+    `tab_inactive = { fg = "${ink}", bg = "${line}" }`,
+    `marker_selected = { fg = "${ok}", bg = "${ok}" }`,
+    `count_selected = { fg = "${surface}", bg = "${ok}" }`,
+    '',
+    '[mode]',
+    `normal_main = { fg = "${surface}", bg = "${accent}", bold = true }`,
+    `normal_alt = { fg = "${accent}", bg = "${line}" }`,
+    `select_main = { fg = "${surface}", bg = "${ok}", bold = true }`,
+    `select_alt = { fg = "${ok}", bg = "${line}" }`,
+    `unset_main = { fg = "${surface}", bg = "${danger}", bold = true }`,
+    `unset_alt = { fg = "${danger}", bg = "${line}" }`,
+    '',
+    '[status]',
+    `overall = { fg = "${muted}", bg = "reset" }`,
+    '',
+  ].join('\n');
+}
+
+export function renderFish(t) {
+  const c = t.color;
+  const [ink, muted, line, surface, accent, danger, ok] = [c.ink, c.muted, c.line, c.surface, c.accent, c.danger, c.ok].map(lower);
+  const bare = (s) => s.slice(1);
+  const colors = [
+    ['normal', ink], ['command', accent], ['keyword', accent], ['quote', ok], ['redirection', ink], ['end', muted],
+    ['error', danger], ['param', ink], ['comment', muted], ['operator', accent], ['escape', danger], ['autosuggestion', muted],
+    ['selection', `--background=${bare(line)}`], ['search_match', `--background=${bare(line)}`],
+  ];
+  const lines = colors.map(([n, v]) => `set -g fish_color_${n} ${v.startsWith('#') ? bare(v) : v}`);
+  const fzf = `--color=fg:${ink},bg:${surface},hl:${accent},fg+:${ink},bg+:${line},hl+:${accent},info:${muted},prompt:${accent},pointer:${accent},marker:${ok},spinner:${accent},header:${muted}`;
+  lines.push(`set -gx FZF_DEFAULT_OPTS "${fzf}"`);
+  return lines.join('\n') + '\n';
+}
+
+export function renderGtkCss(t) {
+  const c = t.color;
+  const defs = [
+    ['window_bg_color', c.paper], ['window_fg_color', c.ink],
+    ['view_bg_color', c.surface], ['view_fg_color', c.ink],
+    ['headerbar_bg_color', c.surface], ['headerbar_fg_color', c.ink],
+    ['accent_bg_color', c.accent], ['accent_fg_color', c.surface], ['accent_color', c.accent],
+    ['theme_bg_color', c.paper], ['theme_fg_color', c.ink],
+    ['theme_base_color', c.surface], ['theme_text_color', c.ink],
+    ['theme_selected_bg_color', c.accent], ['theme_selected_fg_color', c.surface],
+  ];
+  return defs.map(([n, v]) => `@define-color ${n} ${lower(v)};`).join('\n') + '\n';
+}
+
+export function renderGtkSettings(t) {
+  return `[Settings]\ngtk-application-prefer-dark-theme=${t.mode === 'dark'}\n`;
+}
+
+export function renderChromium(t) {
+  return JSON.stringify({ BrowserThemeColor: lower(t.color.surface), BrowserColorScheme: t.mode }, null, 2) + '\n';
+}

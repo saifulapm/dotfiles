@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,6 +19,17 @@ test('renders every fragment into XDG_STATE_HOME/dots/theme-out', (t) => {
   const config = join(state, 'config.kdl');
   writeFileSync(config, `include "${join(out, 'niri.kdl')}"\n`);
   execFileSync('niri', ['validate', '-c', config], { stdio: 'pipe' });
+});
+
+test('renders the app fragments and no kitty file', (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-theme-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  execFileSync('node', [cli, 'blueprint'], { env: { ...process.env, XDG_STATE_HOME: state } });
+  const names = readdirSync(join(state, 'dots/theme-out'));
+  for (const f of ['tmux.conf', 'dots.kak', 'yazi-theme.toml', 'colors.fish', 'gtk.css', 'gtk-settings.ini', 'chromium.json']) {
+    assert.ok(names.includes(f), f);
+  }
+  assert.deepEqual(names.filter((n) => /kitty/i.test(n)), []);
 });
 
 test('an unknown theme exits non-zero and names it', () => {
