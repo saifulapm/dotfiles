@@ -13,12 +13,14 @@ PanelWindow {
     readonly property var launcher: launcherLoader.item
     readonly property var themes: themesLoader.item
     readonly property var notifications: notifsLoader.item
-    readonly property bool shown: (launcher?.shown ?? false) || (themes?.shown ?? false) || (notifications?.shown ?? false)
+    readonly property var cheatsheet: cheatsheetLoader.item
+    readonly property bool shown: (launcher?.shown ?? false) || (themes?.shown ?? false) || (notifications?.shown ?? false) || (cheatsheet?.shown ?? false)
 
     // t0 is taken before the first load, so a cold open's time includes loading.
     function openLauncher(t0) {
         themes?.close();
         notifications?.close();
+        cheatsheet?.close();
         launcherLoader.active = true;
         launcher.open(t0);
     }
@@ -26,6 +28,7 @@ PanelWindow {
     function openThemes(t0) {
         launcher?.close();
         notifications?.close();
+        cheatsheet?.close();
         themesLoader.active = true;
         themes.open(t0);
     }
@@ -33,8 +36,17 @@ PanelWindow {
     function openNotifs(t0) {
         launcher?.close();
         themes?.close();
+        cheatsheet?.close();
         notifsLoader.active = true;
         notifications.open(t0);
+    }
+
+    function openCheatsheet(t0) {
+        launcher?.close();
+        themes?.close();
+        notifications?.close();
+        cheatsheetLoader.active = true;
+        cheatsheet.open(t0);
     }
 
     Connections {
@@ -43,6 +55,7 @@ PanelWindow {
             host.launcher?.swapped();
             host.themes?.swapped();
             host.notifications?.swapped();
+            host.cheatsheet?.swapped();
         }
     }
 
@@ -89,6 +102,15 @@ PanelWindow {
         sourceComponent: Root.Notifications {
             theme: host.theme
             notifs: host.notifs
+        }
+    }
+
+    Loader {
+        id: cheatsheetLoader
+        anchors.fill: parent
+        active: false
+        sourceComponent: Root.CheatSheet {
+            theme: host.theme
         }
     }
 }

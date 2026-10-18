@@ -275,4 +275,32 @@ ShellRoot {
             return JSON.stringify({ open: false, themes: root.themeList.map(t => t.name), selected: themeService.name, current: themeService.name, openMs: null, opens: 0 });
         }
     }
+
+    IpcHandler {
+        target: "cheatsheet"
+
+        // t0 is taken before the first load, so a cold open's time includes loading.
+        function open(): void {
+            const t0 = Date.now();
+            surfacesLoader.active = true;
+            surfacesLoader.item.openCheatsheet(t0);
+        }
+
+        function close(): void {
+            surfacesLoader.item?.cheatsheet?.close();
+        }
+
+        function toggle(): void {
+            if (surfacesLoader.item?.cheatsheet?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (surfacesLoader.item?.cheatsheet)
+                return surfacesLoader.item.cheatsheet.state();
+            return JSON.stringify({ open: false, rows: 0, groups: [], query: "", openMs: null, opens: 0 });
+        }
+    }
 }
