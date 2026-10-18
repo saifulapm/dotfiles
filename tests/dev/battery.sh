@@ -44,7 +44,8 @@ check "status still reports one running timer" one_timer
 
 # Read last, so it covers the shell both before and after the restart.
 journal() { journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat; }
-errors=$(journal | grep -E 'ERROR|Failed to load|TypeError|ReferenceError|is not a type|Cannot assign|Cannot read|quickshell\.network')
+# The nested bus has no NetworkManager, and Quickshell's Networking says so once per start; any other line is ours.
+errors=$(journal | grep -E 'ERROR|Failed to load|TypeError|ReferenceError|is not a type|Cannot assign|Cannot read|quickshell\.network' | grep -vF 'Network will not work. Could not find an available backend.')
 echo "     UPower warnings: $(journal | grep -c 'quickshell.service.upower')"
 check "the shell's journal has no errors" test -z "$errors"
 [ -z "$errors" ] || echo "$errors"
