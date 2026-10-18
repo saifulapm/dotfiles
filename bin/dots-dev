@@ -45,7 +45,7 @@ qs_dead() {
 cleanup() {
   trap - EXIT INT TERM
   # The unit stops first, or systemd restarts a displayless qs every 500 ms once niri is gone.
-  systemctl --user stop "$DOTS_DEV_UNIT" 2>/dev/null || true
+  systemctl --user stop "$DOTS_DEV_UNIT" "$DOTS_DEV_UNIT-clip" 2>/dev/null || true
   # qs keeps a dead instance's run dir, and every later qs ipc call walks them all, so this config's dead ones go.
   qs_dead
   if [ -n "$session" ]; then

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# wl-paste --watch runs this with each copy on stdin; cliphist keeps no times and no 10 MB cap, so this adds both.
+set -euo pipefail
+
+dir=${XDG_STATE_HOME:-$HOME/.local/state}/dots
+db=$dir/clips.db times=$dir/clip-times stamp=$dir/clip-pruned
+max=10000000
+clip() { cliphist -db-path "$db" "$@"; }
+newest() { [ ! -e "$db" ] || clip list | awk -F'\t' 'NR == 1 { print $1 }'; }
+
+mkdir -p "$dir"
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+# A bash variable drops NUL bytes, so the clip goes through a file.
+head -c $((max + 1)) >"$tmp"
+if (($(stat -c %s "$tmp") > max)); then
+  cat >/dev/null
+  exit 0
+fi
+
+before=$(newest)
+clip -max-items 500 store <"$tmp"
+after=$(newest)
+# A clip cliphist skipped (sensitive, blank) leaves the newest id as it was, and must not renew that clip's time.
+if [ -n "$after" ] && [ "$after" != "$before" ]; then
+  echo "$after $(date +%s)" >>"$times"
+fi
+
+# The 30-day prune runs at most once an hour.
+if [ -f "$times" ] && [ -z "$(find "$stamp" -mmin -60 2>/dev/null)" ]; then
+  touch "$stamp"
+  cutoff=$(($(date +%s) - 30 * 86400))
+  awk -v c="$cutoff" '$2 < c { print $1 }' "$times" | clip delete
+  awk -v c="$cutoff" '$2 >= c' "$times" >"$times.new"
+  mv "$times.new" "$times"
+fi

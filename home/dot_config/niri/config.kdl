@@ -5,6 +5,7 @@ include "rules.kdl"
 
 spawn-at-startup "systemctl" "--user" "start" "dots-shell.service"
 spawn-at-startup "systemctl" "--user" "start" "dots-dshift.service"
+spawn-at-startup "systemctl" "--user" "start" "dots-clip.service"
 
 // logind ignores the lid (there is no suspend), so closing it only locks.
 switch-events {

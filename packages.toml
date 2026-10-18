@@ -58,3 +58,8 @@ why = "builds the double-Shift watcher"
 name = "wl-clipboard"
 arch = "all"
 why = "the Notes window reads the primary selection and copies out with wl-paste and wl-copy"
+
+[[package]]
+name = "cliphist"
+arch = "all"
+why = "keeps the clipboard history the launcher lists with v or Mod+V"
