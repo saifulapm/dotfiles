@@ -51,6 +51,7 @@ wtype -k Escape
 until_ok 2000 centre_closed
 check "at rest the shell runs one timer" bash -c 'timeout 0.5 qs ipc call shell status | jq -e ".timers == 1" >/dev/null'
 
-journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -iE "error|failed|TypeError|ReferenceError" | head -5
+qml_errors() { journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -v "host portal" | grep -iE "error|failed to load"; }
+check "the shell logged no QML error" eval '! qml_errors'
 
 exit $((fails > 0))
