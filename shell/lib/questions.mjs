@@ -29,7 +29,8 @@ export function parseQuestions(text) {
 export const shown = (questions, away) => questions.find((q) => q.popup && !away[q.id]) ?? null;
 
 export function optionFor(question, key) {
-  const i = '123456789'.indexOf(key);
+  // A key with no text (Shift, an arrow, Mod) must pick nothing, though indexOf('') is 0.
+  const i = key.length === 1 ? '123456789'.indexOf(key) : -1;
   return i >= 0 && i < question.options.length ? question.options[i] : null;
 }
 

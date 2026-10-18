@@ -30,6 +30,8 @@ test('keys 1 to 9 pick an option, and other keys pick none', () => {
   assert.equal(optionFor(a, '3'), null);
   assert.equal(optionFor(a, '0'), null);
   assert.equal(optionFor(a, 'x'), null);
+  assert.equal(optionFor(a, ''), null);
+  assert.equal(optionFor(a, '12'), null);
 });
 
 test('an answer travels as argv after --, so a leading dash stays text', () => {
