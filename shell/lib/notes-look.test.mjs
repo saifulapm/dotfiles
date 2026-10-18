@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { notesLook, tagColour, keyLine, KEYS, EMPTY_KEYS } from './notes-look.mjs';
+import { notesLook, tagColour, keyLine, keyPairs, KEYS, EMPTY_KEYS } from './notes-look.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
 
@@ -46,4 +46,16 @@ test('Blueprint draws its rules and done cards dashed, the others solid', () => 
   assert.equal(bp.card(false, true).dashed, true);
   assert.equal(bp.card(true, true).dashed, false);
   for (const name of ['paper', 'artboard']) assert.equal(notesLook(theme(name)).card(false, true).dashed, false);
+});
+
+test('the key strip lays out whole pairs, so a key never wraps away from its word', () => {
+  assert.deepEqual(keyPairs(theme('blueprint'), [['m', 'merge'], ['⇧M', 'move']]), ['[M] MERGE', '[⇧M] MOVE']);
+  assert.equal(keyLine(theme('paper'), KEYS), keyPairs(theme('paper'), KEYS).join('  '));
+});
+
+test('every theme rules off its key strip, and Blueprint puts // between NOTES and its section', () => {
+  for (const name of ['paper', 'artboard', 'blueprint']) assert.equal(notesLook(theme(name)).strip.width, 1, name);
+  assert.equal(notesLook(theme('artboard')).strip.color, theme('artboard').color.line);
+  assert.equal(notesLook(theme('blueprint')).separator, '//');
+  assert.equal(notesLook(theme('paper')).separator, '');
 });

@@ -171,5 +171,5 @@ export function attachTo(store, id, attachments, now, newId) {
 
 export const firstImage = (note) => note.attachments.find((a) => a.mime.indexOf('image/') === 0) ?? null;
 
-// Bidi overrides and isolates would draw a card in another order than y copies it, so they show as marks.
-export const displayText = (text) => text.replace(/[\u202A-\u202E\u2066-\u2069]/g, (ch) => `⟨U+${ch.charCodeAt(0).toString(16).toUpperCase()}⟩`);
+// Bidi marks, overrides and isolates would draw a card in another order than y copies it, so they show as marks.
+export const displayText = (text) => text.replace(/[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, (ch) => `⟨U+${ch.charCodeAt(0).toString(16).toUpperCase()}⟩`);

@@ -23,6 +23,8 @@ FloatingWindow {
     property string editing: ""
     // switch (Ctrl+K) or move (M): what the section picker's Enter does.
     property string picking: ""
+    // Where the picker gives the keyboard back: the composer it was opened from keeps its draft and the keyboard.
+    property string pickFrom: "list"
     property int pickSelected: 0
     // Set once niri has focused this window, so losing focus can hide it.
     property bool hadFocus: false
@@ -136,6 +138,7 @@ FloatingWindow {
     }
 
     function openPicker(kind) {
+        pickFrom = mode === "composer" ? "composer" : "list";
         picking = kind;
         pickInput.text = "";
         pickSelected = 0;
@@ -153,8 +156,15 @@ FloatingWindow {
                 apply(N.moveNotes(store, targets(), name, Date.now()));
             }
         }
+        closePicker();
+    }
+
+    function closePicker() {
         picking = "";
-        useList();
+        if (pickFrom === "composer")
+            useComposer();
+        else
+            useList();
     }
 
     function listKey(event) {
@@ -281,6 +291,16 @@ FloatingWindow {
                 font.letterSpacing: win.look ? win.look.title.spacing : 0
             }
 
+            Text {
+                id: separator
+                visible: text !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: win.look ? win.look.separator : ""
+                color: win.c.muted ?? "gray"
+                font: titleText.font
+            }
+
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 width: sectionText.width + (color.a > 0 ? 18 : 0)
@@ -292,7 +312,7 @@ FloatingWindow {
                     id: sectionText
                     anchors.centerIn: parent
                     // A long section name is cut short, so the key hint and the pinned mark keep their place.
-                    width: Math.min(implicitWidth, header.width - titleText.width - keyHint.width - 2 * header.spacing - 18)
+                    width: Math.min(implicitWidth, header.width - titleText.width - (separator.visible ? separator.width + header.spacing : 0) - keyHint.width - 2 * header.spacing - 18)
                     elide: Text.ElideRight
                     textFormat: Text.PlainText
                     text: win.look ? win.look.sectionLabel(win.store.activeSection) : win.store.activeSection
@@ -404,7 +424,8 @@ FloatingWindow {
             model: win.cards
             currentIndex: win.selected
             highlightFollowsCurrentItem: false
-            onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
+            // Contain on the first card would scroll its top margin away.
+            onCurrentIndexChanged: currentIndex === 0 ? positionViewAtBeginning() : positionViewAtIndex(currentIndex, ListView.Contain)
             boundsBehavior: Flickable.StopAtBounds
 
             Keys.onPressed: event => {
@@ -672,10 +693,9 @@ FloatingWindow {
                 onTextChanged: win.pickSelected = 0
 
                 Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Escape) {
-                        win.picking = "";
-                        win.useList();
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                    if (event.key === Qt.Key_Escape)
+                        win.closePicker();
+                    else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                         win.pick();
                     else if (event.key === Qt.Key_Down || (event.key === Qt.Key_J && event.modifiers & Qt.ControlModifier))
                         win.pickSelected = Math.min(win.pickSelected + 1, win.picks.length - 1);
@@ -699,6 +719,8 @@ FloatingWindow {
                     Text {
                         required property string modelData
                         required property int index
+                        width: list.width - 20
+                        elide: Text.ElideMiddle
                         textFormat: Text.PlainText
                         text: (index === win.pickSelected ? "› " : "  ") + (win.look ? win.look.sectionLabel(modelData) : modelData) + (win.store.sections.some(s => s.name === modelData) ? "" : "  +")
                         color: index === win.pickSelected ? (win.c.accent ?? "red") : (win.c.ink ?? "black")
@@ -813,23 +835,31 @@ FloatingWindow {
 
             Rectangle {
                 width: parent.width
-                height: win.look ? win.look.rule.width : 1
-                color: win.look ? win.look.rule.color : "black"
+                height: win.look ? win.look.strip.width : 1
+                color: win.look ? win.look.strip.color : "black"
             }
 
-            Text {
+            // Whole pairs, so a key never wraps away from its word.
+            Flow {
                 id: keys
                 x: 18
                 y: 10
                 width: parent.width - 36
-                wrapMode: Text.Wrap
-                lineHeight: 1.3
-                textFormat: Text.PlainText
-                text: win.look ? L.keyLine(win.theme.tokens, L.KEYS) : ""
-                color: win.c.muted ?? "gray"
-                font.family: win.fonts.mono ?? ""
-                font.pixelSize: win.look ? win.look.small.size : 10
-                font.letterSpacing: win.look ? win.look.small.spacing : 0
+                spacing: 10
+
+                Repeater {
+                    model: win.look ? L.keyPairs(win.theme.tokens, L.KEYS) : []
+
+                    Text {
+                        required property string modelData
+                        textFormat: Text.PlainText
+                        text: modelData
+                        color: win.c.muted ?? "gray"
+                        font.family: win.fonts.mono ?? ""
+                        font.pixelSize: win.look ? win.look.small.size : 10
+                        font.letterSpacing: win.look ? win.look.small.spacing : 0
+                    }
+                }
             }
         }
     }

@@ -287,5 +287,6 @@ test('a capture drops trailing whitespace, as a triple-click selection carries i
 test('bidi controls show as visible marks, so a card reads as the text y copies', async () => {
   const { displayText } = await import('./notes.mjs');
   assert.equal(displayText('abc\u202Edef'), 'abc⟨U+202E⟩def');
+  assert.equal(displayText('a\u200Eb\u200Fc\u061Cd'), 'a⟨U+200E⟩b⟨U+200F⟩c⟨U+61C⟩d');
   assert.equal(displayText('plain ünï'), 'plain ünï');
 });

@@ -15,16 +15,16 @@ function voiceOf(t) {
   return t.ui === t.mono ? 'caps' : 'plain';
 }
 
-export function keyLine(tokens, keys) {
+export function keyPairs(tokens, keys) {
   const voice = voiceOf(tokens.type);
-  return keys
-    .map(([k, what]) => {
-      const key = voice === 'bracket' ? `[${k.toUpperCase()}]` : voice === 'caps' ? k.toUpperCase() : k;
-      const word = voice === 'plain' ? what : what.toUpperCase();
-      return word ? `${key} ${word}` : key;
-    })
-    .join('  ');
+  return keys.map(([k, what]) => {
+    const key = voice === 'bracket' ? `[${k.toUpperCase()}]` : voice === 'caps' ? k.toUpperCase() : k;
+    const word = voice === 'plain' ? what : what.toUpperCase();
+    return word ? `${key} ${word}` : key;
+  });
 }
+
+export const keyLine = (tokens, keys) => keyPairs(tokens, keys).join('  ');
 
 // Two hex colours mixed, a share of the second into the first.
 function mix(a, b, share) {
@@ -52,6 +52,8 @@ export function notesLook(tokens) {
     section: { font: voice === 'caps' ? t.display : t.ui, size: voice === 'caps' ? 20 : voice === 'bracket' ? 11 : 12, italic: voice === 'caps', color: voice === 'caps' ? c.muted : c.ink, pill: round ? mix(c.surface, c.paper, 0.45) : 'transparent' },
     pinned: { text: voice === 'plain' ? 'Pinned' : 'PINNED', color: voice === 'bracket' ? c.danger : c.accent, fill: round ? mix(c.surface, c.accent, 0.1) : 'transparent', border: round ? 0 : 1 },
     rule: { color: voice === 'bracket' ? c.line : c.ink, width: p.frame === 'none' ? 0 : 1, dashed: voice === 'bracket' },
+    strip: { color: voice === 'caps' ? c.ink : c.line, width: 1 },
+    separator: voice === 'bracket' ? '//' : '',
     small: { font: t.mono, size: voice === 'plain' ? 11 : 10, color: c.muted, spacing: voice === 'plain' ? 0 : 1.2 },
     body: { font: voice === 'plain' ? t.ui : t.mono, size: voice === 'plain' ? 14 : 13, color: c.ink, done: c.muted },
     composer: { font: voice === 'caps' ? t.display : voice === 'plain' ? t.ui : t.mono, size: voice === 'caps' ? 20 : 14, italic: voice === 'caps', prompt: voice === 'bracket' ? '>' : '', placeholder: voice === 'bracket' ? 'add a note or a prompt' : 'Add a note or a prompt…', fill: round ? tint : 'transparent', radius: round ? 12 : 0 },

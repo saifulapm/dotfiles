@@ -111,4 +111,20 @@ pick_section inbox
 pick_section work
 check "an exact section name wins over one that contains it" notes_is '.activeSection == "work"'
 
+key -k Tab
+until_ok 1000 notes_is '.mode == "composer"'
+n=$(notes_state | jq '.count')
+key do
+key -M ctrl k -m ctrl
+until_ok 1000 notes_is '.mode == "picker"'
+key inbox
+key -k Return
+check "a section picked from the composer gives the keyboard back to the composer" until_ok 1000 notes_is '.mode == "composer" and .activeSection == "inbox"'
+key -M ctrl k -m ctrl
+until_ok 1000 notes_is '.mode == "picker"'
+key -k Escape
+until_ok 1000 notes_is '.mode == "composer"'
+key ' it'
+check "and typing on lands in the draft, deleting nothing" until_ok 1000 notes_is ".composer == \"do it\" and .count == $n"
+
 exit $((fails > 0))
