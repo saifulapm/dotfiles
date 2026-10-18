@@ -62,6 +62,12 @@ Scope {
             notesService.capture();
         }
 
+        function open(): void {
+            notesLoader.active = true;
+            if (!notesLoader.item.shown)
+                notesLoader.item.show();
+        }
+
         function toggle(): void {
             notesLoader.active = true;
             notesLoader.item.toggle();
