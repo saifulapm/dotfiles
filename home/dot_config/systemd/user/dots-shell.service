@@ -1,0 +1,11 @@
+[Unit]
+Description=dots shell (Quickshell)
+PartOf=graphical-session.target
+After=graphical-session.target
+# Restart=always must never give up, however often the shell dies.
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=qs
+Restart=always
+RestartSec=500ms

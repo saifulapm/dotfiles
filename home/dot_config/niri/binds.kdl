@@ -1,0 +1,44 @@
+// Shared by the real session and the nested dev session (dev/niri-dev.kdl).
+// Mod is Super on a TTY and Alt in a nested niri.
+binds {
+    Mod+Shift+Slash hotkey-overlay-title="Show Hotkeys" { show-hotkey-overlay; }
+    Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
+    Mod+Q repeat=false hotkey-overlay-title="Close Window" { close-window; }
+    Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }
+
+    Mod+H hotkey-overlay-title="Focus Column Left" { focus-column-left; }
+    Mod+J hotkey-overlay-title="Focus Window Down" { focus-window-down; }
+    Mod+K hotkey-overlay-title="Focus Window Up" { focus-window-up; }
+    Mod+L hotkey-overlay-title="Focus Column Right" { focus-column-right; }
+    Mod+Ctrl+H hotkey-overlay-title="Move Column Left" { move-column-left; }
+    Mod+Ctrl+J hotkey-overlay-title="Move Window Down" { move-window-down; }
+    Mod+Ctrl+K hotkey-overlay-title="Move Window Up" { move-window-up; }
+    Mod+Ctrl+L hotkey-overlay-title="Move Column Right" { move-column-right; }
+
+    Mod+U hotkey-overlay-title="Focus Workspace Down" { focus-workspace-down; }
+    Mod+I hotkey-overlay-title="Focus Workspace Up" { focus-workspace-up; }
+    Mod+Ctrl+U hotkey-overlay-title="Move Column to Workspace Down" { move-column-to-workspace-down; }
+    Mod+Ctrl+I hotkey-overlay-title="Move Column to Workspace Up" { move-column-to-workspace-up; }
+
+    Mod+1 hotkey-overlay-title="Focus Workspace 1" { focus-workspace 1; }
+    Mod+2 hotkey-overlay-title="Focus Workspace 2" { focus-workspace 2; }
+    Mod+3 hotkey-overlay-title="Focus Workspace 3" { focus-workspace 3; }
+    Mod+4 hotkey-overlay-title="Focus Workspace 4" { focus-workspace 4; }
+    Mod+5 hotkey-overlay-title="Focus Workspace 5" { focus-workspace 5; }
+    Mod+6 hotkey-overlay-title="Focus Workspace 6" { focus-workspace 6; }
+    Mod+7 hotkey-overlay-title="Focus Workspace 7" { focus-workspace 7; }
+    Mod+8 hotkey-overlay-title="Focus Workspace 8" { focus-workspace 8; }
+    Mod+9 hotkey-overlay-title="Focus Workspace 9" { focus-workspace 9; }
+    Mod+Ctrl+1 hotkey-overlay-title="Move Column to Workspace 1" { move-column-to-workspace 1; }
+    Mod+Ctrl+2 hotkey-overlay-title="Move Column to Workspace 2" { move-column-to-workspace 2; }
+    Mod+Ctrl+3 hotkey-overlay-title="Move Column to Workspace 3" { move-column-to-workspace 3; }
+    Mod+Ctrl+4 hotkey-overlay-title="Move Column to Workspace 4" { move-column-to-workspace 4; }
+    Mod+Ctrl+5 hotkey-overlay-title="Move Column to Workspace 5" { move-column-to-workspace 5; }
+    Mod+Ctrl+6 hotkey-overlay-title="Move Column to Workspace 6" { move-column-to-workspace 6; }
+    Mod+Ctrl+7 hotkey-overlay-title="Move Column to Workspace 7" { move-column-to-workspace 7; }
+    Mod+Ctrl+8 hotkey-overlay-title="Move Column to Workspace 8" { move-column-to-workspace 8; }
+    Mod+Ctrl+9 hotkey-overlay-title="Move Column to Workspace 9" { move-column-to-workspace 9; }
+
+    Mod+F hotkey-overlay-title="Maximize Column" { maximize-column; }
+    Mod+Shift+F hotkey-overlay-title="Fullscreen Window" { fullscreen-window; }
+}
