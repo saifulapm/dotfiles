@@ -89,4 +89,41 @@ ShellRoot {
             return JSON.stringify({ mode: "rest", text: island.text });
         }
     }
+
+    LazyLoader {
+        id: launcherLoader
+
+        Root.Launcher {
+            theme: themeService
+        }
+    }
+
+    IpcHandler {
+        target: "launcher"
+
+        // t0 is taken before the first load, so a cold open's time includes loading.
+        function open(): void {
+            const t0 = Date.now();
+            launcherLoader.active = true;
+            launcherLoader.item.open(t0);
+        }
+
+        function close(): void {
+            if (launcherLoader.item)
+                launcherLoader.item.close();
+        }
+
+        function toggle(): void {
+            if (launcherLoader.item?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (launcherLoader.item)
+                return launcherLoader.item.state();
+            return JSON.stringify({ open: false, mode: "apps", query: "", results: [], selected: 0, openMs: null, opens: 0 });
+        }
+    }
 }
