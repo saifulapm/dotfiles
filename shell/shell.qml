@@ -111,7 +111,7 @@ ShellRoot {
         target: "island"
 
         function state(): string {
-            return JSON.stringify({ mode: "rest", text: island.text });
+            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth });
         }
     }
 

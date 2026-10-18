@@ -2,7 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import "." as Root
-import "lib/margins.mjs" as M
+import "lib/island.mjs" as I
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; the window pads for its shadow.
 PanelWindow {
@@ -13,7 +13,26 @@ PanelWindow {
     required property var clock
     // A theme switch's failure, shown in place of the clock for 5 s.
     property string notice: ""
-    readonly property string text: notice || M.clockText(clock.now)
+    // What the island may show; each is null while it has nothing to show.
+    property var question: null
+    property bool calendar: false
+    property var notification: null
+    property var recording: null
+    property var osd: null
+    property var toast: null
+    property var playing: null
+    readonly property var slots: ({
+            question,
+            calendar,
+            notification,
+            recording,
+            osd,
+            toast,
+            playing,
+            notice
+        })
+    readonly property string mode: I.pick(slots)
+    readonly property string text: I.islandText(mode, slots, clock.now)
     readonly property real boxWidth: box.width
     // Room for the widest shadow, Artboard's soft one, beside and below the box.
     readonly property int padSide: 32
@@ -51,7 +70,7 @@ PanelWindow {
         id: box
         x: island.padSide
         y: 10
-        width: Math.ceil(label.implicitWidth) + 28
+        width: I.boxWidth(Math.ceil(label.implicitWidth) + 28)
         height: 34
         tokens: island.theme.tokens
         role: "island"
@@ -59,6 +78,8 @@ PanelWindow {
         Text {
             id: label
             anchors.centerIn: parent
+            width: Math.min(implicitWidth, parent.width - 28)
+            elide: Text.ElideRight
             text: island.text
             color: box.style.text
             font.family: island.theme.tokens?.type.mono ?? ""

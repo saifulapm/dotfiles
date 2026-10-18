@@ -46,6 +46,8 @@ island_is_now() {
 # The minute can roll over between the two reads, so one mismatch earns one re-read.
 island_now_or_next() { island_is_now || island_is_now; }
 check "the island shows date +%H:%M" island_now_or_next
+at_rest() { island | jq -e '.mode == "rest" and .width > 0 and .width <= 560' >/dev/null; }
+check "the island state reports rest and a width within 560 px" at_rest
 
 status=$(shell_status)
 echo "     status: $status"
