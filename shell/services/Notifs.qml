@@ -55,6 +55,43 @@ Scope {
         save();
     }
 
+    // The island is cleared here, not by the closed signal, since after a restart no live object is left.
+    function remove(key) {
+        if (current?.key === key) {
+            current = null;
+            hold.stop();
+        }
+        const kept = {};
+        for (const k in live) {
+            if (k === key)
+                live[k]?.dismiss();
+            else
+                kept[k] = live[k];
+        }
+        live = kept;
+        history = history.filter(e => e.key !== key);
+        save();
+    }
+
+    function clear() {
+        current = null;
+        hold.stop();
+        for (const k in live)
+            live[k]?.dismiss();
+        live = {};
+        history = [];
+        save();
+    }
+
+    // True when the entry's app is still there to take its default action.
+    function act(key) {
+        const action = live[key]?.actions.find(a => a.identifier === "default");
+        if (!action)
+            return false;
+        action.invoke();
+        return true;
+    }
+
     function save() {
         store.setText(N.storeText({
             dnd,

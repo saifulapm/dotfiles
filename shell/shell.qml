@@ -109,9 +109,28 @@ ShellRoot {
             notifsService.setDnd(on);
         }
 
+        // t0 is taken before the first load, so a cold open's time includes loading.
+        function open(): void {
+            const t0 = Date.now();
+            surfacesLoader.active = true;
+            surfacesLoader.item.openNotifs(t0);
+        }
+
+        function close(): void {
+            surfacesLoader.item?.notifications?.close();
+        }
+
+        function toggle(): void {
+            if (surfacesLoader.item?.notifications?.shown)
+                close();
+            else
+                open();
+        }
+
         function state(): string {
             const h = notifsService.history;
-            return JSON.stringify({ dnd: notifsService.dnd, count: h.length, summaries: h.map(e => e.summary) });
+            const centre = surfacesLoader.item?.notifications?.state() ?? { open: false, query: "", selected: 0, groups: [], hint: false, openMs: null, opens: 0 };
+            return JSON.stringify(Object.assign(centre, { dnd: notifsService.dnd, count: h.length, summaries: h.map(e => e.summary) }));
         }
     }
 
@@ -225,6 +244,7 @@ ShellRoot {
         Root.Surfaces {
             theme: themeService
             themeList: root.themeList
+            notifs: notifsService
         }
     }
 
