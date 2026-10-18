@@ -2,8 +2,9 @@
 dev:
     bin/dots-dev
 
+# fails past 5 s, so the fast suite stays fast
 test:
-    node --test 'shell/lib/**/*.test.mjs'
+    timeout 5 node --test 'shell/lib/**/*.test.mjs'
 
 # checks that each open a nested niri for a few seconds
 test-dev:

@@ -2,11 +2,6 @@
 # The shell times itself: a qs ipc round trip costs tens of ms, too much to time a 16 ms open from here.
 source "$(dirname "$0")/../tests/dev/lib.sh"
 
-first_frame_budget=${DOTS_BUDGET_FIRST_FRAME_MS:-150}
-rss_budget=${DOTS_BUDGET_RSS_MIB:-150}
-cold_budget=${DOTS_BUDGET_COLD_MS:-50}
-warm_budget=${DOTS_BUDGET_WARM_MS:-16}
-timers_budget=${DOTS_BUDGET_TIMERS:-1}
 idle_s=${DOTS_BENCH_IDLE_S:-60}
 
 die() {
@@ -51,20 +46,4 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-over=0
-# line <name> <value> <unit> <op> <limit> <ok?>
-line() {
-  local verdict=ok
-  "${@:6}" || { verdict=OVER; over=1; }
-  # The op sits outside a width: printf pads by bytes and ≤ is three.
-  printf '%-13s %-7s %s %-8s %s\n' "$1" "$2 $3" "$4" "$5 $3" "$verdict"
-}
-line "first frame" "$first_frame" ms "≤" "$first_frame_budget" test "$first_frame" -le "$first_frame_budget"
-# RSS is checked in KiB, so a value just over the budget is not rounded down into it.
-line "idle rss" $((rss_kib / 1024)) MiB "≤" "$rss_budget" test "$rss_kib" -le $((rss_budget * 1024))
-line "panel cold" "$cold" ms "≤" "$cold_budget" test "$cold" -le "$cold_budget"
-line "panel warm" "$warm" ms "≤" "$warm_budget" test "$warm" -le "$warm_budget"
-line "timers" "$timers" "" "=" "$timers_budget" test "$timers" -eq "$timers_budget"
-printf '%-13s %s\n' "idle cpu" "$cpu %"
-
-exit "$over"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu"
