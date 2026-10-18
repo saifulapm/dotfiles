@@ -119,6 +119,10 @@ ShellRoot {
         id: questionsService
     }
 
+    Services.Media {
+        id: mediaService
+    }
+
     Root.Island {
         id: island
         theme: themeService
@@ -127,6 +131,7 @@ ShellRoot {
         notifs: notifsService
         questions: questionsService
         osd: osdService.current
+        playing: mediaService.playing
     }
 
     Variants {
