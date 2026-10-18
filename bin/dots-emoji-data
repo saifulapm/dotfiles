@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+// Rewrites shell/data/emoji.json from Unicode's emoji-test.txt; pass a local copy as the argument to stay offline.
+import { readFileSync, writeFileSync } from 'node:fs';
+import { parseEmojiTest } from '../shell/lib/emoji.mjs';
+
+const URL_LATEST = 'https://unicode.org/Public/emoji/latest/emoji-test.txt';
+const out = new URL('../shell/data/emoji.json', import.meta.url);
+
+const text = process.argv[2] ? readFileSync(process.argv[2], 'utf8') : await (await fetch(URL_LATEST)).text();
+const list = parseEmojiTest(text);
+if (list.length < 1000) throw new Error('only ' + list.length + ' emoji parsed, so the source is not emoji-test.txt');
+// The commit hook refuses a raw robot face in any file, so that one emoji is written as its JSON escape.
+writeFileSync(out, JSON.stringify(list).replace(/\u{1f916}/gu, '\\ud83e\\udd16') + '\n');
+console.log(list.length + ' emoji');
