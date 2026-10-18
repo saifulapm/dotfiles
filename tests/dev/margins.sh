@@ -12,11 +12,14 @@ foot_focused() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot" and .is
 until_ok 5000 foot_focused
 check "foot is focused" foot_focused
 
-title=$(niri msg -j focused-window | jq -r .title)
-left_is_foot() { margins | jq -e --arg t "$title" '.left.text == "01 · foot — " + $t' >/dev/null 2>&1; }
+# foot's shell retitles the window once it starts, so the title is read again on every poll.
+left_is_foot() {
+  title=$(niri msg -j focused-window | jq -r .title)
+  margins | jq -e --arg t "$title" '.left.text == "01 · foot — " + $t' >/dev/null 2>&1
+}
 until_ok 1000 left_is_foot
 echo "     margins: $(margins)"
-check "the top-left reads 01 · foot — $title" left_is_foot
+check "the top-left reads 01 · foot — <foot's title>" left_is_foot
 
 niri msg action focus-workspace 2
 start=$(now_ms)
