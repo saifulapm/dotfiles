@@ -28,14 +28,15 @@ Item {
     function close() {
         if (!shown)
             return;
+        const f = flow;
         shown = false;
         input.text = "";
-        if (flow && !flow.isCompleted)
-            flow.cancelAuthenticationRequest();
         flow = null;
+        if (f && !f.isCompleted)
+            f.cancelAuthenticationRequest();
     }
 
-    // The agent calls this once the request has ended on its own.
+    // The request ended on its own: answered, or cancelled by the daemon.
     function finish() {
         flow = null;
         shown = false;
@@ -60,6 +61,14 @@ Item {
             error: flow?.supplementaryIsError ? flow.supplementaryMessage : "",
             field: input.text.length
         });
+    }
+
+    Connections {
+        target: prompt.flow
+        function onIsCompletedChanged() {
+            if (prompt.flow?.isCompleted)
+                prompt.finish();
+        }
     }
 
     Component.onCompleted: Root.State.loaded.push("polkit")

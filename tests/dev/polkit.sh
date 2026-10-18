@@ -32,4 +32,17 @@ until_ok 2000 state_is '(.open | not) and (.active | not)'
 check "the prompt closes and the agent goes idle" state_is '(.open | not) and (.active | not)'
 check "the keyboard goes back" focus_is None
 
+# A request that arrives while the prompt is up is refused at once, so its caller gets an answer, and the shown one carries on.
+fake Begin s c2 >/dev/null
+until_ok 3000 state_is '.open'
+fake Begin s c3 >/dev/null
+until_ok 3000 result_is c3 org.freedesktop.PolicyKit1.Error.Cancelled
+check "a second request while the prompt is up is cancelled" result_is c3 org.freedesktop.PolicyKit1.Error.Cancelled
+check "and the first still shows, waiting" bash -c "[ \"\$(busctl --address=\"$DBUS_SESSION_BUS_ADDRESS\" call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit Result s c2)\" = 's \"pending\"' ] && timeout 0.5 qs ipc call polkit state | jq -e '.open and (.message | test(\"run true\"))' >/dev/null"
+wtype -k Escape
+until_ok 3000 result_is c2 org.freedesktop.PolicyKit1.Error.Cancelled
+check "Esc then cancels the first" result_is c2 org.freedesktop.PolicyKit1.Error.Cancelled
+until_ok 2000 state_is '.open | not'
+check "and the prompt closes" state_is '.open | not'
+
 exit $((fails > 0))
