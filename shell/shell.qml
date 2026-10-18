@@ -4,6 +4,7 @@ import QtQuick
 import "." as Root
 import "services" as Services
 import "lib/status.mjs" as Status
+import "lib/margins.mjs" as MarginsLib
 
 ShellRoot {
     Services.Theme {
@@ -40,6 +41,52 @@ ShellRoot {
                 rssKiB: Status.rssKiB(procStatus.text()),
                 timers: Root.State.timers()
             });
+        }
+    }
+
+    Services.Niri {
+        id: niriService
+    }
+
+    Services.Clock {
+        id: clockService
+    }
+
+    Root.Island {
+        id: island
+        theme: themeService
+        niri: niriService
+        clock: clockService
+    }
+
+    Variants {
+        model: Quickshell.screens
+
+        Root.Margins {
+            required property var modelData
+            screen: modelData
+            theme: themeService
+            niri: niriService
+            clock: clockService
+            islandWidth: island.boxWidth
+        }
+    }
+
+    IpcHandler {
+        target: "margins"
+
+        // The margins of the output with the focused workspace.
+        function state(): string {
+            const view = niriService.view(niriService.focusedOutput) ?? { idx: 0, app: null, title: null };
+            return JSON.stringify(MarginsLib.marginState(view, clockService.now));
+        }
+    }
+
+    IpcHandler {
+        target: "island"
+
+        function state(): string {
+            return JSON.stringify({ mode: "rest", text: island.text });
         }
     }
 }
