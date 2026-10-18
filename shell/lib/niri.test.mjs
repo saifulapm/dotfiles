@@ -61,3 +61,12 @@ test('before any event there is no view and no focused output', () => {
   assert.equal(outputView(initial, 'winit'), null);
   assert.equal(focusedOutput(initial), null);
 });
+
+test('a focus change moves is_focused to that window, or to none', () => {
+  const run = (lines) => lines.reduce((s, l) => reduce(s, JSON.parse(l)), initial);
+  const focused = (s) => s.windows.filter((w) => w.is_focused).map((w) => w.id);
+  const s = run(LINES.concat(SECOND_FOOT));
+  assert.deepEqual(focused(s), [3]);
+  assert.deepEqual(focused(reduce(s, { WindowFocusChanged: { id: 2 } })), [2]);
+  assert.deepEqual(focused(reduce(s, { WindowFocusChanged: { id: null } })), []);
+});

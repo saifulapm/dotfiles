@@ -6,6 +6,8 @@ binds {
     Mod+Shift+T hotkey-overlay-title="Themes" { spawn "qs" "ipc" "call" "themes" "toggle"; }
     Mod+A hotkey-overlay-title="Notifications" { spawn "qs" "ipc" "call" "notifs" "toggle"; }
     Mod+I hotkey-overlay-title="Island" { spawn "qs" "ipc" "call" "island" "focus"; }
+    Mod+N hotkey-overlay-title="Notes" { spawn "qs" "ipc" "call" "notes" "toggle"; }
+    Mod+Shift+N hotkey-overlay-title="Pin Notes" { spawn "qs" "ipc" "call" "notes" "pin"; }
     Mod+Q repeat=false hotkey-overlay-title="Close Window" { close-window; }
     Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }
 

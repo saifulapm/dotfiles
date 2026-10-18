@@ -1,5 +1,6 @@
 // bin/dots-dev includes this, then the temp theme-out/niri.kdl whose path changes every run.
 include "../home/dot_config/niri/binds.kdl"
+include "../home/dot_config/niri/rules.kdl"
 
 spawn-at-startup "dots-dev-shell"
 

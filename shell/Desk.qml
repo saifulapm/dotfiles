@@ -62,9 +62,31 @@ Scope {
             notesService.capture();
         }
 
+        function toggle(): void {
+            notesLoader.active = true;
+            notesLoader.item.toggle();
+        }
+
+        function pin(): void {
+            notesLoader.active = true;
+            notesLoader.item.pin();
+        }
+
         function state(): string {
             const s = notesService.store;
-            return JSON.stringify({ path: notesService.path, activeSection: s.activeSection, sections: s.sections.map(x => x.name), count: s.notes.filter(n => !n.deleted).length, notes: s.notes });
+            const view = notesLoader.item?.state() ?? { open: false, focused: false, pinned: false };
+            return JSON.stringify(Object.assign(view, { path: notesService.path, activeSection: s.activeSection, sections: s.sections.map(x => x.name), count: s.notes.filter(n => !n.deleted).length, notes: s.notes }));
+        }
+    }
+
+    // The window loads on the first Mod+N, so the shell's start and idle memory never pay for it.
+    LazyLoader {
+        id: notesLoader
+
+        Root.Notes {
+            theme: desk.theme
+            notes: notesService
+            niri: niriService
         }
     }
 

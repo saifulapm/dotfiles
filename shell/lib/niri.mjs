@@ -30,8 +30,13 @@ export function reduce(state, event) {
       });
     case 'WindowsChanged':
       return set(state, { windows: e.windows });
-    case 'WindowOpenedOrChanged':
-      return set(state, { windows: [...state.windows.filter((w) => w.id !== e.window.id), e.window] });
+    case 'WindowOpenedOrChanged': {
+      // A window that opens focused takes the focus from every other, with no WindowFocusChanged sent.
+      const others = state.windows.filter((w) => w.id !== e.window.id).map((w) => (e.window.is_focused ? set(w, { is_focused: false }) : w));
+      return set(state, { windows: others.concat([e.window]) });
+    }
+    case 'WindowFocusChanged':
+      return set(state, { windows: state.windows.map((w) => set(w, { is_focused: w.id === e.id })) });
     case 'WindowClosed':
       return set(state, { windows: state.windows.filter((w) => w.id !== e.id) });
     default:

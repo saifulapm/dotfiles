@@ -1,5 +1,6 @@
 // Theme fragment rendered by the theme renderer: layout, background-color, animations.
 include "~/.local/state/dots/theme-out/niri.kdl"
 include "binds.kdl"
+include "rules.kdl"
 
 spawn-at-startup "systemctl" "--user" "start" "dots-shell.service"
