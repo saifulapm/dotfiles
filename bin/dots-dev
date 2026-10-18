@@ -13,10 +13,13 @@ export PATH=$repo/bin:$PATH
 dconf_name=dots_dev_${D##*-}
 dconf_name=${dconf_name//[^[:alnum:]_]/_}
 export TMUX_TMPDIR=$D/tmux DCONF_PROFILE=$D/dconf-profile DOTS_CHROMIUM_POLICY_DIR=$D/chromium-policy
+# Nor the live hub's questions or the live PipeWire.
+export DOTS_HUB_QUESTIONS=$D/hub-questions.json PIPEWIRE_RUNTIME_DIR=$D/pw
 # TMUX would point every tmux call at the live server and ignore TMUX_TMPDIR.
 unset TMUX
 dconf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/dconf
 session=
+pw=
 
 cleanup() {
   trap - EXIT INT TERM
@@ -28,6 +31,7 @@ cleanup() {
     wait "$session" 2>/dev/null || true
   fi
   tmux kill-server 2>/dev/null || true
+  [ -z "$pw" ] || { kill "$pw" 2>/dev/null; wait "$pw" 2>/dev/null; } || true
   rm -f "$dconf_dir/$dconf_name" "${XDG_RUNTIME_DIR:-/nonexistent}/dconf/$dconf_name"
   rm -rf "$D"
 }
@@ -35,7 +39,7 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME" "$TMUX_TMPDIR" "$DOTS_CHROMIUM_POLICY_DIR"
+mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME" "$TMUX_TMPDIR" "$DOTS_CHROMIUM_POLICY_DIR" "$PIPEWIRE_RUNTIME_DIR"
 printf 'user-db:%s\n' "$dconf_name" >"$DCONF_PROFILE"
 # Fonts are read, never written, so the user's own stay visible to the nested shell.
 [ -d "$user_data/fonts" ] && ln -s "$user_data/fonts" "$XDG_DATA_HOME/fonts"
@@ -47,6 +51,14 @@ cat >"$D/niri.kdl" <<EOF
 include "$repo/dev/niri-dev.kdl"
 include "$XDG_STATE_HOME/dots/theme-out/niri.kdl"
 EOF
+
+pipewire -c "$repo/dev/pipewire.conf" 2>"$D/pipewire.log" &
+pw=$!
+# The shell connects to PipeWire once, as it starts.
+until [ -S "$PIPEWIRE_RUNTIME_DIR/pipewire-0" ]; do
+  kill -0 "$pw" 2>/dev/null || { cat "$D/pipewire.log" >&2; exit 1; }
+  sleep 0.02
+done
 
 dbus-run-session niri -c "$D/niri.kdl" &
 session=$!

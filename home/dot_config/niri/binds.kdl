@@ -1,9 +1,11 @@
 // Shared with dev/niri-dev.kdl; Mod is Super on a TTY and Alt in a nested niri.
 binds {
-    Mod+Shift+Slash hotkey-overlay-title="Show Hotkeys" { show-hotkey-overlay; }
+    Mod+Slash hotkey-overlay-title="Cheat Sheet" { spawn "qs" "ipc" "call" "cheatsheet" "toggle"; }
     Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
     Mod+Space hotkey-overlay-title="Launcher" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Shift+T hotkey-overlay-title="Themes" { spawn "qs" "ipc" "call" "themes" "toggle"; }
+    Mod+A hotkey-overlay-title="Notifications" { spawn "qs" "ipc" "call" "notifs" "toggle"; }
+    Mod+I hotkey-overlay-title="Island" { spawn "qs" "ipc" "call" "island" "focus"; }
     Mod+Q repeat=false hotkey-overlay-title="Close Window" { close-window; }
     Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }
 
@@ -17,7 +19,8 @@ binds {
     Mod+Ctrl+L hotkey-overlay-title="Move Column Right" { move-column-right; }
 
     Mod+U hotkey-overlay-title="Focus Workspace Down" { focus-workspace-down; }
-    Mod+I hotkey-overlay-title="Focus Workspace Up" { focus-workspace-up; }
+    Mod+Page_Down hotkey-overlay-title="Focus Workspace Down" { focus-workspace-down; }
+    Mod+Page_Up hotkey-overlay-title="Focus Workspace Up" { focus-workspace-up; }
     Mod+Ctrl+U hotkey-overlay-title="Move Column to Workspace Down" { move-column-to-workspace-down; }
     Mod+Ctrl+I hotkey-overlay-title="Move Column to Workspace Up" { move-column-to-workspace-up; }
 
@@ -39,6 +42,12 @@ binds {
     Mod+Ctrl+7 hotkey-overlay-title="Move Column to Workspace 7" { move-column-to-workspace 7; }
     Mod+Ctrl+8 hotkey-overlay-title="Move Column to Workspace 8" { move-column-to-workspace 8; }
     Mod+Ctrl+9 hotkey-overlay-title="Move Column to Workspace 9" { move-column-to-workspace 9; }
+
+    XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="Volume Up" { spawn "wpctl" "set-volume" "-l" "1" "@DEFAULT_AUDIO_SINK@" "5%+"; }
+    XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="Volume Down" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }
+    XF86AudioMute allow-when-locked=true hotkey-overlay-title="Mute" { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+    XF86MonBrightnessUp allow-when-locked=true hotkey-overlay-title="Brightness Up" { spawn "qs" "ipc" "call" "osd" "brightness" "5%+"; }
+    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness Down" { spawn "qs" "ipc" "call" "osd" "brightness" "5%-"; }
 
     Mod+F hotkey-overlay-title="Maximize Column" { maximize-column; }
     Mod+Shift+F hotkey-overlay-title="Fullscreen Window" { fullscreen-window; }
