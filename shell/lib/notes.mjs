@@ -6,17 +6,37 @@ const set = (o, fields) => Object.assign({}, o, fields);
 
 export const emptyStore = () => ({ version: 1, activeSection: 'inbox', sections: [{ name: 'inbox', order: 0 }], notes: [] });
 
-// An empty file is a new store; a broken one is null, so nothing ever saves over the notes it holds.
+const SHA256 = /^[0-9a-f]{64}$/;
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const str = (v) => typeof v === 'string';
+
+// A note missing an optional field gets its default; an attachment that could not name a file in the store is dropped.
+function readNote(n) {
+  const attachments = Array.isArray(n.attachments) ? n.attachments.filter((a) => isObject(a) && str(a.sha256) && SHA256.test(a.sha256) && str(a.name) && str(a.mime)) : [];
+  return Object.assign({}, n, {
+    attachments: attachments.map((a) => ({ sha256: a.sha256, name: a.name, mime: a.mime, size: typeof a.size === 'number' ? a.size : 0 })),
+    tags: Array.isArray(n.tags) ? n.tags.filter(str) : [],
+    todo: n.todo === true,
+    done: n.done === true,
+    createdAt: typeof n.createdAt === 'number' ? n.createdAt : 0,
+    updatedAt: typeof n.updatedAt === 'number' ? n.updatedAt : 0,
+  });
+}
+
+// A file that is empty, broken or the wrong shape is null, so nothing ever saves over the notes it holds; a missing file is the window's loadFailed.
 export function parseStore(text) {
-  if (!text.trim()) return emptyStore();
   let data = null;
   try {
     data = JSON.parse(text);
   } catch (e) {
     return null;
   }
-  if (data === null || typeof data !== 'object' || !Array.isArray(data.sections) || !Array.isArray(data.notes) || !data.sections.length) return null;
-  return data;
+  if (!isObject(data) || !Array.isArray(data.sections) || !Array.isArray(data.notes) || !data.sections.length) return null;
+  if (!data.sections.every((x) => isObject(x) && str(x.name) && x.name)) return null;
+  if (!data.notes.every((n) => isObject(n) && str(n.id) && str(n.section) && str(n.text))) return null;
+  const sections = data.sections.map((x, i) => ({ name: x.name, order: typeof x.order === 'number' ? x.order : i }));
+  const activeSection = sections.some((x) => x.name === data.activeSection) ? data.activeSection : sections[0].name;
+  return Object.assign({}, data, { version: 1, activeSection, sections, notes: data.notes.map(readNote) });
 }
 
 // The id names the store file, so anything that is not a plain name falls through to the next source.
@@ -55,7 +75,7 @@ const newest = (a, b) => b.createdAt - a.createdAt;
 // A Wayland primary selection never expires, so a capture equal to the last one makes no note.
 export function capture(store, selection, last, now, id) {
   if (!selection.trim()) return { store, toast: 'Nothing selected', last };
-  const text = selection.slice(0, CAPTURE_MAX);
+  const text = selection.replace(/\s+$/, '').slice(0, CAPTURE_MAX);
   if (text === last && store.notes.some((n) => !n.deleted && n.text === text)) return { store, toast: 'Already captured', last };
   return { store: addNote(store, text, now, id), toast: 'Captured', last: text };
 }
@@ -150,3 +170,6 @@ export function attachTo(store, id, attachments, now, newId) {
 }
 
 export const firstImage = (note) => note.attachments.find((a) => a.mime.indexOf('image/') === 0) ?? null;
+
+// Bidi overrides and isolates would draw a card in another order than y copies it, so they show as marks.
+export const displayText = (text) => text.replace(/[\u202A-\u202E\u2066-\u2069]/g, (ch) => `⟨U+${ch.charCodeAt(0).toString(16).toUpperCase()}⟩`);

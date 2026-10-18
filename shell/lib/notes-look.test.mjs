@@ -39,3 +39,11 @@ test('the empty line names section and attach, and the strip names every list ke
   for (const name of ['paper', 'artboard', 'blueprint']) assert.match(keyLine(theme(name), EMPTY_KEYS), /section.*attach/i);
   assert.deepEqual(KEYS.map((k) => k[0]), ['j/k', '␣', '↵', '1–6', 'v', 'm', '⇧M', 'y', '⇧Y', '⌃Y', '⌃V', 'd', '/', '⌃K', 'esc']);
 });
+
+test('Blueprint draws its rules and done cards dashed, the others solid', () => {
+  const bp = notesLook(theme('blueprint'));
+  assert.equal(bp.rule.dashed, true);
+  assert.equal(bp.card(false, true).dashed, true);
+  assert.equal(bp.card(true, true).dashed, false);
+  for (const name of ['paper', 'artboard']) assert.equal(notesLook(theme(name)).card(false, true).dashed, false);
+});

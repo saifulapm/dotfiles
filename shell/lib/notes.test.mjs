@@ -9,8 +9,8 @@ test('a new store has one inbox section and no notes', () => {
 });
 
 test('an empty store file reads as a new store, and a broken one as null, so it is never saved over', () => {
-  for (const t of ['', '  \n']) assert.deepEqual(parseStore(t), emptyStore());
-  for (const t of ['{', '[]', 'null', '{"version":1}', '{"sections":[],"notes":[]}']) assert.equal(parseStore(t), null);
+  // A missing file is a new store (the window's loadFailed); an empty one means something truncated it.
+  for (const t of ['', '  \n', '{', '[]', 'null', '{"version":1}', '{"sections":[],"notes":[]}']) assert.equal(parseStore(t), null);
   const s = Object.assign(emptyStore(), { notes: [{ id: 'a', section: 'inbox', text: 'x' }] });
   assert.equal(parseStore(JSON.stringify(s)).notes[0].text, 'x');
 });
@@ -257,4 +257,35 @@ test('a capture equal to the last one is made again once that note is deleted', 
   const r2 = capture(gone, 'same', r1.last, T + 2, 'c2');
   assert.equal(r2.toast, 'Captured');
   assert.equal(r2.store.notes.filter((n) => !n.deleted).length, 1);
+});
+
+test('a store of the wrong shape is refused, and missing optional fields are filled in', () => {
+  const ok = { version: 1, activeSection: 'inbox', sections: [{ name: 'inbox', order: 0 }], notes: [] };
+  const bad = [
+    Object.assign({}, ok, { notes: [null] }),
+    Object.assign({}, ok, { sections: [null] }),
+    Object.assign({}, ok, { notes: [{ id: 'a', section: 'inbox' }] }),
+    Object.assign({}, ok, { notes: [{ id: 3, section: 'inbox', text: 'x' }] }),
+  ];
+  for (const b of bad) assert.equal(parseStore(JSON.stringify(b)), null, JSON.stringify(b));
+  const s = parseStore(JSON.stringify({ sections: [{ name: 'inbox', order: 0 }], notes: [{ id: 'a', section: 'inbox', text: 'x' }] }));
+  assert.equal(s.activeSection, 'inbox');
+  assert.deepEqual([s.notes[0].attachments, s.notes[0].tags, s.notes[0].todo, s.notes[0].done], [[], [], false, false]);
+  assert.equal(parseStore(JSON.stringify(Object.assign({}, ok, { activeSection: 'gone' }))).activeSection, 'inbox');
+});
+
+test('an attachment whose sha256 is not 64 hex digits is dropped, so no path is built from it', () => {
+  const att = (sha256) => ({ sha256, name: 'x.png', mime: 'image/png', size: 1 });
+  const text = JSON.stringify({ version: 1, activeSection: 'inbox', sections: [{ name: 'inbox', order: 0 }], notes: [{ id: 'a', section: 'inbox', text: 'x', attachments: [att('../dev'), att('a'.repeat(64))] }] });
+  assert.deepEqual(parseStore(text).notes[0].attachments.map((a) => a.sha256), ['a'.repeat(64)]);
+});
+
+test('a capture drops trailing whitespace, as a triple-click selection carries it', () => {
+  assert.equal(capture(emptyStore(), 'a sentence.\n\n', '', T, 'c1').store.notes[0].text, 'a sentence.');
+});
+
+test('bidi controls show as visible marks, so a card reads as the text y copies', async () => {
+  const { displayText } = await import('./notes.mjs');
+  assert.equal(displayText('abc\u202Edef'), 'abc⟨U+202E⟩def');
+  assert.equal(displayText('plain ünï'), 'plain ünï');
 });

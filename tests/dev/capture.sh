@@ -42,11 +42,33 @@ capture
 until_ok 2000 notes_is '.count == 2'
 check "a 12,000-character selection is stored as 10,000" notes_is '[.notes[] | .text | length] | max == 10000'
 
+cp "$store" "$store.good"
 printf '{"notes": [' >"$store"
 wl-copy --primary 'after the store broke'
 sleep 0.3
 capture
 check "a store that does not parse is never saved over" until_ok 1000 island_says 'Notes store unreadable'
 check "and the file is as it was" test "$(cat "$store")" = '{"notes": ['
+niri msg action spawn -- qs ipc call notes toggle
+until_ok 3000 notes_is '.focused'
+wtype 'typed while broken'
+wtype -k Return
+check "Enter on a broken store keeps the typed text in the composer" until_ok 1000 notes_is '.composer == "typed while broken"'
+
+: >"$store"
+sleep 0.3
+capture
+check "an emptied store file is never saved over either" until_ok 1000 island_says 'Notes store unreadable'
+check "and stays empty" test ! -s "$store"
+printf '{"sections":[null],"notes":[]}' >"$store"
+sleep 0.3
+capture
+check "a store of the wrong shape is refused too" until_ok 1000 island_says 'Notes store unreadable'
+
+cp "$store.good" "$store"
+until_ok 2000 notes_is '.count == 2'
+capture
+check "restoring the exact text last written makes the store usable again" until_ok 1000 island_says Captured
+check "and the capture is saved" until_ok 1000 store_has '[.notes[] | select(.text == "after the store broke")] | length == 1'
 
 exit $((fails > 0))

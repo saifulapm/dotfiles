@@ -2,7 +2,7 @@
 // Copies the Wayland clipboard's image or files into an attachments folder, named by sha256, and prints a JSON array of what it did.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ATTACH_MAX, attachRefusal, attachmentFile } from '../shell/lib/notes.mjs';
@@ -46,8 +46,9 @@ function fromFiles(list) {
     let path;
     try { path = fileURLToPath(url); } catch { continue; }
     let st;
-    try { st = statSync(path); } catch { continue; }
-    if (!st.isFile()) continue;
+    // Kernel pseudo-files read as empty regular files but hold live state, so no path into them is attached, a symlink's included.
+    try { path = realpathSync(path); st = statSync(path); } catch { continue; }
+    if (!st.isFile() || /^\/(proc|sys|dev)\//.test(path)) continue;
     const name = basename(path);
     if (attachRefusal(st.size)) out.push({ refused: attachRefusal(st.size), name });
     else out.push(attachBytes(readFileSync(path), name, mimeOf(name)));

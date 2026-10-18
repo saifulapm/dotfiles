@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, truncateSync, writeFileSync, chmodSync } from 'node:fs';
+import { symlinkSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, truncateSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -88,4 +88,12 @@ test('attaching the same png twice keeps one file and the same hash', (t) => {
   c.offer(['image/png'], { 'image/png': PNG });
   assert.deepEqual(c.run(), c.run());
   assert.deepEqual(readdirSync(c.out), [sha(PNG) + '.png']);
+});
+
+test('a uri-list naming a /proc, /sys or /dev file, directly or through a symlink, attaches nothing', (t) => {
+  const c = rig(t);
+  symlinkSync('/proc/self/environ', join(c.root, 'innocent.txt'));
+  c.offer(['text/uri-list'], { 'text/uri-list': ['file:///proc/cpuinfo', 'file:///sys/kernel/uevent_seqnum', 'file://' + join(c.root, 'innocent.txt')].join('\n') });
+  assert.deepEqual(c.run(), []);
+  assert.deepEqual(readdirSync(c.out), []);
 });

@@ -3,6 +3,7 @@ import Quickshell.Io
 import QtQuick
 import "lib/notes.mjs" as N
 import "lib/notes-look.mjs" as L
+import "." as Root
 
 // A real window, never a layer surface, so other apps keep their keyboard and clipboard; a niri rule docks it right.
 FloatingWindow {
@@ -96,9 +97,10 @@ FloatingWindow {
         const now = Date.now();
         const next = editing ? N.editNote(store, editing, composer.text, now) : N.compose(store, composer.text, now, notes.newId());
         const wasEditing = editing !== "";
+        if (!notes.save(next))
+            return;
         composer.text = "";
         editing = "";
-        notes.save(next);
         if (wasEditing)
             useList();
         else
@@ -189,6 +191,7 @@ FloatingWindow {
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             editing = current.id;
             composer.text = current.text;
+            composer.cursorPosition = composer.text.length;
             useComposer();
         } else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_6)
             notes.save(N.toggleTag(store, current.id, String(event.key - Qt.Key_0), now));
@@ -263,7 +266,7 @@ FloatingWindow {
             id: header
             x: 18
             y: 16
-            width: parent.width - 36
+            width: parent.width - 36 - (pinnedBox.visible ? pinnedBox.width + 10 : 0)
             spacing: 10
 
             Text {
@@ -280,7 +283,7 @@ FloatingWindow {
 
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
-                width: sectionText.implicitWidth + (color.a > 0 ? 18 : 0)
+                width: sectionText.width + (color.a > 0 ? 18 : 0)
                 height: sectionText.implicitHeight + (color.a > 0 ? 6 : 0)
                 radius: 8
                 color: win.look ? win.look.section.pill : "transparent"
@@ -288,6 +291,9 @@ FloatingWindow {
                 Text {
                     id: sectionText
                     anchors.centerIn: parent
+                    // A long section name is cut short, so the key hint and the pinned mark keep their place.
+                    width: Math.min(implicitWidth, header.width - titleText.width - keyHint.width - 2 * header.spacing - 18)
+                    elide: Text.ElideRight
                     textFormat: Text.PlainText
                     text: win.look ? win.look.sectionLabel(win.store.activeSection) : win.store.activeSection
                     color: win.look ? win.look.section.color : "black"
@@ -298,6 +304,7 @@ FloatingWindow {
             }
 
             Text {
+                id: keyHint
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
                 text: win.look && win.look.voice === "bracket" ? "[⌃K]" : "⌃K"
@@ -308,6 +315,7 @@ FloatingWindow {
         }
 
         Rectangle {
+            id: pinnedBox
             visible: win.pinned
             anchors.verticalCenter: header.verticalCenter
             anchors.right: parent.right
@@ -337,7 +345,13 @@ FloatingWindow {
             anchors.topMargin: 12
             width: parent.width
             height: win.look ? win.look.rule.width : 1
-            color: win.look ? win.look.rule.color : "black"
+            color: win.look && !win.look.rule.dashed ? win.look.rule.color : "transparent"
+
+            Root.Dashed {
+                visible: win.look ? win.look.rule.dashed : false
+                anchors.fill: parent
+                color: win.look ? win.look.rule.color : "black"
+            }
         }
 
         TextInput {
@@ -375,11 +389,16 @@ FloatingWindow {
         ListView {
             id: list
             anchors.top: search.bottom
-            anchors.topMargin: 16
+            anchors.topMargin: 8
             anchors.bottom: composerBox.top
             anchors.bottomMargin: 12
-            x: 16
-            width: parent.width - 32
+            // The list clips at its edge, so a margin keeps a selected card's glow, ticks and shadow inside it.
+            x: 8
+            width: parent.width - 16
+            leftMargin: 8
+            rightMargin: 8
+            topMargin: 8
+            bottomMargin: 8
             clip: true
             spacing: 12
             model: win.cards
@@ -400,7 +419,7 @@ FloatingWindow {
                 readonly property var style: win.look ? win.look.card(isSelected, modelData.done) : null
                 readonly property var images: modelData.attachments.filter(a => a.mime.indexOf("image/") === 0)
                 readonly property real frameHeight: frame.height
-                width: ListView.view.width
+                width: ListView.view.width - 16
                 height: content.implicitHeight + 24 + (style && style.shadow ? style.shadow.y : 0)
 
                 Rectangle {
@@ -428,8 +447,15 @@ FloatingWindow {
                     height: content.implicitHeight + 24
                     radius: win.look ? win.look.radius : 0
                     color: card.style ? card.style.fill : "transparent"
-                    border.width: card.style ? card.style.border.width : 1
+                    border.width: card.style && !card.style.dashed ? card.style.border.width : 0
                     border.color: card.style ? card.style.border.color : "black"
+
+                    Root.Dashed {
+                        visible: !!(card.style && card.style.dashed)
+                        anchors.fill: parent
+                        frame: true
+                        color: card.style ? card.style.border.color : "black"
+                    }
 
                     Rectangle {
                         anchors.fill: parent
@@ -438,25 +464,27 @@ FloatingWindow {
                         color: Qt.alpha(win.c.accent ?? "red", 0.12)
                     }
 
+                    // An L at each corner, opening inward: [left, top] says which sides it sits on.
                     Repeater {
-                        model: card.style && card.style.ticks ? [[-6, -6, 1, 1], [1, -6, 0, 1], [-6, 1, 1, 0], [1, 1, 0, 0]] : []
+                        model: card.style && card.style.ticks ? [[true, true], [false, true], [true, false], [false, false]] : []
 
                         Item {
+                            id: tick
                             required property var modelData
-                            x: modelData[0] < 0 ? -6 : frame.width - 4
-                            y: modelData[1] < 0 ? -6 : frame.height - 4
+                            x: tick.modelData[0] ? -6 : frame.width - 4
+                            y: tick.modelData[1] ? -6 : frame.height - 4
                             width: 10
                             height: 10
 
                             Rectangle {
-                                x: modelData[2] ? 0 : 9
+                                x: tick.modelData[0] ? 0 : 9
                                 width: 1
                                 height: 10
                                 color: win.c.accent ?? "cyan"
                             }
 
                             Rectangle {
-                                y: modelData[3] ? 0 : 9
+                                y: tick.modelData[1] ? 0 : 9
                                 width: 10
                                 height: 1
                                 color: win.c.accent ?? "cyan"
@@ -494,6 +522,16 @@ FloatingWindow {
                         color: card.modelData.done ? (win.look && win.look.voice === "plain" ? win.c.accent : win.c.ink) ?? "black" : "transparent"
                         border.width: card.modelData.done ? 0 : 1.5
                         border.color: win.c.ink ?? "black"
+
+                        Text {
+                            visible: card.modelData.done && win.look && win.look.voice === "plain"
+                            anchors.centerIn: parent
+                            textFormat: Text.PlainText
+                            text: "✓"
+                            color: win.c.surface ?? "white"
+                            font.pixelSize: 9
+                            font.bold: true
+                        }
                     }
 
                     Text {
@@ -520,7 +558,7 @@ FloatingWindow {
                         textFormat: Text.PlainText
                         wrapMode: Text.Wrap
                         lineHeight: 1.15
-                        text: card.modelData.text
+                        text: N.displayText(card.modelData.text)
                         color: card.modelData.done ? win.look?.body.done ?? "gray" : win.look?.body.color ?? "black"
                         font.family: win.look ? win.look.body.font : ""
                         font.pixelSize: win.look ? win.look.body.size : 13
@@ -685,7 +723,13 @@ FloatingWindow {
                 visible: win.look ? win.look.composer.radius === 0 : true
                 width: parent.width
                 height: win.look ? win.look.rule.width : 1
-                color: win.look ? win.look.rule.color : "black"
+                color: win.look && !win.look.rule.dashed ? win.look.rule.color : "transparent"
+
+                Root.Dashed {
+                    visible: win.look ? win.look.rule.dashed : false
+                    anchors.fill: parent
+                    color: win.look ? win.look.rule.color : "black"
+                }
             }
 
             Column {
@@ -731,6 +775,8 @@ FloatingWindow {
                                 win.save();
                             else if (event.key === Qt.Key_Tab)
                                 win.useList();
+                            else if (event.key === Qt.Key_K && event.modifiers & Qt.ControlModifier)
+                                win.openPicker("switch");
                             else if (event.key === Qt.Key_Escape && win.editing) {
                                 win.editing = "";
                                 text = "";

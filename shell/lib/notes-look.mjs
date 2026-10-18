@@ -66,6 +66,7 @@ export function notesLook(tokens) {
         fill: round && !selected ? tint : c.surface,
         border: { width, color },
         shadow: selected && p.shadow === 'hard-offset' ? { x: 4, y: 4, color: c.accent } : null,
+        dashed: !selected && done && voice === 'bracket',
         glow: selected && p.frame === 'glow',
         ticks: selected && p.corner === 'cut',
       };

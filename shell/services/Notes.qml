@@ -27,16 +27,18 @@ Scope {
         return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     }
 
+    // False when nothing was saved, so the caller keeps what was typed.
     function save(next) {
         if (next === store)
-            return;
+            return true;
         if (broken) {
             toast("Notes store unreadable");
-            return;
+            return false;
         }
         store = next;
         written = JSON.stringify(next, null, 1) + "\n";
         storeFile.setText(written);
+        return true;
     }
 
     function capture() {
@@ -132,7 +134,7 @@ Scope {
         printErrors: false
         onFileChanged: reload()
         onLoaded: {
-            if (text() === notes.written && notes.ready)
+            if (text() === notes.written && notes.ready && !notes.broken)
                 return;
             const parsed = N.parseStore(text());
             notes.broken = parsed === null;
