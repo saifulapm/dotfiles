@@ -61,5 +61,8 @@ db=${XDG_CONFIG_HOME:-$HOME/.config}/dconf/$db_name
 pw_left() { for p in $(pgrep -x pipewire); do grep -qzF "PIPEWIRE_RUNTIME_DIR=$dev/" "/proc/$p/environ" 2>/dev/null && return 0; done; return 1; }
 check "no pipewire still uses the old temp dir" eval '! pw_left'
 check "the dconf db file is deleted" test -n "$db_name" -a ! -e "$db" -a ! -e "$XDG_RUNTIME_DIR/dconf/$db_name"
+# qs keeps a dead instance's run dir, and every qs ipc call walks them all, so hundreds of them slow each call by 70 ms or more.
+dead_left() { qs list --show-dead -j 2>/dev/null | jq -e 'length > 0' >/dev/null; }
+check "no dead qs instance of this shell is left behind" eval '! dead_left'
 
 exit $((fails > 0))

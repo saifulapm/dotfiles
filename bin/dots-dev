@@ -25,10 +25,23 @@ dconf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/dconf
 session=
 pw=
 
+qs_dead() {
+  local run=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/quickshell live id pid shell
+  live=$(qs list -j 2>/dev/null | jq -r '.[].id' 2>/dev/null) || true
+  (qs list --show-dead -j 2>/dev/null || true) | (jq -r '.[] | "\(.id) \(.pid) \(.shell_id)"' 2>/dev/null || true) |
+    while read -r id pid shell; do
+      if grep -qx "$id" <<<"$live"; then continue; fi
+      rm -rf "${run:?}/by-id/$id" "$run/by-shell/$shell/$id"
+      if [ "$(readlink "$run/by-pid/$pid")" = "$run/by-id/$id" ]; then rm -f "$run/by-pid/$pid"; fi
+    done
+}
+
 cleanup() {
   trap - EXIT INT TERM
   # The unit stops first, or systemd restarts a displayless qs every 500 ms once niri is gone.
   systemctl --user stop "$DOTS_DEV_UNIT" 2>/dev/null || true
+  # qs keeps a dead instance's run dir, and every later qs ipc call walks them all, so this config's dead ones go.
+  qs_dead
   if [ -n "$session" ]; then
     # dbus-run-session does not forward signals, so niri gets them directly.
     pkill -TERM -P "$session" -x niri 2>/dev/null || true
