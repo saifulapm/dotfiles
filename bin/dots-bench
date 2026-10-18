@@ -84,6 +84,21 @@ qs ipc call cheatsheet open >/dev/null || die "cheatsheet open failed"
 until_ok 3000 sheet_focus Exclusive || die "the cheat sheet never took the keyboard"
 qs ipc call cheatsheet close >/dev/null
 until_ok 3000 sheet_focus None || die "the cheat sheet never gave the keyboard back"
+host_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
+qs ipc call control open >/dev/null || die "control open failed"
+until_ok 3000 host_focus Exclusive || die "Control never took the keyboard"
+qs ipc call control close >/dev/null
+until_ok 3000 host_focus None || die "Control never gave the keyboard back"
+# The picker opens and closes on one toggle each; nothing records.
+qs ipc call record toggle >/dev/null || die "record toggle failed"
+until_ok 3000 host_focus Exclusive || die "the region picker never took the keyboard"
+qs ipc call record toggle >/dev/null
+until_ok 3000 host_focus None || die "the region picker never gave the keyboard back"
+# Emoji mode reads its bundled list on first use, so it is opened once too.
+qs ipc call launcher mode emoji >/dev/null || die "launcher emoji mode failed"
+until_ok 3000 host_focus Exclusive || die "emoji mode never took the keyboard"
+qs ipc call launcher close >/dev/null
+until_ok 3000 host_focus None || die "emoji mode never gave the keyboard back"
 sleep 5
 rss_kib=$(shell_status | jq -r .rssKiB) || die "status did not answer after the opens"
 

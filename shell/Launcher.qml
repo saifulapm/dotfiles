@@ -123,7 +123,9 @@ Item {
             ids: rows.map(r => r.id ?? null),
             selected: selected,
             openMs: openMs,
-            opens: opens
+            opens: opens,
+            // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
+            keyboard: launcher.Window.active
         });
     }
 
