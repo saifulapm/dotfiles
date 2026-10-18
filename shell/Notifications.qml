@@ -142,6 +142,7 @@ Item {
                     spacing: 12
 
                     Text {
+                        textFormat: Text.PlainText
                         text: "NOTIFICATIONS"
                         color: c.ink
                         font.family: fonts.ui
@@ -150,6 +151,7 @@ Item {
                         font.letterSpacing: 1.4
                     }
                     Text {
+                        textFormat: Text.PlainText
                         Layout.fillWidth: true
                         text: rows.length + " · newest first"
                         color: c.muted
@@ -163,6 +165,7 @@ Item {
                         border.color: centre.notifs.dnd ? c.accent : c.line
                         border.width: 1
                         Text {
+                            textFormat: Text.PlainText
                             id: chip
                             anchors.centerIn: parent
                             text: "Do not disturb: " + (centre.notifs.dnd ? "on" : "off")
@@ -203,6 +206,7 @@ Item {
                     }
 
                     Text {
+                        textFormat: Text.PlainText
                         visible: input.text === ""
                         text: "/ search"
                         color: c.muted
@@ -217,6 +221,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     visible: rows.length === 0
                     Layout.fillWidth: true
                     leftPadding: 20
@@ -248,6 +253,7 @@ Item {
                         width: list.width
 
                         Text {
+                            textFormat: Text.PlainText
                             visible: item.modelData.head !== ""
                             leftPadding: 20
                             topPadding: 10
@@ -280,6 +286,7 @@ Item {
                                     Layout.fillWidth: true
                                     spacing: 2
                                     Text {
+                                        textFormat: Text.PlainText
                                         width: parent.width
                                         text: item.modelData.entry.summary
                                         elide: Text.ElideRight
@@ -302,6 +309,7 @@ Item {
                                     }
                                 }
                                 Text {
+                                    textFormat: Text.PlainText
                                     Layout.alignment: Qt.AlignTop
                                     text: Qt.formatTime(new Date(item.modelData.entry.time), "HH:mm")
                                     color: c.muted
@@ -320,6 +328,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     leftPadding: 20
                     rightPadding: 20

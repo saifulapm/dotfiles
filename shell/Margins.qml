@@ -34,6 +34,7 @@ PanelWindow {
     mask: Region {}
 
     component Label: Text {
+        textFormat: Text.PlainText
         color: root.theme.color.muted ?? "black"
         font.family: root.look.font
         font.pixelSize: root.look.size

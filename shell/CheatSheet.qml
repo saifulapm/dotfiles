@@ -109,6 +109,7 @@ Item {
                     spacing: 14
 
                     Text {
+                        textFormat: Text.PlainText
                         text: "KEYS"
                         color: c.ink
                         font.family: fonts.ui
@@ -117,6 +118,7 @@ Item {
                         font.letterSpacing: 1.4
                     }
                     Text {
+                        textFormat: Text.PlainText
                         Layout.fillWidth: true
                         text: "read from the niri binds · Mod = Super"
                         elide: Text.ElideRight
@@ -143,6 +145,7 @@ Item {
                         }
                     }
                     Text {
+                        textFormat: Text.PlainText
                         text: "/ filter · Esc"
                         color: c.muted
                         font.family: fonts.mono
@@ -183,6 +186,7 @@ Item {
                                 spacing: 6
 
                                 Text {
+                                    textFormat: Text.PlainText
                                     bottomPadding: 4
                                     text: group.modelData.name
                                     color: c.muted
@@ -200,6 +204,7 @@ Item {
                                         spacing: 6
 
                                         Text {
+                                            textFormat: Text.PlainText
                                             Layout.maximumWidth: group.width - keyText.implicitWidth - 24
                                             text: modelData.title
                                             elide: Text.ElideRight
@@ -208,6 +213,7 @@ Item {
                                             font.pixelSize: 13
                                         }
                                         Text {
+                                            textFormat: Text.PlainText
                                             Layout.fillWidth: true
                                             text: "........................................................................"
                                             clip: true
@@ -216,6 +222,7 @@ Item {
                                             font.pixelSize: 11
                                         }
                                         Text {
+                                            textFormat: Text.PlainText
                                             id: keyText
                                             text: modelData.key
                                             color: c.ink
@@ -236,6 +243,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     leftPadding: 24
                     rightPadding: 24

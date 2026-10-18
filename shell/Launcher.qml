@@ -116,6 +116,7 @@ Item {
                         implicitHeight: chip.implicitHeight + 6
                         color: c.ink
                         Text {
+                            textFormat: Text.PlainText
                             id: chip
                             anchors.centerIn: parent
                             text: "APPS"
@@ -153,6 +154,7 @@ Item {
                     }
 
                     Text {
+                        textFormat: Text.PlainText
                         text: found.length + " FOUND"
                         color: c.muted
                         font.family: fonts.ui
@@ -194,6 +196,7 @@ Item {
                         width: parent.width
 
                         Text {
+                            textFormat: Text.PlainText
                             visible: rows.length === 0
                             leftPadding: 20
                             topPadding: 11
@@ -224,12 +227,14 @@ Item {
                                     spacing: 14
 
                                     Text {
+                                        textFormat: Text.PlainText
                                         text: "▸"
                                         color: current ? c.accent : "transparent"
                                         font.family: fonts.ui
                                         font.pixelSize: 15
                                     }
                                     Text {
+                                        textFormat: Text.PlainText
                                         Layout.fillWidth: true
                                         text: modelData.name
                                         elide: Text.ElideRight
@@ -239,6 +244,7 @@ Item {
                                         font.weight: current ? Font.Medium : Font.Normal
                                     }
                                     Text {
+                                        textFormat: Text.PlainText
                                         Layout.maximumWidth: 260
                                         text: modelData.genericName
                                         elide: Text.ElideRight
@@ -260,6 +266,7 @@ Item {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     leftPadding: 20
                     rightPadding: 20

@@ -125,6 +125,7 @@ Item {
     }
 
     Text {
+        textFormat: Text.PlainText
         visible: surface.style.handles && surface.label !== ""
         y: -20
         text: surface.label

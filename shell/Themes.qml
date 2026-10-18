@@ -120,6 +120,7 @@ Item {
                 Row {
                     spacing: 12
                     Text {
+                        textFormat: Text.PlainText
                         anchors.baseline: currentName.baseline
                         text: "THEMES"
                         color: c.muted
@@ -128,6 +129,7 @@ Item {
                         font.letterSpacing: 0.66
                     }
                     Text {
+                        textFormat: Text.PlainText
                         id: currentName
                         text: "current: " + switcher.theme.name
                         color: c.muted
@@ -190,6 +192,7 @@ Item {
                                 }
 
                                 Text {
+                                    textFormat: Text.PlainText
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     y: 8
                                     text: "14:32"
@@ -206,6 +209,7 @@ Item {
                                 height: name.height
 
                                 Text {
+                                    textFormat: Text.PlainText
                                     id: name
                                     text: card.modelData.name.charAt(0).toUpperCase() + card.modelData.name.slice(1)
                                     color: c.ink
@@ -213,6 +217,7 @@ Item {
                                     font.pixelSize: 20
                                 }
                                 Text {
+                                    textFormat: Text.PlainText
                                     anchors.right: parent.right
                                     anchors.baseline: name.baseline
                                     text: Lib.summary(card.modelData)
@@ -230,6 +235,7 @@ Item {
                     height: hint.height
 
                     Text {
+                        textFormat: Text.PlainText
                         id: hint
                         text: "j/k or ←/→ choose    ↵ apply (≤ 300 ms)"
                         color: c.muted
@@ -237,6 +243,7 @@ Item {
                         font.pixelSize: 11
                     }
                     Text {
+                        textFormat: Text.PlainText
                         anchors.right: parent.right
                         text: "Esc"
                         color: c.muted

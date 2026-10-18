@@ -114,6 +114,7 @@ PanelWindow {
         role: "island"
 
         Text {
+            textFormat: Text.PlainText
             id: label
             visible: ["notification", "question", "calendar", "osd"].indexOf(island.mode) < 0
             anchors.centerIn: parent
@@ -169,6 +170,7 @@ PanelWindow {
             }
 
             Text {
+                textFormat: Text.PlainText
                 width: 36
                 anchors.verticalCenter: parent.verticalCenter
                 horizontalAlignment: Text.AlignRight
@@ -188,6 +190,7 @@ PanelWindow {
             spacing: 2
 
             Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 text: island.notification?.app ?? ""
                 elide: Text.ElideRight
@@ -197,6 +200,7 @@ PanelWindow {
             }
 
             Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 text: island.notification?.summary ?? ""
                 elide: Text.ElideRight
@@ -261,6 +265,7 @@ PanelWindow {
                 height: monthTitle.implicitHeight
 
                 Text {
+                    textFormat: Text.PlainText
                     id: monthTitle
                     text: island.grid?.title ?? ""
                     color: box.style.text
@@ -270,6 +275,7 @@ PanelWindow {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     anchors.right: parent.right
                     text: M.clockText(island.clock.now)
                     color: Qt.alpha(box.style.text, 0.65)
@@ -296,6 +302,7 @@ PanelWindow {
                         color: isToday ? box.style.text : "transparent"
 
                         Text {
+                            textFormat: Text.PlainText
                             anchors.centerIn: parent
                             text: parent.modelData ?? ""
                             color: parent.isToday ? box.style.fill : Qt.alpha(box.style.text, parent.index < 7 ? 0.55 : 0.85)
@@ -308,6 +315,7 @@ PanelWindow {
             }
 
             Text {
+                textFormat: Text.PlainText
                 text: "h/l month · Esc"
                 color: Qt.alpha(box.style.text, 0.55)
                 font.family: island.theme.tokens?.type.mono ?? ""
@@ -328,6 +336,7 @@ PanelWindow {
                 height: where.implicitHeight
 
                 Text {
+                    textFormat: Text.PlainText
                     id: where
                     text: [island.question?.project, island.question?.machine].filter(p => p).join(" · ")
                     color: Qt.alpha(box.style.text, 0.65)
@@ -336,6 +345,7 @@ PanelWindow {
                 }
 
                 Text {
+                    textFormat: Text.PlainText
                     anchors.right: parent.right
                     text: island.focused ? "1-9 pick · r reply · Esc" : "Mod+I to answer"
                     color: Qt.alpha(box.style.text, 0.65)
@@ -377,6 +387,7 @@ PanelWindow {
                         border.color: Qt.alpha(box.style.text, 0.35)
 
                         Text {
+                            textFormat: Text.PlainText
                             id: chip
                             anchors.centerIn: parent
                             text: (parent.isReply ? "r" : parent.index + 1) + " · " + parent.modelData
