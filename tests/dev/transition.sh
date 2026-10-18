@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The outgoing theme's switch transition: seen mid-way on screen, done by 350 ms, and nothing left running.
+# The outgoing theme's switch transition: seen mid-way on screen, done by 300 ms, and nothing left running.
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -31,7 +31,7 @@ near12() { (($1 - $4 <= 12 && $4 - $1 <= 12 && $2 - $5 <= 12 && $5 - $2 <= 12 &&
 
 declare -A rgb=([paper]="241 233 216" [artboard]="228 230 234" [blueprint]="12 26 46")
 
-# Switches to $2 in the background and grabs the column until 300 ms; then the frame at 350 ms.
+# Switches to $2 in the background and grabs the column until 250 ms; then the frame at 300 ms.
 seen=() final=""
 switch_from() {
   local start t pid
@@ -39,10 +39,10 @@ switch_from() {
   "$repo/bin/dots" theme "$2" >/dev/null &
   pid=$!
   seen=()
-  while t=$(($(now_ms) - start)) && ((t < 300)); do
+  while t=$(($(now_ms) - start)) && ((t < 250)); do
     seen+=("$t $(bands)")
   done
-  while (($(now_ms) - start < 350)); do sleep 0.005; done
+  while (($(now_ms) - start < 300)); do sleep 0.005; done
   final=$(bands)
   wait "$pid"
 }
@@ -71,14 +71,14 @@ check "the start is all paper ($final)" all_are ${rgb[paper]}
 
 switch_from paper blueprint
 check "paper to blueprint: a grab has cream on top and navy below (the sheet slides up)" mix_seen "${rgb[paper]}" "${rgb[blueprint]}"
-check "paper to blueprint: all blueprint by 350 ms ($final)" all_are ${rgb[blueprint]}
+check "paper to blueprint: all blueprint by 300 ms ($final)" all_are ${rgb[blueprint]}
 
 switch_from blueprint artboard
 check "blueprint to artboard: a grab has grey on top and navy below (the scan line sweeps down)" mix_seen "${rgb[artboard]}" "${rgb[blueprint]}"
-check "blueprint to artboard: all artboard by 350 ms ($final)" all_are ${rgb[artboard]}
+check "blueprint to artboard: all artboard by 300 ms ($final)" all_are ${rgb[artboard]}
 
 switch_from artboard paper
-check "artboard to paper: all paper by 350 ms ($final)" all_are ${rgb[paper]}
+check "artboard to paper: all paper by 300 ms ($final)" all_are ${rgb[paper]}
 
 timers_one() { shell_status | jq -e '.timers == 1' >/dev/null; }
 check "after the transitions status reports timers 1" timers_one

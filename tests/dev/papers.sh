@@ -36,6 +36,8 @@ for t in "paper 241 233 216" "artboard 228 230 234" "blueprint 12 26 46"; do
   read -r name rgb <<<"$t"
   switch "$name"
   until_ok 3000 centre_is "$rgb"
+  # The centre turns before the switch transition has finished drawing the new sheet.
+  sleep 0.3
   check "$name: the paper at $cx,$cy is $rgb ($(mean_at "$cx" "$cy" 10 10))" centre_is "$rgb"
   case $name in
     artboard)

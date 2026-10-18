@@ -144,7 +144,7 @@ PanelWindow {
             target: paper.back
             property: "offset"
             to: 0
-            duration: 280
+            duration: 220
             easing.type: Easing.OutExpo
         }
         NumberAnimation {
@@ -152,12 +152,12 @@ PanelWindow {
             property: "offset"
             from: 0
             to: -paper.height / 4
-            duration: 280
+            duration: 220
             easing.type: Easing.OutExpo
         }
     }
 
-    // Artboard: the canvas zooms out 3% while the sheets cross-fade, then springs back, in a fixed 280 ms.
+    // Artboard: the canvas zooms out 3% while the sheets cross-fade, then springs back, in a fixed 220 ms.
     ParallelAnimation {
         id: zoom
         onFinished: paper.finish()
@@ -167,14 +167,14 @@ PanelWindow {
                 target: canvas
                 property: "scale"
                 to: 0.97
-                duration: 110
+                duration: 85
                 easing.type: Easing.OutCubic
             }
             NumberAnimation {
                 target: canvas
                 property: "scale"
                 to: 1
-                duration: 170
+                duration: 135
                 easing.type: Easing.OutBack
                 easing.overshoot: 2.5
             }
@@ -185,7 +185,7 @@ PanelWindow {
             property: "opacity"
             from: 1
             to: 0
-            duration: 280
+            duration: 220
         }
     }
 
@@ -196,7 +196,7 @@ PanelWindow {
         property: "cut"
         from: 0
         to: paper.height
-        duration: 280
+        duration: 220
         onFinished: paper.finish()
     }
 
