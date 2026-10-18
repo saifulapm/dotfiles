@@ -62,6 +62,11 @@ qs ipc call themes open >/dev/null || die "themes open failed"
 until_ok 3000 themes_focus Exclusive || die "the switcher never took the keyboard"
 qs ipc call themes close >/dev/null
 until_ok 3000 themes_focus None || die "the switcher never gave the keyboard back"
+notifs_focus() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -e --arg k "$1" '.open == ($k == "Exclusive")' >/dev/null && niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
+qs ipc call notifs open >/dev/null || die "notifs open failed"
+until_ok 3000 notifs_focus Exclusive || die "the notification centre never took the keyboard"
+qs ipc call notifs close >/dev/null
+until_ok 3000 notifs_focus None || die "the notification centre never gave the keyboard back"
 sleep 5
 rss_kib=$(shell_status | jq -r .rssKiB) || die "status did not answer after the opens"
 
