@@ -51,6 +51,10 @@ check "every window survives with its id ($before)" test "$(windows)" = "$before
 DOTS_SWITCH_T0='1; touch '"$DOTS_DEV_DIR"'/pwned' "$repo/bin/dots" theme artboard
 check "a bad DOTS_SWITCH_T0 still switches" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.to == "artboard" and .ms >= 0 and .ms <= 300'
 check "and runs nothing" test ! -e "$DOTS_DEV_DIR/pwned"
+DOTS_SWITCH_T0=1000000000000 "$repo/bin/dots" theme blueprint
+check "a stamp from 2001 is not taken" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.to == "blueprint" and .ms >= 0 and .ms <= 300'
+DOTS_SWITCH_T0=9999999999999 "$repo/bin/dots" theme artboard
+check "nor one from 2286" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.to == "artboard" and .ms >= 0 and .ms <= 300'
 check "after artboard the fragment's corner radius is 14" grep -q 'geometry-corner-radius 14' "$kdl"
 "$repo/bin/dots" theme paper
 check "after paper the shadow is hard at 3,3" grep -Pzq 'softness 0\s+spread 0\s+offset x=3 y=3' "$kdl"
