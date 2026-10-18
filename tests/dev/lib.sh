@@ -1,5 +1,4 @@
-# Sourced by tests/dev/*.sh: starts bin/dots-dev in the background, sources the env it
-# prints, and stops it again when the check exits.
+# Sourced by tests/dev/*.sh: runs bin/dots-dev in the background and sources the env it prints.
 set -uo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)

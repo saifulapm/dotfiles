@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Spawned by the nested niri that bin/dots-dev starts: runs the shell as a transient user
-# unit, so systemd restarts it like the real dots-shell.service. A transient unit gets the
-# user manager's env, which is the live session's, so every variable that points at the
-# nested session is passed on by name. QT_QPA_PLATFORMTHEME is cleared as in dots-shell.service.
+# A transient unit gets the live user manager's env, so each nested-session variable is passed by name.
 set -euo pipefail
 
 systemd-run --user --quiet --collect --unit "$DOTS_DEV_UNIT" \

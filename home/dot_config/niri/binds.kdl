@@ -1,5 +1,4 @@
-// Shared by the real session and the nested dev session (dev/niri-dev.kdl).
-// Mod is Super on a TTY and Alt in a nested niri.
+// Shared with dev/niri-dev.kdl; Mod is Super on a TTY and Alt in a nested niri.
 binds {
     Mod+Shift+Slash hotkey-overlay-title="Show Hotkeys" { show-hotkey-overlay; }
     Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }

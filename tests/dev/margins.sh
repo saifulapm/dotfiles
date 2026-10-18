@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# The top margins and the island: workspace and title from niri's event stream, the time
-# from the shell's one minute tick.
+# The margins and the island, from niri's event stream and the shell's one minute tick.
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null

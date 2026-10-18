@@ -1,5 +1,4 @@
-// niri's event stream folded into the workspaces and windows the shell shows. Pure, so node
-// can test it on captured events; services/Niri.qml feeds it one parsed line at a time.
+// Pure, so node can test it on captured events; services/Niri.qml feeds it one line at a time.
 
 export const initial = { workspaces: [], windows: [] };
 
@@ -40,8 +39,7 @@ export function reduce(state, event) {
   }
 }
 
-// The active workspace on an output and the window active in it, or null before niri has
-// told us about that output.
+// Null until niri has told us about that output.
 export function outputView(state, output) {
   const ws = state.workspaces.find((w) => w.output === output && w.is_active);
   if (!ws) return null;

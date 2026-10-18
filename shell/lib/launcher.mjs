@@ -11,8 +11,7 @@ function tier(entry, q) {
   return -1;
 }
 
-// Entries are plain {id, name, genericName, keywords}; returns the matches, best first and
-// ties by name.
+// Entries are plain {id, name, genericName, keywords}; ties go by name.
 export function rank(entries, query) {
   const q = query.trim().toLowerCase();
   return entries

@@ -1,5 +1,4 @@
-// Text for the top margins and the island clock. Names are spelled out here rather than
-// taken from toLocale*, so QML and node agree whatever the locale.
+// Day and month names are spelled out, not taken from toLocale*, so QML and node agree in any locale.
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

@@ -3,8 +3,7 @@ import Quickshell.Wayland
 import QtQuick
 import "lib/margins.mjs" as M
 
-// The top margins of one output: workspace, app and title on the left, the date on the
-// right, each over an ink hairline that stops 8 px short of the island.
+// Each margin sits over an ink hairline that stops 8 px short of the island.
 PanelWindow {
     id: root
 

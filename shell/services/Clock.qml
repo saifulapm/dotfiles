@@ -3,8 +3,7 @@ import QtQuick
 import ".." as Root
 import "../lib/margins.mjs" as M
 
-// The shell's one timer. It fires on each minute boundary and works the wait out again
-// every time, so it stays aligned however late a tick lands.
+// The wait to the next minute is worked out on every tick, so a late tick never drifts the clock.
 Scope {
     id: clock
 

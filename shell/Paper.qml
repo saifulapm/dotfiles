@@ -2,8 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 
-// The paper behind every window on one output. The flat primitive is a plain fill, so it
-// never redraws unless the theme changes.
+// The flat primitive is a plain fill, so the paper never redraws unless the theme changes.
 PanelWindow {
     id: paper
 

@@ -5,8 +5,7 @@ export function rssKiB(procStatus) {
   return m ? Number(m[1]) : 0;
 }
 
-// How long this process has run, from /proc/uptime and /proc/self/stat. Both count from
-// boot, starttime in clock ticks of 10 ms (CLK_TCK is 100 on Linux).
+// Both count from boot; starttime is in clock ticks of 10 ms (CLK_TCK is 100 on Linux).
 export function processAgeMs(uptime, selfStat) {
   const starttime = Number(selfStat.slice(selfStat.lastIndexOf(')') + 2).split(' ')[19]);
   return Math.round(parseFloat(uptime) * 100 - starttime) * 10;

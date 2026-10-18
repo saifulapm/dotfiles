@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# just dev: a nested niri on its own session bus, running this checkout's shell against a
-# fresh temp state and data dir. Prints the env to reach it once the shell is started.
+# just dev: a nested niri on its own bus, running this checkout's shell on a temp state and data dir.
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
@@ -14,8 +13,7 @@ session=
 
 cleanup() {
   trap - EXIT INT TERM
-  # The unit stops first: once niri is gone, qs loses its display and systemd would
-  # restart it every 500 ms.
+  # The unit stops first, or systemd restarts a displayless qs every 500 ms once niri is gone.
   systemctl --user stop "$DOTS_DEV_UNIT" 2>/dev/null || true
   if [ -n "$session" ]; then
     # dbus-run-session does not forward signals, so niri gets them directly.

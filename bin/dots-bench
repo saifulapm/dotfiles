@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# just bench: starts a fresh nested session, reads the shell's own timings, and prints one
-# line per speed budget. Exits 1 when any budget is over.
-# The timings come from the shell itself: a qs ipc round trip costs tens of ms, too much
-# to time a 16 ms open from out here.
+# The shell times itself: a qs ipc round trip costs tens of ms, too much to time a 16 ms open from here.
 source "$(dirname "$0")/../tests/dev/lib.sh"
 
 first_frame_budget=${DOTS_BUDGET_FIRST_FRAME_MS:-150}
@@ -23,8 +20,7 @@ launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 status_has() { shell_status | jq -e "$1" >/dev/null; }
 open_reported() { launcher_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
 
-# ipc calls made while qs starts hold its start back by 1 to 2 s, so nothing asks qs until
-# niri lists the paper.
+# ipc calls made while qs starts hold it back by 1 to 2 s, so nothing asks qs until niri lists the paper.
 until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
 until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
 first_frame=$(shell_status | jq -r .firstFrameMs)

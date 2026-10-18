@@ -2,8 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { initial, reduce, outputView, focusedOutput } from './niri.mjs';
 
-// Lines captured from `niri msg --json event-stream` on niri 26.04: start, open foot,
-// focus-workspace 2, focus-workspace 1, open a second foot, close it.
+// Captured from niri 26.04's event stream: start, open foot, workspace 2, workspace 1, open and close a second foot.
 const LINES = [
   '{"WorkspacesChanged":{"workspaces":[{"id":1,"idx":1,"name":null,"output":"winit","is_urgent":false,"is_active":true,"is_focused":true,"active_window_id":null}]}}',
   '{"WindowsChanged":{"windows":[]}}',

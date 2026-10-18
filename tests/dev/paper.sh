@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# just dev: a nested niri on its own bus, the Paper paper on every output, and a shell
-# that systemd brings back within 1 s of a kill.
+# just dev: its own bus, the Paper paper, and a shell systemd brings back within 1 s of a kill.
 source "$(dirname "$0")/lib.sh"
 
 check "WAYLAND_DISPLAY is printed" test -n "$WAYLAND_DISPLAY"
@@ -30,8 +29,7 @@ near() { (($1 - $2 <= 6 && $2 - $1 <= 6)); }
 centre_is_paper() { near "${r:-0}" 241 && near "${g:-0}" 233 && near "${b:-0}" 216; }
 check "the output centre is #F1E9D8" centre_is_paper
 
-# qs ipc calls made while the new shell starts slow its start by up to 1.5 s, so the check
-# waits on systemd and niri first and asks qs only once the paper is back.
+# qs ipc calls made while a shell starts slow it by up to 1.5 s, so qs is asked only once the paper is back.
 new_pid() { local p; p=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT"); [ "$p" != 0 ] && [ "$p" != "$pid" ]; }
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
 start=$(now_ms)

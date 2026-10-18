@@ -3,8 +3,7 @@ import Quickshell.Wayland
 import QtQuick
 import "lib/margins.mjs" as M
 
-// The island at the top centre of the output with the focused workspace. At rest it is the
-// clock: an ink box with a hard accent shadow 3 px down and right.
+// At rest the island is the clock: an ink box with a hard accent shadow 3 px down and right.
 PanelWindow {
     id: island
 

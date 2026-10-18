@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# dots install: turn a fresh Fedora into this repo, applied by chezmoi.
-# It runs before the repo is cloned (curl ... | bash -s install), so it reads nothing from its own path.
+# dots install runs before the repo is cloned (curl ... | bash -s install), so it reads nothing from its own path.
 set -euo pipefail
 
 die() {
@@ -30,8 +29,7 @@ install() {
     git clone --branch "$branch" "$repo" "$dir" || die "could not clone $repo ($branch)"
   fi
 
-  # chezmoi init rewrites its config and state db every time, so it runs only until the config
-  # names this repo; a v1 machine's config points at ~/.dotfiles and must be replaced.
+  # chezmoi init rewrites its config and state db, so it runs only until the config names this repo.
   local config=${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml
   if grep -qxF 'sourceDir = "~/Sites/github/dotfiles"' "$config" 2>/dev/null; then
     chezmoi apply || die "chezmoi apply failed"
