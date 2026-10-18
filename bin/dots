@@ -93,7 +93,15 @@ theme() {
   state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
   out=$state/theme-out
   from=$(cat "$state/theme" 2>/dev/null || true)
-  node "$repo/shell/lib/theme-render.mjs" "$name" || exit 1
+  if ! node "$repo/shell/lib/theme-render.mjs" "$name"; then
+    local msg="theme $name: invalid theme.toml"
+    [[ -f $repo/themes/$name/theme.toml ]] || msg="theme $name: no such theme"
+    [[ $name == paper ]] && exit 1
+    theme paper
+    # The island shows what the shell finds here for 5 s.
+    echo "$msg" >"$out/notice"
+    exit 1
+  fi
   echo "$name" >"$state/theme"
 
   local scheme=prefer-light

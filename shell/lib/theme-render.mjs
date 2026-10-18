@@ -34,6 +34,8 @@ const files = {
   'gtk.css': renderGtkCss(theme),
   'gtk-settings.ini': renderGtkSettings(theme),
   'chromium.json': renderChromium(theme),
+  // dots theme writes a failed switch's reason here after the fallback render; any render clears it.
+  notice: '',
 };
 for (const [f, text] of Object.entries(files)) {
   const path = join(out, f);

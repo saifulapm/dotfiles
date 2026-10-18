@@ -10,7 +10,9 @@ PanelWindow {
     required property var theme
     required property var niri
     required property var clock
-    readonly property string text: M.clockText(clock.now)
+    // A theme switch's failure, shown in place of the clock for 5 s.
+    property string notice: ""
+    readonly property string text: notice || M.clockText(clock.now)
     readonly property real boxWidth: box.width
 
     screen: Quickshell.screens.find(s => s.name === niri.focusedOutput) ?? Quickshell.screens[0]
@@ -23,6 +25,20 @@ PanelWindow {
     implicitWidth: box.width + 3
     implicitHeight: box.height + 3
     color: "transparent"
+
+    Connections {
+        target: island.theme
+        function onNotice(text) {
+            island.notice = text;
+            noticeTick.restart();
+        }
+    }
+
+    Tick {
+        id: noticeTick
+        interval: 5000
+        onTriggered: island.notice = ""
+    }
 
     Rectangle {
         x: 3
