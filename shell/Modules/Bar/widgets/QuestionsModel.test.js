@@ -42,7 +42,7 @@ function plain(value) {
 const FILE = JSON.stringify({
     self: "mini",
     questions: [
-        { id: "AAAA1111", project: "workflow", machine: "nuc", text: "Ship it?", options: ["yes", "no"], person: true, popup: true },
+        { id: "AAAA1111", project: "workflow", machine: "nuc", text: "Ship it?", options: ["yes", "no"], recommend: "yes", person: true, popup: true },
         { id: "BBBB2222", project: "dotfiles", machine: "mini", text: "Which theme?", options: [], person: true, popup: false },
         { id: "CCCC3333", project: "workflow", machine: "nuc", text: "for dulali", options: ["ok"], person: false, popup: true }
     ]
@@ -71,11 +71,19 @@ test("popups are the questions that ring here and were not closed", () => {
         machine: "nuc",
         text: "Ship it?",
         options: ["yes", "no"],
+        recommend: "yes",
         person: true,
         popup: true
     });
     const closed = Model.dismiss({}, "AAAA1111");
     assert.deepEqual(plain(Model.popups(state, closed).map(q => q.id)), ["CCCC3333"]);
+});
+
+test("a question without a recommended option has none", () => {
+    const state = Model.parseState(FILE);
+    assert.equal(state.questions[1].recommend, "");
+    const odd = Model.parseState('{"self":"mini","questions":[{"id":"DDDD4444","recommend":7}]}');
+    assert.equal(odd.questions[0].recommend, "");
 });
 
 test("a closed question still counts as waiting", () => {

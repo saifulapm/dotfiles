@@ -9,9 +9,9 @@
 //
 //     {"self":"mini","questions":[{"id":"ABCD1234","project":"workflow",
 //       "machine":"nuc","text":"...","options":["yes","no"],
-//       "person":true,"popup":true}]}
+//       "recommend":"yes","person":true,"popup":true}]}
 //
-// `person` marks a question for Saiful, which counts as waiting. `popup`
+// `recommend` is the option the asker recommends, "" for none. `person` marks a question for Saiful, which counts as waiting. `popup`
 // marks one that rings on this machine. Question text and answers are
 // untrusted, so they only ever travel as argv elements.
 
@@ -47,6 +47,7 @@ function parseState(raw) {
             options: Array.isArray(q.options) ? q.options.filter(function (o) {
                 return typeof o === "string";
             }) : [],
+            recommend: typeof q.recommend === "string" ? q.recommend : "",
             person: q.person === true,
             popup: q.popup === true
         });

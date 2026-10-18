@@ -7,7 +7,7 @@ import "QuestionsModel.js" as Model
 // The questions ringing on this machine: a stack of cards top-center under
 // the bar (the notification toasts own the top-right corner), and the Reply
 // modal. Each card names the project and the asking machine, shows the
-// question and its options, and offers Reply...; the x only closes the card,
+// question, its options with the recommended one marked, and offers Reply...; the x only closes the card,
 // so the question keeps waiting. Everything here reads QuestionsService,
 // which loads this only while a card or the modal is up.
 Scope {
@@ -117,6 +117,16 @@ Scope {
                             text: card.modelData.text
                         }
 
+                        StyledText {
+                            theme: popupsRoot.theme
+                            role: StyledText.Small
+                            muted: true
+                            width: parent.width
+                            visible: card.modelData.recommend !== ""
+                            elide: Text.ElideRight
+                            text: "Recommended: " + card.modelData.recommend
+                        }
+
                         Flow {
                             width: parent.width
                             spacing: popupsRoot.theme.space(1.5)
@@ -128,6 +138,7 @@ Scope {
                                     required property string modelData
                                     theme: popupsRoot.theme
                                     label: modelData
+                                    selected: modelData === card.modelData.recommend
                                     enabled: !popupsRoot.answering
                                     onClicked: popupsRoot.questions.answer(card.qid, modelData, "")
                                 }
@@ -187,7 +198,9 @@ Scope {
                     id: "",
                     project: "",
                     machine: "",
-                    text: ""
+                    text: "",
+                    options: [],
+                    recommend: ""
                 })
 
             anchors.left: parent.left
@@ -211,6 +224,36 @@ Scope {
                 width: parent.width
                 wrapMode: Text.Wrap
                 text: modalColumn.question.text
+            }
+
+            StyledText {
+                theme: popupsRoot.theme
+                role: StyledText.Small
+                muted: true
+                width: parent.width
+                visible: modalColumn.question.recommend !== ""
+                wrapMode: Text.Wrap
+                text: "Recommended: " + modalColumn.question.recommend
+            }
+
+            // An option answers at once, with any images attached here.
+            Flow {
+                width: parent.width
+                visible: modalColumn.question.options.length > 0
+                spacing: popupsRoot.theme.space(1.5)
+
+                Repeater {
+                    model: modalColumn.question.options
+
+                    PanelButton {
+                        required property string modelData
+                        theme: popupsRoot.theme
+                        label: modelData
+                        selected: modelData === modalColumn.question.recommend
+                        enabled: !popupsRoot.answering
+                        onClicked: popupsRoot.questions.answer(popupsRoot.questions.modalId, modelData, popupsRoot.questions.attachments)
+                    }
+                }
             }
 
             Rectangle {
