@@ -115,6 +115,9 @@ ShellRoot {
         }
     }
 
+    // The desktop entry scan starts with the shell, so the launcher's first open does not wait on it.
+    readonly property int appCount: DesktopEntries.applications.values.length
+
     LazyLoader {
         id: launcherLoader
 
