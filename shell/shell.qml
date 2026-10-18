@@ -94,12 +94,17 @@ ShellRoot {
         }
     }
 
+    Services.Questions {
+        id: questionsService
+    }
+
     Root.Island {
         id: island
         theme: themeService
         niri: niriService
         clock: clockService
         notifs: notifsService
+        questions: questionsService
     }
 
     Variants {
@@ -130,6 +135,10 @@ ShellRoot {
 
         function state(): string {
             return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, since: island.modeSince });
+        }
+
+        function focus(): void {
+            island.focusIsland();
         }
     }
 
