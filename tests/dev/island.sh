@@ -10,7 +10,8 @@ notify-send hi
 until_ok 2000 mode_is notification
 state=$(island)
 echo "     island: $state"
-check "notify-send hi shows hi in the island" jq -e '.text | test("hi")' <<<"$state" >/dev/null
+shows_hi() { jq -e '.text | test("hi")' <<<"$state" >/dev/null; }
+check "notify-send hi shows hi in the island" shows_hi
 until_ok 8000 mode_is rest
 # Both ends come from the shell's own mode clock, so the poll's latency does not count.
 held=$(($(island | jq .since) - $(jq .since <<<"$state")))
