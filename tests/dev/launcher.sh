@@ -6,7 +6,7 @@ launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 state_is() { launcher_state | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_space() { niri msg action spawn -- qs ipc call launcher toggle; }
-launcher_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-launcher" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
+launcher_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
 # The first result row, selected and ink while the launcher is open.
 row_rgb() {
   local geo

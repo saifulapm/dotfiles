@@ -118,39 +118,30 @@ ShellRoot {
     // The desktop entry scan starts with the shell, so the launcher's first open does not wait on it.
     readonly property int appCount: DesktopEntries.applications.values.length
 
-    LazyLoader {
-        id: launcherLoader
-
-        Root.Launcher {
-            theme: themeService
-        }
-    }
-
     IpcHandler {
         target: "launcher"
 
         // t0 is taken before the first load, so a cold open's time includes loading.
         function open(): void {
             const t0 = Date.now();
-            launcherLoader.active = true;
-            launcherLoader.item.open(t0);
+            surfacesLoader.active = true;
+            surfacesLoader.item.openLauncher(t0);
         }
 
         function close(): void {
-            if (launcherLoader.item)
-                launcherLoader.item.close();
+            surfacesLoader.item?.launcher?.close();
         }
 
         function toggle(): void {
-            if (launcherLoader.item?.shown)
+            if (surfacesLoader.item?.launcher?.shown)
                 close();
             else
                 open();
         }
 
         function state(): string {
-            if (launcherLoader.item)
-                return launcherLoader.item.state();
+            if (surfacesLoader.item?.launcher)
+                return surfacesLoader.item.launcher.state();
             return JSON.stringify({ open: false, mode: "apps", query: "", results: [], selected: 0, openMs: null, opens: 0 });
         }
     }
@@ -172,11 +163,11 @@ ShellRoot {
     }
 
     LazyLoader {
-        id: themesLoader
+        id: surfacesLoader
 
-        Root.Themes {
+        Root.Surfaces {
             theme: themeService
-            themes: root.themeList
+            themeList: root.themeList
         }
     }
 
@@ -186,25 +177,24 @@ ShellRoot {
         // t0 is taken before the first load, so a cold open's time includes loading.
         function open(): void {
             const t0 = Date.now();
-            themesLoader.active = true;
-            themesLoader.item.open(t0);
+            surfacesLoader.active = true;
+            surfacesLoader.item.openThemes(t0);
         }
 
         function close(): void {
-            if (themesLoader.item)
-                themesLoader.item.close();
+            surfacesLoader.item?.themes?.close();
         }
 
         function toggle(): void {
-            if (themesLoader.item?.shown)
+            if (surfacesLoader.item?.themes?.shown)
                 close();
             else
                 open();
         }
 
         function state(): string {
-            if (themesLoader.item)
-                return themesLoader.item.state();
+            if (surfacesLoader.item?.themes)
+                return surfacesLoader.item.themes.state();
             return JSON.stringify({ open: false, themes: root.themeList.map(t => t.name), selected: themeService.name, current: themeService.name, openMs: null, opens: 0 });
         }
     }

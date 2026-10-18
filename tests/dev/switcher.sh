@@ -7,7 +7,7 @@ themes_state() { timeout 0.5 qs ipc call themes state 2>/dev/null; }
 state_is() { themes_state | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_shift_t() { niri msg action spawn -- qs ipc call themes toggle; }
-themes_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-themes" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
+themes_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
 # The right edge of the Blueprint card's preview, Blueprint's navy paper, which nothing else draws under Paper.
 card_rgb() {
   local geo
@@ -65,6 +65,21 @@ until_ok 2000 themes_gone
 check "Esc closes the switcher and releases the keyboard" themes_gone
 sleep 0.5
 check "Esc applies nothing, status still blueprint" status_theme blueprint
+
+# The launcher and the switcher draw in one Overlay window, and opening one closes the other.
+launcher_is() { timeout 0.5 qs ipc call launcher state 2>/dev/null | jq -e "$1" >/dev/null; }
+overlays() { niri msg -j layers | jq -c '[.[] | select(.layer == "Overlay") | .namespace]'; }
+launcher_holds() { launcher_is .open && themes_focus Exclusive; }
+niri msg action spawn -- qs ipc call launcher toggle
+until_ok 3000 launcher_holds
+check "the launcher holds dots-surfaces' keyboard exclusive" launcher_holds
+mod_shift_t
+until_ok 3000 state_is .open
+check "opening the switcher closes the launcher" launcher_is '.open == false'
+check "niri lists one Overlay layer from the shell, dots-surfaces: $(overlays)" test "$(overlays)" = '["dots-surfaces"]'
+wtype -k Escape
+until_ok 2000 themes_gone
+check "with both closed, dots-surfaces takes no keyboard" themes_gone
 
 echo "     openMs: first $ms1, second $ms2"
 check "the second open took ${ms2} ms, 16 or less" bash -c "[ '$ms2' != none ] && (( $ms2 <= 16 ))"

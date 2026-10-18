@@ -1,12 +1,11 @@
 import Quickshell
-import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
 import "." as Root
 import "lib/launcher.mjs" as Lib
 
-// Apps mode; stays mapped once loaded, since a remap costs 20 to 30 ms before the first frame.
-PanelWindow {
+// Apps mode, drawn in the Surfaces window.
+Item {
     id: launcher
 
     required property var theme
@@ -44,6 +43,14 @@ PanelWindow {
         shown = false;
     }
 
+    // Called on each of the host window's frames; the first one after open() ends the timing.
+    function swapped() {
+        if (shown && openT0 >= 0) {
+            openMs = Date.now() - openT0;
+            openT0 = -1;
+        }
+    }
+
     function move(by) {
         selected = Math.max(0, Math.min(rows.length - 1, selected + by));
     }
@@ -72,36 +79,10 @@ PanelWindow {
     onQueryChanged: selected = 0
     Component.onCompleted: Root.State.loaded.push("launcher")
 
-    Connections {
-        target: launcher.contentItem.Window.window
-        function onFrameSwapped() {
-            if (launcher.shown && launcher.openT0 >= 0) {
-                launcher.openMs = Date.now() - launcher.openT0;
-                launcher.openT0 = -1;
-            }
-        }
-    }
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "dots-launcher"
-    WlrLayershell.keyboardFocus: shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    exclusionMode: ExclusionMode.Ignore
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
-    }
-    color: "transparent"
-    mask: shown ? null : noInput
-
-    Region {
-        id: noInput
-    }
+    visible: shown
 
     Item {
         anchors.fill: parent
-        visible: launcher.shown
 
         Rectangle {
             anchors.fill: parent

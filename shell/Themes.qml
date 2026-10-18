@@ -1,12 +1,11 @@
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import "." as Root
 import "lib/themes.mjs" as Lib
 
-// The theme switcher; stays mapped once loaded, like the launcher, since a remap costs 20 to 30 ms.
-PanelWindow {
+// The theme switcher, drawn in the Surfaces window.
+Item {
     id: switcher
 
     required property var theme
@@ -34,6 +33,14 @@ PanelWindow {
 
     function close() {
         shown = false;
+    }
+
+    // Called on each of the host window's frames; the first one after open() ends the timing.
+    function swapped() {
+        if (shown && openT0 >= 0) {
+            openMs = Date.now() - openT0;
+            openT0 = -1;
+        }
     }
 
     function move(by) {
@@ -69,37 +76,11 @@ PanelWindow {
         }
     }
 
-    Connections {
-        target: switcher.contentItem.Window.window
-        function onFrameSwapped() {
-            if (switcher.shown && switcher.openT0 >= 0) {
-                switcher.openMs = Date.now() - switcher.openT0;
-                switcher.openT0 = -1;
-            }
-        }
-    }
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "dots-themes"
-    WlrLayershell.keyboardFocus: shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    exclusionMode: ExclusionMode.Ignore
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
-    }
-    color: "transparent"
-    mask: shown ? null : noInput
-
-    Region {
-        id: noInput
-    }
+    visible: shown
 
     Item {
         id: keys
         anchors.fill: parent
-        visible: switcher.shown
         focus: true
         Keys.onPressed: event => {
             if (event.key === Qt.Key_J || event.key === Qt.Key_Right)

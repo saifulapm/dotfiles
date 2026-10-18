@@ -10,7 +10,7 @@ die() {
 }
 
 layer_up() { niri msg -j layers | jq -e --arg ns "$1" 'any(.[]; .namespace == $ns)' >/dev/null; }
-launcher_closed() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-launcher" and .keyboard_interactivity == "None")' >/dev/null; }
+launcher_closed() { launcher_state | jq -e ".open == false" >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "None")' >/dev/null; }
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 status_has() { shell_status | jq -e "$1" >/dev/null; }
 open_reported() { launcher_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
@@ -23,18 +23,18 @@ first_frame=$(shell_status | jq -r .firstFrameMs)
 # Opens number $1, reads the time the launcher measured, closes it and waits for the keyboard.
 open_once() {
   qs ipc call launcher open >/dev/null || die "launcher open failed"
-  until_ok 3000 layer_up dots-launcher || die "dots-launcher never mapped"
+  until_ok 3000 layer_up dots-surfaces || die "dots-surfaces never mapped"
   until_ok 3000 open_reported "$1" || die "open $1 never reported openMs"
   launcher_state | jq -r .openMs
   qs ipc call launcher close >/dev/null
-  until_ok 3000 launcher_closed || die "dots-launcher never gave the keyboard back"
+  until_ok 3000 launcher_closed || die "the launcher never gave the keyboard back"
 }
 cold=$(open_once 1) || exit 1
 sleep 0.3
 warm=$(open_once 2) || exit 1
 
 themes_state() { timeout 0.5 qs ipc call themes state 2>/dev/null; }
-themes_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-themes" and .keyboard_interactivity == $k)' >/dev/null; }
+themes_focus() { themes_state | jq -e --arg k "$1" '.open == ($k == "Exclusive")' >/dev/null && niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 switch_json=$XDG_STATE_HOME/dots/theme-switch.json
 theme_index() { themes_state | jq -r --arg n "$1" '.themes | index($n)'; }
 selected_is() { themes_state | jq -e --arg t "$1" '.selected == $t' >/dev/null; }
