@@ -86,10 +86,12 @@ reload_chromium() {
 }
 
 theme() {
-  local name=${1:-} t0=${DOTS_SWITCH_T0:-$(date +%s%3N)}
+  local name=${1:-} t0=${DOTS_SWITCH_T0:-} LC_ALL=C
   [[ -n $name ]] || die "usage: dots theme <name>"
-  # The name lands in paths and in theme-switch.json, so it is checked before anything runs.
-  [[ $name =~ ^[a-z0-9][a-z0-9_-]*$ ]] || die "theme $name: not a theme name"
+  # The name lands in paths, theme-switch.json and the island, so it is checked before anything runs; C keeps [a-z] ASCII.
+  [[ $name =~ ^[a-z0-9][a-z0-9_-]{0,31}$ ]] || die "theme $name: not a theme name"
+  # The caller's stamp goes into arithmetic, so only a time in ms is taken.
+  [[ $t0 =~ ^[0-9]{13}$ ]] || t0=$(date +%s%3N)
   local repo state out from
   repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
   state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
