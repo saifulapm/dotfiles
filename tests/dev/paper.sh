@@ -29,6 +29,15 @@ near() { (($1 - $2 <= 6 && $2 - $1 <= 6)); }
 centre_is_paper() { near "${r:-0}" 241 && near "${g:-0}" 233 && near "${b:-0}" 216; }
 check "the output centre is #F1E9D8" centre_is_paper
 
+# A colour the theme check refuses leaves the last good paper on screen, never black.
+tokens=$XDG_STATE_HOME/dots/theme-out/shell.json
+good=$(<"$tokens")
+jq '.color.paper = "notacolor"' <<<"$good" >"$tokens"
+sleep 1
+read -r r g b < <(grim -s 1 -t ppm -g "$geo" - | mean_rgb)
+printf '%s\n' "$good" >"$tokens"
+check "a bad colour in shell.json keeps the paper ($r $g $b)" eval 'near "$r" 241 && near "$g" 233 && near "$b" 216'
+
 # qs ipc calls made while a shell starts slow it by up to 1.5 s, so qs is asked only once the paper is back.
 new_pid() { local p; p=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT"); [ "$p" != 0 ] && [ "$p" != "$pid" ]; }
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")

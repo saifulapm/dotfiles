@@ -30,12 +30,17 @@ export function validateTheme(doc) {
   return {
     name: meta.name,
     mode: meta.mode,
-    color: { ...color, ansi: [...color.ansi] },
-    primitive: { ...primitive },
-    paper: { ...(doc.paper ?? {}) },
+    color: Object.assign({}, color, { ansi: [...color.ansi] }),
+    primitive: Object.assign({}, primitive),
+    paper: Object.assign({}, doc.paper),
     type: { display: type.display, ui: type.ui, mono: type.mono, scale: type.scale ?? 1 },
     niri: { gaps: niri.gaps ?? 16, border: niri.border ?? 1, blur: niri.blur ?? false },
   };
+}
+
+// The shell's tokens come from shell.json, so they get the same check as theme.toml.
+export function checkTokens(t) {
+  return validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } }));
 }
 
 const CURVES = {
