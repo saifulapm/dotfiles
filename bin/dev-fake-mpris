@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+# An MPRIS player playing "<title>" by "<artist>" (its two arguments) on the nested session bus; Play, Pause and PlayPause change it.
+import os
+import sys
+
+if not os.environ.get("DOTS_DEV_DIR") or not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
+    sys.exit("dev-fake-mpris: run it from a sourced just dev env, never on the live session bus")
+if len(sys.argv) != 3:
+    sys.exit("usage: dev-fake-mpris <title> <artist>")
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+ROOT = "org.mpris.MediaPlayer2"
+PLAYER = "org.mpris.MediaPlayer2.Player"
+PROPS = "org.freedesktop.DBus.Properties"
+
+
+class Player(dbus.service.Object):
+    def __init__(self, bus, title, artist):
+        super().__init__(bus, "/org/mpris/MediaPlayer2")
+        self.props = {
+            ROOT: {
+                "Identity": dbus.String("Dots fake player"),
+                "DesktopEntry": dbus.String(""),
+                "CanQuit": dbus.Boolean(False),
+                "CanRaise": dbus.Boolean(False),
+                "HasTrackList": dbus.Boolean(False),
+                "SupportedUriSchemes": dbus.Array([], signature="s"),
+                "SupportedMimeTypes": dbus.Array([], signature="s"),
+            },
+            PLAYER: {
+                "PlaybackStatus": dbus.String("Playing"),
+                "LoopStatus": dbus.String("None"),
+                "Rate": dbus.Double(1.0),
+                "Shuffle": dbus.Boolean(False),
+                "Metadata": dbus.Dictionary(
+                    {
+                        "mpris:trackid": dbus.ObjectPath("/org/dots/track/1"),
+                        "mpris:length": dbus.Int64(180_000_000),
+                        "xesam:title": dbus.String(title),
+                        "xesam:artist": dbus.Array([dbus.String(artist)], signature="s"),
+                    },
+                    signature="sv",
+                ),
+                "Volume": dbus.Double(1.0),
+                "Position": dbus.Int64(0),
+                "MinimumRate": dbus.Double(1.0),
+                "MaximumRate": dbus.Double(1.0),
+                "CanGoNext": dbus.Boolean(False),
+                "CanGoPrevious": dbus.Boolean(False),
+                "CanPlay": dbus.Boolean(True),
+                "CanPause": dbus.Boolean(True),
+                "CanSeek": dbus.Boolean(False),
+                "CanControl": dbus.Boolean(True),
+            },
+        }
+
+    def status(self, value):
+        self.props[PLAYER]["PlaybackStatus"] = dbus.String(value)
+        self.PropertiesChanged(PLAYER, {"PlaybackStatus": dbus.String(value)}, [])
+
+    @dbus.service.method(PLAYER)
+    def Play(self):
+        self.status("Playing")
+
+    @dbus.service.method(PLAYER)
+    def Pause(self):
+        self.status("Paused")
+
+    @dbus.service.method(PLAYER)
+    def PlayPause(self):
+        self.status("Paused" if self.props[PLAYER]["PlaybackStatus"] == "Playing" else "Playing")
+
+    @dbus.service.method(PLAYER)
+    def Stop(self):
+        self.status("Stopped")
+
+    @dbus.service.method(PLAYER)
+    def Next(self):
+        pass
+
+    @dbus.service.method(PLAYER)
+    def Previous(self):
+        pass
+
+    @dbus.service.method(PLAYER, in_signature="x")
+    def Seek(self, offset):
+        pass
+
+    @dbus.service.method(PLAYER, in_signature="ox")
+    def SetPosition(self, track, position):
+        pass
+
+    @dbus.service.signal(PLAYER, signature="x")
+    def Seeked(self, position):
+        pass
+
+    @dbus.service.method(ROOT)
+    def Raise(self):
+        pass
+
+    @dbus.service.method(ROOT)
+    def Quit(self):
+        pass
+
+    @dbus.service.method(PROPS, in_signature="ss", out_signature="v")
+    def Get(self, interface, name):
+        return self.props[interface][name]
+
+    @dbus.service.method(PROPS, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        return self.props.get(interface, {})
+
+    @dbus.service.method(PROPS, in_signature="ssv")
+    def Set(self, interface, name, value):
+        pass
+
+    @dbus.service.signal(PROPS, signature="sa{sv}as")
+    def PropertiesChanged(self, interface, changed, invalidated):
+        pass
+
+
+DBusGMainLoop(set_as_default=True)
+bus = dbus.SessionBus()
+player = Player(bus, sys.argv[1], sys.argv[2])
+name = dbus.service.BusName("org.mpris.MediaPlayer2.dotsfake", bus, do_not_queue=True)
+GLib.MainLoop().run()
