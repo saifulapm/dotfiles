@@ -89,6 +89,9 @@ PanelWindow {
         outgoing.opacity = 1;
         outgoing.offset = 0;
         outgoing.cut = 0;
+        // The hidden sheet drops its ShaderEffect, so idle holds one; the next switch rebuilds it unseen.
+        outgoing.shaderUrl = "";
+        outgoing.tokens = null;
         canvas.scale = 1;
         kind = "";
     }
