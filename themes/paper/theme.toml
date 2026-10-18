@@ -1,0 +1,37 @@
+[meta]
+name = "paper"
+mode = "light"
+
+[color]
+paper = "#F1E9D8"
+ink = "#1C1915"
+muted = "#6A6052"
+line = "#D8CDB6"
+surface = "#FAF6EC"
+accent = "#C8381E"
+danger = "#C8381E"
+ok = "#3D6B3A"
+ansi = [
+  "#1C1915", "#C8381E", "#3D6B3A", "#A86A12", "#2C4A9A", "#7A3E7A", "#2F6F6A", "#D8CDB6",
+  "#6A6052", "#E0563A", "#55874F", "#C88A2E", "#4A68B8", "#985A98", "#4A8D87", "#FAF6EC",
+]
+
+[primitive]
+paper = "flat"
+frame = "ink"
+shadow = "hard-offset"
+corner = "square"
+motion = "snappy"
+
+[paper]
+
+[type]
+display = "Instrument Serif"
+ui = "Maple Mono"
+mono = "Maple Mono"
+scale = 1.0
+
+[niri]
+gaps = 24
+border = 1
+blur = false
