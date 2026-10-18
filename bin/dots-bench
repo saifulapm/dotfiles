@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# just bench: starts a fresh nested session, reads the shell's own timings, and prints one
+# line per speed budget. Exits 1 when any budget is over.
+# The timings come from the shell itself: a qs ipc round trip costs tens of ms, too much
+# to time a 16 ms open from out here.
+source "$(dirname "$0")/../tests/dev/lib.sh"
+
+first_frame_budget=${DOTS_BUDGET_FIRST_FRAME_MS:-150}
+rss_budget=${DOTS_BUDGET_RSS_MIB:-150}
+cold_budget=${DOTS_BUDGET_COLD_MS:-50}
+warm_budget=${DOTS_BUDGET_WARM_MS:-16}
+timers_budget=${DOTS_BUDGET_TIMERS:-1}
+idle_s=${DOTS_BENCH_IDLE_S:-60}
+
+die() {
+  echo "bench: $*" >&2
+  exit 1
+}
+
+layer_up() { niri msg -j layers | jq -e --arg ns "$1" 'any(.[]; .namespace == $ns)' >/dev/null; }
+layer_gone() { ! layer_up "$1"; }
+launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
+status_has() { shell_status | jq -e "$1" >/dev/null; }
+open_reported() { launcher_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
+
+# ipc calls made while qs starts hold its start back by 1 to 2 s, so nothing asks qs until
+# niri lists the paper.
+until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
+until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
+first_frame=$(shell_status | jq -r .firstFrameMs)
+
+# Opens number $1: waits on niri for the layer, then asks qs for the time the launcher
+# measured, then closes it and waits for the layer to go.
+open_once() {
+  qs ipc call launcher open >/dev/null || die "launcher open failed"
+  until_ok 3000 layer_up dots-launcher || die "dots-launcher never mapped"
+  until_ok 3000 open_reported "$1" || die "open $1 never reported openMs"
+  launcher_state | jq -r .openMs
+  qs ipc call launcher close >/dev/null
+  until_ok 3000 layer_gone dots-launcher || die "dots-launcher never unmapped"
+}
+cold=$(open_once 1) || exit 1
+sleep 0.3
+warm=$(open_once 2) || exit 1
+
+sleep 5
+# rssKiB is read with blockLoading, so each status reports the RSS of the call before it;
+# the first call here only refreshes it.
+shell_status >/dev/null
+status=$(shell_status) || die "status did not answer after the opens"
+rss_kib=$(jq -r .rssKiB <<<"$status")
+timers=$(jq -r .timers <<<"$status")
+
+pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
+# utime and stime are fields 14 and 15; the comm in field 2 is cut off first.
+cpu_ticks() { local s; s=$(<"/proc/$pid/stat"); read -ra f <<<"${s##*) }"; echo $((f[11] + f[12])); }
+t0=$(cpu_ticks)
+sleep "$idle_s"
+t1=$(cpu_ticks)
+cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
+
+over=0
+# line <name> <value> <unit> <op> <limit> <ok?>
+line() {
+  local verdict=ok
+  "${@:6}" || { verdict=OVER; over=1; }
+  # The op sits outside a width: printf pads by bytes and ≤ is three.
+  printf '%-13s %-7s %s %-8s %s\n' "$1" "$2 $3" "$4" "$5 $3" "$verdict"
+}
+line "first frame" "$first_frame" ms "≤" "$first_frame_budget" test "$first_frame" -le "$first_frame_budget"
+# RSS is checked in KiB, so a value just over the budget is not rounded down into it.
+line "idle rss" $((rss_kib / 1024)) MiB "≤" "$rss_budget" test "$rss_kib" -le $((rss_budget * 1024))
+line "panel cold" "$cold" ms "≤" "$cold_budget" test "$cold" -le "$cold_budget"
+line "panel warm" "$warm" ms "≤" "$warm_budget" test "$warm" -le "$warm_budget"
+line "timers" "$timers" "" "=" "$timers_budget" test "$timers" -eq "$timers_budget"
+printf '%-13s %s\n' "idle cpu" "$cpu %"
+
+exit "$over"
