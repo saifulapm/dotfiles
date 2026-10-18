@@ -26,11 +26,13 @@ near() { (($1 - $2 <= 6 && $2 - $1 <= 6)); }
 centre_is_paper() { near "${r:-0}" 241 && near "${g:-0}" 233 && near "${b:-0}" 216; }
 check "the output centre is #F1E9D8" centre_is_paper
 
-back() { [ "$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")" != "$pid" ] && shell_status >/dev/null; }
+# qs ipc calls made while the new shell starts slow its start by up to 1.5 s, so the check
+# waits on systemd and niri first and asks qs only once the paper is back.
+new_pid() { local p; p=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT"); [ "$p" != 0 ] && [ "$p" != "$pid" ]; }
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
 start=$(now_ms)
 kill -9 "$pid"
-until_ok 3000 back
+until_ok 3000 new_pid && until_ok 3000 paper_layer && until_ok 3000 shell_status >/dev/null
 elapsed=$(($(now_ms) - start))
 check "status answers again ${elapsed} ms after kill -9" test "$elapsed" -le 1000
 
