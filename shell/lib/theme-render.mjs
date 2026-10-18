@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // node shell/lib/theme-render.mjs <name>: renders themes/<name>/theme.toml into $XDG_STATE_HOME/dots/theme-out/.
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
@@ -20,6 +20,18 @@ try {
   console.error(`theme ${name}: invalid theme.toml: ${e.message}`);
   process.exit(1);
 }
+// The switcher's cards, Paper first, then by name; a theme that fails the check gets no card.
+const themes = [];
+const dir = new URL('../../themes/', import.meta.url).pathname;
+for (const d of readdirSync(dir).sort()) {
+  try {
+    const t = validateTheme(parseToml(readFileSync(join(dir, d, 'theme.toml'), 'utf8')));
+    themes.push({ name: t.name, mode: t.mode, color: t.color, primitive: t.primitive, type: t.type });
+  } catch {
+    continue;
+  }
+}
+themes.sort((a, b) => (b.name === 'paper') - (a.name === 'paper'));
 const out = join(process.env.XDG_STATE_HOME || join(homedir(), '.local/state'), 'dots/theme-out');
 mkdirSync(out, { recursive: true });
 const files = {
@@ -36,6 +48,7 @@ const files = {
   'chromium.json': renderChromium(theme),
   // dots theme writes a failed switch's reason here after the fallback render; any render clears it.
   notice: '',
+  'themes.json': JSON.stringify(themes, null, 2) + '\n',
 };
 for (const [f, text] of Object.entries(files)) {
   const path = join(out, f);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync, cpSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -48,4 +48,21 @@ test('every theme renders a niri fragment niri accepts', (t) => {
     writeFileSync(config, `include "${join(state, 'dots/theme-out/niri.kdl')}"\n`);
     execFileSync('niri', ['validate', '-c', config], { stdio: 'pipe' });
   }
+});
+
+test('themes.json lists every valid theme, paper first, and skips a broken one', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'dots-themes-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const repo = new URL('../..', import.meta.url).pathname;
+  cpSync(join(repo, 'shell/lib'), join(root, 'shell/lib'), { recursive: true });
+  cpSync(join(repo, 'themes'), join(root, 'themes'), { recursive: true });
+  mkdirSync(join(root, 'themes/broken'));
+  writeFileSync(join(root, 'themes/broken/theme.toml'), '[meta]\nname = "broken"\nmode = "dim"\n');
+  const state = join(root, 'state');
+  execFileSync('node', [join(root, 'shell/lib/theme-render.mjs'), 'paper'], { env: { ...process.env, XDG_STATE_HOME: state } });
+  const themes = JSON.parse(readFileSync(join(state, 'dots/theme-out/themes.json'), 'utf8'));
+  assert.deepEqual(themes.map((x) => x.name), ['paper', 'artboard', 'blueprint']);
+  assert.deepEqual(Object.keys(themes[2]), ['name', 'mode', 'color', 'primitive', 'type']);
+  assert.equal(themes[2].color.paper, '#0C1A2E');
+  assert.equal(themes[2].primitive.frame, 'glow');
 });
