@@ -17,19 +17,22 @@ Item {
                 }))).map(i => all[i])
     readonly property var rows: devices.map(d => Lib.btRow(d))
 
-    // The item under the selection: a reorder (a connect moves it to the top) keeps the selection on it, and a forget leaves it on a row that exists.
+    // The item a key last acted on: the reorder its connect causes keeps the selection on it, and moving away lets it go.
     property var picked: null
-    onSelectedChanged: picked = devices[selected] ?? null
+    onSelectedChanged: {
+        if (devices.indexOf(picked) !== selected)
+            picked = null;
+    }
     onRowsChanged: {
         const i = devices.indexOf(picked);
         selected = i >= 0 ? i : Math.max(0, Math.min(selected, rows.length - 1));
-        picked = devices[selected] ?? null;
     }
 
     function key(event) {
         const device = devices[selected];
         if (!device)
             return false;
+        picked = device;
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (device.connected)
                 device.disconnect();

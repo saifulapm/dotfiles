@@ -73,5 +73,17 @@ check "the recorder's hint carries its frame label" labelled "$hint_x"
 wtype -k Escape
 until_ok 2000 is_open record '.picking | not'
 
+# Each theme's key style is a different width, so the apps footer must fit the card in all three.
+for t in paper artboard blueprint; do
+  "$repo/bin/dots" theme "$t" >/dev/null
+  until_ok 2000 status_theme "$t"
+  niri msg action spawn -- qs ipc call launcher toggle
+  until_ok 3000 is_open launcher .open
+  until_ok 2000 is_open launcher '.legendOverflow == false'
+  check "$t: the launcher's prefix legend fits its card" is_open launcher '.legendOverflow == false'
+  timeout 0.5 qs ipc call launcher close
+  until_ok 2000 is_open launcher '.open | not'
+done
+
 "$repo/bin/dots" theme paper >/dev/null
 exit $((fails > 0))

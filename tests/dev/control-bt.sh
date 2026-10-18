@@ -48,6 +48,7 @@ until_ok 3000 control_focus
 tab_to() { local n; for n in 1 2 3 4 5 6; do section_is "$1" && return 0; wtype -k Tab; sleep 0.15; done; section_is "$1"; }
 tab_to bluetooth
 check "Tab twice is bluetooth" section_is bluetooth
+check "Bluetooth opens on its first row, Test Headphones" state_is '.selected == 0 and .rows[0] == "Test Headphones"'
 until_ok 3000 detail_is "Test Headphones" paired
 echo "     state: $(control_state)"
 check "Test Headphones reads paired" detail_is "Test Headphones" paired

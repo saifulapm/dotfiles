@@ -19,19 +19,22 @@ Item {
                 }))).map(i => all[i])
     readonly property var rows: networks.map(n => Lib.wifiRow(n))
 
-    // The item under the selection: a reorder (a connect moves it to the top) keeps the selection on it, and a forget leaves it on a row that exists.
+    // The item a key last acted on: the reorder its connect causes keeps the selection on it, and moving away lets it go.
     property var picked: null
-    onSelectedChanged: picked = networks[selected] ?? null
+    onSelectedChanged: {
+        if (networks.indexOf(picked) !== selected)
+            picked = null;
+    }
     onRowsChanged: {
         const i = networks.indexOf(picked);
         selected = i >= 0 ? i : Math.max(0, Math.min(selected, rows.length - 1));
-        picked = networks[selected] ?? null;
     }
 
     function key(event) {
         const network = networks[selected];
         if (!network)
             return false;
+        picked = network;
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (network.connected)
                 network.disconnect();

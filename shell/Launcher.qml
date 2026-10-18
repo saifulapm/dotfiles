@@ -128,6 +128,7 @@ Item {
             openMs: openMs,
             opens: opens,
             legend: legend,
+            legendOverflow: footer.contentWidth > footer.width - footer.leftPadding - footer.rightPadding,
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: launcher.Window.active
         });
@@ -369,7 +370,10 @@ Item {
                     topPadding: 12
                     bottomPadding: 12
                     horizontalAlignment: Text.AlignRight
+                    id: footer
                     text: launcher.legend
+                    // Blueprint's bracketed keys run wider than the card, so the legend wraps onto a second line.
+                    wrapMode: Text.Wrap
                     color: c.muted
                     font.family: fonts.ui
                     font.pixelSize: 10
