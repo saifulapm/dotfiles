@@ -86,3 +86,140 @@ test('a section lists its live notes newest first', () => {
   s = Object.assign({}, s, { notes: s.notes.concat([{ id: 'd', section: 'inbox', text: 'gone', deleted: true, createdAt: T + 3 }]) });
   assert.deepEqual(sectionNotes(s, 'inbox').map((n) => n.text), ['new', 'old']);
 });
+
+import { TAGS, toggleTag, deleteNotes, merge, moveNotes, toggleDone, editNote, search, sectionNames, sectionList, ATTACH_MAX, attachRefusal, attach, attachmentFile, dragOffer, chipOffer } from './notes.mjs';
+
+const PNG = { sha256: 'abc123', name: 'shot.PNG', mime: 'image/png', size: 10 };
+const mk = (id, fields) => Object.assign({ id, section: 'inbox', text: id, attachments: [], todo: false, done: false, tags: [], createdAt: T, updatedAt: T }, fields);
+const storeOf = (notes, sections) => Object.assign(emptyStore(), { notes, sections: sections || emptyStore().sections });
+// Runs a rule and checks it left its input untouched.
+const pure = (store, fn) => {
+  const before = structuredClone(store);
+  const out = fn(store);
+  assert.deepEqual(store, before);
+  return out;
+};
+
+test('merging joins texts, attachments and tags into the first note and tombstones the rest', () => {
+  const s = storeOf([mk('a', { tags: ['red'] }), mk('b', { attachments: [PNG], tags: ['blue'] })]);
+  const r = pure(s, (x) => merge(x, ['a', 'b'], T + 9));
+  assert.equal(r.notes.length, 2);
+  assert.deepEqual(r.notes[0], mk('a', { text: 'a\n\nb', attachments: [PNG], tags: ['red', 'blue'], updatedAt: T + 9 }));
+  assert.deepEqual(r.notes[1], { id: 'b', section: 'inbox', text: '', attachments: [], todo: false, done: false, tags: [], createdAt: T, updatedAt: T + 9, deleted: true });
+});
+
+test('merging keeps a shared attachment once and needs two live notes', () => {
+  const s = storeOf([mk('a', { attachments: [PNG] }), mk('b', { attachments: [PNG] }), mk('c', { deleted: true })]);
+  assert.equal(merge(s, ['a', 'b'], T + 1).notes[0].attachments.length, 1);
+  for (const ids of [['a'], [], ['a', 'c'], ['a', 'zz']]) assert.deepEqual(pure(s, (x) => merge(x, ids, T + 1)), s);
+});
+
+test('merging takes todo from any note and done from every to-do', () => {
+  const s = storeOf([mk('a', { todo: true, done: true }), mk('b'), mk('c', { todo: true, done: true })]);
+  const m = merge(s, ['a', 'b', 'c'], T + 1).notes[0];
+  assert.deepEqual([m.todo, m.done], [true, true]);
+  const m2 = merge(storeOf([mk('a', { todo: true, done: true }), mk('b', { todo: true })]), ['a', 'b'], T + 1).notes[0];
+  assert.deepEqual([m2.todo, m2.done], [true, false]);
+  const m3 = merge(storeOf([mk('a'), mk('b')]), ['a', 'b'], T + 1).notes[0];
+  assert.deepEqual([m3.todo, m3.done], [false, false]);
+});
+
+test('merging follows the order of the ids given', () => {
+  const s = storeOf([mk('a'), mk('b')]);
+  const r = merge(s, ['b', 'a'], T + 1);
+  assert.equal(r.notes[1].text, 'b\n\na');
+  assert.equal(r.notes[0].deleted, true);
+});
+
+test('a tag key toggles its colour in tag order', () => {
+  assert.deepEqual(TAGS, ['red', 'orange', 'yellow', 'green', 'blue', 'purple']);
+  let s = storeOf([mk('a', { tags: ['blue'] })]);
+  s = pure(s, (x) => toggleTag(x, 'a', '3', T + 1));
+  assert.deepEqual(s.notes[0].tags, ['yellow', 'blue']);
+  assert.equal(s.notes[0].updatedAt, T + 1);
+  assert.deepEqual(toggleTag(s, 'a', '3', T + 2).notes[0].tags, ['blue']);
+  for (const k of ['7', 'x', '0']) assert.equal(toggleTag(s, 'a', k, T + 2), s);
+});
+
+test('deleting leaves tombstones in the store', () => {
+  const s = storeOf([mk('a', { text: 'hi', attachments: [PNG], tags: ['red'], todo: true, done: true }), mk('b')]);
+  const r = pure(s, (x) => deleteNotes(x, ['a'], T + 4));
+  assert.deepEqual(r.notes[0], { id: 'a', section: 'inbox', text: '', attachments: [], todo: false, done: false, tags: [], createdAt: T, updatedAt: T + 4, deleted: true });
+  assert.deepEqual(r.notes[1], s.notes[1]);
+});
+
+test('moving notes creates a missing section with the next order', () => {
+  const s = storeOf([mk('a'), mk('b')]);
+  const r = pure(s, (x) => moveNotes(x, ['a'], 'prompts', T + 1));
+  assert.deepEqual(r.sections, [{ name: 'inbox', order: 0 }, { name: 'prompts', order: 1 }]);
+  assert.deepEqual([r.notes[0].section, r.notes[0].updatedAt, r.notes[1].section], ['prompts', T + 1, 'inbox']);
+  assert.equal(r.activeSection, 'inbox');
+  assert.equal(moveNotes(r, ['b'], 'prompts', T + 2).sections.length, 2);
+});
+
+test('done toggles a to-do and turns a plain note into one', () => {
+  let s = storeOf([mk('a')]);
+  s = pure(s, (x) => toggleDone(x, 'a', T + 1));
+  assert.deepEqual([s.notes[0].todo, s.notes[0].done], [true, false]);
+  s = toggleDone(s, 'a', T + 2);
+  assert.deepEqual([s.notes[0].todo, s.notes[0].done], [true, true]);
+  assert.equal(toggleDone(s, 'a', T + 3).notes[0].done, false);
+});
+
+test('editing replaces the text and ignores an empty one', () => {
+  const s = storeOf([mk('a')]);
+  const r = pure(s, (x) => editNote(x, 'a', 'new text', T + 1));
+  assert.deepEqual([r.notes[0].text, r.notes[0].updatedAt], ['new text', T + 1]);
+  for (const t of ['', '  \n']) assert.equal(editNote(s, 'a', t, T + 1), s);
+});
+
+test('search finds text in every section, newest first, skipping tombstones', () => {
+  const s = storeOf(
+    [mk('a', { text: 'An Island trip', createdAt: T }), mk('b', { section: 'other', text: 'island', createdAt: T + 1 }), mk('c', { text: 'island', deleted: true }), mk('d', { text: 'sea' })],
+    [{ name: 'inbox', order: 0 }, { name: 'other', order: 1 }]
+  );
+  assert.deepEqual(pure(s, (x) => search(x, 'ISLAND')).map((n) => n.id), ['b', 'a']);
+  assert.deepEqual(search(s, ''), []);
+});
+
+test('section names come in section order', () => {
+  const s = storeOf([], [{ name: 'b', order: 1 }, { name: 'a', order: 0 }]);
+  assert.deepEqual(pure(s, sectionNames), ['a', 'b']);
+});
+
+test('a section renders as a Markdown list', () => {
+  const s = storeOf([
+    mk('a', { text: 'plain', createdAt: T }),
+    mk('b', { text: 'todo', todo: true, createdAt: T + 1 }),
+    mk('c', { text: 'finished', todo: true, done: true, createdAt: T + 2 }),
+    mk('d', { text: 'one\ntwo', createdAt: T + 3 }),
+    mk('e', { text: 'gone', deleted: true, createdAt: T + 4 }),
+    mk('f', { section: 'other', text: 'else', createdAt: T + 5 }),
+  ]);
+  assert.equal(pure(s, (x) => sectionList(x, 'inbox')), '- one\n  two\n- [x] finished\n- [ ] todo\n- plain');
+});
+
+test('an attachment over 25 MB is refused', () => {
+  assert.equal(ATTACH_MAX, 25 * 1024 * 1024);
+  assert.equal(attachRefusal(26 * 1024 * 1024), 'Attachment over 25 MB');
+  assert.equal(attachRefusal(ATTACH_MAX), null);
+});
+
+test('attaching adds a file once per sha256', () => {
+  const s = storeOf([mk('a')]);
+  const r = pure(s, (x) => attach(x, 'a', PNG, T + 1));
+  assert.deepEqual([r.notes[0].attachments, r.notes[0].updatedAt], [[PNG], T + 1]);
+  assert.deepEqual(attach(r, 'a', PNG, T + 2).notes[0].attachments, [PNG]);
+});
+
+test('an attachment file is named by hash and extension', () => {
+  assert.equal(attachmentFile(PNG), 'abc123.png');
+  assert.equal(attachmentFile({ sha256: 'h', name: 'noext', mime: 'image/png' }), 'h.png');
+  assert.equal(attachmentFile({ sha256: 'h', name: 'x', mime: 'image/jpeg' }), 'h.jpg');
+  assert.equal(attachmentFile({ sha256: 'h', name: 'x', mime: 'application/zip' }), 'h.bin');
+});
+
+test('dragging offers one format only', () => {
+  assert.deepEqual(dragOffer(mk('a', { text: 'hi', attachments: [PNG] })), { 'text/plain': 'hi' });
+  assert.deepEqual(chipOffer(PNG, '/d/files'), { 'text/uri-list': 'file:///d/files/abc123.png' });
+});
