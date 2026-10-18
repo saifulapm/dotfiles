@@ -42,6 +42,10 @@ as_root "
   printf '#!/bin/bash\necho \"\$*\" >> $log\nexec /usr/bin/sudo \"\$@\"\n' > /opt/shim/sudo
   chmod 755 /opt/shim/sudo
   install -o saiful -m 644 /dev/null $log
+  # A v1 machine already has a chezmoi config, pointing at the old repo.
+  install -d -o saiful $home/.config $home/.config/chezmoi
+  echo 'sourceDir = \"~/.dotfiles\"' > $home/.config/chezmoi/chezmoi.toml
+  chown saiful: $home/.config/chezmoi/chezmoi.toml
 " || { echo "FAIL: fixture"; exit 1; }
 
 echo "--- first run"

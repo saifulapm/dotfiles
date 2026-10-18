@@ -30,8 +30,10 @@ install() {
     git clone --branch "$branch" "$repo" "$dir" || die "could not clone $repo ($branch)"
   fi
 
-  # chezmoi init rewrites its config and state db every time, so it runs only until the config exists.
-  if [[ -f ${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml ]]; then
+  # chezmoi init rewrites its config and state db every time, so it runs only until the config
+  # names this repo; a v1 machine's config points at ~/.dotfiles and must be replaced.
+  local config=${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml
+  if grep -qxF 'sourceDir = "~/Sites/github/dotfiles"' "$config" 2>/dev/null; then
     chezmoi apply || die "chezmoi apply failed"
   else
     local args=()
