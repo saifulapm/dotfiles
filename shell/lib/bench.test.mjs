@@ -16,7 +16,7 @@ test('every measure within budget reads ok and passes', () => {
     'panel warm    4 ms    ≤ 16 ms    ok',
     'timers        1       = 1        ok',
     'theme switch  120 ms  ≤ 300 ms   ok',
-    'idle cpu      0.03 %',
+    'idle cpu      0.03 %  ≤ 0.07 %   ok',
     'rss switched  153 MiB',
   ]);
 });
@@ -60,4 +60,10 @@ test('the six ordered pairs of three themes are each switched once, ending where
 
 test('the RSS after every theme has been shown is reported but never OVER', () => {
   assert.equal(report({ ...good, switchedKiB: 400 * 1024 }, BUDGETS).over, false);
+});
+
+test('idle cpu over 0.07 % is OVER', () => {
+  const r = report({ ...good, cpu: '0.08' }, BUDGETS);
+  assert.equal(r.over, true);
+  assert.equal(r.lines[6], 'idle cpu      0.08 %  ≤ 0.07 %   OVER');
 });

@@ -57,7 +57,7 @@ switch_once() {
   until_ok 3000 themes_focus None || die "the switcher never gave the keyboard back"
   jq -r .ms "$switch_json"
 }
-# The budget's RSS is read with every surface opened once on the starting theme (NQ4RZ9C1), before any switch.
+# The budget's RSS is read with every surface opened once on the starting theme, before any switch.
 qs ipc call themes open >/dev/null || die "themes open failed"
 until_ok 3000 themes_focus Exclusive || die "the switcher never took the keyboard"
 qs ipc call themes close >/dev/null
@@ -81,6 +81,10 @@ status=$(shell_status) || die "status did not answer after the switches"
 switched_kib=$(jq -r .rssKiB <<<"$status")
 timers=$(jq -r .timers <<<"$status")
 
+"$(dirname "$0")/dots" theme blueprint >/dev/null || die "dots theme blueprint failed"
+until_ok 3000 status_has '.theme == "blueprint"' || die "the shell never reported blueprint"
+# The paper's transition ends 300 ms after the call; idle starts after it.
+sleep 1
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
 # utime and stime are fields 14 and 15; the comm in field 2 is cut off first.
 cpu_ticks() { local s; s=$(<"/proc/$pid/stat"); read -ra f <<<"${s##*) }"; echo $((f[11] + f[12])); }

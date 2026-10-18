@@ -1,5 +1,5 @@
 // The verdict for each speed budget; bin/dots-bench gathers the numbers and runs this as a CLI.
-export const BUDGETS = { firstFrameMs: 150, rssMiB: 150, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300 };
+export const BUDGETS = { firstFrameMs: 150, rssMiB: 150, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07 };
 
 const line = (name, value, unit, op, limit, ok) =>
   `${name.padEnd(13)} ${`${value} ${unit}`.padEnd(7)} ${op} ${`${limit} ${unit}`.padEnd(8)} ${ok ? 'ok' : 'OVER'}`;
@@ -13,10 +13,12 @@ export function report(m, b) {
     line('panel warm', m.warmMs, 'ms', '≤', b.warmMs, m.warmMs <= b.warmMs),
     line('timers', m.timers, '', '=', b.timers, m.timers === b.timers),
     line('theme switch', m.switchMs, 'ms', '≤', b.switchMs, m.switchMs <= b.switchMs),
+    // Read with Blueprint on, the theme whose grid paper is the costliest to draw: m1's 0.02 % plus 0.05.
+    line('idle cpu', m.cpu, '%', '≤', b.idleCpu, Number(m.cpu) <= b.idleCpu),
   ];
   // Every theme's shaders and effects loaded once; reported, not budgeted.
   const switched = `${'rss switched'.padEnd(13)} ${Math.floor(m.switchedKiB / 1024)} MiB`;
-  return { lines: [...checks, `${'idle cpu'.padEnd(13)} ${m.cpu} %`, switched], over: checks.some((l) => l.endsWith('OVER')) };
+  return { lines: [...checks, switched], over: checks.some((l) => l.endsWith('OVER')) };
 }
 
 // Round the list and back again from start: with three themes that is each of the six ordered pairs once.
@@ -43,6 +45,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     warmMs: env('DOTS_BUDGET_WARM_MS', BUDGETS.warmMs),
     timers: env('DOTS_BUDGET_TIMERS', BUDGETS.timers),
     switchMs: env('DOTS_BUDGET_SWITCH_MS', BUDGETS.switchMs),
+    idleCpu: env('DOTS_BUDGET_IDLE_CPU', BUDGETS.idleCpu),
   });
   console.log(r.lines.join('\n'));
   process.exit(r.over ? 1 : 0);
