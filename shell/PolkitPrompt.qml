@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import "." as Root
+import "lib/notes-look.mjs" as K
 
 // The one Overlay prompt a polkit request shows, drawn in the Surfaces window.
 Item {
@@ -13,6 +14,8 @@ Item {
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
+    // The key line in the theme's voice: Blueprint brackets its keys.
+    readonly property string keys: theme.tokens ? K.keyLine(theme.tokens, [["↵", "authenticate"], ["esc", "cancel"]]) : ""
 
     function show(f) {
         flow = f;
@@ -148,7 +151,7 @@ Item {
                 Layout.rightMargin: 20
                 Layout.bottomMargin: 16
                 wrapMode: Text.Wrap
-                text: prompt.flow?.supplementaryMessage ? prompt.flow.supplementaryMessage : "↵ AUTHENTICATE · ESC CANCEL"
+                text: prompt.flow?.supplementaryMessage ? prompt.flow.supplementaryMessage : prompt.keys
                 color: prompt.flow?.supplementaryIsError ? prompt.c.danger : prompt.c.muted
                 font.family: prompt.fonts.ui
                 font.pixelSize: 10

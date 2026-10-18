@@ -3,6 +3,7 @@ import Quickshell.Io
 import QtQuick
 import "." as Root
 import "lib/recorder.mjs" as R
+import "lib/notes-look.mjs" as K
 
 // Mod+Shift+R: the region picker, drawn in the Surfaces window, and the wf-recorder run it starts.
 Item {
@@ -117,22 +118,40 @@ Item {
         border.color: recorder.c.accent
     }
 
-    Rectangle {
+    // The hint is a card in the theme's treatment: Paper's hard shadow and serif size, Artboard's frame label, Blueprint's chamfer and brackets.
+    Root.Surface {
+        id: hint
         x: Math.min(recorder.region.x, recorder.width - width)
-        y: recorder.region.y >= height + 8 ? recorder.region.y - height - 8 : recorder.region.y + 8
-        width: hint.implicitWidth + 16
-        height: hint.implicitHeight + 8
-        color: recorder.c.ink
+        y: recorder.region.y >= height + 32 ? recorder.region.y - height - 12 : recorder.region.y + 28
+        width: hintRow.implicitWidth + 28
+        height: hintRow.implicitHeight + 16
+        tokens: recorder.theme.tokens
+        label: "Record"
 
-        Text {
-            id: hint
-            textFormat: Text.PlainText
+        Row {
+            id: hintRow
             anchors.centerIn: parent
-            text: recorder.region.w + " × " + recorder.region.h + " · STEP " + R.STEP + " · HJKL MOVE · ⇧HJKL SIZE · F FULL · ↵ REC · ESC"
-            color: recorder.c.surface
-            font.family: recorder.fonts.ui
-            font.pixelSize: 11
-            font.letterSpacing: 1.2
+            spacing: 14
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.baseline: keys.baseline
+                text: recorder.region.w + " × " + recorder.region.h
+                color: recorder.c.ink
+                font.family: recorder.fonts.display
+                font.pixelSize: 20
+            }
+
+            Text {
+                id: keys
+                textFormat: Text.PlainText
+                anchors.verticalCenter: parent.verticalCenter
+                text: recorder.theme.tokens ? K.keyLine(recorder.theme.tokens, [["hjkl", "move"], ["⇧HJKL", "size"], ["f", "full"], ["↵", "rec"], ["esc", "cancel"]]) : ""
+                color: recorder.c.muted
+                font.family: recorder.fonts.ui
+                font.pixelSize: 11
+                font.letterSpacing: 1.2
+            }
         }
     }
 
