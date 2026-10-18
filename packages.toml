@@ -1,0 +1,35 @@
+[[package]]
+name = "niri"
+arch = "all"
+why = "the compositor"
+
+[[package]]
+name = "quickshell"
+arch = "all"
+copr = "errornointernet/quickshell"
+why = "runs the shell in shell/"
+
+[[package]]
+name = "foot"
+arch = "all"
+why = "the terminal"
+
+[[package]]
+name = "fish"
+arch = "all"
+why = "the login shell"
+
+[[package]]
+name = "git"
+arch = "all"
+why = "clones and updates this repo"
+
+[[package]]
+name = "nodejs24"
+arch = "all"
+why = "provides node for the theme renderer and tests"
+
+[[package]]
+name = "chezmoi"
+arch = "all"
+why = "links home/ into place"

@@ -1,0 +1,28 @@
+{{- /* Machine id: a recorded id wins, then the hardware model, then one prompt. The prompt text is "machine" so `--promptString machine=<id>` answers it. */ -}}
+{{- $machine := "" -}}
+{{- if hasKey . "machine" -}}
+{{-   $machine = .machine -}}
+{{- end -}}
+{{- $model := "" -}}
+{{- if stat "/proc/device-tree/model" -}}
+{{-   $model = lower (output "sh" "-c" "tr -d '\\0' < /proc/device-tree/model") -}}
+{{- else if stat "/sys/class/dmi/id/product_name" -}}
+{{-   $model = lower (output "cat" "/sys/class/dmi/id/product_name") -}}
+{{- end -}}
+{{- if not $machine -}}
+{{-   if contains "mac mini (m2" $model -}}
+{{-     $machine = "mac-mini-m2" -}}
+{{-   else if contains "macbook pro (13-inch, m2" $model -}}
+{{-     $machine = "macbook-m2" -}}
+{{-   else if contains "nuc" $model -}}
+{{-     $machine = "nuc" -}}
+{{-   end -}}
+{{- end -}}
+{{- if not $machine -}}
+{{-   $machine = promptStringOnce . "machine" "machine" -}}
+{{- end -}}
+sourceDir = "~/Sites/github/dotfiles"
+mode = "symlink"
+
+[data]
+    machine = {{ $machine | quote }}

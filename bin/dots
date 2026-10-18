@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# dots install: turn a fresh Fedora into this repo, applied by chezmoi.
+# It runs before the repo is cloned (curl ... | bash -s install), so it reads nothing from its own path.
+set -euo pipefail
+
+die() {
+  echo "dots: $*" >&2
+  exit 1
+}
+
+install() {
+  local repo=${DOTS_REPO:-https://github.com/saifulapm/dotfiles.git}
+  local branch=${DOTS_BRANCH:-v2}
+  local dir=$HOME/Sites/github/dotfiles
+
+  # The only sudo that may prompt; every later root command uses sudo -n.
+  sudo -v || die "sudo failed"
+  while sleep 50; do sudo -n -v || exit; done >/dev/null 2>&1 &
+  # shellcheck disable=SC2064 # the keepalive pid is fixed now
+  trap "kill $! 2>/dev/null" EXIT
+
+  local missing=() p
+  for p in git chezmoi; do rpm -q --quiet "$p" || missing+=("$p"); done
+  if ((${#missing[@]})); then
+    sudo -n dnf -y install "${missing[@]}" || die "dnf could not install ${missing[*]}"
+  fi
+
+  if [[ ! -e $dir ]]; then
+    mkdir -p "${dir%/*}"
+    git clone --branch "$branch" "$repo" "$dir" || die "could not clone $repo ($branch)"
+  fi
+
+  local args=()
+  [[ -n ${DOTS_MACHINE:-} ]] && args+=(--promptString "machine=$DOTS_MACHINE")
+  chezmoi init --apply --source "$dir" "${args[@]}" || die "chezmoi apply failed"
+
+  cat <<'EOF'
+dots: installed. Next:
+  dots secrets
+  tailscale up
+  reboot
+EOF
+}
+
+main() {
+  case ${1:-} in
+    install) install ;;
+    *)
+      echo "usage: dots install" >&2
+      exit 2
+      ;;
+  esac
+}
+
+# Everything runs from here, so bash has read the whole script before a pipe could cut it short.
+main "$@"

@@ -1,0 +1,29 @@
+#!/bin/bash
+# packages.toml hash: {{ include (joinPath .chezmoi.workingTree "packages.toml") | sha256sum }}
+{{ template "lib.sh" . }}
+list={{ joinPath .chezmoi.workingTree "packages.toml" | quote }}
+
+# One "name copr" line per entry for this arch; copr is "-" when the package is in Fedora.
+entries=$(awk -v arch="$(uname -m)" '
+  function flush() { if (name != "" && (a == "all" || a == arch)) print name, (copr == "" ? "-" : copr) }
+  function val() { match($0, /"[^"]*"/); return substr($0, RSTART + 1, RLENGTH - 2) }
+  /^\[\[package\]\]/ { flush(); name = ""; a = ""; copr = ""; next }
+  /^name *=/ { name = val() }
+  /^arch *=/ { a = val() }
+  /^copr *=/ { copr = val() }
+  END { flush() }
+' "$list")
+
+missing=()
+while read -r name copr; do
+  if [[ $copr != - && ! -e /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:${copr/\//:}.repo ]]; then
+    log "enabling COPR $copr"
+    root dnf -y -q copr enable "$copr" || die "could not enable COPR $copr"
+  fi
+  rpm -q --quiet "$name" || missing+=("$name")
+done <<<"$entries"
+
+if ((${#missing[@]})); then
+  log "installing ${missing[*]}"
+  root dnf -y install "${missing[@]}" || die "dnf could not install ${missing[*]}"
+fi
