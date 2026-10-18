@@ -4,6 +4,7 @@ import QtQuick
 import "." as Root
 import "lib/island.mjs" as I
 import "lib/questions.mjs" as Q
+import "lib/margins.mjs" as M
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; the window pads for its shadow.
 PanelWindow {
@@ -18,7 +19,10 @@ PanelWindow {
     property string notice: ""
     // What the island may show; each is null while it has nothing to show.
     readonly property var question: questions.current
-    property bool calendar: false
+    // The month the calendar shows, {year, month}, while Mod+I has it open.
+    property var calendar: null
+    readonly property var grid: calendar ? I.monthGrid(calendar.year, calendar.month) : null
+    readonly property int today: calendar && calendar.year === clock.now.getFullYear() && calendar.month === clock.now.getMonth() ? clock.now.getDate() : 0
     readonly property var notification: notifs.current
     property var recording: null
     property var osd: null
@@ -48,7 +52,12 @@ PanelWindow {
     property bool replying: false
 
     function focusIsland() {
-        if (mode !== "question")
+        if (mode === "rest" || mode === "playing")
+            calendar = {
+                year: clock.now.getFullYear(),
+                month: clock.now.getMonth()
+            };
+        else if (mode !== "question")
             return;
         focused = true;
         keys.forceActiveFocus();
@@ -56,6 +65,7 @@ PanelWindow {
 
     function release() {
         focused = false;
+        calendar = null;
         replying = false;
         reply.text = "";
     }
@@ -97,14 +107,14 @@ PanelWindow {
         x: island.padSide
         y: 10
         // A notification is a 440 px card and a question the full 560, as drawn; every other mode is one line as wide as its text.
-        width: island.mode === "notification" ? 440 : island.mode === "question" ? I.MAX_WIDTH : I.boxWidth(Math.ceil(label.implicitWidth) + 28)
-        height: island.mode === "notification" ? card.implicitHeight + 28 : island.mode === "question" ? ask.implicitHeight + 32 : 34
+        width: island.mode === "notification" ? 440 : island.mode === "question" ? I.MAX_WIDTH : island.mode === "calendar" ? 320 : I.boxWidth(Math.ceil(label.implicitWidth) + 28)
+        height: island.mode === "notification" ? card.implicitHeight + 28 : island.mode === "question" ? ask.implicitHeight + 32 : island.mode === "calendar" ? month.implicitHeight + 32 : 34
         tokens: island.theme.tokens
         role: "island"
 
         Text {
             id: label
-            visible: island.mode !== "notification" && island.mode !== "question"
+            visible: ["notification", "question", "calendar"].indexOf(island.mode) < 0
             anchors.centerIn: parent
             width: Math.min(implicitWidth, parent.width - 28)
             elide: Text.ElideRight
@@ -160,6 +170,14 @@ PanelWindow {
             id: keys
             focus: island.focused
             Keys.onPressed: event => {
+                event.accepted = true;
+                if (island.mode === "calendar") {
+                    if (event.key === Qt.Key_Escape)
+                        island.release();
+                    else if (event.key === Qt.Key_H || event.key === Qt.Key_L)
+                        island.calendar = I.shiftMonth(island.calendar.year, island.calendar.month, event.key === Qt.Key_H ? -1 : 1);
+                    return;
+                }
                 const q = island.question;
                 if (!q)
                     return;
@@ -173,7 +191,73 @@ PanelWindow {
                     if (option !== null)
                         island.questions.answer(q.id, option);
                 }
-                event.accepted = true;
+            }
+        }
+
+        Column {
+            id: month
+            visible: island.mode === "calendar"
+            x: 18
+            y: 16
+            width: box.width - 36
+            spacing: 10
+
+            Item {
+                width: parent.width
+                height: monthTitle.implicitHeight
+
+                Text {
+                    id: monthTitle
+                    text: island.grid?.title ?? ""
+                    color: box.style.text
+                    font.family: island.theme.tokens?.type.ui ?? ""
+                    font.pixelSize: 13
+                    font.weight: Font.Medium
+                }
+
+                Text {
+                    anchors.right: parent.right
+                    text: M.clockText(island.clock.now)
+                    color: Qt.alpha(box.style.text, 0.65)
+                    font.family: island.theme.tokens?.type.mono ?? ""
+                    font.pixelSize: 12
+                }
+            }
+
+            Grid {
+                columns: 7
+                rowSpacing: 6
+                width: parent.width
+
+                Repeater {
+                    model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].concat((island.grid?.weeks ?? []).flat())
+
+                    Rectangle {
+                        required property var modelData
+                        required property int index
+                        readonly property bool isToday: index >= 7 && modelData === island.today
+                        width: month.width / 7
+                        height: 18
+                        radius: 4
+                        color: isToday ? box.style.text : "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: parent.modelData ?? ""
+                            color: parent.isToday ? box.style.fill : Qt.alpha(box.style.text, parent.index < 7 ? 0.55 : 0.85)
+                            font.family: island.theme.tokens?.type.mono ?? ""
+                            font.pixelSize: 11
+                            font.weight: parent.isToday ? Font.DemiBold : Font.Normal
+                        }
+                    }
+                }
+            }
+
+            Text {
+                text: "h/l month · Esc"
+                color: Qt.alpha(box.style.text, 0.55)
+                font.family: island.theme.tokens?.type.mono ?? ""
+                font.pixelSize: 11
             }
         }
 

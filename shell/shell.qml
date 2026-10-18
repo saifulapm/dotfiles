@@ -134,7 +134,8 @@ ShellRoot {
         target: "island"
 
         function state(): string {
-            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, since: island.modeSince });
+            const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks } : null;
+            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, since: island.modeSince, focused: island.focused, calendar });
         }
 
         function focus(): void {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -49,4 +49,23 @@ test('the box never grows past 560 px', () => {
   assert.equal(MAX_WIDTH, 560);
   assert.equal(boxWidth(100), 100);
   assert.equal(boxWidth(5000), 560);
+});
+
+test('the month grid starts on Monday and pads the first and last weeks', () => {
+  const g = monthGrid(2026, 9);
+  assert.equal(g.title, 'October 2026');
+  assert.deepEqual(g.weeks[0], [null, null, null, 1, 2, 3, 4]);
+  assert.deepEqual(g.weeks.at(-1), [26, 27, 28, 29, 30, 31, null]);
+  assert.equal(g.weeks.length, 5);
+});
+
+test('a month that starts on Sunday puts the 1st last in its first week', () => {
+  assert.deepEqual(monthGrid(2026, 1).weeks[0], [null, null, null, null, null, null, 1]);
+  assert.deepEqual(monthGrid(2026, 1).weeks.at(-1).slice(0, 6), [23, 24, 25, 26, 27, 28]);
+});
+
+test('the calendar reads as its month, and moving a month crosses the year', () => {
+  assert.equal(islandText('calendar', { calendar: { year: 2026, month: 9 } }, AT), 'October 2026');
+  assert.deepEqual(shiftMonth(2026, 11, 1), { year: 2027, month: 0 });
+  assert.deepEqual(shiftMonth(2026, 0, -1), { year: 2025, month: 11 });
 });

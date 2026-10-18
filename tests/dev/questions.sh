@@ -74,4 +74,21 @@ check "Esc puts the question away" not_question
 check "Esc answers nothing" eval '! grep -q Q3 "$calls"'
 check "Esc gives the keyboard back" island_focus None
 
+until_ok 6000 mode_is rest
+mod_i
+until_ok 2000 mode_is calendar
+state=$(island)
+echo "     calendar: $(jq -c '.calendar | {title, today}' <<<"$state")"
+this_month() { jq -e --arg t "$(date '+%B %Y')" --argjson d "$(date +%-d)" '.calendar.title == $t and .calendar.today == $d and .width <= 560' <<<"$state" >/dev/null; }
+check "Mod+I at rest shows this month's calendar with today marked" this_month
+check "the calendar has the keyboard" island_focus Exclusive
+wtype -k l
+next_month() { island | jq -e --arg t "$(date -d "$(date +%Y-%m-01) +1 month" '+%B %Y')" '.calendar.title == $t' >/dev/null; }
+until_ok 1000 next_month
+check "l shows the next month" next_month
+wtype -k Escape
+until_ok 1000 mode_is rest
+check "Esc closes the calendar" mode_is rest
+check "and gives the keyboard back" island_focus None
+
 exit $((fails > 0))
