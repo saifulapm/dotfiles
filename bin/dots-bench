@@ -33,6 +33,41 @@ cold=$(open_once 1) || exit 1
 sleep 0.3
 warm=$(open_once 2) || exit 1
 
+themes_state() { timeout 0.5 qs ipc call themes state 2>/dev/null; }
+themes_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-themes" and .keyboard_interactivity == $k)' >/dev/null; }
+switch_json=$XDG_STATE_HOME/dots/theme-switch.json
+theme_index() { themes_state | jq -r --arg n "$1" '.themes | index($n)'; }
+selected_is() { themes_state | jq -e --arg t "$1" '.selected == $t' >/dev/null; }
+switched_to() { jq -e --arg t "$1" --arg was "$2" '.to == $t and (tojson != $was)' "$switch_json" >/dev/null 2>&1; }
+
+# Through the switcher as a person would, so the time runs from the Enter key to dots theme's last reload.
+switch_once() {
+  local to=$1 was from delta key
+  was=$(jq -c . "$switch_json" 2>/dev/null)
+  qs ipc call themes open >/dev/null || die "themes open failed"
+  until_ok 3000 themes_focus Exclusive || die "the switcher never took the keyboard"
+  from=$(themes_state | jq -r .selected)
+  delta=$(($(theme_index "$to") - $(theme_index "$from")))
+  key=j
+  ((delta < 0)) && key=k delta=$((-delta))
+  for ((; delta > 0; delta--)); do wtype "$key"; done
+  until_ok 1000 selected_is "$to" || die "the cursor never reached $to"
+  wtype -k Return
+  until_ok 3000 switched_to "$to" "$was" || die "the switch to $to was never recorded"
+  until_ok 3000 themes_focus None || die "the switcher never gave the keyboard back"
+  jq -r .ms "$switch_json"
+}
+start=$(shell_status | jq -r .theme)
+switch_max=0
+mapfile -t names < <(themes_state | jq -r '.themes[]')
+for to in $(node "$(dirname "$0")/../shell/lib/bench.mjs" cycle "$start" "${names[@]}"); do
+  ms=$(switch_once "$to") || exit 1
+  echo "     switch to $to: $ms ms" >&2
+  ((ms > switch_max)) && switch_max=$ms
+  # The paper's own transition runs up to 300 ms after dots theme returns.
+  sleep 0.4
+done
+
 sleep 5
 status=$(shell_status) || die "status did not answer after the opens"
 rss_kib=$(jq -r .rssKiB <<<"$status")
@@ -46,4 +81,4 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max"
