@@ -111,7 +111,7 @@ Item {
         if (row.exec)
             Quickshell.execDetached(row.exec);
         else if (row.copy)
-            Quickshell.execDetached(["wl-copy", row.copy]);
+            Quickshell.execDetached(["wl-copy", "--", row.copy]);
     }
 
     function state() {

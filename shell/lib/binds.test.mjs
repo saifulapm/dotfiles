@@ -37,7 +37,7 @@ test('the volume keys step the default sink by 5 % and the brightness keys go th
   assert.match(binds, spawns('XF86MonBrightnessDown', ['qs', 'ipc', 'call', 'osd', 'brightness', '5%-']));
 });
 
-test('m5 binds open Control, the clipboard and emoji modes, the lock and the recorder', () => {
+test('the system binds open Control, the clipboard and emoji modes, the lock and the recorder', () => {
   assert.match(binds, spawns('Mod+C', ['qs', 'ipc', 'call', 'control', 'toggle']));
   assert.match(binds, spawns('Mod+V', ['qs', 'ipc', 'call', 'launcher', 'mode', 'clipboard']));
   assert.match(binds, spawns('Mod+Period', ['qs', 'ipc', 'call', 'launcher', 'mode', 'emoji']));

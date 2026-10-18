@@ -9,6 +9,6 @@ const out = new URL('../shell/data/emoji.json', import.meta.url);
 const text = process.argv[2] ? readFileSync(process.argv[2], 'utf8') : await (await fetch(URL_LATEST)).text();
 const list = parseEmojiTest(text);
 if (list.length < 1000) throw new Error('only ' + list.length + ' emoji parsed, so the source is not emoji-test.txt');
-// The commit hook refuses a raw robot face in any file, so that one emoji is written as its JSON escape.
+// This repo keeps a raw robot face out of its files, so that one emoji is written as its JSON escape.
 writeFileSync(out, JSON.stringify(list).replace(/\u{1f916}/gu, '\\ud83e\\udd16') + '\n');
 console.log(list.length + ' emoji');

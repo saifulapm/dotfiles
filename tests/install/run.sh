@@ -75,6 +75,10 @@ clip=$(podman exec "$name" readlink -f "$home/.local/bin/dots-clip-store")
 check "\$HOME/.local/bin/dots-clip-store links to the repo script (got '$clip')" \
   test "$clip" = "$home/Sites/github/dotfiles/bin/dots-clip-store"
 
+# The lock authenticates through dots-lock, and PAM's other service denies every password, so a missing file would lock the user out.
+check "/etc/pam.d/dots-lock includes system-auth" podman exec "$name" grep -qx 'auth include system-auth' /etc/pam.d/dots-lock
+check "logind leaves the lid to niri" podman exec "$name" grep -qx 'HandleLidSwitch=ignore' /etc/systemd/logind.conf.d/dots-lid.conf
+
 check "gcc, wl-clipboard, cliphist and wtype are installed" podman exec "$name" rpm -q gcc wl-clipboard cliphist wtype
 
 calls=$(podman exec "$name" cat "$log")

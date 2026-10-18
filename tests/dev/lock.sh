@@ -58,16 +58,42 @@ check "the test password unlocks" state_is '.locked == false and .field == 0'
 until_ok 1000 test ! -e "$marker"
 check "unlocking removes the marker" test ! -e "$marker"
 
+# A magenta window behind the lock: any magenta on screen while the shell is dead means niri showed the desktop.
+magenta() {
+  grim -s 1 -t ppm - | node -e '
+    const b = require("fs").readFileSync(0);
+    const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);
+    const px = b.subarray(head[0].length);
+    let n = 0;
+    for (let i = 0; i < head[1] * head[2] * 3; i += 3) if (px[i] > 200 && px[i + 1] < 60 && px[i + 2] > 200) n++;
+    console.log(n);
+  '
+}
+niri msg action spawn -- foot -o colors.background=ff00ff -e sleep 120
+magenta_shown() { (($(magenta) > 10000)); }
+until_ok 5000 magenta_shown
+check "a magenta window shows before the lock" magenta_shown
+
 mod_escape
 until_ok 3000 locked_shown
 check "Mod+Escape locks again" locked_shown
 old=$(shell_pid)
 t0=$(now_ms)
 systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
+# The unit restarts after 500 ms, so grabs in that gap show what niri draws with no lock client.
+seen=0 grabs=0
+while [ "$(shell_pid)" = "$old" ] || [ -z "$(shell_pid)" ] || [ "$(shell_pid)" = 0 ]; do
+  (($(now_ms) - t0 < 2000)) || break
+  seen=$((seen + $(magenta))) grabs=$((grabs + 1))
+done
+check "while the shell is dead the screen stays covered ($grabs grabs, $seen magenta px)" test "$grabs" -gt 0 -a "$seen" = 0
 restarted_locked() { [ "$(shell_pid)" != "$old" ] && locked_shown; }
-until_ok 2500 restarted_locked
+until_ok 2000 restarted_locked
 took=$(($(now_ms) - t0))
-check "the restarted shell holds the lock within 2.5 s of the kill (${took} ms)" restarted_locked
+check "the restarted shell holds the lock within 2 s of the kill (${took} ms)" restarted_locked
+lock_drawn() { (($(clock_ink) > 0)) && (($(magenta) == 0)); }
+until_ok 2000 lock_drawn
+check "the restarted shell draws its lock over the magenta window" lock_drawn
 check "the marker survives the kill" test -e "$marker"
 
 type_enter dots-test-pass

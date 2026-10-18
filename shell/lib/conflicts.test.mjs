@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// m5: a rebase left a diff3 base block in bin/dots-dev-shell, and only an unrelated test noticed; untracked files count, so a file is checked before its commit.
+// A rebase once left a diff3 base block in a script, and only an unrelated test noticed; untracked files count, so a file is checked before its commit.
 const root = new URL('../..', import.meta.url).pathname;
 const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
   .split('\n')
