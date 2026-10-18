@@ -77,11 +77,16 @@ ShellRoot {
         id: clockService
     }
 
+    Services.Notifs {
+        id: notifsService
+    }
+
     Root.Island {
         id: island
         theme: themeService
         niri: niriService
         clock: clockService
+        notifs: notifsService
     }
 
     Variants {
@@ -111,7 +116,7 @@ ShellRoot {
         target: "island"
 
         function state(): string {
-            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth });
+            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, since: island.modeSince });
         }
     }
 
