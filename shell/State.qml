@@ -7,7 +7,11 @@ Singleton {
     // Names of the surfaces that have loaded; each surface appends itself on first open.
     property list<string> loaded: []
     property list<QtObject> ticks: []
-    readonly property int timers: ticks.filter(t => t.running).length
+
+    // A function, not a binding: a binding over ticks would miss a Tick starting or stopping.
+    function timers(): int {
+        return ticks.filter(t => t.running).length;
+    }
 
     function addTick(tick) {
         ticks.push(tick);

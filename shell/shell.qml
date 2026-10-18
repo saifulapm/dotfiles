@@ -38,7 +38,7 @@ ShellRoot {
                 loaded: Root.State.loaded,
                 sync: {},
                 rssKiB: Status.rssKiB(procStatus.text()),
-                timers: Root.State.timers
+                timers: Root.State.timers()
             });
         }
     }
