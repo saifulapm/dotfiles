@@ -44,9 +44,9 @@ niri msg action spawn -- qs ipc call control toggle
 control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
 until_ok 3000 section_is audio
 until_ok 3000 control_focus
-wtype -k Tab
-wtype -k Tab
-until_ok 2000 section_is bluetooth
+# The first Tab can reach the layer before it has the keyboard, so Tab repeats until the section moves.
+tab_to() { local n; for n in 1 2 3 4 5 6; do section_is "$1" && return 0; wtype -k Tab; sleep 0.15; done; section_is "$1"; }
+tab_to bluetooth
 check "Tab twice is bluetooth" section_is bluetooth
 until_ok 3000 detail_is "Test Headphones" paired
 echo "     state: $(control_state)"
@@ -66,6 +66,17 @@ until_ok 3000 connected_is false
 check "Enter again disconnects it" connected_is false
 until_ok 2000 detail_is "Test Headphones" paired
 check "its row reads paired again" detail_is "Test Headphones" paired
+
+# Connecting moves a device to the top, and the selection goes with it.
+until_ok 3000 select_row "Test Speaker"
+wtype -k Return
+until_ok 3000 bash -c "busctl --address=\"$DBUS_SESSION_BUS_ADDRESS\" get-property org.bluez $speaker org.bluez.Device1 Connected | grep -q true"
+until_ok 2000 detail_is "Test Speaker" connected
+on_speaker() { state_is '.rows[.selected] == "Test Speaker"'; }
+check "the selection stays on Test Speaker as it moves to the top" on_speaker
+wtype -k Return
+until_ok 2000 detail_is "Test Speaker" new
+check "so Enter again disconnects Test Speaker, not Test Headphones" detail_is "Test Speaker" new
 
 until_ok 3000 select_row "Test Speaker"
 wtype d

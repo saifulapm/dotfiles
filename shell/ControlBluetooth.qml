@@ -17,8 +17,14 @@ Item {
                 }))).map(i => all[i])
     readonly property var rows: devices.map(d => Lib.btRow(d))
 
-    // A forgotten device leaves the list, so the selection stays on a row that exists.
-    onRowsChanged: selected = Math.max(0, Math.min(selected, rows.length - 1))
+    // The item under the selection: a reorder (a connect moves it to the top) keeps the selection on it, and a forget leaves it on a row that exists.
+    property var picked: null
+    onSelectedChanged: picked = devices[selected] ?? null
+    onRowsChanged: {
+        const i = devices.indexOf(picked);
+        selected = i >= 0 ? i : Math.max(0, Math.min(selected, rows.length - 1));
+        picked = devices[selected] ?? null;
+    }
 
     function key(event) {
         const device = devices[selected];

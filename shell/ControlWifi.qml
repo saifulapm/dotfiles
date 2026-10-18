@@ -19,8 +19,14 @@ Item {
                 }))).map(i => all[i])
     readonly property var rows: networks.map(n => Lib.wifiRow(n))
 
-    // A forgotten network can leave the list, so the selection stays on a row that exists.
-    onRowsChanged: selected = Math.max(0, Math.min(selected, rows.length - 1))
+    // The item under the selection: a reorder (a connect moves it to the top) keeps the selection on it, and a forget leaves it on a row that exists.
+    property var picked: null
+    onSelectedChanged: picked = networks[selected] ?? null
+    onRowsChanged: {
+        const i = networks.indexOf(picked);
+        selected = i >= 0 ? i : Math.max(0, Math.min(selected, rows.length - 1));
+        picked = networks[selected] ?? null;
+    }
 
     function key(event) {
         const network = networks[selected];
