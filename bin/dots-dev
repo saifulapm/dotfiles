@@ -6,6 +6,7 @@ set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 D=$(mktemp -d -t dots-dev-XXXXXXXX)
 export DOTS_DEV_DIR=$D DOTS_DEV_UNIT=dots-shell-dev-${D##*-}
+user_data=${XDG_DATA_HOME:-$HOME/.local/share}
 export XDG_STATE_HOME=$D/state XDG_DATA_HOME=$D/data QS_CONFIG_PATH=$repo/shell
 # niri's spawn-at-startup finds bin/dots-dev-shell on PATH.
 export PATH=$repo/bin:$PATH
@@ -28,6 +29,8 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME"
+# Fonts are read, never written, so the user's own stay visible to the nested shell.
+[ -d "$user_data/fonts" ] && ln -s "$user_data/fonts" "$XDG_DATA_HOME/fonts"
 printf 'paper\n' >"$XDG_STATE_HOME/dots/theme"
 node "$repo/shell/lib/theme-render.mjs" paper
 # The theme-out path changes every run, so the config that includes it is written here.
