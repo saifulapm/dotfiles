@@ -9,3 +9,5 @@ StartLimitIntervalSec=0
 ExecStart=qs
 Restart=always
 RestartSec=500ms
+# The shell draws its own UI; the gtk3 platform theme a session may set costs up to 1.5 s of start-up.
+Environment=QT_QPA_PLATFORMTHEME=

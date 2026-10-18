@@ -2,13 +2,13 @@
 # Spawned by the nested niri that bin/dots-dev starts: runs the shell as a transient user
 # unit, so systemd restarts it like the real dots-shell.service. A transient unit gets the
 # user manager's env, which is the live session's, so every variable that points at the
-# nested session is passed on by name.
+# nested session is passed on by name. QT_QPA_PLATFORMTHEME is cleared as in dots-shell.service.
 set -euo pipefail
 
 systemd-run --user --quiet --collect --unit "$DOTS_DEV_UNIT" \
   -p Restart=always -p RestartSec=500ms -p StartLimitIntervalSec=0 \
   -E WAYLAND_DISPLAY -E NIRI_SOCKET -E DBUS_SESSION_BUS_ADDRESS \
-  -E XDG_STATE_HOME -E XDG_DATA_HOME -E QS_CONFIG_PATH \
+  -E XDG_STATE_HOME -E XDG_DATA_HOME -E QS_CONFIG_PATH -E QT_QPA_PLATFORMTHEME= \
   qs
 
 for v in WAYLAND_DISPLAY NIRI_SOCKET DBUS_SESSION_BUS_ADDRESS QS_CONFIG_PATH XDG_STATE_HOME DOTS_DEV_UNIT; do
