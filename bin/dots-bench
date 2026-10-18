@@ -15,11 +15,6 @@ launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 status_has() { shell_status | jq -e "$1" >/dev/null; }
 open_reported() { launcher_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
 
-# ipc calls made while qs starts hold it back by 1 to 2 s, so nothing asks qs until niri lists the paper.
-until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
-until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
-first_frame=$(shell_status | jq -r .firstFrameMs)
-
 # Opens number $1, reads the time the launcher measured, closes it and waits for the keyboard.
 open_once() {
   qs ipc call launcher open >/dev/null || die "launcher open failed"
@@ -29,7 +24,24 @@ open_once() {
   qs ipc call launcher close >/dev/null
   until_ok 3000 launcher_closed || die "the launcher never gave the keyboard back"
 }
-cold=$(open_once 1) || exit 1
+
+# A start's first frame and cold open vary by 50 ms run to run, so each budget holds the median of five starts; nothing asks qs before niri lists the paper, since early ipc calls hold a start back 1 to 2 s.
+paper_gone() { ! layer_up dots-paper; }
+frames=() colds=()
+for i in 1 2 3 4 5; do
+  if ((i > 1)); then
+    systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
+    until_ok 3000 paper_gone || die "the killed shell's paper never went away"
+  fi
+  until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
+  until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
+  frames+=("$(shell_status | jq -r .firstFrameMs)")
+  colds+=("$(open_once 1)") || exit 1
+done
+echo "     first frames: ${frames[*]}; cold opens: ${colds[*]}"
+median() { printf '%s\n' "$@" | sort -n | sed -n 3p; }
+first_frame=$(median "${frames[@]}")
+cold=$(median "${colds[@]}")
 sleep 0.3
 warm=$(open_once 2) || exit 1
 
