@@ -88,6 +88,8 @@ reload_chromium() {
 theme() {
   local name=${1:-} t0=${DOTS_SWITCH_T0:-$(date +%s%3N)}
   [[ -n $name ]] || die "usage: dots theme <name>"
+  # The name lands in paths and in theme-switch.json, so it is checked before anything runs.
+  [[ $name =~ ^[a-z0-9][a-z0-9_-]*$ ]] || die "theme $name: not a theme name"
   local repo state out from
   repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
   state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
