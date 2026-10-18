@@ -81,3 +81,12 @@ fi
 source "$dev_out"
 # Every qs ipc call below must reach the worktree shell, never the live one.
 : "${QS_CONFIG_PATH:?}" "${DOTS_DEV_DIR:?}" "${DOTS_DEV_UNIT:?}"
+
+# A nested niri whose window the live session hides (a lock screen, an output off) draws about once a second, which turns every timing below into noise.
+until_ok 5000 shell_status >/dev/null
+grim_ms() { local t0; t0=$(now_ms); grim -s 0.1 -t ppm - >/dev/null 2>&1; echo $(($(now_ms) - t0)); }
+grim_ms >/dev/null
+if (($(grim_ms) > 500 && $(grim_ms) > 500)); then
+  echo "FAIL the nested output draws about once a second: is the live session locked, or its output off?"
+  exit 2
+fi
