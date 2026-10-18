@@ -3,7 +3,9 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Pam
 import QtQuick
+import "." as Root
 import "services" as Services
+import "lib/lock-look.mjs" as L
 
 // The session lock: a WlSessionLock cannot live in the Overlay host, so it is the one surface outside it.
 Scope {
@@ -23,8 +25,11 @@ Scope {
     signal cleared
 
     // A shell restarted while locked may start before the theme loads, and the lock must draw anyway.
-    readonly property var c: theme.tokens ? theme.color : ({ paper: "black", ink: "white", muted: "gray", accent: "white" })
+    readonly property var c: theme.tokens ? theme.color : L.FALLBACK
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({ display: "", ui: "" })
+    readonly property var look: L.lockLook(theme.tokens, Quickshell.env("USER") || "")
+    // The clock a lock surface drew last, so state() reports what is on screen rather than the lookup.
+    property Item clockItem: null
     readonly property string marker: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/locked"
 
     // The marker goes down before the lock does, so a shell killed at any point after this relocks on restart.
@@ -73,12 +78,20 @@ Scope {
         }
 
         function state(): string {
+            const t = screenLock.clockItem;
+            const p = t ? t.mapToItem(null, 0, 0) : null;
             return JSON.stringify({
                 locked: session.locked,
                 secure: session.secure,
                 field: screenLock.field,
                 failures: screenLock.failures,
-                shaking: shake.running
+                shaking: shake.running,
+                look: screenLock.look.kind,
+                clockFamily: t ? t.font.family : "",
+                clockPx: t ? t.font.pixelSize : 0,
+                clockFill: t ? String(t.color) : "",
+                clockStroke: t && t.style === Text.Outline ? String(t.styleColor) : "transparent",
+                clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null
             });
         }
     }
@@ -122,6 +135,13 @@ Scope {
         NumberAnimation { target: screenLock; property: "shakeX"; to: 0; duration: 60 }
     }
 
+    // Blueprint's sheet caption names the machine, like a drawing's title block.
+    FileView {
+        id: hostFile
+        path: "/etc/hostname"
+        printErrors: false
+    }
+
     WlSessionLock {
         id: session
 
@@ -129,80 +149,257 @@ Scope {
             id: surface
             color: screenLock.c.paper
 
+            readonly property var look: screenLock.look
+            readonly property string kind: look.kind
+            readonly property string date: {
+                const d = Qt.formatDate(clock.now, look.date.format);
+                return look.date.caps ? d.toUpperCase() : d;
+            }
+
             Services.Clock {
                 id: clock
             }
 
+            Text {
+                textFormat: Text.PlainText
+                x: 32
+                y: 16
+                text: surface.look.status.text
+                color: surface.look.status.color
+                font.family: screenLock.fonts.ui
+                font.pixelSize: surface.kind === "card" ? 12 : 11
+                font.weight: surface.kind === "card" ? Font.DemiBold : Font.Normal
+                font.letterSpacing: surface.kind === "card" ? 0 : 1.32
+            }
+
+            // Paper's running head: a ruled line under the status row.
+            Rectangle {
+                visible: surface.kind === "print"
+                x: 32
+                y: 40
+                width: surface.width - 64
+                height: 1
+                color: screenLock.c.ink
+            }
+
+            // Blueprint's crop marks: a 14 px L in the accent, 8 px in from each corner.
+            Repeater {
+                model: surface.kind === "sheet" ? 4 : 0
+
+                Item {
+                    required property int index
+                    readonly property bool atRight: index % 2 === 1
+                    readonly property bool atBottom: index >= 2
+                    x: atRight ? surface.width - 22 : 8
+                    y: atBottom ? surface.height - 22 : 8
+                    width: 14
+                    height: 14
+
+                    Rectangle {
+                        x: parent.atRight ? 13 : 0
+                        width: 1
+                        height: 14
+                        color: screenLock.c.accent
+                    }
+
+                    Rectangle {
+                        y: parent.atBottom ? 13 : 0
+                        width: 14
+                        height: 1
+                        color: screenLock.c.accent
+                    }
+                }
+            }
+
+            // Artboard's selected card: handles, outline and soft shadow come from Surface, the date is its frame label.
+            Root.Surface {
+                id: card
+                visible: surface.kind === "card"
+                x: Math.round((surface.width - width) / 2)
+                y: Math.round(surface.height * 0.3)
+                width: 460
+                height: 36 + face.height + 22 + entry.height + 32
+                tokens: screenLock.theme.tokens
+                label: surface.date
+            }
+
             Column {
+                id: face
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: Math.round(surface.height * 0.2)
-                spacing: 4
+                y: surface.kind === "card" ? card.y + 36 : Math.round(surface.height * (surface.kind === "sheet" ? 0.22 : 0.167))
+                spacing: surface.kind === "sheet" ? 18 : 4
 
                 Text {
+                    visible: surface.kind === "sheet"
+                    textFormat: Text.PlainText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "SHEET 01 OF 01 · " + hostFile.text().trim().toUpperCase()
+                    color: screenLock.c.muted
+                    font.family: screenLock.fonts.ui
+                    font.pixelSize: 11
+                    font.letterSpacing: 3.3
+                }
+
+                Text {
+                    id: clockText
                     objectName: "lockClock"
                     textFormat: Text.PlainText
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: Qt.formatTime(clock.now, "HH:mm")
-                    color: screenLock.c.ink
-                    font.family: screenLock.fonts.display
-                    font.pixelSize: Math.round(Math.min(220, surface.height / 4))
+                    color: surface.look.clock.fill
+                    // An outline with a transparent fill draws the digits hollow.
+                    style: surface.look.clock.stroke === "transparent" ? Text.Normal : Text.Outline
+                    styleColor: surface.look.clock.stroke
+                    font.family: surface.look.clock.family
+                    font.pixelSize: surface.look.clock.px
+                    font.bold: surface.look.clock.bold
+                    font.letterSpacing: surface.look.clock.tracking
+                    Component.onCompleted: screenLock.clockItem = clockText
                 }
 
                 Text {
+                    visible: surface.kind === "print"
                     textFormat: Text.PlainText
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: Qt.formatDate(clock.now, "dddd, d MMMM")
-                    color: screenLock.c.muted
-                    font.family: screenLock.fonts.display
-                    font.italic: true
-                    font.pixelSize: 30
+                    text: surface.date
+                    color: surface.look.date.color
+                    font.family: surface.look.date.family
+                    font.italic: surface.look.date.italic
+                    font.pixelSize: surface.look.date.px
+                }
+
+                // Blueprint's dimension line: end ticks, a rule each side and the date in the middle.
+                Row {
+                    visible: surface.kind === "sheet"
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 640
+                    spacing: 12
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 1
+                        height: 12
+                        color: screenLock.c.accent
+                    }
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (640 - 2 - 4 * 12 - dimDate.width) / 2
+                        height: 1
+                        color: screenLock.c.accent
+                    }
+
+                    Text {
+                        id: dimDate
+                        textFormat: Text.PlainText
+                        text: surface.date
+                        color: surface.look.date.color
+                        font.family: surface.look.date.family
+                        font.pixelSize: surface.look.date.px
+                        font.letterSpacing: surface.look.date.tracking
+                    }
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (640 - 2 - 4 * 12 - dimDate.width) / 2
+                        height: 1
+                        color: screenLock.c.accent
+                    }
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 1
+                        height: 12
+                        color: screenLock.c.accent
+                    }
                 }
             }
 
             Column {
+                id: entry
+                readonly property bool centred: surface.kind !== "print"
                 x: Math.round((surface.width - width) / 2) + screenLock.shakeX
-                y: Math.round(surface.height * 0.68)
-                width: 400
-                spacing: 10
+                y: surface.kind === "card" ? face.y + face.height + 22 : Math.round(surface.height * (surface.kind === "sheet" ? 0.71 : 0.69))
+                width: surface.kind === "card" ? 380 : 400
+                spacing: surface.kind === "sheet" ? 12 : 10
 
                 Text {
+                    visible: surface.look.prompt !== ""
                     textFormat: Text.PlainText
-                    text: "PASSWORD FOR " + (Quickshell.env("USER") || "").toUpperCase()
+                    width: parent.width
+                    horizontalAlignment: entry.centred ? Text.AlignHCenter : Text.AlignLeft
+                    text: surface.look.prompt
                     color: screenLock.c.muted
                     font.family: screenLock.fonts.ui
                     font.pixelSize: 10
-                    font.letterSpacing: 1.6
+                    font.letterSpacing: surface.kind === "sheet" ? 2 : 1.6
                 }
 
-                TextInput {
-                    id: input
+                Item {
                     width: parent.width
-                    color: screenLock.c.ink
-                    font.family: screenLock.fonts.ui
-                    font.pixelSize: 20
-                    font.letterSpacing: 7
-                    echoMode: TextInput.Password
-                    inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-                    cursorDelegate: Rectangle {
-                        width: 2
-                        color: screenLock.c.accent
-                    }
-                    focus: true
-                    clip: true
-                    onTextChanged: screenLock.field = text.length
-                    Keys.onReturnPressed: screenLock.submit(text)
-                    Keys.onEnterPressed: screenLock.submit(text)
-                    Component.onCompleted: forceActiveFocus()
+                    height: surface.kind === "card" ? 46 : input.implicitHeight
 
-                    Connections {
-                        target: screenLock
-                        function onCleared() {
-                            input.text = "";
+                    // Artboard's field: a tinted rounded well with a 2 px accent ring.
+                    Rectangle {
+                        visible: surface.kind === "card"
+                        anchors.fill: parent
+                        radius: 12
+                        color: Qt.tint(screenLock.c.surface ?? "white", Qt.alpha(screenLock.c.ink, 0.05))
+                        border.width: 2
+                        border.color: screenLock.c.accent
+                    }
+
+                    // Blueprint brackets the field.
+                    Repeater {
+                        model: surface.kind === "sheet" ? ["[", "]"] : []
+
+                        Text {
+                            required property string modelData
+                            required property int index
+                            textFormat: Text.PlainText
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: index === 0 ? 50 : parent.width - 50 - width
+                            text: modelData
+                            color: screenLock.c.accent
+                            font.family: screenLock.fonts.ui
+                            font.pixelSize: 20
+                        }
+                    }
+
+                    TextInput {
+                        id: input
+                        anchors.centerIn: parent
+                        width: surface.kind === "sheet" ? 240 : surface.kind === "card" ? parent.width - 32 : parent.width
+                        horizontalAlignment: entry.centred ? TextInput.AlignHCenter : TextInput.AlignLeft
+                        color: surface.kind === "sheet" ? screenLock.c.accent : screenLock.c.ink
+                        font.family: screenLock.fonts.ui
+                        font.pixelSize: surface.kind === "card" ? 16 : 20
+                        font.letterSpacing: surface.kind === "card" ? 4.8 : 7
+                        echoMode: TextInput.Password
+                        inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
+                        // Blueprint's cursor is a block, the others a 2 px bar.
+                        cursorDelegate: Rectangle {
+                            width: surface.kind === "sheet" ? 11 : 2
+                            color: screenLock.c.accent
+                        }
+                        focus: true
+                        clip: true
+                        onTextChanged: screenLock.field = text.length
+                        Keys.onReturnPressed: screenLock.submit(text)
+                        Keys.onEnterPressed: screenLock.submit(text)
+                        Component.onCompleted: forceActiveFocus()
+
+                        Connections {
+                            target: screenLock
+                            function onCleared() {
+                                input.text = "";
+                            }
                         }
                     }
                 }
 
                 Rectangle {
+                    visible: surface.kind === "print"
                     width: parent.width
                     height: 1.5
                     color: screenLock.c.ink
@@ -210,11 +407,14 @@ Scope {
 
                 Text {
                     textFormat: Text.PlainText
-                    text: "press return to unlock"
+                    width: parent.width
+                    horizontalAlignment: entry.centred ? Text.AlignHCenter : Text.AlignLeft
+                    text: surface.look.hint
                     color: screenLock.c.muted
-                    font.family: screenLock.fonts.display
-                    font.italic: true
-                    font.pixelSize: 16
+                    font.family: surface.kind === "print" ? screenLock.fonts.display : screenLock.fonts.ui
+                    font.italic: surface.kind === "print"
+                    font.pixelSize: surface.kind === "print" ? 16 : surface.kind === "card" ? 12 : 10
+                    font.letterSpacing: surface.kind === "sheet" ? 1.6 : 0
                 }
             }
         }
