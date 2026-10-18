@@ -1,16 +1,4 @@
-// dots-dshift: double-Shift watcher, because niri binds are key chords only.
-//
-//   dots-dshift [-i <id>] [event-file...]
-//
-// Two clean Shift taps within TAP_WINDOW_MS run `qs ipc [-i <id>] call notes
-// capture`. A clean tap is a Shift pressed and released with no other key in
-// between; any other key, a mouse button or a wheel event resets, autorepeat
-// is ignored and both Shifts count. It reads evdev read-only and never grabs,
-// so every key still reaches the compositor. Needs the `input` group to read
-// /dev/input. Virtual keyboards (wtype) are invisible to it.
-//
-// With event files it reads each as a stream of struct input_event instead of
-// /dev/input, waits for the commands it started and exits 0 at the end.
+// dots-dshift [-i <id>] [event-file...]: two clean Shift taps run qs ipc call notes capture; it reads evdev without grabbing, and files stand in for /dev/input.
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -63,8 +51,7 @@ static void scan_devices(void) {
         int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
         if (fd < 0)
             continue;
-        // Pointer devices too: without the mouse open, a shift+click chord
-        // spans two devices and a double shift-click reads as two clean taps.
+        // Pointer devices too: without the mouse open, a double shift-click reads as two clean taps.
         if (!has_key(fd, KEY_LEFTSHIFT) && !has_key(fd, BTN_LEFT)) {
             close(fd);
             continue;
