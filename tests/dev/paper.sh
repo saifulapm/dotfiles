@@ -12,8 +12,8 @@ status=$(shell_status)
 echo "     status: $status"
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
 check "the shell process has the nested bus" grep -qzxF "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" "/proc/$pid/environ"
-status_is_m1() { jq -e '.theme == "paper" and (.outputs | length) == 1 and .timers == 0' <<<"$status" >/dev/null; }
-check "status names theme paper, one output, no timers" status_is_m1
+status_is_m1() { jq -e '.theme == "paper" and (.outputs | length) == 1 and .timers == 1' <<<"$status" >/dev/null; }
+check "status names theme paper, one output, only the clock tick" status_is_m1
 
 paper_layer() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-paper" and .layer == "Background")' >/dev/null; }
 until_ok 3000 paper_layer
