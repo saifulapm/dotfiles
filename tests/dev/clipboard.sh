@@ -43,7 +43,26 @@ sleep 0.5
 wtype -k Return
 typed_ok() { [ "$(cat "$typed" 2>/dev/null)" = first ]; }
 until_ok 3000 typed_ok
-check "Enter types first into the foot it came from" typed_ok
+check "Enter pastes first into the foot it came from" typed_ok
+
+# A paste, not typed keys: a 200 KB line is past any argv, and a newline is never pressed as Return.
+long=$(mktemp -u)
+cleanup_long() { rm -f "$long"; }
+# Without -icanon the tty would cut each pasted line at 4095 bytes.
+niri msg action spawn -- foot -e sh -c "stty -icanon; head -c 200000 | wc -c > $long"
+long_focused() { niri msg -j focused-window | jq -e '.app_id == "foot"' >/dev/null; }
+sleep 0.5
+until_ok 5000 long_focused
+yes aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | head -c 200000 | wl-copy
+until_ok 3000 bash -c "cliphist -db-path '$XDG_STATE_HOME/dots/clips.db' list | head -1 | grep -q '^[0-9]*\taaaa'"
+mod_v
+until_ok 3000 state_is '.open and .mode == "clipboard" and .selected == 0'
+wtype -k Return
+until_ok 2000 state_is '.open == false'
+long_ok() { [ "$(cat "$long" 2>/dev/null)" = 200000 ]; }
+until_ok 5000 long_ok
+check "Enter pastes a 200 KB clip whole into foot ($(cat "$long" 2>/dev/null || echo none) bytes)" long_ok
+cleanup_long
 
 wl-copy --sensitive secret
 wl-copy after
@@ -56,6 +75,14 @@ check "a clip of 10 MB and 1 byte is not stored" test "$(count)" = "$n"
 
 printf old | store
 check "the store script keeps a plain clip" listed old
+
+# wl-paste marks a password manager's clip sensitive and its later wipe clear; neither may store, delete or leave a temp file.
+n=$(count)
+printf hunter2 | CLIPBOARD_STATE=sensitive store
+check "a sensitive clip given to the store script is not stored" bash -c "[ $(count) = $n ] && ! cliphist -db-path '$XDG_STATE_HOME/dots/clips.db' list | grep -q hunter2"
+printf '' | CLIPBOARD_STATE=clear store
+check "a clear keeps the newest real clip" listed old
+check "and the count" test "$(count)" = "$n"
 old=$(clip list | awk -F'\t' '$2 == "old" { print $1 }')
 sed -i "s/^$old .*/$old $(($(date +%s) - 31 * 86400))/" "$XDG_STATE_HOME/dots/clip-times"
 # The prune runs at most once an hour, so the check drops its marker to run it now.

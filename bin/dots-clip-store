@@ -8,6 +8,13 @@ max=10000000
 clip() { cliphist -db-path "$db" "$@"; }
 newest() { [ ! -e "$db" ] || clip list | awk -F'\t' 'NR == 1 { print $1 }'; }
 
+# A password manager's clip (sensitive) never touches disk, and its wipe (clear) must not make cliphist delete the clip before it.
+case ${CLIPBOARD_STATE:-} in sensitive | clear)
+  cat >/dev/null
+  exit 0
+  ;;
+esac
+
 mkdir -p "$dir"
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
