@@ -63,3 +63,8 @@ why = "the Notes window reads the primary selection and copies out with wl-paste
 name = "cliphist"
 arch = "all"
 why = "keeps the clipboard history the launcher lists with v or Mod+V"
+
+[[package]]
+name = "wtype"
+arch = "all"
+why = "the launcher types a clip or an emoji into the window you came from"

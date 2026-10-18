@@ -71,7 +71,11 @@ check "dots-dshift.service links to the repo unit (got '$unit')" \
 check "dots-dshift.service runs %h/.local/bin/dots-dshift" \
   podman exec "$name" grep -qx 'ExecStart=%h/.local/bin/dots-dshift' "$home/.config/systemd/user/dots-dshift.service"
 
-check "gcc and wl-clipboard are installed" podman exec "$name" rpm -q gcc wl-clipboard
+clip=$(podman exec "$name" readlink -f "$home/.local/bin/dots-clip-store")
+check "\$HOME/.local/bin/dots-clip-store links to the repo script (got '$clip')" \
+  test "$clip" = "$home/Sites/github/dotfiles/bin/dots-clip-store"
+
+check "gcc, wl-clipboard, cliphist and wtype are installed" podman exec "$name" rpm -q gcc wl-clipboard cliphist wtype
 
 calls=$(podman exec "$name" cat "$log")
 total=$(grep -c . <<<"$calls")
