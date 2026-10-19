@@ -1,7 +1,7 @@
 // ~/.ssh travels as v1's age blob under qshell-sync/ssh, with a three-way rule that stops when both sides changed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { identity, machine, sync, world } from './lib.mjs';
 
@@ -78,4 +78,15 @@ test('with ~/.ssh changed on both sides, b stops with exit 3 and changes neither
   assert.equal(readFileSync(join(sshDir(b), 'known_hosts'), 'utf8'), 'hosts seen by b\n');
   await ok(b);
   assert.equal(status(b).ssh.ok, true);
+});
+
+test('DOTS_AGE_IDENTITY names the key, so a missing one skips the ssh unit even when key.txt exists', async () => {
+  const w = world();
+  const a = machine(w, 'a');
+  await identity(a);
+  put(a, 'id_ed25519', KEY);
+  a.env.DOTS_AGE_IDENTITY = join(a.env.HOME, 'no-such-key');
+  await ok(a, ['--only', 'ssh']);
+  assert.equal(existsSync(join(w.remote, 'qshell-sync/ssh/ssh.age')), false);
+  assert.equal(status(a).ssh.ok, true);
 });

@@ -23,6 +23,8 @@ rc() {
   if out=$(timeout 120 rclone --contimeout 10s --timeout 30s "$@" 2>&1); then return 0; else code=$?; fi
   err=$(tail -n 1 <<<"$out")
   err=${err#[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] }
+  # rclone wraps the cause as "NOTICE: Failed to lsf with 2 errors: last error was: <cause>"; Route has room for the cause only.
+  err=${err##*last error was: }
   [[ -n $err ]] || err="rclone $1 exited $code"
   return 1
 }
@@ -149,7 +151,8 @@ ssh_pull() {
 
 # Three hashes decide: this disk's, the remote meta's, and the base both last agreed on; when both moved it stops for a human.
 sync_ssh() {
-  local identity=${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/key.txt recipient here_hash remote_hash='' remote_machine='' base=''
+  # just dev points DOTS_AGE_IDENTITY at a missing file, so a nested session never reads the real key or ~/.ssh.
+  local identity=${DOTS_AGE_IDENTITY:-${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/key.txt} recipient here_hash remote_hash='' remote_machine='' base=''
   # A machine not yet given the age key cannot take part, and that is not a failure.
   if [[ ! -f $identity ]]; then
     echo "dots sync: ssh skipped, no age identity at $identity"
@@ -256,9 +259,9 @@ main() {
     exit 0
   fi
 
-  local lockdir=${XDG_RUNTIME_DIR:-$state}
-  mkdir -p "$state" "$lockdir"
-  exec 9>"$lockdir/dots-sync.lock"
+  # The lock sits beside the state it guards, so a just dev session and the live timer never meet on it.
+  mkdir -p "$state"
+  exec 9>"$state/dots-sync.lock"
   if ! flock -n 9; then
     echo "already running"
     exit 0
