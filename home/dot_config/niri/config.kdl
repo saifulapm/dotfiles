@@ -15,3 +15,7 @@ spawn-at-startup "systemctl" "--user" "start" "mail-sync.timer"
 switch-events {
     lid-close { spawn "qs" "ipc" "call" "lock" "lock"; }
 }
+
+hotkey-overlay {
+    skip-at-startup
+}

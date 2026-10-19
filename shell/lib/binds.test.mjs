@@ -53,3 +53,8 @@ test('Print opens niri screenshot UI and center-column moves to Mod+Shift+C', ()
   assert.match(binds, /^\s*Print hotkey-overlay-title="[^"]+" \{ screenshot; \}$/m);
   assert.match(binds, /^\s*Mod\+Shift\+C hotkey-overlay-title="[^"]+" \{ center-column; \}$/m);
 });
+
+test('niri shows no hotkey overlay at login, so the artboard is the first thing on screen', () => {
+  const config = readFileSync(new URL('../../home/dot_config/niri/config.kdl', import.meta.url), 'utf8');
+  assert.match(config, /^hotkey-overlay \{\n\s+skip-at-startup\n\}$/m);
+});
