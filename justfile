@@ -29,6 +29,10 @@ test-dev:
 bench:
     bin/dots-bench
 
+# 30 minutes of simulated use in a nested session; fails when the shell's RSS drifts over 5 MiB
+soak:
+    bin/dots-soak
+
 # dots install twice in a fresh fedora:44 container
 test-install:
     tests/install/run.sh

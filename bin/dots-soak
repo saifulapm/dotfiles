@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# A nested session soaks for DOTS_SOAK_MIN minutes; the shell's RSS must not drift more than 5 MiB after minute 5.
+{
+minutes=${DOTS_SOAK_MIN:-30}
+step_s=${DOTS_SOAK_STEP_S:-60}
+((minutes >= 6)) || { echo "soak: DOTS_SOAK_MIN must be at least 6, since drift is measured from minute 5" >&2; exit 2; }
+
+# Read before lib.sh moves XDG_STATE_HOME to the temp dir.
+live_theme_file=${XDG_STATE_HOME:-$HOME/.local/state}/dots/theme
+live_pid=$(systemctl --user show -p MainPID --value dots-shell.service)
+live_theme=$(<"$live_theme_file") || exit 2
+[[ $live_pid =~ ^[1-9][0-9]*$ && -n $live_theme ]] || { echo "soak: cannot read the live shell's PID and theme, so it cannot be guarded" >&2; exit 2; }
+
+source "$(dirname "$0")/../tests/dev/lib.sh"
+
+csv=${DOTS_SOAK_CSV:-$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/dots-soak.XXXXXX.csv")}
+
+die() {
+  echo "soak: $*" >&2
+  exit 1
+}
+
+# True when the live session changed during the soak.
+live_moved() {
+  [[ $(systemctl --user show -p MainPID --value dots-shell.service) != "$live_pid" || $(<"$live_theme_file") != "$live_theme" ]]
+}
+cleanup() { live_moved && echo "FAIL soak touched the live session: its shell PID or theme changed" >&2; return 0; }
+
+layer_up() { niri msg -j layers | jq -e --arg ns "$1" 'any(.[]; .namespace == $ns)' >/dev/null; }
+launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
+launcher_closed() { launcher_state | jq -e ".open == false" >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "None")' >/dev/null; }
+status_has() { shell_status | jq -e "$1" >/dev/null; }
+
+# Nothing asks qs before niri lists the paper, since early ipc calls hold a start back 1 to 2 s.
+until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
+until_ok 3000 status_has '(.rssKiB | type) == "number"' || die "status never reported rssKiB"
+sleep 5
+
+sample() { echo "$1,$(shell_status | jq -r .rssKiB)" >>"$csv"; }
+echo "minute,rss_kib" >"$csv"
+sample 0
+echo "soak: csv $csv" >&2
+
+mapfile -t names < <(timeout 0.5 qs ipc call themes state | jq -r '.themes[]')
+theme=$(shell_status | jq -r .theme)
+for ((m = 1; m <= minutes; m++)); do
+  notify-send soak "minute $m" || die "notify-send failed"
+  qs ipc call launcher open >/dev/null || die "launcher open failed"
+  until_ok 3000 layer_up dots-surfaces || die "dots-surfaces never mapped"
+  qs ipc call launcher close >/dev/null
+  until_ok 3000 launcher_closed || die "the launcher never gave the keyboard back"
+  if ((m % 5 == 0)); then
+    for i in "${!names[@]}"; do [[ ${names[i]} == "$theme" ]] && break; done
+    theme=${names[(i + 1) % ${#names[@]}]}
+    "$(dirname "$0")/dots" theme "$theme" >/dev/null || die "dots theme $theme failed"
+    until_ok 3000 status_has ".theme == \"$theme\"" || die "the shell never reported $theme"
+  fi
+  sleep "$step_s"
+  sample "$m"
+done
+
+live_moved && die "the live session changed during the soak"
+node "$(dirname "$0")/../shell/lib/soak.mjs" "$csv"
+exit
+}
