@@ -10,6 +10,8 @@ PanelWindow {
     required property var theme
     required property var themeList
     required property var notifs
+    // The Desk's goals service, null until the Desk loads.
+    required property var goals
     readonly property var launcher: launcherLoader.item
     readonly property var themes: themesLoader.item
     readonly property var notifications: notifsLoader.item
@@ -17,8 +19,9 @@ PanelWindow {
     readonly property var control: controlLoader.item
     readonly property var recorder: recorderLoader.item
     readonly property var polkit: polkitLoader.item
+    readonly property var goalsView: goalsLoader.item
     // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
-    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit]
+    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView]
     readonly property bool shown: all.some(s => s?.shown ?? false)
 
     // Only one surface shows at a time.
@@ -58,6 +61,12 @@ PanelWindow {
         controlLoader.active = true;
         closeOthers(control);
         control.open(t0);
+    }
+
+    function openGoals(t0) {
+        goalsLoader.active = true;
+        closeOthers(goalsView);
+        goalsView.open(t0);
     }
 
     function toggleRecorder() {
@@ -163,6 +172,16 @@ PanelWindow {
         active: false
         sourceComponent: Root.PolkitPrompt {
             theme: host.theme
+        }
+    }
+
+    Loader {
+        id: goalsLoader
+        anchors.fill: parent
+        active: false
+        sourceComponent: Root.Goals {
+            theme: host.theme
+            goals: host.goals
         }
     }
 }

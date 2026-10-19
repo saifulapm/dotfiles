@@ -89,6 +89,10 @@ qs ipc call control open >/dev/null || die "control open failed"
 until_ok 3000 host_focus Exclusive || die "Control never took the keyboard"
 qs ipc call control close >/dev/null
 until_ok 3000 host_focus None || die "Control never gave the keyboard back"
+qs ipc call goals open >/dev/null || die "goals open failed"
+until_ok 3000 host_focus Exclusive || die "Goals never took the keyboard"
+qs ipc call goals close >/dev/null
+until_ok 3000 host_focus None || die "Goals never gave the keyboard back"
 # The picker opens and closes on one toggle each; nothing records.
 qs ipc call record toggle >/dev/null || die "record toggle failed"
 until_ok 3000 host_focus Exclusive || die "the region picker never took the keyboard"

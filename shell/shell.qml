@@ -75,6 +75,7 @@ ShellRoot {
 
     // Everything else but the paper loads after its first frame, so the services and the island never hold that frame back.
     LazyLoader {
+        id: deskLoader
         active: root.firstFrameMs !== null
 
         Root.Desk {
@@ -177,6 +178,37 @@ ShellRoot {
             theme: themeService
             themeList: root.themeList
             notifs: notifsService
+            goals: deskLoader.item ? deskLoader.item.goals : null
+        }
+    }
+
+    IpcHandler {
+        target: "goals"
+
+        // The store lives in the Desk, so Goals opens only once the Desk has loaded.
+        function open(): void {
+            const t0 = Date.now();
+            if (!deskLoader.item)
+                return;
+            surfacesLoader.active = true;
+            surfacesLoader.item.openGoals(t0);
+        }
+
+        function close(): void {
+            surfacesLoader.item?.goalsView?.close();
+        }
+
+        function toggle(): void {
+            if (surfacesLoader.item?.goalsView?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (surfacesLoader.item?.goalsView)
+                return surfacesLoader.item.goalsView.state();
+            return JSON.stringify({ open: false, selected: 0, rows: [], active: [], done: [], count: 0, hint: "", prompt: null, confirm: false, openMs: null, opens: 0 });
         }
     }
 
