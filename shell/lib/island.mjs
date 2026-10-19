@@ -69,11 +69,11 @@ export const isCompact = (mode) => ['rest', 'playing', 'recording', 'toast'].inc
 const STEPS = 60;
 const sampled = (at) => Array.from({ length: STEPS + 1 }, (_, i) => (i === 0 ? 0 : i === STEPS ? 1 : Math.round(at(i / STEPS) * 10000) / 10000));
 
-// A unit-mass spring, as the approved prototype ran it; it ends within 0.2% of rest.
-export function springCurve(stiffness, damping) {
+// A unit-mass spring, as the approved prototype ran it; it ends within 1/within of rest, 0.2% unless told.
+export function springCurve(stiffness, damping, within = 500) {
   const w0 = Math.sqrt(stiffness);
   const z = damping;
-  const secs = z < 1 ? Math.log((1 + z / Math.sqrt(1 - z * z)) * 500) / (z * w0) : 8.5 / w0;
+  const secs = z < 1 ? Math.log((1 + z / Math.sqrt(1 - z * z)) * within) / (z * w0) : 8.5 / w0;
   const at = (t) => {
     if (z >= 1) return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
     const wd = w0 * Math.sqrt(1 - z * z);
@@ -107,7 +107,7 @@ export function ease(points, t) {
 
 const LINEAR = sampled((x) => x);
 // niri's curves for the same tokens, so the island moves as the windows do.
-const EASED = {
+export const EASED = {
   snappy: { ms: 120, points: bezier(0.16, 1, 0.3, 1), swap: 'drop' },
   ease: { ms: 200, points: bezier(0.33, 1, 0.68, 1), swap: 'drop' },
   typewriter: { ms: 90, points: LINEAR, swap: 'scan' },

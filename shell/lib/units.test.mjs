@@ -62,3 +62,10 @@ test('niri starts the sync timer and both path units at login', () => {
     assert.match(niri, new RegExp(`^spawn-at-startup "systemctl" "--user" "start" "${u.replace('.', '\\.')}"$`, 'm'));
   }
 });
+
+// The motion slowdown is for nested checks only, so the live shell always moves at its theme's speed.
+test('only the dev unit carries the motion slowdown', () => {
+  assert.doesNotMatch(unit, /DOTS_MOTION_SLOWDOWN/);
+  assert.match(dev, /-E DOTS_MOTION_SLOWDOWN\b/);
+  assert.match(readFileSync(root + 'bin/dots-dev', 'utf8'), /^export DOTS_MOTION_SLOWDOWN=\$\{DOTS_MOTION_SLOWDOWN:-1\}$/m);
+});

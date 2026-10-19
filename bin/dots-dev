@@ -19,6 +19,8 @@ export TMUX_TMPDIR=$D/tmux DCONF_PROFILE=$D/dconf-profile DOTS_CHROMIUM_POLICY_D
 export DOTS_MACHINE=dev
 # Nor the live hub's questions or the live PipeWire.
 export DOTS_HUB_QUESTIONS=$D/hub-questions.json PIPEWIRE_RUNTIME_DIR=$D/pw
+# Surface motion runs this many times slower; only the motion checks pass more than 1, and the live unit never sets it.
+export DOTS_MOTION_SLOWDOWN=${DOTS_MOTION_SLOWDOWN:-1}
 # Recordings land in the temp dir, never in ~/Videos.
 export DOTS_RECORDINGS_DIR=$D/recordings
 # dots sync goes to an alias Dropbox: inside the temp dir, never the live rclone config's.
