@@ -1,0 +1,10 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "nerd-symbols") }}
+archive=$(pin_fetch)
+dir=$HOME/.local/share/fonts/nerd-symbols
+rm -rf "$dir"
+mkdir -p "$dir"
+tar -xJf "$archive" -C "$dir" --wildcards '*.ttf'
+fc-cache "$dir"
+pin_done

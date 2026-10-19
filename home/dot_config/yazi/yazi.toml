@@ -1,0 +1,37 @@
+[mgr]
+show_hidden = false
+sort_by = "mtime"
+ratio = [2, 3, 3]
+linemode = "size_and_mtime"
+
+[preview]
+wrap = "no"
+max_width = 2000
+max_height = 2000
+
+[opener]
+edit = [
+	{ run = '$EDITOR %s', block = true, for = "unix" },
+]
+open = [
+	{ run = 'xdg-open %s1', desc = "Open (default app)" },
+]
+browser = [
+	{ run = 'chromium-browser %s', orphan = true, desc = "Open in Chromium", for = "unix" },
+]
+extract = [
+	{ run = "ya pub extract --list %s", desc = "Extract here" },
+]
+
+[open]
+prepend_rules = [
+	{ mime = "trash/**", use = [ "open", "trash" ] },
+	{ mime = "text/*", use = [ "edit", "open", "reveal" ] },
+	{ mime = "image/*", use = [ "open", "browser", "reveal" ] },
+	{ mime = "application/pdf", use = [ "open", "browser", "reveal" ] },
+	{ url = "*.{json,js,ts,md,yaml,yml,toml,lua}", use = "edit" },
+	{ url = "*.html", use = [ "open", "edit" ] },
+]
+append_rules = [
+	{ url = "*", use = [ "open", "edit", "reveal" ] },
+]

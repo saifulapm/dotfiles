@@ -10,3 +10,19 @@ url.aarch64 = "https://github.com/sxyazi/yazi/releases/download/v{version}/yazi-
 url.x86_64 = "https://github.com/sxyazi/yazi/releases/download/v{version}/yazi-x86_64-unknown-linux-gnu.zip"
 sha256.aarch64 = "02807f08d6b589b65b7516a4e259d83f5995d7a23bb12b3a155141385b370b3a"
 sha256.x86_64 = "a02fe91d3304294048c681f010f1100856872a4e98ecf6927328e888d40a6ad2"
+
+[[pin]]
+name = "maple-mono"
+version = "7.9"
+repo = "subframe7536/maple-font"
+install = "~/.local/share/fonts/maple-mono, the themes' mono face"
+url = "https://github.com/subframe7536/maple-font/releases/download/v{version}/MapleMono-TTF.zip"
+sha256 = "3a35f8f0669bef3dded9df208cc4526a6f7573210e134816e9084a8981271d75"
+
+[[pin]]
+name = "nerd-symbols"
+version = "3.5.0"
+repo = "ryanoasis/nerd-fonts"
+install = "~/.local/share/fonts/nerd-symbols, foot's icon fallback"
+url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v{version}/NerdFontsSymbolsOnly.tar.xz"
+sha256 = "b7ef2283462b435f1fe91d729dc412d5dbe34269dd2c7f4e1d803e4105c8d883"

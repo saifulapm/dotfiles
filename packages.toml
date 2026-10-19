@@ -93,3 +93,18 @@ why = "fetches the versions.toml pins"
 name = "unzip"
 arch = "all"
 why = "unpacks the pins that ship as zip files"
+
+[[package]]
+name = "tmux"
+arch = "all"
+why = "the terminal multiplexer, themed from theme-out/tmux.conf"
+
+[[package]]
+name = "fontconfig"
+arch = "all"
+why = "fc-cache indexes the pinned fonts"
+
+[[package]]
+name = "xz"
+arch = "all"
+why = "unpacks the nerd-symbols font pin"
