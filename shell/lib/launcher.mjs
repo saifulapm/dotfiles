@@ -24,9 +24,6 @@ export function rank(entries, query) {
 
 const PREFIXES = { 'w ': 'windows', 'v ': 'clipboard', ': ': 'emoji', '= ': 'calculator', '> ': 'commands' };
 
-// The apps footer: each prefix with its mode, as the designs end the card, then the moving keys.
-export const LEGEND = [['w', 'windows'], ['v', 'clipboard'], [':', 'emoji'], ['=', 'calc'], ['>', 'commands'], ['j/k', 'move'], ['↵', 'open'], ['esc', 'close']];
-
 export function parseQuery(text) {
   const mode = PREFIXES[text.slice(0, 2)];
   return mode ? { mode, q: text.slice(2) } : { mode: 'apps', q: text };

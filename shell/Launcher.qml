@@ -2,11 +2,12 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Effects
 import "." as Root
 import "lib/launcher.mjs" as Lib
 import "lib/clips.mjs" as Clips
 import "lib/emoji.mjs" as Emoji
-import "lib/notes-look.mjs" as K
+import "lib/launcher-look.mjs" as L
 
 // Apps, windows, clipboard, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
 Item {
@@ -62,9 +63,7 @@ Item {
         return [];
     }
     readonly property var rows: found.slice(0, 8)
-    // In apps mode the footer names every prefix; inside a mode it keeps to the moving keys.
-    readonly property string legend: theme.tokens ? K.keyLine(theme.tokens, mode === "apps" ? Lib.LEGEND : Lib.LEGEND.slice(5)) : ""
-    readonly property var chipNames: ({ apps: "APPS", windows: "WINDOWS", clipboard: "CLIPBOARD", emoji: "EMOJI", calculator: "CALC", commands: "COMMANDS" })
+    readonly property var look: L.launcherLook(theme.tokens)
 
     // mode is clipboard or emoji when a key opened the launcher straight into one.
     function open(t0, mode) {
@@ -116,7 +115,14 @@ Item {
             Quickshell.execDetached(["wl-copy", "--", row.copy]);
     }
 
+    // The rows of the footer: one unless its prefixes wrap.
+    function legendLines() {
+        return Math.max(1, new Set(footer.children.filter(k => k.visible && k.width > 0).map(k => k.y)).size);
+    }
+
     function state() {
+        const cur = rowRepeater.itemAt(selected);
+        const p = cur ? cur.mapToItem(null, 0, 0) : null;
         return JSON.stringify({
             open: shown,
             mode: mode,
@@ -127,8 +133,19 @@ Item {
             selected: selected,
             openMs: openMs,
             opens: opens,
-            legend: legend,
-            legendOverflow: footer.contentWidth > footer.width - footer.leftPadding - footer.rightPadding,
+            look: look.voice,
+            label: look.label.text(mode),
+            count: found.length,
+            countText: look.count(found.length),
+            slots: rows.map((r, i) => look.slot === "number" ? look.number(i) : look.slot === "marker" ? "▸" : r.icon || "tile"),
+            cursorFill: cur ? String(cur.color) : null,
+            cursorBox: cur ? { x: p.x, y: p.y, w: cur.width, h: cur.height } : null,
+            queryFont: [input.font.family, input.font.pixelSize],
+            detailFont: [look.detail.font, look.detail.size, look.detail.italic],
+            legend: look.legendLine(mode),
+            legendKeys: footerKeys.count,
+            legendLines: legendLines(),
+            legendOverflow: legendLines() > 1,
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: launcher.Window.active
         });
@@ -200,38 +217,103 @@ Item {
                 width: parent.width
                 spacing: 0
 
+                // Blueprint names the mode and counts its matches on a line of their own above the prompt.
+                RowLayout {
+                    visible: look.label.kind === "header"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 22
+                    Layout.rightMargin: 22
+                    Layout.topMargin: 12
+
+                    Text {
+                        id: header
+                        textFormat: Text.PlainText
+                        Layout.fillWidth: true
+                        text: look.label.text(launcher.mode)
+                        color: look.small.color
+                        font.family: look.small.font
+                        font.pixelSize: look.small.size
+                        font.letterSpacing: look.small.spacing
+                    }
+                    Text {
+                        textFormat: Text.PlainText
+                        text: look.count(found.length)
+                        color: look.small.color
+                        font.family: look.small.font
+                        font.pixelSize: look.small.size
+                        font.letterSpacing: look.small.spacing
+                    }
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.leftMargin: 20
-                    Layout.rightMargin: 20
-                    Layout.topMargin: 18
-                    Layout.bottomMargin: 14
-                    spacing: 14
+                    Layout.leftMargin: look.voice === "plain" ? 18 : look.voice === "bracket" ? 22 : 20
+                    Layout.rightMargin: Layout.leftMargin
+                    Layout.topMargin: look.voice === "plain" ? 16 : look.voice === "bracket" ? 8 : 18
+                    Layout.bottomMargin: look.voice === "plain" ? 16 : 14
+                    spacing: look.voice === "caps" ? 14 : look.voice === "bracket" ? 10 : 12
 
                     Rectangle {
+                        visible: look.label.kind === "chip"
                         implicitWidth: chip.implicitWidth + 14
                         implicitHeight: chip.implicitHeight + 6
-                        color: c.ink
+                        color: look.label.fill
                         Text {
                             id: chip
                             textFormat: Text.PlainText
                             anchors.centerIn: parent
-                            text: launcher.chipNames[launcher.mode]
-                            color: c.surface
+                            text: look.label.text(launcher.mode)
+                            color: look.label.color
                             font.family: fonts.ui
                             font.pixelSize: 10
                             font.letterSpacing: 1.4
                         }
                     }
 
+                    // Artboard's magnifier: a ring and a handle at 45 degrees.
+                    Item {
+                        visible: look.prompt.search
+                        implicitWidth: 18
+                        implicitHeight: 18
+                        Rectangle {
+                            x: 2.5
+                            y: 2.5
+                            width: 11
+                            height: 11
+                            radius: 5.5
+                            color: "transparent"
+                            border.width: 1.6
+                            border.color: look.prompt.color
+                        }
+                        Rectangle {
+                            x: 11.5
+                            y: 13.3
+                            width: 6
+                            height: 1.6
+                            radius: 0.8
+                            rotation: 45
+                            color: look.prompt.color
+                        }
+                    }
+
+                    Text {
+                        visible: look.prompt.text !== ""
+                        textFormat: Text.PlainText
+                        text: look.prompt.text
+                        color: look.prompt.color
+                        font.family: look.query.font
+                        font.pixelSize: look.query.size
+                    }
+
                     TextInput {
                         id: input
                         Layout.fillWidth: true
                         color: c.ink
-                        font.family: fonts.display
-                        font.pixelSize: 34
+                        font.family: look.query.font
+                        font.pixelSize: look.query.size
                         clip: true
                         focus: true
+                        cursorDelegate: look.caret === "block" ? blockCaret : null
                         Keys.onPressed: event => {
                             const ctrl = event.modifiers & Qt.ControlModifier;
                             if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_J))
@@ -251,20 +333,35 @@ Item {
                     }
 
                     Text {
+                        visible: look.label.kind === "chip"
                         textFormat: Text.PlainText
-                        text: found.length + " FOUND"
-                        color: c.muted
-                        font.family: fonts.ui
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.4
+                        text: look.count(found.length)
+                        color: look.small.color
+                        font.family: look.small.font
+                        font.pixelSize: look.small.size
+                        font.letterSpacing: look.small.spacing
+                    }
+
+                    Rectangle {
+                        visible: look.label.kind === "pill"
+                        implicitWidth: pill.implicitWidth + 18
+                        implicitHeight: pill.implicitHeight + 6
+                        radius: 8
+                        color: look.label.fill
+                        Text {
+                            id: pill
+                            textFormat: Text.PlainText
+                            anchors.centerIn: parent
+                            text: look.label.text(launcher.mode)
+                            color: look.label.color
+                            font.family: fonts.ui
+                            font.pixelSize: 12
+                            font.weight: Font.Medium
+                        }
                     }
                 }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 1
-                    color: c.ink
-                }
+                Rule {}
 
                 // Holds focus after Tab, where plain j/k move and / returns to the query.
                 Item {
@@ -290,7 +387,9 @@ Item {
                     Column {
                         id: list
                         y: 8
-                        width: parent.width
+                        // Paper's rows run edge to edge; the others sit inset as tiles.
+                        x: look.voice === "plain" ? 8 : look.voice === "bracket" ? 10 : 0
+                        width: parent.width - 2 * x
 
                         Text {
                             textFormat: Text.PlainText
@@ -306,6 +405,7 @@ Item {
                         }
 
                         Repeater {
+                            id: rowRepeater
                             model: rows
 
                             Rectangle {
@@ -313,42 +413,91 @@ Item {
                                 required property int index
                                 readonly property bool current: index === launcher.selected
                                 width: list.width
-                                implicitHeight: row.implicitHeight + 22
-                                color: current ? c.ink : "transparent"
+                                implicitHeight: row.implicitHeight + (look.voice === "caps" ? 22 : 20)
+                                radius: look.cursor.radius
+                                color: current ? look.cursor.fill : "transparent"
 
                                 RowLayout {
                                     id: row
                                     anchors.fill: parent
-                                    anchors.leftMargin: 20
-                                    anchors.rightMargin: 20
-                                    spacing: 14
+                                    anchors.leftMargin: look.voice === "caps" ? 20 : 12
+                                    anchors.rightMargin: anchors.leftMargin
+                                    spacing: look.voice === "plain" ? 12 : 14
 
                                     Text {
+                                        visible: look.slot !== "icon"
                                         textFormat: Text.PlainText
-                                        text: "▸"
-                                        color: current ? c.accent : "transparent"
-                                        font.family: fonts.ui
-                                        font.pixelSize: 15
+                                        text: look.slot === "number" ? look.number(index) : "▸"
+                                        color: look.slot === "number" ? (current ? look.cursor.text : c.muted) : current ? look.cursor.marker : "transparent"
+                                        font.family: look.slot === "number" ? look.name.font : fonts.ui
+                                        font.pixelSize: look.slot === "number" ? 13 : 15
+                                        font.bold: look.slot === "number" && current
                                     }
-                                    Text {
-                                        textFormat: Text.PlainText
+
+                                    // An app's own icon at 32 px, or a plain tile when its theme lacks one.
+                                    Rectangle {
+                                        visible: look.slot === "icon"
+                                        implicitWidth: look.tile.size
+                                        implicitHeight: look.tile.size
+                                        radius: look.tile.radius
+                                        color: modelData.icon ? "transparent" : look.tile.fill
+                                        Image {
+                                            anchors.fill: parent
+                                            visible: !!modelData.icon
+                                            source: look.slot === "icon" && modelData.icon ? modelData.icon : ""
+                                            sourceSize.width: look.tile.size
+                                            sourceSize.height: look.tile.size
+                                            asynchronous: true
+                                        }
+                                    }
+
+                                    GridLayout {
                                         Layout.fillWidth: true
-                                        text: modelData.title
-                                        elide: Text.ElideRight
-                                        color: current ? c.surface : c.ink
-                                        font.family: fonts.ui
-                                        font.pixelSize: 15
-                                        font.weight: current ? Font.Medium : Font.Normal
+                                        // Artboard sets the detail under the name; the others put it at the right.
+                                        columns: look.voice === "plain" ? 1 : 2
+                                        rowSpacing: 0
+                                        columnSpacing: 14
+
+                                        Text {
+                                            textFormat: Text.PlainText
+                                            Layout.fillWidth: true
+                                            text: look.title(modelData.title)
+                                            elide: Text.ElideRight
+                                            color: current ? look.cursor.text : look.name.color
+                                            font.family: look.name.font
+                                            font.pixelSize: look.name.size
+                                            font.weight: current ? look.cursor.weight : look.name.weight
+                                            font.letterSpacing: look.name.spacing
+                                        }
+                                        Text {
+                                            textFormat: Text.PlainText
+                                            Layout.fillWidth: look.voice === "plain"
+                                            Layout.maximumWidth: look.voice === "plain" ? -1 : 260
+                                            text: look.detailText(modelData.detail)
+                                            elide: Text.ElideRight
+                                            color: current ? look.cursor.detail : look.detail.color
+                                            font.family: look.detail.font
+                                            font.italic: look.detail.italic
+                                            font.pixelSize: look.detail.size
+                                            font.letterSpacing: look.detail.spacing ?? 0
+                                        }
                                     }
-                                    Text {
-                                        textFormat: Text.PlainText
-                                        Layout.maximumWidth: 260
-                                        text: modelData.detail
-                                        elide: Text.ElideRight
-                                        color: current ? c.line : c.muted
-                                        font.family: fonts.display
-                                        font.italic: true
-                                        font.pixelSize: 16
+
+                                    Rectangle {
+                                        visible: current && look.cursor.badge !== ""
+                                        implicitWidth: badge.implicitWidth + 14
+                                        implicitHeight: badge.implicitHeight + 4
+                                        radius: 6
+                                        color: c.surface
+                                        Text {
+                                            id: badge
+                                            textFormat: Text.PlainText
+                                            anchors.centerIn: parent
+                                            text: look.cursor.badge
+                                            color: look.cursor.text
+                                            font.family: fonts.mono
+                                            font.pixelSize: 11
+                                        }
                                     }
                                 }
                             }
@@ -356,30 +505,104 @@ Item {
                     }
                 }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 1
-                    color: c.ink
-                }
+                Rule {}
 
-                Text {
-                    textFormat: Text.PlainText
+                // The prefixes start at the left, as chips in Artboard, and the moving keys end the line at the right.
+                RowLayout {
                     Layout.fillWidth: true
-                    leftPadding: 20
-                    rightPadding: 20
-                    topPadding: 12
-                    bottomPadding: 12
-                    horizontalAlignment: Text.AlignRight
-                    id: footer
-                    text: launcher.legend
-                    // Blueprint's bracketed keys run wider than the card, so the legend wraps onto a second line.
-                    wrapMode: Text.Wrap
-                    color: c.muted
-                    font.family: fonts.ui
-                    font.pixelSize: 10
-                    font.letterSpacing: 1.2
+                    Layout.leftMargin: look.voice === "plain" ? 14 : look.voice === "bracket" ? 22 : 20
+                    Layout.rightMargin: Layout.leftMargin
+                    Layout.topMargin: look.voice === "plain" ? 10 : 12
+                    Layout.bottomMargin: look.voice === "bracket" ? 14 : Layout.topMargin
+                    spacing: 14
+
+                    Flow {
+                        id: footer
+                        Layout.fillWidth: true
+                        spacing: look.legend(launcher.mode).chips ? 8 : 14
+
+                        Repeater {
+                            id: footerKeys
+                            model: look.legend(launcher.mode).keys
+
+                            Rectangle {
+                                required property var modelData
+                                width: pair.implicitWidth + (look.legend(launcher.mode).chips ? 14 : 0)
+                                height: pair.implicitHeight + (look.legend(launcher.mode).chips ? 6 : 0)
+                                radius: 6
+                                color: look.chip.fill
+
+                                Row {
+                                    id: pair
+                                    anchors.centerIn: parent
+                                    spacing: look.legend(launcher.mode).chips ? 6 : 5
+
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        text: modelData.key
+                                        color: look.chip.key
+                                        font.family: fonts.mono
+                                        font.pixelSize: look.small.size
+                                        font.letterSpacing: look.small.spacing
+                                        font.bold: true
+                                    }
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        text: modelData.word
+                                        color: c.muted
+                                        font.family: look.small.font
+                                        font.pixelSize: look.small.size
+                                        font.letterSpacing: look.small.spacing
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        id: tail
+                        textFormat: Text.PlainText
+                        Layout.alignment: Qt.AlignRight | Qt.AlignTop
+                        topPadding: look.legend(launcher.mode).chips ? 3 : 0
+                        text: look.legend(launcher.mode).tail
+                        color: c.muted
+                        font.family: look.small.font
+                        font.pixelSize: look.small.size
+                        font.letterSpacing: look.small.spacing
+                    }
                 }
             }
+        }
+    }
+
+    // Blueprint's caret: a glowing accent block the height of the query.
+    Component {
+        id: blockCaret
+
+        Rectangle {
+            width: 11
+            height: input.font.pixelSize
+            color: look.prompt.color
+
+            RectangularShadow {
+                anchors.fill: parent
+                z: -1
+                blur: 9.6
+                color: Qt.alpha(look.prompt.color, 0.8)
+            }
+        }
+    }
+
+    // A rule across the card: solid, or dashed in Blueprint.
+    component Rule: Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 1
+        color: look.rule.dashed ? "transparent" : look.rule.color
+
+        Root.Dashed {
+            visible: look.rule.dashed
+            anchors.fill: parent
+            color: look.rule.color
         }
     }
 }

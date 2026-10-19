@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { launcherLook, MODES } from './launcher-look.mjs';
+import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
 const look = (name) => launcherLook(theme(name));
@@ -67,4 +68,15 @@ test('inside a mode the legend keeps to the moving keys and drops the prefixes',
 
 test('the legend reads as one line for the state and the footer checks', () => {
   assert.equal(look('blueprint').legendLine('apps'), '[W] WINDOWS  [V] CLIPBOARD  [:] EMOJI  [=] CALC  [>] COMMANDS  J/K · ↵ · ESC');
+});
+
+test('before the theme loads the launcher still has a whole look', () => {
+  const u = launcherLook(null);
+  assert.equal(u.label.text('apps'), 'APPS');
+  assert.ok(u.cursor.fill && u.query.size);
+});
+
+test('each prefix the apps footer names opens its mode', () => {
+  const prefixes = look('artboard').legend('apps').keys.map((k) => k.key);
+  assert.deepEqual(prefixes.map((p) => parseQuery(p + ' x').mode), ['windows', 'clipboard', 'emoji', 'calculator', 'commands']);
 });

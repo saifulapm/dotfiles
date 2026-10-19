@@ -68,7 +68,7 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME" "$TMUX_TMPDIR" "$DOTS_CHROMIUM_POLICY_DIR" "$PIPEWIRE_RUNTIME_DIR"
+mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME/applications" "$TMUX_TMPDIR" "$DOTS_CHROMIUM_POLICY_DIR" "$PIPEWIRE_RUNTIME_DIR"
 printf 'user-db:%s\n' "$dconf_name" >"$DCONF_PROFILE"
 mkdir -p "$D/remote"
 printf '[Dropbox]\ntype = alias\nremote = %s\n' "$D/remote" >"$RCLONE_CONFIG"

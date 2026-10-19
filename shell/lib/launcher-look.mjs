@@ -10,12 +10,15 @@ const CAPS_NAME = { calculator: 'CALC' };
 // Artboard's board tints, which no token carries and no mix of tokens lands on.
 const ARTBOARD = { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6' };
 
+// An open can come before the theme's tokens load; until then the launcher draws in black and white.
+const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '', voice: 'caps' } };
+
 const upper = (s) => (s || '').toUpperCase();
 const same = (s) => s || '';
 
 export function launcherLook(tokens) {
-  const c = tokens.color;
-  const t = tokens.type;
+  const c = (tokens || UNTHEMED).color;
+  const t = (tokens || UNTHEMED).type;
   const voice = t.voice;
   const caps = voice !== 'plain';
   const key = (k) => (voice === 'bracket' ? `[${upper(k)}]` : caps ? upper(k) : k);
@@ -51,6 +54,7 @@ export function launcherLook(tokens) {
       detail: { font: t.ui, size: 12, italic: false, color: c.muted },
       cursor: { fill: ARTBOARD.tint, text: ARTBOARD.deep, detail: c.muted, marker: 'transparent', radius: 10, weight: 600, badge: '↵' },
       rule: { color: c.line, dashed: false },
+      small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
       chip: { fill: ARTBOARD.tile, key: c.ink },
     });
   }
