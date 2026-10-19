@@ -3,8 +3,22 @@
 {
 source "$(dirname "$0")/lib.sh"
 
+# niri logs each config it loads, and a shader that does not compile only as a warning after it.
+loads() { grep -ac 'loaded config from' "$dev_log"; }
+loads_past() { (($(loads) > $1)); }
+no_shader_errors() { ! tail -n +"$1" "$dev_log" | grep -aq 'error compiling custom'; }
+# Runs a command that changes the config, then waits for niri to load it and compile its shaders.
+reload() {
+  local n
+  n=$(loads) log_line=$(($(wc -l <"$dev_log") + 1))
+  "$@" || return 1
+  until_ok 3000 loads_past "$n" || return 1
+  sleep 0.3
+}
+
 # Slowed only here: no rendered fragment carries a slowdown.
-printf 'animations {\n    slowdown 20\n}\n' >>"$DOTS_DEV_DIR/niri.kdl"
+slow() { printf 'animations {\n    slowdown 20\n}\n' >>"$DOTS_DEV_DIR/niri.kdl"; }
+check "niri loads the slowdown" reload slow
 
 window_count() { niri msg -j windows | jq length; }
 has_windows() { [ "$(window_count)" = "$1" ]; }
@@ -34,7 +48,6 @@ grab_test() {
     const at = (x, y) => [...px.subarray((y * w + x) * 3, (y * w + x) * 3 + 3)];
     const near = (c, t, d = 16) => c.every((v, i) => Math.abs(v - t[i]) <= d);
     const magenta = (c) => c[0] - c[1] > 60 && c[2] - c[1] > 60;
-    const args = process.argv.slice(1);
     const ok = (function () { '"$1"' }());
     process.exit(ok ? 0 : 1);
   ' "${@:2}"
@@ -66,10 +79,10 @@ calibrate() {
   [ -n "$box" ]
 }
 
+switch_to() { "$repo/bin/dots" theme "$1" >/dev/null; }
 theme() {
-  "$repo/bin/dots" theme "$1" >/dev/null
-  # niri reloads the fragment on its own watch; the next open must already use it.
-  sleep 1
+  check "niri loads $1's fragment" reload switch_to "$1"
+  check "niri compiles $1's shaders" no_shader_errors "$log_line"
 }
 
 blueprint() {
@@ -151,5 +164,13 @@ artboard() {
 blueprint
 paper
 artboard
+
+# The broken fixture: a syntax error in an open shader must turn the check above red; it is an include of its own, since niri merges a second animations block only from one.
+broken() {
+  printf 'animations {\n    window-open {\n        custom-shader r"\n            vec4 open_color(vec3 coords_geo, vec3 size_geo) { return vec4(1.0) +; }\n        "\n    }\n}\n' >"$DOTS_DEV_DIR/broken.kdl"
+  printf 'include "broken.kdl"\n' >>"$DOTS_DEV_DIR/niri.kdl"
+}
+reload broken
+check "a shader with a syntax error fails the compile check" eval "! no_shader_errors $log_line"
 exit "$fails"
 }
