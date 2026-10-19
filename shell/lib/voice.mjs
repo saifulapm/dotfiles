@@ -19,6 +19,8 @@ const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 
 const BIDI = /[\u202A-\u202E\u2066-\u2069]/g;
 const same = (s) => (s || '').replace(BIDI, '');
 const upper = (s) => same(s).toUpperCase();
+// A one-line label: newlines and tabs become single spaces, so a sender cannot stack lines.
+const line = (s) => same(s).replace(/\s+/g, ' ').trim();
 
 export function launcherLook(tokens) {
   const c = (tokens || UNTHEMED).color;
@@ -103,7 +105,7 @@ export function islandLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
   const voice = t.voice;
-  const appText = (app) => (voice === 'plain' ? same(app) : upper(app));
+  const appText = (app) => (voice === 'plain' ? line(app) : line(app).toUpperCase());
   const base = {
     voice,
     appText,
@@ -112,7 +114,8 @@ export function islandLook(tokens) {
       const a = appText(app);
       return a && voice === 'bracket' ? `[ ${a} ]` : a;
     },
-    summaryText: same,
+    summaryText: line,
+    bodyText: same,
     glyph: (app) => upper(app).charAt(0) || '•',
     tile: null,
   };
@@ -134,7 +137,7 @@ export function islandLook(tokens) {
       pad: { x: 18, top: 12, bottom: 14 },
       head: { font: t.mono, size: 10, spacing: 1.6, color: c.muted },
       summary: { font: t.mono, size: 15, weight: 700, spacing: 0.6, color: c.accent },
-      summaryText: upper,
+      summaryText: (x) => line(x).toUpperCase(),
       body: { font: t.mono, size: 12, color: c.ink },
     });
   }
@@ -209,6 +212,7 @@ export function listLook(tokens) {
     tabText: wordText,
     keyText,
     keys: (pairs) => pairs.map(([k, w]) => ({ key: keyText(k), word: wordText(w) })),
+    groupHead: (app, n) => (line(app || '') ? `${wordText(line(app))} · ${n}` : String(n)),
     // An age in whole units, floored; under a minute it is the island's word for arrival.
     ageText(ms) {
       const s = Math.floor(ms / 1000);

@@ -23,8 +23,7 @@ Scope {
             key: Date.now() + "-" + n.id,
             id: n.id,
             app: n.appName,
-            // The app's icon as an image url, "" when it sends none or the theme lacks it; a path stays a path.
-            icon: n.appIcon.startsWith("/") ? "file://" + n.appIcon : n.appIcon.startsWith("file://") ? n.appIcon : n.appIcon ? Quickshell.iconPath(n.appIcon, true) : "",
+            icon: notifs.iconOf(n.appIcon || n.hints["image-path"] || ""),
             summary: n.summary,
             body: n.body,
             critical: n.urgency === NotificationUrgency.Critical,
@@ -34,6 +33,11 @@ Scope {
                         text: a.text
                     }))
         };
+    }
+
+    // An app's icon as an image url, "" when it sends none or the theme lacks it; a path stays a path. notify-send -i sends a path as the image-path hint.
+    function iconOf(name) {
+        return name.startsWith("/") ? "file://" + name : name.startsWith("file://") ? name : name ? Quickshell.iconPath(name, true) : "";
     }
 
     function setDnd(on) {

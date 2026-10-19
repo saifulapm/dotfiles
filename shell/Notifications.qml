@@ -32,7 +32,7 @@ Item {
     // One row per entry in group order; the first of each group carries its header.
     readonly property var rows: groups.reduce((all, g) => all.concat(g.entries.map((e, i) => ({
                         entry: e,
-                        head: i === 0 ? look.tabText(g.app) + " · " + g.entries.length : ""
+                        head: i === 0 ? look.groupHead(g.app, g.entries.length) : ""
                     }))), [])
 
     function open(t0) {
@@ -103,6 +103,14 @@ Item {
                 const d = list.itemAtIndex(i);
                 return d ? d.age : null;
             }),
+            // Each group's head as drawn: its text, whether it elides, and how many lines it takes.
+            heads: rows.map((r, i) => list.itemAtIndex(i)).filter(d => d && d.headItem.visible).map(d => ({
+                        text: d.headItem.text,
+                        elided: d.headItem.truncated,
+                        lines: d.headItem.lineCount,
+                        right: d.headItem.mapToItem(null, d.headItem.width, 0).x
+                    })),
+            cardRight: box(card).x + card.width,
             openMs: openMs,
             opens: opens,
             headingKind: look.label.kind,
@@ -335,11 +343,17 @@ Item {
                         readonly property bool current: index === centre.selected
                         readonly property Item box: rowBox
                         readonly property string age: ageLabel.text
+                        readonly property Item headItem: headLabel
                         width: list.width
 
+                        // An app name can be any length; it elides inside the card.
                         Text {
+                            id: headLabel
                             textFormat: Text.PlainText
                             visible: item.modelData.head !== ""
+                            width: parent.width
+                            elide: Text.ElideRight
+                            rightPadding: 20
                             leftPadding: 20
                             topPadding: 10
                             bottomPadding: 4

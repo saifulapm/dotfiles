@@ -243,3 +243,16 @@ test('Artboard spells Wi-Fi as its board does, and a sync failure leads the righ
 test('a bidi control in a window title cannot reorder the margin', () => {
   assert.equal(margin('blueprint').drawn({ idx: 1, app: 'foot', title: 'a‮b' }, SUN, right).left, '[01] FOOT — AB');
 });
+
+test("a newline in a notification's app or summary keeps each to one line, and the body cannot reorder itself", () => {
+  const b = island('blueprint');
+  assert.equal(b.appLabel('two\nlines'), '[ TWO LINES ]');
+  assert.equal(b.summaryText('Download\ncomplete'), 'DOWNLOAD COMPLETE');
+  assert.equal(island('paper').summaryText('a\r\n\tb'), 'a b');
+  for (const n of ['paper', 'artboard', 'blueprint']) assert.equal(island(n).bodyText('x‮yz\nnext'), 'xyz\nnext', n);
+});
+
+test("the notification centre's group head names the app on one line and its count, or the count alone", () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => list(n).groupHead('Fire\nfox', 3)), ['FIRE FOX · 3', 'Fire fox · 3', 'FIRE FOX · 3']);
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => list(n).groupHead('', 1)), ['1', '1', '1']);
+});

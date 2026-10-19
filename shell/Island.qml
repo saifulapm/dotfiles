@@ -169,6 +169,10 @@ PanelWindow {
             app: openBracket.visible ? openBracket.text + appName.text + closeBracket.text : appName.text,
             age: age.text,
             summary: summary.text,
+            summaryLines: summary.lineCount,
+            body: body.text,
+            cardBottom: card.mapToItem(null, 0, card.height).y,
+            boxBottom: box.mapToItem(null, 0, box.height).y,
             summaryFont: [summary.font.family, summary.font.pixelSize],
             summaryBox: at(summary),
             bracketsShown: openBracket.visible,
@@ -554,7 +558,8 @@ PanelWindow {
                         Text {
                             width: parent.width
                             visible: text !== ""
-                            text: island.heldNotification?.body ?? ""
+                            id: body
+                            text: island.noteLook.bodyText(island.heldNotification?.body ?? "")
                             textFormat: Text.PlainText
                             wrapMode: Text.Wrap
                             maximumLineCount: 3

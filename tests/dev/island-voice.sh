@@ -21,7 +21,7 @@ near() {
 }
 geo() { island | jq -r ".note.$1 | \"\(.x | floor),\(.y | floor) \(.w | floor)x\(.h | floor)\""; }
 # Notify with an app name notify-send would not send as given; the newest notification replaces the shown one, so each check waits for its own summary.
-notify_as() { gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.Notify "$1" 0 "" "$2" "" '[]' '{}' 5000 >/dev/null; }
+notify_as() { gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.Notify "$1" 0 "" "$2" "${3:-}" '[]' '{}' 5000 >/dev/null; }
 
 until_ok 5000 shell_status >/dev/null
 
@@ -45,6 +45,13 @@ shown '.note.summary == "LONG APP"'
 echo "     note: $(island | jq -c .note)"
 check "blueprint: a long app name elides inside its brackets, short of T+0S" state_is '.note.appElided and .note.bracketsShown and .note.bracketEnd < .note.ageStart'
 
+# Any app can send a newline or a bidi override; the island keeps app and summary to one line each and draws the body in its spelt order.
+notify_as $'two\nlines' $'Download\ncomplete' $'x\u202Eyz'
+shown '.note.summary == "DOWNLOAD COMPLETE"'
+echo "     note: $(island | jq -c '.note | {app, summaryLines, body, cardBottom, boxBottom}')"
+check "blueprint: a newline in the app or summary stays on one line each" state_is '.note.app == "[ TWO LINES ]" and .note.summaryLines == 1'
+check "blueprint: the body draws in its spelt order and inside the island" state_is '.note.body == "xyz" and .note.cardBottom <= .note.boxBottom'
+
 in_theme paper
 notify-send "Download complete" "report-october.pdf · 2.4 MB"
 shown '.note.summary == "Download complete"'
@@ -63,6 +70,10 @@ check "artboard: the island reads the app and now, muted" state_is '.note.app ==
 check "artboard: the notification shows a 40 px tile with its glyph" state_is '.note.tileBox.w == 40 and .note.tileBox.h == 40 and .note.glyph == "N"'
 tile=$(near "$(geo tileBox)" 43 47 54 4)
 check "artboard: the tile at the notification's left reads #2B2F36 ($tile of 1600 px)" test "$tile" -gt 1000
+# notify-send -i sends a path as the image-path hint, not as the app icon.
+notify-send -i /usr/share/icons/hicolor/48x48/apps/foot.png "With icon"
+shown '.note.summary == "With icon"'
+check "artboard: an icon sent as a path draws in the tile instead of the letter" state_is '.note.tileBox != null and .note.glyph == null'
 check "artboard: the tile sits at the card's left" state_is '.note.tileBox != null and .note.tileBox.x < .note.summaryBox.x'
 # Each notification above replaced the one before; the last one's 5 s end before the timers are counted.
 until_ok 6000 state_is '.mode == "rest"'

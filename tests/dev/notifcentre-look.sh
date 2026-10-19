@@ -90,6 +90,21 @@ until_ok 2000 state_is .hint
 check "blueprint: the empty list's hint brackets its keys ($(notifs | jq -c .hintKeys))" state_is '.hint and .hintKeys == ["[/]", "[ESC]"]'
 close_centre
 
-in_theme paper
+# An app name is whatever the sender says: a long one elides inside the card, a newline stays on one line, and none at all leaves just the count.
+notify_as() { gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.Notify "$1" 0 "" "$2" "" '[]' '{}' 5000 >/dev/null; }
+notify_as "App $(printf 'long%.0s' {1..50})" "long"
+notify_as $'two\nlines' "newline"
+notify_as "" "no app"
+until_ok 2000 state_is '.count == 3'
+for t in blueprint artboard paper; do
+  in_theme "$t"
+  open_centre
+  echo "     $t heads: $(notifs | jq -c '[.heads[] | {text: .text[0:24], elided, lines, right}] + [{cardRight}]')"
+  check "$t: a long app name elides inside the card" state_is '[.heads[] | select(.text | startswith("APP LONG") or startswith("App long"))] | length == 1 and (.[0].elided)'
+  check "$t: no group head runs past the card or onto a second line" state_is '. as $s | all(.heads[]; .right <= $s.cardRight and .lines == 1)'
+  check "$t: an app sent without a name heads its group with the count alone" state_is 'any(.heads[]; .text == "1")'
+  close_centre
+done
+
 exit $((fails > 0))
 }
