@@ -1,0 +1,11 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+user=$(id -un)
+# tty1 logs straight in; the drop-in lands at the next boot, since restarting getty would end the session running this install.
+conf=/etc/systemd/system/getty@tty1.service.d/autologin.conf
+want=$(printf '[Service]\nExecStart=\nExecStart=-/sbin/agetty -o "-p -f -- \\\\u" --noclear --autologin %s %%I $TERM\n' "$user")
+if [[ $(cat "$conf" 2>/dev/null) != "$want" ]]; then
+  echo "$want" | root install -D -m 0644 /dev/stdin "$conf" || die "could not write $conf"
+  root systemctl daemon-reload 2>/dev/null || true
+fi
+[[ $(getent passwd "$user" | cut -d: -f7) == /usr/bin/fish ]] || root usermod -s /usr/bin/fish "$user" || die "could not make fish the login shell"

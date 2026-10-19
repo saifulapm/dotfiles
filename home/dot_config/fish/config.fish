@@ -1,3 +1,7 @@
+# niri-session re-execs through a non-interactive login shell, so without the interactive test this would recurse.
+if status is-login; and status is-interactive; and test -z "$WAYLAND_DISPLAY"; and test (tty) = /dev/tty1
+    exec niri-session
+end
 set -g fish_greeting
 fish_add_path -g ~/Sites/github/dotfiles/bin
 set -g __dots_colors_file (set -q XDG_STATE_HOME; and echo $XDG_STATE_HOME; or echo ~/.local/state)/dots/theme-out/colors.fish
