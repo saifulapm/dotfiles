@@ -108,3 +108,28 @@ why = "fc-cache indexes the pinned fonts"
 name = "xz"
 arch = "all"
 why = "unpacks the nerd-symbols font pin"
+
+[[package]]
+name = "lsd"
+arch = "all"
+why = "ll, lt and la list directories with it"
+
+[[package]]
+name = "bat"
+arch = "all"
+why = "la prints files with it"
+
+[[package]]
+name = "ripgrep"
+arch = "all"
+why = "fif searches file contents with it"
+
+[[package]]
+name = "fzf"
+arch = "all"
+why = "fif and gwl pick from lists with it"
+
+[[package]]
+name = "fd-find"
+arch = "all"
+why = "sweep finds node_modules and vendor dirs with it"
