@@ -134,12 +134,14 @@ Item {
             openMs: openMs,
             opens: opens,
             look: look.voice,
-            label: look.label.text(mode),
+            label: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             count: found.length,
-            countText: look.count(found.length),
+            countText: (look.label.kind === "header" ? headerCount : chipCount).text,
             slots: rows.map((r, i) => look.slot === "number" ? look.number(i) : look.slot === "marker" ? "▸" : r.icon || "tile"),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? { x: p.x, y: p.y, w: cur.width, h: cur.height } : null,
+            cursorElided: cur ? cur.elided : null,
+            cursorDetailWidth: cur ? cur.detailWidth : null,
             queryFont: [input.font.family, input.font.pixelSize],
             detailFont: [look.detail.font, look.detail.size, look.detail.italic],
             legend: look.legendLine(mode),
@@ -236,6 +238,7 @@ Item {
                         font.letterSpacing: look.small.spacing
                     }
                     Text {
+                        id: headerCount
                         textFormat: Text.PlainText
                         text: look.count(found.length)
                         color: look.small.color
@@ -333,6 +336,7 @@ Item {
                     }
 
                     Text {
+                        id: chipCount
                         visible: look.label.kind === "chip"
                         textFormat: Text.PlainText
                         text: look.count(found.length)
@@ -412,6 +416,8 @@ Item {
                                 required property var modelData
                                 required property int index
                                 readonly property bool current: index === launcher.selected
+                                readonly property bool elided: title.truncated
+                                readonly property real detailWidth: detail.width
                                 width: list.width
                                 implicitHeight: row.implicitHeight + (look.voice === "caps" ? 22 : 20)
                                 radius: look.cursor.radius
@@ -459,6 +465,7 @@ Item {
                                         columnSpacing: 14
 
                                         Text {
+                                            id: title
                                             textFormat: Text.PlainText
                                             Layout.fillWidth: true
                                             text: look.title(modelData.title)
@@ -470,6 +477,7 @@ Item {
                                             font.letterSpacing: look.name.spacing
                                         }
                                         Text {
+                                            id: detail
                                             textFormat: Text.PlainText
                                             Layout.fillWidth: look.voice === "plain"
                                             Layout.maximumWidth: look.voice === "plain" ? -1 : 260

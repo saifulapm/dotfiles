@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Each theme's launcher looks like its board: Paper's ink cursor row, Artboard's icon tiles and tinted rounded cursor.
+# Each theme's launcher looks like its board: Paper's ink row, Artboard's icon tiles and tinted cursor, Blueprint's header, numbers and cyan cursor.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -29,6 +29,8 @@ cursor_geo() {
 # An app whose icon no theme has, written after the shell's scan, so the scan must pick it up.
 mkdir -p "$DOTS_DEV_DIR/data/applications"
 printf '[Desktop Entry]\nType=Application\nName=Zz Iconless\nIcon=dots-no-such-icon\nExec=true\n' >"$DOTS_DEV_DIR/data/applications/dots-iconless.desktop"
+long="Zz Long $(printf 'name%.0s' {1..48})"
+printf '[Desktop Entry]\nType=Application\nName=%s\nGenericName=Long Detail\nExec=true\n' "$long" >"$DOTS_DEV_DIR/data/applications/dots-long.desktop"
 
 until_ok 5000 shell_status >/dev/null
 
@@ -67,6 +69,41 @@ check "artboard: an entry whose icon is missing gets the fallback tile ($(launch
 tile=$(near "$(cursor_geo 20 20 16 16)" 242 243 246 2)
 check "artboard: the fallback tile is #F2F3F6 ($tile of 256 px)" test "$tile" -gt 240
 close_launcher
+
+in_theme blueprint
+open_launcher
+wtype fo
+until_ok 3000 state_is '.query == "fo" and .cursorBox != null'
+check "blueprint: the header reads LAUNCH // APPS and <n> MATCHES for the state's count ($(launcher_state | jq -c '[.label, .countText, .count]'))" state_is '.label == "LAUNCH // APPS" and .countText == "\(.count) MATCHES"'
+check "blueprint: the cursor row's fill is #7FE3F0 and its first cell reads 01" state_is '.cursorFill == "#7fe3f0" and .slots[.selected] == "01"'
+cyan=$(near "$(cursor_geo -60 3 8 8)" 127 227 240 3)
+check "blueprint: inside the cursor row reads the accent ($cyan of 64 px)" test "$cyan" -eq 64
+check "blueprint: the legend fits one line in apps mode ($(launcher_state | jq -c .legend))" state_is '.legendLines == 1 and .legendKeys == 5'
+# The board restyles at once: the query and the keyboard stay while the cursor row turns Artboard's tint.
+in_theme artboard
+until_ok 2000 state_is '.cursorFill == "#eef1ff"'
+check "switching to artboard while open restyles the cursor row and keeps the query" state_is '.open and .query == "fo" and .cursorFill == "#eef1ff" and .label == "Apps" and .keyboard'
+tint=$(near "$(cursor_geo -70 4 8 8)" 238 241 255 3)
+check "after the switch the cursor row draws the tint ($tint of 64 px)" test "$tint" -eq 64
+close_launcher
+
+for t in paper artboard blueprint; do
+  in_theme "$t"
+  open_launcher
+  wtype "zz long"
+  until_ok 3000 state_is '(.results[0] // "") | startswith("Zz Long")'
+  check "$t: a 200-character name elides before the detail column ($(launcher_state | jq -c '[.cursorElided, .cursorDetailWidth]'))" state_is '.cursorElided and .cursorDetailWidth > 40'
+  close_launcher
+done
+
+for m in "w " "v " ": " "= " "> "; do
+  in_theme blueprint
+  open_launcher
+  wtype -- "$m"
+  until_ok 2000 state_is ".query == \"$m\""
+  check "blueprint: the legend fits one line in mode '$m'" state_is '.legendLines == 1'
+  close_launcher
+done
 
 in_theme paper
 exit $((fails > 0))
