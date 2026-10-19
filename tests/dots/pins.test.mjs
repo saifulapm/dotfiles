@@ -34,9 +34,9 @@ function source(sum) {
   return root;
 }
 
-function run(root) {
+function run(root, script = SCRIPT) {
   const rendered = spawnSync('chezmoi', ['--config', join(root, 'none.toml'), '--source', root, 'execute-template'], {
-    input: SCRIPT,
+    input: script,
     encoding: 'utf8',
     env: { PATH: process.env.PATH, HOME: root },
   });
@@ -48,6 +48,16 @@ test('a pin with the right sha256 is fetched and reported as changed', () => {
   const r = run(source(sha('hello pin\n')));
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, 'hello pin\ndots: pin hello 1.2\n');
+});
+
+// /tmp is a small tmpfs on the Macs, too small for kakoune-lsp's cargo build.
+test('a pin is fetched and built under ~/.cache, not /tmp, and the dir is removed after', () => {
+  const root = source(sha('hello pin\n'));
+  const r = run(root, SCRIPT.replace('cat "$file"', 'echo "$file"'));
+  assert.equal(r.status, 0, r.stderr);
+  const file = r.stdout.split('\n')[0];
+  assert.ok(file.startsWith(`${root}/.cache/`), file);
+  assert.deepEqual(readdirSync(join(root, '.cache')), []);
 });
 
 test('a pin with a wrong sha256 stops the script, naming the pin', () => {

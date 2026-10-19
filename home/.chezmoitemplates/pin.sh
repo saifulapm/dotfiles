@@ -12,7 +12,9 @@ pin_name={{ $pin.name | quote }}
 pin_version={{ $pin.version | quote }}
 pin_url={{ $url | replace "{version}" $pin.version | quote }}
 pin_sha256={{ $sha | quote }}
-pin_tmp=$(mktemp -d)
+# On disk, not in /tmp: /tmp is a small tmpfs on the Macs and a cargo build does not fit.
+mkdir -p "$HOME/.cache"
+pin_tmp=$(mktemp -d -p "$HOME/.cache" dots-pin-XXXXXX)
 trap 'rm -rf "$pin_tmp"' EXIT
 # pin_fetch: downloads the pin into a temp dir and prints its path; a wrong sha256 stops the install.
 pin_fetch() {
