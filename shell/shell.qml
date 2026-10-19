@@ -23,7 +23,14 @@ ShellRoot {
         surfacesLoader.component = Qt.createComponent("Surfaces.qml");
         desk = Qt.createComponent("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService });
         polkit = Qt.createComponent("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
-        appCount = Qt.binding(() => DesktopEntries.applications.values.length);
+        apps = Qt.binding(() => DesktopEntries.applications.values.map(e => ({
+                        id: e.id,
+                        name: e.name,
+                        genericName: e.genericName || e.comment,
+                        keywords: e.keywords,
+                        icon: e.icon ? Quickshell.iconPath(e.icon, true) : "",
+                        entry: e
+                    })));
     }
 
     // qs emits this only after a hot reload, before the new tree draws its first frame.
@@ -133,8 +140,8 @@ ShellRoot {
     }
 
 
-    // The desktop entry scan starts right after the first frame, so neither that frame nor the launcher's first open waits on it.
-    property int appCount: 0
+    // The desktop entry scan and its icon lookups start right after the first frame, so neither that frame nor the launcher's first open waits on them; an icon the theme lacks is "".
+    property var apps: []
 
     IpcHandler {
         target: "launcher"
@@ -202,6 +209,7 @@ ShellRoot {
             item = (component ?? Qt.createComponent("Surfaces.qml")).createObject(root, {
                 theme: themeService,
                 themeList: Qt.binding(() => root.themeList),
+                apps: Qt.binding(() => root.apps),
                 notifs: notifsService,
                 goals: Qt.binding(() => root.desk ? root.desk.goals : null),
                 sync: Qt.binding(() => root.desk ? root.desk.sync : null)

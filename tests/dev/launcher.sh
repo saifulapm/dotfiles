@@ -36,6 +36,7 @@ check "status lists launcher in loaded" bash -c 'timeout 0.5 qs ipc call shell s
 wtype foot
 until_ok 3000 state_is '.open and .mode == "apps" and .query == "foot" and .results[0] == "Foot" and .selected == 0'
 check "typing foot puts Foot first" state_is '.query == "foot" and .results[0] == "Foot"'
+check "Foot's row carries its theme icon, looked up when the shell scanned it ($(launcher_state | jq -c '.icons[0]'))" state_is '.icons[0] | test("^image://icon/foot")'
 wtype -k Return
 until_ok 5000 foot_open
 check "Enter opens a window with app_id foot" foot_open

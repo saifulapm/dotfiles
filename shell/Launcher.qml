@@ -23,13 +23,8 @@ Item {
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var apps: DesktopEntries.applications.values.map(e => ({
-                id: e.id,
-                name: e.name,
-                genericName: e.genericName || e.comment,
-                keywords: e.keywords,
-                entry: e
-            }))
+    // {id, name, genericName, keywords, icon, entry} per desktop entry, from the shell's scan.
+    required property var apps
     readonly property var parsed: Lib.parseQuery(query)
     readonly property string mode: parsed.mode
     // niri's windows as of entering windows mode.
@@ -60,6 +55,7 @@ Item {
             return Lib.rank(apps, parsed.q).map(a => ({
                         title: a.name,
                         detail: a.genericName,
+                        icon: a.icon,
                         exec: ["niri", "msg", "action", "spawn", "--"].concat(a.entry.command)
                     }));
         }
@@ -127,6 +123,7 @@ Item {
             query: query,
             results: rows.map(r => r.title),
             ids: rows.map(r => r.id ?? null),
+            icons: rows.map(r => r.icon ?? null),
             selected: selected,
             openMs: openMs,
             opens: opens,

@@ -9,6 +9,8 @@ PanelWindow {
 
     required property var theme
     required property var themeList
+    // The desktop entries with their icons, scanned by the shell after its first frame.
+    required property var apps
     required property var notifs
     // The Desk's goals service, null until the Desk loads.
     required property var goals
@@ -116,6 +118,7 @@ PanelWindow {
         active: false
         sourceComponent: Root.Launcher {
             theme: host.theme
+            apps: host.apps
         }
     }
 
