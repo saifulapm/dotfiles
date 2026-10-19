@@ -45,7 +45,12 @@ PanelWindow {
     readonly property string mode: I.pick(slots)
     // When the current mode began, in ms since the epoch, so a check can time a mode without polling error.
     property real modeSince: Date.now()
-    onModeChanged: modeSince = Date.now()
+    onModeChanged: {
+        modeSince = Date.now();
+        // The keyboard goes back once what it was given for is gone, such as a notification whose 5 s ran out.
+        if (focused && ["calendar", "question", "notification"].indexOf(mode) < 0)
+            release();
+    }
     readonly property string text: I.islandText(mode, slots, clock.now)
     readonly property real boxWidth: box.width
     // Room for the widest shadow, Artboard's soft one, beside and below the box.
@@ -61,10 +66,24 @@ PanelWindow {
                 year: clock.now.getFullYear(),
                 month: clock.now.getMonth()
             };
-        else if (mode !== "question")
+        else if (mode !== "question" && mode !== "notification")
             return;
         focused = true;
         keys.forceActiveFocus();
+    }
+
+    // Runs the notification's default action when it has one; either way it leaves the island.
+    function openNotification() {
+        if (notification)
+            notifs.act(notification.key);
+        putAway();
+    }
+
+    // Leaves the island only: the notification stays in the Mod+A history.
+    function putAway() {
+        if (notification)
+            notifs.gone(notification.key);
+        release();
     }
 
     // A capture's Captured or a refusal shows for 1.5 s.
@@ -246,6 +265,15 @@ PanelWindow {
             }
         }
 
+        // A click opens a notification and a right click puts it away; the keyboard does the same through Mod+I.
+        MouseArea {
+            anchors.fill: parent
+            enabled: island.mode === "notification"
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: Qt.PointingHandCursor
+            onClicked: mouse => mouse.button === Qt.RightButton ? island.putAway() : island.openNotification()
+        }
+
         Item {
             id: keys
             focus: island.focused
@@ -256,6 +284,13 @@ PanelWindow {
                         island.release();
                     else if (event.key === Qt.Key_H || event.key === Qt.Key_L)
                         island.calendar = I.shiftMonth(island.calendar.year, island.calendar.month, event.key === Qt.Key_H ? -1 : 1);
+                    return;
+                }
+                if (island.mode === "notification") {
+                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                        island.openNotification();
+                    else if (event.key === Qt.Key_D || event.key === Qt.Key_Escape)
+                        island.putAway();
                     return;
                 }
                 const q = island.question;
