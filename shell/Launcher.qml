@@ -7,7 +7,7 @@ import "." as Root
 import "lib/launcher.mjs" as Lib
 import "lib/clips.mjs" as Clips
 import "lib/emoji.mjs" as Emoji
-import "lib/launcher-look.mjs" as L
+import "lib/voice.mjs" as L
 
 // Apps, windows, clipboard, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
 Item {

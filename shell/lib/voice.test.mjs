@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, MODES } from './launcher-look.mjs';
+import { launcherLook, islandLook, osdLook, MODES } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -87,4 +87,65 @@ test('a name cannot reorder itself with bidi controls, so it draws in the order 
     assert.equal(l.title('Zf ‮evil'), n === 'blueprint' ? 'ZF EVIL' : 'Zf evil', n);
     assert.equal(l.detailText('⁧RTLover⁩'), n === 'blueprint' ? 'RTLOVER' : 'RTLover', n);
   }
+});
+
+const island = (name) => islandLook(theme(name));
+const osd = (name) => osdLook(theme(name));
+
+test("Blueprint's notification reads [ APP ] and T+0S over its summary, uppercase bold in the accent", () => {
+  const b = island('blueprint');
+  assert.deepEqual([b.appLabel('notify-send'), b.age, b.brackets], ['[ NOTIFY-SEND ]', 'T+0S', true]);
+  assert.equal(b.summaryText('Download complete'), 'DOWNLOAD COMPLETE');
+  assert.deepEqual([b.summary.font, b.summary.size, b.summary.weight, b.summary.color], ['Maple Mono', 15, 700, '#7FE3F0']);
+  assert.equal(b.tile, null);
+});
+
+test("Paper's notification puts the app and NOW in tracked caps over a 24 px serif summary and a 12 px mono body", () => {
+  const p = island('paper');
+  assert.deepEqual([p.appLabel('Chromium'), p.age, p.head.spacing > 1], ['CHROMIUM', 'NOW', true]);
+  assert.deepEqual([p.summary.font, p.summary.size, p.summaryText('Download complete')], ['Instrument Serif', 24, 'Download complete']);
+  assert.deepEqual([p.body.font, p.body.size], ['Maple Mono', 12]);
+});
+
+test("Artboard's notification has a 40 px rounded tile, the app and now muted, and a 15 px bold summary", () => {
+  const a = island('artboard');
+  assert.deepEqual([a.tile.size, a.tile.radius, a.tile.fill], [40, 12, '#2B2F36']);
+  assert.deepEqual([a.appLabel('Chromium'), a.age], ['Chromium', 'now']);
+  assert.deepEqual([a.summary.size, a.summary.weight], [15, 600]);
+  assert.deepEqual([a.glyph('chromium'), a.glyph('')], ['C', '•']);
+  assert.equal(a.width, 440);
+});
+
+test('an empty app name draws no empty brackets and no empty caps', () => {
+  for (const n of ['paper', 'artboard', 'blueprint']) assert.equal(island(n).appLabel(''), '', n);
+  assert.equal(island('blueprint').appLabel(null), '');
+});
+
+test('an app name cannot reorder its label with bidi controls', () => {
+  assert.equal(island('blueprint').appLabel('a‮b'), '[ AB ]');
+  assert.equal(island('blueprint').appText('a‮b'), 'AB');
+});
+
+test('the OSD lights a twentieth for every 5 %, rounded, and clamps', () => {
+  const p = osd('paper');
+  assert.deepEqual([0, 62, 100, 140, -3].map((v) => p.litCount(v)), [0, 12, 20, 20, 0]);
+});
+
+test("Blueprint's OSD reads VOL, ▮ blocks and a three-digit value", () => {
+  const b = osd('blueprint');
+  assert.deepEqual([b.word('volume'), b.word('brightness'), b.bars, b.valueText(62), b.valueText(5), b.valueText(100)], ['VOL', 'BRT', 'blocks', '062', '005', '100']);
+  assert.deepEqual([b.value.weight, b.value.color, b.lit.color, b.unlit.color], [700, '#7FE3F0', '#7FE3F0', '#2E5A72']);
+});
+
+test("Paper's OSD reads VOL, 20 accent bars and the value in serif; Artboard's draws a glyph and a rounded #6C83FF bar", () => {
+  const p = osd('paper');
+  assert.deepEqual([p.word('volume'), p.bars, p.valueText(62), p.value.font, p.lit.color], ['VOL', 'bars', '62', 'Instrument Serif', '#C8381E']);
+  const a = osd('artboard');
+  assert.deepEqual([a.word('volume'), a.bars, a.valueText(62), a.lit.color, a.unlit.color], ['', 'round', '62', '#6C83FF', '#2B2F36']);
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => [osd(n).width, osd(n).height]), [[280, 34], [300, 40], [320, 34]]);
+});
+
+test('before the theme loads the island still has a whole notification and OSD look', () => {
+  assert.equal(islandLook(null).appLabel('x'), 'X');
+  assert.equal(osdLook(null).valueText(7), '7');
 });
