@@ -399,3 +399,18 @@ why = "certutil, which caddy uses to trust its CA in Chromium's store"
 name = "podman"
 arch = "all"
 why = "runs the dev databases and mailpit as socket-started quadlets"
+
+[[package]]
+name = "gnupg2"
+arch = "all"
+why = "decrypts the pass store, whose GPG key dots secrets imports"
+
+[[package]]
+name = "pass"
+arch = "all"
+why = "holds the gh PATs, the mail password and the hub's tokens"
+
+[[package]]
+name = "pinentry-qt"
+arch = "all"
+why = "asks for the GPG passphrase on screen"
