@@ -19,10 +19,12 @@ check() {
 }
 as_root() { podman exec -u root "$name" bash -c "$1"; }
 # shellcheck disable=SC2329 # called through check
+# The committed bin/dots goes in on stdin, as the curl one-liner sends it, so an edit to the checkout cannot reach a run.
 dots_install() {
-  podman exec -u saiful -w "$home" -e HOME="$home" -e PATH=/opt/shim:/usr/local/bin:/usr/bin:/bin \
-    -e DOTS_REPO=/src.git -e DOTS_BRANCH="$branch" -e DOTS_MACHINE=test \
-    "$name" bash /src/bin/dots install
+  git -C "$here" show "$branch:bin/dots" |
+    podman exec -i -u saiful -w "$home" -e HOME="$home" -e PATH=/opt/shim:/usr/local/bin:/usr/bin:/bin \
+      -e DOTS_REPO=/src.git -e DOTS_BRANCH="$branch" -e DOTS_MACHINE=test \
+      "$name" bash -s install
 }
 snapshot() { as_root "find $home /etc \\( -type f -o -type l \\) -printf '%p %s %T@ %l\\n' | sort"; }
 
@@ -30,11 +32,13 @@ trap 'podman rm -f -t 0 "$name" >/dev/null 2>&1' EXIT
 # label=disable lets the container read the checkout without relabelling it on the host.
 podman run -d --rm --name "$name" --userns=keep-id --security-opt label=disable \
   --passwd-entry "saiful:*:1000:1000::$home:/bin/bash" \
-  -v "$here:/src:ro" -v "$gitdir:/src.git:ro" \
+  -v "$here:/src:ro" -v "$gitdir:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 \
   docker.io/library/fedora:44 sleep infinity >/dev/null || { echo "FAIL: container did not start"; exit 1; }
 
 as_root "
   set -e
+  # Downloaded rpms stay in the cache volume, so the next run fetches only what changed.
+  echo keepcache=True >> /etc/dnf/dnf.conf
   command -v sudo >/dev/null || dnf -y -q install sudo
   mkdir -p $home && chown saiful: $home
   echo 'saiful ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/saiful
