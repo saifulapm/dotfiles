@@ -100,8 +100,11 @@ test('a deleted goal leaves a tombstone and no longer lists', () => {
 });
 
 test('a deadline is typed as Nd, Nh or a date; empty is none and anything else is refused', () => {
-  assert.deepEqual(parseDeadline('3d', T), { deadline: T + 3 * D });
-  assert.deepEqual(parseDeadline(' 5h ', T), { deadline: T + 5 * H });
+  // From the start of the minute, since the margin's clock only moves on the minute: typed at 14:32:45, 3d still reads 3d.
+  const M0 = new Date(2026, 9, 18, 14, 32).getTime();
+  assert.deepEqual(parseDeadline('3d', M0 + 45000), { deadline: M0 + 3 * D });
+  assert.deepEqual(parseDeadline(' 5h ', M0 + 45000), { deadline: M0 + 5 * H });
+  assert.equal(countdown(parseDeadline('3d', M0 + 45000).deadline, M0), '3d');
   assert.deepEqual(parseDeadline('', T), { deadline: null });
   assert.deepEqual(parseDeadline('2026-10-21', T), { deadline: new Date(2026, 9, 21, 23, 59).getTime() });
   for (const t of ['3', 'd', '0d', '2026-02-30', '2026-13-01', 'tomorrow', '3 d']) assert.equal(parseDeadline(t, T), null);

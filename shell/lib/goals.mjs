@@ -105,12 +105,12 @@ export function moveTask(store, goalId, taskId, dir, now) {
   return fn ? changeGoal(store, goalId, (g) => set(g, { tasks: g.tasks.map(fn) })) : store;
 }
 
-// What the deadline prompt accepts: Nd or Nh from now, or a date, due at 23:59 local; null is a refusal.
+// The prompt takes Nd or Nh from the start of this minute (the margin's clock moves only on the minute), or a date due 23:59 local; null refuses.
 export function parseDeadline(text, now) {
   const t = text.trim();
   if (!t) return { deadline: null };
   const rel = t.match(/^([1-9][0-9]*)([dh])$/);
-  if (rel) return { deadline: now + Number(rel[1]) * (rel[2] === 'd' ? D : H) };
+  if (rel) return { deadline: now - (now % 60000) + Number(rel[1]) * (rel[2] === 'd' ? D : H) };
   const date = t.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
   if (!date) return null;
   const d = new Date(Number(date[1]), Number(date[2]) - 1, Number(date[3]), 23, 59);
