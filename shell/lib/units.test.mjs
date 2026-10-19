@@ -25,3 +25,32 @@ test('the dev unit sets the same environment as the real one', () => {
   assert.deepEqual(devEnv, real);
   assert.ok(real.includes('QSG_RENDER_LOOP=basic'));
 });
+
+const userUnit = (name) => readFileSync(root + 'home/dot_config/systemd/user/' + name, 'utf8');
+const props = (text, key) => [...text.matchAll(new RegExp(`^${key}=(.*)$`, 'gm'))].map((m) => m[1]);
+const syncCmd = (args) => `{{ joinPath .chezmoi.workingTree "bin/dots" }} sync${args}`;
+
+test('the sync timer runs dots sync 3 min after boot and then every 15 min', () => {
+  const timer = userUnit('dots-sync.timer');
+  assert.deepEqual(props(timer, 'OnBootSec'), ['3min']);
+  assert.deepEqual(props(timer, 'OnUnitActiveSec'), ['15min']);
+  const service = userUnit('dots-sync.service.tmpl');
+  assert.deepEqual(props(service, 'Type'), ['oneshot']);
+  assert.deepEqual(props(service, 'ExecStart'), [syncCmd('')]);
+});
+
+test('a change to the notes or goals store runs dots sync --only for that unit', () => {
+  for (const unit of ['notes', 'goals']) {
+    const path = userUnit(`dots-sync-${unit}.path`);
+    assert.deepEqual(props(path, 'PathChanged'), [`%h/.local/share/dots/${unit}`]);
+    assert.deepEqual(props(path, 'MakeDirectory'), ['yes']);
+    assert.deepEqual(props(userUnit(`dots-sync-${unit}.service.tmpl`), 'ExecStart'), [syncCmd(` --only ${unit}`)]);
+  }
+});
+
+test('niri starts the sync timer and both path units at login', () => {
+  const niri = readFileSync(root + 'home/dot_config/niri/config.kdl', 'utf8');
+  for (const u of ['dots-sync.timer', 'dots-sync-notes.path', 'dots-sync-goals.path']) {
+    assert.match(niri, new RegExp(`^spawn-at-startup "systemctl" "--user" "start" "${u.replace('.', '\\.')}"$`, 'm'));
+  }
+});

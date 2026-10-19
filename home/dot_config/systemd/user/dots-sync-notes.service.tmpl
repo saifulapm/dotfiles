@@ -1,0 +1,6 @@
+[Unit]
+Description=dots sync, the notes unit only
+
+[Service]
+Type=oneshot
+ExecStart={{ joinPath .chezmoi.workingTree "bin/dots" }} sync --only notes

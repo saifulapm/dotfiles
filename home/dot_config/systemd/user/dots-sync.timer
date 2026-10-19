@@ -1,0 +1,7 @@
+[Unit]
+Description=dots sync, 3 min after boot and every 15 min
+
+[Timer]
+# niri starts this at login; a login after the third minute runs a round at once, since a past OnBootSec elapses immediately.
+OnBootSec=3min
+OnUnitActiveSec=15min

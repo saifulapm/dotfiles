@@ -68,3 +68,8 @@ why = "keeps the clipboard history the launcher lists with v or Mod+V"
 name = "wtype"
 arch = "all"
 why = "the launcher types a clip or an emoji into the window you came from"
+
+[[package]]
+name = "rclone"
+arch = "all"
+why = "dots sync copies notes and goals to Dropbox and back"

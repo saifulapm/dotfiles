@@ -1,0 +1,7 @@
+[Unit]
+Description=dots sync, one round over every unit
+
+[Service]
+Type=oneshot
+# The repo's bin/ is not on the user manager's PATH, so the unit names the checkout chezmoi applies from.
+ExecStart={{ joinPath .chezmoi.workingTree "bin/dots" }} sync

@@ -1,0 +1,7 @@
+[Unit]
+Description=dots sync when the notes store changes
+
+[Path]
+# The shell writes the store with a close, and dots sync renames its merge over it; both fire this. Dot-files are ignored.
+PathChanged=%h/.local/share/dots/notes
+MakeDirectory=yes
