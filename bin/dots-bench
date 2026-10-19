@@ -106,6 +106,9 @@ qs ipc call launcher close >/dev/null
 until_ok 3000 host_focus None || die "emoji mode never gave the keyboard back"
 sleep 5
 rss_kib=$(shell_status | jq -r .rssKiB) || die "status did not answer after the opens"
+# GPU buffers are shmem, which RSS misses, so the unit's cgroup anon+shmem is read at the same moment.
+cgroup=$(systemctl --user show -p ControlGroup --value "$DOTS_DEV_UNIT")
+anon_shmem_kib=$(awk '$1 == "anon" || $1 == "shmem" { b += $2 } END { printf "%d", b / 1024 }' "/sys/fs/cgroup$cgroup/memory.stat") || die "memory.stat of $DOTS_DEV_UNIT unreadable"
 
 start=$(shell_status | jq -r .theme)
 switch_max=0
@@ -135,6 +138,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib"
 exit
 }

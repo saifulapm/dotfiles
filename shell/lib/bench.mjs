@@ -7,6 +7,8 @@ const line = (name, value, unit, op, limit, ok) =>
   `${name.padEnd(13)} ${`${value} ${unit}`.padEnd(7)} ${op} ${`${limit} ${unit}`.padEnd(8)} ${ok ? 'ok' : 'OVER'}`;
 
 export function report(m, b) {
+  // GPU buffers are shmem, so a lever that moves memory out of RSS into them only shows here; reported, not budgeted.
+  const cgroup = `${'cgroup mem'.padEnd(13)} ${Math.floor(m.anonShmemKiB / 1024)} MiB`;
   const checks = [
     line('first frame', m.firstFrameMs, 'ms', '≤', b.firstFrameMs, m.firstFrameMs <= b.firstFrameMs),
     // RSS is compared in KiB, so a value just over the budget is not rounded down into it.
@@ -20,7 +22,7 @@ export function report(m, b) {
   ];
   // Every theme's shaders and effects loaded once; reported, not budgeted.
   const switched = `${'rss switched'.padEnd(13)} ${Math.floor(m.switchedKiB / 1024)} MiB`;
-  return { lines: [...checks, switched], over: checks.some((l) => l.endsWith('OVER')) };
+  return { lines: [...checks.slice(0, 2), cgroup, ...checks.slice(2), switched], over: checks.some((l) => l.endsWith('OVER')) };
 }
 
 // Round the list and back again from start: with three themes that is each of the six ordered pairs once.
@@ -39,8 +41,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const [firstFrameMs, rssKiB, coldMs, warmMs, timers] = process.argv.slice(2, 7).map(Number);
   const switchMs = Number(process.argv[8]);
   const switchedKiB = Number(process.argv[9]);
+  const anonShmemKiB = Number(process.argv[10]);
   const env = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
-  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, cpu: process.argv[7] }, {
+  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, cpu: process.argv[7] }, {
     firstFrameMs: env('DOTS_BUDGET_FIRST_FRAME_MS', BUDGETS.firstFrameMs),
     rssMiB: env('DOTS_BUDGET_RSS_MIB', BUDGETS.rssMiB),
     coldMs: env('DOTS_BUDGET_COLD_MS', BUDGETS.coldMs),

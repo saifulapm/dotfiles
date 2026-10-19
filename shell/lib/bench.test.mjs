@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { report, switchCycle, BUDGETS } from './bench.mjs';
 
 const cli = new URL('./bench.mjs', import.meta.url).pathname;
-const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 48, warmMs: 4, timers: 1, switchMs: 120, switchedKiB: 157000, cpu: '0.03' };
+const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 48, warmMs: 4, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03' };
 
 test('every measure within budget reads ok and passes', () => {
   const r = report(good, BUDGETS);
@@ -12,6 +12,7 @@ test('every measure within budget reads ok and passes', () => {
   assert.deepEqual(r.lines, [
     'first frame   130 ms  ≤ 150 ms   ok',
     'idle rss      149 MiB ≤ 180 MiB  ok',
+    'cgroup mem    231 MiB',
     'panel cold    48 ms   ≤ 50 ms    ok',
     'panel warm    4 ms    ≤ 16 ms    ok',
     'timers        1       = 1        ok',
@@ -24,7 +25,7 @@ test('every measure within budget reads ok and passes', () => {
 test('one measure over its budget reads OVER and fails', () => {
   const r = report({ ...good, warmMs: 17 }, BUDGETS);
   assert.equal(r.over, true);
-  assert.equal(r.lines[3], 'panel warm    17 ms   ≤ 16 ms    OVER');
+  assert.equal(r.lines[4], 'panel warm    17 ms   ≤ 16 ms    OVER');
 });
 
 test('a first frame of 150 ms passes and 160 ms is OVER', () => {
@@ -54,7 +55,7 @@ test('the CLI exits 1 when an env budget is exceeded and 0 otherwise', () => {
 test('the slowest of the six theme switches over 300 ms is OVER', () => {
   const r = report({ ...good, switchMs: 301 }, BUDGETS);
   assert.equal(r.over, true);
-  assert.equal(r.lines[5], 'theme switch  301 ms  ≤ 300 ms   OVER');
+  assert.equal(r.lines[6], 'theme switch  301 ms  ≤ 300 ms   OVER');
 });
 
 test('the six ordered pairs of three themes are each switched once, ending where they began', () => {
@@ -71,5 +72,16 @@ test('the RSS after every theme has been shown is reported but never OVER', () =
 test('idle cpu over 0.07 % is OVER', () => {
   const r = report({ ...good, cpu: '0.08' }, BUDGETS);
   assert.equal(r.over, true);
-  assert.equal(r.lines[6], 'idle cpu      0.08 %  ≤ 0.07 %   OVER');
+  assert.equal(r.lines[7], 'idle cpu      0.08 %  ≤ 0.07 %   OVER');
+});
+
+test('the cgroup anon+shmem is reported beside idle rss but never OVER', () => {
+  const r = report({ ...good, anonShmemKiB: 900 * 1024 }, BUDGETS);
+  assert.equal(r.lines[2], 'cgroup mem    900 MiB');
+  assert.equal(r.over, false);
+});
+
+test('the CLI prints the cgroup memory from its ninth argument', () => {
+  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544'];
+  assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /cgroup mem {4}231 MiB/);
 });
