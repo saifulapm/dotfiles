@@ -16,6 +16,14 @@ Item {
     readonly property real chamfer: style.corner.chamfer
     readonly property var shadow: style.shadow
     readonly property color accent: tokens ? tokens.color.accent : "transparent"
+    // The Motion that plays this card's open and close; the island and the previews have none.
+    property var motion: null
+    readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, outline: 1, fill: 1 })
+
+    scale: pose.scale
+    transform: Translate {
+        y: surface.pose.lift
+    }
 
     Rectangle {
         visible: surface.shadow.kind === "hard" && !surface.chamfer

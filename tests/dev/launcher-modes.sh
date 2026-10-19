@@ -8,7 +8,7 @@ state_is() { launcher_state | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_space() { niri msg action spawn -- qs ipc call launcher toggle; }
 # niri lists the layer Exclusive a moment before its keys arrive, so typing waits until the window has the keyboard.
-open_launcher() { mod_space; until_ok 3000 state_is '.open and .query == "" and .keyboard'; }
+open_launcher() { mod_space; until_ok 3000 state_is '.open and .query == "" and .keyboard and .settled'; }
 close_launcher() { wtype -k Escape; until_ok 2000 state_is '.open == false'; }
 windows_n() { niri msg -j windows | jq length; }
 

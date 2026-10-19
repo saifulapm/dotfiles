@@ -28,11 +28,13 @@ PanelWindow {
     readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView]
     readonly property bool shown: all.some(s => s?.shown ?? false)
 
-    // Only one surface shows at a time.
+    // Only one surface shows at a time, so another's close is cut short.
     function closeOthers(keep) {
         for (const s of all) {
-            if (s && s !== keep)
+            if (s && s !== keep) {
                 s.close();
+                s.motion?.cut();
+            }
         }
     }
 

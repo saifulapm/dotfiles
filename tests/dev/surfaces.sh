@@ -7,8 +7,8 @@ unset TMUX
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 launcher_is() { launcher_state | jq -e "$1" >/dev/null; }
 launcher_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
-launcher_open() { launcher_is .open && launcher_focus Exclusive; }
-launcher_closed() { launcher_is '.open == false' && launcher_focus None; }
+launcher_open() { launcher_is ".open and .settled" && launcher_focus Exclusive; }
+launcher_closed() { launcher_is ".open == false and .drawing == false" && launcher_focus None; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 
 read -r ox oy ow < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y) \(.width)"')

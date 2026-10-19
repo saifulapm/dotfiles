@@ -64,6 +64,10 @@ Item {
     }
     readonly property var rows: found.slice(0, 8)
     readonly property var look: L.launcherLook(theme.tokens)
+    readonly property Root.Motion motion: Root.Motion {
+        shown: launcher.shown
+        tokens: launcher.theme.tokens
+    }
 
     // mode is clipboard or emoji when a key opened the launcher straight into one.
     function open(t0, mode) {
@@ -126,6 +130,12 @@ Item {
         return Math.max(1, new Set(footer.children.filter(k => k.visible && k.width > 0).map(k => k.y)).size);
     }
 
+    function drawnBox(item) {
+        const a = item.mapToItem(null, 0, 0);
+        const b = item.mapToItem(null, item.width, item.height);
+        return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
+    }
+
     function state() {
         const cur = rowRepeater.itemAt(selected);
         const p = cur ? cur.mapToItem(null, 0, 0) : null;
@@ -140,6 +150,12 @@ Item {
             selected: selected,
             openMs: openMs,
             opens: opens,
+            motion: motion.curves?.kind ?? null,
+            settleMs: motion.settleMs,
+            settled: motion.settled,
+            drawing: motion.drawing,
+            // The card as drawn this frame, moved and scaled by its motion.
+            cardBox: drawnBox(card),
             look: look.voice,
             label: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             count: found.length,
@@ -205,7 +221,7 @@ Item {
 
     Component.onCompleted: Root.State.loaded.push("launcher")
 
-    visible: shown
+    visible: motion.drawing
 
     Item {
         anchors.fill: parent
@@ -223,6 +239,7 @@ Item {
             height: column.implicitHeight
             tokens: launcher.theme.tokens
             label: "Launcher"
+            motion: launcher.motion
 
             ColumnLayout {
                 id: column
