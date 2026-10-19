@@ -28,6 +28,7 @@ cleanup() { live_moved && echo "FAIL soak touched the live session: its shell PI
 
 layer_up() { niri msg -j layers | jq -e --arg ns "$1" 'any(.[]; .namespace == $ns)' >/dev/null; }
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
+launcher_open() { launcher_state | jq -e ".open" >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
 launcher_closed() { launcher_state | jq -e ".open == false" >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "None")' >/dev/null; }
 status_has() { shell_status | jq -e "$1" >/dev/null; }
 
@@ -36,18 +37,27 @@ until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
 until_ok 3000 status_has '(.rssKiB | type) == "number"' || die "status never reported rssKiB"
 sleep 5
 
+mapfile -t names < <(timeout 0.5 qs ipc call themes state | jq -r '.themes[]')
+theme=$(shell_status | jq -r .theme)
+# A theme shown once keeps its shaders, so every theme is shown before the first sample and minute 5 is a warm baseline.
+for t in "${names[@]}" "$theme"; do
+  "$(dirname "$0")/dots" theme "$t" >/dev/null || die "dots theme $t failed"
+  until_ok 3000 status_has ".theme == \"$t\"" || die "the shell never reported $t"
+  sleep 1
+done
+
 sample() { echo "$1,$(shell_status | jq -r .rssKiB)" >>"$csv"; }
 echo "minute,rss_kib" >"$csv"
 sample 0
 echo "soak: csv $csv" >&2
 
-mapfile -t names < <(timeout 0.5 qs ipc call themes state | jq -r '.themes[]')
-theme=$(shell_status | jq -r .theme)
 for ((m = 1; m <= minutes; m++)); do
   notify-send soak "minute $m" || die "notify-send failed"
   qs ipc call launcher open >/dev/null || die "launcher open failed"
   until_ok 3000 layer_up dots-surfaces || die "dots-surfaces never mapped"
-  qs ipc call launcher close >/dev/null
+  until_ok 3000 launcher_open || die "the launcher never took the keyboard"
+  # A real key, so the nested shell's idle steps (dim, lock, monitors off) never start.
+  wtype -k Escape
   until_ok 3000 launcher_closed || die "the launcher never gave the keyboard back"
   if ((m % 5 == 0)); then
     for i in "${!names[@]}"; do [[ ${names[i]} == "$theme" ]] && break; done
