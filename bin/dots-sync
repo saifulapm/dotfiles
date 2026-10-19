@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2329 # the runner calls each sync_<unit> by name
+# dots sync [--only notes|goals]: one round through rclone's Dropbox:, each machine writing only <unit>/<machine>.json; exits 0 when every unit synced or skipped, else the highest unit exit code.
+set -uo pipefail
+shopt -s nullglob
+
+here=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+root=Dropbox:dots-sync
+data=${XDG_DATA_HOME:-$HOME/.local/share}/dots
+state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
+status=$state/sync.json
+units=(notes goals)
+machine=
+tmp=
+# The last error line of the step that failed, for sync.json.
+err=
+
+# A dead network must end in an error rather than hold the lock, so each call has rclone's timeouts and an outer one.
+rc() {
+  local out
+  if out=$(timeout 120 rclone --contimeout 10s --timeout 30s "$@" 2>&1); then return 0; fi
+  local code=$?
+  err=$(tail -n 1 <<<"$out")
+  err=${err#[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] }
+  [[ -n $err ]] || err="rclone $1 exited $code"
+  return 1
+}
+
+# merge <unit> <store> <pulled dir>: the merge CLI skips this machine's own file among the pulled ones.
+merge() {
+  local out code
+  if out=$("$here/dots-sync-merge" "$1" "$2" "$3"/*.json 2>&1); then code=0; else code=$?; fi
+  [[ -n $out ]] && echo "$out" >&2
+  ((code == 0)) || err=$(tail -n 1 <<<"$out")
+  return "$code"
+}
+
+# store_unit <unit>: pull the other machines' files, merge, then copy this machine's store up under its own name.
+store_unit() {
+  local store=$data/$1/$machine.json pulled=$tmp/$1
+  mkdir -p "$pulled"
+  rc mkdir "$root/$1" &&
+    rc copy "$root/$1" "$pulled" --max-depth 1 --include '*.json' &&
+    merge "$1" "$store" "$pulled" || return
+  # --checksum, as Dropbox keeps modtimes to the second and a same-size edit inside it would look unchanged.
+  [[ ! -f $store ]] || rc copyto "$store" "$root/$1/$machine.json" --checksum
+}
+
+# Attachments are named by their sha256, so a name already present on either side is the same file; none is ever deleted.
+sync_notes() {
+  local dir=$data/notes/attachments
+  store_unit notes || return
+  mkdir -p "$dir"
+  rc mkdir "$root/notes/attachments" &&
+    rc copy "$root/notes/attachments" "$dir" --ignore-existing --exclude '*.tmp' &&
+    rc copy "$dir" "$root/notes/attachments" --ignore-existing --exclude '*.tmp'
+}
+
+sync_goals() {
+  store_unit goals
+}
+
+# record <unit> <true|false> <error>: one entry of sync.json, written whole through a temp file.
+record() {
+  local now cur
+  now=$(date +%s%3N)
+  cur=$(jq -c . "$status" 2>/dev/null) || cur='{}'
+  [[ $cur == \{* ]] || cur='{}'
+  jq -n --argjson cur "$cur" --arg unit "$1" --argjson ok "$2" --arg error "$3" --argjson now "$now" \
+    '$cur | .[$unit] = {ok: $ok, lastRun: $now, lastOk: (if $ok then $now else ($cur[$unit].lastOk // null) end), error: (if $ok then null else $error end)}' \
+    >"$status.$$.tmp" && mv "$status.$$.tmp" "$status"
+}
+
+usage() {
+  echo "usage: dots sync [--only notes|goals]" >&2
+  exit 2
+}
+
+main() {
+  case "${1:-}" in
+    '') ;;
+    --only)
+      [[ ${2:-} == notes || ${2:-} == goals ]] || usage
+      units=("$2")
+      ;;
+    *) usage ;;
+  esac
+
+  # Before dots secrets there is no Dropbox: remote, and that is not a failure.
+  local remotes
+  remotes=$(timeout 30 rclone listremotes 2>/dev/null)
+  if ! grep -qxF 'Dropbox:' <<<"$remotes"; then
+    echo "dots sync: skipped, no Dropbox: remote in rclone yet"
+    exit 0
+  fi
+
+  local lockdir=${XDG_RUNTIME_DIR:-$state}
+  mkdir -p "$state" "$lockdir"
+  exec 9>"$lockdir/dots-sync.lock"
+  if ! flock -n 9; then
+    echo "already running"
+    exit 0
+  fi
+
+  machine=$("$here/dots-sync-merge" machine) || exit 1
+  tmp=$(mktemp -d)
+  # shellcheck disable=SC2064 # the temp dir is fixed now
+  trap "rm -rf '$tmp'" EXIT
+
+  local unit code worst=0
+  if ! rc lsf --max-depth 1 Dropbox:; then
+    for unit in "${units[@]}"; do record "$unit" false "$err"; done
+    echo "dots sync: $err" >&2
+    exit 1
+  fi
+  for unit in "${units[@]}"; do
+    err=
+    "sync_$unit"
+    code=$?
+    if ((code == 0)); then
+      record "$unit" true ""
+    else
+      record "$unit" false "${err:-exited $code}"
+      echo "dots sync: $unit: $err" >&2
+      ((code > worst)) && worst=$code
+    fi
+  done
+  exit "$worst"
+}
+
+main "$@"

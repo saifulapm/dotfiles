@@ -6,6 +6,10 @@ dev:
 test:
     timeout 5 node --test 'shell/lib/**/*.test.mjs'
 
+# dots sync between two scratch machines over a local alias remote
+test-sync:
+    node --test 'tests/sync/*.test.mjs'
+
 # checks that each open a nested niri for a few seconds
 test-dev:
     tests/dev/run.sh

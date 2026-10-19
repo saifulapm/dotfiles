@@ -1,0 +1,58 @@
+#!/usr/bin/env node
+// dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals> <store> <other>...` merges the others into the local store.
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+import * as goals from '../shell/lib/goals.mjs';
+import * as notes from '../shell/lib/notes.mjs';
+
+const read = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
+const fail = (msg, code) => {
+  process.stderr.write(msg + '\n');
+  process.exit(code);
+};
+
+function machine() {
+  const env = process.env;
+  const config = env.XDG_CONFIG_HOME || env.HOME + '/.config';
+  return notes.machineId(env.DOTS_MACHINE, read(config + '/chezmoi/chezmoi.toml'), read('/etc/hostname'));
+}
+
+const mtime = (path) => (existsSync(path) ? statSync(path, { bigint: true }).mtimeNs : null);
+
+// Merging a store with itself only sorts it, so the two compare equal when the others brought nothing and the file stays untouched.
+function round(model, path, others) {
+  const before = mtime(path);
+  const local = before === null ? model.emptyStore() : model.parseStore(readFileSync(path, 'utf8'));
+  if (!local) fail(`${basename(path)}: the local store is broken, so it is left as it is`, 4);
+  const base = model.mergeStores(local, local);
+  const merged = others.reduce((s, store) => model.mergeStores(s, store), base);
+  if (JSON.stringify(merged) === JSON.stringify(base)) return true;
+  const tmp = join(dirname(path), '.' + basename(path) + '.' + process.pid + '.tmp');
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(tmp, JSON.stringify(merged));
+  // The shell may have saved while this round merged; then the round starts again from its file.
+  if (mtime(path) !== before) {
+    unlinkSync(tmp);
+    return false;
+  }
+  renameSync(tmp, path);
+  return true;
+}
+
+function merge(unit, path, files) {
+  const model = { notes, goals }[unit];
+  const others = [];
+  for (const f of files) {
+    if (basename(f) === basename(path)) continue;
+    const store = model.parseStore(read(f));
+    if (store) others.push(store);
+    else process.stderr.write(`${unit}: skipped ${basename(f)}, which does not parse\n`);
+  }
+  for (let i = 0; i < 3; i++) if (round(model, path, others)) return;
+  fail(`${unit}: the local store kept changing, so this round left it alone`, 1);
+}
+
+const [cmd, path, ...files] = process.argv.slice(2);
+if (cmd === 'machine') process.stdout.write(machine() + '\n');
+else if ((cmd === 'notes' || cmd === 'goals') && path) merge(cmd, path, files);
+else fail('usage: dots-sync-merge machine | dots-sync-merge <notes|goals> <store> <other>...', 2);

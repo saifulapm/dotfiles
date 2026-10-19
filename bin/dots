@@ -125,8 +125,9 @@ main() {
   case ${1:-} in
     install) install ;;
     theme) theme "${2:-}" ;;
+    sync) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-sync" "${@:2}" ;;
     *)
-      echo "usage: dots install | dots theme <name>" >&2
+      echo "usage: dots install | dots theme <name> | dots sync [--only notes|goals]" >&2
       exit 2
       ;;
   esac
