@@ -13,9 +13,9 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3
 const v1Notes = (home, extra = []) => ({
   version: 2,
   notes: [
-    { id: '0mtmhm85a-xdie', text: 'cli setup', path: '', done: false, updatedAt: '2026-09-04T05:02:24.190Z' },
-    { id: '0mun8kh5q-88yi', text: '', path: join(home, '.local/state/qshell/notes/attachments/paste-1.png'), done: false, updatedAt: '2026-09-29T22:16:34.526Z' },
-    { id: '0mteaikqo-mp7z', text: '', path: '', done: false, updatedAt: '2026-09-30T20:09:46.423Z', deletedAt: '2026-09-30T20:09:46.423Z' },
+    { id: '0mt0a0001-aaaa', text: 'first note', path: '', done: false, updatedAt: '2026-09-04T00:00:00.000Z' },
+    { id: '0mt0a0002-aaaa', text: '', path: join(home, '.local/state/qshell/notes/attachments/paste-1.png'), done: false, updatedAt: '2026-09-29T00:00:00.000Z' },
+    { id: '0mt0a0003-aaaa', text: '', path: '', done: false, updatedAt: '2026-09-30T00:00:00.000Z', deletedAt: '2026-09-30T00:00:00.000Z' },
     ...extra,
   ],
 });
@@ -23,7 +23,7 @@ const v1Notes = (home, extra = []) => ({
 const v1Goals = {
   version: 1,
   goals: [
-    { id: 'g1', name: 'Ship', due: '2026-09-22T15:58:58.547Z', state: 'shipped', tasks: [{ id: 't1', text: 'a', done: true, updatedAt: '2026-09-22T03:59:23.008Z' }], createdAt: '2026-09-10T11:44:57.460Z', updatedAt: '2026-09-26T10:32:04.402Z', shippedAt: '2026-09-26T10:32:04.402Z' },
+    { id: 'g1', name: 'Ship', due: '2026-09-22T00:00:00.000Z', state: 'shipped', tasks: [{ id: 't1', text: 'a', done: true, updatedAt: '2026-09-21T00:00:00.000Z' }], createdAt: '2026-09-10T00:00:00.000Z', updatedAt: '2026-09-26T12:00:00.000Z', shippedAt: '2026-09-26T12:00:00.000Z' },
     { id: 'g2', name: 'Next', due: '2026-10-30T00:00:00.000Z', state: 'active', tasks: [], createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-02T00:00:00.000Z' },
   ],
 };
@@ -54,8 +54,9 @@ function scratch() {
   writeFileSync(join(home, '.local/share/fish/test_box_history'), entry('ls', 100) + entry('make', 200));
   writeFileSync(join(home, '.local/share/fish/fish_history'), entry('ls', 100) + entry('v2 only', 300));
 
-  // qshell.service is enabled and running, update-all.timer only enabled, and an unrelated v1 unit is enabled too.
+  // qshell.service is enabled and running, update-all.timer only enabled, a static qshell-sync.service mid-run, and an unrelated v1 unit is enabled too.
   for (const f of ['qshell.service.enabled', 'qshell.service.active', 'update-all.timer.enabled', 'hub-local.service.enabled', 'hub-local.service.active']) writeFileSync(join(units, f), '');
+  writeFileSync(join(units, 'qshell-sync.service.active'), 'activating');
   writeFileSync(
     join(stubs, 'systemctl'),
     `#!/bin/sh
@@ -63,7 +64,7 @@ echo "$*" >> ${log}
 [ "$1" = --user ] || exit 1
 case $2 in
   is-enabled) if [ -e ${units}/$3.enabled ]; then echo enabled; else echo static; fi ;;
-  is-active) test -e ${units}/$4.active ;;
+  is-active) if [ -e ${units}/$3.active ]; then s=$(cat ${units}/$3.active); echo \${s:-active}; [ "\${s:-active}" = active ]; else echo inactive; exit 3; fi ;;
   disable) rm -f ${units}/$4.enabled ${units}/$4.active ;;
   *) exit 1 ;;
 esac
@@ -106,13 +107,13 @@ test('cutover imports v1 notes, goals and history, stops the units v2 replaces, 
   const s = scratch();
   const r = run(s);
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(lastLine(r), 'notes: 2 imported · goals: 2 imported · history: 1 merged · v1 units: 2 stopped');
+  assert.equal(lastLine(r), 'notes: 2 imported · goals: 2 imported · history: 1 merged · v1 units: 3 stopped');
 
   const notes = store(s, 'notes').notes;
-  assert.deepEqual(notes.filter((n) => !n.deleted).map((n) => n.id).sort(), ['0mtmhm85a-xdie', '0mun8kh5q-88yi']);
-  assert.equal(notes.find((n) => n.id === '0mteaikqo-mp7z').deleted, true);
+  assert.deepEqual(notes.filter((n) => !n.deleted).map((n) => n.id).sort(), ['0mt0a0001-aaaa', '0mt0a0002-aaaa']);
+  assert.equal(notes.find((n) => n.id === '0mt0a0003-aaaa').deleted, true);
   const sha = createHash('sha256').update(PNG).digest('hex');
-  assert.deepEqual(notes.find((n) => n.id === '0mun8kh5q-88yi').attachments, [{ sha256: sha, name: 'paste-1.png', mime: 'image/png', size: PNG.length }]);
+  assert.deepEqual(notes.find((n) => n.id === '0mt0a0002-aaaa').attachments, [{ sha256: sha, name: 'paste-1.png', mime: 'image/png', size: PNG.length }]);
   assert.deepEqual(readFileSync(join(s.home, `.local/share/dots/notes/attachments/${sha}.png`)), PNG);
 
   const goals = store(s, 'goals').goals;
@@ -125,7 +126,7 @@ test('cutover imports v1 notes, goals and history, stops the units v2 replaces, 
 test('only the v1 units v2 replaces are stopped, and only the v1 links that outrank v2 are removed', () => {
   const s = scratch();
   assert.equal(run(s).status, 0);
-  assert.deepEqual(calls(s).filter((c) => c.includes('disable')), ['--user disable --now qshell.service', '--user disable --now update-all.timer']);
+  assert.deepEqual(calls(s).filter((c) => c.includes('disable')), ['--user disable --now qshell.service', '--user disable --now qshell-sync.service', '--user disable --now update-all.timer']);
   assert.deepEqual(readdirSync(s.units).sort(), ['hub-local.service.active', 'hub-local.service.enabled']);
   assert.equal(existsSync(join(s.home, '.gitconfig')), false);
   assert.equal(existsSync(join(s.home, '.config/fish/conf.d/10-history.fish')), false);

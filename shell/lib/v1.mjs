@@ -24,7 +24,8 @@ export function notesFromV1(text, attachmentOf) {
     const base = { id: n.id, section: 'inbox', text: '', attachments: [], todo: false, done: false, tags: [] };
     if (n.deletedAt) return Object.assign(base, { deleted: true, createdAt: createdAt(n), updatedAt: ms(n.deletedAt) });
     const attachment = n.path ? attachmentOf(n.path) : null;
-    return Object.assign(base, { text: String(n.text ?? ''), attachments: attachment ? [attachment] : [], todo: n.done === true, done: n.done === true, createdAt: createdAt(n), updatedAt: ms(n.updatedAt) });
+    // A file v1 left where it was dropped may not be on this machine; then its path is the text, as v1 showed its name.
+    return Object.assign(base, { text: String(n.text ?? '') || (attachment ? '' : String(n.path ?? '')), attachments: attachment ? [attachment] : [], todo: n.done === true, done: n.done === true, createdAt: createdAt(n), updatedAt: ms(n.updatedAt) });
   };
   return { version: 1, activeSection: 'inbox', sections: [{ name: 'inbox', order: 0 }], notes: v1.map(note) };
 }

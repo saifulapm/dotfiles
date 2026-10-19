@@ -10,39 +10,41 @@ const png = { sha256: 'a'.repeat(64), name: 'paste-1.png', mime: 'image/png', si
 const v1Notes = JSON.stringify({
   version: 2,
   notes: [
-    { id: '0mtmhm85a-xdie', text: 'cli setup', path: '', done: false, updatedAt: '2026-09-04T05:02:24.190Z' },
-    { id: '0mun8kh5q-88yi', text: '', path: '/v1/notes/attachments/paste-1.png', done: false, updatedAt: '2026-09-29T22:16:34.526Z' },
-    { id: '0mteaikqo-mp7z', text: '', path: '', done: false, updatedAt: '2026-09-30T20:09:46.423Z', deletedAt: '2026-09-30T20:09:46.423Z' },
-    { id: '0mtqvousn-jtbs', text: 'ticked', path: '', done: true, updatedAt: '2026-09-26T11:06:41.801Z' },
+    { id: '0mt0a0001-aaaa', text: 'first note', path: '', done: false, updatedAt: '2026-09-04T00:00:00.000Z' },
+    { id: '0mt0a0002-aaaa', text: '', path: '/v1/notes/attachments/paste-1.png', done: false, updatedAt: '2026-09-29T00:00:00.000Z' },
+    { id: '0mt0a0003-aaaa', text: '', path: '', done: false, updatedAt: '2026-09-30T00:00:00.000Z', deletedAt: '2026-09-30T00:00:00.000Z' },
+    { id: '0mt0a0004-aaaa', text: 'ticked', path: '', done: true, updatedAt: '2026-09-26T00:00:00.000Z' },
   ],
 });
 
 test('v1 notes become a v2 store the notes model reads, in the inbox, created when their id says', () => {
   const s = notes.parseStore(JSON.stringify(notesFromV1(v1Notes, (path) => (path === '/v1/notes/attachments/paste-1.png' ? png : null))));
   assert.ok(s);
-  const n = s.notes.find((x) => x.id === '0mtmhm85a-xdie');
-  assert.deepEqual(n, { id: '0mtmhm85a-xdie', section: 'inbox', text: 'cli setup', attachments: [], todo: false, done: false, tags: [], createdAt: parseInt('0mtmhm85a', 36), updatedAt: ms('2026-09-04T05:02:24.190Z') });
-  assert.deepEqual(s.notes.find((x) => x.id === '0mun8kh5q-88yi').attachments, [png]);
-  assert.deepEqual(notes.sectionNotes(s, 'inbox').map((x) => x.id).sort(), ['0mtmhm85a-xdie', '0mtqvousn-jtbs', '0mun8kh5q-88yi']);
+  const n = s.notes.find((x) => x.id === '0mt0a0001-aaaa');
+  assert.deepEqual(n, { id: '0mt0a0001-aaaa', section: 'inbox', text: 'first note', attachments: [], todo: false, done: false, tags: [], createdAt: parseInt('0mt0a0001', 36), updatedAt: ms('2026-09-04T00:00:00.000Z') });
+  assert.deepEqual(s.notes.find((x) => x.id === '0mt0a0002-aaaa').attachments, [png]);
+  assert.deepEqual(notes.sectionNotes(s, 'inbox').map((x) => x.id).sort(), ['0mt0a0001-aaaa', '0mt0a0002-aaaa', '0mt0a0004-aaaa']);
 });
 
 test('a ticked v1 note is a done todo', () => {
-  const n = notesFromV1(v1Notes, () => null).notes.find((x) => x.id === '0mtqvousn-jtbs');
+  const n = notesFromV1(v1Notes, () => null).notes.find((x) => x.id === '0mt0a0004-aaaa');
   assert.equal(n.todo, true);
   assert.equal(n.done, true);
 });
 
 test('a deleted v1 note stays a tombstone, so a later import from a machine that still has it live cannot bring it back', () => {
-  const t = notesFromV1(v1Notes, () => null).notes.find((x) => x.id === '0mteaikqo-mp7z');
+  const t = notesFromV1(v1Notes, () => null).notes.find((x) => x.id === '0mt0a0003-aaaa');
   assert.equal(t.deleted, true);
-  assert.equal(t.updatedAt, ms('2026-09-30T20:09:46.423Z'));
-  const live = notes.parseStore(JSON.stringify(Object.assign(notes.emptyStore(), { notes: [{ id: '0mteaikqo-mp7z', section: 'inbox', text: 'old', updatedAt: ms('2026-09-01T00:00:00Z') }] })));
+  assert.equal(t.updatedAt, ms('2026-09-30T00:00:00.000Z'));
+  const live = notes.parseStore(JSON.stringify(Object.assign(notes.emptyStore(), { notes: [{ id: '0mt0a0003-aaaa', section: 'inbox', text: 'old', updatedAt: ms('2026-09-01T00:00:00Z') }] })));
   const merged = notes.mergeStores(live, notes.parseStore(JSON.stringify(notesFromV1(v1Notes, () => null))));
-  assert.equal(merged.notes.find((x) => x.id === '0mteaikqo-mp7z').deleted, true);
+  assert.equal(merged.notes.find((x) => x.id === '0mt0a0003-aaaa').deleted, true);
 });
 
-test('an attachment whose file is gone leaves its note without one', () => {
-  assert.deepEqual(notesFromV1(v1Notes, () => null).notes.find((x) => x.id === '0mun8kh5q-88yi').attachments, []);
+test('a note whose file cannot come keeps the path as its text, so it never arrives blank', () => {
+  const n = notesFromV1(v1Notes, () => null).notes.find((x) => x.id === '0mt0a0002-aaaa');
+  assert.deepEqual(n.attachments, []);
+  assert.equal(n.text, '/v1/notes/attachments/paste-1.png');
 });
 
 test('the same v1 file always converts to the same store, so importing twice writes nothing new', () => {
@@ -60,18 +62,18 @@ const v1Goals = JSON.stringify({
   goals: [
     {
       id: 'g1',
-      name: 'SplitRoute',
-      due: '2026-09-22T15:58:58.547Z',
+      name: 'Ship app',
+      due: '2026-09-22T00:00:00.000Z',
       state: 'shipped',
       tasks: [
-        { id: 't1', text: 'Overrides', done: true, updatedAt: '2026-09-22T03:59:23.008Z' },
-        { id: 't2', text: 'Submit', done: false, updatedAt: '2026-09-26T10:32:02.942Z' },
+        { id: 't1', text: 'a', done: true, updatedAt: '2026-09-21T00:00:00.000Z' },
+        { id: 't2', text: 'b', done: false, updatedAt: '2026-09-25T00:00:00.000Z' },
       ],
-      createdAt: '2026-09-10T11:44:57.460Z',
-      updatedAt: '2026-09-26T10:32:04.402Z',
-      shippedAt: '2026-09-26T10:32:04.402Z',
+      createdAt: '2026-09-10T00:00:00.000Z',
+      updatedAt: '2026-09-26T12:00:00.000Z',
+      shippedAt: '2026-09-26T12:00:00.000Z',
     },
-    { id: 'g2', name: 'ShortCart', due: '2026-10-30T00:00:00.000Z', state: 'active', tasks: [], createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-02T00:00:00.000Z' },
+    { id: 'g2', name: 'Next app', due: '2026-10-30T00:00:00.000Z', state: 'active', tasks: [], createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-02T00:00:00.000Z' },
     { id: 'g3', name: 'Later', due: '', state: 'queued', tasks: [], createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-03T00:00:00.000Z' },
     { id: 'g4', name: '', due: '', state: '', tasks: [], createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-04T00:00:00.000Z', deletedAt: '2026-10-04T00:00:00.000Z' },
   ],
@@ -83,16 +85,16 @@ test('a shipped v1 goal is done at its ship time, keeping its deadline and tasks
   const g = s.goals.find((x) => x.id === 'g1');
   assert.deepEqual(g, {
     id: 'g1',
-    title: 'SplitRoute',
-    deadline: ms('2026-09-22T15:58:58.547Z'),
+    title: 'Ship app',
+    deadline: ms('2026-09-22T00:00:00.000Z'),
     order: 0,
     done: true,
-    doneAt: ms('2026-09-26T10:32:04.402Z'),
-    updatedAt: ms('2026-09-26T10:32:04.402Z'),
+    doneAt: ms('2026-09-26T12:00:00.000Z'),
+    updatedAt: ms('2026-09-26T12:00:00.000Z'),
     deleted: false,
     tasks: [
-      { id: 't1', text: 'Overrides', done: true, order: 0, updatedAt: ms('2026-09-22T03:59:23.008Z'), deleted: false },
-      { id: 't2', text: 'Submit', done: false, order: 1, updatedAt: ms('2026-09-26T10:32:02.942Z'), deleted: false },
+      { id: 't1', text: 'a', done: true, order: 0, updatedAt: ms('2026-09-21T00:00:00.000Z'), deleted: false },
+      { id: 't2', text: 'b', done: false, order: 1, updatedAt: ms('2026-09-25T00:00:00.000Z'), deleted: false },
     ],
   });
 });
