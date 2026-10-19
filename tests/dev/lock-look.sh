@@ -37,8 +37,17 @@ near_runs() {
     console.log(n, best);
   ' "$2" "$3" "$4"
 }
-# A one-pixel row across the clock's middle, from its box in the lock's state.
-clock_row() { lock_state | jq -r '.clockBox | "\(.x | floor),\(.y + .h * 0.55 | floor) \(.w | floor)x1"'; }
+# A one-pixel row across the clock at a share of its height, from its box in the lock's state; one row can miss thin digits like 1 and 7, so three are summed.
+clock_row() { lock_state | jq -r --argjson f "$1" '.clockBox | "\(.x | floor),\(.y + .h * $f | floor) \(.w | floor)x1"'; }
+# Sums near_runs' counts over the three rows and keeps the longest run.
+rows_runs() {
+  local f n run total=0 longest=0
+  for f in 0.35 0.55 0.75; do
+    read -r n run < <(near_runs "$(clock_row "$f")" "$@")
+    total=$((total + n)) && ((run > longest)) && longest=$run
+  done
+  echo "$total $longest"
+}
 
 until_ok 5000 shell_status >/dev/null
 read -r ow oh < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.width) \(.height)"')
@@ -59,9 +68,9 @@ unlock
 
 lock_in blueprint
 check "blueprint: the clock's fill is transparent and its outline #7FE3F0 ($(lock_state | jq -c '[.clockFill, .clockStroke]'))" state_is '.look == "sheet" and .clockFill == "#00000000" and (.clockStroke | ascii_downcase) == "#7fe3f0"'
-read -r cyan cyan_run < <(near_runs "$(clock_row)" 127 227 240)
-read -r ground _ < <(near_runs "$(clock_row)" 12 26 46)
-check "blueprint: a row across the clock has accent ($cyan px) and background ($ground px)" test "$cyan" -gt 10 -a "$ground" -gt 10
+read -r cyan cyan_run < <(rows_runs 127 227 240)
+read -r ground _ < <(rows_runs 12 26 46)
+check "blueprint: rows across the clock have accent ($cyan px) and background ($ground px)" test "$cyan" -gt 10 -a "$ground" -gt 10
 # A filled 200 px bold glyph crosses the row in runs of 20 px or more; an outline only in thin ones.
 check "blueprint: the clock's strokes are thin outlines, not fills (longest accent run $cyan_run px)" test "$cyan_run" -le 8
 unlock
