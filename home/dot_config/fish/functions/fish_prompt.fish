@@ -1,7 +1,11 @@
-function fish_prompt -d "Directory, git branch, a failed status, then ›; colours from the theme's colors.fish"
+function fish_prompt -d "Directory name (~ at home), git branch, a failed status, then ›; colours from the theme's colors.fish"
     set -l last $status
     set_color $fish_color_cwd
-    echo -n (prompt_pwd)
+    if test "$PWD" = "$HOME"
+        echo -n '~'
+    else
+        echo -n (path basename -- $PWD)
+    end
     set_color $fish_color_comment
     fish_vcs_prompt ' %s'
     if test $last -ne 0

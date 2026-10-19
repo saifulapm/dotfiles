@@ -67,11 +67,11 @@ test('fish writes its history to the file dots sync reads', () => {
   assert.deepEqual(files(join(env.XDG_DATA_HOME, 'fish')), ['fish_history']);
 });
 
-test('the prompt shows the directory, the git branch and a failed status', () => {
-  const r = run('fish', ['-i', '-c', 'mkdir -p ~/proj; cd ~/proj; git init -q -b main; false; fish_prompt']);
+test('the prompt shows the directory\'s name, the git branch and a failed status', () => {
+  const r = run('fish', ['-i', '-c', 'mkdir -p ~/code/proj; cd ~/code/proj; git init -q -b main; false; fish_prompt']);
   assert.equal(r.status, 0, r.stderr);
   // set_color's escapes aside, the words are the prompt.
-  assert.equal(r.stdout.replace(/\x1b\[[0-9;:]*m|\x1b\(B/g, ''), '~/proj main [1] › ');
+  assert.equal(r.stdout.replace(/\x1b\[[0-9;:]*m|\x1b\(B/g, ''), 'proj main [1] › ');
   const ok = run('fish', ['-i', '-c', 'cd ~; true; fish_prompt']);
   assert.equal(ok.stdout.replace(/\x1b\[[0-9;:]*m|\x1b\(B/g, ''), '~ › ');
 });
