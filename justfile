@@ -32,3 +32,7 @@ bench:
 # dots install twice in a fresh fedora:44 container
 test-install:
     tests/install/run.sh
+
+# the install test on another machine (the NUC for x86_64), whose own packages must not change
+test-install-remote host:
+    tests/install/remote.sh {{host}}
