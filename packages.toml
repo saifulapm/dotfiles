@@ -83,3 +83,13 @@ why = "dots sync encrypts ~/.ssh to the chezmoi age key before it goes to Dropbo
 name = "rsync"
 arch = "all"
 why = "dots sync applies a pulled ~/.ssh and leaves known_hosts alone"
+
+[[package]]
+name = "curl"
+arch = "all"
+why = "fetches the versions.toml pins"
+
+[[package]]
+name = "unzip"
+arch = "all"
+why = "unpacks the pins that ship as zip files"

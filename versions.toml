@@ -1,0 +1,12 @@
+# Every download dnf does not provide. dots bump rewrites version and sha256; a changed entry reruns only its own run_onchange_after_2*-pin-<name> script.
+
+[[pin]]
+name = "yazi"
+version = "26.9.1"
+repo = "sxyazi/yazi"
+install = "~/.local/bin/yazi and ~/.local/bin/ya"
+check = "yazi --version"
+url.aarch64 = "https://github.com/sxyazi/yazi/releases/download/v{version}/yazi-aarch64-unknown-linux-gnu.zip"
+url.x86_64 = "https://github.com/sxyazi/yazi/releases/download/v{version}/yazi-x86_64-unknown-linux-gnu.zip"
+sha256.aarch64 = "02807f08d6b589b65b7516a4e259d83f5995d7a23bb12b3a155141385b370b3a"
+sha256.x86_64 = "a02fe91d3304294048c681f010f1100856872a4e98ecf6927328e888d40a6ad2"

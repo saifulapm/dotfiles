@@ -1,0 +1,7 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "yazi") }}
+zip=$(pin_fetch)
+unzip -qo "$zip" -d "$pin_tmp"
+install -D -m 0755 -t "$HOME/.local/bin" "$pin_tmp"/yazi-*/yazi "$pin_tmp"/yazi-*/ya
+pin_done
