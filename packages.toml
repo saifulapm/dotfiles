@@ -449,3 +449,8 @@ why = "builds the kakoune-lsp pin, which has no aarch64 Linux release"
 name = "helix"
 arch = "all"
 why = "its runtime holds the tree-sitter grammars the kakoune fork highlights with"
+
+[[package]]
+name = "file"
+arch = "all"
+why = "yazi detects each file's type with it"
