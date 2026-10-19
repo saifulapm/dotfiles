@@ -7,8 +7,9 @@ under_dev() { case $1 in "$DOTS_DEV_DIR"/*) true ;; *) false ;; esac; }
 under_dev "${RCLONE_CONFIG:-}" && grep -qx 'type = alias' "$RCLONE_CONFIG" || { echo "FAIL RCLONE_CONFIG is not the dev alias remote"; exit 1; }
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
 grep -qzxF "RCLONE_CONFIG=$RCLONE_CONFIG" "/proc/$pid/environ" || { echo "FAIL the shell unit does not carry the dev RCLONE_CONFIG"; exit 1; }
-# The printed env leaves XDG_DATA_HOME out, and dots sync must merge into the dev stores only.
-export XDG_DATA_HOME=$DOTS_DEV_DIR/data
+# Nor unless the ssh unit skips (a real age key would let it read the real ~/.ssh) and the stores it merges are the dev ones.
+under_dev "${DOTS_AGE_IDENTITY:-}" && [ ! -e "$DOTS_AGE_IDENTITY" ] || { echo "FAIL DOTS_AGE_IDENTITY is not a missing file in the temp dir"; exit 1; }
+under_dev "${XDG_DATA_HOME:-}" || { echo "FAIL XDG_DATA_HOME is not the dev data dir"; exit 1; }
 remote=$DOTS_DEV_DIR/remote
 
 margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }

@@ -8,7 +8,14 @@ test:
 
 # dots sync between two scratch machines over a local alias remote
 test-sync:
+    #!/usr/bin/env bash
+    # Every run works on scratch homes, so the real ~/.ssh must hash the same after it as before.
+    ssh_tree() { find ~/.ssh -type f -print0 2>/dev/null | sort -z | xargs -0r sha256sum | sha256sum; }
+    before=$(ssh_tree)
     node --test 'tests/sync/*.test.mjs'
+    rc=$?
+    [ "$(ssh_tree)" = "$before" ] || { echo "the real ~/.ssh changed during the sync tests" >&2; exit 1; }
+    exit $rc
 
 # checks that each open a nested niri for a few seconds
 test-dev:
