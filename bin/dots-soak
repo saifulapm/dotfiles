@@ -56,9 +56,9 @@ for ((m = 1; m <= minutes; m++)); do
   qs ipc call launcher open >/dev/null || die "launcher open failed"
   until_ok 3000 layer_up dots-surfaces || die "dots-surfaces never mapped"
   until_ok 3000 launcher_open || die "the launcher never took the keyboard"
-  # A real key, so the nested shell's idle steps (dim, lock, monitors off) never start.
-  wtype -k Escape
-  until_ok 3000 launcher_closed || die "the launcher never gave the keyboard back"
+  # A real key, so the nested idle steps never start; repeated, since niri lists the layer Exclusive before its keyboard enter lands.
+  escape_closes() { wtype -k Escape && sleep 0.2 && launcher_closed; }
+  until_ok 3000 escape_closes || die "the launcher never gave the keyboard back"
   if ((m % 5 == 0)); then
     for i in "${!names[@]}"; do [[ ${names[i]} == "$theme" ]] && break; done
     theme=${names[(i + 1) % ${#names[@]}]}
