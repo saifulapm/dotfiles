@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# At the live speed every surface settles within its theme's motion: Paper's drop in 140 ms, Artboard's spring in 400.
+# At the live speed every surface settles within its theme's motion: Paper's drop in 140 ms, Artboard's spring in 400, Blueprint's plot in 260.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
@@ -24,6 +24,7 @@ until_ok 5000 shell_status >/dev/null
 for s in launcher; do
   settles "$s" paper drop 140
   settles "$s" artboard spring 400
+  settles "$s" blueprint plot 260
 done
 
 "$repo/bin/dots" theme paper >/dev/null

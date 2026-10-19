@@ -102,6 +102,42 @@ check "artboard: at rest the card's top edge is white" near $((cx + 100)) $((cy 
 wtype -k Escape
 until_ok 9000 state_is '.drawing == false'
 
+theme blueprint
+# Pixels in a box brighter than the navy paper, its grid and the card's fill: the cyan pen, the ink text.
+bright() {
+  grim -s 1 -t ppm -g "$1,$2 $3x$4" - | node -e '
+    const b = require("fs").readFileSync(0);
+    const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length);
+    let n = 0;
+    for (let i = 0; i < head[1] * head[2]; i++) if (px[i * 3] + px[i * 3 + 1] + px[i * 3 + 2] > 450) n++;
+    console.log(n);
+  '
+}
+press
+wait_until 1000
+# The pen starts on the top edge past the chamfer and goes round clockwise, so a second in it has drawn the top but not the left edge.
+top_pen=$(bright $((cx + 14)) $((cy - 1)) 200 3)
+left_pen=$(bright $((cx - 1)) $((cy + 30)) 3 30)
+inside=$(bright $((cx + 10)) $((cy + 10)) 620 60)
+check "blueprint: 1 s into a 20x open the outline has drawn its top edge ($top_pen px) and not yet its left ($left_pen px)" test "$top_pen" -ge 150 -a "$left_pen" = 0
+check "blueprint: and nothing inside the card is drawn yet ($inside bright px)" test "$inside" = 0
+until_ok 7000 state_is .settled
+check "blueprint: the launcher reports a plot that settled in about 20 times 240 ms ($(launcher_state | jq -c '[.motion, .settleMs]'))" state_is '.motion == "plot" and .settleMs >= 4700 and .settleMs <= 5400'
+check "blueprint: at rest the card's text is drawn ($(bright $((cx + 10)) $((cy + 10)) 620 60) bright px)" test "$(bright $((cx + 10)) $((cy + 10)) 620 60)" -gt 50
+check "blueprint: at rest the pen runs down the left edge below the chamfer and not across its square corner" test "$(bright $((cx - 1)) $((cy + 30)) 3 30)" -gt 0 -a "$(bright "$cx" "$cy" 2 2)" = 0
+wtype -k Escape
+until_ok 7000 state_is '.drawing == false'
+
+# A theme switch mid-plot carries the open on in Paper's drop, so it ends as a Paper card with no pen left over.
+press
+wait_until 1000
+theme paper
+until_ok 7000 state_is .settled
+check "blueprint to paper mid-open: it settles as Paper's card, its ink frame at rest" test "$(first_y $((cx + 320)) $((cy - 30)) 60 28 25 21)" = 30
+check "blueprint to paper mid-open: the state says drop" state_is '.motion == "drop"'
+wtype -k Escape
+until_ok 4000 state_is '.drawing == false'
+
 theme paper
 exit $((fails > 0))
 }

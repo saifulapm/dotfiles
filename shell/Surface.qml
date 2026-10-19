@@ -19,6 +19,8 @@ Item {
     // The Motion that plays this card's open and close; the island and the previews have none.
     property var motion: null
     readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, outline: 1, fill: 1 })
+    // What a surface puts in its card fades in with the fill, after a plot's outline.
+    default property alias content: inner.data
 
     scale: pose.scale
     transform: Translate {
@@ -27,6 +29,7 @@ Item {
 
     Rectangle {
         visible: surface.shadow.kind === "hard" && !surface.chamfer
+        opacity: surface.pose.fill
         x: surface.shadow.x
         y: surface.shadow.y
         width: surface.width
@@ -38,6 +41,7 @@ Item {
     // Loaded only for themes that blur, so a hard-shadow theme pays for no shader.
     Loader {
         active: surface.shadow.kind === "soft" || surface.shadow.kind === "glow"
+        opacity: surface.pose.fill
         anchors.fill: parent
         sourceComponent: RectangularShadow {
             offset.x: surface.shadow.x
@@ -51,10 +55,10 @@ Item {
     }
 
     Rectangle {
-        visible: !surface.chamfer
+        visible: !surface.chamfer && surface.pose.outline >= 1
         anchors.fill: parent
         radius: surface.style.corner.radius
-        color: surface.style.fill
+        color: Qt.alpha(surface.style.fill, surface.pose.fill)
         border.width: surface.style.frame.width
         border.color: surface.style.frame.color
     }
@@ -62,6 +66,7 @@ Item {
     // A cut corner bevels the top-left and bottom-right, like the designs' clip-path polygons.
     Loader {
         active: surface.chamfer > 0
+        visible: surface.pose.outline >= 1
         anchors.fill: parent
         sourceComponent: Shape {
             // CurveRenderer's smoother diagonals cost a warm open 5 to 10 ms more on its first frame.
@@ -70,7 +75,7 @@ Item {
             ShapePath {
                 strokeWidth: 0
                 strokeColor: "transparent"
-                fillColor: surface.shadow.kind === "hard" ? surface.shadow.color : "transparent"
+                fillColor: surface.shadow.kind === "hard" ? Qt.alpha(surface.shadow.color, surface.pose.fill) : "transparent"
                 PathRectangle {
                     x: surface.shadow.x
                     y: surface.shadow.y
@@ -86,7 +91,7 @@ Item {
                 id: body
                 strokeWidth: surface.style.frame.width
                 strokeColor: surface.style.frame.width ? surface.style.frame.color : "transparent"
-                fillColor: surface.style.fill
+                fillColor: Qt.alpha(surface.style.fill, surface.pose.fill)
                 joinStyle: ShapePath.MiterJoin
                 PathRectangle {
                     width: surface.width
@@ -95,6 +100,33 @@ Item {
                     bottomRightRadius: surface.chamfer
                     bevel: true
                     strokeAdjustment: body.strokeWidth
+                }
+            }
+        }
+    }
+
+    // A plot draws the frame's own path, chamfers and all, from the top edge round, before any fill.
+    Loader {
+        active: surface.pose.outline < 1
+        anchors.fill: parent
+        sourceComponent: Shape {
+            preferredRendererType: Shape.GeometryRenderer
+
+            ShapePath {
+                id: pen
+                strokeWidth: surface.style.frame.width
+                strokeColor: surface.style.frame.width ? surface.style.frame.color : "transparent"
+                fillColor: "transparent"
+                joinStyle: ShapePath.MiterJoin
+                trim.end: surface.pose.outline
+                PathRectangle {
+                    width: surface.width
+                    height: surface.height
+                    radius: surface.style.corner.radius
+                    topLeftRadius: surface.chamfer || surface.style.corner.radius
+                    bottomRightRadius: surface.chamfer || surface.style.corner.radius
+                    bevel: surface.chamfer > 0
+                    strokeAdjustment: pen.strokeWidth
                 }
             }
         }
@@ -111,7 +143,7 @@ Item {
             width: modelData[2]
             height: modelData[3]
             color: surface.accent
-            opacity: 0.6
+            opacity: 0.6 * surface.pose.fill
         }
     }
 
@@ -124,6 +156,7 @@ Item {
             x: modelData[0] * surface.width - 4
             y: modelData[1] * surface.height - 4
             z: 1
+            opacity: surface.pose.fill
             width: 8
             height: 8
             color: surface.style.fill
@@ -135,11 +168,18 @@ Item {
     Text {
         textFormat: Text.PlainText
         visible: surface.style.handles && surface.label !== ""
+        opacity: surface.pose.fill
         y: -20
         text: surface.label
         color: surface.accent
         font.family: surface.tokens ? surface.tokens.type.ui : ""
         font.pixelSize: 11
         font.weight: Font.Medium
+    }
+
+    Item {
+        id: inner
+        anchors.fill: parent
+        opacity: surface.pose.fill
     }
 }
