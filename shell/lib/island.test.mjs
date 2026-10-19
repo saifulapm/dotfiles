@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -75,4 +75,52 @@ test('a recording reads minutes and seconds since it started', () => {
   assert.equal(recordingText(1000, 1000), '00:00');
   assert.equal(recordingText(1000, 13999), '00:12');
   assert.equal(recordingText(0, 61 * 60 * 1000), '61:00');
+});
+
+// The approved prototype's numbers: stiffness 260 and damping 0.70 open, 1.5 times stiffer and 0.08 more damped close.
+test('Artboard: the spring opens in 611 ms and closes in 456 ms', () => {
+  const m = islandMotion('spring');
+  assert.deepEqual([m.open.ms, m.close.ms], [611, 456]);
+  assert.deepEqual(m.swap, { kind: 'blur', inMs: 306, outMs: 130, delay: 60, blur: 6 });
+});
+
+test('a spring curve starts at 0, overshoots and ends at rest', () => {
+  const { points } = springCurve(260, 0.7);
+  assert.equal(points.length, 61);
+  assert.deepEqual([points[0], points[60]], [0, 1]);
+  assert.ok(points.some((y) => y > 1));
+});
+
+test('a critically damped spring never overshoots', () => {
+  assert.ok(springCurve(260, 1).points.every((y) => y <= 1));
+});
+
+test('Paper is snappy: 120 ms open, 96 ms close, past halfway a quarter of the way in', () => {
+  const m = islandMotion('snappy');
+  assert.deepEqual([m.open.ms, m.close.ms, m.swap.kind], [120, 96, 'drop']);
+  assert.deepEqual([m.open.points[0], m.open.points[60]], [0, 1]);
+  assert.ok(ease(m.open.points, 0.25) > 0.5);
+});
+
+test('ease reads between samples and keeps the overshoot', () => {
+  const linear = islandMotion('linear').open.points;
+  assert.deepEqual([ease(linear, 0), ease(linear, 0.5), ease(linear, 1)], [0, 0.5, 1]);
+  const spring = springCurve(260, 0.7).points;
+  assert.ok([0.3, 0.35, 0.4, 0.45].some((t) => ease(spring, t) > 1));
+  assert.equal(ease(spring, 2), 1);
+});
+
+test('Blueprint is linear: 150 ms open, 120 ms close, and its content scans in', () => {
+  const m = islandMotion('linear');
+  assert.deepEqual([m.open.ms, m.close.ms, m.swap.kind], [150, 120, 'scan']);
+});
+
+test('every motion on the theme menu has an island motion, and no token means none', () => {
+  for (const motion of ['spring', 'snappy', 'ease', 'typewriter', 'linear']) assert.ok(islandMotion(motion), motion);
+  assert.equal(islandMotion(undefined), null);
+});
+
+test('the one-line modes close; the cards open', () => {
+  assert.deepEqual(['rest', 'playing', 'recording', 'toast'].map(isCompact), [true, true, true, true]);
+  assert.deepEqual(['notification', 'question', 'calendar', 'osd'].map(isCompact), [false, false, false, false]);
 });
