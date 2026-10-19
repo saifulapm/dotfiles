@@ -13,6 +13,22 @@ ShellRoot {
     // A hot reload rebuilds this tree in the old process, so its first frame is timed from here instead.
     readonly property real builtAt: Date.now()
     property bool reloaded: false
+    // Named by URL and made after the paper's first frame, since qs compiles every type shell.qml names before that frame.
+    property var desk: null
+    property var lock: null
+    property var polkit: null
+    property var idle: null
+
+    onFirstFrameMsChanged: {
+        if (firstFrameMs === null || desk !== null)
+            return;
+        surfacesLoader.component = Qt.createComponent("Surfaces.qml");
+        desk = Qt.createComponent("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService });
+        lock = Qt.createComponent("Lock.qml").createObject(root, { theme: themeService });
+        polkit = Qt.createComponent("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
+        idle = Qt.createComponent("Idle.qml").createObject(root, { lock: lock, surfaces: surfacesLoader });
+        appCount = Qt.binding(() => DesktopEntries.applications.values.length);
+    }
 
     // qs emits this only after a hot reload, before the new tree draws its first frame.
     Connections {
@@ -75,7 +91,7 @@ ShellRoot {
                 theme: themeService.name,
                 outputs: Quickshell.screens.map(s => s.name),
                 loaded: Root.State.loaded,
-                sync: deskLoader.item ? deskLoader.item.sync.units : {},
+                sync: root.desk ? root.desk.sync.units : {},
                 rssKiB: Status.rssKiB(procStatus.text()),
                 timers: Root.State.timers(),
                 firstFrameMs: root.firstFrameMs
@@ -86,17 +102,6 @@ ShellRoot {
     // The notification server starts with the shell, since a notification sent before it registers is lost.
     Services.Notifs {
         id: notifsService
-    }
-
-    // Everything else but the paper loads after its first frame, so the services and the island never hold that frame back.
-    LazyLoader {
-        id: deskLoader
-        active: root.firstFrameMs !== null
-
-        Root.Desk {
-            theme: themeService
-            notifs: notifsService
-        }
     }
 
     IpcHandler {
@@ -132,8 +137,8 @@ ShellRoot {
     }
 
 
-    // The desktop entry scan starts with the shell, so the launcher's first open does not wait on it.
-    readonly property int appCount: DesktopEntries.applications.values.length
+    // The desktop entry scan starts right after the first frame, so neither that frame nor the launcher's first open waits on it.
+    property int appCount: 0
 
     IpcHandler {
         target: "launcher"
@@ -186,15 +191,25 @@ ShellRoot {
         }
     }
 
-    LazyLoader {
+    // Stands in for a LazyLoader: Surfaces compiles after the first frame and is made on the first open, so a cold open is creation only.
+    QtObject {
         id: surfacesLoader
 
-        Root.Surfaces {
-            theme: themeService
-            themeList: root.themeList
-            notifs: notifsService
-            goals: deskLoader.item ? deskLoader.item.goals : null
-            sync: deskLoader.item ? deskLoader.item.sync : null
+        property Component component: null
+        property bool active: false
+        property var item: null
+
+        // An open before the first frame compiles here instead.
+        onActiveChanged: {
+            if (!active || item)
+                return;
+            item = (component ?? Qt.createComponent("Surfaces.qml")).createObject(root, {
+                theme: themeService,
+                themeList: Qt.binding(() => root.themeList),
+                notifs: notifsService,
+                goals: Qt.binding(() => root.desk ? root.desk.goals : null),
+                sync: Qt.binding(() => root.desk ? root.desk.sync : null)
+            });
         }
     }
 
@@ -204,7 +219,7 @@ ShellRoot {
         // The store lives in the Desk, so Goals opens only once the Desk has loaded.
         function open(): void {
             const t0 = Date.now();
-            if (!deskLoader.item)
+            if (!root.desk)
                 return;
             surfacesLoader.active = true;
             surfacesLoader.item.openGoals(t0);
@@ -326,19 +341,5 @@ ShellRoot {
                 return surfacesLoader.item.recorder.state();
             return JSON.stringify({ picking: false, recording: false });
         }
-    }
-
-    Root.Lock {
-        id: lockScope
-        theme: themeService
-    }
-
-    Root.Polkit {
-        surfaces: surfacesLoader
-    }
-
-    Root.Idle {
-        lock: lockScope
-        surfaces: surfacesLoader
     }
 }
