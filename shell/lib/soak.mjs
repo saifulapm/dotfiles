@@ -7,14 +7,14 @@ const LIMIT_MIB = 5;
 const line = (name, value, unit, op, limit, ok) =>
   `${name.padEnd(13)} ${`${value} ${unit}`.padEnd(7)} ${op} ${`${limit} ${unit}`.padEnd(8)} ${ok ? 'ok' : 'FAIL'}`;
 
-// Drift is the last minute's RSS against minute 5's, after the shell has warmed up.
+// Drift is the last minute's RSS against minute 5's, after the shell has warmed up; a fall counts as much as a rise.
 export function verdict(csv) {
   const rows = csv.trim().split('\n').slice(1).map((l) => l.split(',').map(Number));
   const base = rows.find(([m]) => m === 5);
   if (!base) throw new Error('the CSV has no minute 5 row');
   const driftKiB = rows[rows.length - 1][1] - base[1];
-  const ok = driftKiB <= LIMIT_MIB * 1024;
-  const driftMiB = Math.floor(driftKiB / 1024);
+  const ok = Math.abs(driftKiB) <= LIMIT_MIB * 1024;
+  const driftMiB = Math.trunc(driftKiB / 1024);
   return { driftMiB, ok, line: line('rss drift', driftMiB, 'MiB', '≤', LIMIT_MIB, ok) };
 }
 

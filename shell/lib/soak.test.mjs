@@ -28,3 +28,9 @@ test('exactly 5 MiB passes', () => {
 test('a CSV with no minute 5 row is refused', () => {
   assert.throws(() => verdict('minute,rss_kib\n0,1\n1,2\n'), /minute 5/);
 });
+
+test('minute 30 6 MiB below minute 5 is not within 5 MiB either', () => {
+  const v = verdict(csv(-6));
+  assert.equal(v.ok, false);
+  assert.equal(v.line, 'rss drift     -6 MiB  ≤ 5 MiB    FAIL');
+});
