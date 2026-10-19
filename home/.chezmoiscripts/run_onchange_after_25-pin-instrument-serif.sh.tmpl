@@ -1,0 +1,10 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "instrument-serif") }}
+tgz=$(pin_fetch)
+dir=$HOME/.local/share/fonts/instrument-serif
+rm -rf "$dir"
+mkdir -p "$dir"
+tar -xzf "$tgz" -C "$dir" --strip-components=3 --wildcards '*/fonts/ttf/*.ttf'
+fc-cache "$dir"
+pin_done

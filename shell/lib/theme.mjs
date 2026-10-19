@@ -7,7 +7,8 @@ const MENUS = {
   motion: ['spring', 'snappy', 'ease', 'typewriter', 'linear'],
 };
 const COLORS = ['paper', 'ink', 'muted', 'line', 'surface', 'accent', 'danger', 'ok'];
-const FONTS = ['Maple Mono', 'Inter', 'Instrument Serif'];
+const FONTS = ['Maple Mono', 'Instrument Serif'];
+const VOICES = ['plain', 'caps', 'bracket'];
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const NIRI_COLORS = ['border_inactive', 'ring_color', 'shadow_color', 'shadow_inactive'];
 
@@ -27,6 +28,7 @@ export function validateTheme(doc) {
   }
   const type = doc.type ?? fail('missing [type]');
   for (const k of ['display', 'ui', 'mono']) if (!FONTS.includes(type[k])) fail(`type.${k}: "${type[k]}" is not one of ${FONTS.join(', ')}`);
+  if (!VOICES.includes(type.voice)) fail(`type.voice: "${type.voice}" is not one of ${VOICES.join(', ')}`);
   const niri = doc.niri ?? fail('missing [niri]');
   for (const k of NIRI_COLORS) {
     if (k in niri && !/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(niri[k])) fail(`niri.${k}: "${niri[k]}" is not #RRGGBB or #RRGGBBAA`);
@@ -37,7 +39,7 @@ export function validateTheme(doc) {
     color: Object.assign({}, color, { ansi: [...color.ansi] }),
     primitive: Object.assign({}, primitive),
     paper: Object.assign({}, doc.paper),
-    type: { display: type.display, ui: type.ui, mono: type.mono, scale: type.scale ?? 1 },
+    type: { display: type.display, ui: type.ui, mono: type.mono, voice: type.voice, scale: type.scale ?? 1 },
     niri: Object.assign({}, niri, { gaps: niri.gaps ?? 16, border: niri.border ?? 1, blur: niri.blur ?? false }),
   };
 }

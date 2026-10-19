@@ -28,8 +28,9 @@ spacing = 16
 dot = "#B4BAC4"
 
 [type]
-display = "Inter"
-ui = "Inter"
+display = "Maple Mono"
+ui = "Maple Mono"
+voice = "plain"
 mono = "Maple Mono"
 scale = 1.0
 

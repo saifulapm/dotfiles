@@ -34,7 +34,7 @@ Item {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property bool caps: S.marginStyle(theme.tokens).caps
-    readonly property bool capsTitles: theme.tokens ? theme.tokens.type.display === theme.tokens.type.mono : false
+    readonly property bool capsTitles: theme.tokens ? theme.tokens.type.voice === "bracket" : false
 
     onListChanged: selected = Math.max(0, Math.min(selected, list.length - 1))
 

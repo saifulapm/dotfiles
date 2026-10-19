@@ -32,6 +32,7 @@ major_alpha = 0.13
 [type]
 display = "Maple Mono"
 ui = "Maple Mono"
+voice = "bracket"
 mono = "Maple Mono"
 scale = 1.0
 

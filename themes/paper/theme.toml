@@ -29,6 +29,7 @@ grain = 0.06
 [type]
 display = "Instrument Serif"
 ui = "Maple Mono"
+voice = "caps"
 mono = "Maple Mono"
 scale = 1.0
 

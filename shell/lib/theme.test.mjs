@@ -79,6 +79,20 @@ test('foot\'s own chrome takes the theme too: cursor, selection, URLs, labels, s
   assert.match(ini, /^search-box-no-match=0A1526 FFB547$/m);
 });
 
+test('Inter is not a theme font: the themes draw with Maple Mono and Instrument Serif', () => {
+  const bad = structuredClone(paper);
+  bad.type.ui = 'Inter';
+  assert.throws(() => validateTheme(bad), /type\.ui: "Inter"/);
+  assert.deepEqual([load('artboard').type.display, load('artboard').type.ui], ['Maple Mono', 'Maple Mono']);
+});
+
+test('each theme names its voice, since the fonts no longer tell the themes apart', () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => load(n).type.voice), ['caps', 'plain', 'bracket']);
+  const bad = structuredClone(paper);
+  bad.type.voice = 'loud';
+  assert.throws(() => validateTheme(bad), /type\.voice: "loud"/);
+});
+
 test('the footclient overrides say what the fragment says, one per line', () => {
   const t = load('artboard');
   const args = renderFootArgs(t).trim().split('\n');

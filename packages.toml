@@ -35,11 +35,6 @@ arch = "all"
 why = "links home/ into place"
 
 [[package]]
-name = "rsms-inter-fonts"
-arch = "all"
-why = "Inter, the UI face of the Artboard theme"
-
-[[package]]
 name = "qt6-qtshadertools"
 arch = "all"
 why = "qsb, which compiles the paper shaders in shell/shaders"
@@ -98,6 +93,36 @@ why = "unpacks the pins that ship as zip files"
 name = "tmux"
 arch = "all"
 why = "the terminal multiplexer, themed from theme-out/tmux.conf"
+
+[[package]]
+name = "google-noto-sans-vf-fonts"
+arch = "all"
+why = "Noto Sans, what web pages get for sans-serif"
+
+[[package]]
+name = "google-noto-serif-vf-fonts"
+arch = "all"
+why = "Noto Serif, what web pages get for serif"
+
+[[package]]
+name = "google-noto-sans-bengali-vf-fonts"
+arch = "all"
+why = "Bangla, the fallback for every font"
+
+[[package]]
+name = "google-noto-naskh-arabic-vf-fonts"
+arch = "all"
+why = "Arabic, the fallback for every font"
+
+[[package]]
+name = "google-noto-color-emoji-fonts"
+arch = "all"
+why = "emoji outside foot"
+
+[[package]]
+name = "twitter-twemoji-fonts"
+arch = "all"
+why = "emoji in foot, since its font library rejects Noto's COLRv1 emoji"
 
 [[package]]
 name = "fontconfig"

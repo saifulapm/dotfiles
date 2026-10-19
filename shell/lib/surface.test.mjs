@@ -136,8 +136,8 @@ test('before the tokens load a surface draws nothing', () => {
   assert.equal(marginStyle(null).rules, false);
 });
 
-test('margins: mono labels are 11 px uppercase over ink rules, others 12 px as written with none', () => {
+test('margins: caps and bracket voices are 11 px uppercase, over ink rules where the frame is ink; plain is 12 px as written', () => {
   assert.deepEqual(marginStyle(paper), { font: 'Maple Mono', size: 11, caps: true, tracking: 1.32, rules: true });
-  assert.deepEqual(marginStyle(artboard), { font: 'Inter', size: 12, caps: false, tracking: 0, rules: false });
+  assert.deepEqual(marginStyle(artboard), { font: 'Maple Mono', size: 12, caps: false, tracking: 0, rules: false });
   assert.deepEqual(marginStyle(blueprint), { font: 'Maple Mono', size: 11, caps: true, tracking: 1.32, rules: false });
 });

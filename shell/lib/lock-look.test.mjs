@@ -18,12 +18,12 @@ test('Paper: a 220 px Instrument Serif clock in ink over an italic serif date', 
   });
 });
 
-test('Artboard: a 96 px bold Inter clock on a card, the date as its frame label', () => {
+test('Artboard: a 96 px bold Maple Mono clock on a card, the date as its frame label', () => {
   assert.deepEqual(lockLook(load('artboard'), 'saiful'), {
     kind: 'card',
     status: { text: 'Locked', color: '#15171B' },
-    clock: { family: 'Inter', px: 96, bold: true, tracking: -4.8, fill: '#15171B', stroke: 'transparent' },
-    date: { format: 'dddd, d MMMM', caps: false, family: 'Inter', px: 12, italic: false, tracking: 0, color: '#3D5AFE' },
+    clock: { family: 'Maple Mono', px: 96, bold: true, tracking: -4.8, fill: '#15171B', stroke: 'transparent' },
+    date: { format: 'dddd, d MMMM', caps: false, family: 'Maple Mono', px: 12, italic: false, tracking: 0, color: '#3D5AFE' },
     prompt: '',
     hint: 'Password for saiful · ↵ to unlock',
   });

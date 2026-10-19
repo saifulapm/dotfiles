@@ -9,14 +9,8 @@ export const KEYS = [['j/k', ''], ['␣', 'done'], ['↵', 'edit'], ['1–6', 't
 export const EMPTY_KEYS = [['↵', 'save'], ['# name', 'section'], ['⌃V', 'attach']];
 export const COMPOSER_KEYS = [['↵', 'save'], ['⇧↵', 'line'], ['# name', 'section'], ['⌃V', 'attach']];
 
-// Blueprint's display face is its mono, Paper's is a serif beside a mono UI, Artboard's is its UI face.
-function voiceOf(t) {
-  if (t.display === t.mono) return 'bracket';
-  return t.ui === t.mono ? 'caps' : 'plain';
-}
-
 export function keyPairs(tokens, keys) {
-  const voice = voiceOf(tokens.type);
+  const voice = tokens.type.voice;
   return keys.map(([k, what]) => {
     const key = voice === 'bracket' ? `[${k.toUpperCase()}]` : voice === 'caps' ? k.toUpperCase() : k;
     const word = voice === 'plain' ? what : what.toUpperCase();
@@ -37,7 +31,7 @@ export function notesLook(tokens) {
   const c = tokens.color;
   const t = tokens.type;
   const p = tokens.primitive;
-  const voice = voiceOf(t);
+  const voice = t.voice;
   const round = p.corner === 'round';
   const tint = mix(c.surface, c.paper, 0.3);
   return {

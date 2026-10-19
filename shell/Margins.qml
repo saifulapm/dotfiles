@@ -80,8 +80,8 @@ PanelWindow {
 
         // Paper's accent bold, Artboard's ink medium, Blueprint's amber (its danger token); the voice tells the themes apart.
         Label {
-            readonly property bool bracket: root.theme.tokens?.type.display === root.theme.tokens?.type.mono
-            readonly property bool caps: root.theme.tokens?.type.ui === root.theme.tokens?.type.mono
+            readonly property bool bracket: root.theme.tokens?.type.voice === "bracket"
+            readonly property bool caps: (root.theme.tokens?.type.voice ?? "plain") !== "plain"
             text: root.marginState.right.goal
             visible: text !== ""
             // A title can arrive by sync at any length, so it takes only the room the other words leave before the island.
