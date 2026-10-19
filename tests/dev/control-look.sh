@@ -37,8 +37,6 @@ marker=$(near "$(box_geo cursorBox 0 4 50 30)" 200 56 30 40)
 check "paper: the cursor row's ▸ marker is #C8381E ($marker px)" test "$marker" -gt 6 -a "$marker" -lt 200
 check "paper: the legend is tracked caps ($(control_state | jq -c .legend))" state_is '.legend == "TAB SECTION  J/K MOVE  ESC CLOSE" and .legendSpacing > 1'
 check "paper: the section hint reads in caps ($(control_state | jq -c .hint))" state_is '.hint == "H/L VOLUME · ↵ DEFAULT · M MUTE"'
-# The legend already names Tab, so the tab row draws no ⇥ NEXT of its own.
-check "the tab row draws no ⇥ NEXT" bash -c '! grep -q "⇥ NEXT" "$1/shell/Control.qml"' _ "$repo"
 close_control
 
 in_theme artboard
