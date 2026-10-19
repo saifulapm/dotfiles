@@ -150,3 +150,21 @@ for (const [what, extra] of [
     assert.equal(readFileSync(m.RCLONE_CONFIG, 'utf8'), conf);
   });
 }
+
+test('a machine that already holds every secret runs on while iCloud is unreachable', async () => {
+  const conf = readFileSync(w.m.RCLONE_CONFIG, 'utf8');
+  writeFileSync(w.m.RCLONE_CONFIG, conf.replace(`remote = ${w.icloud}\n`, `remote = ${join(w.root, 'expired')}\n`));
+  try {
+    const r = await secrets(w.m);
+    assert.equal(r.code, 0, r.stdout + r.stderr);
+  } finally {
+    writeFileSync(w.m.RCLONE_CONFIG, conf);
+  }
+});
+
+test('a fresh machine with iCloud unreachable stops and names rclone config reconnect', async () => {
+  const m = home(w.root, 'expired-home', `[iCloud]\ntype = alias\nremote = ${join(w.root, 'expired')}\n`);
+  const r = await secrets(m);
+  assert.equal(r.code, 1, r.stdout + r.stderr);
+  assert.match(r.stderr, /rclone config reconnect iCloud:/);
+});
