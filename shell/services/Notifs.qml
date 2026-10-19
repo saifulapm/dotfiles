@@ -23,6 +23,8 @@ Scope {
             key: Date.now() + "-" + n.id,
             id: n.id,
             app: n.appName,
+            // The app's icon as an image url, "" when it sends none or the theme lacks it; a path stays a path.
+            icon: n.appIcon.startsWith("/") ? "file://" + n.appIcon : n.appIcon.startsWith("file://") ? n.appIcon : n.appIcon ? Quickshell.iconPath(n.appIcon, true) : "",
             summary: n.summary,
             body: n.body,
             critical: n.urgency === NotificationUrgency.Critical,

@@ -6,6 +6,7 @@ import "." as Root
 import "lib/island.mjs" as I
 import "lib/questions.mjs" as Q
 import "lib/margins.mjs" as M
+import "lib/voice.mjs" as V
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; the window pads for its shadow.
 PanelWindow {
@@ -69,10 +70,12 @@ PanelWindow {
             release();
     }
     readonly property string text: I.islandText(mode, slots, clock.now)
-    // As drawn: a 440 px notification card, a 560 px question, a 320 px calendar and a 280 px OSD bar; any other mode is one line as wide as its text.
+    // How the theme's board draws a notification and the OSD.
+    readonly property var noteLook: V.islandLook(theme.tokens)
+    // As drawn: the theme's 420 or 440 px notification card, a 560 px question, a 320 px calendar and a 280 px OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
-            notification: [440, card.implicitHeight + 28],
+            notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
             question: [I.MAX_WIDTH, ask.implicitHeight + 32],
             calendar: [320, month.implicitHeight + 32],
             osd: [280, 36]
@@ -128,6 +131,38 @@ PanelWindow {
         progress = 0;
         morphing.restart();
     }
+    component HeadText: Text {
+        textFormat: Text.PlainText
+        color: island.noteLook.head.color
+        font.family: island.noteLook.head.font
+        font.pixelSize: island.noteLook.head.size
+        font.letterSpacing: island.noteLook.head.spacing
+    }
+
+    // Where a notification's parts are drawn, in output pixels, for `island state`.
+    function noteState() {
+        if (mode !== "notification")
+            return null;
+        const at = (item) => {
+            const p = item.mapToItem(null, 0, 0);
+            return { x: p.x + (screen.width - width) / 2, y: p.y, w: item.width, h: item.height };
+        };
+        const bracketEnd = closeBracket.mapToItem(null, closeBracket.width, 0).x;
+        return {
+            app: noteLook.appLabel(heldNotification?.app ?? ""),
+            age: age.text,
+            summary: summary.text,
+            summaryFont: [summary.font.family, summary.font.pixelSize],
+            summaryBox: at(summary),
+            bracketsShown: openBracket.visible,
+            appElided: appName.truncated,
+            bracketEnd: bracketEnd,
+            ageStart: age.mapToItem(null, 0, 0).x,
+            tileBox: tile.visible ? at(tile) : null,
+            glyph: tile.visible && glyph.visible ? glyph.text : null
+        };
+    }
+
     // Room for the widest shadow, Artboard's soft one, beside and below the box.
     readonly property int padSide: 32
     readonly property int padBelow: 44
@@ -339,45 +374,108 @@ PanelWindow {
                 width: island.sizes.notification[0]
                 height: island.sizes.notification[1]
 
-                Column {
+                // Artboard's icon tile, then the app and its age over the summary and body.
+                Row {
                     id: card
-                    x: 18
-                    y: 14
-                    width: parent.width - 36
-                    spacing: 2
+                    x: island.noteLook.pad.x
+                    y: island.noteLook.pad.top
+                    width: parent.width - 2 * x
+                    spacing: 14
 
-                    Text {
-                        textFormat: Text.PlainText
-                        width: parent.width
-                        text: island.heldNotification?.app ?? ""
-                        elide: Text.ElideRight
-                        color: Qt.alpha(box.style.text, 0.65)
-                        font.family: island.theme.tokens?.type.ui ?? ""
-                        font.pixelSize: 12
+                    Rectangle {
+                        id: tile
+                        visible: island.noteLook.tile !== null
+                        width: island.noteLook.tile?.size ?? 0
+                        height: width
+                        radius: island.noteLook.tile?.radius ?? 0
+                        color: island.noteLook.tile?.fill ?? "transparent"
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Image {
+                            anchors.centerIn: parent
+                            visible: source != ""
+                            source: tile.visible ? island.heldNotification?.icon ?? "" : ""
+                            sourceSize.width: 24
+                            sourceSize.height: 24
+                        }
+
+                        Text {
+                            id: glyph
+                            textFormat: Text.PlainText
+                            anchors.centerIn: parent
+                            visible: !island.heldNotification?.icon
+                            text: island.noteLook.glyph(island.heldNotification?.app ?? "")
+                            color: box.style.text
+                            font.family: island.theme.tokens?.type.mono ?? ""
+                            font.pixelSize: 15
+                            font.weight: Font.DemiBold
+                        }
                     }
 
-                    Text {
-                        textFormat: Text.PlainText
-                        width: parent.width
-                        text: island.heldNotification?.summary ?? ""
-                        elide: Text.ElideRight
-                        color: box.style.text
-                        font.family: island.theme.tokens?.type.ui ?? ""
-                        font.pixelSize: 14
-                        font.weight: Font.Medium
-                    }
+                    Column {
+                        width: parent.width - (tile.visible ? tile.width + parent.spacing : 0)
+                        spacing: island.noteLook.voice === "plain" ? 2 : 4
 
-                    Text {
-                        width: parent.width
-                        visible: text !== ""
-                        text: island.heldNotification?.body ?? ""
-                        textFormat: Text.PlainText
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 3
-                        elide: Text.ElideRight
-                        color: Qt.alpha(box.style.text, 0.85)
-                        font.family: island.theme.tokens?.type.ui ?? ""
-                        font.pixelSize: 13
+                        Item {
+                            width: parent.width
+                            height: age.implicitHeight
+
+                            // Blueprint's brackets stay drawn around a long name, which elides inside them.
+                            Row {
+                                id: appRow
+                                readonly property real room: parent.width - age.implicitWidth - 12
+
+                                HeadText {
+                                    id: openBracket
+                                    visible: island.noteLook.brackets && appName.text !== ""
+                                    text: "[ "
+                                }
+                                HeadText {
+                                    id: appName
+                                    width: Math.min(implicitWidth, Math.max(0, appRow.room - (openBracket.visible ? openBracket.implicitWidth + closeBracket.implicitWidth : 0)))
+                                    elide: Text.ElideRight
+                                    text: island.noteLook.appText(island.heldNotification?.app ?? "")
+                                }
+                                HeadText {
+                                    id: closeBracket
+                                    visible: openBracket.visible
+                                    text: " ]"
+                                }
+                            }
+
+                            HeadText {
+                                id: age
+                                anchors.right: parent.right
+                                text: island.noteLook.age
+                            }
+                        }
+
+                        Text {
+                            id: summary
+                            textFormat: Text.PlainText
+                            width: parent.width
+                            text: island.noteLook.summaryText(island.heldNotification?.summary ?? "")
+                            elide: Text.ElideRight
+                            lineHeight: island.noteLook.voice === "caps" ? 1.1 : 1
+                            color: island.noteLook.summary.color || box.style.text
+                            font.family: island.noteLook.summary.font
+                            font.pixelSize: island.noteLook.summary.size
+                            font.weight: island.noteLook.summary.weight
+                            font.letterSpacing: island.noteLook.summary.spacing
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: text !== ""
+                            text: island.heldNotification?.body ?? ""
+                            textFormat: Text.PlainText
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 3
+                            elide: Text.ElideRight
+                            color: island.noteLook.body.color || box.style.text
+                            font.family: island.noteLook.body.font
+                            font.pixelSize: island.noteLook.body.size
+                        }
                     }
                 }
             }
