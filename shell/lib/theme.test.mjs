@@ -57,7 +57,8 @@ test('rendered tokens check out, and a bad colour in them is refused by name', (
 
 test('the foot fragment carries the palette', () => {
   const ini = renderFoot(validateTheme(paper));
-  assert.match(ini, /^\[colors\]$/m);
+  // foot warns that [colors] is deprecated for [colors-dark], the palette it uses unless told otherwise.
+  assert.match(ini, /^\[colors-dark\]$/m);
   assert.match(ini, /^background=FAF6EC$/m);
   assert.match(ini, /^foreground=1C1915$/m);
   assert.match(ini, /^regular1=C8381E$/m);

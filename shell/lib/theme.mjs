@@ -123,7 +123,7 @@ animations {
 export function renderFoot(t) {
   const hex = (s) => s.slice(1).toUpperCase();
   const c = t.color;
-  const lines = ['[colors]', `background=${hex(c.surface)}`, `foreground=${hex(c.ink)}`];
+  const lines = ['[colors-dark]', `background=${hex(c.surface)}`, `foreground=${hex(c.ink)}`];
   c.ansi.forEach((v, i) => lines.push(`${i < 8 ? 'regular' : 'bright'}${i % 8}=${hex(v)}`));
   return lines.join('\n') + '\n';
 }
