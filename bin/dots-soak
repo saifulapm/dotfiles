@@ -37,6 +37,10 @@ until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
 until_ok 3000 status_has '(.rssKiB | type) == "number"' || die "status never reported rssKiB"
 sleep 5
 
+# niri counts no wtype key as activity, so the nested idle steps (dim, lock, monitors off) move past the soak's end.
+idle_s=$(((minutes + 1) * step_s))
+timeout 0.5 qs ipc call idle times "$idle_s" "$((idle_s + 1))" "$((idle_s + 2))" >/dev/null || die "the idle times were not set"
+
 mapfile -t names < <(timeout 0.5 qs ipc call themes state | jq -r '.themes[]')
 theme=$(shell_status | jq -r .theme)
 # A theme shown once keeps its shaders, so every theme is shown before the first sample and minute 5 is a warm baseline.
@@ -56,7 +60,7 @@ for ((m = 1; m <= minutes; m++)); do
   qs ipc call launcher open >/dev/null || die "launcher open failed"
   until_ok 3000 layer_up dots-surfaces || die "dots-surfaces never mapped"
   until_ok 3000 launcher_open || die "the launcher never took the keyboard"
-  # A real key, so the nested idle steps never start; repeated, since niri lists the layer Exclusive before its keyboard enter lands.
+  # Closed by its key, as a person would; repeated, since niri lists the layer Exclusive before its keyboard enter lands.
   escape_closes() { wtype -k Escape && sleep 0.2 && launcher_closed; }
   until_ok 3000 escape_closes || die "the launcher never gave the keyboard back"
   if ((m % 5 == 0)); then
