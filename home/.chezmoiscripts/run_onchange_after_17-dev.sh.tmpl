@@ -12,3 +12,7 @@ if root systemctl restart dnsmasq systemd-resolved 2>/dev/null && root sysctl -q
   # The sockets are enabled by their wants/ links; a running manager starts them now.
   systemctl --user daemon-reload 2>/dev/null && systemctl --user start sockets.target 2>/dev/null || true
 fi
+# validate provisions caddy's internal CA, so its root exists to be trusted before caddy first serves.
+caddy validate --config "$HOME/.config/caddy/Caddyfile" --adapter caddyfile >/dev/null 2>&1 || die "caddy refused ~/.config/caddy/Caddyfile"
+root install -D -m 0644 "$HOME/.local/share/caddy/pki/authorities/local/root.crt" /etc/pki/ca-trust/source/anchors/caddy-dev-local-ca.crt || die "could not trust caddy's .test CA"
+root update-ca-trust || die "update-ca-trust failed"

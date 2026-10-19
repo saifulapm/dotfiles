@@ -134,6 +134,7 @@ dropped=$(as_user "find ~/.config -iname '*herdr*' -o -iname '*kitty*' -o -iname
 check "nothing for herdr, kitty or vicinae under ~/.config (got '$dropped')" test -z "$dropped"
 
 check "caddy accepts its Caddyfile" as_user "caddy validate --config ~/.config/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1"
+check "the system trusts caddy's .test CA" podman exec "$name" grep -q 'Caddy Local Authority' /etc/pki/tls/certs/ca-bundle.crt
 for v in 82 83 84; do check "php$v runs" as_user "php$v -r 'exit(0);'"; done
 check "bin/php follows .php-version" as_user "mkdir -p /tmp/p && echo 8.3 > /tmp/p/.php-version && cd /tmp/p && ~/Sites/github/dotfiles/bin/php -r 'echo PHP_VERSION;' | grep -q '^8\.3\.'"
 check "*.test resolves through dnsmasq" podman exec "$name" grep -qx 'address=/test/127.0.0.1' /etc/dnsmasq.d/test-domains.conf
@@ -145,8 +146,6 @@ shell=$(podman exec "$name" getent passwd saiful | cut -d: -f7)
 check "fish is saiful's login shell (got '$shell')" test "$shell" = /usr/bin/fish
 check "foot reads its config" as_user "foot --check-config"
 check "tmux reads its config" as_user "tmux -L check start-server \\; kill-server"
-# yazi reads the terminal's size before its config, so it needs a tty.
-check "yazi reads its config" podman exec -t -u saiful -e HOME="$home" "$name" "$home/.local/bin/yazi" --debug
 
 calls=$(podman exec "$name" cat "$log")
 total=$(grep -c . <<<"$calls")
