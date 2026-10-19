@@ -1,4 +1,4 @@
-// How the shell speaks under a token set, from its voice, as the three themes' boards draw it: the launcher, the island's notification and OSD.
+// How the shell speaks under a token set, from its voice, as the three themes' boards draw it: the launcher and the lists that share its idioms, the island's notification and OSD.
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands'];
 
@@ -188,5 +188,24 @@ export function osdLook(tokens) {
     unlit: { color: c.muted },
     value: { font: t.display, size: 18, weight: 400, color: '' },
     label: { font: t.ui, size: 10, spacing: 1.4, color: '' },
+  });
+}
+
+// Control, the notification centre, the cheat sheet, polkit and the recorder draw as the launcher does: its cursor row, rules and legend.
+export function listLook(tokens) {
+  const l = launcherLook(tokens);
+  const voice = l.voice;
+  const keyText = (k) => (voice === 'bracket' ? `[${upper(k)}]` : voice === 'caps' ? upper(k) : same(k));
+  const wordText = (w) => (voice === 'plain' ? same(w) : upper(w));
+  const label = l.label;
+  return Object.assign(l, {
+    heading(name, section) {
+      if (label.kind === 'header') return section ? `${upper(name)} // ${upper(section)}` : upper(name);
+      return label.kind === 'pill' ? name.charAt(0).toUpperCase() + same(name.slice(1)) : upper(name);
+    },
+    tab: { fill: label.kind === 'header' ? l.cursor.fill : label.fill, text: label.kind === 'header' ? l.cursor.text : label.color, radius: label.kind === 'pill' ? 8 : 0 },
+    tabText: wordText,
+    keyText,
+    keys: (pairs) => pairs.map(([k, w]) => ({ key: keyText(k), word: wordText(w) })),
   });
 }

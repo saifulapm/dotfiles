@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, islandLook, osdLook, MODES } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, MODES } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -148,4 +148,38 @@ test("Paper's OSD reads VOL, 20 accent bars and the value in serif; Artboard's d
 test('before the theme loads the island still has a whole notification and OSD look', () => {
   assert.equal(islandLook(null).appLabel('x'), 'X');
   assert.equal(osdLook(null).valueText(7), '7');
+});
+
+const list = (name) => listLook(theme(name));
+
+test("a list surface's heading is Paper's chip word, Artboard's pill word or Blueprint's NAME // SECTION header", () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => list(n).heading('control', 'audio')), ['CONTROL', 'Control', 'CONTROL // AUDIO']);
+  assert.equal(list('blueprint').heading('notifications', ''), 'NOTIFICATIONS');
+});
+
+test("a list surface's current tab takes the launcher's mode label: an ink chip, a tint pill or the cyan cursor", () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => [list(n).tab.fill, list(n).tab.text, list(n).tab.radius]), [
+    ['#1C1915', '#FAF6EC', 0],
+    ['#EEF1FF', '#3D5AFE', 8],
+    ['#7FE3F0', '#0A1526', 0],
+  ]);
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => list(n).tabText('Wi-Fi')), ['WI-FI', 'Wi-Fi', 'WI-FI']);
+});
+
+test("a list surface's legend keys follow the voice: Paper's tracked caps, Artboard's chips, Blueprint's brackets", () => {
+  const pairs = [['tab', 'section'], ['j/k', 'move'], ['esc', 'close']];
+  assert.deepEqual(list('paper').keys(pairs).map((k) => `${k.key} ${k.word}`), ['TAB SECTION', 'J/K MOVE', 'ESC CLOSE']);
+  assert.deepEqual(list('artboard').keys(pairs).map((k) => `${k.key} ${k.word}`), ['tab section', 'j/k move', 'esc close']);
+  assert.deepEqual(list('blueprint').keys(pairs).map((k) => `${k.key} ${k.word}`), ['[TAB] SECTION', '[J/K] MOVE', '[ESC] CLOSE']);
+  assert.equal(list('paper').small.spacing > 1, true);
+  assert.equal(list('blueprint').keyText('Mod ⇧ t'), '[MOD ⇧ T]');
+  assert.equal(list('paper').keyText('Mod ⇧ t'), 'MOD ⇧ T');
+  assert.equal(list('artboard').keyText('Mod ⇧ t'), 'Mod ⇧ t');
+});
+
+test("a list surface keeps the launcher's cursor row and rules", () => {
+  for (const n of ['paper', 'artboard', 'blueprint']) {
+    assert.deepEqual(list(n).cursor, look(n).cursor, n);
+    assert.deepEqual(list(n).rule, look(n).rule, n);
+  }
 });
