@@ -63,6 +63,14 @@ test('the active goal opens the top-right, and an empty one leaves no gap', () =
   assert.equal(marginState(view, AT, { goal: '', wifi: 'wifi', battery: '82%' }).right.text.startsWith('wifi'), true);
 });
 
+test('a failing sync opens the top-right, before the goal', () => {
+  const view = { idx: 1, app: null, title: null };
+  const s = marginState(view, AT, { sync: 'sync !', goal: 'Ship v2 · 3d', wifi: 'wifi', battery: '82%' });
+  assert.equal(s.right.sync, 'sync !');
+  assert.equal(s.right.text, 'sync !  Ship v2 · 3d  wifi  82%  Sun 18 Oct');
+  assert.equal(marginState(view, AT, { sync: '', goal: 'Ship v2 · 3d', wifi: 'wifi', battery: '82%' }).right.text, 'Ship v2 · 3d  wifi  82%  Sun 18 Oct');
+});
+
 test('wifi is named only when there is a Wi-Fi device', () => {
   assert.equal(wifiText([{ wifi: true, connected: true }]), 'wifi');
   assert.equal(wifiText([{ wifi: false, connected: true }, { wifi: true, connected: false }]), 'no wifi');

@@ -14,6 +14,8 @@ Scope {
     required property var notifs
     // The Goals window reaches the store through this.
     readonly property alias goals: goalsService
+    // Control's Route section and the shell's status read the last sync round through this.
+    readonly property alias sync: syncService
 
     Services.Niri {
         id: niriService
@@ -60,6 +62,10 @@ Scope {
     Services.Goals {
         id: goalsService
         onToast: text => island.showToast(text)
+    }
+
+    Services.Sync {
+        id: syncService
     }
 
     IpcHandler {
@@ -127,6 +133,7 @@ Scope {
             power: powerService
             network: networkService
             goals: goalsService
+            sync: syncService
             islandWidth: island.boxWidth
         }
     }
@@ -137,7 +144,7 @@ Scope {
         // The margins of the output with the focused workspace.
         function state(): string {
             const view = niriService.view(niriService.focusedOutput) ?? { idx: 0, app: null, title: null };
-            return JSON.stringify(MarginsLib.marginState(view, clockService.now, { goal: GoalsLib.marginGoal(goalsService.store, clockService.now), wifi: networkService.wifi, battery: powerService.battery }));
+            return JSON.stringify(MarginsLib.marginState(view, clockService.now, { sync: syncService.failing ? "sync !" : "", goal: GoalsLib.marginGoal(goalsService.store, clockService.now), wifi: networkService.wifi, battery: powerService.battery }));
         }
     }
 

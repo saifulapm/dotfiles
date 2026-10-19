@@ -1,5 +1,7 @@
 // Pure pieces of Control's Power, Display and Route sections.
 
+import { clockText } from './margins.mjs';
+
 // brightnessctl -m -l prints device,class,current,percent,max per line.
 export function backlights(text) {
   return text
@@ -40,4 +42,30 @@ const COMMANDS = {
 
 export function actionCommand(id) {
   return COMMANDS[id] || null;
+}
+
+// bin/dots sync writes { <unit>: { ok, lastRun, lastOk, error } }; a missing or broken file is no rounds yet.
+export function parseSync(text) {
+  try {
+    const units = JSON.parse(text);
+    return units && typeof units === 'object' && !Array.isArray(units) ? units : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+export const syncFailing = (units) => Object.keys(units).some((k) => units[k].ok === false);
+
+// Control's detail text has no width of its own, so a long error is cut to 60 characters on screen.
+const cut = (s) => (s.length > 60 ? s.slice(0, 59) + '…' : s);
+
+export function syncRows(units) {
+  const names = Object.keys(units);
+  if (names.length === 0) return [{ title: 'Sync', detail: 'no rounds yet' }];
+  const failing = names.filter((k) => units[k].ok === false);
+  if (failing.length === 0) {
+    const newest = Math.max.apply(null, names.map((k) => units[k].lastOk));
+    return [{ title: 'Sync', detail: 'ok · ' + clockText(new Date(newest)) }];
+  }
+  return [{ title: 'Sync', detail: failing.length + ' failing' }].concat(failing.map((k) => ({ title: k, detail: cut(String(units[k].error)) })));
 }

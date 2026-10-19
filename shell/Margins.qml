@@ -15,9 +15,10 @@ PanelWindow {
     required property var power
     required property var network
     required property var goals
+    required property var sync
     required property real islandWidth
     readonly property var view: niri.view(screen.name) ?? { idx: 0, app: null, title: null }
-    readonly property var marginState: M.marginState(view, clock.now, { goal: G.marginGoal(goals.store, clock.now), wifi: network.wifi, battery: power.battery })
+    readonly property var marginState: M.marginState(view, clock.now, { sync: sync.failing ? "sync !" : "", goal: G.marginGoal(goals.store, clock.now), wifi: network.wifi, battery: power.battery })
     readonly property real lineEnd: width / 2 - islandWidth / 2 - 8
     readonly property var look: S.marginStyle(theme.tokens)
 
@@ -68,6 +69,13 @@ PanelWindow {
         anchors.rightMargin: 32
         y: 17
         spacing: 20
+
+        // The danger token reads as a warning in every theme.
+        Label {
+            text: root.marginState.right.sync
+            visible: text !== ""
+            color: root.theme.color.danger ?? "black"
+        }
 
         // Paper's accent bold, Artboard's ink medium, Blueprint's amber (its danger token); the voice tells the themes apart.
         Label {
