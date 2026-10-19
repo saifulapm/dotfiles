@@ -192,6 +192,20 @@ test('no rendered fragment slows niri\'s animations; slowdown belongs to the nes
   for (const name of ['paper', 'artboard', 'blueprint']) assert.doesNotMatch(renderNiri(load(name)), /slowdown/);
 });
 
+test('Blueprint opens and closes with its own shaders, its pen baked in as its accent', () => {
+  const kdl = renderNiri(load('blueprint'));
+  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
+  assert.match(shader('window-open'), /vec4 open_color\(vec3 coords_geo, vec3 size_geo\)/);
+  assert.match(shader('window-close'), /vec4 close_color\(vec3 coords_geo, vec3 size_geo\)/);
+  for (const glsl of [shader('window-open'), shader('window-close')]) assert.match(glsl, /vec4\(0\.498, 0\.890, 0\.941, 1\.0\)/);
+});
+
+test('a motion no board draws keeps niri\'s own open and close', () => {
+  const t = load('blueprint');
+  t.primitive.motion = 'typewriter';
+  assert.doesNotMatch(renderNiri(t), /custom-shader/);
+});
+
 test('a theme without shadow keys gets no shadow', () => {
   const t = load('paper');
   delete t.niri.shadow_color;

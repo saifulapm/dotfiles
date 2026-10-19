@@ -110,6 +110,65 @@ const MOTION = {
   },
 };
 
+// A #RRGGBB colour as an opaque GLSL vec4, so a shader draws in the theme's own ink.
+const glslColor = (hex) => `vec4(${[1, 3, 5].map((i) => (parseInt(hex.slice(i, i + 2), 16) / 255).toFixed(3)).join(', ')}, 1.0)`;
+
+// niri draws the whole tile into niri_tex, border, ring and shadow included, so a shader samples it past the geometry and stops only at the texture's edge.
+const TEX = `vec4 dots_tex(vec3 coords_geo) {
+    vec3 t = niri_geo_to_tex * coords_geo;
+    if (t.x < 0.0 || t.x > 1.0 || t.y < 0.0 || t.y > 1.0) return vec4(0.0);
+    return texture2D(niri_tex, t.st);
+}`;
+
+// How far along the 1 px outline, clockwise from the top-left corner, a pixel lies; -1.0 off the outline.
+const OUTLINE = `float dots_outline(vec2 px, vec2 size) {
+    if (px.x < 0.0 || px.y < 0.0 || px.x >= size.x || px.y >= size.y) return -1.0;
+    if (px.y < 1.0) return px.x;
+    if (px.x >= size.x - 1.0) return size.x + px.y;
+    if (px.y >= size.y - 1.0) return 2.0 * size.x + size.y - px.x;
+    if (px.x < 1.0) return 2.0 * (size.x + size.y) - px.y;
+    return -1.0;
+}`;
+
+// The open and close shaders the Motion boards draw, by motion; the Blueprint pen is the accent.
+const SHADERS = {
+  linear: (c) => {
+    const pen = glslColor(c.accent);
+    return {
+      // The outline is traced until 55%; from 45% a scan line comes down and shows the window above it.
+      open: `${TEX}
+${OUTLINE}
+vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+    float p = niri_clamped_progress;
+    vec2 px = coords_geo.xy * size_geo.xy;
+    float scan = (p - 0.45) / 0.55 * size_geo.y;
+    vec4 color = px.y < scan ? dots_tex(coords_geo) : vec4(0.0);
+    float d = dots_outline(px, size_geo.xy);
+    bool inside = px.x >= 0.0 && px.x < size_geo.x && px.y >= 0.0 && px.y < size_geo.y;
+    if (inside && p < 1.0 && px.y >= scan && px.y < scan + 1.0) color = ${pen};
+    if (d >= 0.0 && d <= min(p / 0.55, 1.0) * 2.0 * (size_geo.x + size_geo.y)) color = ${pen};
+    return color;
+}`,
+      // A scan line goes up and takes the window with it in the first 60%; then the outline is lifted, last drawn first.
+      close: `${TEX}
+${OUTLINE}
+vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+    float p = niri_clamped_progress;
+    vec2 px = coords_geo.xy * size_geo.xy;
+    float scan = (1.0 - p / 0.6) * size_geo.y;
+    vec4 color = px.y < scan ? dots_tex(coords_geo) : vec4(0.0);
+    float d = dots_outline(px, size_geo.xy);
+    bool inside = px.x >= 0.0 && px.x < size_geo.x && px.y >= 0.0 && px.y < size_geo.y;
+    if (inside && p < 0.6 && px.y >= scan && px.y < scan + 1.0) color = ${pen};
+    if (d >= 0.0 && d <= clamp((1.0 - p) / 0.4, 0.0, 1.0) * 2.0 * (size_geo.x + size_geo.y)) color = ${pen};
+    return color;
+}`,
+    };
+  },
+};
+
+const indent = (text, pad) => text.split('\n').map((l) => (l ? pad + l : l)).join('\n');
+
 export function renderNiri(t) {
   const c = t.color;
   const n = t.niri;
@@ -132,7 +191,12 @@ export function renderNiri(t) {
   const radius = t.primitive.corner === 'round' ? 14 : 0;
   const motion = MOTION[t.primitive.motion]
     ?? { 'window-open': CURVES[t.primitive.motion], 'window-close': CURVES[t.primitive.motion] };
-  const animations = Object.entries(motion).map(([name, timing]) => `    ${name} {\n        ${timing}\n    }`).join('\n');
+  const shaders = SHADERS[t.primitive.motion]?.(c) ?? {};
+  const shader = (name) => {
+    const glsl = shaders[{ 'window-open': 'open', 'window-close': 'close' }[name]];
+    return glsl ? `\n        custom-shader r"\n${indent(glsl, '            ')}\n        "` : '';
+  };
+  const animations = Object.entries(motion).map(([name, timing]) => `    ${name} {\n        ${timing}${shader(name)}\n    }`).join('\n');
   return `layout {
     gaps ${t.niri.gaps}
     background-color "${c.paper}"
