@@ -149,7 +149,8 @@ check "mail-sync.timer waits for ~/.mbsyncrc, which a keyless install does not w
 check "tty1 logs saiful straight in" podman exec "$name" grep -q -- '--autologin saiful' /etc/systemd/system/getty@tty1.service.d/autologin.conf
 shell=$(podman exec "$name" getent passwd saiful | cut -d: -f7)
 check "fish is saiful's login shell (got '$shell')" test "$shell" = /usr/bin/fish
-check "foot reads its config without a warning" as_user "foot --check-config 2>&1 | { ! grep -q .; }"
+out=$(as_user "foot --check-config" 2>&1)
+check "foot reads its config without a warning (got '$out')" test -z "$out"
 check "tmux reads its config" as_user "tmux -L check start-server \\; kill-server"
 
 calls=$(podman exec "$name" cat "$log")
