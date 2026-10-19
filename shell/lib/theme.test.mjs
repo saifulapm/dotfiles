@@ -162,7 +162,7 @@ test('Blueprint frames the focused window in cyan, the others in #2E5A72, and gl
 });
 
 test('each theme\'s fragment times every animation from its motion', () => {
-  const block = (kdl, name) => kdl.match(new RegExp(`\\n    ${name} \\{\\n([\\s\\S]*?)\\n    \\}`))?.[1].trim().split(/\s*\n\s*/);
+  const block = (kdl, name) => kdl.match(new RegExp(`\\n    ${name} \\{\\n([\\s\\S]*?)\\n    \\}`))?.[1].split('custom-shader')[0].trim().split(/\s*\n\s*/);
   const paper = renderNiri(load('paper'));
   assert.deepEqual(block(paper, 'workspace-switch'), ['spring damping-ratio=1.0 stiffness=1200 epsilon=0.0001']);
   assert.deepEqual(block(paper, 'window-close'), ['duration-ms 100', 'curve "ease-out-quad"']);
@@ -198,6 +198,14 @@ test('Blueprint opens and closes with its own shaders, its pen baked in as its a
   assert.match(shader('window-open'), /vec4 open_color\(vec3 coords_geo, vec3 size_geo\)/);
   assert.match(shader('window-close'), /vec4 close_color\(vec3 coords_geo, vec3 size_geo\)/);
   for (const glsl of [shader('window-open'), shader('window-close')]) assert.match(glsl, /vec4\(0\.498, 0\.890, 0\.941, 1\.0\)/);
+});
+
+test('Paper drops its windows in whole and lifts them out, 8 px either way, with no fade', () => {
+  const kdl = renderNiri(load('paper'));
+  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
+  assert.match(shader('window-open'), /vec4 open_color[\s\S]*8\.0 \* \(1\.0 - p\)/);
+  assert.match(shader('window-close'), /vec4 close_color[\s\S]*8\.0 \* p/);
+  for (const glsl of [shader('window-open'), shader('window-close')]) assert.doesNotMatch(glsl, /\* p;|\* \(1\.0 - p\);/);
 });
 
 test('a motion no board draws keeps niri\'s own open and close', () => {

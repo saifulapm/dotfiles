@@ -96,6 +96,32 @@ blueprint() {
   until_ok 8000 has_windows 0
 }
 
+paper() {
+  local x y w h t
+  theme paper
+  check "paper: a resting magenta window is found" calibrate || return
+  read -r x y w h <<<"$box"
+  open_magenta
+  wait_until 300
+  t=$(($(now_ms) - t0))
+  # A column through the top edge, from 16 px above the resting top: the magenta starts 3 px or more higher, and is pure.
+  check "paper $t ms into its open (of 2800): its top 3 px or more above rest, fully opaque" \
+    grab_test "$((x + w / 2)),$((y - 16)) 1x40" '
+      let top = -1; for (let i = 0; i < h; i++) if (magenta(at(0, i))) { top = i; break; }
+      return top >= 0 && top <= 13 && near(at(0, top + 10), [255, 0, 255], 4);'
+  sleep 4
+  close_window
+  wait_until 1000
+  t=$(($(now_ms) - t0))
+  check "paper 50% into its close ($t ms of 2000): at most its top 40%, and paper where its bottom half was" \
+    grab_test "$((x + w / 2)),$y 1x$h" '
+      for (let i = 0; i < h; i++) if (magenta(at(0, i)) && i >= h * 0.4) return false;
+      for (let i = Math.ceil(h / 2); i < h; i++) if (!near(at(0, i), [241, 233, 216], 30)) return false;
+      return true;'
+  until_ok 8000 has_windows 0
+}
+
 blueprint
+paper
 exit "$fails"
 }

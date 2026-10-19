@@ -132,6 +132,22 @@ const OUTLINE = `float dots_outline(vec2 px, vec2 size) {
 
 // The open and close shaders the Motion boards draw, by motion; the Blueprint pen is the accent.
 const SHADERS = {
+  snappy: () => ({
+    // Whole from the first frame, 8 px above its place, dropping into it.
+    open: `${TEX}
+vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+    float p = niri_clamped_progress;
+    return dots_tex(vec3(coords_geo.x, coords_geo.y + 8.0 * (1.0 - p) / size_geo.y, 1.0));
+}`,
+    // Lifts 8 px while a cut climbs from just below its shadow to its top.
+    close: `${TEX}
+vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+    float p = niri_clamped_progress;
+    vec3 c = vec3(coords_geo.x, coords_geo.y + 8.0 * p / size_geo.y, 1.0);
+    if (c.y > (1.0 - p) * (1.0 + 8.0 / size_geo.y)) return vec4(0.0);
+    return dots_tex(c);
+}`,
+  }),
   linear: (c) => {
     const pen = glslColor(c.accent);
     return {
