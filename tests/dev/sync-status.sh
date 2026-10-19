@@ -44,10 +44,10 @@ rm -rf "$remote"
 until_ok 3000 marked
 echo "     margins: $(margins | jq -c .right)"
 check "a round with the remote gone starts the margin with sync !" marked
-failing_rows() { state_is '.rows == ["Questions ring on", "Do Not Disturb", "Sync", "notes", "goals"] and .details[2] == "2 failing" and (.details[3:] | all(startswith("NOTICE: Failed to lsf"))) and ([.sync.notes.error, .sync.goals.error] | all(endswith("directory not found")))'; }
+failing_rows() { state_is '.rows == ["Questions ring on", "Do Not Disturb", "Sync", "notes", "goals", "fish", "ssh"] and .details[2] == "4 failing" and (.details[3:] | all(endswith("directory not found"))) and ([.sync[].error] | all(endswith("directory not found")))'; }
 until_ok 2000 failing_rows
 echo "     route: $(control_state | jq -c '{rows, details, sync}')"
-check "Route lists notes and goals, each with its error" failing_rows
+check "Route lists each unit with its error" failing_rows
 wtype -k Escape
 until_ok 2000 state_is '.open == false'
 

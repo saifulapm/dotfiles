@@ -21,6 +21,8 @@ export DOTS_HUB_QUESTIONS=$D/hub-questions.json PIPEWIRE_RUNTIME_DIR=$D/pw
 export DOTS_RECORDINGS_DIR=$D/recordings
 # dots sync goes to an alias Dropbox: inside the temp dir, never the live rclone config's.
 export RCLONE_CONFIG=$D/rclone.conf
+# The ssh unit skips without an age key, so a nested round never reads the real key or ~/.ssh.
+export DOTS_AGE_IDENTITY=$D/no-age-identity
 # workflow route tells every hub, so Control's Route toggle runs a fake that keeps the route here.
 export DOTS_WORKFLOW=$repo/bin/dev-fake-workflow
 # The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.

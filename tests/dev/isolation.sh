@@ -27,6 +27,10 @@ check "PIPEWIRE_RUNTIME_DIR is inside the temp dir" under_dev "${PIPEWIRE_RUNTIM
 check "the shell unit carries PIPEWIRE_RUNTIME_DIR" unit_has PIPEWIRE_RUNTIME_DIR "${PIPEWIRE_RUNTIME_DIR:-}"
 check "RCLONE_CONFIG is inside the temp dir" under_dev "${RCLONE_CONFIG:-}"
 check "the shell unit carries RCLONE_CONFIG" unit_has RCLONE_CONFIG "${RCLONE_CONFIG:-}"
+check "DOTS_AGE_IDENTITY is inside the temp dir" under_dev "${DOTS_AGE_IDENTITY:-}"
+check "the shell unit carries DOTS_AGE_IDENTITY" unit_has DOTS_AGE_IDENTITY "${DOTS_AGE_IDENTITY:-}"
+# A check that runs dots sync merges the stores under XDG_DATA_HOME, so the env it sources must name the temp one.
+check "XDG_DATA_HOME is inside the temp dir" under_dev "${XDG_DATA_HOME:-}"
 
 live_volume() { env -u PIPEWIRE_RUNTIME_DIR wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null; }
 live_vol_before=$(live_volume)
