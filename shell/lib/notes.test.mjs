@@ -290,3 +290,42 @@ test('bidi controls show as visible marks, so a card reads as the text y copies'
   assert.equal(displayText('a\u200Eb\u200Fc\u061Cd'), 'a⟨U+200E⟩b⟨U+200F⟩c⟨U+61C⟩d');
   assert.equal(displayText('plain ünï'), 'plain ünï');
 });
+
+import { mergeStores } from './notes.mjs';
+
+const note = (id, text, updatedAt, extra) => Object.assign({ id, section: 'inbox', text, attachments: [], todo: false, done: false, tags: [], createdAt: T, updatedAt }, extra);
+const notesStore = (notes, extra) => Object.assign(emptyStore(), { notes }, extra);
+
+test('a sync merge keeps the newer edit of a note from either side', () => {
+  const a = notesStore([note('n1', 'from a', T + 1)]);
+  const b = notesStore([note('n1', 'from b', T + 2), note('n2', 'only b', T)]);
+  assert.deepEqual(mergeStores(a, b).notes.map((n) => [n.id, n.text]), [['n1', 'from b'], ['n2', 'only b']]);
+  assert.deepEqual(mergeStores(b, a).notes.map((n) => [n.id, n.text]), [['n1', 'from b'], ['n2', 'only b']]);
+});
+
+test('a sync merge lets a delete beat an older edit, and keeps the tombstone', () => {
+  const a = deleteNotes(notesStore([note('n1', 'x', T)]), ['n1'], T + 5);
+  const b = notesStore([note('n1', 'edited on b', T + 3)]);
+  const m = mergeStores(b, a);
+  assert.deepEqual(m.notes, [{ id: 'n1', section: 'inbox', text: '', attachments: [], todo: false, done: false, tags: [], createdAt: T, updatedAt: T + 5, deleted: true }]);
+  assert.deepEqual(sectionNotes(m, 'inbox'), []);
+});
+
+test('a sync merge gives one result in either order, unions sections by name and keeps the local active section', () => {
+  const a = notesStore([note('n2', 'a2', T), note('n1', 'tie a', T + 1)], { activeSection: 'work', sections: [{ name: 'inbox', order: 0 }, { name: 'work', order: 1 }] });
+  const b = notesStore([note('n1', 'tie b', T + 1)], { sections: [{ name: 'inbox', order: 0 }, { name: 'home', order: 1 }] });
+  const ab = mergeStores(a, b);
+  const ba = mergeStores(b, a);
+  assert.equal(ab.activeSection, 'work');
+  assert.equal(ba.activeSection, 'inbox');
+  assert.deepEqual(ab.sections, [{ name: 'inbox', order: 0 }, { name: 'home', order: 1 }, { name: 'work', order: 1 }]);
+  assert.deepEqual(Object.assign({}, ab, { activeSection: '' }), Object.assign({}, ba, { activeSection: '' }));
+  assert.deepEqual(ab.notes.map((n) => [n.id, n.text]), [['n1', 'tie b'], ['n2', 'a2']]);
+});
+
+test('a sync merge of a store with itself changes nothing', () => {
+  const s = notesStore([note('n1', 'one', T), note('n2', 'two', T + 1)], { activeSection: 'work', sections: [{ name: 'inbox', order: 0 }, { name: 'work', order: 1 }] });
+  assert.deepEqual(mergeStores(s, s), s);
+  const m = mergeStores(s, notesStore([note('n3', 'three', T)]));
+  assert.deepEqual(mergeStores(m, m), m);
+});

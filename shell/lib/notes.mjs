@@ -159,7 +159,31 @@ export function attachmentFile(attachment) {
   return attachment.sha256 + '.' + ((fromName ? fromName.toLowerCase() : '') || fromMime || 'bin');
 }
 
-export const dragOffer = (note) => ({ 'text/plain': note.text });
+// The newer copy wins; a tie goes to the larger text, so both machines pick the same one.
+function newer(a, b) {
+  if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt ? a : b;
+  return JSON.stringify(a) >= JSON.stringify(b) ? a : b;
+}
+
+const byName = (a, b) => a.order - b.order || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+
+// The sync merge: each note from its newer copy (a tombstone is a note too), sections by name at their lower order, and the active section stays local.
+export function mergeStores(a, b) {
+  const notes = {};
+  a.notes.concat(b.notes).forEach((n) => {
+    notes[n.id] = notes[n.id] ? newer(notes[n.id], n) : n;
+  });
+  const sections = {};
+  a.sections.concat(b.sections).forEach((s) => {
+    sections[s.name] = sections[s.name] && sections[s.name].order <= s.order ? sections[s.name] : s;
+  });
+  return set(a, {
+    sections: Object.keys(sections).map((k) => sections[k]).sort(byName),
+    notes: Object.keys(notes).sort().map((id) => notes[id]),
+  });
+}
+
+export const dragOffer =(note) => ({ 'text/plain': note.text });
 
 export const chipOffer = (attachment, dir) => ({ 'text/uri-list': 'file://' + dir + '/' + attachmentFile(attachment) });
 
