@@ -9,10 +9,8 @@ import "../lib/notifs.mjs" as N
 Scope {
     id: notifs
 
-    // The island's notification slot, null while none shows.
+    // The island's notification slot, null while none shows; each one, critical too, shows for 5 s.
     property var current: null
-    // The newest critical notification not yet closed; the island goes back to it when a newer one's 5 s are up.
-    property var pinned: null
     // Newest first, at most 200, kept in the state dir across restarts.
     property var history: []
     // While on, a notification goes to the history only, and the island stays at rest.
@@ -62,20 +60,13 @@ Scope {
         if (dnd)
             return;
         current = e;
-        if (e.critical) {
-            pinned = e;
-            hold.stop();
-        } else {
-            hold.restart();
-        }
+        hold.restart();
     }
 
-    // Closed by its app, or dismissed here: the island falls back to a pinned critical one, or rests.
+    // Closed by its app, or dismissed here: the island rests.
     function gone(key) {
-        if (pinned?.key === key)
-            pinned = null;
         if (current?.key === key) {
-            current = pinned;
+            current = null;
             hold.stop();
         }
     }
@@ -86,8 +77,6 @@ Scope {
         e.key = key;
         history = [e].concat(history.filter(h => h.key !== key));
         save();
-        if (pinned?.key === key && !e.critical)
-            pinned = null;
         show(e);
     }
 
@@ -107,7 +96,6 @@ Scope {
 
     function clear() {
         current = null;
-        pinned = null;
         hold.stop();
         for (const k in live)
             live[k]?.dismiss();
@@ -175,6 +163,6 @@ Scope {
     Root.Tick {
         id: hold
         interval: 5000
-        onTriggered: notifs.current = notifs.pinned
+        onTriggered: notifs.current = null
     }
 }

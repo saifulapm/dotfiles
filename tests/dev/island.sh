@@ -20,11 +20,10 @@ check "the island is back to the clock after 5.0 ± 0.3 s (${held} ms)" test "$h
 
 notify-send -u critical stop
 until_ok 2000 mode_is notification
-sleep 30
-check "a critical notification is still shown after 30 s" eval 'island | jq -e ".mode == \"notification\" and (.text | test(\"stop\"))" >/dev/null'
-status=$(shell_status)
-one_timer() { jq -e '.timers == 1' <<<"$status" >/dev/null; }
-check "a critical notification runs no timer" one_timer
+state=$(island)
+until_ok 8000 mode_is rest
+held=$(($(island | jq .since) - $(jq .since <<<"$state")))
+check "a critical notification is back to the clock after 5.0 ± 0.3 s too (${held} ms)" test "$held" -ge 4700 -a "$held" -le 5300
 
 start=$(now_ms)
 for i in $(seq 1 20); do notify-send "seq $i"; done
@@ -41,9 +40,8 @@ notify-send -u critical "battery low"
 until_ok 1000 eval 'island | jq -e ".text | test(\"battery low\")" >/dev/null'
 notify-send "chat ping"
 until_ok 1000 eval 'island | jq -e ".text | test(\"chat ping\")" >/dev/null'
-critical_back() { island | jq -e '.mode == "notification" and (.text | test("battery low"))' >/dev/null; }
-until_ok 7000 critical_back
-check "a critical notification comes back once a newer one's 5 s are up" critical_back
+until_ok 7000 mode_is rest
+check "a critical notification does not come back once a newer one's 5 s are up" mode_is rest
 
 id=$(notify-send -p "download 10%")
 until_ok 1000 eval 'island | jq -e ".text | test(\"download 10%\")" >/dev/null'
