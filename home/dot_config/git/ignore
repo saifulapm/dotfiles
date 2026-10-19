@@ -1,0 +1,17 @@
+# Agent and tool files never belong in a product repository.
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.agents/
+.cursor/
+.scratch/
+.e2e/
+.amx/
+.mcp.json
+opencode.json
+opencode.jsonc
+skills-lock.json
+.playwright-cli/
+**/agent-memory/
+**/agent-memory-local/

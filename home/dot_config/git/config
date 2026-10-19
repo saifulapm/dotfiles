@@ -1,0 +1,52 @@
+[user]
+	name = Saiful Islam
+	email = saiful.apm@gmail.com
+[github]
+	user = saifulapm
+
+[core]
+	excludesFile = ~/.config/git/ignore
+	quotepath = false
+	# line endings: force LF during add, warn on conversion
+	autocrlf = input
+	safecrlf = warn
+	# No core.editor: it outranks $VISUAL/$EDITOR, which config.fish sets.
+
+[init]
+	defaultBranch = main
+[push]
+	autoSetupRemote = true
+[pull]
+	rebase = true
+[rebase]
+	autoStash = true
+[fetch]
+	prune = true
+[rerere]
+	enabled = true
+[merge]
+	conflictStyle = zdiff3
+[diff]
+	algorithm = histogram
+[branch]
+	sort = -committerdate
+
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+
+# Which GitHub account a remote uses follows the repo's URL, not whichever gh account is active.
+# Every lareysbd remote is dialled through the github.com-lareys ssh alias, which pins the commercial key.
+# Rewriting changes only the URL git dials; .git/config keeps the github.com remote.
+[url "git@github.com-lareys:lareysbd/"]
+	insteadOf = git@github.com:lareysbd/
+	insteadOf = https://github.com/lareysbd/
+	insteadOf = ssh://git@github.com/lareysbd/
+
+# There is no git@github.com:saifulapm/ line: that form already dials the right alias, and rewriting it to itself loops.
+[url "git@github.com:saifulapm/"]
+	insteadOf = https://github.com/saifulapm/
+	insteadOf = ssh://git@github.com/saifulapm/

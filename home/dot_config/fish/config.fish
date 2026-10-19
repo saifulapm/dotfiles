@@ -3,10 +3,20 @@ if status is-login; and status is-interactive; and test -z "$WAYLAND_DISPLAY"; a
     exec niri-session
 end
 set -g fish_greeting
-fish_add_path -g ~/Sites/github/dotfiles/bin
+
+set -gx EDITOR kak
+set -gx VISUAL kak
+# Without it composer prefers a legacy ~/.composer when one exists.
+set -gx COMPOSER_HOME ~/.config/composer
+
+fish_add_path -g ~/.local/bin ~/.config/composer/vendor/bin ~/Sites/github/dotfiles/bin
+# Last, so an untrusted clone cannot shadow a system command with its own node_modules/.bin or vendor/bin; fish_add_path would make them absolute.
+set -gx PATH $PATH node_modules/.bin vendor/bin
+
 set -g __dots_colors_file (set -q XDG_STATE_HOME; and echo $XDG_STATE_HOME; or echo ~/.local/state)/dots/theme-out/colors.fish
 # dots theme rewrites the colours file, so each prompt re-reads it once its text changes.
 function __dots_colors --on-event fish_prompt
+    test -r $__dots_colors_file; or return
     set -l text (string collect <$__dots_colors_file 2>/dev/null); or return
     test "$text" = "$__dots_colors_seen"; and return
     set -g __dots_colors_seen $text
