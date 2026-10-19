@@ -11,6 +11,7 @@ binds {
     Mod+I hotkey-overlay-title="Island" { spawn "qs" "ipc" "call" "island" "focus"; }
     Mod+N hotkey-overlay-title="Notes" { spawn "qs" "ipc" "call" "notes" "toggle"; }
     Mod+Shift+N hotkey-overlay-title="Pin Notes" { spawn "qs" "ipc" "call" "notes" "pin"; }
+    Mod+G hotkey-overlay-title="Goals" { spawn "qs" "ipc" "call" "goals" "toggle"; }
     Mod+Escape hotkey-overlay-title="Lock" { spawn "qs" "ipc" "call" "lock" "lock"; }
     Mod+Shift+R hotkey-overlay-title="Record a Region" { spawn "qs" "ipc" "call" "record" "toggle"; }
     Print hotkey-overlay-title="Screenshot" { screenshot; }

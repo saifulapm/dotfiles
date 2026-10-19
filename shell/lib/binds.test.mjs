@@ -45,6 +45,10 @@ test('the system binds open Control, the clipboard and emoji modes, the lock and
   assert.match(binds, spawns('Mod+Shift+R', ['qs', 'ipc', 'call', 'record', 'toggle']));
 });
 
+test('Mod+G toggles Goals', () => {
+  assert.match(binds, spawns('Mod+G', ['qs', 'ipc', 'call', 'goals', 'toggle']));
+});
+
 test('Print opens niri screenshot UI and center-column moves to Mod+Shift+C', () => {
   assert.match(binds, /^\s*Print hotkey-overlay-title="[^"]+" \{ screenshot; \}$/m);
   assert.match(binds, /^\s*Mod\+Shift\+C hotkey-overlay-title="[^"]+" \{ center-column; \}$/m);
