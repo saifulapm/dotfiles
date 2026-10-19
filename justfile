@@ -19,7 +19,7 @@ test-sync:
 
 # dots bump and the other dots subcommands, against stub gh and curl
 test-dots:
-    node --test 'tests/dots/*.test.mjs'
+    node --test 'tests/dots/*.test.mjs' 'tests/home/*.test.mjs'
 
 # checks that each open a nested niri for a few seconds
 test-dev:
