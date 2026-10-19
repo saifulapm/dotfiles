@@ -46,8 +46,9 @@ packages() {
   committed packages.toml | awk -v arch="$arch" -F' = ' '
     function flush() { if (n != "" && (a == "all" || a == arch)) print n }
     /^\[\[package\]\]/ { flush(); n = a = ""; next }
+    { gsub(/"/, "", $2) }
     $1 == "name" { n = $2 } $1 == "arch" { a = $2 }
-    END { flush() }' | tr -d '"'
+    END { flush() }'
 }
 snapshot() { as_root "find $home /etc \\( -type f -o -type l \\) -printf '%p %s %T@ %l\\n' | sort"; }
 
@@ -124,7 +125,8 @@ shell=$(podman exec "$name" getent passwd saiful | cut -d: -f7)
 check "fish is saiful's login shell (got '$shell')" test "$shell" = /usr/bin/fish
 check "foot reads its config" as_user "foot --check-config"
 check "tmux reads its config" as_user "tmux -L check start-server \\; kill-server"
-check "yazi reads its config" as_user "yazi --debug >/dev/null"
+# yazi reads the terminal's size before its config, so it needs a tty.
+check "yazi reads its config" podman exec -t -u saiful -e HOME="$home" "$name" "$home/.local/bin/yazi" --debug
 
 calls=$(podman exec "$name" cat "$log")
 total=$(grep -c . <<<"$calls")
@@ -141,7 +143,7 @@ check "second run changes no file under $home or /etc" diff <(echo "$before") <(
 
 echo "--- dots update with nothing new"
 as_root ": > $log"
-out=$(as_user "dots update" 2>&1)
+out=$(as_user "Sites/github/dotfiles/bin/dots update" 2>&1)
 rc=$?
 echo "${out##*$'\n'}"
 check "dots update exits 0" test $rc = 0
@@ -155,7 +157,7 @@ echo "--- dots update after a pin moved"
 as_user "cd ~/Sites/github/dotfiles && sed -i -e 's/^version = \"26.9.1\"/version = \"26.8.15\"/' \\
   -e 's/02807f08d6b589b65b7516a4e259d83f5995d7a23bb12b3a155141385b370b3a/f5a85771f06bb0e8c488136ae0aedaec8d341a7cee995549df391d7d852fe8d1/' \\
   -e 's/a02fe91d3304294048c681f010f1100856872a4e98ecf6927328e888d40a6ad2/cc67eb7991550c2f9407cda52d3f5af0937627aa6884e7de99a04fcf059807e0/' versions.toml"
-out=$(as_user "dots update" 2>&1)
+out=$(as_user "Sites/github/dotfiles/bin/dots update" 2>&1)
 check "dots update reinstalls only yazi" test "$(grep -c '^dots: pin ' <<<"$out")" = 1 -a "$(grep -c '^dots: pin yazi 26.8.15$' <<<"$out")" = 1
 check "dots update ends with pins: 1 changed (got '${out##*$'\n'}')" grep -qE '^dnf: [0-9]+ upgraded · pins: 1 changed$' <<<"${out##*$'\n'}"
 check "yazi is now 26.8.15" as_user "yazi --version | grep -q 26.8.15"
