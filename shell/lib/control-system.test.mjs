@@ -60,3 +60,15 @@ test('Route names the sync state and each failing unit with its error', () => {
     { title: 'fish', detail: 'Failed to copy: ' + 'x'.repeat(43) + '…' },
   ]);
 });
+
+test('a forged sync.json reads as units Route can draw, never a TypeError', () => {
+  const units = parseSync(JSON.stringify({ notes: null, goals: 7, fish: { ok: 'false', lastOk: 'x' }, ssh: { ok: false, error: { a: 1 } }, '<b>x</b>': { ok: true, lastOk: 'soon' } }));
+  assert.deepEqual(units, {
+    fish: { ok: false, lastRun: null, lastOk: null, error: 'no error recorded' },
+    ssh: { ok: false, lastRun: null, lastOk: null, error: 'no error recorded' },
+    '<b>x</b>': { ok: true, lastRun: null, lastOk: null, error: null },
+  });
+  assert.equal(syncFailing(units), true);
+  assert.deepEqual(syncRows(units).map((r) => r.detail), ['2 failing', 'no error recorded', 'no error recorded']);
+  assert.deepEqual(syncRows(parseSync('{"notes":{"ok":true,"lastOk":"x"}}')), [{ title: 'Sync', detail: 'ok' }]);
+});

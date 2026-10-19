@@ -45,13 +45,29 @@ export function actionCommand(id) {
 }
 
 // bin/dots sync writes { <unit>: { ok, lastRun, lastOk, error } }; a missing or broken file is no rounds yet.
+const isUnit = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const time = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
+
+// Each unit is reshaped to { ok, lastRun, lastOk, error } with those types, so a hand-edited or forged file cannot break Route.
+function readUnit(v) {
+  const ok = v.ok === true;
+  const error = typeof v.error === 'string' && v.error ? v.error : 'no error recorded';
+  return { ok, lastRun: time(v.lastRun), lastOk: time(v.lastOk), error: ok ? null : error };
+}
+
 export function parseSync(text) {
+  let units = null;
   try {
-    const units = JSON.parse(text);
-    return units && typeof units === 'object' && !Array.isArray(units) ? units : {};
+    units = JSON.parse(text);
   } catch (e) {
     return {};
   }
+  const out = {};
+  if (!isUnit(units)) return out;
+  Object.keys(units).forEach((k) => {
+    if (isUnit(units[k])) out[k] = readUnit(units[k]);
+  });
+  return out;
 }
 
 export const syncFailing = (units) => Object.keys(units).some((k) => units[k].ok === false);
@@ -64,8 +80,8 @@ export function syncRows(units) {
   if (names.length === 0) return [{ title: 'Sync', detail: 'no rounds yet' }];
   const failing = names.filter((k) => units[k].ok === false);
   if (failing.length === 0) {
-    const newest = Math.max.apply(null, names.map((k) => units[k].lastOk));
-    return [{ title: 'Sync', detail: 'ok · ' + clockText(new Date(newest)) }];
+    const times = names.map((k) => units[k].lastOk).filter((t) => t !== null);
+    return [{ title: 'Sync', detail: times.length ? 'ok · ' + clockText(new Date(Math.max.apply(null, times))) : 'ok' }];
   }
-  return [{ title: 'Sync', detail: failing.length + ' failing' }].concat(failing.map((k) => ({ title: k, detail: cut(String(units[k].error)) })));
+  return [{ title: 'Sync', detail: failing.length + ' failing' }].concat(failing.map((k) => ({ title: k, detail: cut(units[k].error) })));
 }
