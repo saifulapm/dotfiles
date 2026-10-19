@@ -120,6 +120,15 @@ for font in 'Maple Mono' 'Symbols Nerd Font Mono'; do
   check "fontconfig finds $font (got '$got')" test "$got" = "$font"
 done
 
+err=$(as_user "fish -c 'echo ok'" 2>&1 >/dev/null)
+out=$(as_user "fish -c 'echo ok'" 2>/dev/null)
+check "fish -c 'echo ok' prints ok and nothing else (got '$out', stderr '$err')" test "$out" = ok -a -z "$err"
+excludes=$(as_user "git config --get-all --path core.excludesFile")
+check "git has one excludes file, under ~/.config/git (got '$excludes')" test "$excludes" = "$home/.config/git/ignore"
+check "claude's settings render with its hooks" as_user "jq -e .hooks ~/.claude/settings.json >/dev/null"
+dropped=$(as_user "find ~/.config -iname '*herdr*' -o -iname '*kitty*' -o -iname '*vicinae*'")
+check "nothing for herdr, kitty or vicinae under ~/.config (got '$dropped')" test -z "$dropped"
+
 check "tty1 logs saiful straight in" podman exec "$name" grep -q -- '--autologin saiful' /etc/systemd/system/getty@tty1.service.d/autologin.conf
 shell=$(podman exec "$name" getent passwd saiful | cut -d: -f7)
 check "fish is saiful's login shell (got '$shell')" test "$shell" = /usr/bin/fish
