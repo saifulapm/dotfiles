@@ -2,8 +2,6 @@
 const lower = (s) => s.toLowerCase();
 const rgb = (s) => `rgb:${lower(s).slice(1)}`;
 
-// The ends of a tmux tab, by corner: Nerd Font half circles for round, slants for cut, none for square.
-const TAB_ENDS = { round: ['\ue0b6', '\ue0b4'], cut: ['\ue0ba', '\ue0bc'], square: ['', ''] };
 
 // The bar sits on the terminal's own background; the formats carry their colours, as tmux bakes #[...] into a format.
 export function renderTmux(t) {
@@ -12,16 +10,21 @@ export function renderTmux(t) {
   const frame = t.primitive.frame;
   const edge = { ink, double: ink, hairline: muted }[frame] ?? accent;
   const lines = frame === 'double' ? 'double' : 'single';
-  const [l, r] = TAB_ENDS[t.primitive.corner];
-  // Maple Mono draws the half circles inside their cell; the slants come from Symbols Nerd Font and spill into the next one, so they get a space to spill into.
-  const pad = t.primitive.corner === 'round' ? '' : ' ';
-  const tab = (bg, text) => `#[fg=${bg},bg=default]${l}#[fg=${surface},bg=${bg}]${pad}${text}${pad}#[fg=${bg},bg=default]${r}#[default]`;
-  // A plain tab keeps the filled one's width, so the centred list does not shift as focus moves.
-  const plain = (text) => `${l && ' '}${pad}#[fg=${muted}]${text}#[default]${pad}${r && ' '}`;
+  // A cut corner draws a tab as a drawing's dimension marks; round and square fill it, round with Nerd Font half circles at its ends.
+  const marks = t.primitive.corner === 'cut';
+  const [l, r] = t.primitive.corner === 'round' ? ['\ue0b6', '\ue0b4'] : ['', ''];
+  const pad = l ? '' : ' ';
+  const tab = marks
+    ? (mark, text) => `#[fg=${mark}]├─ #[fg=${ink}]${text}#[fg=${mark}] ─┤#[default]`
+    : (bg, text) => `#[fg=${bg},bg=default]${l}#[fg=${surface},bg=${bg}]${pad}${text}${pad}#[fg=${bg},bg=default]${r}#[default]`;
+  // A plain tab keeps the current one's width, so the centred list does not shift as focus moves.
+  const plain = marks
+    ? (text) => `   #[fg=${muted}]${text}#[default]   `
+    : (text) => `${l && ' '}${pad}#[fg=${muted}]${text}#[default]${pad}${r && ' '}`;
   const win = '#I #W#{?window_zoomed_flag, \u{f0293},}';
   return [
     `set -g status-style "fg=${muted},bg=default"`,
-    `set -g status-left " ${tab(`#{?client_prefix,${accent},${ink}}`, '#S')} "`,
+    `set -g status-left " ${tab(`#{?client_prefix,${accent},${marks ? line : ink}}`, '#S')} "`,
     `set -g status-right "#[fg=${accent}]#(amx statusline)#[fg=${muted}] #{?#{==:#{pane_current_path},#{HOME}},~,#{=/-24/…:#{b:pane_current_path}}} "`,
     `set -g window-status-format "${plain(win)}"`,
     `set -g window-status-current-format "${tab(accent, win)}"`,

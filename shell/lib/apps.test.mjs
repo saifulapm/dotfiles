@@ -14,11 +14,13 @@ const paper = load('paper');
 
 const artboard = load('artboard');
 
-test('tmux tabs take the theme\'s corner: round pills, cut slants, square blocks', () => {
+test('tmux tabs take the theme\'s corner: round pills, cut dimension marks, square blocks', () => {
   const current = (t) => renderTmux(t).match(/^set -g window-status-current-format "(.*)"$/m)[1];
   assert.match(current(artboard), /\ue0b6.*#\[fg=#ffffff,bg=#3d5afe\].*\ue0b4/);
-  assert.match(current(blueprint), /\ue0ba.*#\[fg=#0a1526,bg=#7fe3f0\].*\ue0bc/);
-  assert.doesNotMatch(current(paper), /[\ue0b4\ue0b6\ue0ba\ue0bc]/);
+  assert.equal(current(blueprint), '#[fg=#7fe3f0]├─ #[fg=#d6f4f8]#I #W#{?window_zoomed_flag, \u{f0293},}#[fg=#7fe3f0] ─┤#[default]');
+  // The session's marks sit in the line colour, and turn the accent while the prefix is held.
+  assert.match(renderTmux(blueprint), /^set -g status-left " #\[fg=#\{\?client_prefix,#7fe3f0,#2e5a72}\]├─ /m);
+  assert.doesNotMatch(current(paper), /[\ue0b4\ue0b6]/);
   assert.match(current(paper), /#\[fg=#faf6ec,bg=#c8381e\] #I #W/);
 });
 
