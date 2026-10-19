@@ -31,7 +31,7 @@ dots_install() {
       "$name" bash -s install
 }
 as_user() {
-  podman exec -u saiful -w "$home" -e HOME="$home" -e PATH="/opt/shim:$home/.local/bin:/usr/local/bin:/usr/bin:/bin" "$name" bash -c "$1"
+  podman exec -u saiful -w "$home" -e HOME="$home" -e LANG=C.UTF-8 -e PATH="/opt/shim:$home/.local/bin:/usr/local/bin:/usr/bin:/bin" "$name" bash -c "$1"
 }
 # committed <file>: the file as the branch under test has it.
 committed() { git -C "$snap/src.git" show "$branch:$1"; }
