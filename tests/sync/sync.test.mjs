@@ -36,6 +36,17 @@ test('a goal added on a reaches b after a then b sync', async () => {
   assert.deepEqual(G.activeGoals(goals(b)).map((g) => g.title), ['X']);
 });
 
+test('a machine that lost its local store gets its own goals back from the remote', async () => {
+  const w = world();
+  const a = machine(w, 'a');
+  write(goalsPath(a), G.addGoal(G.emptyStore(), 'only on a', null, T, 'g1'));
+  await ok(a);
+  // A reinstall under the same machine id starts with no store.
+  renameSync(goalsPath(a), goalsPath(a) + '.gone');
+  await ok(a);
+  assert.deepEqual(G.activeGoals(goals(a)).map((g) => g.title), ['only on a']);
+});
+
 test('a note edited on both machines offline ends with the later edit on both', async () => {
   const w = world();
   const [a, b] = [machine(w, 'a'), machine(w, 'b')];

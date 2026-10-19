@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals> <store> <other>...` merges the others into the local store.
+// dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals> <store> <pulled>...` merges the pulled files into the local store.
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import * as goals from '../shell/lib/goals.mjs';
@@ -42,8 +42,8 @@ function round(model, path, others) {
 function merge(unit, path, files) {
   const model = { notes, goals }[unit];
   const others = [];
+  // This machine's own remote file is merged too, so a reinstall with no local store gets its goals and notes back before its first push.
   for (const f of files) {
-    if (basename(f) === basename(path)) continue;
     const store = model.parseStore(read(f));
     if (store) others.push(store);
     else process.stderr.write(`${unit}: skipped ${basename(f)}, which does not parse\n`);

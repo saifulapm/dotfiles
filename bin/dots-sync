@@ -25,7 +25,7 @@ rc() {
   return 1
 }
 
-# merge <unit> <store> <pulled dir>: the merge CLI skips this machine's own file among the pulled ones.
+# merge <unit> <store> <pulled dir>: every pulled file, this machine's own included, merges into the local store.
 merge() {
   local out code
   if out=$("$here/dots-sync-merge" "$1" "$2" "$3"/*.json 2>&1); then code=0; else code=$?; fi
@@ -34,7 +34,7 @@ merge() {
   return "$code"
 }
 
-# store_unit <unit>: pull the other machines' files, merge, then copy this machine's store up under its own name.
+# store_unit <unit>: pull every machine's file, merge, then copy this machine's store up under its own name.
 store_unit() {
   local store=$data/$1/$machine.json pulled=$tmp/$1
   mkdir -p "$pulled"
