@@ -209,6 +209,12 @@ export function listLook(tokens) {
     tabText: wordText,
     keyText,
     keys: (pairs) => pairs.map(([k, w]) => ({ key: keyText(k), word: wordText(w) })),
+    // An age in whole units, floored; under a minute it is the island's word for arrival.
+    ageText(ms) {
+      const s = Math.floor(ms / 1000);
+      const age = s < 60 ? (voice === 'bracket' ? '0S' : 'NOW') : s < 3600 ? `${Math.floor(s / 60)}M` : s < 86400 ? `${Math.floor(s / 3600)}H` : `${Math.floor(s / 86400)}D`;
+      return voice === 'bracket' ? `T+${age}` : voice === 'plain' ? age.toLowerCase() : age;
+    },
   });
 }
 

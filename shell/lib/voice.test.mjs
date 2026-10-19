@@ -184,6 +184,14 @@ test("a list surface keeps the launcher's cursor row and rules", () => {
   }
 });
 
+test("a list surface writes an entry's age in whole units, floored: NOW, now or T+0S under a minute, then minutes, hours and days", () => {
+  const S = 1000, M = 60 * S, H = 60 * M, D = 24 * H;
+  const ages = [0, 59 * S, 60 * S, 5 * M, 59 * M, 60 * M, 3 * H, 23 * H + 59 * M, 24 * H, 2 * D + 5 * H];
+  assert.deepEqual(ages.map((ms) => list('paper').ageText(ms)), ['NOW', 'NOW', '1M', '5M', '59M', '1H', '3H', '23H', '1D', '2D']);
+  assert.deepEqual(ages.map((ms) => list('artboard').ageText(ms)), ['now', 'now', '1m', '5m', '59m', '1h', '3h', '23h', '1d', '2d']);
+  assert.deepEqual(ages.map((ms) => list('blueprint').ageText(ms)), ['T+0S', 'T+0S', 'T+1M', 'T+5M', 'T+59M', 'T+1H', 'T+3H', 'T+23H', 'T+1D', 'T+2D']);
+});
+
 const margin = (name) => marginLook(theme(name));
 const foot = { idx: 2, app: 'foot', title: '~' };
 // Sunday 18 October 2026, local time.
