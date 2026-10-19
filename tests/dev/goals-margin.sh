@@ -53,6 +53,16 @@ until_ok 3000 no_goal
 echo "     margins: $(margins | jq -c .right)"
 check "with no active goals the margin starts with the Wi-Fi text" no_goal
 
+# A goal title can arrive by sync at any length; the margin cuts it short of the island, so the left half stays bare paper.
+strip() { grim -s 1 -t ppm -g "100,12 800x24" - | mean_rgb; }
+bare=$(strip)
+long=$(printf 'W%.0s' $(seq 2000))
+write_by_rename "$long:none"
+until_ok 3000 right_starts "WWWW"
+sleep 0.3
+echo "     left strip: $bare, with a 2000-character goal: $(strip)"
+check "a 2000-character goal stays out of the left half of the margin" test "$(strip)" = "$bare"
+
 status=$(shell_status)
 echo "     status: $status"
 one_timer() { jq -e '.timers == 1' <<<"$status" >/dev/null; }

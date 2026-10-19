@@ -72,6 +72,7 @@ PanelWindow {
 
         // The danger token reads as a warning in every theme.
         Label {
+            id: syncLabel
             text: root.marginState.right.sync
             visible: text !== ""
             color: root.theme.color.danger ?? "black"
@@ -83,21 +84,28 @@ PanelWindow {
             readonly property bool caps: root.theme.tokens?.type.ui === root.theme.tokens?.type.mono
             text: root.marginState.right.goal
             visible: text !== ""
+            // A title can arrive by sync at any length, so it takes only the room the other words leave before the island.
+            readonly property real room: root.lineEnd - 32 - [syncLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).reduce((w, l) => w + l.width + 20, 0)
+            width: Math.min(implicitWidth, Math.max(0, room))
+            elide: Text.ElideRight
             color: (bracket ? root.theme.color.danger : caps ? root.theme.color.accent : root.theme.color.ink) ?? "black"
             font.weight: bracket ? Font.Normal : caps ? Font.Bold : Font.Medium
         }
 
         Label {
+            id: wifiLabel
             text: root.marginState.right.wifi
             visible: text !== ""
         }
 
         Label {
+            id: batteryLabel
             text: root.marginState.right.battery
             visible: text !== ""
         }
 
         Label {
+            id: dateLabel
             text: root.marginState.right.date
         }
     }
