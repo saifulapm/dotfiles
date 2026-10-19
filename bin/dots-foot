@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Opens a window in the foot server with the current theme as -o overrides, since the server read foot.ini only once, when it started.
 {
+# The server's socket is one per user, so a window asked for in a nested just dev session would open on the live desktop.
+[[ -n ${DOTS_DEV_DIR:-} ]] && exec foot "$@"
 args=()
 while IFS= read -r line; do
   args+=(-o "$line")
