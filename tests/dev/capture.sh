@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # A capture stores the primary selection in the active section, says so in the island, and leaves the clipboard alone.
+{
 source "$(dirname "$0")/lib.sh"
 
 notes_state() { timeout 0.5 qs ipc call notes state 2>/dev/null; }
@@ -72,3 +73,4 @@ check "restoring the exact text last written makes the store usable again" until
 check "and the capture is saved" until_ok 1000 store_has '[.notes[] | select(.text == "after the store broke")] | length == 1'
 
 exit $((fails > 0))
+}

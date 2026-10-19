@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Usage: mail-sync [--quiet]. Pulls mail, indexes it (the notmuch post-new hook routes it), and files it into IMAP folders by its tags.
 set -uo pipefail
+{
 
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/hey-mail"
 LOG="$STATE/sync.log"
@@ -62,3 +63,4 @@ fi
 
 log "done in $(( $(date +%s) - start ))s"
 exit 0
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Now playing: the island rests as the track while an MPRIS player plays, and as the clock once it pauses.
+{
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
@@ -31,3 +32,4 @@ one_timer() { jq -e '.timers == 1' <<<"$status" >/dev/null; }
 check "playing media runs no timer" one_timer
 
 exit $((fails > 0))
+}

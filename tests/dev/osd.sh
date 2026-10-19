@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The island's OSD: volume from the nested PipeWire's default sink, brightness from a fake brightnessctl.
+{
 fake=$(mktemp -d)
 fake_log=$fake/argv
 cat >"$fake/brightnessctl" <<EOF
@@ -75,3 +76,4 @@ check "status reports timers 1 once the OSD has gone" one_timer
 
 check "the live volume is still ${live_before#Volume: }" test "$(live_volume)" = "$live_before"
 exit $((fails > 0))
+}

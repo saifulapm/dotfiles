@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # A theme.toml that does not validate leaves Paper on, exits 1, and the island says why for 5 s.
+{
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -31,3 +32,4 @@ check "after 5 s the island is the clock again ($(island))" eval '! island_says'
 check "and only the clock tick runs" status_has '.timers == 1'
 
 exit $((fails > 0))
+}

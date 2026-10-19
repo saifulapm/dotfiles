@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The outgoing theme's switch transition: seen mid-way on screen, done by 300 ms, and nothing left running.
+{
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -117,3 +118,4 @@ errors=$(journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -E 'Fail
 check "the shell's journal has no load or shader error" test -z "$errors"
 
 exit $((fails > 0))
+}

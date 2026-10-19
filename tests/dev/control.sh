@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Mod+C opens Control on Audio; Tab moves between sections; h/l, m and Enter act on the nested PipeWire's nodes.
+{
 source "$(dirname "$0")/lib.sh"
 
 under_dev() { case $1 in "$DOTS_DEV_DIR"/*) true ;; *) false ;; esac; }
@@ -87,3 +88,4 @@ check "Esc closes Control and releases the keyboard" control_gone
 
 check "the live volume is still ${live_before#Volume: }" test "$(live_volume)" = "$live_before"
 exit $((fails > 0))
+}

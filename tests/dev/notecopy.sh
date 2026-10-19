@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # A note keeps its text and image: Ctrl+V attaches into the store, y gives the text alone, Y the image, Ctrl+Y the section.
+{
 source "$(dirname "$0")/lib.sh"
 
 notes_state() { timeout 0.5 qs ipc call notes state 2>/dev/null; }
@@ -53,3 +54,4 @@ check "and nothing is attached" notes_is '.notes[0].attachments | length == 1'
 check "and nothing is stored" test "$(find "$attachments" -type f | wc -l)" = 1
 
 exit $((fails > 0))
+}

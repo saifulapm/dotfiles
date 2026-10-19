@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # A transient unit gets the live user manager's env, so each nested-session variable is passed by name.
 set -euo pipefail
+{
 
 # The nested session bus stands in for the system bus, so UPower and NetworkManager doubles run there.
 export DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS
@@ -21,3 +22,5 @@ for v in WAYLAND_DISPLAY NIRI_SOCKET DBUS_SESSION_BUS_ADDRESS DBUS_SYSTEM_BUS_AD
 done >"$DOTS_DEV_DIR/env.tmp"
 # bin/dots-dev waits for env, so it appears whole.
 mv "$DOTS_DEV_DIR/env.tmp" "$DOTS_DEV_DIR/env"
+exit
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # just dev: its own bus, the Paper paper, and a shell systemd brings back within 1 s of a kill.
+{
 source "$(dirname "$0")/lib.sh"
 
 check "WAYLAND_DISPLAY is printed" test -n "$WAYLAND_DISPLAY"
@@ -52,3 +53,4 @@ check "the transient unit is gone" test "$(systemctl --user show -p LoadState --
 check "the temp dir is deleted" test ! -e "$DOTS_DEV_DIR"
 
 exit $((fails > 0))
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Idle steps at test times of 4, 5 and 6 s: dim, then lock, then monitors off; a window holding an idle inhibitor stops all three.
+{
 source "$(dirname "$0")/lib.sh"
 
 idle_state() { timeout 0.5 qs ipc call idle state 2>/dev/null; }
@@ -51,3 +52,4 @@ check "nothing locks" bash -c "! timeout 0.5 qs ipc call lock state | jq -e .loc
 check "and the monitors stay on" idle_is ".monitorsOff == $before"
 
 exit $((fails > 0))
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # just dev: a nested niri on its own bus, running this checkout's shell on a temp state and data dir.
 set -euo pipefail
+{
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 D=$(mktemp -d -t dots-dev-XXXXXXXX)
@@ -100,3 +101,5 @@ done
 echo "export DOTS_DEV_DIR=$D"
 cat "$D/env"
 wait "$session"
+exit
+}

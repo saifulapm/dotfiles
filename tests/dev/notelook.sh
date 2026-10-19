@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Notes draws each theme's design: an empty Notes shows one line of keys, and the selected card is outlined in the accent.
+{
 source "$(dirname "$0")/lib.sh"
 
 notes_state() { timeout 0.5 qs ipc call notes state 2>/dev/null; }
@@ -43,3 +44,4 @@ for t in artboard:#3D5AFE blueprint:#7FE3F0; do
 done
 
 exit $((fails > 0))
+}

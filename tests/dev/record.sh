@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Mod+Shift+R picks a region by keys, Enter records it with wf-recorder, and Mod+Shift+R again saves the file.
+{
 source "$(dirname "$0")/lib.sh"
 
 rec_state() { timeout 0.5 qs ipc call record state 2>/dev/null; }
@@ -53,3 +54,4 @@ echo "     $f: ${dur:-no duration} s"
 check "its duration is 3 +- 0.5 s" node -e "const d = parseFloat(process.argv[1]); process.exit(d >= 2.5 && d <= 3.5 ? 0 : 1)" "${dur:-0}"
 
 exit $((fails > 0))
+}

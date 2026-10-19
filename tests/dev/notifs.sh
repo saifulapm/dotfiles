@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The notification history: 200 entries kept across restarts, and Do Not Disturb.
+{
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
@@ -36,3 +37,4 @@ check "20 notifications sent in ${sent} ms all reach the history" eval 'notifs |
 check "the island ends showing the 20th" eval 'island | jq -e ".text | test(\"burst 20$\")" >/dev/null'
 
 exit $((fails > 0))
+}

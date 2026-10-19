@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # just dev's workflow: `route [phone|device]` keeps the route in DOTS_DEV_DIR and prints it as workflow does, so no test tells a real hub.
 set -euo pipefail
+{
 [ -n "${DOTS_DEV_DIR:-}" ] || { echo "dev-fake-workflow: run it from a sourced just dev env" >&2; exit 1; }
 [ "${1:-}" = route ] || { echo "dev-fake-workflow: only route is faked" >&2; exit 1; }
 f=$DOTS_DEV_DIR/route
@@ -11,3 +12,5 @@ case ${2:-} in
 esac
 to=$(cat "$f" 2>/dev/null || echo device)
 if [ "$to" = phone ]; then echo "route: phone"; else echo "route: device (dev)"; fi
+exit
+}

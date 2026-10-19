@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The island as the notification server: notify-send runs on the nested session bus that lib.sh sources.
+{
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
@@ -55,3 +56,4 @@ in_place() { notifs | jq -e --argjson n "$before" '.summaries[0] == "download 90
 check "and takes the old one's place in the history" in_place
 
 exit $((fails > 0))
+}

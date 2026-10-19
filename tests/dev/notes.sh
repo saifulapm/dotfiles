@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Notes is a real window docked right: Mod+N and Esc move focus, a pinned Notes stays while foot keeps its keyboard.
+{
 source "$(dirname "$0")/lib.sh"
 
 notes_is() { timeout 0.5 qs ipc call notes state 2>/dev/null | jq -e "$1" >/dev/null; }
@@ -79,3 +80,4 @@ until_ok 3000 notes_focused
 check "qs ipc call notes open shows and focuses Notes" notes_is '.open and .focused'
 
 exit $((fails > 0))
+}

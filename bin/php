@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The nearest .php-version up from $PWD picks Remi's /usr/bin/phpXY; none means the system php.
 set -u
+{
 
 ver=""
 dir="$PWD"
@@ -24,3 +25,5 @@ if [ -n "$mm" ]; then
     && echo "php shim: $dir/.php-version wants $mm but /usr/bin/php${mm//./} is not installed — using system $sys (chezmoi apply installs the Remi SCLs)" >&2
 fi
 exec /usr/bin/php "$@"
+exit
+}

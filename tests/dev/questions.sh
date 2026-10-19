@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # An agent question in the island, answered by Mod+I and a key through a fake mem that records its argv.
+{
 fake=$(mktemp -d)
 calls=$fake/calls
 cat >"$fake/mem" <<EOF
@@ -109,3 +110,4 @@ echo "     right of the card: $before before, $after with the question"
 check "a 300-character header and option stay inside the 560 px card" test "$after" = "$before"
 
 exit $((fails > 0))
+}

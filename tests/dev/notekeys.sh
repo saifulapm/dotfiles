@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Sections, tags, search, merge, move, delete, done and edit all work from the keys in Notes.
+{
 source "$(dirname "$0")/lib.sh"
 
 notes_state() { timeout 0.5 qs ipc call notes state 2>/dev/null; }
@@ -128,3 +129,4 @@ key ' it'
 check "and typing on lands in the draft, deleting nothing" until_ok 1000 notes_is ".composer == \"do it\" and .count == $n"
 
 exit $((fails > 0))
+}

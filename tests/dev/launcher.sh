@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Mod+Space opens the launcher, typing filters, Enter starts an app, Esc gives the keyboard back.
+{
 source "$(dirname "$0")/lib.sh"
 
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
@@ -71,3 +72,4 @@ check "state counts at least two opens" state_is '.opens >= 2'
 check "the second open reported a numeric openMs" test "$ms2" != none
 
 exit $((fails > 0))
+}

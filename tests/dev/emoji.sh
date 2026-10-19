@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Mod+. opens the launcher in emoji mode, typing fire finds the emoji, and Enter copies it and types it into the window you came from.
+{
 source "$(dirname "$0")/lib.sh"
 
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
@@ -35,3 +36,4 @@ until_ok 3000 typed_ok
 check "Enter types the emoji into the foot it came from" typed_ok
 
 exit $((fails > 0))
+}

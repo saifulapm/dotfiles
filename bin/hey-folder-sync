@@ -3,6 +3,7 @@
 
 # A message whose folder changed since the last run wins for tags and any other is placed by its tags, which stops the two directions fighting.
 set -uo pipefail
+{
 
 MAIL="$(notmuch config get database.path 2>/dev/null)"
 STORE="${HEY_MAIL_STORE:-icloud}"          # the mbsync MaildirStore dir under $MAIL
@@ -309,3 +310,5 @@ case "${1:-}" in
     ''|--dry-run|-n) dry_run ;;
     *) printf 'usage: %s [--apply|--dry-run|--state]\n' "${0##*/}" >&2; exit 2 ;;
 esac
+exit
+}

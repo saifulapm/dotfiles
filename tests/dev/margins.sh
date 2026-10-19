@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The margins and the island, from niri's event stream and the shell's one minute tick.
+{
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
@@ -60,3 +61,4 @@ check "dots-margins is on the Top layer" on_top dots-margins
 check "dots-island is on the Top layer" on_top dots-island
 
 exit $((fails > 0))
+}

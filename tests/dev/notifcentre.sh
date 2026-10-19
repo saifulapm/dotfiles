@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Mod+A opens the notification centre: grouped by app, d dismisses, D clears all, Esc gives the keyboard back.
+{
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
@@ -52,3 +53,4 @@ until_ok 2000 centre_closed
 check "at rest the shell runs one timer" bash -c 'timeout 0.5 qs ipc call shell status | jq -e ".timers == 1" >/dev/null'
 
 exit $((fails > 0))
+}

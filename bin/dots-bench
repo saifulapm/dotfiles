@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The shell times itself: a qs ipc round trip costs tens of ms, too much to time a 16 ms open from here.
+{
 source "$(dirname "$0")/../tests/dev/lib.sh"
 
 idle_s=${DOTS_BENCH_IDLE_S:-60}
@@ -135,3 +136,5 @@ t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
 node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib"
+exit
+}

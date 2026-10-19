@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # A polkit request shows the shell's one prompt with exclusive keyboard, and Esc cancels the request.
+{
 source "$(dirname "$0")/lib.sh"
 
 # pkexec is setuid and always reaches the live polkitd, so a fake authority on the nested bus asks the nested shell's agent instead.
@@ -46,3 +47,4 @@ until_ok 2000 state_is '.open | not'
 check "and the prompt closes" state_is '.open | not'
 
 exit $((fails > 0))
+}

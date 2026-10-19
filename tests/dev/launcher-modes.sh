@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The query prefix picks the launcher's mode: = calculates, > lists commands, w lists windows.
+{
 source "$(dirname "$0")/lib.sh"
 
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
@@ -47,3 +48,4 @@ until_ok 3000 focused_is_first
 check "Enter focuses the first row's window" focused_is_first
 
 exit $((fails > 0))
+}

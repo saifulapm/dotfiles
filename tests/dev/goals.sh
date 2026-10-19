@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Mod+G opens Goals; its keys add, tick, reorder and delete goals through the store, and the order survives a restart.
+{
 source "$(dirname "$0")/lib.sh"
 
 store="$DOTS_DEV_DIR/data/dots/goals/dev.json"
@@ -104,3 +105,4 @@ until_ok 2000 state_is '.open == false'
 check "Esc closes Goals" state_is '.open == false'
 
 exit $((fails > 0))
+}

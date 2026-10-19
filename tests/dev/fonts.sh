@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The nested shell's temp data dir still finds the fonts installed for the user.
+{
 source "$(dirname "$0")/lib.sh"
 
 paper_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-paper")' >/dev/null; }
@@ -11,3 +12,4 @@ echo "     XDG_DATA_HOME=$data resolves Maple Mono to: $family"
 check "the shell's data dir finds Maple Mono" test "$family" = "Maple Mono"
 
 exit $((fails > 0))
+}

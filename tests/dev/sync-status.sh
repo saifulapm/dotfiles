@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # A failed dots sync round marks the margin `sync !` and lists each failing unit in Control's Route, and a good round from the launcher clears both.
+{
 source "$(dirname "$0")/lib.sh"
 
 # The live rclone config reaches the real Dropbox, so nothing below runs unless both this shell and the shell unit use the dev alias remote.
@@ -76,3 +77,4 @@ status_units() { jq -e '.sync.notes.ok == true and .sync.goals.ok == true and (.
 check "shell status .sync holds the units after a round" status_units
 
 exit $((fails > 0))
+}

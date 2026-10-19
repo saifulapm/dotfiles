@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # dots theme recolours the paper, niri, an open foot, tmux and GTK in this session, and keeps every window.
+{
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -65,3 +66,4 @@ check "every window still has its id" test "$(windows)" = "$before"
 check "the same window keeps focus ($focus_before)" test "$(focused)" = "$focus_before"
 
 exit $((fails > 0))
+}

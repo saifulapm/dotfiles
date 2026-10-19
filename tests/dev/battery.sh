@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The top-right battery and wifi words, from a UPower double on the nested bus that stands in for the system bus.
+{
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
@@ -51,3 +52,4 @@ check "the shell's journal has no errors" test -z "$errors"
 [ -z "$errors" ] || echo "$errors"
 
 exit $((fails > 0))
+}

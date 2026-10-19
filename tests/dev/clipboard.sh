@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Every copy lands in cliphist, Mod+V lists it newest first, and Enter pastes the pick into the window you came from.
+{
 source "$(dirname "$0")/lib.sh"
 
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
@@ -97,3 +98,4 @@ check "the oldest of them is gone" not_listed "clip 1"
 check "the second oldest is kept" listed "clip 2"
 
 exit $((fails > 0))
+}

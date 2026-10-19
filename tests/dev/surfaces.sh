@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Each theme's launcher card and island carry a mark that only that theme's primitives draw.
+{
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -77,3 +78,4 @@ check "blueprint: the island's top edge is the cyan stroke" blueprint_island
 
 "$repo/bin/dots" theme paper >/dev/null
 exit $((fails > 0))
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Each theme's paper: its colour at a cell's middle, Blueprint's crop mark, and a dot and a grid line only the shader draws.
+{
 source "$(dirname "$0")/lib.sh"
 
 paper_layer() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-paper" and .layer == "Background")' >/dev/null; }
@@ -66,3 +67,4 @@ errors=$(journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -E 'Fail
 check "the shell's journal has no load or shader error" test -z "$errors"
 
 exit $((fails > 0))
+}

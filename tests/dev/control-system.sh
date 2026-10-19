@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Control's Power asks for y before a reboot, Display steps a fake backlight, and Route flips a fake workflow route and Do Not Disturb.
+{
 fake=$(mktemp -d)
 fake_log=$fake/argv
 cat >"$fake/brightnessctl" <<EOF2
@@ -89,3 +90,4 @@ check "and Enter again turns it off" dnd false
 wtype -k Escape
 
 exit $((fails > 0))
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # With Artboard, every system surface is a selected frame: an accent label names it above its top-left handle.
+{
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -87,3 +88,4 @@ done
 
 "$repo/bin/dots" theme paper >/dev/null
 exit $((fails > 0))
+}

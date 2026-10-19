@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Mod+Escape locks, only the test password unlocks, and a shell killed while locked locks again on restart.
+{
 source "$(dirname "$0")/lib.sh"
 
 marker=$XDG_STATE_HOME/dots/locked
@@ -116,3 +117,4 @@ until_ok 3000 state_is '.locked == false'
 check "without dots-lock, the password unlocks through login" state_is '.locked == false'
 
 exit $((fails > 0))
+}

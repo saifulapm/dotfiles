@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The top-right margin starts with the nearest-deadline active goal, from the goals store on disk.
+{
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
@@ -69,3 +70,4 @@ one_timer() { jq -e '.timers == 1' <<<"$status" >/dev/null; }
 check "status reports one running timer" one_timer
 
 exit $((fails > 0))
+}

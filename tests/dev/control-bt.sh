@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Control's Bluetooth section lists a fake BlueZ's devices; Enter connects and disconnects, d forgets.
+{
 source "$(dirname "$0")/lib.sh"
 
 control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
@@ -100,3 +101,4 @@ check "its row goes" state_is '.rows | index("Test Speaker") == null'
 echo "     state: $(control_state)"
 
 exit $((fails > 0))
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Mod+Shift+T opens the theme switcher, j/k move the cursor, Enter applies through dots theme, Esc closes.
+{
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -85,3 +86,4 @@ echo "     openMs: first $ms1, second $ms2"
 check "the second open took ${ms2} ms, 16 or less" bash -c "[ '$ms2' != none ] && (( $ms2 <= 16 ))"
 
 exit $((fails > 0))
+}

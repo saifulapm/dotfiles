@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # dots bump: moves each versions.toml pin to its upstream's latest release (or head commit for track = "commit"), rewriting only that pin's version and sha256 lines; the commit is left to the user.
 set -euo pipefail
+{
 
 die() {
   echo "dots bump: $*" >&2
@@ -101,3 +102,4 @@ fi
 
 if [[ -s $work/report ]]; then cat "$work/report"; elif ((!failed)); then echo "all pins current"; fi
 exit "$failed"
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Each theme locks into its own lock design: Paper's big serif clock, Artboard's card, Blueprint's hollow outlined clock.
+{
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -78,3 +79,4 @@ check "blueprint: the test password unlocks" unlocked
 
 "$repo/bin/dots" theme paper >/dev/null
 exit $((fails > 0))
+}

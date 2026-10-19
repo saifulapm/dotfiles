@@ -1,3 +1,6 @@
 #!/usr/bin/env bash
 # Fedora's composer hardcodes /usr/bin/php, so it goes through the project's PHP instead.
+{
 exec "$(dirname "$(readlink -f "$0")")/php" /usr/bin/composer "$@"
+exit
+}

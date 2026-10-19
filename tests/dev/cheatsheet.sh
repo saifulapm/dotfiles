@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Mod+/ shows every titled niri bind in four groups, and Esc gives the keyboard back.
+{
 source "$(dirname "$0")/lib.sh"
 
 sheet_state() { timeout 0.5 qs ipc call cheatsheet state 2>/dev/null; }
@@ -35,3 +36,4 @@ check "status lists cheatsheet in loaded" bash -c 'timeout 0.5 qs ipc call shell
 check "status reports one timer" bash -c 'timeout 0.5 qs ipc call shell status | jq -e ".timers == 1" >/dev/null'
 
 exit $((fails > 0))
+}

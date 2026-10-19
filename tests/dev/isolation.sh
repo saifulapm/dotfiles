@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # just dev: its tmux server, dconf database, Chromium policy dir, hub file, PipeWire and rclone config all live inside its temp dir.
+{
 source "$(dirname "$0")/lib.sh"
 
 dev=$DOTS_DEV_DIR
@@ -72,3 +73,4 @@ dead_left() { qs list --show-dead -j 2>/dev/null | jq -e 'length > 0' >/dev/null
 check "no dead qs instance of this shell is left behind" eval '! dead_left'
 
 exit $((fails > 0))
+}
