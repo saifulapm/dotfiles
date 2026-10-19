@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# dots update: pull the repo, dnf upgrade, chezmoi apply, then one summary line.
+set -euo pipefail
+
+die() {
+  echo "dots: $*" >&2
+  exit 1
+}
+
+# Packages are compared by name.arch, so the count does not depend on dnf's output format.
+installed() { rpm -qa --qf '%{NAME}.%{ARCH} %{VERSION}-%{RELEASE}\n' | sort; }
+
+main() {
+  local repo tmp
+  repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+  tmp=$(mktemp -d -t dots-update-XXXX)
+
+  git -C "$repo" pull --ff-only || die "git pull failed"
+
+  # The only sudo that may prompt; every later root command uses sudo -n.
+  sudo -v || die "sudo failed"
+  while sleep 50; do sudo -n -v || exit; done >/dev/null 2>&1 &
+  # shellcheck disable=SC2064 # the keepalive pid and tmp are fixed now
+  trap "kill $! 2>/dev/null; rm -rf '$tmp'" EXIT
+
+  installed >"$tmp/before" || die "rpm query failed"
+  sudo -n dnf upgrade -y || die "dnf upgrade failed"
+  installed >"$tmp/after" || die "rpm query failed"
+
+  chezmoi apply | tee "$tmp/chezmoi" || die "chezmoi apply failed"
+
+  local upgraded pins
+  upgraded=$(comm -13 "$tmp/before" "$tmp/after" | wc -l)
+  pins=$(grep -c '^dots: pin [^ ]* [^ ]*$' "$tmp/chezmoi" || true)
+  echo "dnf: $upgraded upgraded · pins: $pins changed"
+}
+
+# git pull can rewrite this file while bash reads it, so main runs and exits on one line.
+main "$@"; exit
