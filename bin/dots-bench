@@ -108,6 +108,7 @@ sleep 5
 rss_kib=$(shell_status | jq -r .rssKiB) || die "status did not answer after the opens"
 # GPU buffers are shmem, which RSS misses, so the unit's cgroup anon+shmem is read at the same moment.
 cgroup=$(systemctl --user show -p ControlGroup --value "$DOTS_DEV_UNIT")
+[ -n "$cgroup" ] || die "$DOTS_DEV_UNIT has no cgroup"
 anon_shmem_kib=$(awk '$1 == "anon" || $1 == "shmem" { b += $2 } END { printf "%d", b / 1024 }' "/sys/fs/cgroup$cgroup/memory.stat") || die "memory.stat of $DOTS_DEV_UNIT unreadable"
 
 start=$(shell_status | jq -r .theme)

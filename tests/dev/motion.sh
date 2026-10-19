@@ -68,8 +68,9 @@ rest_box() {
   '
 }
 
-# A first open and close finds where the window rests, so the timed grabs need no layout maths.
+# A first open and close finds where the window rests, so the timed grabs need no layout maths; check always returns 0, so a failed one is skipped by its empty box.
 calibrate() {
+  box=
   open_magenta || return 1
   sleep 6
   box=$(rest_box)
@@ -88,7 +89,8 @@ theme() {
 blueprint() {
   local x y w h t
   theme blueprint
-  check "blueprint: a resting magenta window is found" calibrate || return
+  check "blueprint: a resting magenta window is found" calibrate
+  [ -n "$box" ] || return
   read -r x y w h <<<"$box"
   # niri's 1 px border sits just outside foot's surface, so the outline runs one row above the magenta.
   open_magenta
@@ -113,10 +115,12 @@ blueprint() {
 paper() {
   local x y w h t
   theme paper
-  check "paper: a resting magenta window is found" calibrate || return
+  check "paper: a resting magenta window is found" calibrate
+  [ -n "$box" ] || return
   read -r x y w h <<<"$box"
   open_magenta
-  wait_until 300
+  # The drop is 3 px or more only until about 400 ms, and the grab lands up to 50 ms after the wait.
+  wait_until 250
   t=$(($(now_ms) - t0))
   # A column through the top edge, from 16 px above the resting top: the magenta starts 3 px or more higher, and is pure.
   check "paper $t ms into its open (of 2800): its top 3 px or more above rest, fully opaque" \
@@ -129,7 +133,9 @@ paper() {
   t=$(($(now_ms) - t0))
   check "paper 50% into its close ($t ms of 2000): at most its top 40%, and paper where its bottom half was" \
     grab_test "$((x + w / 2)),$y 1x$h" '
-      for (let i = 0; i < h; i++) if (magenta(at(0, i)) && i >= h * 0.4) return false;
+      let shown = 0;
+      for (let i = 0; i < h; i++) if (magenta(at(0, i))) { if (i >= h * 0.4) return false; shown++; }
+      if (!shown) return false;
       for (let i = Math.ceil(h / 2); i < h; i++) if (!near(at(0, i), [241, 233, 216], 30)) return false;
       return true;'
   until_ok 8000 has_windows 0
@@ -138,7 +144,8 @@ paper() {
 artboard() {
   local x y w h t
   theme artboard
-  check "artboard: a resting magenta window is found" calibrate || return
+  check "artboard: a resting magenta window is found" calibrate
+  [ -n "$box" ] || return
   read -r x y w h <<<"$box"
   # The magenta's own box corner lies outside the 14 px radius and its 2 px ring, so it reads the paper's grey (a dot or the shadow may darken it), never magenta or the blue ring.
   local corner='

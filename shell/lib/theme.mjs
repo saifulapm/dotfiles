@@ -61,11 +61,8 @@ export function checkTokens(t) {
 }
 
 const CURVES = {
-  spring: 'spring damping-ratio=0.72 stiffness=380 epsilon=0.0001',
-  snappy: 'duration-ms 120\n        curve "ease-out-expo"',
   ease: 'duration-ms 200\n        curve "ease-out-cubic"',
   typewriter: 'duration-ms 90\n        curve "linear"',
-  linear: 'duration-ms 150\n        curve "linear"',
 };
 
 const spring = (d, k) => `spring damping-ratio=${d} stiffness=${k} epsilon=0.0001`;
