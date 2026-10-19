@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# dots cutover: the one-off switch from v1, safe to run again; stops the v1 units v2 replaces, removes the v1 links that outrank v2's, imports v1's notes, goals and fish history, and leaves ~/.dotfiles in place.
+set -uo pipefail
+{
+here=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+v1=$HOME/.dotfiles
+config=${XDG_CONFIG_HOME:-$HOME/.config}
+fish=${XDG_DATA_HOME:-$HOME/.local/share}/fish
+# Every other v1 unit (hub-local, pxy, bt-agent...) has no v2 replacement and keeps running from ~/.dotfiles.
+replaced=(qshell.service qshell-dshift.service qshell-sync.service qshell-sync.timer qshell-sync-notes.path qshell-sync-notes.service
+  qshell-sync-goals.path qshell-sync-goals.service qshell-updates.service qshell-updates.timer update-all.service update-all.timer vicinae.service)
+
+# v1 has stopped writing by the time its data is read.
+stopped=0
+for unit in "${replaced[@]}"; do
+  # A static unit answers is-enabled with 0 too, so only the word enabled counts.
+  [[ $(systemctl --user is-enabled "$unit" 2>/dev/null) == enabled ]] || systemctl --user is-active --quiet "$unit" || continue
+  systemctl --user disable --now "$unit" >/dev/null 2>&1 || { echo "dots: could not stop $unit" >&2; exit 1; }
+  ((stopped++))
+done
+
+# ~/.gitconfig outranks v2's ~/.config/git/config, and 10-history.fish points fish at <machine>_history instead of the merged fish_history.
+for link in "$HOME/.gitconfig" "$config/fish/conf.d/10-history.fish"; do
+  [[ -L $link && $(readlink -f "$link") == "$(readlink -f "$v1")"/* ]] && rm "$link"
+done
+
+machine=$("$here/dots-sync-merge" machine)
+counts=$("$here/dots-cutover-import" "${XDG_STATE_HOME:-$HOME/.local/state}/qshell" "${XDG_DATA_HOME:-$HOME/.local/share}/dots" "$machine") || exit 1
+
+# v1 named fish's history after its machine slug, as its 10-history.fish did.
+slug=$(cat "$config/qshell/machine" 2>/dev/null || uname -n)
+old=$fish/${slug//[^a-zA-Z0-9_]/_}_history
+entries() { grep -c '^- cmd: ' "$fish/fish_history" 2>/dev/null; }
+before=$(entries)
+if [[ -f $old ]]; then
+  "$here/dots-sync-fish" "$fish/fish_history" "$old" || exit 1
+fi
+after=$(entries)
+
+echo "$counts · history: $((${after:-0} - ${before:-0})) merged · v1 units: $stopped stopped"
+exit
+}

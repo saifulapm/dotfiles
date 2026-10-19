@@ -1,0 +1,178 @@
+// dots cutover on a scratch home holding a v1 checkout, v1's links and data, with systemctl replaced by a stub that keeps unit state in files.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+
+const dots = new URL('../../bin/dots', import.meta.url).pathname;
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+const v1Notes = (home, extra = []) => ({
+  version: 2,
+  notes: [
+    { id: '0mtmhm85a-xdie', text: 'cli setup', path: '', done: false, updatedAt: '2026-09-04T05:02:24.190Z' },
+    { id: '0mun8kh5q-88yi', text: '', path: join(home, '.local/state/qshell/notes/attachments/paste-1.png'), done: false, updatedAt: '2026-09-29T22:16:34.526Z' },
+    { id: '0mteaikqo-mp7z', text: '', path: '', done: false, updatedAt: '2026-09-30T20:09:46.423Z', deletedAt: '2026-09-30T20:09:46.423Z' },
+    ...extra,
+  ],
+});
+
+const v1Goals = {
+  version: 1,
+  goals: [
+    { id: 'g1', name: 'Ship', due: '2026-09-22T15:58:58.547Z', state: 'shipped', tasks: [{ id: 't1', text: 'a', done: true, updatedAt: '2026-09-22T03:59:23.008Z' }], createdAt: '2026-09-10T11:44:57.460Z', updatedAt: '2026-09-26T10:32:04.402Z', shippedAt: '2026-09-26T10:32:04.402Z' },
+    { id: 'g2', name: 'Next', due: '2026-10-30T00:00:00.000Z', state: 'active', tasks: [], createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-02T00:00:00.000Z' },
+  ],
+};
+
+const entry = (cmd, when) => `- cmd: ${cmd}\n  when: ${when}\n`;
+
+function scratch() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-cutover-')));
+  const home = join(root, 'home');
+  const stubs = join(root, 'stubs');
+  const units = join(root, 'units');
+  const log = join(root, 'systemctl.log');
+  mkdirSync(stubs);
+  mkdirSync(units);
+  for (const d of ['.dotfiles/home', '.config/fish/conf.d', '.config/qshell', '.local/state/qshell/notes/attachments', '.local/state/qshell/goals', '.local/share/fish', 'repo']) mkdirSync(join(home, d), { recursive: true });
+
+  writeFileSync(join(home, '.dotfiles/home/dot_gitconfig'), '[user]\n');
+  writeFileSync(join(home, '.dotfiles/home/10-history.fish'), 'set -g fish_history x\n');
+  writeFileSync(join(home, 'repo/aliases.fish'), '');
+  symlinkSync(join(home, '.dotfiles/home/dot_gitconfig'), join(home, '.gitconfig'));
+  symlinkSync(join(home, '.dotfiles/home/10-history.fish'), join(home, '.config/fish/conf.d/10-history.fish'));
+  symlinkSync(join(home, 'repo/aliases.fish'), join(home, '.config/fish/conf.d/aliases.fish'));
+
+  writeFileSync(join(home, '.config/qshell/machine'), 'test-box\n');
+  writeFileSync(join(home, '.local/state/qshell/notes/attachments/paste-1.png'), PNG);
+  writeFileSync(join(home, '.local/state/qshell/notes/notes.json'), JSON.stringify(v1Notes(home)));
+  writeFileSync(join(home, '.local/state/qshell/goals/goals.json'), JSON.stringify(v1Goals));
+  writeFileSync(join(home, '.local/share/fish/test_box_history'), entry('ls', 100) + entry('make', 200));
+  writeFileSync(join(home, '.local/share/fish/fish_history'), entry('ls', 100) + entry('v2 only', 300));
+
+  // qshell.service is enabled and running, update-all.timer only enabled, and an unrelated v1 unit is enabled too.
+  for (const f of ['qshell.service.enabled', 'qshell.service.active', 'update-all.timer.enabled', 'hub-local.service.enabled', 'hub-local.service.active']) writeFileSync(join(units, f), '');
+  writeFileSync(
+    join(stubs, 'systemctl'),
+    `#!/bin/sh
+echo "$*" >> ${log}
+[ "$1" = --user ] || exit 1
+case $2 in
+  is-enabled) if [ -e ${units}/$3.enabled ]; then echo enabled; else echo static; fi ;;
+  is-active) test -e ${units}/$4.active ;;
+  disable) rm -f ${units}/$4.enabled ${units}/$4.active ;;
+  *) exit 1 ;;
+esac
+`,
+  );
+  chmodSync(join(stubs, 'systemctl'), 0o755);
+  return { root, home, units, log };
+}
+
+const run = (s) =>
+  spawnSync(dots, ['cutover'], {
+    encoding: 'utf8',
+    env: {
+      PATH: join(s.root, 'stubs') + delimiter + process.env.PATH,
+      HOME: s.home,
+      XDG_CONFIG_HOME: join(s.home, '.config'),
+      XDG_STATE_HOME: join(s.home, '.local/state'),
+      XDG_DATA_HOME: join(s.home, '.local/share'),
+      XDG_CACHE_HOME: join(s.home, '.cache'),
+      DOTS_MACHINE: 'test',
+    },
+  });
+
+const lastLine = (r) => r.stdout.trim().split('\n').at(-1);
+const store = (s, unit) => JSON.parse(readFileSync(join(s.home, `.local/share/dots/${unit}/test.json`), 'utf8'));
+const calls = (s) => (existsSync(s.log) ? readFileSync(s.log, 'utf8').trim().split('\n') : []);
+
+// Every path under the scratch home with its size and mtime, links by their target.
+function snapshot(dir, out = []) {
+  for (const name of readdirSync(dir).sort()) {
+    const p = join(dir, name);
+    const st = statSync(p, { throwIfNoEntry: false }) ?? {};
+    out.push(`${p} ${st.size} ${st.mtimeMs}`);
+    if (st.isDirectory?.()) snapshot(p, out);
+  }
+  return out;
+}
+
+test('cutover imports v1 notes, goals and history, stops the units v2 replaces, and prints one report line', () => {
+  const s = scratch();
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(lastLine(r), 'notes: 2 imported · goals: 2 imported · history: 1 merged · v1 units: 2 stopped');
+
+  const notes = store(s, 'notes').notes;
+  assert.deepEqual(notes.filter((n) => !n.deleted).map((n) => n.id).sort(), ['0mtmhm85a-xdie', '0mun8kh5q-88yi']);
+  assert.equal(notes.find((n) => n.id === '0mteaikqo-mp7z').deleted, true);
+  const sha = createHash('sha256').update(PNG).digest('hex');
+  assert.deepEqual(notes.find((n) => n.id === '0mun8kh5q-88yi').attachments, [{ sha256: sha, name: 'paste-1.png', mime: 'image/png', size: PNG.length }]);
+  assert.deepEqual(readFileSync(join(s.home, `.local/share/dots/notes/attachments/${sha}.png`)), PNG);
+
+  const goals = store(s, 'goals').goals;
+  assert.deepEqual(goals.map((g) => [g.id, g.done]), [['g1', true], ['g2', false]]);
+  assert.equal(goals.reduce((n, g) => n + g.tasks.length, 0), 1);
+
+  assert.equal(readFileSync(join(s.home, '.local/share/fish/fish_history'), 'utf8'), entry('ls', 100) + entry('make', 200) + entry('v2 only', 300));
+});
+
+test('only the v1 units v2 replaces are stopped, and only the v1 links that outrank v2 are removed', () => {
+  const s = scratch();
+  assert.equal(run(s).status, 0);
+  assert.deepEqual(calls(s).filter((c) => c.includes('disable')), ['--user disable --now qshell.service', '--user disable --now update-all.timer']);
+  assert.deepEqual(readdirSync(s.units).sort(), ['hub-local.service.active', 'hub-local.service.enabled']);
+  assert.equal(existsSync(join(s.home, '.gitconfig')), false);
+  assert.equal(existsSync(join(s.home, '.config/fish/conf.d/10-history.fish')), false);
+  assert.ok(existsSync(join(s.home, '.config/fish/conf.d/aliases.fish')), 'a link into the v2 repo stays');
+  assert.ok(existsSync(join(s.home, '.dotfiles/home/dot_gitconfig')), '~/.dotfiles stays in place');
+});
+
+test('a ~/.gitconfig that is not v1s link is left alone', () => {
+  const s = scratch();
+  spawnSync('rm', [join(s.home, '.gitconfig')]);
+  writeFileSync(join(s.home, '.gitconfig'), '[user]\n');
+  assert.equal(run(s).status, 0);
+  assert.equal(readFileSync(join(s.home, '.gitconfig'), 'utf8'), '[user]\n');
+});
+
+test('a second run imports nothing, stops nothing and changes no file', () => {
+  const s = scratch();
+  assert.equal(run(s).status, 0);
+  const before = snapshot(s.root);
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(lastLine(r), 'notes: 0 imported · goals: 0 imported · history: 0 merged · v1 units: 0 stopped');
+  assert.deepEqual(snapshot(s.root).filter((l) => !l.includes('systemctl.log')), before.filter((l) => !l.includes('systemctl.log')));
+});
+
+test('a note made in v1 after the first run comes in with the next one', () => {
+  const s = scratch();
+  assert.equal(run(s).status, 0);
+  writeFileSync(join(s.home, '.local/state/qshell/notes/notes.json'), JSON.stringify(v1Notes(s.home, [{ id: '0mvaaaaaa-new1', text: 'later', path: '', done: false, updatedAt: '2026-10-19T00:00:00.000Z' }])));
+  const r = run(s);
+  assert.match(lastLine(r), /^notes: 1 imported · goals: 0 imported/);
+  assert.ok(store(s, 'notes').notes.some((n) => n.id === '0mvaaaaaa-new1' && n.text === 'later'));
+});
+
+test('a machine without v1 data imports nothing and still succeeds', () => {
+  const s = scratch();
+  spawnSync('rm', ['-rf', join(s.home, '.local/state/qshell'), join(s.home, '.local/share/fish/test_box_history')]);
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(lastLine(r), /^notes: 0 imported · goals: 0 imported · history: 0 merged/);
+});
+
+test('a v1 notes file that does not parse fails the cutover by name and leaves the v2 store alone', () => {
+  const s = scratch();
+  writeFileSync(join(s.home, '.local/state/qshell/notes/notes.json'), '{');
+  const r = run(s);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /notes\.json/);
+  assert.equal(existsSync(join(s.home, '.local/share/dots/notes/test.json')), false);
+});

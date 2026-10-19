@@ -1,0 +1,61 @@
+#!/usr/bin/env node
+// dots-cutover-import <v1 state dir> <v2 data dir> <machine>: merges v1's notes, attachments and goals into this machine's v2 stores through dots-sync-merge, and prints how many were new.
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import * as goals from '../shell/lib/goals.mjs';
+import * as notes from '../shell/lib/notes.mjs';
+import { goalsFromV1, notesFromV1 } from '../shell/lib/v1.mjs';
+
+const [v1, data, machine] = process.argv.slice(2);
+if (!v1 || !data || !machine) {
+  process.stderr.write('usage: dots-cutover-import <v1 state dir> <v2 data dir> <machine>\n');
+  process.exit(2);
+}
+const here = dirname(fileURLToPath(import.meta.url));
+const attachments = join(data, 'notes/attachments');
+const mimeOf = (name) => (/\.png$/i.test(name) ? 'image/png' : /\.jpe?g$/i.test(name) ? 'image/jpeg' : 'application/octet-stream');
+
+// v1 kept a note's file where it was dropped, so it is copied in under its sha256 name; one that is gone or too big leaves the note without it.
+function attachmentOf(path) {
+  const st = statSync(path, { throwIfNoEntry: false });
+  if (!st?.isFile() || notes.attachRefusal(st.size)) return null;
+  const bytes = readFileSync(path);
+  const a = { sha256: createHash('sha256').update(bytes).digest('hex'), name: basename(path), mime: mimeOf(path), size: bytes.length };
+  const final = join(attachments, notes.attachmentFile(a));
+  if (!existsSync(final)) {
+    mkdirSync(attachments, { recursive: true });
+    writeFileSync(final + '.' + process.pid + '.tmp', bytes);
+    renameSync(final + '.' + process.pid + '.tmp', final);
+  }
+  return a;
+}
+
+const tmp = mkdtempSync(join(tmpdir(), 'dots-cutover-'));
+// unit: notes or goals; key: the store's list; convert: v1 text to a v2 store. Returns how many live records were new to the store.
+function importUnit(unit, file, key, model, convert) {
+  const from = join(v1, unit, file);
+  if (!existsSync(from)) return 0;
+  const store = convert(readFileSync(from, 'utf8'));
+  if (!store) throw new Error(`${from} does not parse, so nothing was imported from it`);
+  const path = join(data, unit, machine + '.json');
+  const before = existsSync(path) ? model.parseStore(readFileSync(path, 'utf8')) : model.emptyStore();
+  const known = new Set((before?.[key] ?? []).map((x) => x.id));
+  writeFileSync(join(tmp, unit + '.json'), JSON.stringify(store));
+  execFileSync(join(here, 'dots-sync-merge'), [unit, path, join(tmp, unit + '.json')], { stdio: ['ignore', 'inherit', 'inherit'] });
+  return store[key].filter((x) => !x.deleted && !known.has(x.id)).length;
+}
+
+try {
+  const n = importUnit('notes', 'notes.json', 'notes', notes, (text) => notesFromV1(text, attachmentOf));
+  const g = importUnit('goals', 'goals.json', 'goals', goals, goalsFromV1);
+  process.stdout.write(`notes: ${n} imported · goals: ${g} imported\n`);
+} catch (e) {
+  process.stderr.write(`dots: ${e.message}\n`);
+  process.exitCode = 1;
+} finally {
+  rmSync(tmp, { recursive: true, force: true });
+}
