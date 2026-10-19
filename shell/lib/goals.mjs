@@ -105,16 +105,24 @@ export function moveTask(store, goalId, taskId, dir, now) {
   return fn ? changeGoal(store, goalId, (g) => set(g, { tasks: g.tasks.map(fn) })) : store;
 }
 
+// Ten years out is the furthest deadline taken, so a typo like 99999999d never reaches a date the clock cannot draw.
+const FURTHEST = 3650 * D;
+
+function dueAt(t, now) {
+  const rel = t.match(/^([1-9][0-9]*)([dh])$/);
+  if (rel) return now - (now % 60000) + Number(rel[1]) * (rel[2] === 'd' ? D : H);
+  const date = t.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
+  if (!date) return null;
+  const d = new Date(Number(date[1]), Number(date[2]) - 1, Number(date[3]), 23, 59);
+  return d.getMonth() === Number(date[2]) - 1 && d.getDate() === Number(date[3]) ? d.getTime() : null;
+}
+
 // The prompt takes Nd or Nh from the start of this minute (the margin's clock moves only on the minute), or a date due 23:59 local; null refuses.
 export function parseDeadline(text, now) {
   const t = text.trim();
   if (!t) return { deadline: null };
-  const rel = t.match(/^([1-9][0-9]*)([dh])$/);
-  if (rel) return { deadline: now - (now % 60000) + Number(rel[1]) * (rel[2] === 'd' ? D : H) };
-  const date = t.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
-  if (!date) return null;
-  const d = new Date(Number(date[1]), Number(date[2]) - 1, Number(date[3]), 23, 59);
-  return d.getMonth() === Number(date[2]) - 1 && d.getDate() === Number(date[3]) ? { deadline: d.getTime() } : null;
+  const deadline = dueAt(t, now);
+  return deadline !== null && deadline - now <= FURTHEST ? { deadline } : null;
 }
 
 // Rounded up, so a goal due in 3 days still reads 3d a minute later.

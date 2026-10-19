@@ -108,6 +108,9 @@ test('a deadline is typed as Nd, Nh or a date; empty is none and anything else i
   assert.deepEqual(parseDeadline('', T), { deadline: null });
   assert.deepEqual(parseDeadline('2026-10-21', T), { deadline: new Date(2026, 9, 21, 23, 59).getTime() });
   for (const t of ['3', 'd', '0d', '2026-02-30', '2026-13-01', 'tomorrow', '3 d']) assert.equal(parseDeadline(t, T), null);
+  // A deadline past ten years is refused, so a typo like 99999999d never reaches a date the clock cannot draw.
+  for (const t of ['99999999d', '3651d', '87601h', '9999-01-01']) assert.equal(parseDeadline(t, T), null);
+  assert.notEqual(parseDeadline('3650d', T), null);
 });
 
 test('the countdown rounds up, switches to hours under a day, and reads late once past', () => {
