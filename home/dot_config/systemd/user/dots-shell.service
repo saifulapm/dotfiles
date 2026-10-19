@@ -6,7 +6,8 @@ After=graphical-session.target
 StartLimitIntervalSec=0
 
 [Service]
-ExecStart=qs
+# Linked by run_onchange_after_18-shell, since systemd finds a bare name only on its own fixed PATH.
+ExecStart=%h/.local/bin/dots-qs
 Restart=always
 RestartSec=500ms
 # The shell draws its own UI; the gtk3 platform theme a session may set costs up to 1.5 s of start-up.

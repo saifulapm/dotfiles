@@ -34,6 +34,11 @@ test("both units give the shell its own fontconfig, from the shell dir it runs",
   assert.match(dev, /-E FONTCONFIG_FILE=\$QS_CONFIG_PATH\/fonts\.conf\b/);
 });
 
+test('both units start the shell through dots-qs, which picks the renderer', () => {
+  assert.deepEqual(unitProps('ExecStart'), ['%h/.local/bin/dots-qs']);
+  assert.match(dev, /^  dots-qs$/m);
+});
+
 const userUnit = (name) => readFileSync(root + 'home/dot_config/systemd/user/' + name, 'utf8');
 const props = (text, key) => [...text.matchAll(new RegExp(`^${key}=(.*)$`, 'gm'))].map((m) => m[1]);
 const syncCmd = (args) => `{{ joinPath .chezmoi.workingTree "bin/dots" }} sync${args}`;
