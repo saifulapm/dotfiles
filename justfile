@@ -17,7 +17,7 @@ test-sync:
     [ "$(ssh_tree)" = "$before" ] || { echo "the real ~/.ssh changed during the sync tests" >&2; exit 1; }
     exit $rc
 
-# dots bump and the other dots subcommands, against stub gh and curl
+# dots subcommands and the home configs, on scratch homes with stubbed remotes
 test-dots:
     node --test 'tests/dots/*.test.mjs' 'tests/home/*.test.mjs'
 
