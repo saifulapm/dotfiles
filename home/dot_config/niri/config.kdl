@@ -19,3 +19,8 @@ switch-events {
 hotkey-overlay {
     skip-at-startup
 }
+
+// The MacBook's built-in screen at 1.2; niri would pick 1.75 for its 2560x1600.
+output "eDP-1" {
+    scale 1.2
+}
