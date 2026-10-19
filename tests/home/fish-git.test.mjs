@@ -92,6 +92,13 @@ test('gwd removes the worktree it stands in and its branch, once asked', () => {
   assert.equal(git('branch', '--list', 'feat').stdout, '');
 });
 
+test('mise reads the tools and settings v2 gives it', () => {
+  assert.equal(run('mise', ['settings', 'get', 'node.corepack']).stdout.trim(), 'true');
+  assert.equal(run('mise', ['settings', 'get', 'upgrade.auto_prune']).stdout.trim(), 'false');
+  const tools = readFileSync(join(home, '.config/mise/config.toml'), 'utf8');
+  for (const tool of ['node = "24.21.0"', 'deno = "latest"', '"npm:cf" = "latest"']) assert.ok(tools.includes(tool), tool);
+});
+
 test('fish writes its history to the file dots sync reads', () => {
   const r = run('fish', ['-i', '-c', 'history append "echo marker-xyz"; history save']);
   assert.equal(r.status, 0, r.stderr);

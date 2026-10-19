@@ -1,0 +1,21 @@
+# Tool versions live here: change them and chezmoi apply, never `mise use -g`, which rewrites this file under chezmoi.
+
+[tools]
+node = "24.21.0"
+deno = "latest"
+# The Cloudflare CLI.
+"npm:cf" = "latest"
+
+[settings]
+# Laravel and React repos pin node with .nvmrc, .node-version or package.json devEngines, which mise ignores unless asked.
+idiomatic_version_file_enable_tools = ["node"]
+# Project mise configs here are trusted without a prompt; not ~/Sites/tries, where try clone drops other people's repos.
+trusted_config_paths = ["~/Sites/github", "~/Sites/laravel", "~/Sites/shopify_themes"]
+
+[settings.node]
+# corepack enable after each node install keeps the pnpm shim across a major bump; node 25 and later drop corepack.
+corepack = true
+
+[settings.upgrade]
+# mise up would delete an old install while processes still run from it, as Claude Code re-execs itself by path.
+auto_prune = false
