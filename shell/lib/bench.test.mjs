@@ -10,8 +10,8 @@ test('every measure within budget reads ok and passes', () => {
   const r = report(good, BUDGETS);
   assert.equal(r.over, false);
   assert.deepEqual(r.lines, [
-    'first frame   130 ms  ≤ 200 ms   ok',
-    'idle rss      149 MiB ≤ 180 MiB  ok',
+    'first frame   130 ms  ≤ 150 ms   ok',
+    'idle rss      149 MiB ≤ 150 MiB  ok',
     'panel cold    48 ms   ≤ 50 ms    ok',
     'panel warm    4 ms    ≤ 16 ms    ok',
     'timers        1       = 1        ok',
@@ -27,14 +27,14 @@ test('one measure over its budget reads OVER and fails', () => {
   assert.equal(r.lines[3], 'panel warm    17 ms   ≤ 16 ms    OVER');
 });
 
-test('a first frame of 200 ms passes and 210 ms is OVER', () => {
-  assert.equal(report({ ...good, firstFrameMs: 200 }, BUDGETS).over, false);
-  assert.equal(report({ ...good, firstFrameMs: 210 }, BUDGETS).over, true);
+test('a first frame of 150 ms passes and 160 ms is OVER', () => {
+  assert.equal(report({ ...good, firstFrameMs: 150 }, BUDGETS).over, false);
+  assert.equal(report({ ...good, firstFrameMs: 160 }, BUDGETS).over, true);
 });
 
-test('RSS a KiB over the 180 MiB budget is OVER, not rounded down into it', () => {
-  assert.equal(report({ ...good, rssKiB: 180 * 1024 }, BUDGETS).over, false);
-  assert.equal(report({ ...good, rssKiB: 180 * 1024 + 1 }, BUDGETS).over, true);
+test('RSS a KiB over the 150 MiB budget is OVER, not rounded down into it', () => {
+  assert.equal(report({ ...good, rssKiB: 150 * 1024 }, BUDGETS).over, false);
+  assert.equal(report({ ...good, rssKiB: 150 * 1024 + 1 }, BUDGETS).over, true);
 });
 
 test('a timer count other than the budget is OVER either way', () => {
