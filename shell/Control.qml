@@ -54,7 +54,9 @@ Item {
             selected: section.selected,
             rows: rows.map(r => r.title),
             openMs: openMs,
-            opens: opens
+            opens: opens,
+            // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
+            keyboard: control.Window.active
         }, section.state()));
     }
 

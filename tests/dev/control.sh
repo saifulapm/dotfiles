@@ -47,6 +47,8 @@ check "state lists the six sections in order" state_is '.sections == ["audio","w
 until_ok 3000 state_is '(.openMs | type) == "number" and .opens == 1'
 check "the open reports a numeric openMs" state_is '(.openMs | type) == "number"'
 
+# Tabs sent before Control has the keyboard arrive late, so they wait for it.
+until_ok 3000 state_is '.keyboard'
 wtype -k Tab
 wtype -k Tab
 until_ok 2000 section_is bluetooth

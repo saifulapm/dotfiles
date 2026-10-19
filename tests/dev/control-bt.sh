@@ -44,8 +44,19 @@ niri msg action spawn -- qs ipc call control toggle
 control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
 until_ok 3000 section_is audio
 until_ok 3000 control_focus
-# The first Tab can reach the layer before it has the keyboard, so Tab repeats until the section moves.
-tab_to() { local n; for n in 1 2 3 4 5 6; do section_is "$1" && return 0; wtype -k Tab; sleep 0.15; done; section_is "$1"; }
+# One Tab at a time, each waiting for the section to move, so a late press never overshoots.
+section_not() { ! section_is "$1"; }
+tab_to() {
+  local n s
+  until_ok 3000 state_is '.keyboard' || return 1
+  for n in 1 2 3 4 5 6; do
+    section_is "$1" && return 0
+    s=$(control_state | jq -r .section)
+    wtype -k Tab
+    until_ok 2000 section_not "$s" || return 1
+  done
+  section_is "$1"
+}
 tab_to bluetooth
 check "Tab twice is bluetooth" section_is bluetooth
 check "Bluetooth opens on its first row, Test Headphones" state_is '.selected == 0 and .rows[0] == "Test Headphones"'

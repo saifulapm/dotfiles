@@ -29,7 +29,19 @@ select_row() {
   done
   return 1
 }
-tab_to() { local n; for n in 1 2 3 4 5 6; do section_is "$1" && return 0; wtype -k Tab; sleep 0.1; done; section_is "$1"; }
+# One Tab at a time, each waiting for the section to move, so a late press never overshoots.
+section_not() { ! section_is "$1"; }
+tab_to() {
+  local n s
+  until_ok 3000 state_is '.keyboard' || return 1
+  for n in 1 2 3 4 5 6; do
+    section_is "$1" && return 0
+    s=$(control_state | jq -r .section)
+    wtype -k Tab
+    until_ok 2000 section_not "$s" || return 1
+  done
+  section_is "$1"
+}
 
 until_ok 5000 shell_status >/dev/null
 check "the shell runs the fake workflow" test -x "$DOTS_WORKFLOW"
