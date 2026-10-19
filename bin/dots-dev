@@ -7,7 +7,8 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 D=$(mktemp -d -t dots-dev-XXXXXXXX)
 export DOTS_DEV_DIR=$D DOTS_DEV_UNIT=dots-shell-dev-${D##*-}
 user_data=${XDG_DATA_HOME:-$HOME/.local/share}
-export XDG_STATE_HOME=$D/state XDG_DATA_HOME=$D/data QS_CONFIG_PATH=$repo/shell
+# A check that edits the config must never edit the checkout's shell/, which the live shell watches.
+export XDG_STATE_HOME=$D/state XDG_DATA_HOME=$D/data QS_CONFIG_PATH=${DOTS_DEV_SHELL:-$repo/shell}
 # niri's spawn-at-startup finds bin/dots-dev-shell on PATH.
 export PATH=$repo/bin:$PATH
 # The nested session must never reach the live tmux server, dconf database or Chromium policy dir.
