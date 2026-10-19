@@ -50,7 +50,7 @@ test('a pin with the right sha256 is fetched and reported as changed', () => {
   assert.equal(r.stdout, 'hello pin\ndots: pin hello 1.2\n');
 });
 
-// /tmp is a small tmpfs on the Macs, too small for kakoune-lsp's cargo build.
+// /tmp is a small tmpfs on the Macs, too small for a source build.
 test('a pin is fetched and built under ~/.cache, not /tmp, and the dir is removed after', () => {
   const root = source(sha('hello pin\n'));
   const r = run(root, SCRIPT.replace('cat "$file"', 'echo "$file"'));

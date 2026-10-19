@@ -50,13 +50,3 @@ hook global BufCreate .*/\.claude/plans/.* %{
   add-highlighter buffer/wrap wrap -word -indent
 }
 
-declare-option -hidden str js_linter_lsp
-hook global KakBegin .* %{
-  evaluate-commands %sh{
-    if [ -f "eslint.config.js" ] || [ -f "eslint.config.mjs" ] || [ -f "eslint.config.ts" ]; then
-      echo "set-option global js_linter_lsp eslint"
-    elif [ -f "biome.json" ] || [ -f "biome.jsonc" ]; then
-      echo "set-option global js_linter_lsp biome"
-    fi
-  }
-}

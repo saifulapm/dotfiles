@@ -12,7 +12,7 @@ pin_name={{ $pin.name | quote }}
 pin_version={{ $pin.version | quote }}
 pin_url={{ $url | replace "{version}" $pin.version | quote }}
 pin_sha256={{ $sha | quote }}
-# On disk, not in /tmp: /tmp is a small tmpfs on the Macs and a cargo build does not fit.
+# On disk, not in /tmp: /tmp is a small tmpfs on the Macs and a source build may not fit.
 mkdir -p "$HOME/.cache"
 pin_tmp=$(mktemp -d -p "$HOME/.cache" dots-pin-XXXXXX)
 trap 'rm -rf "$pin_tmp"' EXIT

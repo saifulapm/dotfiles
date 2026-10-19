@@ -56,15 +56,31 @@ test('kak opens with the carried config and the debug buffer holds no error', ()
   assert.deepEqual(errors, []);
 });
 
-test('kak loads the carried autoload and the kak-lsp plugin', () => {
+test('kak loads the carried autoload, and nothing from kak-lsp', () => {
   const out = join(root, 'defined.txt');
   // define-command refuses a name that exists, so each catch marks a command the config defined.
   const probe = (name) => `try %{ define-command ${name} nop; echo -to-file ${out}.${name} missing } catch %{ echo -to-file ${out}.${name} defined }`;
-  const r = kak(`${probe('url-open')}; ${probe('lsp-enable-window')}; quit!`);
+  const names = ['url-open', 'lsp-enable-window', 'snippets-insert', 'emmet-expand'];
+  const r = kak(`${names.map(probe).join('; ')}; quit!`);
   assert.equal(r.status, 0, r.stderr);
   const read = (name) => (existsSync(`${out}.${name}`) ? readFileSync(`${out}.${name}`, 'utf8') : 'not run');
-  assert.deepEqual(
-    { 'url-open': read('url-open'), 'lsp-enable-window': read('lsp-enable-window') },
-    { 'url-open': 'defined', 'lsp-enable-window': 'defined' },
-  );
+  assert.deepEqual(Object.fromEntries(names.map((n) => [n, read(n)])), {
+    'url-open': 'defined',
+    'lsp-enable-window': 'missing',
+    'snippets-insert': 'missing',
+    'emmet-expand': 'missing',
+  });
+});
+
+// Filetype hooks only run when a buffer of that type opens, so the first test cannot see them.
+test('a PHP and a JavaScript buffer open with no error in the debug buffer', () => {
+  const debug = join(root, 'debug-filetypes.txt');
+  writeFileSync(join(root, 'a.php'), '<?php\n');
+  writeFileSync(join(root, 'a.js'), 'let a;\n');
+  const r = kak(`edit ${join(root, 'a.php')}; edit ${join(root, 'a.js')}; eval -buffer *debug* %{ write ${debug} }; quit!`);
+  assert.equal(r.status, 0, r.stderr);
+  const errors = readFileSync(debug, 'utf8')
+    .split('\n')
+    .filter((l) => /error|no such/i.test(l));
+  assert.deepEqual(errors, []);
 });

@@ -36,12 +36,3 @@ install = "~/.local/bin/kak and ~/.local/share/kak, built from source"
 check = "kak -version"
 url = "https://github.com/saifulapm/kakoune/archive/{version}.tar.gz"
 sha256 = "839647ab05d5877a30a2248ac8cf701f2f00508114e0fc8e5848ddd249f06c80"
-
-[[pin]]
-name = "kakoune-lsp"
-version = "22.0.0"
-repo = "kakoune-lsp/kakoune-lsp"
-install = "~/.local/bin/kak-lsp, built with cargo"
-check = "kak-lsp --version"
-url = "https://github.com/kakoune-lsp/kakoune-lsp/archive/refs/tags/v{version}.tar.gz"
-sha256 = "fe631342dc68692ac8cf3ff454e83d37756998e85f27f33d0cfd923c1309a7e0"

@@ -691,18 +691,6 @@ define-command -hidden decrement_selected_numbers -params 1 %{
   execute-keys "a-%sh{expr $1 '|' 1}<esc>|{ cat; echo; } | bc<ret>"
 }
 
-define-command snippets-or-emmet-expand %{
-    try %{
-        snippets-expand-trigger
-    } catch %{
-        try %{
-            lsp-snippets-select-next-placeholders
-        } catch %{
-            emmet-expand
-        }
-    }
-}
-
 define-command select_highlights %{
   execute-keys -save-regs 'ab' '"aZ*%s<ret>"bZ"az"b<a-z>a'
 }

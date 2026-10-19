@@ -65,9 +65,6 @@ map global goto u '<esc>: url-open<ret>' -docstring 'Open url in browser'
 map global goto w '<esc>:hop-kak-words<ret>' -docstring 'Jump to word (Hop)'
 map -docstring "file non-recursive" global goto '<a-f>' '<esc>gf'
 map -docstring "file" global goto 'f' '<esc>: goto-file %val{selection}<ret>'
-map global goto d <esc>:lsp-definition<ret> -docstring 'LSP definition'
-map global goto r <esc>:lsp-references<ret> -docstring 'LSP references'
-map global goto y <esc>:lsp-type-definition<ret> -docstring 'LSP type definition'
 
 # local leader mode
 map global normal "'" ':enter-user-mode local<ret>' -docstring 'Local Leader'
@@ -88,7 +85,6 @@ map global user e ':explore<ret>'   -docstring 'Explorer'
 map global user p ':extra-paste-system<ret>' -docstring 'Paste Sys Clipboard'
 map global user y ':extra-yank-system<ret>'  -docstring 'yank to system clipboard'
 map global user Y ':extra-yank-cursor<ret>'  -docstring 'yank cursor'
-map global user l ':enter-user-mode lsp<ret>' -docstring 'LSP mode'
 map global user n ':enter-user-mode notes<ret>' -docstring 'Notes mode'
 
 ## buffers
@@ -131,7 +127,7 @@ map -docstring 'next bracket blocks' global object ] 'c<a-;>f[\[,\]<ret>'
 map -docstring 'previous angle blocks' global object <lt> 'c<a-;><a-f><lt><lt>,<gt><ret>'
 map -docstring 'next angle blocks' global object <gt> 'c<a-;>f<lt><lt>,<gt><ret>'
 
-# Tab Completion# Lsp Snippets
+# Tab Completion
 hook global InsertCompletionShow .* %{ map window insert <tab> <c-n>; map window insert <s-tab> <c-p> }
 hook global InsertCompletionHide .* %{ unmap window insert <tab> <c-n>; unmap window insert <s-tab> <c-p> }
 
@@ -163,7 +159,3 @@ hook global -always BufOpenFifo '\*sg-grep\*' %{ map global normal <minus> ': sg
 # map -docstring 'case insensitive extend search' global user '?' ?(?i)
 # map -docstring 'case insensitive backward extend-search' global user '<a-?>' <a-?>(?i)
 
-# Emmet
-# map global insert <c-'> '<a-;>:emmet-expand<ret>' -docstring 'Emmet expand'
-map global insert <c-j> '<a-;>:try snippets-or-emmet-expand<ret>' -docstring 'Placeholder/Snippet/Emmet expand'
-map global normal <c-'> '<a-;>:emmet-wrap<ret>' -docstring 'Emmet wrap'
