@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2329 # the runner calls each sync_<unit> by name
-# dots sync [--only notes|goals]: one round through rclone's Dropbox:, each machine writing only <unit>/<machine>.json; exits 0 when every unit synced or skipped, else the highest unit exit code.
+# dots sync [--only <unit> | --adopt local|remote]: one round through rclone's Dropbox:, each machine writing only its own <unit>/<machine> file; exits 0 when every unit synced or skipped, else the highest unit exit code.
 set -uo pipefail
 shopt -s nullglob
 
@@ -9,7 +9,9 @@ root=Dropbox:dots-sync
 data=${XDG_DATA_HOME:-$HOME/.local/share}/dots
 state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
 status=$state/sync.json
-units=(notes goals)
+units=(notes goals fish ssh)
+# auto, or push or pull when --adopt picks a side of an ssh conflict.
+adopt=auto
 machine=
 tmp=
 # The last error line of the step that failed, for sync.json.
@@ -59,6 +61,159 @@ sync_goals() {
   store_unit goals
 }
 
+# Every machine's file, its own included, merges into the live history, which then goes up as this machine's file.
+sync_fish() {
+  local live=${XDG_DATA_HOME:-$HOME/.local/share}/fish/fish_history pulled=$tmp/fish out
+  mkdir -p "$pulled"
+  rc mkdir "$root/fish" &&
+    rc copy "$root/fish" "$pulled" --max-depth 1 --include '*.history' || return
+  if ! out=$("$here/dots-sync-fish" "$live" "$pulled"/*.history 2>&1); then
+    err=$(tail -n 1 <<<"$out")
+    return 1
+  fi
+  [[ ! -f $live ]] || rc copyto "$live" "$root/fish/$machine.history" --checksum
+}
+
+# The ssh unit keeps v1's blob (ssh.age, ssh.meta.json) and manifest hash, so a v1 and a v2 machine share one ~/.ssh.
+ssh_dir=$HOME/.ssh
+ssh_remote=Dropbox:qshell-sync/ssh
+ssh_state=$state/sync/ssh
+
+# known_hosts is each machine's own and control sockets are live, so neither travels.
+ssh_files() {
+  find "$ssh_dir" -type f ! -name 'known_hosts' ! -name 'known_hosts.old' ! -name 'cm-*' ! -name '*.sock' ! -name '.DS_Store' \
+    -print0 2>/dev/null | sort -z
+}
+
+# Relative path, mode and sha256 per file, sorted and hashed as v1 does; empty when there is nothing to sync.
+ssh_hash() {
+  local f m=
+  while IFS= read -r -d '' f; do
+    m+=$(printf '%s\t%s\t%s' "${f#"$ssh_dir"/}" "$(stat -c %a "$f")" "$(sha256sum "$f" | cut -d' ' -f1)")$'\n'
+  done < <(ssh_files)
+  [[ -n $m ]] || return 0
+  printf '%s' "${m%$'\n'}" | sha256sum | cut -d' ' -f1
+}
+
+# The last five plaintext tarballs of ~/.ssh stay in the state dir, mode 600, before anything overwrites it.
+ssh_backup() {
+  local out
+  out=$ssh_state/backups/ssh-$(date +%Y%m%d-%H%M%S)-$1.tar.gz
+  mkdir -p "$ssh_state/backups"
+  chmod 700 "$ssh_state/backups"
+  tar czf "$out" -C "$HOME" .ssh 2>/dev/null
+  chmod 600 "$out" 2>/dev/null
+  # shellcheck disable=SC2012 # these names are ours and hold no newlines; with nullglob an empty glob would list the cwd, so ls lists the dir
+  (cd "$ssh_state/backups" && ls -1t | tail -n +6 | xargs -r rm -f)
+}
+
+ssh_push() {
+  local hash=$1 recipient=$2 blob=$tmp/ssh/ssh.age meta=$tmp/ssh/push.meta.json
+  if ! (cd "$ssh_dir" && ssh_files | sed -z "s|^$ssh_dir/||" | tar czf - --null --files-from - 2>/dev/null) | age -r "$recipient" -o "$blob" 2>/dev/null; then
+    err="could not build the encrypted ssh blob"
+    return 1
+  fi
+  jq -n --arg hash "$hash" --arg machine "$machine" --arg when "$(date -Is)" '{hash:$hash, machine:$machine, when:$when}' >"$meta"
+  rc copyto "$blob" "$ssh_remote/ssh.age" && rc copyto "$meta" "$ssh_remote/ssh.meta.json" || return
+  echo "$hash" >"$ssh_state/base.hash"
+}
+
+ssh_pull() {
+  local hash=$1 identity=$2 blob=$tmp/ssh/ssh.age stage=$tmp/ssh/stage out f
+  rc copyto "$ssh_remote/ssh.age" "$blob" || return
+  mkdir -m 700 "$stage"
+  if ! age -d -i "$identity" "$blob" 2>/dev/null | tar xzf - -C "$stage" 2>/dev/null; then
+    err="could not decrypt the ssh blob; is this machine's age key the right one?"
+    return 1
+  fi
+  if [[ -z $(ls -A "$stage") ]]; then
+    err="the ssh blob decrypted to nothing, so it is not applied"
+    return 1
+  fi
+  ssh_backup pull
+  mkdir -p "$ssh_dir"
+  if ! out=$(rsync -a --checksum --delete --exclude 'known_hosts' --exclude 'known_hosts.old' --exclude 'cm-*' --exclude '*.sock' "$stage/" "$ssh_dir/" 2>&1); then
+    err="applying the ssh blob failed: $(head -n 1 <<<"$out")"
+    return 1
+  fi
+  # ssh refuses a private key that group or others can read, so modes are set again rather than trusted to the tar.
+  chmod 700 "$ssh_dir"
+  while IFS= read -r -d '' f; do
+    case ${f##*/} in
+      *.pub | known_hosts | known_hosts.old) chmod 644 "$f" ;;
+      *) chmod 600 "$f" ;;
+    esac
+  done < <(find "$ssh_dir" -type f -print0)
+  echo "$hash" >"$ssh_state/base.hash"
+}
+
+# Three hashes decide: this disk's, the remote meta's, and the base both last agreed on; when both moved it stops for a human.
+sync_ssh() {
+  local identity=${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/key.txt recipient here_hash remote_hash='' remote_machine='' base=''
+  # A machine not yet given the age key cannot take part, and that is not a failure.
+  if [[ ! -f $identity ]]; then
+    echo "dots sync: ssh skipped, no age identity at $identity"
+    return 0
+  fi
+  if ! recipient=$(age-keygen -y "$identity" 2>/dev/null); then
+    err="could not derive an age recipient from $identity"
+    return 1
+  fi
+  mkdir -p "$tmp/ssh" "$ssh_state"
+  chmod 700 "$ssh_state"
+  rc mkdir "$ssh_remote" &&
+    rc copy "$ssh_remote" "$tmp/ssh" --max-depth 1 --include ssh.meta.json || return
+  if [[ -f $tmp/ssh/ssh.meta.json ]]; then
+    remote_hash=$(jq -r '.hash // ""' "$tmp/ssh/ssh.meta.json" 2>/dev/null)
+    remote_machine=$(jq -r '.machine // ""' "$tmp/ssh/ssh.meta.json" 2>/dev/null)
+  fi
+  [[ -f $ssh_state/base.hash ]] && base=$(<"$ssh_state/base.hash")
+  here_hash=$(ssh_hash)
+
+  case $adopt in
+    push)
+      if [[ -z $here_hash ]]; then
+        err="nothing in ~/.ssh to publish"
+        return 1
+      fi
+      ssh_backup adopt-local
+      ssh_push "$here_hash" "$recipient"
+      return
+      ;;
+    pull)
+      if [[ -z $remote_hash ]]; then
+        err="Dropbox has no ssh blob to adopt"
+        return 1
+      fi
+      ssh_pull "$remote_hash" "$identity"
+      return
+      ;;
+  esac
+
+  if [[ -z $here_hash ]]; then
+    [[ -z $remote_hash ]] || ssh_pull "$remote_hash" "$identity"
+    return
+  fi
+  if [[ $here_hash == "$remote_hash" ]]; then
+    echo "$here_hash" >"$ssh_state/base.hash"
+    return 0
+  fi
+  if [[ -z $remote_hash || $remote_hash == "$base" ]]; then
+    ssh_push "$here_hash" "$recipient"
+    return
+  fi
+  if [[ $here_hash == "$base" ]]; then
+    ssh_pull "$remote_hash" "$identity"
+    return
+  fi
+  if [[ -z $base ]]; then
+    err="conflict: ~/.ssh here was never synced and differs from the one ${remote_machine:-another machine} put on Dropbox; run dots sync --adopt local or --adopt remote"
+  else
+    err="conflict: ~/.ssh changed here and on ${remote_machine:-another machine} since the last sync; run dots sync --adopt local or --adopt remote"
+  fi
+  return 3
+}
+
 # record <unit> <true|false> <error>: one entry of sync.json, written whole through a temp file.
 record() {
   local now cur
@@ -71,7 +226,7 @@ record() {
 }
 
 usage() {
-  echo "usage: dots sync [--only notes|goals]" >&2
+  echo "usage: dots sync [--only notes|goals|fish|ssh | --adopt local|remote]" >&2
   exit 2
 }
 
@@ -79,8 +234,16 @@ main() {
   case "${1:-}" in
     '') ;;
     --only)
-      [[ ${2:-} == notes || ${2:-} == goals ]] || usage
+      [[ ${2:-} =~ ^(notes|goals|fish|ssh)$ ]] || usage
       units=("$2")
+      ;;
+    --adopt)
+      case ${2:-} in
+        local) adopt=push ;;
+        remote) adopt=pull ;;
+        *) usage ;;
+      esac
+      units=(ssh)
       ;;
     *) usage ;;
   esac

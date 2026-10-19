@@ -1,0 +1,49 @@
+#!/usr/bin/env node
+// dots-sync-fish <live> <pulled>...: unions fish history files into the live one, each (cmd, when) once, ordered by when.
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+
+// latin1 keeps every byte as it was, so blocks pass through without fish's escaping ever being decoded.
+const read = (path) => (existsSync(path) ? readFileSync(path, 'latin1') : '');
+const mtime = (path) => (existsSync(path) ? statSync(path, { bigint: true }).mtimeNs : null);
+
+// Each block is "- cmd: ..." and its indented lines, kept verbatim; text before the first block is a broken head and is dropped.
+function parse(text) {
+  const out = [];
+  for (const block of text.split(/^(?=- cmd: )/m)) {
+    if (!block.startsWith('- cmd: ')) continue;
+    const cmd = block.slice(7, block.indexOf('\n') < 0 ? undefined : block.indexOf('\n'));
+    const when = Number(/^\s+when: (\d+)/m.exec(block)?.[1] ?? 0);
+    out.push({ key: cmd + '\0' + when, when, block: block.endsWith('\n') ? block : block + '\n' });
+  }
+  return out;
+}
+
+// One try: false when fish appended while the union was built, so the caller starts again from the new file.
+function round(live, pulled) {
+  const before = mtime(live);
+  const own = parse(read(live));
+  const merged = new Map();
+  for (const e of own.concat(...pulled.map((f) => parse(read(f))))) if (!merged.has(e.key)) merged.set(e.key, e);
+  // Nothing new means no write, so the file's mtime and fish's own appends stay untouched.
+  if (merged.size === new Set(own.map((e) => e.key)).size) return true;
+  const text = [...merged.values()].sort((x, y) => x.when - y.when).map((e) => e.block).join('');
+  mkdirSync(dirname(live), { recursive: true });
+  const tmp = join(dirname(live), '.' + basename(live) + '.' + process.pid + '.tmp');
+  writeFileSync(tmp, text, 'latin1');
+  if (mtime(live) !== before) {
+    unlinkSync(tmp);
+    return false;
+  }
+  renameSync(tmp, live);
+  return true;
+}
+
+const [live, ...pulled] = process.argv.slice(2);
+if (!live) {
+  process.stderr.write('usage: dots-sync-fish <live> <pulled>...\n');
+  process.exit(2);
+}
+for (let i = 0; i < 3; i++) if (round(live, pulled)) process.exit(0);
+process.stderr.write('fish: the live history kept changing, so this round left it alone\n');
+process.exit(1);

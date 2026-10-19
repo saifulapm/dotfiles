@@ -73,3 +73,13 @@ why = "the launcher types a clip or an emoji into the window you came from"
 name = "rclone"
 arch = "all"
 why = "dots sync copies notes and goals to Dropbox and back"
+
+[[package]]
+name = "age"
+arch = "all"
+why = "dots sync encrypts ~/.ssh to the chezmoi age key before it goes to Dropbox"
+
+[[package]]
+name = "rsync"
+arch = "all"
+why = "dots sync applies a pulled ~/.ssh and leaves known_hosts alone"

@@ -1,8 +1,8 @@
-// The only way tests/sync may run dots sync: each machine gets an env built from PATH and scratch dirs alone, so no run reaches the real HOME, rclone config or Dropbox.
+// The only way tests/sync may run dots sync, fish or age-keygen: each machine gets an env built from PATH and scratch dirs alone, so no run reaches the real HOME, rclone config or Dropbox.
 import { spawn } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 
 const dots = new URL('../../bin/dots', import.meta.url).pathname;
 const SCRATCH = ['HOME', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_RUNTIME_DIR', 'RCLONE_CONFIG'];
@@ -53,10 +53,24 @@ export function checked(env) {
   return env;
 }
 
-// Runs `dots sync <args>` as machine m and resolves its exit code and output.
-export function sync(m, args = []) {
+export const sync = (m, args = []) => run(m, dots, ['sync'].concat(args));
+
+// What `history` prints in fish run as m, newest command first.
+export const fishHistory = (m) => run(m, 'fish', ['-c', 'history']);
+
+// The age identity the ssh unit reads, made for m, or copied from another machine so both open one blob.
+export async function identity(m, from) {
+  const path = join(m.env.XDG_CONFIG_HOME, 'chezmoi/key.txt');
+  mkdirSync(dirname(path), { recursive: true });
+  if (from) return copyFileSync(join(from.env.XDG_CONFIG_HOME, 'chezmoi/key.txt'), path);
+  const r = await run(m, 'age-keygen', ['-o', path]);
+  if (r.code !== 0) throw new Error('age-keygen: ' + r.stderr);
+}
+
+// Runs cmd with args as machine m and resolves its exit code and output.
+function run(m, cmd, args) {
   return new Promise((resolve, reject) => {
-    const p = spawn(dots, ['sync'].concat(args), { env: checked(m.env) });
+    const p = spawn(cmd, args, { env: checked(m.env) });
     let stdout = '';
     let stderr = '';
     p.stdout.on('data', (d) => (stdout += d));
