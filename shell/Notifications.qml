@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Layouts
 import "." as Root
 import "lib/notifs.mjs" as Lib
+import "lib/voice.mjs" as V
 
 // The notification centre, drawn in the Surfaces window.
 Item {
@@ -21,11 +22,14 @@ Item {
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
+    readonly property var look: V.listLook(theme.tokens)
+    // The caps voices write d and D alike, so clear all reads ⇧D.
+    readonly property var legendKeys: look.keys([["j/k", "move"], ["↵", "open"], ["d", "dismiss"], ["⇧D", "clear all"], ["/", "search"], ["esc", "close"]])
     readonly property var groups: Lib.group(Lib.visible(notifs.history, query))
     // One row per entry in group order; the first of each group carries its header.
     readonly property var rows: groups.reduce((all, g) => all.concat(g.entries.map((e, i) => ({
                         entry: e,
-                        head: i === 0 ? g.app.toUpperCase() + " · " + g.entries.length : ""
+                        head: i === 0 ? look.tabText(g.app) + " · " + g.entries.length : ""
                     }))), [])
 
     function open(t0) {
@@ -66,7 +70,21 @@ Item {
             notifs.remove(row.entry.key);
     }
 
+    // An item's box in window coordinates, as a screenshot reads it.
+    function box(item) {
+        const p = item.mapToItem(null, 0, 0);
+        return {
+            x: p.x,
+            y: p.y,
+            w: item.width,
+            h: item.height
+        };
+    }
+
     function state() {
+        const d = rows.length > 0 ? list.itemAtIndex(selected) : null;
+        const cur = d ? d.box : null;
+        const heading = look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip;
         return {
             open: shown,
             query: query,
@@ -77,7 +95,16 @@ Item {
                     })),
             hint: rows.length === 0,
             openMs: openMs,
-            opens: opens
+            opens: opens,
+            headingKind: look.label.kind,
+            heading: heading.text,
+            headingBox: box(heading),
+            ruleBox: box(headRule),
+            cursorFill: cur ? String(cur.color) : null,
+            cursorBox: cur ? box(cur) : null,
+            legend: legendKeys.map(k => k.key + " " + k.word).join("  "),
+            legendKeys: legendKeys.map(k => k.key),
+            legendSpacing: look.small.spacing
         };
     }
 
@@ -133,6 +160,7 @@ Item {
                 width: parent.width
                 spacing: 0
 
+                // The launcher's mode label names the centre: Paper's ink chip, Artboard's tint pill, Blueprint's header line.
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.leftMargin: 20
@@ -141,31 +169,66 @@ Item {
                     Layout.bottomMargin: 12
                     spacing: 12
 
+                    Rectangle {
+                        visible: look.label.kind === "chip"
+                        implicitWidth: chip.implicitWidth + 14
+                        implicitHeight: chip.implicitHeight + 6
+                        color: look.label.fill
+                        Text {
+                            id: chip
+                            textFormat: Text.PlainText
+                            anchors.centerIn: parent
+                            text: look.heading("notifications", "")
+                            color: look.label.color
+                            font.family: fonts.ui
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.4
+                        }
+                    }
+                    Rectangle {
+                        visible: look.label.kind === "pill"
+                        implicitWidth: pill.implicitWidth + 18
+                        implicitHeight: pill.implicitHeight + 6
+                        radius: 8
+                        color: look.label.fill
+                        Text {
+                            id: pill
+                            textFormat: Text.PlainText
+                            anchors.centerIn: parent
+                            text: look.heading("notifications", "")
+                            color: look.label.color
+                            font.family: fonts.ui
+                            font.pixelSize: 12
+                            font.weight: Font.Medium
+                        }
+                    }
                     Text {
+                        id: header
+                        visible: look.label.kind === "header"
                         textFormat: Text.PlainText
-                        text: "NOTIFICATIONS"
-                        color: c.ink
-                        font.family: fonts.ui
-                        font.pixelSize: 11
-                        font.weight: Font.Medium
-                        font.letterSpacing: 1.4
+                        text: look.heading("notifications", "")
+                        color: look.small.color
+                        font.family: look.small.font
+                        font.pixelSize: look.small.size
+                        font.letterSpacing: look.small.spacing
                     }
                     Text {
                         textFormat: Text.PlainText
                         Layout.fillWidth: true
-                        text: rows.length + " · newest first"
-                        color: c.muted
-                        font.family: fonts.ui
-                        font.pixelSize: 12
+                        text: look.tabText(rows.length + " · newest first")
+                        color: look.small.color
+                        font.family: look.small.font
+                        font.pixelSize: look.small.size
+                        font.letterSpacing: look.small.spacing
                     }
                     Rectangle {
-                        implicitWidth: chip.implicitWidth + 14
-                        implicitHeight: chip.implicitHeight + 6
+                        implicitWidth: dnd.implicitWidth + 14
+                        implicitHeight: dnd.implicitHeight + 6
                         color: "transparent"
                         border.color: centre.notifs.dnd ? c.accent : c.line
                         border.width: 1
                         Text {
-                            id: chip
+                            id: dnd
                             textFormat: Text.PlainText
                             anchors.centerIn: parent
                             text: "Do not disturb: " + (centre.notifs.dnd ? "on" : "off")
@@ -214,10 +277,8 @@ Item {
                     }
                 }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 1
-                    color: c.line
+                Rule {
+                    id: headRule
                 }
 
                 Text {
@@ -250,6 +311,7 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property bool current: index === centre.selected
+                        readonly property Item box: rowBox
                         width: list.width
 
                         Text {
@@ -259,28 +321,39 @@ Item {
                             topPadding: 10
                             bottomPadding: 4
                             text: item.modelData.head
-                            color: c.muted
-                            font.family: fonts.mono
-                            font.pixelSize: 10
-                            font.letterSpacing: 1.2
+                            color: look.small.color
+                            font.family: look.small.font
+                            font.pixelSize: look.small.size
+                            font.letterSpacing: look.small.spacing
                         }
 
+                        // The launcher's cursor row: Paper's runs edge to edge, the others sit inset as tiles.
                         Rectangle {
-                            x: 10
-                            width: parent.width - 20
-                            implicitHeight: entry.implicitHeight + 16
-                            color: "transparent"
-                            border.color: item.current ? c.accent : "transparent"
-                            border.width: 1.5
+                            id: rowBox
+                            x: look.voice === "plain" ? 8 : look.voice === "bracket" ? 10 : 0
+                            width: parent.width - 2 * x
+                            implicitHeight: entry.implicitHeight + 20
+                            radius: look.cursor.radius
+                            color: item.current ? look.cursor.fill : "transparent"
 
                             RowLayout {
                                 id: entry
                                 anchors.fill: parent
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 10
-                                anchors.topMargin: 8
-                                anchors.bottomMargin: 8
+                                anchors.leftMargin: look.voice === "caps" ? 20 : 12
+                                anchors.rightMargin: anchors.leftMargin
+                                anchors.topMargin: 10
+                                anchors.bottomMargin: 10
                                 spacing: 12
+
+                                Text {
+                                    visible: look.slot === "marker"
+                                    Layout.alignment: Qt.AlignTop
+                                    textFormat: Text.PlainText
+                                    text: "▸"
+                                    color: item.current ? look.cursor.marker : "transparent"
+                                    font.family: fonts.ui
+                                    font.pixelSize: 15
+                                }
 
                                 Column {
                                     Layout.fillWidth: true
@@ -288,58 +361,121 @@ Item {
                                     Text {
                                         textFormat: Text.PlainText
                                         width: parent.width
-                                        text: item.modelData.entry.summary
+                                        text: look.title(item.modelData.entry.summary)
                                         elide: Text.ElideRight
-                                        color: c.ink
-                                        font.family: fonts.ui
-                                        font.pixelSize: 14
-                                        font.weight: item.current ? Font.Medium : Font.Normal
+                                        color: item.current ? look.cursor.text : look.name.color
+                                        font.family: look.name.font
+                                        font.pixelSize: look.name.size
+                                        font.weight: item.current ? look.cursor.weight : look.name.weight
+                                        font.letterSpacing: look.name.spacing
                                     }
                                     Text {
                                         visible: text !== ""
                                         width: parent.width
-                                        text: item.modelData.entry.body
+                                        text: look.detailText(item.modelData.entry.body)
                                         elide: Text.ElideRight
                                         maximumLineCount: 2
                                         wrapMode: Text.Wrap
                                         textFormat: Text.PlainText
-                                        color: c.muted
-                                        font.family: fonts.ui
-                                        font.pixelSize: 13
+                                        color: item.current ? look.cursor.detail : look.detail.color
+                                        font.family: look.detail.font
+                                        font.italic: look.detail.italic
+                                        font.pixelSize: look.detail.size
+                                        font.letterSpacing: look.detail.spacing ?? 0
                                     }
                                 }
                                 Text {
                                     textFormat: Text.PlainText
                                     Layout.alignment: Qt.AlignTop
                                     text: Qt.formatTime(new Date(item.modelData.entry.time), "HH:mm")
-                                    color: c.muted
+                                    color: item.current ? look.cursor.detail : c.muted
                                     font.family: fonts.mono
                                     font.pixelSize: 11
+                                }
+
+                                Rectangle {
+                                    visible: item.current && look.cursor.badge !== ""
+                                    Layout.alignment: Qt.AlignTop
+                                    implicitWidth: badge.implicitWidth + 14
+                                    implicitHeight: badge.implicitHeight + 4
+                                    radius: 6
+                                    color: c.surface
+                                    Text {
+                                        id: badge
+                                        textFormat: Text.PlainText
+                                        anchors.centerIn: parent
+                                        text: look.cursor.badge
+                                        color: look.cursor.text
+                                        font.family: fonts.mono
+                                        font.pixelSize: 11
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 1
-                    color: c.line
-                }
+                Rule {}
 
-                Text {
-                    textFormat: Text.PlainText
+                // The keys as the launcher's legend draws them: chips in Artboard, tracked caps or brackets in the others.
+                Flow {
                     Layout.fillWidth: true
-                    leftPadding: 20
-                    rightPadding: 20
-                    topPadding: 10
-                    bottomPadding: 10
-                    text: "j/k move  ↵ open  d dismiss  D clear all  / search  Esc"
-                    color: c.muted
-                    font.family: fonts.mono
-                    font.pixelSize: 11
+                    Layout.leftMargin: look.voice === "plain" ? 14 : look.voice === "bracket" ? 22 : 20
+                    Layout.rightMargin: Layout.leftMargin
+                    Layout.topMargin: look.voice === "plain" ? 10 : 12
+                    Layout.bottomMargin: look.voice === "bracket" ? 14 : Layout.topMargin
+                    spacing: look.legend("").chips ? 8 : 14
+
+                    Repeater {
+                        model: centre.legendKeys
+
+                        Rectangle {
+                            required property var modelData
+                            width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
+                            height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
+                            radius: 6
+                            color: look.chip.fill
+
+                            Row {
+                                id: pair
+                                anchors.centerIn: parent
+                                spacing: look.legend("").chips ? 6 : 5
+
+                                Text {
+                                    textFormat: Text.PlainText
+                                    text: modelData.key
+                                    color: look.chip.key
+                                    font.family: fonts.mono
+                                    font.pixelSize: look.small.size
+                                    font.letterSpacing: look.small.spacing
+                                    font.bold: true
+                                }
+                                Text {
+                                    textFormat: Text.PlainText
+                                    text: modelData.word
+                                    color: c.muted
+                                    font.family: look.small.font
+                                    font.pixelSize: look.small.size
+                                    font.letterSpacing: look.small.spacing
+                                }
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    // A rule across the card: solid, or dashed in Blueprint.
+    component Rule: Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 1
+        color: look.rule.dashed ? "transparent" : look.rule.color
+
+        Root.Dashed {
+            visible: look.rule.dashed
+            anchors.fill: parent
+            color: look.rule.color
         }
     }
 }
