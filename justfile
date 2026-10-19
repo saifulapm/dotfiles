@@ -33,6 +33,10 @@ bench:
 test-install:
     tests/install/run.sh
 
+# dots install then dots cutover twice on a v1 machine in a container with a live user manager
+test-cutover:
+    tests/cutover/run.sh
+
 # the install test on another machine (the NUC for x86_64), whose own packages must not change
 test-install-remote host:
     tests/install/remote.sh {{host}}

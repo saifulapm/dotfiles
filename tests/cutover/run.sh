@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# A v1 machine in a fedora:44 container with a live user manager: v1's units running and its data in place, then dots install, then dots cutover twice.
+set -uo pipefail
+{
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+branch=$(git -C "$here" symbolic-ref --short -q HEAD) || { echo "FAIL: HEAD is detached, check out a branch" >&2; exit 1; }
+gitdir=$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)
+snap=$(mktemp -d)
+git clone -q --bare --single-branch --branch "$branch" "$gitdir" "$snap/src.git" || { echo "FAIL: could not snapshot $branch"; exit 1; }
+name=dots-cutover-test-$$
+image=localhost/dots-cutover-test:44
+home=/home/saiful
+failed=0
+
+check() {
+  local what=$1
+  shift
+  if "$@"; then echo "PASS: $what"; else echo "FAIL: $what"; failed=1; fi
+}
+as_root() { podman exec -u root "$name" bash -c "$1"; }
+as_user() {
+  podman exec -u saiful -w "$home" -e HOME="$home" -e LANG=C.UTF-8 -e XDG_RUNTIME_DIR=/run/user/1000 \
+    -e PATH="$home/.local/bin:/usr/local/bin:/usr/bin:/bin" "$name" bash -c "$1"
+}
+# put <path>: writes stdin to the user's file; podman exec passes stdin only with -i.
+put() { podman exec -i -u saiful "$name" bash -c "cat > $1"; }
+# shellcheck disable=SC2329 # called through check
+dots_install() {
+  git -C "$snap/src.git" show "$branch:bin/dots" |
+    podman exec -i -u saiful -w "$home" -e HOME="$home" -e XDG_RUNTIME_DIR=/run/user/1000 -e PATH=/usr/local/bin:/usr/bin:/bin \
+      -e DOTS_REPO=/src.git -e DOTS_BRANCH="$branch" -e DOTS_MACHINE=test "$name" bash -s install
+}
+unit_state() { as_user "echo \$(systemctl --user is-enabled $1 2>/dev/null) \$(systemctl --user is-active $1 2>/dev/null)"; }
+snapshot() { as_user "find ~ \\( -type f -o -type l \\) -printf '%p %s %T@ %l\\n' | sort"; }
+
+trap 'podman rm -f -t 0 "$name" >/dev/null 2>&1; rm -rf "$snap"' EXIT
+# systemd runs as the container's init, so the image carries it; downloaded rpms stay in the install test's cache volume.
+podman volume exists dots-install-dnf-cache || podman volume create dots-install-dnf-cache >/dev/null
+cache=$(podman volume inspect dots-install-dnf-cache --format '{{.Mountpoint}}')
+printf 'FROM docker.io/library/fedora:44\nRUN echo keepcache=True >> /etc/dnf/dnf.conf && dnf -y -q install systemd sudo\nCMD ["/sbin/init"]\n' |
+  podman build -q -t "$image" -v "$cache:/var/cache/libdnf5:z" -f - >/dev/null || { echo "FAIL: image did not build"; exit 1; }
+# keep-id would start init as saiful, so it runs as root.
+podman run -d --name "$name" --user root --systemd=always --userns=keep-id --security-opt label=disable \
+  --passwd-entry "saiful:*:1000:1000::$home:/bin/bash" \
+  -v "$snap/src.git:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 \
+  "$image" >/dev/null || { echo "FAIL: container did not start"; exit 1; }
+
+as_root "
+  set -e
+  until systemctl is-system-running 2>/dev/null | grep -qE 'running|degraded'; do sleep 0.2; done
+  mkdir -p $home && chown saiful: $home
+  echo 'saiful ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/saiful
+  loginctl enable-linger saiful
+  until systemctl is-active -q user@1000.service; do sleep 0.2; done
+" || { echo "FAIL: no user manager"; exit 1; }
+
+# v1 as a machine has it: units linked from ~/.dotfiles and enabled, links that outrank v2, and the shell's data.
+as_user '
+  set -e
+  d=~/.dotfiles/home/dot_config/systemd/user
+  mkdir -p $d ~/.config/systemd/user ~/.config/chezmoi ~/.config/fish/conf.d ~/.config/qshell \
+    ~/.local/state/qshell/notes/attachments ~/.local/state/qshell/goals ~/.local/share/fish
+  echo "sourceDir = \"~/.dotfiles\"" > ~/.config/chezmoi/chezmoi.toml
+  for u in qshell hub-local; do printf "[Service]\nExecStart=/bin/sleep infinity\n[Install]\nWantedBy=default.target\n" > $d/$u.service; done
+  for u in qshell-sync update-all; do
+    printf "[Service]\nType=oneshot\nExecStart=/bin/true\n" > $d/$u.service
+    printf "[Timer]\nOnCalendar=daily\n[Install]\nWantedBy=timers.target\n" > $d/$u.timer
+  done
+  for f in $d/*; do ln -s $f ~/.config/systemd/user/; done
+  systemctl --user daemon-reload
+  systemctl --user enable --now qshell.service hub-local.service qshell-sync.timer update-all.timer 2>/dev/null
+  printf "[user]\n\tname = v1\n" > ~/.dotfiles/home/dot_gitconfig
+  ln -s ~/.dotfiles/home/dot_gitconfig ~/.gitconfig
+  echo "set -g fish_history test_box" > ~/.dotfiles/home/10-history.fish
+  ln -s ~/.dotfiles/home/10-history.fish ~/.config/fish/conf.d/10-history.fish
+  echo test-box > ~/.config/qshell/machine
+  printf "\x89PNG\r\n\x1a\nnot really an image\n" > ~/.local/state/qshell/notes/attachments/paste-1.png
+  printf -- "- cmd: ls\n  when: 1760000000\n- cmd: make\n  when: 1760000100\n- cmd: git status\n  when: 1760000200\n" > ~/.local/share/fish/test_box_history
+' || { echo "FAIL: v1 fixture"; exit 1; }
+put "$home/.local/state/qshell/notes/notes.json" <<EOF
+{"version":2,"notes":[
+{"id":"0mt0a0001-aaaa","text":"one","path":"","done":false,"updatedAt":"2026-09-01T00:00:00.000Z"},
+{"id":"0mt0a0002-aaaa","text":"two","path":"","done":false,"updatedAt":"2026-09-02T00:00:00.000Z"},
+{"id":"0mt0a0003-aaaa","text":"three","path":"","done":false,"updatedAt":"2026-09-03T00:00:00.000Z"},
+{"id":"0mt0a0004-aaaa","text":"four","path":"","done":true,"updatedAt":"2026-09-04T00:00:00.000Z"},
+{"id":"0mt0a0005-aaaa","text":"five","path":"","done":false,"updatedAt":"2026-09-05T00:00:00.000Z"},
+{"id":"0mt0a0006-aaaa","text":"six","path":"","done":false,"updatedAt":"2026-09-06T00:00:00.000Z"},
+{"id":"0mt0a0007-aaaa","text":"seven","path":"","done":false,"updatedAt":"2026-09-07T00:00:00.000Z"},
+{"id":"0mt0a0008-aaaa","text":"eight","path":"","done":false,"updatedAt":"2026-09-08T00:00:00.000Z"},
+{"id":"0mt0a0009-aaaa","text":"nine","path":"","done":false,"updatedAt":"2026-09-09T00:00:00.000Z"},
+{"id":"0mt0a0010-aaaa","text":"ten","path":"","done":false,"updatedAt":"2026-09-10T00:00:00.000Z"},
+{"id":"0mt0a0011-aaaa","text":"","path":"$home/.local/state/qshell/notes/attachments/paste-1.png","done":false,"updatedAt":"2026-09-11T00:00:00.000Z"},
+{"id":"0mt0a0012-aaaa","text":"","path":"","done":false,"updatedAt":"2026-09-12T00:00:00.000Z","deletedAt":"2026-09-12T00:00:00.000Z"},
+{"id":"0mt0a0013-aaaa","text":"","path":"","done":false,"updatedAt":"2026-09-13T00:00:00.000Z","deletedAt":"2026-09-13T00:00:00.000Z"}
+]}
+EOF
+put "$home/.local/state/qshell/goals/goals.json" <<'EOF'
+{"version":1,"goals":[
+{"id":"g1","name":"Shipped app","due":"2026-09-22T00:00:00.000Z","state":"shipped","createdAt":"2026-09-10T00:00:00.000Z","updatedAt":"2026-09-26T00:00:00.000Z","shippedAt":"2026-09-26T00:00:00.000Z","tasks":[
+{"id":"t1","text":"a","done":true,"updatedAt":"2026-09-20T00:00:00.000Z"},{"id":"t2","text":"b","done":true,"updatedAt":"2026-09-20T00:00:00.000Z"},
+{"id":"t3","text":"c","done":true,"updatedAt":"2026-09-20T00:00:00.000Z"},{"id":"t4","text":"d","done":true,"updatedAt":"2026-09-20T00:00:00.000Z"},
+{"id":"t5","text":"e","done":true,"updatedAt":"2026-09-20T00:00:00.000Z"},{"id":"t6","text":"f","done":true,"updatedAt":"2026-09-20T00:00:00.000Z"}]},
+{"id":"g2","name":"Shipped theme","due":"2026-09-30T00:00:00.000Z","state":"shipped","createdAt":"2026-09-12T00:00:00.000Z","updatedAt":"2026-09-30T00:00:00.000Z","shippedAt":"2026-09-30T00:00:00.000Z","tasks":[]},
+{"id":"g3","name":"Active app","due":"2026-11-01T00:00:00.000Z","state":"active","createdAt":"2026-10-01T00:00:00.000Z","updatedAt":"2026-10-02T00:00:00.000Z","tasks":[
+{"id":"t7","text":"g","done":false,"updatedAt":"2026-10-02T00:00:00.000Z"},{"id":"t8","text":"h","done":true,"updatedAt":"2026-10-02T00:00:00.000Z"},
+{"id":"t9","text":"i","done":false,"updatedAt":"2026-10-02T00:00:00.000Z"}]}
+]}
+EOF
+
+for u in qshell.service hub-local.service qshell-sync.timer update-all.timer; do
+  got=$(unit_state $u)
+  check "v1's $u is enabled and active before the cutover (got '$got')" test "$got" = "enabled active"
+done
+
+echo "--- dots install on the v1 machine"
+check "dots install exits 0" dots_install
+
+echo "--- dots cutover"
+out=$(as_user "Sites/github/dotfiles/bin/dots cutover" 2>&1)
+rc=$?
+echo "${out##*$'\n'}"
+check "dots cutover exits 0" test $rc = 0
+check "dots cutover prints notes: 11 imported · goals: 3 imported" grep -q '^notes: 11 imported · goals: 3 imported · ' <<<"${out##*$'\n'}"
+
+store=$home/.local/share/dots
+live=$(as_user "jq '[.notes[] | select(.deleted | not)] | length' $store/notes/test.json")
+check "v2's notes store lists 11 live notes (got '$live')" test "$live" = 11
+gone=$(as_user "jq '[.notes[] | select(.deleted)] | length' $store/notes/test.json")
+check "v1's 2 deleted notes are tombstones (got '$gone')" test "$gone" = 2
+sha=$(as_user "jq -r '.notes[] | select(.id == \"0mt0a0011-aaaa\") | .attachments[0].sha256' $store/notes/test.json")
+check "the image note's attachment is under its sha256 name with the original bytes" \
+  as_user "test \"\$(sha256sum < ~/.local/state/qshell/notes/attachments/paste-1.png | cut -d' ' -f1)\" = $sha && cmp -s ~/.local/state/qshell/notes/attachments/paste-1.png $store/notes/attachments/$sha.png"
+goals=$(as_user "jq -c '[([.goals[] | select(.done)] | length), ([.goals[] | select((.done | not) and (.deleted | not))] | length), ([.goals[].tasks[]] | length)]' $store/goals/test.json")
+check "2 goals are done, 1 is active, and they hold 9 tasks (got '$goals')" test "$goals" = '[2,1,9]'
+entries=$(as_user "grep -c '^- cmd: ' ~/.local/share/fish/fish_history")
+check "v1's fish history is in fish_history (got '$entries' entries)" test "$entries" = 3
+
+for u in qshell.service qshell-sync.timer update-all.timer; do
+  got=$(unit_state $u)
+  check "v1's $u is neither enabled nor active (got '$got')" bash -c "[[ '$got' != enabled* && '$got' != *' active' ]]"
+done
+got=$(unit_state hub-local.service)
+check "v1's hub-local.service, which v2 does not replace, still runs (got '$got')" test "$got" = "enabled active"
+check "v1's ~/.gitconfig and 10-history.fish links are gone" as_user "test ! -e ~/.gitconfig -a ! -e ~/.config/fish/conf.d/10-history.fish"
+check "~/.dotfiles stays in place" as_user "test -f ~/.dotfiles/home/dot_gitconfig"
+
+echo "--- dots cutover again"
+before=$(snapshot)
+out=$(as_user "Sites/github/dotfiles/bin/dots cutover" 2>&1)
+rc=$?
+echo "${out##*$'\n'}"
+check "the second dots cutover exits 0" test $rc = 0
+check "the second run imports and stops nothing" test "${out##*$'\n'}" = 'notes: 0 imported · goals: 0 imported · history: 0 merged · v1 units: 0 stopped'
+check "the second run changes no file under $home" diff <(echo "$before") <(snapshot)
+
+exit $failed
+}
