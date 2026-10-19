@@ -133,5 +133,5 @@ main() {
   esac
 }
 
-# Everything runs from here, so bash has read the whole script before a pipe could cut it short.
-main "$@"
+# Everything runs from here, so bash has read the whole script before a pipe could cut it short; exit stops it reading on after a git pull rewrote the file.
+main "$@"; exit
