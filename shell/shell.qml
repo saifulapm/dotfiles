@@ -15,18 +15,14 @@ ShellRoot {
     property bool reloaded: false
     // Named by URL and made after the paper's first frame, since qs compiles every type shell.qml names before that frame.
     property var desk: null
-    property var lock: null
     property var polkit: null
-    property var idle: null
 
     onFirstFrameMsChanged: {
         if (firstFrameMs === null || desk !== null)
             return;
         surfacesLoader.component = Qt.createComponent("Surfaces.qml");
         desk = Qt.createComponent("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService });
-        lock = Qt.createComponent("Lock.qml").createObject(root, { theme: themeService });
         polkit = Qt.createComponent("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
-        idle = Qt.createComponent("Idle.qml").createObject(root, { lock: lock, surfaces: surfacesLoader });
         appCount = Qt.binding(() => DesktopEntries.applications.values.length);
     }
 
@@ -341,5 +337,16 @@ ShellRoot {
                 return surfacesLoader.item.recorder.state();
             return JSON.stringify({ picking: false, recording: false });
         }
+    }
+
+    // Declared, never made by URL: a broken Lock.qml or Idle.qml then fails the whole reload and the working lock stays.
+    Root.Lock {
+        id: lockScope
+        theme: themeService
+    }
+
+    Root.Idle {
+        lock: lockScope
+        surfaces: surfacesLoader
     }
 }
