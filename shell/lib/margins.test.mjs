@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pad2, dateText, clockText, msToNextMinute, marginState, screenTail, batteryText, wifiText } from './margins.mjs';
+import { pad2, dateText, clockText, msToNextMinute, marginState, batteryText, wifiText } from './margins.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32, 10, 500);
 
@@ -36,11 +36,6 @@ test('the margin state for an empty workspace is just its number', () => {
   const s = marginState({ idx: 2, app: null, title: null }, AT, { goal: '', wifi: '', battery: '' });
   assert.equal(s.left.text, '02');
   assert.equal(s.left.workspace, '02');
-});
-
-test('on screen the number is followed by a dash, the app and the title', () => {
-  assert.equal(screenTail({ app: 'foot', title: '~/Sites' }), ' — foot · ~/Sites');
-  assert.equal(screenTail({ app: null, title: null }), '');
 });
 
 test('the battery reads its percentage, and says when it is charging', () => {

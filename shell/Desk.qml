@@ -122,6 +122,7 @@ Scope {
     }
 
     Variants {
+        id: marginsVariants
         model: Quickshell.screens
 
         Root.Margins {
@@ -144,7 +145,8 @@ Scope {
         // The margins of the output with the focused workspace.
         function state(): string {
             const view = niriService.view(niriService.focusedOutput) ?? { idx: 0, app: null, title: null };
-            return JSON.stringify(MarginsLib.marginState(view, clockService.now, { sync: syncService.failing ? "sync !" : "", goal: GoalsLib.marginGoal(goalsService.store, clockService.now), wifi: networkService.wifi, battery: powerService.battery }));
+            const shown = marginsVariants.instances.find(m => m.screen.name === niriService.focusedOutput);
+            return JSON.stringify(Object.assign(MarginsLib.marginState(view, clockService.now, { sync: syncService.failing ? "sync !" : "", goal: GoalsLib.marginGoal(goalsService.store, clockService.now), wifi: networkService.wifi, battery: powerService.battery }), { drawn: shown ? shown.drawnState() : null }));
         }
     }
 

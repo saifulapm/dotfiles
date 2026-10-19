@@ -4,6 +4,7 @@ import QtQuick
 import "lib/margins.mjs" as M
 import "lib/goals.mjs" as G
 import "lib/surface.mjs" as S
+import "lib/voice.mjs" as V
 
 // Each margin sits over an ink hairline that stops 8 px short of the island, when the theme's frame is drawn in ink.
 PanelWindow {
@@ -19,6 +20,8 @@ PanelWindow {
     required property real islandWidth
     readonly property var view: niri.view(screen.name) ?? { idx: 0, app: null, title: null }
     readonly property var marginState: M.marginState(view, clock.now, { sync: sync.failing ? "sync !" : "", goal: G.marginGoal(goals.store, clock.now), wifi: network.wifi, battery: power.battery })
+    readonly property var goal: G.marginGoalParts(goals.store, clock.now)
+    readonly property var voice: V.marginLook(theme.tokens)
     readonly property real lineEnd: width / 2 - islandWidth / 2 - 8
     readonly property var look: S.marginStyle(theme.tokens)
 
@@ -45,68 +48,118 @@ PanelWindow {
         font.capitalization: root.look.caps ? Font.AllUppercase : Font.MixedCase
     }
 
+    // Paper's dash and Blueprint's dot between the right margin's words; Artboard has none.
+    component Sep: Label {
+        property bool shown: true
+        text: root.voice.sep
+        visible: shown && text !== ""
+    }
+
+    // The words as drawn, read back from the labels, for `qs ipc call margins state`.
+    function drawnState() {
+        const right = [syncLabel, goalLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).map(l => l.text).join(voice.sep ? " " + voice.sep + " " : " ");
+        return {
+            left: number.text + tail.text,
+            right: right,
+            leftEnd: tail.mapToItem(null, tail.width, 0).x,
+            rightStart: rightRow.mapToItem(null, 0, 0).x,
+            lineEnd: lineEnd,
+            width: width
+        };
+    }
+
     Row {
         x: 32
         y: 17
 
         Label {
             id: number
-            text: root.marginState.left.workspace
-            color: root.theme.color.ink ?? "black"
-            font.bold: true
+            text: root.voice.number(root.view.idx)
+            color: root.voice.numberColor ?? "black"
+            font.weight: root.voice.numberWeight
         }
 
         Label {
-            text: M.screenTail(root.view)
-            width: Math.max(0, root.lineEnd - 32 - number.width)
+            id: tail
+            text: root.voice.tail(root.view)
+            width: Math.min(implicitWidth, Math.max(0, root.lineEnd - 32 - number.width))
             elide: Text.ElideRight
         }
     }
 
-    // A Row skips invisible Labels, so an absent word leaves no gap.
+    // A Row skips invisible items, so an absent word leaves no gap; each word but the date is followed by the theme's separator.
     Row {
+        id: rightRow
         anchors.right: parent.right
         anchors.rightMargin: 32
         y: 17
-        spacing: 20
+        spacing: root.voice.spacing
 
         // The danger token reads as a warning in every theme.
         Label {
             id: syncLabel
-            text: root.marginState.right.sync
+            text: root.marginState.right.sync ? root.voice.word(root.marginState.right.sync) : ""
             visible: text !== ""
             color: root.theme.color.danger ?? "black"
         }
+        Sep {
+            id: syncSep
+            shown: syncLabel.visible
+        }
 
-        // Paper's accent bold, Artboard's ink medium, Blueprint's amber (its danger token); the voice tells the themes apart.
-        Label {
-            readonly property bool bracket: root.theme.tokens?.type.voice === "bracket"
-            readonly property bool caps: (root.theme.tokens?.type.voice ?? "plain") !== "plain"
-            text: root.marginState.right.goal
-            visible: text !== ""
-            // A title can arrive by sync at any length, so it takes only the room the other words leave before the island.
-            readonly property real room: root.lineEnd - 32 - [syncLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).reduce((w, l) => w + l.width + 20, 0)
-            width: Math.min(implicitWidth, Math.max(0, room))
-            elide: Text.ElideRight
-            color: (bracket ? root.theme.color.danger : caps ? root.theme.color.accent : root.theme.color.ink) ?? "black"
-            font.weight: bracket ? Font.Normal : caps ? Font.Bold : Font.Medium
+        Row {
+            id: goalItem
+            visible: goalLabel.text !== ""
+            spacing: 6
+
+            Rectangle {
+                visible: root.voice.dot
+                anchors.verticalCenter: parent.verticalCenter
+                width: 6
+                height: 6
+                radius: 3
+                color: root.voice.dotColor ?? "black"
+            }
+
+            Label {
+                id: goalLabel
+                text: root.voice.goal(root.goal)
+                // A title can arrive by sync at any length, so it takes only the room the other words leave before the island.
+                readonly property real room: root.lineEnd - 32 - [syncLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).reduce((w, l) => w + l.width + rightRow.spacing, 0) - [syncSep, goalSep, wifiSep, batterySep].filter(l => l.visible).reduce((w, l) => w + l.width + rightRow.spacing, 0) - (root.voice.dot ? 12 : 0)
+                width: Math.min(implicitWidth, Math.max(0, room))
+                elide: Text.ElideRight
+                color: root.voice.goalColor ?? "black"
+                font.weight: root.voice.goalWeight
+            }
+        }
+        Sep {
+            id: goalSep
+            shown: goalItem.visible
         }
 
         Label {
             id: wifiLabel
-            text: root.marginState.right.wifi
+            text: root.marginState.right.wifi ? root.voice.word(root.marginState.right.wifi) : ""
             visible: text !== ""
+        }
+        Sep {
+            id: wifiSep
+            shown: wifiLabel.visible
         }
 
         Label {
             id: batteryLabel
-            text: root.marginState.right.battery
+            text: root.marginState.right.battery ? root.voice.word(root.marginState.right.battery) : ""
             visible: text !== ""
+        }
+        Sep {
+            id: batterySep
+            shown: batteryLabel.visible
         }
 
         Label {
             id: dateLabel
-            text: root.marginState.right.date
+            text: root.voice.date(root.clock.now)
         }
     }
 

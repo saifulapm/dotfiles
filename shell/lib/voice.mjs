@@ -1,4 +1,6 @@
-// How the shell speaks under a token set, from its voice, as the three themes' boards draw it: the launcher and the lists that share its idioms, the island's notification and OSD.
+// How the shell speaks under a token set, from its voice, as the three themes' boards draw it: the launcher and the lists that share its idioms, the island's notification and OSD, and the margins.
+
+import { dateText, pad2 } from './margins.mjs';
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands'];
 
@@ -208,4 +210,49 @@ export function listLook(tokens) {
     keyText,
     keys: (pairs) => pairs.map(([k, w]) => ({ key: keyText(k), word: wordText(w) })),
   });
+}
+
+// How the margins read under a token set: Paper's caps and dashes, Artboard's Page 03 and accent dot, Blueprint's brackets and ISO date.
+export function marginLook(tokens) {
+  const c = (tokens || UNTHEMED).color;
+  const voice = (tokens || UNTHEMED).type.voice;
+  const say = voice === 'plain' ? same : upper;
+  const plain = voice === 'plain';
+  const bracket = voice === 'bracket';
+  const look = {
+    voice,
+    number: (idx) => (plain ? `Page ${pad2(idx)}` : bracket ? `[${pad2(idx)}]` : pad2(idx)),
+    numberColor: bracket ? c.accent : c.ink,
+    numberWeight: plain ? 600 : bracket ? 400 : 700,
+    tail(view) {
+      if (view.app === null && view.title === null) return '';
+      const app = say(view.app ?? '');
+      const title = say(view.title ?? '');
+      return plain ? ` / ${app} — ${title}` : bracket ? ` ${app} — ${title}` : ` — ${app} · ${title}`;
+    },
+    goal(g) {
+      if (!g) return '';
+      const title = say(g.title);
+      if (g.left === null) return title;
+      if (bracket) return g.left === 'late' ? `${title} LATE` : `${title} T−${upper(g.left)}`;
+      return `${title} · ${say(g.left)}`;
+    },
+    // Paper's accent bold, Artboard's ink medium after an accent dot, Blueprint's amber (its danger token).
+    goalColor: bracket ? c.danger : plain ? c.ink : c.accent,
+    goalWeight: bracket ? 400 : plain ? 500 : 700,
+    dot: plain,
+    dotColor: c.accent,
+    word: (w) => (plain ? same(w).replace(/^wifi$/, 'Wi-Fi').replace(/^no wifi$/, 'No Wi-Fi') : upper(w)),
+    date: (d) => (bracket ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : say(dateText(d))),
+    sep: plain ? '' : bracket ? '·' : '—',
+    spacing: plain ? 16 : 14,
+  };
+  // The words on screen, in order, for `qs ipc call margins state`.
+  look.drawn = (view, now, right) => ({
+    left: look.number(view.idx) + look.tail(view),
+    right: [right.sync && look.word(right.sync), look.goal(right.goal), right.wifi && look.word(right.wifi), right.battery && look.word(right.battery), look.date(now)]
+      .filter((p) => p)
+      .join(look.sep ? ` ${look.sep} ` : ' '),
+  });
+  return look;
 }

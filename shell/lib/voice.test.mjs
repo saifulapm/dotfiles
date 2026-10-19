@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, islandLook, osdLook, listLook, MODES } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, marginLook, MODES } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -182,4 +182,56 @@ test("a list surface keeps the launcher's cursor row and rules", () => {
     assert.deepEqual(list(n).cursor, look(n).cursor, n);
     assert.deepEqual(list(n).rule, look(n).rule, n);
   }
+});
+
+const margin = (name) => marginLook(theme(name));
+const foot = { idx: 2, app: 'foot', title: '~' };
+// Sunday 18 October 2026, local time.
+const SUN = new Date(2026, 9, 18, 9, 30);
+const right = { sync: '', goal: { title: 'Ship v2', left: '3d' }, wifi: 'wifi', battery: '82%' };
+
+test('the top-left margin reads each board: 02 — FOOT · ~, Page 02 / foot — ~ and [02] FOOT — ~', () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => margin(n).drawn(foot, SUN, right).left), ['02 — FOOT · ~', 'Page 02 / foot — ~', '[02] FOOT — ~']);
+});
+
+test('an empty workspace reads only its number', () => {
+  const empty = { idx: 4, app: null, title: null };
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => margin(n).drawn(empty, SUN, right).left), ['04', 'Page 04', '[04]']);
+});
+
+test('on 2026-10-18 the date reads SUN 18 OCT, Sun 18 Oct and 2026-10-18', () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => margin(n).date(SUN)), ['SUN 18 OCT', 'Sun 18 Oct', '2026-10-18']);
+  assert.equal(margin('blueprint').date(new Date(2026, 0, 5)), '2026-01-05');
+});
+
+test('the top-right margin reads each board, with its own separators and goal countdown', () => {
+  assert.equal(margin('paper').drawn(foot, SUN, right).right, 'SHIP V2 · 3D — WIFI — 82% — SUN 18 OCT');
+  assert.equal(margin('artboard').drawn(foot, SUN, right).right, 'Ship v2 · 3d Wi-Fi 82% Sun 18 Oct');
+  assert.equal(margin('blueprint').drawn(foot, SUN, right).right, 'SHIP V2 T−3D · WIFI · 82% · 2026-10-18');
+});
+
+test("the goal takes each board's colour and weight, and Artboard's accent dot", () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => [margin(n).goalColor, margin(n).dot]), [
+    ['#C8381E', false],
+    ['#15171B', true],
+    ['#FFB547', false],
+  ]);
+  assert.deepEqual([margin('blueprint').goal({ title: 'Read', left: null }), margin('blueprint').goal({ title: 'Ship', left: 'late' }), margin('paper').goal(null)], ['READ', 'SHIP LATE', '']);
+});
+
+test('the workspace number takes the board colour: ink in Paper and Artboard, the accent in Blueprint', () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => [margin(n).numberColor, margin(n).number(3)]), [
+    ['#1C1915', '03'],
+    ['#15171B', 'Page 03'],
+    ['#7FE3F0', '[03]'],
+  ]);
+});
+
+test('Artboard spells Wi-Fi as its board does, and a sync failure leads the right margin in every voice', () => {
+  assert.deepEqual([margin('artboard').word('no wifi'), margin('paper').word('no wifi')], ['No Wi-Fi', 'NO WIFI']);
+  assert.equal(margin('blueprint').drawn(foot, SUN, { ...right, sync: 'sync !' }).right.slice(0, 9), 'SYNC ! · ');
+});
+
+test('a bidi control in a window title cannot reorder the margin', () => {
+  assert.equal(margin('blueprint').drawn({ idx: 1, app: 'foot', title: 'a‮b' }, SUN, right).left, '[01] FOOT — AB');
 });

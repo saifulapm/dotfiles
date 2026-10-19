@@ -132,11 +132,17 @@ export function countdown(deadline, now) {
   return left < D ? Math.ceil(left / H) + 'h' : Math.ceil(left / D) + 'd';
 }
 
-export function marginGoal(store, now) {
+// The goal the margin names, as { title, left }: the nearest deadline and its countdown, else the first goal with left null; null with no goal.
+export function marginGoalParts(store, now) {
   const active = activeGoals(store);
   const due = active.filter((g) => g.deadline !== null).sort((a, b) => a.deadline - b.deadline || byOrder(a, b));
-  if (due.length) return due[0].title + ' · ' + countdown(due[0].deadline, now);
-  return active.length ? active[0].title : '';
+  if (due.length) return { title: due[0].title, left: countdown(due[0].deadline, now) };
+  return active.length ? { title: active[0].title, left: null } : null;
+}
+
+export function marginGoal(store, now) {
+  const g = marginGoalParts(store, now);
+  return g === null ? '' : g.left === null ? g.title : g.title + ' · ' + g.left;
 }
 
 // The newer copy wins; a tie goes to the larger text, so both machines pick the same one.

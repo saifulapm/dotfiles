@@ -34,6 +34,3 @@ export function wifiText(devices) {
   if (wifi.length === 0) return '';
   return wifi.some((d) => d.connected) ? 'wifi' : 'no wifi';
 }
-
-// What follows the bold workspace number on screen.
-export const screenTail = (view) => (hasWindow(view) ? ` — ${view.app ?? ''} · ${view.title ?? ''}` : '');
