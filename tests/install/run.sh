@@ -141,6 +141,10 @@ check "*.test resolves through dnsmasq" podman exec "$name" grep -qx 'address=/t
 check "the dev quadlets generate units" as_user "/usr/lib/systemd/user-generators/podman-user-generator --dryrun >/dev/null 2>&1"
 check "the dev sockets are enabled" as_user "test -f ~/.config/systemd/user/sockets.target.wants/mysql84-proxy.socket -a -f ~/.config/systemd/user/sockets.target.wants/caddy-dev-https.socket"
 
+check "kak opens with the carried config" as_user "kak -ui dummy -e 'eval -buffer *debug* %{ write /tmp/kak-debug }; quit!' && ! grep -Eiq 'error|could not load' /tmp/kak-debug"
+check "mail-sync.timer waits for ~/.mbsyncrc, which a keyless install does not write" \
+  as_user "grep -qx 'ConditionPathExists=%h/.mbsyncrc' ~/.config/systemd/user/mail-sync.timer && test ! -e ~/.mbsyncrc"
+
 check "tty1 logs saiful straight in" podman exec "$name" grep -q -- '--autologin saiful' /etc/systemd/system/getty@tty1.service.d/autologin.conf
 shell=$(podman exec "$name" getent passwd saiful | cut -d: -f7)
 check "fish is saiful's login shell (got '$shell')" test "$shell" = /usr/bin/fish
