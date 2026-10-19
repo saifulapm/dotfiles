@@ -76,6 +76,7 @@ Item {
             settleMs: motion.settleMs,
             settled: motion.settled,
             drawing: motion.drawing,
+            cardBox: card.drawnBox(),
             heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             headingKind: look.label.kind,
             ruleBox: { x: r.x, y: r.y, w: topRule.width, h: topRule.height },

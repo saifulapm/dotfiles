@@ -102,6 +102,23 @@ check "artboard: at rest the card's top edge is white" near $((cx + 100)) $((cy 
 wtype -k Escape
 until_ok 9000 state_is '.drawing == false'
 
+# Every other surface's card springs too, read from the card as drawn rather than from its Motion.
+surface_is() { timeout 0.5 qs ipc call "$1" state 2>/dev/null | jq -e "$2" >/dev/null; }
+card_w() { timeout 0.5 qs ipc call "$1" state 2>/dev/null | jq -r .cardBox.w; }
+springs() {
+  local w1 w2
+  t0=$(now_ms)
+  qs ipc call "$1" open >/dev/null
+  wait_until 300
+  w1=$(card_w "$1")
+  until_ok 9000 surface_is "$1" .settled
+  w2=$(card_w "$1")
+  check "artboard: 300 ms into a 20x open the $1 card is drawn at 0.98 of its rest width or less ($w1 of $w2)" node -e "process.exit($w1 / $w2 <= 0.98 ? 0 : 1)"
+  qs ipc call "$1" close >/dev/null
+  until_ok 9000 surface_is "$1" '.drawing == false'
+}
+for s in themes notifs cheatsheet goals; do springs "$s"; done
+
 theme blueprint
 # Pixels in a box brighter than the navy paper, its grid and the card's fill: the cyan pen, the ink text.
 bright() {

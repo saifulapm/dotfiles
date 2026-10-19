@@ -121,6 +121,7 @@ Item {
             settleMs: motion.settleMs,
             settled: motion.settled,
             drawing: motion.drawing,
+            cardBox: card.drawnBox(),
             headingKind: look.label.kind,
             heading: heading.text,
             headingBox: box(heading),

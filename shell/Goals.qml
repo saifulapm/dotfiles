@@ -83,6 +83,7 @@ Item {
             settleMs: motion.settleMs,
             settled: motion.settled,
             drawing: motion.drawing,
+            cardBox: panel.drawnBox(),
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: view.Window.active
         });

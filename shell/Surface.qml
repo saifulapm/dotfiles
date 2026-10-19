@@ -23,6 +23,13 @@ Item {
     default property alias content: inner.data
 
     scale: pose.scale
+
+    // The card as drawn this frame, moved and scaled by its motion, in the window's pixels.
+    function drawnBox() {
+        const a = mapToItem(null, 0, 0);
+        const b = mapToItem(null, width, height);
+        return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
+    }
     transform: Translate {
         y: surface.pose.lift
     }
