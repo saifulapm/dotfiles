@@ -1,0 +1,10 @@
+{
+  "app.interrupt": ["escape", "ctrl+c"],
+  "app.model.select": ["ctrl+l", "alt+p"],
+  "app.thinking.cycle": ["shift+tab", "alt+t"],
+  "tui.editor.undo": ["ctrl+-", "ctrl+_"],
+  "tui.altScreen.top": "ctrl+home",
+  "tui.altScreen.bottom": "ctrl+end",
+  "tui.editor.cursorLineStart": ["home", "ctrl+a"],
+  "tui.editor.cursorLineEnd": ["end", "ctrl+e"]
+}

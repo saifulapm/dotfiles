@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+# ~/.claude/settings.json — a modify_ script rather than a plain source file,
+# for the reason spelled out in home/dot_pi/agent/modify_settings.json: this
+# repo applies in symlink mode, and Claude Code writes to this file. `/config`
+# writes theme, `/plugin` writes enabledPlugins, `/permissions` appends allow
+# rules. As a symlink into ~/.dotfiles every one of those left the repo dirty.
+#
+# amx's keys are gone from here (2026-09-16). It wired seven hooks into this
+# file and shipped a plugin through a github marketplace, and both are
+# `amx setup claude`'s now: a directory under ~/.claude/skills/amx that claude
+# loads as amx@skills-dir, and nothing in anybody's settings. Leaving
+# extraKnownMarketplaces behind would have re-cloned the whole amx repository
+# into ~/.claude/plugins on the next apply — twelve gigabytes of it on this
+# machine, one copy having caught target/.
+#
+# chezmoi writes a real file for a modify_ script and feeds the current one in
+# on stdin, so Claude owns the file day to day and this owns the keys below.
+# Anything Claude adds that is not named here survives apply untouched.
+#
+# The trade is that this config can no longer be edited live: edit here, then
+# `chezmoi apply`.
+set -euo pipefail
+
+managed=$(
+  cat <<'JSON'
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "cleanupPeriodDays": 90,
+  "skillListingBudgetFraction": 0.02,
+  "syncClaudeAiSkills": false,
+  "disableClaudeAiConnectors": true,
+  "skillOverrides": {
+    "schedule": "off",
+    "init": "off",
+    "dataviz": "off",
+    "claude-in-chrome": "off",
+    "keybindings-help": "off",
+    "fewer-permission-prompts": "off",
+    "plugin-authoring": "off",
+    "artifact-diagramming": "off",
+    "code-review": "user-invocable-only",
+    "security-review": "user-invocable-only",
+    "simplify": "user-invocable-only",
+    "update-config": "user-invocable-only",
+    "run": "user-invocable-only",
+    "claude-api": "user-invocable-only"
+  },
+  "env": {
+    "CLAUDE_CODE_AUTO_CONNECT_IDE": "false",
+    "CLAUDE_CODE_DISABLE_CRON": "1",
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "DISABLE_AUTOUPDATER": "1",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5",
+    "WORKFLOW_AGENT": "1"
+  },
+  "advisorModel": "fable",
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false,
+    "commitTrailers": false
+  },
+  "includeGitInstructions": false,
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git worktree list:*)",
+      "Bash(ls:*)",
+      "Bash(mem:*)",
+      "Bash(workflow:*)",
+      "Bash(amx:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh release list:*)",
+      "Bash(redis-cli:*)",
+      "Bash(playwright-cli:*)",
+      "Bash(tmux:*)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/*.pem)",
+      "Read(~/.ssh/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.config/gh/hosts.yml)",
+      "Read(~/.config/rclone/rclone.conf)",
+      "Read(~/.config/.wrangler/**)",
+      "Read(~/.config/cloudflare/**)",
+      "Read(~/.npmrc)",
+      "Read(~/.netrc)"
+    ],
+    "defaultMode": "auto"
+  },
+  "fallbackModel": [
+    "opus"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mem context || true"
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mem context --brief --hook-json --session-id \"$CLAUDE_CODE_SESSION_ID\" || true"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mem precompact --hook-json || true"
+          }
+        ]
+      }
+    ]
+  },
+  "worktree": {
+    "symlinkDirectories": [
+      "node_modules",
+      "vendor"
+    ],
+    "baseRef": "head",
+    "bgIsolation": "none"
+  },
+  "disableAgentView": true,
+  "disableRemoteControl": false,
+  "inputNeededNotifEnabled": true,
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.py",
+    "refreshInterval": 10
+  },
+  "sandbox": {
+    "enabled": false
+  },
+  "spinnerTipsEnabled": false,
+  "promptCacheTtl": "1h",
+  "effortLevel": "high",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "high"
+    },
+    "claude-fable-5-1": {
+      "effortLevel": "high"
+    }
+  },
+  "autoContinueAtUsageLimit": true,
+  "awaySummaryEnabled": false,
+  "tui": "fullscreen",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "prefersReducedMotion": true,
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "custom:qshell"
+}
+JSON
+)
+
+# Empty stdin is a machine where Claude has never run, so merge onto {}.
+current=$(cat)
+[ -n "$current" ] || current='{}'
+
+# `*` is jq's recursive object merge: nested objects combine, scalars and
+# arrays are replaced outright by the right-hand side. A key the managed block
+# stops carrying therefore survives in the file until it is deleted here:
+# CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC turned off feature-flag fetching,
+# which the advisor tool needs, and `claude-opus-5` never matched Opus 5.5
+# (its canonical name is claude-opus-5-5), so Opus 5.5 ran at its default
+# medium effort. subagentPromptCacheTtl went back to the 5-minute default on
+# 2026-10-08: an hour-long write costs 2x where a 5-minute one costs 1.25x, and
+# in two weeks only 15 subagent calls came more than five minutes after the
+# last one, so the hour cost about a third more than it saved.
+#
+# Every skill's description rides in every session and every subagent, so
+# skillOverrides hides the bundled ones this machine never uses (2026-10-08),
+# and the user-invocable ones stay reachable as /name. artifact-design,
+# artifact-capabilities and workflow-authoring stay on: the Artifact and
+# Workflow tools load them before they act. syncClaudeAiSkills stops the
+# claude.ai skills landing in ~/.claude/skills/synced; claude.ai keeps them.
+# disableClaudeAiConnectors keeps claude.ai's connectors out of the terminal
+# sessions (2026-10-18): local Claude called the Mem connector, a second road
+# to the store beside the mem CLI and its replica. claude.ai chat keeps them.
+#
+# ANTHROPIC_DEFAULT_HAIKU_MODEL pins the haiku alias to Haiku 5.5 (2026-10-08):
+# Claude Code's built-in helper agents still resolved it to Haiku 4.5, which
+# costs ten times as much per input token and scores far lower.
+#
+# Remote Control is on again (2026-10-15): workflow go starts orchestrators
+# with --remote-control, so each run shows in the Claude app under its machine,
+# and inputNeededNotifEnabled pushes to the phone when one waits on a question
+# or a permission prompt. It is false rather than deleted because the merge
+# below would keep the old true. Require trusted devices is on for the account.
+# The deny list covers nested .env files (./ matched the root only), the gpg
+# key behind pass, and the rclone, wrangler, cloudflare and npm tokens.
+#
+# Re-measured 2026-10-15 over 844 subagents on the mini and the nuc: 0.16-0.22%
+# of their calls came after a 5-60 minute gap, so a 1h subagent cache would
+# cost 9-12% more of their spend. A subagent's cache stays warm while it keeps
+# calling, however long it runs; the orchestrator, which waits, is already 1h.
+#
+# The Stop hook (`mem session-check`) went on 2026-10-09: of 240 nudges, 7 were
+# followed by a mem write, and every one woke the model for another turn.
+printf '%s' "$current" | jq --argjson managed "$managed" '
+  del(.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC)
+  | del(.modelSettings["claude-opus-5"])
+  | del(.subagentPromptCacheTtl)
+  | del(.hooks.Stop)
+  | . * $managed'
