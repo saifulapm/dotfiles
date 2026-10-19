@@ -221,6 +221,13 @@ test('a motion no board draws keeps niri\'s own open and close', () => {
   assert.doesNotMatch(renderNiri(t), /custom-shader/);
 });
 
+test('the backdrop between workspaces during a switch is the theme\'s paper, not niri\'s grey', () => {
+  for (const name of ['paper', 'artboard', 'blueprint']) {
+    const t = load(name);
+    assert.match(renderNiri(t), new RegExp(`overview \\{\\s*backdrop-color "${t.color.paper}"\\s*\\}`));
+  }
+});
+
 test('a theme without shadow keys gets no shadow', () => {
   const t = load('paper');
   delete t.niri.shadow_color;

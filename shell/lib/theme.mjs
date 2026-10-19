@@ -246,6 +246,11 @@ export function renderNiri(t) {
 
 prefer-no-csd
 
+// niri shows the overview's backdrop between two workspaces while it switches them.
+overview {
+    backdrop-color "${c.paper}"
+}
+
 window-rule {
     geometry-corner-radius ${radius}
     clip-to-geometry true

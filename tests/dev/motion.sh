@@ -128,6 +128,13 @@ paper() {
       let top = -1; for (let i = 0; i < h; i++) if (magenta(at(0, i))) { top = i; break; }
       return top >= 0 && top <= 13 && near(at(0, top + 10), [255, 0, 255], 4);'
   sleep 4
+  # The workspaces slide over niri's overview backdrop, so a gap between them shows its colour.
+  niri msg action focus-workspace-down
+  sleep 0.3
+  check "paper mid workspace switch: no band of niri's grey backdrop" \
+    grab_test "$((x + w / 2)),0 1x$((y + h + 28))" 'for (let i = 0; i < h; i++) if (near(at(0, i), [38, 38, 38], 8)) return false; return true;'
+  niri msg action focus-workspace-up
+  sleep 4
   close_window
   wait_until 1000
   t=$(($(now_ms) - t0))
