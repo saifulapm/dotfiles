@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import QtQuick.Layouts
 import QtQuick.Shapes
 import "." as Root
 import "lib/island.mjs" as I
@@ -72,13 +73,14 @@ PanelWindow {
     readonly property string text: I.islandText(mode, slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
-    // As drawn: the theme's 420 or 440 px notification card, a 560 px question, a 320 px calendar and a 280 px OSD bar; any other mode is one line as wide as its text.
+    readonly property var osdLook: V.osdLook(theme.tokens)
+    // As drawn: the theme's 420 or 440 px notification card, a 560 px question, a 320 px calendar and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
             question: [I.MAX_WIDTH, ask.implicitHeight + 32],
             calendar: [320, month.implicitHeight + 32],
-            osd: [280, 36]
+            osd: [osdLook.width, osdLook.height]
         })
     readonly property string part: ["notification", "question", "calendar", "osd"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
@@ -137,6 +139,21 @@ PanelWindow {
         font.family: island.noteLook.head.font
         font.pixelSize: island.noteLook.head.size
         font.letterSpacing: island.noteLook.head.spacing
+    }
+
+    // What the OSD draws, for `island state`.
+    function osdState() {
+        if (mode !== "osd")
+            return null;
+        const p = osdValue.mapToItem(null, 0, 0);
+        return {
+            word: osdWord.text,
+            value: osdValue.text,
+            valueFont: [osdValue.font.family, osdValue.font.pixelSize],
+            bars: osdLook.bars,
+            lit: osdLook.litCount(heldOsd?.value ?? 0),
+            valueBox: { x: p.x + (screen.width - width) / 2, y: p.y, w: osdValue.width, h: osdValue.height }
+        };
     }
 
     // Where a notification's parts are drawn, in output pixels, for `island state`.
@@ -311,16 +328,29 @@ PanelWindow {
                 width: island.sizes.osd[0]
                 height: island.sizes.osd[1]
 
-                Row {
-                    x: 14
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 10
+                // The word or glyph, the bar and the value, as each theme's volume board draws them.
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: island.osdLook.voice === "caps" ? 14 : 16
+                    anchors.rightMargin: anchors.leftMargin
+                    spacing: island.osdLook.voice === "plain" ? 12 : 10
+
+                    Text {
+                        id: osdWord
+                        visible: text !== ""
+                        textFormat: Text.PlainText
+                        text: island.osdLook.word(island.heldOsd?.kind ?? "volume")
+                        color: island.osdLook.label?.color || box.style.text
+                        font.family: island.osdLook.label?.font ?? ""
+                        font.pixelSize: island.osdLook.label?.size ?? 10
+                        font.letterSpacing: island.osdLook.label?.spacing ?? 0
+                    }
 
                     // A speaker for volume, a sun for brightness, drawn as 16 px strokes in the text colour.
                     Shape {
-                        width: 16
-                        height: 16
-                        anchors.verticalCenter: parent.verticalCenter
+                        visible: island.osdLook.word("volume") === ""
+                        implicitWidth: 16
+                        implicitHeight: 16
 
                         ShapePath {
                             strokeColor: box.style.text
@@ -337,30 +367,81 @@ PanelWindow {
                         }
                     }
 
-                    Rectangle {
-                        width: 180
-                        height: 4
-                        radius: 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: Qt.alpha(box.style.text, 0.2)
+                    Item {
+                        Layout.fillWidth: true
+                        implicitHeight: 14
+                        readonly property int lit: island.osdLook.litCount(island.heldOsd?.value ?? 0)
 
+                        // Paper: 20 bars, the lit ones tall in the accent.
+                        Row {
+                            visible: island.osdLook.bars === "bars"
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 3
+
+                            Repeater {
+                                model: 20
+
+                                Rectangle {
+                                    required property int index
+                                    readonly property bool on: index < parent.parent.lit
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 4
+                                    height: on ? 14 : 8
+                                    color: on ? island.osdLook.lit.color : island.osdLook.unlit.color
+                                }
+                            }
+                        }
+
+                        // Blueprint: a run of ▮ blocks, the unlit ones in the line colour.
+                        Row {
+                            visible: island.osdLook.bars === "blocks"
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Text {
+                                textFormat: Text.PlainText
+                                text: "▮".repeat(parent.parent.lit)
+                                color: island.osdLook.lit.color
+                                font.family: island.osdLook.value.font
+                                font.pixelSize: 12
+                                font.letterSpacing: 0.6
+                            }
+                            Text {
+                                textFormat: Text.PlainText
+                                text: "▮".repeat(20 - parent.parent.lit)
+                                color: island.osdLook.unlit.color
+                                font.family: island.osdLook.value.font
+                                font.pixelSize: 12
+                                font.letterSpacing: 0.6
+                            }
+                        }
+
+                        // Artboard: one rounded bar.
                         Rectangle {
-                            width: parent.width * Math.min(island.heldOsd?.value ?? 0, 100) / 100
-                            height: parent.height
-                            radius: parent.radius
-                            color: box.style.text
+                            visible: island.osdLook.bars === "round"
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width
+                            height: 6
+                            radius: 3
+                            color: island.osdLook.unlit.color
+
+                            Rectangle {
+                                width: parent.width * Math.min(Math.max(island.heldOsd?.value ?? 0, 0), 100) / 100
+                                height: parent.height
+                                radius: parent.radius
+                                color: island.osdLook.lit.color
+                            }
                         }
                     }
 
                     Text {
+                        id: osdValue
                         textFormat: Text.PlainText
-                        width: 36
-                        anchors.verticalCenter: parent.verticalCenter
                         horizontalAlignment: Text.AlignRight
-                        text: island.heldOsd?.value ?? ""
-                        color: box.style.text
-                        font.family: island.theme.tokens?.type.mono ?? ""
-                        font.pixelSize: 12
+                        text: island.heldOsd ? island.osdLook.valueText(island.heldOsd.value) : ""
+                        color: island.osdLook.value.color || box.style.text
+                        font.family: island.osdLook.value.font
+                        font.pixelSize: island.osdLook.value.size
+                        font.weight: island.osdLook.value.weight
                     }
                 }
             }

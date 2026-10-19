@@ -71,6 +71,33 @@ took=$(($(island | jq .since) - osd_since))
 check "a notification takes the island from a showing OSD (${took} ms in)" test "$took" -lt 1500
 
 until_ok 8000 mode_is rest
+
+# Each theme's volume board: Blueprint's VOL, blocks and 062; Paper's bars and serif value; Artboard's glyph and rounded bar.
+status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
+in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+osd_is() { island | jq -e --arg v "$1" '.mode == "osd" and .animating == false and .osd.value == $v' >/dev/null 2>&1; }
+osd_reads() { until_ok 2000 osd_is "$1"; }
+in_theme blueprint
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.62
+osd_reads 062
+state=$(island)
+echo "     osd: $(jq -c .osd <<<"$state")"
+check "blueprint: at volume 62 the OSD reads VOL, 12 lit blocks and 062" state_has '.osd.word == "VOL" and .osd.bars == "blocks" and .osd.lit == 12 and .osd.value == "062"'
+value_cyan=$(grim -s 1 -t ppm -g "$(jq -r '.osd.valueBox | "\(.x | floor),\(.y | floor) \(.w | floor)x\(.h | floor)"' <<<"$state")" - | node -e '
+  const b = require("fs").readFileSync(0), head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length);
+  let n = 0;
+  for (let i = 0; i < head[1] * head[2]; i++) if (Math.abs(px[i * 3] - 127) <= 10 && Math.abs(px[i * 3 + 1] - 227) <= 10 && Math.abs(px[i * 3 + 2] - 240) <= 10) n++;
+  console.log(n);')
+check "blueprint: the value draws in #7FE3F0 ($value_cyan px)" test "$value_cyan" -gt 15
+in_theme paper
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.63
+osd_reads 63
+check "paper: the OSD reads VOL, 13 lit bars and 63 in Instrument Serif" eval 'island | jq -e ".osd.word == \"VOL\" and .osd.bars == \"bars\" and .osd.lit == 13 and .osd.valueFont[0] == \"Instrument Serif\"" >/dev/null'
+in_theme artboard
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.64
+osd_reads 64
+check "artboard: the OSD draws its glyph and one rounded bar" eval 'island | jq -e ".osd.word == \"\" and .osd.bars == \"round\"" >/dev/null'
+until_ok 3000 mode_is rest
 one_timer() { shell_status | jq -e '.timers == 1' >/dev/null; }
 check "status reports timers 1 once the OSD has gone" one_timer
 
