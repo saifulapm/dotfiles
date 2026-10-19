@@ -1,6 +1,7 @@
 import Quickshell.Networking
 import QtQuick
 import "lib/control-net.mjs" as Lib
+import "lib/voice.mjs" as V
 
 // Control's Wi-Fi section: every Wi-Fi device's networks, from NetworkManager's own change events.
 Item {
@@ -8,6 +9,7 @@ Item {
 
     required property var theme
     property int selected: 0
+    readonly property var look: V.listLook(theme.tokens)
 
     readonly property var wifi: Networking.devices.values.filter(d => d.type === DeviceType.Wifi)
     readonly property var all: wifi.reduce((nets, d) => nets.concat(d.networks.values), [])
@@ -59,10 +61,10 @@ Item {
         id: line
         textFormat: Text.PlainText
         leftPadding: 20
-        text: section.wifi.length ? "↵ CONNECT · D FORGET" : "NO WI-FI"
-        color: section.theme.color.muted
-        font.family: section.theme.tokens ? section.theme.tokens.type.ui : ""
-        font.pixelSize: 10
-        font.letterSpacing: 1.2
+        text: section.look.tabText(section.wifi.length ? "↵ connect · d forget" : "No Wi-Fi")
+        color: section.look.small.color
+        font.family: section.look.small.font
+        font.pixelSize: section.look.small.size
+        font.letterSpacing: section.look.small.spacing
     }
 }

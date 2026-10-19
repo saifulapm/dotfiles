@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import "lib/control-system.mjs" as Lib
+import "lib/voice.mjs" as V
 
 // Control's Display section: the built-in panel by brightnessctl, external screens by ddcutil.
 Item {
@@ -9,6 +10,7 @@ Item {
 
     required property var theme
     property int selected: 0
+    readonly property var look: V.listLook(theme.tokens)
     property var panels: []
     property var externals: []
     readonly property var rows: panels.map(p => ({
@@ -74,10 +76,10 @@ Item {
         id: hint
         textFormat: Text.PlainText
         leftPadding: 20
-        text: "H/L BRIGHTNESS"
-        color: display.theme.color.muted
-        font.family: display.theme.tokens ? display.theme.tokens.type.ui : ""
-        font.pixelSize: 10
-        font.letterSpacing: 1.2
+        text: display.look.tabText("h/l brightness")
+        color: display.look.small.color
+        font.family: display.look.small.font
+        font.pixelSize: display.look.small.size
+        font.letterSpacing: display.look.small.spacing
     }
 }

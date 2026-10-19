@@ -170,19 +170,6 @@ Item {
                         }
                     }
                 }
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    text: "⇥ NEXT"
-                    color: c.muted
-                    font.family: fonts.ui
-                    font.pixelSize: 10
-                    font.letterSpacing: 1.2
-                }
             }
 
             Rule {

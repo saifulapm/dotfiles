@@ -1,6 +1,7 @@
 import Quickshell.Services.Pipewire
 import QtQuick
 import "lib/control.mjs" as Lib
+import "lib/voice.mjs" as V
 
 // Control's Audio section: every sink, then every source, from PipeWire's own change events.
 Item {
@@ -8,6 +9,7 @@ Item {
 
     required property var theme
     property int selected: 0
+    readonly property var look: V.listLook(theme.tokens)
 
     readonly property var all: Pipewire.nodes.values.filter(n => n.audio && !n.isStream)
     readonly property var nodes: all.filter(n => n.isSink).concat(all.filter(n => !n.isSink))
@@ -44,7 +46,8 @@ Item {
     function state() {
         return {
             defaultSink: defaultSink ? defaultSink.name : null,
-            defaultSource: defaultSource ? defaultSource.name : null
+            defaultSource: defaultSource ? defaultSource.name : null,
+            hint: hint.text
         };
     }
 
@@ -58,10 +61,10 @@ Item {
         id: hint
         textFormat: Text.PlainText
         leftPadding: 20
-        text: "H/L VOLUME · ↵ DEFAULT · M MUTE"
-        color: audio.theme.color.muted
-        font.family: audio.theme.tokens ? audio.theme.tokens.type.ui : ""
-        font.pixelSize: 10
-        font.letterSpacing: 1.2
+        text: audio.look.tabText("h/l volume · ↵ default · m mute")
+        color: audio.look.small.color
+        font.family: audio.look.small.font
+        font.pixelSize: audio.look.small.size
+        font.letterSpacing: audio.look.small.spacing
     }
 }

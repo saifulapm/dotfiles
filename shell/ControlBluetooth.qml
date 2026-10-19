@@ -1,6 +1,7 @@
 import Quickshell.Bluetooth
 import QtQuick
 import "lib/control-net.mjs" as Lib
+import "lib/voice.mjs" as V
 
 // Control's Bluetooth section: the default adapter's devices, from BlueZ's own change events.
 Item {
@@ -8,6 +9,7 @@ Item {
 
     required property var theme
     property int selected: 0
+    readonly property var look: V.listLook(theme.tokens)
 
     readonly property var all: Bluetooth.defaultAdapter ? Bluetooth.defaultAdapter.devices.values : []
     readonly property var devices: Lib.btOrder(all.map(d => ({
@@ -59,10 +61,10 @@ Item {
         id: hint
         textFormat: Text.PlainText
         leftPadding: 20
-        text: Bluetooth.defaultAdapter ? "↵ CONNECT · P PAIR · D FORGET" : "NO BLUETOOTH"
-        color: section.theme.color.muted
-        font.family: section.theme.tokens ? section.theme.tokens.type.ui : ""
-        font.pixelSize: 10
-        font.letterSpacing: 1.2
+        text: section.look.tabText(Bluetooth.defaultAdapter ? "↵ connect · p pair · d forget" : "No Bluetooth")
+        color: section.look.small.color
+        font.family: section.look.small.font
+        font.pixelSize: section.look.small.size
+        font.letterSpacing: section.look.small.spacing
     }
 }

@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import "lib/control-system.mjs" as Lib
+import "lib/voice.mjs" as V
 
 // Control's Route section: where agent questions ring, Do Not Disturb, and the sync details.
 Item {
@@ -13,6 +14,7 @@ Item {
     required property var sync
     readonly property var units: sync ? sync.units : ({})
     property int selected: 0
+    readonly property var look: V.listLook(theme.tokens)
     // phone or device, as workflow route last printed it; "" until it answers.
     property string to: ""
     // just dev points this at a fake, since workflow route tells every hub.
@@ -62,10 +64,10 @@ Item {
         id: hint
         textFormat: Text.PlainText
         leftPadding: 20
-        text: "↵ TOGGLE"
-        color: route.theme.color.muted
-        font.family: route.theme.tokens ? route.theme.tokens.type.ui : ""
-        font.pixelSize: 10
-        font.letterSpacing: 1.2
+        text: route.look.tabText("↵ toggle")
+        color: route.look.small.color
+        font.family: route.look.small.font
+        font.pixelSize: route.look.small.size
+        font.letterSpacing: route.look.small.spacing
     }
 }

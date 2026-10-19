@@ -3,6 +3,7 @@ import Quickshell.Io
 import Quickshell.Services.UPower
 import QtQuick
 import "lib/control-system.mjs" as Lib
+import "lib/voice.mjs" as V
 
 // Control's Power section: battery, profile, charge limit where the hardware has one, then the session actions, each but Lock waiting for y.
 Item {
@@ -10,6 +11,7 @@ Item {
 
     required property var theme
     property int selected: 0
+    readonly property var look: V.listLook(theme.tokens)
     // The action waiting for its y, or "".
     property string confirming: ""
     // The battery's end-of-charge threshold, or -1 where the hardware has none.
@@ -98,10 +100,10 @@ Item {
         id: hint
         textFormat: Text.PlainText
         leftPadding: 20
-        text: power.confirming !== "" ? (Lib.ACTIONS.find(a => a.id === power.confirming).title.toUpperCase() + "? Y CONFIRMS · ANY OTHER KEY CANCELS") : "↵ ACT · H/L PROFILE"
-        color: power.confirming !== "" ? power.theme.color.danger : power.theme.color.muted
-        font.family: power.theme.tokens ? power.theme.tokens.type.ui : ""
-        font.pixelSize: 10
-        font.letterSpacing: 1.2
+        text: power.look.tabText(power.confirming !== "" ? (Lib.ACTIONS.find(a => a.id === power.confirming).title + "? y confirms · any other key cancels") : "↵ act · h/l profile")
+        color: power.confirming !== "" ? power.theme.color.danger : power.look.small.color
+        font.family: power.look.small.font
+        font.pixelSize: power.look.small.size
+        font.letterSpacing: power.look.small.spacing
     }
 }
