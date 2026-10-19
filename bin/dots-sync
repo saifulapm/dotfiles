@@ -17,9 +17,8 @@ err=
 
 # A dead network must end in an error rather than hold the lock, so each call has rclone's timeouts and an outer one.
 rc() {
-  local out
-  if out=$(timeout 120 rclone --contimeout 10s --timeout 30s "$@" 2>&1); then return 0; fi
-  local code=$?
+  local out code
+  if out=$(timeout 120 rclone --contimeout 10s --timeout 30s "$@" 2>&1); then return 0; else code=$?; fi
   err=$(tail -n 1 <<<"$out")
   err=${err#[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] }
   [[ -n $err ]] || err="rclone $1 exited $code"
