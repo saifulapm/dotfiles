@@ -133,3 +133,8 @@ why = "fif and gwl pick from lists with it"
 name = "fd-find"
 arch = "all"
 why = "sweep finds node_modules and vendor dirs with it"
+
+[[package]]
+name = "gh"
+arch = "all"
+why = "git's credential helper, dots bump's release lookups and dots secrets' two accounts"
