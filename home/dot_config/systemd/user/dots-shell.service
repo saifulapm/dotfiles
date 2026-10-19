@@ -13,3 +13,5 @@ RestartSec=500ms
 Environment=QT_QPA_PLATFORMTHEME=
 # One render loop on the GUI thread shares a GL context across windows: 13 MiB less RSS, faster first frames.
 Environment=QSG_RENDER_LOOP=basic
+# Text falls back only to the themes' faces, never to the system sans (shell/fonts.conf).
+Environment=FONTCONFIG_FILE=%h/.config/quickshell/fonts.conf

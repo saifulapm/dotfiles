@@ -19,11 +19,19 @@ test('the dev unit restarts like the real one', () => {
   for (const p of ['Restart=always', 'RestartSec=500ms', 'StartLimitIntervalSec=0']) assert.match(dev, new RegExp(`-p ${p}\\b`));
 });
 
+// Each unit's shell dir is its own: the live config link, or the checkout or copy just dev runs.
+const shellDir = (env) => env.replace('%h/.config/quickshell/', '<shell>/').replace('$QS_CONFIG_PATH/', '<shell>/');
+
 test('the dev unit sets the same environment as the real one', () => {
-  const real = unitProps('Environment').sort();
-  const devEnv = [...dev.matchAll(/-E (\w+=\S*)/g)].map((m) => m[1]).sort();
+  const real = unitProps('Environment').map(shellDir).sort();
+  const devEnv = [...dev.matchAll(/-E (\w+=\S*)/g)].map((m) => shellDir(m[1])).sort();
   assert.deepEqual(devEnv, real);
   assert.ok(real.includes('QSG_RENDER_LOOP=basic'));
+});
+
+test("both units give the shell its own fontconfig, from the shell dir it runs", () => {
+  assert.deepEqual(unitProps('Environment').filter((e) => e.startsWith('FONTCONFIG_FILE=')), ['FONTCONFIG_FILE=%h/.config/quickshell/fonts.conf']);
+  assert.match(dev, /-E FONTCONFIG_FILE=\$QS_CONFIG_PATH\/fonts\.conf\b/);
 });
 
 const userUnit = (name) => readFileSync(root + 'home/dot_config/systemd/user/' + name, 'utf8');
