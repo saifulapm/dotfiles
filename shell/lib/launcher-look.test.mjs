@@ -80,3 +80,11 @@ test('each prefix the apps footer names opens its mode', () => {
   const prefixes = look('artboard').legend('apps').keys.map((k) => k.key);
   assert.deepEqual(prefixes.map((p) => parseQuery(p + ' x').mode), ['windows', 'clipboard', 'emoji', 'calculator', 'commands']);
 });
+
+test('a name cannot reorder itself with bidi controls, so it draws in the order it is spelt', () => {
+  for (const n of ['paper', 'artboard', 'blueprint']) {
+    const l = look(n);
+    assert.equal(l.title('Zf ‮evil'), n === 'blueprint' ? 'ZF EVIL' : 'Zf evil', n);
+    assert.equal(l.detailText('⁧RTLover⁩'), n === 'blueprint' ? 'RTLOVER' : 'RTLover', n);
+  }
+});

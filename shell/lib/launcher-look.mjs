@@ -13,8 +13,10 @@ const ARTBOARD = { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6' };
 // An open can come before the theme's tokens load; until then the launcher draws in black and white.
 const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '', voice: 'caps' } };
 
-const upper = (s) => (s || '').toUpperCase();
-const same = (s) => s || '';
+// Bidi embedding, override and isolate controls, which let an app's name redraw itself in another order.
+const BIDI = /[\u202A-\u202E\u2066-\u2069]/g;
+const same = (s) => (s || '').replace(BIDI, '');
+const upper = (s) => same(s).toUpperCase();
 
 export function launcherLook(tokens) {
   const c = (tokens || UNTHEMED).color;
