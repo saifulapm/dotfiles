@@ -71,13 +71,24 @@ test('with ~/.ssh changed on both sides, b stops with exit 3 and changes neither
   assert.deepEqual(blob(w), before.remote);
   const s = status(b).ssh;
   assert.equal(s.ok, false);
-  assert.match(s.error, /^conflict: ~\/\.ssh changed here and on a since the last sync; run dots sync --adopt local or --adopt remote$/);
+  assert.match(s.error, /^conflict, run dots sync --adopt local or remote: ~\/\.ssh changed here and on a since the last sync$/);
+  // Route cuts an error at 60 characters, so the fix comes first.
+  assert.match(s.error.slice(0, 59), /--adopt local or remote/);
 
   await ok(b, ['--adopt', 'remote']);
   assert.deepEqual(tree(b), tree(a));
   assert.equal(readFileSync(join(sshDir(b), 'known_hosts'), 'utf8'), 'hosts seen by b\n');
   await ok(b);
   assert.equal(status(b).ssh.ok, true);
+});
+
+test('when another machine pushes right after a, a does not take its own push as agreed, and its next round stops', async () => {
+  const { w, a } = await agreed();
+  put(a, 'config', 'Host nuc\n');
+  await ok(machine(w, 'a', { racer: true }), ['--only', 'ssh']);
+  const r = await sync(a, ['--only', 'ssh']);
+  assert.equal(r.code, 3, r.stdout + r.stderr);
+  assert.equal(readFileSync(join(sshDir(a), 'config'), 'utf8'), 'Host nuc\n');
 });
 
 test('DOTS_AGE_IDENTITY names the key, so a missing one skips the ssh unit even when key.txt exists', async () => {

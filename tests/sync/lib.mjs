@@ -27,11 +27,22 @@ function slowShim(root) {
   return dir;
 }
 
-// opts.conf replaces the world's rclone.conf; opts.slow puts the slow rclone first on PATH.
+// A shim rclone that, after any push of the ssh meta, puts another machine's meta over it, as if b pushed a moment later.
+function racerShim(w) {
+  const real = process.env.PATH.split(delimiter).map((d) => join(d, 'rclone')).find((p) => existsSync(p));
+  const dir = join(w.root, 'racer');
+  mkdirSync(dir, { recursive: true });
+  const meta = join(w.remote, 'qshell-sync/ssh/ssh.meta.json');
+  writeFileSync(join(dir, 'rclone'), `#!/bin/sh\n${real} "$@" || exit\ncase " $* " in *" copyto "*"/ssh.meta.json ") echo '{"hash":"f00","machine":"b","when":"later"}' > ${meta} ;; esac\n`);
+  chmodSync(join(dir, 'rclone'), 0o755);
+  return dir;
+}
+
+// opts.conf replaces the world's rclone.conf; opts.slow puts the slow rclone first on PATH; opts.racer the racing one.
 export function machine(w, id, opts = {}) {
   const home = join(w.root, id);
   const env = {
-    PATH: (opts.slow ? slowShim(w.root) + delimiter : '') + process.env.PATH,
+    PATH: (opts.slow ? slowShim(w.root) + delimiter : '') + (opts.racer ? racerShim(w) + delimiter : '') + process.env.PATH,
     HOME: home,
     XDG_CONFIG_HOME: join(home, '.config'),
     XDG_DATA_HOME: join(home, '.local/share'),

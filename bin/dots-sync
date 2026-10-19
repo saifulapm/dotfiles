@@ -117,6 +117,9 @@ ssh_push() {
   fi
   jq -n --arg hash "$hash" --arg machine "$machine" --arg when "$(date -Is)" '{hash:$hash, machine:$machine, when:$when}' >"$meta"
   rc copyto "$blob" "$ssh_remote/ssh.age" && rc copyto "$meta" "$ssh_remote/ssh.meta.json" || return
+  # Two machines whose rounds overlap can both push; only a push still on Dropbox after it becomes the base, so the loser's next round stops instead of pulling over its change.
+  rc copyto "$ssh_remote/ssh.meta.json" "$tmp/ssh/pushed.meta.json" || return
+  [[ $(jq -r '.hash // ""' "$tmp/ssh/pushed.meta.json" 2>/dev/null) == "$hash" ]] || return 0
   echo "$hash" >"$ssh_state/base.hash"
 }
 
@@ -210,9 +213,9 @@ sync_ssh() {
     return
   fi
   if [[ -z $base ]]; then
-    err="conflict: ~/.ssh here was never synced and differs from the one ${remote_machine:-another machine} put on Dropbox; run dots sync --adopt local or --adopt remote"
+    err="conflict, run dots sync --adopt local or remote: ~/.ssh here was never synced and differs from the one ${remote_machine:-another machine} put on Dropbox"
   else
-    err="conflict: ~/.ssh changed here and on ${remote_machine:-another machine} since the last sync; run dots sync --adopt local or --adopt remote"
+    err="conflict, run dots sync --adopt local or remote: ~/.ssh changed here and on ${remote_machine:-another machine} since the last sync"
   fi
   return 3
 }
