@@ -3,11 +3,11 @@ import Quickshell.Io
 import Quickshell.Services.Polkit
 import QtQuick
 
-// The polkit agent; it registers as the shell starts and shows its prompt in the Surfaces window.
+// The polkit agent; it registers right after the paper's first frame and shows its prompt in the Surfaces window.
 Scope {
     id: polkit
 
-    // The shell's LazyLoader of the Surfaces window.
+    // The shell's loader of the Surfaces window (active, item).
     required property var surfaces
     readonly property var prompt: surfaces.item?.polkit ?? null
 

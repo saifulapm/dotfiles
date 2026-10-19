@@ -9,7 +9,7 @@ Scope {
     id: idle
 
     required property var lock
-    // The shell's LazyLoader of the Surfaces window.
+    // The shell's loader of the Surfaces window (active, item).
     required property var surfaces
     property var times: Lib.TIMES
     // How often a step asked niri to turn the monitors off, so a check can see the request.
