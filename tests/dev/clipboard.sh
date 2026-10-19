@@ -70,8 +70,8 @@ until_ok 3000 listed after
 check "a clip offered with x-kde-passwordManagerHint is not stored" not_listed secret
 
 n=$(count)
-head -c 10000001 /dev/zero | tr '\0' a | store
-check "a clip of 10 MB and 1 byte is not stored" test "$(count)" = "$n"
+head -c 5000001 /dev/zero | tr '\0' a | store
+check "a clip of 5 MB and 1 byte is not stored" test "$(count)" = "$n"
 
 printf old | store
 check "the store script keeps a plain clip" listed old

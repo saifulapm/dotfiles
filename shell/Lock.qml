@@ -106,9 +106,17 @@ Scope {
         onLoaded: session.locked = true
     }
 
+    // PAM's other service refuses every password, so with no dots-lock installed the lock uses login rather than shutting the user out.
+    FileView {
+        id: pamService
+        path: pam.configDirectory + "/dots-lock"
+        blockLoading: true
+        printErrors: false
+    }
+
     PamContext {
         id: pam
-        config: "dots-lock"
+        config: pamService.loaded ? "dots-lock" : "login"
         configDirectory: Quickshell.env("DOTS_PAM_DIR") || "/etc/pam.d"
         // A second prompt gets an empty answer, which no password matches.
         onPamMessage: {

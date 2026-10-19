@@ -100,4 +100,19 @@ type_enter dots-test-pass
 until_ok 3000 state_is '.locked == false'
 check "the test password unlocks the restarted shell" state_is '.locked == false'
 
+# With no dots-lock service the lock falls back to login, since PAM's other service would refuse every password.
+mv "$DOTS_PAM_DIR/dots-lock" "$DOTS_PAM_DIR/login"
+old=$(shell_pid)
+systemctl --user restart "$DOTS_DEV_UNIT"
+until_ok 5000 bash -c "[ \"\$(systemctl --user show -p MainPID --value $DOTS_DEV_UNIT)\" != $old ]"
+until_ok 5000 state_is '.locked == false'
+mod_escape
+until_ok 3000 locked_shown
+type_enter wrong-password
+until_ok 3000 state_is '.failures >= 1'
+check "without dots-lock, a wrong password still leaves it locked" state_is '.locked and .failures >= 1'
+type_enter dots-test-pass
+until_ok 3000 state_is '.locked == false'
+check "without dots-lock, the password unlocks through login" state_is '.locked == false'
+
 exit $((fails > 0))

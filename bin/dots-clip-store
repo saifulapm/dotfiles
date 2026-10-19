@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# wl-paste --watch runs this with each copy on stdin; cliphist keeps no times and no 10 MB cap, so this adds both.
+# wl-paste --watch runs this with each copy on stdin; cliphist keeps no times, so this logs them, and it drops a clip over cliphist's own 5 MB cap before storing.
 set -euo pipefail
 
 dir=${XDG_STATE_HOME:-$HOME/.local/state}/dots
 db=$dir/clips.db times=$dir/clip-times stamp=$dir/clip-pruned
-max=10000000
+max=5000000
 clip() { cliphist -db-path "$db" "$@"; }
 newest() { [ ! -e "$db" ] || clip list | awk -F'\t' 'NR == 1 { print $1 }'; }
 
