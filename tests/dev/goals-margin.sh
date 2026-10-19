@@ -54,8 +54,7 @@ until_ok 3000 no_goal
 echo "     margins: $(margins | jq -c .right)"
 check "with no active goals the margin starts with the Wi-Fi text" no_goal
 
-# A goal title can arrive by sync at any length; the margin cuts it short of the island, so the left half stays bare paper.
-# The strip ends where the left margin's room ends, 8 px short of the island: past the island the right margin's words may sit.
+# A goal title can arrive by sync at any length and is cut short of the island; the strip ends 8 px short of the island too, since past it the right margin's words may sit.
 line_end=$(margins | jq '.drawn.lineEnd | floor')
 strip() { grim -s 1 -t ppm -g "100,12 $((line_end - 100))x24" - | mean_rgb; }
 bare=$(strip)
