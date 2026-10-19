@@ -444,3 +444,8 @@ why = "runs the kakoune pin's build"
 name = "cargo"
 arch = "all"
 why = "builds the kakoune-lsp pin, which has no aarch64 Linux release"
+
+[[package]]
+name = "helix"
+arch = "all"
+why = "its runtime holds the tree-sitter grammars the kakoune fork highlights with"

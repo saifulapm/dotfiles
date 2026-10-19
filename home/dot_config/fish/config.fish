@@ -6,6 +6,7 @@ set -g fish_greeting
 
 set -gx EDITOR kak
 set -gx VISUAL kak
+set -gx HELIX_RUNTIME /usr/lib64/helix/runtime
 # Without it composer prefers a legacy ~/.composer when one exists.
 set -gx COMPOSER_HOME ~/.config/composer
 
