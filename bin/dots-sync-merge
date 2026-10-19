@@ -39,13 +39,21 @@ function round(model, path, others) {
   return true;
 }
 
+// A record stamped more than a day ahead of this clock would win every merge from now on, so a pulled file's such records are left out.
+function recent(unit, store) {
+  const limit = Date.now() + 24 * 3600000;
+  const ok = (x) => x.updatedAt <= limit;
+  if (unit === 'notes') return Object.assign({}, store, { notes: store.notes.filter(ok) });
+  return Object.assign({}, store, { goals: store.goals.filter(ok).map((g) => Object.assign({}, g, { tasks: g.tasks.filter(ok) })) });
+}
+
 function merge(unit, path, files) {
   const model = { notes, goals }[unit];
   const others = [];
   // This machine's own remote file is merged too, so a reinstall with no local store gets its goals and notes back before its first push.
   for (const f of files) {
     const store = model.parseStore(read(f));
-    if (store) others.push(store);
+    if (store) others.push(recent(unit, store));
     else process.stderr.write(`${unit}: skipped ${basename(f)}, which does not parse\n`);
   }
   for (let i = 0; i < 3; i++) if (round(model, path, others)) return;

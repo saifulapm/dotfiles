@@ -47,6 +47,21 @@ test('a machine that lost its local store gets its own goals back from the remot
   assert.deepEqual(G.activeGoals(goals(a)).map((g) => g.title), ['only on a']);
 });
 
+test('a pulled goal or note stamped more than a day ahead is ignored, so it cannot outvote every later edit', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  const FAR = 9999999999999;
+  const forged = G.editGoal(G.addGoal(G.emptyStore(), 'mine', null, T, 'g1'), 'g1', 'forged', null, FAR);
+  write(goalsPath(a), forged);
+  write(notesPath(a), N.deleteNotes(withN1('kept'), ['n1'], FAR));
+  write(goalsPath(b), G.addGoal(G.emptyStore(), 'mine', null, T, 'g1'));
+  write(notesPath(b), withN1('kept'));
+  await ok(a);
+  await ok(b);
+  assert.deepEqual(G.activeGoals(goals(b)).map((g) => g.title), ['mine']);
+  assert.deepEqual(N.sectionNotes(notes(b), 'inbox').map((n) => n.text), ['kept']);
+});
+
 test('a note edited on both machines offline ends with the later edit on both', async () => {
   const w = world();
   const [a, b] = [machine(w, 'a'), machine(w, 'b')];
