@@ -60,7 +60,7 @@ ShellRoot {
                 theme: themeService.name,
                 outputs: Quickshell.screens.map(s => s.name),
                 loaded: Root.State.loaded,
-                sync: {},
+                sync: deskLoader.item ? deskLoader.item.sync.units : {},
                 rssKiB: Status.rssKiB(procStatus.text()),
                 timers: Root.State.timers(),
                 firstFrameMs: root.firstFrameMs
@@ -179,6 +179,7 @@ ShellRoot {
             themeList: root.themeList
             notifs: notifsService
             goals: deskLoader.item ? deskLoader.item.goals : null
+            sync: deskLoader.item ? deskLoader.item.sync : null
         }
     }
 

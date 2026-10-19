@@ -9,6 +9,9 @@ Item {
 
     required property var theme
     required property var notifs
+    // The Desk's sync service, null until the Desk loads.
+    required property var sync
+    readonly property var units: sync ? sync.units : ({})
     property int selected: 0
     // phone or device, as workflow route last printed it; "" until it answers.
     property string to: ""
@@ -20,10 +23,7 @@ Item {
         }, {
             title: "Do Not Disturb",
             detail: notifs.dnd ? "on" : "off"
-        }, {
-            title: "Sync",
-            detail: "no rounds yet"
-        }]
+        }].concat(Lib.syncRows(units))
 
     function key(event) {
         if (event.key !== Qt.Key_Return && event.key !== Qt.Key_Enter)
@@ -38,7 +38,8 @@ Item {
     }
 
     function state() {
-        return { route: to, dnd: notifs.dnd };
+        // details are the rows' text as drawn, errors cut short; sync holds them whole.
+        return { route: to, dnd: notifs.dnd, sync: units, details: rows.map(r => r.detail) };
     }
 
     implicitHeight: hint.implicitHeight

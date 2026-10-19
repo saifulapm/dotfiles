@@ -12,6 +12,8 @@ PanelWindow {
     required property var notifs
     // The Desk's goals service, null until the Desk loads.
     required property var goals
+    // The Desk's sync service, null until the Desk loads.
+    required property var sync
     readonly property var launcher: launcherLoader.item
     readonly property var themes: themesLoader.item
     readonly property var notifications: notifsLoader.item
@@ -153,6 +155,7 @@ PanelWindow {
         sourceComponent: Root.Control {
             theme: host.theme
             notifs: host.notifs
+            sync: host.sync
         }
     }
 
