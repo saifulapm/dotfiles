@@ -70,3 +70,9 @@ test('the calculator row is the formatted result, copied on Enter', () => {
   assert.deepEqual(calcRows('1440 * 1.25').map((r) => [r.title, r.copy]), [['1800', '1800']]);
   assert.deepEqual(calcRows('2 +'), []);
 });
+
+test('a window row keeps the icon its window was given, and calculator and command rows carry their prefix as a glyph', () => {
+  assert.equal(windowRows([{ id: 1, title: 'a', app_id: 'foot', icon: 'image://icon/foot' }], '')[0].icon, 'image://icon/foot');
+  assert.equal(calcRows('1 + 1')[0].glyph, '=');
+  assert.equal(commandRows('lock')[0].glyph, '>');
+});

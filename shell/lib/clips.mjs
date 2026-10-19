@@ -19,6 +19,7 @@ export function clipRows(text, q, db) {
       return {
         title: image ? 'image · ' + image[1] : preview,
         detail: '',
+        glyph: image ? '◫' : '¶',
         id,
         exec: ['sh', '-c', PASTE, 'sh', db, id, TERMINALS.join(' ')],
       };

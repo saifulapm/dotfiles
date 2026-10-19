@@ -49,3 +49,8 @@ test('the emoji reaches the shell as an argument, never inside the script', () =
   assert.equal(row.exec[0], 'sh');
   assert.ok(!row.exec[2].includes('🔥'));
 });
+
+test('an emoji row carries its emoji as a glyph and its name alone as a bare title', () => {
+  const [row] = emojiRows([['🔥', 'fire', 'Travel & Places']], 'fire');
+  assert.deepEqual([row.glyph, row.bare], ['🔥', 'fire']);
+});

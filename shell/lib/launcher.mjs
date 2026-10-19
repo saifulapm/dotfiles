@@ -29,7 +29,7 @@ export function parseQuery(text) {
   return mode ? { mode, q: text.slice(2) } : { mode: 'apps', q: text };
 }
 
-// A row is {title, detail, exec?: argv run detached, copy?: text for wl-copy}; a mode adds one function returning rows.
+// A row is {title, detail, exec?: argv run detached, copy?: text for wl-copy, icon?, glyph?}; a mode adds one function returning rows.
 const rows = (entries, q) => rank(entries, q).map((e) => e.row);
 
 // Matches on the window title, then its app_id as a keyword.
@@ -41,6 +41,7 @@ export function windowRows(windows, q) {
       row: {
         title: w.title || '',
         detail: w.app_id || '',
+        icon: w.icon,
         id: w.id,
         exec: ['niri', 'msg', 'action', 'focus-window', '--id', String(w.id)],
       },
@@ -57,12 +58,12 @@ const COMMANDS = [
 ];
 
 export function commandRows(q) {
-  return rows(COMMANDS.map((c) => ({ name: c.title, keywords: [], row: c })), q);
+  return rows(COMMANDS.map((c) => ({ name: c.title, keywords: [], row: Object.assign({ glyph: '>' }, c) })), q);
 }
 
 export function calcRows(q) {
   const v = calc(q);
   if (v === null) return [];
   const text = format(v);
-  return [{ title: text, detail: q.trim(), copy: text }];
+  return [{ title: text, detail: q.trim(), copy: text, glyph: '=' }];
 }

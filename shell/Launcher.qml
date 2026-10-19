@@ -82,6 +82,12 @@ Item {
         }
     }
 
+    // A window's icon is its app's desktop entry icon, else the theme's icon named by its app_id.
+    function iconFor(appId) {
+        const app = apps.find(a => a.id.toLowerCase() === appId.toLowerCase());
+        return app ? app.icon : appId ? Quickshell.iconPath(appId, true) : "";
+    }
+
     function listClips() {
         if (!clipper.running)
             clipper.running = true;
@@ -137,7 +143,7 @@ Item {
             label: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             count: found.length,
             countText: (look.label.kind === "header" ? headerCount : chipCount).text,
-            slots: rows.map((r, i) => look.slot === "number" ? look.number(i) : look.slot === "marker" ? "▸" : r.icon || "tile"),
+            slots: rows.map((r, i) => look.slot === "number" ? look.number(i) : look.slot === "marker" ? "▸" : r.icon || r.glyph || "tile"),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? { x: p.x, y: p.y, w: cur.width, h: cur.height } : null,
             cursorElided: cur ? cur.elided : null,
@@ -176,7 +182,9 @@ Item {
         }
         onExited: code => {
             try {
-                launcher.windowList = JSON.parse(listed.text);
+                launcher.windowList = JSON.parse(listed.text).map(w => Object.assign({
+                            icon: launcher.iconFor(w.app_id || "")
+                        }, w));
             } catch (e) {
                 console.warn("launcher: niri windows exited " + code + ": " + e.message);
             }
@@ -440,7 +448,7 @@ Item {
                                         font.bold: look.slot === "number" && current
                                     }
 
-                                    // An app's own icon at 32 px, or a plain tile when its theme lacks one.
+                                    // An app's own icon at 32 px, else a tile holding the row's glyph, or a plain tile when it has neither.
                                     Rectangle {
                                         visible: look.slot === "icon"
                                         implicitWidth: look.tile.size
@@ -455,6 +463,15 @@ Item {
                                             sourceSize.height: look.tile.size
                                             asynchronous: true
                                         }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            visible: !modelData.icon && !!modelData.glyph
+                                            textFormat: Text.PlainText
+                                            text: modelData.glyph ?? ""
+                                            color: c.ink
+                                            font.family: fonts.mono
+                                            font.pixelSize: 16
+                                        }
                                     }
 
                                     GridLayout {
@@ -468,7 +485,8 @@ Item {
                                             id: title
                                             textFormat: Text.PlainText
                                             Layout.fillWidth: true
-                                            text: look.title(modelData.title)
+                                            // Where the slot shows the row's glyph, the title drops it.
+                                            text: look.title(look.slot === "icon" && modelData.bare ? modelData.bare : modelData.title)
                                             elide: Text.ElideRight
                                             color: current ? look.cursor.text : look.name.color
                                             font.family: look.name.font

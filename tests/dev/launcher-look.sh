@@ -105,6 +105,40 @@ for m in "w " "v " ": " "= " "> "; do
   close_launcher
 done
 
+# Every mode draws its rows in the theme's look.
+in_theme blueprint
+niri msg action spawn -- qs ipc call launcher mode clipboard
+until_ok 3000 state_is '.open and .mode == "clipboard"'
+check "blueprint: Mod+V shows a header reading LAUNCH // CLIPBOARD ($(launcher_state | jq -c .label))" state_is '.label == "LAUNCH // CLIPBOARD"'
+close_launcher
+
+in_theme artboard
+open_launcher
+wtype ": fire"
+until_ok 3000 state_is '.results[0] == "🔥 fire" and .cursorBox != null'
+check "artboard: : fire shows 🔥 in the first row's icon slot ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "🔥"'
+flame=$(near "$(cursor_geo 12 12 32 32)" 245 130 40 60)
+check "artboard: the flame's colours show in the slot ($flame px)" test "$flame" -gt 20
+close_launcher
+
+for t in paper artboard blueprint; do
+  in_theme "$t"
+  open_launcher
+  wtype "= 1440*1.25"
+  until_ok 3000 state_is '.mode == "calculator" and .results == ["1800"]'
+  check "$t: = 1440*1.25 shows 1800 as the first row" state_is '.results[0] == "1800" and .label != ""'
+  close_launcher
+done
+
+in_theme artboard
+niri msg action spawn -- foot
+until_ok 5000 bash -c 'niri msg -j windows | jq -e "any(.[]; .app_id == \"foot\")" >/dev/null'
+open_launcher
+wtype "w "
+until_ok 3000 state_is '.mode == "windows" and (.results | length) >= 1'
+check "artboard: a foot window's row draws foot's icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
+close_launcher
+
 in_theme paper
 exit $((fails > 0))
 }

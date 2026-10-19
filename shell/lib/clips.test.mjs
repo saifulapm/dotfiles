@@ -37,3 +37,7 @@ test('a terminal pastes on Ctrl+Shift+V and every other window on Ctrl+V', () =>
   assert.match(script, /wtype -M ctrl -k v -m ctrl/);
   assert.ok(TERMINALS.includes('foot'));
 });
+
+test('each clip carries a glyph for its type: ¶ for text, ◫ for an image', () => {
+  assert.deepEqual(clipRows(list, '', db).map((r) => r.glyph), ['¶', '◫', '¶']);
+});

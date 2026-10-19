@@ -23,5 +23,5 @@ export function emojiRows(list, q) {
   return rank(
     list.map((e) => ({ name: e[1], keywords: [e[2]], e })),
     q,
-  ).map((x) => ({ title: x.e[0] + ' ' + x.e[1], detail: x.e[2], exec: ['sh', '-c', TYPE, 'sh', x.e[0]] }));
+  ).map((x) => ({ title: x.e[0] + ' ' + x.e[1], bare: x.e[1], glyph: x.e[0], detail: x.e[2], exec: ['sh', '-c', TYPE, 'sh', x.e[0]] }));
 }
