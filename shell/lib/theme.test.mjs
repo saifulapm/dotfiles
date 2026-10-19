@@ -161,6 +161,37 @@ test('Blueprint frames the focused window in cyan, the others in #2E5A72, and gl
   assert.match(kdl, /geometry-corner-radius 0/);
 });
 
+test('each theme\'s fragment times every animation from its motion', () => {
+  const block = (kdl, name) => kdl.match(new RegExp(`\\n    ${name} \\{\\n([\\s\\S]*?)\\n    \\}`))?.[1].trim().split(/\s*\n\s*/);
+  const paper = renderNiri(load('paper'));
+  assert.deepEqual(block(paper, 'workspace-switch'), ['spring damping-ratio=1.0 stiffness=1200 epsilon=0.0001']);
+  assert.deepEqual(block(paper, 'window-close'), ['duration-ms 100', 'curve "ease-out-quad"']);
+  const blueprint = renderNiri(load('blueprint'));
+  assert.deepEqual(block(blueprint, 'window-movement'), ['duration-ms 150', 'curve "linear"']);
+  assert.deepEqual(block(blueprint, 'exit-confirmation-open-close'), ['duration-ms 150', 'curve "linear"']);
+  const artboard = renderNiri(load('artboard'));
+  assert.deepEqual(block(artboard, 'config-notification-open-close'), ['spring damping-ratio=0.6 stiffness=1000 epsilon=0.0001']);
+  assert.deepEqual(block(artboard, 'screenshot-ui-open'), ['duration-ms 200', 'curve "ease-out-cubic"']);
+  for (const kdl of [paper, blueprint, artboard]) {
+    for (const name of ['window-open', 'window-close', 'workspace-switch', 'horizontal-view-movement', 'window-movement', 'window-resize',
+      'overview-open-close', 'screenshot-ui-open', 'config-notification-open-close', 'exit-confirmation-open-close']) {
+      assert.ok(block(kdl, name), `${name} is set`);
+    }
+  }
+});
+
+test('a motion outside the three boards keeps one open and close curve and leaves the rest to niri', () => {
+  const t = load('paper');
+  t.primitive.motion = 'ease';
+  const kdl = renderNiri(t);
+  assert.match(kdl, /window-open \{\s*duration-ms 200\s*curve "ease-out-cubic"\s*\}/);
+  assert.doesNotMatch(kdl, /workspace-switch|window-movement/);
+});
+
+test('no rendered fragment slows niri\'s animations; slowdown belongs to the nested test config', () => {
+  for (const name of ['paper', 'artboard', 'blueprint']) assert.doesNotMatch(renderNiri(load(name)), /slowdown/);
+});
+
 test('a theme without shadow keys gets no shadow', () => {
   const t = load('paper');
   delete t.niri.shadow_color;

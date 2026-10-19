@@ -68,6 +68,48 @@ const CURVES = {
   linear: 'duration-ms 150\n        curve "linear"',
 };
 
+const spring = (d, k) => `spring damping-ratio=${d} stiffness=${k} epsilon=0.0001`;
+const eased = (ms, curve) => `duration-ms ${ms}\n        curve "${curve}"`;
+// Every animation's timing for the three motions the Motion boards draw (agent #W2A0F2JH); another motion keeps CURVES for open and close only.
+const MOTION = {
+  snappy: {
+    'window-open': eased(140, 'ease-out-expo'),
+    'window-close': eased(100, 'ease-out-quad'),
+    'workspace-switch': spring('1.0', 1200),
+    'horizontal-view-movement': spring('1.0', 1000),
+    'window-movement': spring('1.0', 1000),
+    'window-resize': spring('1.0', 1000),
+    'overview-open-close': eased(160, 'ease-out-expo'),
+    'screenshot-ui-open': eased(120, 'ease-out-expo'),
+    'config-notification-open-close': spring('1.0', 1000),
+    'exit-confirmation-open-close': spring('1.0', 1000),
+  },
+  spring: {
+    'window-open': spring(0.72, 380),
+    'window-close': eased(160, 'ease-out-quad'),
+    'workspace-switch': spring(0.85, 600),
+    'horizontal-view-movement': spring(0.9, 700),
+    'window-movement': spring(0.8, 600),
+    'window-resize': spring(0.85, 600),
+    'overview-open-close': spring(0.85, 600),
+    'screenshot-ui-open': eased(200, 'ease-out-cubic'),
+    'config-notification-open-close': spring(0.6, 1000),
+    'exit-confirmation-open-close': spring(0.6, 1000),
+  },
+  linear: {
+    'window-open': eased(220, 'linear'),
+    'window-close': eased(160, 'linear'),
+    'workspace-switch': eased(200, 'ease-out-cubic'),
+    'horizontal-view-movement': eased(200, 'ease-out-cubic'),
+    'window-movement': eased(150, 'linear'),
+    'window-resize': eased(150, 'linear'),
+    'overview-open-close': eased(180, 'linear'),
+    'screenshot-ui-open': eased(150, 'linear'),
+    'config-notification-open-close': eased(150, 'linear'),
+    'exit-confirmation-open-close': eased(150, 'linear'),
+  },
+};
+
 export function renderNiri(t) {
   const c = t.color;
   const n = t.niri;
@@ -88,7 +130,9 @@ export function renderNiri(t) {
     ].join('\n')
     : 'shadow {\n        off\n    }';
   const radius = t.primitive.corner === 'round' ? 14 : 0;
-  const curve = CURVES[t.primitive.motion];
+  const motion = MOTION[t.primitive.motion]
+    ?? { 'window-open': CURVES[t.primitive.motion], 'window-close': CURVES[t.primitive.motion] };
+  const animations = Object.entries(motion).map(([name, timing]) => `    ${name} {\n        ${timing}\n    }`).join('\n');
   return `layout {
     gaps ${t.niri.gaps}
     background-color "${c.paper}"
@@ -112,12 +156,7 @@ window-rule {
 }
 
 animations {
-    window-open {
-        ${curve}
-    }
-    window-close {
-        ${curve}
-    }
+${animations}
 }
 `;
 }
