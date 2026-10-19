@@ -20,7 +20,7 @@ hotkey-overlay {
     skip-at-startup
 }
 
-// The MacBook's built-in screen at 1.2; niri would pick 1.75 for its 2560x1600.
+// The MacBook's built-in screen at 1.25 (logical 2048x1280); niri would pick 1.75 for its 2560x1600.
 output "eDP-1" {
-    scale 1.2
+    scale 1.25
 }
