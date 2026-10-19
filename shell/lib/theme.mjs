@@ -148,6 +148,25 @@ vec4 close_color(vec3 coords_geo, vec3 size_geo) {
     return dots_tex(c);
 }`,
   }),
+  spring: () => ({
+    // From 96% around its centre and 8 px low, overshooting with the spring, faded in over the first 60%.
+    open: `${TEX}
+vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+    float s = 0.96 + 0.04 * niri_progress;
+    vec3 c = vec3((coords_geo.xy - vec2(0.5)) / s + vec2(0.5), 1.0);
+    c.y -= 8.0 * (1.0 - niri_progress) / size_geo.y;
+    return dots_tex(c) * clamp(niri_clamped_progress / 0.6, 0.0, 1.0);
+}`,
+    // Shrinks to 96%, sinks 8 px and fades.
+    close: `${TEX}
+vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+    float p = niri_clamped_progress;
+    float s = 1.0 - 0.04 * p;
+    vec3 c = vec3((coords_geo.xy - vec2(0.5)) / s + vec2(0.5), 1.0);
+    c.y -= 8.0 * p / size_geo.y;
+    return dots_tex(c) * (1.0 - p);
+}`,
+  }),
   linear: (c) => {
     const pen = glslColor(c.accent);
     return {

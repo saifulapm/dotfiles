@@ -208,6 +208,13 @@ test('Paper drops its windows in whole and lifts them out, 8 px either way, with
   for (const glsl of [shader('window-open'), shader('window-close')]) assert.doesNotMatch(glsl, /\* p;|\* \(1\.0 - p\);/);
 });
 
+test('Artboard springs its windows up from 96% and fades them in, and shrinks, sinks and fades them out', () => {
+  const kdl = renderNiri(load('artboard'));
+  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
+  assert.match(shader('window-open'), /vec4 open_color[\s\S]*0\.96 \+ 0\.04 \* niri_progress[\s\S]*niri_clamped_progress \/ 0\.6/);
+  assert.match(shader('window-close'), /vec4 close_color[\s\S]*1\.0 - 0\.04 \* p[\s\S]*\* \(1\.0 - p\)/);
+});
+
 test('a motion no board draws keeps niri\'s own open and close', () => {
   const t = load('blueprint');
   t.primitive.motion = 'typewriter';

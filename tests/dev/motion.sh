@@ -9,10 +9,11 @@ printf 'animations {\n    slowdown 20\n}\n' >>"$DOTS_DEV_DIR/niri.kdl"
 window_count() { niri msg -j windows | jq length; }
 has_windows() { [ "$(window_count)" = "$1" ]; }
 
-# Opens the magenta foot and sets t0 to the moment niri lists it, which is when its open starts.
+# Opens the magenta foot, its cursor hidden, and sets t0 to the moment niri lists it, which is when its open starts.
 t0=0
 open_magenta() {
-  niri msg action spawn -- foot -c /dev/null -o colors-dark.background=ff00ff -o colors-light.background=ff00ff sleep 600 >/dev/null
+  niri msg action spawn -- foot -c /dev/null -o colors-dark.background=ff00ff -o colors-light.background=ff00ff \
+    sh -c 'printf "\033[?25l"; exec sleep 600' >/dev/null
   until_ok 5000 has_windows 1 || return 1
   t0=$(now_ms)
 }
@@ -121,7 +122,34 @@ paper() {
   until_ok 8000 has_windows 0
 }
 
+artboard() {
+  local x y w h t
+  theme artboard
+  check "artboard: a resting magenta window is found" calibrate || return
+  read -r x y w h <<<"$box"
+  # The magenta's own box corner lies outside the 14 px radius and its 2 px ring, so it reads the paper's grey (a dot or the shadow may darken it), never magenta or the blue ring.
+  local corner='
+    const grey = (c) => Math.max(...c) - Math.min(...c) < 24;
+    let x0 = w, y0 = h, x1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (magenta(at(x, y))) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); }
+    return x1 >= 0 && grey(at(x0, y0)) && grey(at(x1, y0));'
+  open_magenta
+  wait_until 1000
+  t=$(($(now_ms) - t0))
+  # niri's own open starts at half size, so the 96% floor tells Artboard's apart.
+  check "artboard $t ms into its open (50 ms real): 2% to 4% narrower than at rest" \
+    grab_test "$((x - 40)),$((y + h / 2)) $((w + 80))x1" "
+      let n = 0; for (let i = 0; i < w; i++) if (magenta(at(i, 0))) n++;
+      return n >= $w * 0.96 - 1 && n <= $w * 0.98;"
+  check "artboard mid-open: its corners outside the radius read the paper's grey" grab_test "$((x - 40)),$((y - 40)) $((w + 80))x$((h / 2))" "$corner"
+  sleep 4
+  check "artboard at rest: its corners outside the radius read the paper's grey" grab_test "$((x - 40)),$((y - 40)) $((w + 80))x$((h / 2))" "$corner"
+  close_window
+  until_ok 8000 has_windows 0
+}
+
 blueprint
 paper
+artboard
 exit "$fails"
 }
