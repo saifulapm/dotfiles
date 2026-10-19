@@ -10,6 +10,17 @@ ShellRoot {
 
     // Process start to the first paper frame; set once, by the first paper to swap.
     property var firstFrameMs: null
+    // A hot reload rebuilds this tree in the old process, so its first frame is timed from here instead.
+    readonly property real builtAt: Date.now()
+    property bool reloaded: false
+
+    // qs emits this only after a hot reload, before the new tree draws its first frame.
+    Connections {
+        target: Quickshell
+        function onReloadCompleted() {
+            root.reloaded = true;
+        }
+    }
 
     Services.Theme {
         id: themeService
@@ -25,6 +36,10 @@ ShellRoot {
             onFirstFrame: {
                 if (root.firstFrameMs !== null)
                     return;
+                if (root.reloaded) {
+                    root.firstFrameMs = Date.now() - root.builtAt;
+                    return;
+                }
                 uptime.reload();
                 root.firstFrameMs = Status.processAgeMs(uptime.text(), selfStat.text());
             }
