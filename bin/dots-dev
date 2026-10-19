@@ -19,6 +19,8 @@ export DOTS_MACHINE=dev
 export DOTS_HUB_QUESTIONS=$D/hub-questions.json PIPEWIRE_RUNTIME_DIR=$D/pw
 # Recordings land in the temp dir, never in ~/Videos.
 export DOTS_RECORDINGS_DIR=$D/recordings
+# dots sync goes to an alias Dropbox: inside the temp dir, never the live rclone config's.
+export RCLONE_CONFIG=$D/rclone.conf
 # workflow route tells every hub, so Control's Route toggle runs a fake that keeps the route here.
 export DOTS_WORKFLOW=$repo/bin/dev-fake-workflow
 # The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.
@@ -64,6 +66,8 @@ trap 'exit 143' TERM
 
 mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME" "$TMUX_TMPDIR" "$DOTS_CHROMIUM_POLICY_DIR" "$PIPEWIRE_RUNTIME_DIR"
 printf 'user-db:%s\n' "$dconf_name" >"$DCONF_PROFILE"
+mkdir -p "$D/remote"
+printf '[Dropbox]\ntype = alias\nremote = %s\n' "$D/remote" >"$RCLONE_CONFIG"
 mkdir -p "$DOTS_PAM_DIR"
 printf 'auth required pam_exec.so expose_authtok quiet %s\naccount required pam_permit.so\n' "$repo/dev/pam-test-password" >"$DOTS_PAM_DIR/dots-lock"
 # Fonts are read, never written, so the user's own stay visible to the nested shell.

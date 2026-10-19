@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# just dev: its tmux server, dconf database, Chromium policy dir, hub file and PipeWire all live inside its temp dir.
+# just dev: its tmux server, dconf database, Chromium policy dir, hub file, PipeWire and rclone config all live inside its temp dir.
 source "$(dirname "$0")/lib.sh"
 
 dev=$DOTS_DEV_DIR
@@ -25,6 +25,8 @@ check "the shell unit's system bus is the nested session bus" unit_has DBUS_SYST
 check "the shell unit carries the PATH bin/dots-dev set" unit_has PATH "$PATH"
 check "PIPEWIRE_RUNTIME_DIR is inside the temp dir" under_dev "${PIPEWIRE_RUNTIME_DIR:-}"
 check "the shell unit carries PIPEWIRE_RUNTIME_DIR" unit_has PIPEWIRE_RUNTIME_DIR "${PIPEWIRE_RUNTIME_DIR:-}"
+check "RCLONE_CONFIG is inside the temp dir" under_dev "${RCLONE_CONFIG:-}"
+check "the shell unit carries RCLONE_CONFIG" unit_has RCLONE_CONFIG "${RCLONE_CONFIG:-}"
 
 live_volume() { env -u PIPEWIRE_RUNTIME_DIR wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null; }
 live_vol_before=$(live_volume)
