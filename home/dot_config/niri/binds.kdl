@@ -1,7 +1,7 @@
 // Shared with dev/niri-dev.kdl; Mod is Super on a TTY and Alt in a nested niri.
 binds {
     Mod+Slash hotkey-overlay-title="Cheat Sheet" { spawn "qs" "ipc" "call" "cheatsheet" "toggle"; }
-    Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
+    Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "dots-foot"; }
     Mod+Space hotkey-overlay-title="Launcher" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+V hotkey-overlay-title="Clipboard" { spawn "qs" "ipc" "call" "launcher" "mode" "clipboard"; }
     Mod+Period hotkey-overlay-title="Emoji" { spawn "qs" "ipc" "call" "launcher" "mode" "emoji"; }

@@ -120,17 +120,46 @@ animations {
 `;
 }
 
-export function renderFoot(t) {
+// [section, key, value] for foot. The palette goes in the theme's own mode section, so foot tells apps truly whether it is light or dark.
+function footEntries(t) {
   const hex = (s) => s.slice(1).toUpperCase();
+  const pair = (fg, bg) => `${hex(fg)} ${hex(bg)}`;
   const c = t.color;
-  const lines = ['[colors-dark]', `background=${hex(c.surface)}`, `foreground=${hex(c.ink)}`];
-  c.ansi.forEach((v, i) => lines.push(`${i < 8 ? 'regular' : 'bright'}${i % 8}=${hex(v)}`));
+  const s = `colors-${t.mode}`;
+  const entries = [['main', 'initial-color-theme', t.mode], [s, 'background', hex(c.surface)], [s, 'foreground', hex(c.ink)]];
+  c.ansi.forEach((v, i) => entries.push([s, `${i < 8 ? 'regular' : 'bright'}${i % 8}`, hex(v)]));
+  entries.push(
+    [s, 'cursor', pair(c.surface, c.accent)],
+    [s, 'selection-foreground', hex(c.surface)],
+    [s, 'selection-background', hex(c.accent)],
+    [s, 'urls', hex(c.accent)],
+    [s, 'jump-labels', pair(c.surface, c.accent)],
+    [s, 'scrollback-indicator', pair(c.surface, c.accent)],
+    [s, 'search-box-match', pair(c.surface, c.ink)],
+    [s, 'search-box-no-match', pair(c.surface, c.danger)],
+  );
+  return entries;
+}
+
+export function renderFoot(t) {
+  const lines = [];
+  let section;
+  for (const [s, k, v] of footEntries(t)) {
+    if (s !== section) lines.push(`[${(section = s)}]`);
+    lines.push(`${k}=${v}`);
+  }
   return lines.join('\n') + '\n';
 }
 
-// Written to an open foot's pty, so it recolours without a restart (foot-ctlseqs(7): OSC 4, 10, 11).
+// One footclient -o override per line: the foot server read foot.ini when it started, so each new window brings the current theme.
+export function renderFootArgs(t) {
+  return footEntries(t).map(([s, k, v]) => `${s}.${k}=${v}`).join('\n') + '\n';
+}
+
+// Written to an open foot's pty, so it recolours without a restart (foot-ctlseqs(7): OSC 4, 10, 11, 12, 17, 19).
 export function renderFootOsc(t) {
   const osc = (body) => `\x1b]${body}\x1b\\`;
   const c = t.color;
-  return c.ansi.map((v, i) => osc(`4;${i};${v}`)).join('') + osc(`10;${c.ink}`) + osc(`11;${c.surface}`);
+  return c.ansi.map((v, i) => osc(`4;${i};${v}`)).join('') + osc(`12;${c.accent}`) + osc(`17;${c.accent}`) + osc(`19;${c.surface}`)
+    + osc(`10;${c.ink}`) + osc(`11;${c.surface}`);
 }

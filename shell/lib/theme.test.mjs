@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
-import { validateTheme, checkTokens, renderNiri, renderFoot, renderFootOsc, contrast } from './theme.mjs';
+import { validateTheme, checkTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc, contrast } from './theme.mjs';
 
 const paper = parseToml(readFileSync(new URL('../../themes/paper/theme.toml', import.meta.url), 'utf8'));
 
@@ -57,11 +60,44 @@ test('rendered tokens check out, and a bad colour in them is refused by name', (
 
 test('the foot fragment carries the palette', () => {
   const ini = renderFoot(validateTheme(paper));
-  // foot warns that [colors] is deprecated for [colors-dark], the palette it uses unless told otherwise.
-  assert.match(ini, /^\[colors-dark\]$/m);
+  // A light theme fills [colors-light] and starts in it, so foot tells apps the truth about light and dark.
+  assert.match(ini, /^\[main\]\ninitial-color-theme=light\n\[colors-light\]$/m);
+  assert.doesNotMatch(ini, /colors-dark/);
   assert.match(ini, /^background=FAF6EC$/m);
   assert.match(ini, /^foreground=1C1915$/m);
   assert.match(ini, /^regular1=C8381E$/m);
+});
+
+test('foot\'s own chrome takes the theme too: cursor, selection, URLs, labels, search', () => {
+  const ini = renderFoot(load('blueprint'));
+  assert.match(ini, /^initial-color-theme=dark\n\[colors-dark\]$/m);
+  assert.match(ini, /^cursor=0A1526 7FE3F0$/m);
+  assert.match(ini, /^selection-foreground=0A1526$/m);
+  assert.match(ini, /^selection-background=7FE3F0$/m);
+  assert.match(ini, /^urls=7FE3F0$/m);
+  assert.match(ini, /^jump-labels=0A1526 7FE3F0$/m);
+  assert.match(ini, /^search-box-no-match=0A1526 FFB547$/m);
+});
+
+test('the footclient overrides say what the fragment says, one per line', () => {
+  const t = load('artboard');
+  const args = renderFootArgs(t).trim().split('\n');
+  assert.equal(args[0], 'main.initial-color-theme=light');
+  assert.ok(args.includes('colors-light.background=FFFFFF'));
+  assert.ok(args.includes('colors-light.cursor=FFFFFF 3D5AFE'));
+  const keys = renderFoot(t).split('\n').filter((l) => l.includes('=')).length;
+  assert.equal(args.length, keys);
+});
+
+test('foot accepts the home foot.ini with each theme included', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'dots-foot-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const home = readFileSync(new URL('../../home/dot_config/foot/foot.ini', import.meta.url), 'utf8');
+  for (const name of ['paper', 'artboard', 'blueprint']) {
+    writeFileSync(join(dir, 'theme.ini'), renderFoot(load(name)));
+    writeFileSync(join(dir, 'foot.ini'), home.replace(/^include=.*$/m, `include=${join(dir, 'theme.ini')}`));
+    execFileSync('foot', ['--check-config', '-c', join(dir, 'foot.ini')], { stdio: 'pipe' });
+  }
 });
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
@@ -117,9 +153,10 @@ test('a theme without shadow keys gets no shadow', () => {
   assert.match(renderNiri(t), /shadow \{\s*off\s*\}/);
 });
 
-test('the foot OSC string sets the 16 colours, then foreground and background', () => {
+test('the foot OSC string sets the 16 colours, cursor and selection, then foreground and background', () => {
   const osc = renderFootOsc(load('blueprint'));
   assert.ok(osc.startsWith('\x1b]4;0;#1B2B44\x1b\\'));
   assert.ok(osc.includes('\x1b]4;15;#FFFFFF\x1b\\'));
+  assert.ok(osc.includes('\x1b]12;#7FE3F0\x1b\\\x1b]17;#7FE3F0\x1b\\\x1b]19;#0A1526\x1b\\'));
   assert.ok(osc.endsWith('\x1b]10;#D6F4F8\x1b\\\x1b]11;#0A1526\x1b\\'));
 });

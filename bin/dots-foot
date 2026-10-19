@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Opens a window in the foot server with the current theme as -o overrides, since the server read foot.ini only once, when it started.
+{
+args=()
+while IFS= read -r line; do
+  args+=(-o "$line")
+done 2>/dev/null <"${XDG_STATE_HOME:-$HOME/.local/state}/dots/theme-out/foot.args"
+# -N returns once the window exists, so an app that exits nonzero is not opened again in plain foot, which reads the theme from foot.ini.
+footclient -N "${args[@]}" "$@" || exec foot "$@"
+exit
+}
