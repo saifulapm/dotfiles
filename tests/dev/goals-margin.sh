@@ -55,14 +55,17 @@ echo "     margins: $(margins | jq -c .right)"
 check "with no active goals the margin starts with the Wi-Fi text" no_goal
 
 # A goal title can arrive by sync at any length; the margin cuts it short of the island, so the left half stays bare paper.
-strip() { grim -s 1 -t ppm -g "100,12 800x24" - | mean_rgb; }
+# The strip ends where the left margin's room ends, 8 px short of the island: past the island the right margin's words may sit.
+line_end=$(margins | jq '.drawn.lineEnd | floor')
+strip() { grim -s 1 -t ppm -g "100,12 $((line_end - 100))x24" - | mean_rgb; }
 bare=$(strip)
 long=$(printf 'W%.0s' $(seq 2000))
 write_by_rename "$long:none"
 until_ok 3000 right_starts "WWWW"
 sleep 0.3
-echo "     left strip: $bare, with a 2000-character goal: $(strip)"
+echo "     left strip to x=$line_end: $bare, with a 2000-character goal: $(strip); drawn: $(margins | jq -c '.drawn | del(.right)')"
 check "a 2000-character goal stays out of the left half of the margin" test "$(strip)" = "$bare"
+check "a 2000-character goal starts right of the island" eval 'margins | jq -e ".drawn.rightStart >= .drawn.width - .drawn.lineEnd" >/dev/null'
 
 status=$(shell_status)
 echo "     status: $status"

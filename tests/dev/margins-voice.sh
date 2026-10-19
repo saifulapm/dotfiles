@@ -39,5 +39,25 @@ echo "     drawn: $(margins | jq -c .drawn)"
 check "blueprint: the top-left reads [02] FOOT — ~" drawn_is left "[02] FOOT — ~"
 check "blueprint: the date reads $(date +%F)" date_ends "$(date +%F)"
 
+# A title and a goal can be any length; each elides 8 px short of the island in every theme.
+store="$DOTS_DEV_DIR/data/dots/goals/dev.json"
+mkdir -p "$(dirname "$store")"
+node --input-type=module - "$repo/shell/lib/goals.mjs" >"$store.tmp" <<'JS'
+const G = await import(process.argv[2]);
+console.log(JSON.stringify(G.addGoal(G.emptyStore(), 'G'.repeat(2000), Date.now() + 71 * 3600000, Date.now(), 'g0')));
+JS
+mv "$store.tmp" "$store"
+niri msg action focus-workspace 3
+niri msg action spawn -- foot -T "$(printf 'T%.0s' $(seq 2000))" sleep 600
+long_focused() { niri msg -j focused-window | jq -e '.title | length == 2000' >/dev/null 2>&1; }
+until_ok 5000 long_focused
+short_of_island() { margins | jq -e '.drawn.left | length > 2000' >/dev/null 2>&1 && margins | jq -e '.drawn.leftEnd <= .drawn.lineEnd and .drawn.rightStart >= .drawn.width - .drawn.lineEnd' >/dev/null 2>&1; }
+for t in paper artboard blueprint; do
+  in_theme "$t"
+  until_ok 2000 short_of_island
+  echo "     $t: $(margins | jq -c '.drawn | {leftEnd, rightStart, lineEnd, width}')"
+  check "$t: a 2000-character title and goal elide short of the island" short_of_island
+done
+
 exit $((fails > 0))
 }
