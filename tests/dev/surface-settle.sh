@@ -21,11 +21,53 @@ settles() {
 }
 
 until_ok 5000 shell_status >/dev/null
-for s in launcher themes notifs cheatsheet goals; do
+for s in launcher themes notifs cheatsheet goals control; do
   settles "$s" paper drop 140
   settles "$s" artboard spring 400
   settles "$s" blueprint plot 260
 done
+
+# The recorder's picker opens and closes on its one toggle.
+picker_settles() {
+  local theme=$1 kind=$2 ms=$3
+  "$repo/bin/dots" theme "$theme" >/dev/null
+  until_ok 2000 status_theme "$theme"
+  niri msg action spawn -- qs ipc call record toggle >/dev/null
+  until_ok 3000 surface_is record .settled
+  check "$theme: the recorder's picker settles as a $kind within $ms ms ($(timeout 0.5 qs ipc call record state | jq -c '[.motion, .settleMs]'))" \
+    surface_is record ".picking and .motion == \"$kind\" and .settleMs > 0 and .settleMs <= $ms"
+  niri msg action spawn -- qs ipc call record toggle >/dev/null
+  until_ok 2000 surface_is record '.drawing == false'
+}
+picker_settles paper drop 140
+picker_settles artboard spring 400
+picker_settles blueprint plot 260
+
+# pkexec always reaches the live polkitd, so a fake authority on the nested bus asks the nested shell's agent instead.
+fake() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit "$@"; }
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" &
+fake_pid=$!
+cleanup() { kill "$fake_pid" 2>/dev/null; }
+until_ok 3000 fake Registered >/dev/null 2>&1
+# The agent registers as the shell starts, so the shell restarts once the authority is up.
+systemctl --user restart "$DOTS_DEV_UNIT"
+until_ok 5000 surface_is polkit .registered
+
+# A request opens the polkit prompt and Esc cancels it.
+prompt_settles() {
+  local theme=$1 kind=$2 ms=$3
+  "$repo/bin/dots" theme "$theme" >/dev/null
+  until_ok 2000 status_theme "$theme"
+  fake Begin s "settle-$theme" >/dev/null
+  until_ok 3000 surface_is polkit .settled
+  check "$theme: the polkit prompt settles as a $kind within $ms ms ($(timeout 0.5 qs ipc call polkit state | jq -c '[.motion, .settleMs]'))" \
+    surface_is polkit ".open and .motion == \"$kind\" and .settleMs > 0 and .settleMs <= $ms"
+  wtype -k Escape
+  until_ok 2000 surface_is polkit '.drawing == false'
+}
+prompt_settles paper drop 140
+prompt_settles artboard spring 400
+prompt_settles blueprint plot 260
 
 "$repo/bin/dots" theme paper >/dev/null
 exit $((fails > 0))

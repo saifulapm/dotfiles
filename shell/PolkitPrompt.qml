@@ -15,6 +15,10 @@ Item {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
+    readonly property Root.Motion motion: Root.Motion {
+        shown: prompt.shown
+        tokens: prompt.theme.tokens
+    }
 
     function show(f) {
         flow = f;
@@ -61,6 +65,10 @@ Item {
             heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             hint: hint.join("  "),
             open: shown,
+            motion: motion.curves?.kind ?? null,
+            settleMs: motion.settleMs,
+            settled: motion.settled,
+            drawing: motion.drawing,
             message: flow?.message ?? "",
             prompt: flow?.inputPrompt ?? "",
             error: flow?.supplementaryIsError ? flow.supplementaryMessage : "",
@@ -77,7 +85,7 @@ Item {
     }
 
     Component.onCompleted: Root.State.loaded.push("polkit")
-    visible: shown
+    visible: motion.drawing
 
     Rectangle {
         anchors.fill: parent
@@ -92,6 +100,7 @@ Item {
         height: column.implicitHeight
         tokens: prompt.theme.tokens
         label: "Authenticate"
+        motion: prompt.motion
 
         ColumnLayout {
             id: column

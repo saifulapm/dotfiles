@@ -41,7 +41,7 @@ wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.40
 wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
 
 mod_c
-control_shown() { section_is audio && control_focus Exclusive && tab_is_ink; }
+control_shown() { section_is audio && state_is .settled && control_focus Exclusive && tab_is_ink; }
 until_ok 3000 control_shown
 check "Mod+C shows Control on audio with exclusive keyboard" control_shown
 check "state lists the six sections in order" state_is '.sections == ["audio","wifi","bluetooth","power","display","route"]'
@@ -82,7 +82,7 @@ check "state reports dots-null-2 as the default sink" state_is '.defaultSink == 
 echo "     state: $(control_state)"
 
 wtype -k Escape
-control_gone() { state_is '.open == false' && control_focus None && ! tab_is_ink; }
+control_gone() { state_is '.open == false and .drawing == false' && control_focus None && ! tab_is_ink; }
 until_ok 2000 control_gone
 check "Esc closes Control and releases the keyboard" control_gone
 

@@ -25,6 +25,10 @@ Item {
     readonly property var rows: section.rows
     readonly property var look: V.listLook(theme.tokens)
     readonly property var legend: look.keys([["tab", "section"], ["j/k", "move"], ["esc", "close"]])
+    readonly property Root.Motion motion: Root.Motion {
+        shown: control.shown
+        tokens: control.theme.tokens
+    }
 
     function open(t0) {
         openT0 = t0;
@@ -67,6 +71,10 @@ Item {
             rows: rows.map(r => r.title),
             openMs: openMs,
             opens: opens,
+            motion: motion.curves?.kind ?? null,
+            settleMs: motion.settleMs,
+            settled: motion.settled,
+            drawing: motion.drawing,
             heading: header.visible ? header.text : "",
             tabFill: tab ? String(tab.color) : null,
             tabText: tab ? tab.text : null,
@@ -82,7 +90,7 @@ Item {
     }
 
     Component.onCompleted: Root.State.loaded.push("control")
-    visible: shown
+    visible: motion.drawing
 
     Keys.onPressed: event => {
         const back = event.key === Qt.Key_Backtab || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier));
@@ -114,6 +122,7 @@ Item {
         height: column.implicitHeight
         tokens: control.theme.tokens
         label: "Control"
+        motion: control.motion
 
         ColumnLayout {
             id: column

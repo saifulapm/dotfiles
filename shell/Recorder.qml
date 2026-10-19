@@ -25,6 +25,11 @@ Item {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
+    // Plays only the picker's open and close; a recording runs with the picker gone.
+    readonly property Root.Motion motion: Root.Motion {
+        shown: recorder.shown
+        tokens: recorder.theme.tokens
+    }
 
     function toggle() {
         if (recording)
@@ -49,6 +54,8 @@ Item {
         file = dir + "/" + R.fileName(new Date());
         pending = true;
         shown = false;
+        // No close plays here: the recording starts on the next frame, and a sinking picker would be in it.
+        motion.cut();
     }
 
     // SIGINT lets wf-recorder finish the file.
@@ -70,7 +77,7 @@ Item {
         const hint = [];
         for (let i = 0; i < hintRepeater.count; i++)
             hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
-        return JSON.stringify({ picking: shown, recording: recording, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
+        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: motion.drawing, recording: recording, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
     }
 
     Process {
@@ -79,7 +86,7 @@ Item {
     }
 
     Component.onCompleted: Root.State.loaded.push("recorder")
-    visible: shown
+    visible: motion.drawing
 
     Keys.onPressed: event => {
         const k = event.key;
@@ -132,6 +139,7 @@ Item {
         height: hintRow.implicitHeight + 16
         tokens: recorder.theme.tokens
         label: "Record"
+        motion: recorder.motion
 
         Row {
             id: hintRow
