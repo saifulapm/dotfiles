@@ -26,3 +26,22 @@ repo = "ryanoasis/nerd-fonts"
 install = "~/.local/share/fonts/nerd-symbols, foot's icon fallback"
 url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v{version}/NerdFontsSymbolsOnly.tar.xz"
 sha256 = "b7ef2283462b435f1fe91d729dc412d5dbe34269dd2c7f4e1d803e4105c8d883"
+
+[[pin]]
+name = "kakoune"
+version = "be31e203e2948031bdde6cb573cfafa75158e228"
+repo = "saifulapm/kakoune"
+track = "commit"
+install = "~/.local/bin/kak and ~/.local/share/kak, built from source"
+check = "kak -version"
+url = "https://github.com/saifulapm/kakoune/archive/{version}.tar.gz"
+sha256 = "839647ab05d5877a30a2248ac8cf701f2f00508114e0fc8e5848ddd249f06c80"
+
+[[pin]]
+name = "kakoune-lsp"
+version = "22.0.0"
+repo = "kakoune-lsp/kakoune-lsp"
+install = "~/.local/bin/kak-lsp, built with cargo"
+check = "kak-lsp --version"
+url = "https://github.com/kakoune-lsp/kakoune-lsp/archive/refs/tags/v{version}.tar.gz"
+sha256 = "fe631342dc68692ac8cf3ff454e83d37756998e85f27f33d0cfd923c1309a7e0"

@@ -429,3 +429,18 @@ why = "indexes and tags the mail mail-sync pulls"
 name = "msmtp"
 arch = "all"
 why = "sends mail, including the post-new hook's away replies"
+
+[[package]]
+name = "gcc-c++"
+arch = "all"
+why = "builds the kakoune pin"
+
+[[package]]
+name = "make"
+arch = "all"
+why = "runs the kakoune pin's build"
+
+[[package]]
+name = "cargo"
+arch = "all"
+why = "builds the kakoune-lsp pin, which has no aarch64 Linux release"

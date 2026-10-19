@@ -1,0 +1,12 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "kakoune") }}
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+src=$pin_tmp/kakoune-$pin_version
+# A tarball has no git history, so the Makefile reads the version kak -version prints from .version.
+echo "$pin_version" >"$src/.version"
+# The vendored tree-sitter lexer includes "unicode/umachine.h", which lives in src/tree_sitter.
+make -C "$src" -j"$(nproc)" CPPFLAGS=-Isrc/tree_sitter
+make -C "$src" install PREFIX="$HOME/.local"
+pin_done
