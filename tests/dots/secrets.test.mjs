@@ -133,3 +133,20 @@ test('a second run changes no file in the scratch home', async () => {
 test('nothing is written into the repo checkout', async () => {
   assert.equal(await porcelain(), dirtyBefore);
 });
+
+for (const [what, extra] of [
+  ['an indented [iCloud] section', ' [iCloud]\ntype = alias\nremote = /tmp/evil\n'],
+  ['a second section of any name', '[Other]\ntype = alias\nremote = /etc\n'],
+]) {
+  test(`a dropbox.conf carrying ${what} is refused and the rclone config left alone`, async () => {
+    const forged = join(w.root, `forged-${extra.length}`);
+    mkdirSync(join(forged, 'rclone'), { recursive: true });
+    writeFileSync(join(forged, 'rclone/dropbox.conf'), `[Dropbox]\ntype = alias\nremote = ${w.dropbox}\n${extra}`);
+    const conf = `[iCloud]\ntype = alias\nremote = ${forged}\n`;
+    const m = home(w.root, `forged-home-${extra.length}`, conf);
+    const r = await secrets(m);
+    assert.equal(r.code, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /dropbox\.conf/);
+    assert.equal(readFileSync(m.RCLONE_CONFIG, 'utf8'), conf);
+  });
+}
