@@ -1,5 +1,0 @@
-#!/bin/bash
-{{ template "lib.sh" . }}
-# dots-shell.service runs the shell's start script from ~/.local/bin, since the repo's bin/ is not on systemd's fixed PATH.
-mkdir -p "$HOME/.local/bin"
-ln -sfn {{ joinPath .chezmoi.workingTree "bin/dots-qs" | quote }} "$HOME/.local/bin/dots-qs" || die "could not link the shell's start script"
