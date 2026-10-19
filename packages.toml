@@ -72,7 +72,7 @@ why = "the launcher types a clip or an emoji into the window you came from"
 [[package]]
 name = "rclone"
 arch = "all"
-why = "dots sync copies notes and goals to Dropbox and back"
+why = "dots sync copies notes, goals, fish history and the ssh blob to Dropbox and back"
 
 [[package]]
 name = "age"
