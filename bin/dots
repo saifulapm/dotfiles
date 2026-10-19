@@ -110,12 +110,15 @@ theme() {
   fi
   echo "$name" >"$state/theme"
 
-  local scheme=prefer-light
+  local scheme=prefer-light ui mono
   [[ $(jq -r .mode "$out/shell.json") == dark ]] && scheme=prefer-dark
+  { read -r ui; read -r mono; } < <(jq -r '.type.ui, .type.mono' "$out/shell.json")
   reload_foot "$out" &
   { tmux has-session 2>/dev/null && tmux source-file "$out/tmux.conf"; } &
   { command -v kak >/dev/null && reload_kak; } &
-  gsettings set org.gnome.desktop.interface color-scheme "$scheme" &
+  { gsettings set org.gnome.desktop.interface color-scheme "$scheme"
+    gsettings set org.gnome.desktop.interface font-name "$ui 11"
+    gsettings set org.gnome.desktop.interface monospace-font-name "$mono 11"; } &
   reload_chromium "$out" &
   wait
   printf '{"from":"%s","to":"%s","ms":%d}\n' "$from" "$name" $(($(date +%s%3N) - t0)) >"$state/theme-switch.json"

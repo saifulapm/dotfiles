@@ -167,7 +167,7 @@ export function renderGtkCss(t) {
 }
 
 export function renderGtkSettings(t) {
-  return `[Settings]\ngtk-application-prefer-dark-theme=${t.mode === 'dark'}\n`;
+  return `[Settings]\ngtk-application-prefer-dark-theme=${t.mode === 'dark'}\ngtk-font-name=${t.type.ui} 11\n`;
 }
 
 export function renderChromium(t) {

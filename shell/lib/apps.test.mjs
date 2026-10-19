@@ -68,6 +68,7 @@ test('gtk.css defines the window and accent colours', () => {
 test('gtk settings prefer dark exactly for dark mode', () => {
   assert.match(renderGtkSettings(blueprint), /^\[Settings\]\ngtk-application-prefer-dark-theme=true$/m);
   assert.match(renderGtkSettings(paper), /^gtk-application-prefer-dark-theme=false$/m);
+  assert.match(renderGtkSettings(paper), /^gtk-font-name=Maple Mono 11$/m);
 });
 
 test('chromium policy holds the surface colour and the mode', () => {

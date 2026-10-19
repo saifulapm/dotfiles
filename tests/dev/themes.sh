@@ -8,6 +8,7 @@ until_ok 5000 shell_status >/dev/null
 near() { (($1 - $2 <= 6 && $2 - $1 <= 6)); }
 windows() { niri msg -j windows | jq -c '[.[] | .id] | sort'; }
 gtk_scheme() { gsettings get org.gnome.desktop.interface color-scheme; }
+gtk_font() { gsettings get org.gnome.desktop.interface font-name; }
 
 niri msg action spawn -- foot
 foot_up() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot")' >/dev/null; }
@@ -38,8 +39,9 @@ check "the state file reads blueprint" test "$(<"$XDG_STATE_HOME/dots/theme")" =
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 until_ok 1000 status_theme blueprint
 check "shell status reports blueprint" status_theme blueprint
-check "tmux status-style carries #d6f4f8 ($(tmux show -g status-style))" bash -c 'tmux show -g status-style | grep -q "#d6f4f8"'
+check "tmux status-style carries #7fa6b8 ($(tmux show -g status-style))" bash -c 'tmux show -g status-style | grep -q "#7fa6b8"'
 check "GTK prefers dark ($(gtk_scheme))" test "$(gtk_scheme)" = "'prefer-dark'"
+check "GTK draws with the theme's UI font ($(gtk_font))" test "$(gtk_font)" = "'Maple Mono 11'"
 json_has() { jq -e "$2" "$1" >/dev/null; }
 check "Chromium's policy colour is Blueprint's surface" json_has "$DOTS_CHROMIUM_POLICY_DIR/color.json" '(.BrowserThemeColor | ascii_downcase) == "#0a1526"'
 switch_ms=$(jq -r .ms "$XDG_STATE_HOME/dots/theme-switch.json")
