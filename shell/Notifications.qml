@@ -25,6 +25,10 @@ Item {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
+    readonly property Root.Motion motion: Root.Motion {
+        shown: centre.shown
+        tokens: centre.theme.tokens
+    }
     // The caps voices write d and D alike, so clear all reads ⇧D.
     readonly property var legendKeys: look.keys([["j/k", "move"], ["↵", "open"], ["d", "dismiss"], ["⇧D", "clear all"], ["/", "search"], ["esc", "close"]])
     readonly property var hintKeys: look.keys([["/", "search"], ["esc", "close"]])
@@ -113,6 +117,10 @@ Item {
             cardRight: box(card).x + card.width,
             openMs: openMs,
             opens: opens,
+            motion: motion.curves?.kind ?? null,
+            settleMs: motion.settleMs,
+            settled: motion.settled,
+            drawing: motion.drawing,
             headingKind: look.label.kind,
             heading: heading.text,
             headingBox: box(heading),
@@ -132,7 +140,7 @@ Item {
     onSelectedChanged: list.positionViewAtIndex(selected, ListView.Contain)
     Component.onCompleted: Root.State.loaded.push("notifs")
 
-    visible: shown
+    visible: motion.drawing
 
     // Holds focus while the list is in use, where plain j/k move and d, D and / act.
     Item {
@@ -173,6 +181,7 @@ Item {
             tokens: centre.theme.tokens
             role: "card"
             label: "Notifications"
+            motion: centre.motion
 
             ColumnLayout {
                 id: column

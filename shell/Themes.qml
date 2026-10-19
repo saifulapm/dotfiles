@@ -21,6 +21,10 @@ Item {
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
+    readonly property Root.Motion motion: Root.Motion {
+        shown: switcher.shown
+        tokens: switcher.theme.tokens
+    }
 
     function open(t0) {
         openT0 = t0;
@@ -62,7 +66,11 @@ Item {
             selected: selected,
             current: theme.name,
             openMs: openMs,
-            opens: opens
+            opens: opens,
+            motion: motion.curves?.kind ?? null,
+            settleMs: motion.settleMs,
+            settled: motion.settled,
+            drawing: motion.drawing
         });
     }
 
@@ -76,7 +84,7 @@ Item {
         }
     }
 
-    visible: shown
+    visible: motion.drawing
 
     Item {
         id: keys
@@ -109,6 +117,7 @@ Item {
             height: column.implicitHeight + 36
             tokens: switcher.theme.tokens
             label: "Themes"
+            motion: switcher.motion
 
             Column {
                 id: column

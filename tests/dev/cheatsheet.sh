@@ -19,8 +19,8 @@ titled=$(grep -c 'hotkey-overlay-title=' "$DOTS_NIRI_BINDS")
 until_ok 5000 shell_status >/dev/null
 closed_rgb=$(middle_rgb)
 drawn() { [ "$(middle_rgb)" != "$closed_rgb" ]; }
-sheet_shown() { state_is .open && sheet_focus Exclusive && drawn; }
-sheet_gone() { state_is '.open == false' && sheet_focus None && ! drawn; }
+sheet_shown() { state_is '.open and .settled' && sheet_focus Exclusive && drawn; }
+sheet_gone() { state_is '.open == false and .drawing == false' && sheet_focus None && ! drawn; }
 
 mod_slash
 until_ok 3000 sheet_shown

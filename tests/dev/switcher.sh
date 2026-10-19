@@ -16,7 +16,7 @@ card_rgb() {
   grim -s 1 -t ppm -g "$geo" - | mean_rgb
 }
 card_is_navy() { local r g b; read -r r g b < <(card_rgb); ((r < 40 && g < 50 && b < 70 && b > r)); }
-themes_shown() { state_is .open && themes_focus Exclusive && card_is_navy; }
+themes_shown() { state_is '.open and .settled' && themes_focus Exclusive && card_is_navy; }
 # No pixel check here: after a switch to Blueprint its paper is the same navy as the card.
 themes_gone() { state_is '.open == false' && themes_focus None; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }

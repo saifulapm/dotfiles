@@ -25,6 +25,10 @@ Item {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
+    readonly property Root.Motion motion: Root.Motion {
+        shown: sheet.shown
+        tokens: sheet.theme.tokens
+    }
 
     function open(t0) {
         openT0 = t0;
@@ -68,6 +72,10 @@ Item {
             query: query,
             openMs: openMs,
             opens: opens,
+            motion: motion.curves?.kind ?? null,
+            settleMs: motion.settleMs,
+            settled: motion.settled,
+            drawing: motion.drawing,
             heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             headingKind: look.label.kind,
             ruleBox: { x: r.x, y: r.y, w: topRule.width, h: topRule.height },
@@ -88,7 +96,7 @@ Item {
         onLoaded: sheet.rows = Lib.parseBinds(text())
     }
 
-    visible: shown
+    visible: motion.drawing
 
     Item {
         id: keys
@@ -117,6 +125,7 @@ Item {
             height: Math.min(column.implicitHeight, parent.height - 96)
             tokens: sheet.theme.tokens
             label: "Keys"
+            motion: sheet.motion
 
             ColumnLayout {
                 id: column

@@ -54,7 +54,7 @@ check "Control carries its frame label" labelled $(((ow - 720) / 2))
 timeout 0.5 qs ipc call control close
 
 niri msg action spawn -- qs ipc call notifs toggle
-until_ok 3000 is_open notifs .open
+until_ok 3000 is_open notifs '.open and .settled'
 until_ok 2000 labelled $(((ow - 640) / 2))
 check "the notification centre carries its frame label" labelled $(((ow - 640) / 2))
 timeout 0.5 qs ipc call notifs close

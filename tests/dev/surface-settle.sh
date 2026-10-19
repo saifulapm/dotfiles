@@ -21,7 +21,7 @@ settles() {
 }
 
 until_ok 5000 shell_status >/dev/null
-for s in launcher; do
+for s in launcher themes notifs cheatsheet goals; do
   settles "$s" paper drop 140
   settles "$s" artboard spring 400
   settles "$s" blueprint plot 260

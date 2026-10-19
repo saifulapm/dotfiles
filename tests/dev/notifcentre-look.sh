@@ -11,8 +11,8 @@ in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme 
 send_fresh() { local n; n=$(notifs | jq .count); notify-send -a mail "fresh $1"; until_ok 2000 state_is ".count == $((n + 1))"; }
 one_timer() { shell_status | jq -e '.timers == 1' >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-open_centre() { niri msg action spawn -- qs ipc call notifs toggle; until_ok 3000 state_is '.open and .cursorBox != null'; }
-close_centre() { niri msg action spawn -- qs ipc call notifs toggle; until_ok 2000 state_is '.open == false'; }
+open_centre() { niri msg action spawn -- qs ipc call notifs toggle; until_ok 3000 state_is '.open and .settled and .cursorBox != null'; }
+close_centre() { niri msg action spawn -- qs ipc call notifs toggle; until_ok 2000 state_is '.open == false and .drawing == false'; }
 # Pixels of geometry $1 within $5 of r g b.
 near() {
   grim -s 1 -t ppm -g "$1" - | node -e '

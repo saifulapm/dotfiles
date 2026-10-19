@@ -35,6 +35,10 @@ Item {
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property bool caps: S.marginStyle(theme.tokens).caps
     readonly property bool capsTitles: theme.tokens ? theme.tokens.type.voice === "bracket" : false
+    readonly property Root.Motion motion: Root.Motion {
+        shown: view.shown
+        tokens: view.theme.tokens
+    }
 
     onListChanged: selected = Math.max(0, Math.min(selected, list.length - 1))
 
@@ -75,6 +79,10 @@ Item {
             confirm: confirm,
             openMs: openMs,
             opens: opens,
+            motion: motion.curves?.kind ?? null,
+            settleMs: motion.settleMs,
+            settled: motion.settled,
+            drawing: motion.drawing,
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: view.Window.active
         });
@@ -198,7 +206,7 @@ Item {
     }
 
     Component.onCompleted: Root.State.loaded.push("goals")
-    visible: shown
+    visible: motion.drawing
 
     Item {
         id: keys
@@ -249,6 +257,7 @@ Item {
             height: column.implicitHeight
             tokens: view.theme.tokens
             label: "Goals"
+            motion: view.motion
 
             ColumnLayout {
                 id: column
