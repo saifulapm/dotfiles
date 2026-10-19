@@ -1,0 +1,15 @@
+[Unit]
+Description=Sync mail with mbsync and index it with notmuch
+# A locked gpg-agent asks for the pass passphrase through a graphical pinentry, so the sync needs the session.
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+ConditionPathExists=%h/.mbsyncrc
+
+[Service]
+Type=oneshot
+ExecStart=%h/Sites/github/dotfiles/bin/mail-sync --quiet
+Nice=19
+IOSchedulingClass=idle
+# Backstop for a sync stuck on a half-open connection, which would hold the lock every later sync needs.
+TimeoutStartSec=10min

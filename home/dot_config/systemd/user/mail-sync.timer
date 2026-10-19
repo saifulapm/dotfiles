@@ -1,0 +1,10 @@
+[Unit]
+Description=Mail sync, 2 min after login and every 15 min
+# Without the age key there is no ~/.mbsyncrc, so niri's start leaves the timer inactive.
+ConditionPathExists=%h/.mbsyncrc
+
+[Timer]
+OnStartupSec=2min
+OnUnitActiveSec=15min
+# Keeps it off the same second as dots-sync.timer, which also runs every 15 min.
+RandomizedDelaySec=2min

@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+# Routes newly indexed mail into its HEY box by the sender lists in $DB_DIR, which stay out of git since each is a list of who mails you.
+
+# No `set -e`: a hook that dies halfway strands tag:new and poisons the next run, so each step survives alone.
+set -uo pipefail
+
+DB_DIR="${HEY_MAIL_DB_DIR:-$HOME/.local/share/hey-mail}"
+LOG="${XDG_STATE_HOME:-$HOME/.local/state}/hey-mail/post-new.log"
+
+mkdir -p "$DB_DIR" "$(dirname "$LOG")"
+
+log() { printf '%s post-new: %s\n' "$(date -Is)" "$*" >>"$LOG"; }
+
+if [ -f "$LOG" ] && [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+    tail -n 2000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+fi
+
+# A double quote from a mail header would break the query, so it is stripped: dropping a malformed sender's rule beats matching too much.
+sanitize() { printf '%s' "${1//\"/}"; }
+
+# new.tags marks the copies from Sent/Drafts/Junk unread+inbox too, so those are fixed first and routing sees only incoming mail.
+notmuch tag --batch <<'EOF' 2>>"$LOG"
+-inbox -unread +sent -- tag:new and folder:"icloud/Sent Messages"
+-inbox -unread +draft -- tag:new and folder:"icloud/Drafts"
+-inbox -unread +spam -- tag:new and folder:"icloud/Junk"
+-inbox -unread +deleted -- tag:new and folder:"icloud/Deleted Messages"
+-inbox -unread +archived -- tag:new and folder:"icloud/Archive"
+EOF
+
+# Speakeasy: a code in the subject skips the Screener and pulls the mail out of Junk, where a stranger's first mail often lands.
+if [ -s "$DB_DIR/speakeasy" ]; then
+    code="$(head -n1 "$DB_DIR/speakeasy" | tr -d '[:space:]')"
+    if [ -n "$code" ]; then
+        # --exclude=false, or the count cannot see the junked mail this step rescues.
+        speak=$(notmuch count --exclude=false -- tag:new and subject:"$(sanitize "$code")" 2>/dev/null || echo 0)
+        if [ "${speak:-0}" -gt 0 ]; then
+            notmuch tag +screened +speakeasy -spam -deleted +inbox +unread -- \
+                tag:new and subject:"$(sanitize "$code")" 2>>"$LOG" \
+                && log "speakeasy: $speak message(s) let through"
+        fi
+    fi
+fi
+
+# One `notmuch tag --batch` per file: one process per address turns a 200ms hook into a 40-second one at a few thousand senders.
+route_simple() {
+    local db="$1"; shift
+    [ -s "$db" ] || return 0
+    local ops="$*" count
+    # Counted before the loop: the loop runs in the pipe's subshell, so a counter there is lost.
+    count=$(grep -cvE '^[[:space:]]*(#|$)' "$db" 2>/dev/null || echo 0)
+    while IFS= read -r addr; do
+        addr="$(printf '%s' "$addr" | tr -d '[:space:]')"
+        case "$addr" in ''|'#'*) continue ;; esac
+        printf '%s -- tag:new and from:"%s"\n' "$ops" "$(sanitize "$addr")"
+    done <"$db" | notmuch tag --batch 2>>"$LOG"
+    [ "${count:-0}" -gt 0 ] && log "routed via $(basename "$db"): $count rules"
+    return 0
+}
+
+route_simple "$DB_DIR/screened.db" "+screened"
+route_simple "$DB_DIR/thefeed.db" "+thefeed" "+archived" "-inbox"
+route_simple "$DB_DIR/spam.db" "+spam" "+deleted" "+archived" "-inbox" "-unread" "-screened"
+
+if [ -s "$DB_DIR/ledger.db" ]; then
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        cat="$(printf '%s' "$line" | awk '{print $1}' | tr -cd '[:alnum:]_-')"
+        addr="$(printf '%s' "$line" | awk '{print $2}' | tr -d '[:space:]')"
+        [ -n "$cat" ] && [ -n "$addr" ] || continue
+        printf '+ledger/%s +archived -inbox -unread -- tag:new and from:"%s"\n' \
+            "$cat" "$(sanitize "$addr")"
+    done <"$DB_DIR/ledger.db" | notmuch tag --batch 2>>"$LOG"
+fi
+
+route_simple "$DB_DIR/bundle.db" "+bundled"
+
+if [ -s "$DB_DIR/autofile.db" ]; then
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        addr="$(printf '%s' "$line" | awk '{print $1}' | tr -d '[:space:]')"
+        label="$(printf '%s' "$line" | awk '{print $2}' | tr -cd '[:alnum:]_-')"
+        [ -n "$addr" ] && [ -n "$label" ] || continue
+        printf '+label/%s -- tag:new and from:"%s"\n' "$label" "$(sanitize "$addr")"
+    done <"$DB_DIR/autofile.db" | notmuch tag --batch 2>>"$LOG"
+fi
+
+# Bubble Up rides on every sync, so a bubble surfaces at most one timer interval late.
+if [ -s "$DB_DIR/bubble.db" ]; then
+    now="$(date +%s)"
+    remaining="$DB_DIR/bubble.db.tmp"
+    : >"$remaining"
+    fired=0
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        tid="$(printf '%s' "$line" | awk '{print $1}')"
+        due="$(printf '%s' "$line" | awk '{print $2}')"
+        case "$due" in ''|*[!0-9]*) continue ;; esac
+        if [ "$now" -ge "$due" ]; then
+            notmuch tag +inbox +unread +bubbled -bubble -- \
+                "thread:$(sanitize "$tid")" 2>>"$LOG" && fired=$((fired + 1))
+        else
+            printf '%s\n' "$line" >>"$remaining"
+        fi
+    done <"$DB_DIR/bubble.db"
+    mv "$remaining" "$DB_DIR/bubble.db"
+    [ "$fired" -gt 0 ] && log "bubbled up: $fired thread(s)"
+fi
+
+# Recycling only tags; nothing is unlinked, so a wrong rule never deletes mail.
+if [ -s "$DB_DIR/recycle.db" ]; then
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        addr="$(printf '%s' "$line" | awk '{print $1}' | tr -d '[:space:]')"
+        days="$(printf '%s' "$line" | awk '{print $2}')"
+        [ -n "$addr" ] || continue
+        case "$days" in ''|*[!0-9]*) continue ;; esac
+        # notmuch reads "30_days_ago"; "30d_ago" does not parse and silently matches nothing.
+        printf '+deleted -inbox -unread -- from:"%s" and date:..%s_days_ago\n' \
+            "$(sanitize "$addr")" "$days"
+    done <"$DB_DIR/recycle.db" | notmuch tag --batch 2>>"$LOG"
+fi
+
+# A muted thread stays muted as it grows; `unread` is left alone, since read state reaches the phone through the maildir flags.
+notmuch tag +muted -inbox -- 'tag:new and thread:{tag:muted}' 2>>"$LOG"
+
+# The away reply goes once per screened-in sender, never to lists, auto-submitted mail, no-reply or yourself, as each of those risks a mail loop.
+AWAY_FILE="$DB_DIR/away"
+AWAY_MAX="${HEY_AWAY_MAX:-10}"
+if [ -s "$AWAY_FILE" ] && command -v msmtp >/dev/null 2>&1; then
+    away_until="$(sed -n 's/^until:[[:space:]]*//p' "$AWAY_FILE" | head -n1)"
+    away_subject="$(sed -n 's/^subject:[[:space:]]*//p' "$AWAY_FILE" | head -n1)"
+    # Everything after the first blank line is the message.
+    away_body="$(sed '1,/^[[:space:]]*$/d' "$AWAY_FILE")"
+    away_epoch="$(date -d "$away_until 23:59:59" +%s 2>/dev/null || true)"
+    now_epoch="$(date +%s)"
+
+    if [ -z "$away_epoch" ]; then
+        log "away: cannot parse until:'$away_until' — not sending"
+    elif [ "$now_epoch" -gt "$away_epoch" ]; then
+        : # expired; not logged, since it stays expired on every sync until cleared
+    elif [ -z "$(printf '%s' "$away_body" | tr -d '[:space:]')" ]; then
+        log "away: no message body — not sending"
+    else
+        me_name="$(notmuch config get user.name 2>/dev/null)"
+        me_addr="$(notmuch config get user.primary_email 2>/dev/null)"
+        mine="$(printf '%s\n%s\n' "$me_addr" "$(notmuch config get user.other_email 2>/dev/null)")"
+        sent=0
+
+        while IFS= read -r mid; do
+            [ -n "$mid" ] || continue
+            [ "$sent" -lt "$AWAY_MAX" ] || break
+            file="$(notmuch search --output=files -- "$mid" 2>/dev/null | head -n1)"
+            [ -n "$file" ] && [ -r "$file" ] || continue
+
+            # Headers only, so an attachment stays out of the pipeline.
+            headers="$(sed -n '/^[[:space:]]*$/q;p' "$file")"
+
+            case "$(printf '%s' "$headers" | grep -i '^Auto-Submitted:' | head -n1)" in
+                ''|*[Nn][Oo]) ;;   # absent, or the explicit "no" — fine
+                *) continue ;;
+            esac
+            printf '%s' "$headers" | grep -qiE '^(List-Id|List-Post|List-Unsubscribe):' && continue
+            printf '%s' "$headers" | grep -qiE '^Precedence:[[:space:]]*(bulk|list|junk)' && continue
+
+            from_line="$(printf '%s' "$headers" | grep -i '^From:' | head -n1)"
+            # "Name <a@b>" → a@b; a bare "a@b" is left as it is.
+            addr="$(printf '%s' "$from_line" | sed -e 's/^[Ff]rom:[[:space:]]*//' \
+                        -e 's/.*<\([^>]*\)>.*/\1/' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+                    | tr '[:upper:]' '[:lower:]')"
+            case "$addr" in
+                ''|*' '*|*'"'*) continue ;;
+                *noreply*|*no-reply*|*donotreply*|*do-not-reply*) continue ;;
+                *mailer-daemon*|*postmaster*|*bounce*) continue ;;
+            esac
+            printf '%s\n' "$mine" | grep -qixF "$addr" && continue
+            [ -f "$DB_DIR/away-replied.db" ] && grep -qixF "$addr" "$DB_DIR/away-replied.db" && continue
+
+            msgid="$(printf '%s' "$headers" | grep -i '^Message-ID:' | head -n1 \
+                     | sed -e 's/^[Mm]essage-[Ii][Dd]:[[:space:]]*//')"
+            orig_subject="$(printf '%s' "$headers" | grep -i '^Subject:' | head -n1 \
+                            | sed -e 's/^[Ss]ubject:[[:space:]]*//')"
+            subject="${away_subject:-Re: ${orig_subject:-your mail}}"
+
+            if [ -n "${HEY_AWAY_DRY_RUN:-}" ]; then
+                log "away DRY RUN: would reply to $addr (subject: $subject)"
+                printf '%s\n' "$addr" >>"$DB_DIR/away-replied.db"
+                sent=$((sent + 1))
+                continue
+            fi
+
+            # `timeout` because this hook holds mail-sync's lock, and a hung msmtp would stall every later sync.
+            if {
+                printf 'From: %s <%s>\n' "$me_name" "$me_addr"
+                printf 'To: %s\n' "$addr"
+                printf 'Subject: %s\n' "$subject"
+                [ -n "$msgid" ] && printf 'In-Reply-To: %s\nReferences: %s\n' "$msgid" "$msgid"
+                printf 'Date: %s\n' "$(date -R)"
+                printf 'Message-ID: <away-%s-%s@%s>\n' "$(date +%s)" "$$" "$(hostname)"
+                printf 'Auto-Submitted: auto-replied\n'
+                printf 'X-Auto-Response-Suppress: All\n'
+                printf 'Precedence: auto_reply\n'
+                printf 'MIME-Version: 1.0\n'
+                printf 'Content-Type: text/plain; charset=utf-8\n'
+                printf 'Content-Transfer-Encoding: 8bit\n'
+                printf '\n%s\n' "$away_body"
+            } | timeout 30 msmtp -a icloud -- "$addr" 2>>"$LOG"; then
+                printf '%s\n' "$addr" >>"$DB_DIR/away-replied.db"
+                sent=$((sent + 1))
+                log "away: replied to $addr"
+            else
+                log "away: msmtp failed for $addr"
+            fi
+        done <<EOF
+$(notmuch search --output=messages -- 'tag:new and tag:inbox and tag:screened and tag:unread' 2>/dev/null)
+EOF
+        [ "$sent" -gt 0 ] && log "away: $sent repl$([ "$sent" = 1 ] && echo y || echo ies) sent"
+    fi
+fi
+
+# Senders on the notify list are found before tag:new is retired, since the question cannot be asked afterwards.
+notify_senders=""
+if [ -s "$DB_DIR/notify.db" ]; then
+    while IFS= read -r addr; do
+        addr="$(printf '%s' "$addr" | tr -d '[:space:]')"
+        case "$addr" in ''|'#'*) continue ;; esac
+        n=$(notmuch count -- "tag:new and tag:inbox and from:\"$(sanitize "$addr")\"" 2>/dev/null || echo 0)
+        [ "${n:-0}" -gt 0 ] && notify_senders="${notify_senders:+$notify_senders, }$addr"
+    done <"$DB_DIR/notify.db"
+fi
+
+fresh=$(notmuch count -- tag:new and tag:inbox and tag:screened and tag:unread 2>/dev/null || echo 0)
+
+# Must run even if everything above failed, or the next run reprocesses this batch.
+notmuch tag -new -- tag:new 2>>"$LOG"
+
+count() { notmuch count -- "$@" 2>/dev/null || echo 0; }
+imbox=$(count tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled)
+screener=$(count tag:inbox and tag:unread and not tag:screened)
+
+# Only screened-in mail notifies: an unscreened stranger must never buzz you.
+if [ "${fresh:-0}" -gt 0 ] && command -v notify-send >/dev/null 2>&1; then
+    notify-send -a "Mail" -i mail-unread \
+        "$fresh new in your Imbox" "$imbox unread · $screener waiting in the Screener"
+fi
+
+if [ -n "$notify_senders" ] && command -v notify-send >/dev/null 2>&1; then
+    notify-send -a "Mail" -i mail-unread -u critical "Mail from $notify_senders" ""
+fi
+
+exit 0

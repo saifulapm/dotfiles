@@ -23,6 +23,11 @@
 {{- end -}}
 sourceDir = "~/Sites/github/dotfiles"
 mode = "symlink"
+encryption = "age"
 
 [data]
     machine = {{ $machine | quote }}
+
+[age]
+    identity = "~/.config/chezmoi/key.txt"
+    recipient = "age1y05rw7sm72al7vnxqd54th9rj7s0v8ynpuw07lhgtwz547823dyqusaaqr"

@@ -1,0 +1,311 @@
+#!/usr/bin/env bash
+# Usage: hey-folder-sync [--apply|--state]. Files mail into IMAP folders by its tags, since iOS Mail only notifies for INBOX; with no flag it prints what would move.
+
+# A message whose folder changed since the last run wins for tags and any other is placed by its tags, which stops the two directions fighting.
+set -uo pipefail
+
+MAIL="$(notmuch config get database.path 2>/dev/null)"
+STORE="${HEY_MAIL_STORE:-icloud}"          # the mbsync MaildirStore dir under $MAIL
+DB_DIR="${HEY_MAIL_DB_DIR:-$HOME/.local/share/hey-mail}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/hey-mail"
+STATE="$STATE_DIR/folder-state.tsv"
+LOG="$STATE_DIR/folder-sync.log"
+ENABLE_DB="$DB_DIR/foldersync.db"
+
+[ -n "$MAIL" ] && [ -d "$MAIL/$STORE" ] || {
+    printf 'hey-folder-sync: no maildir at %s/%s\n' "${MAIL:-<unset>}" "$STORE" >&2
+    exit 1
+}
+mkdir -p "$STATE_DIR" "$DB_DIR"
+
+log() { printf '%s folder-sync: %s\n' "$(date -Is)" "$*" >>"$LOG"; }
+
+if [ -f "$LOG" ] && [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+    tail -n 2000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+fi
+
+# Order is precedence, since IMAP gives a message one folder. Archive takes the rest, screened-out mail too: iCloud purges Junk and Trash after 30 days.
+RULE_FOLDER=()  RULE_QUERY=()  RULE_NAME=()
+rule() { RULE_FOLDER+=("$1"); RULE_NAME+=("$2"); RULE_QUERY+=("$3"); }
+
+rule "HEY/Bubbled"    "Bubbled Up"  'tag:bubble'
+rule "HEY/ReplyLater" "Reply Later" 'tag:replylater'
+rule "HEY/SetAside"   "Set Aside"   'tag:setaside'
+rule "HEY/Feed"       "The Feed"    'tag:thefeed'
+rule "HEY/PaperTrail" "Paper Trail" 'tag:/^ledger\//'
+rule "HEY/Screener"   "Screener"    'tag:inbox and tag:unread and not tag:screened'
+rule "INBOX"          "Imbox"       'tag:inbox and tag:screened'
+rule "Archive"        "Archived"    '*'
+
+# Only these may be moved out of: iCloud's own folders feed the post-new hook's tags, and mail outside $STORE must never be uploaded.
+MOVABLE=("INBOX" "Archive" "HEY/Bubbled" "HEY/ReplyLater" "HEY/SetAside"
+         "HEY/Feed" "HEY/PaperTrail" "HEY/Screener")
+
+# Junk and Deleted Messages are watched but not movable: a swipe to junk tags the message and leaves it where it went.
+TRACKED=("${MOVABLE[@]}" "Junk" "Deleted Messages")
+
+# Tags for a message found where we did not put it. None touches `unread`, which round-trips through the maildir flags.
+reverse_ops() {
+    case "$1" in
+        # Clears every pile, or `replylater` would bounce it straight back out.
+        "INBOX")           printf '+inbox +screened -archived -replylater -setaside -bubble -bubbled' ;;
+        # Un-screens this message only; screened.db keeps the sender's decision.
+        "HEY/Screener")    printf '+inbox -screened -archived -replylater -setaside -bubble' ;;
+        "HEY/ReplyLater")  printf '+replylater -setaside -bubble -archived' ;;
+        "HEY/SetAside")    printf '+setaside -replylater -bubble -archived' ;;
+        "HEY/Feed")        printf '+thefeed +archived -inbox -replylater -setaside -bubble' ;;
+        # The phone cannot ask which vendor, so it files as unfiled.
+        "HEY/PaperTrail")  printf '+ledger/unfiled +archived -inbox -replylater -setaside -bubble' ;;
+        # Also needs a due date in bubble.db; see bubble_from_folder.
+        "HEY/Bubbled")     printf '+bubble -inbox -bubbled' ;;
+        "Archive")         printf '+archived -inbox -replylater -setaside -bubble' ;;
+        # Like screening out, minus `-screened`: a swipe is about one message, not the sender.
+        "Junk")            printf '+spam +deleted +archived -inbox' ;;
+        "Deleted Messages") printf '+deleted +archived -inbox' ;;
+        *) return 1 ;;
+    esac
+}
+
+# A drag into HEY/Bubbled has no due date, and with no bubble.db line the mail would stay hidden for good, so its thread comes back in 24 hours.
+bubble_from_folder() {
+    local msg="$1" tid
+    tid="$(notmuch search --exclude=false --output=threads -- "$msg" 2>/dev/null | head -n1)"
+    tid="${tid#thread:}"
+    [ -n "$tid" ] || return 0
+    grep -q "^$tid " "$DB_DIR/bubble.db" 2>/dev/null && return 0
+    printf '%s %d\n' "$tid" "$(( $(date +%s) + 86400 ))" >>"$DB_DIR/bubble.db"
+    log "bubble: $tid due in 24h (dragged into HEY/Bubbled on another client)"
+}
+
+if [ ! -e "$ENABLE_DB" ]; then
+    printf '%s\n' '# One box per line to file into (HEY/Screener HEY/Feed HEY/PaperTrail HEY/ReplyLater HEY/SetAside HEY/Bubbled Archive); INBOX is always live. Run hey-folder-sync with no arguments to see what would move.' >"$ENABLE_DB"
+    log "created $ENABLE_DB (nothing enabled)"
+fi
+
+enabled() {
+    [ "$1" = "INBOX" ] && return 0          # always live; see the header
+    grep -qxF "$1" "$ENABLE_DB" 2>/dev/null
+}
+
+# --exclude=false everywhere: the config hides deleted and spam from searches, and the Archive rule must see that mail.
+nm_count() { notmuch count --exclude=false -- "$@" 2>/dev/null || echo 0; }
+
+or_folders() {
+    local out="" f
+    for f in "$@"; do out="${out:+$out or }folder:\"$STORE/$f\""; done
+    printf '(%s)' "$out"
+}
+MOVABLE_Q="$(or_folders "${MOVABLE[@]}")"
+
+# `*` matches everything only as the whole query, not inside a compound one, so the fallback is written as "not any earlier rule".
+CLAIM=()
+build_claims() {
+    local i prior=""
+    for i in "${!RULE_FOLDER[@]}"; do
+        if [ "${RULE_QUERY[i]}" = '*' ]; then
+            CLAIM[i]="${prior:+not ($prior)}"
+            CLAIM[i]="${CLAIM[i]:-*}"
+        elif [ -n "$prior" ]; then
+            CLAIM[i]="(${RULE_QUERY[i]}) and not ($prior)"
+        else
+            CLAIM[i]="(${RULE_QUERY[i]})"
+        fi
+        prior="${prior:+$prior or }(${RULE_QUERY[i]})"
+    done
+}
+build_claims
+
+move_query() {
+    local i="$1"
+    printf '%s and %s and not folder:"%s"' \
+        "${CLAIM[i]}" "$MOVABLE_Q" "$STORE/${RULE_FOLDER[i]}"
+}
+
+current_state() {
+    local f
+    for f in "${TRACKED[@]}"; do
+        notmuch search --exclude=false --output=messages -- "folder:\"$STORE/$f\"" 2>/dev/null \
+            | sed "s|\$|\t$f|"
+    done
+}
+
+dry_run() {
+    local i tot here move src n on
+    printf '\nHEY folder map — DRY RUN, nothing is moved\n'
+    printf 'store: %s/%s\n' "$MAIL" "$STORE"
+    printf 'enabled: INBOX (always)'
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) continue ;; esac
+        printf ' · %s' "$line"
+    done <"$ENABLE_DB"
+    printf '\n\n'
+
+    printf '  %-15s %-4s %-46s %7s %7s %7s\n' \
+        'TARGET' 'ON?' 'CLAIMS (earlier rules win)' 'total' 'in situ' 'TO MOVE'
+    printf '  %s\n' "$(printf '─%.0s' {1..92})"
+
+    local grand=0
+    for i in "${!RULE_FOLDER[@]}"; do
+        tot="$(nm_count "${CLAIM[i]}")"
+        here="$(nm_count "${CLAIM[i]} and folder:\"$STORE/${RULE_FOLDER[i]}\"")"
+        move="$(nm_count "$(move_query "$i")")"
+        enabled "${RULE_FOLDER[i]}" && on='yes' || on='--'
+        printf '  %-15s %-4s %-46.46s %7s %7s %7s\n' \
+            "${RULE_FOLDER[i]}" "$on" "${RULE_QUERY[i]}" "$tot" "$here" "$move"
+        grand=$((grand + move))
+    done
+    printf '  %s\n' "$(printf '─%.0s' {1..92})"
+    printf '  %-15s %-4s %-46s %7s %7s %7s\n' '' '' 'if every box were enabled' '' '' "$grand"
+
+    printf '\nwhere each move would come from:\n'
+    for i in "${!RULE_FOLDER[@]}"; do
+        move="$(nm_count "$(move_query "$i")")"
+        [ "$move" -gt 0 ] || continue
+        enabled "${RULE_FOLDER[i]}" && on='ENABLED — this WILL move on the next sync' \
+                                    || on='off — listed for review only'
+        printf '\n  %s  (%s)\n' "${RULE_FOLDER[i]}" "$on"
+        for src in "${MOVABLE[@]}"; do
+            [ "$src" = "${RULE_FOLDER[i]}" ] && continue
+            n="$(nm_count "$(move_query "$i") and folder:\"$STORE/$src\"")"
+            [ "$n" -gt 0 ] && printf '      %6s  from %s\n' "$n" "$src"
+        done
+    done
+
+    printf '\nleft alone (no rule may move a file out of these):\n'
+    for src in "Sent Messages" "Drafts" "Junk" "Deleted Messages"; do
+        printf '      %6s  %s\n' "$(nm_count "folder:\"$STORE/$src\"")" "$src"
+    done
+    printf '      %6s  outside %s entirely (notes to self — never uploaded)\n' \
+        "$(nm_count "not path:\"$STORE/**\"")" "$STORE"
+
+    local dups
+    dups=$(( $(notmuch search --exclude=false --output=files -- '*' 2>/dev/null | wc -l) \
+             - $(nm_count '*') ))
+    printf '\n  %s message(s) have more than one file on disk; those are skipped\n' "$dups"
+    printf '  and logged rather than guessed at — see move_one().\n\n'
+}
+
+# Keeps the cur/new subdirectory and the :2, suffix, so read state survives the move.
+move_one() {
+    local msg="$1" dstfolder="$2" files=() f base uniq info sub dst
+    while IFS= read -r f; do
+        case "$f" in "$MAIL/$STORE/"*) files+=("$f") ;; esac
+    done < <(notmuch search --exclude=false --output=files -- "$msg" 2>/dev/null)
+
+    if [ "${#files[@]}" -ne 1 ]; then
+        log "skip $msg -> $dstfolder: ${#files[@]} files in $STORE (ambiguous)"
+        return 1
+    fi
+    f="${files[0]}"
+    [ -f "$f" ] || { log "skip $msg: $f is gone"; return 1; }
+
+    sub="$(basename "$(dirname "$f")")"           # cur or new
+    base="$(basename "$f")"
+    case "$base" in
+        *:2,*) info=":2,${base##*:2,}" ; uniq="${base%%:2,*}" ;;
+        *)     info=""                 ; uniq="$base" ;;
+    esac
+    uniq="${uniq%,U=*}"
+
+    dst="$MAIL/$STORE/$dstfolder/$sub/$uniq$info"
+    if [ -e "$dst" ]; then
+        log "skip $msg -> $dstfolder: $dst already exists"
+        return 1
+    fi
+    mkdir -p "$MAIL/$STORE/$dstfolder"/{cur,new,tmp} || return 1
+
+    # `mv -n` exits 0 when it declines to move, so the result is checked on disk.
+    mv -n "$f" "$dst" 2>>"$LOG"
+    if [ -e "$dst" ] && [ ! -e "$f" ]; then
+        return 0
+    fi
+    log "FAILED mv $f -> $dst"
+    return 1
+}
+
+apply() {
+    local moved=0 created=0 tagged=0 i msg folder line
+
+    # Pass 1, folder -> tag, runs first so pass 2 places mail by the tags it set; an unknown message counts as unchanged.
+    local cur="$STATE.new"
+    # A message in two folders at once (a failed expunge) is dropped, so next run places it by its tags.
+    current_state | awk -F'\t' '{ line[NR] = $0; id[NR] = $1; n[$1]++ }
+                                END { for (i = 1; i <= NR; i++)
+                                          if (n[id[i]] == 1) print line[i] }' >"$cur"
+    if [ -s "$STATE" ]; then
+        while IFS=$'\t' read -r msg folder; do
+            [ -n "$msg" ] && [ -n "$folder" ] || continue
+            local ops
+            ops="$(reverse_ops "$folder")" || continue
+            # shellcheck disable=SC2086
+            notmuch tag $ops -- "$msg" 2>>"$LOG" && tagged=$((tagged + 1))
+            [ "$folder" = "HEY/Bubbled" ] && bubble_from_folder "$msg"
+            log "external move: $msg is now in $folder -> $ops"
+        done < <(awk -F'\t' 'NR==FNR { was[$1] = $2; next }
+                             ($1 in was) && was[$1] != $2 { print $1 "\t" $2 }' \
+                     "$STATE" "$cur")
+    fi
+    [ "$tagged" -gt 0 ] && log "retagged $tagged message(s) from external folder moves"
+
+    # An enabled box exists even when empty, or the phone has no folder to drag into.
+    for i in "${!RULE_FOLDER[@]}"; do
+        enabled "${RULE_FOLDER[i]}" || continue
+        local box="$MAIL/$STORE/${RULE_FOLDER[i]}"
+        [ -d "$box/cur" ] && continue
+        if mkdir -p "$box"/{cur,new,tmp}; then
+            created=$((created + 1))
+            log "created empty box ${RULE_FOLDER[i]} — iCloud gets it on this push"
+        else
+            log "could not create $box"
+        fi
+    done
+
+    # Pass 2, tag -> folder.
+    declare -A newfolder=()
+    for i in "${!RULE_FOLDER[@]}"; do
+        enabled "${RULE_FOLDER[i]}" || continue
+        local n=0
+        while IFS= read -r msg; do
+            [ -n "$msg" ] || continue
+            if move_one "$msg" "${RULE_FOLDER[i]}"; then
+                newfolder["$msg"]="${RULE_FOLDER[i]}"
+                moved=$((moved + 1)); n=$((n + 1))
+            fi
+        done < <(notmuch search --exclude=false --output=messages -- "$(move_query "$i")" 2>/dev/null)
+        [ "$n" -gt 0 ] && log "moved $n message(s) -> ${RULE_FOLDER[i]}"
+    done
+
+    # Records the intended folders: notmuch has not reindexed yet, and the old ones would read as external moves next run.
+    if [ "${#newfolder[@]}" -gt 0 ]; then
+        awk -F'\t' -v OFS='\t' 'NR==FNR { to[$1]=$2; next }
+                                { print $1, ($1 in to ? to[$1] : $2) }' \
+            <(for msg in "${!newfolder[@]}"; do printf '%s\t%s\n' "$msg" "${newfolder[$msg]}"; done) \
+            "$cur" >"$STATE.merged" && mv "$STATE.merged" "$cur"
+    fi
+    mv "$cur" "$STATE"
+
+    # Only a move needs a reindex, but a new box needs a push too.
+    printf '%s %s\n' "$moved" "$created"
+}
+
+# mail-sync holds the lock and sets HEY_SYNC_LOCKED, since a second `exec 9>` here is a new open file description and would block on it.
+apply_locked() {
+    if [ -n "${HEY_SYNC_LOCKED:-}" ]; then
+        apply
+        return
+    fi
+    exec 9>"$STATE_DIR/sync.lock"
+    if ! flock -w 300 9; then
+        log "a sync has held the lock for 5 minutes — moved nothing"
+        printf '0\n'
+        return 0
+    fi
+    apply
+}
+
+case "${1:-}" in
+    --apply) apply_locked ;;
+    --state) [ -f "$STATE" ] && cat "$STATE" ;;
+    ''|--dry-run|-n) dry_run ;;
+    *) printf 'usage: %s [--apply|--dry-run|--state]\n' "${0##*/}" >&2; exit 2 ;;
+esac

@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Usage: mail-sync [--quiet]. Pulls mail, indexes it (the notmuch post-new hook routes it), and files it into IMAP folders by its tags.
+set -uo pipefail
+
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/hey-mail"
+LOG="$STATE/sync.log"
+LOCK="$STATE/sync.lock"
+mkdir -p "$STATE"
+
+quiet=0
+[ "${1:-}" = "--quiet" ] && quiet=1
+
+log() {
+    printf '%s mail-sync: %s\n' "$(date -Is)" "$*" >>"$LOG"
+    [ "$quiet" -eq 1 ] || printf 'mail-sync: %s\n' "$*"
+}
+
+if [ -f "$LOG" ] && [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+    tail -n 2000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+fi
+
+# Two mbsync runs on one maildir corrupt the sync state, so a second caller leaves.
+exec 9>"$LOCK"
+if ! flock -n 9; then
+    log "another sync is running — skipping"
+    exit 0
+fi
+
+command -v mbsync >/dev/null 2>&1 || { log "mbsync not installed"; exit 1; }
+command -v notmuch >/dev/null 2>&1 || { log "notmuch not installed"; exit 1; }
+
+start=$(date +%s)
+
+# iCloud drops connections mid-fetch and mbsync still writes most of what it got, so a failed run is indexed anyway.
+if ! mbsync -c "$HOME/.mbsyncrc" icloud >>"$LOG" 2>&1; then
+    log "mbsync exited nonzero — indexing what landed anyway"
+fi
+
+if ! notmuch new --quiet >>"$LOG" 2>&1; then
+    log "notmuch new failed"
+    exit 1
+fi
+
+# Moves need a second `notmuch new` to learn the new names and a second mbsync to push them; the rerun hook sees no tag:new, so it notifies nobody.
+FOLDER_SYNC="$(dirname "$(readlink -f "$0")")/hey-folder-sync"
+if [ -x "$FOLDER_SYNC" ]; then
+    # This process holds the lock on fd 9, which the child inherits.
+    read -r moved created <<<"$(HEY_SYNC_LOCKED=1 "$FOLDER_SYNC" --apply 2>>"$LOG")"
+    case "${moved:-}"   in ''|*[!0-9]*) moved=0 ;; esac
+    case "${created:-}" in ''|*[!0-9]*) created=0 ;; esac
+
+    if [ "$moved" -gt 0 ]; then
+        log "folder sync: moved $moved message(s) between IMAP folders"
+        notmuch new --quiet >>"$LOG" 2>&1 || log "reindex after folder sync failed"
+    fi
+    [ "$created" -gt 0 ] && log "folder sync: created $created new box(es)"
+    if [ $((moved + created)) -gt 0 ]; then
+        mbsync -c "$HOME/.mbsyncrc" icloud >>"$LOG" 2>&1 \
+            || log "mbsync push after folder sync exited nonzero — retried next sync"
+    fi
+fi
+
+log "done in $(( $(date +%s) - start ))s"
+exit 0

@@ -1,0 +1,28 @@
+{{- $mail := fromToml (includeTemplate "mail-identities.toml" .) -}}
+{{- $primary := index $mail "primary" -}}
+{{- if $primary -}}
+[database]
+path={{ .chezmoi.homeDir }}/Mail
+# Outside the maildir, so wiping ~/Mail to re-sync keeps the routing hook.
+hook_dir={{ .chezmoi.homeDir }}/.config/notmuch/hooks
+
+[user]
+name=Saiful Islam
+primary_email={{ $primary }}
+# The custom-domain addresses that reach this inbox, so `notmuch reply` answers from the address a mail was sent to.
+{{- with (index $mail "others") }}
+other_email={{ join ";" . }}
+{{- end }}
+
+[new]
+# The post-new hook routes from tag:new and then removes it.
+tags=unread;inbox;new
+ignore=.uidvalidity;.mbsyncstate;.isyncuidmap.db;dovecot-uidlist;.DS_Store
+
+[search]
+exclude_tags=deleted;spam
+
+[maildir]
+# Read state goes into the maildir flags, which mbsync pushes to the server.
+synchronize_flags=true
+{{ end -}}

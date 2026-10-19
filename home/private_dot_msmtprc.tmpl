@@ -1,0 +1,20 @@
+{{- $mail := fromToml (includeTemplate "mail-identities.toml" .) -}}
+{{- $primary := index $mail "primary" -}}
+{{- if $primary -}}
+defaults
+auth            on
+tls             on
+tls_starttls    on
+# The CA bundle path differs per distro; `system` asks the TLS library for the platform store.
+tls_trust_file  system
+logfile         ~/.local/state/msmtp/msmtp.log
+
+account         icloud
+host            smtp.mail.me.com
+port            587
+from            {{ $primary }}
+user            {{ $primary }}
+passwordeval    "pass email/icloud/{{ (splitList "@" $primary) | first }} | head -n1"
+
+account default : icloud
+{{ end -}}

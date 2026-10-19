@@ -1,0 +1,38 @@
+{{- $mail := fromToml (includeTemplate "mail-identities.toml" .) -}}
+{{- $primary := index $mail "primary" -}}
+{{- if $primary -}}
+# A blank line ends a section in mbsyncrc, so each section below is one unbroken run of lines.
+
+# iCloud drops IMAP connections mid-fetch under load; shallow pipelining resets less often.
+IMAPAccount icloud
+Host imap.mail.me.com
+Port 993
+User {{ $primary }}
+PassCmd "pass email/icloud/{{ (splitList "@" $primary) | first }} | head -n1"
+TLSType IMAPS
+SystemCertificates yes
+PipelineDepth 10
+Timeout 120
+
+IMAPStore icloud-remote
+Account icloud
+
+# Verbatim keeps the on-disk path and the IMAP name the same string, which hey-folder-sync relies on.
+MaildirStore icloud-local
+Path ~/Mail/icloud/
+Inbox ~/Mail/icloud/INBOX
+SubFolders Verbatim
+
+# Notes is Apple Notes, not mail. Create Both shows hey-folder-sync's boxes on the phone, Expunge Both makes a local move an expunge, Remove None keeps a local accident off the server.
+Channel icloud
+Far :icloud-remote:
+Near :icloud-local:
+Patterns * !Notes
+Create Both
+Expunge Both
+Remove None
+SyncState *
+
+Group icloud-all
+Channel icloud
+{{ end -}}

@@ -1,0 +1,4 @@
+{{- /* Empty without the age key, so a keyless apply renders the mail templates empty and chezmoi writes none of them. Callers read keys with `index`: chezmoi's missingkey=error fails a field access on the empty map. */ -}}
+{{- if stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt") -}}
+{{- decrypt (include ".chezmoitemplates/mail-identities.toml.age") -}}
+{{- end -}}

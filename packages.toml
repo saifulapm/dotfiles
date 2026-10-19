@@ -414,3 +414,18 @@ why = "holds the gh PATs, the mail password and the hub's tokens"
 name = "pinentry-qt"
 arch = "all"
 why = "asks for the GPG passphrase on screen"
+
+[[package]]
+name = "isync"
+arch = "all"
+why = "mbsync, which mail-sync pulls iCloud mail with"
+
+[[package]]
+name = "notmuch"
+arch = "all"
+why = "indexes and tags the mail mail-sync pulls"
+
+[[package]]
+name = "msmtp"
+arch = "all"
+why = "sends mail, including the post-new hook's away replies"
