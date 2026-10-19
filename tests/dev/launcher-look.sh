@@ -79,6 +79,17 @@ check "blueprint: the cursor row's fill is #7FE3F0 and its first cell reads 01" 
 cyan=$(near "$(cursor_geo -60 3 8 8)" 127 227 240 3)
 check "blueprint: inside the cursor row reads the accent ($cyan of 64 px)" test "$cyan" -eq 64
 check "blueprint: the legend fits one line in apps mode ($(launcher_state | jq -c .legend))" state_is '.legendLines == 1 and .legendKeys == 5'
+# The block caret is the query's: it glows while the query has focus and goes when Tab hands j/k to the list.
+caret_px() { near "$(launcher_state | jq -r '.queryBox | "\(.x | floor),\(.y | floor) \(.w | floor)x\(.h | floor)"')" 127 227 240 10; }
+caret_on() { (($(caret_px) > 100)); }
+# It blinks, so gone means gone in four looks over 1.6 s.
+caret_off() { local i; for i in 1 2 3 4; do (($(caret_px) < 20)) || return 1; sleep 0.4; done; }
+until_ok 2000 caret_on
+check "blueprint: the query shows its block caret while it has focus ($(caret_px) px)" caret_on
+wtype -k Tab
+check "blueprint: after Tab the block caret is gone" caret_off
+wtype /
+until_ok 2000 caret_on
 # The board restyles at once: the query and the keyboard stay while the cursor row turns Artboard's tint.
 in_theme artboard
 until_ok 2000 state_is '.cursorFill == "#eef1ff"'
@@ -110,6 +121,7 @@ in_theme blueprint
 niri msg action spawn -- qs ipc call launcher mode clipboard
 until_ok 3000 state_is '.open and .mode == "clipboard"'
 check "blueprint: Mod+V shows a header reading LAUNCH // CLIPBOARD ($(launcher_state | jq -c .label))" state_is '.label == "LAUNCH // CLIPBOARD"'
+check "blueprint: Mod+V leaves no block caret in the query, since j/k move the list" caret_off
 close_launcher
 
 in_theme artboard

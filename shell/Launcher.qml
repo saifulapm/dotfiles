@@ -129,6 +129,7 @@ Item {
     function state() {
         const cur = rowRepeater.itemAt(selected);
         const p = cur ? cur.mapToItem(null, 0, 0) : null;
+        const q = input.mapToItem(null, 0, 0);
         return JSON.stringify({
             open: shown,
             mode: mode,
@@ -149,6 +150,7 @@ Item {
             cursorElided: cur ? cur.elided : null,
             cursorDetailWidth: cur ? cur.detailWidth : null,
             queryFont: [input.font.family, input.font.pixelSize],
+            queryBox: { x: q.x, y: q.y, w: input.width, h: input.height },
             detailFont: [look.detail.font, look.detail.size, look.detail.italic],
             legend: look.legendLine(mode),
             legendKeys: footerKeys.count,
@@ -609,6 +611,8 @@ Item {
             width: 11
             height: input.font.pixelSize
             color: look.prompt.color
+            // Qt hides only its own caret when the query loses focus, so a delegate follows cursorVisible itself.
+            visible: input.cursorVisible
 
             RectangularShadow {
                 anchors.fill: parent
