@@ -4,6 +4,7 @@ import QtQuick
 import "." as Root
 import "services" as Services
 import "lib/margins.mjs" as MarginsLib
+import "lib/goals.mjs" as GoalsLib
 
 // The island, the margins and the services behind them; shell.qml loads this after the paper's first frame.
 Scope {
@@ -11,6 +12,8 @@ Scope {
 
     required property var theme
     required property var notifs
+    // The Goals window reaches the store through this.
+    readonly property alias goals: goalsService
 
     Services.Niri {
         id: niriService
@@ -51,6 +54,11 @@ Scope {
 
     Services.Notes {
         id: notesService
+        onToast: text => island.showToast(text)
+    }
+
+    Services.Goals {
+        id: goalsService
         onToast: text => island.showToast(text)
     }
 
@@ -118,6 +126,7 @@ Scope {
             clock: clockService
             power: powerService
             network: networkService
+            goals: goalsService
             islandWidth: island.boxWidth
         }
     }
@@ -128,7 +137,7 @@ Scope {
         // The margins of the output with the focused workspace.
         function state(): string {
             const view = niriService.view(niriService.focusedOutput) ?? { idx: 0, app: null, title: null };
-            return JSON.stringify(MarginsLib.marginState(view, clockService.now, { wifi: networkService.wifi, battery: powerService.battery }));
+            return JSON.stringify(MarginsLib.marginState(view, clockService.now, { goal: GoalsLib.marginGoal(goalsService.store, clockService.now), wifi: networkService.wifi, battery: powerService.battery }));
         }
     }
 

@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import "lib/margins.mjs" as M
+import "lib/goals.mjs" as G
 import "lib/surface.mjs" as S
 
 // Each margin sits over an ink hairline that stops 8 px short of the island, when the theme's frame is drawn in ink.
@@ -13,9 +14,10 @@ PanelWindow {
     required property var clock
     required property var power
     required property var network
+    required property var goals
     required property real islandWidth
     readonly property var view: niri.view(screen.name) ?? { idx: 0, app: null, title: null }
-    readonly property var marginState: M.marginState(view, clock.now, { wifi: network.wifi, battery: power.battery })
+    readonly property var marginState: M.marginState(view, clock.now, { goal: G.marginGoal(goals.store, clock.now), wifi: network.wifi, battery: power.battery })
     readonly property real lineEnd: width / 2 - islandWidth / 2 - 8
     readonly property var look: S.marginStyle(theme.tokens)
 
@@ -66,6 +68,16 @@ PanelWindow {
         anchors.rightMargin: 32
         y: 17
         spacing: 20
+
+        // Paper's accent bold, Artboard's ink medium, Blueprint's amber (its danger token); the voice tells the themes apart.
+        Label {
+            readonly property bool bracket: root.theme.tokens?.type.display === root.theme.tokens?.type.mono
+            readonly property bool caps: root.theme.tokens?.type.ui === root.theme.tokens?.type.mono
+            text: root.marginState.right.goal
+            visible: text !== ""
+            color: (bracket ? root.theme.color.danger : caps ? root.theme.color.accent : root.theme.color.ink) ?? "black"
+            font.weight: bracket ? Font.Normal : caps ? Font.Bold : Font.Medium
+        }
 
         Label {
             text: root.marginState.right.wifi
