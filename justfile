@@ -17,6 +17,10 @@ test-sync:
     [ "$(ssh_tree)" = "$before" ] || { echo "the real ~/.ssh changed during the sync tests" >&2; exit 1; }
     exit $rc
 
+# dots bump and the other dots subcommands, against stub gh and curl
+test-dots:
+    node --test 'tests/dots/*.test.mjs'
+
 # checks that each open a nested niri for a few seconds
 test-dev:
     tests/dev/run.sh
