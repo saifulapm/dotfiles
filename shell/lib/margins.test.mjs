@@ -25,15 +25,15 @@ test('the tick waits until the next minute boundary', () => {
 });
 
 test('the margin state for a focused window', () => {
-  const s = marginState({ idx: 1, app: 'foot', title: '~/Sites/github/dotfiles' }, AT, { wifi: 'wifi', battery: '82%' });
+  const s = marginState({ idx: 1, app: 'foot', title: '~/Sites/github/dotfiles' }, AT, { goal: '', wifi: 'wifi', battery: '82%' });
   assert.equal(
     JSON.stringify(s),
-    '{"left":{"workspace":"01","app":"foot","title":"~/Sites/github/dotfiles","text":"01 · foot — ~/Sites/github/dotfiles"},"right":{"wifi":"wifi","battery":"82%","date":"Sun 18 Oct","text":"wifi  82%  Sun 18 Oct"}}',
+    '{"left":{"workspace":"01","app":"foot","title":"~/Sites/github/dotfiles","text":"01 · foot — ~/Sites/github/dotfiles"},"right":{"goal":"","wifi":"wifi","battery":"82%","date":"Sun 18 Oct","text":"wifi  82%  Sun 18 Oct"}}',
   );
 });
 
 test('the margin state for an empty workspace is just its number', () => {
-  const s = marginState({ idx: 2, app: null, title: null }, AT, { wifi: '', battery: '' });
+  const s = marginState({ idx: 2, app: null, title: null }, AT, { goal: '', wifi: '', battery: '' });
   assert.equal(s.left.text, '02');
   assert.equal(s.left.workspace, '02');
 });
@@ -50,9 +50,17 @@ test('the battery reads its percentage, and says when it is charging', () => {
 
 test('the top-right drops the parts that are absent', () => {
   const view = { idx: 1, app: null, title: null };
-  assert.equal(marginState(view, AT, { wifi: 'no wifi', battery: '' }).right.text, 'no wifi  Sun 18 Oct');
-  assert.equal(marginState(view, AT, { wifi: '', battery: '82% charging' }).right.text, '82% charging  Sun 18 Oct');
-  assert.equal(marginState(view, AT, { wifi: '', battery: '' }).right.text, 'Sun 18 Oct');
+  assert.equal(marginState(view, AT, { goal: '', wifi: 'no wifi', battery: '' }).right.text, 'no wifi  Sun 18 Oct');
+  assert.equal(marginState(view, AT, { goal: '', wifi: '', battery: '82% charging' }).right.text, '82% charging  Sun 18 Oct');
+  assert.equal(marginState(view, AT, { goal: '', wifi: '', battery: '' }).right.text, 'Sun 18 Oct');
+});
+
+test('the active goal opens the top-right, and an empty one leaves no gap', () => {
+  const view = { idx: 1, app: null, title: null };
+  const s = marginState(view, AT, { goal: 'Ship v2 · 3d', wifi: 'wifi', battery: '82%' });
+  assert.equal(s.right.goal, 'Ship v2 · 3d');
+  assert.equal(s.right.text, 'Ship v2 · 3d  wifi  82%  Sun 18 Oct');
+  assert.equal(marginState(view, AT, { goal: '', wifi: 'wifi', battery: '82%' }).right.text.startsWith('wifi'), true);
 });
 
 test('wifi is named only when there is a Wi-Fi device', () => {
