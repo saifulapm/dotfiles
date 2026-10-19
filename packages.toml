@@ -135,6 +135,22 @@ arch = "all"
 why = "unpacks the nerd-symbols font pin"
 
 [[package]]
+name = "zoxide"
+arch = "all"
+why = "fish's cd jumps to directories by frecency"
+
+[[package]]
+name = "mise"
+arch = "all"
+copr = "jdxcode/mise"
+why = "the language runtimes fish activates (node, pnpm, pi)"
+
+[[package]]
+name = "inotify-tools"
+arch = "all"
+why = "fish's rsw mirrors a directory on every change"
+
+[[package]]
 name = "lsd"
 arch = "all"
 why = "ll, lt and la list directories with it"

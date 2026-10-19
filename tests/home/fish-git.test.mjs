@@ -2,7 +2,7 @@
 import { before, after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -35,7 +35,8 @@ before(() => {
 
 after(() => rmSync(root, { recursive: true, force: true }));
 
-const run = (cmd, args) => spawnSync(cmd, args, { env, encoding: 'utf8' });
+// From the scratch home, so mise does not walk up into the real home's config.
+const run = (cmd, args) => spawnSync(cmd, args, { env, cwd: home, encoding: 'utf8' });
 const files = (dir) => { try { return readdirSync(dir); } catch { return []; } };
 
 test('fish starts quietly, plain and interactive', () => {
@@ -52,11 +53,43 @@ test('every kept alias and function is defined, and none is named for a dropped 
     .map((l) => /^alias (\S+)/.exec(l)?.[1])
     .filter(Boolean);
   const fns = files(join(fishDir, 'functions')).map((f) => f.replace(/\.fish$/, ''));
-  for (const name of ['gst', 'a', 'ssh', 'la']) assert.ok(aliases.concat(fns).includes(name), `${name} is kept`);
+  for (const name of ['gst', 'a', 'ssh', 'la', 'cd', 'zd', 'gwd', 'gwp', 'tdl', 'tdlm', 'tsl', 'rsw', 'lsw', 'dsw']) assert.ok(aliases.concat(fns).includes(name), `${name} is kept`);
   const r = run('fish', ['-i', '-c', 'for n in $argv; functions -q $n; or echo missing $n; end', ...aliases, ...fns]);
   assert.equal(r.stdout, '');
   const dropped = run('fish', ['-i', '-c', 'for n in herdr kitty vicinae h hds hdl; functions -q $n; and echo $n; end']);
   assert.equal(dropped.stdout, '');
+});
+
+test('the tool directories that exist join PATH, and SSH asks pinentry for curses', () => {
+  for (const d of ['.cargo/bin', '.opencode/bin', '.local/share/pnpm', '.local/share/go/bin', 'Android/Sdk/platform-tools', '.local/share/mise/shims']) mkdirSync(join(home, d), { recursive: true });
+  const r = run('fish', ['-i', '-c', 'string join \\n -- $PATH; echo "go=$GOBIN pnpm=$PNPM_HOME android=$ANDROID_HOME"']);
+  const lines = r.stdout.trim().split('\n');
+  for (const d of ['.cargo/bin', '.opencode/bin', '.local/share/pnpm', '.local/share/go/bin', 'Android/Sdk/platform-tools', '.local/share/mise/shims']) {
+    assert.ok(lines.includes(join(home, d)), `${d} on PATH`);
+  }
+  assert.equal(lines.at(-1), `go=${home}/.local/share/go/bin pnpm=${home}/.local/share/pnpm android=${home}/Android/Sdk`);
+  const ssh = spawnSync('fish', ['-i', '-c', 'echo $PINENTRY_USER_DATA'], { env: { ...env, SSH_CONNECTION: '1 2 3 4' }, cwd: home, encoding: 'utf8' });
+  assert.equal(ssh.stdout, 'curses\n');
+});
+
+test('cd goes to a real directory, and jumps through zoxide for the rest', () => {
+  mkdirSync(join(home, 'Sites/deep/projx'), { recursive: true });
+  const r = run('fish', ['-i', '-c', 'zoxide add ~/Sites/deep/projx; cd ~/Sites; pwd; cd projx >/dev/null; pwd']);
+  assert.equal(r.stdout, `${home}/Sites\n${home}/Sites/deep/projx\n`, r.stderr);
+});
+
+test('gwd removes the worktree it stands in and its branch, once asked', () => {
+  const repo = join(home, 'gwrepo');
+  mkdirSync(repo);
+  const git = (...a) => spawnSync('git', ['-C', repo, ...a], { env, encoding: 'utf8' });
+  git('init', '-q', '-b', 'main');
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'init');
+  git('worktree', 'add', '-q', '-b', 'feat', join(home, 'gwrepo--feat'));
+  run('fish', ['-i', '-c', `cd ${home}/gwrepo--feat; echo n | gwd`]);
+  assert.ok(existsSync(join(home, 'gwrepo--feat')));
+  run('fish', ['-i', '-c', `cd ${home}/gwrepo--feat; echo y | gwd`]);
+  assert.ok(!existsSync(join(home, 'gwrepo--feat')));
+  assert.equal(git('branch', '--list', 'feat').stdout, '');
 });
 
 test('fish writes its history to the file dots sync reads', () => {

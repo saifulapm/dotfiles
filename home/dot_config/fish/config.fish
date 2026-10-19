@@ -10,7 +10,13 @@ set -gx HELIX_RUNTIME /usr/lib64/helix/runtime
 # Without it composer prefers a legacy ~/.composer when one exists.
 set -gx COMPOSER_HOME ~/.config/composer
 
-fish_add_path -g ~/.local/bin ~/.config/composer/vendor/bin ~/Sites/github/dotfiles/bin
+set -gx GOPATH ~/.local/share/go
+set -gx GOBIN $GOPATH/bin
+set -gx PNPM_HOME ~/.local/share/pnpm
+set -gx ANDROID_HOME ~/Android/Sdk
+
+# fish_add_path skips a directory that does not exist, so a machine without the tool gets nothing.
+fish_add_path -g ~/.local/bin ~/.config/composer/vendor/bin ~/Sites/github/dotfiles/bin ~/.cargo/bin ~/.opencode/bin $PNPM_HOME $PNPM_HOME/bin $GOBIN $ANDROID_HOME/platform-tools ~/.local/share/mise/shims
 # Last, so an untrusted clone cannot shadow a system command with its own node_modules/.bin or vendor/bin; fish_add_path would make them absolute.
 set -gx PATH $PATH node_modules/.bin vendor/bin
 
@@ -24,3 +30,12 @@ function __dots_colors --on-event fish_prompt
     source $__dots_colors_file
 end
 __dots_colors
+
+# gpg asks for a passphrase on this terminal; over SSH, pinentry-auto reads PINENTRY_USER_DATA and draws curses instead of a window on the far screen.
+isatty stdin; and set -gx GPG_TTY (tty)
+set -q SSH_CONNECTION; and set -gx PINENTRY_USER_DATA curses
+
+if status is-interactive
+    command -q mise; and mise activate fish | source
+    command -q zoxide; and zoxide init fish | source
+end

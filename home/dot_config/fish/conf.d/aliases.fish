@@ -3,6 +3,8 @@ alias reload "exec fish"
 alias ll "lsd -l"
 alias lt "lsd --tree"
 alias ta "tmux attach"
+# cd goes to real paths directly and jumps through zoxide for the rest.
+alias cd zd
 
 alias .. "cd .."
 alias ... "cd ../.."
