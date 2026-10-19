@@ -3,7 +3,7 @@ import Quickshell.Io
 import QtQuick
 import "." as Root
 import "lib/recorder.mjs" as R
-import "lib/notes-look.mjs" as K
+import "lib/voice.mjs" as V
 
 // Mod+Shift+R: the region picker, drawn in the Surfaces window, and the wf-recorder run it starts.
 Item {
@@ -24,6 +24,7 @@ Item {
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
+    readonly property var look: V.listLook(theme.tokens)
 
     function toggle() {
         if (recording)
@@ -65,7 +66,11 @@ Item {
     }
 
     function state() {
-        return JSON.stringify({ picking: shown, recording: recording, region: region, step: R.STEP, file: file });
+        // The hint as drawn, read from its key items.
+        const hint = [];
+        for (let i = 0; i < hintRepeater.count; i++)
+            hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
+        return JSON.stringify({ picking: shown, recording: recording, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
     }
 
     Process {
@@ -135,22 +140,59 @@ Item {
 
             Text {
                 textFormat: Text.PlainText
-                anchors.baseline: keys.baseline
+                anchors.verticalCenter: parent.verticalCenter
                 text: recorder.region.w + " × " + recorder.region.h
                 color: recorder.c.ink
                 font.family: recorder.fonts.display
                 font.pixelSize: 20
             }
 
-            Text {
-                id: keys
-                textFormat: Text.PlainText
+            // The keys as the launcher's legend draws them: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
+            Row {
                 anchors.verticalCenter: parent.verticalCenter
-                text: recorder.theme.tokens ? K.keyLine(recorder.theme.tokens, [["hjkl", "move"], ["⇧HJKL", "size"], ["f", "full"], ["↵", "rec"], ["esc", "cancel"]]) : ""
-                color: recorder.c.muted
-                font.family: recorder.fonts.ui
-                font.pixelSize: 11
-                font.letterSpacing: 1.2
+                spacing: recorder.look.legend("").chips ? 8 : 14
+
+                Repeater {
+                    id: hintRepeater
+                    model: recorder.look.keys([["hjkl", "move"], ["⇧HJKL", "size"], ["f", "full"], ["↵", "rec"], ["esc", "cancel"]])
+
+                    Rectangle {
+                        id: keyPair
+                        required property var modelData
+                        readonly property string keyLabel: keyText.text
+                        readonly property string wordLabel: wordText.text
+                        width: pairRow.implicitWidth + (recorder.look.legend("").chips ? 14 : 0)
+                        height: pairRow.implicitHeight + (recorder.look.legend("").chips ? 6 : 0)
+                        radius: 6
+                        color: recorder.look.chip.fill
+
+                        Row {
+                            id: pairRow
+                            anchors.centerIn: parent
+                            spacing: recorder.look.legend("").chips ? 6 : 5
+
+                            Text {
+                                id: keyText
+                                textFormat: Text.PlainText
+                                text: keyPair.modelData.key
+                                color: recorder.look.chip.key
+                                font.family: recorder.fonts.mono
+                                font.pixelSize: recorder.look.small.size
+                                font.letterSpacing: recorder.look.small.spacing
+                                font.bold: true
+                            }
+                            Text {
+                                id: wordText
+                                textFormat: Text.PlainText
+                                text: keyPair.modelData.word
+                                color: recorder.c.muted
+                                font.family: recorder.look.small.font
+                                font.pixelSize: recorder.look.small.size
+                                font.letterSpacing: recorder.look.small.spacing
+                            }
+                        }
+                    }
+                }
             }
         }
     }

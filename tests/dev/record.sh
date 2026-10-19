@@ -15,6 +15,20 @@ files() { find "$DOTS_RECORDINGS_DIR" -name '*.mp4' 2>/dev/null | wc -l; }
 
 until_ok 5000 shell_status >/dev/null
 
+# The picker's key hint reads in each theme's voice: Artboard plain, Blueprint bracketed, Paper caps.
+status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
+in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+for t in "artboard|hjkl move  ⇧HJKL size  f full  ↵ rec  esc cancel" \
+  "blueprint|[HJKL] MOVE  [⇧HJKL] SIZE  [F] FULL  [↵] REC  [ESC] CANCEL" \
+  "paper|HJKL MOVE  ⇧HJKL SIZE  F FULL  ↵ REC  ESC CANCEL"; do
+  in_theme "${t%%|*}"
+  mod_shift_r
+  until_ok 3000 state_is '.picking'
+  check "${t%%|*}: the hint reads ${t#*|} ($(rec_state | jq -c .hint))" state_is ".hint == \"${t#*|}\""
+  wtype -k Escape
+  until_ok 2000 state_is '.picking | not'
+done
+
 mod_shift_r
 until_ok 3000 state_is '.picking'
 check "Mod+Shift+R opens the picker" state_is '.picking and (.recording | not)'

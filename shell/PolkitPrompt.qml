@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import "." as Root
-import "lib/notes-look.mjs" as K
+import "lib/voice.mjs" as V
 
 // The one Overlay prompt a polkit request shows, drawn in the Surfaces window.
 Item {
@@ -14,8 +14,7 @@ Item {
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    // The key line in the theme's voice: Blueprint brackets its keys.
-    readonly property string keys: theme.tokens ? K.keyLine(theme.tokens, [["↵", "authenticate"], ["esc", "cancel"]]) : ""
+    readonly property var look: V.listLook(theme.tokens)
 
     function show(f) {
         flow = f;
@@ -54,7 +53,13 @@ Item {
     }
 
     function state() {
+        // The hint as drawn, read from its key items.
+        const hint = [];
+        for (let i = 0; i < hintRepeater.count; i++)
+            hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
         return JSON.stringify({
+            heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
+            hint: hint.join("  "),
             open: shown,
             message: flow?.message ?? "",
             prompt: flow?.inputPrompt ?? "",
@@ -93,16 +98,58 @@ Item {
             width: parent.width
             spacing: 0
 
-            Text {
-                textFormat: Text.PlainText
+            // The title in the launcher's label idiom: Paper's ink chip, Artboard's pill, Blueprint's header line.
+            RowLayout {
                 Layout.fillWidth: true
                 Layout.margins: 20
-                Layout.bottomMargin: 6
-                text: "AUTHENTICATE"
-                color: prompt.c.muted
-                font.family: prompt.fonts.ui
-                font.pixelSize: 10
-                font.letterSpacing: 1.4
+                Layout.bottomMargin: 10
+
+                Text {
+                    id: header
+                    visible: prompt.look.label.kind === "header"
+                    textFormat: Text.PlainText
+                    Layout.fillWidth: true
+                    text: prompt.look.heading("authenticate", "")
+                    color: prompt.look.small.color
+                    font.family: prompt.look.small.font
+                    font.pixelSize: prompt.look.small.size
+                    font.letterSpacing: prompt.look.small.spacing
+                }
+
+                Rectangle {
+                    visible: prompt.look.label.kind === "chip"
+                    implicitWidth: chip.implicitWidth + 14
+                    implicitHeight: chip.implicitHeight + 6
+                    color: prompt.look.label.fill
+                    Text {
+                        id: chip
+                        textFormat: Text.PlainText
+                        anchors.centerIn: parent
+                        text: prompt.look.heading("authenticate", "")
+                        color: prompt.look.label.color
+                        font.family: prompt.fonts.ui
+                        font.pixelSize: 10
+                        font.letterSpacing: 1.4
+                    }
+                }
+
+                Rectangle {
+                    visible: prompt.look.label.kind === "pill"
+                    implicitWidth: pill.implicitWidth + 18
+                    implicitHeight: pill.implicitHeight + 6
+                    radius: 8
+                    color: prompt.look.label.fill
+                    Text {
+                        id: pill
+                        textFormat: Text.PlainText
+                        anchors.centerIn: parent
+                        text: prompt.look.heading("authenticate", "")
+                        color: prompt.look.label.color
+                        font.family: prompt.fonts.ui
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
+                    }
+                }
             }
 
             Text {
@@ -153,18 +200,71 @@ Item {
                 }
             }
 
+            // The daemon's word replaces the key hint while it has one.
             Text {
+                visible: !!prompt.flow?.supplementaryMessage
                 textFormat: Text.PlainText
                 Layout.fillWidth: true
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
                 Layout.bottomMargin: 16
                 wrapMode: Text.Wrap
-                text: prompt.flow?.supplementaryMessage ? prompt.flow.supplementaryMessage : prompt.keys
+                text: prompt.flow?.supplementaryMessage ?? ""
                 color: prompt.flow?.supplementaryIsError ? prompt.c.danger : prompt.c.muted
                 font.family: prompt.fonts.ui
                 font.pixelSize: 10
                 font.letterSpacing: 1.2
+            }
+
+            // The key hint as the launcher's legend draws it: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
+            Row {
+                visible: !prompt.flow?.supplementaryMessage
+                Layout.leftMargin: 20
+                Layout.rightMargin: 20
+                Layout.bottomMargin: 16
+                spacing: prompt.look.legend("").chips ? 8 : 14
+
+                Repeater {
+                    id: hintRepeater
+                    model: prompt.look.keys([["↵", "authenticate"], ["esc", "cancel"]])
+
+                    Rectangle {
+                        id: keyPair
+                        required property var modelData
+                        readonly property string keyLabel: keyText.text
+                        readonly property string wordLabel: wordText.text
+                        width: pairRow.implicitWidth + (prompt.look.legend("").chips ? 14 : 0)
+                        height: pairRow.implicitHeight + (prompt.look.legend("").chips ? 6 : 0)
+                        radius: 6
+                        color: prompt.look.chip.fill
+
+                        Row {
+                            id: pairRow
+                            anchors.centerIn: parent
+                            spacing: prompt.look.legend("").chips ? 6 : 5
+
+                            Text {
+                                id: keyText
+                                textFormat: Text.PlainText
+                                text: keyPair.modelData.key
+                                color: prompt.look.chip.key
+                                font.family: prompt.fonts.mono
+                                font.pixelSize: prompt.look.small.size
+                                font.letterSpacing: prompt.look.small.spacing
+                                font.bold: true
+                            }
+                            Text {
+                                id: wordText
+                                textFormat: Text.PlainText
+                                text: keyPair.modelData.word
+                                color: prompt.c.muted
+                                font.family: prompt.look.small.font
+                                font.pixelSize: prompt.look.small.size
+                                font.letterSpacing: prompt.look.small.spacing
+                            }
+                        }
+                    }
+                }
             }
         }
     }

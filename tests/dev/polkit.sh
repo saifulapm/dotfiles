@@ -46,5 +46,20 @@ check "Esc then cancels the first" result_is c2 org.freedesktop.PolicyKit1.Error
 until_ok 2000 state_is '.open | not'
 check "and the prompt closes" state_is '.open | not'
 
+# The key hint reads in each theme's voice: Artboard plain, Blueprint bracketed, Paper caps.
+status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
+in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+n=0
+for t in "artboard|↵ authenticate  esc cancel" "blueprint|[↵] AUTHENTICATE  [ESC] CANCEL" "paper|↵ AUTHENTICATE  ESC CANCEL"; do
+  n=$((n + 1))
+  in_theme "${t%%|*}"
+  fake Begin s "h$n" >/dev/null
+  until_ok 3000 state_is '.open'
+  check "${t%%|*}: the hint reads ${t#*|} ($(pk_state | jq -c .hint))" state_is ".hint == \"${t#*|}\""
+  wtype -k Escape
+  until_ok 3000 result_is "h$n" org.freedesktop.PolicyKit1.Error.Cancelled
+  until_ok 2000 state_is '.open | not'
+done
+
 exit $((fails > 0))
 }
