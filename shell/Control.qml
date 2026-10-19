@@ -75,6 +75,7 @@ Item {
             settleMs: motion.settleMs,
             settled: motion.settled,
             drawing: motion.drawing,
+            cardBox: card.drawnBox(),
             heading: header.visible ? header.text : "",
             tabFill: tab ? String(tab.color) : null,
             tabText: tab ? tab.text : null,

@@ -77,7 +77,7 @@ Item {
         const hint = [];
         for (let i = 0; i < hintRepeater.count; i++)
             hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
-        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: motion.drawing, recording: recording, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
+        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: motion.drawing, cardBox: hintCard.drawnBox(), recording: recording, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
     }
 
     Process {
@@ -132,7 +132,7 @@ Item {
 
     // The hint is a card in the theme's treatment: Paper's hard shadow and serif size, Artboard's frame label, Blueprint's chamfer and brackets.
     Root.Surface {
-        id: hint
+        id: hintCard
         x: Math.min(recorder.region.x, recorder.width - width)
         y: recorder.region.y >= height + 32 ? recorder.region.y - height - 12 : recorder.region.y + 28
         width: hintRow.implicitWidth + 28

@@ -69,6 +69,7 @@ Item {
             settleMs: motion.settleMs,
             settled: motion.settled,
             drawing: motion.drawing,
+            cardBox: card.drawnBox(),
             message: flow?.message ?? "",
             prompt: flow?.inputPrompt ?? "",
             error: flow?.supplementaryIsError ? flow.supplementaryMessage : "",
