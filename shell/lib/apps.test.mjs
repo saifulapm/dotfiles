@@ -12,13 +12,26 @@ const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../theme
 const blueprint = load('blueprint');
 const paper = load('paper');
 
-test('tmux status line takes the theme colours, lower-case', () => {
-  assert.match(renderTmux(blueprint), /^set -g status-style "fg=#d6f4f8,bg=#0a1526"$/m);
-  assert.match(renderTmux(paper), /^set -g status-style "fg=#[0-9a-f]{6},bg=#[0-9a-f]{6}"$/m);
-  assert.doesNotMatch(renderTmux(paper), /status-style "fg=#d6f4f8/);
+const artboard = load('artboard');
+
+test('tmux tabs take the theme\'s corner: round pills, cut slants, square blocks', () => {
+  const current = (t) => renderTmux(t).match(/^set -g window-status-current-format "(.*)"$/m)[1];
+  assert.match(current(artboard), /\ue0b6.*#\[fg=#ffffff,bg=#3d5afe\].*\ue0b4/);
+  assert.match(current(blueprint), /\ue0ba.*#\[fg=#0a1526,bg=#7fe3f0\].*\ue0bc/);
+  assert.doesNotMatch(current(paper), /[\ue0b4\ue0b6\ue0ba\ue0bc]/);
+  assert.match(current(paper), /#\[fg=#faf6ec,bg=#c8381e\] #I #W/);
 });
 
-test('a throwaway tmux server accepts the fragment', (t) => {
+test('the active tmux pane border follows the frame', () => {
+  assert.match(renderTmux(paper), /^set -g pane-active-border-style "fg=#1c1915"$/m);
+  assert.match(renderTmux(blueprint), /^set -g pane-active-border-style "fg=#7fe3f0"$/m);
+  assert.match(renderTmux(paper), /^set -g pane-border-lines single$/m);
+  const double = structuredClone(paper);
+  double.primitive.frame = 'double';
+  assert.match(renderTmux(double), /^set -g pane-border-lines double$/m);
+});
+
+test('a throwaway tmux server accepts each theme\'s fragment', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'dots-apps-'));
   const sock = `dots-apps-${process.pid}`;
   const tmux = (...a) => execFileSync('tmux', ['-L', sock, ...a], { encoding: 'utf8' });
@@ -26,10 +39,14 @@ test('a throwaway tmux server accepts the fragment', (t) => {
     try { tmux('kill-server'); } catch {}
     rmSync(dir, { recursive: true, force: true });
   });
-  writeFileSync(join(dir, 'tmux.conf'), renderTmux(blueprint));
   execFileSync('tmux', ['-L', sock, '-f', '/dev/null', 'new-session', '-d']);
-  tmux('source-file', join(dir, 'tmux.conf'));
-  assert.match(tmux('show', '-g', 'status-style'), /#d6f4f8/);
+  for (const theme of [paper, artboard, blueprint]) {
+    writeFileSync(join(dir, 'tmux.conf'), renderTmux(theme));
+    tmux('source-file', join(dir, 'tmux.conf'));
+    assert.match(tmux('show', '-g', 'status-style'), new RegExp(`fg=${theme.color.muted.toLowerCase()},bg=default`));
+    // Without the prefix held, the session badge is ink.
+    assert.match(tmux('display', '-p', '#{T:status-left}'), new RegExp(`fg=${theme.color.ink.toLowerCase()}`, 'i'));
+  }
 });
 
 test('kakoune colorscheme defines the core faces from the tokens', () => {
@@ -59,6 +76,9 @@ test('chromium policy holds the surface colour and the mode', () => {
 test('colors.fish sets fish and fzf colours', () => {
   const fish = renderFish(blueprint);
   assert.match(fish, /^set -g fish_color_normal d6f4f8$/m);
+  // The prompt draws the directory and a failed status in these.
+  assert.match(fish, /^set -g fish_color_cwd 7fe3f0$/m);
+  assert.match(fish, /^set -g fish_color_status ffb547$/m);
   assert.match(fish, /^set -gx FZF_DEFAULT_OPTS "--color=fg:#d6f4f8,bg:#0a1526,hl:#7fe3f0/m);
 });
 

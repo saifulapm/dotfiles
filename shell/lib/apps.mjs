@@ -2,19 +2,46 @@
 const lower = (s) => s.toLowerCase();
 const rgb = (s) => `rgb:${lower(s).slice(1)}`;
 
+// The ends of a tmux tab, by corner: Nerd Font half circles for round, slants for cut, none for square.
+const TAB_ENDS = { round: ['\ue0b6', '\ue0b4'], cut: ['\ue0ba', '\ue0bc'], square: ['', ''] };
+
+// The bar sits on the terminal's own background; the formats carry their colours, as tmux bakes #[...] into a format.
 export function renderTmux(t) {
   const c = t.color;
   const [ink, muted, line, surface, paper, accent, danger] = [c.ink, c.muted, c.line, c.surface, c.paper, c.accent, c.danger].map(lower);
+  const frame = t.primitive.frame;
+  const edge = { ink, double: ink, hairline: muted }[frame] ?? accent;
+  const lines = frame === 'double' ? 'double' : 'single';
+  const [l, r] = TAB_ENDS[t.primitive.corner];
+  // Maple Mono draws the half circles inside their cell; the slants come from Symbols Nerd Font and spill into the next one, so they get a space to spill into.
+  const pad = t.primitive.corner === 'round' ? '' : ' ';
+  const tab = (bg, text) => `#[fg=${bg},bg=default]${l}#[fg=${surface},bg=${bg}]${pad}${text}${pad}#[fg=${bg},bg=default]${r}#[default]`;
+  // A plain tab keeps the filled one's width, so the centred list does not shift as focus moves.
+  const plain = (text) => `${l && ' '}${pad}#[fg=${muted}]${text}#[default]${pad}${r && ' '}`;
+  const win = '#I #W#{?window_zoomed_flag, \u{f0293},}';
   return [
-    `set -g status-style "fg=${ink},bg=${surface}"`,
-    `set -g status-left-style "fg=${accent},bg=${surface}"`,
-    `set -g window-status-style "fg=${muted},bg=${surface}"`,
-    `set -g window-status-current-style "fg=${accent},bg=${surface},bold"`,
+    `set -g status-style "fg=${muted},bg=default"`,
+    `set -g status-left " ${tab(`#{?client_prefix,${accent},${ink}}`, '#S')} "`,
+    `set -g status-right "#[fg=${accent}]#(amx statusline)#[fg=${muted}] #{?#{==:#{pane_current_path},#{HOME}},~,#{=/-24/…:#{b:pane_current_path}}} "`,
+    `set -g window-status-format "${plain(win)}"`,
+    `set -g window-status-current-format "${tab(accent, win)}"`,
+    `set -g pane-border-lines ${lines}`,
     `set -g pane-border-style "fg=${line}"`,
-    `set -g pane-active-border-style "fg=${accent}"`,
+    `set -g pane-active-border-style "fg=${edge}"`,
+    `set -g popup-border-lines ${t.primitive.corner === 'round' ? 'rounded' : lines}`,
+    `set -g popup-border-style "fg=${edge}"`,
+    `set -g menu-border-lines ${t.primitive.corner === 'round' ? 'rounded' : lines}`,
+    `set -g menu-border-style "fg=${edge}"`,
+    `set -g menu-style "fg=${ink},bg=${surface}"`,
+    `set -g menu-selected-style "fg=${surface},bg=${accent}"`,
     `set -g message-style "fg=${ink},bg=${paper}"`,
     `set -g message-command-style "fg=${danger},bg=${paper}"`,
     `set -g mode-style "fg=${surface},bg=${accent}"`,
+    `set -g copy-mode-match-style "fg=${ink},bg=${line}"`,
+    `set -g copy-mode-current-match-style "fg=${surface},bg=${accent}"`,
+    `set -g clock-mode-colour "${accent}"`,
+    `set -g display-panes-active-colour "${accent}"`,
+    `set -g display-panes-colour "${muted}"`,
     '',
   ].join('\n');
 }
@@ -113,6 +140,7 @@ export function renderFish(t) {
   const colors = [
     ['normal', ink], ['command', accent], ['keyword', accent], ['quote', ok], ['redirection', ink], ['end', muted],
     ['error', danger], ['param', ink], ['comment', muted], ['operator', accent], ['escape', danger], ['autosuggestion', muted],
+    ['cwd', accent], ['status', danger],
     ['selection', `--background=${bare(line)}`], ['search_match', `--background=${bare(line)}`],
   ];
   const lines = colors.map(([n, v]) => `set -g fish_color_${n} ${v.startsWith('#') ? bare(v) : v}`);
