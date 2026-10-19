@@ -51,7 +51,8 @@ niri msg action focus-workspace 3
 niri msg action spawn -- foot -T "$(printf 'T%.0s' $(seq 2000))" sleep 600
 long_focused() { niri msg -j focused-window | jq -e '.title | length == 2000' >/dev/null 2>&1; }
 until_ok 5000 long_focused
-short_of_island() { margins | jq -e '.drawn.left | length > 2000' >/dev/null 2>&1 && margins | jq -e '.drawn.leftEnd <= .drawn.lineEnd and .drawn.rightStart >= .drawn.width - .drawn.lineEnd' >/dev/null 2>&1; }
+# A Text paints past its width unless it elides, so the check reads both its box and its elision.
+short_of_island() { margins | jq -e '.drawn.left | length > 2000' >/dev/null 2>&1 && margins | jq -e '.drawn.leftElided and .drawn.goalElided and .drawn.leftEnd <= .drawn.lineEnd and .drawn.rightStart >= .drawn.width - .drawn.lineEnd' >/dev/null 2>&1; }
 for t in paper artboard blueprint; do
   in_theme "$t"
   until_ok 2000 short_of_island

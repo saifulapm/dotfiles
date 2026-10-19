@@ -151,7 +151,7 @@ PanelWindow {
             value: osdValue.text,
             valueFont: [osdValue.font.family, osdValue.font.pixelSize],
             bars: osdLook.bars,
-            lit: osdLook.litCount(heldOsd?.value ?? 0),
+            lit: osdLook.bars === "blocks" ? litBlocks.text.length : osdLook.bars === "bars" ? Array.from({ length: 20 }, (_, i) => barRepeater.itemAt(i)).filter(b => b && b.on).length : Math.round(roundFill.width / roundTrack.width * 20),
             valueBox: { x: p.x + (screen.width - width) / 2, y: p.y, w: osdValue.width, h: osdValue.height }
         };
     }
@@ -166,7 +166,7 @@ PanelWindow {
         };
         const bracketEnd = closeBracket.mapToItem(null, closeBracket.width, 0).x;
         return {
-            app: noteLook.appLabel(heldNotification?.app ?? ""),
+            app: openBracket.visible ? openBracket.text + appName.text + closeBracket.text : appName.text,
             age: age.text,
             summary: summary.text,
             summaryFont: [summary.font.family, summary.font.pixelSize],
@@ -379,6 +379,7 @@ PanelWindow {
                             spacing: 3
 
                             Repeater {
+                                id: barRepeater
                                 model: 20
 
                                 Rectangle {
@@ -398,6 +399,7 @@ PanelWindow {
                             anchors.verticalCenter: parent.verticalCenter
 
                             Text {
+                                id: litBlocks
                                 textFormat: Text.PlainText
                                 text: "▮".repeat(parent.parent.lit)
                                 color: island.osdLook.lit.color
@@ -417,6 +419,7 @@ PanelWindow {
 
                         // Artboard: one rounded bar.
                         Rectangle {
+                            id: roundTrack
                             visible: island.osdLook.bars === "round"
                             anchors.verticalCenter: parent.verticalCenter
                             width: parent.width
@@ -425,6 +428,7 @@ PanelWindow {
                             color: island.osdLook.unlit.color
 
                             Rectangle {
+                                id: roundFill
                                 width: parent.width * Math.min(Math.max(island.heldOsd?.value ?? 0, 0), 100) / 100
                                 height: parent.height
                                 radius: parent.radius
@@ -473,6 +477,7 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
 
                         Image {
+                            id: icon
                             anchors.centerIn: parent
                             visible: source != ""
                             source: tile.visible ? island.heldNotification?.icon ?? "" : ""
@@ -484,7 +489,8 @@ PanelWindow {
                             id: glyph
                             textFormat: Text.PlainText
                             anchors.centerIn: parent
-                            visible: !island.heldNotification?.icon
+                            // An icon that is missing or fails to load leaves the letter.
+                            visible: icon.status !== Image.Ready
                             text: island.noteLook.glyph(island.heldNotification?.app ?? "")
                             color: box.style.text
                             font.family: island.theme.tokens?.type.mono ?? ""

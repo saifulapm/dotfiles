@@ -62,6 +62,8 @@ PanelWindow {
             left: number.text + tail.text,
             right: right,
             leftEnd: tail.mapToItem(null, tail.width, 0).x,
+            leftElided: tail.truncated,
+            goalElided: goalLabel.truncated,
             rightStart: rightRow.mapToItem(null, 0, 0).x,
             lineEnd: lineEnd,
             width: width

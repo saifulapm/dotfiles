@@ -30,6 +30,8 @@ notify-send "Download complete" "report-october.pdf · 2.4 MB"
 shown '.note.summary == "DOWNLOAD COMPLETE"'
 echo "     note: $(island | jq -c .note)"
 check "blueprint: the island reads [ NOTIFY-SEND ] and T+0S over DOWNLOAD COMPLETE" state_is '.note.app == "[ NOTIFY-SEND ]" and .note.age == "T+0S"'
+# While a notification shows, the clock's minute tick and its 5 s hold are the only timers: nothing counts T+0S up.
+check "blueprint: while the notification shows, status reports two timers, the clock and the hold" eval 'shell_status | jq -e ".timers == 2" >/dev/null'
 cyan=$(near "$(geo summaryBox)" 127 227 240 10)
 check "blueprint: the summary's pixels read #7FE3F0 ($cyan px)" test "$cyan" -gt 150
 
