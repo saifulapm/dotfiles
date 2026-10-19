@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import "." as Root
 import "lib/control.mjs" as Lib
+import "lib/voice.mjs" as V
 
 // A section is an Item with: required property var theme; property int selected; readonly property var rows ([{title, detail}]); function key(event): bool for keys other than Tab, Shift+Tab, j/k, Up/Down and Esc; function state(): object; its implicitHeight sizes its band above the rows.
 Item {
@@ -22,6 +23,8 @@ Item {
     readonly property var sections: [audio, wifi, bluetooth, power, display, route]
     readonly property var section: sections[current]
     readonly property var rows: section.rows
+    readonly property var look: V.listLook(theme.tokens)
+    readonly property var legend: look.keys([["tab", "section"], ["j/k", "move"], ["esc", "close"]])
 
     function open(t0) {
         openT0 = t0;
@@ -47,7 +50,15 @@ Item {
         section.selected = Math.max(0, Math.min(rows.length - 1, section.selected + by));
     }
 
+    // An item's box in window coordinates.
+    function box(item) {
+        const p = item.mapToItem(null, 0, 0);
+        return { x: p.x, y: p.y, w: item.width, h: item.height };
+    }
+
     function state() {
+        const cur = rowRepeater.itemAt(section.selected);
+        const tab = tabRepeater.itemAt(current);
         return JSON.stringify(Object.assign({
             open: shown,
             section: Lib.SECTIONS[current],
@@ -56,6 +67,15 @@ Item {
             rows: rows.map(r => r.title),
             openMs: openMs,
             opens: opens,
+            heading: header.visible ? header.text : "",
+            tabFill: tab ? String(tab.color) : null,
+            tabText: tab ? tab.text : null,
+            tabBox: tab ? box(tab) : null,
+            ruleBox: box(topRule),
+            cursorFill: cur ? String(cur.color) : null,
+            cursorBox: cur ? box(cur) : null,
+            legend: legend.map(k => k.key + " " + k.word).join("  "),
+            legendSpacing: look.small.spacing,
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: control.Window.active
         }, section.state()));
@@ -100,32 +120,53 @@ Item {
             width: parent.width
             spacing: 0
 
+            // Blueprint names Control and its section on a line of their own above the tabs.
+            Text {
+                id: header
+                visible: look.label.kind === "header"
+                textFormat: Text.PlainText
+                Layout.fillWidth: true
+                Layout.leftMargin: 20
+                Layout.rightMargin: 20
+                Layout.topMargin: 12
+                text: look.heading("control", Lib.SECTIONS[control.current])
+                color: look.small.color
+                font.family: look.small.font
+                font.pixelSize: look.small.size
+                font.letterSpacing: look.small.spacing
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
-                Layout.topMargin: 14
+                Layout.topMargin: look.label.kind === "header" ? 8 : 14
                 Layout.bottomMargin: 14
                 spacing: 4
 
                 Repeater {
+                    id: tabRepeater
                     model: Lib.TITLES
 
+                    // The current tab takes the launcher's mode label: Paper's ink chip, Artboard's tint pill, Blueprint's cyan cursor.
                     Rectangle {
                         required property string modelData
                         required property int index
                         readonly property bool on: index === control.current
+                        readonly property string text: tab.text
                         implicitWidth: tab.implicitWidth + 20
                         implicitHeight: tab.implicitHeight + 10
-                        color: on ? c.ink : "transparent"
+                        radius: look.tab.radius
+                        color: on ? look.tab.fill : "transparent"
                         Text {
                             id: tab
                             textFormat: Text.PlainText
                             anchors.centerIn: parent
-                            text: modelData
-                            color: on ? c.surface : c.muted
-                            font.family: fonts.ui
+                            text: look.tabText(modelData)
+                            color: on ? look.tab.text : c.muted
+                            font.family: look.name.font
                             font.pixelSize: 13
+                            font.weight: on && look.voice === "plain" ? Font.Medium : Font.Normal
                         }
                     }
                 }
@@ -144,10 +185,8 @@ Item {
                 }
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 1
-                color: c.ink
+            Rule {
+                id: topRule
             }
 
             Item {
@@ -200,8 +239,12 @@ Item {
                 Layout.fillWidth: true
                 Layout.topMargin: 8
                 Layout.bottomMargin: 8
+                // Paper's rows run edge to edge; the others sit inset as tiles.
+                Layout.leftMargin: look.voice === "plain" ? 8 : look.voice === "bracket" ? 10 : 0
+                Layout.rightMargin: Layout.leftMargin
 
                 Repeater {
+                    id: rowRepeater
                     model: control.rows
 
                     Rectangle {
@@ -210,56 +253,136 @@ Item {
                         readonly property bool on: index === control.section.selected
                         width: list.width
                         implicitHeight: row.implicitHeight + 22
-                        color: on ? c.ink : "transparent"
+                        radius: look.cursor.radius
+                        color: on ? look.cursor.fill : "transparent"
 
                         RowLayout {
                             id: row
                             anchors.fill: parent
-                            anchors.leftMargin: 20
-                            anchors.rightMargin: 20
+                            anchors.leftMargin: look.voice === "caps" ? 20 : 12
+                            anchors.rightMargin: anchors.leftMargin
                             spacing: 14
 
+                            // Paper marks the cursor row with the accent's ▸.
                             Text {
+                                visible: look.slot === "marker"
                                 textFormat: Text.PlainText
-                                Layout.fillWidth: true
-                                text: modelData.title
-                                elide: Text.ElideRight
-                                color: on ? c.surface : c.ink
+                                text: "▸"
+                                color: on ? look.cursor.marker : "transparent"
                                 font.family: fonts.ui
                                 font.pixelSize: 15
                             }
-                            Text {
-                                textFormat: Text.PlainText
-                                text: modelData.detail
-                                color: on ? c.line : c.muted
-                                font.family: fonts.ui
-                                font.pixelSize: 12
+
+                            GridLayout {
+                                Layout.fillWidth: true
+                                // Artboard sets the detail under the name; the others put it at the right.
+                                columns: look.voice === "plain" ? 1 : 2
+                                rowSpacing: 0
+                                columnSpacing: 14
+
+                                Text {
+                                    textFormat: Text.PlainText
+                                    Layout.fillWidth: true
+                                    text: look.title(modelData.title)
+                                    elide: Text.ElideRight
+                                    color: on ? look.cursor.text : look.name.color
+                                    font.family: look.name.font
+                                    font.pixelSize: look.name.size
+                                    font.weight: on ? look.cursor.weight : look.name.weight
+                                    font.letterSpacing: look.name.spacing
+                                }
+                                Text {
+                                    textFormat: Text.PlainText
+                                    text: look.detailText(modelData.detail)
+                                    color: on ? look.cursor.detail : look.detail.color
+                                    font.family: look.detail.font
+                                    font.italic: look.detail.italic
+                                    font.pixelSize: look.detail.size
+                                    font.letterSpacing: look.detail.spacing ?? 0
+                                }
+                            }
+
+                            Rectangle {
+                                visible: on && look.cursor.badge !== ""
+                                implicitWidth: badge.implicitWidth + 14
+                                implicitHeight: badge.implicitHeight + 4
+                                radius: 6
+                                color: c.surface
+                                Text {
+                                    id: badge
+                                    textFormat: Text.PlainText
+                                    anchors.centerIn: parent
+                                    text: look.cursor.badge
+                                    color: look.cursor.text
+                                    font.family: fonts.mono
+                                    font.pixelSize: 11
+                                }
                             }
                         }
                     }
                 }
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 1
-                color: c.ink
-            }
+            Rule {}
 
-            Text {
-                textFormat: Text.PlainText
+            // The keys, as chips in Artboard.
+            Flow {
                 Layout.fillWidth: true
-                leftPadding: 20
-                rightPadding: 20
-                topPadding: 12
-                bottomPadding: 12
-                horizontalAlignment: Text.AlignRight
-                text: "TAB · J/K · ESC"
-                color: c.muted
-                font.family: fonts.ui
-                font.pixelSize: 10
-                font.letterSpacing: 1.2
+                Layout.leftMargin: look.voice === "plain" ? 14 : 20
+                Layout.rightMargin: Layout.leftMargin
+                Layout.topMargin: look.voice === "plain" ? 10 : 12
+                Layout.bottomMargin: Layout.topMargin
+                spacing: look.legend("").chips ? 8 : 14
+
+                Repeater {
+                    model: control.legend
+
+                    Rectangle {
+                        required property var modelData
+                        width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
+                        height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
+                        radius: 6
+                        color: look.chip.fill
+
+                        Row {
+                            id: pair
+                            anchors.centerIn: parent
+                            spacing: look.legend("").chips ? 6 : 5
+
+                            Text {
+                                textFormat: Text.PlainText
+                                text: modelData.key
+                                color: look.chip.key
+                                font.family: fonts.mono
+                                font.pixelSize: look.small.size
+                                font.letterSpacing: look.small.spacing
+                                font.bold: true
+                            }
+                            Text {
+                                textFormat: Text.PlainText
+                                text: modelData.word
+                                color: c.muted
+                                font.family: look.small.font
+                                font.pixelSize: look.small.size
+                                font.letterSpacing: look.small.spacing
+                            }
+                        }
+                    }
+                }
             }
+        }
+    }
+
+    // A rule across the card: solid, or dashed in Blueprint.
+    component Rule: Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 1
+        color: look.rule.dashed ? "transparent" : look.rule.color
+
+        Root.Dashed {
+            visible: look.rule.dashed
+            anchors.fill: parent
+            color: look.rule.color
         }
     }
 }
