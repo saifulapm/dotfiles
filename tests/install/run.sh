@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Runs `dots install` twice in a fresh fedora:44 container against this checkout's committed branch.
 set -uo pipefail
-
+# bash reads a script as it runs it, so the whole body sits in one block it parses before the first command; an edit mid-run cannot reach it.
+{
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 branch=$(git -C "$here" symbolic-ref --short -q HEAD) || { echo "FAIL: HEAD is detached, check out a branch" >&2; exit 1; }
 # A worktree's .git is a file pointing outside the checkout, so the clone source is the shared git dir.
 gitdir=$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)
+# The branch as it is now, so a commit made during the run reaches neither the clone nor dots update's pull.
+snap=$(mktemp -d)
+git clone -q --bare --single-branch --branch "$branch" "$gitdir" "$snap/src.git" || { echo "FAIL: could not snapshot $branch"; exit 1; }
 name=dots-install-test-$$
 home=/home/saiful
 log=/var/log/sudo-shim.log
@@ -21,7 +25,7 @@ as_root() { podman exec -u root "$name" bash -c "$1"; }
 # shellcheck disable=SC2329 # called through check
 # The committed bin/dots goes in on stdin, as the curl one-liner sends it, so an edit to the checkout cannot reach a run.
 dots_install() {
-  git -C "$here" show "$branch:bin/dots" |
+  git -C "$snap/src.git" show "$branch:bin/dots" |
     podman exec -i -u saiful -w "$home" -e HOME="$home" -e PATH=/opt/shim:/usr/local/bin:/usr/bin:/bin \
       -e DOTS_REPO=/src.git -e DOTS_BRANCH="$branch" -e DOTS_MACHINE=test \
       "$name" bash -s install
@@ -30,7 +34,7 @@ as_user() {
   podman exec -u saiful -w "$home" -e HOME="$home" -e PATH="/opt/shim:$home/.local/bin:/usr/local/bin:/usr/bin:/bin" "$name" bash -c "$1"
 }
 # committed <file>: the file as the branch under test has it.
-committed() { git -C "$here" show "$branch:$1"; }
+committed() { git -C "$snap/src.git" show "$branch:$1"; }
 # One "name<TAB>version<TAB>check" line per versions.toml pin that has a check command.
 pins() {
   committed versions.toml | awk -F' = ' '
@@ -52,11 +56,11 @@ packages() {
 }
 snapshot() { as_root "find $home /etc \\( -type f -o -type l \\) -printf '%p %s %T@ %l\\n' | sort"; }
 
-trap 'podman rm -f -t 0 "$name" >/dev/null 2>&1' EXIT
+trap 'podman rm -f -t 0 "$name" >/dev/null 2>&1; rm -rf "$snap"' EXIT
 # label=disable lets the container read the checkout without relabelling it on the host.
 podman run -d --rm --name "$name" --userns=keep-id --security-opt label=disable \
   --passwd-entry "saiful:*:1000:1000::$home:/bin/bash" \
-  -v "$here:/src:ro" -v "$gitdir:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 \
+  -v "$snap/src.git:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 \
   docker.io/library/fedora:44 sleep infinity >/dev/null || { echo "FAIL: container did not start"; exit 1; }
 
 as_root "
@@ -129,6 +133,13 @@ check "claude's settings render with its hooks" as_user "jq -e .hooks ~/.claude/
 dropped=$(as_user "find ~/.config -iname '*herdr*' -o -iname '*kitty*' -o -iname '*vicinae*'")
 check "nothing for herdr, kitty or vicinae under ~/.config (got '$dropped')" test -z "$dropped"
 
+check "caddy accepts its Caddyfile" as_user "caddy validate --config ~/.config/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1"
+for v in 82 83 84; do check "php$v runs" as_user "php$v -r 'exit(0);'"; done
+check "bin/php follows .php-version" as_user "mkdir -p /tmp/p && echo 8.3 > /tmp/p/.php-version && cd /tmp/p && ~/Sites/github/dotfiles/bin/php -r 'echo PHP_VERSION;' | grep -q '^8\.3\.'"
+check "*.test resolves through dnsmasq" podman exec "$name" grep -qx 'address=/test/127.0.0.1' /etc/dnsmasq.d/test-domains.conf
+check "the dev quadlets generate units" as_user "/usr/lib/systemd/user-generators/podman-user-generator --dryrun >/dev/null 2>&1"
+check "the dev sockets are enabled" as_user "test -f ~/.config/systemd/user/sockets.target.wants/mysql84-proxy.socket -a -f ~/.config/systemd/user/sockets.target.wants/caddy-dev-https.socket"
+
 check "tty1 logs saiful straight in" podman exec "$name" grep -q -- '--autologin saiful' /etc/systemd/system/getty@tty1.service.d/autologin.conf
 shell=$(podman exec "$name" getent passwd saiful | cut -d: -f7)
 check "fish is saiful's login shell (got '$shell')" test "$shell" = /usr/bin/fish
@@ -180,3 +191,4 @@ check "the refusal names the pin" grep -q 'pin yazi: sha256' <<<"$out"
 check "yazi stays 26.8.15" as_user "yazi --version | grep -q 26.8.15"
 
 exit $failed
+}
