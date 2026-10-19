@@ -19,12 +19,15 @@ Item {
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
     property real openT0: -1
+    // When the centre last opened; each row's age is counted to it, so the ages need no timer.
+    property real openedAt: 0
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     // The caps voices write d and D alike, so clear all reads ⇧D.
     readonly property var legendKeys: look.keys([["j/k", "move"], ["↵", "open"], ["d", "dismiss"], ["⇧D", "clear all"], ["/", "search"], ["esc", "close"]])
+    readonly property var hintKeys: look.keys([["/", "search"], ["esc", "close"]])
     readonly property var groups: Lib.group(Lib.visible(notifs.history, query))
     // One row per entry in group order; the first of each group carries its header.
     readonly property var rows: groups.reduce((all, g) => all.concat(g.entries.map((e, i) => ({
@@ -34,6 +37,7 @@ Item {
 
     function open(t0) {
         openT0 = t0;
+        openedAt = Date.now();
         openMs = null;
         opens += 1;
         input.text = "";
@@ -94,6 +98,11 @@ Item {
                         entries: g.entries.map(e => e.summary)
                     })),
             hint: rows.length === 0,
+            hintKeys: hintKeys.map(k => k.key),
+            ages: rows.map((r, i) => {
+                const d = list.itemAtIndex(i);
+                return d ? d.age : null;
+            }),
             openMs: openMs,
             opens: opens,
             headingKind: look.label.kind,
@@ -104,7 +113,9 @@ Item {
             cursorBox: cur ? box(cur) : null,
             legend: legendKeys.map(k => k.key + " " + k.word).join("  "),
             legendKeys: legendKeys.map(k => k.key),
-            legendSpacing: look.small.spacing
+            legendSpacing: look.small.spacing,
+            // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
+            keyboard: centre.Window.active
         };
     }
 
@@ -231,10 +242,11 @@ Item {
                             id: dnd
                             textFormat: Text.PlainText
                             anchors.centerIn: parent
-                            text: "Do not disturb: " + (centre.notifs.dnd ? "on" : "off")
+                            text: look.tabText("Do not disturb: " + (centre.notifs.dnd ? "on" : "off"))
                             color: centre.notifs.dnd ? c.accent : c.muted
-                            font.family: fonts.ui
-                            font.pixelSize: 11
+                            font.family: look.small.font
+                            font.pixelSize: look.small.size
+                            font.letterSpacing: look.small.spacing
                         }
                     }
                 }
@@ -281,18 +293,28 @@ Item {
                     id: headRule
                 }
 
-                Text {
-                    textFormat: Text.PlainText
+                // An empty list says so, then names its keys as the legend draws them.
+                Flow {
                     visible: rows.length === 0
                     Layout.fillWidth: true
-                    leftPadding: 20
-                    topPadding: 14
-                    bottomPadding: 14
-                    text: (query ? "NO MATCH" : "NO NOTIFICATIONS") + " · / SEARCH · ESC CLOSE"
-                    color: c.muted
-                    font.family: fonts.ui
-                    font.pixelSize: 10
-                    font.letterSpacing: 1.2
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    Layout.topMargin: 14
+                    Layout.bottomMargin: 14
+                    spacing: look.legend("").chips ? 8 : 14
+
+                    Text {
+                        textFormat: Text.PlainText
+                        text: look.tabText(query ? "No match" : "No notifications")
+                        color: look.small.color
+                        font.family: look.small.font
+                        font.pixelSize: look.small.size
+                        font.letterSpacing: look.small.spacing
+                    }
+                    Repeater {
+                        model: centre.hintKeys
+                        KeyChip {}
+                    }
                 }
 
                 ListView {
@@ -312,6 +334,7 @@ Item {
                         required property int index
                         readonly property bool current: index === centre.selected
                         readonly property Item box: rowBox
+                        readonly property string age: ageLabel.text
                         width: list.width
 
                         Text {
@@ -385,9 +408,10 @@ Item {
                                     }
                                 }
                                 Text {
+                                    id: ageLabel
                                     textFormat: Text.PlainText
                                     Layout.alignment: Qt.AlignTop
-                                    text: Qt.formatTime(new Date(item.modelData.entry.time), "HH:mm")
+                                    text: look.ageText(centre.openedAt - item.modelData.entry.time)
                                     color: item.current ? look.cursor.detail : c.muted
                                     font.family: fonts.mono
                                     font.pixelSize: 11
@@ -428,40 +452,42 @@ Item {
 
                     Repeater {
                         model: centre.legendKeys
-
-                        Rectangle {
-                            required property var modelData
-                            width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
-                            height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
-                            radius: 6
-                            color: look.chip.fill
-
-                            Row {
-                                id: pair
-                                anchors.centerIn: parent
-                                spacing: look.legend("").chips ? 6 : 5
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    text: modelData.key
-                                    color: look.chip.key
-                                    font.family: fonts.mono
-                                    font.pixelSize: look.small.size
-                                    font.letterSpacing: look.small.spacing
-                                    font.bold: true
-                                }
-                                Text {
-                                    textFormat: Text.PlainText
-                                    text: modelData.word
-                                    color: c.muted
-                                    font.family: look.small.font
-                                    font.pixelSize: look.small.size
-                                    font.letterSpacing: look.small.spacing
-                                }
-                            }
-                        }
+                        KeyChip {}
                     }
                 }
+            }
+        }
+    }
+
+    // A key and its word as the legend draws them, a chip in Artboard.
+    component KeyChip: Rectangle {
+        required property var modelData
+        width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
+        height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
+        radius: 6
+        color: look.chip.fill
+
+        Row {
+            id: pair
+            anchors.centerIn: parent
+            spacing: look.legend("").chips ? 6 : 5
+
+            Text {
+                textFormat: Text.PlainText
+                text: modelData.key
+                color: look.chip.key
+                font.family: fonts.mono
+                font.pixelSize: look.small.size
+                font.letterSpacing: look.small.spacing
+                font.bold: true
+            }
+            Text {
+                textFormat: Text.PlainText
+                text: modelData.word
+                color: c.muted
+                font.family: look.small.font
+                font.pixelSize: look.small.size
+                font.letterSpacing: look.small.spacing
             }
         }
     }
