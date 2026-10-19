@@ -1,0 +1,9 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+# caddy mints its CA on first start, which may be after this install, so this checks on every apply.
+ca=$HOME/.local/share/caddy/pki/authorities/local/root.crt
+trusted=/etc/pki/ca-trust/source/anchors/caddy-dev-local-ca.crt
+[[ -f $ca ]] || { systemctl --user start caddy-dev.service 2>/dev/null && sleep 2; }
+[[ -f $ca ]] || exit 0
+cmp -s "$ca" "$trusted" && exit 0
+{ root install -D -m 0644 "$ca" "$trusted" && root update-ca-trust; } || log "the .test CA is trusted after the next dots update"

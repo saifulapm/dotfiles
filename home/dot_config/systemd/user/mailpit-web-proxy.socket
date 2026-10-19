@@ -1,0 +1,8 @@
+[Unit]
+Description=Mailpit on-demand web socket (127.0.0.1:8025)
+
+[Socket]
+ListenStream=127.0.0.1:8025
+
+[Install]
+WantedBy=sockets.target

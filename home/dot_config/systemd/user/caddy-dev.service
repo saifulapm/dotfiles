@@ -1,0 +1,10 @@
+[Unit]
+Description=Caddy (on-demand .test web server)
+StopWhenUnneeded=true
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/caddy run --config %h/.config/caddy/Caddyfile --adapter caddyfile
+ExecReload=/usr/bin/caddy reload --config %h/.config/caddy/Caddyfile --adapter caddyfile --force
+
+TimeoutStartSec=120

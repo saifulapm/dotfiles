@@ -1,0 +1,8 @@
+[Unit]
+Description=PostgreSQL 18 on-demand socket (127.0.0.1:5432)
+
+[Socket]
+ListenStream=127.0.0.1:5432
+
+[Install]
+WantedBy=sockets.target

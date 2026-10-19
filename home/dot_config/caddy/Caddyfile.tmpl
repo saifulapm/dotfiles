@@ -1,0 +1,25 @@
+{
+	http_port 38080
+	https_port 38443
+
+	auto_https disable_redirects
+}
+
+import sites/*.caddy
+
+http://*.test {
+	redir https://{host}{uri} 308
+}
+
+*.test {
+	tls {
+		issuer internal
+		on_demand
+	}
+
+	root * {{ .chezmoi.homeDir }}/Sites/laravel/{labels.1}/public
+
+	php_fastcgi 127.0.0.1:9084
+
+	file_server
+}

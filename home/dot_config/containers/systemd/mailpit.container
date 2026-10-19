@@ -1,0 +1,19 @@
+[Unit]
+Description=Mailpit (on-demand dev SMTP catcher + inbox UI)
+StopWhenUnneeded=true
+
+[Container]
+Image=docker.io/axllent/mailpit:latest
+ContainerName=dev-mailpit
+Volume=mailpit-data:/data
+PublishPort=127.0.0.1:31025:1025
+PublishPort=127.0.0.1:38025:8025
+Environment=MP_DATABASE=/data/mailpit.db
+Notify=healthy
+HealthCmd=wget -q --spider http://127.0.0.1:8025/livez
+HealthInterval=30s
+HealthStartPeriod=15s
+HealthRetries=3
+
+[Service]
+TimeoutStartSec=300

@@ -3,25 +3,35 @@
 {{ template "lib.sh" . }}
 list={{ joinPath .chezmoi.workingTree "packages.toml" | quote }}
 
-# One "name copr" line per entry for this arch; copr is "-" when the package is in Fedora.
+# One "name copr rpm" line per entry for this arch; copr is "-" when the package is in Fedora, rpm is "-" unless it installs from a URL.
 entries=$(awk -v arch="$(uname -m)" '
-  function flush() { if (name != "" && (a == "all" || a == arch)) print name, (copr == "" ? "-" : copr) }
+  function flush() { if (name != "" && (a == "all" || a == arch)) print name, (copr == "" ? "-" : copr), (rpm == "" ? "-" : rpm) }
   function val() { match($0, /"[^"]*"/); return substr($0, RSTART + 1, RLENGTH - 2) }
-  /^\[\[package\]\]/ { flush(); name = ""; a = ""; copr = ""; next }
+  /^\[\[package\]\]/ { flush(); name = ""; a = ""; copr = ""; rpm = ""; next }
   /^name *=/ { name = val() }
   /^arch *=/ { a = val() }
   /^copr *=/ { copr = val() }
+  /^rpm *=/ { rpm = val() }
   END { flush() }
 ' "$list")
 
 missing=()
-while read -r name copr; do
+while read -r name copr rpm; do
   if [[ $copr != - && ! -e /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:${copr/\//:}.repo ]]; then
     log "enabling COPR $copr"
     root dnf -y -q copr enable "$copr" || die "could not enable COPR $copr"
   fi
+  if [[ $rpm != - ]] && ! rpm -q --quiet "$name"; then
+    log "installing $name"
+    root dnf -y -q install "${rpm//\{fedora\}/$(rpm -E %fedora)}" || die "could not install $name"
+  fi
   rpm -q --quiet "$name" || missing+=("$name")
 done <<<"$entries"
+
+# Remi also ships composer, which would fight Fedora's on every upgrade.
+if [[ -e /etc/yum.repos.d/remi.repo ]]; then
+  root dnf -y -q config-manager setopt --create-missing-dir remi.excludepkgs=composer || die "could not keep composer on Fedora's package"
+fi
 
 if ((${#missing[@]})); then
   log "installing ${missing[*]}"

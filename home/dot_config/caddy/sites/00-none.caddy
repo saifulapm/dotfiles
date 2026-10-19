@@ -1,0 +1,1 @@
+# The Caddyfile imports sites/*.caddy, which must match a file; per-project <name>.caddy overrides go beside this one.

@@ -1,0 +1,8 @@
+[Unit]
+Description=Caddy .test on-demand HTTP socket (127.0.0.1:80)
+
+[Socket]
+ListenStream=127.0.0.1:80
+
+[Install]
+WantedBy=sockets.target

@@ -138,3 +138,264 @@ why = "sweep finds node_modules and vendor dirs with it"
 name = "gh"
 arch = "all"
 why = "git's credential helper, dots bump's release lookups and dots secrets' two accounts"
+
+[[package]]
+name = "remi-release"
+arch = "all"
+rpm = "https://rpms.remirepo.net/fedora/remi-release-{fedora}.rpm"
+why = "Remi's repo, which carries the parallel php82, php83 and php84 collections"
+
+[[package]]
+name = "php-cli"
+arch = "all"
+why = "the system PHP, for projects without a .php-version"
+
+[[package]]
+name = "php-mbstring"
+arch = "all"
+why = "system PHP: Laravel's string handling"
+
+[[package]]
+name = "php-xml"
+arch = "all"
+why = "system PHP: dom and xml, which Laravel and composer need"
+
+[[package]]
+name = "php-pdo"
+arch = "all"
+why = "system PHP: database access"
+
+[[package]]
+name = "php-intl"
+arch = "all"
+why = "system PHP: Laravel's localisation"
+
+[[package]]
+name = "php-process"
+arch = "all"
+why = "system PHP: pcntl and posix for queue workers"
+
+[[package]]
+name = "php-mysqlnd"
+arch = "all"
+why = "system PHP: the MySQL driver"
+
+[[package]]
+name = "php-pgsql"
+arch = "all"
+why = "system PHP: the Postgres driver"
+
+[[package]]
+name = "php-gd"
+arch = "all"
+why = "system PHP: image handling"
+
+[[package]]
+name = "php-bcmath"
+arch = "all"
+why = "system PHP: arbitrary precision maths"
+
+[[package]]
+name = "php-pecl-pcov"
+arch = "all"
+why = "system PHP: the pcov coverage driver"
+
+[[package]]
+name = "php82"
+arch = "all"
+why = "PHP 8.2 beside the system one, picked by bin/php from .php-version"
+
+[[package]]
+name = "php82-php-xml"
+arch = "all"
+why = "PHP 8.2: dom and xml, which Laravel and composer need"
+
+[[package]]
+name = "php82-php-pdo"
+arch = "all"
+why = "PHP 8.2: database access"
+
+[[package]]
+name = "php82-php-mysqlnd"
+arch = "all"
+why = "PHP 8.2: the MySQL driver"
+
+[[package]]
+name = "php82-php-pgsql"
+arch = "all"
+why = "PHP 8.2: the Postgres driver"
+
+[[package]]
+name = "php82-php-intl"
+arch = "all"
+why = "PHP 8.2: Laravel's localisation"
+
+[[package]]
+name = "php82-php-gd"
+arch = "all"
+why = "PHP 8.2: image handling"
+
+[[package]]
+name = "php82-php-bcmath"
+arch = "all"
+why = "PHP 8.2: arbitrary precision maths"
+
+[[package]]
+name = "php82-php-process"
+arch = "all"
+why = "PHP 8.2: pcntl and posix for queue workers"
+
+[[package]]
+name = "php82-php-pecl-zip"
+arch = "all"
+why = "PHP 8.2: ZipArchive, for composer"
+
+[[package]]
+name = "php82-php-pecl-pcov"
+arch = "all"
+why = "PHP 8.2: the pcov coverage driver"
+
+[[package]]
+name = "php83"
+arch = "all"
+why = "PHP 8.3 beside the system one, picked by bin/php from .php-version"
+
+[[package]]
+name = "php83-php-xml"
+arch = "all"
+why = "PHP 8.3: dom and xml, which Laravel and composer need"
+
+[[package]]
+name = "php83-php-pdo"
+arch = "all"
+why = "PHP 8.3: database access"
+
+[[package]]
+name = "php83-php-mysqlnd"
+arch = "all"
+why = "PHP 8.3: the MySQL driver"
+
+[[package]]
+name = "php83-php-pgsql"
+arch = "all"
+why = "PHP 8.3: the Postgres driver"
+
+[[package]]
+name = "php83-php-intl"
+arch = "all"
+why = "PHP 8.3: Laravel's localisation"
+
+[[package]]
+name = "php83-php-gd"
+arch = "all"
+why = "PHP 8.3: image handling"
+
+[[package]]
+name = "php83-php-bcmath"
+arch = "all"
+why = "PHP 8.3: arbitrary precision maths"
+
+[[package]]
+name = "php83-php-process"
+arch = "all"
+why = "PHP 8.3: pcntl and posix for queue workers"
+
+[[package]]
+name = "php83-php-pecl-zip"
+arch = "all"
+why = "PHP 8.3: ZipArchive, for composer"
+
+[[package]]
+name = "php83-php-pecl-pcov"
+arch = "all"
+why = "PHP 8.3: the pcov coverage driver"
+
+[[package]]
+name = "php84"
+arch = "all"
+why = "PHP 8.4 beside the system one, picked by bin/php from .php-version"
+
+[[package]]
+name = "php84-php-xml"
+arch = "all"
+why = "PHP 8.4: dom and xml, which Laravel and composer need"
+
+[[package]]
+name = "php84-php-pdo"
+arch = "all"
+why = "PHP 8.4: database access"
+
+[[package]]
+name = "php84-php-mysqlnd"
+arch = "all"
+why = "PHP 8.4: the MySQL driver"
+
+[[package]]
+name = "php84-php-pgsql"
+arch = "all"
+why = "PHP 8.4: the Postgres driver"
+
+[[package]]
+name = "php84-php-intl"
+arch = "all"
+why = "PHP 8.4: Laravel's localisation"
+
+[[package]]
+name = "php84-php-gd"
+arch = "all"
+why = "PHP 8.4: image handling"
+
+[[package]]
+name = "php84-php-bcmath"
+arch = "all"
+why = "PHP 8.4: arbitrary precision maths"
+
+[[package]]
+name = "php84-php-process"
+arch = "all"
+why = "PHP 8.4: pcntl and posix for queue workers"
+
+[[package]]
+name = "php84-php-pecl-zip"
+arch = "all"
+why = "PHP 8.4: ZipArchive, for composer"
+
+[[package]]
+name = "php84-php-pecl-pcov"
+arch = "all"
+why = "PHP 8.4: the pcov coverage driver"
+
+[[package]]
+name = "php83-php-fpm"
+arch = "all"
+why = "serves the .test sites on PHP 8.3 through php83-fpm.service"
+
+[[package]]
+name = "php84-php-fpm"
+arch = "all"
+why = "serves the .test sites on PHP 8.4 through php84-fpm.service"
+
+[[package]]
+name = "composer"
+arch = "all"
+why = "PHP's package manager, run through bin/composer so it uses the project's PHP"
+
+[[package]]
+name = "caddy"
+arch = "all"
+why = "serves https://<dir>.test from ~/Sites/laravel/<dir>/public with its own CA"
+
+[[package]]
+name = "dnsmasq"
+arch = "all"
+why = "answers *.test with 127.0.0.1"
+
+[[package]]
+name = "nss-tools"
+arch = "all"
+why = "certutil, which caddy uses to trust its CA in Chromium's store"
+
+[[package]]
+name = "podman"
+arch = "all"
+why = "runs the dev databases and mailpit as socket-started quadlets"

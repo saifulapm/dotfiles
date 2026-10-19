@@ -1,0 +1,8 @@
+[Unit]
+Description=MySQL 8.4 on-demand socket (127.0.0.1:3306)
+
+[Socket]
+ListenStream=127.0.0.1:3306
+
+[Install]
+WantedBy=sockets.target
