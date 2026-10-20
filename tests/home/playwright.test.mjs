@@ -110,3 +110,10 @@ test('mise puts the dotfiles bin dir ahead of every tool bin dir', () => {
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.split('\n')[0], join(home, 'Sites/github/dotfiles/bin'));
 });
+
+// Playwright's own Chromium is a download pinned to its revision, which a playwright-cli bump leaves missing, so open uses Fedora's.
+test('the config open gets launches Fedora\'s chromium with the desktop scaling features', () => {
+  const config = JSON.parse(readFileSync(join(repo, 'home/dot_config/playwright/cli.config.json'), 'utf8'));
+  assert.equal(config.browser.launchOptions.executablePath, '/usr/bin/chromium-browser');
+  assert.deepEqual(config.browser.launchOptions.args, ['--enable-features=CDPScreenshotNewSurface,WaylandPerSurfaceScale,WaylandUiScale']);
+});
