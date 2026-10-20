@@ -54,12 +54,15 @@ store_unit() {
 
 # Attachments are named by their sha256, so a name already present on either side is the same file; none is ever deleted.
 sync_notes() {
-  local dir=$data/notes/attachments
-  store_unit notes || return
+  local dir=$data/notes/attachments code=0
+  store_unit notes || code=$?
+  # Another machine's file that does not parse (5) fails the unit, but attachments still travel.
+  ((code == 0 || code == 5)) || return "$code"
   mkdir -p "$dir"
   rc mkdir "$root/notes/attachments" &&
     rc copy "$root/notes/attachments" "$dir" --ignore-existing --exclude '*.tmp' &&
-    rc copy "$dir" "$root/notes/attachments" --ignore-existing --exclude '*.tmp'
+    rc copy "$dir" "$root/notes/attachments" --ignore-existing --exclude '*.tmp' || return
+  return "$code"
 }
 
 sync_goals() {
@@ -310,7 +313,8 @@ main() {
       record "$unit" true ""
     else
       record "$unit" false "${err:-exited $code}"
-      echo "dots sync: $unit: $err" >&2
+      # The merge's own errors already start with their unit.
+      echo "dots sync: $unit: ${err#"$unit: "}" >&2
       ((code > worst)) && worst=$code
     fi
   done

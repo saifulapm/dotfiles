@@ -208,6 +208,22 @@ test('a shell save that lands just before the merge puts its result in place is 
   assert.deepEqual(G.activeGoals(goals(a)).map((g) => g.title).sort(), ['Early', 'From b', 'Late save']);
 });
 
+test('a notes file from another machine that does not parse still lets attachments travel, and names its unit once', async () => {
+  const w = world();
+  const a = machine(w, 'a');
+  await ok(a);
+  writeFileSync(join(w.remote, 'dots-sync/notes/other.json'), '{"notes":');
+  const att = { sha256: SHA, name: 'shot.png', mime: 'image/png', size: 5 };
+  write(notesPath(a), N.attachTo(N.emptyStore(), null, [att], T, 'n1'));
+  mkdirSync(join(a.data, 'notes/attachments'), { recursive: true });
+  writeFileSync(join(a.data, 'notes/attachments', SHA + '.png'), 'bytes');
+  const r = await sync(a, ['--only', 'notes']);
+  assert.notEqual(r.code, 0);
+  assert.equal(readFileSync(join(w.remote, 'dots-sync/notes/attachments', SHA + '.png'), 'utf8'), 'bytes');
+  assert.match(r.stderr, /^dots sync: notes: skipped other\.json, which does not parse$/m);
+  assert.doesNotMatch(r.stderr, /notes: notes:/);
+});
+
 // A store change starts a --only round from its path unit; one that met a running round used to wait 15 min for the timer.
 test('a --only goals round that meets the lock waits for it, then pushes the goal saved before it started', async () => {
   const w = world();
