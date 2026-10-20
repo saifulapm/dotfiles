@@ -10,6 +10,23 @@ die() {
 # Packages are compared by name.arch, so the count does not depend on dnf's output format.
 installed() { rpm -qa --qf '%{NAME}.%{ARCH} %{VERSION}-%{RELEASE}\n' | sort; }
 
+# A booted kernel older than the newest installed one of its flavour (+16k on Asahi), or a niri whose binary dnf replaced, takes effect only after a reboot; only tests move the modules dir.
+reboot_needed() {
+  local running arch flavour d newest pid
+  running=$(uname -r)
+  arch=$(uname -m)
+  flavour=${running##*."$arch"}
+  newest=$(for d in "${DOTS_MODULES_DIR:-/usr/lib/modules}"/*; do
+    d=${d##*/}
+    [[ $d == *."$arch"* && ${d##*."$arch"} == "$flavour" ]] && echo "$d"
+  done | sort -V | tail -n 1)
+  [[ -n $newest && $newest != "$running" ]] && return 0
+  for pid in $(pgrep -x niri); do
+    [[ $(readlink "/proc/$pid/exe") == *" (deleted)" ]] && return 0
+  done
+  return 1
+}
+
 main() {
   local repo tmp
   repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
@@ -33,7 +50,7 @@ main() {
   local upgraded pins
   upgraded=$(comm -13 "$tmp/before" "$tmp/after" | wc -l)
   pins=$(grep -c '^dots: pin [^ ]* [^ ]*$' "$tmp/chezmoi" || true)
-  echo "dnf: $upgraded upgraded · pins: $pins changed"
+  echo "dnf: $upgraded upgraded · pins: $pins changed$(reboot_needed && echo ' · reboot: needed')"
 }
 
 # git pull can rewrite this file while bash reads it, so main runs and exits on one line.

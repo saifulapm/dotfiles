@@ -1,7 +1,7 @@
 // dots update against a scratch clone, with sudo, dnf, rpm and chezmoi replaced by stubs that log to one file.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -22,7 +22,7 @@ const stub = (dir, name, body) => {
   chmodSync(join(dir, name), 0o755);
 };
 
-// opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns.
+// opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns; opts.kernels: the modules dir's kernels, the booted one first; opts.niri: the pids pgrep reports for niri.
 function scratch(opts = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-update-')));
   const stubs = join(root, 'stubs');
@@ -50,8 +50,13 @@ function scratch(opts = {}) {
   );
   stub(stubs, 'rpm', `if [ -e ${state} ]; then cat ${join(root, 'after')}; else cat ${join(root, 'before')}; fi`);
   stub(stubs, 'chezmoi', `echo "chezmoi $*" >> ${log}\ncat ${join(root, 'chezmoi.out')}`);
+  const kernels = opts.kernels ?? ['7.1.13-402.asahi.fc44.aarch64+16k'];
+  const modules = join(root, 'modules');
+  for (const k of kernels) mkdirSync(join(modules, k), { recursive: true });
+  stub(stubs, 'uname', `case "$1" in -r) echo ${kernels[0]} ;; -m) echo aarch64 ;; *) exec /usr/bin/uname "$@" ;; esac`);
+  stub(stubs, 'pgrep', `[ "$*" = "-x niri" ] && printf '%s\\n' ${(opts.niri ?? []).join(' ')}; exit 0`);
 
-  return { root, repo, log, sudoLog, stubs };
+  return { root, repo, log, sudoLog, stubs, modules };
 }
 
 // A second clone pushes a commit upstream, which the scratch repo can fast-forward to.
@@ -64,7 +69,7 @@ const push = (s, name) => {
 const run = (s) =>
   spawnSync(join(s.repo, 'bin/dots'), ['update'], {
     encoding: 'utf8',
-    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root },
+    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, DOTS_MODULES_DIR: s.modules },
   });
 
 const lines = (path) => readFileSync(path, 'utf8').trim().split('\n');
@@ -111,6 +116,37 @@ test('the sudo keepalive stops renewing once its update is killed', async () => 
   const after = renewals();
   await wait(1000);
   assert.equal(renewals(), after, 'no renewal after the update is gone');
+});
+
+// The summary said nothing of a new kernel or niri, which only a reboot puts in use.
+test('a kernel newer than the booted one of its flavour adds reboot: needed', () => {
+  const s = scratch({ kernels: ['7.1.13-401.asahi.fc44.aarch64+16k', '7.1.13-402.asahi.fc44.aarch64+16k', '7.1.6-400.asahi.fc44.aarch64+16k'] });
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · reboot: needed');
+});
+
+test('a newer kernel of another flavour, or an older one, needs no reboot', () => {
+  const s = scratch({ kernels: ['7.1.13-402.asahi.fc44.aarch64+16k', '7.1.14-400.asahi.fc44.aarch64', '7.1.6-400.asahi.fc44.aarch64+16k'] });
+  assert.equal(run(s).stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed');
+});
+
+test('a niri whose binary the upgrade replaced adds reboot: needed', (t) => {
+  const s = scratch();
+  // A copy of sleep, removed while it runs, shows in /proc as niri does after dnf replaced it.
+  copyFileSync('/usr/bin/sleep', join(s.root, 'niri'));
+  chmodSync(join(s.root, 'niri'), 0o755);
+  const p = spawn(join(s.root, 'niri'), ['30'], { stdio: 'ignore' });
+  t.after(() => p.kill());
+  rmSync(join(s.root, 'niri'));
+  const r = spawnSync(join(s.repo, 'bin/dots'), ['update'], {
+    encoding: 'utf8',
+    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, DOTS_MODULES_DIR: s.modules },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed', 'no niri reported yet');
+  stub(s.stubs, 'pgrep', `[ "$*" = "-x niri" ] && echo ${p.pid}; exit 0`);
+  assert.equal(run(s).stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · reboot: needed');
 });
 
 test('nothing to upgrade and no pin lines is zero and zero', () => {
