@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // node shell/lib/theme-render.mjs <name>: renders themes/<name>/theme.toml into $XDG_STATE_HOME/dots/theme-out/.
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
@@ -53,6 +53,8 @@ const files = {
 };
 for (const [f, text] of Object.entries(files)) {
   const path = join(out, f);
-  // Rewriting an unchanged file would wake niri's config watcher for nothing.
-  if (!existsSync(path) || readFileSync(path, 'utf8') !== text) writeFileSync(path, text);
+  // Rewriting an unchanged file would wake niri's config watcher for nothing; a changed one is renamed in whole, so a reader never sees half of it.
+  if (existsSync(path) && readFileSync(path, 'utf8') === text) continue;
+  writeFileSync(path + '.tmp', text);
+  renameSync(path + '.tmp', path);
 }

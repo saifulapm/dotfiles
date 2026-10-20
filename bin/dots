@@ -82,7 +82,8 @@ reload_chromium() {
   [[ -w $dir ]] || return 0
   cmp -s "$1/chromium.json" "$dir/color.json" || cp "$1/chromium.json" "$dir/color.json"
   if [[ -n $(session_pids chromium-browse) ]]; then
-    chromium-browser --refresh-platform-policy --no-startup-window >/dev/null 2>&1 &
+    # A browser started here would hold the theme lock for as long as it runs, so it does not inherit fd 8.
+    chromium-browser --refresh-platform-policy --no-startup-window >/dev/null 2>&1 8>&- &
   fi
 }
 
@@ -99,6 +100,13 @@ theme() {
   repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
   state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
   out=$state/theme-out
+  # Two switches at once would leave fragments from both, so they take turns; the fallback to paper already holds the lock.
+  if [[ -z ${theme_locked:-} ]]; then
+    mkdir -p "$state"
+    exec 8>"$state/theme.lock"
+    flock -w 30 8 || die "theme $name: another switch held the lock for 30 s"
+    theme_locked=1
+  fi
   from=$(cat "$state/theme" 2>/dev/null || true)
   if ! node "$repo/shell/lib/theme-render.mjs" "$name"; then
     local msg="theme $name: invalid theme.toml"
