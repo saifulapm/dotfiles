@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Kakoune
+GenericName=Text Editor
+Comment=Edit text in kak in a foot window
+Exec=dots-foot kak %F
+Icon=accessories-text-editor
+Terminal=false
+Categories=Utility;TextEditor;
+MimeType=text/plain;text/markdown;text/x-makefile;text/x-c;text/x-csrc;text/x-chdr;text/x-c++;text/x-c++src;text/x-c++hdr;text/x-java;text/x-tex;application/x-shellscript;application/xml;text/xml;
