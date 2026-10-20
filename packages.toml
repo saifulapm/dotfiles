@@ -439,7 +439,7 @@ why = "PHP's package manager, run through bin/composer so it uses the project's 
 [[package]]
 name = "caddy"
 arch = "all"
-why = "serves https://<dir>.test from ~/Sites/laravel/<dir>/public with its own CA"
+why = "serves https://<dir>.test from ~/Codes/<dir>/public with its own CA"
 
 [[package]]
 name = "dnsmasq"

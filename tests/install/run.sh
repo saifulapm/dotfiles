@@ -96,8 +96,8 @@ installs=$(podman exec "$name" grep -c 'claude.ai/install.sh' "$curl_log")
 check "first run runs the Claude installer once (got $installs)" test "$installs" = 1
 
 target=$(podman exec "$name" readlink "$home/.config/quickshell")
-check "\$HOME/.config/quickshell links to $home/Sites/github/dotfiles/shell (got '$target')" \
-  test "$target" = "$home/Sites/github/dotfiles/shell"
+check "\$HOME/.config/quickshell links to $home/Codes/dotfiles/shell (got '$target')" \
+  test "$target" = "$home/Codes/dotfiles/shell"
 
 theme=$(podman exec "$name" cat "$home/.local/state/dots/theme" 2>/dev/null)
 check "\$HOME/.local/state/dots/theme contains paper (got '$theme')" test "$theme" = paper
@@ -113,13 +113,13 @@ check "saiful is in the input group" podman exec "$name" bash -c "id -nG saiful 
 
 unit=$(podman exec "$name" readlink -f "$home/.config/systemd/user/dots-dshift.service")
 check "dots-dshift.service links to the repo unit (got '$unit')" \
-  test "$unit" = "$home/Sites/github/dotfiles/home/dot_config/systemd/user/dots-dshift.service"
+  test "$unit" = "$home/Codes/dotfiles/home/dot_config/systemd/user/dots-dshift.service"
 check "dots-dshift.service runs %h/.local/bin/dots-dshift" \
   podman exec "$name" grep -qx 'ExecStart=%h/.local/bin/dots-dshift' "$home/.config/systemd/user/dots-dshift.service"
 
 clip=$(podman exec "$name" readlink -f "$home/.local/bin/dots-clip-store")
 check "\$HOME/.local/bin/dots-clip-store links to the repo script (got '$clip')" \
-  test "$clip" = "$home/Sites/github/dotfiles/bin/dots-clip-store"
+  test "$clip" = "$home/Codes/dotfiles/bin/dots-clip-store"
 
 # The lock authenticates through dots-lock, and PAM's other service denies every password, so a missing file would lock the user out.
 check "/etc/pam.d/dots-lock includes system-auth" podman exec "$name" grep -qx 'auth include system-auth' /etc/pam.d/dots-lock
@@ -149,7 +149,7 @@ pi=$(as_user "fish -c 'pi --version'" 2>&1)
 # sort -V puts any word after a number, so the output must be a version before it is compared.
 check "pi --version prints 1.3.0 or newer (got '$pi')" bash -c "[[ \$1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\$ && \$(printf '%s\n' 1.3.0 \"\$1\" | sort -V | head -n1) == 1.3.0 ]]" _ "$pi"
 check "mise lists node 24.21.0 as installed" as_user "mise ls --installed node | grep -qw 24.21.0"
-dirt=$(as_user "git -C ~/Sites/github/dotfiles status --porcelain")
+dirt=$(as_user "git -C ~/Codes/dotfiles status --porcelain")
 check "the apply leaves the repo clean (got '$dirt')" test -z "$dirt"
 for font in 'Maple Mono' 'Symbols Nerd Font Mono'; do
   got=$(as_user "fc-match -f '%{family[0]}' '$font'")
@@ -175,13 +175,13 @@ check "pi's pxy extension has every placeholder filled" as_user "grep -q 127.0.0
 # The machine has no gh login before dots secrets, so the private skills repo is not cloned and the apply still finishes.
 check "the skills repo waits for dots secrets" as_user "test ! -e ~/.local/src/skills"
 pw=$(as_user "mise exec -- bash -c 'command -v playwright-cli'" 2>&1)
-check "mise's PATH finds the playwright-cli wrapper first (got '$pw')" test "$pw" = "$home/Sites/github/dotfiles/bin/playwright-cli"
+check "mise's PATH finds the playwright-cli wrapper first (got '$pw')" test "$pw" = "$home/Codes/dotfiles/bin/playwright-cli"
 pwv=$(as_user "mise exec -- playwright-cli --version" 2>&1)
 check "playwright-cli --version prints a version (got '$pwv')" grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' <<<"$pwv"
 v1=$(as_user "find ~/.claude ~/.pi ~/.agents ~/.config/playwright ~/.config/playwright-cli -type l -lname '*/.dotfiles/*'" 2>&1)
 check "nothing Claude Code or pi loads links into v1 (got '$v1')" test -z "$v1"
 # A skill comes from the dotfiles, the skills repo, amx setup, playwright-cli, or workflow install, the one writer of real folders into both skill folders.
-stray=$(as_user 'for e in ~/.claude/skills/*; do n=${e##*/}; t=$(readlink -f "$e/SKILL.md"); case $t in "$HOME"/Sites/github/dotfiles/* | "$HOME"/.local/src/skills/*) continue ;; esac; [[ $n == amx || $n == playwright-cli ]] && continue; [[ ! -L $e && -d ~/.agents/skills/$n && ! -L ~/.agents/skills/$n ]] && continue; echo "$n"; done')
+stray=$(as_user 'for e in ~/.claude/skills/*; do n=${e##*/}; t=$(readlink -f "$e/SKILL.md"); case $t in "$HOME"/Codes/dotfiles/* | "$HOME"/.local/src/skills/*) continue ;; esac; [[ $n == amx || $n == playwright-cli ]] && continue; [[ ! -L $e && -d ~/.agents/skills/$n && ! -L ~/.agents/skills/$n ]] && continue; echo "$n"; done')
 check "every skill in \$HOME/.claude/skills comes from one of the five sources (got strays '$stray')" test -z "$stray"
 dropped=$(as_user "find ~/.config -iname '*herdr*' -o -iname '*kitty*' -o -iname '*vicinae*'")
 check "nothing for herdr, kitty or vicinae under ~/.config (got '$dropped')" test -z "$dropped"
@@ -189,7 +189,7 @@ check "nothing for herdr, kitty or vicinae under ~/.config (got '$dropped')" tes
 check "caddy accepts its Caddyfile" as_user "caddy validate --config ~/.config/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1"
 check "the system trusts caddy's .test CA" podman exec "$name" bash -c "trust list | grep -q 'Caddy Local Authority'"
 for v in 82 83 84; do check "php$v runs" as_user "php$v -r 'exit(0);'"; done
-check "bin/php follows .php-version" as_user "mkdir -p /tmp/p && echo 8.3 > /tmp/p/.php-version && cd /tmp/p && ~/Sites/github/dotfiles/bin/php -r 'echo PHP_VERSION;' | grep -q '^8\.3\.'"
+check "bin/php follows .php-version" as_user "mkdir -p /tmp/p && echo 8.3 > /tmp/p/.php-version && cd /tmp/p && ~/Codes/dotfiles/bin/php -r 'echo PHP_VERSION;' | grep -q '^8\.3\.'"
 check "*.test resolves through dnsmasq" podman exec "$name" grep -qx 'address=/test/127.0.0.1' /etc/dnsmasq.d/test-domains.conf
 check "the dev quadlets generate units" as_user "/usr/lib/systemd/user-generators/podman-user-generator --dryrun >/dev/null 2>&1"
 check "the dev sockets are enabled" as_user "test -f ~/.config/systemd/user/sockets.target.wants/mysql84-proxy.socket -a -f ~/.config/systemd/user/sockets.target.wants/caddy-dev-https.socket"
@@ -227,7 +227,7 @@ check "second run changes no file under $home or /etc" diff <(echo "$before") <(
 
 echo "--- dots update with nothing new"
 as_root ": > $log"
-out=$(as_user "Sites/github/dotfiles/bin/dots update" 2>&1)
+out=$(as_user "Codes/dotfiles/bin/dots update" 2>&1)
 rc=$?
 echo "${out##*$'\n'}"
 check "dots update exits 0" test $rc = 0
@@ -239,16 +239,16 @@ check "dots update's sudo log starts with -v, ends with -k and every call betwee
 
 echo "--- dots update after a pin moved"
 # The repo's working copy takes the older yazi release, as a pulled bump would bring a newer one.
-as_user "cd ~/Sites/github/dotfiles && sed -i -e 's/^version = \"26.9.1\"/version = \"26.8.15\"/' \\
+as_user "cd ~/Codes/dotfiles && sed -i -e 's/^version = \"26.9.1\"/version = \"26.8.15\"/' \\
   -e 's/02807f08d6b589b65b7516a4e259d83f5995d7a23bb12b3a155141385b370b3a/f5a85771f06bb0e8c488136ae0aedaec8d341a7cee995549df391d7d852fe8d1/' \\
   -e 's/a02fe91d3304294048c681f010f1100856872a4e98ecf6927328e888d40a6ad2/cc67eb7991550c2f9407cda52d3f5af0937627aa6884e7de99a04fcf059807e0/' versions.toml"
-out=$(as_user "Sites/github/dotfiles/bin/dots update" 2>&1)
+out=$(as_user "Codes/dotfiles/bin/dots update" 2>&1)
 check "dots update reinstalls only yazi" test "$(grep -c '^dots: pin ' <<<"$out")" = 1 -a "$(grep -c '^dots: pin yazi 26.8.15$' <<<"$out")" = 1
 check "dots update ends with pins: 1 changed (got '${out##*$'\n'}')" grep -qE '^dnf: [0-9]+ upgraded · pins: 1 changed$' <<<"${out##*$'\n'}"
 check "yazi is now 26.8.15" as_user "yazi --version | grep -q 26.8.15"
 
 echo "--- dots install with a tampered pin"
-as_user "cd ~/Sites/github/dotfiles && sed -i 's/f5a85771f06bb0e8c488136ae0aedaec8d341a7cee995549df391d7d852fe8d1/$(printf '0%.0s' {1..64})/; s/cc67eb7991550c2f9407cda52d3f5af0937627aa6884e7de99a04fcf059807e0/$(printf '0%.0s' {1..64})/' versions.toml"
+as_user "cd ~/Codes/dotfiles && sed -i 's/f5a85771f06bb0e8c488136ae0aedaec8d341a7cee995549df391d7d852fe8d1/$(printf '0%.0s' {1..64})/; s/cc67eb7991550c2f9407cda52d3f5af0937627aa6884e7de99a04fcf059807e0/$(printf '0%.0s' {1..64})/' versions.toml"
 out=$(dots_install 2>&1)
 rc=$?
 check "dots install refuses the tampered pin (exit $rc)" test $rc != 0
