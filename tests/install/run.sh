@@ -154,7 +154,7 @@ check "foot reads its config without a warning (got '$out')" test -z "$out"
 check "tmux reads its config" as_user "tmux -L check start-server \\; kill-server"
 # yazi reads its config only as a TUI, so it runs under a pty (-t) with a fixed size, since the pty has no window to measure. On a config error it prints "Failed to parse ..." and waits for a key, so the title it sets once it is up is the proof. timeout stops it either way.
 out=$(podman exec -t -u saiful -w "$home" -e HOME="$home" -e LANG=C.UTF-8 -e LINES=24 -e COLUMNS=80 -e PATH="$home/.local/bin:/usr/bin:/bin" "$name" timeout --foreground -k 2 5 yazi 2>&1)
-check "yazi starts with the shipped config (got '$(tr -d '\r' <<<"$out" | grep -a -m1 'Failed')')" grep -aq 'Yazi: ' <<<"$out"
+check "yazi starts with the shipped config (got '$(grep -ao 'Failed to parse config "[^"]*"' <<<"$out")')" grep -aq 'Yazi: ' <<<"$out"
 
 calls=$(podman exec "$name" cat "$log")
 total=$(grep -c . <<<"$calls")
