@@ -55,7 +55,15 @@ test('kakoune colorscheme defines the core faces from the tokens', () => {
   const kak = renderKak(blueprint);
   assert.match(kak, /^face global Default rgb:d6f4f8,rgb:0a1526$/m);
   assert.match(kak, /^face global PrimarySelection rgb:0a1526,rgb:7fe3f0\+fg$/m);
-  assert.match(kak, /^face global StatusLine rgb:d6f4f8,rgb:2e5a72$/m);
+  assert.match(kak, /^face global StatusLine rgb:d6f4f8,rgb:0a1526$/m);
+});
+
+test('kakoune draws its status line flat and its info and menu on a 6% ink tint, keeping red for errors', () => {
+  const kak = renderKak(paper);
+  assert.match(kak, /^face global StatusLineInfo rgb:575653,rgb:faf6ec$/m);
+  assert.match(kak, /^face global Information rgb:1c1915,rgb:ede9df$/m);
+  assert.match(kak, /^face global MenuBackground rgb:1c1915,rgb:ede9df$/m);
+  assert.match(kak, /^face global Error rgb:faf6ec,rgb:c8381e$/m);
 });
 
 test('kakoune colours code from the theme\'s syntax table', () => {

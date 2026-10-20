@@ -54,6 +54,8 @@ export function renderTmux(t) {
 export function renderKak(t) {
   const c = t.color;
   const s = t.syntax;
+  // Info boxes and menus sit on a light wash of ink; the status line is flat, as tmux's bar is.
+  const tint = mix(c.surface, c.ink, 0.06);
   const faces = [
     ['value', `${rgb(s.value)}`],
     ['type', `${rgb(s.type)}`],
@@ -86,18 +88,18 @@ export function renderKak(t) {
     ['LineNumberCursor', `${rgb(c.accent)},${rgb(c.surface)}+b`],
     ['LineNumbersWrapped', `${rgb(c.line)},${rgb(c.surface)}+i`],
     ['MenuForeground', `${rgb(c.surface)},${rgb(c.accent)}`],
-    ['MenuBackground', `${rgb(c.ink)},${rgb(c.line)}`],
+    ['MenuBackground', `${rgb(c.ink)},${rgb(tint)}`],
     ['MenuInfo', `${rgb(c.muted)}`],
-    ['Information', `${rgb(c.surface)},${rgb(c.danger)}`],
+    ['Information', `${rgb(c.ink)},${rgb(tint)}`],
     ['Error', `${rgb(c.surface)},${rgb(c.danger)}`],
     ['DiagnosticError', `${rgb(c.danger)}`],
     ['DiagnosticWarning', `${rgb(c.danger)}`],
-    ['StatusLine', `${rgb(c.ink)},${rgb(c.line)}`],
-    ['StatusLineMode', `${rgb(c.accent)},${rgb(c.line)}+b`],
-    ['StatusLineInfo', `${rgb(c.muted)},${rgb(c.line)}`],
-    ['StatusLineValue', `${rgb(c.ok)},${rgb(c.line)}`],
+    ['StatusLine', `${rgb(c.ink)},${rgb(c.surface)}`],
+    ['StatusLineMode', `${rgb(c.accent)},${rgb(c.surface)}+b`],
+    ['StatusLineInfo', `${rgb(c.muted)},${rgb(c.surface)}`],
+    ['StatusLineValue', `${rgb(c.ok)},${rgb(c.surface)}`],
     ['StatusCursor', `${rgb(c.surface)},${rgb(c.accent)}`],
-    ['Prompt', `${rgb(c.accent)},${rgb(c.line)}`],
+    ['Prompt', `${rgb(c.accent)},${rgb(c.surface)}`],
     ['MatchingChar', `${rgb(c.ink)},${rgb(c.line)}+b`],
     ['Whitespace', `${rgb(c.line)}+f`],
     ['BufferPadding', `${rgb(c.line)},${rgb(c.surface)}`],
