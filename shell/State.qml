@@ -1,5 +1,6 @@
 pragma Singleton
 import Quickshell
+import Quickshell.Io
 import QtQuick
 import "lib/motion.mjs" as M
 
@@ -24,5 +25,45 @@ Singleton {
 
     function removeTick(tick) {
         ticks = ticks.filter(t => t !== tick);
+    }
+
+    // Every Ipc handler, so the socket can answer what qs ipc would: the first enabled handler of a target, and only the functions it declares.
+    property var ipcs: []
+
+    function addIpc(handler) {
+        ipcs.push(handler);
+    }
+
+    function removeIpc(handler) {
+        ipcs = ipcs.filter(h => h !== handler);
+    }
+
+    // A bare handler's own functions, such as targetChanged, which qs ipc never exposes and neither may the socket.
+    IpcHandler {
+        id: bare
+        enabled: false
+    }
+    readonly property var builtins: functionNames(bare)
+
+    function functionNames(object) {
+        const names = [];
+        for (const key in object)
+            if (typeof object[key] === "function")
+                names.push(key);
+        return names;
+    }
+
+    // {ran: true, output} once the function ran; {ran: false} for an unknown target or function or the wrong argument count, so dots-call asks qs ipc and nothing runs twice.
+    function callIpc(target, name, args) {
+        const handler = ipcs.find(h => h.enabled && h.target === target);
+        if (!handler || builtins.includes(name) || /Changed$/.test(name) || !functionNames(handler).includes(name) || handler[name].length !== args.length)
+            return { ran: false };
+        try {
+            const out = handler[name](...args);
+            return { ran: true, output: out === undefined || out === null ? "" : String(out) };
+        } catch (e) {
+            console.warn("ipc " + target + " " + name + " failed: " + e);
+            return { ran: true, output: "" };
+        }
     }
 }

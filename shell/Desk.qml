@@ -37,7 +37,7 @@ Scope {
         id: osdService
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "osd"
 
         // The brightness keys call this; the step is like 5%+ or 5%-.
@@ -68,7 +68,7 @@ Scope {
         id: syncService
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "notes"
 
         // The double-Shift watcher calls this; it never opens Notes or touches the clipboard.
@@ -139,7 +139,7 @@ Scope {
         }
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "margins"
 
         // The margins of the output with the focused workspace.
@@ -150,7 +150,7 @@ Scope {
         }
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "island"
 
         function state(): string {

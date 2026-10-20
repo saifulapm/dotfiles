@@ -53,6 +53,24 @@ ShellRoot {
         }
     }
 
+    // niri's binds call dots-call, which this answers in about 4 ms where a qs ipc client takes about 38: one request per line, its fields split by \x1f, one reply ended by \x1e.
+    SocketServer {
+        active: true
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/dots-shell-" + Quickshell.env("WAYLAND_DISPLAY") + ".sock"
+        handler: Socket {
+            id: ipcConnection
+            parser: SplitParser {
+                onRead: data => {
+                    const fields = String(data).split("\x1f");
+                    const r = fields.length >= 2 ? Root.State.callIpc(fields[0], fields[1], fields.slice(2)) : { ran: false };
+                    ipcConnection.write(r.ran ? "OK\x1f" + r.output + "\x1e" : "SKIP\x1e");
+                    ipcConnection.flush();
+                    ipcConnection.connected = false;
+                }
+            }
+        }
+    }
+
     // qs emits this only after a hot reload, before the new tree draws its first frame.
     Connections {
         target: Quickshell
@@ -106,7 +124,7 @@ ShellRoot {
         blockAllReads: true
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "shell"
 
         function status(): string {
@@ -130,7 +148,7 @@ ShellRoot {
         id: notifsService
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "notifs"
 
         function dnd(on: bool): void {
@@ -166,7 +184,7 @@ ShellRoot {
     // The desktop entry scan and its icon lookups start right after the first frame, so neither that frame nor the launcher's first open waits on them; an icon the theme lacks is "".
     property var apps: []
 
-    IpcHandler {
+    Root.Ipc {
         target: "launcher"
 
         // t0 is taken before the first load, so a cold open's time includes loading.
@@ -240,7 +258,7 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "goals"
 
         // The store lives in the Desk, so Goals opens only once the Desk has loaded.
@@ -270,7 +288,7 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "themes"
 
         // t0 is taken before the first load, so a cold open's time includes loading.
@@ -298,7 +316,7 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "cheatsheet"
 
         // t0 is taken before the first load, so a cold open's time includes loading.
@@ -326,7 +344,7 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "control"
 
         // t0 is taken before the first load, so a cold open's time includes loading.
@@ -354,7 +372,7 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "record"
 
         // Opens the picker, or stops a recording that is running.

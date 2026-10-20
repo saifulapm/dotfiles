@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Polkit
 import QtQuick
+import "." as Root
 
 // The polkit agent; it registers right after the paper's first frame and shows its prompt in the Surfaces window.
 Scope {
@@ -25,7 +26,7 @@ Scope {
         }
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "polkit"
 
         function state(): string {

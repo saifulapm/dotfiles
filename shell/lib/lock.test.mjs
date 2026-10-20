@@ -8,8 +8,8 @@ const root = new URL('../..', import.meta.url).pathname;
 const lock = readFileSync(root + 'shell/Lock.qml', 'utf8');
 
 function ipcFunctions(src) {
-  const at = src.search(/IpcHandler\s*\{/);
-  assert.ok(at >= 0, 'Lock.qml has an IpcHandler');
+  const at = src.search(/Root\.Ipc\s*\{/);
+  assert.ok(at >= 0, 'Lock.qml has an Ipc handler');
   let depth = 0;
   for (let i = src.indexOf('{', at); i < src.length; i++) {
     if (src[i] === '{') depth++;

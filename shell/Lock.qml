@@ -70,7 +70,7 @@ Scope {
         markerFile.setText("");
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "lock"
 
         function lock(): void {

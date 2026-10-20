@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
+import "." as Root
 import "lib/idle.mjs" as Lib
 
 // Idle steps: dim, then lock, then monitors off, each held back by any idle inhibitor.
@@ -88,7 +89,7 @@ Scope {
         }
     }
 
-    IpcHandler {
+    Root.Ipc {
         target: "idle"
 
         // A test hook: shorter steps, in seconds; anything but three rising whole numbers is ignored.

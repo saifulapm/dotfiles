@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# dots-call <target> <function> [args...]: what niri's binds run to reach the shell, over its own socket in about 4 ms where qs ipc takes about 38; each argument travels as a string, so a typed call such as idle times stays on qs ipc, and a call the socket cannot answer falls back to it.
+set -uo pipefail
+{
+
+sock=${XDG_RUNTIME_DIR:-/run/user/$UID}/dots-shell-${WAYLAND_DISPLAY:-}.sock
+# Fields go out split by \x1f and the line ends the request; an argument holding either takes qs ipc.
+if [[ -S $sock && $* != *[$'\x1e\x1f\n']* ]] && command -v socat >/dev/null; then
+  request=$(IFS=$'\x1f' && echo "$*")
+  reply=$(printf '%s\n' "$request" | timeout 2 socat -t 5 - "UNIX-CONNECT:$sock" 2>&1)
+  case $reply in
+    OK$'\x1f'*$'\x1e')
+      out=${reply#OK$'\x1f'}
+      out=${out%$'\x1e'}
+      [[ -z $out ]] || printf '%s\n' "$out"
+      exit 0
+      ;;
+    # The shell ran nothing (no such target or function, the wrong number of arguments), so qs ipc gives its exact answer.
+    SKIP$'\x1e') ;;
+    # A socket no shell listens on, left by a killed one.
+    *"E connect("*) ;;
+    # The request went out and the answer did not come whole, so the call may have run and is not retried.
+    *)
+      echo "dots-call: the shell did not answer $1 $2" >&2
+      exit 1
+      ;;
+  esac
+fi
+qs ipc call "$@"
+exit
+}

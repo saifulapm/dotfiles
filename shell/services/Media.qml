@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 import QtQuick
+import ".." as Root
 
 // MPRIS players announce every change on the bus, so the island's now-playing slot follows them without polling.
 Scope {
@@ -22,7 +23,7 @@ Scope {
     readonly property var target: player ?? (Mpris.players.values.includes(last) ? last : null) ?? Mpris.players.values[0] ?? null
 
     // The media keys: niri runs qs ipc call media <playPause|next|previous>.
-    IpcHandler {
+    Root.Ipc {
         target: "media"
 
         function playPause(): void {
