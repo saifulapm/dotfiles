@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Mail
+GenericName=Mail Client
+Comment=Read mail in kak-mail in a foot window
+Exec=mail-open
+Icon=mail-unread
+Terminal=false
+Categories=Network;Email;
+MimeType=x-scheme-handler/mailto;

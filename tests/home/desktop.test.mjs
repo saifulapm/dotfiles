@@ -51,6 +51,14 @@ test('kak.desktop opens the files in kak in a themed foot window', () => {
   assert.match(entry, /^Exec=dots-foot kak %F$/m);
 });
 
+test('a mailto link opens mail-open', () => {
+  const r = spawnSync('xdg-mime', ['query', 'default', 'x-scheme-handler/mailto'], { env, encoding: 'utf8' });
+  assert.equal(r.stdout, 'mail-open.desktop\n');
+  const entry = readFileSync(join(home, '.local/share/applications/mail-open.desktop'), 'utf8');
+  assert.match(entry, /^Exec=mail-open$/m);
+  assert.match(entry, /^MimeType=x-scheme-handler\/mailto;$/m);
+});
+
 test('WirePlumber offers A2DP to headsets and connects it on attach', () => {
   const conf = readFileSync(join(home, '.config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf'), 'utf8');
   assert.match(conf, /bluez5\.roles = \[ a2dp_source hfp_ag \]/);
