@@ -3,6 +3,7 @@ import Quickshell.Io
 import QtQuick
 import "." as Root
 import "services" as Services
+import "lib/themes.mjs" as ThemesLib
 import "lib/status.mjs" as Status
 
 ShellRoot {
@@ -195,7 +196,7 @@ ShellRoot {
         onFileChanged: reload()
         onLoaded: {
             try {
-                root.themeList = JSON.parse(text());
+                root.themeList = ThemesLib.cards(JSON.parse(text()));
             } catch (e) {
                 console.warn("themes: keeping the last good list: " + e.message);
             }

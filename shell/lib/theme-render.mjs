@@ -27,7 +27,7 @@ for (const d of readdirSync(dir).sort()) {
   try {
     const t = validateTheme(parseToml(readFileSync(join(dir, d, 'theme.toml'), 'utf8')));
     themes.push(t);
-  } catch {
+  } catch (e) {
     continue;
   }
 }

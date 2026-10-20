@@ -121,5 +121,17 @@ check "four cards share the panel's width without overlap, each specimen inside 
 check "the header counts four sheets and the keys jump 1–4" state_is '.header[0] == "THEMES // 4 SHEETS" and (.legend | contains("[1–4] JUMP"))'
 close_picker
 
+# themes.json is a forged write: an entry the shell would refuse gets no card, and a name stays one line, in order, inside its card.
+long=$(printf 'n%.0s' $(seq 200))
+jq --arg long "$long" '[.[0], (.[1] | del(.niri) | .name = "noniri"), (.[1] | del(.color.ansi) | .name = "noansi"),
+  (.[2] | del(.paper) | .name = "blue\nprint\u202eevil"), (.[2] | .name = $long)]' "$list" >"$list.new" && mv "$list.new" "$list"
+until_ok 2000 state_is '.themes | length == 3'
+open_picker
+check "forged entries without niri or ANSI get no card; the rest draw" state_is '[.cards[].name | .[0:4]] == ["pape", "blue", "nnnn"] and all(.cards[]; .paperReady)'
+check "a forged name draws on one line, in the order it is spelt" \
+  state_is '.cards[1].title == "BLUE PRINTEVIL" and all(.cards[]; .nameLines == 1)'
+check "a 200-character name elides inside its card" state_is 'all(.cards[]; (.nameRight | type) == "number" and .nameRight <= .box.x + .box.w)'
+close_picker
+
 exit $((fails > 0))
 }

@@ -259,7 +259,9 @@ Item {
                                         number: number.text,
                                         title: name.text,
                                         tag: tagText.visible ? tagText.text : "",
-                                        baselines: [name.mapToItem(null, 0, name.baselineOffset).y, tagText.mapToItem(null, 0, tagText.baselineOffset).y]
+                                        baselines: [name.mapToItem(null, 0, name.baselineOffset).y, tagText.mapToItem(null, 0, tagText.baselineOffset).y],
+                                        nameRight: name.mapToItem(null, name.width, 0).x,
+                                        nameLines: name.lineCount
                                     }, specimen.item ? specimen.item.drawn() : { paperReady: false });
                                 }
 
@@ -376,6 +378,9 @@ Item {
                                             Text {
                                                 id: name
                                                 textFormat: Text.PlainText
+                                                // A long name elides inside its card and leaves room for the tag.
+                                                width: Math.min(implicitWidth, parent.parent.width - x - (tagText.visible ? tagText.implicitWidth + 22 : 0))
+                                                elide: Text.ElideRight
                                                 text: parent.parent.cardName.text
                                                 color: c.ink
                                                 font.family: parent.parent.cardName.font

@@ -1,11 +1,26 @@
 // The theme picker's cursor, captions and specimens, from each theme's tokens alone, so a theme added later draws too; pure, so node tests what the shell imports.
-import { marginLook, listLook } from './voice.mjs';
+import { marginLook, listLook, line } from './voice.mjs';
+import { checkTokens } from './theme.mjs';
 import { marginStyle } from './surface.mjs';
 import { pad2 } from './margins.mjs';
 
 export function step(names, name, by) {
   const i = Math.max(0, Math.min(names.length - 1, names.indexOf(name) + by));
   return names[i];
+}
+
+// themes.json is a file any process can write, so each entry passes the check shell.json passes, and one that fails gets no card.
+export function cards(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const t of list) {
+    try {
+      out.push(checkTokens(t));
+    } catch (e) {
+      continue;
+    }
+  }
+  return out;
 }
 
 // A digit picks the card it numbers; a digit with no card leaves the cursor where it is.
@@ -30,9 +45,10 @@ const TILE = '#F6F7F9';
 
 // A card's name in its own theme's typeface and voice; the picker draws it in the current theme's ink, so it always reads.
 export function cardName(t) {
-  if (t.type.voice === 'bracket') return { text: t.name.toUpperCase(), font: t.type.ui, size: 14, weight: 700, spacing: 1.12 };
-  if (t.type.voice === 'plain') return { text: cap(t.name), font: t.type.ui, size: 16, weight: 700, spacing: -0.16 };
-  return { text: cap(t.name), font: t.type.display, size: 26, weight: 400, spacing: 0 };
+  const name = line(t.name);
+  if (t.type.voice === 'bracket') return { text: name.toUpperCase(), font: t.type.ui, size: 14, weight: 700, spacing: 1.12 };
+  if (t.type.voice === 'plain') return { text: cap(name), font: t.type.ui, size: 16, weight: 700, spacing: -0.16 };
+  return { text: cap(name), font: t.type.display, size: 26, weight: 400, spacing: 0 };
 }
 
 // Its primitives in a line, in its own voice: grain, ink, a hard shadow; Dots · soft shadow · round; GRID // GLOW // CUT.
@@ -123,7 +139,7 @@ export function terminalLines(tokens) {
     prompt('just test'),
     [{ text: '✓ 42 passed', color: a[2] }, { text: ' · 0.9 s', color: tokens.color.muted }],
     prompt('git log -1'),
-    [{ text: 'a1e9e71 ', color: a[3] }, { text: `${tokens.name} on the shelf`, color: ink }],
+    [{ text: 'a1e9e71 ', color: a[3] }, { text: `${line(tokens.name)} on the shelf`, color: ink }],
   ];
 }
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme } from './theme.mjs';
-import { step, jump, previewSwitch, cardName, tagline, pickerLook, windowLook, terminalLines, swatches, specimenMargins } from './themes.mjs';
+import { cards, step, jump, previewSwitch, cardName, tagline, pickerLook, windowLook, terminalLines, swatches, specimenMargins } from './themes.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const paper = load('paper');
@@ -135,4 +135,21 @@ test('a card plays its own theme switch in miniature: Paper slides, Artboard zoo
   ]);
   assert.deepEqual(previewSwitch('ease', 1), { kind: 'cut', ms: 0 });
   assert.deepEqual(previewSwitch('linear', 10), { kind: 'scan', ms: 2200 });
+});
+
+test('a themes.json entry the shell would refuse gets no card, and the rest keep theirs', () => {
+  const noNiri = { ...artboard }; delete noNiri.niri;
+  const noAnsi = { ...artboard, name: 'noansi', color: { ...artboard.color } }; delete noAnsi.color.ansi;
+  const noPaper = { ...blueprint, name: 'nopaper' }; delete noPaper.paper;
+  const list = cards([paper, noNiri, noAnsi, noPaper, null, 'x', blueprint]);
+  assert.deepEqual(list.map((t) => t.name), ['paper', 'nopaper', 'blueprint']);
+  assert.deepEqual(list[1].paper, {});
+  assert.deepEqual(cards({ not: 'a list' }), []);
+});
+
+test('a forged theme name draws on one line, in the order it is spelt', () => {
+  const t = { ...paper, name: 'pa\nper\u202Eevil' };
+  assert.equal(cardName(t).text, 'Pa perevil');
+  assert.equal(terminalLines(t)[3][1].text, 'pa perevil on the shelf');
+  assert.equal(cardName({ ...blueprint, name: 'blue\tprint' }).text, 'BLUE PRINT');
 });

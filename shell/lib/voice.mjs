@@ -22,7 +22,7 @@ const same = (s) => (s || '').replace(BIDI, '');
 export const inOrder = same;
 const upper = (s) => same(s).toUpperCase();
 // A one-line label: newlines and tabs become single spaces, so a sender cannot stack lines.
-const line = (s) => same(s).replace(/\s+/g, ' ').trim();
+export const line = (s) => same(s).replace(/\s+/g, ' ').trim();
 
 export function launcherLook(tokens) {
   const c = (tokens || UNTHEMED).color;
