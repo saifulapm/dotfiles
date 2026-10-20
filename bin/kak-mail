@@ -93,6 +93,16 @@ def width(s):
     return w
 
 
+# A sender writes every header, so control characters (a newline splits a row, ESC drives the terminal) become spaces and bidi controls go.
+BIDI = dict.fromkeys(map(ord, "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"))
+
+
+def line(s):
+    """S as one line of plain text: control characters become spaces, bidi controls are dropped."""
+    s = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", str(s))
+    return s.translate(BIDI)
+
+
 def fit(s, n):
     """Truncate/pad S to exactly N display cells."""
     s = s.replace("\t", " ").replace("\n", " ")
@@ -115,7 +125,7 @@ def fmt_date(ts):
 
 
 def row(ts, who, subject, tags):
-    return f"{fmt_date(ts):<10} {fit(who, 22)} {subject}  [{' '.join(tags)}]"
+    return f"{fmt_date(ts):<10} {fit(line(who), 22)} {line(subject)}  [{line(' '.join(tags))}]"
 
 
 # ───────────────────────────── boxes / lists ─────────────────────────────
@@ -211,7 +221,7 @@ def body_text(parts, attachments, links=True):
             for inner in c:
                 h = inner.get("headers", {})
                 out.append("---------- attached message ----------\n" +
-                           "".join(f"{k}: {h[k]}\n" for k in ("From", "Date", "Subject") if k in h) + "\n" +
+                           "".join(f"{k}: {line(h[k])}\n" for k in ("From", "Date", "Subject") if k in h) + "\n" +
                            body_text(inner.get("body", []), attachments, links))
         elif ct == "text/plain":
             out.append(c or "")
@@ -239,7 +249,7 @@ def render_message(m):
     h = m["headers"]
     atts = []
     body = body_text(m.get("body", []), atts)
-    head = "".join(f"{k}: {h[k]}\n" for k in ("From", "To", "Cc", "Date", "Subject") if h.get(k))
+    head = "".join(f"{k}: {line(h[k])}\n" for k in ("From", "To", "Cc", "Date", "Subject") if h.get(k))
     head += f"Tags: {' '.join(m['tags'])}\n"
     tail = "".join(f"[attachment {i}: {name} ({ct})]\n" for i, name, ct in atts)
     return head + "\n" + body + ("\n" + tail if tail else "")

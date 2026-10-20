@@ -212,3 +212,31 @@ test('kak loads mail.kak with the carried config and no error', () => {
   const errors = readFileSync(`${out}.debug`, 'utf8').split('\n').filter((l) => /error|could not load/i.test(l));
   assert.deepEqual(errors, []);
 });
+
+// A sender writes From and Subject, so a newline there split a list row (row i then opened message i+1) and printed a fake header; U+202E reordered the text after it.
+test('kak-mail keeps a forged From and Subject on one line, without bidi controls', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'kak-mail-forged-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const evil = 'line1\nFrom: spoof@x.test\rline3\x1b[31mred ‮gpj.exe⁦';
+  const msg = { id: 'a@x', match: true, timestamp: 1792500000, tags: ['inbox'], headers: { From: `Evil\nFrom: spoof@x.test <e@x.test>`, To: 'me@x.test', Date: 'Tue, 20 Oct 2026 14:00:00 +0000', Subject: evil }, body: [{ id: 1, 'content-type': 'text/plain', content: 'body\n' }] };
+  const thread = { thread: '0001', timestamp: 1792500000, matched: 1, total: 1, authors: 'Evil\nFrom: spoof ‮exe', subject: evil, tags: ['inbox'] };
+  const show = JSON.stringify([[[msg, []]]]);
+  writeFileSync(join(dir, 'show.json'), show);
+  writeFileSync(join(dir, 'search.json'), JSON.stringify([thread]));
+  writeFileSync(join(dir, 'notmuch'), `#!/bin/sh\ncase "$1" in show) cat ${dir}/show.json ;; search) cat ${dir}/search.json ;; esac\n`, { mode: 0o755 });
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, HOME: dir };
+  const bad = /[\x00-\x08\x0b-\x1f\x7f‎‏‪-‮⁦-⁩]/;
+  for (const args of [['list', '--out', join(dir, 'list'), 'tag:inbox'], ['list', '--out', join(dir, 'flat'), '--unthreaded', 'tag:inbox']]) {
+    const r = spawnSync(join(repo, 'bin/kak-mail'), args, { env, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    const rows = readFileSync(args[2], 'utf8').replace(/\n$/, '').split('\n');
+    assert.equal(rows.length, 1, rows.join('|'));
+    assert.doesNotMatch(rows[0], bad);
+  }
+  const r = spawnSync(join(repo, 'bin/kak-mail'), ['show', '--out', join(dir, 'thread'), 'id:a@x'], { env, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const lines = readFileSync(join(dir, 'thread'), 'utf8').split('\n');
+  assert.equal(lines.filter((l) => l.startsWith('From:')).length, 1, lines.join('|'));
+  assert.equal(lines.filter((l) => l.startsWith('Subject:')).length, 1);
+  assert.ok(!lines.some((l) => bad.test(l)), lines.join('|'));
+});
