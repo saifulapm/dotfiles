@@ -10,11 +10,11 @@ in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme 
 
 until_ok 5000 shell_status >/dev/null
 # niri drops an empty workspace once focus leaves it, so workspace 1 keeps a window of its own.
-niri msg action spawn -- foot sleep 600
+niri msg action spawn -- foot -c /dev/null sleep 600
 until_ok 5000 eval 'niri msg -j windows | jq -e "length == 1" >/dev/null'
 niri msg action focus-workspace 2
 # sleep never retitles its window the way a shell does, so the title stays ~.
-niri msg action spawn -- foot -T '~' sleep 600
+niri msg action spawn -- foot -c /dev/null -T '~' sleep 600
 foot_focused() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot" and .title == "~" and .is_focused)' >/dev/null; }
 until_ok 5000 foot_focused
 
@@ -48,7 +48,7 @@ console.log(JSON.stringify(G.addGoal(G.emptyStore(), 'G'.repeat(2000), Date.now(
 JS
 mv "$store.tmp" "$store"
 niri msg action focus-workspace 3
-niri msg action spawn -- foot -T "$(printf 'T%.0s' $(seq 2000))" sleep 600
+niri msg action spawn -- foot -c /dev/null -T "$(printf 'T%.0s' $(seq 2000))" sleep 600
 long_focused() { niri msg -j focused-window | jq -e '.title | length == 2000' >/dev/null 2>&1; }
 until_ok 5000 long_focused
 # A Text paints past its width unless it elides, so the check reads both its box and its elision.

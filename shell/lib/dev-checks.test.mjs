@@ -31,3 +31,29 @@ test('the fake ddcutil lives in dev/path, never in bin/', () => {
   assert.ok(existsSync(new URL('../../dev/path/ddcutil', import.meta.url)));
   assert.ok(!existsSync(new URL('../../bin/ddcutil', import.meta.url)));
 });
+
+// The live foot.ini themes every foot and its [colors-light] beats -o colors.*, so a nested foot reads /dev/null (themes.sh reads it on purpose).
+test('every foot a tests/dev script spawns passes -c /dev/null', () => {
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh') && f !== 'themes.sh')) {
+    readFileSync(dir + f, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (/spawn\s+--\s+foot\b/.test(line) && !/\bfoot\s+-c\s+\/dev\/null\b/.test(line)) found.push(`${f}:${i + 1}`);
+      });
+  }
+  assert.deepEqual(found, [], 'foot spawned without -c /dev/null');
+});
+
+// The shell centres a card at Math.round((width - N) / 2), so an odd width rounds up: (ow - N + 1) / 2 in bash.
+test('no tests/dev script floors a centred card x position', () => {
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
+    readFileSync(dir + f, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (/\(\(?\s*ow\s*-\s*\d+\s*\)\s*\/\s*2/.test(line) && !/ow\s*-\s*\d+\s*\+\s*1\s*\)\s*\/\s*2/.test(line)) found.push(`${f}:${i + 1}`);
+      });
+  }
+  assert.deepEqual(found, [], 'card x floored, use (ow - N + 1) / 2');
+});

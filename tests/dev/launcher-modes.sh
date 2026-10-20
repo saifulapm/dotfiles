@@ -33,8 +33,8 @@ until_ok 3000 state_is '.mode == "commands" and .results[0] == "lock"'
 check "> lo lists lock first" state_is '.mode == "commands" and .results[0] == "lock"'
 close_launcher
 
-niri msg action spawn -- foot
-niri msg action spawn -- foot
+niri msg action spawn -- foot -c /dev/null
+niri msg action spawn -- foot -c /dev/null
 two_windows() { [ "$(windows_n)" = 2 ]; }
 until_ok 8000 two_windows
 open_launcher

@@ -18,7 +18,7 @@ until_ok 5000 shell_status >/dev/null
 
 typed=$(mktemp -u)
 cleanup() { rm -f "$typed"; }
-niri msg action spawn -- foot -e sh -c "read x; echo \"\$x\" > $typed"
+niri msg action spawn -- foot -c /dev/null -e sh -c "read x; echo \"\$x\" > $typed"
 foot_focused() { niri msg -j windows | jq -e 'any(.[]; .is_focused and .app_id == "foot")' >/dev/null; }
 until_ok 5000 foot_focused
 
@@ -50,7 +50,7 @@ check "Enter pastes first into the foot it came from" typed_ok
 long=$(mktemp -u)
 cleanup_long() { rm -f "$long"; }
 # Without -icanon the tty would cut each pasted line at 4095 bytes.
-niri msg action spawn -- foot -e sh -c "stty -icanon; head -c 200000 | wc -c > $long"
+niri msg action spawn -- foot -c /dev/null -e sh -c "stty -icanon; head -c 200000 | wc -c > $long"
 long_focused() { niri msg -j focused-window | jq -e '.app_id == "foot"' >/dev/null; }
 sleep 0.5
 until_ok 5000 long_focused

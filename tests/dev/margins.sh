@@ -7,7 +7,7 @@ until_ok 5000 shell_status >/dev/null
 margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 
-niri msg action spawn -- foot
+niri msg action spawn -- foot -c /dev/null
 foot_focused() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot" and .is_focused)' >/dev/null; }
 until_ok 5000 foot_focused
 check "foot is focused" foot_focused

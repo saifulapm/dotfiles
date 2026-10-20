@@ -54,7 +54,7 @@ check "state says open false" state_is '.open == false'
 typed=$(mktemp -u)
 cleanup() { rm -f "$typed"; }
 before=$(niri msg -j windows | jq '[.[].id]')
-niri msg action spawn -- foot -e sh -c "read x; echo \"\$x\" > $typed"
+niri msg action spawn -- foot -c /dev/null -e sh -c "read x; echo \"\$x\" > $typed"
 new_focused() { niri msg -j windows | jq -e --argjson b "$before" 'any(.[]; .is_focused and (.id | IN($b[]) | not))' >/dev/null; }
 until_ok 5000 new_focused
 mod_space

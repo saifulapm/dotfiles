@@ -62,7 +62,7 @@ check "paper: the test password unlocks" unlocked
 lock_in artboard
 check "artboard: the lock draws its clock on a card, 96 px bold Maple Mono" state_is '.look == "card" and .clockFamily == "Maple Mono" and .clockPx == 96'
 # The card is white and the paper grey, so a pixel inside the card's top-left reads white.
-card_white() { local r g b; read -r r g b < <(grim -s 1 -t ppm -g "$(((ow - 460) / 2 + 24)),$((oh * 3 / 10 + 8)) 4x4" - | mean_rgb); ((r > 250 && g > 250 && b > 250)); }
+card_white() { local r g b; read -r r g b < <(grim -s 1 -t ppm -g "$(((ow - 460 + 1) / 2 + 24)),$((oh * 3 / 10 + 8)) 4x4" - | mean_rgb); ((r > 250 && g > 250 && b > 250)); }
 until_ok 2000 card_white
 check "artboard: the white card shows at the screen's centre" card_white
 unlock

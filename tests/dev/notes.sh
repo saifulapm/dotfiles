@@ -22,7 +22,7 @@ docked_right() {
 until_ok 5000 bash -c 'timeout 0.5 qs ipc call notes state >/dev/null 2>&1'
 typed=$(mktemp -u)
 cleanup() { rm -f "$typed"; }
-niri msg action spawn -- foot -e sh -c "read x; echo \"\$x\" > $typed"
+niri msg action spawn -- foot -c /dev/null -e sh -c "read x; echo \"\$x\" > $typed"
 foot_up() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot" and .is_focused)' >/dev/null; }
 until_ok 5000 foot_up
 foot=$(niri msg -j windows | jq '.[] | select(.app_id == "foot") | .id')
@@ -70,7 +70,7 @@ typed_ok() { [ "$(cat "$typed" 2>/dev/null)" = "echo ok" ]; }
 until_ok 3000 typed_ok
 check "with Notes pinned, typing echo ok lands in foot" typed_ok
 check "and nothing reached the composer" notes_is '.composer == ""'
-niri msg action spawn -- foot
+niri msg action spawn -- foot -c /dev/null
 until_ok 5000 foot_up
 mod_shift_n
 until_ok 2000 notes_gone

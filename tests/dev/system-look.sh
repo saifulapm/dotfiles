@@ -45,29 +45,29 @@ until_ok 2000 status_theme artboard
 
 niri msg action spawn -- dots-call launcher toggle
 until_ok 3000 is_open launcher .open
-until_ok 2000 labelled $(((ow - 640) / 2))
-check "the launcher card carries its frame label" labelled $(((ow - 640) / 2))
+until_ok 2000 labelled $(((ow - 640 + 1) / 2))
+check "the launcher card carries its frame label" labelled $(((ow - 640 + 1) / 2))
 check "the launcher's drawn frame label reads Launcher" drawn_label launcher Launcher
 timeout 0.5 qs ipc call launcher close
 
 niri msg action spawn -- dots-call control toggle
 until_ok 3000 is_open control '.open and .settled'
-until_ok 2000 labelled $(((ow - 720) / 2))
-check "Control carries its frame label" labelled $(((ow - 720) / 2))
+until_ok 2000 labelled $(((ow - 720 + 1) / 2))
+check "Control carries its frame label" labelled $(((ow - 720 + 1) / 2))
 check "Control's drawn frame label reads Control" drawn_label control Control
 timeout 0.5 qs ipc call control close
 
 niri msg action spawn -- dots-call notifs toggle
 until_ok 3000 is_open notifs '.open and .settled'
-until_ok 2000 labelled $(((ow - 640) / 2))
-check "the notification centre carries its frame label" labelled $(((ow - 640) / 2))
+until_ok 2000 labelled $(((ow - 640 + 1) / 2))
+check "the notification centre carries its frame label" labelled $(((ow - 640 + 1) / 2))
 check "the notification centre's drawn frame label reads Notifications" drawn_label notifs Notifications
 timeout 0.5 qs ipc call notifs close
 
 fake Begin s c1 >/dev/null
 until_ok 3000 is_open polkit '.open and .settled'
-until_ok 2000 labelled $(((ow - 520) / 2))
-check "the polkit prompt carries its frame label" labelled $(((ow - 520) / 2))
+until_ok 2000 labelled $(((ow - 520 + 1) / 2))
+check "the polkit prompt carries its frame label" labelled $(((ow - 520 + 1) / 2))
 check "the polkit prompt's drawn frame label reads Authenticate" drawn_label polkit Authenticate
 wtype -k Escape
 until_ok 2000 is_open polkit '(.open | not) and .drawing == false'

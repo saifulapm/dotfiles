@@ -143,7 +143,7 @@ for t in paper artboard blueprint; do
 done
 
 in_theme artboard
-niri msg action spawn -- foot
+niri msg action spawn -- foot -c /dev/null
 until_ok 5000 bash -c 'niri msg -j windows | jq -e "any(.[]; .app_id == \"foot\")" >/dev/null'
 open_launcher
 wtype "w "

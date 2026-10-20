@@ -14,7 +14,7 @@ until_ok 5000 shell_status >/dev/null
 
 typed=$(mktemp -u)
 cleanup() { rm -f "$typed"; }
-niri msg action spawn -- foot -e sh -c "read x; echo \"\$x\" > $typed"
+niri msg action spawn -- foot -c /dev/null -e sh -c "read x; echo \"\$x\" > $typed"
 foot_focused() { niri msg -j windows | jq -e 'any(.[]; .is_focused and .app_id == "foot")' >/dev/null; }
 until_ok 5000 foot_focused
 

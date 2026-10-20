@@ -20,7 +20,7 @@ theme() {
 
 read -r ox oy ow < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y) \(.width)"')
 # The launcher card's top-left corner at rest, in screen pixels.
-cx=$((ox + (ow - 640) / 2))
+cx=$((ox + (ow - 640 + 1) / 2))
 cy=$((oy + 168))
 
 rgb() { grim -s 1 -t ppm -g "$1,$2 ${3:-1}x${4:-1}" - | mean_rgb; }
