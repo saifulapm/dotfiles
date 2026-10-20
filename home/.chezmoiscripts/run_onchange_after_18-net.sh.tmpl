@@ -1,0 +1,7 @@
+#!/bin/bash
+# net source hashes: {{ joinPath .chezmoi.workingTree "system/sysctl.d/99-tcp-bbr.conf" | include | sha256sum }} {{ joinPath .chezmoi.workingTree "system/modules-load.d/tcp-bbr.conf" | include | sha256sum }}
+{{ template "lib.sh" . }}
+root install -D -m 0644 {{ joinPath .chezmoi.workingTree "system/sysctl.d/99-tcp-bbr.conf" | quote }} /etc/sysctl.d/99-tcp-bbr.conf || die "could not install the BBR sysctl"
+root install -D -m 0644 {{ joinPath .chezmoi.workingTree "system/modules-load.d/tcp-bbr.conf" | quote }} /etc/modules-load.d/tcp-bbr.conf || die "could not load tcp_bbr at boot"
+# A container cannot load modules or set net sysctls; the next boot applies both.
+root modprobe -a tcp_bbr sch_fq 2>/dev/null && root sysctl -q -p /etc/sysctl.d/99-tcp-bbr.conf 2>/dev/null || log "BBR lands at the next boot"
