@@ -59,15 +59,17 @@ function place(step, tmp) {
   }
 }
 
-// A record stamped more than a day ahead of this clock would win every merge from now on, so a pulled file's such records are left out.
+// A record stamped more than a day ahead of this clock would win every merge from now on, so a pulled file's such records are left out and counted.
 function recent(unit, store) {
   const limit = Date.now() + 24 * 3600000;
-  const ok = (x) => x.updatedAt <= limit;
-  if (unit === 'notes') return Object.assign({}, store, { notes: store.notes.filter(ok) });
-  return Object.assign({}, store, { goals: store.goals.filter(ok).map((g) => Object.assign({}, g, { tasks: g.tasks.filter(ok) })) });
+  let dropped = 0;
+  const ok = (x) => x.updatedAt <= limit || (dropped++, false);
+  if (unit === 'notes') return { store: Object.assign({}, store, { notes: store.notes.filter(ok) }), dropped };
+  const kept = store.goals.filter(ok).map((g) => Object.assign({}, g, { tasks: g.tasks.filter(ok) }));
+  return { store: Object.assign({}, store, { goals: kept }), dropped };
 }
 
-// A pulled file that does not parse is left out and the rest still merge; exit 5 then names it last, so the unit shows the error while this machine's store still goes up.
+// A pulled file that does not parse, or its records stamped ahead, are left out and the rest still merge; exit 5 then names them last, so the unit shows the error while this machine's store still goes up.
 function merge(unit, path, files) {
   const model = { notes, goals }[unit];
   const others = [];
@@ -75,8 +77,13 @@ function merge(unit, path, files) {
   // This machine's own remote file is merged too, so a reinstall with no local store gets its goals and notes back before its first push.
   for (const f of files) {
     const store = model.parseStore(read(f));
-    if (store) others.push(recent(unit, store));
-    else skipped.push(`${unit}: skipped ${basename(f)}, which does not parse`);
+    if (!store) {
+      skipped.push(`${unit}: skipped ${basename(f)}, which does not parse`);
+      continue;
+    }
+    const { store: kept, dropped } = recent(unit, store);
+    others.push(kept);
+    if (dropped) skipped.push(`${unit}: left out ${dropped} record${dropped === 1 ? '' : 's'} from ${basename(f)}, stamped more than a day ahead`);
   }
   for (let i = 0; i < 3; i++) {
     if (!round(model, path, others)) continue;

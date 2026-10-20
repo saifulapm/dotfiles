@@ -45,7 +45,7 @@ store_unit() {
   rc mkdir "$root/$1" &&
     rc copy "$root/$1" "$pulled" --max-depth 1 --include '*.json' || return
   merge "$1" "$store" "$pulled" || code=$?
-  # 5 is another machine's file that does not parse: the unit fails with that, but what did merge still goes up.
+  # 5 is another machine's file that does not parse, or its records stamped ahead: the unit fails with that, but what did merge still goes up.
   ((code == 0 || code == 5)) || return "$code"
   # --checksum, as Dropbox keeps modtimes to the second and a same-size edit inside it would look unchanged.
   [[ ! -f $store ]] || rc copyto "$store" "$root/$1/$machine.json" --checksum || return
@@ -56,7 +56,7 @@ store_unit() {
 sync_notes() {
   local dir=$data/notes/attachments code=0
   store_unit notes || code=$?
-  # Another machine's file that does not parse (5) fails the unit, but attachments still travel.
+  # Another machine's file that does not parse, or its records stamped ahead (5), fails the unit, but attachments still travel.
   ((code == 0 || code == 5)) || return "$code"
   mkdir -p "$dir"
   rc mkdir "$root/notes/attachments" &&
