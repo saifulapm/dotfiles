@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # The picker wears the current theme: each theme's cursor, current tag, header and keys, and n cards share its width.
 {
+# Slowed, so the picker opens while the paper's switch still plays.
+export DOTS_MOTION_SLOWDOWN=20
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -75,6 +77,8 @@ close_picker
 switch artboard
 until_ok 3000 status_theme artboard
 open_picker
+# Paper's motion is snappy, so the switch away from it is a slide; .current names the theme whether or not the paper still moves, status reads the paper's running kind.
+check "artboard: the picker opened while the paper's slide still ran" eval 'shell_status | jq -e ".transition == \"slide\"" >/dev/null'
 check "artboard: opened mid-switch, the current card is artboard" state_is '.current == "artboard" and .cards[1].tag == "Current"'
 wtype k
 until_ok 1000 state_is '.selected == "paper"'
@@ -94,6 +98,8 @@ frame_label() {
 check "artboard: the panel has its blue Themes frame label" frame_label
 check "artboard: the header reads Themes 3 themes" state_is '.header == ["Themes3 themes", ""]'
 close_picker
+ended() { shell_status | jq -e '.transition == ""' >/dev/null; }
+check "artboard: once the switch ends, status reports no transition" until_ok 8000 ended
 
 switch blueprint
 until_ok 3000 status_theme blueprint

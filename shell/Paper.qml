@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import "." as Root
 
 // The shader has no time uniform, so the paper never redraws unless the theme or the output changes.
 PanelWindow {
@@ -152,7 +153,7 @@ PanelWindow {
             target: paper.back
             property: "offset"
             to: 0
-            duration: 220
+            duration: 220 * Root.State.slowdown
             easing.type: Easing.OutExpo
         }
         NumberAnimation {
@@ -160,7 +161,7 @@ PanelWindow {
             property: "offset"
             from: 0
             to: -paper.height / 4
-            duration: 220
+            duration: 220 * Root.State.slowdown
             easing.type: Easing.OutExpo
         }
     }
@@ -175,14 +176,14 @@ PanelWindow {
                 target: canvas
                 property: "scale"
                 to: 0.97
-                duration: 85
+                duration: 85 * Root.State.slowdown
                 easing.type: Easing.OutCubic
             }
             NumberAnimation {
                 target: canvas
                 property: "scale"
                 to: 1
-                duration: 135
+                duration: 135 * Root.State.slowdown
                 easing.type: Easing.OutBack
                 easing.overshoot: 2.5
             }
@@ -193,7 +194,7 @@ PanelWindow {
             property: "opacity"
             from: 1
             to: 0
-            duration: 220
+            duration: 220 * Root.State.slowdown
         }
     }
 
@@ -204,7 +205,7 @@ PanelWindow {
         property: "cut"
         from: 0
         to: paper.height
-        duration: 220
+        duration: 220 * Root.State.slowdown
         onFinished: paper.finish()
     }
 
