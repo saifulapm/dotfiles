@@ -1,6 +1,7 @@
 #!/bin/bash
 {{ template "lib.sh" . }}
 {{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "amx") }}
+{{ template "cargo.sh" . }}
 tarball=$(pin_fetch)
 tar -xzf "$tarball" -C "$pin_tmp"
 pin_cargo "$pin_tmp/amx-$pin_version" amx

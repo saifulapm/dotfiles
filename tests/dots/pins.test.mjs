@@ -22,7 +22,7 @@ function source(sum) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-pins-')));
   const templates = join(root, 'home/.chezmoitemplates');
   mkdirSync(templates, { recursive: true });
-  for (const f of ['lib.sh', 'pin.sh']) copyFileSync(join(repo, 'home/.chezmoitemplates', f), join(templates, f));
+  for (const f of ['lib.sh', 'pin.sh', 'cargo.sh']) copyFileSync(join(repo, 'home/.chezmoitemplates', f), join(templates, f));
   writeFileSync(join(root, '.chezmoiroot'), 'home\n');
   writeFileSync(join(root, 'hello-1.2.txt'), 'hello pin\n');
   const url = `file://${root}/hello-{version}.txt`;
@@ -81,7 +81,8 @@ mkdir -p "$t/release" && printf '#!/bin/sh\\necho built\\n' > "$t/release/hello"
 function cargo(root, env = {}) {
   mkdirSync(join(root, 'stubs'));
   writeFileSync(join(root, 'stubs/cargo'), CARGO, { mode: 0o755 });
-  const r = run(root, SCRIPT.replace('cat "$file"', 'mkdir -p "$pin_tmp/src"; pin_cargo "$pin_tmp/src" hello'), `${root}/stubs:`, env);
+  const script = SCRIPT.replace('{{ template "pin.sh"', '{{ template "cargo.sh" . }}\n{{ template "pin.sh"').replace('cat "$file"', 'mkdir -p "$pin_tmp/src"; pin_cargo "$pin_tmp/src" hello');
+  const r = run(root, script, `${root}/stubs:`, env);
   return r;
 }
 
@@ -130,5 +131,16 @@ test('every pin in versions.toml has its own script, and every pin script a pin'
   for (const name of pins) {
     const [file] = readdirSync(join(repo, 'home/.chezmoiscripts')).filter((f) => f.endsWith(`-pin-${name}.sh.tmpl`));
     assert.match(readFileSync(join(repo, 'home/.chezmoiscripts', file), 'utf8'), new RegExp(`"name" "${name}"`), file);
+  }
+});
+
+// Every pin script renders pin.sh, so a helper only some pins use belongs in its own template, or editing it re-runs every pin.
+test('every function pin.sh defines is called by every pin script', () => {
+  const dir = join(repo, 'home/.chezmoiscripts');
+  const fns = [...readFileSync(join(repo, 'home/.chezmoitemplates/pin.sh'), 'utf8').matchAll(/^(\w+)\(\) \{/gm)].map((m) => m[1]);
+  assert.ok(fns.length >= 2, fns.join());
+  for (const f of readdirSync(dir).filter((f) => /^run_onchange_after_2\d-pin-.+\.sh\.tmpl$/.test(f))) {
+    const text = readFileSync(join(dir, f), 'utf8');
+    assert.deepEqual(fns.filter((fn) => !new RegExp(`\\b${fn}\\b`).test(text)), [], f);
   }
 });
