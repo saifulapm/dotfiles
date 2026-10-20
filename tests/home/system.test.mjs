@@ -1,4 +1,4 @@
-// The root steps m18 brings back: ydotoold with its uinput rule, and swap with zswap on zstd.
+// Root steps v1 had and v2 brings back: ydotoold with its uinput rule, and swap with zswap on zstd.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
