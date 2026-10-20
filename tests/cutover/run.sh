@@ -61,14 +61,14 @@ as_user '
   mkdir -p $d ~/.config/systemd/user ~/.config/chezmoi ~/.config/fish/conf.d ~/.config/qshell \
     ~/.local/state/qshell/notes/attachments ~/.local/state/qshell/goals ~/.local/share/fish
   echo "sourceDir = \"~/.dotfiles\"" > ~/.config/chezmoi/chezmoi.toml
-  for u in qshell hub-local; do printf "[Service]\nExecStart=/bin/sleep infinity\n[Install]\nWantedBy=default.target\n" > $d/$u.service; done
+  for u in qshell hub-local pxy; do printf "[Service]\nExecStart=/bin/sleep infinity\n[Install]\nWantedBy=default.target\n" > $d/$u.service; done
   for u in qshell-sync update-all; do
     printf "[Service]\nType=oneshot\nExecStart=/bin/true\n" > $d/$u.service
     printf "[Timer]\nOnCalendar=daily\n[Install]\nWantedBy=timers.target\n" > $d/$u.timer
   done
   for f in $d/*; do ln -s $f ~/.config/systemd/user/; done
   systemctl --user daemon-reload
-  systemctl --user enable --now qshell.service hub-local.service qshell-sync.timer update-all.timer 2>/dev/null
+  systemctl --user enable --now qshell.service hub-local.service pxy.service qshell-sync.timer update-all.timer 2>/dev/null
   printf "[user]\n\tname = v1\n" > ~/.dotfiles/home/dot_gitconfig
   ln -s ~/.dotfiles/home/dot_gitconfig ~/.gitconfig
   echo "set -g fish_history test_box" > ~/.dotfiles/home/10-history.fish
@@ -107,7 +107,7 @@ put "$home/.local/state/qshell/goals/goals.json" <<'EOF'
 ]}
 EOF
 
-for u in qshell.service hub-local.service qshell-sync.timer update-all.timer; do
+for u in qshell.service hub-local.service pxy.service qshell-sync.timer update-all.timer; do
   got=$(unit_state $u)
   check "v1's $u is enabled and active before the cutover (got '$got')" test "$got" = "enabled active"
 done
@@ -147,6 +147,11 @@ got=$(unit_state pxy.service)
 check "pxy.service is enabled and active (got '$got')" test "$got" = "enabled active"
 got=$(as_user "systemctl --user is-failed hub-local.service")
 check "with no local.env, hub-local.service is inactive, not failed (got '$got')" test "$got" = inactive
+# A peer token is all hub local needs to serve; the file goes again before the snapshots below.
+as_user "mkdir -p ~/.config/hub && echo HUB_PEER_TOKEN=test > ~/.config/hub/local.env && systemctl --user start hub-local.service && sleep 3"
+got=$(as_user "echo \$(systemctl --user is-active hub-local.service) \$(systemctl --user show -p NRestarts --value hub-local.service)")
+check "with local.env present, hub-local.service is active and has not restarted (got '$got')" test "$got" = "active 0"
+as_user "systemctl --user stop hub-local.service; rm ~/.config/hub/local.env"
 got=$(as_user "pgrep -cf '^/bin/sleep infinity\$'")
 check "no v1 stand-in (sleep infinity) is left running (got $got)" test "$got" = 0
 # A device enables its own Remote Control projects; one whose folder under ~/Codes is missing is skipped, not failed.

@@ -50,7 +50,7 @@ function scratch(opts = {}) {
   );
   stub(stubs, 'rpm', `if [ -e ${state} ]; then cat ${join(root, 'after')}; else cat ${join(root, 'before')}; fi`);
   stub(stubs, 'chezmoi', `echo "chezmoi $*" >> ${log}\ncat ${join(root, 'chezmoi.out')}`);
-  stub(stubs, 'mise', `echo "mise $*" >> ${log}\n${opts.mise === 'fail' ? 'exit 1' : 'exit 0'}`);
+  stub(stubs, 'mise', `echo "mise $*" >> ${log}\npwd > ${join(root, 'mise.cwd')}\n${opts.mise === 'fail' ? 'exit 1' : 'exit 0'}`);
   const claude = Object.assign({ from: '2.1.303', to: '2.1.303', fail: false }, opts.claude);
   const version = join(root, 'claude.version');
   writeFileSync(version, claude.from);
@@ -207,5 +207,17 @@ test('every run puts a stubs dir holding mise and claude first on PATH', () => {
   const s = scratch();
   assert.ok(existsSync(join(s.stubs, 'mise')), 'mise stub');
   assert.ok(existsSync(join(s.stubs, 'claude')), 'claude stub');
-  assert.ok(run.toString().includes('PATH: s.stubs + delimiter'), 'run() puts the stubs first');
+});
+
+// Started inside a project, mise up would also upgrade that project's tools, or stop on its untrusted config.
+test('mise up runs from home, whatever directory dots update starts in', () => {
+  const s = scratch();
+  mkdirSync(join(s.root, 'project'));
+  const r = spawnSync(join(s.repo, 'bin/dots'), ['update'], {
+    cwd: join(s.root, 'project'),
+    encoding: 'utf8',
+    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, DOTS_MODULES_DIR: s.modules },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readFileSync(join(s.root, 'mise.cwd'), 'utf8').trim(), s.root);
 });

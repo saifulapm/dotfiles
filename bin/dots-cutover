@@ -6,7 +6,7 @@ here=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 v1=$HOME/.dotfiles
 config=${XDG_CONFIG_HOME:-$HOME/.config}
 fish=${XDG_DATA_HOME:-$HOME/.local/share}/fish
-# Every other v1 unit (hub-local, pxy, bt-agent...) has no v2 replacement and keeps running from ~/.dotfiles.
+# v2 takes over hub-local and pxy under the same names; every other v1 unit (bt-agent...) has no v2 replacement and keeps running from ~/.dotfiles.
 replaced=(qshell.service qshell-dshift.service qshell-sync.service qshell-sync.timer qshell-sync-notes.path qshell-sync-notes.service
   qshell-sync-goals.path qshell-sync-goals.service qshell-updates.service qshell-updates.timer update-all.service update-all.timer vicinae.service)
 

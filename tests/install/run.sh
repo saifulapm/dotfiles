@@ -142,7 +142,8 @@ done < <(runs)
 claude=$(as_user "claude --version" 2>&1)
 check "claude --version prints a version (got '$claude')" grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' <<<"$claude"
 pi=$(as_user "fish -c 'pi --version'" 2>&1)
-check "pi --version prints 1.3.0 or newer (got '$pi')" test "$(printf '%s\n' 1.3.0 "$pi" | sort -V | head -n1)" = 1.3.0 -a -n "$pi"
+# sort -V puts any word after a number, so the output must be a version before it is compared.
+check "pi --version prints 1.3.0 or newer (got '$pi')" bash -c "[[ \$1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\$ && \$(printf '%s\n' 1.3.0 \"\$1\" | sort -V | head -n1) == 1.3.0 ]]" _ "$pi"
 check "mise lists node 24.21.0 as installed" as_user "mise ls --installed node | grep -qw 24.21.0"
 dirt=$(as_user "git -C ~/Sites/github/dotfiles status --porcelain")
 check "the apply leaves the repo clean (got '$dirt')" test -z "$dirt"

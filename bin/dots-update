@@ -47,9 +47,9 @@ main() {
 
   chezmoi apply | tee "$tmp/chezmoi" || die "chezmoi apply failed"
 
-  # A failed mise up is named and stops nothing, like the claude update below.
+  # From home, so only the global tools move; a failed mise up is named and stops nothing, like the claude update below.
   local mise=''
-  mise up || mise=' · mise: update failed'
+  (cd "$HOME" && mise up) || mise=' · mise: update failed'
 
   # Claude Code's own updater is off in its settings, so its updates come from here; a failed one is named and stops nothing.
   local claude='' was now
