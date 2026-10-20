@@ -43,6 +43,23 @@ echo "     status: $status"
 one_timer() { jq -e '.timers == 1' <<<"$status" >/dev/null; }
 check "status still reports one running timer" one_timer
 
+# Asahi does not suspend, so nothing but this notice stands between a low battery and a dead MacBook.
+set_battery() { busctl --user call org.freedesktop.UPower /org/freedesktop/UPower org.dots.FakeUPower Set db "$1" "$2"; }
+lows() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq '[.summaries[] | select(. == "Battery low")] | length'; }
+lows_is() { [ "$(lows)" = "$1" ]; }
+set_battery 9 false
+until_ok 3000 lows_is 1
+check "at 9% discharging a notice says the battery is low ($(lows))" lows_is 1
+set_battery 8 false
+sleep 1
+check "at 8% it does not warn again ($(lows))" lows_is 1
+set_battery 20 false
+sleep 0.5
+set_battery 10 false
+until_ok 3000 lows_is 2
+check "past 15% and back to 10% it warns again ($(lows))" lows_is 2
+set_battery 82 false
+
 # Read last, so it covers the shell both before and after the restart.
 journal() { journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat; }
 # The nested bus has no NetworkManager, and Quickshell's Networking says so once per start; any other line is ours.
