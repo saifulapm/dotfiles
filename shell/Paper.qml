@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 
@@ -90,8 +89,7 @@ PanelWindow {
         outgoing.opacity = 1;
         outgoing.offset = 0;
         outgoing.cut = 0;
-        // The hidden sheet drops its ShaderEffect, so idle holds one; the next switch rebuilds it unseen.
-        outgoing.shaderUrl = "";
+        // The hidden sheet drops its ShaderEffect with its tokens, so idle holds one; the next switch rebuilds it unseen.
         outgoing.tokens = null;
         canvas.scale = 1;
         kind = "";
@@ -217,91 +215,22 @@ PanelWindow {
         property var tokens: null
         property real offset: 0
         property real cut: 0
-        // flat and gradient stay the plain fill below.
-        readonly property string shader: ({ grain: "grain", dots: "dots", grid: "grid" })[tokens?.primitive.paper] ?? ""
-        property string shaderUrl: ""
-        property bool shaderFailed: false
-        readonly property bool ready: shader === "" || shaderFailed || effect.item !== null
+        readonly property bool ready: fill.ready
 
         y: offset + cut
         width: paper.width
         height: paper.height - cut
         clip: cut > 0
 
-        Item {
+        PaperFill {
+            id: fill
             y: -sheet.cut
             width: paper.width
             height: paper.height
-
-            // The shader paints the whole sheet, so the fill only shows until it loads; both at once would fade twice.
-            Rectangle {
-                anchors.fill: parent
-                visible: effect.item === null
-                color: sheet.tokens?.color.paper ?? "transparent"
-            }
-
-            // A missing .qsb crashes qs, so the effect gets a shader only once this read of it succeeds.
-            FileView {
-                path: sheet.shader ? paper.theme.dir + "/shaders/" + sheet.shader + ".frag.qsb" : ""
-                onPathChanged: {
-                    sheet.shaderUrl = "";
-                    sheet.shaderFailed = false;
-                }
-                onLoaded: sheet.shaderUrl = "file://" + path
-                onLoadFailed: sheet.shaderFailed = true
-            }
-
-            // A ShaderEffect with no fragmentShader runs Qt's default one, which wants a source texture.
-            Loader {
-                id: effect
-                anchors.fill: parent
-                active: sheet.shaderUrl !== ""
-
-                sourceComponent: ShaderEffect {
-                    // Opaque at rest; a fading sheet must blend, or qt_Opacity darkens it instead.
-                    blending: sheet.opacity < 1
-                    fragmentShader: sheet.shaderUrl
-                    property size outputSize: Qt.size(width, height)
-                    property color base: sheet.tokens.color.paper
-                    property color accent: sheet.tokens.color.accent
-                    property color dotColor: sheet.tokens.paper.dot ?? "transparent"
-                    property real grain: sheet.tokens.paper.grain ?? 0
-                    property real spacing: sheet.tokens.paper.spacing ?? 16
-                    property real minor: sheet.tokens.paper.minor ?? 16
-                    property real major: sheet.tokens.paper.major ?? 80
-                    property real minorAlpha: sheet.tokens.paper.minor_alpha ?? 0
-                    property real majorAlpha: sheet.tokens.paper.major_alpha ?? 0
-                }
-            }
-
-            // Blueprint's crop marks: a 14 px L in 1 px accent, 8 px in from each screen corner, on any grid paper.
-            Repeater {
-                model: sheet.tokens?.primitive.paper === "grid" ? 4 : 0
-
-                Item {
-                    required property int index
-                    readonly property bool atRight: index % 2 === 1
-                    readonly property bool atBottom: index >= 2
-                    x: atRight ? paper.width - 8 - 14 : 8
-                    y: atBottom ? paper.height - 8 - 14 : 8
-                    width: 14
-                    height: 14
-
-                    Rectangle {
-                        x: parent.atRight ? 13 : 0
-                        width: 1
-                        height: 14
-                        color: sheet.tokens.color.accent
-                    }
-
-                    Rectangle {
-                        y: parent.atBottom ? 13 : 0
-                        width: 14
-                        height: 1
-                        color: sheet.tokens.color.accent
-                    }
-                }
-            }
+            tokens: sheet.tokens
+            dir: paper.theme.dir
+            // The zoom fades the sheet, not the fill, so the fill blends by the sheet's opacity.
+            blending: sheet.opacity < 1
         }
     }
 }
