@@ -28,7 +28,7 @@ input {
         drag-lock
         natural-scroll
         click-method "clickfinger"
-        scroll-factor 0.4
+        scroll-factor 0.8
     }
 }
 
