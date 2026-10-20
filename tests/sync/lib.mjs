@@ -90,3 +90,15 @@ function run(m, cmd, args) {
     p.on('close', (code) => resolve({ code, stdout, stderr }));
   });
 }
+
+// Holds m's sync lock from another process for the given seconds; resolves once it is held, with a promise that resolves when it is let go.
+export function holdLock(m, seconds) {
+  const dir = join(m.env.XDG_STATE_HOME, 'dots');
+  mkdirSync(dir, { recursive: true });
+  return new Promise((resolve, reject) => {
+    const p = spawn('flock', [join(dir, 'dots-sync.lock'), '-c', `echo held; sleep ${seconds}`], { env: checked(m.env) });
+    const freed = new Promise((done) => p.on('close', done));
+    p.on('error', reject);
+    p.stdout.once('data', () => resolve({ freed }));
+  });
+}

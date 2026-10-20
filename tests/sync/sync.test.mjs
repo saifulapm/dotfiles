@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync,
 import { dirname, join } from 'node:path';
 import * as G from '../../shell/lib/goals.mjs';
 import * as N from '../../shell/lib/notes.mjs';
-import { machine, sync, world } from './lib.mjs';
+import { holdLock, machine, sync, world } from './lib.mjs';
 
 const T = 1760000000000;
 const SHA = 'ab'.repeat(32);
@@ -170,6 +170,32 @@ test('two rounds started together run once, and the other says already running',
   assert.deepEqual(runs.map((r) => r.code), [0, 0]);
   assert.deepEqual(runs.map((r) => r.stdout.trim() === 'already running').sort(), [false, true]);
   assert.equal(status(a).goals.ok, true);
+});
+
+// A store change starts a --only round from its path unit; one that met a running round used to wait 15 min for the timer.
+test('a --only goals round that meets the lock waits for it, then pushes the goal saved before it started', async () => {
+  const w = world();
+  const a = machine(w, 'a');
+  write(goalsPath(a), G.addGoal(G.emptyStore(), 'Late', null, T, 'g1'));
+  const lock = await holdLock(a, 3);
+  const t0 = Date.now();
+  const r = await ok(a, ['--only', 'goals']);
+  await lock.freed;
+  assert.ok(Date.now() - t0 >= 2500, `it ran after ${Date.now() - t0} ms, before the lock was let go`);
+  assert.doesNotMatch(r.stdout, /already running/);
+  const remote = G.parseStore(readFileSync(join(w.remote, 'dots-sync/goals/a.json'), 'utf8'));
+  assert.deepEqual(G.activeGoals(remote).map((g) => g.title), ['Late']);
+});
+
+test('a full round that meets the lock still says already running and exits at once', async () => {
+  const w = world();
+  const a = machine(w, 'a');
+  const lock = await holdLock(a, 3);
+  const t0 = Date.now();
+  const r = await ok(a);
+  assert.ok(Date.now() - t0 < 1000, `it took ${Date.now() - t0} ms`);
+  assert.equal(r.stdout.trim(), 'already running');
+  await lock.freed;
 });
 
 test('with no Dropbox remote set up, dots sync skips with exit 0 and records no failure', async () => {

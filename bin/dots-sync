@@ -265,7 +265,11 @@ main() {
   # The lock sits beside the state it guards, so a just dev session and the live timer never meet on it.
   mkdir -p "$state"
   exec 9>"$state/dots-sync.lock"
-  if ! flock -n 9; then
+  # A notes or goals round comes from a store change, which would otherwise wait for the next timer round, so it waits its turn.
+  local wait=-n
+  [[ ${units[*]} == notes || ${units[*]} == goals ]] && wait='-w 600'
+  # shellcheck disable=SC2086 # $wait is one flag, or a flag and its seconds
+  if ! flock $wait 9; then
     echo "already running"
     exit 0
   fi
