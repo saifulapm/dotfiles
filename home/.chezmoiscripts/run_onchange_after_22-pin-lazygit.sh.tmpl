@@ -1,0 +1,7 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "lazygit") }}
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp" lazygit
+install -D -m 0755 -t "$HOME/.local/bin" "$pin_tmp/lazygit"
+pin_done
