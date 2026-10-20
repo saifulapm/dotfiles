@@ -1,0 +1,15 @@
+[Unit]
+Description=pxy - tiny multi-provider LLM proxy
+After=network.target
+# A machine whose pxy pin has not built yet skips the unit instead of failing it.
+ConditionPathExists=%h/.local/bin/pxy
+
+[Service]
+ExecStart=%h/.local/bin/pxy serve
+Restart=on-failure
+RestartSec=2
+# pass/gpg need the user keyring; user units inherit the session environment.
+Environment=RUST_LOG=pxy=info
+
+[Install]
+WantedBy=default.target

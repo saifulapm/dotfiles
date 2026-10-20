@@ -1,0 +1,15 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+export PATH="$HOME/.local/bin:$PATH"
+# Every apply starts the agent services; a running one is left alone, and the hub skips itself by its condition until dots secrets writes local.env.
+case $(systemctl --user is-system-running 2>/dev/null) in
+  running | degraded) ;;
+  *) exit 0 ;;
+esac
+systemctl --user daemon-reload
+systemctl --user start pxy.service hub-local.service || log "pxy or the local hub did not start: systemctl --user status pxy hub-local"
+# The first apply after dots secrets joins the machine to the mem store; workflow switch writes HUB_STORE_TOKEN into local.env, so it runs once.
+env=$HOME/.config/hub/local.env
+if [[ -f $env ]] && ! grep -q '^HUB_STORE_TOKEN=' "$env"; then
+  workflow switch --store wss://mem.on-rexa.com/store/share || log "workflow switch did not join the mem store; the next apply tries again"
+fi
