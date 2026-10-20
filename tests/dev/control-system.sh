@@ -63,6 +63,8 @@ check "any other key cancels the confirm" state_is '.confirming == ""'
 tab_to display
 until_ok 2000 state_is '.rows | index("fake-bl")'
 check "Display lists the fake backlight" state_is '.rows | index("fake-bl")'
+until_ok 2000 state_is '.rows | index("FAKE-B")'
+check "Display lists both fake external displays" state_is '.rows as $r | ["FAKE-A", "FAKE-B"] | all(. as $t | $r | index($t))'
 select_row fake-bl
 wtype l
 stepped() { grep -qx -- '-m -d fake-bl set 5%+' "$fake_log" 2>/dev/null; }

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Stands in for ddcutil in a nested session, so Control never probes the live I2C buses.
+[ "${1:-}" = detect ] || exit 0
+cat <<'OUT'
+Display 1
+   I2C bus:  /dev/i2c-4
+   Monitor:  FAK:FAKE-A:0001
+
+Display 2
+   I2C bus:  /dev/i2c-5
+   Monitor:  FAK:FAKE-B:0002
+OUT

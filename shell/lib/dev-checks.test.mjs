@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 // A redirect on a check line silences the check's own ok or FAIL line, so the run hides the result.
 const dir = new URL('../../tests/dev/', import.meta.url).pathname;
@@ -24,4 +24,10 @@ test('lib.sh takes the nested-check lock before it starts dots-dev, and dots-dev
   const start = lib.search(/"\$repo\/bin\/dots-dev"[^\n]*9>&-/);
   assert.ok(lock >= 0, 'lib.sh runs flock -w <s> 9');
   assert.ok(start > lock, 'dots-dev starts after the lock, with fd 9 closed');
+});
+
+// bin/ is on the live desktop's PATH, so a fake ddcutil there would hide the real one from the live shell.
+test('the fake ddcutil lives in dev/path, never in bin/', () => {
+  assert.ok(existsSync(new URL('../../dev/path/ddcutil', import.meta.url)));
+  assert.ok(!existsSync(new URL('../../bin/ddcutil', import.meta.url)));
 });
