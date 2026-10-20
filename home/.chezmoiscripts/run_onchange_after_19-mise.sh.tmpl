@@ -7,3 +7,6 @@ node=$(mise where node) || die "mise has no node"
 if [[ -d $node/lib/node_modules/@earendil-works/pi-coding-agent ]]; then
   mise exec node -- npm uninstall -g @earendil-works/pi-coding-agent || die "could not remove v1's pi from node's globals"
 fi
+# The wrapper on PATH would only pass the call along, so the install runs the tool by its mise path; it writes the playwright-cli skill into ~/.claude/skills.
+playwright=$(mise which playwright-cli) || die "mise has no playwright-cli"
+"$playwright" install --skills --global || die "playwright-cli install --skills failed"

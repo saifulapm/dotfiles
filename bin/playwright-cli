@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# playwright-cli: give Playwright's Chromium the fractional-scaling flags the desktop browser gets, then exec the real CLI.
+#
+# Playwright spawns its own chromium from ~/.cache/ms-playwright, so it never goes through /usr/bin/chromium-browser and never sees CHROMIUM_USER_FLAGS. It runs on native Wayland but lacks WaylandPerSurfaceScale and WaylandUiScale, so on a 1.5 scale output it renders at 1x and the compositor upscales it into a blur.
+#
+# playwright-cli reads its default config only from .playwright/cli.config.json in the cwd, with no upward search and no home fallback, so a machine-wide default needs this wrapper to pass --config.
+# Only open and attach accept --config, hence the subcommand test. A project's own config and an explicit --config both win.
+#
+# The config sets --enable-features instead of appending: chromium keeps one value per switch, so a second --enable-features replaces the first. Playwright's own CDPScreenshotNewSurface is repeated in the value to keep it; a playwright upgrade that changes its default features needs the same edit.
+set -euo pipefail
+
+# This wrapper is first on PATH, so a PATH lookup would find itself; mise which prints the install's own path.
+real=$(mise which playwright-cli)
+config=${XDG_CONFIG_HOME:-$HOME/.config}/playwright/cli.config.json
+
+# The global session flag is spelled -s=<name>, so a token that starts with - is never the subcommand.
+subcommand=""
+explicit_config=false
+extension=false
+for arg in "$@"; do
+  case $arg in
+    --config | --config=*) explicit_config=true ;;
+    --extension | --extension=*) extension=true ;;
+    -*) ;;
+    *) [[ -n $subcommand ]] || subcommand=$arg ;;
+  esac
+done
+
+# attach --extension drives the desktop chromium, and Playwright looks for Google Chrome, which has no Linux arm64 build.
+# Over ssh nobody is at the screen to click the extension's Allow, so pass its own token to auto-approve.
+# Chromium starts as its own user unit, because a child of the CLI daemon would die with it.
+if [[ $subcommand == attach && $extension == true ]]; then
+  export PLAYWRIGHT_MCP_EXECUTABLE_PATH=${PLAYWRIGHT_MCP_EXECUTABLE_PATH:-/usr/bin/chromium-browser}
+  if [[ -n ${SSH_CONNECTION:-} ]]; then
+    # SingletonLock links to <host>-<pid> of the running browser; the socket beside it outlives a killed chromium, so it cannot say whether chromium is up.
+    chromium_up() {
+      local lock
+      lock=$(readlink "$HOME/.config/chromium/SingletonLock" 2>/dev/null) &&
+        kill -0 "${lock##*-}" 2>/dev/null
+    }
+    if ! chromium_up; then
+      systemd-run --user --quiet --collect --property=ExitType=cgroup -- chromium-browser
+      for _ in {1..50}; do
+        chromium_up && break
+        sleep 0.2
+      done
+    fi
+    if [[ -z ${PLAYWRIGHT_MCP_EXTENSION_TOKEN:-} ]] &&
+      token=$(playwright-extension-token); then
+      export PLAYWRIGHT_MCP_EXTENSION_TOKEN=$token
+    fi
+  fi
+fi
+
+if [[ -f $config ]] &&
+  [[ $subcommand == open || $subcommand == attach ]] &&
+  [[ $explicit_config == false ]] &&
+  [[ ! -f .playwright/cli.config.json ]]; then
+  exec "$real" "$@" --config "$config"
+fi
+
+exec "$real" "$@"

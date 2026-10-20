@@ -7,6 +7,12 @@ deno = "latest"
 "npm:cf" = "latest"
 # pi, the coding agent; a node bump carries it along.
 "npm:@earendil-works/pi-coding-agent" = "latest"
+# The Playwright CLI; the wrapper in the dotfiles bin dir hands it the machine config.
+"npm:@playwright/cli" = "latest"
+
+[env]
+# mise activate moves its tool bin dirs to the front of PATH; this keeps the dotfiles bin dir, and so the playwright-cli wrapper, ahead of them.
+_.path = ["~/Sites/github/dotfiles/bin"]
 
 [settings]
 # Laravel and React repos pin node with .nvmrc, .node-version or package.json devEngines, which mise ignores unless asked.
