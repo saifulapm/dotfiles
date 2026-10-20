@@ -86,6 +86,11 @@ control_gone() { state_is '.open == false and .drawing == false' && control_focu
 until_ok 2000 control_gone
 check "Esc closes Control and releases the keyboard" control_gone
 
+timeout 0.5 qs ipc call control section power
+until_ok 3000 section_is power
+check "control section power opens Control on Power" section_is power
+timeout 0.5 qs ipc call control close
+until_ok 2000 control_gone
 check "the live volume is still ${live_before#Volume: }" test "$(live_volume)" = "$live_before"
 exit $((fails > 0))
 }

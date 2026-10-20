@@ -42,6 +42,10 @@ Item {
         forceActiveFocus();
     }
 
+    function show(name) {
+        current = Math.max(0, Lib.SECTIONS.indexOf(name));
+    }
+
     function close() {
         shown = false;
         // Only the secret clears as Control closes; the rest of the line is drawn until the close stops drawing.

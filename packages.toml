@@ -495,3 +495,8 @@ why = "its runtime holds the tree-sitter grammars the kakoune fork highlights wi
 name = "file"
 arch = "all"
 why = "yazi detects each file's type with it"
+
+[[package]]
+name = "btop"
+arch = "all"
+why = "Mod+Shift+Escape opens it as the system monitor"

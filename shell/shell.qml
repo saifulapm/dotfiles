@@ -155,6 +155,14 @@ ShellRoot {
             notifsService.setDnd(on);
         }
 
+        function toggleDnd(): void {
+            notifsService.setDnd(!notifsService.dnd);
+        }
+
+        function clear(): void {
+            notifsService.clear();
+        }
+
         // t0 is taken before the first load, so a cold open's time includes loading.
         function open(): void {
             const t0 = Date.now();
@@ -356,6 +364,12 @@ ShellRoot {
 
         function close(): void {
             surfacesLoader.item?.control?.close();
+        }
+
+        // Opens Control on one section by name, as the power key opens it on Power.
+        function section(name: string): void {
+            open();
+            surfacesLoader.item.control.show(name);
         }
 
         function toggle(): void {
