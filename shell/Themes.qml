@@ -230,15 +230,15 @@ Item {
                                 readonly property var dress: cursor ? switcher.look.cursor : switcher.look.tile
                                 readonly property var tag: switcher.look.tag(current, cursor)
                                 readonly property real pad: switcher.look.tile.pad
-                                readonly property real fit: Math.min(1, (width - 2 * pad) / specimen.width)
+                                readonly property real fit: Math.min(1, (width - 2 * pad) / content.width)
                                 width: cards.cardWidth
-                                height: specimen.height * fit + 2 * pad
+                                height: content.height * fit + 2 * pad
 
                                 function play(t0) {
-                                    specimen.play(t0);
+                                    specimen.item?.play(t0);
                                 }
 
-                                readonly property real playedMs: specimen.playedMs
+                                readonly property real playedMs: specimen.item?.playedMs ?? -1
 
                                 function drawn() {
                                     const a = tile.mapToItem(null, 0, 0);
@@ -250,7 +250,7 @@ Item {
                                         number: number.text,
                                         title: name.text,
                                         tag: tagText.visible ? tagText.text : ""
-                                    }, specimen.drawn());
+                                    }, specimen.item ? specimen.item.drawn() : { paperReady: false });
                                 }
 
                                 // The cursor's hard shadow, offset under the tile.
@@ -310,19 +310,37 @@ Item {
                                     }
                                 }
 
-                                Root.Specimen {
-                                    id: specimen
+                                // The specimen at its own size, scaled to the card; its slot never changes size, so nothing moves as it loads.
+                                Item {
+                                    id: content
                                     x: card.pad
                                     y: card.pad
+                                    width: 306
+                                    height: 258
                                     scale: card.fit
                                     transformOrigin: Item.TopLeft
-                                    tokens: card.modelData
-                                    dir: switcher.theme.dir
-                                    under: switcher.c.paper
+
+                                    // The card's own paper, there from the first frame while its specimen loads.
+                                    Rectangle {
+                                        width: parent.width
+                                        height: 196
+                                        color: card.modelData.color.paper
+                                    }
+
+                                    Loader {
+                                        id: specimen
+                                        asynchronous: true
+                                        sourceComponent: Root.Specimen {
+                                            tokens: card.modelData
+                                            dir: switcher.theme.dir
+                                            under: switcher.c.paper
+                                        }
+                                    }
 
                                     Item {
+                                        y: 206
                                         width: parent.width
-                                        height: name.height
+                                        height: 32
                                         readonly property var cardName: Lib.cardName(card.modelData)
                                         readonly property var tagline: Lib.tagline(card.modelData)
 

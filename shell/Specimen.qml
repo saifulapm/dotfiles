@@ -13,8 +13,8 @@ Item {
     readonly property var c: tokens.color
     readonly property var margins: Lib.specimenMargins(tokens)
     readonly property real inset: tokens.primitive.paper === "grid" ? 14 : 10
-    // What the card puts between the preview and the palette, such as its name.
-    default property alias caption: captionSlot.data
+    // The room the card leaves between the preview and the palette for its name.
+    property real gap: 32
     // The paper the card's switch plays over: the current theme's.
     property color under: "transparent"
     readonly property var motion: Lib.previewSwitch(tokens.primitive.motion, Root.State.slowdown)
@@ -38,6 +38,17 @@ Item {
 
     width: 306
     height: column.implicitHeight
+    // A card loads its specimen while the picker opens, so the detail fades in over the card's paper.
+    opacity: 0
+    Component.onCompleted: arrive.start()
+
+    NumberAnimation {
+        id: arrive
+        target: specimen
+        property: "opacity"
+        to: 1
+        duration: 60
+    }
 
     // The preview, the palette and every margin as drawn, in the window's pixels, for the picker's state.
     function drawn() {
@@ -96,8 +107,8 @@ Item {
                         tokens: specimen.tokens
                         dir: specimen.dir
                         period: 0.5
-                        // Artboard's zoom fades the stage, not the fill.
-                        blending: stage.opacity < 1
+                        // The arrival and Artboard's zoom fade the specimen and the stage, not the fill.
+                        blending: specimen.opacity < 1 || stage.opacity < 1
                     }
 
                     Row {
@@ -278,9 +289,8 @@ Item {
         }
 
         Item {
-            id: captionSlot
             width: parent.width
-            height: childrenRect.height
+            height: specimen.gap
         }
 
         Row {
