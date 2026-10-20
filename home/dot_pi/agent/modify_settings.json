@@ -2,35 +2,33 @@
 # ~/.pi/agent/settings.json — a modify_ script rather than a plain source file,
 # because this repo applies in symlink mode and pi WRITES to this file.
 #
-# A plain source file lands as a symlink into ~/.dotfiles (that is what
-# mode = "symlink" in chezmoi.toml does, and what ~/.claude/settings.json used
-# to be). pi's settings-manager persists on every ctrl+l model switch
-# (setDefaultModelAndProvider), every shift+tab thinking cycle
-# (setDefaultThinkingLevel) and every version bump (setLastChangelogVersion) —
-# so through a symlink, ordinary use of pi would leave the repo dirty. The same
-# trap run_after_45-amx.sh used to refuse to walk into for claude's hooks,
-# back when amx wired them into a settings file at all.
+# A plain source file lands as a symlink into ~/Sites/github/dotfiles (that is
+# what mode = "symlink" in chezmoi.toml does). pi's settings-manager persists on
+# every ctrl+l model switch (setDefaultModelAndProvider), every shift+tab
+# thinking cycle (setDefaultThinkingLevel) and every version bump
+# (setLastChangelogVersion), so through a symlink, ordinary use of pi would
+# leave the repo dirty.
 #
 # A modify_ script is exempt from symlink mode: chezmoi writes a real file, and
 # feeds the current one in on stdin. So pi owns the file day to day and this
-# owns the keys below — apply forces them back and leaves everything else
+# owns the keys below: apply forces them back and leaves everything else
 # (lastChangelogVersion above all) exactly as pi left it.
 #
 # The trade is that this is the one config in the repo you cannot edit live:
 # edit here, then `chezmoi apply`. Editing ~/.pi/agent/settings.json by hand
 # works until the next apply overwrites the key.
 #
-# lastChangelogVersion is deliberately absent — pinning it would re-show the
+# lastChangelogVersion is deliberately absent: pinning it would re-show the
 # changelog after every pi upgrade.
 #
-# The four things these keys name arrive by four different routes, none of
-# them this file:
-#   provider "pxy"  run_after_36-pxy.sh generates extensions/pxy.ts from the
-#                   pxy checkout's contrib/pi-pxy.ts, so a bare `pi` has the
-#                   provider without anyone running `pxy launch pi`
-#   amx, mem        amx's extensions/amx.ts is written by `amx setup pi` in
-#                   run_after_45-amx.sh; mem's by `mem doctor --fix` in
-#                   run_after_46-workflow.sh
+# The things these keys name arrive by other routes, none of them this file:
+#   provider "pxy"  run_onchange_after_28-pin-pxy fills extensions/pxy.ts from
+#                   the pinned pxy checkout's contrib/pi-pxy.ts, so a bare `pi`
+#                   has the provider without anyone running `pxy launch pi`
+#   amx, mem        amx's extensions/amx.ts and amx-subagent.ts are written by
+#                   `amx setup pi --subagent` in run_onchange_after_26-pin-amx;
+#                   mem's mem.ts by `mem doctor --fix` in
+#                   run_onchange_after_27-pin-workflow
 #   theme "dots"    dots theme writes ~/.pi/agent/themes/dots.json from the
 #                   current theme on every switch
 set -euo pipefail

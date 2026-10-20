@@ -158,6 +158,24 @@ check "fish -c 'echo ok' prints ok and nothing else (got '$out', stderr '$err')"
 excludes=$(as_user "git config --get-all --path core.excludesFile")
 check "git has one excludes file, under ~/.config/git (got '$excludes')" test "$excludes" = "$home/.config/git/ignore"
 check "claude's settings render with its hooks" as_user "jq -e .hooks ~/.claude/settings.json >/dev/null"
+for s in mem plan orchestrate grill tdd diagnose dogfood amx playwright-cli desktop; do
+  check "\$HOME/.claude/skills/$s/SKILL.md exists" as_user "test -f ~/.claude/skills/$s/SKILL.md"
+done
+for a in implementer reviewer scout dogfooder code-reviewer security-reviewer desktop-operator browser-operator; do
+  check "\$HOME/.claude/agents/$a.md exists" as_user "test -f ~/.claude/agents/$a.md"
+done
+for e in amx.ts amx-subagent.ts mem.ts pxy.ts; do
+  check "\$HOME/.pi/agent/extensions/$e exists" as_user "test -f ~/.pi/agent/extensions/$e"
+done
+check "pi's pxy extension has every placeholder filled" as_user "grep -q 127.0.0.1:4100/v1 ~/.pi/agent/extensions/pxy.ts && ! grep -q __PXY_ ~/.pi/agent/extensions/pxy.ts"
+# The machine has no gh login before dots secrets, so the private skills repo is not cloned and the apply still finishes.
+check "the skills repo waits for dots secrets" as_user "test ! -e ~/.local/src/skills"
+pw=$(as_user "mise exec -- bash -c 'command -v playwright-cli'" 2>&1)
+check "mise's PATH finds the playwright-cli wrapper first (got '$pw')" test "$pw" = "$home/Sites/github/dotfiles/bin/playwright-cli"
+pwv=$(as_user "mise exec -- playwright-cli --version" 2>&1)
+check "playwright-cli --version prints a version (got '$pwv')" grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' <<<"$pwv"
+v1=$(as_user "find ~/.claude ~/.pi ~/.agents ~/.config/playwright ~/.config/playwright-cli -type l -lname '*/.dotfiles/*'" 2>&1)
+check "nothing Claude Code or pi loads links into v1 (got '$v1')" test -z "$v1"
 dropped=$(as_user "find ~/.config -iname '*herdr*' -o -iname '*kitty*' -o -iname '*vicinae*'")
 check "nothing for herdr, kitty or vicinae under ~/.config (got '$dropped')" test -z "$dropped"
 
