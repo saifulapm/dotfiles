@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Control's Wi-Fi section lists a fake NetworkManager's networks; Enter joins an open and a known network with no password, and a new secured one through a masked password line.
+# Control's Wi-Fi section lists a fake NetworkManager's networks; Enter joins an open and a known network with no password, and a new secured one through a masked password line that takes a paste.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -189,16 +189,20 @@ until_ok 2000 no_line
 wtype -k Escape
 until_ok 2000 state_is '.open == false and .drawing == false'
 
+# A long passphrase can come from the clipboard: Ctrl+V adds its text, less the trailing newline a copy often carries.
 open_wifi
 enter_on "Dots Secured"
 until_ok 3000 line_open
-type_psk dots-secret-1
-check "the line draws dots-secret-1 as 13 dots" state_is '.lineText == "•••••••••••••"'
+printf 'secret-1\n' | wl-copy
+type_psk dots-
+wtype -M ctrl v -m ctrl
+until_ok 2000 state_is '.pskLength == 13'
+check "the line draws dots- typed and secret-1 pasted as 13 dots ($(control_state | jq -c '{pskLength, lineText}'))" state_is '.lineText == "•••••••••••••"'
 check "and no state field holds the typed text" state_clean
 wtype -k Return
 until_ok 3000 detail_is "Dots Secured" connected
 echo "     state: $(control_state | jq -c '{rows, details, selected, line, lineMessage}')"
-check "Enter on the line joins Dots Secured with the typed password" detail_is "Dots Secured" connected
+check "Enter on the line joins Dots Secured with the typed and pasted password" detail_is "Dots Secured" connected
 check "and the double recorded that PSK" last_psk_is dots-secret-1
 check "and the line closes" no_line
 check "the shell's journal holds neither typed password" journal_clean

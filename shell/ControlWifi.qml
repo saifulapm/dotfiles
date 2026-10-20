@@ -1,3 +1,4 @@
+import Quickshell
 import Quickshell.Networking
 import QtQuick
 import "lib/control-net.mjs" as Lib
@@ -85,6 +86,9 @@ Item {
             }
         } else if (event.key === Qt.Key_Escape)
             closeLine();
+        else if (event.key === Qt.Key_V && event.modifiers & Qt.ControlModifier)
+            // A passphrase holds no line breaks, so the newline a copy often carries goes.
+            psk += Quickshell.clipboardText.replace(/[\r\n]/g, "");
         else if (event.key === Qt.Key_Backspace)
             // Spread, not Array.from: QML's Array.from walks UTF-16 units, so it would split an emoji.
             psk = [...psk].slice(0, -1).join("");
