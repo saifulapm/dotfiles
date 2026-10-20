@@ -20,3 +20,13 @@ test('a new tmux pane runs fish, whatever shell started the server', (t) => {
   }
   assert.equal(commands, 'fish\nfish');
 });
+
+test('the tmux bar sits at the top, as the page\'s running head', (t) => {
+  const sock = `dots-tmux-top-${process.pid}`;
+  const env = { ...process.env };
+  delete env.TMUX;
+  const tmux = (...a) => execFileSync('tmux', ['-L', sock, ...a], { env, encoding: 'utf8' }).trim();
+  t.after(() => { try { tmux('kill-server'); } catch {} });
+  tmux('-f', conf, 'new-session', '-d', '-x', '80', '-y', '24');
+  assert.equal(tmux('show', '-gv', 'status-position'), 'top');
+});

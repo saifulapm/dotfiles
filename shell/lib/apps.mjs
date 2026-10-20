@@ -8,7 +8,7 @@ const rgb = (s) => `rgb:${lower(s).slice(1)}`;
 // tmux has no case modifier, so the caps voices upper-case a name letter by letter.
 const CAPS = 'abcdefghijklmnopqrstuvwxyz'.split('').map((l) => `s/${l}/${l.toUpperCase()}/`).join(';');
 
-// The bar reads as the page's bottom margin, in the margins' voice, with no filled block: Paper's caps and dashes, Artboard's accent dot, Blueprint's brackets.
+// The bar sits at the top and reads as the page's running head, in the margins' voice, with no filled block: Paper's caps and dashes, Artboard's accent dot, Blueprint's brackets.
 export function renderTmux(t) {
   const c = t.color;
   const [ink, muted, line, surface, paper, accent, danger] = [c.ink, c.muted, c.line, c.surface, c.paper, c.accent, c.danger].map(lower);

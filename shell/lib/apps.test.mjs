@@ -14,7 +14,7 @@ const paper = load('paper');
 
 const artboard = load('artboard');
 
-// The tmux bar reads as the page's bottom margin, in the margins' voice: Paper's caps and dashes, Artboard's accent dot, Blueprint's brackets.
+// The tmux bar reads as the page's running head, in the margins' voice: Paper's caps and dashes, Artboard's accent dot, Blueprint's brackets.
 const tmuxOpt = (t, name) => renderTmux(t).match(new RegExp(`^set -g ${name} "(.*)"$`, 'm'))[1];
 
 test('the tmux bar draws no filled block in any theme, only text in the margin colours', () => {
