@@ -92,10 +92,6 @@ define-command npx -docstring 'npx [<arguments>]: npx utility wrapper' -params 1
   fifo -name "'npx %arg{@}'" -scroll -- npx %arg{@}
 }
 
-define-command copilot -docstring 'Start copilot api' %{
-  fifo -name "*copilot*" -scroll -- npx copilot-api@latest start
-}
-
 define-command dev -docstring 'Cloudflared dev tunnel' %{
   evaluate-commands %sh{
     printf "fifo -name '*cloudflared*' -scroll -- cloudflared tunnel --config '%s/.cloudflared/config.dev.yaml' run dev\n" "$HOME"
