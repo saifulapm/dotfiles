@@ -1,10 +1,10 @@
 // dots update against a scratch clone, with sudo, dnf, rpm and chezmoi replaced by stubs that log to one file.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 const bin = new URL('../../bin/', import.meta.url).pathname;
 const GIT = 'git -c user.name=t -c user.email=t@t';
@@ -22,7 +22,7 @@ const stub = (dir, name, body) => {
   chmodSync(join(dir, name), 0o755);
 };
 
-// opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints.
+// opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns.
 function scratch(opts = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-update-')));
   const stubs = join(root, 'stubs');
@@ -42,11 +42,11 @@ function scratch(opts = {}) {
   sh(join(root, 'seed'), `chmod +x bin/*; git add bin; ${GIT} commit -qm seed; git push -q origin HEAD:main`);
   sh(root, 'git clone -q origin.git repo');
 
-  stub(stubs, 'sudo', `echo "$*" >> ${sudoLog}\nif [ "$1" = -v ] || [ "$1 $2" = "-n -v" ]; then exit 0; fi\nshift\nexec "$@"`);
+  stub(stubs, 'sudo', `echo "$*" >> ${sudoLog}\nif [ "$1" = -v ] || [ "$1 $2" = "-n -v" ] || [ "$1" = -k ]; then exit 0; fi\nshift\nexec "$@"`);
   stub(
     stubs,
     'dnf',
-    `echo "dnf $* pulled=$(test -f ${repo}/upstream.txt && echo yes || echo no)" >> ${log}\n${opts.upgrade ? `if [ "$1" = upgrade ]; then touch ${state}; fi` : ''}`,
+    `echo "dnf $* pulled=$(test -f ${repo}/upstream.txt && echo yes || echo no)" >> ${log}\n${opts.upgrade ? `if [ "$1" = upgrade ]; then touch ${state}; fi` : ''}${opts.hang ? `\necho $$ > ${join(root, 'dnf.pid')}\nexec sleep 60` : ''}`,
   );
   stub(stubs, 'rpm', `if [ -e ${state} ]; then cat ${join(root, 'after')}; else cat ${join(root, 'before')}; fi`);
   stub(stubs, 'chezmoi', `echo "chezmoi $*" >> ${log}\ncat ${join(root, 'chezmoi.out')}`);
@@ -86,7 +86,31 @@ test('only the first sudo call can prompt', () => {
   const calls = lines(s.sudoLog);
   assert.equal(calls[0], '-v');
   assert.ok(calls.includes('-n dnf upgrade -y'));
-  for (const c of calls.slice(1)) assert.ok(c.startsWith('-n '), c);
+  // sudo -k only drops the timestamp, so it never prompts; real sudo refuses -n with it.
+  for (const c of calls.slice(1)) assert.ok(c.startsWith('-n ') || c === '-k', c);
+});
+
+test('an update ends by dropping the sudo timestamp', () => {
+  const s = scratch({ upgrade: true });
+  assert.equal(run(s).status, 0);
+  assert.equal(lines(s.sudoLog).at(-1), '-k');
+});
+
+// A killed update runs no EXIT trap, and its keepalive went on renewing root's timestamp for good.
+test('the sudo keepalive stops renewing once its update is killed', async () => {
+  const s = scratch({ hang: true });
+  const env = { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, DOTS_SUDO_TICK: '0.2' };
+  const p = spawn(join(s.repo, 'bin/dots'), ['update'], { env, stdio: 'ignore' });
+  const renewals = () => lines(s.sudoLog).filter((c) => c === '-n -v').length;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 50 && !(existsSync(s.log) && renewals() >= 2); i++) await wait(100);
+  assert.ok(renewals() >= 2, 'the keepalive renews while the update runs');
+  p.kill('SIGKILL');
+  process.kill(Number(readFileSync(join(s.root, 'dnf.pid'), 'utf8')), 'SIGKILL');
+  await wait(500);
+  const after = renewals();
+  await wait(1000);
+  assert.equal(renewals(), after, 'no renewal after the update is gone');
 });
 
 test('nothing to upgrade and no pin lines is zero and zero', () => {

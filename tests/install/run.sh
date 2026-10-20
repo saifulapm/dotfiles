@@ -177,8 +177,9 @@ echo "${out##*$'\n'}"
 check "dots update exits 0" test $rc = 0
 check "dots update ends with dnf: N upgraded · pins: 0 changed" grep -qE '^dnf: [0-9]+ upgraded · pins: 0 changed$' <<<"${out##*$'\n'}"
 calls=$(podman exec "$name" cat "$log")
-check "dots update's sudo log starts with -v and every later call uses -n" \
-  test "$(head -n1 <<<"$calls")" = -v -a "$(grep -vc '^-n' <<<"$calls")" = 1
+# sudo -k only drops the timestamp, so it never prompts and ends the log.
+check "dots update's sudo log starts with -v, ends with -k and every call between uses -n" \
+  test "$(head -n1 <<<"$calls")" = -v -a "$(tail -n1 <<<"$calls")" = -k -a "$(grep -vc '^-n' <<<"$calls")" = 2
 
 echo "--- dots update after a pin moved"
 # The repo's working copy takes the older yazi release, as a pulled bump would bring a newer one.

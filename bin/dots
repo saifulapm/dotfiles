@@ -14,7 +14,8 @@ install() {
 
   # The only sudo that may prompt; every later root command uses sudo -n.
   sudo -v || die "sudo failed"
-  while sleep 50; do sudo -n -v || exit; done >/dev/null 2>&1 &
+  # A killed install runs no trap, so the keepalive checks it is still alive before each renewal.
+  while sleep 50 && kill -0 $$ 2>/dev/null; do sudo -n -v || exit; done >/dev/null 2>&1 &
   # shellcheck disable=SC2064 # the keepalive pid is fixed now
   trap "kill $! 2>/dev/null" EXIT
 
