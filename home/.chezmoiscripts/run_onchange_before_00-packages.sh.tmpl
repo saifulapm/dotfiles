@@ -3,20 +3,33 @@
 {{ template "lib.sh" . }}
 list={{ joinPath .chezmoi.workingTree "packages.toml" | quote }}
 
-# One "name copr rpm" line per entry for this arch; copr is "-" when the package is in Fedora, rpm is "-" unless it installs from a URL.
+# One "name copr rpm fusion" line per entry for this arch; copr is "-" when the package is in Fedora, rpm is "-" unless it installs from a URL, fusion is "-" unless it comes from RPM Fusion.
 entries=$(awk -v arch="$(uname -m)" '
-  function flush() { if (name != "" && (a == "all" || a == arch)) print name, (copr == "" ? "-" : copr), (rpm == "" ? "-" : rpm) }
+  function flush() { if (name != "" && (a == "all" || a == arch)) print name, (copr == "" ? "-" : copr), (rpm == "" ? "-" : rpm), (fusion == "" ? "-" : fusion) }
   function val() { match($0, /"[^"]*"/); return substr($0, RSTART + 1, RLENGTH - 2) }
-  /^\[\[package\]\]/ { flush(); name = ""; a = ""; copr = ""; rpm = ""; next }
+  /^\[\[package\]\]/ { flush(); name = ""; a = ""; copr = ""; rpm = ""; fusion = ""; next }
   /^name *=/ { name = val() }
   /^arch *=/ { a = val() }
   /^copr *=/ { copr = val() }
   /^rpm *=/ { rpm = val() }
+  /^rpmfusion *=/ { fusion = val() }
   END { flush() }
 ' "$list")
 
 missing=()
-while read -r name copr rpm; do
+from_fusion=()
+while read -r name copr rpm fusion; do
+  # Fedora's ffmpeg-free also answers to "ffmpeg", so an RPM Fusion package stays out of the batch, where dnf would quietly pick the Fedora one.
+  if [[ $fusion != - ]]; then
+    if [[ ! -e /etc/yum.repos.d/rpmfusion-$fusion.repo ]]; then
+      log "enabling RPM Fusion $fusion"
+      # download1 is RPM Fusion's own server; mirrors.rpmfusion.org can redirect to a mirror that times out.
+      root dnf -y -q install "https://download1.rpmfusion.org/$fusion/fedora/rpmfusion-$fusion-release-$(rpm -E %fedora).noarch.rpm" ||
+        log "could not reach RPM Fusion $fusion, so $name is left out until it is installed by hand"
+    fi
+    rpm -q --quiet "$name" || from_fusion+=("$name $fusion")
+    continue
+  fi
   if [[ $copr != - && ! -e /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:${copr/\//:}.repo ]]; then
     log "enabling COPR $copr"
     root dnf -y -q copr enable "$copr" || die "could not enable COPR $copr"
@@ -37,3 +50,11 @@ if ((${#missing[@]})); then
   log "installing ${missing[*]}"
   root dnf -y install "${missing[@]}" || die "dnf could not install ${missing[*]}"
 fi
+
+# --allowerasing replaces the -free libraries mpv and wf-recorder pulled in, as dnf swap would, and works whether or not they are there.
+for entry in "${from_fusion[@]}"; do
+  read -r name fusion <<<"$entry"
+  [[ -e /etc/yum.repos.d/rpmfusion-$fusion.repo ]] || continue
+  log "installing $name from RPM Fusion $fusion"
+  root dnf -y -q install --allowerasing "$name" || log "could not install $name from RPM Fusion $fusion"
+done

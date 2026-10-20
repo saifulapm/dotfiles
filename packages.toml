@@ -510,3 +510,184 @@ why = "yazi detects each file's type with it"
 name = "btop"
 arch = "all"
 why = "Mod+Shift+Escape opens it as the system monitor"
+
+[[package]]
+name = "chromium"
+arch = "all"
+why = "the browser, which opens links"
+
+[[package]]
+name = "tailscale"
+arch = "all"
+why = "joins the private network with the tailscale up dots install asks for"
+
+[[package]]
+name = "pipewire"
+arch = "all"
+why = "the sound server"
+
+[[package]]
+name = "wireplumber"
+arch = "all"
+why = "pipewire's session manager, which connects A2DP on a known headset"
+
+[[package]]
+name = "brightnessctl"
+arch = "all"
+why = "the brightness keys and the shell's brightness slider"
+
+[[package]]
+name = "wf-recorder"
+arch = "all"
+why = "the shell's screen recorder"
+
+[[package]]
+name = "grim"
+arch = "all"
+why = "takes screenshots"
+
+[[package]]
+name = "slurp"
+arch = "all"
+why = "picks the region grim and wf-recorder capture"
+
+[[package]]
+name = "wlrctl"
+arch = "all"
+why = "the desktop skill's mouse script moves the pointer with it"
+
+[[package]]
+name = "ydotool"
+arch = "all"
+why = "the desktop skill presses and drags with it through ydotoold"
+
+[[package]]
+name = "tesseract"
+arch = "all"
+why = "reads the text out of a screen region"
+
+[[package]]
+name = "tesseract-langpack-eng"
+arch = "all"
+why = "tesseract's English model"
+
+[[package]]
+name = "tesseract-langpack-ben"
+arch = "all"
+why = "tesseract's Bangla model"
+
+[[package]]
+name = "zbar"
+arch = "all"
+why = "zbarimg reads a QR code off the screen"
+
+[[package]]
+name = "python3-gobject"
+arch = "all"
+why = "gi, which the dev-fake D-Bus services in bin/ import"
+
+[[package]]
+name = "just"
+arch = "all"
+why = "runs this repo's justfile recipes"
+
+[[package]]
+name = "mpv"
+arch = "all"
+why = "plays video"
+
+[[package]]
+name = "imv"
+arch = "all"
+why = "shows images"
+
+[[package]]
+name = "zathura"
+arch = "all"
+why = "reads PDFs"
+
+[[package]]
+name = "zathura-pdf-mupdf"
+arch = "all"
+why = "zathura's PDF backend"
+
+[[package]]
+name = "yt-dlp"
+arch = "all"
+why = "downloads video for mpv"
+
+[[package]]
+name = "pass-otp"
+arch = "all"
+why = "pass otp prints the one-time codes kept in the pass store"
+
+[[package]]
+name = "ffmpeg"
+arch = "all"
+rpmfusion = "free"
+why = "RPM Fusion's full build, with the codecs Fedora's ffmpeg-free leaves out"
+
+[[package]]
+name = "ruby"
+arch = "all"
+why = "runs the try script"
+
+[[package]]
+name = "rubypick"
+arch = "all"
+why = "/usr/bin/ruby, which the try script's shebang finds"
+
+[[package]]
+name = "golang"
+arch = "all"
+why = "mise builds goimapnotify with go"
+
+[[package]]
+name = "gtk4"
+arch = "all"
+why = "satty's toolkit, with the pango, cairo and glib it also links"
+
+[[package]]
+name = "libadwaita"
+arch = "all"
+why = "satty links libadwaita-1"
+
+[[package]]
+name = "meson"
+arch = "aarch64"
+why = "builds the libva-v4l2-request pin on the Macs"
+
+[[package]]
+name = "ninja-build"
+arch = "aarch64"
+why = "meson's build backend for the libva-v4l2-request pin"
+
+[[package]]
+name = "arm-none-eabi-gcc-cs"
+arch = "aarch64"
+why = "arm-none-eabi-gcc, which builds Asahi's AVD firmware"
+
+[[package]]
+name = "libva-devel"
+arch = "aarch64"
+why = "builds the libva-v4l2-request pin on the Macs"
+
+[[package]]
+name = "libdrm-devel"
+arch = "aarch64"
+why = "builds the libva-v4l2-request pin on the Macs"
+
+[[package]]
+name = "kernel-headers"
+arch = "aarch64"
+why = "builds the libva-v4l2-request pin on the Macs"
+
+[[package]]
+name = "binutils"
+arch = "aarch64"
+why = "nm, which the AVD firmware build reads symbols with"
+
+[[package]]
+name = "pkgconf-pkg-config"
+arch = "aarch64"
+why = "pkg-config, which meson finds libva and libdrm with"
