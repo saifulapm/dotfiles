@@ -12,6 +12,7 @@ const FONTS = ['Maple Mono', 'Instrument Serif'];
 const VOICES = ['plain', 'caps', 'bracket'];
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const NIRI_COLORS = ['border_inactive', 'ring_color', 'shadow_color', 'shadow_inactive'];
+const TAB_SIDES = ['left', 'right', 'top', 'bottom'];
 
 export function validateTheme(doc) {
   const fail = (msg) => { throw new Error(`theme: ${msg}`); };
@@ -36,6 +37,7 @@ export function validateTheme(doc) {
   for (const k of NIRI_COLORS) {
     if (k in niri && !/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(niri[k])) fail(`niri.${k}: "${niri[k]}" is not #RRGGBB or #RRGGBBAA`);
   }
+  if ('tab_position' in niri && !TAB_SIDES.includes(niri.tab_position)) fail(`niri.tab_position: "${niri.tab_position}" is not one of ${TAB_SIDES.join(', ')}`);
   return {
     name: meta.name,
     mode: meta.mode,
@@ -225,6 +227,16 @@ export function renderNiri(t) {
     ].join('\n')
     : 'shadow {\n        off\n    }';
   const radius = t.primitive.corner === 'round' ? 14 : 0;
+  // Tabs take the focus colour and the inactive frame's colour; a round theme draws them as pills.
+  const tabs = n.tab_position
+    ? [
+      'tab-indicator {', '        hide-when-single-tab', '        place-within-column', `        gap ${n.tab_gap}`, `        width ${n.tab_width}`,
+      `        length total-proportion=${Number.isInteger(n.tab_length) ? n.tab_length.toFixed(1) : n.tab_length}`, `        position "${n.tab_position}"`, `        gaps-between-tabs ${n.tab_gaps}`,
+      `        corner-radius ${t.primitive.corner === 'round' ? n.tab_width / 2 : 0}`,
+      `        active-color "${n.ring_width ? n.ring_color ?? c.accent : frameColor}"`, `        inactive-color "${n.border_inactive ?? c.muted}"`,
+      `        urgent-color "${c.danger}"`, '    }',
+    ].join('\n')
+    : 'tab-indicator {\n        hide-when-single-tab\n    }';
   const motion = MOTION[t.primitive.motion]
     ?? { 'window-open': CURVES[t.primitive.motion], 'window-close': CURVES[t.primitive.motion] };
   const shaders = SHADERS[t.primitive.motion]?.(c) ?? {};
@@ -239,6 +251,10 @@ export function renderNiri(t) {
     ${ring}
     ${border}
     ${shadow}
+    ${tabs}
+    insert-hint {
+        color "${c.accent}80"
+    }
     // Windows start 56 px down and 32 px in, below the margins, as on the approved artboard.
     struts {
         top ${56 - t.niri.gaps}

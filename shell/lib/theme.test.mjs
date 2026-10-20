@@ -250,3 +250,39 @@ test('the foot OSC string sets the 16 colours, cursor and selection, then foregr
   assert.ok(osc.includes('\x1b]12;#7FE3F0\x1b\\\x1b]17;#7FE3F0\x1b\\\x1b]19;#0A1526\x1b\\'));
   assert.ok(osc.endsWith('\x1b]10;#D6F4F8\x1b\\\x1b]11;#0A1526\x1b\\'));
 });
+
+const tabs = (name) => renderNiri(load(name)).match(/^    tab-indicator \{\n([^]*?)\n    \}$/m)?.[1] ?? '';
+
+test('each theme draws niri tabs in its own language: Paper index tabs, Artboard pills, Blueprint a dimension line', () => {
+  const paper = tabs('paper');
+  assert.match(paper, /^\s+position "top"$/m);
+  assert.match(paper, /^\s+width 5$/m);
+  assert.match(paper, /^\s+corner-radius 0$/m);
+  // niri reads total-proportion only as a float, so 1.0 keeps its point.
+  assert.match(paper, /^\s+length total-proportion=1\.0$/m);
+  assert.match(paper, /^\s+active-color "#1C1915"$/m);
+  assert.match(paper, /^\s+inactive-color "#575653"$/m);
+  const artboard = tabs('artboard');
+  assert.match(artboard, /^\s+length total-proportion=0\.3$/m);
+  assert.match(artboard, /^\s+corner-radius 2$/m);
+  assert.match(artboard, /^\s+active-color "#3D5AFE"$/m);
+  const blueprint = tabs('blueprint');
+  assert.match(blueprint, /^\s+position "left"$/m);
+  assert.match(blueprint, /^\s+width 2$/m);
+  assert.match(blueprint, /^\s+active-color "#7FE3F0"$/m);
+  assert.match(blueprint, /^\s+inactive-color "#2E5A72"$/m);
+  for (const t of [paper, artboard, blueprint]) {
+    assert.match(t, /^\s+hide-when-single-tab$/m);
+    assert.match(t, /^\s+place-within-column$/m);
+  }
+});
+
+test('niri shows where a moved window lands in the theme accent at half strength', () => {
+  assert.match(renderNiri(load('blueprint')), /^    insert-hint \{\n        color "#7FE3F080"\n    \}$/m);
+});
+
+test('a tab position outside left, right, top and bottom is refused by name', () => {
+  const bad = structuredClone(paper);
+  bad.niri.tab_position = 'middle';
+  assert.throws(() => validateTheme(bad), /niri\.tab_position: "middle"/);
+});
