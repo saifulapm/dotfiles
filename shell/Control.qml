@@ -75,6 +75,7 @@ Item {
             opens: opens,
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
+            firstFrame: motion.firstFrame,
             settled: motion.settled,
             drawing: control.visible,
             cardBox: card.drawnBox(),

@@ -21,6 +21,8 @@ Item {
     // The ms from the last open to its rest, or -1 while it is still moving.
     property real settleMs: -1
     property real startedAt: 0
+    // An open from rest waits for the window's next frame to start its clock, so a slow first frame cannot eat the start.
+    property bool armed: false
     // How far through the open its first drawn frame was, or -1 until it is drawn; near 0 means the whole drop played.
     property real firstFrame: -1
 
@@ -33,42 +35,66 @@ Item {
         play();
     }
     // A theme switch mid-motion carries on at the new theme's pace.
-    onCurvesChanged: if (playing.running)
+    onCurvesChanged: if (clock.running)
         play()
     onSettledChanged: if (settled)
         settleMs = Date.now() - startedAt
 
     // Called on each of the host window's frames.
     function swapped() {
-        if (open && firstFrame < 0 && progress > 0)
+        if (armed) {
+            armed = false;
+            startedAt = clock.t0 = Date.now();
+        } else if (open && firstFrame < 0 && progress > 0) {
             firstFrame = progress;
+        }
     }
 
     // From wherever the card is, so an open pressed again mid-close turns back, and a close mid-open sinks from there.
     function play() {
-        playing.stop();
+        clock.stop();
+        armed = open && progress === 0;
         const to = open ? 1 : 0;
         const ms = !curves ? 0 : open ? curves.openMs * (1 - progress) : curves.closeMs * progress;
         if (ms <= 0) {
+            armed = false;
             progress = to;
             return;
         }
-        playing.to = to;
-        playing.duration = ms;
-        playing.start();
+        clock.p0 = progress;
+        clock.p1 = to;
+        clock.ms = ms;
+        clock.t0 = Date.now();
+        clock.start();
     }
 
     // Another surface opening ends this one's close at once, so only the new one shows.
     function cut() {
         if (!shown) {
-            playing.stop();
+            clock.stop();
             progress = 0;
         }
     }
 
-    NumberAnimation {
-        id: playing
-        target: motion
-        property: "progress"
+    // Each tick sets progress from the wall clock, so a stalled frame neither eats nor stretches the motion.
+    FrameAnimation {
+        id: clock
+        property real p0: 0
+        property real p1: 0
+        property real ms: 0
+        property real t0: 0
+        onTriggered: {
+            if (motion.armed) {
+                // An open that changes nothing on screen gets no frame, so the clock starts 50 ms on regardless.
+                if (Date.now() - t0 < 50)
+                    return;
+                motion.armed = false;
+                motion.startedAt = t0 = Date.now();
+            }
+            const t = Math.min(1, (Date.now() - t0) / ms);
+            motion.progress = p0 + (p1 - p0) * t;
+            if (t === 1)
+                stop();
+        }
     }
 }

@@ -8,7 +8,7 @@ status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 surface_is() { timeout 0.5 qs ipc call "$1" state 2>/dev/null | jq -e "$2" >/dev/null; }
 # The settleMs a motion of kind $1 takes at least.
 least() { case $1 in drop) echo 100 ;; spring) echo 340 ;; plot) echo 220 ;; esac; }
-# A surface whose first open loads its content first draws its open from near the start, not halfway through.
+# A first open draws its first frame near the start of its motion, not halfway through.
 from_start() { surface_is "$1" '(.firstFrame | type) == "number" and .firstFrame > 0 and .firstFrame <= 0.3'; }
 
 # Opens surface $1 in theme $2 and checks it settles as motion $3 within $4 ms, then closes it.
@@ -20,7 +20,7 @@ settles() {
   until_ok 3000 surface_is "$s" .settled
   check "$theme: the $s settles as a $kind in $(least "$kind") to $ms ms ($(timeout 0.5 qs ipc call "$s" state | jq -c '[.motion, .settleMs, .firstFrame]'))" \
     surface_is "$s" ".motion == \"$kind\" and (.settleMs | type) == \"number\" and .settleMs >= $(least "$kind") and .settleMs <= $ms"
-  case $s in cheatsheet) check "$theme: the $s draws its first frame near the start of its open" from_start "$s" ;; esac
+  case $s in cheatsheet | control) check "$theme: the $s draws its first frame near the start of its open" from_start "$s" ;; esac
   timeout 0.5 qs ipc call "$s" close >/dev/null
   until_ok 2000 surface_is "$s" '.drawing == false'
 }
