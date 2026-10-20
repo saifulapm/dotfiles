@@ -55,3 +55,23 @@ install = "~/.local/bin/amx, built with cargo"
 runs = "amx --version"
 url = "https://github.com/saifulapm/amx/archive/{version}.tar.gz"
 sha256 = "88c0b3db4b619050e4d4edbb8bd4210bd6757c538a58b5fe378cd1daf652f590"
+
+[[pin]]
+name = "workflow"
+version = "d935e62a3a591cfdb9409397bfa919ab12fc2c9a"
+repo = "saifulapm/workflow"
+track = "commit"
+install = "~/.local/bin/mem, ~/.local/bin/workflow and ~/.local/bin/hub, built with cargo"
+runs = "mem --version && workflow --version && hub --version"
+url = "https://github.com/saifulapm/workflow/archive/{version}.tar.gz"
+sha256 = "2968bfe43af235a068167bc8db131c520951c3c6b6a7925edb5b62935dccf46f"
+
+[[pin]]
+name = "pxy"
+version = "91134d359cdd85a596e163cb735c671e62ff0886"
+repo = "saifulapm/pxy"
+track = "commit"
+install = "~/.local/bin/pxy, built with cargo"
+runs = "pxy --version"
+url = "https://github.com/saifulapm/pxy/archive/{version}.tar.gz"
+sha256 = "5dfbdd21fcabc2f8ba9cf69d476fa79b67622a98ffcebcb46a6440d11f1906b5"

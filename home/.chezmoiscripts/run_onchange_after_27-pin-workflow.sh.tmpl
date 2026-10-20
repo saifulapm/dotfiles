@@ -1,0 +1,10 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "workflow") }}
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+# Three crates, each with its own lockfile, in one repo.
+for crate in mem workflow hub; do pin_cargo "$pin_tmp/workflow-$pin_version/$crate" "$crate"; done
+# A running local hub keeps the old binary until it restarts.
+systemctl --user try-restart hub-local.service 2>/dev/null || true
+pin_done

@@ -1,0 +1,9 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "pxy") }}
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+pin_cargo "$pin_tmp/pxy-$pin_version" pxy
+# A running pxy keeps the old binary until it restarts.
+systemctl --user try-restart pxy.service 2>/dev/null || true
+pin_done

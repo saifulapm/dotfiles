@@ -112,7 +112,7 @@ test('changing one pin re-renders only that pin\'s script', () => {
     return Object.fromEntries(scripts.map((f) => [f, renderOnly(root, readFileSync(join(dir, f), 'utf8'))]));
   };
   const base = render(versions);
-  for (const name of ['amx']) {
+  for (const name of ['amx', 'workflow', 'pxy']) {
     const moved = versions.replace(new RegExp(`(name = "${name}"\\nversion = ")[^"]+`), `$1${'f'.repeat(40)}`);
     assert.notEqual(moved, versions, `versions.toml has a ${name} pin`);
     const after = render(moved);
