@@ -74,9 +74,9 @@ test('the tool directories that exist join PATH, and SSH asks pinentry for curse
 });
 
 test('cd goes to a real directory, and jumps through zoxide for the rest', () => {
-  mkdirSync(join(home, 'Sites/deep/projx'), { recursive: true });
-  const r = run('fish', ['-i', '-c', 'zoxide add ~/Sites/deep/projx; cd ~/Sites; pwd; cd projx >/dev/null; pwd']);
-  assert.equal(r.stdout, `${home}/Sites\n${home}/Sites/deep/projx\n`, r.stderr);
+  mkdirSync(join(home, 'Codes/deep/projx'), { recursive: true });
+  const r = run('fish', ['-i', '-c', 'zoxide add ~/Codes/deep/projx; cd ~/Codes; pwd; cd projx >/dev/null; pwd']);
+  assert.equal(r.stdout, `${home}/Codes\n${home}/Codes/deep/projx\n`, r.stderr);
 });
 
 test('gwd removes the worktree it stands in and its branch, once asked', () => {

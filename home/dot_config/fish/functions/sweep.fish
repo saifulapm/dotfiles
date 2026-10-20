@@ -1,21 +1,21 @@
 # Removes every `node_modules`, and every `vendor` that has a composer.json
 # beside it. Plenty of `vendor` dirs are real source (published Blade views,
 # public assets), so only one next to a composer.json counts as a Composer install.
-function sweep -d "delete node_modules + composer vendor dirs under ~/Sites"
+function sweep -d "delete node_modules + composer vendor dirs under ~/Codes"
     argparse n/dry-run y/yes 'd/days=!_validate_int' h/help -- $argv; or return 1
 
     if set -q _flag_help
         echo "Usage: sweep [-n|--dry-run] [-y|--yes] [-d|--days N] [PATH]"
         echo "  Deletes node_modules, and vendor dirs beside a composer.json."
-        echo "  PATH defaults to \$SITES_PATH or ~/Sites"
+        echo "  PATH defaults to \$CODES_PATH or ~/Codes"
         return 0
     end
 
     set -l days 0
     set -q _flag_days; and set days $_flag_days
 
-    set -l root "$HOME/Sites"
-    test -n "$SITES_PATH"; and set root $SITES_PATH
+    set -l root "$HOME/Codes"
+    test -n "$CODES_PATH"; and set root $CODES_PATH
     test -n "$argv[1]"; and set root $argv[1]
     if not test -d "$root"
         echo "✗ Not a directory: $root" >&2

@@ -116,7 +116,7 @@ echo "--- dots install on the v1 machine"
 check "dots install exits 0" dots_install
 
 echo "--- dots cutover"
-out=$(as_user "Sites/github/dotfiles/bin/dots cutover" 2>&1)
+out=$(as_user "Codes/dotfiles/bin/dots cutover" 2>&1)
 rc=$?
 echo "${out##*$'\n'}"
 check "dots cutover exits 0" test $rc = 0
@@ -141,7 +141,7 @@ for u in qshell.service qshell-sync.timer update-all.timer; do
 done
 for u in pxy hub-local; do
   got=$(as_user "readlink -f \$(systemctl --user show -p FragmentPath --value $u.service)")
-  check "$u.service runs from v2's unit (got '$got')" test "$got" = "$home/Sites/github/dotfiles/home/dot_config/systemd/user/$u.service"
+  check "$u.service runs from v2's unit (got '$got')" test "$got" = "$home/Codes/dotfiles/home/dot_config/systemd/user/$u.service"
 done
 got=$(unit_state pxy.service)
 check "pxy.service is enabled and active (got '$got')" test "$got" = "enabled active"
@@ -166,7 +166,7 @@ check "~/.dotfiles stays in place" as_user "test -f ~/.dotfiles/home/dot_gitconf
 
 echo "--- dots cutover again"
 before=$(snapshot)
-out=$(as_user "Sites/github/dotfiles/bin/dots cutover" 2>&1)
+out=$(as_user "Codes/dotfiles/bin/dots cutover" 2>&1)
 rc=$?
 echo "${out##*$'\n'}"
 check "the second dots cutover exits 0" test $rc = 0

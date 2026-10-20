@@ -84,7 +84,7 @@ test('the wrapper finds the real binary through mise, not PATH', () => {
   assert.deepEqual(calls(home, 'mise.log'), ['which playwright-cli']);
 });
 
-// A project under ~/Sites/tries keeps an untrusted mise.toml, and mise refuses every command run from inside it.
+// A clone under ~/Tries keeps an untrusted mise.toml, and mise refuses every command run from inside it.
 test('the wrapper reaches the real binary from a folder with an untrusted mise.toml', () => {
   const { home, env } = scratch();
   mkdirSync(join(home, 'tries/x'), { recursive: true });

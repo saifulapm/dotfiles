@@ -17,7 +17,7 @@ http://*.test {
 		on_demand
 	}
 
-	root * {{ .chezmoi.homeDir }}/Sites/laravel/{labels.1}/public
+	root * {{ .chezmoi.homeDir }}/Codes/{labels.1}/public
 
 	php_fastcgi 127.0.0.1:9084
 

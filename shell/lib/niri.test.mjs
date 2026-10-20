@@ -22,7 +22,7 @@ const CLOSE_SECOND = [
   '{"WindowClosed":{"id":3}}',
 ];
 const RETITLE =
-  '{"WindowOpenedOrChanged":{"window":{"id":2,"title":"~/Sites/github/dotfiles","app_id":"foot","pid":436321,"workspace_id":1,"is_focused":true,"is_floating":false,"is_urgent":false,"layout":{"pos_in_scrolling_layout":[1,1],"tile_size":[1224.0,1475.0],"window_size":[1224,1475],"tile_pos_in_workspace_view":null,"window_offset_in_tile":[0.0,0.0]},"focus_timestamp":{"secs":16093,"nanos":152239781}}}}';
+  '{"WindowOpenedOrChanged":{"window":{"id":2,"title":"~/Codes/dotfiles","app_id":"foot","pid":436321,"workspace_id":1,"is_focused":true,"is_floating":false,"is_urgent":false,"layout":{"pos_in_scrolling_layout":[1,1],"tile_size":[1224.0,1475.0],"window_size":[1224,1475],"tile_pos_in_workspace_view":null,"window_offset_in_tile":[0.0,0.0]},"focus_timestamp":{"secs":16093,"nanos":152239781}}}}';
 
 const run = (lines, state = initial) => lines.reduce((s, l) => reduce(s, JSON.parse(l)), state);
 
@@ -45,7 +45,7 @@ test('closing the second window returns the view to the first', () => {
 });
 
 test('a title change arrives as WindowOpenedOrChanged and replaces the title', () => {
-  assert.deepEqual(outputView(run([...LINES, RETITLE]), 'winit'), { idx: 1, app: 'foot', title: '~/Sites/github/dotfiles' });
+  assert.deepEqual(outputView(run([...LINES, RETITLE]), 'winit'), { idx: 1, app: 'foot', title: '~/Codes/dotfiles' });
 });
 
 test('the reply to the EventStream request leaves the state as it was', () => {

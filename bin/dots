@@ -10,7 +10,7 @@ die() {
 install() {
   local repo=${DOTS_REPO:-https://github.com/saifulapm/dotfiles.git}
   local branch=${DOTS_BRANCH:-v2}
-  local dir=$HOME/Sites/github/dotfiles
+  local dir=$HOME/Codes/dotfiles
 
   # The only sudo that may prompt; every later root command uses sudo -n.
   sudo -v || die "sudo failed"
@@ -32,7 +32,7 @@ install() {
 
   # chezmoi init rewrites its config and state db, so it runs only until the config names this repo.
   local config=${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml
-  if grep -qxF 'sourceDir = "~/Sites/github/dotfiles"' "$config" 2>/dev/null; then
+  if grep -qxF 'sourceDir = "~/Codes/dotfiles"' "$config" 2>/dev/null; then
     chezmoi apply || die "chezmoi apply failed"
   else
     local args=()

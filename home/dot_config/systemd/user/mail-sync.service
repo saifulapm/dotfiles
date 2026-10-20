@@ -8,7 +8,7 @@ ConditionPathExists=%h/.mbsyncrc
 
 [Service]
 Type=oneshot
-ExecStart=%h/Sites/github/dotfiles/bin/mail-sync --quiet
+ExecStart=%h/Codes/dotfiles/bin/mail-sync --quiet
 Nice=19
 IOSchedulingClass=idle
 # Backstop for a sync stuck on a half-open connection, which would hold the lock every later sync needs.

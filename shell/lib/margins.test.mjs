@@ -25,10 +25,10 @@ test('the tick waits until the next minute boundary', () => {
 });
 
 test('the margin state for a focused window', () => {
-  const s = marginState({ idx: 1, app: 'foot', title: '~/Sites/github/dotfiles' }, AT, { goal: '', wifi: 'wifi', battery: '82%' });
+  const s = marginState({ idx: 1, app: 'foot', title: '~/Codes/dotfiles' }, AT, { goal: '', wifi: 'wifi', battery: '82%' });
   assert.equal(
     JSON.stringify(s),
-    '{"left":{"workspace":"01","app":"foot","title":"~/Sites/github/dotfiles","text":"01 · foot — ~/Sites/github/dotfiles"},"right":{"goal":"","wifi":"wifi","battery":"82%","date":"Sun 18 Oct","text":"wifi  82%  Sun 18 Oct"}}',
+    '{"left":{"workspace":"01","app":"foot","title":"~/Codes/dotfiles","text":"01 · foot — ~/Codes/dotfiles"},"right":{"goal":"","wifi":"wifi","battery":"82%","date":"Sun 18 Oct","text":"wifi  82%  Sun 18 Oct"}}',
   );
 });
 

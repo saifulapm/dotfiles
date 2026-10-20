@@ -2,7 +2,7 @@
 # ~/.pi/agent/settings.json — a modify_ script rather than a plain source file,
 # because this repo applies in symlink mode and pi WRITES to this file.
 #
-# A plain source file lands as a symlink into ~/Sites/github/dotfiles (that is
+# A plain source file lands as a symlink into ~/Codes/dotfiles (that is
 # what mode = "symlink" in chezmoi.toml does). pi's settings-manager persists on
 # every ctrl+l model switch (setDefaultModelAndProvider), every shift+tab
 # thinking cycle (setDefaultThinkingLevel) and every version bump
