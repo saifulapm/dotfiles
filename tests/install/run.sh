@@ -112,6 +112,7 @@ check "\$HOME/.local/bin/dots-clip-store links to the repo script (got '$clip')"
 # The lock authenticates through dots-lock, and PAM's other service denies every password, so a missing file would lock the user out.
 check "/etc/pam.d/dots-lock includes system-auth" podman exec "$name" grep -qx 'auth include system-auth' /etc/pam.d/dots-lock
 check "logind leaves the lid to niri" podman exec "$name" grep -qx 'HandleLidSwitch=ignore' /etc/systemd/logind.conf.d/dots-lid.conf
+check "logind leaves the power key to niri" podman exec "$name" grep -qx 'HandlePowerKey=ignore' /etc/systemd/logind.conf.d/dots-lid.conf
 check "sysctl sets BBR over fq" podman exec "$name" bash -c "grep -qx 'net.ipv4.tcp_congestion_control = bbr' /etc/sysctl.d/99-tcp-bbr.conf && grep -qx 'net.core.default_qdisc = fq' /etc/sysctl.d/99-tcp-bbr.conf"
 check "tcp_bbr and sch_fq load at boot" podman exec "$name" bash -c "grep -qx tcp_bbr /etc/modules-load.d/tcp-bbr.conf && grep -qx sch_fq /etc/modules-load.d/tcp-bbr.conf"
 
