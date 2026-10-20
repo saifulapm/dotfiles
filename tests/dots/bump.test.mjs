@@ -58,7 +58,7 @@ if [ -n "$out" ]; then cp "$f" "$out"; else cat "$f"; fi
 `;
 
 // A scratch repo with bin/dots and bin/dots-bump copied in, plus the stubs and fixtures.
-function world({ yaziTag, kakSha, yaziFails = false }) {
+function world({ yaziTag, kakSha, yaziFails = false, file = FILE }) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-bump-')));
   const [repo, stubs, fix] = ['repo', 'stubs', 'fix'].map((d) => join(root, d));
   for (const d of [join(repo, 'bin'), stubs, join(fix, 'gh'), join(fix, 'curl'), join(root, 'home')]) mkdirSync(d, { recursive: true });
@@ -74,9 +74,11 @@ function world({ yaziTag, kakSha, yaziFails = false }) {
   serve(`${yazi}aarch64-unknown-linux-gnu.zip`, 'yazi arm 26.10.0');
   serve(`${yazi}x86_64-unknown-linux-gnu.zip`, 'yazi x86 26.10.0');
   serve(`https://github.com/saifulapm/kakoune/archive/${KAK_NEW}.tar.gz`, 'kakoune new');
-  writeFileSync(join(repo, 'versions.toml'), FILE);
+  writeFileSync(join(repo, 'versions.toml'), file);
   const env = { PATH: stubs + delimiter + process.env.PATH, HOME: join(root, 'home'), FIX: fix };
   return {
+    fix,
+    serve,
     bump: () => spawnSync(join(repo, 'bin/dots'), ['bump'], { env, encoding: 'utf8' }),
     read: () => readFileSync(join(repo, 'versions.toml'), 'utf8'),
   };
@@ -128,4 +130,22 @@ test('a gh failure leaves that pin untouched, bumps the other and exits 1', () =
   assert.equal(r.stdout, `kakoune ${KAK_OLD} → ${KAK_NEW}\n`);
   assert.match(r.stderr, /yazi/);
   assert.deepEqual(changed(before, w.read()), [`version = "${KAK_NEW}"`, `sha256 = "${sha('kakoune new')}"`]);
+});
+
+// amx, workflow and pxy follow main's head; with every other pin current, a bump names those three, one line each.
+test('the agent tools move to their repos\' head commits, one line each', () => {
+  const file = readFileSync(new URL('../../versions.toml', import.meta.url), 'utf8');
+  const pins = file.split('[[pin]]').slice(1).map((p) => Object.fromEntries([...p.matchAll(/^(name|version|repo|track|url) = "([^"]*)"/gm)].map((m) => [m[1], m[2]])));
+  const w = world({ yaziTag: 'v26.9.1', kakSha: KAK_OLD, file });
+  const head = { amx: 'a'.repeat(40), workflow: 'b'.repeat(40), pxy: 'c'.repeat(40) };
+  for (const p of pins) {
+    const latest = head[p.name] ?? (p.track === 'commit' ? p.version : `v${p.version}`);
+    writeFileSync(join(w.fix, 'gh', p.repo.replace('/', '_')), latest + '\n');
+    if (head[p.name]) w.serve(p.url.replace('{version}', latest), `${p.name} head`);
+  }
+  const r = w.bump();
+  assert.equal(r.status, 0, r.stderr);
+  const old = Object.fromEntries(pins.map((p) => [p.name, p.version]));
+  assert.equal(r.stdout, ['amx', 'workflow', 'pxy'].map((n) => `${n} ${old[n]} → ${head[n]}\n`).join(''));
+  for (const n of ['amx', 'workflow', 'pxy']) assert.match(w.read(), new RegExp(`name = "${n}"\nversion = "${head[n]}"`));
 });
