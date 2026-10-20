@@ -68,3 +68,30 @@ test('the workflow pin runs workflow install and mem doctor --fix once each', ()
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(calls(root), ['workflow install', 'mem doctor --fix']);
 });
+
+// pxy's checkout ships its pi extension with placeholders that pxy launch would fill; the pin fills them from the port this repo configures.
+const PI_PXY = 'const baseUrl = "__PXY_BASE_URL__";\nconst bin = "__PXY_BIN__";\n';
+function pxyHome(template) {
+  const root = scratch({ pxy: { 'contrib/pi-pxy.ts': template } });
+  mkdirSync(join(root, '.config/pxy'), { recursive: true });
+  writeFileSync(join(root, '.config/pxy/config.toml'), '[server]\nhost = "127.0.0.1"\nport = 4100\n');
+  return root;
+}
+
+test('the pxy pin writes pi\'s pxy extension with the configured port and the installed binary', () => {
+  const root = pxyHome(PI_PXY);
+  const r = run(root, 'run_onchange_after_28-pin-pxy.sh.tmpl');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(
+    readFileSync(join(root, '.pi/agent/extensions/pxy.ts'), 'utf8'),
+    `const baseUrl = "http://127.0.0.1:4100/v1";\nconst bin = "${root}/.local/bin/pxy";\n`,
+  );
+});
+
+test('a placeholder the pin does not know stops it, naming the placeholder, and writes no extension', () => {
+  const root = pxyHome(PI_PXY + 'const key = "__PXY_KEY__";\n');
+  const r = run(root, 'run_onchange_after_28-pin-pxy.sh.tmpl');
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /__PXY_KEY__/);
+  assert.equal(existsSync(join(root, '.pi/agent/extensions/pxy.ts')), false);
+});

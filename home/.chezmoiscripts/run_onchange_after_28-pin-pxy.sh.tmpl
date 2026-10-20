@@ -5,6 +5,15 @@
 tarball=$(pin_fetch)
 tar -xzf "$tarball" -C "$pin_tmp"
 pin_cargo "$pin_tmp/pxy-$pin_version" pxy
+# pi's settings name pxy as the provider, and only pxy launch pi would write its extension, so this fills the checkout's template the way launch does.
+port=$(sed -n 's/^port *= *\([0-9]\{1,\}\).*/\1/p' "$HOME/.config/pxy/config.toml" | head -n 1)
+[[ -n $port ]] || die "pin pxy: no port in ~/.config/pxy/config.toml"
+ext=$(sed -e "s|__PXY_BASE_URL__|http://127.0.0.1:$port/v1|" -e "s|__PXY_BIN__|$HOME/.local/bin/pxy|" "$pin_tmp/pxy-$pin_version/contrib/pi-pxy.ts") || die "pin pxy: no contrib/pi-pxy.ts in the checkout"
+# A placeholder a newer pxy added would ship as a literal inside live TypeScript.
+left=$(grep -o '__PXY_[A-Z_]*__' <<<"$ext" | sort -u | tr '\n' ' ') || true
+[[ -z $left ]] || die "pin pxy: pi-pxy.ts has placeholders this script does not fill: $left"
+mkdir -p "$HOME/.pi/agent/extensions"
+printf '%s\n' "$ext" >"$HOME/.pi/agent/extensions/pxy.ts"
 # A running pxy keeps the old binary until it restarts, and the reload first makes the restart read the unit this apply linked.
 systemctl --user daemon-reload 2>/dev/null && systemctl --user try-restart pxy.service 2>/dev/null || true
 pin_done
