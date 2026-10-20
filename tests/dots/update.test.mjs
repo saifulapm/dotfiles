@@ -221,3 +221,30 @@ test('mise up runs from home, whatever directory dots update starts in', () => {
   assert.equal(r.status, 0, r.stderr);
   assert.equal(readFileSync(join(s.root, 'mise.cwd'), 'utf8').trim(), s.root);
 });
+
+// A skills clone at ~/.local/src/skills whose upstream has a new skill; the chezmoi stub records whether the apply saw it.
+function skills(s) {
+  sh(s.root, 'git init -q --bare -b main skills.git');
+  sh(s.root, `git clone -q skills.git skills-seed 2>/dev/null && cd skills-seed && mkdir -p skills/pdf && echo pdf > skills/pdf/SKILL.md && git add . && ${GIT} commit -qm seed && git push -q origin HEAD:main`);
+  sh(s.root, 'mkdir -p .local/src && git clone -q skills.git .local/src/skills');
+  sh(join(s.root, 'skills-seed'), `mkdir -p skills/vite && echo vite > skills/vite/SKILL.md && git add . && ${GIT} commit -qm vite && git push -q origin HEAD:main`);
+  stub(s.stubs, 'chezmoi', `test -f ${s.root}/.local/src/skills/skills/vite/SKILL.md && echo saw-vite >> ${join(s.root, 'skills.log')}; exit 0`);
+}
+
+test('update pulls the skills clone before the apply, so the apply links the new skill', () => {
+  const s = scratch();
+  skills(s);
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readFileSync(join(s.root, 'skills.log'), 'utf8'), 'saw-vite\n');
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed');
+});
+
+test('a skills clone that cannot fast-forward is named in the summary, and the update still succeeds', () => {
+  const s = scratch();
+  skills(s);
+  sh(join(s.root, '.local/src/skills'), `echo mine > mine.txt; git add mine.txt; ${GIT} commit -qm mine`);
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · skills: pull failed');
+});

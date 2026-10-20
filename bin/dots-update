@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots update: pull the repo, dnf upgrade, chezmoi apply, mise up, claude update, then one summary line.
+# dots update: pull the repo, dnf upgrade, pull the skills clone, chezmoi apply, mise up, claude update, then one summary line.
 set -euo pipefail
 
 die() {
@@ -45,6 +45,12 @@ main() {
   sudo -n dnf upgrade -y || die "dnf upgrade failed"
   installed >"$tmp/after" || die "rpm query failed"
 
+  # The apply links the skills a pull adds; a clone that cannot fast-forward is named and stops nothing.
+  local skills='' clone=$HOME/.local/src/skills
+  if [[ -d $clone/.git ]]; then
+    git -C "$clone" pull -q --ff-only || skills=' · skills: pull failed'
+  fi
+
   chezmoi apply | tee "$tmp/chezmoi" || die "chezmoi apply failed"
 
   # From home, so only the global tools move; a failed mise up is named and stops nothing, like the claude update below.
@@ -66,7 +72,7 @@ main() {
   local upgraded pins
   upgraded=$(comm -13 "$tmp/before" "$tmp/after" | wc -l)
   pins=$(grep -c '^dots: pin [^ ]* [^ ]*$' "$tmp/chezmoi" || true)
-  echo "dnf: $upgraded upgraded · pins: $pins changed$mise$claude$(reboot_needed && echo ' · reboot: needed')"
+  echo "dnf: $upgraded upgraded · pins: $pins changed$skills$mise$claude$(reboot_needed && echo ' · reboot: needed')"
 }
 
 # git pull can rewrite this file while bash reads it, so main runs and exits on one line.
