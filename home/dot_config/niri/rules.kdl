@@ -6,3 +6,37 @@ window-rule {
     default-window-height { proportion 0.9; }
     default-floating-position x=32 y=56 relative-to="top-right"
 }
+// Picture-in-picture floats in the top-right corner, below the margin, as Notes does.
+window-rule {
+    match title=r#"Picture.?in.?[Pp]icture"#
+    open-floating true
+    default-column-width { proportion 0.35; }
+    default-window-height { proportion 0.32; }
+    default-floating-position x=32 y=56 relative-to="top-right"
+}
+window-rule {
+    match app-id="^mpv$"
+    match app-id="^imv$"
+    match app-id=r#"^org\.gnome\.Evince$"#
+    match app-id=r#"^org\.pwmt\.zathura$"#
+    open-floating true
+    default-column-width { proportion 0.5; }
+    default-window-height { proportion 0.55; }
+}
+window-rule {
+    match app-id="^chromium-browser$" title=r#"(?i)^(sign in|sign up|log in|login|authoriz|authenticat|continue with|verify)"#
+    open-floating true
+}
+// Chromium's "is sharing your screen" bar floats at the bottom without taking focus.
+window-rule {
+    match app-id="^chromium-browser$" title=r#"(?i)is sharing (your screen|a window|this tab)"#
+    open-floating true
+    open-focused false
+    default-floating-position x=0 y=8 relative-to="bottom"
+}
+// Terminals scroll 1.5 times the touchpad's speed.
+window-rule {
+    match app-id="^foot$"
+    match app-id="^footclient$"
+    scroll-factor 1.5
+}

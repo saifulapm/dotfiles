@@ -62,6 +62,23 @@ test('Print opens niri screenshot UI and center-column moves to Mod+Shift+C', ()
   assert.match(binds, /^\s*Mod\+Shift\+C hotkey-overlay-title="[^"]+" \{ center-column; \}$/m);
 });
 
+test('the keymap opens Chromium on Mod+B, yazi on Mod+E, kak on Mod+Shift+E and the overview on Mod+O', () => {
+  assert.match(binds, spawns('Mod+B', ['chromium-browser']));
+  assert.match(binds, spawns('Mod+E', ['dots-foot', 'yazi']));
+  assert.match(binds, spawns('Mod+Shift+E', ['dots-foot', 'kak']));
+  assert.match(binds, /^\s*Mod\+O repeat=false hotkey-overlay-title="[^"]+" \{ toggle-overview; \}$/m);
+});
+
+test('picture-in-picture, viewers and Chromium sign-in and sharing windows float, and terminals scroll faster', () => {
+  const rules = readFileSync(new URL('../../home/dot_config/niri/rules.kdl', import.meta.url), 'utf8');
+  const block = (re) => rules.split(/^window-rule /m).find((r) => re.test(r)) ?? '';
+  assert.match(block(/Picture/), /open-floating true/);
+  assert.match(block(/\^mpv\$/), /open-floating true/);
+  assert.match(block(/sign in/), /open-floating true/);
+  assert.match(block(/title=r#"\(\?i\)is sharing/), /open-focused false/);
+  assert.match(block(/footclient/), /scroll-factor 1\.5/);
+});
+
 test('niri shows no hotkey overlay at login, so the artboard is the first thing on screen', () => {
   const config = readFileSync(new URL('../../home/dot_config/niri/config.kdl', import.meta.url), 'utf8');
   assert.match(config, /^hotkey-overlay \{\n\s+skip-at-startup\n\}$/m);

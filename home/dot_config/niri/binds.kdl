@@ -2,6 +2,9 @@
 binds {
     Mod+Slash hotkey-overlay-title="Cheat Sheet" { spawn "dots-call" "cheatsheet" "toggle"; }
     Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "dots-foot"; }
+    Mod+B hotkey-overlay-title="Browser: Chromium" { spawn "chromium-browser"; }
+    Mod+E hotkey-overlay-title="Files: yazi" { spawn "dots-foot" "yazi"; }
+    Mod+Shift+E hotkey-overlay-title="Editor: kak" { spawn "dots-foot" "kak"; }
     Mod+Space hotkey-overlay-title="Launcher" { spawn "dots-call" "launcher" "toggle"; }
     Mod+V hotkey-overlay-title="Clipboard" { spawn "dots-call" "launcher" "mode" "clipboard"; }
     Mod+Period hotkey-overlay-title="Emoji" { spawn "dots-call" "launcher" "mode" "emoji"; }
@@ -63,6 +66,7 @@ binds {
     XF86MonBrightnessUp allow-when-locked=true hotkey-overlay-title="Brightness Up" { spawn "dots-call" "osd" "brightness" "5%+"; }
     XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness Down" { spawn "dots-call" "osd" "brightness" "5%-"; }
 
+    Mod+O repeat=false hotkey-overlay-title="Overview" { toggle-overview; }
     Mod+F hotkey-overlay-title="Maximize Column" { maximize-column; }
     Mod+Shift+C hotkey-overlay-title="Center Column" { center-column; }
     Mod+Shift+F hotkey-overlay-title="Fullscreen Window" { fullscreen-window; }
