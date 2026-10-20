@@ -22,7 +22,7 @@ const stub = (dir, name, body) => {
   chmodSync(join(dir, name), 0o755);
 };
 
-// opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns; opts.kernels: the modules dir's kernels, the booted one first; opts.niri: the pids pgrep reports for niri.
+// opts.claude: claude's version before and after claude update, or fail to make it fail; the stub keeps the real claude out of every run. opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns; opts.kernels: the modules dir's kernels, the booted one first; opts.niri: the pids pgrep reports for niri.
 function scratch(opts = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-update-')));
   const stubs = join(root, 'stubs');
@@ -50,6 +50,10 @@ function scratch(opts = {}) {
   );
   stub(stubs, 'rpm', `if [ -e ${state} ]; then cat ${join(root, 'after')}; else cat ${join(root, 'before')}; fi`);
   stub(stubs, 'chezmoi', `echo "chezmoi $*" >> ${log}\ncat ${join(root, 'chezmoi.out')}`);
+  const claude = Object.assign({ from: '2.1.303', to: '2.1.303', fail: false }, opts.claude);
+  const version = join(root, 'claude.version');
+  writeFileSync(version, claude.from);
+  stub(stubs, 'claude', `case "$1" in\n--version) echo "$(cat ${version}) (Claude Code)" ;;\nupdate) echo "claude update" >> ${log}; ${claude.fail ? 'exit 1' : `echo ${claude.to} > ${version}`} ;;\nesac`);
   const kernels = opts.kernels ?? ['7.1.13-402.asahi.fc44.aarch64+16k'];
   const modules = join(root, 'modules');
   for (const k of kernels) mkdirSync(join(modules, k), { recursive: true });
@@ -82,7 +86,7 @@ test('update pulls, upgrades, applies, and ends with one summary line', () => {
   const out = r.stdout.trim().split('\n');
   assert.equal(out.at(-1), 'dnf: 2 upgraded · pins: 1 changed');
   assert.ok(out.includes('some other chezmoi output'), 'chezmoi output reaches the terminal');
-  assert.deepEqual(lines(s.log), ['dnf upgrade -y pulled=yes', 'chezmoi apply']);
+  assert.deepEqual(lines(s.log), ['dnf upgrade -y pulled=yes', 'chezmoi apply', 'claude update']);
 });
 
 test('only the first sudo call can prompt', () => {
@@ -165,4 +169,20 @@ test('a diverged clone stops before dnf with no summary', () => {
   assert.match(r.stderr, /dots: git pull failed/);
   assert.doesNotMatch(r.stdout, /upgraded/);
   assert.throws(() => readFileSync(s.log), /ENOENT/);
+});
+
+// Claude Code's own updater is off in its settings, so dots update is what keeps it current.
+test('update runs claude update after chezmoi apply and names the new version', () => {
+  const s = scratch({ claude: { from: '2.1.303', to: '2.1.310' } });
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  const order = lines(s.log).map((l) => l.split(' ').slice(0, 2).join(' '));
+  assert.ok(order.indexOf('claude update') > order.indexOf('chezmoi apply'), order.join(', '));
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · claude: 2.1.303 → 2.1.310');
+});
+
+test('a failed claude update is named in the summary, and the update still succeeds', () => {
+  const r = run(scratch({ claude: { fail: true } }));
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · claude: update failed');
 });
