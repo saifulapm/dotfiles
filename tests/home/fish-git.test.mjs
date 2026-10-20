@@ -94,7 +94,7 @@ test('gwd removes the worktree it stands in and its branch, once asked', () => {
 });
 
 test('mise reads the tools and settings v2 gives it', () => {
-  assert.equal(run('mise', ['settings', 'get', 'node.corepack']).stdout.trim(), 'true');
+  assert.equal(run('mise', ['settings', 'get', 'node.corepack']).stdout.trim(), 'false');
   assert.equal(run('mise', ['settings', 'get', 'upgrade.auto_prune']).stdout.trim(), 'false');
   const tools = readFileSync(join(home, '.config/mise/config.toml'), 'utf8');
   for (const tool of ['node = "24.21.0"', 'deno = "latest"', '"npm:cf" = "latest"']) assert.ok(tools.includes(tool), tool);

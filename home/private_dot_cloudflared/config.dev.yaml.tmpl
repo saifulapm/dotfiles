@@ -1,0 +1,14 @@
+# cert.pem and <tunnel-id>.json are secrets, so they stay out of the repo; restore them into ~/.cloudflared by hand, or cloudflared exits on the missing credentials file. cloudflared does not expand `~` here, so chezmoi templates in the home directory.
+tunnel: 9340ed70-a135-4ed7-a5d8-d63371d366c9
+credentials-file: {{ .chezmoi.homeDir }}/.cloudflared/9340ed70-a135-4ed7-a5d8-d63371d366c9.json
+
+ingress:
+  - hostname: dev.ecommercestaff.com
+    service: http://localhost:8000
+  - hostname: vite.ecommercestaff.com
+    service: http://localhost:5173
+  - hostname: next.ecommercestaff.com
+    service: http://localhost:3000
+  - hostname: worker.ecommercestaff.com
+    service: http://localhost:8787
+  - service: http_status:404

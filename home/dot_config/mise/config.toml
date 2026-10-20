@@ -9,6 +9,14 @@ deno = "latest"
 "npm:@earendil-works/pi-coding-agent" = "latest"
 # The Playwright CLI; the wrapper in the dotfiles bin dir hands it the machine config.
 "npm:@playwright/cli" = "latest"
+# pnpm as its own tool; corepack is off below, because its shim sits in node's bin dir ahead of this one.
+"aqua:pnpm/pnpm" = "latest"
+# The Shopify CLI; 4.9.4 and later need node 22.12 or newer.
+"npm:@shopify/cli" = "latest"
+# The dev tunnel client that home/private_dot_cloudflared configures.
+"aqua:cloudflare/cloudflared" = "latest"
+# Mail IMAP IDLE watcher. Not packaged for Fedora and upstream ships no binaries, so mise builds it with go; the tag has no v, which go install accepts as a revision.
+"go:gitlab.com/shackra/goimapnotify/cmd/goimapnotify" = "2.5.8"
 
 [env]
 # mise activate moves its tool bin dirs to the front of PATH; this keeps the dotfiles bin dir, and so the playwright-cli wrapper, ahead of them.
@@ -21,8 +29,8 @@ idiomatic_version_file_enable_tools = ["node"]
 trusted_config_paths = ["~/Sites/github", "~/Sites/laravel", "~/Sites/shopify_themes"]
 
 [settings.node]
-# corepack enable after each node install keeps the pnpm shim across a major bump; node 25 and later drop corepack.
-corepack = true
+# Off: pnpm comes from its own mise tool, and a corepack shim would shadow it.
+corepack = false
 
 [settings.upgrade]
 # mise up would delete an old install while processes still run from it, as Claude Code re-execs itself by path.
