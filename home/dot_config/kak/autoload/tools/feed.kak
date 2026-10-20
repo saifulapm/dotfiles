@@ -1,5 +1,5 @@
-# Feed reader — elfeed-kak (github.com/saifulapm/kakfeed), installed by
-# run_after_53. The binary emits its own glue (:elfeed, :elfeed-tree, the
+# Feed reader — elfeed-kak (github.com/saifulapm/kakfeed), installed by its
+# versions.toml pin. The binary emits its own glue (:elfeed, :elfeed-tree, the
 # *elfeed* buffer keys); subscriptions are ~/.config/elfeed-kak/config.toml.
 evaluate-commands %sh{
     command -v elfeed-kak >/dev/null 2>&1 && elfeed-kak init

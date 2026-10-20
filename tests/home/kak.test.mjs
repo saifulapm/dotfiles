@@ -84,3 +84,12 @@ test('a PHP and a JavaScript buffer open with no error in the debug buffer', () 
     .filter((l) => /error|no such/i.test(l));
   assert.deepEqual(errors, []);
 });
+
+// v1 subscribed to 31 feeds; elfeed-kak reads them from the carried config, and the pin installs the binary.
+test('elfeed-kak reads every feed v1 subscribed to', (t) => {
+  const config = readFileSync(join(env.XDG_CONFIG_HOME, 'elfeed-kak/config.toml'), 'utf8');
+  assert.equal(config.match(/^\[\[feed\]\]/gm)?.length, 31);
+  const r = spawnSync('elfeed-kak', ['opml', 'export'], { env, encoding: 'utf8' });
+  if (r.error?.code === 'ENOENT') return t.skip('elfeed-kak is not installed');
+  assert.equal(r.stdout.match(/<outline /g)?.length, 31, r.stderr);
+});
