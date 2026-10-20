@@ -20,13 +20,13 @@ deno = "latest"
 
 [env]
 # mise activate moves its tool bin dirs to the front of PATH; this keeps the dotfiles bin dir, and so the playwright-cli wrapper, ahead of them.
-_.path = ["~/Sites/github/dotfiles/bin"]
+_.path = ["~/Codes/dotfiles/bin"]
 
 [settings]
 # Laravel and React repos pin node with .nvmrc, .node-version or package.json devEngines, which mise ignores unless asked.
 idiomatic_version_file_enable_tools = ["node"]
-# Project mise configs here are trusted without a prompt; not ~/Sites/tries, where try clone drops other people's repos.
-trusted_config_paths = ["~/Sites/github", "~/Sites/laravel", "~/Sites/shopify_themes"]
+# Project mise configs here are trusted without a prompt; not ~/Tries, where try clone drops other people's repos.
+trusted_config_paths = ["~/Codes"]
 
 [settings.node]
 # Off: pnpm comes from its own mise tool, and a corepack shim would shadow it.

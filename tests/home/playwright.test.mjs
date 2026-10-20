@@ -121,7 +121,7 @@ test('mise puts the dotfiles bin dir ahead of every tool bin dir', () => {
   };
   const r = spawnSync('mise', ['env', '--paths'], { encoding: 'utf8', env, cwd: home });
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(r.stdout.split('\n')[0], join(home, 'Sites/github/dotfiles/bin'));
+  assert.equal(r.stdout.split('\n')[0], join(home, 'Codes/dotfiles/bin'));
 });
 
 // Playwright's own Chromium is a download pinned to its revision, which a playwright-cli bump leaves missing, so open uses Fedora's.
