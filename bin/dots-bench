@@ -26,9 +26,22 @@ open_once() {
   until_ok 3000 launcher_closed || die "the launcher never gave the keyboard back"
 }
 
+picker_reported() { themes_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
+themes_state() { timeout 0.5 qs ipc call themes state 2>/dev/null; }
+themes_focus() { themes_state | jq -e --arg k "$1" '.open == ($k == "Exclusive")' >/dev/null && niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
+
+# Opens the theme picker number $1 like open_once does the launcher: reads the time the shell measured, closes it and waits for the keyboard.
+picker_once() {
+  qs ipc call themes open >/dev/null || die "themes open failed"
+  until_ok 3000 picker_reported "$1" || die "picker open $1 never reported openMs"
+  themes_state | jq -r .openMs
+  qs ipc call themes close >/dev/null
+  until_ok 3000 themes_focus None || die "the switcher never gave the keyboard back"
+}
+
 # A start's first frame and cold open vary by 50 ms run to run, so each budget holds the median of five starts; nothing asks qs before niri lists the paper, since early ipc calls hold a start back 1 to 2 s.
 paper_gone() { ! layer_up dots-paper; }
-frames=() colds=()
+frames=() colds=() picker_colds=()
 for i in 1 2 3 4 5; do
   if ((i > 1)); then
     systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
@@ -38,16 +51,17 @@ for i in 1 2 3 4 5; do
   until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
   frames+=("$(shell_status | jq -r .firstFrameMs)")
   colds+=("$(open_once 1)") || exit 1
+  picker_colds+=("$(picker_once 1)") || exit 1
 done
-echo "     first frames: ${frames[*]}; cold opens: ${colds[*]}"
+echo "     first frames: ${frames[*]}; cold opens: ${colds[*]}; picker cold opens: ${picker_colds[*]}"
 median() { printf '%s\n' "$@" | sort -n | sed -n 3p; }
 first_frame=$(median "${frames[@]}")
 cold=$(median "${colds[@]}")
+picker_cold=$(median "${picker_colds[@]}")
 sleep 0.3
 warm=$(open_once 2) || exit 1
+picker_warm=$(picker_once 2) || exit 1
 
-themes_state() { timeout 0.5 qs ipc call themes state 2>/dev/null; }
-themes_focus() { themes_state | jq -e --arg k "$1" '.open == ($k == "Exclusive")' >/dev/null && niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 switch_json=$XDG_STATE_HOME/dots/theme-switch.json
 theme_index() { themes_state | jq -r --arg n "$1" '.themes | index($n)'; }
 selected_is() { themes_state | jq -e --arg t "$1" '.selected == $t' >/dev/null; }
@@ -139,6 +153,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm"
 exit
 }
