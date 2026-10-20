@@ -74,7 +74,7 @@ const push = (s, name) => {
 const run = (s) =>
   spawnSync(join(s.repo, 'bin/dots'), ['update'], {
     encoding: 'utf8',
-    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, DOTS_MODULES_DIR: s.modules },
+    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, TMPDIR: tmpdir(), DOTS_MODULES_DIR: s.modules },
   });
 
 const lines = (path) => readFileSync(path, 'utf8').trim().split('\n');
@@ -109,7 +109,7 @@ test('an update ends by dropping the sudo timestamp', () => {
 // A killed update runs no EXIT trap, and its keepalive went on renewing root's timestamp for good.
 test('the sudo keepalive stops renewing once its update is killed', async () => {
   const s = scratch({ hang: true });
-  const env = { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, DOTS_SUDO_TICK: '0.2' };
+  const env = { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, TMPDIR: tmpdir(), DOTS_SUDO_TICK: '0.2' };
   const p = spawn(join(s.repo, 'bin/dots'), ['update'], { env, stdio: 'ignore' });
   const renewals = () => lines(s.sudoLog).filter((c) => c === '-n -v').length;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -146,7 +146,7 @@ test('a niri whose binary the upgrade replaced adds reboot: needed', (t) => {
   rmSync(join(s.root, 'niri'));
   const r = spawnSync(join(s.repo, 'bin/dots'), ['update'], {
     encoding: 'utf8',
-    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, DOTS_MODULES_DIR: s.modules },
+    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, TMPDIR: tmpdir(), DOTS_MODULES_DIR: s.modules },
   });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed', 'no niri reported yet');
@@ -216,7 +216,7 @@ test('mise up runs from home, whatever directory dots update starts in', () => {
   const r = spawnSync(join(s.repo, 'bin/dots'), ['update'], {
     cwd: join(s.root, 'project'),
     encoding: 'utf8',
-    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, DOTS_MODULES_DIR: s.modules },
+    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, TMPDIR: tmpdir(), DOTS_MODULES_DIR: s.modules },
   });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(readFileSync(join(s.root, 'mise.cwd'), 'utf8').trim(), s.root);

@@ -4,7 +4,7 @@ dev:
 
 # fails past 5 s, so the fast suite stays fast
 test:
-    timeout 5 node --test 'shell/lib/**/*.test.mjs'
+    tests/scratch.sh timeout 5 node --test 'shell/lib/**/*.test.mjs'
 
 # dots sync between two scratch machines over a local alias remote
 test-sync:
@@ -12,14 +12,14 @@ test-sync:
     # Every run works on scratch homes, so the real ~/.ssh must hash the same after it as before.
     ssh_tree() { find ~/.ssh -type f -print0 2>/dev/null | sort -z | xargs -0r sha256sum | sha256sum; }
     before=$(ssh_tree)
-    node --test 'tests/sync/*.test.mjs'
+    tests/scratch.sh node --test 'tests/sync/*.test.mjs'
     rc=$?
     [ "$(ssh_tree)" = "$before" ] || { echo "the real ~/.ssh changed during the sync tests" >&2; exit 1; }
     exit $rc
 
 # dots subcommands and the home configs, on scratch homes with stubbed remotes
 test-dots:
-    node --test 'tests/dots/*.test.mjs' 'tests/home/*.test.mjs'
+    tests/scratch.sh node --test 'tests/dots/*.test.mjs' 'tests/home/*.test.mjs'
 
 # checks that each open a nested niri for a few seconds
 test-dev:
