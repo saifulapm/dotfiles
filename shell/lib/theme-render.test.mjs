@@ -21,7 +21,7 @@ test('renders every fragment into XDG_STATE_HOME/dots/theme-out', (t) => {
   execFileSync('niri', ['validate', '-c', config], { stdio: 'pipe' });
 });
 
-test('renders the app fragments and no kitty file', (t) => {
+test('renders the app fragments and no kitty or opencode file', (t) => {
   const state = mkdtempSync(join(tmpdir(), 'dots-theme-'));
   t.after(() => rmSync(state, { recursive: true, force: true }));
   execFileSync('node', [cli, 'blueprint'], { env: { ...process.env, XDG_STATE_HOME: state } });
@@ -29,7 +29,7 @@ test('renders the app fragments and no kitty file', (t) => {
   for (const f of ['tmux.conf', 'dots.kak', 'helix.toml', 'yazi-theme.toml', 'colors.fish', 'gtk.css', 'gtk-settings.ini', 'chromium.json']) {
     assert.ok(names.includes(f), f);
   }
-  assert.deepEqual(names.filter((n) => /kitty/i.test(n)), []);
+  assert.deepEqual(names.filter((n) => /kitty|opencode/i.test(n)), []);
 });
 
 test('an unknown theme exits non-zero and names it', () => {

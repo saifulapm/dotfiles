@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
 import { validateTheme, contrast } from './theme.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderOpencode, renderAmx } from './apps.mjs';
+import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderAmx } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const blueprint = load('blueprint');
@@ -137,7 +137,7 @@ test('a running fish takes the new colours at its next prompt', (t) => {
   assert.deepEqual(seen, [paper.color.ink.slice(1).toLowerCase(), 'd6f4f8']);
 });
 
-// claude, pi, opencode and amx kept v1's dark palette, so on Paper and Artboard they drew dark boxes in a light terminal.
+// claude, pi and amx kept v1's dark palette, so on Paper and Artboard they drew dark boxes in a light terminal.
 test('the Claude Code theme starts from the light or dark preset of the theme and takes its tokens', () => {
   const a = JSON.parse(renderClaude(artboard));
   assert.equal(a.name, 'dots');
@@ -201,12 +201,6 @@ test('the pi theme names its appearance, sits on the terminal surface, and every
   assert.equal(JSON.parse(renderPi(blueprint)).appearance, 'dark');
   assert.ok(Object.keys(a.colors).length >= 51, `${Object.keys(a.colors).length} colours`);
   for (const [k, v] of Object.entries(a.colors)) assert.ok(v in a.vars, `${k}: ${v}`);
-});
-
-test('the opencode theme sits on the terminal surface and every theme key resolves to a def', () => {
-  const a = JSON.parse(renderOpencode(artboard));
-  assert.deepEqual([a.defs.bg, a.defs.fg, a.defs.accent, a.theme.background, a.theme.text], ['#ffffff', '#15171b', '#3d5afe', 'bg', 'fg']);
-  for (const [k, v] of Object.entries(a.theme)) assert.ok(v in a.defs, `${k}: ${v}`);
 });
 
 test('the amx theme sets its six roles from the tokens', () => {

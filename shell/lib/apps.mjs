@@ -1,4 +1,4 @@
-// Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, and the claude, pi, opencode and amx TUIs) from a validated theme; pure, no object spread.
+// Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
 import { mix } from './notes-look.mjs';
 
 const lower = (s) => s.toLowerCase();
@@ -274,7 +274,7 @@ export function renderChromium(t) {
   return JSON.stringify({ BrowserThemeColor: lower(t.color.surface), BrowserColorScheme: t.mode }, null, 2) + '\n';
 }
 
-// The coding agents draw inside foot, so each sits on surface with ink text; Claude Code, pi and amx name the theme dots, and opencode keeps v1's qshell.
+// The coding agents draw inside foot, so each sits on surface with ink text; Claude Code, pi and amx name the theme dots.
 function agentColors(t) {
   const c = t.color;
   const a = c.ansi.map(lower);
@@ -340,30 +340,6 @@ export function renderPi(t) {
   // Code takes the theme's syntax table, as kak and helix do.
   for (const k of ['comment', 'keyword', 'function', 'variable', 'string', 'value', 'type']) vars['syn' + k[0].toUpperCase() + k.slice(1)] = lower(t.syntax[k]);
   return JSON.stringify({ $schema: 'https://pi.dev/schemas/theme.schema.json', name: 'dots', appearance: t.mode, vars, colors: PI_COLORS, export: PI_EXPORT }, null, 2) + '\n';
-}
-
-const OPENCODE_THEME = {
-  primary: 'accent', secondary: 'magenta', accent: 'accent', error: 'red', warning: 'yellow', success: 'green', info: 'cyan',
-  text: 'fg', textMuted: 'fgMuted', background: 'bg', backgroundPanel: 'bgPanel', backgroundElement: 'bgElement',
-  border: 'border', borderActive: 'accent', borderSubtle: 'borderSubtle', diffAdded: 'green', diffRemoved: 'red',
-  diffContext: 'fgMuted', diffHunkHeader: 'fgMuted', diffHighlightAdded: 'green', diffHighlightRemoved: 'red',
-  diffAddedBg: 'diffAddedBg', diffRemovedBg: 'diffRemovedBg', diffContextBg: 'bgPanel', diffLineNumber: 'fgMuted',
-  diffAddedLineNumberBg: 'diffAddedBg', diffRemovedLineNumberBg: 'diffRemovedBg', markdownText: 'fg', markdownHeading: 'magenta',
-  markdownLink: 'accent', markdownLinkText: 'cyan', markdownCode: 'cyan', markdownBlockQuote: 'fgMuted', markdownEmph: 'yellow',
-  markdownStrong: 'magenta', markdownHorizontalRule: 'borderSubtle', markdownListItem: 'cyan', markdownListEnumeration: 'cyan',
-  markdownImage: 'blue', markdownImageText: 'cyan', markdownCodeBlock: 'fg', syntaxComment: 'fgMuted', syntaxKeyword: 'magenta',
-  syntaxFunction: 'blue', syntaxVariable: 'accent', syntaxString: 'green', syntaxNumber: 'yellow', syntaxType: 'blue',
-  syntaxOperator: 'magenta', syntaxPunctuation: 'fgMuted',
-};
-
-export function renderOpencode(t) {
-  const { a, ink, muted, line, surface, accent, danger, ok, on } = agentColors(t);
-  const defs = {
-    bg: surface, bgPanel: on(ink, 0.04), bgElement: on(ink, 0.1), fg: ink, fgMuted: muted, accent,
-    red: danger, green: ok, yellow: a[3], blue: a[4], magenta: a[5], cyan: a[6],
-    border: on(ink, 0.3), borderSubtle: line, diffAddedBg: on(ok, 0.15), diffRemovedBg: on(danger, 0.15),
-  };
-  return JSON.stringify({ $schema: 'https://opencode.ai/theme.json', defs, theme: OPENCODE_THEME }, null, 2) + '\n';
 }
 
 // amx's theme is six roles, named for what a row means; it re-reads the file when its mtime moves.

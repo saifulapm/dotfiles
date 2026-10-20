@@ -29,9 +29,3 @@ args = ["--approve"]
 
 [pi.env]
 WORKFLOW_AGENT = "1"
-
-[codex.env]
-WORKFLOW_AGENT = "1"
-
-[opencode.env]
-WORKFLOW_AGENT = "1"

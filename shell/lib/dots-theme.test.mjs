@@ -76,7 +76,7 @@ test('a switch names the apps that did not reload in the notice the island shows
 });
 
 // The agents' configs name the theme qshell, and each reloads its file when it changes.
-test('a switch writes the agent TUI themes into the apps that are installed, and no others', (t) => {
+test('a switch writes the Claude Code, pi and amx themes into the ones installed, and nothing for opencode', (t) => {
   const state = mkdtempSync(join(tmpdir(), 'dots-agents-'));
   t.after(() => rmSync(state, { recursive: true, force: true }));
   const home = join(state, 'agents');
@@ -84,7 +84,7 @@ test('a switch writes the agent TUI themes into the apps that are installed, and
   assert.equal(spawnSync(dots, ['theme', 'artboard'], { env: isolated(state) }).status, 0);
   const out = (f) => readFileSync(join(state, 'dots/theme-out', f), 'utf8');
   assert.equal(readFileSync(join(home, '.claude/themes/dots.json'), 'utf8'), out('claude.json'));
-  assert.equal(readFileSync(join(home, '.config/opencode/themes/qshell.json'), 'utf8'), out('opencode.json'));
+  assert.deepEqual(readdirSync(join(home, '.config/opencode')), []);
   assert.equal(readFileSync(join(home, '.config/amx/themes/dots.toml'), 'utf8'), out('amx.toml'));
   assert.equal(JSON.parse(out('claude.json')).base, 'light');
   assert.deepEqual(readdirSync(home, { recursive: true }).filter((f) => f.startsWith('.pi')), []);

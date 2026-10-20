@@ -9,8 +9,6 @@ AGENTS.md
 .e2e/
 .amx/
 .mcp.json
-opencode.json
-opencode.jsonc
 skills-lock.json
 .playwright-cli/
 **/agent-memory/

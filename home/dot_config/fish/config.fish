@@ -16,7 +16,7 @@ set -gx PNPM_HOME ~/.local/share/pnpm
 set -gx ANDROID_HOME ~/Android/Sdk
 
 # fish_add_path skips a directory that does not exist, so a machine without the tool gets nothing.
-fish_add_path -g ~/.local/bin ~/.config/composer/vendor/bin ~/Sites/github/dotfiles/bin ~/.cargo/bin ~/.opencode/bin $PNPM_HOME $PNPM_HOME/bin $GOBIN $ANDROID_HOME/platform-tools ~/.local/share/mise/shims
+fish_add_path -g ~/.local/bin ~/.config/composer/vendor/bin ~/Sites/github/dotfiles/bin ~/.cargo/bin $PNPM_HOME $PNPM_HOME/bin $GOBIN $ANDROID_HOME/platform-tools ~/.local/share/mise/shims
 # Last, so an untrusted clone cannot shadow a system command with its own node_modules/.bin or vendor/bin; fish_add_path would make them absolute.
 set -gx PATH $PATH node_modules/.bin vendor/bin
 
