@@ -168,3 +168,59 @@ test('a fresh machine with iCloud unreachable stops and names rclone config reco
   assert.equal(r.code, 1, r.stdout + r.stderr);
   assert.match(r.stderr, /rclone config reconnect iCloud:/);
 });
+
+// A machine first reached over ssh: no base, and a ~/.ssh holding only authorized_keys; its Dropbox: holds a blob with its own authorized_keys.
+test('a machine reached over ssh restores ~/.ssh with both sides of authorized_keys and gets past the pass clone', async () => {
+  const dropbox = join(w.root, 'reach-dropbox');
+  mkdirSync(dropbox);
+  const remote = `[Dropbox]\ntype = alias\nremote = ${dropbox}\n`;
+  const seed = home(w.root, 'reach-seed', remote);
+  mkdirSync(join(seed.XDG_CONFIG_HOME, 'chezmoi'));
+  copyFileSync(join(w.icloud, 'chezmoi/key.txt'), join(seed.XDG_CONFIG_HOME, 'chezmoi/key.txt'));
+  mkdirSync(join(seed.HOME, '.ssh'), { mode: 0o700 });
+  writeFileSync(join(seed.HOME, '.ssh/id_ed25519'), KEY, { mode: 0o600 });
+  writeFileSync(join(seed.HOME, '.ssh/authorized_keys'), 'ssh-ed25519 BBBB shared\n', { mode: 0o600 });
+  await must(seed, new URL('../../bin/dots', import.meta.url).pathname, ['sync', '--only', 'ssh']);
+
+  const m = { ...home(w.root, 'reached', w.conf + remote), DOTS_PASS_REPO: w.m.DOTS_PASS_REPO };
+  mkdirSync(join(m.HOME, '.ssh'), { mode: 0o700 });
+  writeFileSync(join(m.HOME, '.ssh/authorized_keys'), 'ssh-ed25519 AAAA reach\n', { mode: 0o600 });
+  try {
+    const r = await secrets(m);
+    assert.equal(r.code, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^dots: ~\/\.ssh restored$/m);
+    assert.match(r.stdout, /^dots: password store cloned$/m);
+    assert.equal(readFileSync(join(m.HOME, '.ssh/id_ed25519'), 'utf8'), KEY);
+    assert.equal(readFileSync(join(m.HOME, '.ssh/authorized_keys'), 'utf8'), 'ssh-ed25519 BBBB shared\nssh-ed25519 AAAA reach\n');
+  } finally {
+    await run(m, 'gpgconf', ['--kill', 'gpg-agent']);
+  }
+});
+
+test('with a recorded ssh base it fetches nothing for ~/.ssh, even when ~/.ssh holds only known_hosts', async () => {
+  const m = { ...home(w.root, 'based', w.conf), DOTS_PASS_REPO: w.m.DOTS_PASS_REPO };
+  const state = join(m.XDG_STATE_HOME, 'dots/sync/ssh');
+  mkdirSync(state, { recursive: true });
+  writeFileSync(join(state, 'base.hash'), JSON.parse(readFileSync(join(w.dropbox, 'qshell-sync/ssh/ssh.meta.json'), 'utf8')).hash + '\n');
+  mkdirSync(join(m.HOME, '.ssh'), { mode: 0o700 });
+  writeFileSync(join(m.HOME, '.ssh/known_hosts'), 'hosts seen here\n');
+  try {
+    const r = await secrets(m);
+    assert.equal(r.code, 0, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /~\/\.ssh restored/);
+    assert.deepEqual(readdirSync(join(m.HOME, '.ssh')), ['known_hosts']);
+  } finally {
+    await run(m, 'gpgconf', ['--kill', 'gpg-agent']);
+  }
+});
+
+test('with no base and an id_ed25519 that differs from the blob, it stops on the ssh conflict and leaves ~/.ssh alone', async () => {
+  const m = home(w.root, 'differs', w.conf);
+  mkdirSync(join(m.HOME, '.ssh'), { mode: 0o700 });
+  writeFileSync(join(m.HOME, '.ssh/id_ed25519'), 'another key\n', { mode: 0o600 });
+  const r = await secrets(m);
+  assert.equal(r.code, 1, r.stdout + r.stderr);
+  assert.match(r.stderr, /conflict, run dots sync --adopt local or remote/);
+  assert.deepEqual(readdirSync(join(m.HOME, '.ssh')), ['id_ed25519']);
+  assert.equal(readFileSync(join(m.HOME, '.ssh/id_ed25519'), 'utf8'), 'another key\n');
+});
