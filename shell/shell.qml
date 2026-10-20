@@ -55,6 +55,7 @@ ShellRoot {
     }
 
     Variants {
+        id: papers
         model: Quickshell.screens
 
         Root.Paper {
@@ -106,7 +107,9 @@ ShellRoot {
                 sync: root.desk ? root.desk.sync.units : {},
                 rssKiB: Status.rssKiB(procStatus.text()),
                 timers: Root.State.timers(),
-                firstFrameMs: root.firstFrameMs
+                firstFrameMs: root.firstFrameMs,
+                // The first running transition of any output's paper; "" when none runs.
+                transition: papers.instances.map(p => p.kind).find(k => k) ?? ""
             });
         }
     }

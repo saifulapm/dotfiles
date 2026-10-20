@@ -13,8 +13,8 @@ test('a status text without VmRSS reads as 0', () => {
 });
 
 test('status is JSON with every field the health check reads', () => {
-  const json = statusJson({ theme: 'paper', outputs: ['winit'], loaded: [], sync: {}, rssKiB: 78416, timers: 0, firstFrameMs: 92 });
-  assert.equal(json, '{"theme":"paper","outputs":["winit"],"loaded":[],"sync":{},"rssKiB":78416,"timers":0,"firstFrameMs":92}');
+  const json = statusJson({ theme: 'paper', outputs: ['winit'], loaded: [], sync: {}, rssKiB: 78416, timers: 0, firstFrameMs: 92, transition: 'zoom' });
+  assert.equal(json, '{"theme":"paper","outputs":["winit"],"loaded":[],"sync":{},"rssKiB":78416,"timers":0,"firstFrameMs":92,"transition":"zoom"}');
 });
 
 // Field 22 is starttime in clock ticks since boot; the comm in field 2 may hold spaces and parens.
