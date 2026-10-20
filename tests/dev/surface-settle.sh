@@ -20,14 +20,14 @@ settles() {
   until_ok 3000 surface_is "$s" .settled
   check "$theme: the $s settles as a $kind in $(least "$kind") to $ms ms ($(timeout 0.5 qs ipc call "$s" state | jq -c '[.motion, .settleMs, .firstFrame]'))" \
     surface_is "$s" ".motion == \"$kind\" and (.settleMs | type) == \"number\" and .settleMs >= $(least "$kind") and .settleMs <= $ms"
-  case $s in cheatsheet) check "$theme: the $s draws its first frame near the start of its open" from_start "$s" ;; esac
+  case $s in cheatsheet | themes) check "$theme: the $s draws its first frame near the start of its open" from_start "$s" ;; esac
   timeout 0.5 qs ipc call "$s" close >/dev/null
   until_ok 2000 surface_is "$s" '.drawing == false'
 }
 
 until_ok 5000 shell_status >/dev/null
 for s in launcher themes notifs cheatsheet goals control; do
-  # This is the picker's first open, which loads its three specimens while it drops, so it may take 160 ms.
+  # This is the picker's first open, which keeps its 160 ms for now, though its drop now starts once its three specimens have loaded.
   paper_ms=140
   [ "$s" = themes ] && paper_ms=160
   settles "$s" paper drop "$paper_ms"

@@ -21,12 +21,15 @@ Item {
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
     property real openT0: -1
+    // How many cards' specimens have loaded; the first open waits for all of them, so its drop plays whole.
+    property int specimens: 0
 
     readonly property var c: theme.color
     readonly property var look: Lib.pickerLook(theme.tokens)
     readonly property var header: look.header(themes.length, theme.name)
     readonly property Root.Motion motion: Root.Motion {
         shown: switcher.shown
+        ready: switcher.specimens === switcher.themes.length
         tokens: switcher.theme.tokens
     }
 
@@ -44,9 +47,9 @@ Item {
         shown = false;
     }
 
-    // Called on each of the host window's frames; the first one after open() ends the timing.
+    // Called on each of the host window's frames; the first one after the open starts to play ends the timing, so a first open's load counts.
     function swapped() {
-        if (shown && openT0 >= 0) {
+        if (motion.open && openT0 >= 0) {
             openMs = Date.now() - openT0;
             openT0 = -1;
         }
@@ -88,6 +91,7 @@ Item {
             opens: opens,
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
+            firstFrame: motion.firstFrame,
             settled: motion.settled,
             drawing: switcher.visible,
             cardBox: panel.drawnBox(),
@@ -343,6 +347,7 @@ Item {
                                         id: specimen
                                         asynchronous: true
                                         onLoaded: {
+                                            switcher.specimens += 1;
                                             if (card.pendingT0 >= 0 && switcher.selected === card.modelData.name)
                                                 item.play(card.pendingT0);
                                             card.pendingT0 = -1;
