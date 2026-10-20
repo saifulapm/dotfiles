@@ -53,8 +53,9 @@ check "Route lists each unit with its error" failing_rows
 wtype -k Escape
 until_ok 2000 state_is '.open == false'
 
-# The launcher's sync row runs dots sync from the shell unit, with its env.
+# The launcher's sync row runs dots sync from the shell unit, with its env and a PATH without bin/.
 mkdir -p "$remote"
+notes_run=$(jq '.notes.lastRun' "$XDG_STATE_HOME/dots/sync.json")
 niri msg action spawn -- qs ipc call launcher toggle
 until_ok 3000 launcher_is '.open and .query == "" and .keyboard'
 wtype "> sync"
@@ -63,6 +64,9 @@ wtype -k Return
 until_ok 15000 unmarked
 echo "     margins: $(margins | jq -c .right)"
 check "a good round from the launcher's sync row removes sync !" unmarked
+ran_again() { jq -e --argjson t "$notes_run" '.notes.lastRun > $t' "$XDG_STATE_HOME/dots/sync.json" >/dev/null 2>&1; }
+until_ok 30000 ran_again
+check "the launcher's sync row ran a round without bin/ on the shell's PATH" ran_again
 
 open_route
 ok_row() { state_is '.rows == ["Questions ring on", "Do Not Disturb", "Sync"] and (.details[2] | test("^ok · [0-9]{2}:[0-9]{2}$"))'; }

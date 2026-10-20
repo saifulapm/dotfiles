@@ -23,7 +23,7 @@ check "the shell unit carries DOTS_CHROMIUM_POLICY_DIR" unit_has DOTS_CHROMIUM_P
 check "DOTS_HUB_QUESTIONS is inside the temp dir" under_dev "${DOTS_HUB_QUESTIONS:-}"
 check "the shell unit carries DOTS_HUB_QUESTIONS" unit_has DOTS_HUB_QUESTIONS "${DOTS_HUB_QUESTIONS:-}"
 check "the shell unit's system bus is the nested session bus" unit_has DBUS_SYSTEM_BUS_ADDRESS "$DBUS_SESSION_BUS_ADDRESS"
-check "the shell unit carries the PATH bin/dots-dev set" unit_has PATH "$PATH"
+check "the shell unit carries the PATH bin/dots-dev set, less bin/" unit_has PATH "$(tr ':' '\n' <<<"$PATH" | grep -vxF "$repo/bin" | paste -sd:)"
 # The unit resolves ddcutil with its own PATH, so a real one on it would probe the live I2C buses.
 unit_path=$(systemctl --user show -p Environment --value "$DOTS_DEV_UNIT" | tr ' ' '\n' | sed -n 's/^PATH=//p')
 unit_ddcutil() { [ "$(PATH=$unit_path command -v ddcutil)" = "$repo/dev/path/ddcutil" ]; }
