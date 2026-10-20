@@ -27,10 +27,7 @@ settles() {
 
 until_ok 5000 shell_status >/dev/null
 for s in launcher themes notifs cheatsheet goals control; do
-  # This is the picker's first open, which loads its three specimens while it drops, so it may take 160 ms.
-  paper_ms=140
-  [ "$s" = themes ] && paper_ms=160
-  settles "$s" paper drop "$paper_ms"
+  settles "$s" paper drop 140
   settles "$s" artboard spring 400
   settles "$s" blueprint plot 260
 done
