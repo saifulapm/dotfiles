@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots update: pull the repo, dnf upgrade, chezmoi apply, claude update, then one summary line.
+# dots update: pull the repo, dnf upgrade, chezmoi apply, mise up, claude update, then one summary line.
 set -euo pipefail
 
 die() {
@@ -47,6 +47,10 @@ main() {
 
   chezmoi apply | tee "$tmp/chezmoi" || die "chezmoi apply failed"
 
+  # A failed mise up is named and stops nothing, like the claude update below.
+  local mise=''
+  mise up || mise=' · mise: update failed'
+
   # Claude Code's own updater is off in its settings, so its updates come from here; a failed one is named and stops nothing.
   local claude='' was now
   if command -v claude >/dev/null; then
@@ -62,7 +66,7 @@ main() {
   local upgraded pins
   upgraded=$(comm -13 "$tmp/before" "$tmp/after" | wc -l)
   pins=$(grep -c '^dots: pin [^ ]* [^ ]*$' "$tmp/chezmoi" || true)
-  echo "dnf: $upgraded upgraded · pins: $pins changed$claude$(reboot_needed && echo ' · reboot: needed')"
+  echo "dnf: $upgraded upgraded · pins: $pins changed$mise$claude$(reboot_needed && echo ' · reboot: needed')"
 }
 
 # git pull can rewrite this file while bash reads it, so main runs and exits on one line.

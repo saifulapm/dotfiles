@@ -22,7 +22,7 @@ const stub = (dir, name, body) => {
   chmodSync(join(dir, name), 0o755);
 };
 
-// opts.claude: claude's version before and after claude update, or fail to make it fail; the stub keeps the real claude out of every run. opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns; opts.kernels: the modules dir's kernels, the booted one first; opts.niri: the pids pgrep reports for niri.
+// opts.mise: fail to make mise up exit 1; the stub keeps the real mise out of every run. opts.claude: claude's version before and after claude update, or fail to make it fail; the stub keeps the real claude out of every run. opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns; opts.kernels: the modules dir's kernels, the booted one first; opts.niri: the pids pgrep reports for niri.
 function scratch(opts = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-update-')));
   const stubs = join(root, 'stubs');
@@ -50,6 +50,7 @@ function scratch(opts = {}) {
   );
   stub(stubs, 'rpm', `if [ -e ${state} ]; then cat ${join(root, 'after')}; else cat ${join(root, 'before')}; fi`);
   stub(stubs, 'chezmoi', `echo "chezmoi $*" >> ${log}\ncat ${join(root, 'chezmoi.out')}`);
+  stub(stubs, 'mise', `echo "mise $*" >> ${log}\n${opts.mise === 'fail' ? 'exit 1' : 'exit 0'}`);
   const claude = Object.assign({ from: '2.1.303', to: '2.1.303', fail: false }, opts.claude);
   const version = join(root, 'claude.version');
   writeFileSync(version, claude.from);
@@ -86,7 +87,7 @@ test('update pulls, upgrades, applies, and ends with one summary line', () => {
   const out = r.stdout.trim().split('\n');
   assert.equal(out.at(-1), 'dnf: 2 upgraded · pins: 1 changed');
   assert.ok(out.includes('some other chezmoi output'), 'chezmoi output reaches the terminal');
-  assert.deepEqual(lines(s.log), ['dnf upgrade -y pulled=yes', 'chezmoi apply', 'claude update']);
+  assert.deepEqual(lines(s.log), ['dnf upgrade -y pulled=yes', 'chezmoi apply', 'mise up', 'claude update']);
 });
 
 test('only the first sudo call can prompt', () => {
@@ -185,4 +186,26 @@ test('a failed claude update is named in the summary, and the update still succe
   const r = run(scratch({ claude: { fail: true } }));
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · claude: update failed');
+});
+
+test('a failed mise up is named before the claude segment, and the update still succeeds', () => {
+  const s = scratch({ mise: 'fail', claude: { from: '2.1.303', to: '2.1.310' } });
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(lines(s.log), ['dnf upgrade -y pulled=no', 'chezmoi apply', 'mise up', 'claude update']);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · mise: update failed · claude: 2.1.303 → 2.1.310');
+});
+
+test('a failed mise up alone ends the summary with mise: update failed', () => {
+  const r = run(scratch({ mise: 'fail' }));
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · mise: update failed');
+});
+
+// Without these stubs a test run would execute the real mise up or claude update on this machine.
+test('every run puts a stubs dir holding mise and claude first on PATH', () => {
+  const s = scratch();
+  assert.ok(existsSync(join(s.stubs, 'mise')), 'mise stub');
+  assert.ok(existsSync(join(s.stubs, 'claude')), 'claude stub');
+  assert.ok(run.toString().includes('PATH: s.stubs + delimiter'), 'run() puts the stubs first');
 });
