@@ -26,7 +26,7 @@ test('renders the app fragments and no kitty file', (t) => {
   t.after(() => rmSync(state, { recursive: true, force: true }));
   execFileSync('node', [cli, 'blueprint'], { env: { ...process.env, XDG_STATE_HOME: state } });
   const names = readdirSync(join(state, 'dots/theme-out'));
-  for (const f of ['tmux.conf', 'dots.kak', 'yazi-theme.toml', 'colors.fish', 'gtk.css', 'gtk-settings.ini', 'chromium.json']) {
+  for (const f of ['tmux.conf', 'dots.kak', 'helix.toml', 'yazi-theme.toml', 'colors.fish', 'gtk.css', 'gtk-settings.ini', 'chromium.json']) {
     assert.ok(names.includes(f), f);
   }
   assert.deepEqual(names.filter((n) => /kitty/i.test(n)), []);

@@ -1,4 +1,4 @@
-// Renders the per-app fragments (tmux, kak, yazi, fish, GTK, Chromium, and the claude, pi, opencode and amx TUIs) from a validated theme; pure, no object spread.
+// Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, and the claude, pi, opencode and amx TUIs) from a validated theme; pure, no object spread.
 import { mix } from './notes-look.mjs';
 
 const lower = (s) => s.toLowerCase();
@@ -105,6 +105,101 @@ export function renderKak(t) {
     ['BufferPadding', `${rgb(c.line)},${rgb(c.surface)}`],
   ];
   return faces.map(([n, v]) => `face global ${n} ${v}`).join('\n') + '\n';
+}
+
+// helix takes kak's look: the theme's syntax table, a flat status line, and menus and popups on the same light wash of ink, since helix draws them without a border.
+export function renderHelix(t) {
+  const c = t.color;
+  const s = t.syntax;
+  const a = c.ansi.map(lower);
+  const [ink, muted, line, surface, accent, danger, ok] = [c.ink, c.muted, c.line, c.surface, c.accent, c.danger, c.ok].map(lower);
+  const tint = mix(surface, ink, 0.06);
+  const x = (k) => lower(s[k]);
+  const style = (fg, bg, ...mods) => {
+    const parts = [];
+    if (fg) parts.push(`fg = "${fg}"`);
+    if (bg) parts.push(`bg = "${bg}"`);
+    if (mods.length) parts.push(`modifiers = [${mods.map((m) => `"${m}"`).join(', ')}]`);
+    return `{ ${parts.join(', ')} }`;
+  };
+  const curl = (color) => `{ underline = { color = "${color}", style = "curl" } }`;
+  const scopes = [
+    ['ui.background', style(null, surface)],
+    ['ui.text', `"${ink}"`],
+    ['ui.text.focus', style(ink, tint)],
+    ['ui.text.inactive', `"${muted}"`],
+    ['ui.text.info', `"${ink}"`],
+    ['ui.cursor', style(surface, muted)],
+    ['ui.cursor.primary', style(surface, ink)],
+    ['ui.cursor.match', style(ink, line, 'bold')],
+    ['ui.selection', style(surface, muted)],
+    ['ui.selection.primary', style(surface, accent)],
+    ['ui.cursorline.primary', style(null, tint)],
+    ['ui.linenr', `"${muted}"`],
+    ['ui.linenr.selected', style(accent, null, 'bold')],
+    ['ui.statusline', style(ink, surface)],
+    ['ui.statusline.inactive', style(muted, surface)],
+    ['ui.statusline.normal', style(accent, surface, 'bold')],
+    ['ui.statusline.insert', style(ok, surface, 'bold')],
+    ['ui.statusline.select', style(a[5], surface, 'bold')],
+    ['ui.bufferline', style(muted, surface)],
+    ['ui.bufferline.active', style(ink, surface, 'bold')],
+    ['ui.popup', style(ink, tint)],
+    ['ui.help', style(ink, tint)],
+    ['ui.menu', style(ink, tint)],
+    ['ui.menu.selected', style(surface, accent)],
+    ['ui.window', `"${line}"`],
+    ['ui.highlight', style(null, tint)],
+    ['ui.virtual.whitespace', `"${line}"`],
+    ['ui.virtual.indent-guide', `"${line}"`],
+    ['ui.virtual.ruler', style(null, tint)],
+    ['ui.virtual.inlay-hint', `"${muted}"`],
+    ['ui.virtual.jump-label', style(accent, null, 'bold')],
+    ['error', `"${danger}"`],
+    ['warning', `"${a[3]}"`],
+    ['info', `"${a[4]}"`],
+    ['hint', `"${muted}"`],
+    ['diagnostic.error', curl(danger)],
+    ['diagnostic.warning', curl(a[3])],
+    ['diagnostic.info', curl(a[4])],
+    ['diagnostic.hint', curl(muted)],
+    ['diagnostic.unnecessary', style(null, null, 'dim')],
+    ['diagnostic.deprecated', style(null, null, 'crossed_out')],
+    ['diff.plus', `"${ok}"`],
+    ['diff.minus', `"${danger}"`],
+    ['diff.delta', `"${a[3]}"`],
+    ['keyword', style(x('keyword'), null, 'bold')],
+    ['function', `"${x('function')}"`],
+    ['function.builtin', `"${x('builtin')}"`],
+    ['constructor', `"${x('function')}"`],
+    ['string', `"${x('string')}"`],
+    ['string.regexp', `"${x('meta')}"`],
+    ['string.special', `"${x('meta')}"`],
+    ['type', `"${x('type')}"`],
+    ['type.builtin', `"${x('builtin')}"`],
+    ['namespace', `"${x('type')}"`],
+    ['constant', `"${x('value')}"`],
+    ['constant.builtin', `"${x('builtin')}"`],
+    ['variable', `"${x('variable')}"`],
+    ['variable.builtin', `"${x('builtin')}"`],
+    ['attribute', `"${x('attribute')}"`],
+    ['tag', `"${x('keyword')}"`],
+    ['label', `"${x('meta')}"`],
+    ['special', `"${x('meta')}"`],
+    ['comment', style(x('comment'), null, 'italic')],
+    ['operator', `"${ink}"`],
+    ['punctuation', `"${ink}"`],
+    ['markup.heading', style(accent, null, 'bold')],
+    ['markup.list', `"${accent}"`],
+    ['markup.bold', style(null, null, 'bold')],
+    ['markup.italic', style(null, null, 'italic')],
+    ['markup.strikethrough', style(null, null, 'crossed_out')],
+    ['markup.link.url', style(accent, null, 'underlined')],
+    ['markup.link.text', `"${accent}"`],
+    ['markup.raw', `"${ok}"`],
+    ['markup.quote', style(x('comment'), null, 'italic')],
+  ];
+  return scopes.map(([k, v]) => `"${k}" = ${v}`).join('\n') + '\n';
 }
 
 // yazi's names for ANSI slots 0-15; a token equal to a slot is named so a live palette change recolours a running yazi.

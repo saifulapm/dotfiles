@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, rmSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -90,4 +90,20 @@ test('a switch writes the agent TUI themes into the apps that are installed, and
   assert.deepEqual(readdirSync(home, { recursive: true }).filter((f) => f.startsWith('.pi')), []);
   assert.equal(spawnSync(dots, ['theme', 'blueprint'], { env: isolated(state) }).status, 0);
   assert.equal(JSON.parse(readFileSync(join(home, '.claude/themes/qshell.json'), 'utf8')).base, 'dark');
+});
+
+// helix rereads its config, and with it the theme file, on USR1; this hx only answers on an empty WAYLAND_DISPLAY, so no real editor is reached.
+test('a switch sends USR1 to helix on this display, so it rereads its theme', async (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-helix-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  const bin = join(state, 'bin');
+  mkdirSync(bin);
+  const got = join(state, 'usr1');
+  writeFileSync(join(bin, 'hx'), `#!/bin/bash\ntrap 'echo got >${got}; exit 0' USR1\nwhile :; do sleep 0.05; done\n`, { mode: 0o755 });
+  const hx = spawn(join(bin, 'hx'), [], { env: isolated(state), stdio: 'ignore' });
+  t.after(() => hx.kill('SIGKILL'));
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(spawnSync(dots, ['theme', 'paper'], { env: isolated(state) }).status, 0);
+  for (let i = 0; i < 40 && !existsSync(got); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.equal(readFileSync(got, 'utf8'), 'got\n');
 });

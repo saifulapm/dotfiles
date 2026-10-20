@@ -77,6 +77,15 @@ reload_kak() {
   done
 }
 
+# helix rereads its config, and with it the dots theme file, on USR1.
+reload_helix() {
+  local pid
+  for pid in $(session_pids hx); do
+    kill -USR1 "$pid" 2>/dev/null
+  done
+  return 0
+}
+
 reload_chromium() {
   local dir=${DOTS_CHROMIUM_POLICY_DIR:-/etc/chromium/policies/managed}
   [[ -w $dir ]] || return 1
@@ -142,6 +151,7 @@ theme() {
   reload_foot "$out" &
   { tmux has-session 2>/dev/null && { tmux source-file "$out/tmux.conf" || echo tmux >>"$failed"; }; } &
   { command -v kak >/dev/null && reload_kak; } &
+  reload_helix &
   { gsettings set org.gnome.desktop.interface color-scheme "$scheme" &&
     gsettings set org.gnome.desktop.interface font-name "$ui 11" &&
     gsettings set org.gnome.desktop.interface monospace-font-name "$mono 11" || echo gsettings >>"$failed"; } &

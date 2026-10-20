@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
 import { validateTheme } from './theme.mjs';
-import { renderTmux, renderKak, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderOpencode, renderAmx } from './apps.mjs';
+import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderOpencode, renderAmx } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const blueprint = load('blueprint');
@@ -168,4 +168,18 @@ test('the amx theme sets its six roles from the tokens', () => {
     renderAmx(artboard),
     ['waiting = "#9a6700"', 'done = "#1a7f37"', 'failed = "#cf222e"', 'stopped = "#57606a"', 'accent = "#3d5afe"', 'cursor = "#d0d7de"', ''].join('\n'),
   );
+});
+
+test('helix takes the kak look: syntax colours, a flat status line, and the menu and popups on a 6% ink tint', () => {
+  const hx = renderHelix(paper);
+  assert.match(hx, /^"ui\.background" = \{ bg = "#faf6ec" \}$/m);
+  assert.match(hx, /^"keyword" = \{ fg = "#66800b", modifiers = \["bold"\] \}$/m);
+  assert.match(hx, /^"comment" = \{ fg = "#575653", modifiers = \["italic"\] \}$/m);
+  assert.match(hx, /^"string" = "#24837b"$/m);
+  assert.match(hx, /^"ui\.statusline" = \{ fg = "#1c1915", bg = "#faf6ec" \}$/m);
+  assert.match(hx, /^"ui\.statusline\.normal" = \{ fg = "#c8381e", bg = "#faf6ec", modifiers = \["bold"\] \}$/m);
+  assert.match(hx, /^"ui\.popup" = \{ fg = "#1c1915", bg = "#ede9df" \}$/m);
+  assert.match(hx, /^"ui\.menu\.selected" = \{ fg = "#faf6ec", bg = "#c8381e" \}$/m);
+  assert.match(hx, /^"diagnostic\.error" = \{ underline = \{ color = "#c8381e", style = "curl" \} \}$/m);
+  assert.match(renderHelix(blueprint), /^"function" = "#82aaff"$/m);
 });
