@@ -56,5 +56,6 @@ for entry in "${from_fusion[@]}"; do
   read -r name fusion <<<"$entry"
   [[ -e /etc/yum.repos.d/rpmfusion-$fusion.repo ]] || continue
   log "installing $name from RPM Fusion $fusion"
-  root dnf -y -q install --allowerasing "$name" || log "could not install $name from RPM Fusion $fusion"
+  # Fedora's dnf skips a repo it cannot reach, so with RPM Fusion down this installs ffmpeg-free and exits 0; rpm -q is the check.
+  root dnf -y -q install --allowerasing "$name" && rpm -q --quiet "$name" || log "could not install $name from RPM Fusion $fusion"
 done
