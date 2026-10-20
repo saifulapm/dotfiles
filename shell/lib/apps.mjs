@@ -54,7 +54,7 @@ export function renderTmux(t) {
 export function renderKak(t) {
   const c = t.color;
   const s = t.syntax;
-  // Info boxes and menus sit on a light wash of ink; the status line is flat, as tmux's bar is.
+  // Menus sit on a light wash of ink; info boxes, framed by their border, and the status line are flat, as tmux's bar is.
   const tint = mix(c.surface, c.ink, 0.06);
   const faces = [
     ['value', `${rgb(s.value)}`],
@@ -90,7 +90,7 @@ export function renderKak(t) {
     ['MenuForeground', `${rgb(c.surface)},${rgb(c.accent)}`],
     ['MenuBackground', `${rgb(c.ink)},${rgb(tint)}`],
     ['MenuInfo', `${rgb(c.muted)}`],
-    ['Information', `${rgb(c.ink)},${rgb(tint)}`],
+    ['Information', `${rgb(c.ink)},${rgb(c.surface)}`],
     ['Error', `${rgb(c.surface)},${rgb(c.danger)}`],
     ['DiagnosticError', `${rgb(c.danger)}`],
     ['DiagnosticWarning', `${rgb(c.danger)}`],
