@@ -48,6 +48,14 @@ until_ok 3000 mode_is rest
 held=$(($(island | jq .since) - $(jq .since <<<"$state")))
 check "the OSD lasts 1.5 ± 0.2 s (${held} ms)" test "$held" -ge 1300 -a "$held" -le 1700
 
+# Volume Up as the bind runs it: raising a muted sink unmutes it, since wpctl set-volume alone keeps it muted and the OSD read 0.
+wpctl set-mute @DEFAULT_AUDIO_SINK@ 1
+raise=$(sed -n 's/^ *XF86AudioRaiseVolume .*spawn "sh" "-c" "\(.*\)"; }$/\1/p' "$repo/home/dot_config/niri/binds.kdl")
+niri msg action spawn -- sh -c "$raise"
+until_ok 2000 mode_is osd
+check "Volume Up on a muted sink unmutes it ($(wpctl get-volume @DEFAULT_AUDIO_SINK@))" bash -c '! wpctl get-volume @DEFAULT_AUDIO_SINK@ | grep -q MUTED'
+until_ok 3000 mode_is rest
+
 niri msg action spawn -- qs ipc call osd brightness 5%+
 until_ok 2000 mode_is osd
 state=$(island)

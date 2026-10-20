@@ -29,12 +29,20 @@ test('workspace up and down keep a bind now that Mod+I is the island', () => {
   assert.doesNotMatch(binds, /^\s*Mod\+I [^{]*\{ focus-workspace-up; \}$/m);
 });
 
-test('the volume keys step the default sink by 5 % and the brightness keys go through the shell', () => {
-  assert.match(binds, spawns('XF86AudioRaiseVolume', ['wpctl', 'set-volume', '-l', '1', '@DEFAULT_AUDIO_SINK@', '5%+']));
-  assert.match(binds, spawns('XF86AudioLowerVolume', ['wpctl', 'set-volume', '@DEFAULT_AUDIO_SINK@', '5%-']));
+test('the volume keys unmute the default sink and step it by 5 %, and the brightness keys go through the shell', () => {
+  assert.match(binds, spawns('XF86AudioRaiseVolume', ['sh', '-c', 'wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+']));
+  assert.match(binds, spawns('XF86AudioLowerVolume', ['sh', '-c', 'wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-']));
   assert.match(binds, spawns('XF86AudioMute', ['wpctl', 'set-mute', '@DEFAULT_AUDIO_SINK@', 'toggle']));
+  assert.match(binds, spawns('XF86AudioMicMute', ['wpctl', 'set-mute', '@DEFAULT_AUDIO_SOURCE@', 'toggle']));
   assert.match(binds, spawns('XF86MonBrightnessUp', ['qs', 'ipc', 'call', 'osd', 'brightness', '5%+']));
   assert.match(binds, spawns('XF86MonBrightnessDown', ['qs', 'ipc', 'call', 'osd', 'brightness', '5%-']));
+});
+
+// Apple keyboards send these on F7 to F9, and nothing answered them.
+test('the media keys play, pause and skip through the shell', () => {
+  assert.match(binds, spawns('XF86AudioPlay', ['qs', 'ipc', 'call', 'media', 'playPause']));
+  assert.match(binds, spawns('XF86AudioNext', ['qs', 'ipc', 'call', 'media', 'next']));
+  assert.match(binds, spawns('XF86AudioPrev', ['qs', 'ipc', 'call', 'media', 'previous']));
 });
 
 test('the system binds open Control, the clipboard and emoji modes, the lock and the recorder', () => {

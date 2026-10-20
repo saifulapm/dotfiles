@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# An MPRIS player playing "<title>" by "<artist>" (its two arguments) on the nested session bus; Play, Pause and PlayPause change it.
+# An MPRIS player playing "<title>" by "<artist>" (its two arguments) on the nested session bus; Play, Pause and PlayPause change it, and Next and Previous retitle the track "Next" and "Previous".
 import os
 import sys
 
@@ -49,8 +49,8 @@ class Player(dbus.service.Object):
                 "Position": dbus.Int64(0),
                 "MinimumRate": dbus.Double(1.0),
                 "MaximumRate": dbus.Double(1.0),
-                "CanGoNext": dbus.Boolean(False),
-                "CanGoPrevious": dbus.Boolean(False),
+                "CanGoNext": dbus.Boolean(True),
+                "CanGoPrevious": dbus.Boolean(True),
                 "CanPlay": dbus.Boolean(True),
                 "CanPause": dbus.Boolean(True),
                 "CanSeek": dbus.Boolean(False),
@@ -78,13 +78,18 @@ class Player(dbus.service.Object):
     def Stop(self):
         self.status("Stopped")
 
+    def retitle(self, title):
+        meta = self.props[PLAYER]["Metadata"]
+        meta["xesam:title"] = dbus.String(title)
+        self.PropertiesChanged(PLAYER, {"Metadata": meta}, [])
+
     @dbus.service.method(PLAYER)
     def Next(self):
-        pass
+        self.retitle("Next")
 
     @dbus.service.method(PLAYER)
     def Previous(self):
-        pass
+        self.retitle("Previous")
 
     @dbus.service.method(PLAYER, in_signature="x")
     def Seek(self, offset):
