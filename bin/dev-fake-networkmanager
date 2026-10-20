@@ -1,0 +1,336 @@
+#!/usr/bin/env python3
+# A NetworkManager on $DBUS_SYSTEM_BUS_ADDRESS with wlan0 and three networks: "Dots Open", a saved "Dots Home" (PSK dots-home-1) and a new "Dots Secured" (PSK dots-secret-1); a join with no PSK or a wrong one fails with NoSecrets, and org.dots.FakeNM.LastPsk() on /org/freedesktop/NetworkManager returns the last PSK given ("" if none).
+import os
+import sys
+import time
+import uuid
+
+REAL_SYSTEM_BUS = "unix:path=/run/dbus/system_bus_socket"
+address = os.environ.get("DBUS_SYSTEM_BUS_ADDRESS", "")
+if address in ("", REAL_SYSTEM_BUS):
+    sys.exit("dev-fake-networkmanager: DBUS_SYSTEM_BUS_ADDRESS must be a test bus, not unset or the real system bus")
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+NM = "org.freedesktop.NetworkManager"
+FAKE = "org.dots.FakeNM"
+DEVICE = NM + ".Device"
+WIRELESS = NM + ".Device.Wireless"
+AP = NM + ".AccessPoint"
+SETTINGS = NM + ".Settings.Connection"
+ACTIVE = NM + ".Connection.Active"
+PROPS = "org.freedesktop.DBus.Properties"
+ROOT = "/org/freedesktop/NetworkManager"
+WLAN0 = ROOT + "/Devices/1"
+
+# NetworkManager's numbers: device states, active connection states and the reasons Quickshell reads.
+DISCONNECTED, PREPARE, ACTIVATED, FAILED = 30, 40, 100, 120
+ACTIVATED_CONN, DEACTIVATED_CONN = 2, 4
+NO_SECRETS, CONN_DEVICE_DISCONNECTED, USER_DISCONNECTED = 7, 3, 2
+PRIVACY = 0x1
+RSN_PSK_CCMP = 0x100 | 0x8 | 0x80
+CAPS_WPA2 = 0x4 | 0x8 | 0x10 | 0x20 | 0x100 | 0x200
+INFRA = 2
+# The time between a connect and its outcome, so the shell has read the new active connection first.
+SETTLE_MS = 300
+
+
+def settings_map(groups):
+    return dbus.Dictionary({k: dbus.Dictionary(v, signature="sv") for k, v in groups.items()}, signature="sa{sv}")
+
+
+class Object(dbus.service.Object):
+    def __init__(self, bus, path, props):
+        super().__init__(bus, path)
+        self.path = dbus.ObjectPath(path)
+        self.props = props
+
+    def change(self, interface, **changed):
+        self.props[interface].update(changed)
+        self.PropertiesChanged(interface, dbus.Dictionary(changed, signature="sv"), dbus.Array([], signature="s"))
+
+    @dbus.service.method(PROPS, in_signature="ss", out_signature="v")
+    def Get(self, interface, name):
+        return self.props[interface][name]
+
+    @dbus.service.method(PROPS, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        return dbus.Dictionary(self.props.get(interface, {}), signature="sv")
+
+    @dbus.service.method(PROPS, in_signature="ssv")
+    def Set(self, interface, name, value):
+        self.change(interface, **{name: value})
+
+    @dbus.service.signal(PROPS, signature="sa{sv}as")
+    def PropertiesChanged(self, interface, changed, invalidated):
+        pass
+
+
+class AccessPoint(Object):
+    def __init__(self, bus, n, ssid, strength, psk):
+        secured = psk is not None
+        super().__init__(bus, ROOT + "/AccessPoint/" + str(n), {AP: {
+            "Ssid": dbus.ByteArray(ssid.encode()),
+            "Strength": dbus.Byte(strength),
+            "Flags": dbus.UInt32(PRIVACY if secured else 0),
+            "WpaFlags": dbus.UInt32(0),
+            "RsnFlags": dbus.UInt32(RSN_PSK_CCMP if secured else 0),
+            "Mode": dbus.UInt32(INFRA),
+            "Frequency": dbus.UInt32(2412),
+            "HwAddress": dbus.String("00:00:00:00:01:0" + str(n)),
+        }})
+        self.ssid = ssid
+        # The PSK this network accepts; None for an open network.
+        self.psk = psk
+
+
+class Connection(Object):
+    def __init__(self, bus, n, ap, psk):
+        super().__init__(bus, ROOT + "/Settings/" + str(n), {SETTINGS: {
+            "Unsaved": dbus.Boolean(False),
+            "Flags": dbus.UInt32(0),
+            "Filename": dbus.String(""),
+        }})
+        self.ap = ap
+        self.psk = psk
+        self.groups = {
+            "connection": {
+                "id": dbus.String(ap.ssid),
+                "uuid": dbus.String(str(uuid.uuid4())),
+                "type": dbus.String("802-11-wireless"),
+                "timestamp": dbus.UInt64(int(time.time())),
+            },
+            "802-11-wireless": {"ssid": dbus.ByteArray(ap.ssid.encode()), "mode": dbus.String("infrastructure")},
+        }
+        if ap.psk is not None:
+            self.groups["802-11-wireless-security"] = {"key-mgmt": dbus.String("wpa-psk")}
+
+    # Like NetworkManager, GetSettings leaves the PSK out: it is a secret.
+    @dbus.service.method(SETTINGS, out_signature="a{sa{sv}}")
+    def GetSettings(self):
+        return settings_map(self.groups)
+
+    @dbus.service.method(SETTINGS, in_signature="a{sa{sv}}")
+    def Update(self, settings):
+        psk = settings.get("802-11-wireless-security", {}).get("psk")
+        if psk is not None:
+            self.psk = nm.take_psk(psk)
+        self.Updated()
+
+    @dbus.service.method(SETTINGS)
+    def Delete(self):
+        nm.forget(self)
+
+    @dbus.service.method(SETTINGS)
+    def ClearSecrets(self):
+        self.psk = None
+        self.Updated()
+
+    @dbus.service.signal(SETTINGS)
+    def Updated(self):
+        pass
+
+    @dbus.service.signal(SETTINGS)
+    def Removed(self):
+        pass
+
+
+class Active(Object):
+    def __init__(self, bus, n, conn):
+        super().__init__(bus, ROOT + "/ActiveConnection/" + str(n), {ACTIVE: {
+            "Connection": conn.path,
+            "SpecificObject": conn.ap.path,
+            "Id": dbus.String(conn.ap.ssid),
+            "Uuid": conn.groups["connection"]["uuid"],
+            "Type": dbus.String("802-11-wireless"),
+            "Devices": dbus.Array([dbus.ObjectPath(WLAN0)], signature="o"),
+            "State": dbus.UInt32(1),
+        }})
+        self.conn = conn
+
+    @dbus.service.signal(ACTIVE, signature="uu")
+    def StateChanged(self, state, reason):
+        pass
+
+
+class Device(Object):
+    def __init__(self, bus, aps):
+        super().__init__(bus, WLAN0, {
+            DEVICE: {
+                "DeviceType": dbus.UInt32(2),
+                "Interface": dbus.String("wlan0"),
+                "HwAddress": dbus.String("00:00:00:00:01:00"),
+                "Managed": dbus.Boolean(True),
+                "State": dbus.UInt32(DISCONNECTED),
+                "Autoconnect": dbus.Boolean(True),
+                "AvailableConnections": dbus.Array([], signature="o"),
+                "ActiveConnection": dbus.ObjectPath("/"),
+                "InterfaceFlags": dbus.UInt32(0),
+            },
+            WIRELESS: {
+                "LastScan": dbus.Int64(int(time.clock_gettime(time.CLOCK_BOOTTIME) * 1000)),
+                "WirelessCapabilities": dbus.UInt32(CAPS_WPA2),
+                "ActiveAccessPoint": dbus.ObjectPath("/"),
+                "Mode": dbus.UInt32(INFRA),
+                "AccessPoints": dbus.Array([ap.path for ap in aps], signature="o"),
+            },
+        })
+        self.aps = aps
+
+    def set_state(self, new, reason):
+        old = self.props[DEVICE]["State"]
+        self.change(DEVICE, State=dbus.UInt32(new))
+        self.StateChanged(new, old, reason)
+
+    @dbus.service.method(DEVICE)
+    def Disconnect(self):
+        nm.deactivate(USER_DISCONNECTED)
+
+    @dbus.service.signal(DEVICE, signature="uuu")
+    def StateChanged(self, new, old, reason):
+        pass
+
+    @dbus.service.method(WIRELESS, out_signature="ao")
+    def GetAllAccessPoints(self):
+        return dbus.Array([ap.path for ap in self.aps], signature="o")
+
+    @dbus.service.method(WIRELESS, in_signature="a{sv}")
+    def RequestScan(self, options):
+        pass
+
+    @dbus.service.signal(WIRELESS, signature="o")
+    def AccessPointAdded(self, path):
+        pass
+
+    @dbus.service.signal(WIRELESS, signature="o")
+    def AccessPointRemoved(self, path):
+        pass
+
+
+class NetworkManager(Object):
+    def __init__(self, bus):
+        super().__init__(bus, ROOT, {NM: {
+            "WirelessEnabled": dbus.Boolean(True),
+            "WirelessHardwareEnabled": dbus.Boolean(True),
+            "Connectivity": dbus.UInt32(4),
+            "ConnectivityCheckAvailable": dbus.Boolean(False),
+            "ConnectivityCheckEnabled": dbus.Boolean(False),
+        }})
+        self.bus = bus
+        self.count = 0
+        self.last_psk = ""
+        self.active = None
+        self.aps = [
+            AccessPoint(bus, 1, "Dots Open", 70, None),
+            AccessPoint(bus, 2, "Dots Home", 60, "dots-home-1"),
+            AccessPoint(bus, 3, "Dots Secured", 40, "dots-secret-1"),
+        ]
+        self.device = Device(bus, self.aps)
+        self.conns = {}
+        self.save(self.aps[1], "dots-home-1")
+
+    def next(self):
+        self.count += 1
+        return self.count
+
+    def take_psk(self, psk):
+        self.last_psk = str(psk)
+        return self.last_psk
+
+    def available(self):
+        self.device.change(DEVICE, AvailableConnections=dbus.Array(list(self.conns), signature="o"))
+
+    def save(self, ap, psk):
+        conn = Connection(self.bus, self.next(), ap, psk)
+        self.conns[conn.path] = conn
+        self.available()
+        return conn
+
+    def forget(self, conn):
+        if self.active and self.active.conn is conn:
+            self.deactivate(USER_DISCONNECTED)
+        del self.conns[conn.path]
+        self.available()
+        conn.Removed()
+        conn.remove_from_connection()
+
+    def deactivate(self, reason):
+        active, self.active = self.active, None
+        if not active:
+            return
+        active.change(ACTIVE, State=dbus.UInt32(DEACTIVATED_CONN))
+        active.StateChanged(DEACTIVATED_CONN, reason)
+        self.device.change(WIRELESS, ActiveAccessPoint=dbus.ObjectPath("/"))
+        self.device.change(DEVICE, ActiveConnection=dbus.ObjectPath("/"))
+        self.device.set_state(DISCONNECTED, 0)
+        active.remove_from_connection()
+
+    def activate(self, conn, forget_on_failure):
+        self.deactivate(USER_DISCONNECTED)
+        active = Active(self.bus, self.next(), conn)
+        self.active = active
+        self.device.change(DEVICE, ActiveConnection=active.path)
+        self.device.set_state(PREPARE, 0)
+        GLib.timeout_add(SETTLE_MS, self.settle, active, forget_on_failure)
+        return active
+
+    def settle(self, active, forget_on_failure):
+        if self.active is not active:
+            return False
+        conn = active.conn
+        if conn.ap.psk is None or conn.psk == conn.ap.psk:
+            active.change(ACTIVE, State=dbus.UInt32(ACTIVATED_CONN))
+            self.device.change(WIRELESS, ActiveAccessPoint=conn.ap.path)
+            self.device.set_state(ACTIVATED, 0)
+            return False
+        # Quickshell keeps the device's fail reason and reports it when the active connection goes with DeviceDisconnected.
+        self.device.set_state(FAILED, NO_SECRETS)
+        self.deactivate(CONN_DEVICE_DISCONNECTED)
+        if forget_on_failure:
+            self.forget(conn)
+        return False
+
+    @dbus.service.method(NM, out_signature="ao")
+    def GetAllDevices(self):
+        return dbus.Array([self.device.path], signature="o")
+
+    @dbus.service.method(NM, out_signature="ao")
+    def GetDevices(self):
+        return dbus.Array([self.device.path], signature="o")
+
+    @dbus.service.method(NM, out_signature="u")
+    def CheckConnectivity(self):
+        return self.props[NM]["Connectivity"]
+
+    @dbus.service.method(NM, in_signature="ooo", out_signature="o")
+    def ActivateConnection(self, conn, device, specific):
+        return self.activate(self.conns[str(conn)], False).path
+
+    @dbus.service.method(NM, in_signature="a{sa{sv}}oo", out_signature="oo")
+    def AddAndActivateConnection(self, settings, device, specific):
+        ap = next(ap for ap in self.aps if ap.path == specific)
+        psk = settings.get("802-11-wireless-security", {}).get("psk")
+        conn = self.save(ap, None if psk is None else self.take_psk(psk))
+        return conn.path, self.activate(conn, True).path
+
+    @dbus.service.signal(NM, signature="o")
+    def DeviceAdded(self, path):
+        pass
+
+    @dbus.service.signal(NM, signature="o")
+    def DeviceRemoved(self, path):
+        pass
+
+    @dbus.service.method(FAKE, out_signature="s")
+    def LastPsk(self):
+        return self.last_psk
+
+
+DBusGMainLoop(set_as_default=True)
+bus = dbus.bus.BusConnection(address)
+nm = NetworkManager(bus)
+name = dbus.service.BusName(NM, bus, do_not_queue=True)
+GLib.MainLoop().run()
