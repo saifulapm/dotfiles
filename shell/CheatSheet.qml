@@ -13,6 +13,8 @@ Item {
     required property var theme
     property bool shown: false
     property var rows: []
+    // False until the binds file is first read and its rows are built, so the first open drops a full card.
+    property bool bindsRead: false
     // How many row titles are cut short on screen, so a check can tell every bind apart.
     property int truncated: 0
     readonly property string query: input.text
@@ -27,6 +29,7 @@ Item {
     readonly property var look: V.listLook(theme.tokens)
     readonly property Root.Motion motion: Root.Motion {
         shown: sheet.shown
+        ready: sheet.bindsRead
         tokens: sheet.theme.tokens
     }
 
@@ -44,9 +47,9 @@ Item {
         shown = false;
     }
 
-    // Called on each of the host window's frames; the first one after open() ends the timing.
+    // Called on each of the host window's frames; the first one after the open starts to play ends the timing, so a first open's load counts.
     function swapped() {
-        if (shown && openT0 >= 0) {
+        if (motion.open && openT0 >= 0) {
             openMs = Date.now() - openT0;
             openT0 = -1;
         }
@@ -74,6 +77,7 @@ Item {
             opens: opens,
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
+            firstFrame: motion.firstFrame,
             settled: motion.settled,
             drawing: sheet.visible,
             cardBox: card.drawnBox(),
@@ -94,7 +98,11 @@ Item {
         path: Quickshell.env("DOTS_NIRI_BINDS") || (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/niri/binds.kdl"
         watchChanges: true
         onFileChanged: reload()
-        onLoaded: sheet.rows = Lib.parseBinds(text())
+        onLoaded: {
+            sheet.rows = Lib.parseBinds(text());
+            sheet.bindsRead = true;
+        }
+        onLoadFailed: sheet.bindsRead = true
     }
 
     visible: motion.drawing

@@ -92,8 +92,10 @@ PanelWindow {
     Connections {
         target: host.contentItem.Window.window
         function onFrameSwapped() {
-            for (const s of host.all)
+            for (const s of host.all) {
                 s?.swapped();
+                s?.motion?.swapped();
+            }
         }
     }
 
