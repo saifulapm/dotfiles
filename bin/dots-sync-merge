@@ -18,13 +18,19 @@ function machine() {
   return notes.machineId(env.DOTS_MACHINE, read(config + '/chezmoi/chezmoi.toml'), read('/etc/hostname'));
 }
 
+// How many of this machine's records the last round re-stamped, named once the round holds.
+let restamped = 0;
+
 // Merging a store with itself only sorts it, so the two compare equal when the others brought nothing and the file stays untouched.
-function round(model, path, others) {
+function round(unit, path, others) {
+  const model = { notes, goals }[unit];
   const text = existsSync(path) ? readFileSync(path, 'utf8') : null;
   const local = text === null ? model.emptyStore() : model.parseStore(text);
   if (!local) fail(`${basename(path)}: the local store is broken, so it is left as it is`, 4);
   const base = model.mergeStores(local, local);
-  const merged = others.reduce((s, store) => model.mergeStores(s, store), base);
+  const own = restamp(unit, local);
+  restamped = own.fixed;
+  const merged = others.reduce((s, store) => model.mergeStores(s, store), model.mergeStores(own.store, own.store));
   if (JSON.stringify(merged) === JSON.stringify(base)) return true;
   const tmp = join(dirname(path), '.' + basename(path) + '.' + process.pid + '.tmp');
   mkdirSync(dirname(path), { recursive: true });
@@ -69,6 +75,25 @@ function recent(unit, store) {
   return { store: Object.assign({}, store, { goals: kept }), dropped };
 }
 
+// This machine's records stamped more than a day ahead come from a clock that ran fast; every other machine leaves them out, so they are stamped now and travel again.
+function restamp(unit, store) {
+  const now = Date.now();
+  const limit = now + 24 * 3600000;
+  let fixed = 0;
+  const fix = (x) => {
+    if (x.updatedAt <= limit) return x;
+    fixed++;
+    if (!x.stamps) return Object.assign({}, x, { updatedAt: now });
+    const stamps = Object.fromEntries(Object.entries(x.stamps).map(([f, t]) => [f, t > limit ? now : t]));
+    return Object.assign({}, x, { stamps, updatedAt: Math.max(now, ...Object.values(stamps)) });
+  };
+  const out =
+    unit === 'notes'
+      ? Object.assign({}, store, { notes: store.notes.map(fix) })
+      : Object.assign({}, store, { goals: store.goals.map((g) => Object.assign({}, fix(g), { tasks: g.tasks.map(fix) })) });
+  return { store: out, fixed };
+}
+
 // A pulled file that does not parse, or its records stamped ahead, are left out and the rest still merge; exit 5 then names them last, so the unit shows the error while this machine's store still goes up.
 function merge(unit, path, files) {
   const model = { notes, goals }[unit];
@@ -86,7 +111,8 @@ function merge(unit, path, files) {
     if (dropped) skipped.push(`${unit}: left out ${dropped} record${dropped === 1 ? '' : 's'} from ${basename(f)}, stamped more than a day ahead`);
   }
   for (let i = 0; i < 3; i++) {
-    if (!round(model, path, others)) continue;
+    if (!round(unit, path, others)) continue;
+    if (restamped) process.stderr.write(`${unit}: re-stamped ${restamped} record${restamped === 1 ? '' : 's'} stamped more than a day ahead\n`);
     if (skipped.length) fail(skipped.join('\n'), 5);
     return;
   }

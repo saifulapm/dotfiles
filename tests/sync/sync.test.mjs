@@ -47,16 +47,18 @@ test('a machine that lost its local store gets its own goals back from the remot
   assert.deepEqual(G.activeGoals(goals(a)).map((g) => g.title), ['only on a']);
 });
 
+const FAR = 9999999999999;
+const aheadGoals = () => G.editGoal(G.addGoal(G.emptyStore(), 'mine', null, T, 'g1'), 'g1', 'forged', null, FAR);
+const aheadNotes = () => N.deleteNotes(withN1('kept'), ['n1'], FAR);
+
+// a's clock ran far ahead when it pushed these.
 test('a pulled goal or note stamped more than a day ahead is left out, so it cannot outvote every later edit, and the unit says so', async () => {
   const w = world();
-  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
-  const FAR = 9999999999999;
-  const forged = G.editGoal(G.addGoal(G.emptyStore(), 'mine', null, T, 'g1'), 'g1', 'forged', null, FAR);
-  write(goalsPath(a), forged);
-  write(notesPath(a), N.deleteNotes(withN1('kept'), ['n1'], FAR));
+  const b = machine(w, 'b');
+  write(join(w.remote, 'dots-sync/goals/a.json'), aheadGoals());
+  write(join(w.remote, 'dots-sync/notes/a.json'), aheadNotes());
   write(goalsPath(b), G.addGoal(G.emptyStore(), 'mine', null, T, 'g1'));
   write(notesPath(b), withN1('kept'));
-  await ok(a);
   const r = await sync(b);
   assert.equal(r.code, 5, r.stderr);
   assert.match(r.stderr, /^dots sync: goals: left out 1 record from a\.json, stamped more than a day ahead$/m);
@@ -64,6 +66,27 @@ test('a pulled goal or note stamped more than a day ahead is left out, so it can
   assert.deepEqual(G.activeGoals(goals(b)).map((g) => g.title), ['mine']);
   assert.deepEqual(N.sectionNotes(notes(b), 'inbox').map((n) => n.text), ['kept']);
   assert.equal(status(b).goals.error, 'goals: left out 1 record from a.json, stamped more than a day ahead');
+});
+
+// Once a's clock is right again, its own records from the fast clock would fail every other machine's round for good.
+test('a machine re-stamps its own records stamped more than a day ahead to now, so its edits travel again', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  write(goalsPath(a), aheadGoals());
+  write(notesPath(a), aheadNotes());
+  write(goalsPath(b), G.addGoal(G.emptyStore(), 'mine', null, T, 'g1'));
+  write(notesPath(b), withN1('kept'));
+  const t0 = Date.now();
+  const r = await ok(a);
+  assert.match(r.stderr, /^goals: re-stamped 1 record stamped more than a day ahead$/m);
+  assert.match(r.stderr, /^notes: re-stamped 1 record stamped more than a day ahead$/m);
+  const g1 = goals(a).goals.find((g) => g.id === 'g1');
+  assert.ok(g1.stamps.title >= t0 && g1.stamps.title <= Date.now(), `title stamp ${g1.stamps.title}`);
+  assert.ok(g1.updatedAt <= Date.now(), `updatedAt ${g1.updatedAt}`);
+  await ok(b);
+  assert.deepEqual(G.activeGoals(goals(b)).map((g) => g.title), ['forged']);
+  assert.deepEqual(N.sectionNotes(notes(b), 'inbox').map((n) => n.text), []);
+  assert.equal(status(b).goals.ok, true);
 });
 
 test('a note edited on both machines offline ends with the later edit on both', async () => {
