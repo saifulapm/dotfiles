@@ -136,3 +136,27 @@ test('no config file hard-codes the home path', () => {
   assert.ok(all.length > 0);
   assert.deepEqual(all.filter((f) => readFileSync(f, 'utf8').includes('/home/saiful')), []);
 });
+
+test('the agent, pnpm and tunnel aliases run what v1 ran', () => {
+  const want = {
+    cx: 'claude --allow-dangerously-skip-permissions',
+    pa: 'pi --approve',
+    p: 'pnpm',
+    pdev: 'pnpm run dev',
+    dev: 'cloudflared tunnel --config ~/.cloudflared/config.dev.yaml run dev',
+  };
+  for (const [name, body] of Object.entries(want)) {
+    const r = run('fish', ['-i', '-c', `functions ${name}`]);
+    assert.ok(r.stdout.includes(body), `${name}: ${r.stdout}${r.stderr}`);
+  }
+});
+
+// try draws its picker on /dev/tty, so it runs under python's pty for a terminal.
+test('try clone puts a repo in ~/Tries and moves the shell into it', () => {
+  const src = join(root, 'src.git');
+  spawnSync('git', ['init', '-q', '--bare', src]);
+  const fish = ['fish', '-i', '-c', `try clone file://${src} demo >/dev/null; pwd`];
+  const r = spawnSync('python3', ['-c', 'import pty, sys; sys.exit(pty.spawn(sys.argv[1:]) >> 8)', ...fish], { env, cwd: home, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(r.stdout.trim().split(/\r?\n/).at(-1), join(home, 'Tries/demo'));
+});

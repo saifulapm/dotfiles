@@ -11,6 +11,13 @@ alias ... "cd ../.."
 alias .... "cd ../../.."
 
 alias s "npx skills"
+alias cx "claude --allow-dangerously-skip-permissions"
+alias pa "pi --approve"
+
+alias p pnpm
+alias pdev "pnpm run dev"
+# The dev tunnel, whose config comes from home/private_dot_cloudflared.
+alias dev "cloudflared tunnel --config ~/.cloudflared/config.dev.yaml run dev"
 
 alias a "php artisan"
 alias tinker "php artisan tinker"
