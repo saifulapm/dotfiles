@@ -126,6 +126,7 @@ ssh_push() {
   echo "$hash" >"$ssh_state/base.hash"
 }
 
+# ssh_pull <hash> <identity> [union]: union keeps every local authorized_keys line after the blob's, for a machine adopting the blob for the first time.
 ssh_pull() {
   local hash=$1 identity=$2 blob=$tmp/ssh/ssh.age stage=$tmp/ssh/stage out f
   rc copyto "$ssh_remote/ssh.age" "$blob" || return
@@ -137,6 +138,14 @@ ssh_pull() {
   if [[ -z $(ls -A "$stage") ]]; then
     err="the ssh blob decrypted to nothing, so it is not applied"
     return 1
+  fi
+  if [[ ${3:-} == union ]]; then
+    if [[ -f $stage/authorized_keys ]]; then
+      awk '!seen[$0]++' "$stage/authorized_keys" "$ssh_dir/authorized_keys" >"$tmp/ssh/authorized_keys" &&
+        mv "$tmp/ssh/authorized_keys" "$stage/authorized_keys"
+    else
+      cp "$ssh_dir/authorized_keys" "$stage/authorized_keys"
+    fi
   fi
   ssh_backup pull
   mkdir -p "$ssh_dir"
@@ -213,6 +222,11 @@ sync_ssh() {
   fi
   if [[ $here_hash == "$base" ]]; then
     ssh_pull "$remote_hash" "$identity"
+    return
+  fi
+  # A machine first reached over ssh holds only the authorized_keys that let it be reached; the union keeps those keys, and base stays the blob's so the next round pushes the union.
+  if [[ -z $base && $(ssh_files | tr '\0' '\n') == "$ssh_dir/authorized_keys" ]]; then
+    ssh_pull "$remote_hash" "$identity" union
     return
   fi
   if [[ -z $base ]]; then

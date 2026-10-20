@@ -101,3 +101,61 @@ test('DOTS_AGE_IDENTITY names the key, so a missing one skips the ssh unit even 
   assert.equal(existsSync(join(w.remote, 'qshell-sync/ssh/ssh.age')), false);
   assert.equal(status(a).ssh.ok, true);
 });
+
+const base = (m) => readFileSync(join(m.env.XDG_STATE_HOME, 'dots/sync/ssh/base.hash'), 'utf8').trim();
+const meta = (w) => JSON.parse(readFileSync(join(w.remote, 'qshell-sync/ssh/ssh.meta.json'), 'utf8'));
+
+// c is a machine first reached over ssh: no base, and a ~/.ssh holding only authorized_keys beside its own known_hosts.
+async function reached(w, a, keys) {
+  const c = machine(w, 'c');
+  await identity(c, a);
+  put(c, 'authorized_keys', keys);
+  put(c, 'known_hosts', 'hosts seen by c\n', 0o644);
+  await ok(c, ['--only', 'ssh']);
+  return c;
+}
+
+test('a ~/.ssh holding only authorized_keys keeps its lines on the first pull, and the next round pushes the union', async () => {
+  const { w, a } = await agreed();
+  put(a, 'authorized_keys', 'ssh-ed25519 BBBB shared\nssh-ed25519 CCCC both\n');
+  await ok(a, ['--only', 'ssh']);
+  const c = await reached(w, a, 'ssh-ed25519 AAAA reach\nssh-ed25519 CCCC both\n');
+  assert.equal(tree(c).id_ed25519, KEY);
+  assert.equal(tree(c).authorized_keys, 'ssh-ed25519 BBBB shared\nssh-ed25519 CCCC both\nssh-ed25519 AAAA reach\n');
+  assert.equal(readFileSync(join(sshDir(c), 'known_hosts'), 'utf8'), 'hosts seen by c\n');
+
+  await ok(c);
+  assert.equal(status(c).ssh.ok, true);
+  assert.equal(status(c).ssh.error, null);
+  assert.equal(meta(w).machine, 'c');
+  assert.equal(meta(w).hash, base(c));
+  await ok(a, ['--only', 'ssh']);
+  assert.equal(tree(a).authorized_keys, 'ssh-ed25519 BBBB shared\nssh-ed25519 CCCC both\nssh-ed25519 AAAA reach\n');
+
+  // Once c has a base, a pull mirrors the blob, so a key a removes is gone from c too.
+  put(a, 'authorized_keys', 'ssh-ed25519 CCCC both\nssh-ed25519 AAAA reach\n');
+  await ok(a, ['--only', 'ssh']);
+  await ok(c, ['--only', 'ssh']);
+  assert.equal(tree(c).authorized_keys, 'ssh-ed25519 CCCC both\nssh-ed25519 AAAA reach\n');
+});
+
+test('a blob with no authorized_keys leaves the local one byte for byte on the first pull', async () => {
+  const { w, a } = await agreed();
+  const c = await reached(w, a, 'ssh-ed25519 AAAA reach\n\nssh-rsa ZZZZ no newline');
+  assert.equal(tree(c).id_ed25519, KEY);
+  assert.equal(tree(c).authorized_keys, 'ssh-ed25519 AAAA reach\n\nssh-rsa ZZZZ no newline');
+});
+
+test('with no base and a ~/.ssh holding its own id_ed25519 beside authorized_keys, the pull still stops as a conflict', async () => {
+  const { w, a } = await agreed();
+  const c = machine(w, 'c');
+  await identity(c, a);
+  put(c, 'id_ed25519', 'another key\n');
+  put(c, 'authorized_keys', 'ssh-ed25519 AAAA reach\n');
+  const before = { mine: tree(c, true), remote: blob(w) };
+  const r = await sync(c, ['--only', 'ssh']);
+  assert.equal(r.code, 3, r.stdout + r.stderr);
+  assert.match(r.stderr, /conflict, run dots sync --adopt local or remote: ~\/\.ssh here was never synced/);
+  assert.deepEqual(tree(c, true), before.mine);
+  assert.deepEqual(blob(w), before.remote);
+});
