@@ -149,6 +149,24 @@ pi=$(as_user "fish -c 'pi --version'" 2>&1)
 # sort -V puts any word after a number, so the output must be a version before it is compared.
 check "pi --version prints 1.3.0 or newer (got '$pi')" bash -c "[[ \$1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\$ && \$(printf '%s\n' 1.3.0 \"\$1\" | sort -V | head -n1) == 1.3.0 ]]" _ "$pi"
 check "mise lists node 24.21.0 as installed" as_user "mise ls --installed node | grep -qw 24.21.0"
+shopify=$(as_user "mise exec -- shopify version" 2>&1 | tail -n 1)
+check "shopify version prints 4.9.4 or newer (got '$shopify')" bash -c "[[ \$1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\$ && \$(printf '%s\n' 4.9.4 \"\$1\" | sort -V | head -n1) == 4.9.4 ]]" _ "$shopify"
+for tool in "pnpm --version" "cloudflared --version" "goimapnotify -h"; do
+  check "'$tool' runs through mise" as_user "mise exec -- $tool >/dev/null 2>&1"
+done
+check "goimapnotify has the shim imapnotify@ runs" as_user "test -x ~/.local/share/mise/shims/goimapnotify"
+# kakfeed is private, so elfeed-kak waits for the gh login dots secrets writes.
+check "elfeed-kak waits for dots secrets" as_user "test ! -e ~/.local/bin/elfeed-kak"
+check "the AVD firmware is left to the Macs' hosts" podman exec "$name" bash -c "! ls /usr/lib/firmware/updates/apple/avd-fw-* >/dev/null 2>&1"
+check "the input group may open /dev/uinput" podman exec "$name" grep -q 'KERNEL=="uinput", GROUP="input"' /etc/udev/rules.d/60-uinput-input-group.rules
+check "ydotoold starts with the user manager" as_user "test -L ~/.config/systemd/user/default.target.wants/ydotoold.service"
+check "zswap compresses with zstd from boot" podman exec "$name" bash -c "grep -qx zstd /etc/modules-load.d/zstd.conf && grep -q 'zswap/parameters/compressor - - - - zstd' /etc/tmpfiles.d/zswap.conf"
+check "gpg-agent caches a passphrase for 400 days" as_user "grep -qx 'default-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf && grep -qx 'max-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf"
+check "imapnotify@icloud starts with the session" as_user "test -L ~/.config/systemd/user/graphical-session.target.wants/imapnotify@icloud.service"
+check "the mailto handler is mail-open" as_user "grep -qx 'x-scheme-handler/mailto=mail-open.desktop' ~/.config/mimeapps.list && test -f ~/.local/share/applications/mail-open.desktop"
+cx=$(as_user "fish -i -c 'functions cx'" 2>&1)
+check "fish's cx runs claude --allow-dangerously-skip-permissions" grep -qF 'claude --allow-dangerously-skip-permissions' <<<"$cx"
+check "the repo is at ~/Codes/dotfiles" as_user "test -x ~/Codes/dotfiles/bin/dots"
 dirt=$(as_user "git -C ~/Codes/dotfiles status --porcelain")
 check "the apply leaves the repo clean (got '$dirt')" test -z "$dirt"
 for font in 'Maple Mono' 'Symbols Nerd Font Mono'; do
