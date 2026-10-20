@@ -139,8 +139,16 @@ for u in qshell.service qshell-sync.timer update-all.timer; do
   got=$(unit_state $u)
   check "v1's $u is neither enabled nor active (got '$got')" bash -c "[[ '$got' != enabled* && '$got' != *' active' ]]"
 done
-got=$(unit_state hub-local.service)
-check "v1's hub-local.service, which v2 does not replace, still runs (got '$got')" test "$got" = "enabled active"
+for u in pxy hub-local; do
+  got=$(as_user "readlink -f \$(systemctl --user show -p FragmentPath --value $u.service)")
+  check "$u.service runs from v2's unit (got '$got')" test "$got" = "$home/Sites/github/dotfiles/home/dot_config/systemd/user/$u.service"
+done
+got=$(unit_state pxy.service)
+check "pxy.service is enabled and active (got '$got')" test "$got" = "enabled active"
+got=$(as_user "systemctl --user is-failed hub-local.service")
+check "with no local.env, hub-local.service is inactive, not failed (got '$got')" test "$got" = inactive
+got=$(as_user "pgrep -cf '^/bin/sleep infinity\$'")
+check "no v1 stand-in (sleep infinity) is left running (got $got)" test "$got" = 0
 check "v1's ~/.gitconfig and 10-history.fish links are gone" as_user "test ! -e ~/.gitconfig -a ! -e ~/.config/fish/conf.d/10-history.fish"
 check "~/.dotfiles stays in place" as_user "test -f ~/.dotfiles/home/dot_gitconfig"
 
