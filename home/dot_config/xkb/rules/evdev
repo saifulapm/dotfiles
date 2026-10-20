@@ -1,0 +1,5 @@
+// libxkbcommon reads ~/.config/xkb before the system rules, so this adds one option to them: omarchy:shift_caps_compose.
+! include %S/evdev
+
+! option = symbols
+  omarchy:shift_caps_compose = +omarchy(shift_caps_compose)

@@ -11,16 +11,57 @@ spawn-at-startup "systemctl" "--user" "start" "dots-sync-notes.path"
 spawn-at-startup "systemctl" "--user" "start" "dots-sync-goals.path"
 spawn-at-startup "systemctl" "--user" "start" "mail-sync.timer"
 
-// logind ignores the lid (there is no suspend), so closing it only locks.
+input {
+    keyboard {
+        // Shift+Caps Lock is Compose, from ~/.config/xkb.
+        xkb {
+            options "omarchy:shift_caps_compose"
+        }
+        numlock
+        repeat-delay 250
+        repeat-rate 40
+    }
+    touchpad {
+        tap
+        tap-button-map "left-right-middle"
+        dwt
+        drag-lock
+        natural-scroll
+        click-method "clickfinger"
+        scroll-factor 0.4
+    }
+}
+
+cursor {
+    xcursor-size 24
+}
+
+// logind ignores the lid (there is no suspend), so closing it locks and darkens the screens and keyboard; opening it lights them again.
 switch-events {
-    lid-close { spawn "dots-call" "lock" "lock"; }
+    lid-close { spawn "sh" "-c" "dots-call lock lock; niri msg action power-off-monitors; brightnessctl -q -d kbd_backlight -s set 0"; }
+    lid-open { spawn "sh" "-c" "niri msg action power-on-monitors; brightnessctl -q -d kbd_backlight -r"; }
 }
 
 hotkey-overlay {
     skip-at-startup
 }
 
-// The MacBook's built-in screen at 1.25 (logical 2048x1280); niri would pick 1.75 for its 2560x1600.
+// The MacBook's built-in screen at 1.25 (logical 2048x1280); niri would pick 1.75 for its 2560x1600. Its windows open full width.
 output "eDP-1" {
     scale 1.25
+    layout {
+        default-column-width { proportion 1.0; }
+    }
+}
+output "DP-3" {
+    scale 1.0
+}
+output "HDMI-A-1" {
+    scale 1.0
+}
+
+// Notifications show only in the island, so a screencast leaves it out.
+layer-rule {
+    match namespace="^dots-island$"
+    block-out-from "screencast"
 }
