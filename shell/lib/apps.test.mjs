@@ -5,7 +5,7 @@ import { readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
-import { validateTheme } from './theme.mjs';
+import { validateTheme, contrast } from './theme.mjs';
 import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderOpencode, renderAmx } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
@@ -147,6 +147,52 @@ test('the Claude Code theme starts from the light or dark preset of the theme an
   const b = JSON.parse(renderClaude(blueprint));
   assert.equal(b.base, 'dark');
   assert.equal(b.overrides.claude, '#7fe3f0');
+});
+
+// Claude Code 2.1.303's theme keys; a key left out falls back to Claude's own preset colour.
+const CLAUDE_KEYS = [
+  'autoAccept', 'autoAcceptShimmer', 'skill', 'bashBorder', 'claude', 'claudeShimmer', 'claudeBlue_FOR_SYSTEM_SPINNER', 'claudeBlueShimmer_FOR_SYSTEM_SPINNER',
+  'permission', 'permissionShimmer', 'planMode', 'ide', 'promptBorder', 'promptBorderShimmer', 'text', 'inverseText', 'inactive', 'inactiveShimmer',
+  'subtle', 'suggestion', 'remember', 'background', 'success', 'error', 'warning', 'merged', 'warningShimmer', 'diffAdded', 'diffRemoved',
+  'diffAddedDimmed', 'diffRemovedDimmed', 'diffAddedWord', 'diffRemovedWord', 'red_FOR_SUBAGENTS_ONLY', 'blue_FOR_SUBAGENTS_ONLY',
+  'green_FOR_SUBAGENTS_ONLY', 'yellow_FOR_SUBAGENTS_ONLY', 'purple_FOR_SUBAGENTS_ONLY', 'orange_FOR_SUBAGENTS_ONLY', 'pink_FOR_SUBAGENTS_ONLY',
+  'cyan_FOR_SUBAGENTS_ONLY', 'professionalBlue', 'chromeYellow', 'clawd_body', 'clawd_background', 'userMessageBackground',
+  'userMessageBackgroundHover', 'composerSidebarBackground', 'selectionBg', 'bashMessageBackgroundColor', 'memoryBackgroundColor',
+  'rate_limit_fill', 'rate_limit_empty', 'fastMode', 'fastModeShimmer', 'effortUltra', 'briefLabelYou', 'briefLabelClaude', 'rainbow_red',
+  'rainbow_orange', 'rainbow_yellow', 'rainbow_green', 'rainbow_blue', 'rainbow_indigo', 'rainbow_violet', 'rainbow_red_shimmer',
+  'rainbow_orange_shimmer', 'rainbow_yellow_shimmer', 'rainbow_green_shimmer', 'rainbow_blue_shimmer', 'rainbow_indigo_shimmer',
+  'rainbow_violet_shimmer',
+];
+
+test('the Claude Code theme sets every colour Claude reads, subagents and the sidebar included', () => {
+  const o = JSON.parse(renderClaude(paper)).overrides;
+  assert.deepEqual(Object.keys(o).sort(), [...CLAUDE_KEYS].sort());
+  for (const [k, v] of Object.entries(o)) assert.match(v, /^#[0-9a-f]{6}$/, k);
+  assert.equal(o.red_FOR_SUBAGENTS_ONLY, '#c8381e');
+  assert.equal(o.cyan_FOR_SUBAGENTS_ONLY, '#24837b');
+  assert.equal(o.composerSidebarBackground, '#ede9df');
+});
+
+test('pi colours code from the theme syntax table, as kak and helix do', () => {
+  const p = JSON.parse(renderPi(paper));
+  const hex = (role) => p.vars[p.colors[role]];
+  assert.deepEqual(['syntaxKeyword', 'syntaxFunction', 'syntaxString', 'syntaxNumber', 'syntaxType', 'syntaxComment'].map(hex),
+    ['#66800b', '#bc5215', '#24837b', '#bc5215', '#8e6b01', '#575653']);
+});
+
+test('pi dim text reads at 4.5:1 on every theme and stays dimmer than its muted text', () => {
+  for (const t of [paper, artboard, blueprint]) {
+    const v = JSON.parse(renderPi(t)).vars;
+    assert.ok(contrast(v.dimText, v.background) >= 4.5, `${t.name}: ${contrast(v.dimText, v.background)}`);
+    assert.ok(contrast(v.dimText, v.background) < contrast(v.mutedText, v.background), t.name);
+  }
+});
+
+test('pi sets its optional colours and export page, and points at the pi.dev schema', () => {
+  const p = JSON.parse(renderPi(paper));
+  for (const k of ['scrollbarTrack', 'scrollbarThumb', 'searchMatchBg', 'searchMatchText', 'thinkingMax']) assert.ok(p.colors[k] in p.vars, k);
+  for (const k of ['pageBg', 'cardBg', 'infoBg']) assert.ok(p.export[k] in p.vars, k);
+  assert.equal(p.$schema, 'https://pi.dev/schemas/theme.schema.json');
 });
 
 test('the pi theme names its appearance, sits on the terminal surface, and every colour resolves to a var', () => {

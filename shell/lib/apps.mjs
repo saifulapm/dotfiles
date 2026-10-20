@@ -285,6 +285,8 @@ function agentColors(t) {
 
 export function renderClaude(t) {
   const { a, ink, muted, line, surface, accent, danger, ok, on } = agentColors(t);
+  const shimmer = (x) => mix(x, ink, 0.35);
+  const orange = mix(a[1], a[3], 0.5);
   const overrides = {
     claude: accent, claudeShimmer: mix(accent, ink, 0.35), text: ink, inverseText: surface,
     inactive: mix(ink, surface, 0.4), inactiveShimmer: mix(ink, surface, 0.25), subtle: muted,
@@ -297,7 +299,17 @@ export function renderClaude(t) {
     userMessageBackground: on(ink, 0.06), userMessageBackgroundHover: on(ink, 0.1),
     bashMessageBackgroundColor: on(ink, 0.06), memoryBackgroundColor: on(ink, 0.06), selectionBg: line,
     rate_limit_fill: accent, rate_limit_empty: on(ink, 0.2), briefLabelYou: a[3], briefLabelClaude: accent,
+    autoAcceptShimmer: shimmer(a[3]), skill: a[5], effortUltra: a[5], fastMode: orange, fastModeShimmer: shimmer(orange),
+    claudeBlue_FOR_SYSTEM_SPINNER: a[4], claudeBlueShimmer_FOR_SYSTEM_SPINNER: shimmer(a[4]), background: a[6], professionalBlue: a[4],
+    chromeYellow: a[3], clawd_body: accent, clawd_background: surface, composerSidebarBackground: on(ink, 0.06),
   };
+  // Subagents and the rainbow take the ANSI hues, with orange, pink and indigo mixed from their neighbours.
+  const hues = { red: a[1], orange, yellow: a[3], green: a[2], blue: a[4], indigo: mix(a[4], a[5], 0.5), violet: a[5], purple: a[5], pink: mix(a[1], a[5], 0.5), cyan: a[6] };
+  for (const k of ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan']) overrides[`${k}_FOR_SUBAGENTS_ONLY`] = hues[k];
+  for (const k of ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet']) {
+    overrides[`rainbow_${k}`] = hues[k];
+    overrides[`rainbow_${k}_shimmer`] = shimmer(hues[k]);
+  }
   return JSON.stringify({ name: 'qshell', base: t.mode, overrides }, null, 2) + '\n';
 }
 
@@ -309,21 +321,25 @@ const PI_COLORS = {
   customMessageLabel: 'accent', toolPendingBg: 'panelPending', toolSuccessBg: 'panelSuccess', toolErrorBg: 'panelError',
   toolTitle: 'accent', toolOutput: 'foreground', mdHeading: 'color5', mdLink: 'accent', mdLinkUrl: 'color6', mdCode: 'color6',
   mdCodeBlock: 'foreground', mdCodeBlockBorder: 'borderMuted', mdQuote: 'mutedText', mdQuoteBorder: 'borderMuted', mdHr: 'borderMuted',
-  mdListBullet: 'color5', toolDiffAdded: 'color2', toolDiffRemoved: 'color1', toolDiffContext: 'mutedText', syntaxComment: 'dimText',
-  syntaxKeyword: 'color5', syntaxFunction: 'color4', syntaxVariable: 'accent', syntaxString: 'color2', syntaxNumber: 'color3',
-  syntaxType: 'color4', syntaxOperator: 'color5', syntaxPunctuation: 'mutedText', thinkingOff: 'borderMuted', thinkingMinimal: 'accent',
-  thinkingLow: 'color4', thinkingMedium: 'color5', thinkingHigh: 'color3', thinkingXhigh: 'color1', bashMode: 'color3',
+  mdListBullet: 'color5', toolDiffAdded: 'color2', toolDiffRemoved: 'color1', toolDiffContext: 'mutedText', syntaxComment: 'synComment',
+  syntaxKeyword: 'synKeyword', syntaxFunction: 'synFunction', syntaxVariable: 'synVariable', syntaxString: 'synString', syntaxNumber: 'synValue',
+  syntaxType: 'synType', syntaxOperator: 'foreground', syntaxPunctuation: 'mutedText', thinkingOff: 'borderMuted', thinkingMinimal: 'accent',
+  thinkingLow: 'color4', thinkingMedium: 'color5', thinkingHigh: 'color3', thinkingXhigh: 'color1', thinkingMax: 'color9', bashMode: 'color3',
+  scrollbarTrack: 'panelAlt', scrollbarThumb: 'border', searchMatchBg: 'highlight', searchMatchText: 'foreground',
 };
+const PI_EXPORT = { pageBg: 'background', cardBg: 'panel', infoBg: 'highlight' };
 
 export function renderPi(t) {
   const { a, ink, line, surface, accent, danger, ok, on } = agentColors(t);
   const vars = {
     background: surface, foreground: ink, accent, selectionBackground: line, selectionForeground: ink, selectedBackground: on(accent, 0.22),
     panel: on(ink, 0.06), panelAlt: on(ink, 0.1), panelPending: on(accent, 0.12), panelSuccess: on(ok, 0.12), panelError: on(danger, 0.12),
-    border: on(ink, 0.3), borderMuted: on(ink, 0.2), mutedText: mix(ink, surface, 0.34), dimText: mix(ink, surface, 0.52),
+    border: on(ink, 0.3), borderMuted: on(ink, 0.2), mutedText: mix(ink, surface, 0.34), dimText: mix(ink, surface, 0.39), highlight: on(a[3], 0.2),
   };
   a.forEach((hex, i) => (vars['color' + i] = hex));
-  return JSON.stringify({ $schema: 'https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json', name: 'qshell', appearance: t.mode, vars, colors: PI_COLORS }, null, 2) + '\n';
+  // Code takes the theme's syntax table, as kak and helix do.
+  for (const k of ['comment', 'keyword', 'function', 'variable', 'string', 'value', 'type']) vars['syn' + k[0].toUpperCase() + k.slice(1)] = lower(t.syntax[k]);
+  return JSON.stringify({ $schema: 'https://pi.dev/schemas/theme.schema.json', name: 'qshell', appearance: t.mode, vars, colors: PI_COLORS, export: PI_EXPORT }, null, 2) + '\n';
 }
 
 const OPENCODE_THEME = {
