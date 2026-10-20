@@ -18,9 +18,9 @@ configurations:
       boxes:
           # INBOX only: mbsync syncs every folder anyway, and watching Sent would wake on our own writes.
           - mailbox: INBOX
-            onNewMail: "{{ .chezmoi.homeDir }}/Sites/github/dotfiles/bin/mail-sync --quiet"
+            onNewMail: "{{ .chezmoi.homeDir }}/Codes/dotfiles/bin/mail-sync --quiet"
             onNewMailPost: SKIP
             # A flag change made on the phone shows here too; mail-sync is locked and idempotent, so the extra runs are harmless.
-            onChangedMail: "{{ .chezmoi.homeDir }}/Sites/github/dotfiles/bin/mail-sync --quiet"
+            onChangedMail: "{{ .chezmoi.homeDir }}/Codes/dotfiles/bin/mail-sync --quiet"
             onChangedMailPost: SKIP
 {{ end -}}

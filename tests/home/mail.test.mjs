@@ -117,7 +117,7 @@ test('imapnotify@icloud starts with the session, waits for an unlocked agent, an
   const units = join(keyless.home, '.config/systemd/user');
   const text = readFileSync(join(units, 'imapnotify@.service'), 'utf8');
   assert.match(text, /^ConditionPathExists=%h\/\.config\/imapnotify\/%i\.yaml$/m);
-  assert.match(text, /^ExecStartPre=%h\/Sites\/github\/dotfiles\/bin\/imapnotify-wait %h\/\.config\/imapnotify\/%i\.yaml$/m);
+  assert.match(text, /^ExecStartPre=%h\/Codes\/dotfiles\/bin\/imapnotify-wait %h\/\.config\/imapnotify\/%i\.yaml$/m);
   assert.match(text, /^TimeoutStartSec=infinity$/m);
   assert.match(text, /^Environment="PASSWORD_STORE_GPG_OPTS=--pinentry-mode=error"$/m);
   assert.match(text, /^ExecStart=%h\/\.local\/share\/mise\/shims\/goimapnotify -conf %h\/\.config\/imapnotify\/%i\.yaml$/m);
@@ -131,7 +131,7 @@ test('a keyed apply writes the imapnotify yaml for the primary address, syncing 
   const yaml = readFileSync(join(keyed.home, '.config/imapnotify/icloud.yaml'), 'utf8');
   assert.match(yaml, /^\s+username: test@example\.com$/m);
   assert.match(yaml, /^\s+passwordCMD: "pass email\/icloud\/test \| head -n1"$/m);
-  assert.match(yaml, new RegExp(`^\\s+onNewMail: "${keyed.home}/Sites/github/dotfiles/bin/mail-sync --quiet"$`, 'm'));
+  assert.match(yaml, new RegExp(`^\\s+onNewMail: "${keyed.home}/Codes/dotfiles/bin/mail-sync --quiet"$`, 'm'));
 });
 
 test('gpg-agent keeps a passphrase for 400 days', () => {
