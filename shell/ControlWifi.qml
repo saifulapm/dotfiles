@@ -88,7 +88,8 @@ Item {
         } else if (event.key === Qt.Key_Escape)
             closeLine();
         else if (event.key === Qt.Key_Backspace)
-            psk = psk.slice(0, -1);
+            // Spread, not Array.from: QML's Array.from walks UTF-16 units, so it would split an emoji.
+            psk = [...psk].slice(0, -1).join("");
         else if (event.text >= " " && event.text !== "\x7f" && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier)))
             psk += event.text;
         return true;
@@ -173,7 +174,7 @@ Item {
                     x: 12
                     width: parent.width - 24
                     clip: true
-                    text: "•".repeat(section.psk.length)
+                    text: "•".repeat([...section.psk].length)
                     color: section.theme.color.ink
                     font.family: section.theme.tokens ? section.theme.tokens.type.ui : ""
                     font.pixelSize: 16

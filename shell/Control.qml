@@ -24,7 +24,7 @@ Item {
     readonly property var section: sections[current]
     readonly property var rows: section.rows
     readonly property var look: V.listLook(theme.tokens)
-    readonly property var legend: look.keys([["tab", "section"], ["j/k", "move"], ["esc", "close"]])
+    readonly property var legend: look.keys(section.typing ? [["↵", "join"], ["esc", "cancel"]] : [["tab", "section"], ["j/k", "move"], ["esc", "close"]])
     readonly property Root.Motion motion: Root.Motion {
         shown: control.shown
         tokens: control.theme.tokens
@@ -41,8 +41,8 @@ Item {
 
     function close() {
         shown = false;
-        // A typed password clears as Control closes, not when its close stops drawing.
-        wifi.closeLine();
+        // Only the secret clears as Control closes; the rest of the line is drawn until the close stops drawing.
+        wifi.psk = "";
     }
 
     function swapped() {
@@ -87,6 +87,7 @@ Item {
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur) : null,
             legend: legend.map(k => k.key + " " + k.word).join("  "),
+            legendDrawn: Array.from({ length: legendRepeater.count }, (_, i) => legendRepeater.itemAt(i).label).join("  "),
             legendSpacing: look.small.spacing,
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: control.Window.active
@@ -341,10 +342,12 @@ Item {
                 spacing: look.legend("").chips ? 8 : 14
 
                 Repeater {
+                    id: legendRepeater
                     model: control.legend
 
                     Rectangle {
                         required property var modelData
+                        readonly property string label: pairKey.text + " " + pairWord.text
                         width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
                         height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
                         radius: 6
@@ -356,6 +359,7 @@ Item {
                             spacing: look.legend("").chips ? 6 : 5
 
                             Text {
+                                id: pairKey
                                 textFormat: Text.PlainText
                                 text: modelData.key
                                 color: look.chip.key
@@ -365,6 +369,7 @@ Item {
                                 font.bold: true
                             }
                             Text {
+                                id: pairWord
                                 textFormat: Text.PlainText
                                 text: modelData.word
                                 color: c.muted

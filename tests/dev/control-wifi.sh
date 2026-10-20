@@ -112,8 +112,25 @@ enter_on "Dots Secured"
 until_ok 3000 line_open
 type_psk ab
 timeout 0.5 qs ipc call control toggle >/dev/null
-check "closing Control by its toggle clears the typed password at once ($(control_state | jq -c '{open, drawing, line, pskLength}'))" \
-  state_is '.open == false and .drawing == true and .line == false and .pskLength == 0'
+check "closing Control by its toggle clears only the typed password while the card sinks ($(control_state | jq -c '{open, drawing, line, pskLength}'))" \
+  state_is '.open == false and .drawing == true and .line == true and .pskLength == 0'
+until_ok 2000 state_is '.open == false and .drawing == false'
+open_wifi
+check "Control reopens with no line and an empty field after a toggle close" no_line
+# Backspace removes a whole character: an emoji is two UTF-16 units but one dot.
+enter_on "Dots Secured"
+until_ok 3000 line_open
+wtype 🙂
+until_ok 2000 state_is ".pskLength == 2"
+wtype -k BackSpace
+until_ok 2000 state_is '.pskLength == 0'
+check "Backspace after an emoji leaves the field empty ($(control_state | jq -c '{pskLength, lineText}'))" state_is '.pskLength == 0 and .lineText == ""'
+wtype a🙂
+until_ok 2000 state_is ".pskLength == 3"
+check "a then an emoji draw two dots ($(control_state | jq -c '{pskLength, lineText}'))" state_is '.lineText == "••"'
+wtype -k Escape
+until_ok 2000 no_line
+wtype -k Escape
 until_ok 2000 state_is '.open == false and .drawing == false'
 
 # In each theme the line is drawn as the polkit prompt's password field, and a wrong password says so in the theme's voice.
@@ -135,6 +152,7 @@ for t in "paper|WRONG PASSWORD|↵ JOIN · ESC CANCEL|↵ CONNECT · D FORGET" "
   enter_on "Dots Secured"
   until_ok 3000 line_open
   check "$theme: with the line open the hint reads $join_hint ($(control_state | jq -c .hint))" state_is --arg h "$join_hint" '.hint == $h'
+  check "$theme: with the line open the legend drops tab, j/k and esc close ($(control_state | jq -c .legendDrawn))" state_is '.legendDrawn | ascii_downcase | gsub("[\\[\\]]"; "") == "↵ join  esc cancel"'
   wifi_look=$(control_state | jq -c .lineLook)
   check "$theme: the line's field is drawn as the polkit field ($wifi_look, polkit $pk_look)" same_look "$wifi_look" "$pk_look"
   type_psk nope
@@ -146,6 +164,7 @@ for t in "paper|WRONG PASSWORD|↵ JOIN · ESC CANCEL|↵ CONNECT · D FORGET" "
     state_is --arg m "$wrong" '.line == true and .pskLength == 0 and .lineText == "" and .lineMessage == $m'
   wtype -k Escape
   until_ok 2000 no_line
+  check "$theme: with the line closed the legend is back ($(control_state | jq -c .legendDrawn))" state_is '.legendDrawn | ascii_downcase | gsub("[\\[\\]]"; "") == "tab section  j/k move  esc close"'
   check "$theme: with the line closed the hint reads $connect_hint ($(control_state | jq -c .hint))" state_is --arg h "$connect_hint" '.hint == $h'
   wtype -k Escape
   until_ok 2000 state_is '.open == false and .drawing == false'
