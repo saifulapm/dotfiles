@@ -108,3 +108,8 @@ test('the specimen margins read one scene in each voice: 03 — FOOT, Page 03 / 
   assert.deepEqual(read(blueprint), ['[03] FOOT — ~', 'SHIP V2 T−3D · 2026-10-18', false]);
   assert.equal(specimenMargins(blueprint).goalColor, '#FFB547');
 });
+
+test('before the theme loads the picker still has a whole look', () => {
+  const l = pickerLook(null);
+  assert.deepEqual([l.header(3, '').title, l.tag(true, false).text, l.cursor.border.width, l.legend(3).length], ['Themes', 'IN USE', 2, 3]);
+});

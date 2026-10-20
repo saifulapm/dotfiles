@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import QtQuick.Effects
 import "." as Root
 import "lib/themes.mjs" as Lib
 
@@ -20,7 +21,8 @@ Item {
     property real openT0: -1
 
     readonly property var c: theme.color
-    readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
+    readonly property var look: Lib.pickerLook(theme.tokens)
+    readonly property var header: look.header(themes.length, theme.name)
     readonly property Root.Motion motion: Root.Motion {
         shown: switcher.shown
         tokens: switcher.theme.tokens
@@ -72,6 +74,8 @@ Item {
             settled: motion.settled,
             drawing: switcher.visible,
             cardBox: panel.drawnBox(),
+            header: [title.text + sub.text, headRight.text],
+            legend: legend.line(),
             cards: cards.drawn()
         });
     }
@@ -114,107 +118,250 @@ Item {
         Root.Surface {
             id: panel
             x: Math.round((parent.width - width) / 2)
-            y: 168
-            width: 1000
-            height: column.implicitHeight + 36
+            y: 140
+            width: 1056
+            height: column.implicitHeight
             tokens: switcher.theme.tokens
             label: "Themes"
             motion: switcher.motion
 
             Column {
                 id: column
-                x: 18
-                y: 18
-                width: parent.width - 36
-                spacing: 16
+                width: parent.width
 
-                Row {
-                    spacing: 12
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.baseline: currentName.baseline
-                        text: "THEMES"
-                        color: c.muted
-                        font.family: fonts.ui
-                        font.pixelSize: 11
-                        font.letterSpacing: 0.66
+                Item {
+                    width: parent.width
+                    height: title.height + 32
+
+                    Row {
+                        x: 22
+                        y: 18
+                        spacing: 12
+                        Text {
+                            id: title
+                            textFormat: Text.PlainText
+                            text: switcher.header.title
+                            color: switcher.header.color
+                            font.family: switcher.header.font
+                            font.pixelSize: switcher.header.size
+                            font.weight: switcher.header.weight
+                            font.letterSpacing: switcher.look.voice === "bracket" ? 1.76 : 0
+                        }
+                        Text {
+                            id: sub
+                            textFormat: Text.PlainText
+                            anchors.baseline: title.baseline
+                            text: switcher.header.sub
+                            color: c.muted
+                            font.family: switcher.header.subFont
+                            font.pixelSize: switcher.header.subSize
+                            font.italic: switcher.header.italic
+                            font.letterSpacing: title.font.letterSpacing
+                        }
                     }
                     Text {
-                        id: currentName
+                        id: headRight
                         textFormat: Text.PlainText
-                        text: "current: " + switcher.theme.name
+                        anchors.right: parent.right
+                        anchors.rightMargin: 22
+                        anchors.baseline: title.baseline
+                        text: switcher.header.right
                         color: c.muted
-                        font.family: fonts.ui
-                        font.pixelSize: 12
+                        font.family: switcher.look.small.font
+                        font.pixelSize: switcher.look.small.size
+                        font.letterSpacing: switcher.look.small.spacing
+                    }
+                    Rule {
+                        anchors.bottom: parent.bottom
+                        visible: switcher.look.voice !== "plain"
                     }
                 }
 
-                Row {
-                    id: cards
-                    spacing: 16
+                Item {
+                    width: parent.width
+                    height: cards.height + 36
 
-                    // Each card's specimen as drawn, in list order.
-                    function drawn() {
-                        const out = [];
-                        for (let i = 0; i < cardList.count; i++)
-                            out.push(Object.assign({ name: cardList.itemAt(i).modelData.name }, cardList.itemAt(i).specimenState()));
-                        return out;
-                    }
+                    Row {
+                        id: cards
+                        x: 22
+                        y: 18
+                        spacing: 16
+                        // n cards share the panel's width; past three the specimens shrink to fit.
+                        readonly property real cardWidth: (column.width - 44 - (cardList.count - 1) * spacing) / Math.max(1, cardList.count)
 
-                    Repeater {
-                        id: cardList
-                        model: switcher.themes
+                        // Each card as drawn, in list order.
+                        function drawn() {
+                            const out = [];
+                            for (let i = 0; i < cardList.count; i++)
+                                out.push(cardList.itemAt(i).drawn());
+                            return out;
+                        }
 
-                        Item {
-                            id: card
-                            required property var modelData
-                            width: specimen.width
-                            height: specimen.height
+                        Repeater {
+                            id: cardList
+                            model: switcher.themes
 
-                            function specimenState() {
-                                return specimen.drawn();
-                            }
+                            Item {
+                                id: card
+                                required property var modelData
+                                required property int index
+                                readonly property bool cursor: modelData.name === switcher.selected
+                                readonly property bool current: modelData.name === switcher.theme.name
+                                readonly property var dress: cursor ? switcher.look.cursor : switcher.look.tile
+                                readonly property var tag: switcher.look.tag(current, cursor)
+                                readonly property real pad: switcher.look.tile.pad
+                                readonly property real fit: Math.min(1, (width - 2 * pad) / specimen.width)
+                                width: cards.cardWidth
+                                height: specimen.height * fit + 2 * pad
 
-                            Rectangle {
-                                anchors.fill: parent
-                                anchors.margins: -6
-                                visible: card.modelData.name === switcher.selected
-                                color: "transparent"
-                                border.color: c.accent
-                                border.width: 2
-                                radius: 4
-                            }
+                                function drawn() {
+                                    const a = tile.mapToItem(null, 0, 0);
+                                    return Object.assign({
+                                        name: modelData.name,
+                                        box: { x: a.x, y: a.y, w: tile.width, h: tile.height },
+                                        fill: tile.color.toString(),
+                                        border: { width: tile.border.width, color: tile.border.color.toString() },
+                                        number: number.text,
+                                        title: name.text,
+                                        tag: tagText.visible ? tagText.text : ""
+                                    }, specimen.drawn());
+                                }
 
-                            Root.Specimen {
-                                id: specimen
-                                tokens: card.modelData
-                                dir: switcher.theme.dir
-
-                                Row {
+                                // The cursor's hard shadow, offset under the tile.
+                                Rectangle {
+                                    visible: card.dress.shadow?.kind === "hard"
+                                    x: card.dress.shadow?.x ?? 0
+                                    y: card.dress.shadow?.y ?? 0
                                     width: parent.width
-                                    spacing: 10
-                                    readonly property var cardName: Lib.cardName(card.modelData)
-                                    readonly property var tagline: Lib.tagline(card.modelData)
+                                    height: parent.height
+                                    color: card.dress.shadow?.color ?? "transparent"
+                                }
 
-                                    Text {
-                                        id: name
-                                        textFormat: Text.PlainText
-                                        text: parent.cardName.text
-                                        color: c.ink
-                                        font.family: parent.cardName.font
-                                        font.pixelSize: parent.cardName.size
-                                        font.weight: parent.cardName.weight
-                                        font.letterSpacing: parent.cardName.spacing
+                                Loader {
+                                    active: card.dress.shadow?.kind === "soft" || card.dress.shadow?.kind === "glow"
+                                    anchors.fill: parent
+                                    sourceComponent: RectangularShadow {
+                                        offset.x: card.dress.shadow.x
+                                        offset.y: card.dress.shadow.y
+                                        // Qt's docs give 1.2 times the CSS blur for the same falloff.
+                                        blur: card.dress.shadow.blur * 1.2
+                                        spread: card.dress.shadow.spread
+                                        radius: card.dress.radius ?? 0
+                                        color: Qt.alpha(card.dress.shadow.color, card.dress.shadow.alpha)
                                     }
-                                    Text {
-                                        textFormat: Text.PlainText
-                                        anchors.baseline: name.baseline
-                                        text: parent.tagline.text
-                                        color: c.muted
-                                        font.family: parent.tagline.font
-                                        font.pixelSize: parent.tagline.size
-                                        font.italic: parent.tagline.italic
-                                        font.letterSpacing: parent.tagline.spacing
+                                }
+
+                                Rectangle {
+                                    id: tile
+                                    anchors.fill: parent
+                                    radius: switcher.look.tile.radius
+                                    color: card.dress.fill
+                                    border.width: card.dress.border.width
+                                    border.color: card.dress.border.color
+                                }
+
+                                // Blueprint's cursor: registration ticks just outside each corner.
+                                Repeater {
+                                    model: card.dress.ticks ? [[0, 0], [1, 0], [0, 1], [1, 1]] : []
+                                    Item {
+                                        required property var modelData
+                                        x: modelData[0] ? card.width - 4 : -6
+                                        y: modelData[1] ? card.height - 4 : -6
+                                        width: 10
+                                        height: 10
+                                        Rectangle {
+                                            x: parent.modelData[0] ? 9 : 0
+                                            width: 1
+                                            height: 10
+                                            color: c.accent
+                                        }
+                                        Rectangle {
+                                            y: parent.modelData[1] ? 9 : 0
+                                            width: 10
+                                            height: 1
+                                            color: c.accent
+                                        }
+                                    }
+                                }
+
+                                Root.Specimen {
+                                    id: specimen
+                                    x: card.pad
+                                    y: card.pad
+                                    scale: card.fit
+                                    transformOrigin: Item.TopLeft
+                                    tokens: card.modelData
+                                    dir: switcher.theme.dir
+
+                                    Item {
+                                        width: parent.width
+                                        height: name.height
+                                        readonly property var cardName: Lib.cardName(card.modelData)
+                                        readonly property var tagline: Lib.tagline(card.modelData)
+
+                                        Row {
+                                            spacing: 10
+                                            Text {
+                                                id: number
+                                                textFormat: Text.PlainText
+                                                visible: text !== ""
+                                                anchors.baseline: name.baseline
+                                                text: switcher.look.number(card.index)
+                                                color: card.cursor ? c.accent : c.muted
+                                                font.family: switcher.look.small.font
+                                                font.pixelSize: switcher.look.small.size
+                                                font.letterSpacing: switcher.look.small.spacing
+                                            }
+                                            Text {
+                                                id: name
+                                                textFormat: Text.PlainText
+                                                text: parent.parent.cardName.text
+                                                color: c.ink
+                                                font.family: parent.parent.cardName.font
+                                                font.pixelSize: parent.parent.cardName.size
+                                                font.weight: parent.parent.cardName.weight
+                                                font.letterSpacing: parent.parent.cardName.spacing
+                                            }
+                                            Text {
+                                                textFormat: Text.PlainText
+                                                anchors.baseline: name.baseline
+                                                // The tag keeps its place; the line gives way before it.
+                                                width: Math.max(0, parent.parent.width - x - (tagText.visible ? tagText.implicitWidth + 22 : 0))
+                                                elide: Text.ElideRight
+                                                text: parent.parent.tagline.text
+                                                color: c.muted
+                                                font.family: parent.parent.tagline.font
+                                                font.pixelSize: parent.parent.tagline.size
+                                                font.italic: parent.parent.tagline.italic
+                                                font.letterSpacing: parent.parent.tagline.spacing
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            visible: card.tag !== null
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: tagText.verticalCenter
+                                            width: tagText.implicitWidth + 12
+                                            height: tagText.implicitHeight + 4
+                                            radius: card.tag?.radius ?? 0
+                                            color: card.tag?.fill ?? "transparent"
+                                            border.width: card.tag && card.tag.border !== "transparent" ? 1 : 0
+                                            border.color: card.tag?.border ?? "transparent"
+                                        }
+                                        Text {
+                                            id: tagText
+                                            textFormat: Text.PlainText
+                                            visible: card.tag !== null
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: 6
+                                            anchors.baseline: name.baseline
+                                            text: card.tag?.text ?? ""
+                                            color: card.tag?.color ?? "transparent"
+                                            font.family: switcher.look.small.font
+                                            font.pixelSize: switcher.look.small.size
+                                            font.letterSpacing: switcher.look.small.spacing
+                                            font.weight: Font.Medium
+                                        }
                                     }
                                 }
                             }
@@ -223,27 +370,96 @@ Item {
                 }
 
                 Item {
-                    width: column.width
-                    height: hint.height
+                    width: parent.width
+                    height: legend.height + 24
 
-                    Text {
-                        id: hint
-                        textFormat: Text.PlainText
-                        text: "j/k or ←/→ choose    ↵ apply (≤ 300 ms)"
-                        color: c.muted
-                        font.family: fonts.mono
-                        font.pixelSize: 11
+                    Rule {}
+
+                    Row {
+                        id: legend
+                        x: 22
+                        y: 12
+                        spacing: switcher.look.chips ? 8 : 16
+
+                        // The keys as drawn, then Esc, for the state.
+                        function line() {
+                            const out = [];
+                            for (let i = 0; i < legendKeys.count; i++)
+                                out.push(legendKeys.itemAt(i).drawnText);
+                            return out.concat([esc.text]).join("  ");
+                        }
+
+                        Repeater {
+                            id: legendKeys
+                            model: switcher.look.legend(cardList.count)
+
+                            Rectangle {
+                                required property var modelData
+                                readonly property string drawnText: keyText.text + " " + wordText.text
+                                width: keyRow.width + (switcher.look.chips ? 14 : 0)
+                                height: keyRow.height + (switcher.look.chips ? 6 : 0)
+                                radius: switcher.look.chips ? 6 : 0
+                                color: switcher.look.chips ? switcher.look.chip.fill : "transparent"
+
+                                Row {
+                                    id: keyRow
+                                    anchors.centerIn: parent
+                                    spacing: 5
+                                    Text {
+                                        id: keyText
+                                        textFormat: Text.PlainText
+                                        text: parent.parent.modelData.key
+                                        color: switcher.look.chip.key
+                                        font.family: switcher.look.small.font
+                                        font.pixelSize: switcher.look.small.size
+                                        font.letterSpacing: switcher.look.small.spacing
+                                        font.weight: Font.Bold
+                                    }
+                                    Text {
+                                        id: wordText
+                                        textFormat: Text.PlainText
+                                        text: parent.parent.modelData.word
+                                        color: c.muted
+                                        font.family: switcher.look.small.font
+                                        font.pixelSize: switcher.look.small.size
+                                        font.letterSpacing: switcher.look.small.spacing
+                                    }
+                                }
+                            }
+                        }
                     }
                     Text {
+                        id: esc
                         textFormat: Text.PlainText
                         anchors.right: parent.right
-                        text: "Esc"
-                        color: c.muted
-                        font.family: fonts.mono
-                        font.pixelSize: 11
+                        anchors.rightMargin: 22
+                        anchors.verticalCenter: legend.verticalCenter
+                        text: switcher.look.esc
+                        color: switcher.look.voice === "plain" ? c.muted : switcher.look.chip.key
+                        font.family: switcher.look.small.font
+                        font.pixelSize: switcher.look.small.size
+                        font.letterSpacing: switcher.look.small.spacing
+                        font.weight: switcher.look.voice === "plain" ? Font.Normal : Font.Bold
                     }
                 }
             }
+        }
+    }
+
+    // A rule across the panel in the theme's rule colour, dashed where the theme dashes its rules.
+    component Rule: Item {
+        width: column.width
+        height: 1
+
+        Rectangle {
+            anchors.fill: parent
+            visible: !switcher.look.rule.dashed
+            color: switcher.look.rule.color
+        }
+        Root.Dashed {
+            anchors.fill: parent
+            visible: switcher.look.rule.dashed
+            color: switcher.look.rule.color
         }
     }
 }

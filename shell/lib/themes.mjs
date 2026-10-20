@@ -12,6 +12,8 @@ const WORDS = { paper: { flat: 'flat', grain: 'grain', dots: 'dots', grid: 'grid
 const word = (kind, v) => WORDS[kind][v] ?? v;
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const COUNT = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+// An open can come before the theme's tokens load; until then the picker draws in black and white.
+const UNTHEMED = { name: '', color: { paper: 'black', ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '', voice: 'caps' } };
 // Artboard's tiles, a board tint no token carries.
 const TILE = '#F6F7F9';
 
@@ -35,8 +37,9 @@ export function tagline(t) {
 }
 
 // The panel as the current theme's Themes board dresses it: its header, tiles, cursor, tags and keys.
-export function pickerLook(tokens) {
-  const l = listLook(tokens);
+export function pickerLook(themed) {
+  const tokens = themed || UNTHEMED;
+  const l = listLook(themed);
   const c = tokens.color;
   const t = tokens.type;
   const voice = t.voice;
@@ -64,7 +67,7 @@ export function pickerLook(tokens) {
       tag: (current, cursor) => (current ? { text: '[ACTIVE]', color: c.accent, fill: 'transparent', border: 'transparent', radius: 0 } : cursor ? { text: '[↵]', color: c.accent, fill: 'transparent', border: 'transparent', radius: 0 } : null),
       number: (i) => pad2(i + 1),
       tile: { fill: 'transparent', border: { width: 1, color: c.line }, radius: 0, pad: 9 },
-      cursor: { fill: 'transparent', border: { width: 1, color: c.accent }, shadow: { kind: 'glow', x: 0, y: 0, blur: 14, spread: 0, color: c.accent, alpha: 0.3 }, ticks: true },
+      cursor: { fill: c.surface, border: { width: 1, color: c.accent }, shadow: { kind: 'glow', x: 0, y: 0, blur: 14, spread: 0, color: c.accent, alpha: 0.3 }, ticks: true },
     });
   }
   return Object.assign(base, {
