@@ -8,6 +8,8 @@ Item {
     property var tokens: null
     // The dir that holds shaders/<name>.frag.qsb.
     property string dir: ""
+    // Scales the dot spacing, the grid's cells and the crop marks; 1 is the desktop's paper.
+    property real period: 1
     // Opaque at rest; a fill whose ancestor fades must blend, or qt_Opacity darkens it instead.
     property bool blending: opacity < 1
     // flat and gradient stay the plain fill below.
@@ -49,15 +51,15 @@ Item {
             property color accent: fill.tokens.color.accent
             property color dotColor: fill.tokens.paper.dot ?? "transparent"
             property real grain: fill.tokens.paper.grain ?? 0
-            property real spacing: fill.tokens.paper.spacing ?? 16
-            property real minor: fill.tokens.paper.minor ?? 16
-            property real major: fill.tokens.paper.major ?? 80
+            property real spacing: (fill.tokens.paper.spacing ?? 16) * fill.period
+            property real minor: (fill.tokens.paper.minor ?? 16) * fill.period
+            property real major: (fill.tokens.paper.major ?? 80) * fill.period
             property real minorAlpha: fill.tokens.paper.minor_alpha ?? 0
             property real majorAlpha: fill.tokens.paper.major_alpha ?? 0
         }
     }
 
-    // Blueprint's crop marks: a 14 px L in 1 px accent, 8 px in from each corner, on any grid paper.
+    // Blueprint's crop marks: a 14 px L in 1 px accent, 8 px in from each corner, on any grid paper, both scaled by period.
     Repeater {
         model: fill.tokens?.primitive.paper === "grid" ? 4 : 0
 
@@ -65,21 +67,23 @@ Item {
             required property int index
             readonly property bool atRight: index % 2 === 1
             readonly property bool atBottom: index >= 2
-            x: atRight ? fill.width - 8 - 14 : 8
-            y: atBottom ? fill.height - 8 - 14 : 8
-            width: 14
-            height: 14
+            readonly property real inset: 8 * fill.period
+            readonly property real length: 14 * fill.period
+            x: atRight ? fill.width - inset - length : inset
+            y: atBottom ? fill.height - inset - length : inset
+            width: length
+            height: length
 
             Rectangle {
-                x: parent.atRight ? 13 : 0
+                x: parent.atRight ? parent.length - 1 : 0
                 width: 1
-                height: 14
+                height: parent.length
                 color: fill.tokens.color.accent
             }
 
             Rectangle {
-                y: parent.atBottom ? 13 : 0
-                width: 14
+                y: parent.atBottom ? parent.length - 1 : 0
+                width: parent.length
                 height: 1
                 color: fill.tokens.color.accent
             }
