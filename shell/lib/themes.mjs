@@ -130,6 +130,9 @@ export function windowLook(tokens, focused) {
   return { fill: c.surface, frame, shadow, radius: tokens.primitive.corner === 'round' ? 6 : 0 };
 }
 
+// A name in the terminal line keeps what fits its window: blueprint, nine letters, is the longest whole.
+const short = (n) => (n.length > 9 ? n.slice(0, 8) + '…' : n);
+
 // Four lines of a shell session in the theme's ANSI colours: blue paths, a red prompt, a green pass, yellow hashes.
 export function terminalLines(tokens) {
   const a = tokens.color.ansi;
@@ -139,7 +142,7 @@ export function terminalLines(tokens) {
     prompt('just test'),
     [{ text: '✓ 42 passed', color: a[2] }, { text: ' · 0.9 s', color: tokens.color.muted }],
     prompt('git log -1'),
-    [{ text: 'a1e9e71 ', color: a[3] }, { text: `${line(tokens.name)} on the shelf`, color: ink }],
+    [{ text: 'a1e9e71 ', color: a[3] }, { text: `${short(line(tokens.name))} on the shelf`, color: ink }],
   ];
 }
 

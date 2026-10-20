@@ -130,6 +130,7 @@ open_picker
 check "forged entries without niri or ANSI get no card; the rest draw" state_is '[.cards[].name | .[0:4]] == ["pape", "blue", "nnnn"] and all(.cards[]; .paperReady)'
 check "a forged name draws on one line, in the order it is spelt" \
   state_is '.cards[1].title == "BLUE PRINTEVIL" and all(.cards[]; .nameLines == 1)'
+check "a 200-character name is cut in its card's terminal line" state_is '.cards[2].terminal[3][1].text == "nnnnnnnn… on the shelf"'
 check "a 200-character name elides inside its card" state_is 'all(.cards[]; (.nameRight | type) == "number" and .nameRight <= .box.x + .box.w)'
 close_picker
 

@@ -394,9 +394,11 @@ Item {
             }
         }
 
+        // Its text stays inside it, as a window's does.
         Rectangle {
             id: body
             anchors.fill: parent
+            clip: true
             radius: win.look.radius
             color: win.look.fill
             border.width: win.look.frame.width

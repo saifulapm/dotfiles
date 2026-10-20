@@ -150,6 +150,11 @@ test('a themes.json entry the shell would refuse gets no card, and the rest keep
 test('a forged theme name draws on one line, in the order it is spelt', () => {
   const t = { ...paper, name: 'pa\nper\u202Eevil' };
   assert.equal(cardName(t).text, 'Pa perevil');
-  assert.equal(terminalLines(t)[3][1].text, 'pa perevil on the shelf');
+  assert.equal(terminalLines(t)[3][1].text, 'pa perev… on the shelf');
   assert.equal(cardName({ ...blueprint, name: 'blue\tprint' }).text, 'BLUE PRINT');
+});
+
+test('a long theme name is cut in the terminal line, so the line fits its window', () => {
+  assert.equal(terminalLines({ ...paper, name: 'n'.repeat(200) })[3][1].text, 'nnnnnnnn… on the shelf');
+  assert.equal(terminalLines(blueprint)[3][1].text, 'blueprint on the shelf');
 });
