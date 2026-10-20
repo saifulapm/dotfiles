@@ -43,6 +43,12 @@ pins() {
     $1 == "name" { n = $2 } $1 == "version" { v = $2 } $1 == "check" { c = $2 }
     END { flush() }' | tr -d '"'
 }
+# One "name<TAB>command" line per pin whose runs command only has to exit 0.
+runs() {
+  committed versions.toml | awk -F' = ' '
+    /^\[\[pin\]\]/ { n = ""; next }
+    $1 == "name" { n = $2 } $1 == "runs" { print n "\t" $2 }' | tr -d '"'
+}
 # Every packages.toml name for the container's arch.
 packages() {
   local arch
@@ -60,7 +66,7 @@ trap 'podman rm -f -t 0 "$name" >/dev/null 2>&1; rm -rf "$snap"' EXIT
 # label=disable lets the container read the checkout without relabelling it on the host.
 podman run -d --rm --name "$name" --userns=keep-id --security-opt label=disable \
   --passwd-entry "saiful:*:1000:1000::$home:/bin/bash" \
-  -v "$snap/src.git:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 \
+  -v "$snap/src.git:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 -v dots-install-cargo-cache:$home/.cargo:U \
   docker.io/library/fedora:44 sleep infinity >/dev/null || { echo "FAIL: container did not start"; exit 1; }
 
 as_root "
@@ -124,6 +130,9 @@ while IFS=$'\t' read -r pin version cmd; do
   out=$(as_user "$cmd" 2>&1)
   check "$pin: '$cmd' prints $version (got '${out%%$'\n'*}')" grep -qF -- "$version" <<<"$out"
 done < <(pins)
+while IFS=$'\t' read -r pin cmd; do
+  check "$pin: '$cmd' exits 0" as_user "$cmd >/dev/null"
+done < <(runs)
 for font in 'Maple Mono' 'Symbols Nerd Font Mono'; do
   got=$(as_user "fc-match -f '%{family[0]}' '$font'")
   check "fontconfig finds $font (got '$got')" test "$got" = "$font"

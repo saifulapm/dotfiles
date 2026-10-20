@@ -1,4 +1,4 @@
-# Every download dnf does not provide. dots bump rewrites version and sha256; a changed entry reruns only its own run_onchange_after_2*-pin-<name> script.
+# Every download dnf does not provide. dots bump rewrites version and sha256; a changed entry reruns only its own run_onchange_after_2*-pin-<name> script. check prints the version a pin installs; runs only has to exit 0, for a cargo build whose --version cannot name its commit.
 
 [[pin]]
 name = "yazi"
@@ -45,3 +45,13 @@ install = "~/.local/bin/kak and ~/.local/share/kak, built from source"
 check = "kak -version"
 url = "https://github.com/saifulapm/kakoune/archive/{version}.tar.gz"
 sha256 = "839647ab05d5877a30a2248ac8cf701f2f00508114e0fc8e5848ddd249f06c80"
+
+[[pin]]
+name = "amx"
+version = "e904687e3ee6fe4ba0960195adde3e02a2b53972"
+repo = "saifulapm/amx"
+track = "commit"
+install = "~/.local/bin/amx, built with cargo"
+runs = "amx --version"
+url = "https://github.com/saifulapm/amx/archive/{version}.tar.gz"
+sha256 = "88c0b3db4b619050e4d4edbb8bd4210bd6757c538a58b5fe378cd1daf652f590"
