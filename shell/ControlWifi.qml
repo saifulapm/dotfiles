@@ -21,6 +21,13 @@ Item {
                 }))).map(i => all[i])
     readonly property var rows: networks.map(n => Lib.wifiRow(n))
 
+    // Quickshell lists a network that is not saved only while its device scans, so the section scans while it is drawn and never while idle.
+    function scan() {
+        wifi.forEach(d => d.scannerEnabled = visible);
+    }
+    onVisibleChanged: scan()
+    onWifiChanged: scan()
+
     // The item a key last acted on: the reorder its connect causes keeps the selection on it, and moving away lets it go.
     property var picked: null
     onSelectedChanged: {
