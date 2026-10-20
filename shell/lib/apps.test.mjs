@@ -140,7 +140,7 @@ test('a running fish takes the new colours at its next prompt', (t) => {
 // claude, pi, opencode and amx kept v1's dark palette, so on Paper and Artboard they drew dark boxes in a light terminal.
 test('the Claude Code theme starts from the light or dark preset of the theme and takes its tokens', () => {
   const a = JSON.parse(renderClaude(artboard));
-  assert.equal(a.name, 'qshell');
+  assert.equal(a.name, 'dots');
   assert.equal(a.base, 'light');
   assert.deepEqual([a.overrides.claude, a.overrides.text, a.overrides.inverseText, a.overrides.success, a.overrides.error], ['#3d5afe', '#15171b', '#ffffff', '#1a7f37', '#cf222e']);
   assert.equal(a.overrides.diffAdded, '#ddece1');
@@ -197,7 +197,7 @@ test('pi sets its optional colours and export page, and points at the pi.dev sch
 
 test('the pi theme names its appearance, sits on the terminal surface, and every colour resolves to a var', () => {
   const a = JSON.parse(renderPi(artboard));
-  assert.deepEqual([a.name, a.appearance, a.vars.background, a.vars.foreground, a.vars.accent], ['qshell', 'light', '#ffffff', '#15171b', '#3d5afe']);
+  assert.deepEqual([a.name, a.appearance, a.vars.background, a.vars.foreground, a.vars.accent], ['dots', 'light', '#ffffff', '#15171b', '#3d5afe']);
   assert.equal(JSON.parse(renderPi(blueprint)).appearance, 'dark');
   assert.ok(Object.keys(a.colors).length >= 51, `${Object.keys(a.colors).length} colours`);
   for (const [k, v] of Object.entries(a.colors)) assert.ok(v in a.vars, `${k}: ${v}`);

@@ -31,14 +31,14 @@
 #   amx, mem        amx's extensions/amx.ts is written by `amx setup pi` in
 #                   run_after_45-amx.sh; mem's by `mem doctor --fix` in
 #                   run_after_46-workflow.sh
-#   theme "qshell"  NOT WIRED — ~/.pi/agent/themes/qshell.json is unmanaged, so
-#                   a fresh machine falls back to pi's default theme
+#   theme "dots"    dots theme writes ~/.pi/agent/themes/dots.json from the
+#                   current theme on every switch
 set -euo pipefail
 
 managed=$(
   cat <<'JSON'
 {
-  "theme": "qshell",
+  "theme": "dots",
   "defaultProvider": "pxy",
   "defaultModel": "default",
   "defaultThinkingLevel": "medium",

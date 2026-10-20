@@ -274,7 +274,7 @@ export function renderChromium(t) {
   return JSON.stringify({ BrowserThemeColor: lower(t.color.surface), BrowserColorScheme: t.mode }, null, 2) + '\n';
 }
 
-// The coding agents draw inside foot, so each sits on surface with ink text; the configs v2 carries from v1 name the theme qshell.
+// The coding agents draw inside foot, so each sits on surface with ink text; Claude Code and pi name the theme dots, and opencode and amx keep v1's qshell.
 function agentColors(t) {
   const c = t.color;
   const a = c.ansi.map(lower);
@@ -310,7 +310,7 @@ export function renderClaude(t) {
     overrides[`rainbow_${k}`] = hues[k];
     overrides[`rainbow_${k}_shimmer`] = shimmer(hues[k]);
   }
-  return JSON.stringify({ name: 'qshell', base: t.mode, overrides }, null, 2) + '\n';
+  return JSON.stringify({ name: 'dots', base: t.mode, overrides }, null, 2) + '\n';
 }
 
 // pi's roles point at vars, so a theme only sets the vars.
@@ -339,7 +339,7 @@ export function renderPi(t) {
   a.forEach((hex, i) => (vars['color' + i] = hex));
   // Code takes the theme's syntax table, as kak and helix do.
   for (const k of ['comment', 'keyword', 'function', 'variable', 'string', 'value', 'type']) vars['syn' + k[0].toUpperCase() + k.slice(1)] = lower(t.syntax[k]);
-  return JSON.stringify({ $schema: 'https://pi.dev/schemas/theme.schema.json', name: 'qshell', appearance: t.mode, vars, colors: PI_COLORS, export: PI_EXPORT }, null, 2) + '\n';
+  return JSON.stringify({ $schema: 'https://pi.dev/schemas/theme.schema.json', name: 'dots', appearance: t.mode, vars, colors: PI_COLORS, export: PI_EXPORT }, null, 2) + '\n';
 }
 
 const OPENCODE_THEME = {

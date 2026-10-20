@@ -83,13 +83,16 @@ test('a switch writes the agent TUI themes into the apps that are installed, and
   for (const d of ['.claude', '.config/opencode', '.config/amx']) mkdirSync(join(home, d), { recursive: true });
   assert.equal(spawnSync(dots, ['theme', 'artboard'], { env: isolated(state) }).status, 0);
   const out = (f) => readFileSync(join(state, 'dots/theme-out', f), 'utf8');
-  assert.equal(readFileSync(join(home, '.claude/themes/qshell.json'), 'utf8'), out('claude.json'));
+  assert.equal(readFileSync(join(home, '.claude/themes/dots.json'), 'utf8'), out('claude.json'));
   assert.equal(readFileSync(join(home, '.config/opencode/themes/qshell.json'), 'utf8'), out('opencode.json'));
   assert.equal(readFileSync(join(home, '.config/amx/themes/qshell.toml'), 'utf8'), out('amx.toml'));
   assert.equal(JSON.parse(out('claude.json')).base, 'light');
   assert.deepEqual(readdirSync(home, { recursive: true }).filter((f) => f.startsWith('.pi')), []);
   assert.equal(spawnSync(dots, ['theme', 'blueprint'], { env: isolated(state) }).status, 0);
-  assert.equal(JSON.parse(readFileSync(join(home, '.claude/themes/qshell.json'), 'utf8')).base, 'dark');
+  assert.equal(JSON.parse(readFileSync(join(home, '.claude/themes/dots.json'), 'utf8')).base, 'dark');
+  mkdirSync(join(home, '.pi/agent'), { recursive: true });
+  assert.equal(spawnSync(dots, ['theme', 'paper'], { env: isolated(state) }).status, 0);
+  assert.equal(readFileSync(join(home, '.pi/agent/themes/dots.json'), 'utf8'), out('pi.json'));
 });
 
 // helix rereads its config, and with it the theme file, on USR1; this hx only answers on an empty WAYLAND_DISPLAY, so no real editor is reached.

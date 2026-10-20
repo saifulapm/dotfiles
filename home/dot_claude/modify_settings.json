@@ -187,7 +187,7 @@ managed=$(
   },
   "prefersReducedMotion": true,
   "skipDangerousModePermissionPrompt": true,
-  "theme": "custom:qshell"
+  "theme": "custom:dots"
 }
 JSON
 )

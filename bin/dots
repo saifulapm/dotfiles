@@ -96,7 +96,7 @@ reload_chromium() {
   fi
 }
 
-# Each coding agent's config names its theme qshell, and an agent not installed gets no file; cp writes in place, so a watcher on the file itself sees the change.
+# Each coding agent's config names the theme file below, and an agent not installed gets no file; cp writes in place, so a watcher on the file itself sees the change.
 reload_agents() {
   local home=${DOTS_AGENT_HOME:-$HOME} src dst
   while read -r src dst; do
@@ -104,8 +104,8 @@ reload_agents() {
     cmp -s "$1/$src" "$home/$dst" && continue
     mkdir -p "$(dirname "$home/$dst")" && cp "$1/$src" "$home/$dst" || return 1
   done <<'AGENTS'
-claude.json .claude/themes/qshell.json
-pi.json .pi/agent/themes/qshell.json
+claude.json .claude/themes/dots.json
+pi.json .pi/agent/themes/dots.json
 opencode.json .config/opencode/themes/qshell.json
 amx.toml .config/amx/themes/qshell.toml
 AGENTS
