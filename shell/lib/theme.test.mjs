@@ -37,6 +37,15 @@ test('ansi must hold 16 colours', () => {
   assert.throws(() => validateTheme(bad), /color\.ansi/);
 });
 
+test('every theme carries its code colours, each #RRGGBB', () => {
+  assert.equal(validateTheme(paper).syntax.keyword, '#66800B');
+  const bad = structuredClone(paper);
+  bad.syntax.string = 'teal';
+  assert.throws(() => validateTheme(bad), /syntax\.string: "teal"/);
+  delete bad.syntax;
+  assert.throws(() => validateTheme(bad), /missing \[syntax\]/);
+});
+
 test('the niri fragment sets the paper as background and the ink frame', () => {
   const kdl = renderNiri(validateTheme(paper));
   assert.match(kdl, /background-color "#F1E9D8"/);
@@ -236,7 +245,7 @@ test('a theme without shadow keys gets no shadow', () => {
 
 test('the foot OSC string sets the 16 colours, cursor and selection, then foreground and background', () => {
   const osc = renderFootOsc(load('blueprint'));
-  assert.ok(osc.startsWith('\x1b]4;0;#1B2B44\x1b\\'));
+  assert.ok(osc.startsWith('\x1b]4;0;#2E5A72\x1b\\'));
   assert.ok(osc.includes('\x1b]4;15;#FFFFFF\x1b\\'));
   assert.ok(osc.includes('\x1b]12;#7FE3F0\x1b\\\x1b]17;#7FE3F0\x1b\\\x1b]19;#0A1526\x1b\\'));
   assert.ok(osc.endsWith('\x1b]10;#D6F4F8\x1b\\\x1b]11;#0A1526\x1b\\'));

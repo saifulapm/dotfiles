@@ -5,16 +5,29 @@ mode = "dark"
 [color]
 paper = "#0C1A2E"
 ink = "#D6F4F8"
-muted = "#7FA6B8"
+muted = "#80A4C2"
 line = "#2E5A72"
 surface = "#0A1526"
 accent = "#7FE3F0"
 danger = "#FFB547"
-ok = "#8FE3A6"
+ok = "#ADDB67"
 ansi = [
-  "#1B2B44", "#FF6B6B", "#8FE3A6", "#FFB547", "#6CB4FF", "#C7A2FF", "#7FE3F0", "#D6F4F8",
-  "#2E5A72", "#FF8E8E", "#B2F0C4", "#FFCB7A", "#9ACBFF", "#DBC2FF", "#A8EEF6", "#FFFFFF",
+  "#2E5A72", "#EF5350", "#ADDB67", "#FFB547", "#82AAFF", "#C792EA", "#7FE3F0", "#D6F4F8",
+  "#80A4C2", "#FF5874", "#C5E478", "#FFEB95", "#82B1FF", "#C789D6", "#7FDBCA", "#FFFFFF",
 ]
+
+# Code colours, from Night Owl.
+[syntax]
+keyword = "#C792EA"
+function = "#82AAFF"
+string = "#ECC48D"
+type = "#FFCB8B"
+value = "#F78C6C"
+variable = "#D6DEEB"
+attribute = "#7FDBCA"
+meta = "#FF5874"
+builtin = "#7FDBCA"
+comment = "#637777"
 
 [primitive]
 paper = "grid"

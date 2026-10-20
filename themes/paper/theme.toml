@@ -5,16 +5,29 @@ mode = "light"
 [color]
 paper = "#F1E9D8"
 ink = "#1C1915"
-muted = "#6A6052"
-line = "#D8CDB6"
+muted = "#575653"
+line = "#CECDC3"
 surface = "#FAF6EC"
 accent = "#C8381E"
 danger = "#C8381E"
-ok = "#3D6B3A"
+ok = "#66800B"
 ansi = [
-  "#1C1915", "#C8381E", "#3D6B3A", "#A86A12", "#2C4A9A", "#7A3E7A", "#2F6F6A", "#D8CDB6",
-  "#6A6052", "#E0563A", "#55874F", "#C88A2E", "#4A68B8", "#985A98", "#4A8D87", "#FAF6EC",
+  "#1C1915", "#C8381E", "#66800B", "#8E6B01", "#205EA6", "#A02F6F", "#24837B", "#6F6E69",
+  "#575653", "#942822", "#536907", "#664D01", "#1A4F8C", "#87285E", "#1C6C66", "#878580",
 ]
+
+# Code colours, from Flexoki Light.
+[syntax]
+keyword = "#66800B"
+function = "#BC5215"
+string = "#24837B"
+type = "#8E6B01"
+value = "#BC5215"
+variable = "#1C1915"
+attribute = "#205EA6"
+meta = "#A02F6F"
+builtin = "#C8381E"
+comment = "#575653"
 
 [primitive]
 paper = "grain"
@@ -37,9 +50,9 @@ scale = 1.0
 gaps = 24
 border = 1
 blur = false
-border_inactive = "#6A6052"
+border_inactive = "#575653"
 shadow_softness = 0
 shadow_spread = 0
 shadow_offset = [3, 3]
 shadow_color = "#1C1915"
-shadow_inactive = "#6A6052"
+shadow_inactive = "#575653"

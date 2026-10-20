@@ -10,9 +10,9 @@ const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../theme
 test('Paper: a 220 px Instrument Serif clock in ink over an italic serif date', () => {
   assert.deepEqual(lockLook(load('paper'), 'saiful'), {
     kind: 'print',
-    status: { text: 'LOCKED', color: '#6A6052' },
+    status: { text: 'LOCKED', color: '#575653' },
     clock: { family: 'Instrument Serif', px: 220, bold: false, tracking: -4.4, fill: '#1C1915', stroke: 'transparent' },
-    date: { format: 'dddd, d MMMM', caps: false, family: 'Instrument Serif', px: 30, italic: true, tracking: 0, color: '#6A6052' },
+    date: { format: 'dddd, d MMMM', caps: false, family: 'Instrument Serif', px: 30, italic: true, tracking: 0, color: '#575653' },
     prompt: 'PASSWORD FOR SAIFUL',
     hint: 'press return to unlock',
   });

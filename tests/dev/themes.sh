@@ -39,7 +39,7 @@ check "the state file reads blueprint" test "$(<"$XDG_STATE_HOME/dots/theme")" =
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 until_ok 1000 status_theme blueprint
 check "shell status reports blueprint" status_theme blueprint
-check "tmux status-style carries #7fa6b8 ($(tmux show -g status-style))" bash -c 'tmux show -g status-style | grep -q "#7fa6b8"'
+check "tmux status-style carries #80a4c2 ($(tmux show -g status-style))" bash -c 'tmux show -g status-style | grep -q "#80a4c2"'
 check "GTK prefers dark ($(gtk_scheme))" test "$(gtk_scheme)" = "'prefer-dark'"
 check "GTK draws with the theme's UI font ($(gtk_font))" test "$(gtk_font)" = "'Maple Mono 11'"
 json_has() { jq -e "$2" "$1" >/dev/null; }

@@ -66,8 +66,8 @@ test('Blueprint dresses the picker: THEMES // 3 SHEETS, ACTIVE: BLUEPRINT, numbe
 
 test('a specimen window is framed as niri frames it: Paper ink then muted, hard 2,2 shadows', () => {
   assert.deepEqual(windowLook(paper, true), { fill: '#FAF6EC', frame: { width: 1, color: '#1C1915' }, shadow: { x: 2, y: 2, blur: 0, color: '#1C1915' }, radius: 0 });
-  assert.deepEqual(windowLook(paper, false).frame, { width: 1, color: '#6A6052' });
-  assert.equal(windowLook(paper, false).shadow.color, '#6A6052');
+  assert.deepEqual(windowLook(paper, false).frame, { width: 1, color: '#575653' });
+  assert.equal(windowLook(paper, false).shadow.color, '#575653');
 });
 
 test('Artboard rings only the focused window in blue, rounds both, and shades the other at 0.75 as niri does', () => {
@@ -100,12 +100,12 @@ test('the terminal reads four lines in the ANSI colours: blue path, red prompt, 
   assert.deepEqual(lines.map((l) => l.map((r) => r.text).join('')), [
     '~/S/g/dotfiles ❯ just test', '✓ 42 passed · 0.9 s', '~/S/g/dotfiles ❯ git log -1', 'a1e9e71 blueprint on the shelf',
   ]);
-  assert.deepEqual([lines[0][0].color, lines[0][1].color, lines[1][0].color, lines[3][0].color], ['#6CB4FF', '#FF6B6B', '#8FE3A6', '#FFB547']);
+  assert.deepEqual([lines[0][0].color, lines[0][1].color, lines[1][0].color, lines[3][0].color], ['#82AAFF', '#EF5350', '#ADDB67', '#FFB547']);
 });
 
 test('the palette strip is ink, ANSI 1 to 6 and the paper', () => {
-  assert.deepEqual(swatches(paper), ['#1C1915', '#C8381E', '#3D6B3A', '#A86A12', '#2C4A9A', '#7A3E7A', '#2F6F6A', '#F1E9D8']);
-  assert.deepEqual(swatches(blueprint), ['#D6F4F8', '#FF6B6B', '#8FE3A6', '#FFB547', '#6CB4FF', '#C7A2FF', '#7FE3F0', '#0C1A2E']);
+  assert.deepEqual(swatches(paper), ['#1C1915', '#C8381E', '#66800B', '#8E6B01', '#205EA6', '#A02F6F', '#24837B', '#F1E9D8']);
+  assert.deepEqual(swatches(blueprint), ['#D6F4F8', '#EF5350', '#ADDB67', '#FFB547', '#82AAFF', '#C792EA', '#7FE3F0', '#0C1A2E']);
 });
 
 test('the specimen margins read one scene in each voice: 03 — FOOT, Page 03 / foot, [03] FOOT', () => {

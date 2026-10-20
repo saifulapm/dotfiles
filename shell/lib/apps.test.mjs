@@ -58,6 +58,13 @@ test('kakoune colorscheme defines the core faces from the tokens', () => {
   assert.match(kak, /^face global StatusLine rgb:d6f4f8,rgb:2e5a72$/m);
 });
 
+test('kakoune colours code from the theme\'s syntax table', () => {
+  const kak = renderKak(blueprint);
+  assert.match(kak, /^face global keyword rgb:c792ea\+b$/m);
+  assert.match(kak, /^face global string rgb:ecc48d$/m);
+  assert.match(kak, /^face global comment rgb:637777\+i$/m);
+});
+
 test('gtk.css defines the window and accent colours', () => {
   const css = renderGtkCss(blueprint);
   assert.match(css, /^@define-color window_bg_color #0c1a2e;$/m);
@@ -92,7 +99,7 @@ test('yazi theme sets the keys yazi 26.9 reads', () => {
   assert.match(y, /^hovered = \{ fg = "#0a1526", bg = "cyan" \}$/m);
   assert.match(y, /^\[mode\]$/m);
   assert.match(y, /^\[status\]$/m);
-  assert.match(y, /^border_style = \{ fg = "darkgray" \}$/m);
+  assert.match(y, /^border_style = \{ fg = "black" \}$/m);
   // Named colours follow the terminal palette, so a running yazi recolours live.
   const named = y.match(/"[a-z]+"/g).length;
   const hex = y.match(/"#[0-9a-f]{6}"/g).length;
@@ -127,8 +134,8 @@ test('the Claude Code theme starts from the light or dark preset of the theme an
   const a = JSON.parse(renderClaude(artboard));
   assert.equal(a.name, 'qshell');
   assert.equal(a.base, 'light');
-  assert.deepEqual([a.overrides.claude, a.overrides.text, a.overrides.inverseText, a.overrides.success, a.overrides.error], ['#3d5afe', '#15171b', '#ffffff', '#1f8a4c', '#d93a3a']);
-  assert.equal(a.overrides.diffAdded, '#ddede4');
+  assert.deepEqual([a.overrides.claude, a.overrides.text, a.overrides.inverseText, a.overrides.success, a.overrides.error], ['#3d5afe', '#15171b', '#ffffff', '#1a7f37', '#cf222e']);
+  assert.equal(a.overrides.diffAdded, '#ddece1');
   const b = JSON.parse(renderClaude(blueprint));
   assert.equal(b.base, 'dark');
   assert.equal(b.overrides.claude, '#7fe3f0');
@@ -151,6 +158,6 @@ test('the opencode theme sits on the terminal surface and every theme key resolv
 test('the amx theme sets its six roles from the tokens', () => {
   assert.equal(
     renderAmx(artboard),
-    ['waiting = "#b7791f"', 'done = "#1f8a4c"', 'failed = "#d93a3a"', 'stopped = "#5f6672"', 'accent = "#3d5afe"', 'cursor = "#e3e6eb"', ''].join('\n'),
+    ['waiting = "#9a6700"', 'done = "#1a7f37"', 'failed = "#cf222e"', 'stopped = "#57606a"', 'accent = "#3d5afe"', 'cursor = "#d0d7de"', ''].join('\n'),
   );
 });

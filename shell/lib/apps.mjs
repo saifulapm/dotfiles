@@ -53,20 +53,21 @@ export function renderTmux(t) {
 
 export function renderKak(t) {
   const c = t.color;
+  const s = t.syntax;
   const faces = [
-    ['value', `${rgb(c.danger)}`],
-    ['type', `${rgb(c.accent)}`],
-    ['variable', `${rgb(c.ok)}`],
-    ['module', `${rgb(c.ok)}`],
-    ['function', `${rgb(c.accent)}`],
-    ['string', `${rgb(c.ok)}`],
-    ['keyword', `${rgb(c.accent)}+b`],
+    ['value', `${rgb(s.value)}`],
+    ['type', `${rgb(s.type)}`],
+    ['variable', `${rgb(s.variable)}`],
+    ['module', `${rgb(s.type)}`],
+    ['function', `${rgb(s.function)}`],
+    ['string', `${rgb(s.string)}`],
+    ['keyword', `${rgb(s.keyword)}+b`],
     ['operator', `${rgb(c.ink)}`],
-    ['attribute', `${rgb(c.danger)}`],
-    ['comment', `${rgb(c.muted)}+i`],
+    ['attribute', `${rgb(s.attribute)}`],
+    ['comment', `${rgb(s.comment)}+i`],
     ['documentation', 'comment'],
-    ['meta', `${rgb(c.danger)}`],
-    ['builtin', `${rgb(c.ink)}+b`],
+    ['meta', `${rgb(s.meta)}`],
+    ['builtin', `${rgb(s.builtin)}+b`],
     ['title', `${rgb(c.accent)}+b`],
     ['header', `${rgb(c.accent)}`],
     ['mono', `${rgb(c.ok)}`],

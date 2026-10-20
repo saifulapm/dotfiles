@@ -23,7 +23,7 @@ test("Artboard's launcher follows its board: a search glyph, an Apps pill, icon 
   assert.deepEqual([a.label.kind, a.label.text('apps'), a.label.fill, a.label.color], ['pill', 'Apps', '#EEF1FF', '#3D5AFE']);
   assert.deepEqual([a.slot, a.tile.size, a.tile.fill], ['icon', 32, '#F2F3F6']);
   assert.deepEqual([a.cursor.fill, a.cursor.text, a.cursor.radius, a.cursor.badge], ['#EEF1FF', '#2638C9', 10, '↵']);
-  assert.deepEqual([a.name.size, a.name.weight, a.cursor.weight, a.detail.size, a.detail.color], [15, 500, 600, 12, '#5F6672']);
+  assert.deepEqual([a.name.size, a.name.weight, a.cursor.weight, a.detail.size, a.detail.color], [15, 500, 600, 12, '#57606A']);
   assert.equal(a.count(3), '');
 });
 

@@ -7,6 +7,7 @@ const MENUS = {
   motion: ['spring', 'snappy', 'ease', 'typewriter', 'linear'],
 };
 const COLORS = ['paper', 'ink', 'muted', 'line', 'surface', 'accent', 'danger', 'ok'];
+const SYNTAX = ['keyword', 'function', 'string', 'type', 'value', 'variable', 'attribute', 'meta', 'builtin', 'comment'];
 const FONTS = ['Maple Mono', 'Instrument Serif'];
 const VOICES = ['plain', 'caps', 'bracket'];
 const HEX = /^#[0-9A-Fa-f]{6}$/;
@@ -22,6 +23,8 @@ export function validateTheme(doc) {
   if (!Array.isArray(color.ansi) || color.ansi.length !== 16 || !color.ansi.every((c) => HEX.test(c))) {
     fail('color.ansi must hold 16 #RRGGBB colours');
   }
+  const syntax = doc.syntax ?? fail('missing [syntax]');
+  for (const k of SYNTAX) if (!HEX.test(syntax[k] ?? '')) fail(`syntax.${k}: "${syntax[k]}" is not #RRGGBB`);
   const primitive = doc.primitive ?? fail('missing [primitive]');
   for (const [k, menu] of Object.entries(MENUS)) {
     if (!menu.includes(primitive[k])) fail(`primitive.${k}: "${primitive[k]}" is not one of ${menu.join(', ')}`);
@@ -37,6 +40,7 @@ export function validateTheme(doc) {
     name: meta.name,
     mode: meta.mode,
     color: Object.assign({}, color, { ansi: [...color.ansi] }),
+    syntax: Object.assign({}, syntax),
     primitive: Object.assign({}, primitive),
     paper: Object.assign({}, doc.paper),
     type: { display: type.display, ui: type.ui, mono: type.mono, voice: type.voice, scale: type.scale ?? 1 },
