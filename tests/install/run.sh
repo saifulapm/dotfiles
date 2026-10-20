@@ -176,6 +176,9 @@ pwv=$(as_user "mise exec -- playwright-cli --version" 2>&1)
 check "playwright-cli --version prints a version (got '$pwv')" grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' <<<"$pwv"
 v1=$(as_user "find ~/.claude ~/.pi ~/.agents ~/.config/playwright ~/.config/playwright-cli -type l -lname '*/.dotfiles/*'" 2>&1)
 check "nothing Claude Code or pi loads links into v1 (got '$v1')" test -z "$v1"
+# A skill comes from the dotfiles, the skills repo, amx setup, playwright-cli, or workflow install, the one writer of real folders into both skill folders.
+stray=$(as_user 'for e in ~/.claude/skills/*; do n=${e##*/}; t=$(readlink -f "$e/SKILL.md"); case $t in "$HOME"/Sites/github/dotfiles/* | "$HOME"/.local/src/skills/*) continue ;; esac; [[ $n == amx || $n == playwright-cli ]] && continue; [[ ! -L $e && -d ~/.agents/skills/$n && ! -L ~/.agents/skills/$n ]] && continue; echo "$n"; done')
+check "every skill in \$HOME/.claude/skills comes from one of the five sources (got strays '$stray')" test -z "$stray"
 dropped=$(as_user "find ~/.config -iname '*herdr*' -o -iname '*kitty*' -o -iname '*vicinae*'")
 check "nothing for herdr, kitty or vicinae under ~/.config (got '$dropped')" test -z "$dropped"
 
