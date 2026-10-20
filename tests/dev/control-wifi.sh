@@ -19,6 +19,10 @@ select_row() {
   done
   return 1
 }
+# Presses Enter on the row titled $1, or fails the check when that row cannot be selected.
+enter_on() {
+  if until_ok 3000 select_row "$1"; then wtype -k Return; else echo "FAIL the row $1 is listed and selected"; fails=$((fails + 1)); fi
+}
 
 # Quickshell's NetworkManager client talks to the system bus, which in the nested session is the nested session bus.
 bus() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" "$@"; }
@@ -57,13 +61,11 @@ check "Dots Home reads known" detail_is "Dots Home" known
 check "Dots Open reads its signal, 70%" detail_is "Dots Open" "70%"
 check "Dots Secured reads its signal, 40%" detail_is "Dots Secured" "40%"
 
-until_ok 3000 select_row "Dots Open"
-wtype -k Return
+enter_on "Dots Open"
 until_ok 3000 detail_is "Dots Open" connected
 check "Enter on the open Dots Open connects it" detail_is "Dots Open" connected
 
-until_ok 3000 select_row "Dots Home"
-wtype -k Return
+enter_on "Dots Home"
 until_ok 3000 detail_is "Dots Home" connected
 check "Enter on the known Dots Home connects it" detail_is "Dots Home" connected
 check "and Dots Open, saved by its join, reads known" detail_is "Dots Open" known
