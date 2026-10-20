@@ -20,6 +20,8 @@ for dest in "$HOME/.claude/skills" "$HOME/.agents/skills"; do
   for skill in "$src"/skills/*/; do
     skill=${skill%/}
     name=${skill##*/}
+    # A pull leaves a dropped skill's folder behind when it holds untracked files.
+    [[ -f $skill/SKILL.md ]] || continue
     # The dotfiles' own copy of a skill wins, in both folders.
     [[ -e $ours/$name ]] && continue
     link=$dest/$name
@@ -27,8 +29,8 @@ for dest in "$HOME/.claude/skills" "$HOME/.agents/skills"; do
     if [[ -e $link || -L $link ]] && [[ $(readlink "$link") != "$src"/* ]]; then continue; fi
     ln -sfn "$skill" "$link"
   done
-  # A skill the repo dropped leaves a link of ours pointing at nothing.
+  # A skill the repo dropped leaves a link of ours to nothing, or to a folder without SKILL.md.
   for link in "$dest"/*; do
-    if [[ -L $link && ! -e $link && $(readlink "$link") == "$src"/* ]]; then rm -f "$link"; fi
+    if [[ -L $link && ! -f $link/SKILL.md && $(readlink "$link") == "$src"/* ]]; then rm -f "$link"; fi
   done
 done

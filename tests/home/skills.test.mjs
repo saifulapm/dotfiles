@@ -118,3 +118,19 @@ test('the script re-renders once gh is logged in and once the clone gains a skil
   mkdirSync(join(home, '.local/src/skills/skills/pdf'), { recursive: true });
   assert.notEqual(render(home), loggedIn);
 });
+
+// A pull leaves a dropped skill's folder behind when it holds untracked files, so a folder counts as a skill only while it has SKILL.md.
+test('a folder without SKILL.md is not linked, and a link to one is removed', () => {
+  const home = scratch({ loggedIn: true });
+  const up = upstream(home, ['pdf']);
+  assert.equal(apply(home, up).status, 0);
+  mkdirSync(join(home, '.local/src/skills/skills/stop-slop'));
+  rmSync(join(home, '.local/src/skills/skills/pdf/SKILL.md'));
+  writeFileSync(join(home, '.local/src/skills/skills/pdf/notes.txt'), 'left behind\n');
+  const r = apply(home, up);
+  assert.equal(r.status, 0, r.stderr);
+  for (const dir of ['.claude/skills', '.agents/skills']) {
+    assert.throws(() => lstatSync(join(home, dir, 'stop-slop')), dir);
+    assert.throws(() => lstatSync(join(home, dir, 'pdf')), dir);
+  }
+});
