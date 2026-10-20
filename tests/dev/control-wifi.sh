@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Control's Wi-Fi section lists a fake NetworkManager's networks; Enter joins an open and a known network with no password.
+# Control's Wi-Fi section lists a fake NetworkManager's networks; Enter joins an open and a known network with no password, and a new secured one through a masked password line.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -27,30 +27,41 @@ enter_on() {
 # Quickshell's NetworkManager client talks to the system bus, which in the nested session is the nested session bus.
 bus() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" "$@"; }
 nm=/org/freedesktop/NetworkManager
-wlan0=$nm/Devices/1
-secured_ap=$nm/AccessPoint/3
 last_psk() { bus call org.freedesktop.NetworkManager "$nm" org.dots.FakeNM LastPsk 2>/dev/null; }
 last_psk_is() { [ "$(last_psk)" = "s \"$1\"" ]; }
 
+# The polkit prompt's password field is the look the Wi-Fi line copies, so its fake authority runs too.
+polkit() { bus call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit "$@"; }
+pk_state() { timeout 0.5 qs ipc call polkit state 2>/dev/null; }
+pk_is() { pk_state | jq -e "$1" >/dev/null 2>&1; }
+
 DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-networkmanager" &
 fake_pid=$!
-cleanup() { kill "$fake_pid" 2>/dev/null; }
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" &
+polkit_pid=$!
+cleanup() { kill "$fake_pid" "$polkit_pid" 2>/dev/null; }
 fake_up() { bus status org.freedesktop.NetworkManager >/dev/null 2>&1; }
 until_ok 5000 fake_up
 check "the NetworkManager double owns its name on the nested bus" fake_up
+until_ok 3000 polkit Registered >/dev/null 2>&1
 # Quickshell looks for NetworkManager once, when the shell starts, so the shell restarts to find the double.
 systemctl --user restart "$DOTS_DEV_UNIT"
 surfaces_mapped() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces")' >/dev/null; }
 until_ok 10000 surfaces_mapped
 until_ok 5000 shell_status >/dev/null
+until_ok 5000 pk_is .registered
 
-niri msg action spawn -- qs ipc call control toggle
 control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
-until_ok 3000 section_is audio
-until_ok 3000 control_focus
-until_ok 3000 state_is '.keyboard'
-wtype -k Tab
-until_ok 2000 section_is wifi
+# Opens Control and tabs once, to Wi-Fi.
+open_wifi() {
+  niri msg action spawn -- qs ipc call control toggle
+  until_ok 3000 section_is audio
+  until_ok 3000 control_focus
+  until_ok 3000 state_is '.keyboard'
+  wtype -k Tab
+  until_ok 2000 section_is wifi
+}
+open_wifi
 check "Tab once is wifi" section_is wifi
 
 three_rows() { state_is '.rows == ["Dots Home", "Dots Open", "Dots Secured"]'; }
@@ -70,14 +81,82 @@ until_ok 3000 detail_is "Dots Home" connected
 check "Enter on the known Dots Home connects it" detail_is "Dots Home" connected
 check "and Dots Open, saved by its join, reads known" detail_is "Dots Open" known
 check "no password went to NetworkManager (LastPsk is empty)" last_psk_is ""
+check "Enter on an open and on a known network opens no password line" state_is '.line == false and .pskLength == 0'
 
-# The UI cannot type a password yet, so this drives the double directly, the way connectWithPsk calls it.
-bus call org.freedesktop.NetworkManager "$nm" org.freedesktop.NetworkManager AddAndActivateConnection 'a{sa{sv}}oo' \
-  1 802-11-wireless-security 1 psk s dots-secret-1 "$wlan0" "$secured_ap" >/dev/null
+line_open() { state_is '.open and .section == "wifi" and .line == true'; }
+no_line() { state_is '.open and .section == "wifi" and .line == false and .pskLength == 0 and .lineText == ""'; }
+# Types $1 into the line and waits until the field holds that many characters.
+type_psk() { wtype "$1"; until_ok 2000 state_is --argjson n "${#1}" '.pskLength == $n'; }
+# Neither typed password ever shows in Control's state or the shell's journal.
+state_clean() { ! control_state | grep -q -e dots-secret-1 -e nope; }
+journal_clean() { ! journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat 2>/dev/null | grep -q -e dots-secret-1 -e nope; }
+
+# Esc closes the line and leaves Control on Wi-Fi; j and k are letters of a password, not moves.
+enter_on "Dots Secured"
+until_ok 3000 line_open
+check "Enter on the new secured Dots Secured opens the password line" line_open
+row=$(control_state | jq .selected)
+type_psk jk
+check "the line takes j and k as letters, drawn as two dots ($(control_state | jq -c '{pskLength, lineText, selected}'))" \
+  state_is --argjson r "$row" '.pskLength == 2 and .lineText == "••" and .selected == $r'
+wtype -k Escape
+until_ok 2000 no_line
+check "Esc closes the line, empties it and leaves Control open on Wi-Fi" no_line
+wtype -k Escape
+until_ok 2000 state_is '.open == false'
+check "a second Esc closes Control" state_is '.open == false'
+open_wifi
+check "Control reopens with no line and an empty field" no_line
+wtype -k Escape
+until_ok 2000 state_is '.open == false and .drawing == false'
+
+# In each theme the line is drawn as the polkit prompt's password field, and a wrong password says so in the theme's voice.
+look_keys='(.font | type == "string" and length > 0) and (.px | type == "number" and . > 0) and (.ink | type == "string") and (.border | type == "string") and (.placeholder | type == "string")'
+same_look() { jq -e -n --argjson a "$1" --argjson b "$2" "\$a == \$b and (\$a | $look_keys)" >/dev/null 2>&1; }
+status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
+in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+n=0
+for t in "paper|WRONG PASSWORD" "artboard|Wrong password" "blueprint|WRONG PASSWORD"; do
+  n=$((n + 1))
+  theme=${t%%|*}
+  wrong=${t#*|}
+  in_theme "$theme"
+  polkit Begin s "w$n" >/dev/null
+  until_ok 3000 pk_is '.open and .settled'
+  pk_look=$(pk_state | jq -c .fieldLook)
+  wtype -k Escape
+  until_ok 3000 pk_is '(.open | not) and .drawing == false'
+  open_wifi
+  enter_on "Dots Secured"
+  until_ok 3000 line_open
+  wifi_look=$(control_state | jq -c .lineLook)
+  check "$theme: the line's field is drawn as the polkit field ($wifi_look, polkit $pk_look)" same_look "$wifi_look" "$pk_look"
+  type_psk nope
+  check "$theme: four typed characters draw four dots" state_is '.lineText == "••••"'
+  check "$theme: and no state field holds the typed text" state_clean
+  wtype -k Return
+  until_ok 3000 state_is --arg m "$wrong" '.lineMessage == $m'
+  check "$theme: a wrong password keeps the line open and empty and reads $wrong ($(control_state | jq -c '{line, pskLength, lineText, lineMessage}'))" \
+    state_is --arg m "$wrong" '.line == true and .pskLength == 0 and .lineText == "" and .lineMessage == $m'
+  wtype -k Escape
+  until_ok 2000 no_line
+  wtype -k Escape
+  until_ok 2000 state_is '.open == false and .drawing == false'
+done
+
+open_wifi
+enter_on "Dots Secured"
+until_ok 3000 line_open
+type_psk dots-secret-1
+check "the line draws dots-secret-1 as 13 dots" state_is '.lineText == "•••••••••••••"'
+check "and no state field holds the typed text" state_clean
+wtype -k Return
 until_ok 3000 detail_is "Dots Secured" connected
-echo "     state: $(control_state | jq -c '{rows, details, selected}')"
-check "a join of Dots Secured with the right PSK connects it" detail_is "Dots Secured" connected
+echo "     state: $(control_state | jq -c '{rows, details, selected, line, lineMessage}')"
+check "Enter on the line joins Dots Secured with the typed password" detail_is "Dots Secured" connected
 check "and the double recorded that PSK" last_psk_is dots-secret-1
+check "and the line closes" no_line
+check "the shell's journal holds neither typed password" journal_clean
 
 exit $((fails > 0))
 }

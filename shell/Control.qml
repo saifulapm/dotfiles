@@ -4,7 +4,7 @@ import "." as Root
 import "lib/control.mjs" as Lib
 import "lib/voice.mjs" as V
 
-// A section is an Item with: required property var theme; property int selected; readonly property var rows ([{title, detail}]); function key(event): bool for keys other than Tab, Shift+Tab, j/k, Up/Down and Esc; function state(): object; its implicitHeight sizes its band above the rows.
+// A section is an Item with: required property var theme; property int selected; readonly property var rows ([{title, detail}]); function key(event): bool for keys other than Tab, Shift+Tab, j/k, Up/Down and Esc, or for every key while its optional typing is true; function state(): object; its implicitHeight sizes its band above the rows.
 Item {
     id: control
 
@@ -95,6 +95,12 @@ Item {
     visible: motion.drawing
 
     Keys.onPressed: event => {
+        // A section's open password line takes every key first, so j, k and Tab type and Esc closes only the line.
+        if (section.typing) {
+            section.key(event);
+            event.accepted = true;
+            return;
+        }
         const back = event.key === Qt.Key_Backtab || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier));
         if (back)
             current = Lib.cycle(current, -1);
