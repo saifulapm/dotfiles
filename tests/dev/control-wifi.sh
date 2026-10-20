@@ -107,7 +107,13 @@ until_ok 2000 state_is '.open == false'
 check "a second Esc closes Control" state_is '.open == false'
 open_wifi
 check "Control reopens with no line and an empty field" no_line
-wtype -k Escape
+# Closed any other way, Control clears the typed password at once, before its close stops drawing.
+enter_on "Dots Secured"
+until_ok 3000 line_open
+type_psk ab
+timeout 0.5 qs ipc call control toggle >/dev/null
+check "closing Control by its toggle clears the typed password at once ($(control_state | jq -c '{open, drawing, line, pskLength}'))" \
+  state_is '.open == false and .drawing == true and .line == false and .pskLength == 0'
 until_ok 2000 state_is '.open == false and .drawing == false'
 
 # In each theme the line is drawn as the polkit prompt's password field, and a wrong password says so in the theme's voice.
@@ -116,10 +122,9 @@ same_look() { jq -e -n --argjson a "$1" --argjson b "$2" "\$a == \$b and (\$a | 
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 n=0
-for t in "paper|WRONG PASSWORD" "artboard|Wrong password" "blueprint|WRONG PASSWORD"; do
+for t in "paper|WRONG PASSWORD|↵ JOIN · ESC CANCEL|↵ CONNECT · D FORGET" "artboard|Wrong password|↵ join · esc cancel|↵ connect · d forget" "blueprint|WRONG PASSWORD|↵ JOIN · ESC CANCEL|↵ CONNECT · D FORGET"; do
   n=$((n + 1))
-  theme=${t%%|*}
-  wrong=${t#*|}
+  IFS='|' read -r theme wrong join_hint connect_hint <<<"$t"
   in_theme "$theme"
   polkit Begin s "w$n" >/dev/null
   until_ok 3000 pk_is '.open and .settled'
@@ -129,6 +134,7 @@ for t in "paper|WRONG PASSWORD" "artboard|Wrong password" "blueprint|WRONG PASSW
   open_wifi
   enter_on "Dots Secured"
   until_ok 3000 line_open
+  check "$theme: with the line open the hint reads $join_hint ($(control_state | jq -c .hint))" state_is --arg h "$join_hint" '.hint == $h'
   wifi_look=$(control_state | jq -c .lineLook)
   check "$theme: the line's field is drawn as the polkit field ($wifi_look, polkit $pk_look)" same_look "$wifi_look" "$pk_look"
   type_psk nope
@@ -140,6 +146,7 @@ for t in "paper|WRONG PASSWORD" "artboard|Wrong password" "blueprint|WRONG PASSW
     state_is --arg m "$wrong" '.line == true and .pskLength == 0 and .lineText == "" and .lineMessage == $m'
   wtype -k Escape
   until_ok 2000 no_line
+  check "$theme: with the line closed the hint reads $connect_hint ($(control_state | jq -c .hint))" state_is --arg h "$connect_hint" '.hint == $h'
   wtype -k Escape
   until_ok 2000 state_is '.open == false and .drawing == false'
 done

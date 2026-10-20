@@ -118,6 +118,7 @@ Item {
     function state() {
         return {
             details: rows.map(r => r.detail),
+            hint: line.text,
             line: typing,
             pskLength: psk.length,
             lineText: dots.text,
@@ -142,7 +143,7 @@ Item {
             id: line
             textFormat: Text.PlainText
             leftPadding: 20
-            text: section.look.tabText(section.wifi.length ? "↵ connect · d forget" : "No Wi-Fi")
+            text: section.look.tabText(!section.wifi.length ? "No Wi-Fi" : section.typing ? "↵ join · esc cancel" : "↵ connect · d forget")
             color: section.look.small.color
             font.family: section.look.small.font
             font.pixelSize: section.look.small.size
