@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Stands in for wf-recorder in a nested session: the real one, unless a check asks for one that ignores SIGINT.
+if [ -e "${DOTS_DEV_DIR:-/nonexistent}/wf-recorder-stuck" ]; then
+  trap '' INT
+  while :; do sleep 1; done
+fi
+exec /usr/bin/wf-recorder "$@"

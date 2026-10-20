@@ -20,6 +20,8 @@ Item {
     property string file: ""
     // Set when Enter hides the picker; the recording starts on the next frame, so the picker is never in it.
     property bool pending: false
+    // Set when the stop timer kills wf-recorder, so its notice says so.
+    property bool forced: false
     readonly property string dir: Quickshell.env("DOTS_RECORDINGS_DIR") || Quickshell.env("HOME") + "/Videos/Recordings"
 
     readonly property var c: theme.color
@@ -58,9 +60,10 @@ Item {
         motion.cut();
     }
 
-    // SIGINT lets wf-recorder finish the file.
+    // SIGINT lets wf-recorder finish the file; one that has not exited 5 s later is killed.
     function stop() {
         proc.signal(2);
+        forceStop.restart();
     }
 
     function swapped() {
@@ -83,6 +86,27 @@ Item {
     Process {
         id: proc
         onRunningChanged: Root.State.recordingSince = running ? Date.now() : 0
+        // The recording ends with a notice either way, so one that failed at the start or was killed does not just vanish.
+        onExited: (code, status) => {
+            forceStop.stop();
+            const name = recorder.file.slice(recorder.file.lastIndexOf("/") + 1);
+            if (recorder.forced)
+                Quickshell.execDetached(["notify-send", "-u", "critical", "-a", "Recorder", "Recording stopped by force", name + " may be cut short"]);
+            else if (code === 0 && status === 0)
+                Quickshell.execDetached(["notify-send", "-a", "Recorder", "Recording saved", name]);
+            else
+                Quickshell.execDetached(["notify-send", "-u", "critical", "-a", "Recorder", "Recording failed", "wf-recorder exited " + code]);
+            recorder.forced = false;
+        }
+    }
+
+    Root.Tick {
+        id: forceStop
+        interval: 5000
+        onTriggered: {
+            recorder.forced = true;
+            proc.signal(9);
+        }
     }
 
     Component.onCompleted: Root.State.loaded.push("recorder")
