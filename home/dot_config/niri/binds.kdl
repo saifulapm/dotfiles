@@ -127,4 +127,5 @@ binds {
     XF86KbdBrightnessUp allow-when-locked=true hotkey-overlay-title="Keyboard Light Up" { spawn "brightnessctl" "-q" "-d" "kbd_backlight" "set" "10%+"; }
     XF86KbdBrightnessDown allow-when-locked=true hotkey-overlay-title="Keyboard Light Down" { spawn "brightnessctl" "-q" "-d" "kbd_backlight" "set" "10%-"; }
     XF86Search hotkey-overlay-title="Launcher" { spawn "dots-call" "launcher" "toggle"; }
+    XF86PowerOff hotkey-overlay-title="Power" { spawn "dots-call" "control" "section" "power"; }
 }

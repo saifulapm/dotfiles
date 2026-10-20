@@ -144,6 +144,13 @@ test('picture-in-picture, viewers and Chromium sign-in and sharing windows float
   assert.match(block(/footclient/), /scroll-factor 1\.5/);
 });
 
+// niri suspends on the power key before any bind unless its handling is off, and Asahi's resume can leave the display dead.
+test('the power key opens Control on Power instead of suspending', () => {
+  const config = readFileSync(new URL('../../home/dot_config/niri/config.kdl', import.meta.url), 'utf8');
+  assert.match(config, /^input \{[^]*?^\s+disable-power-key-handling$[^]*?^\}$/m);
+  assert.match(binds, spawns('XF86PowerOff', ['dots-call', 'control', 'section', 'power']));
+});
+
 test('niri shows no hotkey overlay at login, so the artboard is the first thing on screen', () => {
   const config = readFileSync(new URL('../../home/dot_config/niri/config.kdl', import.meta.url), 'utf8');
   assert.match(config, /^hotkey-overlay \{\n\s+skip-at-startup\n\}$/m);

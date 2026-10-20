@@ -30,6 +30,8 @@ input {
         click-method "clickfinger"
         scroll-factor 0.8
     }
+    // niri would suspend on the power key, and logind ignores it, so the key reaches its bind.
+    disable-power-key-handling
 }
 
 cursor {
