@@ -78,10 +78,13 @@ export async function identity(m, from) {
   if (r.code !== 0) throw new Error('age-keygen: ' + r.stderr);
 }
 
+// The one place a sync test starts a process: as machine m, in its scratch env.
+const start = (m, cmd, args) => spawn(cmd, args, { env: checked(m.env) });
+
 // Runs cmd with args as machine m and resolves its exit code and output.
 function run(m, cmd, args) {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { env: checked(m.env) });
+    const p = start(m, cmd, args);
     let stdout = '';
     let stderr = '';
     p.stdout.on('data', (d) => (stdout += d));
@@ -96,7 +99,7 @@ export function holdLock(m, seconds) {
   const dir = join(m.env.XDG_STATE_HOME, 'dots');
   mkdirSync(dir, { recursive: true });
   return new Promise((resolve, reject) => {
-    const p = spawn('flock', [join(dir, 'dots-sync.lock'), '-c', `echo held; sleep ${seconds}`], { env: checked(m.env) });
+    const p = start(m, 'flock', [join(dir, 'dots-sync.lock'), '-c', `echo held; sleep ${seconds}`]);
     const freed = new Promise((done) => p.on('close', done));
     p.on('error', reject);
     p.stdout.once('data', () => resolve({ freed }));
