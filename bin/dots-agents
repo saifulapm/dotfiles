@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# dots-agents <voice> <muted> <alert> <ink>, colours as hex without # since tmux runs it with sh, where # starts a comment: amx statusline's ✽N working and ⚠N waiting as the tmux bar's words, in the theme's margin voice, then the margin's separator; nothing when no agent needs mentioning.
+set -uo pipefail
+{
+voice=$1 muted=#$2 alert=#$3 ink=#$4
+command -v amx >/dev/null || exit 0
+working='' waiting=''
+for part in $(amx statusline 2>/dev/null); do
+  case $part in
+    ✽*) working=${part#✽} ;;
+    ⚠*) waiting=${part#⚠} ;;
+  esac
+done
+[[ -n $working || -n $waiting ]] || exit 0
+case $voice in
+  caps) work="WORKING" wait="#[fg=$alert,bold]$waiting WAITING#[nobold]" sep=' · ' end=' — ' ;;
+  bracket) work="RUN" wait="#[fg=$alert]$waiting WAIT" sep=' · ' end=' · ' ;;
+  *) work="working" wait="#[fg=$alert]● #[fg=$ink]$waiting waiting" sep='   ' end='   ' ;;
+esac
+line=''
+[[ -n $working ]] && line="#[fg=$muted]$working $work"
+[[ -n $waiting ]] && line="${line:+$line$sep}$wait"
+printf '%s' "$line#[fg=$muted]$end"
+exit
+}

@@ -14,14 +14,34 @@ const paper = load('paper');
 
 const artboard = load('artboard');
 
-test('tmux tabs take the theme\'s corner: round pills, cut dimension marks, square blocks', () => {
-  const current = (t) => renderTmux(t).match(/^set -g window-status-current-format "(.*)"$/m)[1];
-  assert.match(current(artboard), /\ue0b6.*#\[fg=#ffffff,bg=#3d5afe\].*\ue0b4/);
-  assert.equal(current(blueprint), '#[fg=#7fe3f0]├─ #[fg=#d6f4f8]#I #W#{?window_zoomed_flag, \u{f0293},}#[fg=#7fe3f0] ─┤#[default]');
-  // The session's marks sit in the line colour, and turn the accent while the prefix is held.
-  assert.match(renderTmux(blueprint), /^set -g status-left " #\[fg=#\{\?client_prefix,#7fe3f0,#2e5a72}\]├─ /m);
-  assert.doesNotMatch(current(paper), /[\ue0b4\ue0b6]/);
-  assert.match(current(paper), /#\[fg=#faf6ec,bg=#c8381e\] #I #W/);
+// The tmux bar reads as the page's bottom margin, in the margins' voice: Paper's caps and dashes, Artboard's accent dot, Blueprint's brackets.
+const tmuxOpt = (t, name) => renderTmux(t).match(new RegExp(`^set -g ${name} "(.*)"$`, 'm'))[1];
+
+test('the tmux bar draws no filled block in any theme, only text in the margin colours', () => {
+  for (const t of [paper, artboard, blueprint]) {
+    for (const o of ['status-left', 'status-right', 'window-status-format', 'window-status-current-format']) {
+      assert.doesNotMatch(tmuxOpt(t, o), /bg=(?!default)/, `${t.name} ${o}`);
+    }
+  }
+});
+
+test('tmux windows read like the margin number: Paper 01 FISH in ink, Blueprint [01] in cyan, Artboard an accent dot', () => {
+  const caps = /s\/a\/A\//;
+  assert.match(tmuxOpt(paper, 'window-status-current-format'), /^#\[fg=#1c1915,bold\]#\{\?#\{e\|<:#\{window_index\},10\},0,\}#\{window_index\}#\[nobold\] /);
+  assert.match(tmuxOpt(paper, 'window-status-current-format'), caps);
+  assert.match(tmuxOpt(paper, 'window-status-format'), /^#\[fg=#575653\]/);
+  assert.match(tmuxOpt(blueprint, 'window-status-current-format'), /^#\[fg=#7fe3f0\]\[#\{\?/);
+  assert.match(tmuxOpt(artboard, 'window-status-current-format'), /^#\[fg=#3d5afe\]● #\[fg=#15171b,bold\]/);
+  assert.doesNotMatch(tmuxOpt(artboard, 'window-status-current-format'), caps);
+  assert.equal(tmuxOpt(paper, 'window-status-separator'), '#[fg=#575653] — ');
+  assert.equal(tmuxOpt(blueprint, 'window-status-separator'), '#[fg=#80a4c2] · ');
+});
+
+test('the tmux session drops amx\'s prefix, turns the accent while the prefix key is held, and agents speak in the margin voice', () => {
+  assert.match(tmuxOpt(paper, 'status-left'), /^ #\[fg=#\{\?client_prefix,#c8381e,#575653\}\]#\{s\/\^amx-\/\/;=\/24\/…;s\/a\/A\//);
+  assert.match(tmuxOpt(paper, 'status-right'), /^#\(dots-agents caps 575653 c8381e 1c1915\)/);
+  assert.match(tmuxOpt(artboard, 'status-right'), /^#\(dots-agents plain 57606a 3d5afe 15171b\)/);
+  assert.match(tmuxOpt(blueprint, 'status-right'), /^#\(dots-agents bracket 80a4c2 ffb547 d6f4f8\)/);
 });
 
 test('the active tmux pane border follows the frame', () => {
@@ -41,13 +61,14 @@ test('a throwaway tmux server accepts each theme\'s fragment', (t) => {
     try { tmux('kill-server'); } catch {}
     rmSync(dir, { recursive: true, force: true });
   });
-  execFileSync('tmux', ['-L', sock, '-f', '/dev/null', 'new-session', '-d']);
+  execFileSync('tmux', ['-L', sock, '-f', '/dev/null', 'new-session', '-d', '-s', 'amx-dots']);
   for (const theme of [paper, artboard, blueprint]) {
     writeFileSync(join(dir, 'tmux.conf'), renderTmux(theme));
     tmux('source-file', join(dir, 'tmux.conf'));
     assert.match(tmux('show', '-g', 'status-style'), new RegExp(`fg=${theme.color.muted.toLowerCase()},bg=default`));
-    // Without the prefix held, the session badge is ink.
-    assert.match(tmux('display', '-p', '#{T:status-left}'), new RegExp(`fg=${theme.color.ink.toLowerCase()}`, 'i'));
+    // Without the prefix held, the session reads in the muted colour, without amx's prefix and in the theme's case.
+    const name = theme.type.voice === 'plain' ? 'dots' : 'DOTS';
+    assert.equal(tmux('display', '-p', '#{T:status-left}'), ` #[fg=${theme.color.muted.toLowerCase()}]${name}#[default] \n`);
   }
 });
 

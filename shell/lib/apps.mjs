@@ -5,31 +5,37 @@ const lower = (s) => s.toLowerCase();
 const rgb = (s) => `rgb:${lower(s).slice(1)}`;
 
 
-// The bar sits on the terminal's own background; the formats carry their colours, as tmux bakes #[...] into a format.
+// tmux has no case modifier, so the caps voices upper-case a name letter by letter.
+const CAPS = 'abcdefghijklmnopqrstuvwxyz'.split('').map((l) => `s/${l}/${l.toUpperCase()}/`).join(';');
+
+// The bar reads as the page's bottom margin, in the margins' voice, with no filled block: Paper's caps and dashes, Artboard's accent dot, Blueprint's brackets.
 export function renderTmux(t) {
   const c = t.color;
   const [ink, muted, line, surface, paper, accent, danger] = [c.ink, c.muted, c.line, c.surface, c.paper, c.accent, c.danger].map(lower);
   const frame = t.primitive.frame;
   const edge = { ink, double: ink, hairline: muted }[frame] ?? accent;
   const lines = frame === 'double' ? 'double' : 'single';
-  // A cut corner draws a tab as a drawing's dimension marks; round and square fill it, round with Nerd Font half circles at its ends.
-  const marks = t.primitive.corner === 'cut';
-  const [l, r] = t.primitive.corner === 'round' ? ['\ue0b6', '\ue0b4'] : ['', ''];
-  const pad = l ? '' : ' ';
-  const tab = marks
-    ? (mark, text) => `#[fg=${mark}]├─ #[fg=${ink}]${text}#[fg=${mark}] ─┤#[default]`
-    : (bg, text) => `#[fg=${bg},bg=default]${l}#[fg=${surface},bg=${bg}]${pad}${text}${pad}#[fg=${bg},bg=default]${r}#[default]`;
-  // A plain tab keeps the current one's width, so the centred list does not shift as focus moves.
-  const plain = marks
-    ? (text) => `   #[fg=${muted}]${text}#[default]   `
-    : (text) => `${l && ' '}${pad}#[fg=${muted}]${text}#[default]${pad}${r && ' '}`;
-  const win = '#I #W#{?window_zoomed_flag, \u{f0293},}';
+  const voice = { plain: 'plain', bracket: 'bracket' }[t.type.voice] ?? 'caps';
+  const say = (mods, name) => `#{${[mods, voice === 'plain' ? '' : CAPS].filter((m) => m).join(';')}:${name}}`;
+  const number = '#{?#{e|<:#{window_index},10},0,}#{window_index}';
+  const name = `${say('', 'window_name')}#{?window_zoomed_flag, \u{f0293},}`;
+  const current = {
+    caps: `#[fg=${ink},bold]${number}#[nobold] ${name}#[default]`,
+    bracket: `#[fg=${accent}][${number}]#[fg=${ink}] ${name}#[default]`,
+    plain: `#[fg=${accent}]● #[fg=${ink},bold]${number}#[nobold] ${name}#[default]`,
+  }[voice];
+  const other = voice === 'bracket' ? `#[fg=${muted}][${number}] ${name}#[default]` : `#[fg=${muted}]${number} ${name}#[default]`;
+  const sep = { caps: ' — ', bracket: ' · ', plain: '    ' }[voice];
+  // Paper and Artboard raise an alert in the accent; Blueprint in amber, its danger token, as the margins' goal does.
+  const alert = voice === 'bracket' ? danger : accent;
+  const folder = `#{?#{==:#{pane_current_path},#{HOME}},~,${say('b;=/-24/…', 'pane_current_path')}}`;
   return [
     `set -g status-style "fg=${muted},bg=default"`,
-    `set -g status-left " ${tab(`#{?client_prefix,${accent},${marks ? line : ink}}`, '#S')} "`,
-    `set -g status-right "#[fg=${accent}]#(amx statusline)#[fg=${muted}] #{?#{==:#{pane_current_path},#{HOME}},~,#{=/-24/…:#{b:pane_current_path}}} "`,
-    `set -g window-status-format "${plain(win)}"`,
-    `set -g window-status-current-format "${tab(accent, win)}"`,
+    `set -g status-left " #[fg=#{?client_prefix,${accent},${muted}}]${say('s/^amx-//;=/24/…', 'session_name')}#[default] "`,
+    `set -g status-right "#(dots-agents ${voice} ${[muted, alert, ink].map((x) => x.slice(1)).join(' ')})#[fg=${muted}]${folder} "`,
+    `set -g window-status-format "${other}"`,
+    `set -g window-status-current-format "${current}"`,
+    `set -g window-status-separator "#[fg=${muted}]${sep}"`,
     `set -g pane-border-lines ${lines}`,
     `set -g pane-border-style "fg=${line}"`,
     `set -g pane-active-border-style "fg=${edge}"`,
