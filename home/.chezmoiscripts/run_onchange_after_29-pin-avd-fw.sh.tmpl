@@ -1,0 +1,20 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "avd-fw") }}
+# Fedora Asahi Remix ships no AVD firmware, so without it the Macs' decoder fails its probe and never shows as /dev/video*.
+if ! grep -Faqs 'apple,' /proc/device-tree/compatible || systemd-detect-virt -q --container; then
+  log "avd-fw: not an Apple machine"
+  exit 0
+fi
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+src=$pin_tmp/avd-fw-$pin_version
+meson setup "$src/build" "$src" --prefix=/usr --libdir=lib -Dfirmwaredir=firmware/updates --cross-file="$src/arm-none-eabi-gcc.ini" >/dev/null || die "avd-fw: meson setup failed"
+meson compile -C "$src/build" >/dev/null || die "avd-fw: build failed"
+root meson install -C "$src/build" --no-rebuild >/dev/null || die "avd-fw: install failed"
+# The driver gave up at boot for want of the firmware; binding it again brings the decoder up now.
+dev=$(find /sys/bus/platform/devices -maxdepth 1 -name '*.avd' -printf '%f\n' -quit)
+if [[ -n $dev && ! -e /sys/bus/platform/devices/$dev/driver ]]; then
+  echo "$dev" | root tee /sys/bus/platform/drivers/avd/bind >/dev/null 2>&1 || log "avd-fw: the decoder comes up at the next boot"
+fi
+pin_done

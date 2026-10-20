@@ -1,0 +1,11 @@
+#!/bin/bash
+# uinput rule hash: {{ joinPath .chezmoi.workingTree "system/udev/rules.d/60-uinput-input-group.rules" | include | sha256sum }}
+{{ template "lib.sh" . }}
+rule={{ joinPath .chezmoi.workingTree "system/udev/rules.d/60-uinput-input-group.rules" | quote }}
+# The input group itself is joined by the dshift step; this lets that group open /dev/uinput, which ydotoold writes to.
+root install -D -m 0644 "$rule" /etc/udev/rules.d/60-uinput-input-group.rules || die "could not write the uinput rule"
+if root udevadm control --reload-rules 2>/dev/null && root udevadm trigger --name-match=uinput 2>/dev/null; then
+  systemctl --user daemon-reload 2>/dev/null && systemctl --user restart ydotoold.service 2>/dev/null || true
+else
+  log "the uinput rule applies at the next boot"
+fi

@@ -1,0 +1,29 @@
+#!/bin/bash
+# memory source hashes:{{ range list "modules-load.d/zstd.conf" "tmpfiles.d/zswap.conf" }} {{ joinPath $.chezmoi.workingTree "system" . | include | sha256sum }}{{ end }}
+{{ template "lib.sh" . }}
+system={{ joinPath .chezmoi.workingTree "system" | quote }}
+root install -D -m 0644 "$system/modules-load.d/zstd.conf" /etc/modules-load.d/zstd.conf || die "could not load zstd at boot"
+root install -D -m 0644 "$system/tmpfiles.d/zswap.conf" /etc/tmpfiles.d/zswap.conf || die "could not make zswap compress with zstd"
+# A container has neither the module nor its own swap, so both wait for a real boot.
+if systemd-detect-virt -q --container; then
+  log "swap and zswap: left to the host in a container"
+  exit 0
+fi
+root modprobe zstd && echo zstd | root tee /sys/module/zswap/parameters/compressor >/dev/null || log "zswap compresses with zstd from the next boot"
+# Swap files and partitions, not zram, add up to 16 G; a short machine gets one more file for the rest.
+have=$(awk 'NR > 1 && $1 !~ /zram/ { kb += $3 } END { print int(kb / 1048576 + 0.5) }' /proc/swaps)
+((have >= 16)) && exit 0
+file=/var/swap/dots-swapfile
+size=$((16 - have))
+root mkdir -p /var/swap
+if [[ ! -e $file ]]; then
+  if [[ $(stat -f -c %T /var/swap) == btrfs ]]; then
+    root btrfs filesystem mkswapfile --size "${size}g" "$file" >/dev/null || die "could not make a ${size} G swap file"
+  else
+    root fallocate -l "${size}G" "$file" && root chmod 600 "$file" && root mkswap "$file" >/dev/null || die "could not make a ${size} G swap file"
+  fi
+fi
+grep -q "^$file " /etc/fstab || echo "$file none swap defaults 0 0" | root tee -a /etc/fstab >/dev/null || die "could not add the swap file to fstab"
+# The Macs run a 16K-page kernel, which needs a swap header rewritten for its page size.
+root swapon "$file" 2>/dev/null || root swapon --fixpgsz "$file" || die "could not turn on $file"
+log "swap: $((have + size)) G"

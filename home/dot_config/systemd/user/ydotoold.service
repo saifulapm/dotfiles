@@ -1,0 +1,12 @@
+[Unit]
+Description=ydotoold, the virtual input device agents drive the pointer and keys through
+Documentation=man:ydotoold(8)
+
+[Service]
+# Fedora's ydotool.service runs it as root; here the user's socket is owned by the user, and the uinput rule lets the input group open the device.
+ExecStart=/usr/bin/ydotoold --socket-path=%t/.ydotool_socket --socket-own=%U:%G
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,17 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "libva-v4l2-request") }}
+# Fedora's libva-v4l2-request 1.0 cannot drive the Macs' decoder; this fork can, and mpv and Chromium reach it through VA-API.
+if ! grep -Faqs 'apple,' /proc/device-tree/compatible || systemd-detect-virt -q --container; then
+  log "libva-v4l2-request: not an Apple machine"
+  exit 0
+fi
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+src=$pin_tmp/libva-v4l2_request-$pin_version
+meson setup "$src/build" "$src" --prefix=/usr --buildtype=plain --wrap-mode=nodownload >/dev/null || die "libva-v4l2-request: meson setup failed"
+meson compile -C "$src/build" >/dev/null || die "libva-v4l2-request: build failed"
+root meson install -C "$src/build" --no-rebuild >/dev/null || die "libva-v4l2-request: install failed"
+# libva asks for a driver named after the GPU, asahi, so that name points at this one.
+root ln -sfn v4l2_request_drv_video.so /usr/lib64/dri/asahi_drv_video.so || die "libva-v4l2-request: could not link asahi_drv_video.so"
+pin_done

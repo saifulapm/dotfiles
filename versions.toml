@@ -97,3 +97,20 @@ url.aarch64 = "https://github.com/Satty-org/Satty/releases/download/v{version}/s
 url.x86_64 = "https://github.com/Satty-org/Satty/releases/download/v{version}/satty-x86_64-unknown-linux-gnu.tar.gz"
 sha256.aarch64 = "814073f70e7e18390d826f8b60dc429fc904b3abd05f6cae2b00fb8c2b9ea44b"
 sha256.x86_64 = "eb7a028c4a5ce331c2f355add8e2b807a7d697fe4495f7e1965786a4f6bcd5b8"
+
+[[pin]]
+name = "avd-fw"
+version = "0.1"
+repo = "AsahiLinux/avd-fw"
+install = "/usr/lib/firmware/updates/apple/avd-fw-*.bin on the Macs, the video decoder's firmware"
+url = "https://github.com/AsahiLinux/avd-fw/archive/v{version}/avd-fw-{version}.tar.gz"
+sha256 = "2e131244275cb15c94243e41eec8a2a665ec895cfe3a818181549db991e62c67"
+
+[[pin]]
+name = "libva-v4l2-request"
+version = "cfe6c2ab1b5346d1e973625d01b79fcb648fcf5e"
+repo = "sofus13/libva-v4l2_request"
+track = "commit"
+install = "/usr/lib64/dri/v4l2_request_drv_video.so and its asahi_drv_video.so link on the Macs, VA-API over the decoder"
+url = "https://github.com/sofus13/libva-v4l2_request/archive/{version}.tar.gz"
+sha256 = "ffa02cc58ce904de09ec66697221d3c0f3ca0253dd8cdfadd07765ef687e2713"
