@@ -7,7 +7,7 @@ control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 state_is() { control_state | jq -e "$1" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-open_control() { niri msg action spawn -- qs ipc call control toggle; until_ok 3000 state_is '.open and .keyboard and .cursorBox != null and .settled'; }
+open_control() { niri msg action spawn -- dots-call control toggle; until_ok 3000 state_is '.open and .keyboard and .cursorBox != null and .settled'; }
 close_control() { wtype -k Escape; until_ok 2000 state_is '.open == false and .drawing == false'; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # Pixels of geometry $1 within $5 of r g b.

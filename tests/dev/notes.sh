@@ -5,8 +5,8 @@ source "$(dirname "$0")/lib.sh"
 
 notes_is() { timeout 0.5 qs ipc call notes state 2>/dev/null | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-mod_n() { niri msg action spawn -- qs ipc call notes toggle; }
-mod_shift_n() { niri msg action spawn -- qs ipc call notes pin; }
+mod_n() { niri msg action spawn -- dots-call notes toggle; }
+mod_shift_n() { niri msg action spawn -- dots-call notes pin; }
 notes_window() { niri msg -j windows | jq -e '.[] | select(.title == "Notes")' 2>/dev/null; }
 notes_listed() { notes_window >/dev/null; }
 notes_gone() { ! notes_listed; }

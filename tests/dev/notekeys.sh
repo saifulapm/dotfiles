@@ -18,7 +18,7 @@ compose() {
 key() { wtype "$@"; sleep 0.1; }
 
 until_ok 5000 bash -c 'timeout 0.5 qs ipc call notes state >/dev/null 2>&1'
-niri msg action spawn -- qs ipc call notes toggle
+niri msg action spawn -- dots-call notes toggle
 until_ok 3000 notes_focused
 
 wtype '# prompts'

@@ -5,12 +5,12 @@ import { readFileSync } from 'node:fs';
 // niri matches the key itself; this checks that Mod+Space runs the launcher's toggle.
 const binds = readFileSync(new URL('../../home/dot_config/niri/binds.kdl', import.meta.url), 'utf8');
 
-test('Mod+Space has a title and spawns qs ipc call launcher toggle', () => {
-  assert.match(binds, /^\s*Mod\+Space hotkey-overlay-title="[^"]+" \{ spawn "qs" "ipc" "call" "launcher" "toggle"; \}$/m);
+test('Mod+Space has a title and spawns dots-call launcher toggle', () => {
+  assert.match(binds, /^\s*Mod\+Space hotkey-overlay-title="[^"]+" \{ spawn "dots-call" "launcher" "toggle"; \}$/m);
 });
 
-test('Mod+Shift+T has a title and spawns qs ipc call themes toggle', () => {
-  assert.match(binds, /^\s*Mod\+Shift\+T hotkey-overlay-title="[^"]+" \{ spawn "qs" "ipc" "call" "themes" "toggle"; \}$/m);
+test('Mod+Shift+T has a title and spawns dots-call themes toggle', () => {
+  assert.match(binds, /^\s*Mod\+Shift\+T hotkey-overlay-title="[^"]+" \{ spawn "dots-call" "themes" "toggle"; \}$/m);
 });
 
 const esc = (s) => s.replace(/[+.]/g, '\\$&');
@@ -18,9 +18,9 @@ const spawns = (key, args) =>
   new RegExp(`^\\s*${esc(key)} [^{]*hotkey-overlay-title="[^"]+" \\{ spawn ${args.map((a) => `"${esc(a)}"`).join(' ')}; \\}$`, 'm');
 
 test('Mod+A, Mod+I and Mod+/ toggle the notifications, focus the island and toggle the cheat sheet', () => {
-  assert.match(binds, spawns('Mod+A', ['qs', 'ipc', 'call', 'notifs', 'toggle']));
-  assert.match(binds, spawns('Mod+I', ['qs', 'ipc', 'call', 'island', 'focus']));
-  assert.match(binds, spawns('Mod+Slash', ['qs', 'ipc', 'call', 'cheatsheet', 'toggle']));
+  assert.match(binds, spawns('Mod+A', ['dots-call', 'notifs', 'toggle']));
+  assert.match(binds, spawns('Mod+I', ['dots-call', 'island', 'focus']));
+  assert.match(binds, spawns('Mod+Slash', ['dots-call', 'cheatsheet', 'toggle']));
 });
 
 test('workspace up and down keep a bind now that Mod+I is the island', () => {
@@ -34,27 +34,27 @@ test('the volume keys unmute the default sink and step it by 5 %, and the bright
   assert.match(binds, spawns('XF86AudioLowerVolume', ['sh', '-c', 'wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-']));
   assert.match(binds, spawns('XF86AudioMute', ['wpctl', 'set-mute', '@DEFAULT_AUDIO_SINK@', 'toggle']));
   assert.match(binds, spawns('XF86AudioMicMute', ['wpctl', 'set-mute', '@DEFAULT_AUDIO_SOURCE@', 'toggle']));
-  assert.match(binds, spawns('XF86MonBrightnessUp', ['qs', 'ipc', 'call', 'osd', 'brightness', '5%+']));
-  assert.match(binds, spawns('XF86MonBrightnessDown', ['qs', 'ipc', 'call', 'osd', 'brightness', '5%-']));
+  assert.match(binds, spawns('XF86MonBrightnessUp', ['dots-call', 'osd', 'brightness', '5%+']));
+  assert.match(binds, spawns('XF86MonBrightnessDown', ['dots-call', 'osd', 'brightness', '5%-']));
 });
 
 // Apple keyboards send these on F7 to F9, and nothing answered them.
 test('the media keys play, pause and skip through the shell', () => {
-  assert.match(binds, spawns('XF86AudioPlay', ['qs', 'ipc', 'call', 'media', 'playPause']));
-  assert.match(binds, spawns('XF86AudioNext', ['qs', 'ipc', 'call', 'media', 'next']));
-  assert.match(binds, spawns('XF86AudioPrev', ['qs', 'ipc', 'call', 'media', 'previous']));
+  assert.match(binds, spawns('XF86AudioPlay', ['dots-call', 'media', 'playPause']));
+  assert.match(binds, spawns('XF86AudioNext', ['dots-call', 'media', 'next']));
+  assert.match(binds, spawns('XF86AudioPrev', ['dots-call', 'media', 'previous']));
 });
 
 test('the system binds open Control, the clipboard and emoji modes, the lock and the recorder', () => {
-  assert.match(binds, spawns('Mod+C', ['qs', 'ipc', 'call', 'control', 'toggle']));
-  assert.match(binds, spawns('Mod+V', ['qs', 'ipc', 'call', 'launcher', 'mode', 'clipboard']));
-  assert.match(binds, spawns('Mod+Period', ['qs', 'ipc', 'call', 'launcher', 'mode', 'emoji']));
-  assert.match(binds, spawns('Mod+Escape', ['qs', 'ipc', 'call', 'lock', 'lock']));
-  assert.match(binds, spawns('Mod+Shift+R', ['qs', 'ipc', 'call', 'record', 'toggle']));
+  assert.match(binds, spawns('Mod+C', ['dots-call', 'control', 'toggle']));
+  assert.match(binds, spawns('Mod+V', ['dots-call', 'launcher', 'mode', 'clipboard']));
+  assert.match(binds, spawns('Mod+Period', ['dots-call', 'launcher', 'mode', 'emoji']));
+  assert.match(binds, spawns('Mod+Escape', ['dots-call', 'lock', 'lock']));
+  assert.match(binds, spawns('Mod+Shift+R', ['dots-call', 'record', 'toggle']));
 });
 
 test('Mod+G toggles Goals', () => {
-  assert.match(binds, spawns('Mod+G', ['qs', 'ipc', 'call', 'goals', 'toggle']));
+  assert.match(binds, spawns('Mod+G', ['dots-call', 'goals', 'toggle']));
 });
 
 test('Print opens niri screenshot UI and center-column moves to Mod+Shift+C', () => {

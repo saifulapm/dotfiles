@@ -41,7 +41,7 @@ surfaces_mapped() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-sur
 until_ok 10000 surfaces_mapped
 until_ok 5000 shell_status >/dev/null
 
-niri msg action spawn -- qs ipc call control toggle
+niri msg action spawn -- dots-call control toggle
 control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
 until_ok 3000 section_is audio
 until_ok 3000 control_focus

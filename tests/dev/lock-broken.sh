@@ -33,7 +33,7 @@ check "qs reports the broken Lock.qml" until_ok 5000 failed
 # qs answers no query for a few seconds after a failed reload, then the old tree answers again.
 check "the old tree's lock answers again" until_ok 10000 state_is '.locked == false'
 
-niri msg action spawn -- qs ipc call lock lock
+niri msg action spawn -- dots-call lock lock
 until_ok 3000 locked_shown
 check "the shell still locks" locked_shown
 wtype -- dots-test-pass

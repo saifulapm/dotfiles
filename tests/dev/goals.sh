@@ -7,7 +7,7 @@ store="$DOTS_DEV_DIR/data/dots/goals/dev.json"
 goals_state() { timeout 0.5 qs ipc call goals state 2>/dev/null; }
 state_is() { goals_state | jq -e "$@" >/dev/null 2>&1; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-mod_g() { niri msg action spawn -- qs ipc call goals toggle; }
+mod_g() { niri msg action spawn -- dots-call goals toggle; }
 desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
 # Opens Goals and waits for its own keyboard, since niri lists the layer Exclusive before its keys arrive.
 open_goals() {

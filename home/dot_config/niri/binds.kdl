@@ -1,19 +1,19 @@
 // Shared with dev/niri-dev.kdl; Mod is Super on a TTY and Alt in a nested niri.
 binds {
-    Mod+Slash hotkey-overlay-title="Cheat Sheet" { spawn "qs" "ipc" "call" "cheatsheet" "toggle"; }
+    Mod+Slash hotkey-overlay-title="Cheat Sheet" { spawn "dots-call" "cheatsheet" "toggle"; }
     Mod+Return hotkey-overlay-title="Open a Terminal: foot" { spawn "dots-foot"; }
-    Mod+Space hotkey-overlay-title="Launcher" { spawn "qs" "ipc" "call" "launcher" "toggle"; }
-    Mod+V hotkey-overlay-title="Clipboard" { spawn "qs" "ipc" "call" "launcher" "mode" "clipboard"; }
-    Mod+Period hotkey-overlay-title="Emoji" { spawn "qs" "ipc" "call" "launcher" "mode" "emoji"; }
-    Mod+C hotkey-overlay-title="Control" { spawn "qs" "ipc" "call" "control" "toggle"; }
-    Mod+Shift+T hotkey-overlay-title="Themes" { spawn "qs" "ipc" "call" "themes" "toggle"; }
-    Mod+A hotkey-overlay-title="Notifications" { spawn "qs" "ipc" "call" "notifs" "toggle"; }
-    Mod+I hotkey-overlay-title="Island" { spawn "qs" "ipc" "call" "island" "focus"; }
-    Mod+N hotkey-overlay-title="Notes" { spawn "qs" "ipc" "call" "notes" "toggle"; }
-    Mod+Shift+N hotkey-overlay-title="Pin Notes" { spawn "qs" "ipc" "call" "notes" "pin"; }
-    Mod+G hotkey-overlay-title="Goals" { spawn "qs" "ipc" "call" "goals" "toggle"; }
-    Mod+Escape hotkey-overlay-title="Lock" { spawn "qs" "ipc" "call" "lock" "lock"; }
-    Mod+Shift+R hotkey-overlay-title="Record a Region" { spawn "qs" "ipc" "call" "record" "toggle"; }
+    Mod+Space hotkey-overlay-title="Launcher" { spawn "dots-call" "launcher" "toggle"; }
+    Mod+V hotkey-overlay-title="Clipboard" { spawn "dots-call" "launcher" "mode" "clipboard"; }
+    Mod+Period hotkey-overlay-title="Emoji" { spawn "dots-call" "launcher" "mode" "emoji"; }
+    Mod+C hotkey-overlay-title="Control" { spawn "dots-call" "control" "toggle"; }
+    Mod+Shift+T hotkey-overlay-title="Themes" { spawn "dots-call" "themes" "toggle"; }
+    Mod+A hotkey-overlay-title="Notifications" { spawn "dots-call" "notifs" "toggle"; }
+    Mod+I hotkey-overlay-title="Island" { spawn "dots-call" "island" "focus"; }
+    Mod+N hotkey-overlay-title="Notes" { spawn "dots-call" "notes" "toggle"; }
+    Mod+Shift+N hotkey-overlay-title="Pin Notes" { spawn "dots-call" "notes" "pin"; }
+    Mod+G hotkey-overlay-title="Goals" { spawn "dots-call" "goals" "toggle"; }
+    Mod+Escape hotkey-overlay-title="Lock" { spawn "dots-call" "lock" "lock"; }
+    Mod+Shift+R hotkey-overlay-title="Record a Region" { spawn "dots-call" "record" "toggle"; }
     Print hotkey-overlay-title="Screenshot" { screenshot; }
     Mod+Q repeat=false hotkey-overlay-title="Close Window" { close-window; }
     Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }
@@ -57,11 +57,11 @@ binds {
     XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="Volume Down" { spawn "sh" "-c" "wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"; }
     XF86AudioMute allow-when-locked=true hotkey-overlay-title="Mute" { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
     XF86AudioMicMute allow-when-locked=true hotkey-overlay-title="Mic Mute" { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"; }
-    XF86AudioPlay allow-when-locked=true hotkey-overlay-title="Play/Pause" { spawn "qs" "ipc" "call" "media" "playPause"; }
-    XF86AudioNext allow-when-locked=true hotkey-overlay-title="Next Track" { spawn "qs" "ipc" "call" "media" "next"; }
-    XF86AudioPrev allow-when-locked=true hotkey-overlay-title="Previous Track" { spawn "qs" "ipc" "call" "media" "previous"; }
-    XF86MonBrightnessUp allow-when-locked=true hotkey-overlay-title="Brightness Up" { spawn "qs" "ipc" "call" "osd" "brightness" "5%+"; }
-    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness Down" { spawn "qs" "ipc" "call" "osd" "brightness" "5%-"; }
+    XF86AudioPlay allow-when-locked=true hotkey-overlay-title="Play/Pause" { spawn "dots-call" "media" "playPause"; }
+    XF86AudioNext allow-when-locked=true hotkey-overlay-title="Next Track" { spawn "dots-call" "media" "next"; }
+    XF86AudioPrev allow-when-locked=true hotkey-overlay-title="Previous Track" { spawn "dots-call" "media" "previous"; }
+    XF86MonBrightnessUp allow-when-locked=true hotkey-overlay-title="Brightness Up" { spawn "dots-call" "osd" "brightness" "5%+"; }
+    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness Down" { spawn "dots-call" "osd" "brightness" "5%-"; }
 
     Mod+F hotkey-overlay-title="Maximize Column" { maximize-column; }
     Mod+Shift+C hotkey-overlay-title="Center Column" { center-column; }

@@ -54,7 +54,7 @@ until_ok 5000 pk_is .registered
 control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
 # Opens Control and tabs once, to Wi-Fi.
 open_wifi() {
-  niri msg action spawn -- qs ipc call control toggle
+  niri msg action spawn -- dots-call control toggle
   until_ok 3000 section_is audio
   until_ok 3000 control_focus
   until_ok 3000 state_is '.keyboard'

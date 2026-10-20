@@ -8,7 +8,7 @@ state_is() { sheet_state | jq -e "$@" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-open_sheet() { niri msg action spawn -- qs ipc call cheatsheet toggle; until_ok 3000 state_is '.open and .settled and .rowKeys != null and (.rowKeys | length) == .rows'; }
+open_sheet() { niri msg action spawn -- dots-call cheatsheet toggle; until_ok 3000 state_is '.open and .settled and .rowKeys != null and (.rowKeys | length) == .rows'; }
 close_sheet() { wtype -k Escape; until_ok 2000 state_is '.open == false and .drawing == false'; }
 # Pixels of geometry $1 within $5 of r g b.
 near() {

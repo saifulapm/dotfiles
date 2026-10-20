@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 state_is() { launcher_state | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-mod_v() { niri msg action spawn -- qs ipc call launcher mode clipboard; }
+mod_v() { niri msg action spawn -- dots-call launcher mode clipboard; }
 # The nested XDG_STATE_HOME is a temp dir, so this db is never the live history.
 clip() { cliphist -db-path "$XDG_STATE_HOME/dots/clips.db" "$@"; }
 listed() { clip list 2>/dev/null | cut -f2- | grep -qxF "$1"; }

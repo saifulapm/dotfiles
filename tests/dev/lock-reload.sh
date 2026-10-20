@@ -35,7 +35,7 @@ check "the nested shell runs a copy, not $repo/shell" test -n "$config" -a "$con
 until_ok 5000 state_is '.locked == false'
 ink_before=$(clock_ink)
 
-niri msg action spawn -- qs ipc call lock lock
+niri msg action spawn -- dots-call lock lock
 until_ok 3000 locked_shown
 check "the shell locks" locked_shown
 

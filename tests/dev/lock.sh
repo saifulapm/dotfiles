@@ -10,7 +10,7 @@ shell_pid() { systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT"; }
 lock_state() { timeout 0.5 env -u QS_CONFIG_PATH qs ipc --pid "$(shell_pid)" call lock state 2>/dev/null; }
 state_is() { lock_state | jq -e "$1" >/dev/null 2>&1; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-mod_escape() { niri msg action spawn -- qs ipc call lock lock; }
+mod_escape() { niri msg action spawn -- dots-call lock lock; }
 # Dark pixels in the band where the lock draws its clock: the paper alone has none.
 clock_ink() {
   local geo

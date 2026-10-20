@@ -11,7 +11,7 @@ live_before=$(live_volume)
 control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-mod_c() { niri msg action spawn -- qs ipc call control toggle; }
+mod_c() { niri msg action spawn -- dots-call control toggle; }
 control_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
 # The Audio tab's left padding, left of its text, drawn in ink only while Control shows on audio.
 tab_rgb() {

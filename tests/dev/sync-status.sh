@@ -20,7 +20,7 @@ control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
 # Control opens on Audio, and one Shift+Tab steps back to Route; a key sent before the keyboard arrives is lost, so it repeats while Control is still on Audio.
 open_route() {
-  niri msg action spawn -- qs ipc call control toggle
+  niri msg action spawn -- dots-call control toggle
   until_ok 3000 state_is '.open and .keyboard' || return 1
   local n
   for n in 1 2 3; do
@@ -56,7 +56,7 @@ until_ok 2000 state_is '.open == false'
 # The launcher's sync row runs dots sync from the shell unit, with its env and a PATH without bin/.
 mkdir -p "$remote"
 notes_run=$(jq '.notes.lastRun' "$XDG_STATE_HOME/dots/sync.json")
-niri msg action spawn -- qs ipc call launcher toggle
+niri msg action spawn -- dots-call launcher toggle
 until_ok 3000 launcher_is '.open and .query == "" and .keyboard'
 wtype "> sync"
 until_ok 3000 launcher_is '.mode == "commands" and .results == ["sync"]'

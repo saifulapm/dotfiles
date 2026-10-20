@@ -43,21 +43,21 @@ labelled() {
 "$repo/bin/dots" theme artboard >/dev/null
 until_ok 2000 status_theme artboard
 
-niri msg action spawn -- qs ipc call launcher toggle
+niri msg action spawn -- dots-call launcher toggle
 until_ok 3000 is_open launcher .open
 until_ok 2000 labelled $(((ow - 640) / 2))
 check "the launcher card carries its frame label" labelled $(((ow - 640) / 2))
 check "the launcher's drawn frame label reads Launcher" drawn_label launcher Launcher
 timeout 0.5 qs ipc call launcher close
 
-niri msg action spawn -- qs ipc call control toggle
+niri msg action spawn -- dots-call control toggle
 until_ok 3000 is_open control '.open and .settled'
 until_ok 2000 labelled $(((ow - 720) / 2))
 check "Control carries its frame label" labelled $(((ow - 720) / 2))
 check "Control's drawn frame label reads Control" drawn_label control Control
 timeout 0.5 qs ipc call control close
 
-niri msg action spawn -- qs ipc call notifs toggle
+niri msg action spawn -- dots-call notifs toggle
 until_ok 3000 is_open notifs '.open and .settled'
 until_ok 2000 labelled $(((ow - 640) / 2))
 check "the notification centre carries its frame label" labelled $(((ow - 640) / 2))
@@ -72,7 +72,7 @@ check "the polkit prompt's drawn frame label reads Authenticate" drawn_label pol
 wtype -k Escape
 until_ok 2000 is_open polkit '(.open | not) and .drawing == false'
 
-niri msg action spawn -- qs ipc call record toggle
+niri msg action spawn -- dots-call record toggle
 until_ok 3000 is_open record '.picking and .settled'
 hint_x=$(timeout 0.5 qs ipc call record state | jq .region.x)
 until_ok 2000 labelled "$hint_x"
@@ -85,7 +85,7 @@ until_ok 2000 is_open record '(.picking | not) and .drawing == false'
 for t in paper artboard blueprint; do
   "$repo/bin/dots" theme "$t" >/dev/null
   until_ok 2000 status_theme "$t"
-  niri msg action spawn -- qs ipc call launcher toggle
+  niri msg action spawn -- dots-call launcher toggle
   until_ok 3000 is_open launcher .open
   until_ok 2000 is_open launcher '.legendOverflow == false'
   check "$t: the launcher's prefix legend fits its card" is_open launcher '.legendOverflow == false'

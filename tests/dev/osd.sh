@@ -56,7 +56,7 @@ until_ok 2000 mode_is osd
 check "Volume Up on a muted sink unmutes it ($(wpctl get-volume @DEFAULT_AUDIO_SINK@))" bash -c '! wpctl get-volume @DEFAULT_AUDIO_SINK@ | grep -q MUTED'
 until_ok 3000 mode_is rest
 
-niri msg action spawn -- qs ipc call osd brightness 5%+
+niri msg action spawn -- dots-call osd brightness 5%+
 until_ok 2000 mode_is osd
 state=$(island)
 echo "     island: $state"

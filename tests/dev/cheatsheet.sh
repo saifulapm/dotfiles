@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 sheet_state() { timeout 0.5 qs ipc call cheatsheet state 2>/dev/null; }
 state_is() { sheet_state | jq -e "$@" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-mod_slash() { niri msg action spawn -- qs ipc call cheatsheet toggle; }
+mod_slash() { niri msg action spawn -- dots-call cheatsheet toggle; }
 sheet_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
 # The middle of the screen, where the card's rows draw; a dead shell leaves it as it was.
 middle_rgb() {

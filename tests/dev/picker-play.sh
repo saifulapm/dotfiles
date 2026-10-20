@@ -19,7 +19,7 @@ near() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2; 
 
 until_ok 5000 shell_status >/dev/null
 until_ok 3000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"paper\"' >/dev/null"
-niri msg action spawn -- qs ipc call themes toggle
+niri msg action spawn -- dots-call themes toggle
 # Paper's open takes 120 ms, 2.4 s slowed.
 until_ok 6000 state_is '.open and .settled'
 

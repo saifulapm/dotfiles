@@ -16,7 +16,7 @@ settles() {
   local s=$1 theme=$2 kind=$3 ms=$4
   "$repo/bin/dots" theme "$theme" >/dev/null
   until_ok 2000 status_theme "$theme"
-  niri msg action spawn -- qs ipc call "$s" open >/dev/null
+  niri msg action spawn -- dots-call "$s" open >/dev/null
   until_ok 3000 surface_is "$s" .settled
   check "$theme: the $s settles as a $kind in $(least "$kind") to $ms ms ($(timeout 0.5 qs ipc call "$s" state | jq -c '[.motion, .settleMs, .firstFrame]'))" \
     surface_is "$s" ".motion == \"$kind\" and (.settleMs | type) == \"number\" and .settleMs >= $(least "$kind") and .settleMs <= $ms"
@@ -37,11 +37,11 @@ picker_settles() {
   local theme=$1 kind=$2 ms=$3
   "$repo/bin/dots" theme "$theme" >/dev/null
   until_ok 2000 status_theme "$theme"
-  niri msg action spawn -- qs ipc call record toggle >/dev/null
+  niri msg action spawn -- dots-call record toggle >/dev/null
   until_ok 3000 surface_is record .settled
   check "$theme: the recorder's picker settles as a $kind in $(least "$kind") to $ms ms ($(timeout 0.5 qs ipc call record state | jq -c '[.motion, .settleMs]'))" \
     surface_is record ".picking and .motion == \"$kind\" and (.settleMs | type) == \"number\" and .settleMs >= $(least "$kind") and .settleMs <= $ms"
-  niri msg action spawn -- qs ipc call record toggle >/dev/null
+  niri msg action spawn -- dots-call record toggle >/dev/null
   until_ok 2000 surface_is record '.drawing == false'
 }
 picker_settles paper drop 140

@@ -50,7 +50,7 @@ sleep 0.3
 capture
 check "a store that does not parse is never saved over" until_ok 1000 island_says 'Notes store unreadable'
 check "and the file is as it was" test "$(cat "$store")" = '{"notes": ['
-niri msg action spawn -- qs ipc call notes toggle
+niri msg action spawn -- dots-call notes toggle
 until_ok 3000 notes_is '.focused'
 wtype 'typed while broken'
 wtype -k Return

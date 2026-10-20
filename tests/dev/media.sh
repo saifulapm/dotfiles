@@ -28,7 +28,7 @@ check "a notification outranks now playing" mode_is notification
 until_ok 6000 mode_is playing
 check "and the island goes back to now playing after it" mode_is playing
 # The media keys reach the player through the shell: Play/Pause toggles it, and Next and Previous move it.
-media() { niri msg action spawn -- qs ipc call media "$1"; }
+media() { niri msg action spawn -- dots-call media "$1"; }
 title_is() { island | jq -e --arg t "$1 — Artist  $(date +%H:%M)" '.text == $t' >/dev/null; }
 media playPause
 until_ok 2000 mode_is rest

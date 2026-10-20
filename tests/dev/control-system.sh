@@ -16,7 +16,7 @@ cleanup() { rm -rf "$fake"; }
 
 control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
-mod_c() { niri msg action spawn -- qs ipc call control toggle; }
+mod_c() { niri msg action spawn -- dots-call control toggle; }
 section_is() { state_is --arg s "$1" '.open and .section == $s'; }
 # Presses j or k until the row titled $1 is selected.
 select_row() {

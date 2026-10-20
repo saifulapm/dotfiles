@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 rec_state() { timeout 0.5 qs ipc call record state 2>/dev/null; }
 state_is() { rec_state | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-mod_shift_r() { niri msg action spawn -- qs ipc call record toggle; }
+mod_shift_r() { niri msg action spawn -- dots-call record toggle; }
 # Only this session's recorder writes into its own recordings dir.
 recorder_running() { pgrep -f "[w]f-recorder.*$DOTS_RECORDINGS_DIR" >/dev/null; }
 island_text() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -r .text; }

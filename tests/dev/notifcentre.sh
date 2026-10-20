@@ -8,7 +8,7 @@ notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 state_is() { notifs | jq -e "$1" >/dev/null; }
 island_is() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e --arg m "$1" '.mode == $m' >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
-mod_a() { niri msg action spawn -- qs ipc call notifs toggle; }
+mod_a() { niri msg action spawn -- dots-call notifs toggle; }
 focus_is() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
 centre_open() { state_is .open && focus_is Exclusive; }
 centre_closed() { state_is '.open == false' && focus_is None; }

@@ -25,7 +25,7 @@ is_accent() {
 }
 
 until_ok 5000 bash -c 'timeout 0.5 qs ipc call notes state >/dev/null 2>&1'
-niri msg action spawn -- qs ipc call notes toggle
+niri msg action spawn -- dots-call notes toggle
 until_ok 3000 notes_focused
 check "an empty Notes shows exactly one line in its list" notes_is '.emptyLine.lines == 1'
 check "and it names section and attach" notes_is '.emptyLine.text | test("section.*attach"; "i")'

@@ -13,7 +13,7 @@ check "and warming leaves only the clock's timer running ($(shell_status | jq .t
 
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 reported() { launcher_state | jq -e '.opens == 1 and (.openMs | type) == "number"' >/dev/null; }
-niri msg action spawn -- qs ipc call launcher toggle
+niri msg action spawn -- dots-call launcher toggle
 until_ok 3000 reported
 check "the first launcher open draws within a frame of its key ($(launcher_state | jq .openMs) ms)" bash -c "(( \$(timeout 0.5 qs ipc call launcher state | jq .openMs) <= 35 ))"
 

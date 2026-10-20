@@ -14,7 +14,7 @@ within() { local ms; ms=$(played_ms); [ "$ms" != null ] && ((ms >= 0 && ms <= $1
 
 until_ok 5000 shell_status >/dev/null
 until_ok 3000 status_theme paper
-niri msg action spawn -- qs ipc call themes toggle
+niri msg action spawn -- dots-call themes toggle
 until_ok 3000 state_is '.open and .settled'
 check "the picker opens with nothing played" state_is '.played == null'
 

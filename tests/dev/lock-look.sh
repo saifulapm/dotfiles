@@ -22,7 +22,7 @@ cleanup() { locked_shown && unlock; }
 lock_in() {
   "$repo/bin/dots" theme "$1" >/dev/null
   until_ok 2000 status_theme "$1"
-  niri msg action spawn -- qs ipc call lock lock
+  niri msg action spawn -- dots-call lock lock
   until_ok 3000 locked_shown
 }
 

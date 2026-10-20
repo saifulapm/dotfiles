@@ -16,7 +16,7 @@ switch() {
 }
 shown() { state_is '.open and .settled'; }
 gone() { state_is '.open == false'; }
-open_picker() { niri msg action spawn -- qs ipc call themes toggle; until_ok 3000 shown; }
+open_picker() { niri msg action spawn -- dots-call themes toggle; until_ok 3000 shown; }
 close_picker() { wtype -k Escape; until_ok 2000 gone; }
 # The PPM of a w x h region at x,y relative to card $1's drawn box.
 card_grab() {

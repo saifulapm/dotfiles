@@ -10,7 +10,7 @@ state_is() { launcher_state | jq -e "$1" >/dev/null; }
 themes_is() { timeout 0.5 qs ipc call themes state 2>/dev/null | jq -e "$1" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so a press spawns the bind's command through niri.
-press() { t0=$(now_ms); niri msg action spawn -- qs ipc call launcher toggle >/dev/null; }
+press() { t0=$(now_ms); niri msg action spawn -- dots-call launcher toggle >/dev/null; }
 wait_until() { while (($(now_ms) - t0 < $1)); do sleep 0.005; done; }
 focus_is() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 theme() {
@@ -79,7 +79,7 @@ press
 until_ok 5000 state_is .settled
 wtype -k Escape
 until_ok 1000 state_is '.open == false and .drawing'
-niri msg action spawn -- qs ipc call themes open >/dev/null
+niri msg action spawn -- dots-call themes open >/dev/null
 until_ok 2000 themes_is .open
 check "paper: opening the theme picker mid-close stops the launcher drawing at once" state_is '.drawing == false'
 timeout 0.5 qs ipc call themes close >/dev/null
