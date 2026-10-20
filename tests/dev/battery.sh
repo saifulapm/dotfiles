@@ -23,6 +23,7 @@ systemctl --user restart "$DOTS_DEV_UNIT"
 margins_mapped() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
 until_ok 10000 margins_mapped
 until_ok 5000 shell_status >/dev/null
+until_ok 6000 at_rest
 
 battery_is() { margins | jq -e --arg b "$1" '.right.battery == $b' >/dev/null 2>&1; }
 until_ok 5000 battery_is "82%"

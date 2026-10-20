@@ -12,6 +12,8 @@ Item {
     property int selected: 0
     readonly property var look: V.listLook(theme.tokens)
     property var panels: []
+    // Read once, when Control first opens, not when the warm-up makes it.
+    property bool probe: true
     property var externals: []
     readonly property var rows: panels.map(p => ({
                 title: p.device,
@@ -44,16 +46,16 @@ Item {
     implicitHeight: hint.implicitHeight
 
     Process {
-        running: true
+        running: display.probe
         command: ["brightnessctl", "-m", "-l", "-c", "backlight"]
         stdout: StdioCollector {
             onStreamFinished: display.panels = Lib.backlights(text)
         }
     }
 
-    // ddcutil takes seconds to probe the buses, so it runs once, as the section loads.
+    // ddcutil takes seconds to probe the buses, so it runs once, when Control first opens.
     Process {
-        running: true
+        running: display.probe
         command: ["ddcutil", "detect", "--terse"]
         stdout: StdioCollector {
             onStreamFinished: display.externals = Lib.ddcDisplays(text)

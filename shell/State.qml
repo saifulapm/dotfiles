@@ -5,7 +5,7 @@ import "lib/motion.mjs" as M
 
 // Shell-wide state that `qs ipc call shell status` reports.
 Singleton {
-    // Names of the surfaces that have loaded; each surface appends itself on first open.
+    // Names of the surfaces that have loaded; each appends itself when made, in the warm-up after the first frame or on an earlier open.
     property list<string> loaded: []
     property list<QtObject> ticks: []
     // When the running recording started, in ms since the epoch; 0 while nothing records.

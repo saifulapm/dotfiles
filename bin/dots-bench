@@ -42,11 +42,10 @@ picker_once() {
 # A start's first frame and cold open vary by 50 ms run to run, so each budget holds the median of five starts; nothing asks qs before niri lists the paper, since early ipc calls hold a start back 1 to 2 s.
 paper_gone() { ! layer_up dots-paper; }
 frames=() colds=() picker_colds=()
+# lib.sh waits for the warm-up, so even the first start is a fresh one, and each open lands before its shell warms.
 for i in 1 2 3 4 5; do
-  if ((i > 1)); then
-    systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
-    until_ok 3000 paper_gone || die "the killed shell's paper never went away"
-  fi
+  systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
+  until_ok 3000 paper_gone || die "the killed shell's paper never went away"
   until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
   until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
   frames+=("$(shell_status | jq -r .firstFrameMs)")

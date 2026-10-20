@@ -89,6 +89,24 @@ PanelWindow {
         polkit.show(flow);
     }
 
+    // Each surface is made in turn, one per tick, so none holds a frame long and a first open finds it built; Goals waits for the Desk's store.
+    function warm() {
+        warmTick.start();
+    }
+
+    Root.Tick {
+        id: warmTick
+        interval: 50
+        repeat: true
+        onTriggered: {
+            const next = [launcherLoader, themesLoader, notifsLoader, cheatsheetLoader, controlLoader, recorderLoader, polkitLoader, goalsLoader].find(l => !l.active && (l !== goalsLoader || host.goals));
+            if (next)
+                next.active = true;
+            else
+                stop();
+        }
+    }
+
     Connections {
         target: host.contentItem.Window.window
         function onFrameSwapped() {

@@ -16,6 +16,8 @@ Item {
     property string confirming: ""
     // The battery's end-of-charge threshold, or -1 where the hardware has none.
     property int chargeLimit: -1
+    // Read once, when Control first opens, not when the warm-up makes it.
+    property bool probe: true
 
     readonly property var battery: UPower.displayDevice
     readonly property bool hasBattery: battery.ready && battery.isLaptopBattery && battery.isPresent
@@ -86,7 +88,7 @@ Item {
 
     // The threshold changes only by root's hand, so it is read once.
     Process {
-        running: true
+        running: power.probe
         command: ["sh", "-c", "cat /sys/class/power_supply/*/charge_control_end_threshold 2>/dev/null | head -1"]
         stdout: StdioCollector {
             onStreamFinished: {

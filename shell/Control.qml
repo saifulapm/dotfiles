@@ -12,6 +12,8 @@ Item {
     required property var notifs
     required property var sync
     property bool shown: false
+    // The shell makes Control in its warm-up, before anyone opens it; the sections that probe the system wait for this.
+    property bool opened: false
     property int current: 0
     property int opens: 0
     property var openMs: null
@@ -34,6 +36,7 @@ Item {
         openT0 = t0;
         openMs = null;
         opens += 1;
+        opened = true;
         current = 0;
         shown = true;
         forceActiveFocus();
@@ -221,18 +224,21 @@ Item {
                     theme: control.theme
                 }
                 Root.ControlPower {
+                    probe: control.opened
                     id: power
                     width: parent.width
                     visible: control.current === 3
                     theme: control.theme
                 }
                 Root.ControlDisplay {
+                    probe: control.opened
                     id: display
                     width: parent.width
                     visible: control.current === 4
                     theme: control.theme
                 }
                 Root.ControlRoute {
+                    probe: control.opened
                     id: route
                     width: parent.width
                     visible: control.current === 5

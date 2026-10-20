@@ -95,3 +95,6 @@ if (($(grim_ms) > 500 && $(grim_ms) > 500)); then
   echo "FAIL the nested output draws about once a second: is the live session locked, or its output off?"
   exit 2
 fi
+# The shell makes its surfaces a second after its first frame, with its warm-up's Ticks running, so a check starts once the shell is at rest.
+at_rest() { shell_status | jq -e '.timers == 1 and (.loaded | length) >= 7' >/dev/null 2>&1; }
+until_ok 6000 at_rest

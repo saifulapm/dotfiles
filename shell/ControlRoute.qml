@@ -10,6 +10,8 @@ Item {
 
     required property var theme
     required property var notifs
+    // Read once, when Control first opens, not when the warm-up makes it.
+    property bool probe: true
     // The Desk's sync service, null until the Desk loads.
     required property var sync
     readonly property var units: sync ? sync.units : ({})
@@ -49,7 +51,7 @@ Item {
     // Each form of workflow route prints the route it leaves, so one call both sets and reads it.
     Process {
         id: asker
-        running: true
+        running: route.probe
         command: [route.workflow, "route"]
         stdout: StdioCollector {
             onStreamFinished: {

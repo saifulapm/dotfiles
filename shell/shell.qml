@@ -32,6 +32,7 @@ ShellRoot {
         surfacesLoader.component = compiled("Surfaces.qml");
         desk = compiled("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService });
         polkit = compiled("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
+        warmStart.start();
         apps = Qt.binding(() => DesktopEntries.applications.values.map(e => ({
                         id: e.id,
                         name: e.name,
@@ -40,6 +41,16 @@ ShellRoot {
                         icon: e.icon ? Quickshell.iconPath(e.icon, true) : "",
                         entry: e
                     })));
+    }
+
+    // A second after the first frame the surfaces are made in the background, so even a first open is warm; an open before then is still cold, which is what just bench times.
+    Root.Tick {
+        id: warmStart
+        interval: 1000
+        onTriggered: {
+            surfacesLoader.active = true;
+            surfacesLoader.item.warm();
+        }
     }
 
     // qs emits this only after a hot reload, before the new tree draws its first frame.
@@ -206,7 +217,7 @@ ShellRoot {
         }
     }
 
-    // Stands in for a LazyLoader: Surfaces compiles after the first frame and is made on the first open, so a cold open is creation only.
+    // Stands in for a LazyLoader: Surfaces compiles after the first frame and is made a second later or on the first open, whichever comes first.
     QtObject {
         id: surfacesLoader
 
