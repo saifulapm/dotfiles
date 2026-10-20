@@ -146,7 +146,7 @@ Item {
             id: line
             textFormat: Text.PlainText
             leftPadding: 20
-            text: section.look.tabText(!section.wifi.length ? "No Wi-Fi" : section.typing ? "↵ join · esc cancel" : "↵ connect · d forget")
+            text: section.look.tabText(!section.wifi.length ? "No Wi-Fi" : section.typing ? "↵ join · ctrl+v paste · esc cancel" : "↵ connect · d forget")
             color: section.look.small.color
             font.family: section.look.small.font
             font.pixelSize: section.look.small.size

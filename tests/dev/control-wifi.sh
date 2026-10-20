@@ -139,7 +139,7 @@ same_look() { jq -e -n --argjson a "$1" --argjson b "$2" "\$a == \$b and (\$a | 
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 n=0
-for t in "paper|WRONG PASSWORD|↵ JOIN · ESC CANCEL|↵ CONNECT · D FORGET" "artboard|Wrong password|↵ join · esc cancel|↵ connect · d forget" "blueprint|WRONG PASSWORD|↵ JOIN · ESC CANCEL|↵ CONNECT · D FORGET"; do
+for t in "paper|WRONG PASSWORD|↵ JOIN · CTRL+V PASTE · ESC CANCEL|↵ CONNECT · D FORGET" "artboard|Wrong password|↵ join · ctrl+v paste · esc cancel|↵ connect · d forget" "blueprint|WRONG PASSWORD|↵ JOIN · CTRL+V PASTE · ESC CANCEL|↵ CONNECT · D FORGET"; do
   n=$((n + 1))
   IFS='|' read -r theme wrong join_hint connect_hint <<<"$t"
   in_theme "$theme"
@@ -152,7 +152,7 @@ for t in "paper|WRONG PASSWORD|↵ JOIN · ESC CANCEL|↵ CONNECT · D FORGET" "
   enter_on "Dots Secured"
   until_ok 3000 line_open
   check "$theme: with the line open the hint reads $join_hint ($(control_state | jq -c .hint))" state_is --arg h "$join_hint" '.hint == $h'
-  check "$theme: with the line open the legend drops tab, j/k and esc close ($(control_state | jq -c .legendDrawn))" state_is '.legendDrawn | ascii_downcase | gsub("[\\[\\]]"; "") == "↵ join  esc cancel"'
+  check "$theme: with the line open the legend drops tab, j/k and esc close ($(control_state | jq -c .legendDrawn))" state_is '.legendDrawn | ascii_downcase | gsub("[\\[\\]]"; "") == "↵ join  ctrl+v paste  esc cancel"'
   wifi_look=$(control_state | jq -c .lineLook)
   check "$theme: the line's field is drawn as the polkit field ($wifi_look, polkit $pk_look)" same_look "$wifi_look" "$pk_look"
   type_psk nope
