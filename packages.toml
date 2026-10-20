@@ -653,6 +653,11 @@ arch = "all"
 why = "satty links libadwaita-1"
 
 [[package]]
+name = "lynx"
+arch = "all"
+why = "kak-mail renders HTML mail with it"
+
+[[package]]
 name = "meson"
 arch = "aarch64"
 why = "builds the libva-v4l2-request pin on the Macs"

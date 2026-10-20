@@ -14,7 +14,7 @@ const everyArch = [
   'chromium', 'tailscale', 'pipewire', 'wireplumber', 'brightnessctl', 'wf-recorder', 'grim', 'slurp', 'wlrctl',
   'ydotool', 'tesseract', 'tesseract-langpack-eng', 'tesseract-langpack-ben', 'zbar', 'python3-gobject', 'just',
   'mpv', 'imv', 'zathura', 'zathura-pdf-mupdf', 'yt-dlp', 'pass-otp', 'ffmpeg', 'ruby', 'rubypick', 'golang',
-  'gtk4', 'libadwaita',
+  'gtk4', 'libadwaita', 'lynx',
 ];
 const macOnly = ['meson', 'ninja-build', 'arm-none-eabi-gcc-cs', 'libva-devel', 'binutils', 'pkgconf-pkg-config', 'libdrm-devel', 'kernel-headers'];
 
