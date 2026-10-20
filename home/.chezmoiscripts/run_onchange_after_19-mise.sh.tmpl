@@ -1,0 +1,9 @@
+#!/bin/bash
+# mise config hash: {{ include "dot_config/mise/config.toml" | sha256sum }}
+{{ template "lib.sh" . }}
+mise install || die "mise install failed"
+# v1 installed pi as an npm global inside mise's node, whose bin dir comes before the pi tool's on PATH.
+node=$(mise where node) || die "mise has no node"
+if [[ -d $node/lib/node_modules/@earendil-works/pi-coding-agent ]]; then
+  mise exec node -- npm uninstall -g @earendil-works/pi-coding-agent || die "could not remove v1's pi from node's globals"
+fi

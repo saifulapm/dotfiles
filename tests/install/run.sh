@@ -13,6 +13,7 @@ git clone -q --bare --single-branch --branch "$branch" "$gitdir" "$snap/src.git"
 name=dots-install-test-$$
 home=/home/saiful
 log=/var/log/sudo-shim.log
+curl_log=/var/log/curl-shim.log
 failed=0
 
 # check <description> <command...>: prints PASS or FAIL for the command's status.
@@ -80,6 +81,9 @@ as_root "
   printf '#!/bin/bash\necho \"\$*\" >> $log\nexec /usr/bin/sudo \"\$@\"\n' > /opt/shim/sudo
   chmod 755 /opt/shim/sudo
   install -o saiful -m 644 /dev/null $log
+  printf '#!/bin/bash\necho \"\$*\" >> $curl_log\nexec /usr/bin/curl \"\$@\"\n' > /opt/shim/curl
+  chmod 755 /opt/shim/curl
+  install -o saiful -m 644 /dev/null $curl_log
   # A v1 machine already has a chezmoi config, pointing at the old repo.
   install -d -o saiful $home/.config $home/.config/chezmoi
   echo 'sourceDir = \"~/.dotfiles\"' > $home/.config/chezmoi/chezmoi.toml
@@ -88,6 +92,8 @@ as_root "
 
 echo "--- first run"
 check "first dots install exits 0" dots_install
+installs=$(podman exec "$name" grep -c 'claude.ai/install.sh' "$curl_log")
+check "first run runs the Claude installer once (got $installs)" test "$installs" = 1
 
 target=$(podman exec "$name" readlink "$home/.config/quickshell")
 check "\$HOME/.config/quickshell links to $home/Sites/github/dotfiles/shell (got '$target')" \
@@ -133,6 +139,13 @@ done < <(pins)
 while IFS=$'\t' read -r pin cmd; do
   check "$pin: '$cmd' exits 0" as_user "$cmd >/dev/null"
 done < <(runs)
+claude=$(as_user "claude --version" 2>&1)
+check "claude --version prints a version (got '$claude')" grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' <<<"$claude"
+pi=$(as_user "fish -c 'pi --version'" 2>&1)
+check "pi --version prints 1.3.0 or newer (got '$pi')" test "$(printf '%s\n' 1.3.0 "$pi" | sort -V | head -n1)" = 1.3.0 -a -n "$pi"
+check "mise lists node 24.21.0 as installed" as_user "mise ls --installed node | grep -qw 24.21.0"
+dirt=$(as_user "git -C ~/Sites/github/dotfiles status --porcelain")
+check "the apply leaves the repo clean (got '$dirt')" test -z "$dirt"
 for font in 'Maple Mono' 'Symbols Nerd Font Mono'; do
   got=$(as_user "fc-match -f '%{family[0]}' '$font'")
   check "fontconfig finds $font (got '$got')" test "$got" = "$font"
@@ -179,7 +192,10 @@ check "sudo log starts with -v and every later call uses -n" \
 
 before=$(snapshot)
 echo "--- second run"
+as_root ": > $curl_log"
 check "second dots install exits 0" dots_install
+installs=$(podman exec "$name" grep -c 'claude.ai/install.sh' "$curl_log")
+check "second run runs the Claude installer 0 times (got $installs)" test "$installs" = 0
 after=$(snapshot)
 check "second run changes no file under $home or /etc" diff <(echo "$before") <(echo "$after")
 

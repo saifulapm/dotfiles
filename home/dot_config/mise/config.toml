@@ -5,6 +5,8 @@ node = "24.21.0"
 deno = "latest"
 # The Cloudflare CLI.
 "npm:cf" = "latest"
+# pi, the coding agent; a node bump carries it along.
+"npm:@earendil-works/pi-coding-agent" = "latest"
 
 [settings]
 # Laravel and React repos pin node with .nvmrc, .node-version or package.json devEngines, which mise ignores unless asked.

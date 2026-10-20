@@ -1,0 +1,8 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+# With ~/.local/bin off PATH the installer would add it to a shell config, and fish's links into this repo.
+export PATH="$HOME/.local/bin:$PATH"
+# Claude Code updates through dots update, so one already here is left as it is.
+if ! command -v claude >/dev/null; then
+  curl -fsSL https://claude.ai/install.sh | bash || die "the Claude Code installer failed"
+fi
