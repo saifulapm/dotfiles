@@ -65,9 +65,9 @@ test('Blueprint dresses the picker: THEMES // 3 SHEETS, ACTIVE: BLUEPRINT, numbe
 });
 
 test('a specimen window is framed as niri frames it: Paper ink then muted, hard 2,2 shadows', () => {
-  assert.deepEqual(windowLook(paper, true), { fill: '#FAF6EC', frame: { width: 1, color: '#1C1915' }, shadow: { x: 2, y: 2, blur: 0, color: '#ff1C1915' }, radius: 0 });
+  assert.deepEqual(windowLook(paper, true), { fill: '#FAF6EC', frame: { width: 1, color: '#1C1915' }, shadow: { x: 2, y: 2, blur: 0, color: '#1C1915' }, radius: 0 });
   assert.deepEqual(windowLook(paper, false).frame, { width: 1, color: '#6A6052' });
-  assert.equal(windowLook(paper, false).shadow.color, '#ff6A6052');
+  assert.equal(windowLook(paper, false).shadow.color, '#6A6052');
 });
 
 test('Artboard rings only the focused window in blue, rounds both, and shades the other at 0.75 as niri does', () => {
@@ -80,6 +80,13 @@ test('Blueprint frames the focused window cyan with its glow, the other #2E5A72 
   assert.deepEqual(windowLook(blueprint, true), { fill: '#0A1526', frame: { width: 1, color: '#7FE3F0' }, shadow: { x: 0, y: 0, blur: 9, color: '#407FE3F0' }, radius: 0 });
   assert.deepEqual(windowLook(blueprint, false).frame, { width: 1, color: '#2E5A72' });
   assert.equal(windowLook(blueprint, false).shadow.color, '#00000000');
+});
+
+test('niri border and ring colours with alpha read as Qt reads them, #AARRGGBB', () => {
+  const t = { ...blueprint, niri: { ...blueprint.niri, border_inactive: '#2E5A7280' } };
+  assert.equal(windowLook(t, false).frame.color, '#802E5A72');
+  const r = { ...artboard, niri: { ...artboard.niri, ring_color: '#3D5AFE80' } };
+  assert.equal(windowLook(r, true).frame.color, '#803D5AFE');
 });
 
 test('a theme without niri shadow keys draws its specimen windows with none', () => {

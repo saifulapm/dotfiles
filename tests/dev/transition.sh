@@ -113,7 +113,7 @@ check "paper, blueprint, paper inside one transition ends on paper ($final)" all
 timers_one() { shell_status | jq -e '.timers == 1' >/dev/null; }
 check "after the transitions status reports timers 1" timers_one
 
-errors=$(journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -E 'Failed to load|ShaderEffect|QShader|\.qsb|Paper.qml')
+errors=$(journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -E 'Failed to load|ShaderEffect|QShader|\.qsb|Paper.qml|PaperFill.qml')
 [ -n "$errors" ] && echo "$errors"
 check "the shell's journal has no load or shader error" test -z "$errors"
 

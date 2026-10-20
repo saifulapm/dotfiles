@@ -92,6 +92,7 @@ Item {
             drawing: switcher.visible,
             cardBox: panel.drawnBox(),
             header: [title.text + sub.text, headRight.text],
+            headerBaselines: [title.mapToItem(null, 0, title.baselineOffset).y, headRight.mapToItem(null, 0, headRight.baselineOffset).y],
             legend: legend.line(),
             cards: cards.drawn(),
             played: played ? { name: played, ms: cardList.itemAt(names.indexOf(played))?.playedMs ?? null } : null
@@ -154,6 +155,7 @@ Item {
                     height: title.height + 32
 
                     Row {
+                        id: titleRow
                         x: 22
                         y: 18
                         spacing: 12
@@ -184,7 +186,8 @@ Item {
                         textFormat: Text.PlainText
                         anchors.right: parent.right
                         anchors.rightMargin: 22
-                        anchors.baseline: title.baseline
+                        // On the title's baseline; an anchor cannot reach into the title's Row.
+                        y: titleRow.y + title.y + title.baselineOffset - baselineOffset
                         text: switcher.header.right
                         color: c.muted
                         font.family: switcher.look.small.font
@@ -234,8 +237,14 @@ Item {
                                 width: cards.cardWidth
                                 height: content.height * fit + 2 * pad
 
+                                // A key pressed before the specimen has loaded plays it once it has.
+                                property real pendingT0: -1
+
                                 function play(t0) {
-                                    specimen.item?.play(t0);
+                                    if (specimen.item)
+                                        specimen.item.play(t0);
+                                    else
+                                        pendingT0 = t0;
                                 }
 
                                 readonly property real playedMs: specimen.item?.playedMs ?? -1
@@ -249,7 +258,8 @@ Item {
                                         border: { width: tile.border.width, color: tile.border.color.toString() },
                                         number: number.text,
                                         title: name.text,
-                                        tag: tagText.visible ? tagText.text : ""
+                                        tag: tagText.visible ? tagText.text : "",
+                                        baselines: [name.mapToItem(null, 0, name.baselineOffset).y, tagText.mapToItem(null, 0, tagText.baselineOffset).y]
                                     }, specimen.item ? specimen.item.drawn() : { paperReady: false });
                                 }
 
@@ -330,6 +340,11 @@ Item {
                                     Loader {
                                         id: specimen
                                         asynchronous: true
+                                        onLoaded: {
+                                            if (card.pendingT0 >= 0 && switcher.selected === card.modelData.name)
+                                                item.play(card.pendingT0);
+                                            card.pendingT0 = -1;
+                                        }
                                         sourceComponent: Root.Specimen {
                                             tokens: card.modelData
                                             dir: switcher.theme.dir
@@ -345,6 +360,7 @@ Item {
                                         readonly property var tagline: Lib.tagline(card.modelData)
 
                                         Row {
+                                            id: captionRow
                                             spacing: 10
                                             Text {
                                                 id: number
@@ -399,7 +415,8 @@ Item {
                                             visible: card.tag !== null
                                             anchors.right: parent.right
                                             anchors.rightMargin: 6
-                                            anchors.baseline: name.baseline
+                                            // On the name's baseline; an anchor cannot reach into the name's Row.
+                                            y: captionRow.y + name.y + name.baselineOffset - baselineOffset
                                             text: card.tag?.text ?? ""
                                             color: card.tag?.color ?? "transparent"
                                             font.family: switcher.look.small.font

@@ -62,6 +62,8 @@ check "paper: under the cursor card lies a 4 px #C8381E hard shadow, then not" s
 check "paper: the cursor card reports a 2 px #c8381e border" state_is '.cards[0].border == {"width": 2, "color": "#c8381e"}'
 check "paper: the current card shows IN USE" state_is '[.cards[].tag] == ["IN USE", "", ""]'
 check "paper: the header reads Themes three on the shelf, PAPER IN USE" state_is '.header == ["Themesthree on the shelf", "PAPER IN USE"]'
+aligned() { state_is '(.headerBaselines[0] - .headerBaselines[1] | fabs) < 1 and all(.cards[]; .tag == "" or ((.baselines[0] - .baselines[1]) | fabs) < 1)'; }
+check "paper: PAPER IN USE and IN USE sit on the header's and the name's baselines" aligned
 check "paper: the keys read J/K CHOOSE  1–3 JUMP  ↵ APPLY  ESC" state_is '.legend == "J/K CHOOSE  1–3 JUMP  ↵ APPLY  ESC"'
 wtype j
 until_ok 1000 state_is '.selected == "artboard"'
@@ -100,6 +102,7 @@ check "blueprint: the header reads THEMES // 3 SHEETS, ACTIVE: BLUEPRINT" state_
 check "blueprint: each name follows its number 01 to 03" \
   state_is '[.cards[] | .number + " " + .title] == ["01 Paper", "02 Artboard", "03 BLUEPRINT"]'
 check "blueprint: the current card shows [ACTIVE]" state_is '[.cards[].tag] == ["", "", "[ACTIVE]"]'
+check "blueprint: ACTIVE: BLUEPRINT and [ACTIVE] sit on the header's and the name's baselines" aligned
 check "blueprint: the keys are bracketed" state_is '.legend == "[J/K] CHOOSE  [1–3] JUMP  [↵] APPLY  [ESC]"'
 close_picker
 
@@ -111,9 +114,10 @@ open_picker
 four_fit() {
   themes_state | jq -e '.cardBox as $p | (.cards | length == 4)
     and all(.cards[]; .box.x >= $p.x and .box.x + .box.w <= $p.x + $p.w + 0.5)
-    and ([.cards[].box] | [range(1; 4) as $i | .[$i].x >= .[$i - 1].x + .[$i - 1].w] | all)' >/dev/null
+    and ([.cards[].box] | [range(1; 4) as $i | .[$i].x >= .[$i - 1].x + .[$i - 1].w] | all)
+    and all(.cards[]; .preview.x >= .box.x and .preview.x + .preview.w <= .box.x + .box.w + 0.5)' >/dev/null
 }
-check "four cards share the panel's width without overlap" four_fit
+check "four cards share the panel's width without overlap, each specimen inside its card" four_fit
 check "the header counts four sheets and the keys jump 1–4" state_is '.header[0] == "THEMES // 4 SHEETS" and (.legend | contains("[1–4] JUMP"))'
 close_picker
 

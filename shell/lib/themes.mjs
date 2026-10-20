@@ -69,7 +69,7 @@ export function pickerLook(themed) {
       header: (n) => ({ title: 'Themes', font: t.ui, size: 20, weight: 700, color: c.ink, sub: `${n} themes`, subFont: t.ui, subSize: 13, italic: false, right: '' }),
       tag: (current, cursor) => (current ? { text: 'Current', color: c.accent, fill: l.cursor.fill, border: 'transparent', radius: 6 } : cursor ? { text: '↵', color: l.cursor.text, fill: l.cursor.fill, border: 'transparent', radius: 6 } : null),
       tile: { fill: TILE, border: { width: 0, color: 'transparent' }, radius: 12, pad: 10 },
-      cursor: { fill: c.surface, border: { width: 1.5, color: c.accent }, shadow: { kind: 'soft', x: 0, y: 8, blur: 20, spread: -10, color: c.accent, alpha: 0.45 }, ticks: false },
+      cursor: { fill: c.surface, border: { width: 1.5, color: c.accent }, shadow: { kind: 'soft', x: 0, y: 8, blur: 20, spread: -10, color: c.accent, alpha: 0.45 }, radius: 12, ticks: false },
     });
   }
   if (voice === 'bracket') {
@@ -92,8 +92,9 @@ export function pickerLook(themed) {
 // One fixed moment, so every card reads the same scene in its own voice and no clock ticks for it.
 const SCENE = { view: { idx: 3, app: 'foot', title: '~' }, goal: { title: 'Ship v2', left: '3d' }, date: new Date(2026, 9, 18), clock: '14:32' };
 
-// niri writes #RRGGBBAA where Qt reads #AARRGGBB; alpha scales the alpha.
+// niri writes #RRGGBBAA where Qt reads #AARRGGBB; alpha scales the alpha, and a colour with neither stays as written.
 function qtColor(hex, alpha = 1) {
+  if (hex.length === 7 && alpha === 1) return hex;
   const a = hex.length === 9 ? parseInt(hex.slice(7), 16) : 255;
   return '#' + Math.round(a * alpha).toString(16).padStart(2, '0') + hex.slice(1, 7);
 }
@@ -104,8 +105,8 @@ export function windowLook(tokens, focused) {
   const n = tokens.niri;
   const border = tokens.primitive.frame !== 'none' && n.border > 0;
   const frame = border
-    ? { width: 1, color: focused ? (tokens.primitive.frame === 'glow' ? c.accent : c.ink) : (n.border_inactive ?? c.muted) }
-    : focused && n.ring_width ? { width: n.ring_width * 0.75, color: n.ring_color ?? c.accent } : { width: 0, color: 'transparent' };
+    ? { width: 1, color: focused ? (tokens.primitive.frame === 'glow' ? c.accent : c.ink) : qtColor(n.border_inactive ?? c.muted) }
+    : focused && n.ring_width ? { width: n.ring_width * 0.75, color: qtColor(n.ring_color ?? c.accent) } : { width: 0, color: 'transparent' };
   // An unfocused window without its own shadow colour gets niri's default, the focused colour at 0.75.
   const color = !n.shadow_color ? null : focused ? qtColor(n.shadow_color) : n.shadow_inactive ? qtColor(n.shadow_inactive) : qtColor(n.shadow_color, 0.75);
   const [ox, oy] = n.shadow_offset ?? [0, 0];
