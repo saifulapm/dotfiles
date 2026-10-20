@@ -60,14 +60,12 @@ Item {
 
     Connections {
         target: section.pending
-        // A network that needs secrets fails with NoSecrets; Quickshell takes a PSK only for WPA-PSK, WPA2-PSK and SAE.
+        // With the line open every failure says why; with it closed only NoSecrets opens it, as Quickshell takes a PSK only for WPA-PSK, WPA2-PSK and SAE.
         function onConnectionFailed(reason) {
             const n = section.pending;
-            if (reason !== ConnectionFailReason.NoSecrets || ![WifiSecurityType.WpaPsk, WifiSecurityType.Wpa2Psk, WifiSecurityType.Sae].includes(n.security))
-                return;
             if (section.asking === n)
-                section.message = section.look.tabText("Wrong password");
-            else
+                section.message = section.look.tabText(reason === ConnectionFailReason.NoSecrets ? "Wrong password" : reason === ConnectionFailReason.WifiNetworkLost ? "Network not found" : reason === ConnectionFailReason.WifiAuthTimeout ? "Timed out" : "Could not join");
+            else if (reason === ConnectionFailReason.NoSecrets && [WifiSecurityType.WpaPsk, WifiSecurityType.Wpa2Psk, WifiSecurityType.Sae].includes(n.security))
                 section.asking = n;
         }
         function onConnectedChanged() {

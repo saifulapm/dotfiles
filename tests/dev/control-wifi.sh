@@ -170,6 +170,25 @@ for t in "paper|WRONG PASSWORD|↵ JOIN · ESC CANCEL|↵ CONNECT · D FORGET" "
   until_ok 2000 state_is '.open == false and .drawing == false'
 done
 
+# A join that fails for another reason keeps the line open and says why; Quickshell names a lost network (53) and a supplicant timeout (11).
+fail_next() { bus call org.freedesktop.NetworkManager "$nm" org.dots.FakeNM FailNext u "$1" >/dev/null; }
+open_wifi
+enter_on "Dots Secured"
+until_ok 3000 line_open
+for t in "53|network not found" "11|timed out" "10|could not join"; do
+  IFS='|' read -r reason why <<<"$t"
+  fail_next "$reason"
+  type_psk dots-secret-1
+  wtype -k Return
+  until_ok 3000 state_is --arg m "$why" '(.lineMessage | ascii_downcase) == $m'
+  check "a join that fails with device reason $reason keeps the line open and empty and reads $why ($(control_state | jq -c '{line, pskLength, lineMessage}'))" \
+    state_is --arg m "$why" '.line == true and .pskLength == 0 and (.lineMessage | ascii_downcase) == $m'
+done
+wtype -k Escape
+until_ok 2000 no_line
+wtype -k Escape
+until_ok 2000 state_is '.open == false and .drawing == false'
+
 open_wifi
 enter_on "Dots Secured"
 until_ok 3000 line_open

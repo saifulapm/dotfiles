@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# A NetworkManager on $DBUS_SYSTEM_BUS_ADDRESS with wlan0 and three networks: "Dots Open", a saved "Dots Home" (PSK dots-home-1) and a new "Dots Secured" (PSK dots-secret-1); a join with no PSK or a wrong one fails with NoSecrets, and org.dots.FakeNM.LastPsk() on /org/freedesktop/NetworkManager returns the last PSK given ("" if none).
+# A NetworkManager on $DBUS_SYSTEM_BUS_ADDRESS with wlan0 and three networks: "Dots Open", a saved "Dots Home" (PSK dots-home-1) and a new "Dots Secured" (PSK dots-secret-1); a join with no PSK or a wrong one fails with NoSecrets, and org.dots.FakeNM on /org/freedesktop/NetworkManager has LastPsk(), the last PSK given ("" if none), and FailNext(u), which fails the next join with that device state reason.
 import os
 import sys
 import time
@@ -222,6 +222,7 @@ class NetworkManager(Object):
         self.bus = bus
         self.count = 0
         self.last_psk = ""
+        self.fail_next = None
         self.active = None
         self.aps = [
             AccessPoint(bus, 1, "Dots Open", 70, None),
@@ -281,13 +282,14 @@ class NetworkManager(Object):
         if self.active is not active:
             return False
         conn = active.conn
-        if conn.ap.psk is None or conn.psk == conn.ap.psk:
+        reason, self.fail_next = self.fail_next, None
+        if reason is None and (conn.ap.psk is None or conn.psk == conn.ap.psk):
             active.change(ACTIVE, State=dbus.UInt32(ACTIVATED_CONN))
             self.device.change(WIRELESS, ActiveAccessPoint=conn.ap.path)
             self.device.set_state(ACTIVATED, 0)
             return False
         # Quickshell keeps the device's fail reason and reports it when the active connection goes with DeviceDisconnected.
-        self.device.set_state(FAILED, NO_SECRETS)
+        self.device.set_state(FAILED, NO_SECRETS if reason is None else reason)
         self.deactivate(CONN_DEVICE_DISCONNECTED)
         if forget_on_failure:
             self.forget(conn)
@@ -327,6 +329,10 @@ class NetworkManager(Object):
     @dbus.service.method(FAKE, out_signature="s")
     def LastPsk(self):
         return self.last_psk
+
+    @dbus.service.method(FAKE, in_signature="u")
+    def FailNext(self, reason):
+        self.fail_next = int(reason)
 
 
 DBusGMainLoop(set_as_default=True)
