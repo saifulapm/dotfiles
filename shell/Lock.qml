@@ -62,12 +62,12 @@ Scope {
         shake.restart();
     }
 
-    // Only a PAM success gets here; the marker goes after the lock, so a crash in between relocks.
+    // Only a PAM success gets here; the marker empties after the lock goes, so a crash in between relocks, and through the lock's own synchronous write, so a lock right after cannot lose its marker to a late rm.
     function accept() {
         trying = false;
         pending = "";
         session.locked = false;
-        Quickshell.execDetached(["rm", "-f", marker]);
+        markerFile.setText("");
     }
 
     IpcHandler {
@@ -96,14 +96,17 @@ Scope {
         }
     }
 
-    // Read once at start: a marker left by a killed shell means niri still holds the lock.
+    // Read once at start: a marker with a time in it, left by a killed shell, means niri still holds the lock; an unlock leaves it empty.
     FileView {
         id: markerFile
         path: screenLock.marker
         blockLoading: true
         blockWrites: true
         printErrors: false
-        onLoaded: session.locked = true
+        onLoaded: {
+            if (text().trim() !== "")
+                session.locked = true;
+        }
     }
 
     // PAM's other service refuses every password, so with no dots-lock installed the lock uses login rather than shutting the user out.

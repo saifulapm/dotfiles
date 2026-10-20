@@ -36,7 +36,7 @@ until_ok 3000 locked_shown
 check "Mod+Escape locks and niri confirms the lock" locked_shown
 ink_after=$(clock_ink)
 check "the screen shows the clock ($ink_before dark px before, $ink_after after)" test "$ink_after" -gt $((ink_before + 500))
-check "the lock marker is written" test -e "$marker"
+check "the lock marker is written" test -s "$marker"
 
 wtype -- wrong-pass
 until_ok 2000 state_is '.field == 10'
@@ -56,8 +56,10 @@ check "Enter on an empty field leaves it locked" state_is '.locked and .secure a
 type_enter dots-test-pass
 until_ok 3000 state_is '.locked == false'
 check "the test password unlocks" state_is '.locked == false and .field == 0'
-until_ok 1000 test ! -e "$marker"
-check "unlocking removes the marker" test ! -e "$marker"
+# The unlock empties the marker through the same synchronous write the lock uses, so a lock right after cannot lose its marker to a late rm.
+marker_empty() { [ -e "$marker" ] && [ ! -s "$marker" ]; }
+until_ok 1000 marker_empty
+check "unlocking empties the marker" marker_empty
 
 # A magenta window behind the lock: any magenta on screen while the shell is dead means niri showed the desktop.
 magenta() {
@@ -96,7 +98,7 @@ check "the restarted shell holds the lock within 2 s of the kill (${took} ms)" r
 lock_drawn() { (($(clock_ink) > 0)) && (($(magenta) == 0)); }
 until_ok 2000 lock_drawn
 check "the restarted shell draws its lock over the magenta window" lock_drawn
-check "the marker survives the kill" test -e "$marker"
+check "the marker survives the kill" test -s "$marker"
 
 type_enter dots-test-pass
 until_ok 3000 state_is '.locked == false'
@@ -108,6 +110,7 @@ old=$(shell_pid)
 systemctl --user restart "$DOTS_DEV_UNIT"
 until_ok 5000 bash -c "[ \"\$(systemctl --user show -p MainPID --value $DOTS_DEV_UNIT)\" != $old ]"
 until_ok 5000 state_is '.locked == false'
+check "a shell restarted after an unlock, with the marker empty, starts unlocked ($(wc -c <"$marker") bytes)" state_is '.locked == false'
 mod_escape
 until_ok 3000 locked_shown
 type_enter wrong-password
