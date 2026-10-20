@@ -70,7 +70,8 @@ magenta() {
     console.log(n);
   '
 }
-niri msg action spawn -- foot -o colors.background=ff00ff -e sleep 120
+# The live foot.ini's [colors-light] and [colors-dark] win over [colors], so foot starts on no config and sets both.
+niri msg action spawn -- foot -c /dev/null -o colors-dark.background=ff00ff -o colors-light.background=ff00ff -e sleep 120
 magenta_shown() { (($(magenta) > 10000)); }
 until_ok 5000 magenta_shown
 check "a magenta window shows before the lock" magenta_shown
