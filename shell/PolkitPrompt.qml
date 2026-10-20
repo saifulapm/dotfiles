@@ -88,7 +88,15 @@ Item {
             drawnMessage: messageText.text,
             prompt: flow?.inputPrompt ?? "",
             error: flow?.supplementaryIsError ? flow.supplementaryMessage : "",
-            field: input.text.length
+            field: input.text.length,
+            // The password field as drawn, which Control's Wi-Fi line matches.
+            fieldLook: {
+                font: input.font.family,
+                px: input.font.pixelSize,
+                ink: String(input.color),
+                border: String(fieldBox.border.color),
+                placeholder: String(placeholder.color)
+            }
         });
     }
 
@@ -191,6 +199,7 @@ Item {
             }
 
             Rectangle {
+                id: fieldBox
                 Layout.fillWidth: true
                 Layout.margins: 20
                 implicitHeight: 44
@@ -215,6 +224,7 @@ Item {
                 }
 
                 Text {
+                    id: placeholder
                     textFormat: Text.PlainText
                     visible: input.text === ""
                     anchors.verticalCenter: parent.verticalCenter
