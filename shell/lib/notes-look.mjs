@@ -21,7 +21,7 @@ export function keyPairs(tokens, keys) {
 export const keyLine = (tokens, keys) => keyPairs(tokens, keys).join('  ');
 
 // Two hex colours mixed, a share of the second into the first.
-function mix(a, b, share) {
+export function mix(a, b, share) {
   const ch = (h, i) => parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16);
   const out = [0, 1, 2].map((i) => Math.round(ch(a, i) * (1 - share) + ch(b, i) * share).toString(16).padStart(2, '0'));
   return '#' + out.join('');

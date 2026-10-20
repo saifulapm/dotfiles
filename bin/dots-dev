@@ -15,6 +15,8 @@ export PATH=$repo/dev/path:$repo/bin:$PATH
 dconf_name=dots_dev_${D##*-}
 dconf_name=${dconf_name//[^[:alnum:]_]/_}
 export TMUX_TMPDIR=$D/tmux DCONF_PROFILE=$D/dconf-profile DOTS_CHROMIUM_POLICY_DIR=$D/chromium-policy
+# Nor the live coding agents' theme files.
+export DOTS_AGENT_HOME=$D/agents
 # A fixed machine id names the notes store dev.json, whatever the live chezmoi config says.
 export DOTS_MACHINE=dev
 # Nor the live hub's questions or the live PipeWire.

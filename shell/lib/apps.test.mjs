@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
 import { validateTheme } from './theme.mjs';
-import { renderTmux, renderKak, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium } from './apps.mjs';
+import { renderTmux, renderKak, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderOpencode, renderAmx } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const blueprint = load('blueprint');
@@ -120,4 +120,37 @@ test('a running fish takes the new colours at its next prompt', (t) => {
   const script = `source ${config}; echo $fish_color_normal; echo '${renderFish(blueprint).replace(/'/g, "\\'")}' > ${out}/colors.fish; emit fish_prompt; echo $fish_color_normal`;
   const seen = execFileSync('fish', ['--no-config', '-c', script], { env: { ...process.env, XDG_STATE_HOME: state }, encoding: 'utf8' }).trim().split('\n');
   assert.deepEqual(seen, [paper.color.ink.slice(1).toLowerCase(), 'd6f4f8']);
+});
+
+// claude, pi, opencode and amx kept v1's dark palette, so on Paper and Artboard they drew dark boxes in a light terminal.
+test('the Claude Code theme starts from the light or dark preset of the theme and takes its tokens', () => {
+  const a = JSON.parse(renderClaude(artboard));
+  assert.equal(a.name, 'qshell');
+  assert.equal(a.base, 'light');
+  assert.deepEqual([a.overrides.claude, a.overrides.text, a.overrides.inverseText, a.overrides.success, a.overrides.error], ['#3d5afe', '#15171b', '#ffffff', '#1f8a4c', '#d93a3a']);
+  assert.equal(a.overrides.diffAdded, '#ddede4');
+  const b = JSON.parse(renderClaude(blueprint));
+  assert.equal(b.base, 'dark');
+  assert.equal(b.overrides.claude, '#7fe3f0');
+});
+
+test('the pi theme names its appearance, sits on the terminal surface, and every colour resolves to a var', () => {
+  const a = JSON.parse(renderPi(artboard));
+  assert.deepEqual([a.name, a.appearance, a.vars.background, a.vars.foreground, a.vars.accent], ['qshell', 'light', '#ffffff', '#15171b', '#3d5afe']);
+  assert.equal(JSON.parse(renderPi(blueprint)).appearance, 'dark');
+  assert.ok(Object.keys(a.colors).length >= 51, `${Object.keys(a.colors).length} colours`);
+  for (const [k, v] of Object.entries(a.colors)) assert.ok(v in a.vars, `${k}: ${v}`);
+});
+
+test('the opencode theme sits on the terminal surface and every theme key resolves to a def', () => {
+  const a = JSON.parse(renderOpencode(artboard));
+  assert.deepEqual([a.defs.bg, a.defs.fg, a.defs.accent, a.theme.background, a.theme.text], ['#ffffff', '#15171b', '#3d5afe', 'bg', 'fg']);
+  for (const [k, v] of Object.entries(a.theme)) assert.ok(v in a.defs, `${k}: ${v}`);
+});
+
+test('the amx theme sets its six roles from the tokens', () => {
+  assert.equal(
+    renderAmx(artboard),
+    ['waiting = "#b7791f"', 'done = "#1f8a4c"', 'failed = "#d93a3a"', 'stopped = "#5f6672"', 'accent = "#3d5afe"', 'cursor = "#e3e6eb"', ''].join('\n'),
+  );
 });

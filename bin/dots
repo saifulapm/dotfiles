@@ -87,6 +87,21 @@ reload_chromium() {
   fi
 }
 
+# Each coding agent's config names its theme qshell, and an agent not installed gets no file; cp writes in place, so a watcher on the file itself sees the change.
+reload_agents() {
+  local home=${DOTS_AGENT_HOME:-$HOME} src dst
+  while read -r src dst; do
+    [[ -d $home/${dst%%/themes/*} ]] || continue
+    cmp -s "$1/$src" "$home/$dst" && continue
+    mkdir -p "$(dirname "$home/$dst")" && cp "$1/$src" "$home/$dst" || return 1
+  done <<'AGENTS'
+claude.json .claude/themes/qshell.json
+pi.json .pi/agent/themes/qshell.json
+opencode.json .config/opencode/themes/qshell.json
+amx.toml .config/amx/themes/qshell.toml
+AGENTS
+}
+
 theme() {
   local name=${1:-} t0=${DOTS_SWITCH_T0:-} LC_ALL=C
   [[ -n $name ]] || die "usage: dots theme <name>"
@@ -131,6 +146,7 @@ theme() {
     gsettings set org.gnome.desktop.interface font-name "$ui 11" &&
     gsettings set org.gnome.desktop.interface monospace-font-name "$mono 11" || echo gsettings >>"$failed"; } &
   { reload_chromium "$out" || echo chromium >>"$failed"; } &
+  { reload_agents "$out" || echo agents >>"$failed"; } &
   wait
   # The island shows the notice for 5 s, so an app left on the old theme is named.
   [[ -s $failed ]] && echo "theme $name: $(sort "$failed" | paste -sd, - | sed 's/,/, /g') did not reload" >"$out/notice"

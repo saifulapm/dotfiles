@@ -1,4 +1,6 @@
-// Renders the per-app fragments (tmux, kak, yazi, fish, GTK, Chromium) from a validated theme; pure, no object spread.
+// Renders the per-app fragments (tmux, kak, yazi, fish, GTK, Chromium, and the claude, pi, opencode and amx TUIs) from a validated theme; pure, no object spread.
+import { mix } from './notes-look.mjs';
+
 const lower = (s) => s.toLowerCase();
 const rgb = (s) => `rgb:${lower(s).slice(1)}`;
 
@@ -172,4 +174,87 @@ export function renderGtkSettings(t) {
 
 export function renderChromium(t) {
   return JSON.stringify({ BrowserThemeColor: lower(t.color.surface), BrowserColorScheme: t.mode }, null, 2) + '\n';
+}
+
+// The coding agents draw inside foot, so each sits on surface with ink text; the configs v2 carries from v1 name the theme qshell.
+function agentColors(t) {
+  const c = t.color;
+  const a = c.ansi.map(lower);
+  const [ink, muted, line, surface, accent, danger, ok] = [c.ink, c.muted, c.line, c.surface, c.accent, c.danger, c.ok].map(lower);
+  const on = (x, share) => mix(surface, x, share);
+  return { a, ink, muted, line, surface, accent, danger, ok, on };
+}
+
+export function renderClaude(t) {
+  const { a, ink, muted, line, surface, accent, danger, ok, on } = agentColors(t);
+  const overrides = {
+    claude: accent, claudeShimmer: mix(accent, ink, 0.35), text: ink, inverseText: surface,
+    inactive: mix(ink, surface, 0.4), inactiveShimmer: mix(ink, surface, 0.25), subtle: muted,
+    suggestion: a[6], permission: a[4], permissionShimmer: mix(a[4], ink, 0.35), remember: a[3],
+    success: ok, error: danger, warning: a[3], warningShimmer: mix(a[3], ink, 0.35), merged: a[5],
+    promptBorder: accent, promptBorderShimmer: mix(accent, ink, 0.35), planMode: a[6], autoAccept: a[3],
+    bashBorder: a[11], ide: a[14],
+    diffAdded: on(ok, 0.15), diffRemoved: on(danger, 0.15), diffAddedDimmed: on(ok, 0.08), diffRemovedDimmed: on(danger, 0.08),
+    diffAddedWord: on(ok, 0.32), diffRemovedWord: on(danger, 0.32),
+    userMessageBackground: on(ink, 0.06), userMessageBackgroundHover: on(ink, 0.1),
+    bashMessageBackgroundColor: on(ink, 0.06), memoryBackgroundColor: on(ink, 0.06), selectionBg: line,
+    rate_limit_fill: accent, rate_limit_empty: on(ink, 0.2), briefLabelYou: a[3], briefLabelClaude: accent,
+  };
+  return JSON.stringify({ name: 'qshell', base: t.mode, overrides }, null, 2) + '\n';
+}
+
+// pi's roles point at vars, so a theme only sets the vars.
+const PI_COLORS = {
+  accent: 'accent', border: 'border', borderAccent: 'accent', borderMuted: 'borderMuted', success: 'color2', error: 'color1',
+  warning: 'color3', muted: 'mutedText', dim: 'dimText', text: 'foreground', thinkingText: 'dimText', selectedBg: 'selectedBackground',
+  userMessageBg: 'panel', userMessageText: 'foreground', customMessageBg: 'panel', customMessageText: 'foreground',
+  customMessageLabel: 'accent', toolPendingBg: 'panelPending', toolSuccessBg: 'panelSuccess', toolErrorBg: 'panelError',
+  toolTitle: 'accent', toolOutput: 'foreground', mdHeading: 'color5', mdLink: 'accent', mdLinkUrl: 'color6', mdCode: 'color6',
+  mdCodeBlock: 'foreground', mdCodeBlockBorder: 'borderMuted', mdQuote: 'mutedText', mdQuoteBorder: 'borderMuted', mdHr: 'borderMuted',
+  mdListBullet: 'color5', toolDiffAdded: 'color2', toolDiffRemoved: 'color1', toolDiffContext: 'mutedText', syntaxComment: 'dimText',
+  syntaxKeyword: 'color5', syntaxFunction: 'color4', syntaxVariable: 'accent', syntaxString: 'color2', syntaxNumber: 'color3',
+  syntaxType: 'color4', syntaxOperator: 'color5', syntaxPunctuation: 'mutedText', thinkingOff: 'borderMuted', thinkingMinimal: 'accent',
+  thinkingLow: 'color4', thinkingMedium: 'color5', thinkingHigh: 'color3', thinkingXhigh: 'color1', bashMode: 'color3',
+};
+
+export function renderPi(t) {
+  const { a, ink, line, surface, accent, danger, ok, on } = agentColors(t);
+  const vars = {
+    background: surface, foreground: ink, accent, selectionBackground: line, selectionForeground: ink, selectedBackground: on(accent, 0.22),
+    panel: on(ink, 0.06), panelAlt: on(ink, 0.1), panelPending: on(accent, 0.12), panelSuccess: on(ok, 0.12), panelError: on(danger, 0.12),
+    border: on(ink, 0.3), borderMuted: on(ink, 0.2), mutedText: mix(ink, surface, 0.34), dimText: mix(ink, surface, 0.52),
+  };
+  a.forEach((hex, i) => (vars['color' + i] = hex));
+  return JSON.stringify({ $schema: 'https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json', name: 'qshell', appearance: t.mode, vars, colors: PI_COLORS }, null, 2) + '\n';
+}
+
+const OPENCODE_THEME = {
+  primary: 'accent', secondary: 'magenta', accent: 'accent', error: 'red', warning: 'yellow', success: 'green', info: 'cyan',
+  text: 'fg', textMuted: 'fgMuted', background: 'bg', backgroundPanel: 'bgPanel', backgroundElement: 'bgElement',
+  border: 'border', borderActive: 'accent', borderSubtle: 'borderSubtle', diffAdded: 'green', diffRemoved: 'red',
+  diffContext: 'fgMuted', diffHunkHeader: 'fgMuted', diffHighlightAdded: 'green', diffHighlightRemoved: 'red',
+  diffAddedBg: 'diffAddedBg', diffRemovedBg: 'diffRemovedBg', diffContextBg: 'bgPanel', diffLineNumber: 'fgMuted',
+  diffAddedLineNumberBg: 'diffAddedBg', diffRemovedLineNumberBg: 'diffRemovedBg', markdownText: 'fg', markdownHeading: 'magenta',
+  markdownLink: 'accent', markdownLinkText: 'cyan', markdownCode: 'cyan', markdownBlockQuote: 'fgMuted', markdownEmph: 'yellow',
+  markdownStrong: 'magenta', markdownHorizontalRule: 'borderSubtle', markdownListItem: 'cyan', markdownListEnumeration: 'cyan',
+  markdownImage: 'blue', markdownImageText: 'cyan', markdownCodeBlock: 'fg', syntaxComment: 'fgMuted', syntaxKeyword: 'magenta',
+  syntaxFunction: 'blue', syntaxVariable: 'accent', syntaxString: 'green', syntaxNumber: 'yellow', syntaxType: 'blue',
+  syntaxOperator: 'magenta', syntaxPunctuation: 'fgMuted',
+};
+
+export function renderOpencode(t) {
+  const { a, ink, muted, line, surface, accent, danger, ok, on } = agentColors(t);
+  const defs = {
+    bg: surface, bgPanel: on(ink, 0.04), bgElement: on(ink, 0.1), fg: ink, fgMuted: muted, accent,
+    red: danger, green: ok, yellow: a[3], blue: a[4], magenta: a[5], cyan: a[6],
+    border: on(ink, 0.3), borderSubtle: line, diffAddedBg: on(ok, 0.15), diffRemovedBg: on(danger, 0.15),
+  };
+  return JSON.stringify({ $schema: 'https://opencode.ai/theme.json', defs, theme: OPENCODE_THEME }, null, 2) + '\n';
+}
+
+// amx's theme is six roles, named for what a row means; it re-reads the file when its mtime moves.
+export function renderAmx(t) {
+  const { a, muted, line, accent, danger, ok } = agentColors(t);
+  const roles = [['waiting', a[3]], ['done', ok], ['failed', danger], ['stopped', muted], ['accent', accent], ['cursor', line]];
+  return roles.map(([k, v]) => `${k} = "${v}"`).join('\n') + '\n';
 }

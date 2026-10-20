@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
 import { validateTheme, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
-import { renderTmux, renderKak, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium } from './apps.mjs';
+import { renderTmux, renderKak, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderOpencode, renderAmx } from './apps.mjs';
 
 const name = process.argv[2];
 const file = new URL(`../../themes/${name}/theme.toml`, import.meta.url).pathname;
@@ -47,6 +47,10 @@ const files = {
   'gtk.css': renderGtkCss(theme),
   'gtk-settings.ini': renderGtkSettings(theme),
   'chromium.json': renderChromium(theme),
+  'claude.json': renderClaude(theme),
+  'pi.json': renderPi(theme),
+  'opencode.json': renderOpencode(theme),
+  'amx.toml': renderAmx(theme),
   // dots theme writes a failed switch's reason here after the fallback render; any render clears it.
   notice: '',
   'themes.json': JSON.stringify(themes, null, 2) + '\n',
