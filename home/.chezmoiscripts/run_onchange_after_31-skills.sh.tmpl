@@ -1,0 +1,34 @@
+#!/bin/bash
+# gh: {{ if stat (joinPath .chezmoi.homeDir ".config/gh/hosts.yml") }}logged in{{ else }}not logged in{{ end }}; skills: {{ glob (joinPath .chezmoi.homeDir ".local/src/skills/skills/*") }}
+{{ template "lib.sh" . }}
+# Saiful's skills repo is private, so the clone waits for the gh login dots secrets writes; the key above re-runs this then, and after dots update pulls a new skill.
+src=$HOME/.local/src/skills
+if [[ ! -f $HOME/.config/gh/hosts.yml ]]; then
+  echo "skills: skipped until dots secrets"
+  exit 0
+fi
+# rev-parse, not a .git test: a clone killed mid-transfer leaves the folder.
+if ! git -C "$src" rev-parse HEAD >/dev/null 2>&1; then
+  rm -rf "$src"
+  mkdir -p "${src%/*}"
+  # The git config sends github.com/saifulapm over ssh, with the key dots secrets put in place.
+  git clone -q --depth 1 "${DOTS_SKILLS_REPO:-https://github.com/saifulapm/skills}" "$src" || die "could not clone the skills repo; the next apply tries again"
+fi
+ours={{ joinPath .chezmoi.sourceDir "dot_claude/skills" | quote }}
+for dest in "$HOME/.claude/skills" "$HOME/.agents/skills"; do
+  mkdir -p "$dest"
+  for skill in "$src"/skills/*/; do
+    skill=${skill%/}
+    name=${skill##*/}
+    # The dotfiles' own copy of a skill wins, in both folders.
+    [[ -e $ours/$name ]] && continue
+    link=$dest/$name
+    # workflow install, amx setup and playwright-cli write real folders here, and only a link into the clone is ours to replace.
+    if [[ -e $link || -L $link ]] && [[ $(readlink "$link") != "$src"/* ]]; then continue; fi
+    ln -sfn "$skill" "$link"
+  done
+  # A skill the repo dropped leaves a link of ours pointing at nothing.
+  for link in "$dest"/*; do
+    if [[ -L $link && ! -e $link && $(readlink "$link") == "$src"/* ]]; then rm -f "$link"; fi
+  done
+done
