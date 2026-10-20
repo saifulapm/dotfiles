@@ -15,7 +15,7 @@ function exe(path, body) {
   chmodSync(path, 0o755);
 }
 
-// The stub real binary logs its argv; the stub mise prints it for `which playwright-cli` and logs every call.
+// The stub real binary logs its argv; the stub mise prints it for `which playwright-cli` and logs every call, and like mise refuses to run where an untrusted mise.toml is.
 function scratch() {
   const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-playwright-')));
   mkdirSync(join(home, 'stubs'));
@@ -25,6 +25,9 @@ function scratch() {
   exe(
     join(home, 'stubs/mise'),
     `#!/bin/sh
+dir=$PWD
+if [ "$1" = -C ]; then dir=$2; shift 2; fi
+if [ -f "$dir/mise.toml" ]; then echo "mise ERROR Config files in $dir/mise.toml are not trusted." >&2; exit 1; fi
 echo "$*" >> "$HOME/mise.log"
 case "$*" in
   "which playwright-cli") echo "$HOME/real/playwright-cli" ;;
@@ -79,6 +82,16 @@ test('the wrapper finds the real binary through mise, not PATH', () => {
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(calls(home), ['--version']);
   assert.deepEqual(calls(home, 'mise.log'), ['which playwright-cli']);
+});
+
+// A project under ~/Sites/tries keeps an untrusted mise.toml, and mise refuses every command run from inside it.
+test('the wrapper reaches the real binary from a folder with an untrusted mise.toml', () => {
+  const { home, env } = scratch();
+  mkdirSync(join(home, 'tries/x'), { recursive: true });
+  writeFileSync(join(home, 'tries/x/mise.toml'), '[tools]\njq = "latest"\n');
+  const r = spawnSync('bash', [wrapper, '--version'], { encoding: 'utf8', env, cwd: join(home, 'tries/x') });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(calls(home), ['--version']);
 });
 
 test('the mise step runs the real playwright-cli install --skills --global once', () => {

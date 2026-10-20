@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# playwright-cli: hands Playwright's own Chromium the desktop's scaling flags and the machine-wide config, then runs the real CLI.
+# playwright-cli: hands the browser Playwright starts the desktop's scaling flags and the machine-wide config, then runs the real CLI.
 set -euo pipefail
 {
-# This wrapper comes first on PATH, so a PATH lookup would find itself; mise which prints the install's own path.
-real=$(mise which playwright-cli)
-# Playwright's Chromium never sees CHROMIUM_USER_FLAGS, so without WaylandPerSurfaceScale and WaylandUiScale from this config it renders at 1x on a 1.5 scale output and blurs; the config repeats Playwright's own CDPScreenshotNewSurface there, since a second --enable-features replaces the first.
+# This wrapper comes first on PATH, so a PATH lookup would find itself; mise which prints the install's own path, asked from home since mise refuses to run inside a folder with an untrusted mise.toml.
+real=$(mise -C "$HOME" which playwright-cli)
+# Playwright starts chromium with its own flags, so without WaylandPerSurfaceScale and WaylandUiScale from this config it renders at 1x on a 1.5 scale output and blurs; the config repeats Playwright's own CDPScreenshotNewSurface there, since a second --enable-features replaces the first.
 config=${XDG_CONFIG_HOME:-$HOME/.config}/playwright/cli.config.json
 
 subcommand=""
