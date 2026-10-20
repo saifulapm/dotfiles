@@ -89,6 +89,8 @@ check "\$HOME/.config/quickshell links to $home/Sites/github/dotfiles/shell (got
 
 theme=$(podman exec "$name" cat "$home/.local/state/dots/theme" 2>/dev/null)
 check "\$HOME/.local/state/dots/theme contains paper (got '$theme')" test "$theme" = paper
+mode=$(podman exec "$name" stat -c %a "$home/.local/state/dots")
+check "\$HOME/.local/state/dots is private to the user (got $mode)" test "$mode" = 700
 
 check "\$HOME/.local/state/dots/theme-out/shell.json exists" \
   podman exec "$name" test -f "$home/.local/state/dots/theme-out/shell.json"

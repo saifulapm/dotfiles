@@ -1,7 +1,7 @@
 // dots-clip-store as wl-paste --watch runs it, with cliphist replaced by a stub that logs its calls.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -45,4 +45,6 @@ test('a copy whose owner closes the pipe is stored', async () => {
   p.stdin.end('a whole clip');
   assert.equal(await new Promise((resolve) => p.on('close', resolve)), 0);
   assert.match(readFileSync(log, 'utf8'), /-max-items 500 store/);
+  // The history holds whatever was copied, passwords not marked sensitive among it, so only the user reads its dir.
+  assert.equal(statSync(join(env.XDG_STATE_HOME, 'dots')).mode & 0o777, 0o700);
 });

@@ -117,7 +117,7 @@ theme() {
   out=$state/theme-out
   # Two switches at once would leave fragments from both, so they take turns; the fallback to paper already holds the lock.
   if [[ -z ${theme_locked:-} ]]; then
-    mkdir -p "$state"
+    mkdir -p -m 700 "$state"
     exec 8>"$state/theme.lock"
     flock -w 30 8 || die "theme $name: another switch held the lock for 30 s"
     theme_locked=1

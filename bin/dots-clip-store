@@ -16,7 +16,7 @@ case ${CLIPBOARD_STATE:-} in sensitive | clear)
   ;;
 esac
 
-mkdir -p "$dir"
+mkdir -p -m 700 "$dir"
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 # A bash variable drops NUL bytes, so the clip goes through a file; an owner that stalls with the pipe open would hold the watcher forever, so a read past 3 s drops the clip.
