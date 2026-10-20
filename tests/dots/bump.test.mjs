@@ -37,8 +37,9 @@ url = "https://github.com/saifulapm/kakoune/archive/{version}.tar.gz"
 sha256 = "${OLD}"
 `;
 
-// gh api repos/<owner>/<name>/<what> --jq <expr>: prints $FIX/gh/<owner>_<name>, or an error body on stdout and exit 1 when <owner>_<name>.fail exists.
+// gh api repos/<owner>/<name>/<what> --jq <expr>: prints $FIX/gh/<owner>_<name>, or an error body on stdout and exit 1 when <owner>_<name>.fail exists; a tarball/<sha> path prints $FIX/gh/tarball_<sha>.
 const STUB_GH = `#!/bin/sh
+case $2 in */tarball/*) cat "$FIX/gh/tarball_\${2##*/}"; exit ;; esac
 key=$(echo "$2" | cut -d/ -f2,3 | tr / _)
 if [ -e "$FIX/gh/$key.fail" ]; then echo '{"message":"Not Found","status":"404"}'; exit 1; fi
 cat "$FIX/gh/$key"
@@ -148,4 +149,26 @@ test('the agent tools move to their repos\' head commits, one line each', () => 
   const old = Object.fromEntries(pins.map((p) => [p.name, p.version]));
   assert.equal(r.stdout, ['amx', 'workflow', 'pxy'].map((n) => `${n} ${old[n]} → ${head[n]}\n`).join(''));
   for (const n of ['amx', 'workflow', 'pxy']) assert.match(w.read(), new RegExp(`name = "${n}"\nversion = "${head[n]}"`));
+});
+
+// kakfeed is private: its pin says fetch = "gh", so the new tarball comes from gh api, never curl (the stub curl has no fixture for it).
+test('a fetch = "gh" pin is hashed from the tarball gh api downloads', () => {
+  const file = FILE + `
+[[pin]]
+name = "kakfeed"
+version = "${KAK_OLD}"
+repo = "saifulapm/kakfeed"
+track = "commit"
+fetch = "gh"
+url = "https://github.com/saifulapm/kakfeed/archive/{version}.tar.gz"
+sha256 = "${OLD}"
+`;
+  const w = world({ yaziTag: 'v26.9.1', kakSha: KAK_OLD, file });
+  writeFileSync(join(w.fix, 'gh/saifulapm_kakfeed'), KAK_NEW + '\n');
+  writeFileSync(join(w.fix, `gh/tarball_${KAK_NEW}`), 'kakfeed private tarball');
+  const before = w.read();
+  const r = w.bump();
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, `kakfeed ${KAK_OLD} → ${KAK_NEW}\n`);
+  assert.deepEqual(changed(before, w.read()), [`version = "${KAK_NEW}"`, `sha256 = "${sha('kakfeed private tarball')}"`]);
 });

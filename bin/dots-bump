@@ -41,7 +41,12 @@ bump_pin() {
     template=${urls[$arch]:-}
     [[ -n $template ]] || { echo "dots bump: $name: no url for '$arch'" >&2; return 1; }
     url=${template//\{version\}/$latest}
-    curl -fsSL "$url" -o "$work/download" || { echo "dots bump: $name: could not download $url" >&2; return 1; }
+    if [[ $fetch == gh ]]; then
+      # A private repo: the same tarball the pin script fetches, through the gh login.
+      gh api "repos/$repo_name/tarball/$latest" >"$work/download" || { echo "dots bump: $name: gh could not download $repo_name at $latest" >&2; return 1; }
+    else
+      curl -fsSL "$url" -o "$work/download" || { echo "dots bump: $name: could not download $url" >&2; return 1; }
+    fi
     sum=$(sha256sum "$work/download")
     echo "${sha_lines[$arch]}	${sum%% *}" >>"$pending"
   done
@@ -62,7 +67,7 @@ failed=0
 : >"$work/report"
 
 reset() {
-  name='' repo_name='' version='' version_line='' track=''
+  name='' repo_name='' version='' version_line='' track='' fetch=''
   urls=() sha_lines=()
 }
 reset
@@ -81,6 +86,7 @@ while IFS= read -r line || [[ -n $line ]]; do
     name) name=$value ;;
     repo) repo_name=$value ;;
     track) track=$value ;;
+    fetch) fetch=$value ;;
     version) version=$value version_line=$n ;;
     url) urls[single]=$value ;;
     url.*) urls[${key#url.}]=$value ;;
