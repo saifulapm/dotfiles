@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals> <store> <pulled>...` merges the pulled files into the local store.
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import * as goals from '../shell/lib/goals.mjs';
 import * as notes from '../shell/lib/notes.mjs';
@@ -17,12 +18,10 @@ function machine() {
   return notes.machineId(env.DOTS_MACHINE, read(config + '/chezmoi/chezmoi.toml'), read('/etc/hostname'));
 }
 
-const mtime = (path) => (existsSync(path) ? statSync(path, { bigint: true }).mtimeNs : null);
-
 // Merging a store with itself only sorts it, so the two compare equal when the others brought nothing and the file stays untouched.
 function round(model, path, others) {
-  const before = mtime(path);
-  const local = before === null ? model.emptyStore() : model.parseStore(readFileSync(path, 'utf8'));
+  const text = existsSync(path) ? readFileSync(path, 'utf8') : null;
+  const local = text === null ? model.emptyStore() : model.parseStore(text);
   if (!local) fail(`${basename(path)}: the local store is broken, so it is left as it is`, 4);
   const base = model.mergeStores(local, local);
   const merged = others.reduce((s, store) => model.mergeStores(s, store), base);
@@ -30,13 +29,34 @@ function round(model, path, others) {
   const tmp = join(dirname(path), '.' + basename(path) + '.' + process.pid + '.tmp');
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(tmp, JSON.stringify(merged));
-  // The shell may have saved while this round merged; then the round starts again from its file.
-  if (mtime(path) !== before) {
+  // Only tests set it, to save over the store at the worst moment.
+  if (process.env.DOTS_MERGE_BEFORE_SWAP) execFileSync(process.env.DOTS_MERGE_BEFORE_SWAP);
+  // A store the shell created meanwhile is not replaced: link refuses it and the round starts again from it.
+  if (text === null) {
+    if (!place(() => linkSync(tmp, path), tmp)) return false;
+    unlinkSync(tmp);
+    return true;
+  }
+  // The swap is one step, so a shell save cannot land between a check and a rename; whatever it swapped out is kept to compare.
+  if (!place(() => execFileSync('mv', ['--exchange', tmp, path], { stdio: 'ignore' }), tmp)) return false;
+  const out = readFileSync(tmp, 'utf8');
+  unlinkSync(tmp);
+  if (out === text) return true;
+  // The shell saved after this round read the store: its file merges into the result in the next round.
+  const late = model.parseStore(out);
+  if (late) others.push(late);
+  return false;
+}
+
+// Runs the step that puts the result in place; when the store changed under it (made, or removed), the temp file goes and the round starts again.
+function place(step, tmp) {
+  try {
+    step();
+    return true;
+  } catch (e) {
     unlinkSync(tmp);
     return false;
   }
-  renameSync(tmp, path);
-  return true;
 }
 
 // A record stamped more than a day ahead of this clock would win every merge from now on, so a pulled file's such records are left out.

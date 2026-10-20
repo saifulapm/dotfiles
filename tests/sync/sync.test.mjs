@@ -1,7 +1,7 @@
 // Two machines, a and b, sync notes and goals through one local alias remote.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import * as G from '../../shell/lib/goals.mjs';
 import * as N from '../../shell/lib/notes.mjs';
@@ -187,6 +187,25 @@ test('a pulled goals file that does not parse marks the unit failed, while the f
   const pushed = G.parseStore(readFileSync(join(w.remote, 'dots-sync/goals/a.json'), 'utf8'));
   assert.deepEqual(G.activeGoals(pushed).map((g) => g.title).sort(), ['From a', 'From c']);
   assert.equal(status(a).notes.ok, true);
+});
+
+test('a shell save that lands just before the merge puts its result in place is kept beside the pulled goals', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  write(goalsPath(b), G.addGoal(G.emptyStore(), 'From b', null, T, 'gb'));
+  await ok(b);
+  const early = G.addGoal(G.emptyStore(), 'Early', null, T, 'ga');
+  write(goalsPath(a), early);
+  // The hook stands in for the shell: once, it saves a goal over the store the round already read.
+  const late = join(w.root, 'late.json');
+  writeFileSync(late, JSON.stringify(G.addGoal(early, 'Late save', null, T + 1, 'gl')));
+  const hook = join(w.root, 'save-late');
+  writeFileSync(hook, `#!/bin/sh\n[ -e ${hook}.done ] && exit 0\ntouch ${hook}.done\ncp ${late} ${goalsPath(a)}\n`);
+  chmodSync(hook, 0o755);
+  a.env.DOTS_MERGE_BEFORE_SWAP = hook;
+  await ok(a, ['--only', 'goals']);
+  assert.ok(existsSync(hook + '.done'), 'the hook ran');
+  assert.deepEqual(G.activeGoals(goals(a)).map((g) => g.title).sort(), ['Early', 'From b', 'Late save']);
 });
 
 // A store change starts a --only round from its path unit; one that met a running round used to wait 15 min for the timer.
