@@ -6,6 +6,9 @@ tarball=$(pin_fetch)
 tar -xzf "$tarball" -C "$pin_tmp"
 # Three crates, each with its own lockfile, in one repo.
 for crate in mem workflow hub; do pin_cargo "$pin_tmp/workflow-$pin_version/$crate" "$crate"; done
+# The binaries carry the workflow's skills, subagents, hook stubs and mem's pi extension, so each new pin writes them again; mem doctor reports on the store, so only its failure shows.
+"$HOME/.local/bin/workflow" install || die "workflow install failed"
+"$HOME/.local/bin/mem" doctor --fix >/dev/null || die "mem doctor --fix failed"
 # A running local hub keeps the old binary until it restarts, and the reload first makes the restart read the unit this apply linked.
 systemctl --user daemon-reload 2>/dev/null && systemctl --user try-restart hub-local.service 2>/dev/null || true
 pin_done

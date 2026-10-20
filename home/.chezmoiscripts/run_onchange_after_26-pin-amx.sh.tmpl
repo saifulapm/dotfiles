@@ -5,4 +5,7 @@
 tarball=$(pin_fetch)
 tar -xzf "$tarball" -C "$pin_tmp"
 pin_cargo "$pin_tmp/amx-$pin_version" amx
+# The binary carries amx's Claude Code plugin and pi extensions, so each new pin writes them again.
+"$HOME/.local/bin/amx" setup claude || die "amx setup claude failed"
+"$HOME/.local/bin/amx" setup pi --subagent || die "amx setup pi failed"
 pin_done
