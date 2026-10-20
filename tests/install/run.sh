@@ -132,6 +132,10 @@ check "gcc, wl-clipboard, cliphist and wtype are installed" podman exec "$name" 
 
 # shellcheck disable=SC2046 # one word per package
 check "every packages.toml entry for this arch is installed" podman exec "$name" rpm -q --quiet $(packages)
+# rpm -q matches by name, so ffmpeg-free cannot pass for RPM Fusion's ffmpeg.
+out=$(podman exec "$name" rpm -q chromium tailscale wf-recorder ffmpeg)
+rc=$?
+check "rpm -q chromium tailscale wf-recorder ffmpeg prints 4 versions (exit $rc, got '$out')" test "$rc" = 0 -a "$(grep -c . <<<"$out")" = 4
 while IFS=$'\t' read -r pin version cmd; do
   out=$(as_user "$cmd" 2>&1)
   check "$pin: '$cmd' prints $version (got '${out%%$'\n'*}')" grep -qF -- "$version" <<<"$out"
