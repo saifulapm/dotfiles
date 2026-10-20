@@ -41,6 +41,8 @@ Item {
 
     function close() {
         shown = false;
+        // A typed password clears as Control closes, not when its close stops drawing.
+        wifi.closeLine();
     }
 
     function swapped() {
