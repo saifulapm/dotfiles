@@ -11,7 +11,7 @@ newest() { [ ! -e "$db" ] || clip list | awk -F'\t' 'NR == 1 { print $1 }'; }
 
 # A password manager's clip (sensitive) never touches disk, and its wipe (clear) must not make cliphist delete the clip before it.
 case ${CLIPBOARD_STATE:-} in sensitive | clear)
-  cat >/dev/null
+  timeout 3 cat >/dev/null || true
   exit 0
   ;;
 esac
@@ -19,10 +19,10 @@ esac
 mkdir -p "$dir"
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
-# A bash variable drops NUL bytes, so the clip goes through a file.
-head -c $((max + 1)) >"$tmp"
+# A bash variable drops NUL bytes, so the clip goes through a file; an owner that stalls with the pipe open would hold the watcher forever, so a read past 3 s drops the clip.
+timeout 3 head -c $((max + 1)) >"$tmp" || exit 0
 if (($(stat -c %s "$tmp") > max)); then
-  cat >/dev/null
+  timeout 3 cat >/dev/null || true
   exit 0
 fi
 
