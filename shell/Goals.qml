@@ -53,9 +53,8 @@ Item {
         keys.forceActiveFocus();
     }
 
+    // The prompt row stays drawn through the close; open() clears it.
     function close() {
-        prompt = null;
-        confirm = false;
         shown = false;
     }
 
@@ -82,7 +81,7 @@ Item {
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
             settled: motion.settled,
-            drawing: motion.drawing,
+            drawing: view.visible,
             cardBox: panel.drawnBox(),
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: view.Window.active

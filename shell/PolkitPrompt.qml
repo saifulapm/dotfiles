@@ -11,6 +11,17 @@ Item {
     property bool shown: false
     // The agent's AuthFlow while a request runs.
     property var flow: null
+    // The request's text as the card draws it, copied, since the agent may delete a cancelled request while its close still plays.
+    property var seen: null
+    readonly property var asked: flow ? {
+        message: flow.message,
+        inputPrompt: flow.inputPrompt,
+        responseVisible: flow.responseVisible,
+        supplementaryMessage: flow.supplementaryMessage,
+        supplementaryIsError: flow.supplementaryIsError
+    } : null
+    onAskedChanged: if (asked)
+        seen = asked
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -18,6 +29,8 @@ Item {
     readonly property Root.Motion motion: Root.Motion {
         shown: prompt.shown
         tokens: prompt.theme.tokens
+        onDrawingChanged: if (!drawing)
+            prompt.seen = null
     }
 
     function show(f) {
@@ -68,9 +81,10 @@ Item {
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
             settled: motion.settled,
-            drawing: motion.drawing,
+            drawing: prompt.visible,
             cardBox: card.drawnBox(),
             message: flow?.message ?? "",
+            drawnMessage: messageText.text,
             prompt: flow?.inputPrompt ?? "",
             error: flow?.supplementaryIsError ? flow.supplementaryMessage : "",
             field: input.text.length
@@ -163,12 +177,13 @@ Item {
             }
 
             Text {
+                id: messageText
                 textFormat: Text.PlainText
                 Layout.fillWidth: true
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
                 wrapMode: Text.Wrap
-                text: prompt.flow?.message ?? ""
+                text: prompt.seen?.message ?? ""
                 color: prompt.c.ink
                 font.family: prompt.fonts.display
                 font.pixelSize: 22
@@ -188,7 +203,7 @@ Item {
                     anchors.leftMargin: 12
                     anchors.rightMargin: 12
                     verticalAlignment: TextInput.AlignVCenter
-                    echoMode: prompt.flow?.responseVisible ? TextInput.Normal : TextInput.Password
+                    echoMode: prompt.seen?.responseVisible ? TextInput.Normal : TextInput.Password
                     color: prompt.c.ink
                     font.family: prompt.fonts.ui
                     font.pixelSize: 16
@@ -203,7 +218,7 @@ Item {
                     visible: input.text === ""
                     anchors.verticalCenter: parent.verticalCenter
                     x: 12
-                    text: prompt.flow?.inputPrompt || "Password"
+                    text: prompt.seen?.inputPrompt || "Password"
                     color: prompt.c.muted
                     font.family: prompt.fonts.ui
                     font.pixelSize: 16
@@ -212,15 +227,15 @@ Item {
 
             // The daemon's word replaces the key hint while it has one.
             Text {
-                visible: !!prompt.flow?.supplementaryMessage
+                visible: !!prompt.seen?.supplementaryMessage
                 textFormat: Text.PlainText
                 Layout.fillWidth: true
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
                 Layout.bottomMargin: 16
                 wrapMode: Text.Wrap
-                text: prompt.flow?.supplementaryMessage ?? ""
-                color: prompt.flow?.supplementaryIsError ? prompt.c.danger : prompt.c.muted
+                text: prompt.seen?.supplementaryMessage ?? ""
+                color: prompt.seen?.supplementaryIsError ? prompt.c.danger : prompt.c.muted
                 font.family: prompt.fonts.ui
                 font.pixelSize: 10
                 font.letterSpacing: 1.2
@@ -228,7 +243,7 @@ Item {
 
             // The key hint as the launcher's legend draws it: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
             Row {
-                visible: !prompt.flow?.supplementaryMessage
+                visible: !prompt.seen?.supplementaryMessage
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
                 Layout.bottomMargin: 16

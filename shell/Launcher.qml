@@ -147,7 +147,7 @@ Item {
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
             settled: motion.settled,
-            drawing: motion.drawing,
+            drawing: launcher.visible,
             cardBox: card.drawnBox(),
             look: look.voice,
             label: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,

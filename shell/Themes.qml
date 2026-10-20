@@ -70,7 +70,7 @@ Item {
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
             settled: motion.settled,
-            drawing: motion.drawing,
+            drawing: switcher.visible,
             cardBox: panel.drawnBox()
         });
     }

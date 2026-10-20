@@ -120,7 +120,7 @@ Item {
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
             settled: motion.settled,
-            drawing: motion.drawing,
+            drawing: centre.visible,
             cardBox: card.drawnBox(),
             headingKind: look.label.kind,
             heading: heading.text,

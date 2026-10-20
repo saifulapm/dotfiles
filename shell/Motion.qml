@@ -19,13 +19,22 @@ Item {
     property real settleMs: -1
     property real startedAt: 0
 
-    // From wherever the card is, so an open pressed again mid-close turns back, and a close mid-open sinks from there.
     onShownChanged: {
-        playing.stop();
         if (shown) {
             startedAt = Date.now();
             settleMs = -1;
         }
+        play();
+    }
+    // A theme switch mid-motion carries on at the new theme's pace.
+    onCurvesChanged: if (playing.running)
+        play()
+    onSettledChanged: if (settled)
+        settleMs = Date.now() - startedAt
+
+    // From wherever the card is, so an open pressed again mid-close turns back, and a close mid-open sinks from there.
+    function play() {
+        playing.stop();
         const to = shown ? 1 : 0;
         const ms = !curves ? 0 : shown ? curves.openMs * (1 - progress) : curves.closeMs * progress;
         if (ms <= 0) {
@@ -36,8 +45,6 @@ Item {
         playing.duration = ms;
         playing.start();
     }
-    onSettledChanged: if (settled)
-        settleMs = Date.now() - startedAt
 
     // Another surface opening ends this one's close at once, so only the new one shows.
     function cut() {

@@ -75,7 +75,7 @@ Item {
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
             settled: motion.settled,
-            drawing: motion.drawing,
+            drawing: sheet.visible,
             cardBox: card.drawnBox(),
             heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             headingKind: look.label.kind,

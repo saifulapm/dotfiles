@@ -74,7 +74,7 @@ Item {
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
             settled: motion.settled,
-            drawing: motion.drawing,
+            drawing: control.visible,
             cardBox: card.drawnBox(),
             heading: header.visible ? header.text : "",
             tabFill: tab ? String(tab.color) : null,

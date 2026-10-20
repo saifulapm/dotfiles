@@ -116,6 +116,7 @@ springs() {
   w2=$(card_w "$1")
   check "artboard: 300 ms into a 20x open the $1 card is drawn at 0.98 of its rest width or less ($w1 of $w2)" node -e "process.exit($w1 / $w2 <= 0.98 ? 0 : 1)"
   eval "$3" >/dev/null
+  check "artboard: the $1 card still draws as its close plays" surface_is "$1" .drawing
   until_ok 9000 surface_is "$1" '.drawing == false'
 }
 for s in themes notifs cheatsheet goals control; do springs "$s" "qs ipc call $s open" "qs ipc call $s close"; done
@@ -130,6 +131,14 @@ until_ok 3000 fake Registered >/dev/null 2>&1
 systemctl --user restart "$DOTS_DEV_UNIT"
 until_ok 5000 surface_is polkit .registered
 springs polkit "fake Begin s motion" "wtype -k Escape"
+# The request's text stays on the card while it sinks, so the close plays the open in reverse.
+fake Begin s motion >/dev/null
+until_ok 9000 surface_is polkit .settled
+message=$(timeout 0.5 qs ipc call polkit state | jq -r .drawnMessage)
+wtype -k Escape
+until_ok 1000 surface_is polkit '.open == false'
+check "artboard: the polkit card keeps drawing its message through the close ($message)" surface_is polkit ".drawing and .drawnMessage == \"$message\" and .drawnMessage != \"\""
+until_ok 9000 surface_is polkit '.drawing == false'
 
 theme blueprint
 # Pixels in a box brighter than the navy paper, its grid and the card's fill: the cyan pen, the ink text.
@@ -144,12 +153,22 @@ bright() {
 }
 press
 wait_until 1000
+# A plot neither moves nor scales the card, so its drawn height is its height at rest.
+read -r card_h < <(launcher_state | jq -r '.cardBox.h | floor')
 # The pen starts on the top edge past the chamfer and goes round clockwise, so a second in it has drawn the top but not the left edge.
 top_pen=$(bright $((cx + 14)) $((cy - 1)) 200 3)
 left_pen=$(bright $((cx - 1)) $((cy + 30)) 3 30)
 inside=$(bright $((cx + 10)) $((cy + 10)) 620 60)
 check "blueprint: 1 s into a 20x open the outline has drawn its top edge ($top_pen px) and not yet its left ($left_pen px)" test "$top_pen" -ge 150 -a "$left_pen" = 0
 check "blueprint: and nothing inside the card is drawn yet ($inside bright px)" test "$inside" = 0
+# Near the end of the pen, past the bottom-right corner, it has drawn that corner's bevel and left its square corner bare.
+wait_until 2900
+bevel=$(bright $((cx + 640 - 9)) $((cy + card_h - 9)) 6 6)
+corner=$(bright $((cx + 637)) $((cy + card_h - 3)) 3 3)
+# A 12 px rounded corner would bulge 2 to 3 px past the bevel's line here.
+bulge=$(bright $((cx + 636)) $((cy + card_h - 5)) 2 2)
+inside=$(bright $((cx + 10)) $((cy + 10)) 620 60)
+check "blueprint: the pen turns the bottom-right corner along its chamfer ($bevel px on the bevel, $corner on the square corner, $bulge where an arc would run, $inside inside)" test "$bevel" -gt 0 -a "$corner" = 0 -a "$bulge" = 0 -a "$inside" = 0
 until_ok 7000 state_is .settled
 check "blueprint: the launcher reports a plot that settled in about 20 times 240 ms ($(launcher_state | jq -c '[.motion, .settleMs]'))" state_is '.motion == "plot" and .settleMs >= 4700 and .settleMs <= 5400'
 check "blueprint: at rest the card's text is drawn ($(bright $((cx + 10)) $((cy + 10)) 620 60) bright px)" test "$(bright $((cx + 10)) $((cy + 10)) 620 60)" -gt 50
@@ -163,7 +182,7 @@ wait_until 1000
 theme paper
 until_ok 7000 state_is .settled
 check "blueprint to paper mid-open: it settles as Paper's card, its ink frame at rest" test "$(first_y $((cx + 320)) $((cy - 30)) 60 28 25 21)" = 30
-check "blueprint to paper mid-open: the state says drop" state_is '.motion == "drop"'
+check "blueprint to paper mid-open: the state says drop, timed at Paper's pace rather than Blueprint's 4.8 s ($(launcher_state | jq .settleMs) ms)" state_is '.motion == "drop" and .settleMs < 3600'
 wtype -k Escape
 until_ok 4000 state_is '.drawing == false'
 

@@ -24,6 +24,11 @@ Item {
 
     scale: pose.scale
 
+    // A colour as the fill fades in; at rest it is left alone, since Qt.alpha would make transparent opaque black.
+    function faded(c) {
+        return pose.fill < 1 ? Qt.alpha(c, pose.fill) : c;
+    }
+
     // The card as drawn this frame, moved and scaled by its motion, in the window's pixels.
     function drawnBox() {
         const a = mapToItem(null, 0, 0);
@@ -65,7 +70,7 @@ Item {
         visible: !surface.chamfer && surface.pose.outline >= 1
         anchors.fill: parent
         radius: surface.style.corner.radius
-        color: Qt.alpha(surface.style.fill, surface.pose.fill)
+        color: surface.faded(surface.style.fill)
         border.width: surface.style.frame.width
         border.color: surface.style.frame.color
     }
@@ -82,7 +87,7 @@ Item {
             ShapePath {
                 strokeWidth: 0
                 strokeColor: "transparent"
-                fillColor: surface.shadow.kind === "hard" ? Qt.alpha(surface.shadow.color, surface.pose.fill) : "transparent"
+                fillColor: surface.shadow.kind === "hard" ? surface.faded(surface.shadow.color) : "transparent"
                 PathRectangle {
                     x: surface.shadow.x
                     y: surface.shadow.y
@@ -98,7 +103,7 @@ Item {
                 id: body
                 strokeWidth: surface.style.frame.width
                 strokeColor: surface.style.frame.width ? surface.style.frame.color : "transparent"
-                fillColor: Qt.alpha(surface.style.fill, surface.pose.fill)
+                fillColor: surface.faded(surface.style.fill)
                 joinStyle: ShapePath.MiterJoin
                 PathRectangle {
                     width: surface.width
@@ -114,7 +119,8 @@ Item {
 
     // A plot draws the frame's own path, chamfers and all, from the top edge round, before any fill.
     Loader {
-        active: surface.pose.outline < 1
+        // Only while the card shows, so a closed Blueprint surface keeps no pen.
+        active: surface.pose.outline < 1 && surface.visible
         anchors.fill: parent
         sourceComponent: Shape {
             preferredRendererType: Shape.GeometryRenderer
