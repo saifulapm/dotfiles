@@ -1,0 +1,17 @@
+[Unit]
+Description=Claude Code Remote Control server for %i
+# One server per project folder under ~/Codes, enabled on the device with systemctl --user enable --now claude-rc@<project>; the Claude app's Code tab lists it by the folder's name, and a folder the device lacks skips the unit instead of failing it.
+ConditionPathIsDirectory=%h/Codes/%i
+# Server mode exits after about 10 minutes without network; with no limit it retries every 5 s until the network is back, instead of failing for good.
+StartLimitIntervalSec=0
+
+[Service]
+WorkingDirectory=%h/Codes/%i
+# bypassPermissions, as workflow go's orchestrators run; no session is pre-created in the checkout an orchestrator works in, so every session gets its own worktree.
+ExecStart=%h/.local/bin/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir
+# A stop or SIGTERM withdraws the server from claude.ai and the restart serves again in about 7 s; after a SIGKILL each restart is refused until the claim lapses, about 3 minutes later (measured 2026-10-15).
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

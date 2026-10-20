@@ -149,6 +149,13 @@ got=$(as_user "systemctl --user is-failed hub-local.service")
 check "with no local.env, hub-local.service is inactive, not failed (got '$got')" test "$got" = inactive
 got=$(as_user "pgrep -cf '^/bin/sleep infinity\$'")
 check "no v1 stand-in (sleep infinity) is left running (got $got)" test "$got" = 0
+# A device enables its own Remote Control projects; one whose folder under ~/Codes is missing is skipped, not failed.
+check "systemctl --user enable --now claude-rc@nope works on v2's template" as_user "systemctl --user enable --now claude-rc@nope.service 2>/dev/null"
+got=$(unit_state claude-rc@nope.service)
+check "claude-rc@nope.service is enabled, and with no ~/Codes/nope inactive (got '$got')" test "$got" = "enabled inactive"
+got=$(as_user "systemctl --user is-failed claude-rc@nope.service")
+check "claude-rc@nope.service is not failed (got '$got')" test "$got" = inactive
+as_user "systemctl --user disable claude-rc@nope.service 2>/dev/null"
 check "v1's ~/.gitconfig and 10-history.fish links are gone" as_user "test ! -e ~/.gitconfig -a ! -e ~/.config/fish/conf.d/10-history.fish"
 check "~/.dotfiles stays in place" as_user "test -f ~/.dotfiles/home/dot_gitconfig"
 

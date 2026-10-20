@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -53,4 +53,16 @@ test('a machine already in the store, or without local.env, runs no workflow swi
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(calls.filter((c) => c.startsWith('workflow')), [], String(env));
   }
+});
+
+// The dotfiles ship one Remote Control template; a device enables its own projects, so no per-project file is linked here.
+test('claude-rc@ runs in ~/Codes/<project>, skips a missing folder, and no instance is enabled from the dotfiles', () => {
+  const units = join(repo, 'home/dot_config/systemd/user');
+  const unit = readFileSync(join(units, 'claude-rc@.service'), 'utf8');
+  assert.match(unit, /^ConditionPathIsDirectory=%h\/Codes\/%i$/m);
+  assert.match(unit, /^WorkingDirectory=%h\/Codes\/%i$/m);
+  assert.match(unit, /^ExecStart=%h\/\.local\/bin\/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir$/m);
+  assert.match(unit, /^WantedBy=default\.target$/m);
+  const linked = readdirSync(units, { recursive: true }).filter((f) => /claude-rc@/.test(f) && f !== 'claude-rc@.service');
+  assert.deepEqual(linked, []);
 });
