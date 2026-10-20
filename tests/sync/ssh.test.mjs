@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { identity, machine, sync, world } from './lib.mjs';
+import { holdLock, identity, machine, sync, world } from './lib.mjs';
 
 const KEY = '-----BEGIN OPENSSH PRIVATE KEY-----\nmarker-only-in-the-key\n-----END OPENSSH PRIVATE KEY-----\n';
 
@@ -56,6 +56,19 @@ test('the remote blob is age-encrypted, and a new machine c with no ~/.ssh pulls
   const c = machine(w, 'c');
   await identity(c, a);
   await ok(c, ['--only', 'ssh']);
+  assert.deepEqual(tree(c), tree(a));
+});
+
+// dots secrets runs --only ssh and then checks ~/.ssh, so a round that met the timer's lock and left at once failed it.
+test('a --only ssh round that meets the lock waits for it, then pulls the keys', async () => {
+  const { w, a } = await agreed();
+  const c = machine(w, 'c');
+  await identity(c, a);
+  const lock = await holdLock(c, 3);
+  const t0 = Date.now();
+  await ok(c, ['--only', 'ssh']);
+  await lock.freed;
+  assert.ok(Date.now() - t0 >= 2500, `it ran after ${Date.now() - t0} ms, before the lock was let go`);
   assert.deepEqual(tree(c), tree(a));
 });
 
