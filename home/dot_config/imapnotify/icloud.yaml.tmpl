@@ -1,0 +1,26 @@
+{{- $mail := fromToml (includeTemplate "mail-identities.toml" .) -}}
+{{- $primary := index $mail "primary" -}}
+{{- if $primary -}}
+# The file name is the unit instance: imapnotify@icloud.service reads this, and a second account is one more file and one more wants link.
+configurations:
+    - host: imap.mail.me.com
+      port: 993
+      tls: true
+      tlsOptions:
+          rejectUnauthorized: true
+      username: {{ $primary }}
+      # The key is passwordCMD, uppercase CMD: goimapnotify ignores passwordCmd and loops on an empty password. The unit's PASSWORD_STORE_GPG_OPTS keeps it from prompting.
+      passwordCMD: "pass email/icloud/{{ (splitList "@" $primary) | first }} | head -n1"
+      alias: icloud
+      xoAuth2: false
+      # iCloud drops a long IDLE silently, so the watcher re-arms every 15 minutes.
+      idleLogoutTimeout: 15
+      boxes:
+          # INBOX only: mbsync syncs every folder anyway, and watching Sent would wake on our own writes.
+          - mailbox: INBOX
+            onNewMail: "{{ .chezmoi.homeDir }}/Sites/github/dotfiles/bin/mail-sync --quiet"
+            onNewMailPost: SKIP
+            # A flag change made on the phone shows here too; mail-sync is locked and idempotent, so the extra runs are harmless.
+            onChangedMail: "{{ .chezmoi.homeDir }}/Sites/github/dotfiles/bin/mail-sync --quiet"
+            onChangedMailPost: SKIP
+{{ end -}}

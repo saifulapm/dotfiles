@@ -1,13 +1,13 @@
-// The mail configs render only where the chezmoi age key exists: a keyless apply writes none and still exits 0, a keyed one writes all three.
+// The mail configs render only where the chezmoi age key exists: a keyless apply writes none and still exits 0, a keyed one writes them all.
 import { before, after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const repo = new URL('../../', import.meta.url).pathname.replace(/\/$/, '');
-const scripts = ['bin/mail-sync', 'bin/hey-folder-sync', 'home/dot_config/notmuch/hooks/executable_post-new'];
+const scripts = ['bin/mail-sync', 'bin/hey-folder-sync', 'bin/mail-open', 'bin/imapnotify-wait', 'home/dot_config/notmuch/hooks/executable_post-new'];
 const address = 'test@example.com';
 
 let root;
@@ -58,7 +58,7 @@ after(() => rmSync(root, { recursive: true, force: true }));
 
 test('a keyless apply exits 0 and writes no mail config', () => {
   assert.equal(keyless.result.status, 0, keyless.result.stderr);
-  for (const f of ['.mbsyncrc', '.msmtprc', '.config/notmuch/default/config']) {
+  for (const f of ['.mbsyncrc', '.msmtprc', '.config/notmuch/default/config', '.config/imapnotify/icloud.yaml']) {
     assert.equal(existsSync(join(keyless.home, f)), false, f);
   }
 });
@@ -111,4 +111,104 @@ test('notmuch reads the rendered config', { skip: !has('notmuch') && 'notmuch is
   const r = run('notmuch', ['config', 'get', 'user.primary_email'], { env: { PATH: process.env.PATH, HOME: keyed.home, NOTMUCH_CONFIG: config } });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, `${address}\n`);
+});
+
+test('imapnotify@icloud starts with the session, waits for an unlocked agent, and stays off without its yaml', () => {
+  const units = join(keyless.home, '.config/systemd/user');
+  const text = readFileSync(join(units, 'imapnotify@.service'), 'utf8');
+  assert.match(text, /^ConditionPathExists=%h\/\.config\/imapnotify\/%i\.yaml$/m);
+  assert.match(text, /^ExecStartPre=%h\/Sites\/github\/dotfiles\/bin\/imapnotify-wait %h\/\.config\/imapnotify\/%i\.yaml$/m);
+  assert.match(text, /^TimeoutStartSec=infinity$/m);
+  assert.match(text, /^Environment="PASSWORD_STORE_GPG_OPTS=--pinentry-mode=error"$/m);
+  assert.match(text, /^ExecStart=%h\/\.local\/share\/mise\/shims\/goimapnotify -conf %h\/\.config\/imapnotify\/%i\.yaml$/m);
+  assert.match(text, /^StartLimitBurst=5$/m);
+  const link = join(units, 'graphical-session.target.wants/imapnotify@icloud.service');
+  assert.ok(lstatSync(link).isSymbolicLink());
+  assert.equal(readlinkSync(link), '../imapnotify@.service');
+});
+
+test('a keyed apply writes the imapnotify yaml for the primary address, syncing on new mail', () => {
+  const yaml = readFileSync(join(keyed.home, '.config/imapnotify/icloud.yaml'), 'utf8');
+  assert.match(yaml, /^\s+username: test@example\.com$/m);
+  assert.match(yaml, /^\s+passwordCMD: "pass email\/icloud\/test \| head -n1"$/m);
+  assert.match(yaml, new RegExp(`^\\s+onNewMail: "${keyed.home}/Sites/github/dotfiles/bin/mail-sync --quiet"$`, 'm'));
+});
+
+test('gpg-agent keeps a passphrase for 400 days', () => {
+  const text = readFileSync(join(keyless.home, '.gnupg/gpg-agent.conf'), 'utf8');
+  assert.match(text, /^default-cache-ttl 34560000$/m);
+  assert.match(text, /^max-cache-ttl 34560000$/m);
+  assert.doesNotMatch(text, /pinentry-program/);
+});
+
+// A fake pass stands in for the store: it fails as gpg does on a locked key until its Nth call, so the wait is seen to retry and then stop.
+function fakePass(dir, succeedOn) {
+  mkdirSync(dir, { recursive: true });
+  const pass = join(dir, 'pass');
+  writeFileSync(pass, `#!/bin/bash
+n=$(( $(cat "${dir}/calls" 2>/dev/null || echo 0) + 1 ))
+echo $n > "${dir}/calls"
+echo "$PASSWORD_STORE_GPG_OPTS|$*" >> "${dir}/log"
+[ $n -ge ${succeedOn} ] || { echo "gpg: decryption failed: No pinentry" >&2; exit 2; }
+echo hunter2
+echo "host: imap.mail.me.com"
+`);
+  chmodSync(pass, 0o755);
+  const yaml = join(dir, 'icloud.yaml');
+  writeFileSync(yaml, 'configurations:\n    - host: imap.mail.me.com\n      passwordCMD: "pass email/icloud/test | head -n1"\n');
+  return yaml;
+}
+
+const wait = (dir, yaml, timeout) =>
+  run(join(repo, 'bin/imapnotify-wait'), [yaml], {
+    env: { PATH: `${dir}:/usr/bin:/bin`, HOME: dir, IMAPNOTIFY_WAIT_SECONDS: '0.1' },
+    timeout,
+  });
+
+test('imapnotify-wait returns once the password decrypts without a prompt, and prints nothing', () => {
+  const dir = join(root, 'wait-ok');
+  const r = wait(dir, fakePass(dir, 3), 10000);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, '');
+  assert.deepEqual(readFileSync(join(dir, 'log'), 'utf8').trim().split('\n'), [
+    '--pinentry-mode=error|email/icloud/test',
+    '--pinentry-mode=error|email/icloud/test',
+    '--pinentry-mode=error|email/icloud/test',
+  ]);
+});
+
+test('imapnotify-wait keeps waiting while the agent is locked', () => {
+  const dir = join(root, 'wait-locked');
+  const r = wait(dir, fakePass(dir, 1000), 1500);
+  assert.equal(r.signal, 'SIGTERM');
+  assert.equal(r.stdout, '');
+  assert.ok(Number(readFileSync(join(dir, 'calls'), 'utf8')) >= 3);
+});
+
+test('kak loads mail.kak with the carried config and no error', () => {
+  const home = keyless.home;
+  const runDir = join(root, 'kak-run');
+  mkdirSync(runDir, { mode: 0o700 });
+  // The scratch HOME hides ~/.local/bin, where the kak pin installs, so it goes in by its real path, after this checkout's bin/.
+  const env = {
+    PATH: [join(repo, 'bin'), join(process.env.HOME, '.local/bin'), process.env.PATH].join(':'),
+    HOME: home,
+    XDG_CONFIG_HOME: join(home, '.config'),
+    XDG_DATA_HOME: join(home, '.local/share'),
+    XDG_STATE_HOME: join(home, '.local/state'),
+    XDG_CACHE_HOME: join(home, '.cache'),
+    XDG_RUNTIME_DIR: runDir,
+  };
+  const theme = run('node', [join(repo, 'shell/lib/theme-render.mjs'), 'paper'], { env });
+  assert.equal(theme.status, 0, theme.stderr);
+  const out = join(root, 'kak-mail');
+  // define-command refuses a name that exists, so each catch marks a command mail.kak defined.
+  const names = ['mail', 'mail-sync', 'mail-compose', 'mail-box'];
+  const probe = (name) => `try %{ define-command ${name} nop; echo -to-file ${out}.${name} missing } catch %{ echo -to-file ${out}.${name} defined }`;
+  const r = run('kak', ['-ui', 'dummy', '-e', `${names.map(probe).join('; ')}; eval -buffer *debug* %{ write ${out}.debug }; quit!`], { env, timeout: 20000 });
+  assert.equal(r.status, 0, r.stderr);
+  const read = (name) => (existsSync(`${out}.${name}`) ? readFileSync(`${out}.${name}`, 'utf8') : 'not run');
+  assert.deepEqual(Object.fromEntries(names.map((n) => [n, read(n)])), Object.fromEntries(names.map((n) => [n, 'defined'])));
+  const errors = readFileSync(`${out}.debug`, 'utf8').split('\n').filter((l) => /error|could not load/i.test(l));
+  assert.deepEqual(errors, []);
 });

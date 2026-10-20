@@ -1,0 +1,27 @@
+[Unit]
+Description=IMAP IDLE watcher for %i (goimapnotify)
+Documentation=https://gitlab.com/shackra/goimapnotify
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+# Without mail identities there is no yaml, and goimapnotify would exit and restart forever.
+ConditionPathExists=%h/.config/imapnotify/%i.yaml
+# A revoked app password fails every start; 5 a day keeps it from hammering Apple's IMAP. The wait below never fails, so a locked agent spends none of them.
+StartLimitIntervalSec=1d
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# gpg fails on an uncached passphrase instead of drawing pinentry, for the wait, the passwordCMD and every mail-sync this unit runs.
+Environment="PASSWORD_STORE_GPG_OPTS=--pinentry-mode=error"
+ExecStartPre=%h/Sites/github/dotfiles/bin/imapnotify-wait %h/.config/imapnotify/%i.yaml
+# The wait lasts until the mail-sync timer's prompt unlocks the agent, however long that is.
+TimeoutStartSec=infinity
+ExecStart=%h/.local/share/mise/shims/goimapnotify -conf %h/.config/imapnotify/%i.yaml
+# Suspend, a wifi change or iCloud hanging up drops the IDLE connection, so reconnecting is the normal path.
+Restart=always
+RestartSec=30
+Nice=10
+
+[Install]
+WantedBy=graphical-session.target
