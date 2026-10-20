@@ -62,7 +62,12 @@ test('themes.json lists every valid theme, paper first, and skips a broken one',
   execFileSync('node', [join(root, 'shell/lib/theme-render.mjs'), 'paper'], { env: { ...process.env, XDG_STATE_HOME: state } });
   const themes = JSON.parse(readFileSync(join(state, 'dots/theme-out/themes.json'), 'utf8'));
   assert.deepEqual(themes.map((x) => x.name), ['paper', 'artboard', 'blueprint']);
-  assert.deepEqual(Object.keys(themes[2]), ['name', 'mode', 'color', 'primitive', 'type']);
+  assert.deepEqual(Object.keys(themes[2]), ['name', 'mode', 'color', 'primitive', 'paper', 'type', 'niri']);
   assert.equal(themes[2].color.paper, '#0C1A2E');
   assert.equal(themes[2].primitive.frame, 'glow');
+  assert.equal(themes[1].paper.dot, '#B4BAC4');
+  assert.equal(themes[2].paper.minor, 16);
+  assert.equal(themes[2].type.voice, 'bracket');
+  assert.equal(themes[1].niri.ring_color, '#3D5AFE');
+  assert.equal(themes[0].niri.border_inactive, '#6A6052');
 });

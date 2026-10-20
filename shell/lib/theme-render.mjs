@@ -20,13 +20,13 @@ try {
   console.error(`theme ${name}: invalid theme.toml: ${e.message}`);
   process.exit(1);
 }
-// The switcher's cards, Paper first, then by name; a theme that fails the check gets no card.
+// The picker's cards, Paper first, then by name, each with every token its specimen draws; a theme that fails the check gets no card.
 const themes = [];
 const dir = new URL('../../themes/', import.meta.url).pathname;
 for (const d of readdirSync(dir).sort()) {
   try {
     const t = validateTheme(parseToml(readFileSync(join(dir, d, 'theme.toml'), 'utf8')));
-    themes.push({ name: t.name, mode: t.mode, color: t.color, primitive: t.primitive, type: t.type });
+    themes.push(t);
   } catch {
     continue;
   }
