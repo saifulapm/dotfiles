@@ -71,7 +71,8 @@ Item {
             settleMs: motion.settleMs,
             settled: motion.settled,
             drawing: switcher.visible,
-            cardBox: panel.drawnBox()
+            cardBox: panel.drawnBox(),
+            cards: cards.drawn()
         });
     }
 
@@ -152,19 +153,27 @@ Item {
                     id: cards
                     spacing: 16
 
+                    // Each card's specimen as drawn, in list order.
+                    function drawn() {
+                        const out = [];
+                        for (let i = 0; i < cardList.count; i++)
+                            out.push(Object.assign({ name: cardList.itemAt(i).modelData.name }, cardList.itemAt(i).specimenState()));
+                        return out;
+                    }
+
                     Repeater {
+                        id: cardList
                         model: switcher.themes
 
                         Item {
                             id: card
                             required property var modelData
-                            readonly property var tc: modelData.color
-                            readonly property var tp: modelData.primitive
-                            readonly property real radius: tp.corner === "round" ? 12 : 0
-                            readonly property color frameColor: tp.frame === "glow" ? tc.accent : tp.frame === "hairline" ? tc.line : tc.ink
-                            readonly property real frameWidth: tp.frame === "none" ? 0 : tp.frame === "double" ? 3 : 1
-                            width: (column.width - 2 * cards.spacing) / 3
-                            height: caption.y + caption.height
+                            width: specimen.width
+                            height: specimen.height
+
+                            function specimenState() {
+                                return specimen.drawn();
+                            }
 
                             Rectangle {
                                 anchors.fill: parent
@@ -176,64 +185,37 @@ Item {
                                 radius: 4
                             }
 
-                            Rectangle {
-                                id: preview
-                                width: parent.width
-                                height: 190
-                                clip: true
-                                color: card.tc.paper
-                                radius: card.radius
-                                border.color: card.frameColor
-                                border.width: card.frameWidth
+                            Root.Specimen {
+                                id: specimen
+                                tokens: card.modelData
+                                dir: switcher.theme.dir
 
-                                Repeater {
-                                    model: [[24, 150], [188, 84]]
+                                Row {
+                                    width: parent.width
+                                    spacing: 10
+                                    readonly property var cardName: Lib.cardName(card.modelData)
+                                    readonly property var tagline: Lib.tagline(card.modelData)
 
-                                    // Each preview window is drawn in its own theme's primitives, not the current one's.
-                                    Root.Surface {
-                                        required property var modelData
-                                        x: modelData[0]
-                                        y: 30
-                                        width: modelData[1]
-                                        height: 118
-                                        tokens: card.modelData
-                                        role: "window"
+                                    Text {
+                                        id: name
+                                        textFormat: Text.PlainText
+                                        text: parent.cardName.text
+                                        color: c.ink
+                                        font.family: parent.cardName.font
+                                        font.pixelSize: parent.cardName.size
+                                        font.weight: parent.cardName.weight
+                                        font.letterSpacing: parent.cardName.spacing
                                     }
-                                }
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    y: 8
-                                    text: "14:32"
-                                    color: card.tc.ink
-                                    font.family: card.modelData.type.display
-                                    font.pixelSize: 13
-                                }
-                            }
-
-                            Item {
-                                id: caption
-                                y: preview.height + 10
-                                width: parent.width
-                                height: name.height
-
-                                Text {
-                                    id: name
-                                    textFormat: Text.PlainText
-                                    text: card.modelData.name.charAt(0).toUpperCase() + card.modelData.name.slice(1)
-                                    color: c.ink
-                                    font.family: card.modelData.type.display
-                                    font.pixelSize: 20
-                                }
-                                Text {
-                                    textFormat: Text.PlainText
-                                    anchors.right: parent.right
-                                    anchors.baseline: name.baseline
-                                    text: Lib.summary(card.modelData)
-                                    color: c.muted
-                                    font.family: fonts.mono
-                                    font.pixelSize: 11
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        anchors.baseline: name.baseline
+                                        text: parent.tagline.text
+                                        color: c.muted
+                                        font.family: parent.tagline.font
+                                        font.pixelSize: parent.tagline.size
+                                        font.italic: parent.tagline.italic
+                                        font.letterSpacing: parent.tagline.spacing
+                                    }
                                 }
                             }
                         }

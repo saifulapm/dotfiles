@@ -94,28 +94,18 @@ test('Blueprint: the island is a chamfered surface box with the cyan stroke and 
   });
 });
 
-test('a switcher preview window takes its own theme at the preview scale, without signatures', () => {
-  const w = (t) => surfaceStyle(t, 'window');
-  assert.deepEqual([w(paper).shadow, w(paper).frame, w(paper).corner], [
-    { kind: 'hard', x: 3, y: 3, blur: 0, spread: 0, color: '#1C1915', alpha: 1 },
-    { width: 1, color: '#1C1915' },
-    { radius: 0, chamfer: 0 },
+test('a specimen card draws its island as a chip at half size: the island look without the card signatures', () => {
+  const w = (t) => surfaceStyle(t, 'chip');
+  assert.deepEqual([w(paper).fill, w(paper).text, w(paper).shadow, w(paper).corner, w(paper).misregistered], [
+    '#1C1915', '#F1E9D8', { kind: 'hard', x: 2, y: 2, blur: 0, spread: 0, color: '#C8381E', alpha: 1 }, { radius: 0, chamfer: 0 }, true,
   ]);
-  assert.deepEqual([w(artboard).shadow, w(artboard).frame, w(artboard).corner], [
-    { kind: 'soft', x: 0, y: 14, blur: 30, spread: 0, color: '#15171B', alpha: 0.22 },
-    { width: 0, color: '#3D5AFE' },
-    { radius: 10, chamfer: 0 },
+  assert.deepEqual([w(artboard).fill, w(artboard).shadow, w(artboard).corner], [
+    '#15171B', { kind: 'soft', x: 0, y: 4, blur: 10, spread: -3, color: '#15171B', alpha: 0.4 }, { radius: 8, chamfer: 0 },
   ]);
-  assert.deepEqual([w(blueprint).shadow, w(blueprint).frame, w(blueprint).corner], [
-    { kind: 'glow', x: 0, y: 0, blur: 4, spread: 0, color: '#7FE3F0', alpha: 0.6 },
-    { width: 1, color: '#7FE3F0' },
-    { radius: 0, chamfer: 10 },
+  assert.deepEqual([w(blueprint).fill, w(blueprint).frame, w(blueprint).shadow, w(blueprint).corner], [
+    '#0A1526', { width: 1, color: '#7FE3F0' }, { kind: 'glow', x: 0, y: 0, blur: 4, spread: 0, color: '#7FE3F0', alpha: 0.35 }, { radius: 0, chamfer: 5 },
   ]);
-  assert.deepEqual([paper, artboard, blueprint].map((t) => [w(t).handles, w(t).ticks, w(t).misregistered]), [
-    [false, false, false],
-    [false, false, false],
-    [false, false, false],
-  ]);
+  assert.deepEqual([paper, artboard, blueprint].map((t) => [w(t).handles, w(t).ticks]), [[false, false], [false, false], [false, false]]);
 });
 
 test('the look follows the primitives, not the name', () => {

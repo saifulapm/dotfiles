@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme } from './theme.mjs';
-import { step, summary, windowLook, terminalLines, swatches, specimenMargins } from './themes.mjs';
+import { step, cardName, tagline, pickerLook, windowLook, terminalLines, swatches, specimenMargins } from './themes.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const paper = load('paper');
@@ -19,10 +19,49 @@ test('step moves the cursor by one name and stops at the ends', () => {
   assert.equal(step(names, 'paper', -1), 'paper');
 });
 
-test('summary names the mode, frame and shadow', () => {
-  assert.equal(summary({ mode: 'light', primitive: { frame: 'ink', shadow: 'hard-offset' } }), 'light · ink · hard shadow');
-  assert.equal(summary({ mode: 'dark', primitive: { frame: 'glow', shadow: 'none' } }), 'dark · glow · no shadow');
-  assert.equal(summary({ mode: 'light', primitive: { frame: 'none', shadow: 'soft' } }), 'light · no frame · soft shadow');
+test('each card names its theme in its own typeface and voice', () => {
+  assert.deepEqual([paper, artboard, blueprint].map((t) => { const n = cardName(t); return [n.text, n.font, n.size, n.weight]; }), [
+    ['Paper', 'Instrument Serif', 26, 400],
+    ['Artboard', 'Maple Mono', 16, 700],
+    ['BLUEPRINT', 'Maple Mono', 14, 700],
+  ]);
+});
+
+test('each card sums up its primitives in its own voice', () => {
+  assert.deepEqual([paper, artboard, blueprint].map((t) => tagline(t).text), ['grain, ink, a hard shadow', 'Dots · soft shadow · round', 'GRID // GLOW // CUT']);
+  assert.equal(tagline(paper).italic, true);
+});
+
+test('Paper dresses the picker: a serif header, three on the shelf, a vermilion 2 px cursor with a 4 px hard shadow, IN USE', () => {
+  const l = pickerLook(paper);
+  assert.deepEqual([l.header(3, 'paper').title, l.header(3, 'paper').sub, l.header(3, 'paper').right], ['Themes', 'three on the shelf', 'PAPER IN USE']);
+  assert.equal(l.header(4, 'paper').sub, 'four on the shelf');
+  assert.deepEqual([l.cursor.border, l.cursor.shadow.kind, l.cursor.shadow.x, l.cursor.shadow.color], [{ width: 2, color: '#C8381E' }, 'hard', 4, '#C8381E']);
+  assert.equal(l.tag(true, false).text, 'IN USE');
+  assert.equal(l.tag(false, true), null);
+  assert.deepEqual(l.legend(3).map((k) => `${k.key} ${k.word}`), ['J/K CHOOSE', '1–3 JUMP', '↵ APPLY']);
+  assert.equal(l.number(0), '');
+});
+
+test('Artboard dresses the picker: Themes · 3 themes, a white tile outlined 1.5 px blue, Current and a return badge', () => {
+  const l = pickerLook(artboard);
+  assert.deepEqual([l.header(3, 'artboard').title, l.header(3, 'artboard').sub], ['Themes', '3 themes']);
+  assert.deepEqual([l.cursor.fill, l.cursor.border], ['#FFFFFF', { width: 1.5, color: '#3D5AFE' }]);
+  assert.equal(l.tile.fill, '#F6F7F9');
+  assert.deepEqual([l.tag(true, true).text, l.tag(false, true).text, l.tag(false, false)], ['Current', '↵', null]);
+  assert.deepEqual(l.legend(3).map((k) => `${k.key} ${k.word}`), ['j/k choose', '1–3 jump', '↵ apply']);
+  assert.equal(l.chips, true);
+});
+
+test('Blueprint dresses the picker: THEMES // 3 SHEETS, ACTIVE: BLUEPRINT, numbered sheets, [ACTIVE] and [↵]', () => {
+  const l = pickerLook(blueprint);
+  const h = l.header(3, 'blueprint');
+  assert.deepEqual([h.title + h.sub, h.right], ['THEMES // 3 SHEETS', 'ACTIVE: BLUEPRINT']);
+  assert.deepEqual([0, 1, 2].map(l.number), ['01', '02', '03']);
+  assert.deepEqual([l.tag(true, false).text, l.tag(false, true).text], ['[ACTIVE]', '[↵]']);
+  assert.deepEqual([l.cursor.border, l.cursor.ticks], [{ width: 1, color: '#7FE3F0' }, true]);
+  assert.deepEqual(l.legend(3).map((k) => `${k.key} ${k.word}`), ['[J/K] CHOOSE', '[1–3] JUMP', '[↵] APPLY']);
+  assert.equal(l.esc, '[ESC]');
 });
 
 test('a specimen window is framed as niri frames it: Paper ink then muted, hard 2,2 shadows', () => {

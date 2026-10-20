@@ -1,16 +1,78 @@
 // The theme picker's cursor, captions and specimens, from each theme's tokens alone, so a theme added later draws too; pure, so node tests what the shell imports.
-import { marginLook } from './voice.mjs';
+import { marginLook, listLook } from './voice.mjs';
 import { marginStyle } from './surface.mjs';
+import { pad2 } from './margins.mjs';
 
 export function step(names, name, by) {
   const i = Math.max(0, Math.min(names.length - 1, names.indexOf(name) + by));
   return names[i];
 }
 
-export function summary(t) {
-  const frame = t.primitive.frame === 'none' ? 'no frame' : t.primitive.frame;
-  const shadow = t.primitive.shadow === 'hard-offset' ? 'hard' : t.primitive.shadow === 'none' ? 'no' : t.primitive.shadow;
-  return `${t.mode} · ${frame} · ${shadow} shadow`;
+const WORDS = { paper: { flat: 'flat', grain: 'grain', dots: 'dots', grid: 'grid', gradient: 'gradient' }, frame: { none: 'no frame' }, shadow: { 'hard-offset': 'hard', none: 'no' } };
+const word = (kind, v) => WORDS[kind][v] ?? v;
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const COUNT = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+// Artboard's tiles, a board tint no token carries.
+const TILE = '#F6F7F9';
+
+// A card's name in its own theme's typeface and voice; the picker draws it in the current theme's ink, so it always reads.
+export function cardName(t) {
+  if (t.type.voice === 'bracket') return { text: t.name.toUpperCase(), font: t.type.ui, size: 14, weight: 700, spacing: 1.12 };
+  if (t.type.voice === 'plain') return { text: cap(t.name), font: t.type.ui, size: 16, weight: 700, spacing: -0.16 };
+  return { text: cap(t.name), font: t.type.display, size: 26, weight: 400, spacing: 0 };
+}
+
+// Its primitives in a line, in its own voice: grain, ink, a hard shadow; Dots · soft shadow · round; GRID // GLOW // CUT.
+export function tagline(t) {
+  const p = t.primitive;
+  if (t.type.voice === 'bracket') {
+    return { text: [word('paper', p.paper), word('frame', p.frame), p.corner].join(' // ').toUpperCase(), font: t.type.ui, size: 9, italic: false, spacing: 1.26 };
+  }
+  if (t.type.voice === 'plain') {
+    return { text: `${cap(word('paper', p.paper))} · ${word('shadow', p.shadow)} shadow · ${p.corner}`, font: t.type.ui, size: 11, italic: false, spacing: 0 };
+  }
+  return { text: `${word('paper', p.paper)}, ${word('frame', p.frame)}, a ${word('shadow', p.shadow)} shadow`, font: t.type.display, size: 15, italic: true, spacing: 0 };
+}
+
+// The panel as the current theme's Themes board dresses it: its header, tiles, cursor, tags and keys.
+export function pickerLook(tokens) {
+  const l = listLook(tokens);
+  const c = tokens.color;
+  const t = tokens.type;
+  const voice = t.voice;
+  const base = {
+    voice,
+    small: l.small,
+    rule: l.rule,
+    chips: voice === 'plain',
+    chip: l.chip,
+    legend: (n) => l.keys([['j/k', 'choose'], [n > 1 ? `1–${Math.min(n, 9)}` : '1', 'jump'], ['↵', 'apply']]),
+    esc: l.keyText('esc'),
+    number: () => '',
+  };
+  if (voice === 'plain') {
+    return Object.assign(base, {
+      header: (n) => ({ title: 'Themes', font: t.ui, size: 20, weight: 700, color: c.ink, sub: `${n} themes`, subFont: t.ui, subSize: 13, italic: false, right: '' }),
+      tag: (current, cursor) => (current ? { text: 'Current', color: c.accent, fill: l.cursor.fill, border: 'transparent', radius: 6 } : cursor ? { text: '↵', color: l.cursor.text, fill: l.cursor.fill, border: 'transparent', radius: 6 } : null),
+      tile: { fill: TILE, border: { width: 0, color: 'transparent' }, radius: 12, pad: 10 },
+      cursor: { fill: c.surface, border: { width: 1.5, color: c.accent }, shadow: { kind: 'soft', x: 0, y: 8, blur: 20, spread: -10, color: c.accent, alpha: 0.45 }, ticks: false },
+    });
+  }
+  if (voice === 'bracket') {
+    return Object.assign(base, {
+      header: (n, current) => ({ title: 'THEMES', font: t.mono, size: 11, weight: 700, color: c.accent, sub: ` // ${n} SHEETS`, subFont: t.mono, subSize: 11, italic: false, right: `ACTIVE: ${current.toUpperCase()}` }),
+      tag: (current, cursor) => (current ? { text: '[ACTIVE]', color: c.accent, fill: 'transparent', border: 'transparent', radius: 0 } : cursor ? { text: '[↵]', color: c.accent, fill: 'transparent', border: 'transparent', radius: 0 } : null),
+      number: (i) => pad2(i + 1),
+      tile: { fill: 'transparent', border: { width: 1, color: c.line }, radius: 0, pad: 9 },
+      cursor: { fill: 'transparent', border: { width: 1, color: c.accent }, shadow: { kind: 'glow', x: 0, y: 0, blur: 14, spread: 0, color: c.accent, alpha: 0.3 }, ticks: true },
+    });
+  }
+  return Object.assign(base, {
+    header: (n, current) => ({ title: 'Themes', font: t.display, size: 34, weight: 400, color: c.ink, sub: `${COUNT[n] ?? n} on the shelf`, subFont: t.display, subSize: 18, italic: true, right: `${current.toUpperCase()} IN USE` }),
+    tag: (current) => (current ? { text: 'IN USE', color: c.accent, fill: 'transparent', border: c.accent, radius: 0 } : null),
+    tile: { fill: 'transparent', border: { width: 1, color: c.line }, radius: 0, pad: 8 },
+    cursor: { fill: c.surface, border: { width: 2, color: c.accent }, shadow: { kind: 'hard', x: 4, y: 4, blur: 0, spread: 0, color: c.accent, alpha: 1 }, ticks: false },
+  });
 }
 
 // One fixed moment, so every card reads the same scene in its own voice and no clock ticks for it.

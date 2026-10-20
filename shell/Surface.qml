@@ -8,7 +8,7 @@ Item {
     id: surface
 
     property var tokens: null
-    // island, card or window; each has its own shadow and corner numbers in surface.mjs.
+    // island, card or chip; each has its own shadow and corner numbers in surface.mjs.
     property string role: "card"
     // Shown above the top-left corner when the theme draws frame labels.
     property string label: ""
