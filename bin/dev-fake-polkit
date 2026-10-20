@@ -63,6 +63,11 @@ class Authority(dbus.service.Object):
     # Asks for the running user, as pkexec would for an admin action.
     @dbus.service.method(FAKE, in_signature="s")
     def Begin(self, cookie):
+        self.BeginWith(cookie, "Authentication is needed to run true as root")
+
+    # The same with a message of the check's own, which a real request's sender controls.
+    @dbus.service.method(FAKE, in_signature="ss")
+    def BeginWith(self, cookie, message):
         sender, path = self.agent
         agent = dbus.Interface(self.bus.get_object(sender, path), AGENT)
         identity = dbus.Struct(("unix-user", {"uid": dbus.UInt32(os.getuid(), variant_level=1)}), signature="sa{sv}")
@@ -77,7 +82,7 @@ class Authority(dbus.service.Object):
             self.results[cookie] = e.get_dbus_name()
 
         agent.BeginAuthentication(
-            "org.dots.test", "Authentication is needed to run true as root", "", dbus.Dictionary({"program": "/usr/bin/true"}, signature="ss"), cookie, dbus.Array([identity], signature="(sa{sv})"),
+            "org.dots.test", message, "", dbus.Dictionary({"program": "/usr/bin/true"}, signature="ss"), cookie, dbus.Array([identity], signature="(sa{sv})"),
             reply_handler=done, error_handler=failed, timeout=600,
         )
 

@@ -33,6 +33,14 @@ until_ok 2000 state_is '(.open | not) and (.active | not)'
 check "the prompt closes and the agent goes idle" state_is '(.open | not) and (.active | not)'
 check "the keyboard goes back" focus_is None
 
+# A request's message is its sender's text: bidi controls cannot reorder what the card says will run.
+fake BeginWith ss bidi $'run \u202eevil.sh as root \u2066x\u2069' >/dev/null
+until_ok 3000 state_is '.open and .settled'
+check "a message's bidi controls are dropped, so it draws in the order it is spelt ($(timeout 0.5 qs ipc call polkit state | jq -c .drawnMessage))" state_is '.drawnMessage == "run evil.sh as root x"'
+wtype -k Escape
+until_ok 3000 result_is bidi org.freedesktop.PolicyKit1.Error.Cancelled
+until_ok 3000 state_is '.drawing == false'
+
 # A request that arrives while the prompt is up is refused at once, so its caller gets an answer, and the shown one carries on.
 fake Begin s c2 >/dev/null
 until_ok 3000 state_is '.open'

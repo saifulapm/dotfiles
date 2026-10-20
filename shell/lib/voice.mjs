@@ -18,6 +18,8 @@ const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 
 // Bidi embedding, override and isolate controls, which let an app's name redraw itself in another order.
 const BIDI = /[\u202A-\u202E\u2066-\u2069]/g;
 const same = (s) => (s || '').replace(BIDI, '');
+// Text a sender wrote, drawn in the order it is spelt; its lines stay.
+export const inOrder = same;
 const upper = (s) => same(s).toUpperCase();
 // A one-line label: newlines and tabs become single spaces, so a sender cannot stack lines.
 const line = (s) => same(s).replace(/\s+/g, ' ').trim();

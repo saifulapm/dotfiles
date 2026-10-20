@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, islandLook, osdLook, listLook, marginLook, MODES } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, marginLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -255,4 +255,10 @@ test("a newline in a notification's app or summary keeps each to one line, and t
 test("the notification centre's group head names the app on one line and its count, or the count alone", () => {
   assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => list(n).groupHead('Fire\nfox', 3)), ['FIRE FOX · 3', 'Fire fox · 3', 'FIRE FOX · 3']);
   assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => list(n).groupHead('', 1)), ['1', '1', '1']);
+});
+
+test('a polkit request cannot reorder what it asks with bidi controls, and keeps its lines', () => {
+  assert.equal(inOrder('run ‮evil.sh as root'), 'run evil.sh as root');
+  assert.equal(inOrder('a⁦b⁩\nc‪‬d'), 'ab\ncd');
+  assert.equal(inOrder(undefined), '');
 });

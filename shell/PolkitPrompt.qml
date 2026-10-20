@@ -183,7 +183,7 @@ Item {
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
                 wrapMode: Text.Wrap
-                text: prompt.seen?.message ?? ""
+                text: V.inOrder(prompt.seen?.message)
                 color: prompt.c.ink
                 font.family: prompt.fonts.display
                 font.pixelSize: 22
@@ -218,7 +218,7 @@ Item {
                     visible: input.text === ""
                     anchors.verticalCenter: parent.verticalCenter
                     x: 12
-                    text: prompt.seen?.inputPrompt || "Password"
+                    text: V.inOrder(prompt.seen?.inputPrompt) || "Password"
                     color: prompt.c.muted
                     font.family: prompt.fonts.ui
                     font.pixelSize: 16
@@ -234,7 +234,7 @@ Item {
                 Layout.rightMargin: 20
                 Layout.bottomMargin: 16
                 wrapMode: Text.Wrap
-                text: prompt.seen?.supplementaryMessage ?? ""
+                text: V.inOrder(prompt.seen?.supplementaryMessage)
                 color: prompt.seen?.supplementaryIsError ? prompt.c.danger : prompt.c.muted
                 font.family: prompt.fonts.ui
                 font.pixelSize: 10
