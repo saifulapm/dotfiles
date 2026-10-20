@@ -79,6 +79,8 @@ const v1Goals = JSON.stringify({
   ],
 });
 
+const stamped = (fields, when) => Object.fromEntries(fields.map((f) => [f, ms(when)]));
+
 test('a shipped v1 goal is done at its ship time, keeping its deadline and tasks', () => {
   const s = goals.parseStore(JSON.stringify(goalsFromV1(v1Goals)));
   assert.ok(s);
@@ -93,9 +95,11 @@ test('a shipped v1 goal is done at its ship time, keeping its deadline and tasks
     updatedAt: ms('2026-09-26T12:00:00.000Z'),
     deleted: false,
     tasks: [
-      { id: 't1', text: 'a', done: true, order: 0, updatedAt: ms('2026-09-21T00:00:00.000Z'), deleted: false },
-      { id: 't2', text: 'b', done: false, order: 1, updatedAt: ms('2026-09-25T00:00:00.000Z'), deleted: false },
+      { id: 't1', text: 'a', done: true, order: 0, updatedAt: ms('2026-09-21T00:00:00.000Z'), deleted: false, stamps: stamped(['text', 'done', 'order', 'deleted'], '2026-09-21T00:00:00.000Z') },
+      { id: 't2', text: 'b', done: false, order: 1, updatedAt: ms('2026-09-25T00:00:00.000Z'), deleted: false, stamps: stamped(['text', 'done', 'order', 'deleted'], '2026-09-25T00:00:00.000Z') },
     ],
+    // v1 kept one time per record, so every field carries it.
+    stamps: stamped(['title', 'deadline', 'order', 'done', 'deleted'], '2026-09-26T12:00:00.000Z'),
   });
 });
 

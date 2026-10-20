@@ -10,19 +10,49 @@ const num = (v, fallback) => (typeof v === 'number' ? v : fallback);
 
 export const emptyStore = () => ({ version: 1, goals: [] });
 
-const readTask = (t, i) => ({ id: t.id, text: t.text, done: t.done === true, order: num(t.order, i), updatedAt: num(t.updatedAt, 0), deleted: t.deleted === true });
+// Each field carries the time it was last set, so a merge takes every field from the machine that changed it last; doneAt goes with done.
+const GOAL_FIELDS = ['title', 'deadline', 'order', 'done', 'deleted'];
+const TASK_FIELDS = ['text', 'done', 'order', 'deleted'];
 
-const readGoal = (g, i) => ({
-  id: g.id,
-  title: g.title,
-  deadline: num(g.deadline, null),
-  order: num(g.order, i),
-  done: g.done === true,
-  doneAt: num(g.doneAt, null),
-  updatedAt: num(g.updatedAt, 0),
-  deleted: g.deleted === true,
-  tasks: (g.tasks ?? []).map(readTask),
-});
+const newest = (stamps) => Object.keys(stamps).reduce((max, f) => Math.max(max, stamps[f]), 0);
+
+// A record from before the stamps has only updatedAt, which then stands for every field.
+function readStamps(x, fields) {
+  const from = isObject(x.stamps) ? x.stamps : {};
+  const updatedAt = num(x.updatedAt, 0);
+  return fields.reduce((s, f) => set(s, { [f]: num(from[f], updatedAt) }), {});
+}
+
+// updatedAt stays the newest stamp, so a machine still on the whole-record merge picks the newest copy, and a stamp far ahead is caught by it.
+function readTask(t, i) {
+  const stamps = readStamps(t, TASK_FIELDS);
+  return { id: t.id, text: t.text, done: t.done === true, order: num(t.order, i), updatedAt: Math.max(num(t.updatedAt, 0), newest(stamps)), deleted: t.deleted === true, stamps };
+}
+
+function readGoal(g, i) {
+  const stamps = readStamps(g, GOAL_FIELDS);
+  return {
+    id: g.id,
+    title: g.title,
+    deadline: num(g.deadline, null),
+    order: num(g.order, i),
+    done: g.done === true,
+    doneAt: num(g.doneAt, null),
+    updatedAt: Math.max(num(g.updatedAt, 0), newest(stamps)),
+    deleted: g.deleted === true,
+    tasks: (g.tasks ?? []).map(readTask),
+    stamps,
+  };
+}
+
+// Sets the fields and stamps those that carry a stamp with now.
+function touch(x, keys, fields, now) {
+  const stamps = Object.keys(fields).reduce((s, f) => (keys.indexOf(f) >= 0 ? set(s, { [f]: now }) : s), readStamps(x, keys));
+  return set(x, Object.assign({}, fields, { stamps, updatedAt: newest(stamps) }));
+}
+
+const touchGoal = (g, fields, now) => touch(g, GOAL_FIELDS, fields, now);
+const touchTask = (t, fields, now) => touch(t, TASK_FIELDS, fields, now);
 
 const validTask = (t) => isObject(t) && str(t.id) && str(t.text);
 const validGoal = (g) => isObject(g) && str(g.id) && str(g.title) && (g.tasks === undefined || (Array.isArray(g.tasks) && g.tasks.every(validTask)));
@@ -56,31 +86,31 @@ const changeTask = (store, goalId, taskId, fn) => changeGoal(store, goalId, (g) 
 
 export function addGoal(store, title, deadline, now, id) {
   if (!title.trim()) return store;
-  const goal = { id, title: title.trim(), deadline, order: nextOrder(activeGoals(store)), done: false, doneAt: null, updatedAt: now, deleted: false, tasks: [] };
+  const goal = touchGoal({ id, title: title.trim(), deadline, order: nextOrder(activeGoals(store)), done: false, doneAt: null, updatedAt: now, deleted: false, tasks: [] }, {}, now);
   return set(store, { goals: store.goals.concat([goal]) });
 }
 
 export function addTask(store, goalId, text, now, id) {
   if (!text.trim()) return store;
-  return changeGoal(store, goalId, (g) => set(g, { tasks: g.tasks.concat([{ id, text: text.trim(), done: false, order: nextOrder(liveTasks(g)), updatedAt: now, deleted: false }]) }));
+  return changeGoal(store, goalId, (g) => set(g, { tasks: g.tasks.concat([touchTask({ id, text: text.trim(), done: false, order: nextOrder(liveTasks(g)), updatedAt: now, deleted: false }, {}, now)]) }));
 }
 
 // A goal brought back from done goes to the end of the active list.
 export const toggleGoal = (store, id, now) =>
-  changeGoal(store, id, (g) => (g.done ? set(g, { done: false, doneAt: null, order: nextOrder(activeGoals(store)), updatedAt: now }) : set(g, { done: true, doneAt: now, updatedAt: now })));
+  changeGoal(store, id, (g) => (g.done ? touchGoal(g, { done: false, doneAt: null, order: nextOrder(activeGoals(store)) }, now) : touchGoal(g, { done: true, doneAt: now }, now)));
 
-export const toggleTask = (store, goalId, taskId, now) => changeTask(store, goalId, taskId, (t) => set(t, { done: !t.done, updatedAt: now }));
+export const toggleTask = (store, goalId, taskId, now) => changeTask(store, goalId, taskId, (t) => touchTask(t, { done: !t.done }, now));
 
-export const editGoal = (store, id, title, deadline, now) => (title.trim() ? changeGoal(store, id, (g) => set(g, { title: title.trim(), deadline, updatedAt: now })) : store);
+export const editGoal = (store, id, title, deadline, now) => (title.trim() ? changeGoal(store, id, (g) => touchGoal(g, { title: title.trim(), deadline }, now)) : store);
 
-export const editTask = (store, goalId, taskId, text, now) => (text.trim() ? changeTask(store, goalId, taskId, (t) => set(t, { text: text.trim(), updatedAt: now })) : store);
+export const editTask = (store, goalId, taskId, text, now) => (text.trim() ? changeTask(store, goalId, taskId, (t) => touchTask(t, { text: text.trim() }, now)) : store);
 
-export const deleteGoal = (store, id, now) => changeGoal(store, id, (g) => set(g, { title: '', deadline: null, done: false, doneAt: null, tasks: [], deleted: true, updatedAt: now }));
+export const deleteGoal = (store, id, now) => changeGoal(store, id, (g) => touchGoal(g, { title: '', deadline: null, done: false, doneAt: null, tasks: [], deleted: true }, now));
 
-export const deleteTask = (store, goalId, taskId, now) => changeTask(store, goalId, taskId, (t) => set(t, { text: '', done: false, deleted: true, updatedAt: now }));
+export const deleteTask = (store, goalId, taskId, now) => changeTask(store, goalId, taskId, (t) => touchTask(t, { text: '', done: false, deleted: true }, now));
 
 // Swaps the item with its neighbour, then numbers the list 0..n; an item whose number changed is stamped, so a merge carries it.
-function reorder(list, id, dir, now) {
+function reorder(list, id, dir, now, touchIt) {
   const i = list.findIndex((x) => x.id === id);
   const j = i + dir;
   if (i < 0 || j < 0 || j >= list.length) return null;
@@ -91,17 +121,17 @@ function reorder(list, id, dir, now) {
   moved.forEach((x, k) => {
     if (x.order !== k) changed[x.id] = k;
   });
-  return (x) => (x.id in changed ? set(x, { order: changed[x.id], updatedAt: now }) : x);
+  return (x) => (x.id in changed ? touchIt(x, { order: changed[x.id] }, now) : x);
 }
 
 export function moveGoal(store, id, dir, now) {
-  const fn = reorder(activeGoals(store), id, dir, now);
+  const fn = reorder(activeGoals(store), id, dir, now, touchGoal);
   return fn ? set(store, { goals: store.goals.map(fn) }) : store;
 }
 
 export function moveTask(store, goalId, taskId, dir, now) {
   const goal = store.goals.find((g) => g.id === goalId);
-  const fn = goal ? reorder(liveTasks(goal), taskId, dir, now) : null;
+  const fn = goal ? reorder(liveTasks(goal), taskId, dir, now, touchTask) : null;
   return fn ? changeGoal(store, goalId, (g) => set(g, { tasks: g.tasks.map(fn) })) : store;
 }
 
@@ -145,11 +175,27 @@ export function marginGoal(store, now) {
   return g === null ? '' : g.left === null ? g.title : g.title + ' · ' + g.left;
 }
 
-// The newer copy wins; a tie goes to the larger text, so both machines pick the same one.
-function newer(a, b) {
-  if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt ? a : b;
-  return JSON.stringify(a) >= JSON.stringify(b) ? a : b;
+// The copy that set the field later wins it; a tie goes to the larger value's text, so both machines pick the same one.
+function later(a, b, f) {
+  if (a.stamps[f] !== b.stamps[f]) return a.stamps[f] > b.stamps[f] ? a : b;
+  const value = (x) => JSON.stringify(f === 'done' ? [x.done, x.doneAt] : x[f]);
+  return value(a) >= value(b) ? a : b;
 }
+
+// Builds the record field by field from whichever copy set each one later.
+function mergeFields(a, b, fields, base) {
+  const stamps = {};
+  const out = Object.assign({}, base);
+  fields.forEach((f) => {
+    const from = later(a, b, f);
+    out[f] = from[f];
+    if (f === 'done') out.doneAt = from.doneAt;
+    stamps[f] = from.stamps[f];
+  });
+  return Object.assign(out, { updatedAt: Math.max(a.updatedAt, b.updatedAt), stamps });
+}
+
+const mergeTask = (a, b) => mergeFields(a, b, TASK_FIELDS, { id: a.id, text: '', done: false, order: 0, updatedAt: 0, deleted: false });
 
 function mergeById(xs, ys, fn) {
   const byId = {};
@@ -159,10 +205,10 @@ function mergeById(xs, ys, fn) {
   return Object.keys(byId).sort().map((id) => byId[id]);
 }
 
-// Goal fields come from the newer goal and each task from its newer copy, so a rename on one machine and a tick on another both survive.
+// Goal and task fields merge one by one, so a tick on one machine and a deadline edit on another both survive.
 const mergeGoal = (a, b) => {
-  const g = newer(a, b);
-  return set(g, { tasks: g.deleted ? [] : mergeById(a.tasks, b.tasks, newer) });
+  const g = mergeFields(a, b, GOAL_FIELDS, { id: a.id, title: '', deadline: null, order: 0, done: false, doneAt: null, updatedAt: 0, deleted: false, tasks: [] });
+  return set(g, { tasks: g.deleted ? [] : mergeById(a.tasks, b.tasks, mergeTask) });
 };
 
 export const mergeStores = (a, b) => ({ version: 1, goals: mergeById(a.goals, b.goals, mergeGoal) });

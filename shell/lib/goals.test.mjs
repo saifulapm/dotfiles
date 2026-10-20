@@ -32,7 +32,7 @@ test('a new store has no goals, and a broken file reads as null so it is never s
   assert.deepEqual(emptyStore(), { version: 1, goals: [] });
   for (const t of ['', '{', '[]', 'null', '{"version":1}', '{"goals":[{"title":"x"}]}', '{"goals":[{"id":"a","title":"x","tasks":[{"text":"t"}]}]}']) assert.equal(parseStore(t), null);
   const s = parseStore('{"version":1,"goals":[{"id":"a","title":"x"}]}');
-  assert.deepEqual(s.goals, [{ id: 'a', title: 'x', deadline: null, order: 0, done: false, doneAt: null, updatedAt: 0, deleted: false, tasks: [] }]);
+  assert.deepEqual(s.goals, [{ id: 'a', title: 'x', deadline: null, order: 0, done: false, doneAt: null, updatedAt: 0, deleted: false, tasks: [], stamps: { title: 0, deadline: 0, order: 0, done: 0, deleted: 0 } }]);
 });
 
 test('two goals added in turn are both active, in that order, with the deadline kept', () => {
@@ -96,7 +96,7 @@ test('a deleted goal leaves a tombstone and no longer lists', () => {
   s = deleteGoal(s, 'g1', T + 1);
   assert.deepEqual(activeGoals(s), []);
   assert.deepEqual(doneGoals(s), []);
-  assert.deepEqual(s.goals[0], { id: 'g1', title: '', deadline: null, order: 0, done: false, doneAt: null, updatedAt: T + 1, deleted: true, tasks: [] });
+  assert.deepEqual(s.goals[0], { id: 'g1', title: '', deadline: null, order: 0, done: false, doneAt: null, updatedAt: T + 1, deleted: true, tasks: [], stamps: { title: T + 1, deadline: T + 1, order: T, done: T + 1, deleted: T + 1 } });
 });
 
 test('a deadline is typed as Nd, Nh or a date; empty is none and anything else is refused', () => {
@@ -154,6 +154,68 @@ test('a merge takes the newer copy of each goal and of each task, and keeps tomb
 test('a merge gives the same store whichever side comes first', () => {
   const a = addGoal(emptyStore(), 'A', null, T, 'g1');
   const b = addGoal(emptyStore(), 'B', null, T, 'g1');
+  assert.deepEqual(mergeStores(a, b), mergeStores(b, a));
+  const m = mergeStores(a, b);
+  assert.deepEqual(mergeStores(m, m), m);
+});
+
+// One goal g1 with one task t1, all stamped 1000, as both machines last agreed on it.
+const agreed = () => addTask(addGoal(emptyStore(), 'Read', null, 1000, 'g1'), 'g1', 'ch 1', 1000, 't1');
+const goal = (store) => store.goals.find((g) => g.id === 'g1');
+const both = (a, b) => [mergeStores(a, b), mergeStores(b, a)];
+
+test('a goal marked done on one machine and its deadline edited later on another keeps both', () => {
+  const a = toggleGoal(agreed(), 'g1', 2000);
+  const b = editGoal(agreed(), 'g1', 'Read', 9000000, 3000);
+  for (const m of both(a, b)) {
+    assert.equal(goal(m).done, true);
+    assert.equal(goal(m).doneAt, 2000);
+    assert.equal(goal(m).deadline, 9000000);
+  }
+});
+
+test('a rename on one machine and a later reorder on another both survive', () => {
+  const base = addGoal(agreed(), 'Write', null, 1000, 'g2');
+  const a = editGoal(base, 'g1', 'Read more', null, 2000);
+  const b = moveGoal(base, 'g2', -1, 3000);
+  for (const m of both(a, b)) assert.deepEqual(titles(activeGoals(m)), ['Write', 'Read more']);
+});
+
+test('a task ticked on one machine and its text edited later on another keeps both', () => {
+  const a = toggleTask(agreed(), 'g1', 't1', 2000);
+  const b = editTask(agreed(), 'g1', 't1', 'ch 1 and 2', 3000);
+  for (const m of both(a, b)) assert.deepEqual([goal(m).tasks[0].done, goal(m).tasks[0].text], [true, 'ch 1 and 2']);
+});
+
+test('an old whole-record goal merges as if each field had its one stamp', () => {
+  const old = parseStore(JSON.stringify({ version: 1, goals: [{ id: 'g1', title: 'Read', deadline: null, order: 0, done: true, doneAt: 5000, updatedAt: 5000, deleted: false, tasks: [] }] }));
+  const fresh = parseStore(
+    JSON.stringify({
+      version: 1,
+      goals: [{ id: 'g1', title: 'Read', deadline: 9000000, order: 0, done: false, doneAt: null, updatedAt: 6000, deleted: false, tasks: [], stamps: { title: 1000, deadline: 6000, order: 1000, done: 1000, deleted: 1000 } }],
+    }),
+  );
+  for (const m of both(old, fresh)) assert.deepEqual([goal(m).done, goal(m).deadline], [true, 9000000]);
+});
+
+test('a goal deleted on one machine stays deleted when another renames it later', () => {
+  const a = deleteGoal(agreed(), 'g1', 2000);
+  const b = editGoal(agreed(), 'g1', 'Read again', null, 3000);
+  for (const m of both(a, b)) {
+    assert.equal(goal(m).deleted, true);
+    assert.deepEqual(activeGoals(m), []);
+  }
+});
+
+test('a saved goal carries its newest field stamp as updatedAt, so a machine on the old merge still picks it', () => {
+  const s = moveGoal(editGoal(addGoal(agreed(), 'Write', null, 1000, 'g2'), 'g1', 'Read more', null, 3000), 'g2', -1, 2000);
+  assert.equal(goal(s).updatedAt, 3000);
+  assert.equal(goal(parseStore(JSON.stringify(s))).updatedAt, 3000);
+});
+
+test('a merge of stamped goals is the same either way round, also on equal stamps, and merging with itself changes nothing', () => {
+  const a = toggleGoal(editGoal(agreed(), 'g1', 'A', null, 2000), 'g1', 2000);
+  const b = editTask(editGoal(agreed(), 'g1', 'B', 5, 2000), 'g1', 't1', 'B task', 1000);
   assert.deepEqual(mergeStores(a, b), mergeStores(b, a));
   const m = mergeStores(a, b);
   assert.deepEqual(mergeStores(m, m), m);
