@@ -15,6 +15,8 @@ Item {
     readonly property var names: themes.map(t => t.name)
     property bool shown: false
     property string selected: ""
+    // The card that last played its switch, for the state.
+    property string played: ""
     property int opens: 0
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
@@ -33,6 +35,7 @@ Item {
         openMs = null;
         opens += 1;
         selected = theme.name;
+        played = "";
         shown = true;
         keys.forceActiveFocus();
     }
@@ -50,7 +53,21 @@ Item {
     }
 
     function move(by) {
-        selected = Lib.step(names, selected, by);
+        land(Lib.step(names, selected, by));
+    }
+
+    function jump(digit) {
+        land(Lib.jump(names, selected, digit));
+    }
+
+    // The card the cursor lands on plays its theme's switch in miniature; the desktop waits for Enter.
+    function land(name) {
+        if (name === selected)
+            return;
+        const t0 = Date.now();
+        selected = name;
+        played = name;
+        cardList.itemAt(names.indexOf(name))?.play(t0);
     }
 
     function apply() {
@@ -76,7 +93,8 @@ Item {
             cardBox: panel.drawnBox(),
             header: [title.text + sub.text, headRight.text],
             legend: legend.line(),
-            cards: cards.drawn()
+            cards: cards.drawn(),
+            played: played ? { name: played, ms: cardList.itemAt(names.indexOf(played))?.playedMs ?? null } : null
         });
     }
 
@@ -101,6 +119,8 @@ Item {
                 switcher.move(1);
             else if (event.key === Qt.Key_K || event.key === Qt.Key_Left)
                 switcher.move(-1);
+            else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9)
+                switcher.jump(event.key - Qt.Key_0);
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 switcher.apply();
             else if (event.key === Qt.Key_Escape)
@@ -214,6 +234,12 @@ Item {
                                 width: cards.cardWidth
                                 height: specimen.height * fit + 2 * pad
 
+                                function play(t0) {
+                                    specimen.play(t0);
+                                }
+
+                                readonly property real playedMs: specimen.playedMs
+
                                 function drawn() {
                                     const a = tile.mapToItem(null, 0, 0);
                                     return Object.assign({
@@ -292,6 +318,7 @@ Item {
                                     transformOrigin: Item.TopLeft
                                     tokens: card.modelData
                                     dir: switcher.theme.dir
+                                    under: switcher.c.paper
 
                                     Item {
                                         width: parent.width

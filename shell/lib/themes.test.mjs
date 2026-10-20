@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme } from './theme.mjs';
-import { step, cardName, tagline, pickerLook, windowLook, terminalLines, swatches, specimenMargins } from './themes.mjs';
+import { step, jump, previewSwitch, cardName, tagline, pickerLook, windowLook, terminalLines, swatches, specimenMargins } from './themes.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const paper = load('paper');
@@ -112,4 +112,20 @@ test('the specimen margins read one scene in each voice: 03 — FOOT, Page 03 / 
 test('before the theme loads the picker still has a whole look', () => {
   const l = pickerLook(null);
   assert.deepEqual([l.header(3, '').title, l.tag(true, false).text, l.cursor.border.width, l.legend(3).length], ['Themes', 'IN USE', 2, 3]);
+});
+
+test('a digit jumps to its card, and one with no card changes nothing', () => {
+  const names = ['paper', 'artboard', 'blueprint'];
+  assert.equal(jump(names, 'paper', 3), 'blueprint');
+  assert.equal(jump(names, 'blueprint', 1), 'paper');
+  assert.equal(jump(names, 'artboard', 7), 'artboard');
+  assert.equal(jump(names, 'artboard', 0), 'artboard');
+});
+
+test('a card plays its own theme switch in miniature: Paper slides, Artboard zooms, Blueprint scans, in 220 ms', () => {
+  assert.deepEqual([paper, artboard, blueprint].map((t) => previewSwitch(t.primitive.motion, 1)), [
+    { kind: 'slide', ms: 220 }, { kind: 'zoom', ms: 220 }, { kind: 'scan', ms: 220 },
+  ]);
+  assert.deepEqual(previewSwitch('ease', 1), { kind: 'cut', ms: 0 });
+  assert.deepEqual(previewSwitch('linear', 10), { kind: 'scan', ms: 2200 });
 });

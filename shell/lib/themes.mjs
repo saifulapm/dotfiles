@@ -8,6 +8,17 @@ export function step(names, name, by) {
   return names[i];
 }
 
+// A digit picks the card it numbers; a digit with no card leaves the cursor where it is.
+export function jump(names, name, digit) {
+  return names[digit - 1] ?? name;
+}
+
+// The card the cursor lands on plays its theme's desktop switch in miniature, as Paper.qml plays it full size.
+export function previewSwitch(motion, slowdown) {
+  const kind = { snappy: 'slide', spring: 'zoom', linear: 'scan' }[motion] ?? 'cut';
+  return { kind, ms: kind === 'cut' ? 0 : 220 * slowdown };
+}
+
 const WORDS = { paper: { flat: 'flat', grain: 'grain', dots: 'dots', grid: 'grid', gradient: 'gradient' }, frame: { none: 'no frame' }, shadow: { 'hard-offset': 'hard', none: 'no' } };
 const word = (kind, v) => WORDS[kind][v] ?? v;
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
