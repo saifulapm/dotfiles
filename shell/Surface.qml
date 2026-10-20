@@ -178,7 +178,13 @@ Item {
         }
     }
 
+    // The label as drawn: the Text item's own text and visibility, for the state functions.
+    function frameLabel() {
+        return { text: frameText.text, visible: frameText.visible };
+    }
+
     Text {
+        id: frameText
         textFormat: Text.PlainText
         visible: surface.style.handles && surface.label !== ""
         opacity: surface.pose.fill

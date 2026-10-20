@@ -122,6 +122,7 @@ Item {
             settled: motion.settled,
             drawing: centre.visible,
             cardBox: card.drawnBox(),
+            frameLabel: card.frameLabel(),
             headingKind: look.label.kind,
             heading: heading.text,
             headingBox: box(heading),

@@ -82,6 +82,7 @@ Item {
             settleMs: motion.settleMs,
             settled: motion.settled,
             drawing: prompt.visible,
+            frameLabel: card.frameLabel(),
             cardBox: card.drawnBox(),
             message: flow?.message ?? "",
             drawnMessage: messageText.text,

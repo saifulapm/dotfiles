@@ -77,7 +77,7 @@ Item {
         const hint = [];
         for (let i = 0; i < hintRepeater.count; i++)
             hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
-        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), recording: recording, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
+        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), frameLabel: hintCard.frameLabel(), recording: recording, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
     }
 
     Process {

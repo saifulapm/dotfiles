@@ -29,6 +29,8 @@ accent_px() {
     console.log(hit.length, hit.length ? hit[0] : -1);
   '
 }
+# The label as drawn, read from the surface's own state: the Text item's text and visibility, not the label it was given.
+drawn_label() { is_open "$1" ".frameLabel.visible and .frameLabel.text == \"$2\""; }
 # The card's top-left handle is the first accent pixel down a column 3 px left of the card; the label sits 16 px above it.
 labelled() {
   local x=$((ox + $1)) n top
@@ -45,24 +47,28 @@ niri msg action spawn -- qs ipc call launcher toggle
 until_ok 3000 is_open launcher .open
 until_ok 2000 labelled $(((ow - 640) / 2))
 check "the launcher card carries its frame label" labelled $(((ow - 640) / 2))
+check "the launcher's drawn frame label reads Launcher" drawn_label launcher Launcher
 timeout 0.5 qs ipc call launcher close
 
 niri msg action spawn -- qs ipc call control toggle
 until_ok 3000 is_open control '.open and .settled'
 until_ok 2000 labelled $(((ow - 720) / 2))
 check "Control carries its frame label" labelled $(((ow - 720) / 2))
+check "Control's drawn frame label reads Control" drawn_label control Control
 timeout 0.5 qs ipc call control close
 
 niri msg action spawn -- qs ipc call notifs toggle
 until_ok 3000 is_open notifs '.open and .settled'
 until_ok 2000 labelled $(((ow - 640) / 2))
 check "the notification centre carries its frame label" labelled $(((ow - 640) / 2))
+check "the notification centre's drawn frame label reads Notifications" drawn_label notifs Notifications
 timeout 0.5 qs ipc call notifs close
 
 fake Begin s c1 >/dev/null
 until_ok 3000 is_open polkit '.open and .settled'
 until_ok 2000 labelled $(((ow - 520) / 2))
 check "the polkit prompt carries its frame label" labelled $(((ow - 520) / 2))
+check "the polkit prompt's drawn frame label reads Authenticate" drawn_label polkit Authenticate
 wtype -k Escape
 until_ok 2000 is_open polkit '(.open | not) and .drawing == false'
 
@@ -71,6 +77,7 @@ until_ok 3000 is_open record '.picking and .settled'
 hint_x=$(timeout 0.5 qs ipc call record state | jq .region.x)
 until_ok 2000 labelled "$hint_x"
 check "the recorder's hint carries its frame label" labelled "$hint_x"
+check "the recorder's drawn frame label reads Record" drawn_label record Record
 wtype -k Escape
 until_ok 2000 is_open record '(.picking | not) and .drawing == false'
 

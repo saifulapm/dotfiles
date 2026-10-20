@@ -148,6 +148,7 @@ Item {
             settleMs: motion.settleMs,
             settled: motion.settled,
             drawing: launcher.visible,
+            frameLabel: card.frameLabel(),
             cardBox: card.drawnBox(),
             look: look.voice,
             label: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
