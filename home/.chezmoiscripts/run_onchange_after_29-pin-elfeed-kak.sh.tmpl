@@ -1,0 +1,14 @@
+#!/bin/bash
+# gh: {{ if stat (joinPath .chezmoi.homeDir ".config/gh/hosts.yml") }}logged in{{ else }}not logged in{{ end }}
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "elfeed-kak") }}
+{{ template "cargo.sh" . }}
+# kakfeed is private, so the download waits for the gh login dots secrets writes; the key above re-runs this then.
+if [[ ! -f $HOME/.config/gh/hosts.yml ]]; then
+  echo "elfeed-kak: skipped until dots secrets"
+  exit 0
+fi
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+pin_cargo "$pin_tmp/saifulapm-kakfeed-$pin_version" elfeed-kak
+pin_done

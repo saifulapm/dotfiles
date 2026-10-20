@@ -144,3 +144,27 @@ test('every function pin.sh defines is called by every pin script', () => {
     assert.deepEqual(fns.filter((fn) => !new RegExp(`\\b${fn}\\b`).test(text)), [], f);
   }
 });
+
+// A private repo's pin: fetch = "gh" sends the download through gh api, and the sha256 check still stands.
+function ghPin(sum) {
+  const root = source(sum);
+  const toml = readFileSync(join(root, 'versions.toml'), 'utf8').replace('repo = "x/hello"\n', 'repo = "x/hello"\nfetch = "gh"\n');
+  writeFileSync(join(root, 'versions.toml'), toml);
+  mkdirSync(join(root, 'stubs'));
+  writeFileSync(join(root, 'stubs/gh'), '#!/bin/sh\n[ "$2" = repos/x/hello/tarball/1.2 ] && printf \'hello pin\\n\'\n', { mode: 0o755 });
+  return root;
+}
+
+test('a fetch = "gh" pin downloads through gh api and prints the file', () => {
+  const root = ghPin(sha('hello pin\n'));
+  const r = run(root, SCRIPT, `${root}/stubs:`);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, 'hello pin\ndots: pin hello 1.2\n');
+});
+
+test('a fetch = "gh" pin with a wrong sha256 stops the script', () => {
+  const root = ghPin('0'.repeat(64));
+  const r = run(root, SCRIPT, `${root}/stubs:`);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /pin hello: sha256/);
+});

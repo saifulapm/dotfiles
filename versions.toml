@@ -114,3 +114,13 @@ track = "commit"
 install = "/usr/lib64/dri/v4l2_request_drv_video.so and its asahi_drv_video.so link on the Macs, VA-API over the decoder"
 url = "https://github.com/sofus13/libva-v4l2_request/archive/{version}.tar.gz"
 sha256 = "ffa02cc58ce904de09ec66697221d3c0f3ca0253dd8cdfadd07765ef687e2713"
+
+[[pin]]
+name = "elfeed-kak"
+version = "bfa1710b7767f61fa30a34f485cd40641239ce41"
+repo = "saifulapm/kakfeed"
+track = "commit"
+fetch = "gh"
+install = "~/.local/bin/elfeed-kak, built with cargo from a private repo, so it waits for the gh login"
+url = "https://github.com/saifulapm/kakfeed/archive/{version}.tar.gz"
+sha256 = "1664096dbe4675ed3d41d5bad0d8a67397dfd853de0f2817c4729c5cf80e58da"

@@ -19,7 +19,12 @@ trap 'rm -rf "$pin_tmp"' EXIT
 # pin_fetch: downloads the pin into a temp dir and prints its path; a wrong sha256 stops the install.
 pin_fetch() {
   local file=$pin_tmp/${pin_url##*/}
+{{- if eq (get $pin "fetch") "gh" }}
+  # A private repo: the tarball comes through the gh login, not an anonymous url.
+  gh api "repos/{{ $pin.repo }}/tarball/$pin_version" >"$file" || die "pin $pin_name: gh could not download {{ $pin.repo }} at $pin_version"
+{{- else }}
   curl -fsSL -o "$file" "$pin_url" || die "pin $pin_name: could not download $pin_url"
+{{- end }}
   echo "$pin_sha256  $file" | sha256sum -c --status || die "pin $pin_name: sha256 of $pin_url is not $pin_sha256"
   echo "$file"
 }
