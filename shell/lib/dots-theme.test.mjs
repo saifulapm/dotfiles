@@ -59,3 +59,17 @@ test('a switch replaces a changed fragment whole, so a reader of the old one sti
   assert.notEqual(readFileSync(path, 'utf8'), paper);
   assert.deepEqual(readdirSync(join(state, 'dots/theme-out')).filter((f) => f.includes('.tmp')), []);
 });
+
+// Each reload ran in the background with its status dropped, so an app left on the old theme said nothing.
+test('a switch names the apps that did not reload in the notice the island shows', (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-notice-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  const notice = () => readFileSync(join(state, 'dots/theme-out/notice'), 'utf8');
+  // No session bus refuses gsettings, and no policy dir refuses chromium.
+  assert.equal(spawnSync(dots, ['theme', 'blueprint'], { env: isolated(state) }).status, 0);
+  assert.equal(notice(), 'theme blueprint: chromium, gsettings did not reload\n');
+  mkdirSync(join(state, 'no-policy'));
+  assert.equal(spawnSync(dots, ['theme', 'paper'], { env: isolated(state) }).status, 0);
+  assert.equal(notice(), 'theme paper: gsettings did not reload\n');
+  assert.match(readFileSync(join(state, 'no-policy/color.json'), 'utf8'), /BrowserThemeColor/);
+});

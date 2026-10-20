@@ -44,6 +44,7 @@ check "GTK prefers dark ($(gtk_scheme))" test "$(gtk_scheme)" = "'prefer-dark'"
 check "GTK draws with the theme's UI font ($(gtk_font))" test "$(gtk_font)" = "'Maple Mono 11'"
 json_has() { jq -e "$2" "$1" >/dev/null; }
 check "Chromium's policy colour is Blueprint's surface" json_has "$DOTS_CHROMIUM_POLICY_DIR/color.json" '(.BrowserThemeColor | ascii_downcase) == "#0a1526"'
+check "the switch names no app that missed it ($(cat "$XDG_STATE_HOME/dots/theme-out/notice"))" test ! -s "$XDG_STATE_HOME/dots/theme-out/notice"
 switch_ms=$(jq -r .ms "$XDG_STATE_HOME/dots/theme-switch.json")
 check "theme-switch.json records paper to blueprint in ${switch_ms} ms" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.from == "paper" and .to == "blueprint" and .ms <= 300'
 kdl=$XDG_STATE_HOME/dots/theme-out/niri.kdl
