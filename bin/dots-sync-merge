@@ -47,16 +47,22 @@ function recent(unit, store) {
   return Object.assign({}, store, { goals: store.goals.filter(ok).map((g) => Object.assign({}, g, { tasks: g.tasks.filter(ok) })) });
 }
 
+// A pulled file that does not parse is left out and the rest still merge; exit 5 then names it last, so the unit shows the error while this machine's store still goes up.
 function merge(unit, path, files) {
   const model = { notes, goals }[unit];
   const others = [];
+  const skipped = [];
   // This machine's own remote file is merged too, so a reinstall with no local store gets its goals and notes back before its first push.
   for (const f of files) {
     const store = model.parseStore(read(f));
     if (store) others.push(recent(unit, store));
-    else process.stderr.write(`${unit}: skipped ${basename(f)}, which does not parse\n`);
+    else skipped.push(`${unit}: skipped ${basename(f)}, which does not parse`);
   }
-  for (let i = 0; i < 3; i++) if (round(model, path, others)) return;
+  for (let i = 0; i < 3; i++) {
+    if (!round(model, path, others)) continue;
+    if (skipped.length) fail(skipped.join('\n'), 5);
+    return;
+  }
   fail(`${unit}: the local store kept changing, so this round left it alone`, 1);
 }
 

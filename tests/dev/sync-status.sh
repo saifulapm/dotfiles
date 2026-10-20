@@ -76,5 +76,15 @@ echo "     status: $(jq -c .sync <<<"$status")"
 status_units() { jq -e '.sync.notes.ok == true and .sync.goals.ok == true and (.sync.goals.lastOk | type) == "number"' <<<"$status" >/dev/null; }
 check "shell status .sync holds the units after a round" status_units
 
+# A truncated file from another machine fails the goals unit by name, while notes still sync.
+printf '{"goals":' >"$remote/dots-sync/goals/other.json"
+"$repo/bin/dots" sync >/dev/null 2>&1
+open_route
+broken_row() { state_is '.rows == ["Questions ring on", "Do Not Disturb", "Sync", "goals"] and .details[2] == "1 failing" and .sync.goals.error == "goals: skipped other.json, which does not parse" and .sync.notes.ok'; }
+until_ok 2000 broken_row
+echo "     route: $(control_state | jq -c '{rows, details}')"
+check "Route lists the goals unit with the file that does not parse" broken_row
+wtype -k Escape
+
 exit $((fails > 0))
 }

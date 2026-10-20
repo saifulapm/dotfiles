@@ -40,13 +40,16 @@ merge() {
 
 # store_unit <unit>: pull every machine's file, merge, then copy this machine's store up under its own name.
 store_unit() {
-  local store=$data/$1/$machine.json pulled=$tmp/$1
+  local store=$data/$1/$machine.json pulled=$tmp/$1 code=0
   mkdir -p "$pulled"
   rc mkdir "$root/$1" &&
-    rc copy "$root/$1" "$pulled" --max-depth 1 --include '*.json' &&
-    merge "$1" "$store" "$pulled" || return
+    rc copy "$root/$1" "$pulled" --max-depth 1 --include '*.json' || return
+  merge "$1" "$store" "$pulled" || code=$?
+  # 5 is another machine's file that does not parse: the unit fails with that, but what did merge still goes up.
+  ((code == 0 || code == 5)) || return "$code"
   # --checksum, as Dropbox keeps modtimes to the second and a same-size edit inside it would look unchanged.
-  [[ ! -f $store ]] || rc copyto "$store" "$root/$1/$machine.json" --checksum
+  [[ ! -f $store ]] || rc copyto "$store" "$root/$1/$machine.json" --checksum || return
+  return "$code"
 }
 
 # Attachments are named by their sha256, so a name already present on either side is the same file; none is ever deleted.

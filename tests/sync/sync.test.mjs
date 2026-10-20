@@ -172,6 +172,23 @@ test('two rounds started together run once, and the other says already running',
   assert.equal(status(a).goals.ok, true);
 });
 
+test('a pulled goals file that does not parse marks the unit failed, while the files that parse still merge and this machine still pushes', async () => {
+  const w = world();
+  const [a, c] = [machine(w, 'a'), machine(w, 'c')];
+  write(goalsPath(c), G.addGoal(G.emptyStore(), 'From c', null, T, 'gc'));
+  await ok(c);
+  writeFileSync(join(w.remote, 'dots-sync/goals/other.json'), '{"goals":');
+  write(goalsPath(a), G.addGoal(G.emptyStore(), 'From a', null, T, 'ga'));
+  const r = await sync(a);
+  assert.notEqual(r.code, 0);
+  const s = status(a).goals;
+  assert.deepEqual([s.ok, s.error], [false, 'goals: skipped other.json, which does not parse']);
+  assert.deepEqual(G.activeGoals(goals(a)).map((g) => g.title).sort(), ['From a', 'From c']);
+  const pushed = G.parseStore(readFileSync(join(w.remote, 'dots-sync/goals/a.json'), 'utf8'));
+  assert.deepEqual(G.activeGoals(pushed).map((g) => g.title).sort(), ['From a', 'From c']);
+  assert.equal(status(a).notes.ok, true);
+});
+
 // A store change starts a --only round from its path unit; one that met a running round used to wait 15 min for the timer.
 test('a --only goals round that meets the lock waits for it, then pushes the goal saved before it started', async () => {
   const w = world();
