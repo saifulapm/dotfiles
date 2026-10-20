@@ -17,12 +17,20 @@ ShellRoot {
     property var desk: null
     property var polkit: null
 
+    // Qt.createComponent fails quietly, so a file that does not compile names its error in the journal.
+    function compiled(url) {
+        const c = Qt.createComponent(url);
+        if (c.status === Component.Error)
+            console.warn(c.errorString());
+        return c;
+    }
+
     onFirstFrameMsChanged: {
         if (firstFrameMs === null || desk !== null)
             return;
-        surfacesLoader.component = Qt.createComponent("Surfaces.qml");
-        desk = Qt.createComponent("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService });
-        polkit = Qt.createComponent("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
+        surfacesLoader.component = compiled("Surfaces.qml");
+        desk = compiled("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService });
+        polkit = compiled("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
         apps = Qt.binding(() => DesktopEntries.applications.values.map(e => ({
                         id: e.id,
                         name: e.name,
@@ -206,7 +214,7 @@ ShellRoot {
         onActiveChanged: {
             if (!active || item)
                 return;
-            item = (component ?? Qt.createComponent("Surfaces.qml")).createObject(root, {
+            item = (component ?? root.compiled("Surfaces.qml")).createObject(root, {
                 theme: themeService,
                 themeList: Qt.binding(() => root.themeList),
                 apps: Qt.binding(() => root.apps),

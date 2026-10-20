@@ -58,7 +58,7 @@ cleanup() { :; }
 # A QML error can break what a surface draws while its state IPC still reads right, so every check reads the journal.
 qml_errors() {
   journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat 2>/dev/null |
-    grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load configuration|is not a type|Cannot assign|Cannot read propert'
+    grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load configuration|is not a type|Cannot assign|Cannot read propert|unavailable|Invalid property assignment'
 }
 dev_exit() {
   local rc=$? errs=
