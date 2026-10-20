@@ -85,7 +85,7 @@ test('a switch writes the agent TUI themes into the apps that are installed, and
   const out = (f) => readFileSync(join(state, 'dots/theme-out', f), 'utf8');
   assert.equal(readFileSync(join(home, '.claude/themes/dots.json'), 'utf8'), out('claude.json'));
   assert.equal(readFileSync(join(home, '.config/opencode/themes/qshell.json'), 'utf8'), out('opencode.json'));
-  assert.equal(readFileSync(join(home, '.config/amx/themes/qshell.toml'), 'utf8'), out('amx.toml'));
+  assert.equal(readFileSync(join(home, '.config/amx/themes/dots.toml'), 'utf8'), out('amx.toml'));
   assert.equal(JSON.parse(out('claude.json')).base, 'light');
   assert.deepEqual(readdirSync(home, { recursive: true }).filter((f) => f.startsWith('.pi')), []);
   assert.equal(spawnSync(dots, ['theme', 'blueprint'], { env: isolated(state) }).status, 0);

@@ -5,7 +5,7 @@ max_total = 6
 worktrees = false
 notifications = "both"
 trust = true
-theme = "qshell"
+theme = "dots"
 park_after = 1800
 diff = "delta --paging=always"
 

@@ -107,7 +107,7 @@ reload_agents() {
 claude.json .claude/themes/dots.json
 pi.json .pi/agent/themes/dots.json
 opencode.json .config/opencode/themes/qshell.json
-amx.toml .config/amx/themes/qshell.toml
+amx.toml .config/amx/themes/dots.toml
 AGENTS
 }
 

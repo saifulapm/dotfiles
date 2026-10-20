@@ -274,7 +274,7 @@ export function renderChromium(t) {
   return JSON.stringify({ BrowserThemeColor: lower(t.color.surface), BrowserColorScheme: t.mode }, null, 2) + '\n';
 }
 
-// The coding agents draw inside foot, so each sits on surface with ink text; Claude Code and pi name the theme dots, and opencode and amx keep v1's qshell.
+// The coding agents draw inside foot, so each sits on surface with ink text; Claude Code, pi and amx name the theme dots, and opencode keeps v1's qshell.
 function agentColors(t) {
   const c = t.color;
   const a = c.ansi.map(lower);
