@@ -12,8 +12,8 @@ launcher_closed() { launcher_is ".open == false and .drawing == false" && launch
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 
 read -r ox oy ow < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y) \(.width)"')
-# The launcher card's top-left corner and the island's centre line, in screen pixels.
-cx=$((ox + (ow - 640) / 2))
+# The launcher card's top-left corner, at x Math.round((width - 640) / 2) so an odd width rounds up, and the island's centre line.
+cx=$((ox + (ow - 640 + 1) / 2))
 cy=$((oy + 168))
 mid=$((ox + ow / 2))
 
