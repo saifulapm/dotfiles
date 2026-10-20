@@ -398,6 +398,11 @@ Scope {
                         onTextChanged: screenLock.field = text.length
                         Keys.onReturnPressed: screenLock.submit(text)
                         Keys.onEnterPressed: screenLock.submit(text)
+                        // Waking a blanked screen can stall niri until a key's release arrives late, so a repeat types nothing; Backspace and Delete keep theirs to clear a field.
+                        Keys.onPressed: event => {
+                            if (event.isAutoRepeat && event.key !== Qt.Key_Backspace && event.key !== Qt.Key_Delete)
+                                event.accepted = true;
+                        }
                         Component.onCompleted: forceActiveFocus()
 
                         Connections {

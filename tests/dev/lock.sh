@@ -38,6 +38,16 @@ ink_after=$(clock_ink)
 check "the screen shows the clock ($ink_before dark px before, $ink_after after)" test "$ink_after" -gt $((ink_before + 500))
 check "the lock marker is written" test -s "$marker"
 
+# Waking a blanked screen can stall niri until a key's release arrives late, and the held key's repeats filled the field.
+wtype -P x -s 1500 -p x
+until_ok 1000 state_is '.field >= 1'
+check "a key held for 1.5 s types one character, not its repeats ($(lock_state | jq .field))" state_is '.field == 1'
+wtype -- abcd
+until_ok 1000 state_is '.field == 5'
+wtype -P BackSpace -s 1500 -p BackSpace
+until_ok 1000 state_is '.field == 0'
+check "a held Backspace still repeats, and clears the field ($(lock_state | jq .field))" state_is '.field == 0'
+
 wtype -- wrong-pass
 until_ok 2000 state_is '.field == 10'
 check "typing reaches the password field" state_is '.field == 10'
