@@ -1,7 +1,8 @@
 #!/bin/bash
+# local.env: {{ $env := joinPath .chezmoi.homeDir ".config/hub/local.env" }}{{ if stat $env }}written{{ if contains "HUB_STORE_TOKEN=" (include $env) }}, in the store{{ end }}{{ else }}absent{{ end }}
 {{ template "lib.sh" . }}
 export PATH="$HOME/.local/bin:$PATH"
-# Every apply starts the agent services; a running one is left alone, and the hub skips itself by its condition until dots secrets writes local.env.
+# The agent services start at login; this starts them now, again once dots secrets has written local.env, and the hub skips itself by its condition until then.
 case $(systemctl --user is-system-running 2>/dev/null) in
   running | degraded) ;;
   *) exit 0 ;;
@@ -11,5 +12,5 @@ systemctl --user start pxy.service hub-local.service || log "pxy or the local hu
 # The first apply after dots secrets joins the machine to the mem store; workflow switch writes HUB_STORE_TOKEN into local.env, so it runs once.
 env=$HOME/.config/hub/local.env
 if [[ -f $env ]] && ! grep -q '^HUB_STORE_TOKEN=' "$env"; then
-  workflow switch --store wss://mem.on-rexa.com/store/share || log "workflow switch did not join the mem store; the next apply tries again"
+  workflow switch --store wss://mem.on-rexa.com/store/share || die "workflow switch did not join the mem store; the next apply tries again"
 fi

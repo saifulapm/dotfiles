@@ -7,14 +7,36 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const repo = new URL('../../', import.meta.url).pathname;
-const script = readFileSync(join(repo, 'home/.chezmoiscripts/run_after_30-agents.sh.tmpl'), 'utf8');
+const script = readFileSync(join(repo, 'home/.chezmoiscripts/run_onchange_after_30-agents.sh.tmpl'), 'utf8');
+
+const render = (home) => {
+  const r = spawnSync('chezmoi', ['--config', join(home, 'none.toml'), '--source', repo, 'execute-template'], { input: script, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home } });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout;
+};
+
+// run_onchange runs the script again only when its text changes, so the text must change when local.env appears and when the store token lands, and at no other apply.
+test('the script re-renders when local.env appears and when the machine joins the store, and only then', () => {
+  const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-agents-')));
+  const none = render(home);
+  assert.equal(render(home), none);
+  mkdirSync(join(home, '.config/hub'), { recursive: true });
+  writeFileSync(join(home, '.config/hub/local.env'), 'HUB_PEER_TOKEN=x\n');
+  const written = render(home);
+  writeFileSync(join(home, '.config/hub/local.env'), 'HUB_PEER_TOKEN=y\n');
+  assert.equal(render(home), written, 'a rotated token is not a new state');
+  writeFileSync(join(home, '.config/hub/local.env'), 'HUB_PEER_TOKEN=y\nHUB_STORE_TOKEN=z\n');
+  const joined = render(home);
+  assert.equal(new Set([none, written, joined]).size, 3);
+  assert.doesNotMatch(joined, /=y|=z/, 'no token reaches the script text');
+});
 
 // manager: what systemctl --user is-system-running prints; env: local.env's text, or none.
-function apply({ manager = 'running', env } = {}) {
+function apply({ manager = 'running', env, switchFails = false } = {}) {
   const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-agents-')));
   mkdirSync(join(home, 'stubs'));
   writeFileSync(join(home, 'stubs/systemctl'), `#!/bin/sh\necho "systemctl $*" >> "$HOME/calls"\n[ "$2" = is-system-running ] && echo ${manager}\nexit 0\n`, { mode: 0o755 });
-  writeFileSync(join(home, 'stubs/workflow'), '#!/bin/sh\necho "workflow $*" >> "$HOME/calls"\n', { mode: 0o755 });
+  writeFileSync(join(home, 'stubs/workflow'), `#!/bin/sh\necho "workflow $*" >> "$HOME/calls"\nexit ${switchFails ? 2 : 0}\n`, { mode: 0o755 });
   if (env !== undefined) {
     mkdirSync(join(home, '.config/hub'), { recursive: true });
     writeFileSync(join(home, '.config/hub/local.env'), env);
@@ -65,4 +87,11 @@ test('claude-rc@ runs in ~/Codes/<project>, skips a missing folder, and no insta
   assert.match(unit, /^WantedBy=default\.target$/m);
   const linked = readdirSync(units, { recursive: true }).filter((f) => /claude-rc@/.test(f) && f !== 'claude-rc@.service');
   assert.deepEqual(linked, []);
+});
+
+// run_onchange records a script that exits 0, so a join that failed has to fail the script to be tried on the next apply.
+test('a refused store join fails the step, naming it', () => {
+  const { r } = apply({ env: 'HUB_PEER_TOKEN=x\n', switchFails: true });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /dots: workflow switch did not join the mem store/);
 });
