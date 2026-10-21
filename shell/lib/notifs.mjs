@@ -17,7 +17,15 @@ export function parseStore(text) {
   }
   if (data === null || typeof data !== 'object' || !Array.isArray(data.history)) return { dnd: false, history: [] };
   const seen = {};
-  const unique = data.history.filter(isEntry).filter((e) => (seen[e.key] ? false : (seen[e.key] = true)));
+  const unique = data.history
+    .filter(isEntry)
+    .filter((e) => (seen[e.key] ? false : (seen[e.key] = true)))
+    .map((e) => {
+      if (!('files' in e) || validFiles(e.files)) return e;
+      const kept = Object.assign({}, e);
+      delete kept.files;
+      return kept;
+    });
   return { dnd: data.dnd === true, history: unique.slice(0, LIMIT) };
 }
 
@@ -44,3 +52,45 @@ export function group(entries) {
 }
 
 export const clampSelected = (selected, length) => Math.max(0, Math.min(length - 1, selected));
+
+// A notification is about files when our own senders list them, or niri's screenshot names one in image-path.
+const isPath = (p) => typeof p === 'string' && p.startsWith('/');
+const validFiles = (f) => Array.isArray(f) && f.every(isPath);
+
+// Temp files and icon theme images are never the file a notification is about; ".." could walk out of a folder checked by prefix.
+function userFile(path, home) {
+  if (!isPath(path) || path.split('/').includes('..') || path.startsWith('/tmp/')) return false;
+  return !['/usr/share/icons/', '/usr/share/pixmaps/', home + '/.local/share/icons/', home + '/.icons/'].some((d) => path.startsWith(d));
+}
+
+function hintPath(value) {
+  if (typeof value !== 'string') return '';
+  if (!value.startsWith('file://')) return value;
+  try {
+    return decodeURIComponent(value.slice(7));
+  } catch (e) {
+    return '';
+  }
+}
+
+export function filesOf(hints, home) {
+  const listed = typeof hints['x-dots-files'] === 'string' ? hints['x-dots-files'].split('\n').filter((l) => userFile(l, home)) : [];
+  if (listed.length > 0) return listed;
+  const image = hintPath(hints['image-path'] || hints['image_path']);
+  return userFile(image, home) ? [image] : [];
+}
+
+export const fileUri = (path) => 'file://' + path.split('/').map(encodeURIComponent).join('/');
+
+// RFC 2483: each URI ends with CRLF.
+export const uriList = (files) => files.map((f) => fileUri(f) + '\r\n').join('');
+
+export function chipLabel(files) {
+  if (files.length !== 1) return files.length + ' FILES';
+  const name = files[0].slice(files[0].lastIndexOf('/') + 1);
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toUpperCase() : 'FILE';
+}
+
+export const dragPayload = (entry) =>
+  entry.files && entry.files.length > 0 ? { mime: 'text/uri-list', data: uriList(entry.files) } : { mime: 'text/plain', data: entry.body };

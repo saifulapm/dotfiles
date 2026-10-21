@@ -93,7 +93,7 @@ Item {
             if (recorder.forced)
                 Quickshell.execDetached(["notify-send", "-u", "critical", "-a", "Recorder", "Recording stopped by force", name + " may be cut short"]);
             else if (code === 0 && status === 0)
-                Quickshell.execDetached(["notify-send", "-a", "Recorder", "Recording saved", name]);
+                Quickshell.execDetached(["notify-send", "-a", "Recorder", "-h", "string:x-dots-files:" + recorder.file, "Recording saved", name]);
             else
                 Quickshell.execDetached(["notify-send", "-u", "critical", "-a", "Recorder", "Recording failed", "wf-recorder exited " + code]);
             recorder.forced = false;

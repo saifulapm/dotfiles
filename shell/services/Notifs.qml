@@ -26,6 +26,7 @@ Scope {
             icon: notifs.iconOf(n.appIcon || n.hints["image-path"] || ""),
             summary: n.summary,
             body: n.body,
+            files: N.filesOf(n.hints, Quickshell.env("HOME")),
             critical: n.urgency === NotificationUrgency.Critical,
             time: Date.now(),
             actions: n.actions.map(a => ({
