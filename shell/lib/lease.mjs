@@ -14,7 +14,11 @@ export function minutesOf(s) {
 
 export const leaseEnd = (unlockedAt, now, minutes) => Math.min(now + minutes * 60000, unlockedAt + MAX_MS);
 
-// The name any caller gave, as one line; an empty one still holds a lease.
-export const holder = (who) => line(who) || 'agent';
+// C0, DEL and C1 controls draw as tofu, blob the journal and replay on a terminal, and U+0085 ends a line; the bidi marks reorder what follows.
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
+const MARK = /[\u200e\u200f\u061c]/g;
+
+// The name any caller gave, as one line of plain text; an empty one still holds a lease.
+export const holder = (who) => line((who || '').replace(CONTROL, ' ').replace(MARK, '')) || 'agent';
 
 export const unlockLine = (who, minutes) => `lock: agent unlock by ${who} for ${minutes} min`;

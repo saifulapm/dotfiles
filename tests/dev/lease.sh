@@ -71,6 +71,10 @@ call lock unlock "$(printf 'cl\naude‮ x')" 5 >/dev/null
 check "a name with a newline and U+202E holds as one line ($(lock_state | jq -c .heldBy))" state_is '.heldBy == "cl aude x"'
 call lock lock >/dev/null
 until_ok 3000 locked_shown
+call lock unlock "$(printf 'AAA\x1b\x07\x7fBBB\u200fCCC\u0085DDD')" 5 >/dev/null
+check "control characters and bidi marks in a name are gone ($(lock_state | jq -c .heldBy))" state_is '.heldBy == "AAA BBBCCC DDD"'
+call lock lock >/dev/null
+until_ok 3000 locked_shown
 call lock unlock "$(printf 'x%.0s' {1..200})" 5 >/dev/null
 check "a 200-character name holds whole" state_is '(.heldBy | length) == 200'
 call lock lock >/dev/null

@@ -27,6 +27,10 @@ test('the holder is one line any sender spells, and never empty', () => {
   assert.equal(holder(''), 'agent');
   assert.equal(holder(' \n '), 'agent');
   assert.equal(holder('x'.repeat(200)), 'x'.repeat(200));
+  // Control characters draw as tofu, show as a blob in the journal and replay on a terminal; U+0085 splits a line, and the bidi marks reorder.
+  assert.equal(holder('AAA\x1b\x07\x08\x7fBBB\u200fCCC\u061cDDD'), 'AAA BBBCCCDDD');
+  assert.equal(holder('AAA\u0085BBB\u200eC'), 'AAA BBBC');
+  assert.equal(holder('\x00\x1b'), 'agent');
 });
 
 test('the journal line names who and for how long (MBFQCTFH)', () => {
