@@ -14,6 +14,8 @@ HealthCmd=wget -q --spider http://127.0.0.1:8025/livez
 HealthInterval=30s
 HealthStartPeriod=15s
 HealthRetries=3
+HealthStartupCmd=wget -q --spider http://127.0.0.1:8025/livez
+HealthStartupInterval=1s
 
 [Service]
 TimeoutStartSec=300

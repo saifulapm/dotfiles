@@ -13,6 +13,8 @@ HealthCmd=mysqladmin ping -h127.0.0.1 --silent
 HealthInterval=30s
 HealthStartPeriod=90s
 HealthRetries=3
+HealthStartupCmd=mysqladmin ping -h127.0.0.1 --silent
+HealthStartupInterval=1s
 
 [Service]
 TimeoutStartSec=300

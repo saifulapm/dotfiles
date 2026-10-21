@@ -210,6 +210,7 @@ phpv=$(as_user "php -r 'echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;'" 2>&1)
 check "php is Fedora's 8.5 (got '$phpv')" test "$phpv" = 8.5
 remi=$(podman exec "$name" rpm -qa 'php8[234]-*' 'remi-release')
 check "nothing from Remi is installed (got '$remi')" test -z "$remi"
+check "php loads phpredis, Laravel's default Redis client" as_user "php -r 'exit(extension_loaded(\"redis\") ? 0 : 1);'"
 check "php-fpm reads the .test pool" as_user "/usr/sbin/php-fpm -t --fpm-config ~/.config/php-fpm/dev.conf 2>/dev/null"
 check "composer installed the laravel installer and Pint" as_user "~/.config/composer/vendor/bin/laravel --version && ~/.config/composer/vendor/bin/pint --version"
 check "*.test resolves through dnsmasq" podman exec "$name" grep -qx 'address=/test/127.0.0.1' /etc/dnsmasq.d/test-domains.conf

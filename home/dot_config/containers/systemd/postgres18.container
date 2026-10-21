@@ -13,6 +13,8 @@ HealthCmd=pg_isready -U postgres -h 127.0.0.1
 HealthInterval=30s
 HealthStartPeriod=60s
 HealthRetries=3
+HealthStartupCmd=pg_isready -U postgres -h 127.0.0.1
+HealthStartupInterval=1s
 
 [Service]
 TimeoutStartSec=300

@@ -13,6 +13,8 @@ HealthCmd=redis-cli ping
 HealthInterval=30s
 HealthStartPeriod=10s
 HealthRetries=3
+HealthStartupCmd=redis-cli ping
+HealthStartupInterval=1s
 
 [Service]
 TimeoutStartSec=300

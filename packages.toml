@@ -256,6 +256,11 @@ arch = "all"
 why = "system PHP: the pcov coverage driver"
 
 [[package]]
+name = "php-pecl-redis6"
+arch = "all"
+why = "system PHP: phpredis, the client Laravel talks to Redis with by default"
+
+[[package]]
 name = "composer"
 arch = "all"
 why = "PHP's package manager"
