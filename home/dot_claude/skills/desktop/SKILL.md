@@ -261,5 +261,6 @@ a destructive keybind) is tested in the nested session: `bin/dots-dev` in
 `~/Codes/dotfiles` starts it and prints the env to source. With it sourced,
 niri msg, dots-call, qs ipc, grim, wtype and wlrctl act on the nested
 session; ydotool does not, since ydotoold's device reaches the live one, so
-leave `mouse click`, `drag` and `screen drag` alone there. The nested lock's
+leave `mouse drag` and `screen drag`, the two that press through it, alone
+there. Clicks and scrolls go through wlrctl and work. The nested lock's
 password is `dots-test-pass`.

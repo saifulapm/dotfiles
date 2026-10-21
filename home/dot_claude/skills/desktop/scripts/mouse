@@ -16,7 +16,8 @@
 # Screen geometry comes from `niri msg -j outputs` (rightmost output; these
 # machines drive one display). With the env bin/dots-dev prints sourced,
 # niri msg and wlrctl answer for the nested session; MOUSE_SCREEN=WxH
-# overrides the geometry. ydotool's clicks still reach the live session.
+# overrides the geometry. drag presses through ydotool, which still reaches
+# the live session.
 
 set -euo pipefail
 
