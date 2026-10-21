@@ -64,9 +64,10 @@ test('a refused serve says so and still exits 0, so the hub keeps running', () =
   assert.match(r.stderr, /other machines cannot reach this hub/);
 });
 
-// systemd runs ExecStartPost before it calls the unit started, so the wait runs in the background or every start of hub-local would hold for it.
-test('hub-local runs dots-hub-serve in the background after its start, and ignores how it ends', () => {
+// The hub reads its tailnet name once, as it starts; started at boot before tailscale runs, it named itself by its bare machine name, which no peer lists.
+test('hub-local waits on dots-hub-serve before the hub starts, and ignores how it ends', () => {
   const unit = readFileSync(join(units, 'hub-local.service'), 'utf8');
-  assert.match(unit, /^ExecStartPost=-\/bin\/sh -c '%h\/Codes\/dotfiles\/bin\/dots-hub-serve &'$/m);
+  assert.match(unit, /^ExecStartPre=-%h\/Codes\/dotfiles\/bin\/dots-hub-serve$/m);
+  assert.doesNotMatch(unit, /^ExecStartPost=/m);
   assert.ok(readdirSync(new URL('../../bin/', import.meta.url).pathname).includes('dots-hub-serve'));
 });

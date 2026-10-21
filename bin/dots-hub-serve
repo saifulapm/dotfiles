@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# hub-local's ExecStartPost: once tailscale runs, it serves this machine's local hub on port 8789 of its tailnet address, so the phone and the other machines reach it. tailscaled keeps the serve in its own state, so one success holds across reboots; a machine not logged in yet gives up after a minute and the first hub start after `tailscale up` serves.
+# hub-local's ExecStartPre: once tailscale runs, it serves this machine's local hub on port 8789 of its tailnet address, so the phone and the other machines reach it. tailscaled keeps the serve in its own state, so one success holds across reboots; a machine not logged in yet gives up after a minute, so the hub starts without it, and the first hub start after `tailscale up` serves.
 set -uo pipefail
 {
 for _ in $(seq 30); do
