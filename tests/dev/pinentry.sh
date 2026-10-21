@@ -100,6 +100,16 @@ wtype -k Escape
 until_ok 3000 exited "$b"
 check "the first got its passphrase and the second its cancel" bash -c "grep -qx 'D one' '$out/first-request.assuan' && grep -qx 'ERR 83886179 Operation cancelled' '$out/second-request.assuan'"
 
+# gpg's error is the agent's text: one too long for the card is cut short inside it.
+long=$(printf 'A%.0s' $(seq 200))
+printf 'SETDESC long error\nSETERROR %s\nGETPIN\nBYE\n' "$long" | "$repo/bin/dots-pinentry" >/dev/null &
+p=$!
+until_ok 3000 state_is '.open and .settled and .error != ""'
+check "a 200-character error is cut short inside the card ($(pin_state | jq -c '[.errorTruncated, .errorRight, (.cardBox.x + .cardBox.w)]'))" state_is '.errorTruncated and .errorRight <= .cardBox.x + .cardBox.w - 19'
+wtype -k Escape
+until_ok 3000 exited "$p"
+until_ok 3000 state_is '.drawing == false'
+
 # Each theme draws the card with its own heading and key strip, read off the screen.
 read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }

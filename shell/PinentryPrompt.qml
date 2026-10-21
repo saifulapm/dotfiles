@@ -92,6 +92,9 @@ Item {
             description: descriptionText.text,
             descriptionLines: descriptionText.lineCount,
             error: errorText.visible ? errorText.text : "",
+            // The error line as drawn: cut short when it is longer than the card.
+            errorTruncated: errorText.truncated,
+            errorRight: errorText.mapToItem(null, errorText.contentWidth, 0).x,
             field: input.text.length,
             masked: input.echoMode === TextInput.Password,
             motion: motion.curves?.kind ?? null,
@@ -253,6 +256,7 @@ Item {
                 Layout.rightMargin: 20
                 Layout.bottomMargin: 10
                 text: P.errorLine(prompt.seen?.error ?? "")
+                elide: Text.ElideRight
                 color: prompt.c.danger
                 font.family: prompt.look.small.font
                 font.pixelSize: prompt.look.small.size
