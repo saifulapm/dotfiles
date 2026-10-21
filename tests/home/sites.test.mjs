@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -41,7 +41,7 @@ test('caddy sends .test to php-fpm on 9085, which a socket starts and 10 idle mi
 test('a folder with public/ is served on PHP 8.5, one without it gets a 404, and only on 127.0.0.1', { skip: missing }, async (t) => {
   const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-sites-')));
   const env = {
-    PATH: '/usr/bin:/bin', HOME: home,
+    PATH: `${home}/stubs:/usr/bin:/bin`, HOME: home,
     XDG_CONFIG_HOME: join(home, '.config'), XDG_DATA_HOME: join(home, '.local/share'), XDG_CACHE_HOME: join(home, '.cache'),
   };
   const render = (f) => {
@@ -50,14 +50,17 @@ test('a folder with public/ is served on PHP 8.5, one without it gets a 404, and
     return r.stdout;
   };
   const [http, https, fpm] = [await freePort(), await freePort(), await freePort()];
+  // caddy installs a new CA into the system's trust through sudo; the stub records any such call.
+  mkdirSync(join(home, 'stubs'));
+  writeFileSync(join(home, 'stubs/sudo'), '#!/bin/sh\necho "$*" >> "$HOME/sudo.log"\nexit 1\n', { mode: 0o755 });
   mkdirSync(join(home, '.local/state/php-fpm'), { recursive: true });
   mkdirSync(join(home, 'Codes/site/public'), { recursive: true });
   mkdirSync(join(home, 'Codes/nopublic'), { recursive: true });
   writeFileSync(join(home, 'Codes/site/public/index.php'), '<?php echo PHP_VERSION;');
   writeFileSync(join(home, 'Codes/nopublic/index.php'), '<?php echo "served";');
-  // The live caddy owns the admin port, and the live socket proxy owns 9085, so the copy talks to its php-fpm directly.
+  // The live caddy owns the admin port and the live socket proxy owns 9085, so the copy talks to its php-fpm directly; its scratch CA stays out of the system trust.
   writeFileSync(join(home, 'Caddyfile'), render('home/dot_config/caddy/Caddyfile.tmpl')
-    .replace('{\n', '{\n\tadmin off\n').replace('http_port 38080', `http_port ${http}`).replace('https_port 38443', `https_port ${https}`)
+    .replace('{\n', '{\n\tadmin off\n\tskip_install_trust\n').replace('http_port 38080', `http_port ${http}`).replace('https_port 38443', `https_port ${https}`)
     .replace('127.0.0.1:9085', `127.0.0.1:${fpm}`));
   writeFileSync(join(home, 'dev.conf'), render('home/dot_config/php-fpm/dev.conf.tmpl').replace('127.0.0.1:39085', `127.0.0.1:${fpm}`));
 
@@ -71,6 +74,7 @@ test('a folder with public/ is served on PHP 8.5, one without it gets a 404, and
 
   assert.match(get('site'), /^8\.5\.\d+\n200$/);
   assert.equal(get('nopublic'), '\n404');
+  assert.ok(!existsSync(join(home, 'sudo.log')), 'caddy asked sudo to trust its scratch CA');
   // The sockets in front of caddy listen on 127.0.0.1 only, so caddy's own ports must not answer from the network either.
   const bound = spawnSync('ss', ['-Hltun', `( sport = :${http} or sport = :${https} )`], { encoding: 'utf8' }).stdout.trim().split('\n');
   assert.ok(bound.length >= 2, bound.join('\n'));

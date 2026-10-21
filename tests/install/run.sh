@@ -213,6 +213,7 @@ check "nothing from Remi is installed (got '$remi')" test -z "$remi"
 check "php loads phpredis, Laravel's default Redis client" as_user "php -r 'exit(extension_loaded(\"redis\") ? 0 : 1);'"
 check "php-fpm reads the .test pool" as_user "/usr/sbin/php-fpm -t --fpm-config ~/.config/php-fpm/dev.conf 2>/dev/null"
 check "composer installed the laravel installer and Pint" as_user "~/.config/composer/vendor/bin/laravel --version && ~/.config/composer/vendor/bin/pint --version"
+check "laravel new makes an app in ~/Codes whose tests pass" as_user "~/.config/composer/vendor/bin/laravel new ~/Codes/demo --no-interaction >/dev/null 2>&1 && cd ~/Codes/demo && php artisan test >/dev/null 2>&1"
 check "*.test resolves through dnsmasq" podman exec "$name" grep -qx 'address=/test/127.0.0.1' /etc/dnsmasq.d/test-domains.conf
 check "the dev quadlets generate units" as_user "/usr/lib/systemd/user-generators/podman-user-generator --dryrun >/dev/null 2>&1"
 check "the dev sockets are enabled" as_user "test -f ~/.config/systemd/user/sockets.target.wants/mysql84-proxy.socket -a -f ~/.config/systemd/user/sockets.target.wants/caddy-dev-https.socket -a -f ~/.config/systemd/user/sockets.target.wants/php-fpm-proxy.socket"
