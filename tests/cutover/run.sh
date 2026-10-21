@@ -34,10 +34,10 @@ unit_state() { as_user "echo \$(systemctl --user is-enabled $1 2>/dev/null) \$(s
 snapshot() { as_user "find ~ \\( -type f -o -type l \\) -printf '%p %s %T@ %l\\n' | sort"; }
 
 trap 'podman rm -f -t 0 "$name" >/dev/null 2>&1; rm -rf "$snap"' EXIT
-# systemd runs as the container's init, so the image carries it; downloaded rpms stay in the install test's cache volume.
+# systemd runs as the container's init, so the image carries it, and procps-ng as every Fedora install does; downloaded rpms stay in the install test's cache volume.
 podman volume exists dots-install-dnf-cache || podman volume create dots-install-dnf-cache >/dev/null
 cache=$(podman volume inspect dots-install-dnf-cache --format '{{.Mountpoint}}')
-printf 'FROM docker.io/library/fedora:44\nRUN echo keepcache=True >> /etc/dnf/dnf.conf && dnf -y -q install systemd sudo\nCMD ["/sbin/init"]\n' |
+printf 'FROM docker.io/library/fedora:44\nRUN echo keepcache=True >> /etc/dnf/dnf.conf && dnf -y -q install systemd sudo procps-ng\nCMD ["/sbin/init"]\n' |
   podman build -q -t "$image" -v "$cache:/var/cache/libdnf5:z" -f - >/dev/null || { echo "FAIL: image did not build"; exit 1; }
 # keep-id would start init as saiful, so it runs as root.
 podman run -d --name "$name" --user root --systemd=always --userns=keep-id --security-opt label=disable \
