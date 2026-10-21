@@ -38,7 +38,7 @@ test('caddy sends .test to php-fpm on 9085, which a socket starts and 10 idle mi
   assert.equal(read(`${units}/sockets.target.wants/symlink_php-fpm-proxy.socket`).trim(), '../php-fpm-proxy.socket');
 });
 
-test('a folder with public/ is served on PHP 8.5, and one without it gets a 404', { skip: missing }, async (t) => {
+test('a folder with public/ is served on PHP 8.5, one without it gets a 404, and only on 127.0.0.1', { skip: missing }, async (t) => {
   const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-sites-')));
   const env = {
     PATH: '/usr/bin:/bin', HOME: home,
@@ -71,6 +71,10 @@ test('a folder with public/ is served on PHP 8.5, and one without it gets a 404'
 
   assert.match(get('site'), /^8\.5\.\d+\n200$/);
   assert.equal(get('nopublic'), '\n404');
+  // The sockets in front of caddy listen on 127.0.0.1 only, so caddy's own ports must not answer from the network either.
+  const bound = spawnSync('ss', ['-Hltun', `( sport = :${http} or sport = :${https} )`], { encoding: 'utf8' }).stdout.trim().split('\n');
+  assert.ok(bound.length >= 2, bound.join('\n'));
+  assert.deepEqual(bound.filter((l) => !/\s127\.0\.0\.1:\d+\s/.test(l)), []);
 });
 
 test('nothing ships or keeps Remi\'s PHP collections, their fpm units or the shims that picked them', () => {
