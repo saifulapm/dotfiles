@@ -69,15 +69,15 @@ export function islandText(mode, slots, now) {
 
 export const boxWidth = (contentWidth) => Math.min(contentWidth, MAX_WIDTH);
 
-// Weeks run Monday to Sunday; days outside the month are null.
-export function monthGrid(year, month) {
-  const lead = (new Date(year, month, 1).getDay() + 6) % 7;
+// Weeks run Monday to Sunday unless a board starts them on weekStart (0 is Sunday); days outside the month are null.
+export function monthGrid(year, month, weekStart = 1) {
+  const lead = (new Date(year, month, 1).getDay() - weekStart + 7) % 7;
   const days = new Date(year, month + 1, 0).getDate();
   const cells = Array(lead).fill(null).concat(Array.from({ length: days }, (_, i) => i + 1));
   while (cells.length % 7) cells.push(null);
   const weeks = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-  return { title: `${MONTHS[month]} ${year}`, weeks, cells };
+  return { title: `${MONTHS[month]} ${year}`, month: MONTHS[month], abbr: MONTHS[month].slice(0, 3), year, weeks, cells };
 }
 
 export function shiftMonth(year, month, by) {

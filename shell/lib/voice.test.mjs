@@ -505,3 +505,27 @@ test("Blueprint's world clock: uppercase cities, a cyan home time, the offset at
   assert.deepEqual([b.homeTime.size, b.homeTime.color, b.time.size, b.time.color, b.name.size, b.name.color], [15, '#7FE3F0', 15, '#D6F4F8', 10, '#80A4C2']);
   assert.deepEqual([b.place, b.city('New York'), b.offsetText('−10h'), b.offsetWidth, b.rule.color, b.rule.dashed], ['right', 'NEW YORK', '−10H', 34, '#2E5A72', true]);
 });
+
+test("Paper's month grid: a CALENDAR head, a split serif title, Monday weeks in 34 px cells and a boxed today", () => {
+  const g = clock('paper').grid;
+  assert.deepEqual([g.head, g.header, g.weekStart, g.weekdays.join(''), g.cell, g.rowHeight, g.weekHeight], ['CALENDAR', '', 1, 'MTWTFSS', 34, 26, 26]);
+  assert.deepEqual(g.title.parts({ month: 'October', abbr: 'Oct', year: 2026 }), ['October', '2026']);
+  assert.deepEqual([g.title.place, g.title.left.font, g.title.left.size, g.title.right.italic, g.title.right.size], ['split', 'Instrument Serif', 24, true, 16]);
+  assert.deepEqual([g.weekday.size, g.weekday.spacing, g.day.size, g.today.w, g.today.h, g.today.inverted, g.today.borderColor, g.today.border], [10, 1, 12, 26, 22, false, '#C8381E', 1.5]);
+});
+
+test("Artboard's month grid: no head, October 2026 at 15 px, Sunday weeks, #A3A9B4 weekdays and a white pill for today", () => {
+  const g = clock('artboard').grid;
+  assert.deepEqual([g.head, g.header, g.weekStart, g.weekdays.join(' '), g.cell, g.rowHeight, g.weekHeight], ['', '', 0, 'Su Mo Tu We Th Fr Sa', 32, 28, 28]);
+  assert.deepEqual(g.title.parts({ month: 'October', abbr: 'Oct', year: 2026 }), ['October 2026']);
+  assert.deepEqual([g.title.place, g.title.left.size, g.title.left.weight, g.weekday.size, g.weekday.color, g.day.color], ['line', 15, 500, 11, '#A3A9B4', '#C9CED6']);
+  assert.deepEqual([g.today.w, g.today.h, g.today.radius, g.today.inverted, g.today.border], [28, 24, 8, true, 0]);
+});
+
+test("Blueprint's month grid: [ CALENDAR ] and OCT 2026 across the card, Monday weeks, a 22 px weekday line and a cyan today cell", () => {
+  const g = clock('blueprint').grid;
+  assert.deepEqual([g.head, g.header, g.weekStart, g.weekdays.join(''), g.cell, g.rowHeight, g.weekHeight], ['', '[ CALENDAR ]', 1, 'MTWTFSS', 32, 26, 22]);
+  assert.deepEqual(g.title.parts({ month: 'October', abbr: 'Oct', year: 2026 }), ['OCT 2026']);
+  assert.deepEqual([g.title.place, g.title.left.size, g.title.left.color, g.weekday.size, g.weekday.color, g.rowGap], ['header', 10, '#80A4C2', 10, '#80A4C2', 2]);
+  assert.deepEqual([g.today.w, g.today.h, g.today.inverted, g.today.fill, g.today.border], [32, 26, true, '#7FE3F0', 0]);
+});

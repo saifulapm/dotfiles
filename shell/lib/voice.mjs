@@ -488,6 +488,8 @@ export function osdLook(tokens) {
   });
 }
 
+const MONDAY_FIRST = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
 // How the calendar card's city column reads, as each m24 board draws it beside the month: home first and large with its mark (Paper's boxed HOME), then a rule above each city. place puts the offset beside the city's name, under it or at the row's right; the day word always sits under the name. A colour left empty is the island's own text colour.
 export function clockLook(tokens) {
   const c = (tokens || UNTHEMED).color;
@@ -512,6 +514,21 @@ export function clockLook(tokens) {
       offsetText: same,
       dayText: same,
       rule: { color: ISLAND.plain.tile, dashed: false },
+      grid: {
+        head: '',
+        header: '',
+        weekStart: 0,
+        weekdays: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+        cell: 32,
+        rowHeight: 28,
+        weekHeight: 28,
+        rowGap: 0,
+        gap: 6,
+        title: { place: 'line', parts: (g) => [`${g.month} ${g.year}`], left: text(t.ui, 15, { weight: 500 }), right: null },
+        weekday: text(t.mono, 11, { color: ISLAND.plain.head }),
+        day: text(t.mono, 12, { color: ISLAND.plain.body }),
+        today: { w: 28, h: 24, radius: 8, inverted: true, fill: '', border: 0, borderColor: '', weight: 700 },
+      },
     };
   }
   if (voice === 'bracket') {
@@ -532,6 +549,21 @@ export function clockLook(tokens) {
       offsetText: upper,
       dayText: upper,
       rule: { color: c.line, dashed: true },
+      grid: {
+        head: '',
+        header: '[ CALENDAR ]',
+        weekStart: 1,
+        weekdays: MONDAY_FIRST,
+        cell: 32,
+        rowHeight: 26,
+        weekHeight: 22,
+        rowGap: 2,
+        gap: 0,
+        title: { place: 'header', parts: (g) => [`${g.abbr} ${g.year}`.toUpperCase()], left: small, right: null },
+        weekday: text(t.mono, 10, { spacing: 0.8, color: c.muted }),
+        day: text(t.mono, 12),
+        today: { w: 32, h: 26, radius: 0, inverted: true, fill: c.accent, border: 0, borderColor: '', weight: 700 },
+      },
     };
   }
   return {
@@ -550,6 +582,21 @@ export function clockLook(tokens) {
     offsetText: same,
     dayText: upper,
     rule: { color: '', dashed: false },
+    grid: {
+      head: 'CALENDAR',
+      header: '',
+      weekStart: 1,
+      weekdays: MONDAY_FIRST,
+      cell: 34,
+      rowHeight: 26,
+      weekHeight: 26,
+      rowGap: 0,
+      gap: 8,
+      title: { place: 'split', parts: (g) => [g.month, String(g.year)], left: text(t.display, 24), right: text(t.display, 16, { italic: true }) },
+      weekday: text(t.ui, 10, { spacing: 1 }),
+      day: text(t.ui, 12),
+      today: { w: 26, h: 22, radius: 0, inverted: false, fill: '', border: 1.5, borderColor: c.accent, weight: 700 },
+    },
   };
 }
 

@@ -65,6 +65,13 @@ test('a month that starts on Sunday puts the 1st last in its first week', () => 
   assert.deepEqual(monthGrid(2026, 1).weeks.at(-1).slice(0, 6), [23, 24, 25, 26, 27, 28]);
 });
 
+test('a board that starts its weeks on Sunday shifts the grid and names the month and year apart', () => {
+  const g = monthGrid(2026, 9, 0);
+  assert.deepEqual(g.weeks[0], [null, null, null, null, 1, 2, 3]);
+  assert.deepEqual(g.weeks.at(-1), [25, 26, 27, 28, 29, 30, 31]);
+  assert.deepEqual([g.month, g.abbr, g.year, g.title], ['October', 'Oct', 2026, 'October 2026']);
+});
+
 test('the calendar reads as its month, and moving a month crosses the year', () => {
   assert.equal(islandText('calendar', { calendar: { year: 2026, month: 9 } }, AT), 'October 2026');
   assert.deepEqual(shiftMonth(2026, 11, 1), { year: 2027, month: 0 });
