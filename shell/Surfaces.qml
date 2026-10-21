@@ -218,7 +218,7 @@ PanelWindow {
         }
     }
 
-    // Surfaces from m20 on load on their first open and never warm; each unloads once it has drawn nothing for 30 s.
+    // The newer surfaces load on their first open and never warm; each unloads once it has drawn nothing for 30 s.
     Loader {
         id: pinentryLoader
         anchors.fill: parent

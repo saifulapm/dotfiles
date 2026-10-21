@@ -55,20 +55,19 @@ Item {
         input.text = "";
         selected = 0;
         mode = "list";
+        qr = null;
+        newPath.text = "";
         listed = false;
         lister.running = true;
         shown = true;
         input.forceActiveFocus();
     }
 
-    // Every secret the card holds goes at close: a shown password and a new entry's preview.
+    // Every secret the card holds goes at close: a shown password and a new entry's preview. The rest stays as drawn while the close plays, and open() resets it.
     function close() {
         shown = false;
         hide();
-        qr = null;
-        mode = "list";
         generated = "";
-        newPath.text = "";
     }
 
     function hide() {
