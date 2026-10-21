@@ -14,6 +14,12 @@ for e in web/github.com web/gitlab.com mail/icloud; do printf '%s\n' "$password-
 printf '%s\n' "$password" | pass insert -f -e web/github.com >/dev/null
 printf 'otpauth://totp/GitHub:saiful?secret=%s&issuer=GitHub\n' "$secret" | pass otp append -f web/github.com >/dev/null
 echo web/github.com >"$XDG_STATE_HOME/dots/pass-otp"
+# pass commits each change, and dots-pass pushes it to this bare remote.
+remote=$DOTS_DEV_DIR/store-remote.git
+git init -q --bare "$remote"
+pass git init >/dev/null
+pass git remote add origin "$remote"
+pass git push -q -u origin HEAD 2>/dev/null
 
 pass_state() { timeout 0.5 dots-call pass state 2>/dev/null; }
 state_is() { pass_state | jq -e "$1" >/dev/null; }
@@ -65,6 +71,74 @@ until_ok 5000 bash -c "[ \"\$(timeout 1 wl-paste -n 2>/dev/null)\" = '$password'
 copied_at=$(now_ms)
 until_ok 50000 bash -c '[ -z "$(timeout 1 wl-paste -n 2>/dev/null)" ]'
 check "45 s after Enter wl-paste prints nothing ($(($(now_ms) - copied_at)) ms)" bash -c "[ -z \"\$(timeout 1 wl-paste -n 2>/dev/null)\" ] && [ $(($(now_ms) - copied_at)) -ge 44000 ]"
+
+# s shows the password on its row for 10 s.
+niri msg action spawn -- dots-call pass toggle
+until_ok 3000 state_is '.open and .listed and .settled'
+wtype ghb
+until_ok 2000 state_is '.count == 1'
+wtype -k Tab
+until_ok 2000 state_is '.focus == "list"'
+wtype s
+until_ok 5000 state_is '.revealed != null'
+check "s shows the password in place of the name, tagged 10s ($(pass_state | jq -c '.revealed | .tag'))" state_is ".revealed.text == \"$password\" and .revealed.tag == \"10s\""
+shown_at=$(now_ms)
+until_ok 12000 state_is '.revealed == null'
+check "10 s later the row shows the name only ($(($(now_ms) - shown_at)) ms)" bash -c "timeout 0.5 dots-call pass state | jq -e '.revealed == null and .rows[0].name == \"web/github.com\"' >/dev/null && [ $(($(now_ms) - shown_at)) -ge 9000 ]"
+
+# n makes a new entry with a generated 24-character password; h and l change its length.
+wtype n
+until_ok 3000 state_is '.mode == "new" and .newEntry.length == 24'
+check "n opens the new-entry card with a 24-character password" state_is '.newEntry.length == 24 and .newEntry.focus == "path"'
+wtype web/github.com
+until_ok 2000 state_is '.newEntry.path == "web/github.com"'
+check "a path that exists is tagged exists ($(pass_state | jq -c .newEntry.tag))" state_is '.newEntry.tag | ascii_downcase == "exists"'
+wtype -k Return
+sleep 1
+check "and Enter does not overwrite it" bash -c "[ \"\$(pass show web/github.com | head -1)\" = '$password' ] && timeout 0.5 dots-call pass state | jq -e '.mode == \"new\"' >/dev/null"
+wtype -k Escape
+until_ok 2000 state_is '.mode == "list"'
+wtype n
+until_ok 3000 state_is '.mode == "new" and .newEntry.length == 24'
+wtype web/linear.app
+until_ok 2000 state_is '.newEntry.path == "web/linear.app"'
+check "a new path is tagged new ($(pass_state | jq -c .newEntry.tag))" state_is '.newEntry.tag | ascii_downcase == "new"'
+wtype -k Tab
+until_ok 2000 state_is '.newEntry.focus == "length"'
+wtype l
+until_ok 3000 state_is '.newEntry.length == 25'
+check "l lengthens the password to 25" state_is '.newEntry.length == 25'
+wtype h
+until_ok 3000 state_is '.newEntry.length == 24'
+check "h shortens it back to 24" state_is '.newEntry.length == 24'
+wtype -k Return
+saved() { [ "$(pass show web/linear.app 2>/dev/null | head -1 | tr -d '\n' | wc -c)" = 24 ]; }
+until_ok 8000 saved
+check "Enter saves it: pass show web/linear.app prints a 24-character password" saved
+pushed() { git -C "$remote" log -1 --format=%s | grep -qF "$1"; }
+until_ok 5000 pushed "Add given password for web/linear.app"
+check "and the store's remote has the commit ($(git -C "$remote" log -1 --format=%s))" pushed web/linear.app
+
+# d asks on one line under the list, and y deletes.
+until_ok 3000 state_is '.mode == "list" and .listed'
+wtype -k slash
+wtype -M ctrl a -m ctrl
+until_ok 2000 state_is '.focus == "query"'
+wtype linear
+until_ok 2000 state_is '.count == 1 and .rows[0].name == "web/linear.app"'
+wtype -k Tab
+until_ok 2000 state_is '.focus == "list"'
+wtype d
+until_ok 2000 state_is '.mode == "delete"'
+check "d asks on one line ($(pass_state | jq -c .deleteLine))" state_is '.deleteLine == "Delete web/linear.app?  Y YES · N NO"'
+wtype y
+gone() { ! pass ls 2>/dev/null | grep -q linear.app; }
+until_ok 8000 gone
+check "y deletes it: pass ls no longer lists it" gone
+until_ok 5000 pushed "Remove web/linear.app"
+check "and the store's remote's last commit names it ($(git -C "$remote" log -1 --format=%s))" pushed "web/linear.app"
+wtype -k Escape
+until_ok 3000 state_is '.drawing == false'
 
 # Each theme draws the board's key strip; the list unloads 30 s after it closes.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }

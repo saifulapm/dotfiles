@@ -58,3 +58,27 @@ export function failedText(stderr) {
   const why = line(String(stderr).split('\n')[0].replace(/^dots-pass: /, ''));
   return why ? `Not copied · ${why}` : 'Not copied';
 }
+
+// A new entry's path as typed: "new", "exists", or "" while it is not a name pass could save.
+export function pathTag(entries, path) {
+  const p = path.trim();
+  if (!p || /[\t\n]/.test(p) || p.split('/').some((s) => s === '' || s === '.' || s === '..')) return '';
+  return entries.some((e) => e.name === p) ? 'exists' : 'new';
+}
+
+export const LENGTH = { start: 24, min: 8, max: 128 };
+
+// The delete question on one line under the list, and its keys.
+export function deleteText(look, name) {
+  return { question: `Delete ${line(name)}?`, keys: look.keys([['y', 'yes'], ['n', 'no']]) };
+}
+
+// What the island says after a change; dots-pass exits 3 when the change saved and only the push failed.
+const CHANGED = { insert: ['Saved', 'Not saved'], delete: ['Deleted', 'Not deleted'], 'qr-save': ['OTP saved', 'OTP not saved'] };
+export function changedText(verb, name, code, stderr) {
+  const [done, failed] = CHANGED[verb];
+  if (code === 0) return `${done} · ${line(name)}`;
+  if (code === 3) return `${done} · not pushed`;
+  const why = line(String(stderr).split('\n')[0].replace(/^dots-pass: /, ''));
+  return why ? `${failed} · ${why}` : failed;
+}

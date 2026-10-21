@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { listLook } from './voice.mjs';
-import { parseEntries, passRows, segments, passKeys, copiedText, failedText } from './pass.mjs';
+import { parseEntries, passRows, segments, passKeys, copiedText, failedText, pathTag, deleteText, changedText, LENGTH } from './pass.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
 const listed = 'web/github.com\t1\nmail/icloud\t0\nweb/gitlab.com\t0\nnote\t0\n';
@@ -72,4 +72,30 @@ test("the island's notice says what was copied, and a failure says why in one li
   assert.equal(copiedText('otp'), 'OTP copied · clears in 45s');
   assert.equal(failedText('dots-pass: could not decrypt web/github.com\n'), 'Not copied · could not decrypt web/github.com');
   assert.equal(failedText(''), 'Not copied');
+});
+
+test("a new entry's path is tagged new or exists, and a path pass could not save is tagged nothing", () => {
+  const entries = parseEntries(listed);
+  assert.equal(pathTag(entries, 'web/linear.app'), 'new');
+  assert.equal(pathTag(entries, ' web/github.com '), 'exists');
+  for (const bad of ['', '  ', 'web/', '/web/x', 'web//x', '../x', 'a/./b', 'a\tb']) assert.equal(pathTag(entries, bad), '', bad);
+});
+
+test('a new password starts at 24 characters, from 8 to 128', () => {
+  assert.deepEqual(LENGTH, { start: 24, min: 8, max: 128 });
+});
+
+test("the delete question names the entry on one line, with the theme's y and n", () => {
+  const artboard = listLook(theme('artboard'));
+  assert.deepEqual(deleteText(artboard, 'web/linear\n.app'), { question: 'Delete web/linear .app?', keys: [{ key: 'y', word: 'yes' }, { key: 'n', word: 'no' }] });
+  assert.deepEqual(deleteText(listLook(theme('blueprint')), 'x').keys, [{ key: '[Y]', word: 'YES' }, { key: '[N]', word: 'NO' }]);
+});
+
+test("the island's word after a change: done, saved but not pushed, or why not", () => {
+  assert.equal(changedText('insert', 'web/linear.app', 0, ''), 'Saved · web/linear.app');
+  assert.equal(changedText('delete', 'web/linear.app', 0, ''), 'Deleted · web/linear.app');
+  assert.equal(changedText('qr-save', 'web/github.com', 0, ''), 'OTP saved · web/github.com');
+  assert.equal(changedText('insert', 'web/x', 3, 'dots-pass: saved, not pushed\n'), 'Saved · not pushed');
+  assert.equal(changedText('insert', 'web/x', 1, 'dots-pass: web/x exists\n'), 'Not saved · web/x exists');
+  assert.equal(changedText('qr-save', 'web/x', 1, 'dots-pass: the qr code is not an otpauth code\n'), 'OTP not saved · the qr code is not an otpauth code');
 });

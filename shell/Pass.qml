@@ -23,7 +23,16 @@ Item {
     property var entries: []
     property bool listed: false
     // A dots-pass run that outlives the card, such as a copy waiting on gpg's passphrase; the card stays loaded until it ends.
-    readonly property bool busy: runner.running
+    readonly property bool busy: runner.running || changer.running
+    // What the card shows under its query: the list, the new-entry card, or the list with the delete question under it.
+    property string mode: "list"
+    // The entry whose password shows on its row, and the password, for 10 s.
+    property string revealName: ""
+    property string revealText: ""
+    // The new entry's generated password and its length.
+    property string generated: ""
+    property int length: P.LENGTH.start
+    readonly property string pathTag: P.pathTag(entries, newPath.text)
 
     readonly property string bin: Quickshell.shellDir + "/../bin/dots-pass"
     readonly property var c: theme.color
@@ -43,14 +52,123 @@ Item {
         opens += 1;
         input.text = "";
         selected = 0;
+        mode = "list";
         listed = false;
         lister.running = true;
         shown = true;
         input.forceActiveFocus();
     }
 
+    // Every secret the card holds goes at close: a shown password and a new entry's preview.
     function close() {
         shown = false;
+        hide();
+        mode = "list";
+        generated = "";
+        newPath.text = "";
+    }
+
+    function hide() {
+        revealTick.stop();
+        revealName = "";
+        revealText = "";
+    }
+
+    function reveal() {
+        if (!current || revealer.running)
+            return;
+        hide();
+        revealer.name = current.name;
+        revealer.command = [bin, "show", current.name];
+        revealer.running = true;
+    }
+
+    function startNew() {
+        hide();
+        mode = "new";
+        newPath.text = "";
+        length = P.LENGTH.start;
+        generate();
+        newPath.forceActiveFocus();
+    }
+
+    function generate() {
+        generator.running = false;
+        generator.command = [bin, "generate", String(length)];
+        generator.running = true;
+    }
+
+    function lengthen(by) {
+        length = Math.max(P.LENGTH.min, Math.min(P.LENGTH.max, length + by));
+        generate();
+    }
+
+    // An existing path is never overwritten; the tag already says so.
+    function save() {
+        if (pathTag !== "new" || generated === "" || changer.running)
+            return;
+        change("insert", newPath.text.trim(), generated);
+        generated = "";
+        mode = "list";
+        results.forceActiveFocus();
+    }
+
+    // The path field types every letter; on the password line h and l change its length.
+    function newKey(event, onLength) {
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+            save();
+        else if (event.key === Qt.Key_Escape)
+            back();
+        else if (event.key === Qt.Key_Tab)
+            (onLength ? newPath : lengthBox).forceActiveFocus();
+        else if (onLength && event.key === Qt.Key_H)
+            lengthen(-1);
+        else if (onLength && event.key === Qt.Key_L)
+            lengthen(1);
+        else
+            return;
+        event.accepted = true;
+    }
+
+    function back() {
+        mode = "list";
+        generated = "";
+        newPath.text = "";
+        results.forceActiveFocus();
+    }
+
+    function askDelete() {
+        if (!current)
+            return;
+        hide();
+        mode = "delete";
+        deleting = current.name;
+    }
+    property string deleting: ""
+
+    function answerDelete(yes) {
+        if (yes)
+            change("delete", deleting, "");
+        mode = "list";
+        deleting = "";
+    }
+
+    // kak opens in a foot window of its own, which saves and pushes when it closes.
+    function edit() {
+        if (!current)
+            return;
+        const name = current.name;
+        close();
+        Quickshell.execDetached([bin, "edit", name]);
+    }
+
+    // insert and delete change the store; the list reads it again after, and the island says how it went.
+    function change(verb, name, stdin) {
+        changer.verb = verb;
+        changer.name = name;
+        changer.stdin = stdin;
+        changer.command = [bin, verb, name];
+        changer.running = true;
     }
 
     // Called on each of the host window's frames; the first one after open() ends the timing.
@@ -102,6 +220,11 @@ Item {
             focus: results.activeFocus ? "list" : "query",
             hint: keys.join(" · "),
             busy: busy,
+            mode: mode,
+            // The cursor row as drawn while its password shows, and its tag.
+            revealed: cur?.revealed ? { text: cur.shownText(), tag: cur.tagText() } : null,
+            newEntry: mode === "new" ? { path: newPath.text, tag: tagText.text, length: generated.length, lengthText: lengthText.text, focus: lengthBox.activeFocus ? "length" : "path" } : null,
+            deleteLine: deleteLine.visible ? deleteLine.text : "",
             openMs: openMs,
             opens: opens,
             settled: motion.settled,
@@ -112,6 +235,7 @@ Item {
     }
 
     onQueryChanged: selected = 0
+    onSelectedChanged: hide()
 
     Process {
         id: lister
@@ -133,6 +257,60 @@ Item {
             id: runErr
         }
         onExited: code => pass.theme.notice(code === 0 ? P.copiedText(kind) : P.failedText(runErr.text))
+    }
+
+    Process {
+        id: revealer
+        property string name: ""
+        stdout: StdioCollector {
+            id: revealOut
+        }
+        onExited: code => {
+            if (code !== 0 || !pass.shown)
+                return;
+            pass.revealName = name;
+            pass.revealText = revealOut.text.replace(/\n$/, "");
+            revealTick.restart();
+        }
+    }
+
+    Root.Tick {
+        id: revealTick
+        interval: 10000
+        onTriggered: pass.hide()
+    }
+
+    Process {
+        id: generator
+        stdout: StdioCollector {
+            id: generatedOut
+        }
+        onExited: code => {
+            if (code === 0 && pass.mode === "new")
+                pass.generated = generatedOut.text.replace(/\n$/, "");
+        }
+    }
+
+    // A new password reaches dots-pass on stdin, never in its arguments.
+    Process {
+        id: changer
+        property string verb: ""
+        property string name: ""
+        property string stdin: ""
+        stdinEnabled: true
+        stderr: StdioCollector {
+            id: changeErr
+        }
+        onStarted: {
+            if (stdin !== "")
+                write(stdin + "\n");
+            stdin = "";
+        }
+        onExited: code => {
+            pass.theme.notice(P.changedText(verb, name, code, changeErr.text));
+            if (pass.shown)
+                lister.running = true;
+        }
     }
 
     Component.onCompleted: Root.State.loaded.push("pass")
@@ -285,9 +463,18 @@ Item {
             // Holds focus after Tab, where the plain letter keys act on the cursor row and / returns to the query.
             Item {
                 id: results
+                visible: pass.mode !== "new"
                 Layout.fillWidth: true
                 implicitHeight: list.implicitHeight + 16
                 Keys.onPressed: event => {
+                    if (pass.mode === "delete") {
+                        if (event.key === Qt.Key_Y)
+                            pass.answerDelete(true);
+                        else if (event.key === Qt.Key_N || event.key === Qt.Key_Escape)
+                            pass.answerDelete(false);
+                        event.accepted = true;
+                        return;
+                    }
                     if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
                         pass.move(1);
                     else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
@@ -298,6 +485,14 @@ Item {
                         pass.copy("copy");
                     else if (event.key === Qt.Key_O)
                         pass.copy("otp");
+                    else if (event.key === Qt.Key_S)
+                        pass.reveal();
+                    else if (event.key === Qt.Key_N)
+                        pass.startNew();
+                    else if (event.key === Qt.Key_E)
+                        pass.edit();
+                    else if (event.key === Qt.Key_D)
+                        pass.askDelete();
                     else if (event.key === Qt.Key_Escape)
                         pass.close();
                     else
@@ -345,6 +540,13 @@ Item {
                                 return out.join("");
                             }
                             readonly property bool tagShown: otpTag.visible
+                            readonly property bool revealed: pass.revealName === modelData.name
+                            function shownText() {
+                                return revealedText.text;
+                            }
+                            function tagText() {
+                                return otpTag.visible ? otpTag.text : "";
+                            }
                             width: list.width
                             implicitHeight: row.implicitHeight + (look.voice === "caps" ? 22 : 20)
                             radius: look.cursor.radius
@@ -384,7 +586,21 @@ Item {
                                     }
                                 }
 
+                                // A shown password, in mono, in place of the name.
+                                Text {
+                                    id: revealedText
+                                    visible: rowItem.revealed
+                                    Layout.fillWidth: true
+                                    textFormat: Text.PlainText
+                                    text: rowItem.revealed ? pass.revealText : ""
+                                    elide: Text.ElideRight
+                                    color: rowItem.isCurrent ? look.cursor.text : look.name.color
+                                    font.family: fonts.mono
+                                    font.pixelSize: look.name.size
+                                }
+
                                 Row {
+                                    visible: !rowItem.revealed
                                     Layout.fillWidth: true
                                     clip: true
 
@@ -408,15 +624,120 @@ Item {
 
                                 Text {
                                     id: otpTag
-                                    visible: rowItem.modelData.otp
+                                    visible: rowItem.revealed || rowItem.modelData.otp
                                     textFormat: Text.PlainText
-                                    text: "OTP"
+                                    text: rowItem.revealed ? "10s" : "OTP"
                                     color: rowItem.isCurrent ? look.cursor.detail : look.small.color
                                     font.family: look.small.font
                                     font.pixelSize: look.small.size
                                     font.letterSpacing: look.small.spacing
                                 }
                             }
+                        }
+                    }
+                    Text {
+                        id: deleteLine
+                        visible: pass.mode === "delete"
+                        textFormat: Text.PlainText
+                        leftPadding: 20
+                        topPadding: 8
+                        bottomPadding: 3
+                        text: P.deleteText(look, pass.deleting).question + "  " + P.deleteText(look, pass.deleting).keys.map(k => k.key + " " + k.word).join(" · ")
+                        color: c.danger
+                        font.family: look.small.font
+                        font.pixelSize: look.small.size
+                        font.letterSpacing: look.small.spacing
+                    }
+                }
+            }
+
+            // The new-entry card: a path tagged new or exists, and the password it will get, h and l changing its length.
+            ColumnLayout {
+                visible: pass.mode === "new"
+                Layout.fillWidth: true
+                Layout.margins: 20
+                spacing: 10
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 40
+                        color: "transparent"
+                        border.width: 1
+                        border.color: newPath.activeFocus ? c.ink : c.line
+
+                        TextInput {
+                            id: newPath
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            verticalAlignment: TextInput.AlignVCenter
+                            color: c.ink
+                            font.family: fonts.mono
+                            font.pixelSize: 15
+                            clip: true
+                            Keys.onPressed: event => pass.newKey(event, false)
+                        }
+
+                        Text {
+                            visible: newPath.text === ""
+                            textFormat: Text.PlainText
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: 12
+                            text: "folder/name"
+                            color: c.muted
+                            font.family: fonts.mono
+                            font.pixelSize: 15
+                        }
+                    }
+
+                    Text {
+                        id: tagText
+                        textFormat: Text.PlainText
+                        text: look.tabText(pass.pathTag)
+                        color: pass.pathTag === "exists" ? c.danger : look.small.color
+                        font.family: look.small.font
+                        font.pixelSize: look.small.size
+                        font.letterSpacing: look.small.spacing
+                    }
+                }
+
+                // Holds focus after Tab, where h and l shorten and lengthen the password.
+                Rectangle {
+                    id: lengthBox
+                    Layout.fillWidth: true
+                    implicitHeight: 40
+                    color: activeFocus ? look.cursor.fill : "transparent"
+                    radius: look.cursor.radius
+                    Keys.onPressed: event => pass.newKey(event, true)
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 12
+
+                        Text {
+                            id: preview
+                            Layout.fillWidth: true
+                            textFormat: Text.PlainText
+                            text: pass.generated
+                            elide: Text.ElideRight
+                            color: lengthBox.activeFocus ? look.cursor.text : c.ink
+                            font.family: fonts.mono
+                            font.pixelSize: 15
+                        }
+                        Text {
+                            id: lengthText
+                            textFormat: Text.PlainText
+                            text: pass.length + " · " + look.keyText("h") + "/" + look.keyText("l")
+                            color: lengthBox.activeFocus ? look.cursor.detail : look.small.color
+                            font.family: look.small.font
+                            font.pixelSize: look.small.size
+                            font.letterSpacing: look.small.spacing
                         }
                     }
                 }
