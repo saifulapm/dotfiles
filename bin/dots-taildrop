@@ -171,9 +171,10 @@ async function cycle() {
 // One log line per state change, so a machine with no tailscaled leaves one line, not one per retry.
 let state = '';
 function enter(next, line = next) {
-  if (next === state) return;
+  if (next === state) return false;
   state = next;
   console.log('taildrop: ' + line);
+  return true;
 }
 
 const describe = (e) =>
@@ -190,7 +191,9 @@ for (;;) {
     step = 0;
   } catch (e) {
     const line = describe(e);
-    enter(line, line);
+    // Without an operator tailscaled refuses a user's file access, and only Saiful can fix that, so the first refusal says how.
+    if (enter(line, line) && e.status === 403)
+      spawnSync('notify-send', ['-u', 'critical', '-a', 'Tailscale', '--', 'Taildrop cannot save files', 'tailscaled refuses file access: run sudo tailscale set --operator=$USER once'], { stdio: 'ignore' });
     await sleep(LADDER_S[Math.min(step++, LADDER_S.length - 1)] * 1000);
   }
 }

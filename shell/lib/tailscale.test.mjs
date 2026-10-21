@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { parseStatus, offlineText, stateText, tailscaleKeys, tailscaleLook } from './tailscale.mjs';
+import { parseStatus, offlineText, stateText, tailscaleKeys, toggleFailedText, tailscaleLook } from './tailscale.mjs';
 
 const recorded = readFileSync(new URL('../../dev/tailscale-status.json', import.meta.url), 'utf8');
 // 2026-10-21 08:00 UTC: fedora was last seen 55 days before, the old Mac mini 42.
@@ -94,4 +94,11 @@ test("each theme words a machine's state and the list's count as its board does"
   assert.deepEqual([paper.count(3, 2), artboard.count(3, 2), blueprint.count(3, 2)], ['3 ONLINE', '', '3 ONLINE · 2 OFFLINE']);
   assert.deepEqual([paper.words('This device'), artboard.words('This device'), blueprint.words('Machines')], ['THIS DEVICE', 'This device', 'MACHINES']);
   assert.deepEqual([paper.stateLine('off'), artboard.stateLine('off'), blueprint.stateLine('off')], ['Tailscale is off', 'Tailscale is off', 'TAILSCALE IS OFF']);
+});
+
+test('a refused toggle reads its first line from tailscale, on one line', () => {
+  const denied = "Access denied: prefs write access denied\n\nUse 'sudo tailscale up'.\nTo not require root, use 'sudo tailscale set --operator=$USER' once.\n";
+  assert.equal(toggleFailedText(true, denied), 'Tailscale not turned off · Access denied: prefs write access denied');
+  assert.equal(toggleFailedText(false, ''), 'Tailscale not turned on');
+  assert.equal(toggleFailedText(false, 'bad\u202e\u001bthing'), 'Tailscale not turned on · bad thing');
 });

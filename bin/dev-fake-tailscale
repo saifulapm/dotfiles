@@ -37,8 +37,14 @@ case "${1:-} ${2:-}" in
     cat "$status"
   fi
   ;;
-"up "*) set_state Running ;;
-"down "*) set_state Stopped ;;
+# A denied file stands for a machine with no operator set, where tailscaled refuses a non-root up or down.
+"up "* | "down "*)
+  if [ -e "$dir/denied" ]; then
+    printf 'Access denied: prefs write access denied\n\nUse '"'"'sudo tailscale %s'"'"'.\nTo not require root, use '"'"'sudo tailscale set --operator=$USER'"'"' once.\n' "$1" >&2
+    exit 1
+  fi
+  [ "$1" = up ] && set_state Running || set_state Stopped
+  ;;
 "debug watch-ipn")
   state_line
   # tail's --pid ends it within a second of this script, so a killed watcher leaves no reader behind.

@@ -43,6 +43,12 @@ export const stateText = (state) => LINES[state] || '';
 
 export const offlineText = (name) => `${clean(name)} is offline`;
 
+// What the island says when tailscale refuses t, such as tailscaled's Access denied on a machine with no operator.
+export function toggleFailedText(wasOn, stderr) {
+  const why = clean(String(stderr).split('\n')[0]);
+  return `Tailscale not turned ${wasOn ? 'off' : 'on'}` + (why ? ` · ${why}` : '');
+}
+
 export function tailscaleKeys(look, state) {
   if (state === 'on') return look.keys([['↵', 'copy ip'], ['s', 'send files'], ['t', 'turn off'], ['esc', '']]);
   if (state === 'off') return look.keys([['t', 'turn on'], ['esc', '']]);

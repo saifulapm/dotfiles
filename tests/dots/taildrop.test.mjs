@@ -33,6 +33,11 @@ function fakeApi(sock) {
     const url = new URL(req.url, 'http://x');
     seen.push(`${req.method} ${url.pathname}${url.search}`);
     assert.equal(req.headers.host, 'local-tailscaled.sock');
+    if (api.denied) {
+      res.statusCode = 403;
+      res.end('file access denied');
+      return;
+    }
     if (url.pathname === '/localapi/v0/watch-ipn-bus') {
       res.setHeader('Content-Type', 'application/json');
       res.write(JSON.stringify({ Version: '1.98.8' }) + '\n');
@@ -62,7 +67,8 @@ function fakeApi(sock) {
       res.end(inbox.get(name));
     }
   });
-  return {
+  const api = {
+    denied: false,
     inbox,
     seen,
     setIncoming,
@@ -72,6 +78,7 @@ function fakeApi(sock) {
       server.close();
     },
   };
+  return api;
 }
 
 async function scratch(t, { socketUp = true } = {}) {
@@ -176,6 +183,20 @@ test('a file still arriving when the others have landed joins their notification
   assert.equal(s.notes().length, 1);
   const argv = s.notes()[0];
   assert.equal(argv[argv.indexOf('--') + 1], 'Taildrop · 2 files');
+});
+
+test('a tailscaled that refuses file access says how to fix it once, not on every retry', async (t) => {
+  const s = await scratch(t);
+  s.api.denied = true;
+  s.api.inbox.set('a.jpg', Buffer.from('a'));
+  await until('the notification', () => s.notes().length >= 1);
+  await sleep(4000);
+  assert.equal(s.notes().length, 1);
+  const argv = s.notes()[0];
+  assert.deepEqual(argv.slice(argv.indexOf('--') + 1), ['Taildrop cannot save files', 'tailscaled refuses file access: run sudo tailscale set --operator=$USER once']);
+  assert.ok(argv.includes('critical'));
+  s.api.denied = false;
+  await until('the file once allowed', () => saved(s).length === 1);
 });
 
 test('with no socket at start the process keeps running, then catches the queued file once tailscaled is up', async (t) => {

@@ -111,6 +111,7 @@ Item {
     function toggle() {
         if (toggler.running || (status.state !== "on" && status.state !== "off"))
             return;
+        toggler.wasOn = isOn;
         toggler.command = ["tailscale", isOn ? "down" : "up"];
         toggler.running = true;
     }
@@ -186,7 +187,15 @@ Item {
 
     Process {
         id: toggler
-        onExited: panel.read()
+        property bool wasOn: false
+        stderr: StdioCollector {
+            id: toggleErr
+        }
+        onExited: code => {
+            if (code !== 0)
+                panel.theme.notice(T.toggleFailedText(wasOn, toggleErr.text));
+            panel.read();
+        }
     }
 
     Component.onCompleted: Root.State.loaded.push("tailscale")

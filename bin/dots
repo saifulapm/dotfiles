@@ -43,7 +43,7 @@ install() {
   cat <<'EOF'
 dots: installed. Next:
   dots secrets
-  tailscale up
+  sudo tailscale up --operator=$USER
   reboot
 EOF
 }
