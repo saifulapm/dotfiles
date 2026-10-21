@@ -29,6 +29,12 @@ Scope {
         id: clockService
     }
 
+    // The calendar's city column; dots-zones first runs when Mod+I opens it.
+    Services.Zones {
+        id: zonesService
+        clock: clockService
+    }
+
     Services.Power {
         id: powerService
     }
@@ -130,6 +136,7 @@ Scope {
         theme: desk.theme
         niri: niriService
         clock: clockService
+        zones: zonesService
         notifs: desk.notifs
         questions: questionsService
         lock: desk.lock
@@ -170,7 +177,7 @@ Scope {
         target: "island"
 
         function state(): string {
-            const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks } : null;
+            const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks, cities: island.citiesDrawn() } : null;
             return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState(), sending: island.sendingState(), swatch: island.swatchState() });
         }
 

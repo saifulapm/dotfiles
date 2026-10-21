@@ -6,9 +6,9 @@ import QtQuick.Shapes
 import "." as Root
 import "lib/island.mjs" as I
 import "lib/questions.mjs" as Q
-import "lib/margins.mjs" as M
 import "lib/voice.mjs" as V
 import "lib/notifs.mjs" as N
+import "lib/worldclock.mjs" as W
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; the window pads for its shadow.
 PanelWindow {
@@ -17,6 +17,8 @@ PanelWindow {
     required property var theme
     required property var niri
     required property var clock
+    // dots-zones's answer for the calendar's city column, run when the calendar first opens.
+    required property var zones
     required property var notifs
     required property var questions
     required property var lock
@@ -28,6 +30,9 @@ PanelWindow {
     property var calendar: null
     readonly property var grid: heldCalendar ? I.monthGrid(heldCalendar.year, heldCalendar.month) : null
     readonly property int today: heldCalendar && heldCalendar.year === clock.now.getFullYear() && heldCalendar.month === clock.now.getMonth() ? clock.now.getDate() : 0
+    // Home first, then UTC, London and New York, each {city, time, offset, day, home}; empty until dots-zones answers.
+    readonly property var cities: zones.answer ? W.cityRows(clock.now.getTime(), zones.answer) : []
+    readonly property var clockLook: V.clockLook(theme.tokens)
     readonly property var notification: notifs.current
     readonly property real recordingSince: Root.State.recordingSince
     // Bumped each second while a recording runs, so its counter moves.
@@ -99,7 +104,7 @@ PanelWindow {
     property bool noteDragging: false
     onNoteDraggingChanged: notifs.drag(noteDragging)
     readonly property var osdLook: V.osdLook(theme.tokens)
-    // As drawn: the theme's 420 or 440 px notification card, a 560 px question, a 320 px calendar and the theme's OSD bar; any other mode is one line as wide as its text.
+    // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28 + label.swatchSpace), 34],
             lease: [leaseLook.slot.width, leaseLook.slot.height],
@@ -107,7 +112,7 @@ PanelWindow {
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
             question: [I.MAX_WIDTH, ask.implicitHeight + 32],
-            calendar: [320, month.implicitHeight + 32],
+            calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
             osd: [osdLook.width, osdLook.height]
         })
     readonly property string part: ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sending"].indexOf(mode) < 0 ? "label" : mode
@@ -411,6 +416,14 @@ PanelWindow {
         };
     }
 
+    // The city column's rows as drawn, for `island state`.
+    function citiesDrawn() {
+        const rows = [];
+        for (let i = 0; i < cityRepeater.count; i++)
+            rows.push(cityRepeater.itemAt(i).drawn());
+        return rows;
+    }
+
     // dots-call sending: the count and machine come once, then the whole send's percent; a percent outside a send is dropped.
     function sendStart(count, to) {
         sending = { count: Math.max(1, parseInt(count) || 1), to: String(to), pct: 0 };
@@ -515,12 +528,13 @@ PanelWindow {
     function focusIsland() {
         if (mode === "lease")
             leaseOpen = true;
-        else if (mode === "rest" || mode === "playing")
+        else if (mode === "rest" || mode === "playing") {
             calendar = {
                 year: clock.now.getFullYear(),
                 month: clock.now.getMonth()
             };
-        else if (mode !== "question" && mode !== "notification" && mode !== "leaseCard")
+            zones.need();
+        } else if (mode !== "question" && mode !== "notification" && mode !== "leaseCard")
             return;
         focused = true;
         keys.forceActiveFocus();
@@ -1690,42 +1704,254 @@ PanelWindow {
                             font.pixelSize: 13
                             font.weight: Font.Medium
                         }
-
-                        Text {
-                            textFormat: Text.PlainText
-                            anchors.right: parent.right
-                            text: M.clockText(island.clock.now)
-                            color: Qt.alpha(box.style.text, 0.65)
-                            font.family: island.theme.tokens?.type.mono ?? ""
-                            font.pixelSize: 12
-                        }
                     }
 
-                    Grid {
-                        columns: 7
-                        rowSpacing: 6
+                    // The month at the theme's width, a rule, then the city column.
+                    Row {
                         width: parent.width
 
-                        Repeater {
-                            model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].concat(island.grid?.cells ?? [])
+                        Grid {
+                            id: monthGrid
+                            columns: 7
+                            rowSpacing: 6
+                            width: island.clockLook.gridWidth
+
+                            Repeater {
+                                model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].concat(island.grid?.cells ?? [])
+
+                                Rectangle {
+                                    required property var modelData
+                                    required property int index
+                                    readonly property bool isToday: index >= 7 && modelData === island.today
+                                    width: monthGrid.width / 7
+                                    height: 18
+                                    radius: 4
+                                    color: isToday ? box.style.text : "transparent"
+
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        anchors.centerIn: parent
+                                        text: parent.modelData ?? ""
+                                        color: parent.isToday ? box.style.fill : Qt.alpha(box.style.text, parent.index < 7 ? 0.55 : 0.85)
+                                        font.family: island.theme.tokens?.type.mono ?? ""
+                                        font.pixelSize: 11
+                                        font.weight: parent.isToday ? Font.DemiBold : Font.Normal
+                                    }
+                                }
+                            }
+                        }
+
+                        Item {
+                            readonly property color ink: island.clockLook.rule.color || box.style.text
+                            width: 2 * island.clockLook.gap + 1
+                            height: Math.max(monthGrid.height, cityColumn.height)
 
                             Rectangle {
-                                required property var modelData
-                                required property int index
-                                readonly property bool isToday: index >= 7 && modelData === island.today
-                                width: month.width / 7
-                                height: 18
-                                radius: 4
-                                color: isToday ? box.style.text : "transparent"
+                                visible: !island.clockLook.rule.dashed
+                                x: island.clockLook.gap
+                                width: 1
+                                height: parent.height
+                                color: parent.ink
+                            }
+
+                            Root.Dashed {
+                                visible: island.clockLook.rule.dashed
+                                x: island.clockLook.gap + 1
+                                width: parent.height
+                                height: 1
+                                rotation: 90
+                                transformOrigin: Item.TopLeft
+                                color: parent.ink
+                            }
+                        }
+
+                        Column {
+                            id: cityColumn
+                            width: month.width - monthGrid.width - 2 * island.clockLook.gap - 1
+
+                            // Paper heads the column as it heads its cards, after an accent square.
+                            Item {
+                                visible: island.clockLook.head !== ""
+                                width: parent.width
+                                height: cityHead.implicitHeight + 8
+
+                                Rectangle {
+                                    anchors.verticalCenter: cityHead.verticalCenter
+                                    width: 8
+                                    height: 8
+                                    color: island.theme.tokens?.color.accent ?? box.style.text
+                                }
 
                                 Text {
+                                    id: cityHead
+                                    x: 16
                                     textFormat: Text.PlainText
-                                    anchors.centerIn: parent
-                                    text: parent.modelData ?? ""
-                                    color: parent.isToday ? box.style.fill : Qt.alpha(box.style.text, parent.index < 7 ? 0.55 : 0.85)
-                                    font.family: island.theme.tokens?.type.mono ?? ""
-                                    font.pixelSize: 11
-                                    font.weight: parent.isToday ? Font.DemiBold : Font.Normal
+                                    text: island.clockLook.head
+                                    color: box.style.text
+                                    font.family: island.clockLook.offset.font
+                                    font.pixelSize: island.clockLook.offset.size
+                                    font.letterSpacing: island.clockLook.offset.spacing
+                                }
+                            }
+
+                            Repeater {
+                                id: cityRepeater
+                                model: island.cities
+
+                                Item {
+                                    id: cityRow
+                                    required property var modelData
+                                    readonly property var look: island.clockLook
+                                    readonly property bool home: modelData.home
+                                    // One of three offset texts is drawn, by where the theme puts it.
+                                    readonly property Text offsetShown: look.place === "right" ? offsetRight : look.place === "under" ? offsetUnder : offsetBeside
+                                    width: cityColumn.width
+                                    height: Math.max(cityNames.height, cityTime.implicitHeight) + (home ? 8 : 18)
+
+                                    function drawn() {
+                                        return {
+                                            city: cityName.text,
+                                            time: cityTime.text,
+                                            offset: offsetShown.visible ? offsetShown.text : "",
+                                            day: cityDay.visible ? cityDay.text : ""
+                                        };
+                                    }
+
+                                    Rectangle {
+                                        visible: !cityRow.home && !cityRow.look.rule.dashed
+                                        width: parent.width
+                                        height: 1
+                                        color: cityRow.look.rule.color || box.style.text
+                                    }
+
+                                    Root.Dashed {
+                                        visible: !cityRow.home && cityRow.look.rule.dashed
+                                        width: parent.width
+                                        height: 1
+                                        color: cityRow.look.rule.color || box.style.text
+                                    }
+
+                                    Column {
+                                        id: cityNames
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.verticalCenterOffset: cityRow.home ? -4 : 0
+                                        spacing: 1
+
+                                        Item {
+                                            width: cityName.implicitWidth
+                                            height: cityName.implicitHeight
+
+                                            Text {
+                                                id: cityName
+                                                readonly property var at: cityRow.home ? cityRow.look.homeLabel : cityRow.look.name
+                                                textFormat: Text.PlainText
+                                                text: cityRow.look.city(cityRow.modelData.city)
+                                                color: at.color || box.style.text
+                                                font.family: at.font
+                                                font.pixelSize: at.size
+                                                font.weight: at.weight
+                                                font.letterSpacing: at.spacing
+                                            }
+
+                                            Rectangle {
+                                                readonly property bool boxed: cityRow.look.mark.boxed
+                                                visible: cityRow.home
+                                                anchors.left: cityName.right
+                                                anchors.leftMargin: boxed ? 10 : 0
+                                                anchors.verticalCenter: cityName.verticalCenter
+                                                width: cityMark.implicitWidth + (boxed ? 10 : 0)
+                                                height: cityMark.implicitHeight + (boxed ? 2 : 0)
+                                                color: "transparent"
+                                                border.width: boxed ? 1 : 0
+                                                border.color: box.style.text
+
+                                                Text {
+                                                    id: cityMark
+                                                    readonly property var at: parent.boxed ? cityRow.look.offset : cityRow.look.homeLabel
+                                                    anchors.centerIn: parent
+                                                    textFormat: Text.PlainText
+                                                    text: cityRow.look.mark.text
+                                                    color: at.color || box.style.text
+                                                    font.family: at.font
+                                                    font.pixelSize: at.size
+                                                    font.letterSpacing: at.spacing
+                                                }
+                                            }
+
+                                            Text {
+                                                id: offsetBeside
+                                                visible: !cityRow.home && cityRow.look.place === "name"
+                                                anchors.left: cityName.right
+                                                anchors.leftMargin: 10
+                                                anchors.baseline: cityName.baseline
+                                                textFormat: Text.PlainText
+                                                text: cityRow.look.offsetText(cityRow.modelData.offset)
+                                                color: cityRow.look.offset.color || box.style.text
+                                                font.family: cityRow.look.offset.font
+                                                font.pixelSize: cityRow.look.offset.size
+                                                font.letterSpacing: cityRow.look.offset.spacing
+                                            }
+                                        }
+
+                                        // The day word shows only when the city's day is not home's. A child's visible is false while this row is hidden, so this reads their conditions.
+                                        Row {
+                                            visible: (!cityRow.home && cityRow.look.place === "under") || cityRow.modelData.day !== ""
+                                            spacing: 6
+
+                                            Text {
+                                                id: offsetUnder
+                                                visible: !cityRow.home && cityRow.look.place === "under"
+                                                textFormat: Text.PlainText
+                                                text: cityRow.look.offsetText(cityRow.modelData.offset)
+                                                color: cityRow.look.offset.color || box.style.text
+                                                font.family: cityRow.look.offset.font
+                                                font.pixelSize: cityRow.look.offset.size
+                                                font.letterSpacing: cityRow.look.offset.spacing
+                                            }
+
+                                            Text {
+                                                id: cityDay
+                                                visible: cityRow.modelData.day !== ""
+                                                textFormat: Text.PlainText
+                                                text: cityRow.look.dayText(cityRow.modelData.day)
+                                                color: cityRow.look.offset.color || box.style.text
+                                                font.family: cityRow.look.offset.font
+                                                font.pixelSize: cityRow.look.offset.size
+                                                font.letterSpacing: cityRow.look.offset.spacing
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        id: cityTime
+                                        readonly property var at: cityRow.home ? cityRow.look.homeTime : cityRow.look.time
+                                        anchors.right: offsetRight.visible ? offsetRight.left : parent.right
+                                        anchors.rightMargin: offsetRight.visible ? 10 : 0
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.verticalCenterOffset: cityRow.home ? -4 : 0
+                                        textFormat: Text.PlainText
+                                        text: cityRow.modelData.time
+                                        color: at.color || box.style.text
+                                        font.family: at.font
+                                        font.pixelSize: at.size
+                                        font.weight: at.weight
+                                        font.letterSpacing: at.spacing
+                                    }
+
+                                    Text {
+                                        id: offsetRight
+                                        visible: !cityRow.home && cityRow.look.place === "right"
+                                        anchors.right: parent.right
+                                        anchors.baseline: cityTime.baseline
+                                        width: cityRow.look.offsetWidth
+                                        horizontalAlignment: Text.AlignRight
+                                        textFormat: Text.PlainText
+                                        text: cityRow.look.offsetText(cityRow.modelData.offset)
+                                        color: cityRow.look.offset.color || box.style.text
+                                        font.family: cityRow.look.offset.font
+                                        font.pixelSize: cityRow.look.offset.size
+                                        font.letterSpacing: cityRow.look.offset.spacing
+                                    }
                                 }
                             }
                         }
