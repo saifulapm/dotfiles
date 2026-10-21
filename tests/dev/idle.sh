@@ -38,6 +38,24 @@ check "the test password unlocks" bash -c "! timeout 0.5 qs ipc call lock state 
 until_ok 2000 idle_is '.dimmed | not'
 check "input lifts the dim" idle_is '.dimmed | not'
 
+# An agent's lease holds the session unlocked through idle, until the lease's own end.
+niri msg action spawn -- dots-call lock lock
+until_ok 3000 locked
+timeout 0.5 qs ipc call lock unlock claude 1 >/dev/null
+ends=$(lock_state | jq .leaseUntil)
+timeout 0.5 qs ipc call idle times 3 5 7 >/dev/null
+relocked_at=
+until [ -n "$relocked_at" ] || (($(now_ms) > ends + 5000)); do
+  locked && relocked_at=$(now_ms)
+  sleep 0.2
+done
+check "idle at 5 s does not lock during a 1 min lease ($(((${relocked_at:-0} - ends) / 1000)) s from its end)" test "${relocked_at:-0}" -ge "$((ends - 500))"
+check "the lease's end locks" locked
+timeout 0.5 qs ipc call idle times 240 300 360 >/dev/null
+wtype dots-test-pass
+wtype -k Return
+until_ok 3000 bash -c "! timeout 0.5 qs ipc call lock state | jq -e .locked >/dev/null"
+
 env -u QS_CONFIG_PATH qs -p "$repo/dev/idle-inhibitor.qml" >/dev/null 2>&1 &
 inhibitor=$!
 cleanup() { kill "$inhibitor" 2>/dev/null; }

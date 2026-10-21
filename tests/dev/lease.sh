@@ -26,6 +26,8 @@ reply=$("$repo/bin/dots-call" lock unlock claude 1)
 check "dots-call lock unlock answers the state ($reply)" jq -e '.locked == false and .heldBy == "claude"' <<<"$reply"
 check "the lease holds for claude, ending 60 s from now" state_is ".locked == false and .heldBy == \"claude\" and (.leaseUntil - $t0) >= 59000 and (.leaseUntil - $t0) <= 61000"
 check "the marker keeps the lease, so a killed shell relocks" grep -q '^lease claude until ' "$marker"
+until_ok 2000 state_is '.monitorsOff == 1'
+check "an agent unlock asks niri to turn the monitors off ($(lock_state | jq .monitorsOff) times)" state_is '.monitorsOff == 1'
 check "the journal holds the unlock" bash -c "journalctl --user -u $DOTS_DEV_UNIT --no-pager -o cat | grep -qF 'lock: agent unlock by claude for 1 min'"
 
 call lock renew claude 200 >/dev/null

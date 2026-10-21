@@ -44,8 +44,9 @@ Scope {
             IdleMonitor {
                 timeout: idle.times[1]
                 respectInhibitors: true
+                // An agent's lease keeps the session unlocked through idle; its own end locks.
                 onIsIdleChanged: {
-                    if (isIdle)
+                    if (isIdle && !idle.lock.leased)
                         idle.lock.lockNow();
                 }
             }

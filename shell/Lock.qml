@@ -26,6 +26,8 @@ Scope {
     property real unlockedAt: 0
     property real leaseUntil: 0
     readonly property bool leased: heldBy !== ""
+    // How often an agent unlock asked niri to turn the monitors off, so a check can see the request.
+    property int monitorsOff: 0
 
     // Every surface's field clears on this, so no screen keeps a typed password.
     signal cleared
@@ -98,6 +100,7 @@ Scope {
         leaseUntil = Lease.leaseEnd(now, now, m);
         console.info(Lease.unlockLine(name, m));
         session.locked = false;
+        darken.restart();
         markerFile.setText("lease " + name + " until " + new Date(leaseUntil).toISOString() + "\n");
         return stateText();
     }
@@ -122,6 +125,7 @@ Scope {
             heldBy: heldBy,
             unlockedAt: unlockedAt,
             leaseUntil: leaseUntil,
+            monitorsOff: monitorsOff,
             field: field,
             failures: failures,
             shaking: shake.running,
@@ -132,6 +136,16 @@ Scope {
             clockStroke: t && t.style === Text.Outline ? String(t.styleColor) : "transparent",
             clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null
         });
+    }
+
+    // niri lights the monitors as it unlocks, so they go dark a moment after, and nothing shows on an empty desk.
+    Root.Tick {
+        id: darken
+        interval: 1000
+        onTriggered: {
+            screenLock.monitorsOff += 1;
+            Quickshell.execDetached(["niri", "msg", "action", "power-off-monitors"]);
+        }
     }
 
     // Runs only while a lease holds; the lease's end locks.
