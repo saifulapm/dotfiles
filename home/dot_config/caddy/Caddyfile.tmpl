@@ -18,6 +18,10 @@ http://*.test {
 		on_demand
 	}
 
+	# HTTP/2 lets a client put a slash in the host, so only a plain name may pick the folder.
+	@forged not header_regexp Host ^[A-Za-z0-9-]+\.test(:[0-9]+)?$
+	respond @forged 400
+
 	root * {{ .chezmoi.homeDir }}/Codes/{labels.1}/public
 
 	php_fastcgi 127.0.0.1:9085

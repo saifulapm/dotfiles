@@ -58,6 +58,8 @@ test('a folder with public/ is served on PHP 8.5, one without it gets a 404, and
   mkdirSync(join(home, 'Codes/nopublic'), { recursive: true });
   writeFileSync(join(home, 'Codes/site/public/index.php'), '<?php echo PHP_VERSION;');
   writeFileSync(join(home, 'Codes/nopublic/index.php'), '<?php echo "served";');
+  mkdirSync(join(home, 'Codes/site/storage/app/public'), { recursive: true });
+  writeFileSync(join(home, 'Codes/site/storage/app/public/index.php'), '<?php echo "nested";');
   // The live caddy owns the admin port and the live socket proxy owns 9085, so the copy talks to its php-fpm directly; its scratch CA stays out of the system trust.
   writeFileSync(join(home, 'Caddyfile'), render('home/dot_config/caddy/Caddyfile.tmpl')
     .replace('{\n', '{\n\tadmin off\n\tskip_install_trust\n').replace('http_port 38080', `http_port ${http}`).replace('https_port 38443', `https_port ${https}`)
@@ -75,6 +77,9 @@ test('a folder with public/ is served on PHP 8.5, one without it gets a 404, and
   assert.match(get('site'), /^8\.5\.\d+\n200$/);
   assert.equal(get('nopublic'), '\n404');
   assert.ok(!existsSync(join(home, 'sudo.log')), 'caddy asked sudo to trust its scratch CA');
+  // HTTP/2 lets a client put a slash in the host, which would make {labels.1} a path to a deeper public/, such as Laravel's uploads.
+  const forged = spawnSync('curl', ['-sk', '--http2', '--max-time', '10', '--resolve', `site.test:${https}:127.0.0.1`, '-H', 'Host: site/storage/app.test', '-w', '\n%{http_code}', `https://site.test:${https}/`], { encoding: 'utf8' }).stdout;
+  assert.doesNotMatch(forged, /nested|\n200$/);
   // The sockets in front of caddy listen on 127.0.0.1 only, so caddy's own ports must not answer from the network either.
   const bound = spawnSync('ss', ['-Hltun', `( sport = :${http} or sport = :${https} )`], { encoding: 'utf8' }).stdout.trim().split('\n');
   assert.ok(bound.length >= 2, bound.join('\n'));
