@@ -1,0 +1,7 @@
+[Unit]
+Description=PHP 8.5 FPM on-demand proxy
+Requires=php-fpm.service
+After=php-fpm.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=10min 127.0.0.1:39085

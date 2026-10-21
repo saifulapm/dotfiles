@@ -207,6 +207,11 @@ arch = "all"
 why = "the system PHP, for projects without a .php-version"
 
 [[package]]
+name = "php-fpm"
+arch = "all"
+why = "serves the .test sites on the same PHP the command line runs"
+
+[[package]]
 name = "php-mbstring"
 arch = "all"
 why = "system PHP: Laravel's string handling"
