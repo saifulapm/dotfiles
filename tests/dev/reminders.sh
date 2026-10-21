@@ -59,5 +59,33 @@ until_ok 3000 state_is '.results[0] // "" | startswith("Cannot set")'
 check "r 0m x says it cannot set that" state_is '.results[0] | startswith("Cannot set 0m")'
 close_launcher
 
+island_state() { timeout 0.5 qs ipc call island state 2>/dev/null; }
+# The island's notification text is its app, summary and body, joined by " · ".
+island_says() { island_state | jq -e --arg t "$1" '.mode == "notification" and (.text | startswith("Reminders · " + $t + " · set "))' >/dev/null; }
+rung() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -e --arg t "$1" 'any(.summaries[]; . == $t)' >/dev/null; }
+
+# A reminder that came due while the shell was stopped rings when it starts. The dev unit is transient, so it restarts rather than stops; the running shell writes the file only when one rings, and none is due.
+now=$(($(date +%s) * 1000))
+jq -n --argjson now "$now" '[{id: "m1", text: "missed", due: ($now - 300000), created: ($now - 900000)}]' >"$store"
+systemctl --user restart "$DOTS_DEV_UNIT"
+# The unit restarts after 500 ms; until then the old instance's socket may still answer.
+sleep 0.8
+until_ok 5000 shell_status >/dev/null
+until_ok 10000 desk_up
+until_ok 60000 rung "Reminder · missed"
+check "one missed while the shell was stopped rings within 60 s of its start" rung "Reminder · missed"
+check "and leaves the file" stored 'length == 0'
+
+open_launcher
+wtype "r 1m tea"
+until_ok 3000 state_is '.results[0] == "tea"'
+wtype -k Return
+set_at=$(date +%s)
+until_ok 125000 island_says "Reminder · tea"
+took=$(($(date +%s) - set_at))
+echo "     rang after ${took} s"
+check "r 1m tea rings Reminder · tea in the island 60 to 120 s later" bash -c "[ $took -ge 59 ] && [ $took -le 121 ]"
+check "and drops it from the file" stored 'length == 0'
+
 exit $((fails > 0))
 }

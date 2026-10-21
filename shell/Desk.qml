@@ -74,6 +74,7 @@ Scope {
 
     Services.Reminders {
         id: remindersService
+        now: clockService.now
     }
 
     Root.Ipc {
