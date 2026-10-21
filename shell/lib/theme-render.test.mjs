@@ -71,3 +71,52 @@ test('themes.json lists every valid theme, paper first, and skips a broken one',
   assert.equal(themes[1].niri.ring_color, '#3D5AFE');
   assert.equal(themes[0].niri.border_inactive, '#575653');
 });
+
+// Each theme's kak-mail list colours and key strip as its KakMail board draws them; a hex a token does not carry is the board's own.
+const MAIL = {
+  paper: {
+    MailDate: 'rgb:575653',
+    MailSender: 'rgb:2c4a9a',
+    MailSubject: 'rgb:1c1915',
+    MailUnread: 'default,default+b',
+    MailCursor: 'rgb:faf6ec,rgb:1c1915+b',
+    MailStrip: 'rgb:575653,rgb:faf6ec',
+    MailKey: 'rgb:1c1915,rgb:faf6ec+b',
+    keys: '{MailKey}↵{MailStrip} OPEN · {MailKey}R{MailStrip} REPLY · {MailKey}E{MailStrip} ARCHIVE · {MailKey}S{MailStrip} SCREENER · {MailKey}F{MailStrip} FEED · {MailKey}?{MailStrip} HELP',
+  },
+  artboard: {
+    MailDate: 'rgb:c2410c',
+    MailSender: 'rgb:3d5afe',
+    MailSubject: 'rgb:15171b',
+    MailUnread: 'default,default+b',
+    MailCursor: 'rgb:2638c9,rgb:eef1ff+b',
+    MailStrip: 'rgb:57606a,rgb:ffffff',
+    MailKey: 'rgb:15171b,rgb:ffffff',
+    keys: '{MailKey}↵{MailStrip} open · {MailKey}r{MailStrip} reply · {MailKey}e{MailStrip} archive · {MailKey}s{MailStrip} screener · {MailKey}f{MailStrip} feed · {MailKey}?{MailStrip} help',
+  },
+  blueprint: {
+    MailDate: 'rgb:80a4c2',
+    MailSender: 'rgb:7fe3f0',
+    MailSubject: 'rgb:d6f4f8',
+    MailUnread: 'default,default+b',
+    MailCursor: 'rgb:0a1526,rgb:7fe3f0+b',
+    MailStrip: 'rgb:80a4c2,rgb:0a1526',
+    MailKey: 'rgb:7fe3f0,rgb:0a1526',
+    keys: '{MailKey}[↵]{MailStrip} OPEN · {MailKey}[R]{MailStrip} REPLY · {MailKey}[E]{MailStrip} ARCHIVE · {MailKey}[S]{MailStrip} SCREENER · {MailKey}[F]{MailStrip} FEED · {MailKey}[?]{MailStrip} HELP',
+  },
+};
+
+test('dots.kak defines the kak-mail faces and key strip in each theme\'s colours', (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-theme-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  for (const [name, want] of Object.entries(MAIL)) {
+    execFileSync('node', [cli, name], { env: { ...process.env, XDG_STATE_HOME: state } });
+    const kak = readFileSync(join(state, 'dots/theme-out/dots.kak'), 'utf8').split('\n');
+    const got = Object.fromEntries(
+      kak.map((l) => l.match(/^face global (Mail\w+) (.+)$/)).filter(Boolean).map((m) => [m[1], m[2]]),
+    );
+    const keys = kak.find((l) => l.startsWith('set-option global mail_keys '));
+    got.keys = keys?.slice("set-option global mail_keys '".length, -1);
+    assert.deepEqual(got, want, name);
+  }
+});

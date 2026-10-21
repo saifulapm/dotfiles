@@ -398,7 +398,9 @@ c      compose     G  sync now
 ?      this help}" ;;
         mail-list) printf '%s\n' "info -title 'mail: list' %{<ret>  read the thread
 r / R  reply / reply all     F  forward
-a      archive
+e / a  archive
+s      screener: undo screening this sender
+f      feed: move this sender to The Feed
 H      hey… (screen in/out, feed, piles, bubble up…)
 o      open a link           A  save + open an attachment
 u      refresh               G  sync now
@@ -424,6 +426,41 @@ q          back to the list      ?  this help}" ;;
 define-command -hidden mail-prompt-keys %{
     map buffer prompt <c-n> <tab>
     map buffer prompt <c-p> <s-tab>
+}
+
+# The list's faces and the strip under it. The theme's dots.kak redefines the
+# faces and sets mail_keys in the theme's key idiom; these keep a list readable
+# before a theme is rendered, and a `colorscheme dots` recolours an open one.
+declare-option -hidden str mail_keys '{MailKey}↵{MailStrip} open · {MailKey}r{MailStrip} reply · {MailKey}e{MailStrip} archive · {MailKey}s{MailStrip} screener · {MailKey}f{MailStrip} feed · {MailKey}?{MailStrip} help'
+face global MailDate comment
+face global MailSender string
+face global MailSubject default
+face global MailUnread default,default+b
+face global MailCursor default,default+rb
+face global MailStrip StatusLineInfo
+face global MailKey StatusLineMode
+
+# modelinefmt escapes what an expansion returns, so the strip's markup has to
+# be copied into it. A theme switch changes mail_keys, and dots.kak then calls
+# mail-strip-all so each open list takes the new text.
+# A line highlighter reads %val{cursor_line} once, when it is added, so the
+# cursor row is added again each time the cursor settles.
+define-command -hidden mail-cursor-row %{
+    try %{ remove-highlighter window/mail-list/cursor-row }
+    add-highlighter window/mail-list/cursor-row line %val{cursor_line} MailCursor
+}
+
+define-command -hidden mail-strip %{
+    set-option window modelinefmt %opt{mail_keys}
+}
+
+define-command -hidden mail-strip-all %{
+    evaluate-commands %sh{
+        eval "set -- $kak_quoted_client_list"
+        for c; do
+            printf 'evaluate-commands -client %s %%{ evaluate-commands %%sh{ [ "$kak_opt_filetype" = mail-list ] && echo mail-strip } }\n' "$c"
+        done
+    }
 }
 
 # Header, address and quote colours for threads and drafts. Kakoune's stock
@@ -465,11 +502,21 @@ hook global WinSetOption filetype=mail-list %{
     map buffer normal a ':mail-hey archive<ret>'     -docstring 'archive'
     map buffer normal u ':mail-refresh<ret>'         -docstring 'refresh'
     map buffer normal q ':mail<ret>'                 -docstring 'boxes'
+    map buffer normal e ':mail-hey archive<ret>'     -docstring 'archive'
+    map buffer normal s ':mail-hey unscreen<ret>'    -docstring 'back to the screener'
+    map buffer normal f ':mail-hey feed<ret>'        -docstring 'move sender to the feed'
     add-highlighter window/mail-list group
-    add-highlighter window/mail-list/ regex '^.{10}' 0:comment
+    add-highlighter window/mail-list/ regex '^(.{10}) (.{22}) (.*?)  \[[^\]\n]*\]$' 1:MailDate 2:MailSender 3:MailSubject
     add-highlighter window/mail-list/ regex '\[([^\]\n]*)\]$' 1:keyword
-    add-highlighter window/mail-list/ regex '^[^\n]*\[[^\]\n]*\bunread\b[^\]\n]*\]$' 0:+b
-    hook -once -always window WinSetOption filetype=.* %{ remove-highlighter window/mail-list }
+    add-highlighter window/mail-list/ regex '^[^\n]*\[[^\]\n]*\bunread\b[^\]\n]*\]$' 0:MailUnread
+    mail-cursor-row
+    hook -group mail-list-cursor window NormalIdle .* mail-cursor-row
+    mail-strip
+    hook -once -always window WinSetOption filetype=.* %{
+        remove-hooks window mail-list-cursor
+        remove-highlighter window/mail-list
+        unset-option window modelinefmt
+    }
 }
 
 hook global WinSetOption filetype=mail-thread %{
