@@ -15,7 +15,8 @@ before(() => {
   mkdirSync(home);
   writeFileSync(join(root, 'chezmoi.toml'), `sourceDir = "${repo}"\nmode = "symlink"\n[data]\n    machine = "test"\n`);
   env = {
-    PATH: process.env.PATH,
+    // xdg-mime passes over a default whose Exec is not on PATH, and kak.desktop and mail-open.desktop run commands from the repo's bin/.
+    PATH: `${repo}/bin:${process.env.PATH}`,
     HOME: home,
     XDG_CONFIG_HOME: join(home, '.config'),
     XDG_DATA_HOME: join(home, '.local/share'),
