@@ -15,14 +15,14 @@ test('a question outranks every other slot', () => {
   assert.equal(pick(all), 'question');
 });
 
-test('below a question: notification, recording, osd, toast, then playing', () => {
-  const slots = { notification: note, recording: '00:12', osd: { kind: 'volume', value: 40 }, toast: 'Captured', playing: { title: 'T', artist: 'A' } };
+test('below a question: notification, recording, osd, toast, a send, then playing', () => {
+  const slots = { notification: note, recording: '00:12', osd: { kind: 'volume', value: 40 }, toast: 'Captured', sending: { count: 2, to: 'nuc', pct: 48 }, playing: { title: 'T', artist: 'A' } };
   const order = [];
-  for (const k of ['notification', 'recording', 'osd', 'toast', 'playing']) {
+  for (const k of ['notification', 'recording', 'osd', 'toast', 'sending', 'playing']) {
     order.push(pick(slots));
     delete slots[k];
   }
-  assert.deepEqual(order, ['notification', 'recording', 'osd', 'toast', 'playing']);
+  assert.deepEqual(order, ['notification', 'recording', 'osd', 'toast', 'sending', 'playing']);
   assert.equal(pick(slots), 'rest');
 });
 
@@ -137,4 +137,10 @@ test('Mod+I during a lease opens its card, which only a question outranks', () =
   assert.equal(pick({ leaseCard: lease, lease }), 'leaseCard');
   assert.equal(pick({ question: { text: 'q', options: [] }, leaseCard: lease, lease }), 'question');
   assert.equal(isCompact('leaseCard'), false);
+});
+
+test('a send reads how many files go where and how far it got, on one line', () => {
+  assert.equal(islandText('sending', { sending: { count: 2, to: 'nuc', pct: 48 } }, AT), 'Sending 2 files to nuc · 48%');
+  assert.equal(islandText('sending', { sending: { count: 1, to: 'nu\nc', pct: 0 } }, AT), 'Sending 1 file to nu c · 0%');
+  assert.equal(isCompact('sending'), true);
 });

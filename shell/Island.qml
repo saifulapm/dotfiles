@@ -43,6 +43,9 @@ PanelWindow {
     readonly property var leaseCard: leaseOpen ? lease : null
     property var osd: null
     property var toast: null
+    // A Taildrop send, {count, to, pct}, from dots-taildrop-send's start until its done.
+    property var sending: null
+    readonly property var sendingLook: V.sendingLook(theme.tokens)
     property var playing: null
     // What each part last showed, so a part can leave with its content after its slot has emptied.
     property var heldCalendar: null
@@ -70,6 +73,7 @@ PanelWindow {
             recording,
             osd,
             toast,
+            sending,
             playing,
             notice
         })
@@ -91,20 +95,21 @@ PanelWindow {
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             lease: [leaseLook.slot.width, leaseLook.slot.height],
+            sending: [sendingLook.width, sendingLook.height],
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
             question: [I.MAX_WIDTH, ask.implicitHeight + 32],
             calendar: [320, month.implicitHeight + 32],
             osd: [osdLook.width, osdLook.height]
         })
-    readonly property string part: ["notification", "question", "calendar", "osd", "lease", "leaseCard"].indexOf(mode) < 0 ? "label" : mode
+    readonly property string part: ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sending"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
     readonly property var motion: I.islandMotion(theme.tokens?.primitive.motion)
-    readonly property bool animating: morphing.running || [labelPart, leasePart, leaseCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
+    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, leaseCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -183,6 +188,35 @@ PanelWindow {
             unlocked: layout === "print" ? cardUnlockedPrint.text : layout === "card" ? cardUnlockedCard.text : row(1)?.value ?? "",
             time: time ? time.text : row(2)?.value ?? "",
             timeColor: String(time ? time.color : row(2)?.valueColor ?? "")
+        };
+    }
+
+    // dots-call sending: the count and machine come once, then the whole send's percent; a percent outside a send is dropped.
+    function sendStart(count, to) {
+        sending = { count: Math.max(1, parseInt(count) || 1), to: String(to), pct: 0 };
+    }
+
+    function sendProgress(pct) {
+        if (sending)
+            sending = Object.assign({}, sending, { pct: Math.max(0, Math.min(100, parseInt(pct) || 0)) });
+    }
+
+    function sendDone() {
+        sending = null;
+    }
+
+    // What the sending slot draws, for `island state`.
+    function sendingState() {
+        if (mode !== "sending")
+            return null;
+        return {
+            label: sendingLabel.text,
+            pct: sendingPct.text,
+            elided: sendingLabel.truncated,
+            lines: sendingLabel.lineCount,
+            barFill: Math.round(sendingFill.width),
+            barWidth: Math.round(sendingBar.width),
+            pctRight: Math.round(sendingPct.mapToItem(sendingPart, sendingPct.width, 0).x)
         };
     }
 
@@ -503,6 +537,82 @@ PanelWindow {
                         font.weight: leaseRow.slot.time.weight
                         font.letterSpacing: leaseRow.slot.time.spacing
                         font.features: { "tnum": 1 }
+                    }
+                }
+            }
+
+            IslandPart {
+                id: sendingPart
+                shown: island.part === "sending"
+                key: ""
+                swap: island.motion?.swap ?? null
+                x: Math.round((parent.width - width) / 2)
+                width: island.sizes.sending[0]
+                height: island.sizes.sending[1]
+
+                // The mark and what goes where from the left, the percent at the right edge and the bar along the bottom, as the boards draw the slot.
+                Row {
+                    id: sendingRow
+                    readonly property var look: island.sendingLook
+                    x: look.pad
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -sendingBar.height / 2
+                    spacing: look.gap
+
+                    Rectangle {
+                        visible: sendingRow.look.mark !== null
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: sendingRow.look.mark?.size ?? 0
+                        height: width
+                        radius: sendingRow.look.mark?.shape === "dot" ? width / 2 : 0
+                        color: sendingRow.look.mark?.color ?? "transparent"
+                    }
+
+                    // The machine's name comes from the tailnet: one line, elided before the percent.
+                    Text {
+                        id: sendingLabel
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        width: Math.min(implicitWidth, sendingPart.width - 2 * sendingRow.look.pad - sendingRow.spacing * 2 - (sendingRow.look.mark ? sendingRow.look.mark.size : 0) - sendingPct.implicitWidth)
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        text: sendingRow.look.label.text(island.sending?.count ?? 0, island.sending?.to ?? "")
+                        color: sendingRow.look.label.color || box.style.text
+                        font.family: sendingRow.look.label.font
+                        font.pixelSize: sendingRow.look.label.size
+                        font.weight: sendingRow.look.label.weight
+                        font.letterSpacing: sendingRow.look.label.spacing
+                    }
+                }
+
+                Text {
+                    id: sendingPct
+                    anchors.right: parent.right
+                    anchors.rightMargin: sendingRow.look.pad
+                    anchors.verticalCenter: sendingRow.verticalCenter
+                    textFormat: Text.PlainText
+                    text: sendingRow.look.pct.text(island.sending?.pct ?? 0)
+                    color: sendingRow.look.pct.color || box.style.text
+                    font.family: sendingRow.look.pct.font
+                    font.pixelSize: sendingRow.look.pct.size
+                    font.weight: sendingRow.look.pct.weight
+                    font.letterSpacing: sendingRow.look.pct.spacing
+                    font.features: { "tnum": 1 }
+                }
+
+                Rectangle {
+                    id: sendingBar
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: sendingRow.look.bar.height
+                    color: sendingRow.look.bar.track
+
+                    Rectangle {
+                        id: sendingFill
+                        width: parent.width * (island.sending?.pct ?? 0) / 100
+                        height: parent.height
+                        color: sendingRow.look.bar.fill
                     }
                 }
             }

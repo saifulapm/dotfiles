@@ -4,8 +4,8 @@ import { clockText } from './margins.mjs';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// The calendar is opened by hand from rest, so only a question, or an agent's lease that holds the session, takes the island from it.
-const PRIORITY = ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'recording', 'osd', 'toast', 'playing'];
+// The calendar is opened by hand from rest, so only a question, or an agent's lease that holds the session, takes the island from it; a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
+const PRIORITY = ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'recording', 'osd', 'toast', 'sending', 'playing'];
 
 export const MAX_WIDTH = 560;
 
@@ -21,6 +21,8 @@ export function recordingText(sinceMs, nowMs) {
 }
 
 const joined = (parts) => parts.filter((p) => p).join(' · ');
+const oneLine = (s) => String(s).replace(/[\u202A-\u202E\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim();
+export const filesText = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;
 
 // `qs ipc call island state` reports this text, whatever the theme draws.
 export function islandText(mode, slots, now) {
@@ -37,6 +39,8 @@ export function islandText(mode, slots, now) {
       return monthGrid(slots.calendar.year, slots.calendar.month).title;
     case 'toast':
       return slots.toast;
+    case 'sending':
+      return `Sending ${filesText(slots.sending.count)} to ${oneLine(slots.sending.to)} · ${slots.sending.pct}%`;
     case 'playing':
       return `${[slots.playing.title, slots.playing.artist].filter((p) => p).join(' — ')}  ${clockText(now)}`;
     default:
@@ -63,7 +67,7 @@ export function shiftMonth(year, month, by) {
 }
 
 // The one-line modes the island closes into; the rest open it into a card.
-export const isCompact = (mode) => ['rest', 'lease', 'playing', 'recording', 'toast'].includes(mode);
+export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'recording', 'toast'].includes(mode);
 
 // Curves are 61 samples at even steps of time, which ease reads as CSS linear() does; Qt's BezierSpline crashed on a sampled curve.
 const STEPS = 60;

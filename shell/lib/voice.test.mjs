@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, MODES, inOrder } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -319,4 +319,20 @@ test('a holder any caller names is one line without bidi controls, in the slot a
   assert.equal(lease('paper').slot.who.text('cl\naude\u202e x'), 'CL AUDE X');
   assert.equal(lease('artboard').slot.who.text('\u202eclaude'), 'Agent · claude');
   assert.equal(lease('blueprint').card.title('a\nb'), 'A B HAS THE SESSION');
+});
+
+const sending = (name) => sendingLook(theme(name));
+
+test("Paper's sending slot: 300 by 34, a red square, SENDING 2 FILES TO NUC · in the island's text, a 20 px serif percent and a 4 px red bar on paper", () => {
+  const s = sending('paper');
+  assert.deepEqual([s.width, s.height, s.pad, s.gap], [300, 34, 14, 10]);
+  assert.deepEqual([s.mark.shape, s.mark.size, s.mark.color], ['square', 8, '#C8381E']);
+  assert.deepEqual([s.label.text(2, 'nuc'), s.label.text(1, 'n\u202eu\nc'), s.label.size, s.label.color], ['SENDING 2 FILES TO NUC ·', 'SENDING 1 FILE TO NU C ·', 10, '']);
+  assert.deepEqual([s.pct.text(48), s.pct.font, s.pct.size], ['48%', 'Instrument Serif', 20]);
+  assert.deepEqual([s.bar.height, s.bar.track, s.bar.fill], [4, '#F1E9D8', '#C8381E']);
+});
+
+test('each theme draws a send at the width of its lease slot, with a bar', () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((t) => [sending(t).width, sending(t).height]), [[300, 34], [264, 40], [320, 34]]);
+  for (const t of ['paper', 'artboard', 'blueprint']) assert.ok(sending(t).bar.height > 0 && sending(t).bar.fill, t);
 });

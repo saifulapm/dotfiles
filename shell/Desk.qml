@@ -158,11 +158,28 @@ Scope {
 
         function state(): string {
             const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks } : null;
-            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState() });
+            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState(), sending: island.sendingState() });
         }
 
         function focus(): void {
             island.focusIsland();
+        }
+    }
+
+    // dots-taildrop-send reports a send here: start, the whole send's percent, then done.
+    Root.Ipc {
+        target: "sending"
+
+        function start(count: string, to: string): void {
+            island.sendStart(count, to);
+        }
+
+        function progress(pct: string): void {
+            island.sendProgress(pct);
+        }
+
+        function done(): void {
+            island.sendDone();
         }
     }
 }
