@@ -263,7 +263,8 @@ ShellRoot {
                 apps: Qt.binding(() => root.apps),
                 notifs: notifsService,
                 goals: Qt.binding(() => root.desk ? root.desk.goals : null),
-                sync: Qt.binding(() => root.desk ? root.desk.sync : null)
+                sync: Qt.binding(() => root.desk ? root.desk.sync : null),
+                reminders: Qt.binding(() => root.desk ? root.desk.reminders : null)
             });
         }
     }

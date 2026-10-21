@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 // Reminders read and write the local clock, so every test runs at home.
 process.env.TZ = 'Asia/Dhaka';
-const { parseReminder, whenText, addReminder, dueReminders, firedText, MAX_PENDING } = await import('./reminders.mjs');
+const { parseReminder, whenText, addReminder, dueReminders, firedText, reminderRows, MAX_PENDING } = await import('./reminders.mjs');
 
 const at = (s) => new Date(s).getTime();
 const now = at('2026-10-22T14:52:00+06:00');
@@ -70,4 +70,30 @@ test('a rung reminder reads Reminder · its text, and says when it was set', () 
   const r = { id: 'a', text: 'tea', due: now, created: at('2026-10-22T14:51:00+06:00') };
   assert.deepEqual(firedText(r, now), { summary: 'Reminder · tea', body: 'set at 14:51' });
   assert.equal(firedText({ ...r, created: at('2026-10-21T09:05:00+06:00') }, now).body, 'set yesterday at 09:05');
+});
+
+const pending = [
+  { id: 'b', text: 'Call Rubel', due: at('2026-10-22T17:30:00+06:00'), created: now },
+  { id: 'c', text: 'Push lareys release', due: at('2026-10-23T10:00:00+06:00'), created: now },
+];
+
+test('the r rows are the preview, then each pending reminder soonest first under its head', () => {
+  const rows = reminderRows('20m stand up', now, pending);
+  assert.deepEqual(rows.map((r) => [r.title, r.detail]), [['stand up', 'in 20m · 15:12'], ['Call Rubel', '17:30'], ['Push lareys release', 'tomorrow 10:00']]);
+  assert.deepEqual(rows[0].remind, { text: 'stand up', due: at('2026-10-22T15:12:00+06:00') });
+  assert.deepEqual(rows.map((r) => [r.reminderId ?? null, !!r.head]), [[null, false], ['b', true], ['c', false]]);
+});
+
+test('with no time typed yet the r rows are the pending ones, and a time no clock has is a row that sets nothing', () => {
+  assert.deepEqual(reminderRows('', now, pending).map((r) => r.reminderId), ['b', 'c']);
+  const bad = reminderRows('25:00 x', now, pending)[0];
+  assert.match(bad.title, /^Cannot set 25:00/);
+  assert.equal(bad.remind, undefined);
+});
+
+test('with 50 waiting the preview row says no more can be set', () => {
+  const full = Array.from({ length: 50 }, (_, i) => ({ id: `r${i}`, text: 't', due: now + (i + 1) * 60000, created: now }));
+  const top = reminderRows('5m one more', now, full)[0];
+  assert.match(top.title, /50/);
+  assert.equal(top.remind, undefined);
 });

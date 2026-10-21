@@ -22,7 +22,7 @@ export function rank(entries, query) {
     .map((x) => x.e);
 }
 
-const PREFIXES = { 'w ': 'windows', 'v ': 'clipboard', ': ': 'emoji', '= ': 'calculator', '> ': 'commands' };
+const PREFIXES = { 'w ': 'windows', 'v ': 'clipboard', ': ': 'emoji', '= ': 'calculator', '> ': 'commands', 'r ': 'reminder' };
 
 export function parseQuery(text) {
   const mode = PREFIXES[text.slice(0, 2)];

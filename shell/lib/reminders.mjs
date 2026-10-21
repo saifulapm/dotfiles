@@ -79,3 +79,11 @@ export function firedText(r, now) {
   const day = days === 0 ? '' : days === 1 ? 'yesterday ' : `${WEEKDAYS[new Date(r.created).getDay()]} `;
   return { summary: `Reminder · ${r.text}`, body: `set ${day}at ${clock(r.created)}` };
 }
+
+// The launcher's rows in `r ` mode: the reminder the query would set (or why it cannot), then the pending ones, the first under the pending head.
+export function reminderRows(q, now, list) {
+  const parsed = parseReminder(q, now);
+  const error = parsed && (parsed.error || (list.length >= MAX_PENDING ? `At most ${MAX_PENDING} reminders can wait` : ''));
+  const top = !parsed ? [] : error ? [{ title: error, detail: '' }] : [{ title: parsed.text, detail: parsed.when, remind: { text: parsed.text, due: parsed.due } }];
+  return top.concat(list.map((r, i) => ({ title: r.text, detail: whenText(r.due, now), reminderId: r.id, head: i === 0 })));
+}

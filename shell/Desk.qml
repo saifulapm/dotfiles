@@ -18,6 +18,8 @@ Scope {
     readonly property alias goals: goalsService
     // Control's Route section and the shell's status read the last sync round through this.
     readonly property alias sync: syncService
+    // The launcher's r mode sets and deletes through this.
+    readonly property alias reminders: remindersService
 
     Services.Niri {
         id: niriService
@@ -68,6 +70,10 @@ Scope {
 
     Services.Sync {
         id: syncService
+    }
+
+    Services.Reminders {
+        id: remindersService
     }
 
     Root.Ipc {

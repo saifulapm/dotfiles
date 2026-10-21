@@ -32,6 +32,7 @@ test('parseQuery reads the mode from the prefix', () => {
   assert.deepEqual(parseQuery('= 1 + 2'), { mode: 'calculator', q: '1 + 2' });
   assert.deepEqual(parseQuery('> lo'), { mode: 'commands', q: 'lo' });
   assert.deepEqual(parseQuery('w '), { mode: 'windows', q: '' });
+  assert.deepEqual(parseQuery('r 20m tea'), { mode: 'reminder', q: '20m tea' });
 });
 
 test('a prefix letter without its space stays an app search', () => {

@@ -8,6 +8,7 @@ import "lib/launcher.mjs" as Lib
 import "lib/clips.mjs" as Clips
 import "lib/emoji.mjs" as Emoji
 import "lib/voice.mjs" as L
+import "lib/reminders.mjs" as Rem
 
 // Apps, windows, clipboard, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
 Item {
@@ -26,6 +27,9 @@ Item {
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     // {id, name, genericName, keywords, icon, entry} per desktop entry, from the shell's scan.
     required property var apps
+    // The Desk's reminders service, null until the Desk loads.
+    property var reminders: null
+    readonly property var pending: reminders ? reminders.list : []
     readonly property var parsed: Lib.parseQuery(query)
     readonly property string mode: parsed.mode
     // niri's windows as of entering windows mode.
@@ -47,6 +51,8 @@ Item {
             return Emoji.emojiRows(emojiList, parsed.q);
         case "calculator":
             return Lib.calcRows(parsed.q);
+        case "reminder":
+            return Rem.reminderRows(parsed.q, Date.now(), pending);
         case "commands":
             // The user manager's PATH lacks the repo's bin/, so dots is the one beside this shell.
             return Lib.commandRows(parsed.q).map(r => r.exec[0] === "dots" ? Object.assign({}, r, {
@@ -109,6 +115,15 @@ Item {
         }
     }
 
+    // d on a pending reminder deletes it, and the cursor stays on the row that takes its place.
+    function deleteReminder() {
+        const row = rows[selected];
+        if (!row || !row.reminderId)
+            return;
+        reminders.remove(row.reminderId);
+        selected = Math.max(0, Math.min(selected, rows.length - 1));
+    }
+
     function move(by) {
         selected = Math.max(0, Math.min(rows.length - 1, selected + by));
     }
@@ -116,10 +131,16 @@ Item {
     // An app is spawned through niri, so it is niri's child and outlives a shell restart.
     function launch() {
         const row = rows[selected];
-        if (!row)
+        // A pending reminder or one that cannot be set has nothing to run.
+        if (!row || (mode === "reminder" && !row.remind))
             return;
         close();
-        if (row.exec)
+        if (row.remind) {
+            // "20m" counts from Enter, not from when it was typed.
+            const now = Date.now();
+            reminders.add(Rem.parseReminder(parsed.q, now), now);
+        }
+        else if (row.exec)
             Quickshell.execDetached(row.exec);
         else if (row.copy)
             Quickshell.execDetached(["wl-copy", "--", row.copy]);
@@ -132,7 +153,8 @@ Item {
 
     function state() {
         const cur = rowRepeater.itemAt(selected);
-        const p = cur ? cur.mapToItem(null, 0, 0) : null;
+        const box = cur ? cur.box : null;
+        const p = box ? box.mapToItem(null, 0, 0) : null;
         const q = input.mapToItem(null, 0, 0);
         return JSON.stringify({
             open: shown,
@@ -155,11 +177,13 @@ Item {
             count: found.length,
             countText: (look.label.kind === "header" ? headerCount : chipCount).text,
             slots: rows.map((r, i) => look.slot === "number" ? look.number(i) : look.slot === "marker" ? "▸" : r.icon || r.glyph || "tile"),
-            cursorFill: cur ? String(cur.color) : null,
-            cursorBox: cur ? { x: p.x, y: p.y, w: cur.width, h: cur.height } : null,
+            cursorFill: box ? String(box.color) : null,
+            cursorBox: box ? { x: p.x, y: p.y, w: box.width, h: box.height } : null,
             cursorElided: cur ? cur.elided : null,
             cursorDetailWidth: cur ? cur.detailWidth : null,
             keys: rows.map((r, i) => rowRepeater.itemAt(i)?.keyText ?? null),
+            heads: rows.map((r, i) => rowRepeater.itemAt(i)?.headText ?? null),
+            pending: pending.length,
             queryFont: [input.font.family, input.font.pixelSize],
             queryBox: { x: q.x, y: q.y, w: input.width, h: input.height },
             detailFont: [look.detail.font, look.detail.size, look.detail.italic],
@@ -262,7 +286,7 @@ Item {
                     Text {
                         id: headerCount
                         textFormat: Text.PlainText
-                        text: look.count(found.length)
+                        text: launcher.mode === "reminder" ? look.pendingCount(pending.length) : look.count(found.length)
                         color: look.small.color
                         font.family: look.small.font
                         font.pixelSize: look.small.size
@@ -361,7 +385,7 @@ Item {
                         id: chipCount
                         visible: look.label.kind === "chip"
                         textFormat: Text.PlainText
-                        text: look.count(found.length)
+                        text: launcher.mode === "reminder" ? look.pendingCount(pending.length) : look.count(found.length)
                         color: look.small.color
                         font.family: look.small.font
                         font.pixelSize: look.small.size
@@ -401,6 +425,8 @@ Item {
                             launcher.move(-1);
                         else if (event.key === Qt.Key_Slash)
                             input.forceActiveFocus();
+                        else if (event.key === Qt.Key_D && launcher.mode === "reminder")
+                            launcher.deleteReminder();
                         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                             launcher.launch();
                         else if (event.key === Qt.Key_Escape)
@@ -434,13 +460,49 @@ Item {
                             id: rowRepeater
                             model: rows
 
-                            Rectangle {
+                            // A row, under the pending head when it is the first pending reminder.
+                            Column {
                                 required property var modelData
                                 required property int index
                                 readonly property bool current: index === launcher.selected
                                 readonly property bool elided: title.truncated
                                 readonly property real detailWidth: detail.width
                                 readonly property string keyText: keyChip.visible ? keyLabel.text : ""
+                                readonly property string headText: modelData.head ? headLabel.text : ""
+                                readonly property Item box: rowBox
+                                width: list.width
+
+                                RowLayout {
+                                    visible: !!modelData.head
+                                    width: parent.width
+                                    Text {
+                                        id: headLabel
+                                        Layout.fillWidth: true
+                                        leftPadding: look.voice === "caps" ? 20 : 12
+                                        topPadding: 10
+                                        bottomPadding: 4
+                                        textFormat: Text.PlainText
+                                        text: look.pendingHead(launcher.pending.length).text
+                                        color: look.small.color
+                                        font.family: look.small.font
+                                        font.pixelSize: look.small.size
+                                        font.letterSpacing: look.small.spacing
+                                    }
+                                    Text {
+                                        rightPadding: look.voice === "caps" ? 20 : 12
+                                        topPadding: 10
+                                        bottomPadding: 4
+                                        textFormat: Text.PlainText
+                                        text: look.pendingHead(launcher.pending.length).right
+                                        color: look.small.color
+                                        font.family: look.small.font
+                                        font.pixelSize: look.small.size
+                                        font.letterSpacing: look.small.spacing
+                                    }
+                                }
+
+                            Rectangle {
+                                id: rowBox
                                 width: list.width
                                 implicitHeight: row.implicitHeight + (look.voice === "caps" ? 22 : 20)
                                 radius: look.cursor.radius
@@ -569,6 +631,7 @@ Item {
                                         }
                                     }
                                 }
+                            }
                             }
                         }
                     }

@@ -16,6 +16,8 @@ PanelWindow {
     required property var goals
     // The Desk's sync service, null until the Desk loads.
     required property var sync
+    // The Desk's reminders service, null until the Desk loads.
+    required property var reminders
     readonly property var launcher: launcherLoader.item
     readonly property var themes: themesLoader.item
     readonly property var notifications: notifsLoader.item
@@ -164,6 +166,7 @@ PanelWindow {
         sourceComponent: Root.Launcher {
             theme: host.theme
             apps: host.apps
+            reminders: host.reminders
         }
     }
 

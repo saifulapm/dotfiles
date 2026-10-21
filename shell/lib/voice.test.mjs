@@ -41,7 +41,7 @@ test('only Blueprint draws its rules dashed', () => {
 });
 
 test('every mode is named in the theme voice', () => {
-  assert.deepEqual(MODES, ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands']);
+  assert.deepEqual(MODES, ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder']);
   assert.equal(look('paper').label.text('clipboard'), 'CLIPBOARD');
   assert.equal(look('artboard').label.text('clipboard'), 'Clipboard');
   assert.equal(look('blueprint').label.text('clipboard'), 'LAUNCH // CLIPBOARD');
@@ -91,6 +91,16 @@ test('a capture row shows its long detail in Artboard, its tool in Paper, and no
   assert.equal(look('blueprint').rowDetail(row), '');
   assert.equal(look('blueprint').rowDetail({ title: 'lock', detail: 'Lock the screen' }), 'LOCK THE SCREEN');
   assert.equal(look('paper').rowDetail({ title: 'lock', detail: 'Lock the screen' }), 'Lock the screen');
+});
+
+test('reminder mode reads REMIND, Reminder or LAUNCH // REMINDER, counts what is pending, and heads the pending rows as each board does', () => {
+  const p = look('paper'), a = look('artboard'), b = look('blueprint');
+  assert.deepEqual([p.label.text('reminder'), a.label.text('reminder'), b.label.text('reminder')], ['REMIND', 'Reminder', 'LAUNCH // REMINDER']);
+  assert.deepEqual([p.pendingCount(2), a.pendingCount(2), b.pendingCount(2)], ['2 PENDING', '', '2 PENDING']);
+  assert.deepEqual([p.pendingHead(2), a.pendingHead(2), b.pendingHead(2)], [{ text: 'PENDING', right: '' }, { text: 'Pending · 2', right: '' }, { text: 'PENDING', right: '2 OF 50' }]);
+  const keys = (l) => l.legend('reminder').keys.map((k) => [k.key, k.word]);
+  assert.deepEqual([keys(p), keys(a), keys(b)], [[['↵', 'SET'], ['D', 'DELETE']], [['d', 'delete']], [['[D]', 'DELETE']]]);
+  assert.equal(p.legendLine('reminder'), '↵ SET  D DELETE  J/K · ↵ · ESC');
 });
 
 test('before the theme loads the launcher still has a whole look', () => {

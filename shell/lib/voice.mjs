@@ -3,12 +3,12 @@
 import { dateText, pad2 } from './margins.mjs';
 import { chipLabel } from './notifs.mjs';
 
-export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands'];
+export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder'];
 
 // Each mode's prefix and the word the boards give it; Artboard spells calculator out.
 const PREFIXES = [['w', 'windows'], ['v', 'clipboard'], [':', 'emoji'], ['=', 'calc'], ['>', 'commands']];
 const PLAIN_WORD = { calc: 'calculator' };
-const CAPS_NAME = { calculator: 'CALC' };
+const CAPS_NAME = { calculator: 'CALC', reminder: 'REMIND' };
 
 // Artboard's board tints, which no token carries and no mix of tokens lands on.
 const ARTBOARD = { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6' };
@@ -31,8 +31,15 @@ export function launcherLook(tokens) {
   const voice = t.voice;
   const caps = voice !== 'plain';
   const key = (k) => (voice === 'bracket' ? `[${upper(k)}]` : caps ? upper(k) : k);
+  // Reminder mode names the keys its rows take; Paper also names Enter's, as its board does.
+  const REMINDER_KEYS = voice === 'caps' ? [['↵', 'set'], ['d', 'delete']] : [['d', 'delete']];
   const legend = (mode) => ({
-    keys: mode === 'apps' ? PREFIXES.map(([k, w]) => ({ key: key(k), word: caps ? upper(w) : PLAIN_WORD[w] || w })) : [],
+    keys:
+      mode === 'apps'
+        ? PREFIXES.map(([k, w]) => ({ key: key(k), word: caps ? upper(w) : PLAIN_WORD[w] || w }))
+        : mode === 'reminder'
+          ? REMINDER_KEYS.map(([k, w]) => ({ key: key(k), word: caps ? upper(w) : w }))
+          : [],
     tail: caps ? 'J/K · ↵ · ESC' : 'j/k · ↵ · esc',
     chips: voice === 'plain',
   });
@@ -55,6 +62,9 @@ export function launcherLook(tokens) {
       return this.detailText(row.detail);
     },
     count: () => '',
+    pendingCount: (n) => (caps ? `${n} PENDING` : ''),
+    // The head over the pending reminders; Blueprint counts them against the cap at the right.
+    pendingHead: (n) => (voice === 'plain' ? { text: `Pending · ${n}`, right: '' } : { text: 'PENDING', right: voice === 'bracket' ? `${n} OF 50` : '' }),
     prompt: { text: '', color: c.accent, search: false },
     caret: 'line',
     rule: { color: c.ink, dashed: false },
