@@ -140,6 +140,31 @@ check "and the store's remote's last commit names it ($(git -C "$remote" log -1 
 wtype -k Escape
 until_ok 3000 state_is '.drawing == false'
 
+# q reads an otpauth QR from the clipboard image: the card names it without its secret, and Enter on an entry saves it there.
+qr_secret=KRSXG5CTMVRXEZLUKN2XAZLSKNSWG4TF
+qrencode -o "$DOTS_DEV_DIR/qr.png" "otpauth://totp/GitHub:saiful?secret=$qr_secret&issuer=GitHub"
+wl-copy --type image/png <"$DOTS_DEV_DIR/qr.png"
+niri msg action spawn -- dots-call pass toggle
+until_ok 3000 state_is '.open and .listed and .settled'
+wtype -k Tab
+until_ok 2000 state_is '.focus == "list"'
+wtype q
+until_ok 5000 state_is '.mode == "qr"'
+check "q names the code: GitHub, saiful, TOTP · 6 digits · 30s ($(pass_state | jq -c .qr))" state_is '.qr == {"issuer": "GitHub", "account": "saiful", "meta": "TOTP · 6 digits · 30s", "question": "Save to which entry?"}'
+check "no surface state holds the secret" bash -c "! timeout 0.5 dots-call pass state | grep -qF '$qr_secret'"
+wtype github.com
+until_ok 2000 state_is '.count == 1 and .rows[0].name == "web/github.com"'
+wtype -k Return
+qr_code_ok() { local c; c=$(pass otp web/github.com 2>/dev/null); [[ $c =~ ^[0-9]{6}$ ]] && { [ "$c" = "$(oathtool --totp -b "$qr_secret")" ] || [ "$c" = "$(oathtool --totp -b -N '30 seconds ago' "$qr_secret")" ]; }; }
+until_ok 8000 qr_code_ok
+check "Enter on web/github.com saves it: pass otp web/github.com prints the new code ($(pass otp web/github.com 2>/dev/null))" qr_code_ok
+check "and keeps the entry's password" bash -c "[ \"\$(pass show web/github.com | head -1)\" = '$password' ]"
+check "the shell's journal never holds the secret" bash -c "! journalctl --user -u '$DOTS_DEV_UNIT' --no-pager -o cat | grep -qF '$qr_secret'"
+until_ok 3000 bash -c 'timeout 0.5 qs ipc call island state 2>/dev/null | jq -e ".text == \"OTP saved · web/github.com\"" >/dev/null'
+check "the island says the code was saved ($(island_text))" bash -c '[ "$(timeout 0.5 qs ipc call island state | jq -r .text)" = "OTP saved · web/github.com" ]'
+wtype -k Escape
+until_ok 3000 state_is '.drawing == false'
+
 # Each theme draws the board's key strip; the list unloads 30 s after it closes.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }

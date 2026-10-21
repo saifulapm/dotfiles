@@ -33,6 +33,8 @@ Item {
     property string generated: ""
     property int length: P.LENGTH.start
     readonly property string pathTag: P.pathTag(entries, newPath.text)
+    // What the clipboard's QR says it is (issuer, account, type, digits, period), never its secret, while q picks the entry to save it to.
+    property var qr: null
 
     readonly property string bin: Quickshell.shellDir + "/../bin/dots-pass"
     readonly property var c: theme.color
@@ -63,6 +65,7 @@ Item {
     function close() {
         shown = false;
         hide();
+        qr = null;
         mode = "list";
         generated = "";
         newPath.text = "";
@@ -81,6 +84,39 @@ Item {
         revealer.name = current.name;
         revealer.command = [bin, "show", current.name];
         revealer.running = true;
+    }
+
+    // dots-pass reads the clipboard's QR and answers with what it describes; the card never holds the code's secret.
+    function scanQr() {
+        if (scanner.running)
+            return;
+        hide();
+        scanner.running = true;
+    }
+
+    // Enter while picking: the cursor row, or the typed name when nothing matches it.
+    function saveQr() {
+        const name = current ? current.name : query.trim();
+        if (!qr || changer.running || (!current && P.pathTag(entries, name) !== "new"))
+            return;
+        change("qr-save", name, "");
+        qr = null;
+        mode = "list";
+    }
+
+    // Esc while picking a QR's entry goes back to the list; otherwise it closes.
+    function leave() {
+        if (mode === "qr")
+            back();
+        else
+            close();
+    }
+
+    function enter() {
+        if (mode === "qr")
+            saveQr();
+        else
+            copy("copy");
     }
 
     function startNew() {
@@ -131,6 +167,7 @@ Item {
     }
 
     function back() {
+        qr = null;
         mode = "list";
         generated = "";
         newPath.text = "";
@@ -225,6 +262,7 @@ Item {
             revealed: cur?.revealed ? { text: cur.shownText(), tag: cur.tagText() } : null,
             newEntry: mode === "new" ? { path: newPath.text, tag: tagText.text, length: generated.length, lengthText: lengthText.text, focus: lengthBox.activeFocus ? "length" : "path" } : null,
             deleteLine: deleteLine.visible ? deleteLine.text : "",
+            qr: mode === "qr" && qr ? { issuer: qrIssuer.text, account: qrAccount.text, meta: qrMeta.text, question: qrQuestion.text } : null,
             openMs: openMs,
             opens: opens,
             settled: motion.settled,
@@ -278,6 +316,29 @@ Item {
         id: revealTick
         interval: 10000
         onTriggered: pass.hide()
+    }
+
+    Process {
+        id: scanner
+        command: [pass.bin, "qr-scan"]
+        stdout: StdioCollector {
+            id: scanOut
+        }
+        stderr: StdioCollector {
+            id: scanErr
+        }
+        onExited: code => {
+            if (!pass.shown)
+                return;
+            if (code !== 0) {
+                pass.theme.notice(P.changedText("qr-save", "", code, scanErr.text));
+                return;
+            }
+            pass.qr = P.qrInfo(scanOut.text);
+            pass.mode = "qr";
+            input.text = "";
+            input.forceActiveFocus();
+        }
     }
 
     Process {
@@ -419,9 +480,9 @@ Item {
                         else if (event.key === Qt.Key_Tab)
                             results.forceActiveFocus();
                         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                            pass.copy("copy");
+                            pass.enter();
                         else if (event.key === Qt.Key_Escape)
-                            pass.close();
+                            pass.leave();
                         else
                             return;
                         event.accepted = true;
@@ -460,6 +521,56 @@ Item {
 
             Rule {}
 
+            // What the QR holds, then the question; the list under it picks the entry.
+            ColumnLayout {
+                visible: pass.mode === "qr" && !!pass.qr
+                Layout.fillWidth: true
+                Layout.leftMargin: 20
+                Layout.rightMargin: 20
+                Layout.topMargin: 14
+                spacing: 4
+
+                Text {
+                    id: qrIssuer
+                    Layout.fillWidth: true
+                    textFormat: Text.PlainText
+                    text: pass.qr?.issuer ?? ""
+                    elide: Text.ElideRight
+                    color: c.ink
+                    font.family: look.name.font
+                    font.pixelSize: look.name.size + 3
+                    font.weight: look.cursor.weight
+                }
+                Text {
+                    id: qrAccount
+                    Layout.fillWidth: true
+                    textFormat: Text.PlainText
+                    text: pass.qr?.account ?? ""
+                    elide: Text.ElideRight
+                    color: c.muted
+                    font.family: look.name.font
+                    font.pixelSize: look.name.size
+                }
+                Text {
+                    id: qrMeta
+                    textFormat: Text.PlainText
+                    text: pass.qr?.meta ?? ""
+                    color: look.small.color
+                    font.family: look.small.font
+                    font.pixelSize: look.small.size
+                    font.letterSpacing: look.small.spacing
+                }
+                Text {
+                    id: qrQuestion
+                    Layout.topMargin: 8
+                    textFormat: Text.PlainText
+                    text: "Save to which entry?"
+                    color: c.ink
+                    font.family: look.name.font
+                    font.pixelSize: look.name.size
+                }
+            }
+
             // Holds focus after Tab, where the plain letter keys act on the cursor row and / returns to the query.
             Item {
                 id: results
@@ -482,7 +593,7 @@ Item {
                     else if (event.key === Qt.Key_Slash)
                         input.forceActiveFocus();
                     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                        pass.copy("copy");
+                        pass.enter();
                     else if (event.key === Qt.Key_O)
                         pass.copy("otp");
                     else if (event.key === Qt.Key_S)
@@ -493,8 +604,10 @@ Item {
                         pass.edit();
                     else if (event.key === Qt.Key_D)
                         pass.askDelete();
+                    else if (event.key === Qt.Key_Q)
+                        pass.scanQr();
                     else if (event.key === Qt.Key_Escape)
-                        pass.close();
+                        pass.leave();
                     else
                         return;
                     event.accepted = true;

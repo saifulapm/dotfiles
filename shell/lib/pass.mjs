@@ -82,3 +82,9 @@ export function changedText(verb, name, code, stderr) {
   const why = line(String(stderr).split('\n')[0].replace(/^dots-pass: /, ''));
   return why ? `${failed} · ${why}` : failed;
 }
+
+// dots-pass qr-scan's line, "issuer\taccount\tTYPE\tdigits\tperiod", as the card draws it; a QR's text is anyone's, so each field is one line in the order it is spelt.
+export function qrInfo(text) {
+  const [issuer, account, type, digits, period] = String(text).replace(/\n$/, '').split('\t').map(line);
+  return { issuer, account, meta: type === 'HOTP' ? `HOTP · ${digits} digits` : `${type} · ${digits} digits · ${period}s` };
+}

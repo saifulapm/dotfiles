@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { listLook } from './voice.mjs';
-import { parseEntries, passRows, segments, passKeys, copiedText, failedText, pathTag, deleteText, changedText, LENGTH } from './pass.mjs';
+import { parseEntries, passRows, segments, passKeys, copiedText, failedText, pathTag, deleteText, changedText, LENGTH, qrInfo } from './pass.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
 const listed = 'web/github.com\t1\nmail/icloud\t0\nweb/gitlab.com\t0\nnote\t0\n';
@@ -98,4 +98,10 @@ test("the island's word after a change: done, saved but not pushed, or why not",
   assert.equal(changedText('insert', 'web/x', 3, 'dots-pass: saved, not pushed\n'), 'Saved · not pushed');
   assert.equal(changedText('insert', 'web/x', 1, 'dots-pass: web/x exists\n'), 'Not saved · web/x exists');
   assert.equal(changedText('qr-save', 'web/x', 1, 'dots-pass: the qr code is not an otpauth code\n'), 'OTP not saved · the qr code is not an otpauth code');
+});
+
+test("a QR reads as its issuer, its account and what kind of code it makes, each on one line", () => {
+  assert.deepEqual(qrInfo('GitHub\tsaiful\tTOTP\t6\t30\n'), { issuer: 'GitHub', account: 'saiful', meta: 'TOTP · 6 digits · 30s' });
+  assert.deepEqual(qrInfo('Bank\tme\tHOTP\t8\t30\n'), { issuer: 'Bank', account: 'me', meta: 'HOTP · 8 digits' });
+  assert.deepEqual(qrInfo('Git‮Hub\ta  b\tTOTP\t6\t30'), { issuer: 'GitHub', account: 'a b', meta: 'TOTP · 6 digits · 30s' });
 });
