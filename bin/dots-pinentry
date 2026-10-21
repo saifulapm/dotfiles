@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# gpg-agent's pinentry-program: speaks Assuan on stdin and stdout, and has the shell draw each prompt, over a socket held open until the card is answered.
+set -uo pipefail
+{
+
+sock=${XDG_RUNTIME_DIR:-/run/user/$UID}/dots-pinentry-${WAYLAND_DISPLAY:-}.sock
+marker=${XDG_STATE_HOME:-$HOME/.local/state}/dots/locked
+cancelled='ERR 83886179 Operation cancelled'
+
+# gpg-agent hands on the client's PINENTRY_USER_DATA, which fish sets to curses over SSH, where a card would show on a screen nobody faces.
+case ${PINENTRY_USER_DATA:-} in *curses* | *tty*) exec pinentry-curses "$@" ;; esac
+# With no shell listening, Qt's window asks instead.
+socat -u /dev/null "UNIX-CONNECT:$sock" 2>/dev/null || exec pinentry-qt "$@"
+
+card_PID=
+hang_up() {
+  [[ -z $card_PID ]] || kill "$card_PID" 2>/dev/null
+}
+trap hang_up EXIT
+# gpg-agent interrupts its pinentry when the client goes away; hanging up closes the card.
+trap 'exit 1' INT TERM
+
+# ask <kind>: one request line to the shell, then its answer to gpg, which ends at OK or ERR; a shell that hangs up first cancels. gpg's text stays percent-escaped, and tabs are escaped too, since they split the fields; the shell escapes the passphrase, so its D line is relayed as it came.
+ask() {
+  local line answered=
+  # While the screen is locked nobody can answer, and gpg would wait on the card behind it.
+  if [[ -s $marker ]]; then
+    echo "$cancelled"
+    error=
+    return
+  fi
+  coproc card { socat - "UNIX-CONNECT:$sock" 2>/dev/null; }
+  printf '%s\t%s\t%s\t%s\n' "$1" "${desc//$'\t'/%09}" "${prompt//$'\t'/%09}" "${error//$'\t'/%09}" >&"${card[1]}"
+  while IFS= read -r line <&"${card[0]}"; do
+    case $line in
+      'D '*) printf '%s\n' "$line" ;;
+      OK | 'OK '* | 'ERR '*)
+        printf '%s\n' "$line"
+        answered=1
+        break
+        ;;
+    esac
+  done
+  [[ -n $answered ]] || echo "$cancelled"
+  hang_up
+  wait "$card_PID" 2>/dev/null
+  card_PID=
+  # The error belongs to one try.
+  error=
+}
+
+desc='' prompt='' error=''
+echo 'OK Pleased to meet you'
+while IFS= read -r line; do
+  cmd=${line%% *}
+  arg=
+  [[ $line != *' '* ]] || arg=${line#* }
+  case ${cmd^^} in
+    SETDESC) desc=$arg && echo OK ;;
+    SETPROMPT) prompt=$arg && echo OK ;;
+    SETERROR) error=$arg && echo OK ;;
+    GETPIN) ask passphrase ;;
+    CONFIRM | MESSAGE) ask confirm ;;
+    GETINFO)
+      case $arg in
+        pid) echo "D $$" ;;
+        flavor) echo 'D dots' ;;
+      esac
+      echo OK
+      ;;
+    RESET) desc='' prompt='' error='' && echo OK ;;
+    BYE)
+      echo 'OK closing connection'
+      exit 0
+      ;;
+    # Titles, button labels, key info, timeouts and options change nothing on the card.
+    *) echo OK ;;
+  esac
+done
+exit
+}
