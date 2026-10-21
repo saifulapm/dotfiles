@@ -1,7 +1,7 @@
 // The pin.sh template against a scratch source whose one pin points at a local file, so no run reaches the network.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -167,4 +167,27 @@ test('a fetch = "gh" pin with a wrong sha256 stops the script', () => {
   const r = run(root, SCRIPT, `${root}/stubs:`);
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /pin hello: sha256/);
+});
+
+// kakoune's Makefile installs with cp, which cannot write over a binary a running kak holds open (ETXTBSY), as on a machine with a kak session open.
+test('the kakoune pin installs over a kak that is running', () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-pin-kak-')));
+  const home = join(root, 'home');
+  const src = join(root, 'src');
+  const stubs = join(root, 'stubs');
+  for (const d of [join(home, '.local/bin'), join(src, 'src'), stubs]) mkdirSync(d, { recursive: true });
+  copyFileSync('/usr/bin/sleep', join(home, '.local/bin/kak'));
+  copyFileSync('/usr/bin/true', join(src, 'src/kak'));
+  writeFileSync(join(stubs, 'make'), '#!/bin/sh\n[ "$3" = install ] || exit 0\ncp "$2/src/kak" "${4#PREFIX=}/bin/kak"\n', { mode: 0o755 });
+  // The script's steps after the build, run with the build's own make replaced.
+  const text = readFileSync(join(repo, 'home/.chezmoiscripts/run_onchange_after_21-pin-kakoune.sh.tmpl'), 'utf8');
+  const steps = text.slice(text.indexOf('\n', text.indexOf('make -C "$src" -j')) + 1, text.indexOf('pin_done'));
+  const running = spawn(join(home, '.local/bin/kak'), ['30']);
+  try {
+    const r = spawnSync('bash', ['-ec', steps], { encoding: 'utf8', env: { PATH: `${stubs}:${process.env.PATH}`, HOME: home, src } });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(readFileSync(join(home, '.local/bin/kak')), readFileSync('/usr/bin/true'));
+  } finally {
+    running.kill();
+  }
 });

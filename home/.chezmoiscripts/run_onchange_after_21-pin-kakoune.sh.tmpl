@@ -8,5 +8,7 @@ src=$pin_tmp/kakoune-$pin_version
 echo "$pin_version" >"$src/.version"
 # The vendored tree-sitter lexer includes "unicode/umachine.h", which lives in src/tree_sitter.
 make -C "$src" -j"$(nproc)" CPPFLAGS=-Isrc/tree_sitter
+# The Makefile installs with cp, which cannot write over the binary a running kak holds; unlinked first, that kak keeps its own copy.
+rm -f "$HOME/.local/bin/kak"
 make -C "$src" install PREFIX="$HOME/.local"
 pin_done
