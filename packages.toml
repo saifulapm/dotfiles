@@ -525,3 +525,14 @@ why = "nm, which the AVD firmware build reads symbols with"
 name = "pkgconf-pkg-config"
 arch = "aarch64"
 why = "pkg-config, which meson finds libva and libdrm with"
+
+[[package]]
+name = "iwlwifi-mvm-firmware"
+arch = "x86_64"
+why = "firmware for the NUC's Intel wifi"
+
+[[package]]
+name = "intel-media-driver"
+arch = "x86_64"
+rpmfusion = "nonfree"
+why = "VA-API video decode on the NUC's Intel GPU, RPM Fusion's build with the codecs Fedora's libva-intel-media-driver leaves out"
