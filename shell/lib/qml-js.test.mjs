@@ -40,3 +40,14 @@ test('no shared module or QML file catches without a binding', () => {
     [],
   );
 });
+
+// QML refuses a method named after a JavaScript global, such as escape, with "Illegal method name", and the file's type goes unavailable with it.
+test('no QML file names a method after a JavaScript global', () => {
+  const files = readdirSync(qml, { recursive: true }).filter((f) => f.endsWith('.qml'));
+  const globals = 'escape|unescape|eval|isNaN|isFinite|parseInt|parseFloat|encodeURI|decodeURI|encodeURIComponent|decodeURIComponent';
+  const named = new RegExp(`^\\s*function (${globals})\\s*\\(`, 'm');
+  assert.deepEqual(
+    files.filter((f) => named.test(readFileSync(qml + f, 'utf8'))),
+    [],
+  );
+});
