@@ -147,11 +147,20 @@ got=$(unit_state pxy.service)
 check "pxy.service is enabled and active (got '$got')" test "$got" = "enabled active"
 got=$(as_user "systemctl --user is-failed hub-local.service")
 check "with no local.env, hub-local.service is inactive, not failed (got '$got')" test "$got" = inactive
-# A peer token is all hub local needs to serve; the file goes again before the snapshots below.
+# A peer token is all hub local needs to serve; the file goes again before the snapshots below. A tailscale stub first on the unit's PATH says it runs, and records each serve.
+put "$home/.local/bin/tailscale" <<'EOF'
+#!/bin/sh
+[ "$1" = status ] && { echo '{"BackendState":"Running"}'; exit 0; }
+echo "$*" >> /tmp/tailscale.log
+EOF
+as_user "chmod 755 ~/.local/bin/tailscale"
 as_user "mkdir -p ~/.config/hub && echo HUB_PEER_TOKEN=test > ~/.config/hub/local.env && systemctl --user start hub-local.service && sleep 3"
 got=$(as_user "echo \$(systemctl --user is-active hub-local.service) \$(systemctl --user show -p NRestarts --value hub-local.service)")
 check "with local.env present, hub-local.service is active and has not restarted (got '$got')" test "$got" = "active 0"
+got=$(as_user "cat /tmp/tailscale.log 2>/dev/null")
+check "hub-local's start serves tcp 8789 on the tailnet (got '$got')" test "$got" = "serve --bg --tcp 8789 tcp://localhost:8789"
 as_user "systemctl --user stop hub-local.service; rm ~/.config/hub/local.env"
+as_user "rm ~/.local/bin/tailscale /tmp/tailscale.log"
 got=$(as_user "pgrep -cf '^/bin/sleep infinity\$'")
 check "no v1 stand-in (sleep infinity) is left running (got $got)" test "$got" = 0
 # A device enables its own Remote Control projects; one whose folder under ~/Codes is missing is skipped, not failed.

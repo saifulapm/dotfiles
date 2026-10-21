@@ -9,6 +9,8 @@ StartLimitIntervalSec=0
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=%h/.config/hub/local.env
 ExecStart=%h/.local/bin/hub local
+# Serves the hub's port on the tailnet once tailscale runs; in the background, since systemd holds the start until a post command ends.
+ExecStartPost=-/bin/sh -c '%h/Codes/dotfiles/bin/dots-hub-serve &'
 Restart=always
 RestartSec=5
 
