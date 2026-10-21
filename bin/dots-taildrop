@@ -13,6 +13,8 @@ const downloads = join(homedir(), 'Downloads');
 const SETTLE_MS = 1500;
 const POLL_MS = 400;
 const LADDER_S = [1, 2, 5, 10, 30];
+// A transfer tailscaled stops reporting for this long no longer holds the batch open.
+const STALL_MS = 30000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -38,6 +40,31 @@ function call(method, path, { signal, sink } = {}) {
     req.on('error', reject);
     req.end();
   });
+}
+
+// tailscaled's IPN bus repeats the files it is still receiving while a transfer runs, and an empty list once none is; the inbox lists a file only once it has all arrived.
+function watchIncoming() {
+  const bus = { incoming: false, at: 0 };
+  const req = request({ socketPath, path: '/localapi/v0/watch-ipn-bus?mask=0', headers: { Host: 'local-tailscaled.sock' } }, (res) => {
+    let rest = '';
+    res.setEncoding('utf8');
+    res.on('data', (chunk) => {
+      const lines = (rest + chunk).split('\n');
+      rest = lines.pop();
+      for (const l of lines) {
+        try {
+          const n = JSON.parse(l);
+          if ('IncomingFiles' in n) Object.assign(bus, { incoming: Array.isArray(n.IncomingFiles) && n.IncomingFiles.length > 0, at: Date.now() });
+        } catch {}
+      }
+    });
+    res.on('error', () => {});
+  });
+  // A bus that cannot be read leaves the batch to the settle time alone.
+  req.on('error', () => {});
+  req.end();
+  bus.close = () => req.destroy();
+  return bus;
 }
 
 // The inbox answers null when empty, else [{Name, Size}]; waitsec holds the request open until a file is pending.
@@ -115,14 +142,23 @@ async function cycle() {
   }
   mkdirSync(downloads, { recursive: true });
   const names = new Set(wanted.map((f) => f.Name));
-  for (let quiet = Date.now(); Date.now() - quiet < SETTLE_MS; ) {
-    await sleep(POLL_MS);
-    for (const { Name } of usable(await list(0))) {
-      if (!names.has(Name)) {
-        names.add(Name);
-        quiet = Date.now();
+  // A batch ends once no new name has shown for the settle time and tailscaled reports nothing still arriving, so ten photos sent together give one notification however far apart they land.
+  const bus = watchIncoming();
+  try {
+    for (let quiet = Date.now(), heard = 0; ; ) {
+      await sleep(POLL_MS);
+      if (bus.at !== heard) [heard, quiet] = [bus.at, Date.now()];
+      for (const { Name } of usable(await list(0))) {
+        if (!names.has(Name)) {
+          names.add(Name);
+          quiet = Date.now();
+        }
       }
+      const arriving = bus.incoming && Date.now() - bus.at < STALL_MS;
+      if (!arriving && Date.now() - quiet >= SETTLE_MS) break;
     }
+  } finally {
+    bus.close();
   }
   const paths = [];
   try {

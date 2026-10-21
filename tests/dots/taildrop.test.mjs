@@ -19,14 +19,28 @@ async function until(what, fn, ms = 8000) {
   assert.fail('timed out waiting for ' + what);
 }
 
-// The fake keeps tailscaled's inbox in a map and the requests it saw as "METHOD /path" lines; an empty listing with waitsec holds for a moment like the real long-poll.
+// The fake keeps tailscaled's inbox in a map and the requests it saw as "METHOD /path" lines; an empty listing with waitsec holds for a moment like the real long-poll, and its IPN bus streams the files still being received, as tailscaled repeats them while a transfer runs.
 function fakeApi(sock) {
   const inbox = new Map();
   const seen = [];
+  const watchers = new Set();
+  let incoming = [];
+  const setIncoming = (files) => {
+    incoming = files;
+    for (const w of watchers) w.write(JSON.stringify({ IncomingFiles: files }) + '\n');
+  };
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     seen.push(`${req.method} ${url.pathname}${url.search}`);
     assert.equal(req.headers.host, 'local-tailscaled.sock');
+    if (url.pathname === '/localapi/v0/watch-ipn-bus') {
+      res.setHeader('Content-Type', 'application/json');
+      res.write(JSON.stringify({ Version: '1.98.8' }) + '\n');
+      if (incoming.length) res.write(JSON.stringify({ IncomingFiles: incoming }) + '\n');
+      watchers.add(res);
+      req.on('close', () => watchers.delete(res));
+      return;
+    }
     const rest = url.pathname.slice('/localapi/v0/files/'.length);
     if (rest === '') {
       const wait = Math.min(Number(url.searchParams.get('waitsec') ?? 0), 1) * 1000;
@@ -48,7 +62,16 @@ function fakeApi(sock) {
       res.end(inbox.get(name));
     }
   });
-  return { inbox, seen, listen: () => new Promise((r) => server.listen(sock, r)), close: () => server.close() };
+  return {
+    inbox,
+    seen,
+    setIncoming,
+    listen: () => new Promise((r) => server.listen(sock, r)),
+    close: () => {
+      for (const w of watchers) w.destroy();
+      server.close();
+    },
+  };
 }
 
 async function scratch(t, { socketUp = true } = {}) {
@@ -135,6 +158,24 @@ test('ten files arriving together give ten files and one notification with the c
   assert.equal(rest[0], 'Taildrop · 10 files');
   const hint = argv.find((a) => a.startsWith('string:x-dots-files:')).slice('string:x-dots-files:'.length);
   assert.deepEqual(hint.split('\n').sort(), saved(s).map((f) => join(s.downloads, f)));
+});
+
+test('a file still arriving when the others have landed joins their notification, however long it takes', async (t) => {
+  const s = await scratch(t);
+  await until('the first listing', () => s.api.seen.some((l) => l.startsWith('GET /localapi/v0/files/')));
+  s.api.setIncoming([{ Name: 'b.mov', DeclaredSize: 100, Received: 10 }]);
+  s.api.inbox.set('a.jpg', Buffer.from('a'));
+  await until('a.jpg saved or held', () => s.api.seen.some((l) => l.startsWith('GET /localapi/v0/watch-ipn-bus')));
+  await sleep(3500);
+  assert.deepEqual(s.notes(), [], 'no notification while b.mov is still arriving');
+  s.api.inbox.set('b.mov', Buffer.from('b'));
+  s.api.setIncoming([]);
+  await until('both files', () => saved(s).length === 2);
+  await until('the notification', () => s.notes().length >= 1);
+  await sleep(2500);
+  assert.equal(s.notes().length, 1);
+  const argv = s.notes()[0];
+  assert.equal(argv[argv.indexOf('--') + 1], 'Taildrop · 2 files');
 });
 
 test('with no socket at start the process keeps running, then catches the queued file once tailscaled is up', async (t) => {
