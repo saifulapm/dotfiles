@@ -60,8 +60,8 @@ test('a filter matches the title or the key text, ignoring case', () => {
   const rows = parseBinds(binds);
   assert.deepEqual(filterRows(rows, 'theme').map((r) => r.title), ['Themes']);
   assert.deepEqual(filterRows(rows, 'mod ⇧').map((r) => r.title), [
-    'Themes', 'Clear Notifications', 'Pin Notes', 'System Monitor: btop', 'Quit niri', 'Screens Off', 'Screenshot: Screen', 'Screenshot: Region',
-    'Screenshot: Window', 'Record a Region', 'Cast: Focused Window', 'Cast: Focused Screen', 'Cast: Nothing', 'Window Shorter', 'Window Taller',
+    'Mail: kak-mail', 'Themes', 'Clear Notifications', 'Pin Notes', 'System Monitor: btop', 'Quit niri', 'Screens Off', 'Screenshot: Screen', 'Screenshot: Region',
+    'Screenshot: Window', 'Copy Text from a Region', 'Annotate a Region', 'Record a Region', 'Cast: Focused Window', 'Cast: Focused Screen', 'Cast: Nothing', 'Window Shorter', 'Window Taller',
     'Fullscreen Window', 'Focus Floating or Tiled', 'Center Column',
   ]);
   assert.equal(filterRows(rows, '').length, rows.length);

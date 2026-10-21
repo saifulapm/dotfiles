@@ -65,6 +65,13 @@ test('Mod+G toggles Goals', () => {
   assert.match(binds, spawns('Mod+G', ['dots-call', 'goals', 'toggle']));
 });
 
+test('Mod+Shift+6 reads a region\'s text, Mod+Shift+7 annotates one, Mod+S opens Shelf and Mod+Shift+M opens the Imbox', () => {
+  assert.match(binds, spawns('Mod+Shift+6', ['dots-capture', 'ocr']));
+  assert.match(binds, spawns('Mod+Shift+7', ['dots-capture', 'annotate']));
+  assert.match(binds, spawns('Mod+S', ['dots-call', 'notes', 'shelf']));
+  assert.match(binds, spawns('Mod+Shift+M', ['mail-open', 'Imbox']));
+});
+
 test('Print opens niri screenshot UI and center-column moves to Mod+Shift+C', () => {
   assert.match(binds, /^\s*Print hotkey-overlay-title="[^"]+" \{ screenshot; \}$/m);
   assert.match(binds, /^\s*Mod\+Shift\+C hotkey-overlay-title="[^"]+" \{ center-column; \}$/m);

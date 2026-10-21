@@ -5,6 +5,7 @@ binds {
     Mod+B hotkey-overlay-title="Browser: Chromium" { spawn "chromium-browser"; }
     Mod+E hotkey-overlay-title="Editor: kak" { spawn "dots-foot" "kak"; }
     Mod+Y hotkey-overlay-title="Files: yazi" { spawn "dots-foot" "yazi"; }
+    Mod+Shift+M hotkey-overlay-title="Mail: kak-mail" { spawn "mail-open" "Imbox"; }
     Mod+Space hotkey-overlay-title="Launcher" { spawn "dots-call" "launcher" "toggle"; }
     Mod+V hotkey-overlay-title="Clipboard" { spawn "dots-call" "launcher" "mode" "clipboard"; }
     Mod+Period hotkey-overlay-title="Emoji" { spawn "dots-call" "launcher" "mode" "emoji"; }
@@ -16,6 +17,7 @@ binds {
     Mod+I hotkey-overlay-title="Island" { spawn "dots-call" "island" "focus"; }
     Mod+N hotkey-overlay-title="Notes" { spawn "dots-call" "notes" "toggle"; }
     Mod+Shift+N hotkey-overlay-title="Pin Notes" { spawn "dots-call" "notes" "pin"; }
+    Mod+S hotkey-overlay-title="Shelf" { spawn "dots-call" "notes" "shelf"; }
     Mod+G hotkey-overlay-title="Goals" { spawn "dots-call" "goals" "toggle"; }
     Mod+P hotkey-overlay-title="Pass" { spawn "dots-call" "pass" "toggle"; }
     Mod+T hotkey-overlay-title="Tailscale" { spawn "dots-call" "tailscale" "toggle"; }
@@ -31,6 +33,8 @@ binds {
     Mod+Shift+3 hotkey-overlay-title="Screenshot: Screen" { screenshot-screen; }
     Mod+Shift+4 hotkey-overlay-title="Screenshot: Region" { screenshot; }
     Mod+Shift+5 hotkey-overlay-title="Screenshot: Window" { screenshot-window; }
+    Mod+Shift+6 hotkey-overlay-title="Copy Text from a Region" { spawn "dots-capture" "ocr"; }
+    Mod+Shift+7 hotkey-overlay-title="Annotate a Region" { spawn "dots-capture" "annotate"; }
     Mod+Shift+R hotkey-overlay-title="Record a Region" { spawn "dots-call" "record" "toggle"; }
     Mod+Shift+8 hotkey-overlay-title="Cast: Focused Window" { set-dynamic-cast-window; }
     Mod+Shift+9 hotkey-overlay-title="Cast: Focused Screen" { set-dynamic-cast-monitor; }
