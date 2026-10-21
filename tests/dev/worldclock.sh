@@ -103,6 +103,21 @@ rows() { island | jq -c '[.calendar.cities[] | {city, offset, day} | map_values(
 want=$(rows)
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 same_rows() { [ "$(rows)" = "$want" ]; }
+# Each board words the month its own way: Paper's CALENDAR head over a serif title, Artboard's Sunday-first row, Blueprint's [ CALENDAR ] header and OCT 2026.
+month_drawn() {
+  case $1 in
+    paper) echo "CALENDAR|$(date '+%B %Y')|M" ;;
+    artboard) echo "|$(date '+%B %Y')|Su" ;;
+    blueprint) echo "[ CALENDAR ]|$(date '+%b %Y' | tr a-z A-Z)|M" ;;
+  esac
+}
+grid_is() {
+  local want head title first
+  want=$(month_drawn "$1")
+  IFS='|' read -r head title first <<<"$want"
+  island | jq -e --arg h "$head" --arg t "$title" --arg f "$first" '.calendar.grid | .header == $h and .title == $t and .weekdays[0] == $f and (.weekdays | length) == 7' >/dev/null 2>&1
+}
+today_marked() { island | jq -e --argjson d "$(date +%-d)" '.calendar.grid.today | . != null and (.day | tonumber) == $d and .width > 0 and .bold and (.filled or .border > 0)' >/dev/null 2>&1; }
 for t in paper artboard blueprint; do
   wtype -k Escape
   until_ok 1000 mode_is rest
@@ -112,6 +127,9 @@ for t in paper artboard blueprint; do
   until_ok 4000 loaded
   echo "     $t: $(rows)"
   check "$t draws every city's offset and day word" same_rows
+  echo "     $t: $(island | jq -c '.calendar.grid')"
+  check "$t draws its month heading and first weekday letter" grid_is "$t"
+  check "$t marks today's cell" today_marked
 done
 
 exit $((fails > 0))

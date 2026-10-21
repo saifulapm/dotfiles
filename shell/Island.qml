@@ -28,7 +28,9 @@ PanelWindow {
     readonly property var question: questions.current
     // The month the calendar shows, {year, month}, while Mod+I has it open.
     property var calendar: null
-    readonly property var grid: heldCalendar ? I.monthGrid(heldCalendar.year, heldCalendar.month) : null
+    readonly property var grid: heldCalendar ? I.monthGrid(heldCalendar.year, heldCalendar.month, clockLook.grid.weekStart) : null
+    // The month heading as the theme words it: one text, or the month and the year apart.
+    readonly property var titleParts: grid ? clockLook.grid.title.parts(grid) : []
     readonly property int today: heldCalendar && heldCalendar.year === clock.now.getFullYear() && heldCalendar.month === clock.now.getMonth() ? clock.now.getDate() : 0
     // Home first, then UTC, London and New York, each {city, time, offset, day, home}; empty until dots-zones answers.
     readonly property var cities: zones.answer ? W.cityRows(clock.now.getTime(), zones.answer) : []
@@ -458,6 +460,25 @@ PanelWindow {
         for (let i = 0; i < cityRepeater.count; i++)
             rows.push(cityRepeater.itemAt(i).drawn());
         return rows;
+    }
+
+    // The month grid as drawn, for `island state`: the header and title texts, the weekday letters and today's cell.
+    function gridDrawn() {
+        const weekdays = [];
+        for (let i = 0; i < weekdayRepeater.count; i++)
+            weekdays.push(weekdayRepeater.itemAt(i).children[0].text);
+        let today = null;
+        for (let i = 0; i < dayRepeater.count; i++) {
+            const cell = dayRepeater.itemAt(i);
+            if (cell.todayMark.visible)
+                today = { day: cell.dayText.text, width: cell.todayMark.width, height: cell.todayMark.height, filled: cell.todayMark.color.a > 0, border: cell.todayMark.border.width, bold: cell.dayText.font.weight === Font.Bold };
+        }
+        return {
+            header: headerName.visible ? headerName.text : gridHead.visible ? gridHead.text : "",
+            title: headerMonth.text !== "" ? headerMonth.text : titleRight.visible ? titleLeft.text + " " + titleRight.text : titleLeft.text,
+            weekdays,
+            today
+        };
     }
 
     // dots-call sending: the count and machine come once, then the whole send's percent; a percent outside a send is dropped.
@@ -1805,18 +1826,31 @@ PanelWindow {
                     width: parent.width - 36
                     spacing: 10
 
+                    // Blueprint heads the whole card: its name at the left, the month at the right.
                     Item {
+                        visible: island.clockLook.grid.header !== ""
                         width: parent.width
-                        height: monthTitle.implicitHeight
+                        height: headerName.implicitHeight
 
                         Text {
-                            id: monthTitle
+                            id: headerName
                             textFormat: Text.PlainText
-                            text: island.grid?.title ?? ""
-                            color: box.style.text
-                            font.family: island.theme.tokens?.type.ui ?? ""
-                            font.pixelSize: 13
-                            font.weight: Font.Medium
+                            text: island.clockLook.grid.header
+                            color: island.clockLook.grid.title.left.color || box.style.text
+                            font.family: island.clockLook.grid.title.left.font
+                            font.pixelSize: island.clockLook.grid.title.left.size
+                            font.letterSpacing: island.clockLook.grid.title.left.spacing
+                        }
+
+                        Text {
+                            id: headerMonth
+                            anchors.right: parent.right
+                            textFormat: Text.PlainText
+                            text: island.clockLook.grid.title.place === "header" ? island.titleParts.join(" ") : ""
+                            color: island.clockLook.grid.title.left.color || box.style.text
+                            font.family: island.clockLook.grid.title.left.font
+                            font.pixelSize: island.clockLook.grid.title.left.size
+                            font.letterSpacing: island.clockLook.grid.title.left.spacing
                         }
                     }
 
@@ -1824,32 +1858,137 @@ PanelWindow {
                     Row {
                         width: parent.width
 
-                        Grid {
+                        Column {
                             id: monthGrid
-                            columns: 7
-                            rowSpacing: 6
                             width: island.clockLook.gridWidth
+                            spacing: island.clockLook.grid.gap
 
-                            Repeater {
-                                model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].concat(island.grid?.cells ?? [])
+                            // Paper heads the month as it heads the city column, after an accent square.
+                            Item {
+                                visible: island.clockLook.grid.head !== ""
+                                width: parent.width
+                                height: gridHead.implicitHeight
 
                                 Rectangle {
-                                    required property var modelData
-                                    required property int index
-                                    readonly property bool isToday: index >= 7 && modelData === island.today
-                                    width: monthGrid.width / 7
-                                    height: 18
-                                    radius: 4
-                                    color: isToday ? box.style.text : "transparent"
+                                    anchors.verticalCenter: gridHead.verticalCenter
+                                    width: 8
+                                    height: 8
+                                    color: island.theme.tokens?.color.accent ?? box.style.text
+                                }
 
-                                    Text {
-                                        textFormat: Text.PlainText
-                                        anchors.centerIn: parent
-                                        text: parent.modelData ?? ""
-                                        color: parent.isToday ? box.style.fill : Qt.alpha(box.style.text, parent.index < 7 ? 0.55 : 0.85)
-                                        font.family: island.theme.tokens?.type.mono ?? ""
-                                        font.pixelSize: 11
-                                        font.weight: parent.isToday ? Font.DemiBold : Font.Normal
+                                Text {
+                                    id: gridHead
+                                    x: 16
+                                    textFormat: Text.PlainText
+                                    text: island.clockLook.grid.head
+                                    color: box.style.text
+                                    font.family: island.clockLook.offset.font
+                                    font.pixelSize: island.clockLook.offset.size
+                                    font.letterSpacing: island.clockLook.offset.spacing
+                                }
+                            }
+
+                            Item {
+                                visible: island.clockLook.grid.title.place !== "header"
+                                width: parent.width
+                                height: island.clockLook.grid.title.place === "line" ? 24 : titleLeft.implicitHeight
+
+                                Text {
+                                    id: titleLeft
+                                    readonly property var at: island.clockLook.grid.title.left
+                                    anchors.verticalCenter: island.clockLook.grid.title.place === "line" ? parent.verticalCenter : undefined
+                                    textFormat: Text.PlainText
+                                    text: island.titleParts[0] ?? ""
+                                    color: at.color || box.style.text
+                                    font.family: at.font
+                                    font.pixelSize: at.size
+                                    font.weight: at.weight
+                                    font.letterSpacing: at.spacing
+                                }
+
+                                Text {
+                                    id: titleRight
+                                    readonly property var at: island.clockLook.grid.title.right
+                                    visible: island.clockLook.grid.title.place === "split"
+                                    anchors.right: parent.right
+                                    anchors.baseline: titleLeft.baseline
+                                    textFormat: Text.PlainText
+                                    text: visible ? island.titleParts[1] ?? "" : ""
+                                    color: at?.color || box.style.text
+                                    font.family: at?.font ?? ""
+                                    font.pixelSize: at?.size ?? 12
+                                    font.italic: at?.italic ?? false
+                                }
+                            }
+
+                            Column {
+                                spacing: island.clockLook.grid.rowGap
+
+                                Row {
+                                    Repeater {
+                                        id: weekdayRepeater
+                                        model: island.clockLook.grid.weekdays
+
+                                        Item {
+                                            required property string modelData
+                                            readonly property var at: island.clockLook.grid.weekday
+                                            width: island.clockLook.grid.cell
+                                            height: island.clockLook.grid.weekHeight
+
+                                            Text {
+                                                id: weekdayText
+                                                anchors.centerIn: parent
+                                                textFormat: Text.PlainText
+                                                text: parent.modelData
+                                                color: parent.at.color || box.style.text
+                                                font.family: parent.at.font
+                                                font.pixelSize: parent.at.size
+                                                font.letterSpacing: parent.at.spacing
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Grid {
+                                    columns: 7
+
+                                    Repeater {
+                                        id: dayRepeater
+                                        model: island.grid?.cells ?? []
+
+                                        Item {
+                                            required property var modelData
+                                            readonly property bool isToday: modelData !== null && modelData === island.today
+                                            readonly property var at: island.clockLook.grid.day
+                                            readonly property var mark: island.clockLook.grid.today
+                                            property alias dayText: dayLabel
+                                            property alias todayMark: todayBox
+                                            width: island.clockLook.grid.cell
+                                            height: island.clockLook.grid.rowHeight
+
+                                            Rectangle {
+                                                id: todayBox
+                                                visible: parent.isToday
+                                                anchors.centerIn: parent
+                                                width: parent.mark.w
+                                                height: parent.mark.h
+                                                radius: parent.mark.radius
+                                                color: parent.mark.inverted ? parent.mark.fill || box.style.text : "transparent"
+                                                border.width: parent.mark.border
+                                                border.color: parent.mark.borderColor
+                                            }
+
+                                            Text {
+                                                id: dayLabel
+                                                anchors.centerIn: parent
+                                                textFormat: Text.PlainText
+                                                text: parent.modelData ?? ""
+                                                color: parent.isToday && parent.mark.inverted ? box.style.fill : parent.at.color || box.style.text
+                                                font.family: parent.at.font
+                                                font.pixelSize: parent.at.size
+                                                font.weight: parent.isToday ? Font.Bold : Font.Normal
+                                            }
+                                        }
                                     }
                                 }
                             }
