@@ -74,7 +74,10 @@ Scope {
     }
 
     // Only a PAM success gets here; the marker empties after the lock goes, so a crash in between relocks, and through the lock's own synchronous write, so a lock right after cannot lose its marker to a late rm.
+    // A success for an attempt an agent's unlock already ended changes nothing, or it would empty the lease's marker.
     function accept() {
+        if (!trying)
+            return;
         trying = false;
         pending = "";
         session.locked = false;

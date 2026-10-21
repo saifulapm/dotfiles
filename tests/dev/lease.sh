@@ -76,6 +76,23 @@ check "a 200-character name holds whole" state_is '(.heldBy | length) == 200'
 call lock lock >/dev/null
 until_ok 3000 locked_shown
 
+# A password still in PAM when an agent unlocks: its late success must not empty the lease's marker, or a killed shell would restart unlocked.
+slow=$DOTS_DEV_DIR/pam-slow
+printf '#!/usr/bin/env bash\nsleep 2\nexec %q\n' "$repo/dev/pam-test-password" >"$slow"
+chmod +x "$slow"
+cp "$DOTS_PAM_DIR/dots-lock" "$DOTS_DEV_DIR/dots-lock.fast"
+sed -i "s|$repo/dev/pam-test-password|$slow|" "$DOTS_PAM_DIR/dots-lock"
+wtype dots-test-pass
+wtype -k Return
+sleep 0.3
+call lock unlock claude 5 >/dev/null
+sleep 2.5
+check "a password that passes after an agent unlock leaves the lease's marker ($(head -c 40 "$marker"))" grep -q '^lease claude until ' "$marker"
+check "and the lease" state_is '.locked == false and .heldBy == "claude"'
+cp "$DOTS_DEV_DIR/dots-lock.fast" "$DOTS_PAM_DIR/dots-lock"
+call lock lock >/dev/null
+until_ok 3000 locked_shown
+
 wtype dots-test-pass
 wtype -k Return
 until_ok 3000 state_is '.locked == false'
