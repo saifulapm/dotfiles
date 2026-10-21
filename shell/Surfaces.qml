@@ -150,7 +150,8 @@ PanelWindow {
         right: true
     }
     color: "transparent"
-    mask: shown ? null : noInput
+    // A drag out of the notification centre must reach the window under it, which this full-output layer would otherwise cover.
+    mask: shown && !(notifications?.dragging ?? false) ? null : noInput
 
     Region {
         id: noInput

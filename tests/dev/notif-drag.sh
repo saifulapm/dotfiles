@@ -169,5 +169,16 @@ for t in paper:#FAF6EC:#FAF6EC artboard:#2B2F36:#FFFFFF blueprint:#7FE3F0:#0A152
   close_centre
 done
 
+# The centre covers the output while open, so its row's drag must let the pointer through to the window under it.
+in_theme paper
+send_files "$heic"
+toast_for "Taildrop · 1 file"
+open_centre
+n=$(drop_count)
+drag_to_target "$(centre | jq -c '.chips[0].box')"
+check "the centre row's chip drops file://$heic on the window under the centre ($(drops -1))" test "$(drop_count)" -gt "$n" -a "$(drops -1 | jq -r .uriList)" = "file://$heic"$'\r'
+check "and the centre is still open after the drop" centre_is '.open'
+close_centre
+
 exit $((fails > 0))
 }

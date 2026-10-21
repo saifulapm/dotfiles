@@ -13,6 +13,8 @@ Item {
     // The Notifs service: its history, Do Not Disturb and the remove, clear and act calls.
     required property var notifs
     property bool shown: false
+    // True while a row's drag runs, so the surfaces' window lets the pointer through to the app it drops on.
+    property bool dragging: false
     readonly property string query: input.text
     property int selected: 0
     property int opens: 0
@@ -517,6 +519,8 @@ Item {
                                 Drag.imageSource: payload.mime === "text/uri-list" ? rowFace.url : ""
                                 Drag.hotSpot.x: -14
                                 Drag.hotSpot.y: -18
+                                Drag.onDragStarted: centre.dragging = true
+                                Drag.onDragFinished: centre.dragging = false
                             }
 
                             Item {
