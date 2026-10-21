@@ -10,16 +10,17 @@ mkdir -p "$dir"
 touch "$changes"
 # The recorded ages are against 2026-10-21T08:00Z, so each offline LastSeen moves by the same distance to now and stays 55d or 42d.
 if [ ! -e "$status" ]; then
+  # The surface's first read and its watch start together, so each run writes a temp file of its own.
   jq '(.Peer[] | select(.Online == false) | .LastSeen) |= (now - ("2026-10-21T08:00:00Z" | fromdate) + (sub("\\.[0-9]+Z$"; "Z") | fromdate) | floor | todate)' \
-    "$(dirname "$(realpath "$0")")/../dev/tailscale-status.json" >"$status.tmp"
-  mv "$status.tmp" "$status"
+    "$(dirname "$(realpath "$0")")/../dev/tailscale-status.json" >"$status.$$"
+  mv "$status.$$" "$status"
 fi
 
 state_line() { jq -c '{State: .BackendState}' "$status"; }
 
 set_state() {
-  jq --arg s "$1" '.BackendState = $s' "$status" >"$status.tmp"
-  mv "$status.tmp" "$status"
+  jq --arg s "$1" '.BackendState = $s' "$status" >"$status.$$"
+  mv "$status.$$" "$status"
   state_line >>"$changes"
 }
 
@@ -59,11 +60,13 @@ case "${1:-} ${2:-}" in
     echo "can't send to $peer: peer is offline" >&2
     exit 1
   fi
-  # tailscale paints progress only on a terminal, one line per file redrawn in place.
+  # tailscale paints progress only on a terminal, one line per file redrawn in place every update interval, so a reader sees each paint end when the next begins.
   if [ -t 2 ]; then
     for f in "${files[@]}"; do
-      printf '\r\033[K%-36s    1.00KiB    2.00KiB/s     48.00%%    ETA 00:00:01' "$(basename "$f")" >&2
-      sleep 1
+      for _ in 1 2 3 4; do
+        printf '\r\033[K%-36s    1.00KiB    2.00KiB/s     48.00%%    ETA 00:00:01' "$(basename "$f")" >&2
+        sleep 0.25
+      done
       printf '\r\033[K%-36s    2.00KiB    2.00KiB/s    100.00%%    ETA 00:00:00\n' "$(basename "$f")" >&2
     done
   fi
