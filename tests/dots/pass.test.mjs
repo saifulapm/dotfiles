@@ -68,7 +68,7 @@ function scratch(t) {
   };
   // The shims log their arguments and run the real tool, so a test can look for a secret in what any process was started with.
   const shim = (name) => put(name, `echo "${name} $*" >>"$STUB_REC/argv.log"\nexec ${real(name)} "$@"`);
-  for (const name of ['pass', 'zbarimg']) shim(name);
+  for (const name of ['pass', 'zbarimg', 'oathtool']) shim(name);
   // A copy keeps the selection by staying alive, and the next copy ends it, as losing the selection ends the real one.
   put(
     'wl-copy',
@@ -226,6 +226,33 @@ test('otp copies the same code oathtool gives and tags the entry', async (t) => 
   assert.ok(code === before || code === after, `${code} is neither ${before} nor ${after}`);
   assert.equal(state(ctx, 'pass-otp'), 'web/github.com\n');
   assert.equal(state(ctx, 'pass-recent'), 'web/github.com\n');
+  // pass otp hands the secret to oathtool in argv, where any process could read it.
+  assert.doesNotMatch(rec(ctx, 'argv.log'), new RegExp(SECRET));
+});
+
+test("otp follows the code's digits, period and algorithm", async (t) => {
+  const ctx = scratch(t);
+  seed(ctx, 'bank', `pw\notpauth://totp/Bank:me?secret=${SECRET}&digits=8&period=60&algorithm=SHA256\n`);
+  const want = () => execFileSync('oathtool', ['--totp=sha256', '--time-step-size=60s', '--digits=8', '-b', SECRET], { encoding: 'utf8' }).trim();
+  const before = want();
+  const r = await run(ctx, ['otp', 'bank']);
+  const after = want();
+  assert.equal(r.code, 0, r.stderr);
+  const code = rec(ctx, 'wl-copy.stdin');
+  assert.ok(code === before || code === after, `${code} is neither ${before} nor ${after}`);
+  assert.doesNotMatch(rec(ctx, 'argv.log'), new RegExp(SECRET));
+});
+
+test('otp on an entry with no TOTP code says so and copies nothing', async (t) => {
+  const ctx = scratch(t);
+  seed(ctx, 'plain', 'pw\n');
+  seed(ctx, 'counter', `pw\notpauth://hotp/X:y?secret=${SECRET}&counter=1\n`);
+  for (const name of ['plain', 'counter']) {
+    const r = await run(ctx, ['otp', name]);
+    assert.notEqual(r.code, 0);
+    assert.match(r.stderr, /^dots-pass: no totp code in /);
+  }
+  assert.equal(existsSync(join(ctx.rec, 'wl-copy.stdin')), false);
 });
 
 test('show prints the first line and records nothing', async (t) => {
@@ -347,13 +374,14 @@ test('qr-save inserts a new entry from the clipboard, tags it and pushes', async
   qr(ctx, URI);
   const r = await run(ctx, ['qr-save', 'web/new']);
   assert.equal(r.code, 0, r.stderr);
+  // Read before the check below runs pass otp itself, which puts the secret in oathtool's argv.
+  assert.doesNotMatch(rec(ctx, 'argv.log'), new RegExp(SECRET));
+  assert.doesNotMatch(r.stdout + r.stderr, new RegExp(SECRET));
   const code = execFileSync('/usr/bin/pass', ['otp', '--', 'web/new'], { env: ctx.env, encoding: 'utf8' }).trim();
   assert.match(code, /^\d{6}$/);
   assert.equal(state(ctx, 'pass-otp'), 'web/new\n');
   assert.equal(state(ctx, 'pass-recent'), 'web/new\n');
   assert.match(lastRemote(ctx), /web\/new/);
-  assert.doesNotMatch(rec(ctx, 'argv.log'), new RegExp(SECRET));
-  assert.doesNotMatch(r.stdout + r.stderr, new RegExp(SECRET));
 });
 
 test('qr-save appends the code to an entry that exists and keeps its password', async (t) => {

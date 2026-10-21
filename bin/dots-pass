@@ -41,6 +41,35 @@ fetch() {
   secret=${out%%$'\n'*}
 }
 
+# Sets secret to the entry's current TOTP code. pass otp would hand the seed to oathtool in argv, where any process can read it, so the seed goes in on stdin.
+totp() {
+  local out line query pair uri='' key=''
+  local -a pairs
+  local -a args=(-b --totp)
+  [ -f "$store/$name.gpg" ] || die "no entry $name"
+  out=$(pass show -- "$name" 2>/dev/null) || die "could not decrypt $name"
+  while IFS= read -r line; do
+    case $line in otpauth://totp/*\?*)
+      uri=$line
+      break
+      ;;
+    esac
+  done <<<"$out"
+  [ -n "$uri" ] || die "no totp code in $name"
+  query=${uri#*\?}
+  IFS='&' read -ra pairs <<<"$query"
+  for pair in "${pairs[@]}"; do
+    case $pair in
+    secret=?*) key=${pair#secret=} ;;
+    algorithm=*) [[ ${pair#algorithm=} =~ ^(SHA1|SHA256|SHA512)$ ]] && args[1]=--totp=${pair#algorithm=} && args[1]=${args[1],,} ;;
+    digits=*) [[ ${pair#digits=} =~ ^([6-8])$ ]] && args+=(--digits="${pair#digits=}") ;;
+    period=*) [[ ${pair#period=} =~ ^[1-9][0-9]*$ ]] && args+=(--time-step-size="${pair#period=}s") ;;
+    esac
+  done
+  [ -n "$key" ] || die "no totp code in $name"
+  secret=$(printf '%s\n' "$key" | oathtool "${args[@]}" -) || die "could not make a code for $name"
+}
+
 # Holds the secret on the clipboard; the timer clears it only while this wl-copy still owns the selection, so a newer copy is left alone.
 clip() {
   local pid
@@ -152,7 +181,7 @@ copy)
   state_set "$recent" "$name" 1
   ;;
 otp)
-  fetch pass otp -- "$name"
+  totp
   clip
   state_set "$recent" "$name" 1
   state_set "$tagged" "$name" 1
