@@ -1,6 +1,7 @@
 // How the shell speaks under a token set, from its voice, as the three themes' boards draw it: the launcher and the lists that share its idioms, the island's notification and OSD, and the margins.
 
 import { dateText, pad2 } from './margins.mjs';
+import { chipLabel } from './notifs.mjs';
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands'];
 
@@ -305,6 +306,85 @@ export function sendingLook(tokens) {
     parts: [Object.assign(text(10, '', { spacing: 1.4, name: true }), { text: (count, to) => `SENDING ${upper(files(count))} TO ${upper(line(to))} ·` })],
     pct: Object.assign(text(20, '', { font: t.display }), { text: (p) => `${p}%` }),
     bar: { at: 'bottom', height: 4, radius: 0, track: c.paper, fill: c.accent },
+  };
+}
+
+// C0 controls and DEL, which a file name from another machine may carry.
+const CONTROLS = /[\u0000-\u001f\u007f]/g;
+
+// How a file notification's chip draws in the toast, a centre row and the cursor row, its empty slot and the drag image, as the m22 boards do; every per-theme value sits here.
+export function chipLook(tokens) {
+  const c = (tokens || UNTHEMED).color;
+  const t = (tokens || UNTHEMED).type;
+  const voice = t.voice;
+  const label = (files) => line(chipLabel(files));
+  const name = (files) => (files.length === 1 ? line(files[0].slice(files[0].lastIndexOf('/') + 1)).replace(CONTROLS, '') : label(files));
+  const place = (fill, frame, text, grip, glyph, pad, radius) => ({ fill, frame, text, grip, glyph, pad, radius });
+  if (voice === 'plain') {
+    const row = place(ARTBOARD.tile, ARTBOARD.tile, c.muted, '#8A909B', c.muted, [5, 8, 5, 8], 8);
+    return {
+      label,
+      name,
+      font: t.ui,
+      size: 11,
+      spacing: 0,
+      gap: 6,
+      cut: 0,
+      grip: { w: 8, h: 12, r: 1 },
+      glyph: { w: 14, h: 14, stroke: 1.3, path: 'M3 1.5h5l3 3v8H3z M8 1.5v3h3' },
+      toastPlace: 'column',
+      rowPlace: 'afterAge',
+      toast: place(ISLAND.plain.tile, ISLAND.plain.tile, ISLAND.plain.body, ISLAND.plain.head, ISLAND.plain.summary, [8, 10, 8, 10], 10),
+      row,
+      cursor: Object.assign({}, row, { fill: c.surface, frame: c.surface }),
+      empty: { color: ISLAND.plain.bar, width: 1.5, content: false },
+      frame: null,
+      dragAge: '',
+      drag: { fill: c.surface, frame: c.accent, frameWidth: 1.5, text: c.ink, grip: null, glyph: ARTBOARD.deep, shadow: null, pad: [9, 12, 9, 12], gap: 8, size: 12, weight: 500, spacing: 0, radius: 10, cut: 0 },
+    };
+  }
+  if (voice === 'bracket') {
+    const row = place(c.surface, c.accent, c.accent, c.muted, c.accent, [3, 10, 3, 6], 0);
+    return {
+      label,
+      name,
+      font: t.mono,
+      size: 10,
+      spacing: 1.2,
+      gap: 6,
+      cut: 7,
+      grip: { w: 6, h: 10, r: 1 },
+      glyph: { w: 9, h: 11, stroke: 1, path: 'M.5 .5h5l3 3v7h-8z' },
+      toastPlace: 'body',
+      rowPlace: 'underAge',
+      toast: row,
+      row,
+      cursor: place(c.accent, c.surface, c.surface, c.surface, c.surface, [3, 10, 3, 6], 0),
+      empty: { color: c.muted, width: 1, content: false },
+      frame: null,
+      dragAge: 'DRAGGING',
+      drag: { fill: c.surface, frame: c.accent, frameWidth: 1, text: c.ink, grip: c.muted, glyph: c.accent, shadow: null, pad: [6, 14, 6, 9], gap: 8, size: 12, weight: 400, spacing: 0.72, radius: 0, cut: 9 },
+    };
+  }
+  return {
+    label,
+    name,
+    font: t.ui,
+    size: 10,
+    spacing: 1.4,
+    gap: 7,
+    cut: 0,
+    grip: { w: 8, h: 12, r: 1.1 },
+    glyph: { w: 12, h: 14, stroke: 1.2, path: 'M1.5 1.5h6l3 3v8h-9z M7.5 1.5v3h3' },
+    toastPlace: 'body',
+    rowPlace: 'beforeAge',
+    toast: place(c.surface, c.surface, c.ink, c.ink, c.ink, [3, 9, 3, 7], 0),
+    row: place(c.surface, c.ink, c.ink, c.ink, c.ink, [3, 9, 3, 7], 0),
+    cursor: place(c.surface, c.surface, c.ink, c.ink, c.ink, [3, 9, 3, 7], 0),
+    empty: { color: c.paper, width: 1, content: true },
+    frame: { width: 1.5, color: c.accent },
+    dragAge: '',
+    drag: { fill: c.surface, frame: c.ink, frameWidth: 1, text: c.ink, grip: c.ink, glyph: c.ink, shadow: c.ink, pad: [6, 12, 6, 9], gap: 9, size: 12, weight: 500, spacing: 0, radius: 0, cut: 0 },
   };
 }
 

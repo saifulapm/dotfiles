@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, MODES, inOrder } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, chipLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -350,4 +350,48 @@ test("Blueprint's sending slot: 420 by 34, [ TAILDROP ] → NUC 2 FILES in mono,
 
 test('one part of each slot names the machine, and only that one elides', () => {
   for (const t of ['paper', 'artboard', 'blueprint']) assert.equal(sending(t).parts.filter((p) => p.name).length, 1, t);
+});
+
+const chip = (name) => chipLook(theme(name));
+
+test("Paper's file chip: a surface tag with a grip, a file glyph and tracked caps, framed in ink on a row; dragged, a dashed paper slot and a 1.5 px red frame", () => {
+  const p = chip('paper');
+  assert.deepEqual([p.font, p.size, p.spacing, p.gap, p.cut, p.toastPlace, p.rowPlace], ['Maple Mono', 10, 1.4, 7, 0, 'body', 'beforeAge']);
+  assert.deepEqual([p.toast.fill, p.toast.frame, p.toast.text, p.toast.pad, p.toast.radius], ['#FAF6EC', '#FAF6EC', '#1C1915', [3, 9, 3, 7], 0]);
+  assert.deepEqual([p.row.fill, p.row.frame, p.cursor.frame], ['#FAF6EC', '#1C1915', '#FAF6EC']);
+  assert.deepEqual([p.grip, p.glyph], [{ w: 8, h: 12, r: 1.1 }, { w: 12, h: 14, stroke: 1.2, path: 'M1.5 1.5h6l3 3v8h-9z M7.5 1.5v3h3' }]);
+  assert.deepEqual([p.empty.color, p.empty.width, p.empty.content], ['#F1E9D8', 1, true]);
+  assert.deepEqual([p.frame.width, p.frame.color, p.dragAge], [1.5, '#C8381E', '']);
+  const d = p.drag;
+  assert.deepEqual([d.fill, d.frame, d.frameWidth, d.text, d.shadow, d.pad, d.gap, d.size, d.weight], ['#FAF6EC', '#1C1915', 1, '#1C1915', '#1C1915', [6, 12, 6, 9], 9, 12, 500]);
+});
+
+test("Artboard's file chip: a rounded tile-coloured pill beside the card and after a row's age; dragged, a dashed blue slot and a white pill named in ink", () => {
+  const a = chip('artboard');
+  assert.deepEqual([a.size, a.spacing, a.gap, a.toastPlace, a.rowPlace], [11, 0, 6, 'column', 'afterAge']);
+  assert.deepEqual([a.toast.fill, a.toast.text, a.toast.grip, a.toast.glyph, a.toast.pad, a.toast.radius], ['#2B2F36', '#C9CED6', '#A3A9B4', '#FFFFFF', [8, 10, 8, 10], 10]);
+  assert.deepEqual([a.row.fill, a.row.text, a.row.grip, a.row.pad, a.row.radius, a.cursor.fill], ['#F2F3F6', '#57606A', '#8A909B', [5, 8, 5, 8], 8, '#FFFFFF']);
+  assert.deepEqual([a.grip, a.glyph], [{ w: 8, h: 12, r: 1 }, { w: 14, h: 14, stroke: 1.3, path: 'M3 1.5h5l3 3v8H3z M8 1.5v3h3' }]);
+  assert.deepEqual([a.empty.color, a.empty.width, a.empty.content, a.frame], ['#6C83FF', 1.5, false, null]);
+  const d = a.drag;
+  assert.deepEqual([d.fill, d.frame, d.frameWidth, d.text, d.grip, d.glyph, d.radius, d.size, d.weight], ['#FFFFFF', '#3D5AFE', 1.5, '#15171B', null, '#2638C9', 10, 12, 500]);
+});
+
+test("Blueprint's file chip: a cut-corner cyan frame under a row's age, inverted on the cursor row; dragged, a dashed muted slot and DRAGGING for the age", () => {
+  const b = chip('blueprint');
+  assert.deepEqual([b.font, b.size, b.spacing, b.gap, b.cut, b.toastPlace, b.rowPlace], ['Maple Mono', 10, 1.2, 6, 7, 'body', 'underAge']);
+  assert.deepEqual([b.toast.fill, b.toast.frame, b.toast.text, b.toast.grip, b.toast.pad], ['#0A1526', '#7FE3F0', '#7FE3F0', '#80A4C2', [3, 10, 3, 6]]);
+  assert.deepEqual([b.cursor.fill, b.cursor.frame, b.cursor.text, b.cursor.grip], ['#7FE3F0', '#0A1526', '#0A1526', '#0A1526']);
+  assert.deepEqual([b.grip, b.glyph], [{ w: 6, h: 10, r: 1 }, { w: 9, h: 11, stroke: 1, path: 'M.5 .5h5l3 3v7h-8z' }]);
+  assert.deepEqual([b.empty.color, b.empty.content, b.frame, b.dragAge], ['#80A4C2', false, null, 'DRAGGING']);
+  assert.deepEqual([b.drag.frame, b.drag.text, b.drag.cut, b.drag.pad, b.drag.spacing], ['#7FE3F0', '#D6F4F8', 9, [6, 14, 6, 9], 0.72]);
+});
+
+test("a chip reads the file's extension or the count, and the drag image names the file in one line without controls", () => {
+  const p = chip('paper');
+  assert.deepEqual([p.label(['/d/IMG_2041.heic']), p.label(['/d/a', '/d/b', '/d/c'])], ['HEIC', '3 FILES']);
+  assert.equal(p.name(['/d/IMG_2041.HEIC']), 'IMG_2041.HEIC');
+  assert.equal(p.name(['/d/a\nb‮\u0007c.jpg']), 'a bc.jpg');
+  assert.equal(p.name(['/d/a', '/d/b']), '2 FILES');
+  assert.equal(p.label(['/d/x.he‮ic']), 'HEIC');
 });
