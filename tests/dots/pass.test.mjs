@@ -116,6 +116,8 @@ function run(ctx, args, { input = '', env = {} } = {}) {
     p.stderr.on('data', (d) => (stderr += d));
     p.on('error', (e) => resolve({ code: null, stdout, stderr: String(e) }));
     p.on('close', (code) => resolve({ code, stdout, stderr }));
+    // A verb that reads no stdin can exit before the write lands.
+    p.stdin.on('error', () => {});
     p.stdin.end(input);
   });
 }
