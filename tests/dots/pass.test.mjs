@@ -1,7 +1,7 @@
 // dots-pass as the shell runs it: real pass, gpg and git in a scratch root, with the clipboard, the terminal and the editor played by stubs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
@@ -81,10 +81,16 @@ echo $$ >"$STUB_REC/wl-copy.pid"
 exec sleep 300`,
   );
   put('wl-paste', `echo "wl-paste $*" >>"$STUB_REC/argv.log"\n[ -f "$STUB_REC/clipboard.png" ] || exit 1\ncat "$STUB_REC/clipboard.png"`);
-  put('dots-foot', `echo "dots-foot $*" >>"$STUB_REC/argv.log"\n[ "$1" != -e ] || shift\n"$@"`);
+  // The shell's user manager need not have bin/ on PATH, so dots-pass runs from a dir of its own with dots-foot beside it, and that dir is not on PATH.
+  const own = join(root, 'bin');
+  mkdirSync(own);
+  copyFileSync(bin, join(own, 'dots-pass'));
+  chmodSync(join(own, 'dots-pass'), 0o755);
+  writeFileSync(join(own, 'dots-foot'), `#!/bin/bash\necho "dots-foot $*" >>"$STUB_REC/argv.log"\n[ "$1" != -e ] || shift\n"$@"\n`);
+  chmodSync(join(own, 'dots-foot'), 0o755);
   put('kak', `echo "edited in kak" >>"$1"`);
   const env = { ...baseEnv(root), PATH: stubs + delimiter + process.env.PATH, STUB_REC: rec, EDITOR: 'vim' };
-  const ctx = { root, rec, env, groups: [], store: join(root, 'store'), state: join(root, 'state', 'dots') };
+  const ctx = { bin: join(own, 'dots-pass'), root, rec, env, groups: [], store: join(root, 'store'), state: join(root, 'state', 'dots') };
   t.after(() => {
     for (const pid of ctx.groups) {
       try {
@@ -102,7 +108,7 @@ exec sleep 300`,
 // Runs dots-pass in a group of its own, so the copy and the timer it leaves behind can be ended with the test.
 function run(ctx, args, { input = '', env = {} } = {}) {
   return new Promise((resolve) => {
-    const p = spawn(bin, args, { env: { ...ctx.env, ...env }, detached: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const p = spawn(ctx.bin, args, { env: { ...ctx.env, ...env }, detached: true, stdio: ['pipe', 'pipe', 'pipe'] });
     ctx.groups.push(p.pid);
     let stdout = '';
     let stderr = '';

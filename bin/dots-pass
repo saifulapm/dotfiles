@@ -183,9 +183,9 @@ delete)
   ;;
 edit)
   [ -f "$store/$name.gpg" ] || die "no entry $name"
-  # pass edit takes no --, and reads its one argument as the name, so a leading dash is safe.
+  # pass edit takes no --, and reads its one argument as the name, so a leading dash is safe; dots-foot is the one beside this script, since the shell's user manager need not have bin/ on PATH.
   # shellcheck disable=SC2016
-  dots-foot env EDITOR=kak bash -c 'pass edit "$1" && exec "$2" push' _ "$name" "$self"
+  "${self%/*}/dots-foot" env EDITOR=kak bash -c 'pass edit "$1" && exec "$2" push' _ "$name" "$self"
   ;;
 push) push ;;
 qr-scan)
