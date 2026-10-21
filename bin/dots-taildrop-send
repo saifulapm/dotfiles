@@ -102,11 +102,12 @@ def main():
             break
         buf += chunk
         *lines, buf = re.split(rb"[\r\n]", buf)
-        for line in lines:
+        # The paint still open at the end of a read is read too: tailscale starts each repaint with \r, so waiting for it would show every percent one repaint late.
+        for line, whole_line in [(l, True) for l in lines] + [(buf, False)]:
             line = re.sub(rb"\x1b\[[0-9;]*[A-Za-z]", b"", line).strip()
             m = PERCENT.search(line)
             if not m:
-                if line:
+                if line and whole_line:
                     said = line
                 continue
             pct = float(m.group(1))

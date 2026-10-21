@@ -15,11 +15,16 @@ printf '%s\\n' "$*" >>"$STUB_REC/tailscale"
 shift 2
 files=()
 for a in "$@"; do case $a in --*) ;; *:) target=$a ;; *) files+=("$a") ;; esac; done
+want=(24 74)
+i=0
 for f in "\${files[@]}"; do
   [ "$STUB_FAIL" = 1 ] && { echo "can't send to nuc: peer is offline" >&2; exit 1; }
   if [ -t 2 ]; then
     printf '\\r\\033[K%-36s    1.00KiB    2.00KiB/s     48.00%%    ETA 00:00:01' "$(basename "$f")" >&2
-    sleep 0.2
+    sleep 0.5
+    # Whether the island heard 48% while that paint was still the last one, before the next began.
+    grep -q "sending progress \${want[i]}\$" "$STUB_REC/dots-call" 2>/dev/null && echo "\${want[i]}" >>"$STUB_REC/timely"
+    i=$((i + 1))
     printf '\\r\\033[K%-36s    2.00KiB    2.00KiB/s    100.00%%    ETA 00:00:00\\n' "$(basename "$f")" >&2
   fi
 done
@@ -75,6 +80,7 @@ test('sends the picked files, reports start, progress and done to the island, an
   const pcts = calls.filter((l) => l.startsWith('sending progress ')).map((l) => Number(l.split(' ')[2]));
   // 48% of the first of two equal files is 24% of the whole, then half, then 74%, then all.
   assert.deepEqual(pcts, [24, 50, 74, 100]);
+  assert.equal(picked.read('timely'), '24\n74\n', 'each paint reaches the island before the next one starts');
   assert.deepEqual(picked.read('notify').split('\0').slice(0, -1), ['-a', 'Tailscale', '--', 'Sent 2 files to nuc', 'a.txt\nb.txt']);
 });
 
