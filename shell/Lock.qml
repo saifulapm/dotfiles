@@ -6,6 +6,7 @@ import QtQuick
 import "." as Root
 import "services" as Services
 import "lib/lock-look.mjs" as L
+import "lib/lease.mjs" as Lease
 
 // The session lock: a WlSessionLock cannot live in the Overlay host, so it is the one surface outside it.
 Scope {
@@ -20,6 +21,11 @@ Scope {
     property string pending: ""
     // A failed attempt can end in both completed and error, and counts once.
     property bool trying: false
+    // An agent's lease on the unlocked session, in ms since the epoch; heldBy is empty when none holds.
+    property string heldBy: ""
+    property real unlockedAt: 0
+    property real leaseUntil: 0
+    readonly property bool leased: heldBy !== ""
 
     // Every surface's field clears on this, so no screen keeps a typed password.
     signal cleared
@@ -34,6 +40,7 @@ Scope {
 
     // The marker goes down before the lock does, so a shell killed at any point after this relocks on restart.
     function lockNow() {
+        endLease();
         // FileView skips a write of the text it last wrote, so each lock writes its own time.
         markerFile.setText(new Date().toISOString() + "\n");
         session.locked = true;
@@ -70,6 +77,74 @@ Scope {
         markerFile.setText("");
     }
 
+    function endLease() {
+        heldBy = "";
+        unlockedAt = 0;
+        leaseUntil = 0;
+    }
+
+    // An agent's unlock: no PAM, the same release order as accept(), but the marker keeps the lease, so a shell killed mid-lease relocks on restart.
+    function leaseUnlock(who, minutes) {
+        if (!session.locked)
+            return JSON.stringify({ error: "not locked" });
+        const name = Lease.holder(who);
+        const m = Lease.minutesOf(minutes);
+        const now = Date.now();
+        cleared();
+        trying = false;
+        pending = "";
+        heldBy = name;
+        unlockedAt = now;
+        leaseUntil = Lease.leaseEnd(now, now, m);
+        console.info(Lease.unlockLine(name, m));
+        session.locked = false;
+        markerFile.setText("lease " + name + " until " + new Date(leaseUntil).toISOString() + "\n");
+        return stateText();
+    }
+
+    function renewLease(who, minutes) {
+        if (!leased)
+            return JSON.stringify({ error: "no lease" });
+        const name = Lease.holder(who);
+        const m = Lease.minutesOf(minutes);
+        heldBy = name;
+        leaseUntil = Lease.leaseEnd(unlockedAt, Date.now(), m);
+        console.info("lock: lease renewed by " + name + " for " + m + " min");
+        return stateText();
+    }
+
+    function stateText() {
+        const t = clockItem;
+        const p = t ? t.mapToItem(null, 0, 0) : null;
+        return JSON.stringify({
+            locked: session.locked,
+            secure: session.secure,
+            heldBy: heldBy,
+            unlockedAt: unlockedAt,
+            leaseUntil: leaseUntil,
+            field: field,
+            failures: failures,
+            shaking: shake.running,
+            look: look.kind,
+            clockFamily: t ? t.font.family : "",
+            clockPx: t ? t.font.pixelSize : 0,
+            clockFill: t ? String(t.color) : "",
+            clockStroke: t && t.style === Text.Outline ? String(t.styleColor) : "transparent",
+            clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null
+        });
+    }
+
+    // Runs only while a lease holds; the lease's end locks.
+    Root.Tick {
+        interval: 1000
+        repeat: true
+        running: screenLock.leased
+        onTriggered: {
+            if (Date.now() >= screenLock.leaseUntil)
+                screenLock.lockNow();
+        }
+    }
+
     Root.Ipc {
         target: "lock"
 
@@ -77,22 +152,16 @@ Scope {
             screenLock.lockNow();
         }
 
+        function unlock(who: string, minutes: string): string {
+            return screenLock.leaseUnlock(who, minutes);
+        }
+
+        function renew(who: string, minutes: string): string {
+            return screenLock.renewLease(who, minutes);
+        }
+
         function state(): string {
-            const t = screenLock.clockItem;
-            const p = t ? t.mapToItem(null, 0, 0) : null;
-            return JSON.stringify({
-                locked: session.locked,
-                secure: session.secure,
-                field: screenLock.field,
-                failures: screenLock.failures,
-                shaking: shake.running,
-                look: screenLock.look.kind,
-                clockFamily: t ? t.font.family : "",
-                clockPx: t ? t.font.pixelSize : 0,
-                clockFill: t ? String(t.color) : "",
-                clockStroke: t && t.style === Text.Outline ? String(t.styleColor) : "transparent",
-                clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null
-            });
+            return screenLock.stateText();
         }
     }
 

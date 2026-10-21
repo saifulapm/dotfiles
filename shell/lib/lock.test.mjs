@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-// Only PAM may end the lock: an IPC unlock would let any local process skip the password.
+// PAM ends the lock for a person; an agent ends it only on a lease, which relocks by itself (4DCJG21B, C3K63N53, MBFQCTFH).
 const root = new URL('../..', import.meta.url).pathname;
 const lock = readFileSync(root + 'shell/Lock.qml', 'utf8');
 
@@ -18,8 +18,8 @@ function ipcFunctions(src) {
   assert.fail('the IpcHandler block never closes');
 }
 
-test('the lock IPC offers lock and state, never unlock', () => {
-  assert.deepEqual(ipcFunctions(lock).sort(), ['lock', 'state']);
+test('the lock IPC offers lock, state and the lease, unlock and renew', () => {
+  assert.deepEqual(ipcFunctions(lock).sort(), ['lock', 'renew', 'state', 'unlock']);
   assert.doesNotMatch(lock, /\.unlock\s*\(/);
 });
 
