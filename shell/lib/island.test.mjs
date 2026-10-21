@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -143,4 +143,21 @@ test('a send reads how many files go where and how far it got, on one line', () 
   assert.equal(islandText('sending', { sending: { count: 2, to: 'nuc', pct: 48 } }, AT), 'Sending 2 files to nuc · 48%');
   assert.equal(islandText('sending', { sending: { count: 1, to: 'nu\nc', pct: 0 } }, AT), 'Sending 1 file to nu c · 0%');
   assert.equal(isCompact('sending'), true);
+});
+
+test('a capture result shows just below a toast, as one line with its swatch', () => {
+  assert.equal(pick({ toast: 'Captured', capture: { text: 'No text found', swatch: null } }), 'toast');
+  assert.equal(pick({ capture: { text: 'No text found', swatch: null }, sending: { count: 1, to: 'nuc', pct: 1 } }), 'capture');
+  assert.equal(isCompact('capture'), true);
+  assert.deepEqual(captureOf('Copied #c8381e', '#c8381e'), { text: 'Copied #c8381e', swatch: '#C8381E' });
+  assert.deepEqual(captureOf('Text copied · 13 characters', ''), { text: 'Text copied · 13 characters', swatch: null });
+  assert.equal(islandText('capture', { capture: captureOf('Copied #C8381E', '#C8381E') }, AT), 'Copied #C8381E');
+});
+
+test('a capture from any caller is one plain line, and a swatch only a hex colour', () => {
+  assert.equal(captureOf('Ship\nv2\u202Etoday\u001b[31m\u0085x\u200f', '').text, 'Ship v2today [31m x');
+  assert.equal(captureOf('x'.repeat(200), '').text, 'x'.repeat(200));
+  assert.equal(captureOf(' \n ', '#C8381E'), null);
+  assert.equal(captureOf('Copied', 'red').swatch, null);
+  assert.equal(captureOf('Copied', '#C8381E; x').swatch, null);
 });

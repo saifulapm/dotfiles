@@ -44,6 +44,8 @@ PanelWindow {
     readonly property var leaseCard: leaseOpen ? lease : null
     property var osd: null
     property var toast: null
+    // dots-capture's result, {text, swatch}, for the toast's 1.5 s.
+    property var capture: null
     // A Taildrop send, {count, to, pct}, from dots-taildrop-send's start until its done.
     property var sending: null
     readonly property var sendingLook: V.sendingLook(theme.tokens)
@@ -74,6 +76,7 @@ PanelWindow {
             recording,
             osd,
             toast,
+            capture,
             sending,
             playing,
             notice
@@ -98,7 +101,7 @@ PanelWindow {
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question, a 320 px calendar and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
-            label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
+            label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28 + label.swatchSpace), 34],
             lease: [leaseLook.slot.width, leaseLook.slot.height],
             sending: [sendingLook.width, sendingLook.height],
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
@@ -373,6 +376,11 @@ PanelWindow {
         }
     }
 
+    // The capture's swatch as drawn, for `island state`.
+    function swatchState() {
+        return swatch.visible ? String(swatch.color).toUpperCase() : null;
+    }
+
     // What the OSD draws, for `island state`.
     function osdState() {
         if (mode !== "osd")
@@ -538,6 +546,11 @@ PanelWindow {
         toastTick.restart();
     }
 
+    function showCapture(text, hex) {
+        capture = I.captureOf(text, hex);
+        toastTick.restart();
+    }
+
     function release() {
         focused = false;
         leaseOpen = false;
@@ -608,7 +621,10 @@ PanelWindow {
     Tick {
         id: toastTick
         interval: 1500
-        onTriggered: island.toast = null
+        onTriggered: {
+            island.toast = null;
+            island.capture = null;
+        }
     }
 
     Tick {
@@ -658,11 +674,29 @@ PanelWindow {
                 width: island.sizes.label[0]
                 height: island.sizes.label[1]
 
+                // A picked colour's swatch before the text, with a light outline so a dark colour still reads on the island.
+                Rectangle {
+                    id: swatch
+                    visible: island.mode === "capture" && !!island.capture?.swatch
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: label.left
+                    anchors.rightMargin: 8
+                    width: 12
+                    height: 12
+                    radius: 3
+                    color: island.capture?.swatch ?? "transparent"
+                    border.width: 1
+                    border.color: box.style.text
+                }
+
                 Text {
                     id: label
+                    // Room the swatch takes beside the text.
+                    readonly property real swatchSpace: swatch.visible ? swatch.width + swatch.anchors.rightMargin : 0
                     textFormat: Text.PlainText
                     anchors.centerIn: parent
-                    width: Math.min(implicitWidth, parent.width - 28)
+                    anchors.horizontalCenterOffset: swatchSpace / 2
+                    width: Math.min(implicitWidth, parent.width - 28 - swatchSpace)
                     elide: Text.ElideRight
                     text: I.isCompact(island.mode) ? island.text : island.heldText
                     color: box.style.text

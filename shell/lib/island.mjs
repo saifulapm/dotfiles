@@ -5,7 +5,7 @@ import { clockText } from './margins.mjs';
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // The calendar is opened by hand from rest, so only a question, or an agent's lease that holds the session, takes the island from it; a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
-const PRIORITY = ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'recording', 'osd', 'toast', 'sending', 'playing'];
+const PRIORITY = ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing'];
 
 export const MAX_WIDTH = 560;
 
@@ -21,8 +21,20 @@ export function recordingText(sinceMs, nowMs) {
 }
 
 const joined = (parts) => parts.filter((p) => p).join(' · ');
-const oneLine = (s) => String(s).replace(/[\u202A-\u202E\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim();
+// C0 and C1 controls draw as tofu (U+0085 ends a line), and the bidi marks reorder what follows.
+const oneLine = (s) =>
+  String(s)
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
+    .replace(/[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 export const filesText = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;
+
+// dots-capture's result, from any caller of the IPC: one line of text, and a swatch only for a #RRGGBB colour; no text, no pill.
+export function captureOf(text, hex) {
+  const line = oneLine(text);
+  return line ? { text: line, swatch: /^#[0-9a-f]{6}$/i.test(hex) ? hex.toUpperCase() : null } : null;
+}
 
 // `qs ipc call island state` reports this text, whatever the theme draws.
 export function islandText(mode, slots, now) {
@@ -39,6 +51,8 @@ export function islandText(mode, slots, now) {
       return monthGrid(slots.calendar.year, slots.calendar.month).title;
     case 'toast':
       return slots.toast;
+    case 'capture':
+      return slots.capture.text;
     case 'sending':
       return `Sending ${filesText(slots.sending.count)} to ${oneLine(slots.sending.to)} · ${slots.sending.pct}%`;
     case 'playing':
@@ -67,7 +81,7 @@ export function shiftMonth(year, month, by) {
 }
 
 // The one-line modes the island closes into; the rest open it into a card.
-export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'recording', 'toast'].includes(mode);
+export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'recording', 'toast', 'capture'].includes(mode);
 
 // Curves are 61 samples at even steps of time, which ease reads as CSS linear() does; Qt's BezierSpline crashed on a sampled curve.
 const STEPS = 60;

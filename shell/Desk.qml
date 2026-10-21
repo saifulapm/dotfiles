@@ -164,11 +164,16 @@ Scope {
 
         function state(): string {
             const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks } : null;
-            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState(), sending: island.sendingState() });
+            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState(), sending: island.sendingState(), swatch: island.swatchState() });
         }
 
         function focus(): void {
             island.focusIsland();
+        }
+
+        // dots-capture's pill: its text, and a #RRGGBB swatch or "" for none.
+        function capture(text: string, hex: string): void {
+            island.showCapture(text, hex);
         }
     }
 
