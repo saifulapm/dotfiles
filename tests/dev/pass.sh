@@ -7,13 +7,15 @@ cleanup() { gpgconf --kill gpg-agent 2>/dev/null; }
 # bin/dots-dev points the store and the keyring into its temp dir, so nothing here reaches ~/.password-store or ~/.gnupg.
 : "${PASSWORD_STORE_DIR:?}" "${GNUPGHOME:?}"
 mkdir -p -m 700 "$GNUPGHOME"
-password='hunter2-correct-horse' secret=JBSWY3DPEHPK3PXP
-gpg --batch --pinentry-mode loopback --passphrase '' --quick-gen-key 'Dots Test <dots@test>' default default never 2>/dev/null
+password='hunter2-correct-horse' secret=JBSWY3DPEHPK3PXP passphrase=dots-test-phrase
+echo "pinentry-program $repo/bin/dots-pinentry" >"$GNUPGHOME/gpg-agent.conf"
+gpg --batch --pinentry-mode loopback --passphrase "$passphrase" --quick-gen-key 'Dots Test <dots@test>' default default never 2>/dev/null
+# One decrypt with the passphrase warms the agent, so only the check that kills it sees the card.
+echo warm | gpg --batch -e -r dots@test 2>/dev/null | gpg --batch --pinentry-mode loopback --passphrase "$passphrase" -d >/dev/null 2>&1
 pass init dots@test >/dev/null
 for e in web/github.com web/gitlab.com mail/icloud; do printf '%s\n' "$password-$e" | pass insert -e "$e" >/dev/null; done
 printf '%s\n' "$password" | pass insert -f -e web/github.com >/dev/null
 printf 'otpauth://totp/GitHub:saiful?secret=%s&issuer=GitHub\n' "$secret" | pass otp append -f web/github.com >/dev/null
-echo web/github.com >"$XDG_STATE_HOME/dots/pass-otp"
 # pass commits each change, and dots-pass pushes it to this bare remote.
 remote=$DOTS_DEV_DIR/store-remote.git
 git init -q --bare "$remote"
@@ -30,7 +32,7 @@ check "before Mod+P the surface is not loaded" state_is '.loaded == false'
 niri msg action spawn -- dots-call pass toggle
 until_ok 3000 state_is '.open and .listed and .settled and .keyboard'
 check "Mod+P opens Pass listing the store ($(pass_state | jq -c '[.rows[].name]'))" state_is '.open and (.rows | map(.name) | sort) == ["mail/icloud", "web/github.com", "web/gitlab.com"]'
-check "only the entry with a TOTP secret carries the OTP tag" state_is '[.rows[] | select(.otp) | .name] == ["web/github.com"]'
+check "before any decrypt no entry carries the OTP tag: listing never decrypts" state_is '[.rows[] | select(.otp)] == []'
 
 wtype ghb
 until_ok 2000 state_is '.query == "ghb"'
@@ -48,6 +50,13 @@ until_ok 3000 bash -c 'timeout 0.5 qs ipc call island state 2>/dev/null | jq -e 
 check "the island says it was copied ($(island_text))" bash -c '[ "$(timeout 0.5 qs ipc call island state | jq -r .text)" = "Copied · clears in 45s" ]'
 check "Pass closed" state_is '.open | not'
 check "and the next entry used comes first: the list is recent first" bash -c '[ "$(dots-pass list | head -1 | cut -f1)" = web/github.com ]'
+
+# The copy's decrypt saw the otpauth line pass otp append put there, so the entry now carries the tag.
+niri msg action spawn -- dots-call pass toggle
+until_ok 3000 state_is '.open and .listed and .settled'
+check "after a decrypt only the entry with a TOTP secret carries the OTP tag ($(pass_state | jq -c '[.rows[] | select(.otp) | .name]'))" state_is '[.rows[] | select(.otp) | .name] == ["web/github.com"]'
+wtype -k Escape
+until_ok 3000 state_is '.drawing == false'
 
 # o on the cursor row copies the code oathtool gives for the same secret.
 niri msg action spawn -- dots-call pass toggle
@@ -85,6 +94,18 @@ check "s shows the password in place of the name, tagged 10s ($(pass_state | jq 
 shown_at=$(now_ms)
 until_ok 12000 state_is '.revealed == null'
 check "10 s later the row shows the name only ($(($(now_ms) - shown_at)) ms)" bash -c "timeout 0.5 dots-call pass state | jq -e '.revealed == null and .rows[0].name == \"web/github.com\"' >/dev/null && [ $(($(now_ms) - shown_at)) -ge 9000 ]"
+
+# s on a cold agent asks for the passphrase on its card, then Pass comes back showing the password.
+gpgconf --kill gpg-agent
+pin_state() { timeout 0.5 dots-call pinentry state 2>/dev/null; }
+wtype s
+until_ok 8000 bash -c 'timeout 0.5 dots-call pinentry state | jq -e ".open and .settled" >/dev/null'
+check "s with a cold agent opens the passphrase card" bash -c 'timeout 0.5 dots-call pinentry state | jq -e .open >/dev/null'
+wtype "$passphrase"
+wtype -k Return
+until_ok 8000 state_is '.open and .revealed != null'
+check "after the passphrase, Pass comes back with the password on its row ($(pass_state | jq -c '[.open, .revealed.tag]'))" state_is ".open and .revealed.text == \"$password\" and .revealed.tag == \"10s\""
+until_ok 12000 state_is '.revealed == null'
 
 # n makes a new entry with a generated 24-character password; h and l change its length.
 wtype n

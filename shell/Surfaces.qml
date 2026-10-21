@@ -243,6 +243,15 @@ PanelWindow {
         }
     }
 
+    // Pass comes back only when nothing else has taken its place.
+    Connections {
+        target: host.pass
+        function onReopenWanted() {
+            if (!host.shown)
+                host.pass.reopen();
+        }
+    }
+
     Root.Tick {
         interval: 30000
         running: !!host.pass && !host.pass.visible && !host.pass.busy

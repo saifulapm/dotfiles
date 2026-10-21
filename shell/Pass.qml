@@ -23,7 +23,7 @@ Item {
     property var entries: []
     property bool listed: false
     // A dots-pass run that outlives the card, such as a copy waiting on gpg's passphrase; the card stays loaded until it ends.
-    readonly property bool busy: runner.running || changer.running
+    readonly property bool busy: runner.running || changer.running || revealer.running
     // What the card shows under its query: the list, the new-entry card, or the list with the delete question under it.
     property string mode: "list"
     // The entry whose password shows on its row, and the password, for 10 s.
@@ -81,6 +81,7 @@ Item {
             return;
         hide();
         revealer.name = current.name;
+        revealer.wanted = true;
         revealer.command = [bin, "show", current.name];
         revealer.running = true;
     }
@@ -103,12 +104,22 @@ Item {
         mode = "list";
     }
 
-    // Esc while picking a QR's entry goes back to the list; otherwise it closes.
+    // Esc while picking a QR's entry goes back to the list; otherwise it closes, and a reveal still waiting on gpg is dropped.
     function leave() {
-        if (mode === "qr")
+        if (mode === "qr") {
             back();
-        else
-            close();
+            return;
+        }
+        revealer.wanted = false;
+        close();
+    }
+
+    signal reopenWanted
+
+    // Back as it was, after the passphrase card took its place.
+    function reopen() {
+        shown = true;
+        results.forceActiveFocus();
     }
 
     function enter() {
@@ -302,8 +313,15 @@ Item {
         stdout: StdioCollector {
             id: revealOut
         }
+        // gpg's passphrase card closes Pass while it asks; once answered, Pass comes back showing the password, unless Esc closed it.
+        property bool wanted: false
         onExited: code => {
-            if (code !== 0 || !pass.shown)
+            if (code !== 0 || !(pass.shown || wanted))
+                return;
+            wanted = false;
+            if (!pass.shown)
+                pass.reopenWanted();
+            if (!pass.shown)
                 return;
             pass.revealName = name;
             pass.revealText = revealOut.text.replace(/\n$/, "");
