@@ -54,8 +54,8 @@ function scratch() {
   writeFileSync(join(home, '.local/share/fish/test_box_history'), entry('ls', 100) + entry('make', 200));
   writeFileSync(join(home, '.local/share/fish/fish_history'), entry('ls', 100) + entry('v2 only', 300));
 
-  // qshell.service is enabled and running, update-all.timer only enabled, a static qshell-sync.service mid-run, and an unrelated v1 unit is enabled too.
-  for (const f of ['qshell.service.enabled', 'qshell.service.active', 'update-all.timer.enabled', 'hub-local.service.enabled', 'hub-local.service.active']) writeFileSync(join(units, f), '');
+  // qshell.service is enabled and running, update-all.timer only enabled, v1's taildrop-receive.service enabled and running, a static qshell-sync.service mid-run, and an unrelated v1 unit is enabled too.
+  for (const f of ['qshell.service.enabled', 'qshell.service.active', 'update-all.timer.enabled', 'taildrop-receive.service.enabled', 'taildrop-receive.service.active', 'hub-local.service.enabled', 'hub-local.service.active']) writeFileSync(join(units, f), '');
   writeFileSync(join(units, 'qshell-sync.service.active'), 'activating');
   writeFileSync(
     join(stubs, 'systemctl'),
@@ -107,7 +107,7 @@ test('cutover imports v1 notes, goals and history, stops the units v2 replaces, 
   const s = scratch();
   const r = run(s);
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(lastLine(r), 'notes: 2 imported · goals: 2 imported · history: 1 merged · v1 units: 3 stopped');
+  assert.equal(lastLine(r), 'notes: 2 imported · goals: 2 imported · history: 1 merged · v1 units: 4 stopped');
 
   const notes = store(s, 'notes').notes;
   assert.deepEqual(notes.filter((n) => !n.deleted).map((n) => n.id).sort(), ['0mt0a0001-aaaa', '0mt0a0002-aaaa']);
@@ -126,7 +126,7 @@ test('cutover imports v1 notes, goals and history, stops the units v2 replaces, 
 test('only the v1 units v2 replaces are stopped, and only the v1 links that outrank v2 are removed', () => {
   const s = scratch();
   assert.equal(run(s).status, 0);
-  assert.deepEqual(calls(s).filter((c) => c.includes('disable')), ['--user disable --now qshell.service', '--user disable --now qshell-sync.service', '--user disable --now update-all.timer']);
+  assert.deepEqual(calls(s).filter((c) => c.includes('disable')), ['--user disable --now qshell.service', '--user disable --now qshell-sync.service', '--user disable --now update-all.timer', '--user disable --now taildrop-receive.service']);
   assert.deepEqual(readdirSync(s.units).sort(), ['hub-local.service.active', 'hub-local.service.enabled']);
   assert.equal(existsSync(join(s.home, '.gitconfig')), false);
   assert.equal(existsSync(join(s.home, '.config/fish/conf.d/10-history.fish')), false);
