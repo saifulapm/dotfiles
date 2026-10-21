@@ -29,6 +29,8 @@ export DOTS_RECORDINGS_DIR=$D/recordings
 export RCLONE_CONFIG=$D/rclone.conf
 # The ssh unit skips without an age key, so a nested round never reads the real key or ~/.ssh.
 export DOTS_AGE_IDENTITY=$D/no-age-identity
+# Pass reads and writes a store and a keyring inside the temp dir, never ~/.password-store, ~/.gnupg or the store's remote.
+export PASSWORD_STORE_DIR=$D/password-store GNUPGHOME=$D/gnupg
 # workflow route tells every hub, so Control's Route toggle runs a fake that keeps the route here.
 export DOTS_WORKFLOW=$repo/bin/dev-fake-workflow
 # The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.

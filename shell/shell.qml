@@ -269,6 +269,34 @@ ShellRoot {
     }
 
     Root.Ipc {
+        target: "pass"
+
+        // t0 is taken before the load, so the first open after an unload is timed cold.
+        function open(): void {
+            const t0 = Date.now();
+            surfacesLoader.active = true;
+            surfacesLoader.item.openPass(t0);
+        }
+
+        function close(): void {
+            surfacesLoader.item?.pass?.close();
+        }
+
+        function toggle(): void {
+            if (surfacesLoader.item?.pass?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (surfacesLoader.item?.pass)
+                return surfacesLoader.item.pass.state();
+            return JSON.stringify({ loaded: false, open: false, query: "", rows: [], openMs: null, opens: 0 });
+        }
+    }
+
+    Root.Ipc {
         target: "goals"
 
         // The store lives in the Desk, so Goals opens only once the Desk has loaded.

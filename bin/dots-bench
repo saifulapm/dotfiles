@@ -61,6 +61,22 @@ sleep 0.3
 warm=$(open_once 2) || exit 1
 picker_warm=$(picker_once 2) || exit 1
 
+# Pass loads on its open and unloads 30 s after it closes, so the open after that is a cold one.
+pass_state() { timeout 0.5 qs ipc call pass state 2>/dev/null; }
+pass_is() { pass_state | jq -e "$1" >/dev/null; }
+pass_once() {
+  qs ipc call pass open >/dev/null || die "pass open failed"
+  until_ok 3000 pass_is '.opens == 1 and (.openMs | type) == "number"' || die "pass never reported openMs"
+  pass_state | jq -r .openMs
+  qs ipc call pass close >/dev/null
+  until_ok 3000 pass_is '.drawing == false' || die "pass never closed"
+}
+pass_once >/dev/null || exit 1
+until_ok 35000 pass_is '.loaded == false' || die "pass never unloaded"
+pass_cold=$(pass_once) || exit 1
+# Its unload Tick would count as a running timer, and the loaded card as memory, in what follows.
+until_ok 35000 pass_is '.loaded == false' || die "pass never unloaded"
+
 switch_json=$XDG_STATE_HOME/dots/theme-switch.json
 theme_index() { themes_state | jq -r --arg n "$1" '.themes | index($n)'; }
 selected_is() { themes_state | jq -e --arg t "$1" '.selected == $t' >/dev/null; }
@@ -152,6 +168,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm" "$pass_cold"
 exit
 }

@@ -18,6 +18,8 @@ export function report(m, b) {
     // The theme picker answers to the launcher's budgets.
     line('picker cold', m.pickerColdMs, 'ms', '≤', b.coldMs, m.pickerColdMs <= b.coldMs),
     line('picker warm', m.pickerWarmMs, 'ms', '≤', b.warmMs, m.pickerWarmMs <= b.warmMs),
+    // Pass's first open after its 30 s unload, which loads it again.
+    line('pass cold', m.passColdMs, 'ms', '≤', b.coldMs, m.passColdMs <= b.coldMs),
     line('timers', m.timers, '', '=', b.timers, m.timers === b.timers),
     line('theme switch', m.switchMs, 'ms', '≤', b.switchMs, m.switchMs <= b.switchMs),
     // Read with Blueprint on, the theme whose grid paper is the costliest to draw: m1's 0.02 % plus 0.05.
@@ -47,8 +49,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const anonShmemKiB = Number(process.argv[10]);
   const pickerColdMs = Number(process.argv[11]);
   const pickerWarmMs = Number(process.argv[12]);
+  const passColdMs = Number(process.argv[13]);
   const env = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
-  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, pickerColdMs, pickerWarmMs, cpu: process.argv[7] }, {
+  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, pickerColdMs, pickerWarmMs, passColdMs, cpu: process.argv[7] }, {
     firstFrameMs: env('DOTS_BUDGET_FIRST_FRAME_MS', BUDGETS.firstFrameMs),
     rssMiB: env('DOTS_BUDGET_RSS_MIB', BUDGETS.rssMiB),
     coldMs: env('DOTS_BUDGET_COLD_MS', BUDGETS.coldMs),

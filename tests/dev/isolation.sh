@@ -34,6 +34,10 @@ check "RCLONE_CONFIG is inside the temp dir" under_dev "${RCLONE_CONFIG:-}"
 check "the shell unit carries RCLONE_CONFIG" unit_has RCLONE_CONFIG "${RCLONE_CONFIG:-}"
 check "DOTS_AGE_IDENTITY is inside the temp dir" under_dev "${DOTS_AGE_IDENTITY:-}"
 check "the shell unit carries DOTS_AGE_IDENTITY" unit_has DOTS_AGE_IDENTITY "${DOTS_AGE_IDENTITY:-}"
+check "PASSWORD_STORE_DIR is inside the temp dir" under_dev "${PASSWORD_STORE_DIR:-}"
+check "the shell unit carries PASSWORD_STORE_DIR" unit_has PASSWORD_STORE_DIR "${PASSWORD_STORE_DIR:-}"
+check "GNUPGHOME is inside the temp dir" under_dev "${GNUPGHOME:-}"
+check "the shell unit carries GNUPGHOME" unit_has GNUPGHOME "${GNUPGHOME:-}"
 # A check that runs dots sync merges the stores under XDG_DATA_HOME, so the env it sources must name the temp one.
 check "XDG_DATA_HOME is inside the temp dir" under_dev "${XDG_DATA_HOME:-}"
 
