@@ -1,0 +1,12 @@
+[Unit]
+Description=dots Taildrop receiver
+# Restart=always must never give up; the script itself waits through a missing tailscaled.
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=%h/.local/bin/dots-taildrop
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

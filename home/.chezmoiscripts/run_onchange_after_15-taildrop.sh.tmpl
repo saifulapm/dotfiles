@@ -1,0 +1,5 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+# dots-taildrop.service runs the receiver from ~/.local/bin, since the repo's bin/ is not on the user manager's PATH.
+mkdir -p "$HOME/.local/bin"
+ln -sfn {{ joinPath .chezmoi.workingTree "bin/dots-taildrop" | quote }} "$HOME/.local/bin/dots-taildrop" || die "could not link the Taildrop receiver"

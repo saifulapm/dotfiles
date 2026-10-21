@@ -1,0 +1,160 @@
+#!/usr/bin/env node
+// Moves each Taildrop arrival out of tailscaled's inbox into ~/Downloads over its local API socket and raises one notification per batch; it waits through a missing or unready tailscaled and never exits.
+import { spawnSync } from 'node:child_process';
+import { createWriteStream, linkSync, mkdirSync, unlinkSync } from 'node:fs';
+import { request } from 'node:http';
+import { homedir } from 'node:os';
+import { extname, join } from 'node:path';
+import { pipeline } from 'node:stream/promises';
+
+const socketPath = process.env.DOTS_TAILSCALED_SOCKET || '/var/run/tailscale/tailscaled.sock';
+const downloads = join(homedir(), 'Downloads');
+// A batch is over once no new name has shown for this long; the listing is re-read this often meanwhile.
+const SETTLE_MS = 1500;
+const POLL_MS = 400;
+const LADDER_S = [1, 2, 5, 10, 30];
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// tailscaled rejects a Host other than its own name, so the header is set by hand.
+function call(method, path, { signal, sink } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = request({ socketPath, method, path, headers: { Host: 'local-tailscaled.sock' }, signal }, async (res) => {
+      try {
+        const ok = res.statusCode >= 200 && res.statusCode < 300;
+        if (ok && sink) {
+          await pipeline(res, sink);
+          return resolve('');
+        }
+        const chunks = [];
+        for await (const c of res) chunks.push(c);
+        const body = Buffer.concat(chunks).toString();
+        if (!ok) return reject(Object.assign(new Error(`HTTP ${res.statusCode}: ${body.trim()}`), { status: res.statusCode }));
+        resolve(body);
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+// The inbox answers null when empty, else [{Name, Size}]; waitsec holds the request open until a file is pending.
+async function list(waitsec) {
+  const body = await call('GET', `${API}?waitsec=${waitsec}`, { signal: AbortSignal.timeout((waitsec + 20) * 1000) });
+  return JSON.parse(body) ?? [];
+}
+const API = '/localapi/v0/files/';
+
+// The name is the sender's. Replace control and bidi characters with _ first, then keep only a plain base name.
+const BAD = /[\p{Cc}؜‎‏‪-‮⁦-⁩]/gu;
+function safeName(raw) {
+  if (raw.includes('/') || raw.includes('\\')) return null;
+  const name = raw.replace(BAD, '_').trim();
+  return name === '' || name === '.' || name === '..' ? null : name;
+}
+
+// A hard link fails with EEXIST instead of replacing, so a clash takes the next "name (n).ext" and nothing is overwritten.
+function place(tmp, name) {
+  const ext = extname(name);
+  const stem = name.slice(0, name.length - ext.length);
+  for (let n = 0; ; n++) {
+    const final = join(downloads, n === 0 ? name : `${stem} (${n})${ext}`);
+    try {
+      linkSync(tmp, final);
+      return final;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+    }
+  }
+}
+
+async function fetchOne(raw, safe) {
+  const tmp = join(downloads, `.dots-taildrop-${process.pid}.tmp`);
+  try {
+    await call('GET', API + encodeURIComponent(raw), { sink: createWriteStream(tmp) });
+    const final = place(tmp, safe);
+    await call('DELETE', API + encodeURIComponent(raw));
+    return final;
+  } finally {
+    try { unlinkSync(tmp); } catch {}
+  }
+}
+
+function notify(paths) {
+  const names = paths.map((p) => p.slice(downloads.length + 1));
+  const shown = names.length > 5 ? [...names.slice(0, 5), `and ${names.length - 5} more`] : names;
+  const summary = `Taildrop · ${names.length} ${names.length === 1 ? 'file' : 'files'}`;
+  spawnSync('notify-send', ['-a', 'Tailscale', '-h', 'string:x-dots-files:' + paths.join('\n'), '--', summary, shown.join('\n')], { stdio: 'ignore' });
+}
+
+// A refused name stays in the inbox, so it is logged once and skipped from then on.
+const refused = new Set();
+const usable = (files) =>
+  files.filter(({ Name }) => {
+    if (safeName(Name)) return true;
+    if (!refused.has(Name)) {
+      refused.add(Name);
+      console.log(`taildrop: refusing a name that is not a plain base name: ${JSON.stringify(Name.replace(BAD, ''))}`);
+    }
+    return false;
+  });
+
+async function cycle() {
+  let files = await list(0);
+  if (files.length === 0) {
+    enter('waiting', `waiting for files, saving to ${downloads}`);
+    files = await list(600);
+  }
+  const wanted = usable(files);
+  if (wanted.length === 0) {
+    // Only refused names are queued, and the listing would return at once for them.
+    if (files.length) await sleep(5000);
+    return;
+  }
+  mkdirSync(downloads, { recursive: true });
+  const names = new Set(wanted.map((f) => f.Name));
+  for (let quiet = Date.now(); Date.now() - quiet < SETTLE_MS; ) {
+    await sleep(POLL_MS);
+    for (const { Name } of usable(await list(0))) {
+      if (!names.has(Name)) {
+        names.add(Name);
+        quiet = Date.now();
+      }
+    }
+  }
+  const paths = [];
+  try {
+    for (const Name of names) paths.push(await fetchOne(Name, safeName(Name)));
+  } finally {
+    if (paths.length) notify(paths);
+  }
+}
+
+// One log line per state change, so a machine with no tailscaled leaves one line, not one per retry.
+let state = '';
+function enter(next, line = next) {
+  if (next === state) return;
+  state = next;
+  console.log('taildrop: ' + line);
+}
+
+const describe = (e) =>
+  e.status === 403
+    ? `tailscaled refuses file access (${e.message})`
+    : ['ENOENT', 'ECONNREFUSED', 'EACCES'].includes(e.code)
+      ? `tailscaled is not reachable at ${socketPath} (${e.code})`
+      : e.message;
+
+let step = 0;
+for (;;) {
+  try {
+    await cycle();
+    step = 0;
+  } catch (e) {
+    const line = describe(e);
+    enter(line, line);
+    await sleep(LADDER_S[Math.min(step++, LADDER_S.length - 1)] * 1000);
+  }
+}
