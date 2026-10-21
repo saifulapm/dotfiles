@@ -58,12 +58,27 @@ test('windows rank by title then app_id, as rows with the window id', () => {
 });
 
 test('commands filter by name, lock first for lo', () => {
-  assert.deepEqual(commandRows('lo').map((r) => r.title), ['lock']);
-  assert.deepEqual(commandRows('').map((r) => r.title), ['lock', 'record', 'sync', 'theme']);
+  assert.deepEqual(commandRows('lo').map((r) => r.title), ['lock', 'Pick colour']);
   assert.deepEqual(commandRows('lock')[0].exec, ['qs', 'ipc', 'call', 'lock', 'lock']);
   assert.deepEqual(commandRows('theme')[0].exec, ['qs', 'ipc', 'call', 'themes', 'open']);
   assert.deepEqual(commandRows('record')[0].exec, ['qs', 'ipc', 'call', 'record', 'toggle']);
   assert.deepEqual(commandRows('sync')[0].exec, ['dots', 'sync']);
+});
+
+test('an empty commands query lists the five capture rows first, then the others in their own order', () => {
+  assert.deepEqual(commandRows('').map((r) => r.title), [
+    'Annotate region', 'Annotate clipboard image', 'Copy text from region (OCR)', 'Read QR code from region', 'Pick colour',
+    'lock', 'theme', 'record', 'sync',
+  ]);
+});
+
+test('each capture row runs dots-capture, and a row with a global key names it', () => {
+  const row = (q) => commandRows(q)[0];
+  assert.deepEqual([row('annotate region').exec, row('annotate region').key], [['dots-capture', 'annotate'], 'Mod+Shift+7']);
+  assert.deepEqual([row('annotate clip').exec, row('annotate clip').key], [['dots-capture', 'annotate-clip'], undefined]);
+  assert.deepEqual([row('ocr').exec, row('ocr').key], [['dots-capture', 'ocr'], 'Mod+Shift+6']);
+  assert.deepEqual([row('qr').exec, row('qr').key], [['dots-capture', 'qr'], undefined]);
+  assert.deepEqual([row('pick').exec, row('pick').key], [['dots-capture', 'colour'], undefined]);
 });
 
 test('the calculator row is the formatted result, copied on Enter', () => {

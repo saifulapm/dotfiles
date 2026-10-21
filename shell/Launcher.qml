@@ -159,6 +159,7 @@ Item {
             cursorBox: cur ? { x: p.x, y: p.y, w: cur.width, h: cur.height } : null,
             cursorElided: cur ? cur.elided : null,
             cursorDetailWidth: cur ? cur.detailWidth : null,
+            keys: rows.map((r, i) => rowRepeater.itemAt(i)?.keyText ?? null),
             queryFont: [input.font.family, input.font.pixelSize],
             queryBox: { x: q.x, y: q.y, w: input.width, h: input.height },
             detailFont: [look.detail.font, look.detail.size, look.detail.italic],
@@ -439,6 +440,7 @@ Item {
                                 readonly property bool current: index === launcher.selected
                                 readonly property bool elided: title.truncated
                                 readonly property real detailWidth: detail.width
+                                readonly property string keyText: keyChip.visible ? keyLabel.text : ""
                                 width: list.width
                                 implicitHeight: row.implicitHeight + (look.voice === "caps" ? 22 : 20)
                                 radius: look.cursor.radius
@@ -512,13 +514,41 @@ Item {
                                             textFormat: Text.PlainText
                                             Layout.fillWidth: look.voice === "plain"
                                             Layout.maximumWidth: look.voice === "plain" ? -1 : 260
-                                            text: look.detailText(modelData.detail)
+                                            text: look.rowDetail(modelData)
                                             elide: Text.ElideRight
                                             color: current ? look.cursor.detail : look.detail.color
                                             font.family: look.detail.font
                                             font.italic: look.detail.italic
                                             font.pixelSize: look.detail.size
                                             font.letterSpacing: look.detail.spacing ?? 0
+                                        }
+                                    }
+
+                                    // A row with a global key names it; Paper keeps a column for the keys, so the tools line up.
+                                    Item {
+                                        visible: !!modelData.key || look.keyChip.column > 0
+                                        implicitWidth: Math.max(look.keyChip.column, keyChip.implicitWidth)
+                                        implicitHeight: keyChip.implicitHeight
+                                        Rectangle {
+                                            id: keyChip
+                                            anchors.right: parent.right
+                                            visible: !!modelData.key
+                                            implicitWidth: keyLabel.implicitWidth + (look.keyChip.fill === "transparent" && look.keyChip.border === 0 ? 0 : 14)
+                                            implicitHeight: keyLabel.implicitHeight + 4
+                                            radius: look.keyChip.radius
+                                            color: current ? look.keyChip.cursorFill : look.keyChip.fill
+                                            border.width: look.keyChip.border
+                                            border.color: current ? look.keyChip.cursorBorder : look.keyChip.borderColor
+                                            Text {
+                                                id: keyLabel
+                                                anchors.centerIn: parent
+                                                textFormat: Text.PlainText
+                                                text: look.rowKey(modelData.key)
+                                                color: current ? look.keyChip.cursorText : look.keyChip.text
+                                                font.family: look.small.font
+                                                font.pixelSize: look.keyChip.size
+                                                font.letterSpacing: look.keyChip.spacing
+                                            }
                                         }
                                     }
 

@@ -70,6 +70,29 @@ test('the legend reads as one line for the state and the footer checks', () => {
   assert.equal(look('blueprint').legendLine('apps'), '[W] WINDOWS  [V] CLIPBOARD  [:] EMOJI  [=] CALC  [>] COMMANDS  J/K · ↵ · ESC');
 });
 
+test("a row's global key reads Mod+Shift+7 in Artboard, MOD ⇧ 7 in Paper and [MOD ⇧ 7] in Blueprint", () => {
+  assert.equal(look('artboard').rowKey('Mod+Shift+7'), 'Mod+Shift+7');
+  assert.equal(look('paper').rowKey('Mod+Shift+7'), 'MOD ⇧ 7');
+  assert.equal(look('blueprint').rowKey('Mod+Shift+6'), '[MOD ⇧ 6]');
+  assert.equal(look('paper').rowKey(undefined), '');
+});
+
+test("a row's key chip is a tile in Artboard, an outlined cap in a 96 px column in Paper and bare text in Blueprint", () => {
+  const a = look('artboard').keyChip, p = look('paper').keyChip, b = look('blueprint').keyChip;
+  assert.deepEqual([a.fill, a.text, a.cursorFill, a.cursorText, a.border, a.radius, a.size], ['#F2F3F6', '#57606A', '#FFFFFF', '#2638C9', 0, 6, 11]);
+  assert.deepEqual([p.fill, p.text, p.border, p.borderColor, p.cursorText, p.cursorBorder, p.size, p.column], ['transparent', '#1C1915', 1, '#1C1915', '#FAF6EC', '#FAF6EC', 10, 96]);
+  assert.deepEqual([b.fill, b.border, b.text, b.cursorText, b.size], ['transparent', 0, '#80A4C2', '#0A1526', 11]);
+});
+
+test('a capture row shows its long detail in Artboard, its tool in Paper, and none in Blueprint', () => {
+  const row = { title: 'Annotate region', detail: 'satty on a region of the screen', tool: 'satty' };
+  assert.equal(look('artboard').rowDetail(row), 'satty on a region of the screen');
+  assert.equal(look('paper').rowDetail(row), 'satty');
+  assert.equal(look('blueprint').rowDetail(row), '');
+  assert.equal(look('blueprint').rowDetail({ title: 'lock', detail: 'Lock the screen' }), 'LOCK THE SCREEN');
+  assert.equal(look('paper').rowDetail({ title: 'lock', detail: 'Lock the screen' }), 'Lock the screen');
+});
+
 test('before the theme loads the launcher still has a whole look', () => {
   const u = launcherLook(null);
   assert.equal(u.label.text('apps'), 'APPS');

@@ -50,7 +50,13 @@ export function windowRows(windows, q) {
   );
 }
 
+// The capture rows come first, as the m24 boards list them; `key` is the global key a row also has, and `tool` the word Paper shows for it.
 const COMMANDS = [
+  { title: 'Annotate region', detail: 'satty on a region of the screen', tool: 'satty', key: 'Mod+Shift+7', exec: ['dots-capture', 'annotate'] },
+  { title: 'Annotate clipboard image', detail: 'satty on the image in the clipboard', tool: 'satty', exec: ['dots-capture', 'annotate-clip'] },
+  { title: 'Copy text from region (OCR)', detail: 'tesseract eng+ben, text to the clipboard', tool: 'tesseract', key: 'Mod+Shift+6', exec: ['dots-capture', 'ocr'] },
+  { title: 'Read QR code from region', detail: 'zbarimg, copied as sensitive', tool: 'zbarimg', exec: ['dots-capture', 'qr'] },
+  { title: 'Pick colour', detail: 'hex to the clipboard', tool: 'niri', exec: ['dots-capture', 'colour'] },
   { title: 'lock', detail: 'Lock the screen', exec: ['qs', 'ipc', 'call', 'lock', 'lock'] },
   { title: 'theme', detail: 'Switch theme', exec: ['qs', 'ipc', 'call', 'themes', 'open'] },
   { title: 'record', detail: 'Start or stop recording', exec: ['qs', 'ipc', 'call', 'record', 'toggle'] },
@@ -58,7 +64,8 @@ const COMMANDS = [
 ];
 
 export function commandRows(q) {
-  return rows(COMMANDS.map((c) => ({ name: c.title, keywords: [], row: Object.assign({ glyph: '>' }, c) })), q);
+  const entries = COMMANDS.map((c) => ({ name: c.title, keywords: [], row: Object.assign({ glyph: '>' }, c) }));
+  return q.trim() ? rows(entries, q) : entries.map((e) => e.row);
 }
 
 export function calcRows(q) {

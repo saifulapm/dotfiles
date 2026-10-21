@@ -33,6 +33,13 @@ until_ok 3000 state_is '.mode == "commands" and .results[0] == "lock"'
 check "> lo lists lock first" state_is '.mode == "commands" and .results[0] == "lock"'
 close_launcher
 
+open_launcher
+wtype "> "
+until_ok 3000 state_is '.mode == "commands" and (.results | length) > 5'
+check "> lists the five capture rows first" state_is '.results[0:5] == ["Annotate region", "Annotate clipboard image", "Copy text from region (OCR)", "Read QR code from region", "Pick colour"]'
+check "annotate and OCR draw their global keys, the others none" state_is '(.keys[0] | IN("Mod+Shift+7", "MOD ⇧ 7", "[MOD ⇧ 7]")) and (.keys[2] | IN("Mod+Shift+6", "MOD ⇧ 6", "[MOD ⇧ 6]")) and .keys[1] == "" and .keys[3] == "" and .keys[4] == ""'
+close_launcher
+
 niri msg action spawn -- foot -c /dev/null
 niri msg action spawn -- foot -c /dev/null
 two_windows() { [ "$(windows_n)" = 2 ]; }

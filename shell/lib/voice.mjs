@@ -46,6 +46,14 @@ export function launcherLook(tokens) {
     number: (i) => String(i + 1).padStart(2, '0'),
     title: same,
     detailText: same,
+    // A row's global key: Artboard writes it as niri does, Paper in tracked caps and Blueprint in brackets.
+    rowKey: (k) => (!k ? '' : voice === 'plain' ? k : key(k.replace(/\+/g, ' ').replace(/\bShift\b/, '⇧'))),
+    // Paper names a capture row's tool and Blueprint leaves it bare, as the m24 boards draw them.
+    rowDetail(row) {
+      if (row.tool && voice === 'caps') return same(row.tool);
+      if (row.tool && voice === 'bracket') return '';
+      return this.detailText(row.detail);
+    },
     count: () => '',
     prompt: { text: '', color: c.accent, search: false },
     caret: 'line',
@@ -65,6 +73,7 @@ export function launcherLook(tokens) {
       rule: { color: c.line, dashed: false },
       small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
       chip: { fill: ARTBOARD.tile, key: c.ink },
+      keyChip: { fill: ARTBOARD.tile, text: c.muted, border: 0, borderColor: 'transparent', cursorFill: c.surface, cursorText: ARTBOARD.deep, cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0, column: 0 },
     });
   }
   if (voice === 'bracket') {
@@ -83,6 +92,7 @@ export function launcherLook(tokens) {
       rule: { color: c.line, dashed: true },
       small: { font: t.mono, size: 10, spacing: 1.6, color: c.muted },
       chip: { fill: 'transparent', key: c.accent },
+      keyChip: { fill: 'transparent', text: c.muted, border: 0, borderColor: 'transparent', cursorFill: 'transparent', cursorText: c.surface, cursorBorder: 'transparent', radius: 0, size: 11, spacing: 1.3, column: 0 },
     });
   }
   return Object.assign(base, {
@@ -94,6 +104,7 @@ export function launcherLook(tokens) {
     detail: { font: t.display, size: 16, italic: true, color: c.muted },
     cursor: { fill: c.ink, text: c.surface, detail: c.line, marker: c.accent, radius: 0, weight: 500, badge: '' },
     chip: { fill: 'transparent', key: c.ink },
+    keyChip: { fill: 'transparent', text: c.ink, border: 1, borderColor: c.ink, cursorFill: 'transparent', cursorText: c.surface, cursorBorder: c.surface, radius: 0, size: 10, spacing: 1.4, column: 96 },
   });
 }
 
