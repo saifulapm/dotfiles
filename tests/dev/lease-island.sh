@@ -107,8 +107,8 @@ for theme in paper artboard; do
   settled '.mode == "leaseCard" and .focused'
   echo "     $theme card: $(island | jq -c '{drawn, lease}')"
   case $theme in
-    paper) want='.lease.layout == "print" and .drawn == 420 and .lease.who == "claude" and (.lease.unlocked | startswith("unlocked ")) and (.lease.time | test("^1[45]:[0-5][0-9]$")) and .lease.keys == "↵ LOCK NOW · ESC CLOSE"' ;;
-    artboard) want='.lease.layout == "card" and .drawn == 440 and .lease.who == "claude" and (.lease.unlocked | startswith("unlocked ")) and .lease.bar == "round" and .lease.keys == "↵ lock now · esc close"' ;;
+    paper) want='.lease.layout == "print" and .drawn == 420 and .lease.who == "claude" and (.lease.unlocked | startswith("unlocked ")) and (.lease.time | test("^1[45]:[0-5][0-9]$")) and .lease.keys == "↵ LOCK NOW · ESC CLOSE" and .lease.label == "" and (.lease.handles | not)' ;;
+    artboard) want='.lease.layout == "card" and .drawn == 440 and .lease.who == "claude" and (.lease.unlocked | startswith("unlocked ")) and .lease.bar == "round" and .lease.keys == "↵ lock now · esc close" and .lease.label == "Island" and .lease.handles and .lease.timeColor == "#ffffff"' ;;
   esac
   check "$theme: Mod+I opens the board's card" state_is "$want"
   wtype -k Escape

@@ -137,4 +137,6 @@ test('a restyle swaps the fill, text, frame and shadow colour it names and keeps
   assert.equal(restyled(base, null), base);
   const r = restyled(base, { fill: 'F', frame: { width: 1.5, color: 'R' }, glow: 'G' });
   assert.deepEqual([r.fill, r.text, r.frame, r.corner, r.shadow.color, r.shadow.alpha], ['F', 'b', { width: 1.5, color: 'R' }, base.corner, 'G', 0.35]);
+  const h = restyled(Object.assign({ handles: false }, base), { handles: true, handleFill: 'W' });
+  assert.deepEqual([h.handles, h.handleFill], [true, 'W']);
 });

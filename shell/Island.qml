@@ -189,7 +189,7 @@ PanelWindow {
     // What the lease slot and card draw, for `island state`.
     function leaseState() {
         if (mode === "leaseCard")
-            return Object.assign({ card: true, layout: leaseLook.card.layout, title: cardTitle.text, bar: leaseLook.card.bar, keys: leaseLook.card.keys.map(k => k.join(" ")).join(" · ") }, leaseCardDrawn());
+            return Object.assign({ card: true, layout: leaseLook.card.layout, title: cardTitle.text, label: leaseFrameLabel.visible ? leaseFrameLabel.text : "", handles: box.style.handles, bar: leaseLook.card.bar, keys: leaseLook.card.keys.map(k => k.join(" ")).join(" · ") }, leaseCardDrawn());
         if (mode !== "lease")
             return null;
         return {
@@ -355,6 +355,21 @@ PanelWindow {
         onTriggered: island.notice = ""
     }
 
+    // Artboard's open lease card is a selected frame named Island; the island sits 10 px from the top, so the name goes beside its corner, not above.
+    Text {
+        id: leaseFrameLabel
+        visible: island.mode === "leaseCard" && island.leaseLook.card.label !== ""
+        anchors.right: box.left
+        anchors.rightMargin: 12
+        y: box.y
+        textFormat: Text.PlainText
+        text: island.leaseLook.card.label
+        color: island.theme.tokens?.color.accent ?? "transparent"
+        font.family: island.theme.tokens?.type.ui ?? ""
+        font.pixelSize: 11
+        font.weight: Font.Medium
+    }
+
     Root.Surface {
         id: box
         // Centred in a window as wide as the widest card, so the box morphs without the window resizing.
@@ -507,7 +522,7 @@ PanelWindow {
                     // Not named card: the notification's id: card would win the lookup.
                     readonly property var look: island.leaseLook.card
                     readonly property string layout: look.layout
-                    readonly property color ink: box.style.text
+                    readonly property color ink: look.ink || box.style.text
                     readonly property color muted: island.theme.tokens?.color.muted ?? ink
                     readonly property color accent: island.theme.tokens?.color.accent ?? ink
                     readonly property color timeColor: island.leaseWarning ? island.leaseLook.warning.time : layout === "sheet" ? accent : ink

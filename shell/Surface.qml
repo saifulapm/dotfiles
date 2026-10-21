@@ -174,7 +174,7 @@ Item {
             opacity: surface.pose.fill
             width: 8
             height: 8
-            color: surface.style.fill
+            color: surface.style.handleFill || surface.style.fill
             border.width: 1.5
             border.color: surface.accent
         }

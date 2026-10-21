@@ -80,7 +80,7 @@ export function marginStyle(tokens) {
   };
 }
 
-// A surface's look with some parts swapped, as the island's lease draws its last minute: fill, text, frame, and glow or hard-shadow colour.
+// A surface's look with some parts swapped, as the island's lease draws its last minute and Artboard's selected card: fill, text, frame, glow or hard-shadow colour, and handles.
 export function restyled(style, swap) {
   if (!swap) return style;
   return Object.assign({}, style, {
@@ -88,5 +88,7 @@ export function restyled(style, swap) {
     text: swap.text ?? style.text,
     frame: swap.frame ?? style.frame,
     shadow: swap.glow ? Object.assign({}, style.shadow, { color: swap.glow }) : style.shadow,
+    handles: swap.handles ?? style.handles,
+    handleFill: swap.handleFill ?? style.handleFill,
   });
 }

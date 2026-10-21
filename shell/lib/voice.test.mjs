@@ -281,9 +281,15 @@ test("Paper's slot: a red square, AGENT in the island's head colour and a 20 px 
   assert.deepEqual([s.label.size, s.label.color, s.who.weight, s.time.font, s.time.size], [10, '#D9CFBB', 500, 'Instrument Serif', 20]);
 });
 
-test("Artboard's slot: a #6C83FF dot and Agent · claude in its body colour", () => {
+test("Artboard's slot: a #6C83FF dot, Agent · claude in its body colour and the time in white", () => {
   const s = lease('artboard').slot;
-  assert.deepEqual([s.mark.shape, s.mark.color, s.label.text, s.who.color, s.who.size], ['dot', '#6C83FF', '', '#C9CED6', 13]);
+  assert.deepEqual([s.mark.shape, s.mark.color, s.label.text, s.who.color, s.who.size, s.time.color], ['dot', '#6C83FF', '', '#C9CED6', 13, '#FFFFFF']);
+});
+
+test("Artboard's card is a selected frame: an accent outline, white handles, its Island label and white type", () => {
+  const a = lease('artboard').card;
+  assert.deepEqual([a.box.frame, a.box.handles, a.box.handleFill, a.label, a.ink], [{ width: 1.5, color: '#3D5AFE' }, true, '#FFFFFF', 'Island', '#FFFFFF']);
+  assert.deepEqual([lease('paper').card.label, lease('blueprint').card.label], ['', '']);
 });
 
 test("Blueprint's slot: [ AGENT ] muted, the name bold in ink, the time bold in cyan", () => {
