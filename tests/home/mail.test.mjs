@@ -2,7 +2,7 @@
 import { before, after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -224,7 +224,7 @@ test('kak-mail keeps a forged From and Subject on one line, without bidi control
   writeFileSync(join(dir, 'show.json'), show);
   writeFileSync(join(dir, 'search.json'), JSON.stringify([thread]));
   writeFileSync(join(dir, 'notmuch'), `#!/bin/sh\ncase "$1" in show) cat ${dir}/show.json ;; search) cat ${dir}/search.json ;; esac\n`, { mode: 0o755 });
-  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, HOME: dir };
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, HOME: dir, XDG_STATE_HOME: join(dir, 'state') };
   const bad = /[\x00-\x08\x0b-\x1f\x7f‎‏‪-‮⁦-⁩]/;
   for (const args of [['list', '--out', join(dir, 'list'), 'tag:inbox'], ['list', '--out', join(dir, 'flat'), '--unthreaded', 'tag:inbox']]) {
     const r = spawnSync(join(repo, 'bin/kak-mail'), args, { env, encoding: 'utf8' });
@@ -239,4 +239,71 @@ test('kak-mail keeps a forged From and Subject on one line, without bidi control
   assert.equal(lines.filter((l) => l.startsWith('From:')).length, 1, lines.join('|'));
   assert.equal(lines.filter((l) => l.startsWith('Subject:')).length, 1);
   assert.ok(!lines.some((l) => bad.test(l)), lines.join('|'));
+});
+
+// The margin reads the Imbox unread count from this file; the fake notmuch keeps the unread number in a file, and any tag drops it to 2, as reading or archiving one thread would.
+function countFake(t, count = 'cat "$(dirname "$0")/unread"') {
+  const dir = mkdtempSync(join(tmpdir(), 'kak-mail-count-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, 'unread'), '3\n');
+  const msg = { id: 'a@x', match: true, timestamp: 1792500000, tags: ['inbox'], headers: { From: 'A <a@x.test>', Subject: 'hi' }, body: [{ id: 1, 'content-type': 'text/plain', content: 'body\n' }] };
+  writeFileSync(join(dir, 'show.json'), JSON.stringify([[[msg, []]]]));
+  writeFileSync(join(dir, 'notmuch'), `#!/bin/sh
+echo "$*" >> ${dir}/log
+case "$1" in
+  show) cat ${dir}/show.json ;;
+  search) echo thread:0001 ;;
+  tag) echo 2 > ${dir}/unread ;;
+  count) ${count} ;;
+esac
+`, { mode: 0o755 });
+  const state = join(dir, 'state');
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, HOME: dir, XDG_STATE_HOME: state };
+  const kakMail = (...args) => spawnSync(join(repo, 'bin/kak-mail'), args, { env, encoding: 'utf8' });
+  return { dir, folder: join(state, 'dots'), file: join(state, 'dots/mail-unread'), kakMail };
+}
+
+test('kak-mail count writes the Imbox unread count by rename and prints it', (t) => {
+  const f = countFake(t);
+  const r = f.kakMail('count');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, '3\n');
+  assert.equal(readFileSync(f.file, 'utf8'), '3\n');
+  assert.deepEqual(readdirSync(f.folder), ['mail-unread']);
+  assert.match(readFileSync(join(f.dir, 'log'), 'utf8'), /^count -- tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled$/m);
+});
+
+test('kak-mail count leaves the old file when notmuch fails', (t) => {
+  const f = countFake(t, 'echo "database locked" >&2; exit 1');
+  mkdirSync(f.folder, { recursive: true });
+  writeFileSync(f.file, '5\n');
+  const r = f.kakMail('count');
+  assert.notEqual(r.status, 0);
+  assert.equal(readFileSync(f.file, 'utf8'), '5\n');
+  assert.deepEqual(readdirSync(f.folder), ['mail-unread']);
+});
+
+test('opening a thread rewrites the count after marking it read', (t) => {
+  const f = countFake(t);
+  const r = f.kakMail('show', '--out', join(f.dir, 'thread'), 'thread:0001');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readFileSync(f.file, 'utf8'), '2\n');
+});
+
+test('archiving a thread rewrites the count after tagging it', (t) => {
+  const f = countFake(t);
+  const r = f.kakMail('hey', 'archive', 'thread:0001');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, 'archive: 1 thread(s)\n');
+  assert.equal(readFileSync(f.file, 'utf8'), '2\n');
+});
+
+test('a failing count still opens the thread and keeps the old file', (t) => {
+  const f = countFake(t, 'exit 1');
+  mkdirSync(f.folder, { recursive: true });
+  writeFileSync(f.file, '5\n');
+  const r = f.kakMail('show', '--out', join(f.dir, 'thread'), 'thread:0001');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(readFileSync(join(f.dir, 'thread'), 'utf8'), /^Subject: hi$/m);
+  assert.equal(readFileSync(f.file, 'utf8'), '5\n');
 });

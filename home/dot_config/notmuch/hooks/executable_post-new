@@ -234,7 +234,12 @@ fresh=$(notmuch count -- tag:new and tag:inbox and tag:screened and tag:unread 2
 notmuch tag -new -- tag:new 2>>"$LOG"
 
 count() { notmuch count -- "$@" 2>/dev/null || echo 0; }
-imbox=$(count tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled)
+# kak-mail also writes the count to the file the shell's margin watches; its box list holds the Imbox query.
+if command -v kak-mail >/dev/null 2>&1; then
+    imbox=$(kak-mail count 2>>"$LOG") || imbox=0
+else
+    imbox=$(count tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled)
+fi
 screener=$(count tag:inbox and tag:unread and not tag:screened)
 
 # Only screened-in mail notifies: an unscreened stranger must never buzz you.

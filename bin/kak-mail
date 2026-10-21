@@ -19,6 +19,7 @@ Subcommands (the kak side is the only intended caller):
   header FILE set|add NAME VALUE   edit a draft's headers (From, Attach)
   send FILE                   send a draft via msmtp, file it in Sent, delete it
   hey ACTION [--arg A] QUERY...   the HEY routing actions (see HEY below)
+  count                       write the Imbox unread count for the margin, print it
 """
 
 import email.policy
@@ -39,6 +40,8 @@ DB_DIR = os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "
 DRAFTS = os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "kak-mail", "drafts")
 SENT_FOLDER = "icloud/Sent Messages"
 MSMTP_ACCOUNT = "icloud"
+# The shell's margin watches this file for the Imbox unread count.
+COUNT_FILE = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "dots", "mail-unread")
 
 # The HEY boxes in HEY's order as (key, name, query, unthreaded); the queries use the post-new hook's tags, so change one, change both.
 BOXES = [
@@ -187,6 +190,29 @@ def cmd_list(args):
     print("set-option buffer mail_ids " + " ".join(kq(i) for i in ids))
 
 
+def write_count():
+    """Write the Imbox unread count to COUNT_FILE through a rename, so the margin never reads half a file; return it."""
+    n = int(nm("count", "--", box("Imbox")[2]))
+    os.makedirs(os.path.dirname(COUNT_FILE), exist_ok=True)
+    tmp = f"{COUNT_FILE}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
+        f.write(f"{n}\n")
+    os.replace(tmp, COUNT_FILE)
+    return n
+
+
+def refresh_count():
+    # A count that fails leaves the margin's last number; reading or filing mail goes on.
+    try:
+        write_count()
+    except (subprocess.CalledProcessError, OSError, ValueError):
+        pass
+
+
+def cmd_count(args):
+    print(write_count())
+
+
 # ───────────────────────────── thread view ─────────────────────────────
 
 def html_to_text(html, links=True):
@@ -268,6 +294,7 @@ def cmd_show(args):
         f.write("\n".join(lines) + "\n")
     # Opening a thread marks it read.
     nm("tag", "-unread", "--", query)
+    refresh_count()
     print("set-option buffer mail_msgs " + " ".join(kq(x) for x in marks))
 
 
@@ -588,18 +615,20 @@ def cmd_hey(args):
         return
     else:
         die(f"unknown action: {action}")
+    refresh_count()
     print(f"{action}: {', '.join(done)}")
 
 
 def main():
     if len(sys.argv) < 2:
-        die("usage: kak-mail <boxes|query|list|show|identities|compose|send|hey> …")
+        die("usage: kak-mail <boxes|query|list|show|identities|compose|send|hey|count> …")
     cmd, args = sys.argv[1], sys.argv[2:]
     fn = {
         "boxes": cmd_boxes, "query": cmd_query, "list": cmd_list, "show": cmd_show,
         "identities": lambda a: print("\n".join(identities())),
         "links": cmd_links, "attachments": cmd_attachments, "save": cmd_save,
         "compose": cmd_compose, "header": cmd_header, "send": cmd_send, "hey": cmd_hey,
+        "count": cmd_count,
     }.get(cmd)
     if not fn:
         die(f"unknown command: {cmd}")
