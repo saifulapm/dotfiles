@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots-capture <ocr|qr|colour|annotate|annotate-clip> [--region 'X,Y WxH']: reads text, a QR code or a colour off the screen to the clipboard and says so in the island's pill, or opens satty to annotate; --region skips slurp, so a check needs no mouse.
+# dots-capture <ocr|qr|colour|annotate|annotate-clip> [--region 'X,Y WxH']: reads text, a QR code or a colour off the screen to the clipboard and says so in the island, or opens satty to annotate; --region skips slurp, so a check needs no mouse.
 set -uo pipefail
 shopt -s extglob
 {
@@ -11,8 +11,8 @@ region=
 
 # slurp exits non-zero when Escape cancels it, and a cancel shows nothing.
 pick_region() { [[ -n $region ]] || region=$(slurp) || exit 0; }
-# The dots-call beside this script, since niri's spawn need not have bin/ on PATH; the IPC takes exactly two arguments, "" for no swatch.
-pill() { "${self%/*}/dots-call" island capture "$1" "${2:-}" >/dev/null 2>&1; }
+# pill <kind> <title> <detail>: the dots-call beside this script, since niri's spawn need not have bin/ on PATH. The IPC takes exactly three arguments; a miss copied nothing, so its title is "" and its words are the detail.
+pill() { "${self%/*}/dots-call" island capture "$1" "$2" "$3" >/dev/null 2>&1; }
 # satty copies through wl-copy on Enter and saves no file.
 annotate() { satty --filename - --copy-command wl-copy --actions-on-enter save-to-clipboard,exit; }
 
@@ -24,23 +24,23 @@ ocr)
   text=${text##+([[:space:]])}
   text=${text%%+([[:space:]])}
   if [[ -z $text ]]; then
-    pill 'No text found'
+    pill ocr '' 'No text found'
     exit 0
   fi
   printf '%s' "$text" | wl-copy
   # Characters are code points, as `wl-paste | wc -m` counts them, whatever the caller's locale.
-  pill "Text copied · $(printf '%s' "$text" | LC_ALL=C.UTF-8 wc -m) characters"
+  pill ocr "Text copied" "$(printf '%s' "$text" | LC_ALL=C.UTF-8 wc -m) characters"
   ;;
 qr)
   pick_region
   text=$(grim -g "$region" - | zbarimg --raw -q - 2>/dev/null)
   if [[ -z $text ]]; then
-    pill 'No QR code found'
+    pill qr '' 'No QR code found'
     exit 0
   fi
   # Sensitive, so dots-clip-store keeps it out of the clipboard history.
   printf '%s' "$text" | wl-copy --sensitive
-  pill 'QR code copied'
+  pill qr 'QR code copied' ''
   ;;
 colour)
   # niri prints {"rgb":[r,g,b]} from 0 to 1, or null when Escape cancels; this rounds as niri's own Hex line does.
@@ -49,7 +49,7 @@ colour)
   read -r r g b <<<"$rgb"
   hex=$(printf '#%02X%02X%02X' "$r" "$g" "$b")
   printf '%s' "$hex" | wl-copy
-  pill "Copied $hex" "$hex"
+  pill colour Copied "$hex"
   ;;
 annotate)
   pick_region

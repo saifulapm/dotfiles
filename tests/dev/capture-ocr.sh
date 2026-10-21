@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# dots-capture reads text and a QR code off the nested screen to the clipboard, a QR code never reaches the clip history, and each result shows as the island's capture pill, a colour with its swatch.
+# dots-capture reads text and a QR code off the nested screen to the clipboard, a QR code never reaches the clip history, and each result shows as its theme's board draws it: Paper's pill, Blueprint's and Artboard's notification card, a colour with its swatch.
 {
 source "$(dirname "$0")/lib.sh"
 
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
-pill_is() { island | jq -e --arg t "$1" --arg s "${2:-}" '.mode == "capture" and .text == $t and .swatch == (if $s == "" then null else $s end)' >/dev/null 2>&1; }
+state_is() { island | jq -e "$1" >/dev/null 2>&1; }
+# shows <text> <test on .capture>: the capture is what the island shows, and what it drew passes the test.
+shows() { island | jq -e --arg t "$1" ".mode == \"capture\" and .text == \$t and (.capture | $2)" >/dev/null 2>&1; }
+status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
+in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+# How many notifications the Mod+A history holds; a capture never adds one.
+kept() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq .count; }
 rests() { island | jq -e '.mode == "rest"' >/dev/null 2>&1; }
 clip() { cliphist -db-path "$XDG_STATE_HOME/dots/clips.db" "$@"; }
 listed() { clip list 2>/dev/null | cut -f2- | grep -qxF "$1"; }
@@ -35,11 +41,12 @@ wl-copy 'clip before'
 until_ok 3000 listed 'clip before'
 capture ocr --region "$x,$y 600x120"
 check "ocr copies the line it reads (got '$(wl-paste)')" test "$(wl-paste)" = 'Ship v2 today'
-check "the pill reads Text copied · 13 characters" until_ok 1000 pill_is 'Text copied · 13 characters'
+check "paper: the pill draws a check, TEXT COPIED and 13 characters in the italic serif" until_ok 1000 shows 'Text copied · 13 characters' '.drawn == "pill" and .check and .title == "TEXT COPIED" and .detail == "13 characters" and .detailFont == ["Instrument Serif", 17] and .swatch == null'
+echo "     capture: $(island | jq -c .capture)"
 until_ok 3000 rests
 
 capture ocr --region "$x,$((y + h / 2)) 600x120"
-check "ocr over an empty region says No text found" until_ok 1000 pill_is 'No text found'
+check "ocr over an empty region draws only No text found, with no check" until_ok 1000 shows 'No text found' '.drawn == "pill" and (.check | not) and .title == "" and .detail == "No text found"'
 check "and leaves the clipboard unchanged" test "$(wl-paste)" = 'Ship v2 today'
 until_ok 3000 rests
 
@@ -51,26 +58,46 @@ sleep 0.5
 # The code is the only one on screen, so the region is the whole output.
 capture qr --region "$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x),\(.y) \(.width)x\(.height)"')"
 check "qr copies the code's URL (got '$(wl-paste)')" test "$(wl-paste)" = 'https://example.com/x'
-check "the pill reads QR code copied" until_ok 1000 pill_is 'QR code copied'
+check "the pill reads QR CODE COPIED and nothing of the code" until_ok 1000 shows 'QR code copied' '.drawn == "pill" and .title == "QR CODE COPIED" and .detail == ""'
 sleep 0.5
 check "the clip history does not hold the URL" bash -c "! cliphist -db-path '$XDG_STATE_HOME/dots/clips.db' list | grep -qF example.com"
 check "the clip history still holds the copy before it" listed 'Ship v2 today'
 until_ok 3000 rests
 
 capture qr --region "0,0 40x40"
-check "qr with no code in the region says No QR code found" until_ok 1000 pill_is 'No QR code found'
+check "qr with no code in the region says No QR code found" until_ok 1000 shows 'No QR code found' '.title == "" and .detail == "No QR code found"'
 until_ok 3000 rests
 
-"$repo/bin/dots-call" island capture 'Copied #C8381E' ''
-until_ok 1000 pill_is 'Copied #C8381E'
-plain=$(island | jq .width)
-"$repo/bin/dots-call" island capture 'Copied #C8381E' '#c8381e'
-check "a colour's pill draws its swatch" until_ok 1000 pill_is 'Copied #C8381E' '#C8381E'
-check "and grows by the swatch and its gap (20 px)" test "$(island | jq --argjson p "$plain" '.width - $p')" = 20
+kept=$(kept)
+"$repo/bin/dots-call" island capture colour Copied '#c8381e'
+check "paper: a colour's pill draws COPIED, its swatch and the hex in mono" until_ok 1000 shows 'Copied #c8381e' '.drawn == "pill" and .check and .title == "COPIED" and .swatch == "#C8381E" and .detail == "#c8381e" and .detailFont == ["Maple Mono", 12]'
 until_ok 3000 rests
 
-qs ipc call island capture $'Ship\nv2\u202e today\e[31m' 'red' >/dev/null
-check "a forged capture is one plain line with no swatch" until_ok 1000 pill_is 'Ship v2 today [31m'
+qs ipc call island capture ocr $'Ship\nv2\u202e today\e[31m' $'2\n\u202echaracters' >/dev/null
+check "paper: a forged capture draws one plain line each, and no swatch" until_ok 1000 shows 'Ship v2 today [31m · 2 characters' '.title == "SHIP V2 TODAY [31M" and .detail == "2 characters" and .swatch == null'
+until_ok 3000 rests
+qs ipc call island capture annotate Copied '' >/dev/null
+sleep 0.3
+check "a capture of an unknown kind shows nothing" rests
+
+in_theme blueprint
+"$repo/bin/dots-call" island capture ocr 'Text copied' '214 characters'
+check "blueprint: the card reads [ OCR ] over TEXT COPIED and 214 characters" until_ok 1000 shows 'Text copied · 214 characters' '.drawn == "card" and .head == "[ OCR ]" and .title == "TEXT COPIED" and .detail == "214 characters"'
+echo "     capture: $(island | jq -c .capture)"
+check "blueprint: the card is no notification" state_is '.mode == "capture" and .note == null'
+until_ok 3000 rests
+"$repo/bin/dots-call" island capture colour Copied '#C8381E'
+check "blueprint: a colour reads [ COLOUR ], COPIED #C8381E with its swatch, and colour picked" until_ok 1000 shows 'Copied #C8381E' '.drawn == "card" and .head == "[ COLOUR ]" and .title == "COPIED #C8381E" and .detail == "colour picked" and .swatch == "#C8381E"'
+until_ok 3000 rests
+qs ipc call island capture ocr $'Ship\nv2\u202e' $'2\n\u202echaracters' >/dev/null
+check "blueprint: a forged capture's card is one plain line each" until_ok 1000 shows 'Ship v2 · 2 characters' '.title == "SHIP V2" and .detail == "2 characters"'
+until_ok 3000 rests
+
+in_theme artboard
+"$repo/bin/dots-call" island capture colour Copied '#C8381E'
+check "artboard: the card reads Capture over Copied #C8381E, its tile the swatch" until_ok 1000 shows 'Copied #C8381E' '.drawn == "card" and .head == "Capture" and .title == "Copied #C8381E" and .detail == "colour picked" and .swatch == "#C8381E"'
+until_ok 3000 rests
+check "no capture reached the notification history ($kept before, $(kept) after)" eval '[[ $kept =~ ^[0-9]+$ ]] && test "$(kept)" = "$kept"'
 
 exit $((fails > 0))
 }

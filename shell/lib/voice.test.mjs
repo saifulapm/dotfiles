@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, chipLook, clockLook, MODES, inOrder } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -176,6 +176,45 @@ test("Paper's OSD reads VOL, 20 accent bars and the value in serif; Artboard's d
   const a = osd('artboard');
   assert.deepEqual([a.word('volume'), a.bars, a.valueText(62), a.lit.color, a.unlit.color], ['', 'round', '62', '#6C83FF', '#2B2F36']);
   assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => [osd(n).width, osd(n).height]), [[280, 34], [300, 40], [320, 34]]);
+});
+
+const OCR = { kind: 'ocr', title: 'Text copied', detail: '214 characters', swatch: null };
+const COLOUR = { kind: 'colour', title: 'Copied', detail: '#C8381E', swatch: '#C8381E' };
+const QR = { kind: 'qr', title: 'QR code copied', detail: '', swatch: null };
+const MISS = { kind: 'ocr', title: '', detail: 'No text found', swatch: null };
+
+test("Paper's capture result is the pill: a check, the title in tracked caps, the count in italic serif and a hex in mono", () => {
+  const p = captureLook(theme('paper'));
+  assert.equal(p.card, false);
+  assert.equal(p.titleText(OCR.title), 'TEXT COPIED');
+  assert.deepEqual([p.title.font, p.title.size, p.title.spacing], ['Maple Mono', 10, 1.4]);
+  assert.deepEqual([p.detail(OCR).font, p.detail(OCR).size, p.detail(OCR).italic], ['Instrument Serif', 17, true]);
+  assert.deepEqual([p.detail(COLOUR).font, p.detail(COLOUR).size, p.detail(COLOUR).weight, p.detail(COLOUR).italic], ['Maple Mono', 12, 500, false]);
+  assert.deepEqual([p.height, p.pad, p.gap, p.check, p.swatch], [34, 14, 10, 12, 14]);
+  // A miss copied nothing: no check, and its words are muted.
+  assert.deepEqual([p.detail(MISS).color, p.detail(OCR).color], ['#B9AE99', '']);
+  assert.equal(captureLook(null).card, false);
+});
+
+test("Artboard's capture result is its notification card from Capture, the result as the summary", () => {
+  const a = captureLook(theme('artboard'));
+  assert.equal(a.card, true);
+  assert.deepEqual(a.note(OCR), { app: 'Capture', summary: 'Text copied · 214 characters', body: 'eng + ben · from region', swatch: null, icon: '', files: [] });
+  assert.deepEqual([a.note(COLOUR).summary, a.note(COLOUR).body, a.note(COLOUR).swatch], ['Copied #C8381E', 'colour picked', '#C8381E']);
+  assert.deepEqual([a.note(QR).summary, a.note(QR).body], ['QR code copied', 'from region']);
+  assert.equal(a.note(MISS).summary, 'No text found');
+});
+
+test("Blueprint's capture result is its notification card under [ OCR ] or [ COLOUR ], the count as the body", () => {
+  const b = captureLook(theme('blueprint'));
+  const n = islandLook(theme('blueprint'));
+  assert.equal(b.card, true);
+  const ocr = b.note(OCR);
+  assert.deepEqual([n.appLabel(ocr.app), n.summaryText(ocr.summary), ocr.body], ['[ OCR ]', 'TEXT COPIED', '214 characters']);
+  const colour = b.note(COLOUR);
+  assert.deepEqual([n.appLabel(colour.app), n.summaryText(colour.summary), colour.body, colour.swatch], ['[ COLOUR ]', 'COPIED #C8381E', 'colour picked', '#C8381E']);
+  assert.deepEqual([n.appLabel(b.note(QR).app), b.note(QR).body], ['[ QR ]', '']);
+  assert.deepEqual([n.summaryText(b.note(MISS).summary), b.note(MISS).body], ['NO TEXT FOUND', '']);
 });
 
 test('before the theme loads the island still has a whole notification and OSD look', () => {

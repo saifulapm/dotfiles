@@ -49,8 +49,16 @@ PanelWindow {
     readonly property var leaseCard: leaseOpen ? lease : null
     property var osd: null
     property var toast: null
-    // dots-capture's result, {text, swatch}, for the toast's 1.5 s.
+    // dots-capture's result, {kind, title, detail, swatch}, for the toast's 1.5 s.
     property var capture: null
+    property var heldCapture: null
+    onCaptureChanged: {
+        if (capture)
+            heldCapture = capture;
+        holdCaptureNote();
+    }
+    // Paper's pill, or Artboard's and Blueprint's notification card.
+    readonly property var captureLook: V.captureLook(theme.tokens)
     // A Taildrop send, {count, to, pct}, from dots-taildrop-send's start until its done.
     property var sending: null
     readonly property var sendingLook: V.sendingLook(theme.tokens)
@@ -91,6 +99,7 @@ PanelWindow {
     property real modeSince: Date.now()
     onModeChanged: {
         modeSince = Date.now();
+        holdCaptureNote();
         // The keyboard goes back once what it was given for is gone, such as a notification whose 5 s ran out.
         if (focused && ["calendar", "question", "notification", "leaseCard"].indexOf(mode) < 0)
             release();
@@ -106,7 +115,8 @@ PanelWindow {
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
-            label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28 + label.swatchSpace), 34],
+            label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
+            capture: captureLook.card ? [0, 0] : [I.boxWidth(Math.ceil(captureRow.implicitWidth) + 2 * captureLook.pad), captureLook.height],
             lease: [leaseLook.slot.width, leaseLook.slot.height],
             sending: [sendingLook.width, sendingLook.height],
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
@@ -115,14 +125,15 @@ PanelWindow {
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
             osd: [osdLook.width, osdLook.height]
         })
-    readonly property string part: ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sending"].indexOf(mode) < 0 ? "label" : mode
+    // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
+    readonly property string part: mode === "capture" ? (captureLook.card ? "notification" : "capture") : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sending"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
     readonly property var motion: I.islandMotion(theme.tokens?.primitive.motion)
-    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, leaseCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
+    readonly property bool animating: morphing.running || [labelPart, capturePart, leasePart, sendingPart, leaseCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -381,9 +392,33 @@ PanelWindow {
         }
     }
 
-    // The capture's swatch as drawn, for `island state`.
-    function swatchState() {
-        return swatch.visible ? String(swatch.color).toUpperCase() : null;
+    // A capture as drawn, for `island state`: in the pill or the card, its title, detail and swatch.
+    function captureState() {
+        if (mode !== "capture")
+            return null;
+        const hex = (item) => item.visible ? String(item.color).toUpperCase() : null;
+        if (notePart.shown)
+            return {
+                drawn: "card",
+                head: openBracket.visible ? openBracket.text + appName.text + closeBracket.text : appName.text,
+                title: summary.text,
+                detail: body.text,
+                swatch: island.heldNotification?.swatch && tile.visible ? hex(tile) : hex(noteSwatch)
+            };
+        return {
+            drawn: capturePart.shown ? "pill" : null,
+            check: captureCheck.visible,
+            title: captureTitle.text,
+            detail: captureDetail.text,
+            detailFont: [captureDetail.font.family, captureDetail.font.pixelSize],
+            swatch: hex(captureSwatch)
+        };
+    }
+
+    // A card theme draws the capture as a notification, so the card is handed a note while the capture is what shows; one the card held stays drawn as it leaves.
+    function holdCaptureNote() {
+        if (capture && mode === "capture" && captureLook.card)
+            heldNotification = captureLook.note(capture);
     }
 
     // What the OSD draws, for `island state`.
@@ -560,8 +595,8 @@ PanelWindow {
         toastTick.restart();
     }
 
-    function showCapture(text, hex) {
-        capture = I.captureOf(text, hex);
+    function showCapture(kind, title, detail) {
+        capture = I.captureOf(kind, title, detail);
         toastTick.restart();
     }
 
@@ -688,35 +723,97 @@ PanelWindow {
                 width: island.sizes.label[0]
                 height: island.sizes.label[1]
 
-                // A picked colour's swatch before the text, with a light outline so a dark colour still reads on the island.
-                Rectangle {
-                    id: swatch
-                    visible: island.mode === "capture" && !!island.capture?.swatch
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.right: label.left
-                    anchors.rightMargin: 8
-                    width: 12
-                    height: 12
-                    radius: 3
-                    color: island.capture?.swatch ?? "transparent"
-                    border.width: 1
-                    border.color: box.style.text
-                }
-
                 Text {
                     id: label
-                    // Room the swatch takes beside the text.
-                    readonly property real swatchSpace: swatch.visible ? swatch.width + swatch.anchors.rightMargin : 0
                     textFormat: Text.PlainText
                     anchors.centerIn: parent
-                    anchors.horizontalCenterOffset: swatchSpace / 2
-                    width: Math.min(implicitWidth, parent.width - 28 - swatchSpace)
+                    width: Math.min(implicitWidth, parent.width - 28)
                     elide: Text.ElideRight
                     text: I.isCompact(island.mode) ? island.text : island.heldText
                     color: box.style.text
                     font.family: island.theme.tokens?.type.mono ?? ""
                     font.pixelSize: 13
                     font.weight: Font.Medium
+                }
+            }
+
+            // Paper's capture pill: a check for what was copied, the title in caps, a colour's swatch, then the count or the hex; a miss draws only its muted words.
+            IslandPart {
+                id: capturePart
+                shown: island.part === "capture"
+                key: ""
+                swap: island.motion?.swap ?? null
+                x: Math.round((parent.width - width) / 2)
+                width: island.sizes.capture[0]
+                height: island.sizes.capture[1]
+
+                Row {
+                    id: captureRow
+                    readonly property var look: island.captureLook
+                    readonly property var detailLook: !look.card && island.heldCapture ? look.detail(island.heldCapture) : null
+                    // What the title and detail may take once the check and swatch have theirs; a long title leaves the detail half.
+                    readonly property real room: I.MAX_WIDTH - 2 * (look.pad ?? 0) - (captureCheck.visible ? captureCheck.width + spacing : 0) - (captureSwatch.visible ? captureSwatch.width + spacing : 0) - (captureTitle.visible && captureDetail.visible ? spacing : 0)
+                    anchors.centerIn: parent
+                    spacing: look.gap ?? 0
+
+                    Shape {
+                        id: captureCheck
+                        visible: (island.heldCapture?.title ?? "") !== ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: captureRow.look.check ?? 0
+                        height: width
+                        preferredRendererType: Shape.CurveRenderer
+                        ShapePath {
+                            strokeColor: box.style.text
+                            strokeWidth: 1.6
+                            fillColor: "transparent"
+                            PathSvg {
+                                path: "M2 6.5l2.5 2.5L10 3.5"
+                            }
+                        }
+                    }
+
+                    Text {
+                        id: captureTitle
+                        visible: text !== ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.min(implicitWidth, captureDetail.visible ? captureRow.room / 2 : captureRow.room)
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        text: captureRow.look.card ? "" : captureRow.look.titleText(island.heldCapture?.title ?? "")
+                        color: box.style.text
+                        font.family: captureRow.look.title?.font ?? ""
+                        font.pixelSize: captureRow.look.title?.size ?? 10
+                        font.letterSpacing: captureRow.look.title?.spacing ?? 0
+                    }
+
+                    // A light outline, so a dark colour still reads on the island.
+                    Rectangle {
+                        id: captureSwatch
+                        visible: !!island.heldCapture?.swatch
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: captureRow.look.swatch ?? 0
+                        height: width
+                        color: island.heldCapture?.swatch ?? "transparent"
+                        border.width: 1
+                        border.color: box.style.text
+                    }
+
+                    Text {
+                        id: captureDetail
+                        visible: text !== ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.min(implicitWidth, captureRow.room - (captureTitle.visible ? captureTitle.width : 0))
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        text: island.heldCapture?.detail ?? ""
+                        color: captureRow.detailLook?.color || box.style.text
+                        font.family: captureRow.detailLook?.font ?? ""
+                        font.pixelSize: captureRow.detailLook?.size ?? 12
+                        font.weight: captureRow.detailLook?.weight ?? Font.Normal
+                        font.letterSpacing: captureRow.detailLook?.spacing ?? 0
+                        font.italic: captureRow.detailLook?.italic ?? false
+                    }
                 }
             }
 
@@ -1532,7 +1629,10 @@ PanelWindow {
                         width: island.noteLook.tile?.size ?? 0
                         height: width
                         radius: island.noteLook.tile?.radius ?? 0
-                        color: island.noteLook.tile?.fill ?? "transparent"
+                        // Artboard's board fills the tile with a picked colour, ringed in white at 28 %.
+                        color: island.heldNotification?.swatch ?? island.noteLook.tile?.fill ?? "transparent"
+                        border.width: island.heldNotification?.swatch ? 1.5 : 0
+                        border.color: Qt.rgba(1, 1, 1, 0.28)
                         anchors.verticalCenter: parent.verticalCenter
 
                         Image {
@@ -1549,7 +1649,7 @@ PanelWindow {
                             textFormat: Text.PlainText
                             anchors.centerIn: parent
                             // An icon that is missing or fails to load leaves the letter.
-                            visible: icon.status !== Image.Ready
+                            visible: icon.status !== Image.Ready && !island.heldNotification?.swatch
                             text: island.noteLook.glyph(island.heldNotification?.app ?? "")
                             color: box.style.text
                             font.family: island.theme.tokens?.type.mono ?? ""
@@ -1603,7 +1703,7 @@ PanelWindow {
                         Text {
                             id: summary
                             textFormat: Text.PlainText
-                            width: parent.width
+                            width: parent.width - (noteSwatch.visible ? noteSwatch.width + 10 : 0)
                             text: island.noteLook.summaryText(island.heldNotification?.summary ?? "")
                             elide: Text.ElideRight
                             lineHeight: island.noteLook.voice === "caps" ? 1.1 : 1
@@ -1612,6 +1712,19 @@ PanelWindow {
                             font.pixelSize: island.noteLook.summary.size
                             font.weight: island.noteLook.summary.weight
                             font.letterSpacing: island.noteLook.summary.spacing
+
+                            // With no tile, Blueprint's board draws a picked colour 10 px after the summary.
+                            Rectangle {
+                                id: noteSwatch
+                                visible: island.noteLook.tile === null && !!island.heldNotification?.swatch
+                                x: Math.min(summary.implicitWidth, summary.width) + 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 16
+                                height: 16
+                                color: island.heldNotification?.swatch ?? "transparent"
+                                border.width: 1
+                                border.color: box.style.text
+                            }
                         }
 
                         // Paper and Blueprint draw the chip at the right of the body line.

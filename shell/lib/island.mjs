@@ -30,11 +30,16 @@ const oneLine = (s) =>
     .trim();
 export const filesText = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;
 
-// dots-capture's result, from any caller of the IPC: one line of text, and a swatch only for a #RRGGBB colour; no text, no pill.
-export function captureOf(text, hex) {
-  const line = oneLine(text);
-  return line ? { text: line, swatch: /^#[0-9a-f]{6}$/i.test(hex) ? hex.toUpperCase() : null } : null;
+// dots-capture's result, from any caller of the IPC: its kind, a title (empty for a miss, which copied nothing) and a detail, each one line; a colour's detail is its hex, and a #RRGGBB one gives the swatch. No words or an unknown kind shows nothing.
+export function captureOf(kind, title, detail) {
+  const t = oneLine(title);
+  const d = oneLine(detail);
+  if (!['ocr', 'qr', 'colour'].includes(kind) || !(t || d)) return null;
+  return { kind, title: t, detail: d, swatch: kind === 'colour' && /^#[0-9a-f]{6}$/i.test(d) ? d.toUpperCase() : null };
 }
+
+// A capture in one line, as `island state` and Artboard's card read it: Text copied · 214 characters, Copied #C8381E.
+export const captureText = (c) => (c.kind === 'colour' ? [c.title, c.detail].filter((p) => p).join(' ') : joined([c.title, c.detail]));
 
 // `qs ipc call island state` reports this text, whatever the theme draws.
 export function islandText(mode, slots, now) {
@@ -52,7 +57,7 @@ export function islandText(mode, slots, now) {
     case 'toast':
       return slots.toast;
     case 'capture':
-      return slots.capture.text;
+      return captureText(slots.capture);
     case 'sending':
       return `Sending ${filesText(slots.sending.count)} to ${oneLine(slots.sending.to)} · ${slots.sending.pct}%`;
     case 'playing':

@@ -145,19 +145,27 @@ test('a send reads how many files go where and how far it got, on one line', () 
   assert.equal(isCompact('sending'), true);
 });
 
-test('a capture result shows just below a toast, as one line with its swatch', () => {
-  assert.equal(pick({ toast: 'Captured', capture: { text: 'No text found', swatch: null } }), 'toast');
-  assert.equal(pick({ capture: { text: 'No text found', swatch: null }, sending: { count: 1, to: 'nuc', pct: 1 } }), 'capture');
+test('a capture result shows just below a toast, with its kind, title and detail', () => {
+  const ocr = captureOf('ocr', 'Text copied', '214 characters');
+  assert.equal(pick({ toast: 'Captured', capture: ocr }), 'toast');
+  assert.equal(pick({ capture: ocr, sending: { count: 1, to: 'nuc', pct: 1 } }), 'capture');
   assert.equal(isCompact('capture'), true);
-  assert.deepEqual(captureOf('Copied #c8381e', '#c8381e'), { text: 'Copied #c8381e', swatch: '#C8381E' });
-  assert.deepEqual(captureOf('Text copied · 13 characters', ''), { text: 'Text copied · 13 characters', swatch: null });
-  assert.equal(islandText('capture', { capture: captureOf('Copied #C8381E', '#C8381E') }, AT), 'Copied #C8381E');
+  assert.deepEqual(ocr, { kind: 'ocr', title: 'Text copied', detail: '214 characters', swatch: null });
+  assert.deepEqual(captureOf('colour', 'Copied', '#c8381e'), { kind: 'colour', title: 'Copied', detail: '#c8381e', swatch: '#C8381E' });
+  assert.equal(islandText('capture', { capture: ocr }, AT), 'Text copied · 214 characters');
+  assert.equal(islandText('capture', { capture: captureOf('colour', 'Copied', '#C8381E') }, AT), 'Copied #C8381E');
+  assert.equal(islandText('capture', { capture: captureOf('qr', 'QR code copied', '') }, AT), 'QR code copied');
+  // A miss copies nothing, so it has no title, only the words.
+  assert.equal(islandText('capture', { capture: captureOf('ocr', '', 'No text found') }, AT), 'No text found');
 });
 
-test('a capture from any caller is one plain line, and a swatch only a hex colour', () => {
-  assert.equal(captureOf('Ship\nv2\u202Etoday\u001b[31m\u0085x\u200f', '').text, 'Ship v2today [31m x');
-  assert.equal(captureOf('x'.repeat(200), '').text, 'x'.repeat(200));
-  assert.equal(captureOf(' \n ', '#C8381E'), null);
-  assert.equal(captureOf('Copied', 'red').swatch, null);
-  assert.equal(captureOf('Copied', '#C8381E; x').swatch, null);
+test('a capture from any caller is one plain line, a swatch only for a colour hex, and only a known kind', () => {
+  assert.equal(captureOf('ocr', 'Text copied', 'a\nb‮c').detail, 'a bc');
+  assert.equal(captureOf('ocr', 'Copied', '#C8381E').swatch, null);
+  assert.equal(captureOf('annotate', 'Copied', ''), null);
+  assert.equal(captureOf('ocr', 'Ship\nv2\u202Etoday\u001b[31m\u0085x\u200f', '').title, 'Ship v2today [31m x');
+  assert.equal(captureOf('ocr', 'x'.repeat(200), '').title, 'x'.repeat(200));
+  assert.equal(captureOf('colour', ' \n ', ''), null);
+  assert.equal(captureOf('colour', 'Copied', 'red').swatch, null);
+  assert.equal(captureOf('colour', 'Copied', '#C8381E; x').swatch, null);
 });

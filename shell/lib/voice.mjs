@@ -2,6 +2,7 @@
 
 import { dateText, pad2 } from './margins.mjs';
 import { chipLabel } from './notifs.mjs';
+import { captureText } from './island.mjs';
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder'];
 
@@ -173,6 +174,39 @@ export function islandLook(tokens) {
     summary: { font: t.display, size: 24, weight: 400, spacing: 0, color: '' },
     body: { font: t.mono, size: 12, color: tokens ? ISLAND.caps.body : c.ink },
   });
+}
+
+// What each capture card says under its result: Artboard's line names how it was read; niri's pick gives no place, so a colour says only that it was picked.
+const CAPTURE_BODY = { ocr: 'eng + ben · from region', qr: 'from region', colour: 'colour picked' };
+
+// How the island draws dots-capture's result, as each theme's board does: Paper's pill (a check, the title in caps, the count in serif, a colour's swatch and hex), or Artboard's and Blueprint's notification card, fed a note the card already draws. A colour left empty is the island's own text colour.
+export function captureLook(tokens) {
+  const c = (tokens || UNTHEMED).color;
+  const t = (tokens || UNTHEMED).type;
+  const voice = t.voice;
+  const card = (note) => ({ card: true, note: (r) => Object.assign({ swatch: r.swatch, icon: '', files: [] }, note(r)) });
+  if (voice === 'plain') return card((r) => ({ app: 'Capture', summary: captureText(r), body: CAPTURE_BODY[r.kind] }));
+  if (voice === 'bracket')
+    return card((r) => ({
+      app: r.kind.toUpperCase(),
+      summary: r.kind === 'colour' || !r.title ? captureText(r) : r.title,
+      body: r.kind === 'colour' ? CAPTURE_BODY.colour : r.title ? r.detail : '',
+    }));
+  return {
+    card: false,
+    height: 34,
+    pad: 14,
+    gap: 10,
+    check: 12,
+    swatch: 14,
+    titleText: (s) => line(s).toUpperCase(),
+    title: { font: t.ui, size: 10, spacing: 1.4 },
+    // A colour's hex in mono, a count in the italic serif; a miss's words are muted.
+    detail: (r) =>
+      r.kind === 'colour'
+        ? { font: t.mono, size: 12, weight: 500, spacing: 0.72, italic: false, color: '' }
+        : { font: t.display, size: 17, weight: 400, spacing: 0, italic: true, color: r.title ? '' : tokens ? ISLAND.caps.head : c.muted },
+  };
 }
 
 // The m21 boards' colours that no token carries: Artboard's last-minute chip.

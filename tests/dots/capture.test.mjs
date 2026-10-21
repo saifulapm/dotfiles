@@ -52,7 +52,7 @@ test('ocr copies the trimmed text of the picked region and counts it in the pill
   assert.equal(r.status, 0, r.stderr);
   assert.equal(s.read('wl-copy.stdin'), 'Ship v2 today');
   assert.equal(s.read('wl-copy.args'), '\n');
-  assert.deepEqual(s.pill(), ['island', 'capture', 'Text copied · 13 characters', '']);
+  assert.deepEqual(s.pill(), ['island', 'capture', 'ocr', 'Text copied', '13 characters']);
   assert.match(s.read('argv.log'), /^grim -g 10,20 300x40 -$/m);
   assert.match(s.read('argv.log'), /^tesseract - - -l eng\+ben$/m);
 });
@@ -61,7 +61,7 @@ test('ocr counts Bangla in characters, not bytes', (t) => {
   const s = scratch(t, { slurp: REGION, grim: SCREEN, tesseract: `printf 'আমার সোনার\\n'` });
   s.run('ocr');
   assert.equal(s.read('wl-copy.stdin'), 'আমার সোনার');
-  assert.deepEqual(s.pill(), ['island', 'capture', 'Text copied · 10 characters', '']);
+  assert.deepEqual(s.pill(), ['island', 'capture', 'ocr', 'Text copied', '10 characters']);
 });
 
 test('ocr over an empty region says No text found and leaves the clipboard alone', (t) => {
@@ -69,7 +69,7 @@ test('ocr over an empty region says No text found and leaves the clipboard alone
   const r = s.run('ocr');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(s.read('wl-copy.args'), null);
-  assert.deepEqual(s.pill(), ['island', 'capture', 'No text found', '']);
+  assert.deepEqual(s.pill(), ['island', 'capture', 'ocr', '', 'No text found']);
 });
 
 test('--region skips slurp', (t) => {
@@ -96,14 +96,14 @@ test('qr copies the code as sensitive, so the clip store drops it', (t) => {
   assert.equal(s.read('wl-copy.stdin'), 'https://example.com/x');
   assert.equal(s.read('wl-copy.args'), '--sensitive\n');
   assert.match(s.read('argv.log'), /^zbarimg --raw -q -$/m);
-  assert.deepEqual(s.pill(), ['island', 'capture', 'QR code copied', '']);
+  assert.deepEqual(s.pill(), ['island', 'capture', 'qr', 'QR code copied', '']);
 });
 
 test('qr with no code says No QR code found and copies nothing', (t) => {
   const s = scratch(t, { slurp: REGION, grim: SCREEN, zbarimg: 'exit 4' });
   s.run('qr');
   assert.equal(s.read('wl-copy.args'), null);
-  assert.deepEqual(s.pill(), ['island', 'capture', 'No QR code found', '']);
+  assert.deepEqual(s.pill(), ['island', 'capture', 'qr', '', 'No QR code found']);
 });
 
 test("colour copies niri's pick as uppercase hex and gives the pill its swatch", (t) => {
@@ -112,7 +112,7 @@ test("colour copies niri's pick as uppercase hex and gives the pill its swatch",
   s.run('colour');
   assert.match(s.read('argv.log'), /^niri msg --json pick-color$/m);
   assert.equal(s.read('wl-copy.stdin'), '#C8381E');
-  assert.deepEqual(s.pill(), ['island', 'capture', 'Copied #C8381E', '#C8381E']);
+  assert.deepEqual(s.pill(), ['island', 'capture', 'colour', 'Copied', '#C8381E']);
 });
 
 test('colour cancelled (niri prints null) does nothing', (t) => {
@@ -156,7 +156,7 @@ test('real tesseract reads Ship v2 today off a rendered line', (t) => {
   chmodSync(join(s.root, 'stubs', 'grim'), 0o755);
   s.run('ocr');
   assert.equal(s.read('wl-copy.stdin'), 'Ship v2 today');
-  assert.deepEqual(s.pill(), ['island', 'capture', 'Text copied · 13 characters', '']);
+  assert.deepEqual(s.pill(), ['island', 'capture', 'ocr', 'Text copied', '13 characters']);
 });
 
 test('real tesseract reads Bangla as Bangla, not Latin noise', (t) => {
