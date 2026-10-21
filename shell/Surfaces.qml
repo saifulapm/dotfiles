@@ -26,8 +26,9 @@ PanelWindow {
     readonly property var goalsView: goalsLoader.item
     readonly property var pinentry: pinentryLoader.item
     readonly property var pass: passLoader.item
+    readonly property var tailscale: tailscaleLoader.item
     // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
-    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass]
+    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass, tailscale]
     readonly property bool shown: all.some(s => s?.shown ?? false)
 
     // Only one surface shows at a time, so another's close is cut short.
@@ -95,6 +96,12 @@ PanelWindow {
         passLoader.active = true;
         closeOthers(pass);
         pass.open(t0);
+    }
+
+    function openTailscale(t0) {
+        tailscaleLoader.active = true;
+        closeOthers(tailscale);
+        tailscale.open(t0);
     }
 
     // The Pinentry service calls this with each gpg request it shows.
@@ -256,6 +263,21 @@ PanelWindow {
         interval: 30000
         running: !!host.pass && !host.pass.visible && !host.pass.busy
         onTriggered: passLoader.active = false
+    }
+
+    Loader {
+        id: tailscaleLoader
+        anchors.fill: parent
+        active: false
+        sourceComponent: Root.Tailscale {
+            theme: host.theme
+        }
+    }
+
+    Root.Tick {
+        interval: 30000
+        running: !!host.tailscale && !host.tailscale.visible && !host.tailscale.busy
+        onTriggered: tailscaleLoader.active = false
     }
 
     Loader {

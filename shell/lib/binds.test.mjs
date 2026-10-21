@@ -27,6 +27,10 @@ test('Mod+P toggles Pass', () => {
   assert.match(binds, spawns('Mod+P', ['dots-call', 'pass', 'toggle']));
 });
 
+test('Mod+T toggles Tailscale', () => {
+  assert.match(binds, spawns('Mod+T', ['dots-call', 'tailscale', 'toggle']));
+});
+
 test('workspace up and down keep a bind now that Mod+I is the island', () => {
   assert.match(binds, /^\s*Mod\+Page_Up hotkey-overlay-title="[^"]+" \{ focus-workspace-up; \}$/m);
   assert.match(binds, /^\s*Mod\+Page_Down hotkey-overlay-title="[^"]+" \{ focus-workspace-down; \}$/m);

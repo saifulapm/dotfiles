@@ -297,6 +297,33 @@ ShellRoot {
     }
 
     Root.Ipc {
+        target: "tailscale"
+
+        function open(): void {
+            const t0 = Date.now();
+            surfacesLoader.active = true;
+            surfacesLoader.item.openTailscale(t0);
+        }
+
+        function close(): void {
+            surfacesLoader.item?.tailscale?.close();
+        }
+
+        function toggle(): void {
+            if (surfacesLoader.item?.tailscale?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (surfacesLoader.item?.tailscale)
+                return surfacesLoader.item.tailscale.state();
+            return JSON.stringify({ loaded: false, open: false, state: "", online: 0, rows: [], openMs: null, opens: 0 });
+        }
+    }
+
+    Root.Ipc {
         target: "goals"
 
         // The store lives in the Desk, so Goals opens only once the Desk has loaded.

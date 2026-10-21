@@ -18,6 +18,7 @@ binds {
     Mod+Shift+N hotkey-overlay-title="Pin Notes" { spawn "dots-call" "notes" "pin"; }
     Mod+G hotkey-overlay-title="Goals" { spawn "dots-call" "goals" "toggle"; }
     Mod+P hotkey-overlay-title="Pass" { spawn "dots-call" "pass" "toggle"; }
+    Mod+T hotkey-overlay-title="Tailscale" { spawn "dots-call" "tailscale" "toggle"; }
     Mod+Escape hotkey-overlay-title="Lock" { spawn "dots-call" "lock" "lock"; }
     Mod+Shift+Escape hotkey-overlay-title="System Monitor: btop" { spawn "dots-foot" "btop"; }
     Mod+O repeat=false hotkey-overlay-title="Overview" { toggle-overview; }
