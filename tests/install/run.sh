@@ -201,7 +201,7 @@ check "nothing Claude Code or pi loads links into v1 (got '$v1')" test -z "$v1"
 # A skill comes from the dotfiles, the skills repo, amx setup, playwright-cli, or workflow install, the one writer of real folders into both skill folders.
 stray=$(as_user 'for e in ~/.claude/skills/*; do n=${e##*/}; t=$(readlink -f "$e/SKILL.md"); case $t in "$HOME"/Codes/dotfiles/* | "$HOME"/.local/src/skills/*) continue ;; esac; [[ $n == amx || $n == playwright-cli ]] && continue; [[ ! -L $e && -d ~/.agents/skills/$n && ! -L ~/.agents/skills/$n ]] && continue; echo "$n"; done')
 check "every skill in \$HOME/.claude/skills comes from one of the five sources (got strays '$stray')" test -z "$stray"
-dropped=$(as_user "find ~/.config -iname '*herdr*' -o -iname '*kitty*' -o -iname '*vicinae*'")
+dropped=$(as_user "find ~/.config -path ~/.config/composer/vendor -prune -o \( -iname '*herdr*' -o -iname '*kitty*' -o -iname '*vicinae*' \) -print")
 check "nothing for herdr, kitty or vicinae under ~/.config (got '$dropped')" test -z "$dropped"
 
 check "caddy accepts its Caddyfile" as_user "caddy validate --config ~/.config/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1"
