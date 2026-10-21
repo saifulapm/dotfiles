@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Prints the home zone, each city's UTC offset in seconds east and the epoch of the next offset change among them, as one JSON object. Takes an optional epoch to answer as of; the shell runs it at start and again once the clock passes "next".
+set -euo pipefail
+{
+
+at=${1:-$(date +%s)}
+case $at in '' | *[!0-9]*) echo "dots-zones: epoch must be digits" >&2; exit 2 ;; esac
+
+# The machine's zone: $TZ when set, else the zoneinfo name /etc/localtime links to.
+home=${TZ:-}
+home=${home#:}
+[ -n "$home" ] || home=$(readlink /etc/localtime)
+home=${home#*zoneinfo/}
+
+ids=("$home")
+for id in UTC Europe/London America/New_York; do
+  [ "$id" = "$home" ] || ids+=("$id")
+done
+
+year=$(date -u -d "@$at" +%Y)
+next=null json=
+for id in "${ids[@]}"; do
+  z=$(TZ=$id date -d "@$at" +%z)
+  off=$(( ${z:0:1}1 * (10#${z:1:2} * 3600 + 10#${z:3:2} * 60) ))
+  city=${id##*/}; city=${city//_/ }
+  json+="${json:+,}{\"id\":\"$id\",\"city\":\"$city\",\"offset\":$off}"
+
+  # zdump prints each change as two lines, the last second before and the first after. A change is where gmtoff differs from the line above.
+  lines=$(zdump -v -c "$year,$((year + 2))" "$id" | grep -E ' [0-9]{4} UT = .*gmtoff=' || true)
+  [ -n "$lines" ] || continue
+  t=$(paste -d' ' \
+    <(sed 's/^[^ ]* *//; s/ UT = .*/ UTC/' <<<"$lines" | date -u -f - +%s) \
+    <(sed 's/.*gmtoff=//' <<<"$lines") |
+    awk -v at="$at" 'NR > 1 && $2 != prev && $1 > at { print $1; exit } { prev = $2 }')
+  if [ -n "$t" ] && { [ "$next" = null ] || [ "$t" -lt "$next" ]; }; then next=$t; fi
+done
+
+printf '{"home":"%s","zones":[%s],"next":%s}\n' "$home" "$json" "$next"
+exit
+}
