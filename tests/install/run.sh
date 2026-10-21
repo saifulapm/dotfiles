@@ -136,13 +136,13 @@ check "every packages.toml entry for this arch is installed" podman exec "$name"
 out=$(podman exec "$name" rpm -q chromium tailscale wf-recorder ffmpeg)
 rc=$?
 check "rpm -q chromium tailscale wf-recorder ffmpeg prints 4 versions (exit $rc, got '$out')" test "$rc" = 0 -a "$(grep -c . <<<"$out")" = 4
-# The NUC's wifi firmware and VA driver are for x86_64 alone.
-out=$(podman exec "$name" rpm -q iwlwifi-mvm-firmware intel-media-driver)
+# The NUC's wifi firmware, VA driver and vainfo are for x86_64 alone.
+out=$(podman exec "$name" rpm -q iwlwifi-mvm-firmware intel-media-driver libva-utils)
 rc=$?
 if [ "$(uname -m)" = x86_64 ]; then
-  check "rpm -q iwlwifi-mvm-firmware intel-media-driver prints 2 versions (exit $rc, got '$out')" test "$rc" = 0 -a "$(grep -vc 'not installed' <<<"$out")" = 2
+  check "rpm -q iwlwifi-mvm-firmware intel-media-driver libva-utils prints 3 versions (exit $rc, got '$out')" test "$rc" = 0 -a "$(grep -vc 'not installed' <<<"$out")" = 3
 else
-  check "neither iwlwifi-mvm-firmware nor intel-media-driver is installed on $(uname -m) (got '$out')" test "$(grep -c 'is not installed' <<<"$out")" = 2
+  check "none of iwlwifi-mvm-firmware, intel-media-driver and libva-utils is installed on $(uname -m) (got '$out')" test "$(grep -c 'is not installed' <<<"$out")" = 3
 fi
 while IFS=$'\t' read -r pin version cmd; do
   out=$(as_user "$cmd" 2>&1)

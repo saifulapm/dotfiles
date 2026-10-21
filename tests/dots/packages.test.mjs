@@ -38,9 +38,10 @@ test('ffmpeg comes from RPM Fusion free', () => {
 });
 
 // The NUC's Intel wifi and video decode; Fedora's libva-intel-media-driver leaves out codecs RPM Fusion's build has.
-test('the NUC\'s wifi firmware and VA driver are declared for x86_64 only', () => {
+test('the NUC\'s wifi firmware, VA driver and vainfo are declared for x86_64 only', () => {
   assert.equal(byName.get('iwlwifi-mvm-firmware')?.arch, 'x86_64');
   assert.equal(byName.get('intel-media-driver')?.arch, 'x86_64');
   assert.equal(byName.get('intel-media-driver').rpmfusion, 'nonfree');
-  for (const name of ['iwlwifi-mvm-firmware', 'intel-media-driver']) assert.match(byName.get(name).why, /\w/, `${name} why`);
+  assert.equal(byName.get('libva-utils')?.arch, 'x86_64');
+  for (const name of ['iwlwifi-mvm-firmware', 'intel-media-driver', 'libva-utils']) assert.match(byName.get(name).why, /\w/, `${name} why`);
 });

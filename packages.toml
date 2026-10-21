@@ -536,3 +536,8 @@ name = "intel-media-driver"
 arch = "x86_64"
 rpmfusion = "nonfree"
 why = "VA-API video decode on the NUC's Intel GPU, RPM Fusion's build with the codecs Fedora's libva-intel-media-driver leaves out"
+
+[[package]]
+name = "libva-utils"
+arch = "x86_64"
+why = "vainfo, which shows the NUC's VA driver loads"
