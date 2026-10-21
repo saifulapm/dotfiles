@@ -12,6 +12,8 @@ Scope {
 
     required property var theme
     required property var notifs
+    // The session lock, whose agent lease the island shows.
+    required property var lock
     // The Goals window reaches the store through this.
     readonly property alias goals: goalsService
     // Control's Route section and the shell's status read the last sync round through this.
@@ -117,6 +119,7 @@ Scope {
         clock: clockService
         notifs: desk.notifs
         questions: questionsService
+        lock: desk.lock
         osd: osdService.current
         playing: mediaService.playing
     }
@@ -155,7 +158,7 @@ Scope {
 
         function state(): string {
             const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks } : null;
-            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState() });
+            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState() });
         }
 
         function focus(): void {

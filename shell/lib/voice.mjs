@@ -99,7 +99,7 @@ export function launcherLook(tokens) {
 // The island's board tints on its dark box, which no token carries.
 const ISLAND = {
   caps: { head: '#B9AE99', body: '#D9CFBB' },
-  plain: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36', bar: '#6C83FF' },
+  plain: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36', bar: '#6C83FF', dangerChip: '#FFEBE9' },
 };
 
 // How the island draws a notification; every colour not named here is the island's own text colour.
@@ -151,6 +151,57 @@ export function islandLook(tokens) {
     summary: { font: t.display, size: 24, weight: 400, spacing: 0, color: '' },
     body: { font: t.mono, size: 12, color: tokens ? ISLAND.caps.body : c.ink },
   });
+}
+
+// How the island draws an agent's lease in place of the clock, and its last minute (XX2P8V57); colours left empty are the island's own text colour.
+export function leaseLook(tokens) {
+  const c = (tokens || UNTHEMED).color;
+  const t = (tokens || UNTHEMED).type;
+  const voice = t.voice;
+  const time = (ms) => {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return `${voice === 'bracket' ? 'T−' : ''}${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+  };
+  if (voice === 'plain') {
+    return {
+      voice,
+      mark: '●',
+      markColor: tokens ? ISLAND.plain.bar : c.accent,
+      words: (who) => `Agent · ${line(who)}`,
+      time,
+      font: t.ui,
+      timeFont: t.ui,
+      text: '',
+      timeColor: '',
+      warning: { fill: '', frame: '', text: '', time: c.danger || c.accent, chip: tokens ? ISLAND.plain.dangerChip : '' },
+    };
+  }
+  if (voice === 'bracket') {
+    return {
+      voice,
+      mark: '',
+      markColor: '',
+      words: (who) => `[ AGENT ] ${upper(line(who))}`,
+      time,
+      font: t.mono,
+      timeFont: t.mono,
+      text: c.accent,
+      timeColor: c.accent,
+      warning: { fill: '', frame: '', text: '', time: c.danger || c.accent, chip: '' },
+    };
+  }
+  return {
+    voice,
+    mark: '■',
+    markColor: c.accent,
+    words: (who) => `AGENT ${upper(line(who))}`,
+    time,
+    font: t.ui,
+    timeFont: t.display,
+    text: '',
+    timeColor: '',
+    warning: { fill: c.paper, frame: c.danger || c.accent, text: c.ink, time: c.danger || c.accent, chip: '' },
+  };
 }
 
 // How the island draws the volume or brightness OSD: 20 bars, Blueprint's blocks or Artboard's one rounded bar.

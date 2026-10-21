@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, islandLook, osdLook, listLook, marginLook, MODES, inOrder } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -261,4 +261,40 @@ test('a polkit request cannot reorder what it asks with bidi controls, and keeps
   assert.equal(inOrder('run ‮evil.sh as root'), 'run evil.sh as root');
   assert.equal(inOrder('a⁦b⁩\nc‪‬d'), 'ab\ncd');
   assert.equal(inOrder(undefined), '');
+});
+
+// The lease slot's words, in each theme's voice, as the m21 boards draw them (XX2P8V57).
+const leaseParts = (name, who, left) => {
+  const l = leaseLook(theme(name));
+  return [l.mark, l.words(who), l.time(left)].filter((x) => x).join(' ');
+};
+
+test("the lease slot reads each board's words, with the time left as mm:ss", () => {
+  assert.equal(leaseParts('paper', 'claude', 872000), '■ AGENT CLAUDE 14:32');
+  assert.equal(leaseParts('artboard', 'claude', 872000), '● Agent · claude 14:32');
+  assert.equal(leaseParts('blueprint', 'claude', 872000), '[ AGENT ] CLAUDE T−14:32');
+  assert.equal(leaseLook(theme('paper')).time(7200000), '120:00');
+  assert.equal(leaseLook(theme('paper')).time(41200), '00:42');
+});
+
+test("Paper's time is serif, Artboard's dot is its blue, Blueprint draws in cyan", () => {
+  const p = leaseLook(theme('paper'));
+  assert.equal(p.timeFont, 'Instrument Serif');
+  assert.equal(leaseLook(theme('artboard')).markColor, '#6C83FF');
+  const b = leaseLook(theme('blueprint'));
+  assert.deepEqual([b.text, b.timeColor], ['#7FE3F0', '#7FE3F0']);
+});
+
+test("the last minute takes each theme's warning: Paper's sheet and vermilion, Artboard's danger chip, Blueprint's amber", () => {
+  const p = leaseLook(theme('paper')).warning;
+  assert.deepEqual([p.fill, p.frame, p.time, p.text], ['#F1E9D8', '#C8381E', '#C8381E', '#1C1915']);
+  const a = leaseLook(theme('artboard')).warning;
+  assert.equal(a.time, '#CF222E');
+  assert.ok(a.chip, 'Artboard puts the time in a chip');
+  assert.equal(leaseLook(theme('blueprint')).warning.time, '#FFB547');
+});
+
+test('a holder any caller names is one line without bidi controls', () => {
+  assert.equal(leaseLook(theme('paper')).words('cl\naude\u202e x'), 'AGENT CL AUDE X');
+  assert.equal(leaseLook(theme('artboard')).words('\u202eclaude'), 'Agent · claude');
 });

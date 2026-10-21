@@ -4,8 +4,8 @@ import { clockText } from './margins.mjs';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// The calendar is opened by hand from rest, so only a question takes the island from it.
-const PRIORITY = ['question', 'calendar', 'notification', 'recording', 'osd', 'toast', 'playing'];
+// The calendar is opened by hand from rest, so only a question, or an agent's lease that holds the session, takes the island from it.
+const PRIORITY = ['question', 'lease', 'calendar', 'notification', 'recording', 'osd', 'toast', 'playing'];
 
 export const MAX_WIDTH = 560;
 
@@ -63,7 +63,7 @@ export function shiftMonth(year, month, by) {
 }
 
 // The one-line modes the island closes into; the rest open it into a card.
-export const isCompact = (mode) => ['rest', 'playing', 'recording', 'toast'].includes(mode);
+export const isCompact = (mode) => ['rest', 'lease', 'playing', 'recording', 'toast'].includes(mode);
 
 // Curves are 61 samples at even steps of time, which ease reads as CSS linear() does; Qt's BezierSpline crashed on a sampled curve.
 const STEPS = 60;

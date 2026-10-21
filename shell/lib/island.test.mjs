@@ -124,3 +124,10 @@ test('the one-line modes close; the cards open', () => {
   assert.deepEqual(['rest', 'playing', 'recording', 'toast'].map(isCompact), [true, true, true, true]);
   assert.deepEqual(['notification', 'question', 'calendar', 'osd'].map(isCompact), [false, false, false, false]);
 });
+
+test("an agent's lease sits just below a question and above the calendar and notifications (5G53CWPV)", () => {
+  const lease = { who: 'claude', left: 60000 };
+  assert.equal(pick({ question: { text: 'q', options: [] }, lease }), 'question');
+  assert.equal(pick({ lease, calendar: { year: 2026, month: 9 }, notification: { app: 'a' }, osd: { kind: 'volume', value: 1 } }), 'lease');
+  assert.equal(isCompact('lease'), true);
+});

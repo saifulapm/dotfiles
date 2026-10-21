@@ -18,6 +18,7 @@ PanelWindow {
     required property var clock
     required property var notifs
     required property var questions
+    required property var lock
     // A theme switch's failure, shown in place of the clock for 5 s.
     property string notice: ""
     // What the island may show; each is null while it has nothing to show.
@@ -31,6 +32,12 @@ PanelWindow {
     // Bumped each second while a recording runs, so its counter moves.
     property real recordingNow: 0
     readonly property var recording: recordingSince > 0 ? I.recordingText(recordingSince, Math.max(recordingNow, recordingSince)) : null
+    // An agent's lease, {who, left} in ms, while one holds the session; leaseNow is bumped each second so the time left moves.
+    property real leaseNow: Date.now()
+    readonly property var lease: lock.leased ? { who: lock.heldBy, left: Math.max(0, lock.leaseUntil - leaseNow) } : null
+    readonly property var leaseLook: V.leaseLook(theme.tokens)
+    // The last minute takes the theme's warning; a renew past it brings the normal look back.
+    readonly property bool leaseWarning: lease !== null && lease.left <= 60000
     property var osd: null
     property var toast: null
     property var playing: null
@@ -53,6 +60,7 @@ PanelWindow {
     Component.onCompleted: heldText = text
     readonly property var slots: ({
             question,
+            lease,
             calendar,
             notification,
             recording,
@@ -70,26 +78,28 @@ PanelWindow {
         if (focused && ["calendar", "question", "notification"].indexOf(mode) < 0)
             release();
     }
-    readonly property string text: I.islandText(mode, slots, clock.now)
+    // The lease's text is read back from what is drawn, since each theme words it its own way.
+    readonly property string text: mode === "lease" ? [leaseMark.text, leaseWords.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(mode, slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question, a 320 px calendar and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
+            lease: [I.boxWidth(Math.ceil(leaseRow.implicitWidth) + 28), 34],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
             question: [I.MAX_WIDTH, ask.implicitHeight + 32],
             calendar: [320, month.implicitHeight + 32],
             osd: [osdLook.width, osdLook.height]
         })
-    readonly property string part: ["notification", "question", "calendar", "osd"].indexOf(mode) < 0 ? "label" : mode
+    readonly property string part: ["notification", "question", "calendar", "osd", "lease"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
     readonly property var motion: I.islandMotion(theme.tokens?.primitive.motion)
-    readonly property bool animating: morphing.running || [labelPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
+    readonly property bool animating: morphing.running || [labelPart, leasePart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -153,6 +163,22 @@ PanelWindow {
             bars: osdLook.bars,
             lit: osdLook.bars === "blocks" ? litBlocks.text.length : osdLook.bars === "bars" ? Array.from({ length: 20 }, (_, i) => barRepeater.itemAt(i)).filter(b => b && b.on).length : Math.round(roundFill.width / roundTrack.width * 20),
             valueBox: { x: p.x + (screen.width - width) / 2, y: p.y, w: osdValue.width, h: osdValue.height }
+        };
+    }
+
+    // What the lease slot draws, for `island state`.
+    function leaseState() {
+        if (mode !== "lease")
+            return null;
+        return {
+            who: leaseWords.text,
+            time: leaseTime.text,
+            elided: leaseWords.truncated,
+            lines: leaseWords.lineCount,
+            timeColor: String(leaseTime.color),
+            timeFont: leaseTime.font.family,
+            sheet: leaseSheet.visible ? String(leaseSheet.color) : null,
+            chip: leaseChip.visible ? String(leaseChip.color) : null
         };
     }
 
@@ -263,6 +289,22 @@ PanelWindow {
         onTriggered: island.recordingNow = Date.now()
     }
 
+    Tick {
+        interval: 1000
+        repeat: true
+        triggeredOnStart: true
+        running: island.lock.leased
+        onTriggered: island.leaseNow = Date.now()
+    }
+
+    // A renew moves the end, so the time left reads from now, not from the last tick.
+    Connections {
+        target: island.lock
+        function onLeaseUntilChanged() {
+            island.leaseNow = Date.now();
+        }
+    }
+
     NumberAnimation {
         id: morphing
         target: island
@@ -295,6 +337,16 @@ PanelWindow {
         tokens: island.theme.tokens
         role: "island"
 
+        // Paper's last minute flips the island to the sheet with a vermilion rule round it.
+        Rectangle {
+            id: leaseSheet
+            anchors.fill: parent
+            visible: island.mode === "lease" && island.leaseWarning && island.leaseLook.warning.fill !== ""
+            color: island.leaseLook.warning.fill || "transparent"
+            border.width: 2
+            border.color: island.leaseLook.warning.frame || "transparent"
+        }
+
         // Each part is drawn at its own size and clipped to the box as it morphs.
         Item {
             anchors.fill: parent
@@ -320,6 +372,80 @@ PanelWindow {
                     font.family: island.theme.tokens?.type.mono ?? ""
                     font.pixelSize: 13
                     font.weight: Font.Medium
+                }
+            }
+
+            IslandPart {
+                id: leasePart
+                shown: island.part === "lease"
+                key: ""
+                swap: island.motion?.swap ?? null
+                x: Math.round((parent.width - width) / 2)
+                width: island.sizes.lease[0]
+                height: island.sizes.lease[1]
+
+                Row {
+                    id: leaseRow
+                    anchors.centerIn: parent
+                    spacing: 8
+                    readonly property color ink: island.leaseWarning && island.leaseLook.warning.text ? island.leaseLook.warning.text : island.leaseLook.text || box.style.text
+
+                    Text {
+                        id: leaseMark
+                        visible: text !== ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: island.leaseLook.mark
+                        color: island.leaseLook.markColor || leaseRow.ink
+                        font.family: island.leaseLook.font
+                        font.pixelSize: 11
+                    }
+
+                    // A holder's name is anyone's text: one line, elided to what the island has room for.
+                    Text {
+                        id: leaseWords
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        width: Math.min(implicitWidth, I.MAX_WIDTH - 28 - leaseMark.width - leaseTimeBox.width - 2 * leaseRow.spacing)
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        text: island.leaseLook.words(island.lease?.who ?? "")
+                        color: leaseRow.ink
+                        font.family: island.leaseLook.font
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
+                        font.letterSpacing: island.leaseLook.voice === "plain" ? 0 : 1
+                    }
+
+                    Item {
+                        id: leaseTimeBox
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: leaseTime.implicitWidth + (leaseChip.visible ? 12 : 0)
+                        height: leaseTime.implicitHeight
+
+                        // Artboard's last minute puts the time in a light danger chip.
+                        Rectangle {
+                            id: leaseChip
+                            visible: island.leaseWarning && island.leaseLook.warning.chip !== ""
+                            anchors.fill: parent
+                            anchors.topMargin: 3
+                            anchors.bottomMargin: 3
+                            radius: 6
+                            color: island.leaseLook.warning.chip || "transparent"
+                        }
+
+                        Text {
+                            id: leaseTime
+                            anchors.centerIn: parent
+                            textFormat: Text.PlainText
+                            text: island.leaseLook.time(island.lease?.left ?? 0)
+                            color: island.leaseWarning ? island.leaseLook.warning.time : island.leaseLook.timeColor || leaseRow.ink
+                            font.family: island.leaseLook.timeFont
+                            font.pixelSize: island.leaseLook.timeFont === island.leaseLook.font ? 13 : 18
+                            font.weight: Font.Medium
+                            font.features: { "tnum": 1 }
+                        }
+                    }
                 }
             }
 
