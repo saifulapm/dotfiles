@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import QtQuick.Shapes
 import "lib/notes.mjs" as N
 import "lib/notes-look.mjs" as L
 import "." as Root
@@ -34,6 +35,7 @@ FloatingWindow {
     readonly property var look: theme.tokens ? L.notesLook(theme.tokens) : null
     readonly property var store: notes.store
     readonly property string query: search.text
+    readonly property bool onShelf: store.activeSection === N.SHELF
     readonly property var cards: query ? N.search(store, query) : N.sectionNotes(store, store.activeSection)
     readonly property var current: cards[Math.min(selected, cards.length - 1)] ?? null
     readonly property string typedName: pickInput.text.trim()
@@ -263,6 +265,10 @@ FloatingWindow {
             section: store.activeSection,
             // The section order the picker draws, Shelf first.
             tabs: N.sectionNames(store),
+            // What the tab row, the composer's placeholder and the cards' meta lines really draw.
+            drawnTabs: Array.from({ length: tabRepeater.count }, (_, i) => ({ text: tabRepeater.itemAt(i).drawn, current: tabRepeater.itemAt(i).modelData.current, pinned: tabRepeater.itemAt(i).modelData.pinned })),
+            placeholder: placeholder.visible ? placeholder.text : null,
+            metas: cards.map((_, i) => list.itemAtIndex(i)?.metaText ?? null),
             selected: current ? current.id : null,
             cards: cards.map(n => n.id),
             marked,
@@ -416,10 +422,75 @@ FloatingWindow {
             }
         }
 
+        // On Shelf, the sections as a row of tabs, Shelf pinned first and the current one in ink. It only shows them; Ctrl+K still switches, and Tab stays between the list and the composer.
+        Row {
+            id: tabRow
+            visible: win.onShelf
+            anchors.top: headerRule.bottom
+            anchors.topMargin: visible ? 10 : 0
+            x: 18
+            width: parent.width - 36
+            height: visible ? 24 : 0
+            spacing: 6
+            clip: true
+
+            Repeater {
+                id: tabRepeater
+                model: win.onShelf && win.look ? L.tabLabels(win.look, N.sectionNames(win.store), win.store.activeSection) : []
+
+                Rectangle {
+                    id: tab
+                    required property var modelData
+                    readonly property string drawn: tabText.text
+                    width: tabContent.width + 16
+                    height: tabRow.height
+                    radius: win.look ? win.look.radius / 2 : 0
+                    color: modelData.current && win.look ? win.look.section.pill : "transparent"
+                    border.width: modelData.current && win.look && win.look.section.pill === "transparent" ? 1 : 0
+                    border.color: win.c.ink ?? "black"
+
+                    Row {
+                        id: tabContent
+                        anchors.centerIn: parent
+                        spacing: 5
+
+                        Shape {
+                            visible: tab.modelData.pinned
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 10
+                            height: 12
+
+                            ShapePath {
+                                strokeColor: tabText.color
+                                strokeWidth: 1.1
+                                fillColor: "transparent"
+                                joinStyle: ShapePath.RoundJoin
+                                PathSvg { path: "M3 1h4l-.5 4 2 2H1.5l2-2z M5 7v4" }
+                            }
+                        }
+
+                        Text {
+                            id: tabText
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.min(implicitWidth, 120)
+                            elide: Text.ElideRight
+                            textFormat: Text.PlainText
+                            text: tab.modelData.label
+                            color: tab.modelData.current ? win.c.ink ?? "black" : win.c.muted ?? "gray"
+                            font.family: win.look ? win.look.section.font : ""
+                            font.pixelSize: 12
+                            font.italic: win.look ? win.look.section.italic : false
+                            font.bold: tab.modelData.current
+                        }
+                    }
+                }
+            }
+        }
+
         TextInput {
             id: search
             visible: win.mode === "search" || text !== ""
-            anchors.top: headerRule.bottom
+            anchors.top: tabRow.bottom
             anchors.topMargin: visible ? 12 : 0
             x: 18
             width: parent.width - 36
@@ -477,6 +548,7 @@ FloatingWindow {
             delegate: Item {
                 id: card
                 required property var modelData
+                readonly property string metaText: meta.visible ? meta.text : ""
                 required property int index
                 readonly property bool isSelected: win.mode === "list" && index === win.selected
                 readonly property var style: win.look ? win.look.card(isSelected, modelData.done) : null
@@ -693,6 +765,17 @@ FloatingWindow {
                         font.letterSpacing: win.look ? win.look.small.spacing : 0
                     }
 
+                    Text {
+                        id: meta
+                        visible: win.onShelf
+                        textFormat: Text.PlainText
+                        text: win.onShelf && win.look ? L.cardMeta(card.modelData, win.look.voice) : ""
+                        color: win.c.muted ?? "gray"
+                        font.family: win.fonts.mono ?? ""
+                        font.pixelSize: win.look ? win.look.small.size : 10
+                        font.letterSpacing: win.look ? win.look.small.spacing : 0
+                    }
+
                     Row {
                         visible: card.modelData.tags.length > 0
                         spacing: 4
@@ -839,7 +922,8 @@ FloatingWindow {
                         Text {
                             visible: composer.text === ""
                             textFormat: Text.PlainText
-                            text: win.editing ? "" : win.look ? win.look.composer.placeholder : ""
+                            id: placeholder
+                            text: win.editing ? "" : win.onShelf ? L.SHELF_PLACEHOLDER : win.look ? win.look.composer.placeholder : ""
                             color: win.c.muted ?? "gray"
                             font: composer.font
                         }

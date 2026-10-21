@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { notesLook, tagColour, keyLine, keyPairs, KEYS, EMPTY_KEYS } from './notes-look.mjs';
+import { notesLook, tagColour, keyLine, keyPairs, KEYS, EMPTY_KEYS, tabLabels, cardMeta, SHELF_PLACEHOLDER } from './notes-look.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
 
@@ -58,4 +58,35 @@ test('every theme rules off its key strip, and Blueprint puts // between NOTES a
   assert.equal(notesLook(theme('artboard')).strip.color, theme('artboard').color.line);
   assert.equal(notesLook(theme('blueprint')).separator, '//');
   assert.equal(notesLook(theme('paper')).separator, '');
+});
+
+test('the tab row lists the sections in order, Shelf pinned first and the current one marked', () => {
+  const art = notesLook(theme('artboard'));
+  assert.deepEqual(tabLabels(art, ['Shelf', 'inbox', 'work'], 'inbox'), [
+    { name: 'Shelf', label: 'Shelf', pinned: true, current: false },
+    { name: 'inbox', label: '# inbox', pinned: false, current: true },
+    { name: 'work', label: '# work', pinned: false, current: false },
+  ]);
+  assert.equal(tabLabels(notesLook(theme('blueprint')), ['Shelf'], 'Shelf')[0].label, 'SHELF');
+  assert.equal(tabLabels(notesLook(theme('paper')), ['Shelf'], 'Shelf')[0].current, true);
+});
+
+test('a section name typed or synced is one line and bidi-safe in the tab row', () => {
+  const [tab] = tabLabels(notesLook(theme('artboard')), ['a\nb\u202Ec\u0085d'], 'x');
+  assert.equal(tab.label, '# a b⟨U+202E⟩c d');
+});
+
+test('a card says its time and kind: text, image, or the file type', () => {
+  const at = new Date(2026, 9, 18, 13, 55).getTime();
+  const note = (attachments) => ({ createdAt: at, attachments });
+  const file = (name, mime) => ({ name, mime, size: 1, sha256: 'x' });
+  assert.equal(cardMeta(note([]), 'plain'), '13:55 · text');
+  assert.equal(cardMeta(note([file('p.png', 'image/png')]), 'plain'), '13:55 · image');
+  assert.equal(cardMeta(note([file('ferry-ticket.pdf', 'application/pdf')]), 'plain'), '13:55 · PDF');
+  assert.equal(cardMeta(note([file('blob', 'application/octet-stream')]), 'plain'), '13:55 · file');
+  assert.equal(cardMeta(note([]), 'bracket'), '13:55 · TEXT');
+});
+
+test('the Shelf composer says how to paste and drop', () => {
+  assert.equal(SHELF_PLACEHOLDER, '⌃V paste · drop files or images here · ↵ save text');
 });

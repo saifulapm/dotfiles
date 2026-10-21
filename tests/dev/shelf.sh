@@ -29,6 +29,9 @@ check "Mod+S opens and focuses Notes" notes_focused
 check "on the Shelf section" notes_is '.open and .section == "Shelf"'
 check "and Shelf is the first tab" notes_is '.tabs == ["Shelf", "inbox"]'
 
+check "the tab row draws Shelf first with the pin and marked current, then inbox" notes_is '(.drawnTabs | length) == 2 and .drawnTabs[0].pinned and .drawnTabs[0].current and (.drawnTabs[0].text | test("shelf"; "i")) and (.drawnTabs[1].current | not) and (.drawnTabs[1].text | test("inbox"; "i"))'
+check "the composer's placeholder on Shelf is the paste-and-drop line" notes_is '.placeholder == "⌃V paste · drop files or images here · ↵ save text"'
+
 grim -g '0,0 64x32' "$work/one.png"
 want=$(sha256sum <"$work/one.png" | cut -d' ' -f1)
 wl-copy --type image/png <"$work/one.png"
@@ -37,6 +40,7 @@ until_ok 3000 notes_is '.count == 2'
 check "Ctrl+V adds one card" notes_is '.count == 2 and (.cards | length) == 1'
 first=$(notes_state | jq -r '.cards[0]')
 check "on Shelf, holding the pasted PNG" notes_is --arg id "$first" --arg sha "$want" '.notes[] | select(.id == $id) | .section == "Shelf" and .attachments[0].sha256 == $sha and .attachments[0].mime == "image/png"'
+check "its card's meta line is the time and ends with the kind, image" notes_is '.metas[0] | test("^[0-9]{2}:[0-9]{2} · image$"; "i")'
 check "its chip drags out the stored file as a file:// URI" notes_is --arg uri "file://$attachments/$want.png" '.selected == .cards[0] and .offers == [{"text/uri-list": $uri}]'
 check "and that file is the pasted PNG" test "$(sha256sum <"$attachments/$want.png" | cut -d' ' -f1)" = "$want"
 
