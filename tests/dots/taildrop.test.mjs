@@ -166,3 +166,9 @@ test('a sender-controlled name never escapes Downloads or reaches notify-send ra
   const hint = s.notes()[0].find((a) => a.startsWith('string:x-dots-files:'));
   assert.deepEqual(hint.slice('string:x-dots-files:'.length).split('\n').sort(), [join(s.downloads, 'a_b.txt'), join(s.downloads, 'invoice_fdp.exe')]);
 });
+
+test('dots install starts the receiver on a running machine, and restarts it whenever it or its unit changes', () => {
+  const script = readFileSync(new URL('../../home/.chezmoiscripts/run_onchange_after_15-taildrop.sh.tmpl', import.meta.url), 'utf8');
+  assert.match(script, /^# receiver and unit hashes: \{\{ .*bin\/dots-taildrop" \| include \| sha256sum \}\} \{\{ .*dots-taildrop\.service" \| include \| sha256sum \}\}$/m);
+  assert.match(script, /systemctl --user daemon-reload 2>\/dev\/null && systemctl --user restart dots-taildrop\.service 2>\/dev\/null \|\| true/);
+});

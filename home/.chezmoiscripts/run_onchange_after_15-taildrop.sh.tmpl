@@ -1,5 +1,8 @@
 #!/bin/bash
+# receiver and unit hashes: {{ joinPath .chezmoi.workingTree "bin/dots-taildrop" | include | sha256sum }} {{ joinPath .chezmoi.sourceDir "dot_config/systemd/user/dots-taildrop.service" | include | sha256sum }}
 {{ template "lib.sh" . }}
 # dots-taildrop.service runs the receiver from ~/.local/bin, since the repo's bin/ is not on the user manager's PATH.
 mkdir -p "$HOME/.local/bin"
 ln -sfn {{ joinPath .chezmoi.workingTree "bin/dots-taildrop" | quote }} "$HOME/.local/bin/dots-taildrop" || die "could not link the Taildrop receiver"
+# Its wants link starts it at the next login; a running machine starts it now, and a changed receiver takes over from the old one.
+systemctl --user daemon-reload 2>/dev/null && systemctl --user restart dots-taildrop.service 2>/dev/null || true
