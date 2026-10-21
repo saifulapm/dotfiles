@@ -81,13 +81,14 @@ function fakeApi(sock) {
   return api;
 }
 
-async function scratch(t, { socketUp = true } = {}) {
+async function scratch(t, { socketUp = true, notifyFails = 0 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'taildrop-'));
   const home = join(root, 'home');
   const stubs = join(root, 'stubs');
   const rec = join(root, 'rec');
   for (const d of [home, stubs, rec]) mkdirSync(d);
-  writeFileSync(join(stubs, 'notify-send'), `#!/bin/bash\nprintf '%s\\0' "$@" >"${rec}/n.$(date +%s%N).$$"\n`);
+  // Its first notifyFails calls fail, as notify-send does at boot before the shell owns notifications.
+  writeFileSync(join(stubs, 'notify-send'), `#!/bin/bash\necho >>"${root}/tries"\n[ "$(wc -l <"${root}/tries")" -gt ${notifyFails} ] || exit 1\nprintf '%s\\0' "$@" >"${rec}/n.$(date +%s%N).$$"\n`);
   chmodSync(join(stubs, 'notify-send'), 0o755);
   const sock = join(root, 'tailscaled.sock');
   const api = fakeApi(sock);
@@ -197,6 +198,13 @@ test('a tailscaled that refuses file access says how to fix it once, not on ever
   assert.ok(argv.includes('critical'));
   s.api.denied = false;
   await until('the file once allowed', () => saved(s).length === 1);
+});
+
+test('a notification sent before anything shows notifications is sent again until one does', async (t) => {
+  const s = await scratch(t, { notifyFails: 2 });
+  s.api.inbox.set('boot.jpg', Buffer.from('b'));
+  await until('the notification', () => s.notes().length === 1, 12000);
+  assert.equal(s.notes()[0][s.notes()[0].indexOf('--') + 1], 'Taildrop · 1 file');
 });
 
 test('with no socket at start the process keeps running, then catches the queued file once tailscaled is up', async (t) => {

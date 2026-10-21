@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { delimiter, dirname, join } from 'node:path';
+import { spawn, spawnSync } from 'node:child_process';
 
 const source = new URL('../../bin/dots-taildrop-send', import.meta.url).pathname;
 
@@ -115,4 +115,26 @@ test('a machine name with a newline, ESC or U+202E reaches the island and the no
   assert.equal(r.status, 0, r.stderr);
   assert.equal(ctx.read('dots-call').split('\n')[0], 'sending start 1 nu c');
   assert.equal(ctx.read('notify').split('\0')[3], 'Sent a.txt to nu c');
+});
+
+test('a percent in a file name is not read as the progress', (t) => {
+  const ctx = scratch(t);
+  const odd = join(dirname(ctx.files[0]), '50% off.txt');
+  writeFileSync(odd, 'x'.repeat(2048));
+  const r = run(ctx, 'nuc', '100.88.14.3', odd);
+  assert.equal(r.status, 0, r.stderr);
+  const pcts = ctx.read('dots-call').trim().split('\n').filter((l) => l.startsWith('sending progress ')).map((l) => Number(l.split(' ')[2]));
+  assert.deepEqual(pcts, [48, 100]);
+});
+
+test('a send stopped by SIGTERM after start still ends the island slot', async (t) => {
+  const ctx = scratch(t);
+  const child = spawn(ctx.bin, ['nuc', '100.88.14.3', ...ctx.files], { env: ctx.env, stdio: 'ignore' });
+  const until = async (fn) => {
+    for (let i = 0; i < 100 && !fn(); i++) await new Promise((r) => setTimeout(r, 50));
+  };
+  await until(() => (ctx.read('dots-call') || '').includes('sending progress'));
+  child.kill('SIGTERM');
+  await new Promise((r) => child.on('exit', r));
+  assert.equal(ctx.read('dots-call').trim().split('\n').at(-1), 'sending done');
 });

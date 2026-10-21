@@ -5,6 +5,7 @@
 import os
 import pty
 import re
+import signal
 import subprocess
 import sys
 
@@ -85,13 +86,34 @@ def main():
         if not files:
             return 0
     sizes = [max(os.path.getsize(f), 1) if os.path.isfile(f) else 1 for f in files]
-    total = sum(sizes)
     call("start", len(files), name)
+    # Whatever ends the send, the island's slot ends with it and tailscale stops: SIGTERM becomes an exit the finally sees.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    child = []
+    try:
+        code, said = send(files, sizes, sum(sizes), target, child)
+    finally:
+        if child:
+            os.kill(child[0], signal.SIGTERM)
+        call("done")
+    if code != 0:
+        notify("Could not send to %s" % name, clean(said.decode(errors="replace")) or "tailscale file cp failed", critical=True)
+        return 1
+    names = [clean(os.path.basename(f)) for f in files]
+    if len(names) == 1:
+        notify("Sent %s to %s" % (names[0], name))
+    else:
+        notify("Sent %d files to %s" % (len(names), name), "\n".join(names))
+    return 0
 
-    # tailscale paints one line per file, its name padded to 36 columns and its percent rising to 100; a new name, or a lower percent for two files of one name, means the next file began.
+
+# Runs tailscale file cp on a pty and reports the whole send's percent; answers its exit code and the last line it said that was not progress, and keeps its pid in child until it is reaped.
+def send(files, sizes, total, target, child):
     pid, fd = pty.fork()
     if pid == 0:
         os.execvp("tailscale", ["tailscale", "file", "cp", "--update-interval=250ms", "--"] + files + [target + ":"])
+    child.append(pid)
+    # tailscale paints one line per file, its name padded to 36 columns and its percent rising to 100; a new name, or a lower percent for two files of one name, means the next file began.
     index, last, label, shown, said, buf = 0, 0.0, None, -1, b"", b""
     while True:
         try:
@@ -105,12 +127,13 @@ def main():
         # The paint still open at the end of a read is read too: tailscale starts each repaint with \r, so waiting for it would show every percent one repaint late.
         for line, whole_line in [(l, True) for l in lines] + [(buf, False)]:
             line = re.sub(rb"\x1b\[[0-9;]*[A-Za-z]", b"", line).strip()
-            m = PERCENT.search(line)
-            if not m:
+            # The percent is the line's last; a file name before it may hold one of its own.
+            found = PERCENT.findall(line)
+            if not found:
                 if line and whole_line:
                     said = line
                 continue
-            pct = float(m.group(1))
+            pct = float(found[-1])
             if label is not None and (line[:36].rstrip() != label or pct < last) and index < len(files) - 1:
                 index += 1
             last, label = pct, line[:36].rstrip()
@@ -119,16 +142,8 @@ def main():
                 shown = whole
                 call("progress", whole)
     _, status = os.waitpid(pid, 0)
-    call("done")
-    if os.waitstatus_to_exitcode(status) != 0:
-        notify("Could not send to %s" % name, clean(said.decode(errors="replace")) or "tailscale file cp failed", critical=True)
-        return 1
-    names = [clean(os.path.basename(f)) for f in files]
-    if len(names) == 1:
-        notify("Sent %s to %s" % (names[0], name))
-    else:
-        notify("Sent %d files to %s" % (len(names), name), "\n".join(names))
-    return 0
+    child.clear()
+    return os.waitstatus_to_exitcode(status), said
 
 
 if __name__ == "__main__":

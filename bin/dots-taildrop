@@ -15,6 +15,7 @@ const POLL_MS = 400;
 const LADDER_S = [1, 2, 5, 10, 30];
 // A transfer tailscaled stops reporting for this long no longer holds the batch open.
 const STALL_MS = 30000;
+const NOTIFY_TRIES = 30;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -109,11 +110,15 @@ async function fetchOne(raw, safe) {
   }
 }
 
-function notify(paths) {
+async function notify(paths) {
   const names = paths.map((p) => p.slice(downloads.length + 1));
   const shown = names.length > 5 ? [...names.slice(0, 5), `and ${names.length - 5} more`] : names;
   const summary = `Taildrop · ${names.length} ${names.length === 1 ? 'file' : 'files'}`;
-  spawnSync('notify-send', ['-a', 'Tailscale', '-h', 'string:x-dots-files:' + paths.join('\n'), '--', summary, shown.join('\n')], { stdio: 'ignore' });
+  // Files queued while the machine was off land before the shell owns notifications, so a refused send is tried again for a minute.
+  for (let i = 0; i < NOTIFY_TRIES; i++) {
+    if (spawnSync('notify-send', ['-a', 'Tailscale', '-h', 'string:x-dots-files:' + paths.join('\n'), '--', summary, shown.join('\n')], { stdio: 'ignore' }).status === 0) return;
+    await sleep(2000);
+  }
 }
 
 // A refused name stays in the inbox, so it is logged once and skipped from then on.
@@ -164,7 +169,7 @@ async function cycle() {
   try {
     for (const Name of names) paths.push(await fetchOne(Name, safeName(Name)));
   } finally {
-    if (paths.length) notify(paths);
+    if (paths.length) await notify(paths);
   }
 }
 
