@@ -10,6 +10,8 @@ import sys
 
 # The chooser's answer gives up after this long, so an abandoned dialog cannot keep the island's slot up.
 ANSWER_TIMEOUT_SEC = 600
+# dots-call beside this script: the shell starts it by path, and the nested session's PATH holds no bin/.
+DOTS_CALL = os.path.join(os.path.dirname(os.path.realpath(__file__)), "dots-call")
 PERCENT = re.compile(rb"(\d+(?:\.\d+)?)%")
 
 
@@ -66,7 +68,7 @@ def pick(title):
 
 
 def call(*args):
-    subprocess.run(["dots-call", "sending"] + [str(a) for a in args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([DOTS_CALL, "sending"] + [str(a) for a in args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def notify(summary, body="", critical=False):

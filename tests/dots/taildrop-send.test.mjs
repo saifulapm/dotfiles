@@ -1,12 +1,12 @@
 // dots-taildrop-send with stub tailscale, dots-call, notify-send and picker, each recording what it was given.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const bin = new URL('../../bin/dots-taildrop-send', import.meta.url).pathname;
+const source = new URL('../../bin/dots-taildrop-send', import.meta.url).pathname;
 
 // Like the real CLI, the stub paints progress only when stderr is a terminal: each file reaches 48% and then 100%.
 const TAILSCALE = `#!/bin/bash
@@ -39,6 +39,9 @@ function scratch(t, { pick = true, fail = false } = {}) {
     chmodSync(join(stubs, name), 0o755);
   };
   stub('tailscale', TAILSCALE);
+  // The script calls the dots-call beside it, so a copy runs from the stubs with a recording dots-call next to it.
+  copyFileSync(source, join(stubs, 'dots-taildrop-send'));
+  chmodSync(join(stubs, 'dots-taildrop-send'), 0o755);
   stub('dots-call', '#!/bin/bash\nprintf \'%s\\n\' "$*" >>"$STUB_REC/dots-call"\n');
   stub('notify-send', '#!/bin/bash\nfor a in "$@"; do printf \'%s\\0\' "$a"; done >"$STUB_REC/notify"\n');
   stub('picker', pick ? `#!/bin/bash\nprintf '%s\\n' '${files[0]}' '${files[1]}'\n` : '#!/bin/bash\nexit 1\n');
@@ -54,10 +57,10 @@ function scratch(t, { pick = true, fail = false } = {}) {
     DOTS_PICK_FILES: join(stubs, 'picker'),
   };
   const read = (n) => (existsSync(join(rec, n)) ? readFileSync(join(rec, n), 'utf8') : null);
-  return { files, env, read };
+  return { files, env, read, bin: join(stubs, 'dots-taildrop-send') };
 }
 
-const run = (ctx, ...args) => spawnSync(bin, args, { env: ctx.env, encoding: 'utf8', timeout: 10000 });
+const run = (ctx, ...args) => spawnSync(ctx.bin, args, { env: ctx.env, encoding: 'utf8', timeout: 10000 });
 
 test('sends the picked files, reports start, progress and done to the island, and notifies', (t) => {
   const picked = scratch(t);
