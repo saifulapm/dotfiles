@@ -1,0 +1,6 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+# Bash does not read fish's config, so the composer home is set here to match it.
+export COMPOSER_HOME="$HOME/.config/composer"
+# The tool list is in this script, so a change to it reruns the step.
+composer global require --no-interaction laravel/installer:^5 laravel/pint:^1 || die "the composer global install failed"
