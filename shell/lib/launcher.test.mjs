@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rank, parseQuery, windowRows, commandRows, calcRows } from './launcher.mjs';
+import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows } from './launcher.mjs';
 
 const app = (name, keywords = []) => ({ id: name.toLowerCase(), name, genericName: '', keywords });
 const names = (entries) => entries.map((e) => e.name);
@@ -92,6 +92,18 @@ test("given the shell's bin dir, a command row runs dots and dots-capture from i
 test('the calculator row is the formatted result, copied on Enter', () => {
   assert.deepEqual(calcRows('1440 * 1.25').map((r) => [r.title, r.copy]), [['1800', '1800']]);
   assert.deepEqual(calcRows('2 +'), []);
+});
+
+const zones = { home: 'Asia/Dhaka', zones: [
+  { id: 'Asia/Dhaka', city: 'Dhaka', offset: 21600 }, { id: 'UTC', city: 'UTC', offset: 0 },
+  { id: 'Europe/London', city: 'London', offset: 3600 }, { id: 'America/New_York', city: 'New York', offset: -14400 }] };
+
+test('= 17:00 nyc is one row: the conversion, its day word as detail, the home time copied on Enter', () => {
+  const now = Date.UTC(2026, 9, 22, 9, 12);
+  assert.deepEqual(convertRows('17:00 nyc', now, zones).map((r) => [r.title, r.detail, r.copy, r.glyph]), [['17:00 New York = 03:00 Dhaka', 'tomorrow', '03:00', '=']]);
+  assert.deepEqual(convertRows('09:30 london', now, zones).map((r) => [r.title, r.detail]), [['09:30 London = 14:30 Dhaka', 'London UTC+1 · Dhaka UTC+6']]);
+  assert.deepEqual(convertRows('2 + 2', now, zones), []);
+  assert.deepEqual(convertRows('17:00 nyc', now, null), []);
 });
 
 test('a window row keeps the icon its window was given, and calculator and command rows carry their prefix as a glyph', () => {

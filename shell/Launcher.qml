@@ -38,6 +38,8 @@ Item {
     property string clipList: ""
     // [emoji, name, group] triples, read from shell/data/emoji.json the first time emoji mode is entered.
     property var emojiList: []
+    // bin/dots-zones' answer as of entering calculator mode, for `= 17:00 nyc`; null until it answers.
+    property var zones: null
     property bool emojiWanted: false
     readonly property string clipDb: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/clips.db"
     // Every mode supplies rows as {title, detail, exec?, copy?}; a new mode adds a case here.
@@ -50,7 +52,10 @@ Item {
         case "emoji":
             return Emoji.emojiRows(emojiList, parsed.q);
         case "calculator":
-            return Lib.calcRows(parsed.q);
+            {
+                const sum = Lib.calcRows(parsed.q);
+                return sum.length ? sum : Lib.convertRows(parsed.q, Date.now(), zones);
+            }
         case "reminder":
             return Rem.reminderRows(parsed.q, Date.now(), pending);
         case "commands":
@@ -201,6 +206,8 @@ Item {
             listClips();
         if (mode === "emoji")
             emojiWanted = true;
+        if (mode === "calculator" && !zoner.running)
+            zoner.running = true;
     }
 
     FileView {
@@ -233,6 +240,21 @@ Item {
         }
         // cliphist exits 1 until the first copy creates its db, which is an empty history.
         onExited: code => launcher.clipList = code === 0 ? clipped.text : ""
+    }
+
+    Process {
+        id: zoner
+        command: [Quickshell.shellDir + "/../bin/dots-zones"]
+        stdout: StdioCollector {
+            id: zoned
+        }
+        onExited: code => {
+            try {
+                launcher.zones = code === 0 ? JSON.parse(zoned.text) : null;
+            } catch (e) {
+                launcher.zones = null;
+            }
+        }
     }
 
     Component.onCompleted: Root.State.loaded.push("launcher")

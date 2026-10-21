@@ -28,6 +28,14 @@ check "an incomplete expression shows no row" state_is '.mode == "calculator" an
 close_launcher
 
 open_launcher
+wtype "= 17:00 nyc"
+expect="17:00 New York = $(TZ=America/New_York date -d 'today 17:00' +%s | xargs -I{} date -d @{} +%H:%M) $(readlink /etc/localtime | sed 's|.*/||; s|_| |g')"
+until_ok 5000 state_is '.mode == "calculator" and (.results | length) == 1'
+echo "     expected: $expect"
+check "= 17:00 nyc converts to home time" state_is ".results == [\"$expect\"]"
+close_launcher
+
+open_launcher
 wtype "> lo"
 until_ok 3000 state_is '.mode == "commands" and .results[0] == "lock"'
 check "> lo lists lock first" state_is '.mode == "commands" and .results[0] == "lock"'

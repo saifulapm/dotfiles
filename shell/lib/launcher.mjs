@@ -1,5 +1,6 @@
 // Pure pieces of the launcher, kept here so node can test them.
 import { calc, format } from './calc.mjs';
+import { convert } from './worldclock.mjs';
 
 // Lower is better: exact name, name prefix, word prefix, substring, then a keyword match.
 function tier(entry, q) {
@@ -76,4 +77,10 @@ export function calcRows(q) {
   if (v === null) return [];
   const text = format(v);
   return [{ title: text, detail: q.trim(), copy: text, glyph: '=' }];
+}
+
+// `= 17:00 nyc`: a time and a city read as a conversion to home, once the calculator finds no sum; zones is what bin/dots-zones prints.
+export function convertRows(q, now, zones) {
+  const c = zones ? convert(q, now, zones) : null;
+  return c ? [{ title: `${c.from} = ${c.to}`, detail: c.day || c.utc, copy: c.time, glyph: '=' }] : [];
 }

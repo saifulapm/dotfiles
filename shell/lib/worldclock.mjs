@@ -50,5 +50,6 @@ export function convert(text, nowMs, zones) {
   const from = `${pad(h)}:${pad(min)} ${src.city}`;
   const to = `${hhmm(homeWall)} ${home.city}`;
   const day = word(dayOf(homeWall) - dayOf(srcWall));
-  return { from, to, day, text: `${from} = ${to}${day ? ' · ' + day : ''}` };
+  const utc = [src, home].map((z) => (z.id === 'UTC' ? 'UTC' : `${z.city} UTC${offsetText(z.offset).slice(0, -1)}`)).join(' · ');
+  return { from, to, day, text: `${from} = ${to}${day ? ' · ' + day : ''}`, time: hhmm(homeWall), utc };
 }

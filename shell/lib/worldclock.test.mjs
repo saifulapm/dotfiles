@@ -46,7 +46,7 @@ test('a half-hour zone keeps its minutes', () => {
 test('17:00 nyc is 03:00 tomorrow at home', () => {
   assert.deepEqual(convert('17:00 nyc', now, before), {
     from: '17:00 New York', to: '03:00 Dhaka', day: 'tomorrow',
-    text: '17:00 New York = 03:00 Dhaka · tomorrow' });
+    text: '17:00 New York = 03:00 Dhaka · tomorrow', time: '03:00', utc: 'New York UTC−4 · Dhaka UTC+6' });
 });
 
 test('09:00 london follows the London offset in force', () => {
@@ -59,7 +59,7 @@ test('a result on the other side of midnight carries the day word', () => {
   assert.equal(convert('20:00 utc', now, before).day, 'tomorrow');
   assert.deepEqual(convert('01:00 dhaka', now, nyHome), {
     from: '01:00 Dhaka', to: '15:00 New York', day: 'yesterday',
-    text: '01:00 Dhaka = 15:00 New York · yesterday' });
+    text: '01:00 Dhaka = 15:00 New York · yesterday', time: '15:00', utc: 'Dhaka UTC+6 · New York UTC−4' });
 });
 
 test('aliases and city names are case-insensitive, and a half-hour home converts', () => {
@@ -75,4 +75,11 @@ test('text it does not understand is null', () => {
   assert.equal(convert('17:60 nyc', now, before), null);
   assert.equal(convert('17:00 mars', now, before), null);
   assert.equal(convert('', now, before), null);
+});
+
+test('a conversion also gives the home time alone and both UTC offsets', () => {
+  const c = convert('17:00 nyc', now, before);
+  assert.deepEqual([c.time, c.utc], ['03:00', 'New York UTC−4 · Dhaka UTC+6']);
+  assert.equal(convert('08:00 utc', now, before).utc, 'UTC · Dhaka UTC+6');
+  assert.equal(convert('09:00 utc', now, india).utc, 'UTC · Kolkata UTC+5:30');
 });
