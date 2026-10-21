@@ -259,7 +259,7 @@ Item {
                 return {
                     name: item ? item.drawnName : "",
                     underlined: item ? item.underlined() : "",
-                    otp: item ? item.tagShown : false
+                    otp: item ? item.tagText() === "OTP" : false
                 };
             }),
             selected: selected,
@@ -326,6 +326,8 @@ Item {
             pass.revealName = name;
             pass.revealText = revealOut.text.replace(/\n$/, "");
             revealTick.restart();
+            // The decrypt may have learnt or dropped the entry's OTP tag, so the list is read again.
+            lister.running = true;
         }
     }
 
@@ -669,7 +671,6 @@ Item {
                                         out.push(runRepeater.itemAt(i).text);
                                 return out.join("");
                             }
-                            readonly property bool tagShown: otpTag.visible
                             readonly property bool revealed: pass.revealName === modelData.name
                             function shownText() {
                                 return revealedText.text;

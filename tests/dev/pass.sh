@@ -107,6 +107,26 @@ until_ok 8000 state_is '.open and .revealed != null'
 check "after the passphrase, Pass comes back with the password on its row ($(pass_state | jq -c '[.open, .revealed.tag]'))" state_is ".open and .revealed.text == \"$password\" and .revealed.tag == \"10s\""
 until_ok 12000 state_is '.revealed == null'
 
+# An otpauth line added in a terminal shows as the tag on the same open, once s has decrypted the entry.
+printf 'otpauth://totp/Mail:me?secret=%s\n' "$secret" | pass otp append -f mail/icloud >/dev/null
+wtype -k slash
+wtype -M ctrl a -m ctrl
+wtype icloud
+until_ok 2000 state_is '.count == 1 and .rows[0].name == "mail/icloud"'
+check "before a decrypt mail/icloud has no tag" state_is '.rows[0].otp == false'
+wtype -k Tab
+until_ok 2000 state_is '.focus == "list"'
+wtype s
+until_ok 5000 state_is '.revealed != null'
+until_ok 12000 state_is '.revealed == null'
+check "s on it shows the OTP tag once the reveal ends, on the same open ($(pass_state | jq -c .rows[0]))" state_is '.open and .rows[0].otp'
+wtype -k slash
+wtype -M ctrl a -m ctrl
+wtype ghb
+until_ok 2000 state_is '.count == 1'
+wtype -k Tab
+until_ok 2000 state_is '.focus == "list"'
+
 # n makes a new entry with a generated 24-character password; h and l change its length.
 wtype n
 until_ok 3000 state_is '.mode == "new" and .newEntry.length == 24'
