@@ -41,9 +41,10 @@ while read -r name copr rpm fusion; do
   rpm -q --quiet "$name" || missing+=("$name")
 done <<<"$entries"
 
-# Remi also ships composer, which would fight Fedora's on every upgrade.
-if [[ -e /etc/yum.repos.d/remi.repo ]]; then
-  root dnf -y -q config-manager setopt --create-missing-dir remi.excludepkgs=composer || die "could not keep composer on Fedora's package"
+# Every project runs on Fedora's PHP now, so a machine that had Remi's parallel collections loses them and the repo.
+if rpm -q --quiet remi-release; then
+  log "removing Remi's PHP collections"
+  root dnf -y -q remove remi-release 'php82*' 'php83*' 'php84*' || die "could not remove Remi's PHP collections"
 fi
 
 if ((${#missing[@]})); then

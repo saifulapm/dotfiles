@@ -1,8 +1,0 @@
-[Unit]
-Description=PHP 8.4 FPM on-demand socket (127.0.0.1:9084)
-
-[Socket]
-ListenStream=127.0.0.1:9084
-
-[Install]
-WantedBy=sockets.target

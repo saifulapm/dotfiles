@@ -1,8 +1,8 @@
-// The .test wildcard: caddy and php-fpm from home/ run on a scratch home and free ports, since the live ones own 443 and 9085.
+// One PHP, Fedora's 8.5: the .test wildcard's caddy and php-fpm run on a scratch home and free ports, since the live ones own 443 and 9085.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,4 +71,29 @@ test('a folder with public/ is served on PHP 8.5, and one without it gets a 404'
 
   assert.match(get('site'), /^8\.5\.\d+\n200$/);
   assert.equal(get('nopublic'), '\n404');
+});
+
+test('nothing ships or keeps Remi\'s PHP collections, their fpm units or the shims that picked them', () => {
+  assert.doesNotMatch(read('packages.toml'), /remi|"php8\d/);
+  const shipped = readdirSync(join(repo, units), { recursive: true }).filter((f) => /php8\d/.test(f));
+  assert.deepEqual(shipped, []);
+  assert.deepEqual(readdirSync(join(repo, 'home/dot_config/php-fpm')), ['dev.conf.tmpl']);
+  // A machine that had them loses the files the apply once linked there.
+  const removed = read('home/.chezmoiremove').split('\n');
+  for (const v of ['83', '84']) {
+    for (const u of [`php${v}-fpm.service`, `php${v}-fpm-proxy.service`, `php${v}-fpm-proxy.socket`, `sockets.target.wants/php${v}-fpm-proxy.socket`]) {
+      assert.ok(removed.includes(`.config/systemd/user/${u}`), u);
+    }
+    assert.ok(removed.includes(`.config/php-fpm/php${v}-dev.conf`), `php${v}-dev.conf`);
+  }
+});
+
+// The dotfiles bin dir comes first on PATH, as fish and mise put it.
+test('a project pinned to 8.3 by .php-version still runs on 8.5', { skip: !has('/usr/bin/php') && 'php is not installed' }, () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'dots-pinned-')));
+  writeFileSync(join(dir, '.php-version'), '8.3\n');
+  const r = spawnSync('php', ['-r', 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;'], { cwd: dir, encoding: 'utf8', env: { PATH: `${repo}bin:/usr/bin:/bin`, HOME: dir } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, '8.5');
+  assert.equal(r.stderr, '');
 });

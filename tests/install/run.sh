@@ -206,11 +206,15 @@ check "nothing for herdr, kitty or vicinae under ~/.config (got '$dropped')" tes
 
 check "caddy accepts its Caddyfile" as_user "caddy validate --config ~/.config/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1"
 check "the system trusts caddy's .test CA" podman exec "$name" bash -c "trust list | grep -q 'Caddy Local Authority'"
-for v in 82 83 84; do check "php$v runs" as_user "php$v -r 'exit(0);'"; done
-check "bin/php follows .php-version" as_user "mkdir -p /tmp/p && echo 8.3 > /tmp/p/.php-version && cd /tmp/p && ~/Codes/dotfiles/bin/php -r 'echo PHP_VERSION;' | grep -q '^8\.3\.'"
+phpv=$(as_user "php -r 'echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;'" 2>&1)
+check "php is Fedora's 8.5 (got '$phpv')" test "$phpv" = 8.5
+remi=$(podman exec "$name" rpm -qa 'php8[234]-*' 'remi-release')
+check "nothing from Remi is installed (got '$remi')" test -z "$remi"
+check "php-fpm reads the .test pool" as_user "/usr/sbin/php-fpm -t --fpm-config ~/.config/php-fpm/dev.conf 2>/dev/null"
+check "composer installed the laravel installer and Pint" as_user "~/.config/composer/vendor/bin/laravel --version && ~/.config/composer/vendor/bin/pint --version"
 check "*.test resolves through dnsmasq" podman exec "$name" grep -qx 'address=/test/127.0.0.1' /etc/dnsmasq.d/test-domains.conf
 check "the dev quadlets generate units" as_user "/usr/lib/systemd/user-generators/podman-user-generator --dryrun >/dev/null 2>&1"
-check "the dev sockets are enabled" as_user "test -f ~/.config/systemd/user/sockets.target.wants/mysql84-proxy.socket -a -f ~/.config/systemd/user/sockets.target.wants/caddy-dev-https.socket"
+check "the dev sockets are enabled" as_user "test -f ~/.config/systemd/user/sockets.target.wants/mysql84-proxy.socket -a -f ~/.config/systemd/user/sockets.target.wants/caddy-dev-https.socket -a -f ~/.config/systemd/user/sockets.target.wants/php-fpm-proxy.socket"
 
 check "kak opens with the carried config" as_user "kak -ui dummy -e 'eval -buffer *debug* %{ write /tmp/kak-debug }; quit!' && ! grep -Eiq 'error|could not load' /tmp/kak-debug"
 check "kak finds the helix grammars" as_user "fish -c 'test -d \$HELIX_RUNTIME/grammars'"

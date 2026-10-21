@@ -9,6 +9,8 @@ root install -D -m 0644 "$system/resolved.conf.d/test-domains.conf" /etc/systemd
 root install -D -m 0644 "$system/sysctl.d/99-dev-unprivileged-ports.conf" /etc/sysctl.d/99-dev-unprivileged-ports.conf || die "could not let caddy-dev use ports 80 and 443"
 root systemctl enable dnsmasq 2>/dev/null || log ".test resolves once dnsmasq runs at the next boot"
 if root systemctl restart dnsmasq systemd-resolved 2>/dev/null && root sysctl -q --system 2>/dev/null; then
+  # The apply removed Remi's fpm units from disk, but a running manager still holds their sockets.
+  systemctl --user stop 'php8[34]-fpm*' 2>/dev/null || true
   # The sockets are enabled by their wants/ links; a running manager starts them now.
   systemctl --user daemon-reload 2>/dev/null && systemctl --user start sockets.target 2>/dev/null || true
 fi

@@ -1,0 +1,11 @@
+# Remi's php83 and php84 fpm units and pools, which a machine set up before every project ran on PHP 8.5 still has.
+.config/systemd/user/php83-fpm.service
+.config/systemd/user/php83-fpm-proxy.service
+.config/systemd/user/php83-fpm-proxy.socket
+.config/systemd/user/sockets.target.wants/php83-fpm-proxy.socket
+.config/systemd/user/php84-fpm.service
+.config/systemd/user/php84-fpm-proxy.service
+.config/systemd/user/php84-fpm-proxy.socket
+.config/systemd/user/sockets.target.wants/php84-fpm-proxy.socket
+.config/php-fpm/php83-dev.conf
+.config/php-fpm/php84-dev.conf
