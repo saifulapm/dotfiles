@@ -17,6 +17,37 @@ Scope {
     property int monitorsOff: 0
 
     readonly property bool dimmed: monitors.item?.dimmed ?? false
+    // The local hub rings a question here only while neither of v1's qshell flags it reads (workflow's hub/src/presence.rs) has stood 5 minutes; an agent's lease counts as locked, since no one is at the screen.
+    readonly property string flags: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/qshell"
+    readonly property bool away: lock.secure || lock.leased
+
+    // One writer at a time, so a dim lifted at once cannot have its rm land before its create; a flag keeps its first time, which the hub reads as how long it has stood. The command is built here, since a change handler runs before a binding on the same change would update.
+    function writeFlags() {
+        if (flagWriter.running) {
+            flagWriter.dirty = true;
+            return;
+        }
+        flagWriter.command = ["sh", "-c", flagWriter.script, "sh", flags, dimmed ? "1" : "0", away ? "1" : "0"];
+        flagWriter.running = true;
+    }
+
+    onDimmedChanged: writeFlags()
+    onAwayChanged: writeFlags()
+    Component.onCompleted: writeFlags()
+
+    Process {
+        id: flagWriter
+        property bool dirty: false
+        // v2 has no stay-awake toggle, so v1's would hold the hub at watching through any idle.
+        readonly property string script: 'mkdir -p "$1" && rm -f "$1/stay-awake" || exit 1; set_flag() { if [ "$2" = 1 ]; then [ -e "$1" ] || : >"$1"; else rm -f "$1"; fi; }; set_flag "$1/idle" "$2"; set_flag "$1/locked" "$3"'
+        onExited: {
+            if (!dirty)
+                return;
+            dirty = false;
+            // running still reads true inside its own exited handler.
+            Qt.callLater(idle.writeFlags);
+        }
+    }
 
     // An IdleMonitor keeps the timeout it was made with, so new times make new monitors.
     Loader {

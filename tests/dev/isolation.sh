@@ -45,6 +45,8 @@ check "GNUPGHOME is inside the temp dir" under_dev "${GNUPGHOME:-}"
 check "the shell unit carries GNUPGHOME" unit_has GNUPGHOME "${GNUPGHOME:-}"
 # A check that runs dots sync merges the stores under XDG_DATA_HOME, so the env it sources must name the temp one.
 check "XDG_DATA_HOME is inside the temp dir" under_dev "${XDG_DATA_HOME:-}"
+# The shell writes the local hub's presence flags under XDG_STATE_HOME, so the live hub must never read a nested lock or dim.
+check "the shell unit's XDG_STATE_HOME is inside the temp dir" bash -c "grep -qzx 'XDG_STATE_HOME=$dev/.*' /proc/$pid/environ"
 
 live_volume() { env -u PIPEWIRE_RUNTIME_DIR wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null; }
 live_vol_before=$(live_volume)

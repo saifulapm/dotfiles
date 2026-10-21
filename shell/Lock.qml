@@ -26,6 +26,8 @@ Scope {
     property real unlockedAt: 0
     property real leaseUntil: 0
     readonly property bool leased: heldBy !== ""
+    // The compositor's lock state: session.locked set back to false in accept() never notifies a binding, so presence follows this.
+    readonly property bool secure: session.secure
     // How often an agent unlock asked niri to turn the monitors off, so a check can see the request.
     property int monitorsOff: 0
 
