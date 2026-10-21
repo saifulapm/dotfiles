@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Copies the Wayland clipboard's image or files into an attachments folder, named by sha256, and prints a JSON array of what it did.
+// Copies the Wayland clipboard's image or files, or the file URIs given after the folder, into an attachments folder, named by sha256, and prints a JSON array of what it did.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -9,7 +9,7 @@ import { ATTACH_MAX, attachRefusal, attachmentFile } from '../shell/lib/notes.mj
 
 const dir = process.argv[2];
 if (!dir) {
-  process.stderr.write('usage: dots-notes-attach <attachments-dir>\n');
+  process.stderr.write('usage: dots-notes-attach <attachments-dir> [file-uri...]\n');
   process.exit(2);
 }
 
@@ -77,4 +77,6 @@ function main() {
   return fromImage(images.includes('image/png') ? 'image/png' : images[0]);
 }
 
-process.stdout.write(JSON.stringify(main()) + '\n');
+// File URIs after the folder come from a drop, so the clipboard is left alone.
+const uris = process.argv.slice(3);
+process.stdout.write(JSON.stringify(uris.length ? fromFiles(uris.join('\n')) : main()) + '\n');

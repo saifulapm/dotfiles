@@ -141,7 +141,12 @@ export function search(store, query) {
   return q ? store.notes.filter((n) => !n.deleted && n.text.toLowerCase().indexOf(q) >= 0).sort(newest) : [];
 }
 
-export const sectionNames = (store) => store.sections.slice().sort((a, b) => a.order - b.order).map((s) => s.name);
+// Shelf holds things in transit. It sorts first by its name, not a stored flag, so the store's shape and the sync merge stay as they were.
+export const SHELF = 'Shelf';
+
+const shelfFirst = (a, b) => (b.name === SHELF) - (a.name === SHELF) || a.order - b.order;
+
+export const sectionNames = (store) => store.sections.slice().sort(shelfFirst).map((s) => s.name);
 
 export function sectionList(store, section) {
   const item = (n) => (n.todo ? (n.done ? '- [x] ' : '- [ ] ') : '- ') + n.text.split('\n').join('\n  ');
@@ -192,6 +197,15 @@ export function attachTo(store, id, attachments, now, newId) {
   const base = id ? store : addNote(store, '', now, newId);
   return attachments.reduce((s, a) => attach(s, id || newId, a, now), base);
 }
+
+// A drop of files gives their file URIs; anything else dropped gives its text.
+export function dropped(urls, text) {
+  const files = urls.filter((u) => u.indexOf('file://') === 0);
+  return { files, text: files.length || !text.trim() ? '' : text };
+}
+
+// Dropped text is a note as it is, so a line like "# work" never switches the section.
+export const addText = (store, text, now, id) => (text.trim() ? addNote(store, text, now, id) : store);
 
 export const firstImage = (note) => note.attachments.find((a) => a.mime.indexOf('image/') === 0) ?? null;
 

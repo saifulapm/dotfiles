@@ -69,6 +69,29 @@ FloatingWindow {
         useComposer();
     }
 
+    // Mod+S: Notes open on Shelf closes as Mod+N does; otherwise Notes opens on Shelf, made the first time.
+    function shelf() {
+        if (shown && store.activeSection === N.SHELF) {
+            if (focused)
+                niriAction.run(["focus-window-previous"], true);
+            else
+                hide();
+            return;
+        }
+        notes.save(N.useSection(store, N.SHELF));
+        selected = 0;
+        search.text = "";
+        if (!shown)
+            show();
+        else if (!focused && niriWindow)
+            niriAction.run(["focus-window", "--id", String(niriWindow.id)], false);
+    }
+
+    // On Shelf a paste is a new card at the top, never an attachment to the selected one.
+    function pasteTarget() {
+        return current && store.activeSection !== N.SHELF ? current.id : null;
+    }
+
     // Esc: focus goes back to the window you came from; an unpinned Notes hides as it loses focus.
     function back() {
         niriAction.run(["focus-window-previous"], false);
@@ -176,7 +199,7 @@ FloatingWindow {
         else if (ctrl && event.key === Qt.Key_Y)
             notes.copyText(N.sectionList(store, store.activeSection));
         else if (ctrl && event.key === Qt.Key_V)
-            notes.attachClipboard(current ? current.id : null);
+            notes.attachClipboard(pasteTarget());
         else if (ctrl)
             return false;
         else if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
@@ -238,6 +261,8 @@ FloatingWindow {
             pinned,
             mode,
             section: store.activeSection,
+            // The section order the picker draws, Shelf first.
+            tabs: N.sectionNames(store),
             selected: current ? current.id : null,
             cards: cards.map(n => n.id),
             marked,
@@ -248,7 +273,8 @@ FloatingWindow {
             composer: composer.text,
             windowId: niriWindow ? niriWindow.id : null,
             emptyLine: emptyLine.visible ? { text: emptyLine.text, lines: emptyLine.lineCount } : null,
-            selectedRect: selectedRect()
+            selectedRect: selectedRect(),
+            offers: list.itemAtIndex(selected)?.offers() ?? []
         };
     }
 
@@ -271,6 +297,22 @@ FloatingWindow {
     Item {
         id: page
         anchors.fill: parent
+
+        // Files or text dropped from another app become a card in the current section; a card dragged out of this window is not caught back.
+        DropArea {
+            anchors.fill: parent
+            onDropped: drop => {
+                if (drop.source)
+                    return;
+                const d = N.dropped(drop.urls.map(u => String(u)), drop.hasText ? drop.text : "");
+                if (d.files.length)
+                    win.notes.attachFiles(null, d.files);
+                else if (!win.notes.save(N.addText(win.store, d.text, Date.now(), win.notes.newId())))
+                    return;
+                win.selected = 0;
+                drop.acceptProposedAction();
+            }
+        }
 
         Row {
             id: header
@@ -440,6 +482,14 @@ FloatingWindow {
                 readonly property var style: win.look ? win.look.card(isSelected, modelData.done) : null
                 readonly property var images: modelData.attachments.filter(a => a.mime.indexOf("image/") === 0)
                 readonly property real frameHeight: frame.height
+
+                // What each drawn chip hands a drop target, so a check reads the drag's own mime data.
+                function offers() {
+                    const out = [];
+                    for (let i = 0; i < chips.count; i++)
+                        out.push(chips.itemAt(i).offer);
+                    return out;
+                }
                 width: ListView.view.width - 16
                 height: content.implicitHeight + 24 + (style && style.shadow ? style.shadow.y : 0)
 
@@ -602,12 +652,14 @@ FloatingWindow {
                     }
 
                     Repeater {
+                        id: chips
                         model: card.modelData.attachments
 
                         // Each chip drags only its own file.
                         Text {
                             id: chip
                             required property var modelData
+                            readonly property var offer: chipOffer.Drag.mimeData
                             textFormat: Text.PlainText
                             text: (win.look && win.look.voice !== "plain" ? modelData.name.toUpperCase() : modelData.name) + " · " + Math.max(1, Math.round(modelData.size / 1024)) + " KB"
                             color: win.c.muted ?? "gray"
@@ -799,6 +851,11 @@ FloatingWindow {
                                 win.useList();
                             else if (event.key === Qt.Key_K && event.modifiers & Qt.ControlModifier)
                                 win.openPicker("switch");
+                            else if (event.key === Qt.Key_V && event.modifiers & Qt.ControlModifier && win.store.activeSection === N.SHELF && !win.editing) {
+                                // Shelf's composer shelves a pasted image or file as a card; the event goes on, so copied text still pastes here.
+                                win.notes.attachClipboard(null);
+                                return;
+                            }
                             else if (event.key === Qt.Key_Escape && win.editing) {
                                 win.editing = "";
                                 text = "";

@@ -329,3 +329,40 @@ test('a sync merge of a store with itself changes nothing', () => {
   const m = mergeStores(s, notesStore([note('n3', 'three', T)]));
   assert.deepEqual(mergeStores(m, m), m);
 });
+
+import { useSection, SHELF, dropped, addText } from './notes.mjs';
+
+test('Shelf is the first section whatever its order', () => {
+  const s = storeOf([], [{ name: 'inbox', order: 0 }, { name: 'work', order: 1 }, { name: 'Shelf', order: 2 }]);
+  assert.equal(SHELF, 'Shelf');
+  assert.deepEqual(pure(s, sectionNames), ['Shelf', 'inbox', 'work']);
+});
+
+test('opening Shelf twice makes one Shelf section', () => {
+  const once = useSection(emptyStore(), 'Shelf');
+  const twice = useSection(once, 'Shelf');
+  assert.deepEqual(twice.sections, [{ name: 'inbox', order: 0 }, { name: 'Shelf', order: 1 }]);
+  assert.equal(twice.activeSection, 'Shelf');
+});
+
+test('a Shelf made on two machines merges into one', () => {
+  const a = useSection(emptyStore(), 'Shelf');
+  const b = useSection(useSection(emptyStore(), 'work'), 'Shelf');
+  assert.deepEqual(mergeStores(a, b).sections, [{ name: 'inbox', order: 0 }, { name: 'Shelf', order: 1 }, { name: 'work', order: 1 }]);
+  assert.deepEqual(sectionNames(mergeStores(b, a)), ['Shelf', 'inbox', 'work']);
+});
+
+test('a drop gives its file URIs, else its text', () => {
+  assert.deepEqual(dropped(['file:///home/me/a.pdf', 'https://example.com/x', 'file:///tmp/b%20c.png'], 'ignored'), { files: ['file:///home/me/a.pdf', 'file:///tmp/b%20c.png'], text: '' });
+  assert.deepEqual(dropped([], 'Ferry leaves 07:40'), { files: [], text: 'Ferry leaves 07:40' });
+  assert.deepEqual(dropped(['https://example.com/x'], 'https://example.com/x'), { files: [], text: 'https://example.com/x' });
+  assert.deepEqual(dropped([], '  \n'), { files: [], text: '' });
+});
+
+test('dropped text is a note in the current section, even when it reads like a section command', () => {
+  const s = useSection(emptyStore(), 'Shelf');
+  const out = pure(s, (x) => addText(x, '# work', T, 'd1'));
+  assert.deepEqual(out.notes.map((n) => [n.id, n.section, n.text]), [['d1', 'Shelf', '# work']]);
+  assert.equal(out.sections.length, 2);
+  assert.equal(addText(s, ' \n', T, 'd2'), s);
+});

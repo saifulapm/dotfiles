@@ -100,6 +100,12 @@ Scope {
             notesLoader.item.pin();
         }
 
+        // Mod+S.
+        function shelf(): void {
+            notesLoader.active = true;
+            notesLoader.item.shelf();
+        }
+
         function state(): string {
             const s = notesService.store;
             const view = notesLoader.item?.state() ?? { open: false, focused: false, pinned: false };

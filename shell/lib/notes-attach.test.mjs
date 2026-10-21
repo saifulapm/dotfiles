@@ -25,8 +25,8 @@ if [ "$1" = "--list-types" ]; then cat "${clip}/types"; exit 0; fi
 exec cat "${clip}/$(echo "$2" | tr / _)"
 `);
   chmodSync(join(bin, 'wl-paste'), 0o755);
-  const run = () => {
-    const r = spawnSync(script, [out], {
+  const run = (uris) => {
+    const r = spawnSync(script, [out].concat(uris || []), {
       encoding: 'utf8', maxBuffer: 1 << 20,
       env: Object.assign({}, process.env, { WAYLAND_DISPLAY: '', PATH: bin + ':' + process.env.PATH }),
     });
@@ -96,4 +96,13 @@ test('a uri-list naming a /proc, /sys or /dev file, directly or through a symlin
   c.offer(['text/uri-list'], { 'text/uri-list': ['file:///proc/cpuinfo', 'file:///sys/kernel/uevent_seqnum', 'file://' + join(c.root, 'innocent.txt')].join('\n') });
   assert.deepEqual(c.run(), []);
   assert.deepEqual(readdirSync(c.out), []);
+});
+
+test('dropped file URIs given as arguments attach without reading the clipboard', (t) => {
+  const c = rig(t);
+  const pic = join(c.root, 'drop me.png');
+  writeFileSync(pic, PNG);
+  writeFileSync(join(c.clip, 'fail'), '');
+  assert.deepEqual(c.run(['file://' + pic.replace(/ /g, '%20'), 'file:///proc/cpuinfo']), [{ sha256: sha(PNG), name: 'drop me.png', mime: 'image/png', size: PNG.length }]);
+  assert.deepEqual(readdirSync(c.out), [sha(PNG) + '.png']);
 });

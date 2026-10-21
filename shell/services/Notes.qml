@@ -78,6 +78,16 @@ Scope {
         if (attacher.running)
             return;
         attacher.target = id;
+        attacher.uris = [];
+        attacher.running = true;
+    }
+
+    // Dropped files take the same path as a paste: hashed into the store, the same size refusal.
+    function attachFiles(id, uris) {
+        if (attacher.running)
+            return;
+        attacher.target = id;
+        attacher.uris = uris;
         attacher.running = true;
     }
 
@@ -88,8 +98,9 @@ Scope {
     Process {
         id: attacher
         property var target: null
+        property var uris: []
         // The repo's bin is on the session PATH only through fish, so the helper is found beside the shell.
-        command: [Quickshell.shellDir + "/../bin/dots-notes-attach", notes.attachments]
+        command: [Quickshell.shellDir + "/../bin/dots-notes-attach", notes.attachments].concat(uris)
         stdout: StdioCollector {
             id: attached
         }
