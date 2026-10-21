@@ -82,6 +82,13 @@ test('each capture row runs dots-capture, and a row with a global key names it',
   assert.deepEqual([row('pick').exec, row('pick').key], [['dots-capture', 'colour'], undefined]);
 });
 
+test("given the shell's bin dir, a command row runs dots and dots-capture from it and the rest as they are", () => {
+  const bin = '/srv/b';
+  assert.deepEqual(commandRows('sync', bin)[0].exec, ['/srv/b/dots', 'sync']);
+  assert.deepEqual(commandRows('ocr', bin)[0].exec, ['/srv/b/dots-capture', 'ocr']);
+  assert.deepEqual(commandRows('lock', bin)[0].exec, ['qs', 'ipc', 'call', 'lock', 'lock']);
+});
+
 test('the calculator row is the formatted result, copied on Enter', () => {
   assert.deepEqual(calcRows('1440 * 1.25').map((r) => [r.title, r.copy]), [['1800', '1800']]);
   assert.deepEqual(calcRows('2 +'), []);

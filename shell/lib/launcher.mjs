@@ -63,8 +63,11 @@ const COMMANDS = [
   { title: 'sync', detail: 'Sync dotfiles', exec: ['dots', 'sync'] },
 ];
 
-export function commandRows(q) {
-  const entries = COMMANDS.map((c) => ({ name: c.title, keywords: [], row: Object.assign({ glyph: '>' }, c) }));
+// The user manager's PATH lacks the repo's bin/, so a dots script runs from bin, the one beside the shell.
+const fromBin = (c, bin) => (bin && /^dots(-|$)/.test(c.exec[0]) ? Object.assign({}, c, { exec: [`${bin}/${c.exec[0]}`].concat(c.exec.slice(1)) }) : c);
+
+export function commandRows(q, bin) {
+  const entries = COMMANDS.map((c) => ({ name: c.title, keywords: [], row: Object.assign({ glyph: '>' }, fromBin(c, bin)) }));
   return q.trim() ? rows(entries, q) : entries.map((e) => e.row);
 }
 

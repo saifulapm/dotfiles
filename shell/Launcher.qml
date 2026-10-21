@@ -54,10 +54,7 @@ Item {
         case "reminder":
             return Rem.reminderRows(parsed.q, Date.now(), pending);
         case "commands":
-            // The user manager's PATH lacks the repo's bin/, so dots is the one beside this shell.
-            return Lib.commandRows(parsed.q).map(r => r.exec[0] === "dots" ? Object.assign({}, r, {
-                        exec: [Quickshell.shellDir + "/../bin/dots"].concat(r.exec.slice(1))
-                    }) : r);
+            return Lib.commandRows(parsed.q, Quickshell.shellDir + "/../bin");
         case "apps":
             return Lib.rank(apps, parsed.q).map(a => ({
                         title: a.name,
