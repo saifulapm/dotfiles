@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# just dev's dots-notify-phone: `<title> <body>` appends one JSON line to DOTS_DEV_DIR/phone.jsonl instead of messaging a phone, so no test reaches Slack.
+set -euo pipefail
+{
+[ -n "${DOTS_DEV_DIR:-}" ] || { echo "dev-fake-notify-phone: run it from a sourced just dev env" >&2; exit 1; }
+jq -nc --arg t "${1:-}" --arg b "${2:-}" '{title: $t, body: $b}' >>"$DOTS_DEV_DIR/phone.jsonl"
+exit
+}

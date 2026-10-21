@@ -33,6 +33,8 @@ export DOTS_AGE_IDENTITY=$D/no-age-identity
 export PASSWORD_STORE_DIR=$D/password-store GNUPGHOME=$D/gnupg
 # workflow route tells every hub, so Control's Route toggle runs a fake that keeps the route here.
 export DOTS_WORKFLOW=$repo/bin/dev-fake-workflow
+# An agent lease tells the phone through a fake that records each call in the temp dir, never a real Slack DM.
+export DOTS_NOTIFY_PHONE=$repo/bin/dev-fake-notify-phone
 # The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.
 export DOTS_NIRI_BINDS=$repo/home/dot_config/niri/binds.kdl
 # The lock's PAM service accepts only dev/pam-test-password's test password, and pam_exec needs its absolute path.

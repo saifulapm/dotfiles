@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# dots-notify-phone <title> <body>: sends Saiful's phone one Slack DM from the hub's bot, reading the bot token and user id from hub/local.env; a machine without them skips quietly, as hub-local.service does.
+set -uo pipefail
+{
+title=${1:-} body=${2:-}
+env_file=${XDG_CONFIG_HOME:-$HOME/.config}/hub/local.env
+# Two keys are parsed out, never sourced, since local.env holds other secrets.
+key() { sed -n "s/^$1=//p" "$env_file" 2>/dev/null | head -n 1; }
+token=$(key SLACK_BOT_TOKEN) user=$(key SLACK_USER_ID)
+[[ -n $token && -n $user ]] || { echo "dots-notify-phone: no Slack token and user id in $env_file, skipped" >&2; exit 0; }
+tmp=$(mktemp -d) || exit 1
+trap 'rm -rf "$tmp"' EXIT
+# An agent controls both texts: one line each, no bidi controls, and & < > escaped as Slack wants.
+jq -n --arg c "$user" --arg t "$title" --arg b "$body" '
+  def clean: gsub("[\u202a-\u202e\u2066-\u2069]"; "") | gsub("[\r\n]+"; " ") | gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
+  {channel: $c, text: ("*" + ($t | clean) + "*\n" + ($b | clean))}' >"$tmp/body" || exit 1
+# The token reaches curl on stdin, never on a command line, where every process could read it.
+reply=$(
+  {
+    jq -rn --arg h "Authorization: Bearer $token" '"header = " + ($h | tojson)'
+    echo 'header = "Content-Type: application/json; charset=utf-8"'
+    echo 'url = "https://slack.com/api/chat.postMessage"'
+    jq -rn --arg f "$tmp/body" '"data-binary = " + ("@" + $f | tojson)'
+  } | curl -sS --max-time 10 --config -
+) || { echo "dots-notify-phone: curl failed" >&2; exit 1; }
+[[ $(jq -r '.ok' <<<"$reply" 2>/dev/null) = true ]] && exit 0
+echo "dots-notify-phone: Slack said $(jq -r '.error // "no answer"' <<<"$reply" 2>/dev/null || echo "no answer")" >&2
+exit 1
+}
