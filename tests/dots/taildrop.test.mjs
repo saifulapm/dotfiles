@@ -176,10 +176,12 @@ test('a file still arriving when the others have landed joins their notification
   await until('a.jpg saved or held', () => s.api.seen.some((l) => l.startsWith('GET /localapi/v0/watch-ipn-bus')));
   await sleep(3500);
   assert.deepEqual(s.notes(), [], 'no notification while b.mov is still arriving');
+  // tailscaled 1.98.8 announces a transfer once as it starts and never sends the empty list, so a file is done once the inbox lists it.
   s.api.inbox.set('b.mov', Buffer.from('b'));
-  s.api.setIncoming([]);
+  const listed = Date.now();
   await until('both files', () => saved(s).length === 2);
   await until('the notification', () => s.notes().length >= 1);
+  assert.ok(Date.now() - listed < 5000, `the batch closed ${Date.now() - listed} ms after its last file was listed`);
   await sleep(2500);
   assert.equal(s.notes().length, 1);
   const argv = s.notes()[0];

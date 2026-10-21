@@ -43,9 +43,9 @@ function call(method, path, { signal, sink } = {}) {
   });
 }
 
-// tailscaled's IPN bus repeats the files it is still receiving while a transfer runs, and an empty list once none is; the inbox lists a file only once it has all arrived.
+// tailscaled's IPN bus names each file it starts receiving; 1.98.8 sends that once and no empty list after, so a named file is done once the inbox lists it.
 function watchIncoming() {
-  const bus = { incoming: false, at: 0 };
+  const bus = { incoming: [], at: 0 };
   const req = request({ socketPath, path: '/localapi/v0/watch-ipn-bus?mask=0', headers: { Host: 'local-tailscaled.sock' } }, (res) => {
     let rest = '';
     res.setEncoding('utf8');
@@ -55,7 +55,7 @@ function watchIncoming() {
       for (const l of lines) {
         try {
           const n = JSON.parse(l);
-          if ('IncomingFiles' in n) Object.assign(bus, { incoming: Array.isArray(n.IncomingFiles) && n.IncomingFiles.length > 0, at: Date.now() });
+          if ('IncomingFiles' in n) Object.assign(bus, { incoming: (Array.isArray(n.IncomingFiles) ? n.IncomingFiles : []).map((f) => f && f.Name).filter((x) => typeof x === 'string'), at: Date.now() });
         } catch {}
       }
     });
@@ -147,7 +147,7 @@ async function cycle() {
   }
   mkdirSync(downloads, { recursive: true });
   const names = new Set(wanted.map((f) => f.Name));
-  // A batch ends once no new name has shown for the settle time and tailscaled reports nothing still arriving, so ten photos sent together give one notification however far apart they land.
+  // A batch ends once no new name has shown for the settle time and every file tailscaled said it was receiving is listed, so ten photos sent together give one notification however far apart they land.
   const bus = watchIncoming();
   try {
     for (let quiet = Date.now(), heard = 0; ; ) {
@@ -159,7 +159,7 @@ async function cycle() {
           quiet = Date.now();
         }
       }
-      const arriving = bus.incoming && Date.now() - bus.at < STALL_MS;
+      const arriving = bus.incoming.some((n) => !names.has(n)) && Date.now() - bus.at < STALL_MS;
       if (!arriving && Date.now() - quiet >= SETTLE_MS) break;
     }
   } finally {
