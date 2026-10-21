@@ -40,7 +40,7 @@ offset_text() {
 }
 day_word() {
   local d h
-  d=$(TZ=$1 date ${2:+-d "$2"} +%F) h=$(date +%F)
+  d=$(TZ=$1 date -d "$2" +%F) h=$(date -d "$2" +%F)
   if [[ $d > $h ]]; then echo tomorrow; elif [[ $d < $h ]]; then echo yesterday; else echo; fi
 }
 home=$(readlink /etc/localtime)
