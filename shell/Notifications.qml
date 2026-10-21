@@ -25,6 +25,7 @@ Item {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
+    readonly property var chipLook: V.chipLook(theme.tokens)
     readonly property Root.Motion motion: Root.Motion {
         shown: centre.shown
         tokens: centre.theme.tokens
@@ -106,6 +107,11 @@ Item {
             ages: rows.map((r, i) => {
                 const d = list.itemAtIndex(i);
                 return d ? d.age : null;
+            }),
+            // Each row's file chip as drawn, null on a row about no file.
+            chips: rows.map((r, i) => {
+                const f = list.itemAtIndex(i)?.fileChip;
+                return f ? { text: f.text, box: box(f) } : null;
             }),
             // Each group's head as drawn: its text, whether it elides, and how many lines it takes.
             heads: rows.map((r, i) => list.itemAtIndex(i)).filter(d => d && d.headItem.visible).map(d => ({
@@ -355,6 +361,7 @@ Item {
                         readonly property Item box: rowBox
                         readonly property string age: ageLabel.text
                         readonly property Item headItem: headLabel
+                        readonly property Item fileChip: [beforeChip, underChip, afterChip].find(f => f.visible) ?? null
                         width: list.width
 
                         // An app name can be any length; it elides inside the card.
@@ -432,14 +439,39 @@ Item {
                                         font.letterSpacing: look.detail.spacing ?? 0
                                     }
                                 }
-                                Text {
-                                    id: ageLabel
-                                    textFormat: Text.PlainText
+                                RowChip {
+                                    id: beforeChip
+                                    place: "beforeAge"
+                                    current: item.current
+                                    note: item.modelData.entry
+                                }
+                                // Blueprint's chip sits under the age.
+                                Column {
                                     Layout.alignment: Qt.AlignTop
-                                    text: look.ageText(centre.openedAt - item.modelData.entry.time)
-                                    color: item.current ? look.cursor.detail : c.muted
-                                    font.family: fonts.mono
-                                    font.pixelSize: 11
+                                    spacing: 8
+
+                                    Text {
+                                        id: ageLabel
+                                        x: parent.width - width
+                                        textFormat: Text.PlainText
+                                        text: look.ageText(centre.openedAt - item.modelData.entry.time)
+                                        color: item.current ? look.cursor.detail : c.muted
+                                        font.family: fonts.mono
+                                        font.pixelSize: 11
+                                    }
+                                    RowChip {
+                                        id: underChip
+                                        x: parent.width - width
+                                        place: "underAge"
+                                        current: item.current
+                                        note: item.modelData.entry
+                                    }
+                                }
+                                RowChip {
+                                    id: afterChip
+                                    place: "afterAge"
+                                    current: item.current
+                                    note: item.modelData.entry
                                 }
 
                                 Rectangle {
@@ -458,6 +490,44 @@ Item {
                                         font.family: fonts.mono
                                         font.pixelSize: 11
                                     }
+                                }
+                            }
+
+                            // As in the toast: a file notification drags from its chip, one with no file drags its body.
+                            MouseArea {
+                                id: rowArea
+                                property bool onChip: false
+                                anchors.fill: parent
+                                drag.target: rowOffer
+                                onPressed: mouse => {
+                                    const f = item.fileChip;
+                                    onChip = f !== null && f.contains(f.mapFromItem(rowArea, mouse.x, mouse.y));
+                                    if (onChip)
+                                        rowFace.grab();
+                                }
+                            }
+
+                            Item {
+                                id: rowOffer
+                                readonly property var payload: Lib.dragPayload(item.modelData.entry)
+                                Drag.active: rowArea.drag.active && (rowArea.onChip || payload.mime === "text/plain")
+                                Drag.dragType: Drag.Automatic
+                                Drag.supportedActions: Qt.CopyAction
+                                Drag.mimeData: ({ [payload.mime]: payload.data })
+                                Drag.imageSource: payload.mime === "text/uri-list" ? rowFace.url : ""
+                                Drag.hotSpot.x: -14
+                                Drag.hotSpot.y: -18
+                            }
+
+                            Item {
+                                width: 0
+                                height: 0
+                                clip: true
+
+                                Root.Island.DragFace {
+                                    id: rowFace
+                                    look: centre.chipLook
+                                    files: item.modelData.entry.files ?? []
                                 }
                             }
                         }
@@ -515,6 +585,19 @@ Item {
                 font.letterSpacing: look.small.spacing
             }
         }
+    }
+
+    // A row's chip, in the place the theme gives it; a row about no file has none.
+    component RowChip: Root.Island.FileChip {
+        property string place: ""
+        property bool current: false
+        property var note: null
+        Layout.alignment: Qt.AlignVCenter
+        width: implicitWidth
+        height: implicitHeight
+        look: chipLook.rowPlace === place ? chipLook : null
+        at: current ? chipLook.cursor : chipLook.row
+        files: note?.files ?? []
     }
 
     // A rule across the card: solid, or dashed in Blueprint.

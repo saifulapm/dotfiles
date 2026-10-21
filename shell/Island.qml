@@ -8,6 +8,7 @@ import "lib/island.mjs" as I
 import "lib/questions.mjs" as Q
 import "lib/margins.mjs" as M
 import "lib/voice.mjs" as V
+import "lib/notifs.mjs" as N
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; the window pads for its shadow.
 PanelWindow {
@@ -90,6 +91,10 @@ PanelWindow {
     readonly property string text: mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLabel.text, leaseWho.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(mode, slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
+    readonly property var chipLook: V.chipLook(theme.tokens)
+    // True from a drag's start to its drop; the toast holds while it is. Drag.active falls as the platform drag takes the pointer, so its start and finish set this.
+    property bool noteDragging: false
+    onNoteDraggingChanged: notifs.drag(noteDragging)
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question, a 320 px calendar and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
@@ -159,6 +164,213 @@ PanelWindow {
         font.family: island.noteLook.head.font
         font.pixelSize: island.noteLook.head.size
         font.letterSpacing: island.noteLook.head.spacing
+    }
+    // Six dots, two across and three down, that say the chip can be picked up.
+    component ChipGrip: Item {
+        property var size: ({ w: 8, h: 12, r: 1 })
+        property color color: "black"
+        width: size.w
+        height: size.h
+
+        Repeater {
+            model: 6
+            Rectangle {
+                required property int index
+                x: parent.width / 2 + (index % 2 ? 2 : -2) - width / 2
+                y: parent.height / 2 + (Math.floor(index / 2) - 1) * 4 - height / 2
+                width: 2 * parent.size.r
+                height: width
+                radius: width / 2
+                color: parent.color
+            }
+        }
+    }
+    // A page with its corner folded, drawn from the board's own path.
+    component ChipGlyph: Shape {
+        id: chipGlyph
+        property var size: ({ w: 12, h: 14, stroke: 1, path: "" })
+        property color color: "black"
+        width: size.w
+        height: size.h
+        preferredRendererType: Shape.CurveRenderer
+
+        ShapePath {
+            strokeColor: chipGlyph.color
+            strokeWidth: chipGlyph.size.stroke
+            fillColor: "transparent"
+            joinStyle: ShapePath.MiterJoin
+            PathSvg {
+                path: chipGlyph.size.path
+            }
+        }
+    }
+    // A chip's outline: a box with Artboard's radius, or Blueprint's frame with its top right corner cut.
+    component ChipBack: Item {
+        id: chipBack
+        property color fill: "transparent"
+        property color frame: "transparent"
+        property real frameWidth: 1
+        property real radius: 0
+        property real cut: 0
+
+        Rectangle {
+            anchors.fill: parent
+            visible: chipBack.cut === 0
+            radius: chipBack.radius
+            color: chipBack.fill
+            border.width: chipBack.frameWidth
+            border.color: chipBack.frame
+        }
+        Shape {
+            anchors.fill: parent
+            visible: chipBack.cut > 0
+            preferredRendererType: Shape.GeometryRenderer
+
+            ShapePath {
+                strokeColor: chipBack.frame
+                strokeWidth: chipBack.frameWidth
+                fillColor: chipBack.fill
+                PathPolyline {
+                    path: [Qt.point(0.5, 0.5), Qt.point(chipBack.width - 0.5 - chipBack.cut, 0.5), Qt.point(chipBack.width - 0.5, chipBack.cut), Qt.point(chipBack.width - 0.5, chipBack.height - 0.5), Qt.point(0.5, chipBack.height - 0.5), Qt.point(0.5, 0.5)]
+                }
+            }
+        }
+    }
+    // A file notification's chip: the grip, a file glyph and the extension or count; empty, it is the slot a dragged chip left.
+    component FileChip: Item {
+        id: fileChip
+        property var look: null
+        // The chipLook place it sits in: toast, row or cursor.
+        property var at: null
+        property var files: []
+        property bool empty: false
+        readonly property string text: look && files.length > 0 ? look.label(files) : ""
+        readonly property real dash: look?.empty.width ?? 1
+        readonly property bool hollow: empty && look !== null
+        visible: files.length > 0 && look !== null
+        implicitWidth: chipRow.implicitWidth + (at ? at.pad[1] + at.pad[3] : 0)
+        implicitHeight: chipRow.implicitHeight + (at ? at.pad[0] + at.pad[2] : 0)
+
+        ChipBack {
+            anchors.fill: parent
+            visible: !fileChip.hollow
+            fill: fileChip.at?.fill ?? "transparent"
+            frame: fileChip.at?.frame ?? "transparent"
+            radius: fileChip.at?.radius ?? 0
+            cut: fileChip.look?.cut ?? 0
+        }
+        Shape {
+            anchors.fill: parent
+            visible: fileChip.hollow
+            preferredRendererType: Shape.GeometryRenderer
+
+            ShapePath {
+                strokeColor: fileChip.look?.empty.color ?? "transparent"
+                strokeWidth: fileChip.dash
+                strokeStyle: ShapePath.DashLine
+                dashPattern: [4 / strokeWidth, 3 / strokeWidth]
+                fillColor: "transparent"
+                PathRectangle {
+                    x: fileChip.dash / 2
+                    y: fileChip.dash / 2
+                    width: fileChip.width - fileChip.dash
+                    height: fileChip.height - fileChip.dash
+                    radius: fileChip.at?.radius ?? 0
+                }
+            }
+        }
+        Row {
+            id: chipRow
+            x: fileChip.at?.pad[3] ?? 0
+            y: fileChip.at?.pad[0] ?? 0
+            spacing: fileChip.look?.gap ?? 0
+            visible: !fileChip.hollow || fileChip.look.empty.content
+
+            ChipGrip {
+                anchors.verticalCenter: parent.verticalCenter
+                size: fileChip.look?.grip ?? ({ w: 8, h: 12, r: 1 })
+                color: fileChip.hollow ? fileChip.look.empty.color : fileChip.at?.grip ?? "transparent"
+            }
+            ChipGlyph {
+                anchors.verticalCenter: parent.verticalCenter
+                size: fileChip.look?.glyph ?? ({ w: 12, h: 14, stroke: 1, path: "" })
+                color: fileChip.hollow ? fileChip.look.empty.color : fileChip.at?.glyph ?? "transparent"
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: fileChip.text
+                color: fileChip.hollow ? fileChip.look.empty.color : fileChip.at?.text ?? "transparent"
+                font.family: fileChip.look?.font ?? ""
+                font.pixelSize: fileChip.look?.size ?? 10
+                font.letterSpacing: fileChip.look?.spacing ?? 0
+            }
+        }
+    }
+    // What follows the pointer in a drag: the chip with the file's name, elided, as the boards draw it; grabbed to an image before the drag starts.
+    component DragFace: Item {
+        id: face
+        property var look: null
+        property var files: []
+        // The grabbed image's url, kept with its result so the image stays alive.
+        property var grabbed: null
+        readonly property string url: grabbed ? String(grabbed.url) : ""
+        readonly property var drag: look?.drag ?? null
+        width: faceRow.implicitWidth + (drag ? drag.pad[1] + drag.pad[3] : 0) + (drag?.shadow ? 3 : 0)
+        height: faceRow.implicitHeight + (drag ? drag.pad[0] + drag.pad[2] : 0) + (drag?.shadow ? 3 : 0)
+
+        function grab() {
+            if (files.length > 0 && width > 0)
+                grabToImage(r => face.grabbed = r);
+        }
+
+        Rectangle {
+            visible: face.drag?.shadow ? true : false
+            x: 3
+            y: 3
+            width: parent.width - 3
+            height: parent.height - 3
+            color: face.drag?.shadow ?? "transparent"
+        }
+        ChipBack {
+            width: parent.width - (face.drag?.shadow ? 3 : 0)
+            height: parent.height - (face.drag?.shadow ? 3 : 0)
+            fill: face.drag?.fill ?? "transparent"
+            frame: face.drag?.frame ?? "transparent"
+            frameWidth: face.drag?.frameWidth ?? 1
+            radius: face.drag?.radius ?? 0
+            cut: face.drag?.cut ?? 0
+        }
+        Row {
+            id: faceRow
+            x: face.drag?.pad[3] ?? 0
+            y: face.drag?.pad[0] ?? 0
+            spacing: face.drag?.gap ?? 0
+
+            ChipGrip {
+                visible: face.drag?.grip ? true : false
+                anchors.verticalCenter: parent.verticalCenter
+                size: face.look?.grip ?? ({ w: 8, h: 12, r: 1 })
+                color: face.drag?.grip ?? "transparent"
+            }
+            ChipGlyph {
+                anchors.verticalCenter: parent.verticalCenter
+                size: face.look?.glyph ?? ({ w: 12, h: 14, stroke: 1, path: "" })
+                color: face.drag?.glyph ?? "transparent"
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, 280)
+                elide: Text.ElideRight
+                textFormat: Text.PlainText
+                text: face.look && face.files.length > 0 ? face.look.name(face.files) : ""
+                color: face.drag?.text ?? "transparent"
+                font.family: face.look?.font ?? ""
+                font.pixelSize: face.drag?.size ?? 12
+                font.weight: face.drag?.weight ?? 400
+                font.letterSpacing: face.drag?.spacing ?? 0
+            }
+        }
     }
 
     // What the OSD draws, for `island state`.
@@ -259,6 +471,7 @@ PanelWindow {
             return { x: p.x + (screen.width - width) / 2, y: p.y, w: item.width, h: item.height };
         };
         const bracketEnd = closeBracket.mapToItem(null, closeBracket.width, 0).x;
+        const shownChip = bodyChip.visible ? bodyChip : columnChip.visible ? columnChip : null;
         return {
             app: openBracket.visible ? openBracket.text + appName.text + closeBracket.text : appName.text,
             age: age.text,
@@ -274,7 +487,13 @@ PanelWindow {
             bracketEnd: bracketEnd,
             ageStart: age.mapToItem(null, 0, 0).x,
             tileBox: tile.visible ? at(tile) : null,
-            glyph: tile.visible && glyph.visible ? glyph.text : null
+            glyph: tile.visible && glyph.visible ? glyph.text : null,
+            chip: shownChip ? shownChip.text : null,
+            chipBox: shownChip ? at(shownChip) : null,
+            chipEmpty: shownChip ? shownChip.empty : false,
+            dragging: noteDragging,
+            frame: [box.style.frame.width, String(box.style.frame.color)],
+            faceUrl: noteFace.url
         };
     }
 
@@ -423,7 +642,7 @@ PanelWindow {
         tokens: island.theme.tokens
         role: "island"
         // The lease card's own frame, and the slot's last minute: Paper's sheet and vermilion rule, Blueprint's amber frame and glow.
-        restyle: island.mode === "leaseCard" ? island.leaseLook.card.box : island.mode === "lease" && island.leaseWarning ? island.leaseLook.warning.box : null
+        restyle: island.mode === "leaseCard" ? island.leaseLook.card.box : island.mode === "lease" && island.leaseWarning ? island.leaseLook.warning.box : island.mode === "notification" && island.noteDragging && island.chipLook.frame ? { frame: island.chipLook.frame } : null
 
         // Each part is drawn at its own size and clipped to the box as it morphs.
         Item {
@@ -1292,7 +1511,7 @@ PanelWindow {
                     }
 
                     Column {
-                        width: parent.width - (tile.visible ? tile.width + parent.spacing : 0)
+                        width: parent.width - (tile.visible ? tile.width + parent.spacing : 0) - (columnChip.visible ? columnChip.width + parent.spacing : 0)
                         spacing: island.noteLook.voice === "plain" ? 2 : 4
 
                         Item {
@@ -1325,7 +1544,11 @@ PanelWindow {
                             HeadText {
                                 id: age
                                 anchors.right: parent.right
-                                text: island.noteLook.age
+                                // Blueprint's board says DRAGGING here, bold in the accent, while the chip is out.
+                                readonly property bool dragWord: island.noteDragging && island.chipLook.dragAge !== ""
+                                text: dragWord ? island.chipLook.dragAge : island.noteLook.age
+                                color: dragWord ? island.theme.tokens.color.accent : island.noteLook.head.color
+                                font.bold: dragWord
                             }
                         }
 
@@ -1343,19 +1566,63 @@ PanelWindow {
                             font.letterSpacing: island.noteLook.summary.spacing
                         }
 
-                        Text {
+                        // Paper and Blueprint draw the chip at the right of the body line.
+                        Item {
                             width: parent.width
-                            visible: text !== ""
-                            id: body
-                            text: island.noteLook.bodyText(island.heldNotification?.body ?? "")
-                            textFormat: Text.PlainText
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 3
-                            elide: Text.ElideRight
-                            color: island.noteLook.body.color || box.style.text
-                            font.family: island.noteLook.body.font
-                            font.pixelSize: island.noteLook.body.size
+                            visible: body.text !== "" || bodyChip.visible
+                            height: Math.max(body.visible ? body.implicitHeight : 0, bodyChip.visible ? bodyChip.implicitHeight + 2 : 0)
+
+                            Text {
+                                width: parent.width - (bodyChip.visible ? bodyChip.width + 12 : 0)
+                                visible: text !== ""
+                                id: body
+                                text: island.noteLook.bodyText(island.heldNotification?.body ?? "")
+                                textFormat: Text.PlainText
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 3
+                                elide: Text.ElideRight
+                                color: island.noteLook.body.color || box.style.text
+                                font.family: island.noteLook.body.font
+                                font.pixelSize: island.noteLook.body.size
+                            }
+
+                            FileChip {
+                                id: bodyChip
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: implicitWidth
+                                height: implicitHeight
+                                look: island.chipLook.toastPlace === "body" ? island.chipLook : null
+                                at: island.chipLook.toast
+                                files: island.heldNotification?.files ?? []
+                                empty: island.noteDragging
+                            }
                         }
+                    }
+
+                    // Artboard's chip is a column of its own at the card's right.
+                    FileChip {
+                        id: columnChip
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: implicitWidth
+                        height: implicitHeight
+                        look: island.chipLook.toastPlace === "column" ? island.chipLook : null
+                        at: island.chipLook.toast
+                        files: island.heldNotification?.files ?? []
+                        empty: island.noteDragging
+                    }
+                }
+
+                // Out of sight: the drag image is grabbed from here.
+                Item {
+                    width: 0
+                    height: 0
+                    clip: true
+
+                    DragFace {
+                        id: noteFace
+                        look: island.chipLook
+                        files: island.heldNotification?.files ?? []
                     }
                 }
             }
@@ -1565,11 +1832,35 @@ PanelWindow {
 
         // A click opens a notification and a right click puts it away; the keyboard does the same through Mod+I.
         MouseArea {
+            id: noteArea
             anchors.fill: parent
             enabled: island.mode === "notification"
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.PointingHandCursor
             onClicked: mouse => mouse.button === Qt.RightButton ? island.putAway() : island.openNotification()
+            // A file notification drags from its chip only; one with no file drags its body from anywhere.
+            property bool onChip: false
+            onPressed: mouse => {
+                const chip = bodyChip.visible ? bodyChip : columnChip;
+                onChip = chip.visible && chip.contains(chip.mapFromItem(noteArea, mouse.x, mouse.y));
+                if (onChip)
+                    noteFace.grab();
+            }
+            drag.target: noteOffer
+        }
+
+        Item {
+            id: noteOffer
+            readonly property var payload: N.dragPayload(island.heldNotification ?? { body: "" })
+            Drag.active: noteArea.drag.active && (noteArea.onChip || payload.mime === "text/plain")
+            Drag.dragType: Drag.Automatic
+            Drag.supportedActions: Qt.CopyAction
+            Drag.mimeData: ({ [payload.mime]: payload.data })
+            Drag.imageSource: payload.mime === "text/uri-list" ? noteFace.url : ""
+            Drag.hotSpot.x: -14
+            Drag.hotSpot.y: -18
+            Drag.onDragStarted: island.noteDragging = true
+            Drag.onDragFinished: island.noteDragging = false
         }
 
         Item {

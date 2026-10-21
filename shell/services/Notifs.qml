@@ -70,6 +70,14 @@ Scope {
         hold.restart();
     }
 
+    // A drag out of the toast holds it: Drag.Automatic runs its own event loop, where the hold would still fire, so the 5 s start again at the drop.
+    function drag(on) {
+        if (on)
+            hold.stop();
+        else if (current)
+            hold.restart();
+    }
+
     // Closed by its app, or dismissed here: the island rests.
     function gone(key) {
         if (current?.key === key) {
