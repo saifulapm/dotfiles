@@ -30,6 +30,9 @@ check "the shell unit carries the PATH bin/dots-dev set, less bin/" unit_has PAT
 unit_path=$(systemctl --user show -p Environment --value "$DOTS_DEV_UNIT" | tr ' ' '\n' | sed -n 's/^PATH=//p')
 unit_ddcutil() { [ "$(PATH=$unit_path command -v ddcutil)" = "$repo/dev/path/ddcutil" ]; }
 check "the shell unit resolves ddcutil to the fake" unit_ddcutil
+# A real tailscale on that PATH would turn the live tailnet off from a check that presses t.
+unit_tailscale() { [ "$(PATH=$unit_path command -v tailscale)" = "$repo/dev/path/tailscale" ]; }
+check "the shell unit resolves tailscale to the fake" unit_tailscale
 check "PIPEWIRE_RUNTIME_DIR is inside the temp dir" under_dev "${PIPEWIRE_RUNTIME_DIR:-}"
 check "the shell unit carries PIPEWIRE_RUNTIME_DIR" unit_has PIPEWIRE_RUNTIME_DIR "${PIPEWIRE_RUNTIME_DIR:-}"
 check "RCLONE_CONFIG is inside the temp dir" under_dev "${RCLONE_CONFIG:-}"

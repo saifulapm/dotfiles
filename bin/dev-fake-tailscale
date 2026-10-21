@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# just dev's tailscale: status, up, down, debug watch-ipn and file cp against a tailnet kept in DOTS_DEV_DIR/tailscale, so a nested check never reaches the real tailscaled.
+set -euo pipefail
+{
+[ -n "${DOTS_DEV_DIR:-}" ] || { echo "dev-fake-tailscale: run it from a sourced just dev env" >&2; exit 1; }
+dir=$DOTS_DEV_DIR/tailscale
+status=$dir/status.json
+changes=$dir/changes
+mkdir -p "$dir"
+touch "$changes"
+# The recorded ages are against 2026-10-21T08:00Z, so each offline LastSeen moves by the same distance to now and stays 55d or 42d.
+if [ ! -e "$status" ]; then
+  jq '(.Peer[] | select(.Online == false) | .LastSeen) |= (now - ("2026-10-21T08:00:00Z" | fromdate) + (sub("\\.[0-9]+Z$"; "Z") | fromdate) | floor | todate)' \
+    "$(dirname "$(realpath "$0")")/../dev/tailscale-status.json" >"$status.tmp"
+  mv "$status.tmp" "$status"
+fi
+
+state_line() { jq -c '{State: .BackendState}' "$status"; }
+
+set_state() {
+  jq --arg s "$1" '.BackendState = $s' "$status" >"$status.tmp"
+  mv "$status.tmp" "$status"
+  state_line >>"$changes"
+}
+
+case "${1:-} ${2:-}" in
+"status --json")
+  # A down file stands for a tailscaled that is not running, and a state file for a backend state such as NeedsLogin.
+  if [ -e "$dir/down" ]; then
+    echo "failed to connect to local tailscaled; it doesn't appear to be running (sudo systemctl start tailscaled ?)" >&2
+    exit 1
+  fi
+  if [ -s "$dir/state" ]; then
+    jq --arg s "$(cat "$dir/state")" '.BackendState = $s' "$status"
+  else
+    cat "$status"
+  fi
+  ;;
+"up "*) set_state Running ;;
+"down "*) set_state Stopped ;;
+"debug watch-ipn")
+  state_line
+  # tail's --pid ends it within a second of this script, so a killed watcher leaves no reader behind.
+  tail -n0 -F --pid=$$ "$changes" 2>/dev/null &
+  trap 'kill $! 2>/dev/null; exit 0' TERM INT HUP
+  wait $!
+  ;;
+"file cp")
+  shift 2
+  files=()
+  for arg in "$@"; do
+    case $arg in --update-interval=* | --) ;; *) files+=("$arg") ;; esac
+  done
+  target=${files[-1]}
+  unset 'files[-1]'
+  echo "file cp ${files[*]} $target" >>"$dir/cp.log"
+  peer=${target%:}
+  if [ -e "$dir/fail" ] && grep -qxF "$peer" "$dir/fail"; then
+    echo "can't send to $peer: peer is offline" >&2
+    exit 1
+  fi
+  # tailscale paints progress only on a terminal, one line per file redrawn in place.
+  if [ -t 2 ]; then
+    for f in "${files[@]}"; do
+      printf '\r\033[K%-36s    1.00KiB    2.00KiB/s     48.00%%    ETA 00:00:01' "$(basename "$f")" >&2
+      sleep 1
+      printf '\r\033[K%-36s    2.00KiB    2.00KiB/s    100.00%%    ETA 00:00:00\n' "$(basename "$f")" >&2
+    done
+  fi
+  ;;
+*)
+  echo "dev-fake-tailscale: unknown command: $*" >&2
+  exit 2
+  ;;
+esac
+exit
+}
