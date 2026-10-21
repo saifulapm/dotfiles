@@ -273,6 +273,21 @@ test('Artboard spells Wi-Fi as its board does, and a sync failure leads the righ
   assert.equal(margin('blueprint').drawn(foot, SUN, { ...right, sync: 'sync !' }).right.slice(0, 9), 'SYNC ! · ');
 });
 
+test('unread mail reads MAIL 3, mail 3 and MAIL 3 between the goal and Wi-Fi, in each board colour and weight', () => {
+  const mail = { ...right, mail: 3 };
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => margin(n).drawn(foot, SUN, mail).right), [
+    'SHIP V2 · 3D — MAIL 3 — WIFI — 82% — SUN 18 OCT',
+    'Ship v2 · 3d mail 3 Wi-Fi 82% Sun 18 Oct',
+    'SHIP V2 T−3D · MAIL 3 · WIFI · 82% · 2026-10-18',
+  ]);
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => [margin(n).mail(3), margin(n).mailColor, margin(n).mailWeight]), [
+    ['MAIL 3', '#1C1915', 700],
+    ['mail 3', '#15171B', 500],
+    ['MAIL 3', '#7FE3F0', 400],
+  ]);
+  assert.equal(margin('paper').drawn(foot, SUN, { ...right, mail: 0 }).right, 'SHIP V2 · 3D — WIFI — 82% — SUN 18 OCT');
+});
+
 test('a bidi control in a window title cannot reorder the margin', () => {
   assert.equal(margin('blueprint').drawn({ idx: 1, app: 'foot', title: 'a‮b' }, SUN, right).left, '[01] FOOT — AB');
 });

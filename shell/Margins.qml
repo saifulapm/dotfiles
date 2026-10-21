@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import "lib/margins.mjs" as M
@@ -19,7 +20,9 @@ PanelWindow {
     required property var sync
     required property real islandWidth
     readonly property var view: niri.view(screen.name) ?? { idx: 0, app: null, title: null }
-    readonly property var marginState: M.marginState(view, clock.now, { sync: sync.failing ? "sync !" : "", goal: G.marginGoal(goals.store, clock.now), wifi: network.wifi, battery: power.battery })
+    // The Imbox unread count kak-mail writes; 0 hides the item.
+    property int mail: 0
+    readonly property var marginState: M.marginState(view, clock.now, { sync: sync.failing ? "sync !" : "", goal: G.marginGoal(goals.store, clock.now), mail: mail, wifi: network.wifi, battery: power.battery })
     readonly property var goal: G.marginGoalParts(goals.store, clock.now)
     readonly property var voice: V.marginLook(theme.tokens)
     readonly property real lineEnd: width / 2 - islandWidth / 2 - 8
@@ -39,6 +42,25 @@ PanelWindow {
     // An empty mask lets clicks through to the windows under the margins.
     mask: Region {}
 
+    readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots"
+
+    // The watch needs the folder, which nothing may have made yet.
+    Process {
+        running: true
+        command: ["mkdir", "-p", root.stateDir]
+        onExited: mailFile.path = root.stateDir + "/mail-unread"
+    }
+
+    // kak-mail renames a new file over the old one, and the watch follows the path.
+    FileView {
+        id: mailFile
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: root.mail = M.mailCount(text())
+        onLoadFailed: root.mail = 0
+    }
+
     component Label: Text {
         textFormat: Text.PlainText
         color: root.theme.color.muted ?? "black"
@@ -57,7 +79,7 @@ PanelWindow {
 
     // The words as drawn, read back from the labels, for `qs ipc call margins state`.
     function drawnState() {
-        const right = [syncLabel, goalLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).map(l => l.text).join(voice.sep ? " " + voice.sep + " " : " ");
+        const right = [syncLabel, goalLabel, mailLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).map(l => l.text).join(voice.sep ? " " + voice.sep + " " : " ");
         return {
             left: number.text + tail.text,
             right: right,
@@ -127,7 +149,7 @@ PanelWindow {
                 id: goalLabel
                 text: root.voice.goal(root.goal)
                 // A title can arrive by sync at any length, so it takes only the room the other words leave before the island.
-                readonly property real room: root.lineEnd - 32 - [syncLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).reduce((w, l) => w + l.width + rightRow.spacing, 0) - [syncSep, goalSep, wifiSep, batterySep].filter(l => l.visible).reduce((w, l) => w + l.width + rightRow.spacing, 0) - (root.voice.dot ? 12 : 0)
+                readonly property real room: root.lineEnd - 32 - [syncLabel, mailLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).reduce((w, l) => w + l.width + rightRow.spacing, 0) - [syncSep, goalSep, mailSep, wifiSep, batterySep].filter(l => l.visible).reduce((w, l) => w + l.width + rightRow.spacing, 0) - (root.voice.dot ? 12 : 0)
                 width: Math.min(implicitWidth, Math.max(0, room))
                 elide: Text.ElideRight
                 color: root.voice.goalColor ?? "black"
@@ -137,6 +159,18 @@ PanelWindow {
         Sep {
             id: goalSep
             shown: goalItem.visible
+        }
+
+        Label {
+            id: mailLabel
+            text: root.voice.mail(root.mail)
+            visible: text !== ""
+            color: root.voice.mailColor ?? "black"
+            font.weight: root.voice.mailWeight
+        }
+        Sep {
+            id: mailSep
+            shown: mailLabel.visible
         }
 
         Label {

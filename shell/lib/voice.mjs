@@ -575,6 +575,10 @@ export function marginLook(tokens) {
     goalWeight: bracket ? 400 : plain ? 500 : 700,
     dot: plain,
     dotColor: c.accent,
+    // Unread mail is something to act on: ink in Paper (bold) and Artboard (medium), Blueprint's accent.
+    mail: (n) => (n > 0 ? (plain ? `mail ${n}` : `MAIL ${n}`) : ''),
+    mailColor: bracket ? c.accent : c.ink,
+    mailWeight: bracket ? 400 : plain ? 500 : 700,
     word: (w) => (plain ? same(w).replace(/^wifi$/, 'Wi-Fi').replace(/^no wifi$/, 'No Wi-Fi') : upper(w)),
     date: (d) => (bracket ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : say(dateText(d))),
     sep: plain ? '' : bracket ? '·' : '—',
@@ -583,7 +587,7 @@ export function marginLook(tokens) {
   // The words on screen, in order, for `qs ipc call margins state`.
   look.drawn = (view, now, right) => ({
     left: look.number(view.idx) + look.tail(view),
-    right: [right.sync && look.word(right.sync), look.goal(right.goal), right.wifi && look.word(right.wifi), right.battery && look.word(right.battery), look.date(now)]
+    right: [right.sync && look.word(right.sync), look.goal(right.goal), look.mail(right.mail), right.wifi && look.word(right.wifi), right.battery && look.word(right.battery), look.date(now)]
       .filter((p) => p)
       .join(look.sep ? ` ${look.sep} ` : ' '),
   });
