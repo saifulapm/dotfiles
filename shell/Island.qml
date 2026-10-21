@@ -38,6 +38,9 @@ PanelWindow {
     readonly property var leaseLook: V.leaseLook(theme.tokens)
     // The last minute takes the theme's warning; a renew past it brings the normal look back.
     readonly property bool leaseWarning: lease !== null && lease.left <= 60000
+    // Mod+I during a lease opens its card: who, when it unlocked and the time left; Enter locks, Esc closes.
+    property bool leaseOpen: false
+    readonly property var leaseCard: leaseOpen ? lease : null
     property var osd: null
     property var toast: null
     property var playing: null
@@ -60,6 +63,7 @@ PanelWindow {
     Component.onCompleted: heldText = text
     readonly property var slots: ({
             question,
+            leaseCard,
             lease,
             calendar,
             notification,
@@ -75,11 +79,11 @@ PanelWindow {
     onModeChanged: {
         modeSince = Date.now();
         // The keyboard goes back once what it was given for is gone, such as a notification whose 5 s ran out.
-        if (focused && ["calendar", "question", "notification"].indexOf(mode) < 0)
+        if (focused && ["calendar", "question", "notification", "leaseCard"].indexOf(mode) < 0)
             release();
     }
     // The lease's text is read back from what is drawn, since each theme words it its own way.
-    readonly property string text: mode === "lease" ? [leaseMark.text, leaseWords.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(mode, slots, clock.now)
+    readonly property string text: mode === "leaseCard" ? [cardWho.text, cardUnlocked.text, cardLeft.text, cardHint.text].join(" · ") : mode === "lease" ? [leaseMark.text, leaseWords.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(mode, slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var osdLook: V.osdLook(theme.tokens)
@@ -87,19 +91,20 @@ PanelWindow {
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             lease: [I.boxWidth(Math.ceil(leaseRow.implicitWidth) + 28), 34],
+            leaseCard: [320, leaseColumn.implicitHeight + 32],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
             question: [I.MAX_WIDTH, ask.implicitHeight + 32],
             calendar: [320, month.implicitHeight + 32],
             osd: [osdLook.width, osdLook.height]
         })
-    readonly property string part: ["notification", "question", "calendar", "osd", "lease"].indexOf(mode) < 0 ? "label" : mode
+    readonly property string part: ["notification", "question", "calendar", "osd", "lease", "leaseCard"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
     readonly property var motion: I.islandMotion(theme.tokens?.primitive.motion)
-    readonly property bool animating: morphing.running || [labelPart, leasePart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
+    readonly property bool animating: morphing.running || [labelPart, leasePart, leaseCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -168,6 +173,8 @@ PanelWindow {
 
     // What the lease slot draws, for `island state`.
     function leaseState() {
+        if (mode === "leaseCard")
+            return { card: true, who: cardWho.text, unlocked: cardUnlocked.text, time: cardLeft.text, bar: island.leaseLook.bar, hint: cardHint.text, elided: cardWho.truncated, lines: cardWho.lineCount };
         if (mode !== "lease")
             return null;
         return {
@@ -218,12 +225,14 @@ PanelWindow {
     property bool replying: false
 
     function focusIsland() {
-        if (mode === "rest" || mode === "playing")
+        if (mode === "lease")
+            leaseOpen = true;
+        else if (mode === "rest" || mode === "playing")
             calendar = {
                 year: clock.now.getFullYear(),
                 month: clock.now.getMonth()
             };
-        else if (mode !== "question" && mode !== "notification")
+        else if (mode !== "question" && mode !== "notification" && mode !== "leaseCard")
             return;
         focused = true;
         keys.forceActiveFocus();
@@ -251,6 +260,7 @@ PanelWindow {
 
     function release() {
         focused = false;
+        leaseOpen = false;
         calendar = null;
         replying = false;
         reply.text = "";
@@ -445,6 +455,114 @@ PanelWindow {
                             font.weight: Font.Medium
                             font.features: { "tnum": 1 }
                         }
+                    }
+                }
+            }
+
+            IslandPart {
+                id: leaseCardPart
+                shown: island.part === "leaseCard"
+                key: ""
+                swap: island.motion?.swap ?? null
+                x: Math.round((parent.width - width) / 2)
+                width: island.sizes.leaseCard[0]
+                height: island.sizes.leaseCard[1]
+
+                Column {
+                    id: leaseColumn
+                    x: 18
+                    y: 16
+                    width: parent.width - 36
+                    spacing: 10
+
+                    Text {
+                        id: cardWho
+                        width: parent.width
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        text: island.leaseLook.words(island.lease?.who ?? "")
+                        color: island.leaseLook.text || box.style.text
+                        font.family: island.leaseLook.font
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
+                        font.letterSpacing: island.leaseLook.voice === "plain" ? 0 : 1
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: cardLeft.implicitHeight
+
+                        Text {
+                            id: cardUnlocked
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: island.leaseLook.unlocked(Qt.formatTime(new Date(island.lock.unlockedAt), "HH:mm"))
+                            color: Qt.alpha(box.style.text, 0.65)
+                            font.family: island.leaseLook.font
+                            font.pixelSize: 12
+                        }
+
+                        Text {
+                            id: cardLeft
+                            anchors.right: parent.right
+                            textFormat: Text.PlainText
+                            text: island.leaseLook.time(island.lease?.left ?? 0)
+                            color: island.leaseWarning ? island.leaseLook.warning.time : island.leaseLook.timeColor || box.style.text
+                            font.family: island.leaseLook.timeFont
+                            font.pixelSize: island.leaseLook.timeFont === island.leaseLook.font ? 20 : 30
+                            font.weight: Font.Medium
+                            font.features: { "tnum": 1 }
+                        }
+                    }
+
+                    // Artboard's rounded bar and Blueprint's blocks: the share of the lease's longest run still left.
+                    Item {
+                        id: cardBar
+                        visible: island.leaseLook.bar !== null
+                        width: parent.width
+                        height: visible ? 6 : 0
+                        readonly property real share: island.lease && island.lock.leaseUntil > island.lock.unlockedAt ? Math.min(1, island.lease.left / (island.lock.leaseUntil - island.lock.unlockedAt)) : 0
+                        readonly property color fill: island.leaseWarning ? island.leaseLook.warning.time : island.leaseLook.markColor || island.leaseLook.timeColor || box.style.text
+
+                        Rectangle {
+                            visible: island.leaseLook.bar === "round"
+                            anchors.fill: parent
+                            radius: 3
+                            color: Qt.alpha(box.style.text, 0.15)
+
+                            Rectangle {
+                                width: parent.width * cardBar.share
+                                height: parent.height
+                                radius: 3
+                                color: cardBar.fill
+                            }
+                        }
+
+                        Row {
+                            visible: island.leaseLook.bar === "blocks"
+                            spacing: 2
+
+                            Repeater {
+                                model: 20
+
+                                Rectangle {
+                                    required property int index
+                                    width: (cardBar.width - 19 * 2) / 20
+                                    height: cardBar.height
+                                    color: index < Math.ceil(cardBar.share * 20) ? cardBar.fill : Qt.alpha(box.style.text, 0.15)
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        id: cardHint
+                        textFormat: Text.PlainText
+                        text: island.leaseLook.hint
+                        color: Qt.alpha(box.style.text, 0.65)
+                        font.family: island.leaseLook.font
+                        font.pixelSize: 11
                     }
                 }
             }
@@ -915,6 +1033,15 @@ PanelWindow {
             focus: island.focused
             Keys.onPressed: event => {
                 event.accepted = true;
+                if (island.mode === "leaseCard") {
+                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        island.release();
+                        island.lock.lockNow();
+                    } else if (event.key === Qt.Key_Escape) {
+                        island.release();
+                    }
+                    return;
+                }
                 if (island.mode === "calendar") {
                     if (event.key === Qt.Key_Escape)
                         island.release();

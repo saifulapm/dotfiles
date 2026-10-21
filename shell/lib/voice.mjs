@@ -153,6 +153,8 @@ export function islandLook(tokens) {
   });
 }
 
+const HINT = '↵ lock now · esc close';
+
 // How the island draws an agent's lease in place of the clock, and its last minute (XX2P8V57); colours left empty are the island's own text colour.
 export function leaseLook(tokens) {
   const c = (tokens || UNTHEMED).color;
@@ -169,6 +171,9 @@ export function leaseLook(tokens) {
       markColor: tokens ? ISLAND.plain.bar : c.accent,
       words: (who) => `Agent · ${line(who)}`,
       time,
+      unlocked: (hhmm) => `unlocked ${hhmm}`,
+      bar: 'round',
+      hint: HINT,
       font: t.ui,
       timeFont: t.ui,
       text: '',
@@ -183,6 +188,9 @@ export function leaseLook(tokens) {
       markColor: '',
       words: (who) => `[ AGENT ] ${upper(line(who))}`,
       time,
+      unlocked: (hhmm) => `UNLOCKED ${hhmm}`,
+      bar: 'blocks',
+      hint: HINT,
       font: t.mono,
       timeFont: t.mono,
       text: c.accent,
@@ -196,6 +204,9 @@ export function leaseLook(tokens) {
     markColor: c.accent,
     words: (who) => `AGENT ${upper(line(who))}`,
     time,
+    unlocked: (hhmm) => `UNLOCKED ${hhmm}`,
+    bar: null,
+    hint: HINT,
     font: t.ui,
     timeFont: t.display,
     text: '',

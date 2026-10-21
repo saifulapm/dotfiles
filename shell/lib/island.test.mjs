@@ -131,3 +131,10 @@ test("an agent's lease sits just below a question and above the calendar and not
   assert.equal(pick({ lease, calendar: { year: 2026, month: 9 }, notification: { app: 'a' }, osd: { kind: 'volume', value: 1 } }), 'lease');
   assert.equal(isCompact('lease'), true);
 });
+
+test('Mod+I during a lease opens its card, which only a question outranks', () => {
+  const lease = { who: 'claude', left: 60000 };
+  assert.equal(pick({ leaseCard: lease, lease }), 'leaseCard');
+  assert.equal(pick({ question: { text: 'q', options: [] }, leaseCard: lease, lease }), 'question');
+  assert.equal(isCompact('leaseCard'), false);
+});

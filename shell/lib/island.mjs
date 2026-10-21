@@ -5,7 +5,7 @@ import { clockText } from './margins.mjs';
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // The calendar is opened by hand from rest, so only a question, or an agent's lease that holds the session, takes the island from it.
-const PRIORITY = ['question', 'lease', 'calendar', 'notification', 'recording', 'osd', 'toast', 'playing'];
+const PRIORITY = ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'recording', 'osd', 'toast', 'playing'];
 
 export const MAX_WIDTH = 560;
 

@@ -90,6 +90,23 @@ timeout 0.5 qs ipc call lock renew claude 15 >/dev/null
 settled '.warning == false'
 check "renew claude 15 brings the normal look back" state_is '.warning == false and .lease.timeColor == "#7fe3f0"'
 
+# Mod+I opens the lease card; niri runs no binds for wtype, so the check spawns the bind's command.
+mod_i() { niri msg action spawn -- dots-call island focus; }
+mod_i
+settled '.mode == "leaseCard" and .focused'
+echo "     card: $(island | jq -c .lease)"
+check "Mod+I opens the lease card: who, when it unlocked, the time left and its keys" state_is '.lease.card and .lease.who == "[ AGENT ] CLAUDE" and (.lease.unlocked | test("^UNLOCKED [0-2][0-9]:[0-5][0-9]$")) and (.lease.time | startswith("T−1")) and .lease.bar == "blocks" and .lease.hint == "↵ lock now · esc close"'
+wtype -k Escape
+settled '.mode == "lease"'
+check "Esc closes the card back to the slot, still unlocked" bash -c "$(declare -f state_is island lock_is); state_is '.mode == \"lease\" and .focused == false' && lock_is '.locked == false'"
+mod_i
+settled '.mode == "leaseCard" and .focused'
+t0=$(now_ms)
+wtype -k Return
+until_ok 1000 lock_is '.locked'
+took=$(($(now_ms) - t0))
+check "Enter on the card locks within 1 s ($took ms)" lock_is '.locked and .heldBy == ""'
+
 # A holder's name is anyone's text: one line, no bidi controls, elided inside the island.
 niri msg action spawn -- dots-call lock lock
 until_ok 3000 lock_is '.locked and .secure'

@@ -298,3 +298,13 @@ test('a holder any caller names is one line without bidi controls', () => {
   assert.equal(leaseLook(theme('paper')).words('cl\naude\u202e x'), 'AGENT CL AUDE X');
   assert.equal(leaseLook(theme('artboard')).words('\u202eclaude'), 'Agent · claude');
 });
+
+test("the lease card names when it unlocked, and Artboard and Blueprint draw a bar of the time left (XX2P8V57)", () => {
+  const p = leaseLook(theme('paper'));
+  const a = leaseLook(theme('artboard'));
+  const b = leaseLook(theme('blueprint'));
+  assert.deepEqual([p.unlocked('14:20'), a.unlocked('14:20'), b.unlocked('14:20')], ['UNLOCKED 14:20', 'unlocked 14:20', 'UNLOCKED 14:20']);
+  assert.deepEqual([p.bar, a.bar, b.bar], [null, 'round', 'blocks']);
+  assert.equal(p.hint, '↵ lock now · esc close');
+  assert.equal(a.hint, '↵ lock now · esc close');
+});
