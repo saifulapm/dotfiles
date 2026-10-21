@@ -160,6 +160,11 @@ check "elfeed-kak waits for dots secrets" as_user "test ! -e ~/.local/bin/elfeed
 check "the AVD firmware is left to the Macs' hosts" podman exec "$name" bash -c "! ls /usr/lib/firmware/updates/apple/avd-fw-* >/dev/null 2>&1"
 check "the input group may open /dev/uinput" podman exec "$name" grep -q 'KERNEL=="uinput", GROUP="input"' /etc/udev/rules.d/60-uinput-input-group.rules
 check "ydotoold starts with the user manager" as_user "test -L ~/.config/systemd/user/default.target.wants/ydotoold.service"
+# The container runs no user manager, so systemctl reads the unit files offline.
+enabled=$(as_user "systemctl --user --root=/ is-enabled ydotoold" 2>&1)
+check "systemctl --user is-enabled ydotoold prints enabled (got '$enabled')" test "$enabled" = enabled
+tools=$(as_user "command -v grim slurp wlrctl ydotool tesseract wtype" 2>&1)
+check "the desktop skill's six tools are on PATH (got $(wc -l <<<"$tools"): $(tr '\n' ' ' <<<"$tools"))" test "$(grep -c '^/' <<<"$tools")" = 6
 check "zswap compresses with zstd from boot" podman exec "$name" bash -c "grep -qx zstd /etc/modules-load.d/zstd.conf && grep -q 'zswap/parameters/compressor - - - - zstd' /etc/tmpfiles.d/zswap.conf"
 check "gpg-agent caches a passphrase for 400 days" as_user "grep -qx 'default-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf && grep -qx 'max-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf"
 check "imapnotify@icloud starts with the session" as_user "test -L ~/.config/systemd/user/graphical-session.target.wants/imapnotify@icloud.service"
