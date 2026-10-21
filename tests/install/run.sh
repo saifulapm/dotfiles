@@ -163,6 +163,11 @@ check "ydotoold starts with the user manager" as_user "test -L ~/.config/systemd
 # The container runs no user manager, so systemctl reads the unit files offline.
 enabled=$(as_user "systemctl --user --root=/ is-enabled ydotoold" 2>&1)
 check "systemctl --user is-enabled ydotoold prints enabled (got '$enabled')" test "$enabled" = enabled
+check "dots-taildrop starts with the user manager" as_user "test -L ~/.config/systemd/user/default.target.wants/dots-taildrop.service"
+enabled=$(as_user "systemctl --user --root=/ is-enabled dots-taildrop" 2>&1)
+check "systemctl --user is-enabled dots-taildrop prints enabled (got '$enabled')" test "$enabled" = enabled
+# The unit runs the receiver from ~/.local/bin with the user manager's PATH, which reaches /usr/bin's node and not mise's.
+check "the Taildrop receiver is linked into ~/.local/bin and its node is /usr/bin's" as_user "test -x ~/.local/bin/dots-taildrop && test -x /usr/bin/node"
 tools=$(as_user "command -v grim slurp wlrctl ydotool tesseract wtype" 2>&1)
 check "the desktop skill's six tools are on PATH (got $(wc -l <<<"$tools"): $(tr '\n' ' ' <<<"$tools"))" test "$(grep -c '^/' <<<"$tools")" = 6
 check "zswap compresses with zstd from boot" podman exec "$name" bash -c "grep -qx zstd /etc/modules-load.d/zstd.conf && grep -q 'zswap/parameters/compressor - - - - zstd' /etc/tmpfiles.d/zswap.conf"
