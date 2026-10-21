@@ -28,12 +28,16 @@ check "the lease holds for claude, ending 60 s from now" state_is ".locked == fa
 check "the marker keeps the lease, so a killed shell relocks" grep -q '^lease claude until ' "$marker"
 until_ok 2000 state_is '.monitorsOff == 1'
 check "an agent unlock asks niri to turn the monitors off ($(lock_state | jq .monitorsOff) times)" state_is '.monitorsOff == 1'
+phone=$DOTS_DEV_DIR/phone.jsonl
+until_ok 2000 test -s "$phone"
+check "the lease's start tells the phone once, naming claude ($(cat "$phone" 2>/dev/null))" bash -c "[ \$(wc -l <'$phone') = 1 ] && jq -e '.title | test(\"claude\")' '$phone' >/dev/null"
 check "the journal holds the unlock" bash -c "journalctl --user -u $DOTS_DEV_UNIT --no-pager -o cat | grep -qF 'lock: agent unlock by claude for 1 min'"
 
 call lock renew claude 200 >/dev/null
 check "renew claude 200 ends the lease 120 min after the unlock ($(lock_state | jq -c '{unlockedAt, leaseUntil}'))" state_is '.leaseUntil == .unlockedAt + 7200000'
 call lock renew claude 1 >/dev/null
 check "renew claude 1 brings it back to a minute from now" state_is ".leaseUntil - $(now_ms) <= 60000 and .leaseUntil - $(now_ms) >= 58000"
+check "a renew tells the phone nothing" test "$(wc -l <"$phone")" = 1
 
 # The lease's end relocks; a Tick checks once a second.
 ends=$(lock_state | jq .leaseUntil)

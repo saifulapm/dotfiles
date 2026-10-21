@@ -38,6 +38,8 @@ Scope {
     readonly property var look: L.lockLook(theme.tokens, Quickshell.env("USER") || "")
     // The clock a lock surface drew last, so state() reports what is on screen rather than the lookup.
     property Item clockItem: null
+    // just dev points this at a fake, so no check messages the phone.
+    readonly property string notifyPhone: Quickshell.env("DOTS_NOTIFY_PHONE") || Quickshell.shellDir + "/../bin/dots-notify-phone"
     readonly property string marker: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/locked"
 
     // The marker goes down before the lock does, so a shell killed at any point after this relocks on restart.
@@ -101,6 +103,7 @@ Scope {
         console.info(Lease.unlockLine(name, m));
         session.locked = false;
         darken.restart();
+        Quickshell.execDetached([notifyPhone, "Agent unlock by " + name, "holds the session for " + m + " min, until " + Qt.formatTime(new Date(leaseUntil), "HH:mm")]);
         markerFile.setText("lease " + name + " until " + new Date(leaseUntil).toISOString() + "\n");
         return stateText();
     }
