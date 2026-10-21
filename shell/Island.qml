@@ -897,11 +897,11 @@ PanelWindow {
 
                                 Rectangle {
                                     required property var modelData
-                                    readonly property bool chip: leaseColumn.layout === "card"
-                                    width: keyText.implicitWidth + (chip ? 14 : 0)
-                                    height: keyText.implicitHeight + (chip ? 6 : 0)
+                                    readonly property bool tiled: leaseColumn.layout === "card"
+                                    width: keyText.implicitWidth + (tiled ? 14 : 0)
+                                    height: keyText.implicitHeight + (tiled ? 6 : 0)
                                     radius: 6
-                                    color: chip ? leaseColumn.look.tile : "transparent"
+                                    color: tiled ? leaseColumn.look.tile : "transparent"
 
                                     // The key bold in ink, or Blueprint's accent, then what it does.
                                     Row {
@@ -914,8 +914,8 @@ PanelWindow {
                                             text: parent.parent.modelData[0]
                                             color: leaseColumn.layout === "sheet" ? leaseColumn.accent : leaseColumn.ink
                                             font.family: leaseColumn.font
-                                            font.pixelSize: parent.parent.chip ? 11 : 10
-                                            font.weight: parent.parent.chip ? Font.Medium : Font.Bold
+                                            font.pixelSize: parent.parent.tiled ? 11 : 10
+                                            font.weight: parent.parent.tiled ? Font.Medium : Font.Bold
                                         }
 
                                         Text {
@@ -923,8 +923,8 @@ PanelWindow {
                                             text: parent.parent.modelData[1]
                                             color: leaseColumn.look.headColor || leaseColumn.muted
                                             font.family: leaseColumn.font
-                                            font.pixelSize: parent.parent.chip ? 11 : 10
-                                            font.letterSpacing: parent.parent.chip ? 0 : 1.2
+                                            font.pixelSize: parent.parent.tiled ? 11 : 10
+                                            font.letterSpacing: parent.parent.tiled ? 0 : 1.2
                                         }
                                     }
                                 }

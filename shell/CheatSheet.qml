@@ -59,7 +59,7 @@ Item {
         // The keys as drawn, read from the row and legend items.
         const rowKeys = [];
         for (let i = 0; i < groupRepeater.count; i++) {
-            const g = groupRepeater.itemAt(i).rowRepeater;
+            const g = groupRepeater.itemAt(i).groupRows;
             for (let j = 0; j < g.count; j++)
                 rowKeys.push(g.itemAt(j).keyLabel);
         }
@@ -268,7 +268,7 @@ Item {
                             Column {
                                 id: group
                                 required property var modelData
-                                readonly property alias rowRepeater: rowRepeater
+                                readonly property alias groupRows: rowRepeater
                                 width: (groups.width - 3 * groups.spacing) / 4
                                 spacing: 6
 
