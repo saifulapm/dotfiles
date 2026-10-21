@@ -19,8 +19,8 @@ unlock() {
   until_ok 3000 lock_is ".locked == false and .monitorsOff > $n"
   niri msg action power-on-monitors
 }
-# The island's box: centred on the output, 10 px from the top and 34 px tall.
-box() { niri msg -j outputs | jq -r --argjson w "$(island | jq .drawn)" 'first(.[]).logical | "\(((.width - $w) / 2 + .x) | floor),\(.y + 10) \($w | floor)x34"'; }
+# The island's box: centred on the output, 10 px from the top.
+box() { niri msg -j outputs | jq -r --argjson w "$(island | jq .drawn)" --argjson h "$(island | jq .height)" 'first(.[]).logical | "\(((.width - $w) / 2 + .x) | floor),\(.y + 10) \($w | floor)x\($h | floor)"'; }
 # What tesseract reads in the box, light text made dark on light, at the output's own pixels.
 ocr() {
   grim -t ppm -g "$(box)" - | node -e '
@@ -56,14 +56,16 @@ for theme in paper artboard blueprint; do
   settled '.mode == "lease"'
   echo "     $theme: $(island | jq -c '{text, warning, lease}')"
   case $theme in
-    artboard) who=claude word=Agent ;;
-    *) who=CLAUDE word=AGENT ;;
+    paper) who=CLAUDE word=AGENT width=300 pad=14 ;;
+    artboard) who=claude word=Agent width=264 pad=16 ;;
+    blueprint) who=CLAUDE word=AGENT width=320 pad=16 ;;
   esac
   check "$theme: island state reads the lease with $who, out of its warning" state_is ".mode == \"lease\" and (.text | contains(\"$who\")) and .warning == false"
+  check "$theme: the slot is the board's $width px, with the time at its right edge" state_is ".drawn == $width and .lease.timeRight == $width - $pad"
   read_back=$(ocr)
   check "$theme: the box draws the slot where the clock was (tesseract read '$read_back')" grep -qiF "$word" <<<"$read_back"
 done
-check "blueprint: the time counts down as T−mm:ss in cyan" state_is '(.lease.time | test("^T−0[01]:[0-5][0-9]$")) and .lease.timeColor == "#7fe3f0"'
+check "blueprint: the time counts down as T−m:ss in cyan" state_is '(.lease.time | test("^T−[01]:[0-5][0-9]$")) and .lease.timeColor == "#7fe3f0"'
 in_theme paper
 settled '.mode == "lease"'
 check "paper: the time draws in Instrument Serif" state_is '.lease.timeFont == "Instrument Serif"'
@@ -71,20 +73,20 @@ check "paper: the time draws in Instrument Serif" state_is '.lease.timeFont == "
 # 45 s left is inside the last minute.
 timeout 0.5 qs ipc call lock renew claude 0.75 >/dev/null
 settled '.warning == true'
-check "with 42 s left, island state reports warning" state_is '.warning == true and .lease.time <= "00:45"'
-sheet=$(near 241 233 216)
-check "paper: the island flips to the sheet colour ($sheet px of #F1E9D8)" test "$sheet" -gt 1500
-check "paper: the time turns vermilion" state_is '.lease.timeColor == "#c8381e" and .lease.sheet != null'
+check "with 42 s left, island state reports warning, the time as 0:ss" state_is '.warning == true and (.lease.time | test("^0:4[0-5]$"))'
+sheet=$(near 250 246 236)
+check "paper: the island flips to the surface sheet ($sheet px of #FAF6EC)" test "$sheet" -gt 1500
+check "paper: with a vermilion rule and time" state_is '.lease.timeColor == "#c8381e" and (.lease.fill | ascii_downcase) == "#faf6ec" and (.lease.frame | ascii_downcase) == "#c8381e"'
 in_theme artboard
 settled '.mode == "lease"'
-chip=$(near 255 235 233)
-check "artboard: the time sits in a light danger chip ($chip px of #FFEBE9)" test "$chip" -gt 150
-check "artboard: in its danger colour" state_is '.lease.timeColor == "#cf222e" and .lease.chip != null'
+chip=$(near 255 241 232)
+check "artboard: the time sits in the board's chip, and the dot in its ring ($chip px of #FFF1E8)" test "$chip" -gt 300
+check "artboard: in #B4380B" state_is '.lease.timeColor == "#b4380b" and .lease.chip == "#fff1e8"'
 in_theme blueprint
 settled '.mode == "lease"'
 amber=$(near 255 181 71)
 check "blueprint: the time turns amber ($amber px of #FFB547)" test "$amber" -gt 40
-check "blueprint: in its danger colour" state_is '.lease.timeColor == "#ffb547"'
+check "blueprint: the time and the frame turn amber" state_is '.lease.timeColor == "#ffb547" and (.lease.frame | ascii_downcase) == "#ffb547"'
 
 timeout 0.5 qs ipc call lock renew claude 15 >/dev/null
 settled '.warning == false'
@@ -95,8 +97,24 @@ mod_i() { niri msg action spawn -- dots-call island focus; }
 mod_i
 settled '.mode == "leaseCard" and .focused'
 echo "     card: $(island | jq -c .lease)"
-check "Mod+I opens the lease card: who, when it unlocked, the time left and its keys" state_is '.lease.card and .lease.who == "[ AGENT ] CLAUDE" and (.lease.unlocked | test("^UNLOCKED [0-2][0-9]:[0-5][0-9]$")) and (.lease.time | startswith("T−1")) and .lease.bar == "blocks" and .lease.hint == "↵ lock now · esc close"'
+check "Mod+I opens Blueprint's card: the title, WHO, SINCE, LEFT, the blocks and the keys" state_is '.lease.card and .lease.layout == "sheet" and .drawn == 420 and .lease.title == "CLAUDE HAS THE SESSION" and .lease.who == "CLAUDE" and (.lease.unlocked | test("^UNLOCKED [0-2][0-9]:[0-5][0-9]$")) and (.lease.time | startswith("T−1")) and .lease.bar == "blocks" and .lease.keys == "[↵] LOCK NOW · [ESC] CLOSE"'
 wtype -k Escape
+settled '.mode == "lease"'
+for theme in paper artboard; do
+  in_theme "$theme"
+  settled '.mode == "lease"'
+  mod_i
+  settled '.mode == "leaseCard" and .focused'
+  echo "     $theme card: $(island | jq -c '{drawn, lease}')"
+  case $theme in
+    paper) want='.lease.layout == "print" and .drawn == 420 and .lease.who == "claude" and (.lease.unlocked | startswith("unlocked ")) and (.lease.time | test("^1[45]:[0-5][0-9]$")) and .lease.keys == "↵ LOCK NOW · ESC CLOSE"' ;;
+    artboard) want='.lease.layout == "card" and .drawn == 440 and .lease.who == "claude" and (.lease.unlocked | startswith("unlocked ")) and .lease.bar == "round" and .lease.keys == "↵ lock now · esc close"' ;;
+  esac
+  check "$theme: Mod+I opens the board's card" state_is "$want"
+  wtype -k Escape
+  settled '.mode == "lease"'
+done
+in_theme blueprint
 settled '.mode == "lease"'
 check "Esc closes the card back to the slot, still unlocked" bash -c "$(declare -f state_is island lock_is); state_is '.mode == \"lease\" and .focused == false' && lock_is '.locked == false'"
 mod_i
@@ -113,12 +131,17 @@ until_ok 3000 lock_is '.locked and .secure'
 check "a lock ends the slot" state_is '.mode != "lease" and .lease == null'
 timeout 0.5 qs ipc call lock unlock "$(printf 'cl\naude‮ x')" 5 >/dev/null
 settled '.mode == "lease"'
-check "a name with a newline and U+202E draws as one line ($(island | jq -c .lease.who))" state_is '.lease.who == "[ AGENT ] CL AUDE X" and .lease.lines == 1'
+check "a name with a newline and U+202E draws as one line ($(island | jq -c .lease.who))" state_is '.lease.who == "CL AUDE X" and .lease.lines == 1'
 niri msg action spawn -- dots-call lock lock
 until_ok 3000 lock_is '.locked and .secure'
 unlock "$(printf 'x%.0s' {1..200})" 5
 settled '.mode == "lease"'
-check "a 200-character name elides on one line inside the island ($(island | jq -c '{width, drawn}'))" state_is '.lease.elided and .lease.lines == 1 and .drawn <= 560'
+check "a 200-character name elides before the time, inside the slot's 320 px ($(island | jq -c '{drawn, t: .lease.timeRight}'))" state_is '.lease.elided and .lease.lines == 1 and .drawn == 320 and .lease.timeRight == 304'
+mod_i
+settled '.mode == "leaseCard" and .focused'
+check "and on the card it elides on one line" state_is '.lease.elided and .drawn == 420'
+wtype -k Escape
+settled '.mode == "lease"'
 
 niri msg action spawn -- dots-call lock lock
 until_ok 3000 lock_is '.locked and .secure'

@@ -83,15 +83,15 @@ PanelWindow {
             release();
     }
     // The lease's text is read back from what is drawn, since each theme words it its own way.
-    readonly property string text: mode === "leaseCard" ? [cardWho.text, cardUnlocked.text, cardLeft.text, cardHint.text].join(" · ") : mode === "lease" ? [leaseMark.text, leaseWords.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(mode, slots, clock.now)
+    readonly property string text: mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLabel.text, leaseWho.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(mode, slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question, a 320 px calendar and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
-            lease: [I.boxWidth(Math.ceil(leaseRow.implicitWidth) + 28), 34],
-            leaseCard: [320, leaseColumn.implicitHeight + 32],
+            lease: [leaseLook.slot.width, leaseLook.slot.height],
+            leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
             question: [I.MAX_WIDTH, ask.implicitHeight + 32],
             calendar: [320, month.implicitHeight + 32],
@@ -171,20 +171,38 @@ PanelWindow {
         };
     }
 
-    // What the lease slot draws, for `island state`.
+    // The card's name, unlock time and time left as its layout draws them.
+    function leaseCardDrawn() {
+        const layout = leaseLook.card.layout;
+        const row = i => sheetRepeater.itemAt(i);
+        const who = layout === "print" ? cardWhoPrint : layout === "card" ? cardWhoCard : null;
+        const time = layout === "print" ? printTime : layout === "card" ? cardTime : null;
+        return {
+            who: who ? who.text : row(0)?.value ?? "",
+            elided: who ? who.truncated : row(0)?.elided ?? false,
+            unlocked: layout === "print" ? cardUnlockedPrint.text : layout === "card" ? cardUnlockedCard.text : row(1)?.value ?? "",
+            time: time ? time.text : row(2)?.value ?? "",
+            timeColor: String(time ? time.color : row(2)?.valueColor ?? "")
+        };
+    }
+
+    // What the lease slot and card draw, for `island state`.
     function leaseState() {
         if (mode === "leaseCard")
-            return { card: true, who: cardWho.text, unlocked: cardUnlocked.text, time: cardLeft.text, bar: island.leaseLook.bar, hint: cardHint.text, elided: cardWho.truncated, lines: cardWho.lineCount };
+            return Object.assign({ card: true, layout: leaseLook.card.layout, title: cardTitle.text, bar: leaseLook.card.bar, keys: leaseLook.card.keys.map(k => k.join(" ")).join(" · ") }, leaseCardDrawn());
         if (mode !== "lease")
             return null;
         return {
-            who: leaseWords.text,
+            label: leaseLabel.text,
+            who: leaseWho.text,
             time: leaseTime.text,
-            elided: leaseWords.truncated,
-            lines: leaseWords.lineCount,
+            elided: leaseWho.truncated,
+            lines: leaseWho.lineCount,
             timeColor: String(leaseTime.color),
             timeFont: leaseTime.font.family,
-            sheet: leaseSheet.visible ? String(leaseSheet.color) : null,
+            timeRight: Math.round(leaseTimeBox.mapToItem(leasePart, leaseTimeBox.width, 0).x),
+            fill: String(box.style.fill),
+            frame: String(box.style.frame.color),
             chip: leaseChip.visible ? String(leaseChip.color) : null
         };
     }
@@ -346,16 +364,8 @@ PanelWindow {
         height: island.progress >= 1 || !island.curve ? island.toHeight : island.fromHeight + (island.toHeight - island.fromHeight) * I.ease(island.curve.points, island.progress)
         tokens: island.theme.tokens
         role: "island"
-
-        // Paper's last minute flips the island to the sheet with a vermilion rule round it.
-        Rectangle {
-            id: leaseSheet
-            anchors.fill: parent
-            visible: island.mode === "lease" && island.leaseWarning && island.leaseLook.warning.fill !== ""
-            color: island.leaseLook.warning.fill || "transparent"
-            border.width: 2
-            border.color: island.leaseLook.warning.frame || "transparent"
-        }
+        // The lease card's own frame, and the slot's last minute: Paper's sheet and vermilion rule, Blueprint's amber frame and glow.
+        restyle: island.mode === "leaseCard" ? island.leaseLook.card.box : island.mode === "lease" && island.leaseWarning ? island.leaseLook.warning.box : null
 
         // Each part is drawn at its own size and clipped to the box as it morphs.
         Item {
@@ -394,67 +404,90 @@ PanelWindow {
                 width: island.sizes.lease[0]
                 height: island.sizes.lease[1]
 
+                // The mark, the label and the holder from the left, the time at the right edge, as the boards draw the slot.
                 Row {
                     id: leaseRow
-                    anchors.centerIn: parent
-                    spacing: 8
-                    readonly property color ink: island.leaseWarning && island.leaseLook.warning.text ? island.leaseLook.warning.text : island.leaseLook.text || box.style.text
+                    readonly property var slot: island.leaseLook.slot
+                    readonly property var warn: island.leaseWarning ? island.leaseLook.warning : null
+                    x: slot.pad
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: slot.gap
+
+                    // Artboard's last minute rings its dot in the chip's colour.
+                    Rectangle {
+                        visible: leaseRow.slot.mark !== null
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: leaseRow.warn?.ring ? 16 : leaseRow.slot.mark?.size ?? 0
+                        height: width
+                        radius: leaseRow.slot.mark?.shape === "dot" ? width / 2 : 0
+                        color: leaseRow.warn?.ring || "transparent"
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: leaseRow.slot.mark?.size ?? 0
+                            height: width
+                            radius: leaseRow.slot.mark?.shape === "dot" ? width / 2 : 0
+                            color: leaseRow.warn?.mark || leaseRow.slot.mark?.color || "transparent"
+                        }
+                    }
 
                     Text {
-                        id: leaseMark
+                        id: leaseLabel
                         visible: text !== ""
                         anchors.verticalCenter: parent.verticalCenter
                         textFormat: Text.PlainText
-                        text: island.leaseLook.mark
-                        color: island.leaseLook.markColor || leaseRow.ink
-                        font.family: island.leaseLook.font
-                        font.pixelSize: 11
+                        text: leaseRow.slot.label.text
+                        color: leaseRow.warn?.label || leaseRow.slot.label.color || box.style.text
+                        font.family: leaseRow.slot.label.font
+                        font.pixelSize: leaseRow.slot.label.size
+                        font.letterSpacing: leaseRow.slot.label.spacing
                     }
 
-                    // A holder's name is anyone's text: one line, elided to what the island has room for.
+                    // A holder's name is anyone's text: one line, elided before the time.
                     Text {
-                        id: leaseWords
+                        id: leaseWho
                         anchors.verticalCenter: parent.verticalCenter
                         textFormat: Text.PlainText
-                        width: Math.min(implicitWidth, I.MAX_WIDTH - 28 - leaseMark.width - leaseTimeBox.width - 2 * leaseRow.spacing)
+                        width: Math.min(implicitWidth, leasePart.width - 2 * leaseRow.slot.pad - leaseRow.spacing * (leaseLabel.visible ? 3 : 2) - (leaseRow.slot.mark ? 16 : 0) - (leaseLabel.visible ? leaseLabel.width : 0) - leaseTimeBox.width)
                         elide: Text.ElideRight
                         maximumLineCount: 1
-                        text: island.leaseLook.words(island.lease?.who ?? "")
-                        color: leaseRow.ink
-                        font.family: island.leaseLook.font
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                        font.letterSpacing: island.leaseLook.voice === "plain" ? 0 : 1
+                        text: leaseRow.slot.who.text(island.lease?.who ?? "")
+                        color: leaseRow.slot.who.color || box.style.text
+                        font.family: leaseRow.slot.who.font
+                        font.pixelSize: leaseRow.slot.who.size
+                        font.weight: leaseRow.slot.who.weight
+                        font.letterSpacing: leaseRow.slot.who.spacing
+                    }
+                }
+
+                Item {
+                    id: leaseTimeBox
+                    anchors.right: parent.right
+                    anchors.rightMargin: leaseRow.slot.pad
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: leaseTime.implicitWidth + (leaseChip.visible ? 16 : 0)
+                    height: leaseTime.implicitHeight + (leaseChip.visible ? 4 : 0)
+
+                    // Artboard's last minute puts the time in a chip.
+                    Rectangle {
+                        id: leaseChip
+                        visible: (leaseRow.warn?.chip ?? "") !== ""
+                        anchors.fill: parent
+                        radius: 8
+                        color: leaseRow.warn?.chip || "transparent"
                     }
 
-                    Item {
-                        id: leaseTimeBox
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: leaseTime.implicitWidth + (leaseChip.visible ? 12 : 0)
-                        height: leaseTime.implicitHeight
-
-                        // Artboard's last minute puts the time in a light danger chip.
-                        Rectangle {
-                            id: leaseChip
-                            visible: island.leaseWarning && island.leaseLook.warning.chip !== ""
-                            anchors.fill: parent
-                            anchors.topMargin: 3
-                            anchors.bottomMargin: 3
-                            radius: 6
-                            color: island.leaseLook.warning.chip || "transparent"
-                        }
-
-                        Text {
-                            id: leaseTime
-                            anchors.centerIn: parent
-                            textFormat: Text.PlainText
-                            text: island.leaseLook.time(island.lease?.left ?? 0)
-                            color: island.leaseWarning ? island.leaseLook.warning.time : island.leaseLook.timeColor || leaseRow.ink
-                            font.family: island.leaseLook.timeFont
-                            font.pixelSize: island.leaseLook.timeFont === island.leaseLook.font ? 13 : 18
-                            font.weight: Font.Medium
-                            font.features: { "tnum": 1 }
-                        }
+                    Text {
+                        id: leaseTime
+                        anchors.centerIn: parent
+                        textFormat: Text.PlainText
+                        text: island.leaseLook.time(island.lease?.left ?? 0)
+                        color: leaseRow.warn?.time || leaseRow.slot.time.color || box.style.text
+                        font.family: leaseRow.slot.time.font
+                        font.pixelSize: leaseRow.slot.time.size
+                        font.weight: leaseRow.slot.time.weight
+                        font.letterSpacing: leaseRow.slot.time.spacing
+                        font.features: { "tnum": 1 }
                     }
                 }
             }
@@ -468,101 +501,420 @@ PanelWindow {
                 width: island.sizes.leaseCard[0]
                 height: island.sizes.leaseCard[1]
 
+                // One card in three layouts, each as its board draws it: Paper's print, Artboard's card, Blueprint's sheet.
                 Column {
                     id: leaseColumn
-                    x: 18
-                    y: 16
-                    width: parent.width - 36
-                    spacing: 10
+                    // Not named card: the notification's id: card would win the lookup.
+                    readonly property var look: island.leaseLook.card
+                    readonly property string layout: look.layout
+                    readonly property color ink: box.style.text
+                    readonly property color muted: island.theme.tokens?.color.muted ?? ink
+                    readonly property color accent: island.theme.tokens?.color.accent ?? ink
+                    readonly property color timeColor: island.leaseWarning ? island.leaseLook.warning.time : layout === "sheet" ? accent : ink
+                    readonly property string font: island.theme.tokens?.type.ui ?? ""
+                    readonly property string display: island.theme.tokens?.type.display ?? ""
+                    readonly property real share: island.lease && island.lock.leaseUntil > island.lock.unlockedAt ? Math.min(1, island.lease.left / (island.lock.leaseUntil - island.lock.unlockedAt)) : 0
+                    width: parent.width
 
-                    Text {
-                        id: cardWho
-                        width: parent.width
-                        textFormat: Text.PlainText
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        text: island.leaseLook.words(island.lease?.who ?? "")
-                        color: island.leaseLook.text || box.style.text
-                        font.family: island.leaseLook.font
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                        font.letterSpacing: island.leaseLook.voice === "plain" ? 0 : 1
-                    }
-
+                    // The head: Paper's square, AGENT and LEASE; Blueprint's [ AGENT ], LEASE and its title.
                     Item {
+                        visible: leaseColumn.layout !== "card"
                         width: parent.width
-                        height: cardLeft.implicitHeight
+                        height: visible ? headColumn.implicitHeight + (leaseColumn.layout === "print" ? 23 : 24) : 0
 
-                        Text {
-                            id: cardUnlocked
-                            anchors.verticalCenter: parent.verticalCenter
-                            textFormat: Text.PlainText
-                            text: island.leaseLook.unlocked(Qt.formatTime(new Date(island.lock.unlockedAt), "HH:mm"))
-                            color: Qt.alpha(box.style.text, 0.65)
-                            font.family: island.leaseLook.font
-                            font.pixelSize: 12
-                        }
+                        Column {
+                            id: headColumn
+                            x: leaseColumn.layout === "print" ? 15 : 18
+                            y: leaseColumn.layout === "print" ? 11 : 12
+                            width: parent.width - 2 * x
+                            spacing: 4
 
-                        Text {
-                            id: cardLeft
-                            anchors.right: parent.right
-                            textFormat: Text.PlainText
-                            text: island.leaseLook.time(island.lease?.left ?? 0)
-                            color: island.leaseWarning ? island.leaseLook.warning.time : island.leaseLook.timeColor || box.style.text
-                            font.family: island.leaseLook.timeFont
-                            font.pixelSize: island.leaseLook.timeFont === island.leaseLook.font ? 20 : 30
-                            font.weight: Font.Medium
-                            font.features: { "tnum": 1 }
-                        }
-                    }
+                            Item {
+                                width: parent.width
+                                height: headLeft.implicitHeight
 
-                    // Artboard's rounded bar and Blueprint's blocks: the share of the lease's longest run still left.
-                    Item {
-                        id: cardBar
-                        visible: island.leaseLook.bar !== null
-                        width: parent.width
-                        height: visible ? 6 : 0
-                        readonly property real share: island.lease && island.lock.leaseUntil > island.lock.unlockedAt ? Math.min(1, island.lease.left / (island.lock.leaseUntil - island.lock.unlockedAt)) : 0
-                        readonly property color fill: island.leaseWarning ? island.leaseLook.warning.time : island.leaseLook.markColor || island.leaseLook.timeColor || box.style.text
+                                Row {
+                                    id: headLeft
+                                    spacing: 8
 
-                        Rectangle {
-                            visible: island.leaseLook.bar === "round"
-                            anchors.fill: parent
-                            radius: 3
-                            color: Qt.alpha(box.style.text, 0.15)
+                                    Rectangle {
+                                        visible: leaseColumn.layout === "print"
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 8
+                                        height: 8
+                                        color: leaseColumn.accent
+                                    }
 
-                            Rectangle {
-                                width: parent.width * cardBar.share
-                                height: parent.height
-                                radius: 3
-                                color: cardBar.fill
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        text: leaseColumn.layout === "print" ? "AGENT" : "[ AGENT ]"
+                                        color: leaseColumn.look.headColor || leaseColumn.muted
+                                        font.family: leaseColumn.font
+                                        font.pixelSize: 10
+                                        font.letterSpacing: leaseColumn.layout === "print" ? 1.4 : 1.6
+                                    }
+                                }
+
+                                Text {
+                                    anchors.right: parent.right
+                                    textFormat: Text.PlainText
+                                    text: "LEASE"
+                                    color: leaseColumn.look.headColor || leaseColumn.muted
+                                    font.family: leaseColumn.font
+                                    font.pixelSize: 10
+                                    font.letterSpacing: leaseColumn.layout === "print" ? 1.4 : 1.6
+                                }
                             }
-                        }
 
-                        Row {
-                            visible: island.leaseLook.bar === "blocks"
-                            spacing: 2
+                            Text {
+                                id: cardTitle
+                                visible: leaseColumn.layout === "sheet"
+                                width: parent.width
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                text: leaseColumn.layout === "sheet" ? leaseColumn.look.title(island.lease?.who ?? "") : ""
+                                color: leaseColumn.accent
+                                font.family: leaseColumn.font
+                                font.pixelSize: 15
+                                font.weight: Font.Bold
+                                font.letterSpacing: 0.6
+                            }
 
-                            Repeater {
-                                model: 20
+                            // Paper: the name in serif with when it unlocked, and LEFT with the time large at the right.
+                            Item {
+                                visible: leaseColumn.layout === "print"
+                                width: parent.width
+                                height: visible ? Math.max(printLeft.implicitHeight, printRight.implicitHeight) + 4 : 0
 
-                                Rectangle {
-                                    required property int index
-                                    width: (cardBar.width - 19 * 2) / 20
-                                    height: cardBar.height
-                                    color: index < Math.ceil(cardBar.share * 20) ? cardBar.fill : Qt.alpha(box.style.text, 0.15)
+                                Column {
+                                    id: printLeft
+                                    anchors.bottom: parent.bottom
+                                    width: parent.width - printRight.width - 16
+                                    spacing: 4
+
+                                    Text {
+                                        id: cardWhoPrint
+                                        width: parent.width
+                                        textFormat: Text.PlainText
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                        text: leaseColumn.look.who(island.lease?.who ?? "")
+                                        color: leaseColumn.ink
+                                        font.family: leaseColumn.display
+                                        font.pixelSize: 24
+                                    }
+
+                                    Text {
+                                        id: cardUnlockedPrint
+                                        textFormat: Text.PlainText
+                                        text: leaseColumn.look.unlocked(Qt.formatTime(new Date(island.lock.unlockedAt), "HH:mm"))
+                                        color: leaseColumn.look.unlockedColor || leaseColumn.muted
+                                        font.family: leaseColumn.font
+                                        font.pixelSize: 12
+                                    }
+                                }
+
+                                Row {
+                                    id: printRight
+                                    anchors.right: parent.right
+                                    anchors.bottom: parent.bottom
+                                    spacing: 8
+
+                                    Text {
+                                        anchors.baseline: printTime.baseline
+                                        textFormat: Text.PlainText
+                                        text: leaseColumn.look.left ?? ""
+                                        color: leaseColumn.look.headColor || leaseColumn.muted
+                                        font.family: leaseColumn.font
+                                        font.pixelSize: 10
+                                        font.letterSpacing: 1.4
+                                    }
+
+                                    Text {
+                                        id: printTime
+                                        textFormat: Text.PlainText
+                                        text: island.leaseLook.time(island.lease?.left ?? 0)
+                                        color: leaseColumn.timeColor
+                                        font.family: leaseColumn.display
+                                        font.pixelSize: 44
+                                        font.features: { "tnum": 1 }
+                                    }
                                 }
                             }
                         }
                     }
 
-                    Text {
-                        id: cardHint
-                        textFormat: Text.PlainText
-                        text: island.leaseLook.hint
-                        color: Qt.alpha(box.style.text, 0.65)
-                        font.family: island.leaseLook.font
-                        font.pixelSize: 11
+                    // Artboard: a lock tile, the head, name and unlock time, the time at the right, and the bar.
+                    Item {
+                        visible: leaseColumn.layout === "card"
+                        width: parent.width
+                        height: visible ? cardRow.implicitHeight + 14 + 6 + 30 : 0
+
+                        Item {
+                            id: cardRow
+                            x: 18
+                            y: 16
+                            width: parent.width - 36
+                            implicitHeight: Math.max(40, cardMiddle.implicitHeight, cardRight.implicitHeight)
+
+                            Rectangle {
+                                id: cardTile
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 40
+                                height: 40
+                                radius: 12
+                                color: leaseColumn.look.tile ?? "transparent"
+
+                                Shape {
+                                    anchors.centerIn: parent
+                                    width: 18
+                                    height: 18
+
+                                    ShapePath {
+                                        strokeColor: leaseColumn.ink
+                                        strokeWidth: 1.6
+                                        fillColor: "transparent"
+                                        capStyle: ShapePath.RoundCap
+                                        PathSvg {
+                                            path: "M 5.5 8 H 12.5 A 2 2 0 0 1 14.5 10 V 13.5 A 2 2 0 0 1 12.5 15.5 H 5.5 A 2 2 0 0 1 3.5 13.5 V 10 A 2 2 0 0 1 5.5 8 Z M 6 8 V 5.5 A 3 3 0 0 1 11.8 4.5"
+                                        }
+                                    }
+                                }
+                            }
+
+                            Column {
+                                id: cardMiddle
+                                x: 54
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - x - cardRight.width - 14
+                                spacing: 3
+
+                                Text {
+                                    textFormat: Text.PlainText
+                                    text: leaseColumn.look.head ?? ""
+                                    color: leaseColumn.look.headColor || leaseColumn.muted
+                                    font.family: leaseColumn.font
+                                    font.pixelSize: 12
+                                }
+
+                                Text {
+                                    id: cardWhoCard
+                                    width: parent.width
+                                    textFormat: Text.PlainText
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                    text: leaseColumn.look.who(island.lease?.who ?? "")
+                                    color: leaseColumn.ink
+                                    font.family: leaseColumn.font
+                                    font.pixelSize: 15
+                                    font.weight: Font.Medium
+                                }
+
+                                Text {
+                                    id: cardUnlockedCard
+                                    textFormat: Text.PlainText
+                                    text: leaseColumn.look.unlocked(Qt.formatTime(new Date(island.lock.unlockedAt), "HH:mm"))
+                                    color: leaseColumn.look.unlockedColor || leaseColumn.muted
+                                    font.family: leaseColumn.font
+                                    font.pixelSize: 13
+                                }
+                            }
+
+                            Column {
+                                id: cardRight
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                Text {
+                                    id: cardTime
+                                    anchors.right: parent.right
+                                    textFormat: Text.PlainText
+                                    text: island.leaseLook.time(island.lease?.left ?? 0)
+                                    color: leaseColumn.timeColor
+                                    font.family: leaseColumn.font
+                                    font.pixelSize: 26
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: -0.5
+                                    font.features: { "tnum": 1 }
+                                }
+
+                                Text {
+                                    anchors.right: parent.right
+                                    textFormat: Text.PlainText
+                                    text: leaseColumn.look.left ?? ""
+                                    color: leaseColumn.look.headColor || leaseColumn.muted
+                                    font.family: leaseColumn.font
+                                    font.pixelSize: 12
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            x: 18
+                            y: cardRow.y + cardRow.height + 14
+                            width: parent.width - 36
+                            height: 6
+                            radius: 3
+                            color: leaseColumn.look.tile ?? "transparent"
+
+                            Rectangle {
+                                width: parent.width * leaseColumn.share
+                                height: parent.height
+                                radius: 3
+                                color: island.leaseWarning ? island.leaseLook.warning.time : leaseColumn.look.barFill ?? leaseColumn.accent
+                            }
+                        }
+                    }
+
+                    // Blueprint: WHO, SINCE and LEFT rows and a bar of blocks, between dashed rules.
+                    Item {
+                        visible: leaseColumn.layout === "sheet"
+                        width: parent.width
+                        height: visible ? sheetRows.implicitHeight + 24 : 0
+
+                        Root.Dashed {
+                            width: parent.width
+                            height: 1
+                            color: island.theme.tokens?.color.line ?? leaseColumn.muted
+                        }
+
+                        Column {
+                            id: sheetRows
+                            x: 18
+                            y: 12
+                            width: parent.width - 36
+                            spacing: 8
+
+                            Repeater {
+                                id: sheetRepeater
+                                model: leaseColumn.layout === "sheet" ? [["WHO", "who"], ["SINCE", "since"], ["LEFT", "left"]] : []
+
+                                Item {
+                                    required property var modelData
+                                    readonly property string value: rowValue.text
+                                    readonly property bool elided: rowValue.truncated
+                                    readonly property color valueColor: rowValue.color
+                                    width: sheetRows.width
+                                    height: rowValue.implicitHeight
+
+                                    Text {
+                                        anchors.baseline: rowValue.baseline
+                                        textFormat: Text.PlainText
+                                        text: parent.modelData[0]
+                                        color: leaseColumn.muted
+                                        font.family: leaseColumn.font
+                                        font.pixelSize: 10
+                                        font.letterSpacing: 1.6
+                                    }
+
+                                    Text {
+                                        id: rowValue
+                                        anchors.right: parent.right
+                                        width: Math.min(implicitWidth, parent.width - 60)
+                                        horizontalAlignment: Text.AlignRight
+                                        textFormat: Text.PlainText
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                        readonly property string kind: parent.modelData[1]
+                                        text: kind === "who" ? leaseColumn.look.who(island.lease?.who ?? "") : kind === "since" ? leaseColumn.look.unlocked(Qt.formatTime(new Date(island.lock.unlockedAt), "HH:mm")) : island.leaseLook.time(island.lease?.left ?? 0)
+                                        color: kind === "left" ? leaseColumn.timeColor : leaseColumn.ink
+                                        font.family: leaseColumn.font
+                                        font.pixelSize: 12
+                                        font.weight: kind === "left" ? Font.Bold : Font.Normal
+                                        font.features: { "tnum": 1 }
+                                    }
+                                }
+                            }
+
+                            Row {
+                                readonly property int lit: Math.ceil(leaseColumn.share * 20)
+
+                                Text {
+                                    textFormat: Text.PlainText
+                                    text: "▮".repeat(parent.lit)
+                                    color: island.leaseWarning ? island.leaseLook.warning.time : leaseColumn.accent
+                                    font.family: leaseColumn.font
+                                    font.pixelSize: 12
+                                    font.letterSpacing: 0.6
+                                }
+
+                                Text {
+                                    textFormat: Text.PlainText
+                                    text: "▮".repeat(20 - parent.lit)
+                                    color: island.theme.tokens?.color.line ?? leaseColumn.muted
+                                    font.family: leaseColumn.font
+                                    font.pixelSize: 12
+                                    font.letterSpacing: 0.6
+                                }
+                            }
+                        }
+                    }
+
+                    // The keys, under a rule: Paper's paper-coloured line, Artboard's chips, Blueprint's dashes.
+                    Item {
+                        width: parent.width
+                        height: keysRow.implicitHeight + (leaseColumn.layout === "print" ? 18 : 22)
+
+                        Rectangle {
+                            visible: leaseColumn.layout !== "sheet"
+                            width: parent.width
+                            height: 1
+                            color: leaseColumn.layout === "print" ? leaseColumn.ink : leaseColumn.look.tile ?? "transparent"
+                        }
+
+                        Root.Dashed {
+                            visible: leaseColumn.layout === "sheet"
+                            width: parent.width
+                            height: 1
+                            color: island.theme.tokens?.color.line ?? leaseColumn.muted
+                        }
+
+                        Row {
+                            id: keysRow
+                            x: leaseColumn.layout === "print" ? 15 : 18
+                            y: leaseColumn.layout === "print" ? 9 : 10
+                            spacing: leaseColumn.layout === "card" ? 8 : 14
+
+                            Repeater {
+                                model: leaseColumn.look.keys
+
+                                Rectangle {
+                                    required property var modelData
+                                    readonly property bool chip: leaseColumn.layout === "card"
+                                    width: keyText.implicitWidth + (chip ? 14 : 0)
+                                    height: keyText.implicitHeight + (chip ? 6 : 0)
+                                    radius: 6
+                                    color: chip ? leaseColumn.look.tile : "transparent"
+
+                                    // The key bold in ink, or Blueprint's accent, then what it does.
+                                    Row {
+                                        id: keyText
+                                        anchors.centerIn: parent
+                                        spacing: 5
+
+                                        Text {
+                                            textFormat: Text.PlainText
+                                            text: parent.parent.modelData[0]
+                                            color: leaseColumn.layout === "sheet" ? leaseColumn.accent : leaseColumn.ink
+                                            font.family: leaseColumn.font
+                                            font.pixelSize: parent.parent.chip ? 11 : 10
+                                            font.weight: parent.parent.chip ? Font.Medium : Font.Bold
+                                        }
+
+                                        Text {
+                                            textFormat: Text.PlainText
+                                            text: parent.parent.modelData[1]
+                                            color: leaseColumn.look.headColor || leaseColumn.muted
+                                            font.family: leaseColumn.font
+                                            font.pixelSize: parent.parent.chip ? 11 : 10
+                                            font.letterSpacing: parent.parent.chip ? 0 : 1.2
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

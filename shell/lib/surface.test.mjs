@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme } from './theme.mjs';
-import { surfaceStyle, marginStyle } from './surface.mjs';
+import { surfaceStyle, marginStyle, restyled } from './surface.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const paper = load('paper');
@@ -130,4 +130,11 @@ test('margins: caps and bracket voices are 11 px uppercase, over ink rules where
   assert.deepEqual(marginStyle(paper), { font: 'Maple Mono', size: 11, caps: true, tracking: 1.32, rules: true });
   assert.deepEqual(marginStyle(artboard), { font: 'Maple Mono', size: 12, caps: false, tracking: 0, rules: false });
   assert.deepEqual(marginStyle(blueprint), { font: 'Maple Mono', size: 11, caps: true, tracking: 1.32, rules: false });
+});
+
+test('a restyle swaps the fill, text, frame and shadow colour it names and keeps the rest (m21 lease warning)', () => {
+  const base = { fill: 'a', text: 'b', frame: { width: 0, color: 'c' }, corner: { radius: 17, chamfer: 0 }, shadow: { kind: 'glow', color: 'd', alpha: 0.35 } };
+  assert.equal(restyled(base, null), base);
+  const r = restyled(base, { fill: 'F', frame: { width: 1.5, color: 'R' }, glow: 'G' });
+  assert.deepEqual([r.fill, r.text, r.frame, r.corner, r.shadow.color, r.shadow.alpha], ['F', 'b', { width: 1.5, color: 'R' }, base.corner, 'G', 0.35]);
 });

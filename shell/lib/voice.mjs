@@ -99,7 +99,7 @@ export function launcherLook(tokens) {
 // The island's board tints on its dark box, which no token carries.
 const ISLAND = {
   caps: { head: '#B9AE99', body: '#D9CFBB' },
-  plain: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36', bar: '#6C83FF', dangerChip: '#FFEBE9' },
+  plain: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36', bar: '#6C83FF' },
 };
 
 // How the island draws a notification; every colour not named here is the island's own text colour.
@@ -153,65 +153,106 @@ export function islandLook(tokens) {
   });
 }
 
-const HINT = '↵ lock now · esc close';
+// The m21 boards' colours that no token carries: Artboard's last-minute chip.
+const LEASE = { artboardWarn: '#B4380B', artboardChip: '#FFF1E8' };
 
-// How the island draws an agent's lease in place of the clock, and its last minute (XX2P8V57); colours left empty are the island's own text colour.
+// How the island draws an agent's lease in place of the clock, its last minute and its Mod+I card, as the m21 boards do (XX2P8V57); a colour left empty is the island's own text colour.
 export function leaseLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
   const voice = t.voice;
-  const time = (ms) => {
+  const minutes = (ms) => {
     const s = Math.max(0, Math.ceil(ms / 1000));
-    return `${voice === 'bracket' ? 'T−' : ''}${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+    return `${Math.floor(s / 60)}:${pad2(s % 60)}`;
   };
+  const time = (ms) => (voice === 'bracket' ? 'T−' : '') + minutes(ms);
+  const text = (size, color, extra) => Object.assign({ font: t.ui, size, color, weight: 400, spacing: 0 }, extra);
   if (voice === 'plain') {
+    const head = tokens ? ISLAND.plain.head : c.muted;
     return {
       voice,
-      mark: '●',
-      markColor: tokens ? ISLAND.plain.bar : c.accent,
-      words: (who) => `Agent · ${line(who)}`,
       time,
-      unlocked: (hhmm) => `unlocked ${hhmm}`,
-      bar: 'round',
-      hint: HINT,
-      font: t.ui,
-      timeFont: t.ui,
-      text: '',
-      timeColor: '',
-      warning: { fill: '', frame: '', text: '', time: c.danger || c.accent, chip: tokens ? ISLAND.plain.dangerChip : '' },
+      slot: {
+        width: 264,
+        height: 40,
+        pad: 16,
+        gap: 10,
+        mark: { shape: 'dot', size: 8, color: tokens ? ISLAND.plain.bar : c.accent },
+        label: Object.assign(text(13, ''), { text: '' }),
+        who: Object.assign(text(13, tokens ? ISLAND.plain.body : c.ink, { weight: 500 }), { text: (who) => `Agent · ${line(who)}` }),
+        time: text(13, '', { weight: 500 }),
+      },
+      warning: { box: null, label: '', time: LEASE.artboardWarn, chip: LEASE.artboardChip, ring: LEASE.artboardChip, mark: LEASE.artboardWarn },
+      card: {
+        layout: 'card',
+        width: 440,
+        box: tokens ? { frame: { width: 1.5, color: c.accent } } : null,
+        head: 'Agent · lease',
+        headColor: head,
+        who: line,
+        unlocked: (hhmm) => `unlocked ${hhmm}`,
+        unlockedColor: tokens ? ISLAND.plain.body : c.muted,
+        left: 'left',
+        tile: tokens ? ISLAND.plain.tile : c.muted,
+        bar: 'round',
+        barFill: tokens ? ISLAND.plain.bar : c.accent,
+        keys: [['↵', 'lock now'], ['esc', 'close']],
+      },
     };
   }
   if (voice === 'bracket') {
     return {
       voice,
-      mark: '',
-      markColor: '',
-      words: (who) => `[ AGENT ] ${upper(line(who))}`,
       time,
-      unlocked: (hhmm) => `UNLOCKED ${hhmm}`,
-      bar: 'blocks',
-      hint: HINT,
-      font: t.mono,
-      timeFont: t.mono,
-      text: c.accent,
-      timeColor: c.accent,
-      warning: { fill: '', frame: '', text: '', time: c.danger || c.accent, chip: '' },
+      slot: {
+        width: 320,
+        height: 34,
+        pad: 16,
+        gap: 10,
+        mark: null,
+        label: Object.assign(text(12, c.muted, { font: t.mono, spacing: 1.68 }), { text: '[ AGENT ]' }),
+        who: Object.assign(text(12, c.ink, { font: t.mono, weight: 700, spacing: 0.6 }), { text: (who) => upper(line(who)) }),
+        time: text(12, c.accent, { font: t.mono, weight: 700, spacing: 0.6 }),
+      },
+      warning: { box: { frame: { width: 1, color: c.danger }, glow: c.danger }, label: '', time: c.danger, chip: '', ring: '', mark: '' },
+      card: {
+        layout: 'sheet',
+        width: 420,
+        box: null,
+        title: (who) => `${upper(line(who))} HAS THE SESSION`,
+        who: (who) => upper(line(who)),
+        unlocked: (hhmm) => `UNLOCKED ${hhmm}`,
+        bar: 'blocks',
+        keys: [['[↵]', 'LOCK NOW'], ['[ESC]', 'CLOSE']],
+      },
     };
   }
   return {
     voice,
-    mark: '■',
-    markColor: c.accent,
-    words: (who) => `AGENT ${upper(line(who))}`,
     time,
-    unlocked: (hhmm) => `UNLOCKED ${hhmm}`,
-    bar: null,
-    hint: HINT,
-    font: t.ui,
-    timeFont: t.display,
-    text: '',
-    timeColor: '',
-    warning: { fill: c.paper, frame: c.danger || c.accent, text: c.ink, time: c.danger || c.accent, chip: '' },
+    slot: {
+      width: 300,
+      height: 34,
+      pad: 14,
+      gap: 10,
+      mark: { shape: 'square', size: 8, color: c.accent },
+      label: Object.assign(text(10, tokens ? ISLAND.caps.body : c.muted, { spacing: 1.4 }), { text: 'AGENT' }),
+      who: Object.assign(text(10, '', { weight: 500, spacing: 1.4 }), { text: (who) => upper(line(who)) }),
+      time: text(20, '', { font: t.display }),
+    },
+    warning: { box: { fill: c.surface, text: c.ink, frame: { width: 1.5, color: c.danger } }, label: c.muted, time: c.danger, chip: '', ring: '', mark: '' },
+    card: {
+      layout: 'print',
+      width: 420,
+      box: tokens ? { frame: { width: 1.5, color: c.accent } } : null,
+      headColor: tokens ? ISLAND.caps.head : c.muted,
+      who: line,
+      unlocked: (hhmm) => `unlocked ${hhmm}`,
+      unlockedColor: tokens ? ISLAND.caps.body : c.muted,
+      left: 'LEFT',
+      bar: null,
+      keys: [['↵', 'LOCK NOW'], ['ESC', 'CLOSE']],
+    },
   };
 }
 

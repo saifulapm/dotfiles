@@ -263,48 +263,54 @@ test('a polkit request cannot reorder what it asks with bidi controls, and keeps
   assert.equal(inOrder(undefined), '');
 });
 
-// The lease slot's words, in each theme's voice, as the m21 boards draw them (XX2P8V57).
-const leaseParts = (name, who, left) => {
-  const l = leaseLook(theme(name));
-  return [l.mark, l.words(who), l.time(left)].filter((x) => x).join(' ');
-};
+// The lease slot and card as the m21 boards draw them (XX2P8V57): project/AgentLease*.dc.html and Lease*.dc.html.
+const lease = (name) => leaseLook(theme(name));
+const slotText = (l, who, left) => [l.slot.label.text, l.slot.who.text(who), l.time(left)].filter((x) => x).join(' ');
 
-test("the lease slot reads each board's words, with the time left as mm:ss", () => {
-  assert.equal(leaseParts('paper', 'claude', 872000), '■ AGENT CLAUDE 14:32');
-  assert.equal(leaseParts('artboard', 'claude', 872000), '● Agent · claude 14:32');
-  assert.equal(leaseParts('blueprint', 'claude', 872000), '[ AGENT ] CLAUDE T−14:32');
-  assert.equal(leaseLook(theme('paper')).time(7200000), '120:00');
-  assert.equal(leaseLook(theme('paper')).time(41200), '00:42');
+test("each slot reads its board's words at its board's width, the time left as m:ss at the right", () => {
+  assert.equal(slotText(lease('paper'), 'claude', 872000), 'AGENT CLAUDE 14:32');
+  assert.equal(slotText(lease('artboard'), 'claude', 872000), 'Agent · claude 14:32');
+  assert.equal(slotText(lease('blueprint'), 'claude', 872000), '[ AGENT ] CLAUDE T−14:32');
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((t) => [lease(t).slot.width, lease(t).slot.height]), [[300, 34], [264, 40], [320, 34]]);
+  assert.deepEqual([lease('paper').time(42000), lease('blueprint').time(42000), lease('paper').time(7200000)], ['0:42', 'T−0:42', '120:00']);
 });
 
-test("Paper's time is serif, Artboard's dot is its blue, Blueprint draws in cyan", () => {
-  const p = leaseLook(theme('paper'));
-  assert.equal(p.timeFont, 'Instrument Serif');
-  assert.equal(leaseLook(theme('artboard')).markColor, '#6C83FF');
-  const b = leaseLook(theme('blueprint'));
-  assert.deepEqual([b.text, b.timeColor], ['#7FE3F0', '#7FE3F0']);
+test("Paper's slot: a red square, AGENT in the island's head colour and a 20 px serif time", () => {
+  const s = lease('paper').slot;
+  assert.deepEqual([s.mark.shape, s.mark.size, s.mark.color], ['square', 8, '#C8381E']);
+  assert.deepEqual([s.label.size, s.label.color, s.who.weight, s.time.font, s.time.size], [10, '#D9CFBB', 500, 'Instrument Serif', 20]);
 });
 
-test("the last minute takes each theme's warning: Paper's sheet and vermilion, Artboard's danger chip, Blueprint's amber", () => {
-  const p = leaseLook(theme('paper')).warning;
-  assert.deepEqual([p.fill, p.frame, p.time, p.text], ['#F1E9D8', '#C8381E', '#C8381E', '#1C1915']);
-  const a = leaseLook(theme('artboard')).warning;
-  assert.equal(a.time, '#CF222E');
-  assert.ok(a.chip, 'Artboard puts the time in a chip');
-  assert.equal(leaseLook(theme('blueprint')).warning.time, '#FFB547');
+test("Artboard's slot: a #6C83FF dot and Agent · claude in its body colour", () => {
+  const s = lease('artboard').slot;
+  assert.deepEqual([s.mark.shape, s.mark.color, s.label.text, s.who.color, s.who.size], ['dot', '#6C83FF', '', '#C9CED6', 13]);
 });
 
-test('a holder any caller names is one line without bidi controls', () => {
-  assert.equal(leaseLook(theme('paper')).words('cl\naude\u202e x'), 'AGENT CL AUDE X');
-  assert.equal(leaseLook(theme('artboard')).words('\u202eclaude'), 'Agent · claude');
+test("Blueprint's slot: [ AGENT ] muted, the name bold in ink, the time bold in cyan", () => {
+  const s = lease('blueprint').slot;
+  assert.deepEqual([s.mark, s.label.color, s.who.color, s.who.weight, s.time.color, s.time.weight], [null, '#80A4C2', '#D6F4F8', 700, '#7FE3F0', 700]);
 });
 
-test("the lease card names when it unlocked, and Artboard and Blueprint draw a bar of the time left (XX2P8V57)", () => {
-  const p = leaseLook(theme('paper'));
-  const a = leaseLook(theme('artboard'));
-  const b = leaseLook(theme('blueprint'));
-  assert.deepEqual([p.unlocked('14:20'), a.unlocked('14:20'), b.unlocked('14:20')], ['UNLOCKED 14:20', 'unlocked 14:20', 'UNLOCKED 14:20']);
-  assert.deepEqual([p.bar, a.bar, b.bar], [null, 'round', 'blocks']);
-  assert.equal(p.hint, '↵ lock now · esc close');
-  assert.equal(a.hint, '↵ lock now · esc close');
+test("the last minute: Paper's surface sheet with a vermilion rule, Artboard's #B4380B chip and ringed dot, Blueprint's amber frame and glow", () => {
+  const p = lease('paper').warning;
+  assert.deepEqual([p.box.fill, p.box.text, p.box.frame.width, p.box.frame.color, p.label, p.time], ['#FAF6EC', '#1C1915', 1.5, '#C8381E', '#575653', '#C8381E']);
+  const a = lease('artboard').warning;
+  assert.deepEqual([a.box, a.time, a.chip, a.ring], [null, '#B4380B', '#FFF1E8', '#FFF1E8']);
+  const b = lease('blueprint').warning;
+  assert.deepEqual([b.box.frame.color, b.box.glow, b.time], ['#FFB547', '#FFB547', '#FFB547']);
+});
+
+test("each card follows its board: Paper's serif name and LEFT, Artboard's tile and chips, Blueprint's rows", () => {
+  const p = lease('paper').card;
+  assert.deepEqual([p.layout, p.width, p.who('claude'), p.unlocked('14:05'), p.keys], ['print', 420, 'claude', 'unlocked 14:05', [['↵', 'LOCK NOW'], ['ESC', 'CLOSE']]]);
+  const a = lease('artboard').card;
+  assert.deepEqual([a.layout, a.width, a.head, a.who('claude'), a.unlocked('14:05'), a.bar, a.keys], ['card', 440, 'Agent · lease', 'claude', 'unlocked 14:05', 'round', [['↵', 'lock now'], ['esc', 'close']]]);
+  const b = lease('blueprint').card;
+  assert.deepEqual([b.layout, b.width, b.title('claude'), b.who('claude'), b.unlocked('14:05'), b.bar, b.keys], ['sheet', 420, 'CLAUDE HAS THE SESSION', 'CLAUDE', 'UNLOCKED 14:05', 'blocks', [['[↵]', 'LOCK NOW'], ['[ESC]', 'CLOSE']]]);
+});
+
+test('a holder any caller names is one line without bidi controls, in the slot and the card', () => {
+  assert.equal(lease('paper').slot.who.text('cl\naude\u202e x'), 'CL AUDE X');
+  assert.equal(lease('artboard').slot.who.text('\u202eclaude'), 'Agent · claude');
+  assert.equal(lease('blueprint').card.title('a\nb'), 'A B HAS THE SESSION');
 });

@@ -79,3 +79,14 @@ export function marginStyle(tokens) {
     rules: ['ink', 'hairline', 'double'].includes(tokens.primitive.frame),
   };
 }
+
+// A surface's look with some parts swapped, as the island's lease draws its last minute: fill, text, frame, and glow or hard-shadow colour.
+export function restyled(style, swap) {
+  if (!swap) return style;
+  return Object.assign({}, style, {
+    fill: swap.fill ?? style.fill,
+    text: swap.text ?? style.text,
+    frame: swap.frame ?? style.frame,
+    shadow: swap.glow ? Object.assign({}, style.shadow, { color: swap.glow }) : style.shadow,
+  });
+}

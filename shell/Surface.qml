@@ -12,7 +12,9 @@ Item {
     property string role: "card"
     // Shown above the top-left corner when the theme draws frame labels.
     property string label: ""
-    readonly property var style: S.surfaceStyle(tokens, role)
+    // Parts of the look swapped for a moment, as the island's lease draws its last minute; null keeps the theme's.
+    property var restyle: null
+    readonly property var style: S.restyled(S.surfaceStyle(tokens, role), restyle)
     readonly property real chamfer: style.corner.chamfer
     readonly property var shadow: style.shadow
     readonly property color accent: tokens ? tokens.color.accent : "transparent"
