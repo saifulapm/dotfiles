@@ -31,6 +31,12 @@ cat "$STUB_REC/reply"
 `,
   );
   chmodSync(join(stubs, 'curl'), 0o755);
+  // Every other tool the script runs logs its argv and then runs the real one, so a token in any command line shows.
+  for (const tool of ['jq', 'sed', 'head', 'mktemp', 'rm']) {
+    const real = spawnSync('bash', ['-c', `command -v ${tool}`], { encoding: 'utf8' }).stdout.trim();
+    writeFileSync(join(stubs, tool), `#!/bin/bash\nprintf '%s\\n' "${tool} $*" >>"$STUB_REC/argv-all"\nexec ${real} "$@"\n`);
+    chmodSync(join(stubs, tool), 0o755);
+  }
   const env = { ...process.env, HOME: join(root, 'home'), XDG_CONFIG_HOME: config, PATH: stubs + delimiter + process.env.PATH, STUB_REC: rec };
   const read = (n) => (existsSync(join(rec, n)) ? readFileSync(join(rec, n), 'utf8') : null);
   return { root, env, read };
@@ -44,6 +50,8 @@ test('sends one DM naming the title and body, with the token on stdin only', (t)
   assert.equal(r.status, 0, r.stderr);
   assert.ok(ctx.read('stdin').includes(TOKEN));
   assert.ok(!ctx.read('argv').includes(TOKEN));
+  assert.ok(ctx.read('argv-all').includes('jq '), 'the argv log caught the tools');
+  assert.ok(!ctx.read('argv-all').includes(TOKEN), 'the token is on no command line');
   assert.ok(ctx.read('argv').includes('--max-time 10'));
   const body = JSON.parse(ctx.read('body'));
   assert.equal(body.channel, 'U0TEST42');

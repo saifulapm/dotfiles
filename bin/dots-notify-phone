@@ -17,7 +17,8 @@ jq -n --arg c "$user" --arg t "$title" --arg b "$body" '
 # The token reaches curl on stdin, never on a command line, where every process could read it.
 reply=$(
   {
-    jq -rn --arg h "Authorization: Bearer $token" '"header = " + ($h | tojson)'
+    # printf is bash's own, so the token goes through no other process's argv; a Slack token holds no quote or backslash to escape.
+    printf 'header = "Authorization: Bearer %s"\n' "$token"
     echo 'header = "Content-Type: application/json; charset=utf-8"'
     echo 'url = "https://slack.com/api/chat.postMessage"'
     jq -rn --arg f "$tmp/body" '"data-binary = " + ("@" + $f | tojson)'
