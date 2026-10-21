@@ -298,7 +298,7 @@ why = "holds the gh PATs, the mail password and the hub's tokens"
 [[package]]
 name = "pinentry-qt"
 arch = "all"
-why = "asks for the GPG passphrase on screen"
+why = "asks for the GPG passphrase when the shell is down; it brings pinentry-curses, which asks over SSH"
 
 [[package]]
 name = "isync"

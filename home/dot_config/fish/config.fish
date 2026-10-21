@@ -31,7 +31,7 @@ function __dots_colors --on-event fish_prompt
 end
 __dots_colors
 
-# gpg asks for a passphrase on this terminal; over SSH, pinentry-auto reads PINENTRY_USER_DATA and draws curses instead of a window on the far screen.
+# gpg asks for a passphrase on this terminal; over SSH, dots-pinentry reads PINENTRY_USER_DATA and draws curses instead of a card on the far screen.
 isatty stdin; and set -gx GPG_TTY (tty)
 set -q SSH_CONNECTION; and set -gx PINENTRY_USER_DATA curses
 

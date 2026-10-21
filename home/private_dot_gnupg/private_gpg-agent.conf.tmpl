@@ -1,0 +1,5 @@
+# A passphrase stays cached 400 days, so in practice until the next login; the session's idle lock, not this TTL, guards a machine left alone.
+default-cache-ttl 34560000
+max-cache-ttl 34560000
+# The shell draws the prompt; dots-pinentry hands off to curses over SSH and to Qt when the shell is down. gpg-agent wants an absolute path.
+pinentry-program {{ .chezmoi.homeDir }}/Codes/dotfiles/bin/dots-pinentry

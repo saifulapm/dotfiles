@@ -1,5 +1,5 @@
 #!/bin/bash
-# gpg-agent.conf hash: {{ include "private_dot_gnupg/private_gpg-agent.conf" | sha256sum }}
+# gpg-agent.conf hash: {{ include "private_dot_gnupg/private_gpg-agent.conf.tmpl" | sha256sum }}
 {{ template "lib.sh" . }}
 # The agent reads its config only at start, and a reload also drops every cached passphrase, so this runs only when the file changes.
 command -v gpg-connect-agent >/dev/null || exit 0

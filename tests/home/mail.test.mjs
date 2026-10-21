@@ -134,11 +134,11 @@ test('a keyed apply writes the imapnotify yaml for the primary address, syncing 
   assert.match(yaml, new RegExp(`^\\s+onNewMail: "${keyed.home}/Codes/dotfiles/bin/mail-sync --quiet"$`, 'm'));
 });
 
-test('gpg-agent keeps a passphrase for 400 days', () => {
+test('gpg-agent keeps a passphrase for 400 days and asks for it through dots-pinentry', () => {
   const text = readFileSync(join(keyless.home, '.gnupg/gpg-agent.conf'), 'utf8');
   assert.match(text, /^default-cache-ttl 34560000$/m);
   assert.match(text, /^max-cache-ttl 34560000$/m);
-  assert.doesNotMatch(text, /pinentry-program/);
+  assert.match(text, new RegExp(`^pinentry-program ${keyless.home}/Codes/dotfiles/bin/dots-pinentry$`, 'm'));
 });
 
 // A fake pass stands in for the store: it fails as gpg does on a locked key until its Nth call, so the wait is seen to retry and then stop.
