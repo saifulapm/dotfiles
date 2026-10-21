@@ -1,0 +1,22 @@
+{
+  "Version": "1.98.8",
+  "BackendState": "Running",
+  "TailscaleIPs": ["100.101.7.12", "fd7a:115c:a1e0::e034:4701"],
+  "Self": {
+    "HostName": "macbook-m2",
+    "DNSName": "macbook.taila27604.ts.net.",
+    "OS": "linux",
+    "TailscaleIPs": ["100.101.7.12", "fd7a:115c:a1e0::e034:4701"],
+    "Online": true,
+    "LastSeen": "0001-01-01T00:00:00Z"
+  },
+  "MagicDNSSuffix": "taila27604.ts.net",
+  "CurrentTailnet": { "Name": "saifulapm.github", "MagicDNSSuffix": "taila27604.ts.net", "MagicDNSEnabled": true },
+  "Peer": {
+    "nodekey:01": { "HostName": "nuc", "DNSName": "nuc.taila27604.ts.net.", "OS": "linux", "TailscaleIPs": ["100.88.14.3", "fd7a:115c:a1e0::6034:8e01"], "Online": true, "LastSeen": "0001-01-01T00:00:00Z" },
+    "nodekey:02": { "HostName": "localhost", "DNSName": "iphone.taila27604.ts.net.", "OS": "iOS", "TailscaleIPs": ["100.95.3.21", "fd7a:115c:a1e0::2734:7202"], "Online": true, "LastSeen": "2026-10-21T07:11:18.1Z" },
+    "nodekey:03": { "HostName": "fedora", "DNSName": "fedora.taila27604.ts.net.", "OS": "linux", "TailscaleIPs": ["100.117.6.24", "fd7a:115c:a1e0::c934:6103"], "Online": false, "LastSeen": "2026-08-27T08:00:00Z" },
+    "nodekey:04": { "HostName": "mac-mini-m2", "DNSName": "mini.taila27604.ts.net.", "OS": "linux", "TailscaleIPs": ["100.72.40.9", "fd7a:115c:a1e0::d434:2e04"], "Online": true, "LastSeen": "0001-01-01T00:00:00Z" },
+    "nodekey:05": { "HostName": "Saifuls-Mac-mini", "DNSName": "saifuls-mac-mini.taila27604.ts.net.", "OS": "macOS", "TailscaleIPs": ["100.115.145.90", "fd7a:115c:a1e0::9334:9105"], "Online": false, "LastSeen": "2026-09-09T08:00:00Z" }
+  }
+}
