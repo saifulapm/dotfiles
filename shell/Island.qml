@@ -409,6 +409,7 @@ PanelWindow {
             drawn: capturePart.shown ? "pill" : null,
             check: captureCheck.visible,
             title: captureTitle.text,
+            titleElided: captureTitle.truncated,
             detail: captureDetail.text,
             detailFont: [captureDetail.font.family, captureDetail.font.pixelSize],
             swatch: hex(captureSwatch)

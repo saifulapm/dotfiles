@@ -76,9 +76,17 @@ until_ok 3000 rests
 qs ipc call island capture ocr $'Ship\nv2\u202e today\e[31m' $'2\n\u202echaracters' >/dev/null
 check "paper: a forged capture draws one plain line each, and no swatch" until_ok 1000 shows 'Ship v2 today [31m · 2 characters' '.title == "SHIP V2 TODAY [31M" and .detail == "2 characters" and .swatch == null'
 until_ok 3000 rests
+long=$(printf 'x%.0s' {1..200})
+qs ipc call island capture ocr "$long" '' >/dev/null
+check "paper: a 200-character title elides inside the 560 px island" until_ok 1000 shows "$long" '.drawn == "pill" and .titleElided'
+check "and the island is no wider than 560 px ($(island | jq .width))" state_is '.width | type == "number" and . > 300 and . <= 560'
+until_ok 3000 rests
 qs ipc call island capture annotate Copied '' >/dev/null
 sleep 0.3
 check "a capture of an unknown kind shows nothing" rests
+qs ipc call island capture ocr '' '' >/dev/null
+sleep 0.3
+check "a capture with no words shows nothing" rests
 
 in_theme blueprint
 "$repo/bin/dots-call" island capture ocr 'Text copied' '214 characters'
