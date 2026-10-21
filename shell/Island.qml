@@ -209,14 +209,23 @@ PanelWindow {
     function sendingState() {
         if (mode !== "sending")
             return null;
+        const parts = [];
+        let name = null;
+        for (let i = 0; i < sendingParts.count; i++) {
+            const t = sendingParts.itemAt(i);
+            parts.push(t.text);
+            if (t.modelData.name)
+                name = t;
+        }
         return {
-            label: sendingLabel.text,
-            pct: sendingPct.text,
-            elided: sendingLabel.truncated,
-            lines: sendingLabel.lineCount,
+            label: parts.join(" "),
+            pct: sendingPct.visible ? sendingPct.text : "",
+            elided: name ? name.truncated : false,
+            lines: name ? name.lineCount : 0,
             barFill: Math.round(sendingFill.width),
-            barWidth: Math.round(sendingBar.width),
-            pctRight: Math.round(sendingPct.mapToItem(sendingPart, sendingPct.width, 0).x)
+            barWidth: Math.round(sendingFill.track.width),
+            barHeight: Math.round(sendingFill.height),
+            right: Math.round((sendingPct.visible ? sendingPct.mapToItem(sendingPart, sendingPct.width, 0).x : sendingInline.mapToItem(sendingPart, sendingInline.width, 0).x))
         };
     }
 
@@ -549,71 +558,129 @@ PanelWindow {
                 x: Math.round((parent.width - width) / 2)
                 width: island.sizes.sending[0]
                 height: island.sizes.sending[1]
+                readonly property var look: island.sendingLook
+                // What the parts other than the machine's name take, so that one elides into what is left; an inline bar keeps 40 px.
+                readonly property real fixed: 2 * look.pad + (look.mark ? look.mark.size + look.gap : 0) + (look.pct ? sendingPct.implicitWidth + look.gap : 0) + (look.bar.at === "inline" ? 40 + look.gap : 0) + sendingParts.fixedWidth
 
-                // The mark and what goes where from the left, the percent at the right edge and the bar along the bottom, as the boards draw the slot.
+                // The mark and the words from the left, the percent at the right edge, and the bar after the words or along the bottom, as each board draws the slot.
                 Row {
                     id: sendingRow
-                    readonly property var look: island.sendingLook
-                    x: look.pad
+                    x: sendingPart.look.pad
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: -sendingBar.height / 2
-                    spacing: look.gap
+                    anchors.verticalCenterOffset: sendingPart.look.bar.at === "bottom" ? -sendingPart.look.bar.height / 2 : 0
+                    spacing: sendingPart.look.gap
 
-                    Rectangle {
-                        visible: sendingRow.look.mark !== null
+                    Item {
+                        visible: sendingPart.look.mark !== null
                         anchors.verticalCenter: parent.verticalCenter
-                        width: sendingRow.look.mark?.size ?? 0
+                        width: sendingPart.look.mark?.size ?? 0
                         height: width
-                        radius: sendingRow.look.mark?.shape === "dot" ? width / 2 : 0
-                        color: sendingRow.look.mark?.color ?? "transparent"
+
+                        Rectangle {
+                            visible: sendingPart.look.mark?.shape !== "upload"
+                            anchors.fill: parent
+                            color: sendingPart.look.mark?.color || box.style.text
+                        }
+
+                        // Artboard's board draws an arrow up out of a tray.
+                        Shape {
+                            visible: sendingPart.look.mark?.shape === "upload"
+                            anchors.fill: parent
+                            preferredRendererType: Shape.CurveRenderer
+                            ShapePath {
+                                strokeColor: sendingPart.look.mark?.color || box.style.text
+                                strokeWidth: 1.6
+                                fillColor: "transparent"
+                                capStyle: ShapePath.RoundCap
+                                joinStyle: ShapePath.RoundJoin
+                                scale: Qt.size((sendingPart.look.mark?.size ?? 16) / 16, (sendingPart.look.mark?.size ?? 16) / 16)
+                                PathSvg {
+                                    path: "M8 11.5V3.5m-3.2 3.2L8 3.5l3.2 3.2M3 13.5h10"
+                                }
+                            }
+                        }
                     }
 
-                    // The machine's name comes from the tailnet: one line, elided before the percent.
-                    Text {
-                        id: sendingLabel
+                    Repeater {
+                        id: sendingParts
+                        model: sendingPart.look.parts
+                        readonly property real fixedWidth: widthOf(false)
+                        readonly property real nameWidth: widthOf(true)
+
+                        function widthOf(name) {
+                            let w = 0;
+                            for (let i = 0; i < count; i++) {
+                                const t = itemAt(i);
+                                if (t && t.modelData.name === name)
+                                    w += name ? t.width : t.implicitWidth + sendingPart.look.gap;
+                            }
+                            return w;
+                        }
+
+                        // The machine's name comes from the tailnet: one line, and its part elides before the rest.
+                        Text {
+                            required property var modelData
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            width: modelData.name ? Math.max(0, Math.min(implicitWidth, sendingPart.width - sendingPart.fixed)) : implicitWidth
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            text: modelData.text(island.sending?.count ?? 0, island.sending?.to ?? "", island.sending?.pct ?? 0)
+                            color: modelData.color || box.style.text
+                            font.family: modelData.font
+                            font.pixelSize: modelData.size
+                            font.weight: modelData.weight
+                            font.letterSpacing: modelData.spacing
+                        }
+                    }
+
+                    Rectangle {
+                        id: sendingInline
+                        visible: sendingPart.look.bar.at === "inline"
                         anchors.verticalCenter: parent.verticalCenter
-                        textFormat: Text.PlainText
-                        width: Math.min(implicitWidth, sendingPart.width - 2 * sendingRow.look.pad - sendingRow.spacing * 2 - (sendingRow.look.mark ? sendingRow.look.mark.size : 0) - sendingPct.implicitWidth)
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        text: sendingRow.look.label.text(island.sending?.count ?? 0, island.sending?.to ?? "")
-                        color: sendingRow.look.label.color || box.style.text
-                        font.family: sendingRow.look.label.font
-                        font.pixelSize: sendingRow.look.label.size
-                        font.weight: sendingRow.look.label.weight
-                        font.letterSpacing: sendingRow.look.label.spacing
+                        width: visible ? Math.max(40, 40 + sendingPart.width - sendingPart.fixed - sendingParts.nameWidth) : 0
+                        height: sendingPart.look.bar.height
+                        radius: sendingPart.look.bar.radius
+                        color: sendingPart.look.bar.track
                     }
                 }
 
                 Text {
                     id: sendingPct
+                    visible: sendingPart.look.pct !== null
                     anchors.right: parent.right
-                    anchors.rightMargin: sendingRow.look.pad
+                    anchors.rightMargin: sendingPart.look.pad
                     anchors.verticalCenter: sendingRow.verticalCenter
                     textFormat: Text.PlainText
-                    text: sendingRow.look.pct.text(island.sending?.pct ?? 0)
-                    color: sendingRow.look.pct.color || box.style.text
-                    font.family: sendingRow.look.pct.font
-                    font.pixelSize: sendingRow.look.pct.size
-                    font.weight: sendingRow.look.pct.weight
-                    font.letterSpacing: sendingRow.look.pct.spacing
+                    text: sendingPart.look.pct ? sendingPart.look.pct.text(island.sending?.pct ?? 0) : ""
+                    color: sendingPart.look.pct?.color || box.style.text
+                    font.family: sendingPart.look.pct?.font ?? ""
+                    font.pixelSize: sendingPart.look.pct?.size ?? 12
+                    font.weight: sendingPart.look.pct?.weight ?? Font.Normal
+                    font.letterSpacing: sendingPart.look.pct?.spacing ?? 0
                     font.features: { "tnum": 1 }
                 }
 
                 Rectangle {
-                    id: sendingBar
+                    id: sendingBottom
+                    visible: sendingPart.look.bar.at === "bottom"
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
-                    height: sendingRow.look.bar.height
-                    color: sendingRow.look.bar.track
+                    height: sendingPart.look.bar.height
+                    color: sendingPart.look.bar.track
+                }
 
-                    Rectangle {
-                        id: sendingFill
-                        width: parent.width * (island.sending?.pct ?? 0) / 100
-                        height: parent.height
-                        color: sendingRow.look.bar.fill
-                    }
+                // The fill sits on whichever track this theme draws.
+                Rectangle {
+                    id: sendingFill
+                    readonly property Item track: sendingPart.look.bar.at === "inline" ? sendingInline : sendingBottom
+                    x: track.mapToItem(sendingPart, 0, 0).x
+                    y: track.mapToItem(sendingPart, 0, 0).y
+                    width: track.width * (island.sending?.pct ?? 0) / 100
+                    height: track.height
+                    radius: sendingPart.look.bar.radius
+                    color: sendingPart.look.bar.fill
                 }
             }
 

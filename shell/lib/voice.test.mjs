@@ -322,17 +322,32 @@ test('a holder any caller names is one line without bidi controls, in the slot a
 });
 
 const sending = (name) => sendingLook(theme(name));
+const words = (l, count, to, pct) => l.parts.map((p) => p.text(count, to, pct)).join(' ');
 
 test("Paper's sending slot: 300 by 34, a red square, SENDING 2 FILES TO NUC · in the island's text, a 20 px serif percent and a 4 px red bar on paper", () => {
   const s = sending('paper');
   assert.deepEqual([s.width, s.height, s.pad, s.gap], [300, 34, 14, 10]);
   assert.deepEqual([s.mark.shape, s.mark.size, s.mark.color], ['square', 8, '#C8381E']);
-  assert.deepEqual([s.label.text(2, 'nuc'), s.label.text(1, 'n\u202eu\nc'), s.label.size, s.label.color], ['SENDING 2 FILES TO NUC ·', 'SENDING 1 FILE TO NU C ·', 10, '']);
+  assert.deepEqual([words(s, 2, 'nuc', 48), words(s, 1, 'n\u202eu\nc', 0), s.parts[0].size, s.parts[0].color], ['SENDING 2 FILES TO NUC ·', 'SENDING 1 FILE TO NU C ·', 10, '']);
   assert.deepEqual([s.pct.text(48), s.pct.font, s.pct.size], ['48%', 'Instrument Serif', 20]);
-  assert.deepEqual([s.bar.height, s.bar.track, s.bar.fill], [4, '#F1E9D8', '#C8381E']);
+  assert.deepEqual([s.bar.at, s.bar.height, s.bar.track, s.bar.fill], ['bottom', 4, '#F1E9D8', '#C8381E']);
 });
 
-test('each theme draws a send at the width of its lease slot, with a bar', () => {
-  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((t) => [sending(t).width, sending(t).height]), [[300, 34], [264, 40], [320, 34]]);
-  for (const t of ['paper', 'artboard', 'blueprint']) assert.ok(sending(t).bar.height > 0 && sending(t).bar.fill, t);
+test("Artboard's sending slot: a 380 by 40 pill, an upload glyph, the percent in its words and a 6 px rounded bar after them", () => {
+  const s = sending('artboard');
+  assert.deepEqual([s.width, s.height, s.pad, s.gap, s.mark.shape, s.mark.size], [380, 40, 16, 10, 'upload', 16]);
+  assert.deepEqual([words(s, 2, 'nuc', 48), s.parts[0].size, s.parts[0].weight, s.pct], ['Sending 2 files to nuc · 48%', 13, 500, null]);
+  assert.deepEqual([s.bar.at, s.bar.height, s.bar.radius, s.bar.track, s.bar.fill], ['inline', 6, 3, '#2B2F36', '#6C83FF']);
+});
+
+test("Blueprint's sending slot: 420 by 34, [ TAILDROP ] → NUC 2 FILES in mono, a cyan percent and a 3 px cyan bar on the line colour", () => {
+  const s = sending('blueprint');
+  assert.deepEqual([s.width, s.height, s.mark], [420, 34, null]);
+  assert.equal(words(s, 2, 'nuc', 48), '[ TAILDROP ] → NUC 2 FILES');
+  assert.deepEqual(s.parts.map((p) => [p.size, p.color, p.weight]), [[12, '#80A4C2', 400], [12, '#D6F4F8', 700], [10, '#80A4C2', 400]]);
+  assert.deepEqual([s.pct.text(48), s.pct.color, s.bar.at, s.bar.height, s.bar.track, s.bar.fill], ['48%', '#7FE3F0', 'bottom', 3, '#2E5A72', '#7FE3F0']);
+});
+
+test('one part of each slot names the machine, and only that one elides', () => {
+  for (const t of ['paper', 'artboard', 'blueprint']) assert.equal(sending(t).parts.filter((p) => p.name).length, 1, t);
 });

@@ -261,35 +261,39 @@ export function leaseLook(tokens) {
   };
 }
 
-// How the island draws a Taildrop send in place of the clock: what goes where, the percent at the right and a bar along the bottom edge, as the m22 boards do; a colour left empty is the island's own text colour.
+// How the island draws a Taildrop send in place of the clock, as each m22 board does: a mark, the words in parts (the one naming the machine elides), the percent at the right and a bar along the bottom edge or after the words; a colour left empty is the island's own text colour.
 export function sendingLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
   const voice = t.voice;
-  const what = (count, to) => `Sending ${count} ${count === 1 ? 'file' : 'files'} to ${line(to)}`;
-  const text = (size, color, extra) => Object.assign({ font: t.ui, size, color, weight: 400, spacing: 0 }, extra);
+  const files = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;
+  const text = (size, color, extra) => Object.assign({ font: t.ui, size, color, weight: 400, spacing: 0, name: false }, extra);
   if (voice === 'plain') {
     return {
-      width: 264,
+      width: 380,
       height: 40,
       pad: 16,
       gap: 10,
-      mark: { shape: 'dot', size: 8, color: tokens ? ISLAND.plain.bar : c.accent },
-      label: Object.assign(text(13, tokens ? ISLAND.plain.body : c.muted), { text: what }),
-      pct: Object.assign(text(13, tokens ? ISLAND.plain.summary : '', { weight: 500 }), { text: (p) => `${p}%` }),
-      bar: { height: 3, track: tokens ? ISLAND.plain.tile : c.muted, fill: tokens ? ISLAND.plain.bar : c.accent },
+      mark: { shape: 'upload', size: 16, color: '' },
+      parts: [Object.assign(text(13, '', { weight: 500, name: true }), { text: (count, to, pct) => `Sending ${files(count)} to ${line(to)} · ${pct}%` })],
+      pct: null,
+      bar: { at: 'inline', height: 6, radius: 3, track: tokens ? ISLAND.plain.tile : c.muted, fill: tokens ? ISLAND.plain.bar : c.accent },
     };
   }
   if (voice === 'bracket') {
     return {
-      width: 320,
+      width: 420,
       height: 34,
       pad: 16,
       gap: 10,
       mark: null,
-      label: Object.assign(text(12, c.ink, { font: t.mono, spacing: 0.6 }), { text: (count, to) => upper(what(count, to)) }),
+      parts: [
+        Object.assign(text(12, c.muted, { font: t.mono, spacing: 1.68 }), { text: () => '[ TAILDROP ]' }),
+        Object.assign(text(12, c.ink, { font: t.mono, weight: 700, spacing: 0.6, name: true }), { text: (count, to) => `→ ${upper(line(to))}` }),
+        Object.assign(text(10, c.muted, { font: t.mono, spacing: 1 }), { text: (count) => upper(files(count)) }),
+      ],
       pct: Object.assign(text(12, c.accent, { font: t.mono, weight: 700, spacing: 0.6 }), { text: (p) => `${p}%` }),
-      bar: { height: 2, track: c.line, fill: c.accent },
+      bar: { at: 'bottom', height: 3, radius: 0, track: c.line, fill: c.accent },
     };
   }
   return {
@@ -298,9 +302,9 @@ export function sendingLook(tokens) {
     pad: 14,
     gap: 10,
     mark: { shape: 'square', size: 8, color: c.accent },
-    label: Object.assign(text(10, '', { spacing: 1.4 }), { text: (count, to) => upper(what(count, to)) + ' ·' }),
+    parts: [Object.assign(text(10, '', { spacing: 1.4, name: true }), { text: (count, to) => `SENDING ${upper(files(count))} TO ${upper(line(to))} ·` })],
     pct: Object.assign(text(20, '', { font: t.display }), { text: (p) => `${p}%` }),
-    bar: { height: 4, track: c.paper, fill: c.accent },
+    bar: { at: 'bottom', height: 4, radius: 0, track: c.paper, fill: c.accent },
   };
 }
 
