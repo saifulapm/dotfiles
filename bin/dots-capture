@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# dots-capture <ocr|qr|colour|annotate|annotate-clip> [--region 'X,Y WxH']: reads text, a QR code or a colour off the screen to the clipboard and says so in the island's pill, or opens satty to annotate; --region skips slurp, so a check needs no mouse.
+set -uo pipefail
+shopt -s extglob
+{
+
+self=$(readlink -f -- "$0")
+mode=${1:-}
+region=
+[[ ${2:-} != --region ]] || region=${3:-}
+
+# slurp exits non-zero when Escape cancels it, and a cancel shows nothing.
+pick_region() { [[ -n $region ]] || region=$(slurp) || exit 0; }
+# The dots-call beside this script, since niri's spawn need not have bin/ on PATH; the IPC takes exactly two arguments, "" for no swatch.
+pill() { "${self%/*}/dots-call" island capture "$1" "${2:-}" >/dev/null 2>&1; }
+# satty copies through wl-copy on Enter and saves no file.
+annotate() { satty --filename - --copy-command wl-copy --actions-on-enter save-to-clipboard,exit; }
+
+case $mode in
+ocr)
+  pick_region
+  text=$(grim -g "$region" - | tesseract - - -l eng+ben 2>/dev/null)
+  # tesseract ends its page with blank lines and a form feed.
+  text=${text##+([[:space:]])}
+  text=${text%%+([[:space:]])}
+  if [[ -z $text ]]; then
+    pill 'No text found'
+    exit 0
+  fi
+  printf '%s' "$text" | wl-copy
+  # Characters are code points, as `wl-paste | wc -m` counts them, whatever the caller's locale.
+  pill "Text copied · $(printf '%s' "$text" | LC_ALL=C.UTF-8 wc -m) characters"
+  ;;
+qr)
+  pick_region
+  text=$(grim -g "$region" - | zbarimg --raw -q - 2>/dev/null)
+  if [[ -z $text ]]; then
+    pill 'No QR code found'
+    exit 0
+  fi
+  # Sensitive, so dots-clip-store keeps it out of the clipboard history.
+  printf '%s' "$text" | wl-copy --sensitive
+  pill 'QR code copied'
+  ;;
+colour)
+  # niri prints {"rgb":[r,g,b]} from 0 to 1, or null when Escape cancels; this rounds as niri's own Hex line does.
+  rgb=$(niri msg --json pick-color | jq -r 'select(. != null) | .rgb | map([([., 0] | max), 1] | min * 255 | round) | @tsv')
+  [[ -n $rgb ]] || exit 0
+  read -r r g b <<<"$rgb"
+  hex=$(printf '#%02X%02X%02X' "$r" "$g" "$b")
+  printf '%s' "$hex" | wl-copy
+  pill "Copied $hex" "$hex"
+  ;;
+annotate)
+  pick_region
+  grim -g "$region" - | annotate
+  ;;
+annotate-clip)
+  # grep reads every type, since -q would end the pipe early and pipefail would count wl-paste's SIGPIPE as no image.
+  wl-paste --list-types 2>/dev/null | grep -x image/png >/dev/null || exit 0
+  wl-paste --type image/png | annotate
+  ;;
+*)
+  echo "usage: dots-capture <ocr|qr|colour|annotate|annotate-clip> [--region 'X,Y WxH']" >&2
+  exit 2
+  ;;
+esac
+exit
+}
