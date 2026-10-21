@@ -255,7 +255,21 @@ test('otp on an entry with no TOTP code says so and copies nothing', async (t) =
   assert.equal(existsSync(join(ctx.rec, 'wl-copy.stdin')), false);
 });
 
-test('show prints the first line and records nothing', async (t) => {
+// An OTP code added outside Pass (pass otp append in a terminal) is learnt from the first decrypt Pass makes anyway, never from one of its own.
+test('copy and show tag an entry that holds an otpauth line, and untag one that lost it', async (t) => {
+  const ctx = scratch(t);
+  seed(ctx, 'web/github.com', `pw\n${URI}\n`);
+  seed(ctx, 'web/plain', 'pw\n');
+  assert.equal((await run(ctx, ['copy', 'web/github.com'])).code, 0);
+  assert.equal(state(ctx, 'pass-otp'), 'web/github.com\n');
+  seed(ctx, 'web/github.com', 'pw\n');
+  assert.equal((await run(ctx, ['show', 'web/github.com'])).code, 0);
+  assert.equal(state(ctx, 'pass-otp'), '');
+  assert.equal((await run(ctx, ['show', 'web/plain'])).code, 0);
+  assert.equal(state(ctx, 'pass-otp'), '');
+});
+
+test('show prints the first line and records no use', async (t) => {
   const ctx = scratch(t);
   seed(ctx, 'a', 'first\nsecond\n');
   const r = await run(ctx, ['show', 'a']);

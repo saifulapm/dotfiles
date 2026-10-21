@@ -39,6 +39,12 @@ fetch() {
   [ -f "$store/$name.gpg" ] || die "no entry $name"
   out=$("$@" 2>/dev/null) || die "could not decrypt $name"
   secret=${out%%$'\n'*}
+  # The OTP tag is learnt from this decrypt, since listing never decrypts; an otpauth line added in a terminal shows from here on.
+  if [[ $'\n'$out == *$'\n'otpauth://* ]]; then
+    state_set "$tagged" "$name" 1
+  elif [ -f "$tagged" ] && grep -qxF -- "$name" "$tagged"; then
+    state_set "$tagged" "$name" 0
+  fi
 }
 
 # Sets secret to the entry's current TOTP code. pass otp would hand the seed to oathtool in argv, where any process can read it, so the seed goes in on stdin.
