@@ -307,6 +307,7 @@ Item {
 
                     Root.Dashed {
                         visible: badgeBox.badge.dashed
+                        frame: true
                         anchors.fill: parent
                         color: badgeBox.badge.border
                     }
@@ -392,7 +393,7 @@ Item {
                         }
 
                         ColumnLayout {
-                            Layout.fillWidth: !caps
+                            Layout.fillWidth: plain
                             spacing: 2
 
                             Text {
@@ -405,8 +406,8 @@ Item {
                             }
                             Text {
                                 id: deviceName
-                                Layout.fillWidth: !caps
-                                Layout.maximumWidth: 300
+                                Layout.fillWidth: plain
+                                Layout.maximumWidth: plain ? Infinity : 300
                                 textFormat: Text.PlainText
                                 text: look.title(status.self ? status.self.name : "")
                                 elide: Text.ElideRight
@@ -419,11 +420,14 @@ Item {
                         }
 
                         ColumnLayout {
+                            Layout.fillWidth: bracket
                             spacing: 2
 
                             Text {
                                 id: deviceIp
-                                Layout.alignment: plain ? Qt.AlignRight : Qt.AlignLeft
+                                Layout.alignment: caps ? Qt.AlignLeft : Qt.AlignRight
+                                Layout.fillWidth: bracket
+                                horizontalAlignment: caps ? Text.AlignLeft : Text.AlignRight
                                 textFormat: Text.PlainText
                                 text: status.self ? status.self.ip : ""
                                 color: bracket ? (isOn ? c.accent : c.muted) : caps && !isOn ? c.muted : c.ink
