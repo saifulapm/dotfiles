@@ -17,6 +17,7 @@ ShellRoot {
     // Named by URL and made after the paper's first frame, since qs compiles every type shell.qml names before that frame.
     property var desk: null
     property var polkit: null
+    property var pinentry: null
 
     // Qt.createComponent fails quietly, so a file that does not compile names its error in the journal.
     function compiled(url) {
@@ -32,6 +33,7 @@ ShellRoot {
         surfacesLoader.component = compiled("Surfaces.qml");
         desk = compiled("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService });
         polkit = compiled("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
+        pinentry = compiled("Pinentry.qml").createObject(root, { surfaces: surfacesLoader });
         warmStart.start();
         apps = Qt.binding(() => DesktopEntries.applications.values.map(e => ({
                         id: e.id,

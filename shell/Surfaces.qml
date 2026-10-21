@@ -24,8 +24,9 @@ PanelWindow {
     readonly property var recorder: recorderLoader.item
     readonly property var polkit: polkitLoader.item
     readonly property var goalsView: goalsLoader.item
+    readonly property var pinentry: pinentryLoader.item
     // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
-    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView]
+    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry]
     readonly property bool shown: all.some(s => s?.shown ?? false)
 
     // Only one surface shows at a time, so another's close is cut short.
@@ -87,6 +88,13 @@ PanelWindow {
         polkitLoader.active = true;
         closeOthers(polkit);
         polkit.show(flow);
+    }
+
+    // The Pinentry service calls this with each gpg request it shows.
+    function openPinentry(request) {
+        pinentryLoader.active = true;
+        closeOthers(pinentry);
+        pinentry.show(request);
     }
 
     // Each surface is made in turn, one per tick, so none holds a frame long and a first open finds it built; Goals waits for the Desk's store.
@@ -201,6 +209,22 @@ PanelWindow {
         sourceComponent: Root.PolkitPrompt {
             theme: host.theme
         }
+    }
+
+    // Surfaces from m20 on load on their first open and never warm; each unloads once it has drawn nothing for 30 s.
+    Loader {
+        id: pinentryLoader
+        anchors.fill: parent
+        active: false
+        sourceComponent: Root.PinentryPrompt {
+            theme: host.theme
+        }
+    }
+
+    Root.Tick {
+        interval: 30000
+        running: !!host.pinentry && !host.pinentry.visible
+        onTriggered: pinentryLoader.active = false
     }
 
     Loader {
