@@ -5,22 +5,18 @@
 #   mouse click X Y [button] move there, then click (left, right, middle)
 #   mouse drag X1 Y1 X2 Y2   left-press at 1, glide, release at 2 (needs ydotoold)
 #
-# Absolute positioning needs a corner pin first, and the pin corner MUST be
-# top-right: (0,0) and (0,H-1) are niri overview hot corners — a 1x1-px rect
-# at the exact corner pixel that fires even where the bar covers it
-# (contents_under() special-cases it; niri.rs is_inside_hot_corner) — and
-# the right screen edge below the bar is the notes 1-px hot strip
-# (NotesEdge.qml: 150 ms hover dwell, instant for drags). The bar's right
-# end is the one corner with nothing behind it: both right hot corners are
-# off in config.kdl, and the strip starts below the bar's exclusive zone.
+# Absolute positioning needs a corner pin first, and the pin corner is
+# top-right: niri's overview hot corner is the 1x1-px rect at (0,0), which
+# fires even under a layer surface (niri.rs is_inside_hot_corner).
 #
 # Targets are clamped 2 px inside the screen so a landing can never rest in
-# a hot corner or on the notes strip. wlrctl deltas are applied as a single
-# jump (no traversal), so only endpoints matter.
+# a hot corner. wlrctl deltas are applied as a single jump (no traversal),
+# so only endpoints matter.
 #
 # Screen geometry comes from `niri msg -j outputs` (rightmost output; these
-# machines drive one display). Under the nested dev compositor niri msg
-# still answers for the LIVE session — override with MOUSE_SCREEN=WxH.
+# machines drive one display). With the env bin/dots-dev prints sourced,
+# niri msg and wlrctl answer for the nested session; MOUSE_SCREEN=WxH
+# overrides the geometry. ydotool's clicks still reach the live session.
 
 set -euo pipefail
 

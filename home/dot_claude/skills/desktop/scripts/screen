@@ -19,9 +19,9 @@
 #
 # Refuses all input while `dots-call lock state` reads locked, and
 # `type`/`key` while a terminal has focus: keystrokes there run as commands.
-# Drive terminals with tmux instead. Under the nested dev compositor set
-# WAYLAND_DISPLAY=wayland-2 and MOUSE_SCREEN=WxH as the desktop skill says;
-# both pass straight through.
+# Drive terminals with tmux instead. For the nested session, source the env
+# bin/dots-dev prints, as the desktop skill says; MOUSE_SCREEN=WxH passes
+# straight through to scripts/mouse.
 
 set -euo pipefail
 

@@ -28,7 +28,9 @@ dots-call lock unlock claude 15    # a lease of 15 minutes; prints the state JSO
 dots-call lock renew claude 15     # extends the lease you hold
 ```
 
-Always pass the minutes. No lease ends later than 120 minutes after its
+Both exit 0 either way, so read the answer: `jq -e '.error | not'`.
+`unlockedAt` and `leaseUntil` are milliseconds since the epoch
+(`date -d @$((leaseUntil / 1000))`), 0 with no lease. Always pass the minutes. No lease ends later than 120 minutes after its
 unlock. While the lease holds, idle does not lock; when it ends the session
 locks again by itself. The monitors go off a second after an agent
 unlock, so nothing shows on an empty desk. A dark output sends no frame
@@ -255,5 +257,9 @@ login, and every text it may type and commit action it may take; it stops
 at anything not named.
 
 Anything that could wreck the live session (the lock itself, a shell crash,
-a destructive keybind) is tested in the nested session: `just dev` in
-`~/Codes/dotfiles`.
+a destructive keybind) is tested in the nested session: `bin/dots-dev` in
+`~/Codes/dotfiles` starts it and prints the env to source. With it sourced,
+niri msg, dots-call, qs ipc, grim, wtype and wlrctl act on the nested
+session; ydotool does not, since ydotoold's device reaches the live one, so
+leave `mouse click`, `drag` and `screen drag` alone there. The nested lock's
+password is `dots-test-pass`.
