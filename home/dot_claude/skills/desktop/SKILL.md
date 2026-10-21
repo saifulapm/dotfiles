@@ -30,8 +30,12 @@ dots-call lock renew claude 15     # extends the lease you hold
 
 Always pass the minutes. No lease ends later than 120 minutes after its
 unlock. While the lease holds, idle does not lock; when it ends the session
-locks again by itself. The monitors stay off after an agent unlock, so
-nothing shows on an empty desk.
+locks again by itself. The monitors go off a second after an agent
+unlock, so nothing shows on an empty desk. A dark output sends no frame
+callbacks, so a client that waits for them (the shell, Qt apps) stops
+redrawing and a capture shows its last frame; foot keeps drawing. When the
+task needs pixels of such a window, light the desk first with `niri msg
+action power-on-monitors`.
 
 **Before each burst of input, read `lock state` again** and stop typing if
 `locked` is true: the lease ended, or Saiful locked, and the next key would
@@ -100,8 +104,8 @@ exposes nothing: use pixels. Chromium and Electron need
 - A region, smallest that answers: `grim -s 1 -g "X,Y WxH" /tmp/s.png`, then
   Read it. `-s 1` makes image pixels equal pointer coordinates.
 - Text on screen: OCR it instead of Reading the image,
-  `grim -g "X,Y WxH" - | tesseract stdin stdout`. Leave `-s 1` off here:
-  tesseract needs the native pixels for small fonts.
+  `grim -s 3 -g "X,Y WxH" - | tesseract stdin stdout`. tesseract misreads
+  small text at its own size (`hi` as `ni`), so upscale it with `-s 3`.
 - One window: `niri msg action screenshot-window --id N --path /tmp/desk/win.png`
   (an absolute path). It also replaces the clipboard.
 - niri gives a window's size but not its position, so a crop of a tiled
@@ -154,8 +158,9 @@ id=$(niri msg -j focused-window | jq -er 'select(.app_id == "foot") | .id') &&
 [ "$(dots-call lock state | jq -r .locked)" = false ] &&
 wtype 'echo hi' && wtype -k Return &&
 niri msg action fullscreen-window --id "$id" && sleep 0.5 &&
-grim -o "$(niri msg -j focused-output | jq -r .name)" - | tesseract stdin stdout | grep -xE '\s*hi\s*'
+text=$(grim -s 3 -o "$(niri msg -j focused-output | jq -r .name)" - | tesseract stdin stdout 2>/dev/null)
 [ -n "$id" ] && niri msg action close-window --id "$id"
+grep -xE '\s*hi\s*' <<<"$text"    # the last line, so the call's exit code is whether hi was read
 ```
 
 ## 6. Browser: playwright-cli

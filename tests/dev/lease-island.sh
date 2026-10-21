@@ -11,7 +11,7 @@ no_transition() { shell_status | jq -e '.transition == ""' >/dev/null; }
 # A switch plays its transition over the old frame, so a capture waits for it to end and the next frame to land.
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; until_ok 2000 no_transition; sleep 0.3; }
 settled() { until_ok 3000 state_is "$1 and .animating == false"; sleep 0.1; }
-# An agent unlock turns the monitors off a second later, and an output that is off sends no frame callbacks, so nothing redraws; the check wakes them as Saiful would.
+# An agent unlock turns the monitors off a second later, and the shell, a Qt client, draws no new frame without niri's frame callbacks, so the check wakes them as Saiful would.
 unlock() {
   local n
   n=$(timeout 0.5 qs ipc call lock state | jq .monitorsOff)
