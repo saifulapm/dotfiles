@@ -20,20 +20,21 @@ scratchpad-directory default you were given).
 sites, logins the brief gives you credentials for:
 
 ```sh
-playwright-cli -s=op --config ~/.config/playwright-cli/config.json open <url>
+playwright-cli -s=op open <url>
 playwright-cli -s=op goto|click|fill|press|screenshot …
 playwright-cli -s=op close            # always, at the end
 ```
 
-`--config` is required on `open`: it points at Fedora's chromium, and
-without it `open` dies looking for Google Chrome, which has no arm64 build.
+Pass no `--config`: the `playwright-cli` wrapper adds the machine's own, which
+points at Fedora's chromium (Google Chrome has no arm64 build) and keeps it
+sharp on a scaled output.
 
 **The user's own Chromium — only when the brief says the task needs their
 login** (their store, their dashboard, their account). Say in your hand-back
 that you used it.
 
 ```sh
-pgrep -x chromium-browse >/dev/null || app-run chromium-browser
+pgrep -x chromium-browse >/dev/null || systemd-run --user --quiet --collect --property=ExitType=cgroup -- chromium-browser
 playwright-cli attach --extension=chromium      # session name: chromium
 playwright-cli -s=chromium goto <url>           # then drive as usual
 playwright-cli -s=chromium detach               # at the end

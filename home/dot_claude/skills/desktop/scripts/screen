@@ -17,10 +17,11 @@
 # not point. Pointer work goes through scripts/mouse, which keeps the
 # hot-corner and notes-strip clamps.
 #
-# Refuses all input while the screen is locked, and `type`/`key` while a
-# terminal has focus: keystrokes there run as commands. Drive terminals with
-# tmux instead. Under the nested dev compositor set WAYLAND_DISPLAY=wayland-2
-# and MOUSE_SCREEN=WxH as the desktop skill says; both pass straight through.
+# Refuses all input while `dots-call lock state` reads locked, and
+# `type`/`key` while a terminal has focus: keystrokes there run as commands.
+# Drive terminals with tmux instead. Under the nested dev compositor set
+# WAYLAND_DISPLAY=wayland-2 and MOUSE_SCREEN=WxH as the desktop skill says;
+# both pass straight through.
 
 set -euo pipefail
 
@@ -58,8 +59,11 @@ to_logical() {
     LX=$((OX + $1 * W / SW)) LY=$((OY + $2 * H / SH))
 }
 
+# Keys sent at a lock land in its password field, so input waits for a lock
+# state that reads unlocked; a shell that does not answer counts as locked.
 unlocked() {
-    [[ "$(qs ipc call lock status 2>/dev/null)" != locked ]] || die "screen is locked — no input"
+    [[ "$(dots-call lock state 2>/dev/null | jq -r .locked 2>/dev/null)" == false ]] ||
+        die "screen is locked, no input: unlock on a lease (dots-call lock unlock claude 15) or stop"
 }
 
 no_terminal() {
@@ -98,12 +102,12 @@ zoom)
     ;;
 move)
     [[ $# -eq 2 ]] || usage
-    load; unlocked; to_logical "$1" "$2"
+    unlocked; load; to_logical "$1" "$2"
     "$MOUSE" to "$LX" "$LY"
     ;;
 click)
     [[ $# -ge 2 && $# -le 4 ]] || usage
-    load; unlocked; to_logical "$1" "$2"
+    unlocked; load; to_logical "$1" "$2"
     button=${3:-left} count=${4:-1}
     [[ $button =~ ^(left|right|middle)$ ]] || die "button: left, right or middle"
     [[ $count =~ ^[1-3]$ ]] || die "count: 1 to 3"
@@ -112,14 +116,14 @@ click)
     ;;
 drag)
     [[ $# -eq 4 ]] || usage
-    load; unlocked
+    unlocked; load
     to_logical "$1" "$2"; X1=$LX Y1=$LY
     to_logical "$3" "$4"
     "$MOUSE" drag "$X1" "$Y1" "$LX" "$LY"
     ;;
 scroll)
     [[ $# -ge 3 && $# -le 4 ]] || usage
-    load; unlocked; to_logical "$1" "$2"
+    unlocked; load; to_logical "$1" "$2"
     n=${4:-3}
     [[ $n =~ ^[0-9]+$ ]] && ((n >= 1 && n <= 30)) || die "notches: 1 to 30"
     "$MOUSE" to "$LX" "$LY"

@@ -1,421 +1,254 @@
 ---
 name: desktop
-description: "Full control of Saiful's Linux desktop (Fedora Asahi + niri + quickshell). Use whenever a task means touching the live session: open/launch/use/test any app — web app, browser page, CLI, TUI, or GUI — drive an interactive program, type or click into a window, take a screenshot or verify something on screen, control volume/brightness/theme/media/wifi, or drive the qshell bar/menu/panels. Triggers: 'open X', 'run X and …', 'test X', 'click', 'type into', 'screenshot', 'check the screen', 'use the app', 'interact with', 'check the site'."
+description: "Full control of Saiful's Linux desktop (Fedora Asahi, niri and the Quickshell shell). Use whenever a task means touching the live session: open, launch, use or test any app (web app, browser page, CLI, TUI or GUI), drive an interactive program, type or click into a window, take a screenshot or check something on screen, unlock the session for a task, control volume, brightness, theme, media or wifi, or drive the shell's island, launcher, control panel and other surfaces. Triggers: 'open X', 'run X and ...', 'test X', 'click', 'type into', 'screenshot', 'check the screen', 'use the app', 'interact with', 'check the site', 'unlock'."
 ---
 
-# desktop — drive this machine like the user does
+# desktop: drive this machine like Saiful does
 
-This is Saiful's **live session**, not a sandbox. You share keyboard focus,
-clipboard, and windows with a person who may be typing at the same time.
-Everything below is verified on this machine (niri 26.04, quickshell 0.3).
+This is Saiful's live session, not a sandbox. You share keyboard focus,
+clipboard and windows with a person who may be typing at the same time, or
+with nobody at all when he asks from his phone. niri 26.04 is the
+compositor; the shell (Quickshell, unit `dots-shell.service`) draws the
+island, the launcher, the panels and the lock.
 
-**Screen geometry is not fixed here — read it, never assume it.** Which output
-is live changes (this desk drives an external monitor), and the qshell bar is
-themeable and movable to any screen edge. Before the first `grim -g` of a
-session:
-
-```sh
-niri msg -j outputs | jq -r '.[] | "\(.name) \(.logical.width)x\(.logical.height) @\(.logical.scale)"'
-```
-
-**Over SSH** (`$SSH_CONNECTION` set) you drive the machine you are logged
-into, not the one the user sits at — fish's `conf.d/05-ssh-desktop.fish`
-imports `WAYLAND_DISPLAY`/`NIRI_SOCKET` from the live niri session, so every
-tool below works unchanged. No `NIRI_SOCKET` means no graphical session is up
-there; say so rather than working around it. The user is probably not at that
-screen, so check `qs ipc call lock status` before any input — never type
-into a locked screen — and tell them what you left open on it.
-
-## Golden rules
-
-1. **Text before pixels.** `tmux capture-pane`, `niri msg -j …`, `qs ipc`,
-   and command output are free; screenshots cost real money. Screenshot only
-   when a question is genuinely visual. When the text is free but *reading*
-   it is not — a megabyte of page snapshot to find one ref — search it
-   (`playwright-cli find`, `grep` the snapshot file, `gui tree | grep`)
-   instead of dumping it, or hand the job to an operator subagent.
-2. **Never capture the full screen at native scale.** Always
-   `grim -s 1 -g "X,Y WxH" /tmp/shot.png` — the smallest region that answers
-   the question. `-s 1` maps image pixels 1:1 to logical/pointer coordinates.
-3. **If the answer is text on screen, OCR it instead of Reading the image:**
-   `grim -g "X,Y WxH" - | tesseract stdin stdout` → plain text, no vision
-   tokens. OCR captures omit `-s 1` on purpose — tesseract needs the native
-   1.5x pixels for small fonts (verified: the bar clock reads at native,
-   nothing at `-s 1`).
-4. **Check focus before injecting input.** `wtype` and `wlrctl` go to
-   whatever has keyboard focus / is under the pointer. A miss lands your
-   keystrokes in the user's terminal or Claude prompt.
-5. **Clean up what you spawn.** Name tmux sessions `agent-<task>`, kill them
-   when done; kill by pid, never `pkill -f <pattern>` — and never select
-   pids with `pgrep -f <pattern> | kill` either: any pattern that appears in
-   your own command line matches your own Bash tool and kills you (verified
-   twice, once each way). Filter `/proc/<pid>/cmdline` by exact match, or
-   kill the tmux server/pane that owns the process instead.
-
-## The four surfaces, and what drives each
-
-| Surface | Tool | Why |
-|---|---|---|
-| Web app / page | `playwright-cli` — `open` (isolated) or `attach --extension` (their session) | accessibility-tree snapshots, real clicks/typing, console + network |
-| Desktop GUI app | `~/.claude/skills/desktop/scripts/gui` | reads and clicks widgets **by name** over the accessibility bus — no coordinates, no screenshots, no focus stealing |
-| CLI / TUI | tmux (`send-keys` + `capture-pane`) | full text in, full text out, nothing visual to pay for |
-| The shell itself (bar, panels, overlays) | `qs ipc` + `niri msg` | the surfaces answer directly; screenshots are a last resort |
-
-`gui` and `mouse` (same scripts dir) print their full usage with no arguments.
-
-**A visual GUI job with no text channel → the `desktop-operator` subagent.**
-When the only way through is pixels (no a11y tree, a canvas, a dialog `gui`
-cannot see) and it takes more than a shot or two, delegate it instead of
-screenshotting here: Haiku 5.5 runs the look → act loop on its own
-screenshots and hands back a few lines. Its brief must name the goal, what
-counts as done, and every text it may type and commit action it may take —
-it stops at anything not authorised. It drives `scripts/screen` (the
-computer-use action set — `shot`, `zoom`, `click`, `key`… — in screenshot
-pixels), which you can use the same way.
-
-## The loop — every interaction, any app type
-
-```
-- [ ] 1. Pick the cheapest channel that answers the question: command/curl
-        output → gui/web/tmux/IPC text → OCR → region screenshot
-- [ ] 2. Before input: verify the target (focused window id, active pane,
-        highlighted row) — never assume state carried over from a prior call
-- [ ] 3. Act in one atomic burst (focus+verify+type in a single Bash call)
-- [ ] 4. Verify the effect through the cheapest channel before concluding —
-        a failed interaction is usually your targeting, not the app
-- [ ] 5. Revert what you touched: windows, sessions, focus, files, settings
-```
-
-**Which one, measured on this machine (2026-10-08):** a single question is
-fastest by hand — `gui click` 0.3 s, `playwright-cli find` 0.5 s. A job of
-several steps goes to a Haiku operator: `browser-operator` 16–25 s for a
-search-and-read or a signed-in lookup, `desktop-operator` 24–50 s for a
-pixel-driven GUI job. They take the whole loop — and every snapshot and
-screenshot — out of your context.
-
-If an interaction "did nothing", suspect steps 2–3 before reporting an app
-bug — re-verify at fullscreen / re-read the real state, then retest once.
-
-## Seeing the screen
-
-- Region: `grim -s 1 -g "X,Y WxH" /tmp/s.png` then Read. Take W/H from the
-  `niri msg -j outputs` call above — a crop computed from remembered numbers
-  lands on the wrong window and costs two captures instead of one. niri
-  `gaps 10` (config.kdl) applies between columns and to the screen edge, so a
-  full tile is `10,(bar+10) (W-20)x(H-bar-20)`. Derive the bar's extent
-  instead of assuming a top strip — it is themeable and movable:
-  `bar = H - tile_h - 2*gap`, with
-  `tile_h = niri msg -j windows | jq '.[0].layout.tile_size[1]'`.
-- Centred overlays (vicinae, qshell cards) are at `x=(W-cardW)/2`,
-  `y=(H-cardH)/2` — e.g. vicinae's card is its configured
-  `launcher_window.size` in `~/.config/vicinae/overrides.json`.
-- Window *size* IS in IPC (`layout.tile_size` / `window_size`), but its
-  *position* is not (`tile_pos_in_workspace_view` is null; nirisnap verified
-  window-region capture impossible on niri) — which is why a tiled window's
-  x still cannot be computed. For a whole-window shot use the compositor:
-  `niri msg action screenshot-window` → newest file in `~/Pictures/Screenshots/`
-  (`ls -t ~/Pictures/Screenshots | head -1`). Prefer a region crop when you
-  know where to look.
-- Overlays/panels: confirm the surface actually mapped before trusting an
-  empty shot — `niri msg -j layers | jq -r '.[].namespace'` (qshell surfaces
-  are `qshell-<name>`). Overlays dismiss on any user keystroke/click, so
-  chain open→grim within ~0.7s and treat an empty capture as a race first.
-- Text state of any terminal you own: `tmux capture-pane -p -t agent-x` —
-  never screenshot a terminal you can capture.
-
-## Keyboard — wtype
-
-- Keysyms are reliable: `wtype -k Return`, `wtype -k Down`, `wtype -k BackSpace`.
-- Modifiers: `wtype -M ctrl -k space -m ctrl` (press `-M`, release `-m`).
-- Text: `wtype "hello"` — fine on the live session; under the nested dev
-  compositor text autorepeats into garbage, use single `-k` keysyms there.
-- Before typing: `niri msg -j focused-window | jq '{app_id,title}'` (or the
-  layers check above for shell surfaces). After a miss: `wtype -k BackSpace`
-  to clean up.
-- **When the user is active, make every burst atomic**: focus + verify +
-  type inside ONE Bash call (`niri msg action focus-window --id N; check
-  focused==N && wtype …`), and abort on mismatch — their keystrokes between
-  your tool calls can move focus at any moment (they answer you mid-turn).
-- **grim BEFORE pressing Return inside qshell panels.** Blind Right+Return in
-  the network panel once switched the user's DNS to Cloudflare. Look, then press.
-
-## Mouse — scripts/mouse (wlrctl to point, ydotool to hold)
-
-- All absolute positioning goes through `~/.claude/skills/desktop/scripts/mouse`:
-  `mouse to X Y` · `mouse click X Y [left|right|middle]` ·
-  `mouse drag X1 Y1 X2 Y2`.
-- **Never pin the pointer to a corner yourself**
-  (`wlrctl pointer move -20000 -20000` is FORBIDDEN): (0,0) and (0,H-1) are
-  niri overview hot corners — a 1×1-px rect at the exact corner pixel that
-  fires even where the bar covers it — and the right screen edge below the
-  bar is the notes 1-px hot strip (150 ms hover dwell; a drag touching it
-  summons the panel instantly). The old top-left pin opened the overview on
-  EVERY absolute move. The script pins to the bar's right end (the only
-  inert corner) and clamps targets 2 px inside the screen; wlrctl deltas
-  land in a single jump, so only endpoints matter, never the path.
-- If a stray move did trip something: overview →
-  `niri msg action close-overview` (idempotent; state:
-  `niri msg -j overview-state`); notes panel → `qs ipc call notes -- hide`.
-- Scroll stays raw wlrctl: `wlrctl pointer scroll dy dx`.
-- Coordinates == pixels in a `grim -s 1` capture. Take the region shot, find
-  the target, click those numbers.
-- **Moving the pointer changes focus** (focus-follows-mouse is on) and can
-  dismiss open overlays/tooltips. Don't wiggle the mouse for fun; put it back
-  near where it was if the user is active.
-- Tooltips in screenshots may be the idle mouse hovering, not your cursor.
-- **Verify where the pointer actually is** with `grim -c` (includes the
-  cursor) on a small region — the only way to confirm a move landed.
-- Prefer `gui click` over coordinates whenever the app exposes a11y: it
-  can't miss, and it doesn't move the user's pointer at all.
-- **Dragging** (sliders, drag-and-drop, marquee): `mouse drag X1 Y1 X2 Y2` —
-  it holds the button with ydotool (wlrctl cannot express a held button) and
-  steers with wlrctl. Verified end to end (a GTK slider moved 50 → 89). For
-  a multi-waypoint drag, do it manually — `mouse to` the grab point,
-  `ydotool click 0x40` (press and HOLD; `0x80` up), steer with *relative*
-  `wlrctl pointer move DX DY` legs, release — and keep every waypoint off
-  the right edge (notes DropArea). Two traps: **don't reach for `ydotool
-  mousemove --absolute`** — ydotoold's default device is relative, so
-  absolute coordinates are ignored, and `ydotoold -T` (the EV_ABS/touch
-  device that would accept them) exits 2 immediately on this machine,
-  verified against a working control run. Position with wlrctl, use ydotool
-  only for the buttons. And `ydotoold` must be running
-  (`systemctl --user status ydotoold`), which needs the `input` group
-  active in the session — a fresh login after install.
-- **To click a spot inside a window, fullscreen it first**
-  (`niri msg action fullscreen-window --id N`): a tiled window's x-position
-  in the scrolling layout is unknowable from IPC, so clicks computed from
-  assumed tile coords miss silently (verified — same click worked at
-  fullscreen). A click that "did nothing" is usually YOUR coordinates, not
-  the app: re-verify at fullscreen before reporting the app broken.
-
-## Interactive CLIs/TUIs — tmux is the default
+## 1. Preflight: is the session locked?
 
 ```sh
-tmux new-session -d -s agent-x -x 200 -y 50   # headless terminal
+dots-call lock state | jq '{locked, heldBy, leaseUntil}'
+```
+
+While locked, these still work: tmux, every `dots-call <target> state`,
+`niri msg -j` queries, and `systemd-run --user`. Captures show only the lock
+screen, `niri msg action` ignores all but power and VT actions, and wtype or
+ydotool type into the lock's password field. So stay locked for text work,
+and unlock only when the task needs pixels or input:
+
+```sh
+dots-call lock unlock claude 15    # a lease of 15 minutes; prints the state JSON, or {"error":"..."}
+dots-call lock renew claude 15     # extends the lease you hold
+```
+
+Always pass the minutes. No lease ends later than 120 minutes after its
+unlock. While the lease holds, idle does not lock; when it ends the session
+locks again by itself. The monitors stay off after an agent unlock, so
+nothing shows on an empty desk.
+
+**Before each burst of input, read `lock state` again** and stop typing if
+`locked` is true: the lease ended, or Saiful locked, and the next key would
+land in the password field. Without a lease idle locks at 300 s, and wtype
+may not count as activity. A `heldBy` with another name is another agent's
+lease: do not lock or renew it under that agent.
+
+Over SSH (`$SSH_CONNECTION` set) fish's `conf.d/ssh-desktop.fish` imports
+`WAYLAND_DISPLAY` and `NIRI_SOCKET` from the live niri, so every tool here
+works unchanged. No `NIRI_SOCKET` means no graphical session is up; say so.
+
+## 2. Text before pixels
+
+Pick the cheapest channel that answers the question. Screenshots cost real
+money; command output is free.
+
+| Surface | Channel |
+|---|---|
+| Windows, workspaces, outputs | `niri msg -j windows`, `focused-window`, `workspaces`, `outputs`, `layers` |
+| The shell's surfaces | `dots-call <target> state` (JSON; see the IPC table) |
+| CLI or TUI | tmux `send-keys` and `capture-pane` |
+| GUI app | `~/.claude/skills/desktop/scripts/gui` over AT-SPI |
+| Web page | `playwright-cli` (section 6) |
+
+A megabyte of text is not free to read either: search it (`grep` a snapshot
+file, `gui tree <app> | grep`) instead of dumping it, or hand the job to an
+operator subagent (section 9).
+
+### tmux for anything in a terminal
+
+```sh
+tmux new-session -d -s agent-x -x 200 -y 50
 tmux send-keys -t agent-x 'mysql' Enter
-sleep 1; tmux capture-pane -p -t agent-x      # read output as TEXT
-tmux send-keys -t agent-x 'show databases;' Enter
+sleep 1; tmux capture-pane -p -t agent-x
 tmux kill-session -t agent-x                  # always
 ```
 
-- Answer prompts with `send-keys` (`y`, `Enter`, `C-c`, arrows as `Down`/`Up`).
-- Show the user what you're doing: `foot-run tmux attach -t agent-x` opens a
-  visible foot on the same session — you keep driving via send-keys, they watch.
-- `foot-run <cmd>` (in `~/.dotfiles/bin`, already on PATH) is the way to open
-  any visible terminal — server-first footclient, instant spawn.
-- An app that runs its own tmux server (`-L <name>` / `-S <path>`) can be
-  read and driven the same way — target its socket: `tmux -L <name>
-  capture-pane -p -t %N`, `send-keys`. `tmux -L <name> list-panes -a` maps
-  what it built.
+- To let Saiful watch: `niri msg action spawn -- foot tmux attach -t agent-x`.
+  You keep driving with send-keys.
+- Plain `capture-pane -p` drops colours, so a selected row is invisible.
+  Before a destructive key, read `capture-pane -p -e` and find the
+  reverse-video row with `\x1b\[[0-9;]*7m` (a highlight is often `[0;7m`).
+- A fast string can outrun a TUI's palette or autocomplete: type, pause,
+  capture, then Enter.
+- An app with its own tmux server: `tmux -L <name> list-panes -a`, then
+  `capture-pane`/`send-keys` against that socket.
 
-## Driving any TUI precisely
-
-- Plain `capture-pane -p` strips colors, so **selection/highlight state is
-  invisible**. Before any destructive keystroke (delete/confirm/stop), read
-  `capture-pane -p -e` and find the reverse-video row with regex
-  `\x1b\[[0-9;]*7m` — highlights often render as a combined SGR (`[0;7m`),
-  and a bare-`[7m` match misses it (that miss once produced a false
-  "selection vanished" bug report). Selection is often sticky on an old
-  row, not the row you assume (that once armed a destructive action on the
-  wrong list item — caught just in time).
-- Fast typed strings can outrun a TUI's input handling (palettes,
-  autocomplete): type, pause, then Enter — and re-capture between steps.
-- tmux pane → screen coords for clicking: `display-message -p -t %N
-  '#{pane_left} #{pane_top} #{pane_width} #{pane_height} #{window_width}
-  #{window_height}'` cells, scaled into the (fullscreened) window's pixel
-  box.
-
-## Launching GUI apps
-
-- `launch-or-focus <app_id> [cmd…]` — focus the existing window else launch
-  (pattern matches app_id, word-bounded, case-insensitive).
-- `app-run <cmd> [args…]` — detached launch as its own systemd unit under
-  app-graphical.slice (oomd isolation). Use for anything long-lived.
-- `webapp-launch <name>` — chromium webapps (chatgpt, discord, whatsapp, x,
-  youtube, zoom). Plain browser: `app-run chromium-browser <url>`.
-- Or compositor-side: `niri msg action spawn -- cmd args` / `spawn-sh "cmd | pipe"`.
-- Wait for the window: `wlrctl toplevel waitfor app_id:<id>` (and `wait` for
-  it to close, `find` to test existence).
-- **Verify survival, not the flash**: sleep 3, `pgrep -af <cmd>`,
-  `systemd-cgls --user-unit app-graphical.slice | grep <cmd>` — a window that
-  appeared and died has fooled an agent before.
-
-## GUI apps — read and click by name
-
-`scripts/gui` talks to the accessibility bus, so a GTK/Qt app is a tree of
-named widgets with screen coordinates, not a picture to squint at:
+### GUI apps by widget name
 
 ```sh
-gui apps                      # what's on the a11y bus right now
-gui tree <app>                # interactive widgets + coords + state flags
-gui click <app> 'Save'        # activates it semantically — mouse never moves
-gui type <app> 'Search' 'foo' # set an entry's text
-gui text <app>                # every readable string in the app
+gui apps                      # apps on the a11y bus
+gui tree <app>                # interactive widgets, coords, [checked,focused,...] flags
+gui click <app> 'Save'        # activates it; the pointer never moves
+gui type <app> 'Search' 'foo' # sets an entry's text
+gui text <app>                # every readable string
 ```
 
-`[checked,focused,sensitive]` flags in `tree` output are how you assert an
-effect happened without a screenshot. Substring matching: `gui click files
-Save` is enough.
+An app missing from `gui apps`, or whose `tree` is empty (Qt Quick apps),
+exposes nothing: use pixels. Chromium and Electron need
+`--force-renderer-accessibility` to appear.
 
-Limits, and what to do instead: apps absent from `gui apps` don't export
-a11y, and neither do apps listed there whose `gui tree` comes back empty —
-Qt Quick apps such as omacalc register but expose no widgets, even with
-`QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1` (verified 2026-10-08). Drive both with
-`scripts/screen`, or hand the job to `desktop-operator`; Electron/Chromium need
-`--force-renderer-accessibility` to appear; a widget with no action still
-gives you coordinates to click.
+## 3. Pixels: grim, window shots, OCR
 
-## Web apps & browser — decide the session first
+- Read the geometry first, never assume it:
+  `niri msg -j outputs | jq -r '.[] | "\(.name) \(.logical.width)x\(.logical.height) @\(.logical.scale)"'`.
+- A region, smallest that answers: `grim -s 1 -g "X,Y WxH" /tmp/s.png`, then
+  Read it. `-s 1` makes image pixels equal pointer coordinates.
+- Text on screen: OCR it instead of Reading the image,
+  `grim -g "X,Y WxH" - | tesseract stdin stdout`. Leave `-s 1` off here:
+  tesseract needs the native pixels for small fonts.
+- One window: `niri msg action screenshot-window --id N --path /tmp/desk/win.png`
+  (an absolute path). It also replaces the clipboard.
+- niri gives a window's size but not its position, so a crop of a tiled
+  window is a guess. Fullscreen it first (`niri msg action fullscreen-window
+  --id N`, the same call toggles back) and capture the output:
+  `grim -o "$(niri msg -j focused-output | jq -r .name)" ...`.
+- Shell surfaces are layers `dots-island`, `dots-surfaces`, `dots-margins`,
+  `dots-paper` and `dots-dim`: check `niri msg -j layers` before trusting an
+  empty shot. A surface closes on the next key or click, so chain open and
+  grim in one call.
 
-**Before the first browser call, decide *whose session* the task needs.
-That, not difficulty, picks the channel:**
+## 4. Input: wtype for keys, ydotool for buttons
 
-| No login needed → `open` (isolated, default) | User's login needed → `attach --extension` |
-|---|---|
-| public pages, docs, local `.test` dev sites | Shopify admin, dashboards, paid/SaaS consoles |
-| a login the task performs itself (test creds) | "check *my* orders / *my* store / *my* account" |
-| repeatable checks, before/after comparisons | a bug only their logged-in session reproduces |
-| anything unattended | a tab they already have open |
+- **Check focus first**, inside the same Bash call as the keys:
+  `niri msg -j focused-window | jq '{id,app_id,title}'`. A miss lands your
+  keys in Saiful's terminal or in this prompt.
+- Text `wtype 'hello'`; keys `wtype -k Return`; chords
+  `wtype -M ctrl -k s -m ctrl`.
+- Pointer: `~/.claude/skills/desktop/scripts/mouse to X Y`, `click X Y
+  [left|right|middle]`, `drag X1 Y1 X2 Y2`. Coordinates are `grim -s 1`
+  pixels. It moves with wlrctl and holds buttons with ydotool, and it never
+  rests on niri's top-left hot corner. Do not pin the pointer to a corner
+  yourself.
+- ydotool talks to `ydotoold.service` (a user unit, socket
+  `$XDG_RUNTIME_DIR/.ydotool_socket`): `systemctl --user is-active ydotoold`.
+  Use it only for buttons; `ydotool mousemove --absolute` is ignored by its
+  relative device.
+- Moving the pointer can close an open surface. Prefer `gui click`, which
+  does not move it.
+- When Saiful is active, do focus, check and type in one atomic call, and
+  abort on a mismatch.
 
-**A multi-step web job → the `browser-operator` subagent** (Haiku 5.5): it
-drives `playwright-cli` itself, in either session by the rule below, and
-hands back a few lines — no snapshot or screenshot reaches you. Its brief
-must name the goal, what counts as done, whether their login is needed, and
-every text it may type and commit action it may take. A single lookup is
-still cheaper by hand with `find`.
-
-One tool does both — `playwright-cli`. Default hard to `open`: isolated,
-headless, repeatable, and it never touches their profile. Escalate to
-`attach` only when the task is impossible without their identity — and
-**say so in your reply**, because it is their real browser and their data.
-
-**`playwright-cli`** (full command reference: the `playwright-cli` skill —
-invoke it rather than guessing flags). The session-opening command carries
-the config; later commands find the running session on their own:
+## 5. Launching apps
 
 ```sh
-playwright-cli --config ~/.config/playwright-cli/config.json open <url>
-playwright-cli snapshot            # a11y tree with refs (e3, e6…) — 1.2 MB on a real page
-playwright-cli find "Add to cart"  # search the page instead of dumping it
-playwright-cli click e6 · fill e3 "text" · press Enter
-playwright-cli console             # errors without a screenshot
-playwright-cli close-all           # always
+niri msg action spawn -- foot                                # a child of niri, focused when it maps
+systemd-run --user --quiet --collect --property=ExitType=cgroup -- chromium-browser
+# its own unit, which works while locked too; ExitType=cgroup keeps it up while any chromium process lives
 ```
 
-**Do not read a snapshot to find one element.** A real page is 1.2 MB of
-YAML and reading it to locate a ref is the single most expensive habit on
-this machine. Every action already writes the snapshot to a file under
-`.playwright-cli/` and prints its path — search that instead:
+Then wait for the window: `wlrctl toplevel waitfor app_id:<id>`. Check it
+survived, not just that it flashed: after 3 s, `niri msg -j windows | jq -r
+'.[].app_id'` still lists it.
+
+**The worked example**, as one call so nothing types into the wrong window:
 
 ```sh
-playwright-cli find "Add to cart"                        # matching nodes + refs
-grep -n -i 'button.*cart' .playwright-cli/page-*.yml | tail -5
+niri msg action spawn -- foot && sleep 1 &&
+id=$(niri msg -j focused-window | jq -er 'select(.app_id == "foot") | .id') &&
+[ "$(dots-call lock state | jq -r .locked)" = false ] &&
+wtype 'echo hi' && wtype -k Return &&
+niri msg action fullscreen-window --id "$id" && sleep 0.5 &&
+grim -o "$(niri msg -j focused-output | jq -r .name)" - | tesseract stdin stdout | grep -xE '\s*hi\s*'
+[ -n "$id" ] && niri msg action close-window --id "$id"
 ```
 
-Snapshot lines start with the node's role (`- button "Add to cart"`), so
-never anchor a pattern with `^`.
+## 6. Browser: playwright-cli
 
-The config pins Fedora's chromium (`launchOptions.executablePath`) —
-without `--config`, `open` dies looking for `/opt/google/chrome/chrome`,
-because no Chrome build exists for Linux arm64. `--mobile` renders a
-lighter page and costs fewer tokens; `--json`/`--raw` keep output
-scriptable.
+The `playwright-cli` skill has the full command list; read it rather than
+guess flags. The `bin/playwright-cli` wrapper adds the machine's config to
+`open` and `attach` and points the extension at Fedora's chromium, so pass
+no `--config` of your own.
 
-**Their logged-in browser**, through the Playwright Extension (installed by
-policy, `chromium/policies/extensions.json`) — real cookies, real logins,
-real extensions:
+Saiful's own Chromium, with his logins, through the Playwright extension:
 
 ```sh
 playwright-cli attach --extension=chromium     # session name: chromium
-playwright-cli --s=chromium goto https://…       # then drive as usual
-playwright-cli --s=chromium detach               # NEVER `close`/`close-all`
+playwright-cli -s=chromium tab-new https://...
+playwright-cli -s=chromium find "Orders"       # search the page, do not dump it
+playwright-cli -s=chromium tab-close
+playwright-cli -s=chromium detach              # never close, close-all or kill-all
 ```
 
-The `bin/playwright-cli` wrapper sets
-`PLAYWRIGHT_MCP_EXECUTABLE_PATH=/usr/bin/chromium-browser` (without it the
-extension path looks for Google Chrome, which does not exist here). Locally
-their browser must already be running — launch it with `app-run
-chromium-browser` if not — and they click the extension's Allow. **Over SSH
-the wrapper does both**: starts chromium if it is down and passes the
-extension's own token (`playwright-extension-token`), so attach is approved
-with nobody at the screen — it works on a locked screen too. **`detach` leaves their browser alive; `close`
-and `close-all` would shut it, taking their tabs with it.** Never navigate
-their session somewhere destructive, and never quote private page content
-into a reply that doesn't need it.
+`close` and `close-all` shut his browser and every tab in it. Locally
+Chromium must be running (start it as above) and he clicks the extension's
+Allow; over SSH the wrapper starts it and approves the attach with the
+extension's token. Attach behind the lock is untested.
 
-**Cheapest first still applies.** `curl -s` answers most "is it up / what
-does this endpoint return" questions with no browser at all. Local
-projects serve at `https://<dir>.test` for `~/Codes/<dir>/public`
-(caddy + dnsmasq + local CA) — only that subdirectory; anything else
-needs its own `~/.config/caddy/sites/<name>.caddy`.
+When the task needs no login, an isolated browser is safer and repeatable:
+`playwright-cli -s=op open <url>` ... `playwright-cli -s=op close`.
 
-Webapp wrappers (`webapp-launch chatgpt|discord|whatsapp|x|youtube|zoom`)
-are chromium app windows — drive them as GUI windows (app_id
-`webapp-<name>`), or via `attach --extension` if the tab is in the main
-browser.
+A snapshot of a real page is a megabyte. Each action writes it to a file
+under `.playwright-cli/` and prints the path: `find` or `grep` it. Snapshot
+lines start with the role (`- button "Save"`), so never anchor with `^`.
+`curl -s` answers most "is it up" questions with no browser at all.
 
-## Windows & workspaces — niri msg
+## 7. The shell's IPC
 
-- Inspect: `niri msg -j windows|workspaces|focused-window|layers|outputs`.
-- Act: `niri msg action focus-window --id N`, `close-window --id N`,
-  `fullscreen-window`, `move-column-left/right`, `focus-workspace N`,
-  `toggle-overview` … (`niri msg action --help` lists ~140).
-- React: `timeout 10 niri msg event-stream` streams WindowOpened/Focused/
-  WorkspaceActivated etc. Always under `timeout`.
-- Config edits don't hot-reload through the symlink:
-  `niri msg action load-config-file` first.
+`qs ipc show` lists the targets live. `dots-call <target> <function> [args]`
+reaches them in about 4 ms and falls back to `qs ipc call`; a typed call
+(`idle times`) goes straight to `qs ipc call idle times 5 10 20`.
 
-## The qshell shell — qs ipc
+| Target | Functions | What |
+|---|---|---|
+| `lock` | `state`, `lock`, `unlock <who> <min>`, `renew <who> <min>` | the session lock and its lease |
+| `idle` | `state`, `times <dimS> <lockS> <offS>` | dim, lock and monitors-off steps |
+| `island` | `state`, `focus` | the top island: clock, toasts, OSD, lease slot |
+| `notifs` | `state`, `open`, `close`, `toggle`, `clear`, `dnd <bool>`, `toggleDnd` | notification centre |
+| `launcher` | `state`, `open`, `close`, `toggle`, `mode <name>` | modes apps, windows, clipboard, emoji, calculator, commands |
+| `control` | `state`, `open`, `close`, `toggle`, `section <name>` | sections audio, wifi, bluetooth, power, display, route |
+| `themes` | `state`, `open`, `close`, `toggle` | the theme picker; `dots theme <name>` switches from a shell |
+| `notes` | `state`, `open`, `toggle`, `pin`, `capture` | notes panel |
+| `goals` | `state`, `open`, `close`, `toggle` | goals panel |
+| `pass` | `state`, `open`, `close`, `toggle` | password picker |
+| `cheatsheet` | `state`, `open`, `close`, `toggle` | keybind sheet |
+| `record` | `state`, `toggle` | region recorder: picks, or stops a recording |
+| `media` | `playPause`, `next`, `previous` | the current MPRIS player |
+| `osd` | `brightness <step>` | brightness with its OSD, step like `5%+` |
+| `margins` | `state` | the margin text on the focused output |
+| `pinentry` | `state` | the gpg passphrase prompt |
+| `polkit` | `state` | the polkit prompt |
+| `shell` | `status` | theme, outputs, memory, sync |
 
-`qs ipc show` lists everything. Targets you'll actually use: `notifs`
-(status/dismiss/dnd) `media` (playPause/next/previous/status) `theme`
-`background` (set/current) `emojis` `osd` `idle` (stayAwake/status) `bar`
-(`open <widgetId>` opens a panel) `lock` (state only — see Never-do)
-`filepicker` `wallpaper` `wallhaven` `notes` `bluetooth`.
+The shell does not hot-reload QML: `systemctl --user restart dots-shell.service`.
 
-The launcher, the command menu and clipboard history are **vicinae**, not
-the shell (`launcher`/`menu`/`clipboard` targets were retired in 1af38b7):
-`vicinae toggle` · `vicinae deeplink vicinae://launch/clipboard/history` ·
-`vicinae open -q <query>`. Its card is centred — see Seeing the screen.
+Volume: `wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+`. Wifi: `nmcli`.
+Clipboard: `wl-copy`, `wl-paste`. Change wifi, bluetooth or theme only when
+asked, and put back what you change.
 
-Quirks (all verified): `qs ipc call <target> show` prints a listing instead
-of calling — use `qs ipc call <target> -- show` or `toggle`. The shell never
-hot-reloads QML edits — restart it (`qshell-relaunch`). Syntax check QML with
-`qmlformat-qt6 <file> >/dev/null`.
+## 8. Done
 
-## System knobs (prefer the bin/ helpers — they exist for a reason)
+Revert what you touched: windows, tmux sessions, focus, files, settings. If
+you unlocked, lock again and darken the desk:
 
-- Volume/mute: `wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+`, `wpctl set-mute … toggle`
-- Brightness: `brightness-display 5%+` (wraps brightnessctl + OSD) ·
-  keyboard: `brightness-keyboard`
-- Theme: `theme-set [name]` (no arg lists; drives niri + shell + apps) ·
-  wallpaper: `background-next`
-- Network: `network-status --verbose`, `network-dns`, `network-band`; wifi
-  via `nmcli` (no polkit prompt in-session, verified)
-- Media: `qs ipc call media playPause` (media keys route here; no playerctl)
-- Misc: `power-profile`, `system-stats`, `reminder <min> [msg]`,
-  `screenrecord` (wf-recorder), `color-pick`
-- Clipboard: `wl-copy` / `wl-paste` (`wl-copy` detaches a child — don't wait
-  on it in a pipeline)
+```sh
+dots-call lock lock && niri msg action power-off-monitors
+```
 
-## Risky UI testing → nested compositor
+Kill what you spawned by pid or by its tmux session. Never `pkill -f
+<pattern>` or `pgrep -f <pattern> | kill`: the pattern is in your own command
+line, so it matches your own Bash tool and kills it.
 
-To test anything that could wreck the live session (lock screen, shell
-crashes, destructive keybinds): `just dev` in ~/.dotfiles opens a nested niri
-on wayland-2 with its own qshell. Prefix every command with
-`WAYLAND_DISPLAY=wayland-2` (`grim`, `wtype`, `qs list --all`, `qs ipc -i <id>`).
-grim there captures only the nested output and keeps working if the real
-session locks. For `mouse` there, also set `MOUSE_SCREEN=WxH` to the nested
-output size — `niri msg` still answers for the live session.
+## 9. Operators
 
-## Never do (without the user asking in this conversation)
+A job of several steps goes to a Haiku subagent, which keeps every snapshot
+and screenshot out of your context:
 
-- `niri msg action quit` / `power-off-monitors`, `qs ipc call lock lock`,
-  suspend/reboot/poweroff — you'd end the session you're driving.
-- Install packages or add configs — ask per item; installs go through
-  `packages/manifest.toml` + the user running dnf (sudo prompts; have them
-  run `! sudo …`).
-- Change wifi/DNS/bluetooth/theme state as a side effect of "testing" —
-  read state freely, mutate only on request, and revert what you touch.
-- Leave anything behind: tmux sessions, spawned windows, files outside /tmp,
-  a moved mouse mid-overlay.
+- `browser-operator`: a multi-step web job, isolated or in Saiful's Chromium.
+- `desktop-operator`: a visual GUI job with no text channel. It drives
+  `scripts/screen`, the computer-use action set (`shot`, `zoom`, `click`,
+  `type`, `key`...) in screenshot pixels, which refuses input while `lock
+  state` reads locked.
+
+The brief names the goal, what counts as done, whether it needs Saiful's
+login, and every text it may type and commit action it may take; it stops
+at anything not named.
+
+Anything that could wreck the live session (the lock itself, a shell crash,
+a destructive keybind) is tested in the nested session: `just dev` in
+`~/Codes/dotfiles`.
