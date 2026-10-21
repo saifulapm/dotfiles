@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# dots cutover: the one-off switch from v1, safe to run again; stops the v1 units v2 replaces, removes the v1 links that outrank v2's, imports v1's notes, goals and fish history, and leaves ~/.dotfiles in place.
+# dots cutover: the one-off switch from v1, safe to run again; stops the v1 units v2 replaces, removes the v1 links that outrank or shadow v2's, imports v1's notes, goals and fish history, and leaves ~/.dotfiles in place.
 set -uo pipefail
 {
 here=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 v1=$HOME/.dotfiles
 config=${XDG_CONFIG_HOME:-$HOME/.config}
-fish=${XDG_DATA_HOME:-$HOME/.local/share}/fish
+data=${XDG_DATA_HOME:-$HOME/.local/share}
+fish=$data/fish
+units=$config/systemd/user
 # v2 takes over hub-local and pxy under the same names; every other v1 unit (bt-agent...) has no v2 replacement and keeps running from ~/.dotfiles.
 replaced=(qshell.service qshell-dshift.service qshell-sync.service qshell-sync.timer qshell-sync-notes.path qshell-sync-notes.service
   qshell-sync-goals.path qshell-sync-goals.service qshell-updates.service qshell-updates.timer update-all.service update-all.timer vicinae.service taildrop-receive.service)
@@ -20,10 +22,25 @@ for unit in "${replaced[@]}"; do
   ((stopped++))
 done
 
-# ~/.gitconfig outranks v2's ~/.config/git/config, and 10-history.fish points fish at <machine>_history instead of the merged fish_history.
-for link in "$HOME/.gitconfig" "$config/fish/conf.d/10-history.fish"; do
-  [[ -L $link && $(readlink -f "$link") == "$(readlink -f "$v1")"/* ]] && rm "$link"
+v1_link() { [[ -L $1 && $(readlink -f "$1") == "$(readlink -f "$v1")"/* ]]; }
+
+# v1's instance file outranks v2's imapnotify@ template, so v1's mail watcher only stops here: disabling it would drop the wants link v2's instance of the same name starts from at the next login.
+if v1_link "$units/imapnotify@icloud.service"; then
+  systemctl --user stop imapnotify@icloud.service >/dev/null 2>&1 || { echo "dots: could not stop imapnotify@icloud.service" >&2; exit 1; }
+  ((stopped++))
+fi
+
+# ~/.gitconfig outranks v2's ~/.config/git/config; v1's fish files shadow v2's, and 10-history.fish points fish at <machine>_history instead of the merged fish_history; v1's desktop entries mostly run commands v2 does not ship; the units stopped above have no use left.
+links=("$HOME/.gitconfig" "$units/imapnotify@icloud.service")
+for unit in "${replaced[@]}"; do links+=("$units/$unit"); done
+while IFS= read -r -d '' link; do links+=("$link"); done < <(find "$config/fish" "$data/applications" -type l -print0 2>/dev/null)
+reload=0
+for link in "${links[@]}"; do
+  v1_link "$link" || continue
+  rm "$link"
+  [[ $link == "$units"/* ]] && ((reload++))
 done
+((reload)) && { systemctl --user daemon-reload || { echo "dots: systemctl --user daemon-reload failed" >&2; exit 1; }; }
 
 machine=$("$here/dots-sync-merge" machine)
 counts=$("$here/dots-cutover-import" "${XDG_STATE_HOME:-$HOME/.local/state}/qshell" "${XDG_DATA_HOME:-$HOME/.local/share}/dots" "$machine") || exit 1

@@ -66,13 +66,23 @@ as_user '
     printf "[Service]\nType=oneshot\nExecStart=/bin/true\n" > $d/$u.service
     printf "[Timer]\nOnCalendar=daily\n[Install]\nWantedBy=timers.target\n" > $d/$u.timer
   done
+  printf "[Service]\nExecStart=/bin/sleep infinity\n[Install]\nWantedBy=graphical-session.target\n" > $d/imapnotify@.service
   for f in $d/*; do ln -s $f ~/.config/systemd/user/; done
+  # v1 ran its mail watcher from an instance file of its own, wanted by the graphical session, as on the NUC.
+  mkdir -p ~/.config/systemd/user/graphical-session.target.wants
+  ln -s $d/imapnotify@.service ~/.config/systemd/user/imapnotify@icloud.service
+  ln -s $d/imapnotify@.service ~/.config/systemd/user/graphical-session.target.wants/imapnotify@icloud.service
   systemctl --user daemon-reload
   systemctl --user enable --now qshell.service hub-local.service pxy.service qshell-sync.timer update-all.timer 2>/dev/null
+  systemctl --user start imapnotify@icloud.service
   printf "[user]\n\tname = v1\n" > ~/.dotfiles/home/dot_gitconfig
   ln -s ~/.dotfiles/home/dot_gitconfig ~/.gitconfig
   echo "set -g fish_history test_box" > ~/.dotfiles/home/10-history.fish
   ln -s ~/.dotfiles/home/10-history.fish ~/.config/fish/conf.d/10-history.fish
+  mkdir -p ~/.dotfiles/home/fish ~/.config/fish/functions ~/.config/fish/completions ~/.local/share/applications
+  for f in conf.d/00-env.fish functions/hdl.fish completions/theme-set.fish; do echo "# v1" > ~/.dotfiles/home/fish/${f#*/}; ln -s ~/.dotfiles/home/fish/${f#*/} ~/.config/fish/$f; done
+  printf "[Desktop Entry]\nType=Application\nName=X\nExec=webapp-launch https://x.com/\n" > ~/.dotfiles/home/webapp-x.desktop
+  ln -s ~/.dotfiles/home/webapp-x.desktop ~/.local/share/applications/webapp-x.desktop
   echo test-box > ~/.config/qshell/machine
   printf "\x89PNG\r\n\x1a\nnot really an image\n" > ~/.local/state/qshell/notes/attachments/paste-1.png
   printf -- "- cmd: ls\n  when: 1760000000\n- cmd: make\n  when: 1760000100\n- cmd: git status\n  when: 1760000200\n" > ~/.local/share/fish/test_box_history
@@ -107,7 +117,7 @@ put "$home/.local/state/qshell/goals/goals.json" <<'EOF'
 ]}
 EOF
 
-for u in qshell.service hub-local.service pxy.service qshell-sync.timer update-all.timer; do
+for u in qshell.service hub-local.service pxy.service qshell-sync.timer update-all.timer imapnotify@icloud.service; do
   got=$(unit_state $u)
   check "v1's $u is enabled and active before the cutover (got '$got')" test "$got" = "enabled active"
 done
@@ -145,6 +155,14 @@ for u in pxy hub-local; do
 done
 got=$(unit_state pxy.service)
 check "pxy.service is enabled and active (got '$got')" test "$got" = "enabled active"
+got=$(as_user "readlink -f \$(systemctl --user show -p FragmentPath --value imapnotify@icloud.service)")
+check "imapnotify@icloud.service loads from v2's template (got '$got')" test "$got" = "$home/Codes/dotfiles/home/dot_config/systemd/user/imapnotify@.service"
+got=$(as_user "systemctl --user is-enabled imapnotify@icloud.service")
+check "imapnotify@icloud.service stays enabled for the next login (got '$got')" test "$got" = enabled
+got=$(as_user "find ~/.config ~/.local/share -type l -lname '*/.dotfiles/*'")
+check "no link under ~/.config or ~/.local/share points into ~/.dotfiles (got '$got')" test -z "$got"
+got=$(as_user "fish -c 'echo \$fish_history'")
+check "fish keeps its history in the default session (got '$got')" test "$got" = default -o -z "$got"
 got=$(as_user "systemctl --user is-failed hub-local.service")
 check "with no local.env, hub-local.service is inactive, not failed (got '$got')" test "$got" = inactive
 # A peer token is all hub local needs to serve; the file goes again before the snapshots below. A tailscale stub first on the unit's PATH says it runs, and records each serve.

@@ -38,7 +38,7 @@ function scratch() {
   const log = join(root, 'systemctl.log');
   mkdirSync(stubs);
   mkdirSync(units);
-  for (const d of ['.dotfiles/home', '.config/fish/conf.d', '.config/qshell', '.local/state/qshell/notes/attachments', '.local/state/qshell/goals', '.local/share/fish', 'repo']) mkdirSync(join(home, d), { recursive: true });
+  for (const d of ['.dotfiles/home', '.config/fish/conf.d', '.config/fish/functions', '.config/fish/completions', '.config/systemd/user', '.config/qshell', '.local/state/qshell/notes/attachments', '.local/state/qshell/goals', '.local/share/fish', '.local/share/applications', 'repo']) mkdirSync(join(home, d), { recursive: true });
 
   writeFileSync(join(home, '.dotfiles/home/dot_gitconfig'), '[user]\n');
   writeFileSync(join(home, '.dotfiles/home/10-history.fish'), 'set -g fish_history x\n');
@@ -46,6 +46,19 @@ function scratch() {
   symlinkSync(join(home, '.dotfiles/home/dot_gitconfig'), join(home, '.gitconfig'));
   symlinkSync(join(home, '.dotfiles/home/10-history.fish'), join(home, '.config/fish/conf.d/10-history.fish'));
   symlinkSync(join(home, 'repo/aliases.fish'), join(home, '.config/fish/conf.d/aliases.fish'));
+  // v1's other fish files, desktop entries and unit files, as chezmoi's symlink mode left them; bt-agent.service has no v2 replacement and keeps running from ~/.dotfiles.
+  for (const [file, at] of [['00-env.fish', '.config/fish/conf.d'], ['hdl.fish', '.config/fish/functions'], ['theme-set.fish', '.config/fish/completions'], ['webapp-x.desktop', '.local/share/applications'],
+    ['qshell.service', '.config/systemd/user'], ['update-all.timer', '.config/systemd/user'], ['bt-agent.service', '.config/systemd/user']]) {
+    writeFileSync(join(home, '.dotfiles/home', file), '');
+    symlinkSync(join(home, '.dotfiles/home', file), join(home, at, file));
+  }
+  // dots install linked v2's imapnotify@ template, but v1's instance file of its mail watcher, pointing at v1's template, outranks it.
+  writeFileSync(join(home, '.dotfiles/home/imapnotify@.service'), '');
+  writeFileSync(join(home, 'repo/imapnotify@.service'), '');
+  symlinkSync(join(home, 'repo/imapnotify@.service'), join(home, '.config/systemd/user/imapnotify@.service'));
+  symlinkSync(join(home, '.dotfiles/home/imapnotify@.service'), join(home, '.config/systemd/user/imapnotify@icloud.service'));
+  writeFileSync(join(home, 'repo/kak.desktop'), '');
+  symlinkSync(join(home, 'repo/kak.desktop'), join(home, '.local/share/applications/kak.desktop'));
 
   writeFileSync(join(home, '.config/qshell/machine'), 'test-box\n');
   writeFileSync(join(home, '.local/state/qshell/notes/attachments/paste-1.png'), PNG);
@@ -55,7 +68,7 @@ function scratch() {
   writeFileSync(join(home, '.local/share/fish/fish_history'), entry('ls', 100) + entry('v2 only', 300));
 
   // qshell.service is enabled and running, update-all.timer only enabled, v1's taildrop-receive.service enabled and running, a static qshell-sync.service mid-run, and an unrelated v1 unit is enabled too.
-  for (const f of ['qshell.service.enabled', 'qshell.service.active', 'update-all.timer.enabled', 'taildrop-receive.service.enabled', 'taildrop-receive.service.active', 'hub-local.service.enabled', 'hub-local.service.active']) writeFileSync(join(units, f), '');
+  for (const f of ['qshell.service.enabled', 'qshell.service.active', 'update-all.timer.enabled', 'taildrop-receive.service.enabled', 'taildrop-receive.service.active', 'hub-local.service.enabled', 'hub-local.service.active', 'imapnotify@icloud.service.enabled', 'imapnotify@icloud.service.active']) writeFileSync(join(units, f), '');
   writeFileSync(join(units, 'qshell-sync.service.active'), 'activating');
   writeFileSync(
     join(stubs, 'systemctl'),
@@ -66,6 +79,8 @@ case $2 in
   is-enabled) if [ -e ${units}/$3.enabled ]; then echo enabled; else echo static; fi ;;
   is-active) if [ -e ${units}/$3.active ]; then s=$(cat ${units}/$3.active); echo \${s:-active}; [ "\${s:-active}" = active ]; else echo inactive; exit 3; fi ;;
   disable) rm -f ${units}/$4.enabled ${units}/$4.active ;;
+  stop) rm -f ${units}/$3.active ;;
+  daemon-reload) ;;
   *) exit 1 ;;
 esac
 `,
@@ -90,6 +105,10 @@ const run = (s) =>
 
 const lastLine = (r) => r.stdout.trim().split('\n').at(-1);
 const store = (s, unit) => JSON.parse(readFileSync(join(s.home, `.local/share/dots/${unit}/test.json`), 'utf8'));
+// Every link under ~/.config and ~/.local/share that still points into ~/.dotfiles, relative to home.
+const v1Links = (home) =>
+  spawnSync('find', [join(home, '.config'), join(home, '.local/share'), '-type', 'l', '-lname', '*/.dotfiles/*'], { encoding: 'utf8' })
+    .stdout.trim().split('\n').filter(Boolean).map((p) => p.slice(home.length + 1)).sort();
 const calls = (s) => (existsSync(s.log) ? readFileSync(s.log, 'utf8').trim().split('\n') : []);
 
 // Every path under the scratch home with its size and mtime, links by their target.
@@ -107,7 +126,7 @@ test('cutover imports v1 notes, goals and history, stops the units v2 replaces, 
   const s = scratch();
   const r = run(s);
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(lastLine(r), 'notes: 2 imported · goals: 2 imported · history: 1 merged · v1 units: 4 stopped');
+  assert.equal(lastLine(r), 'notes: 2 imported · goals: 2 imported · history: 1 merged · v1 units: 5 stopped');
 
   const notes = store(s, 'notes').notes;
   assert.deepEqual(notes.filter((n) => !n.deleted).map((n) => n.id).sort(), ['0mt0a0001-aaaa', '0mt0a0002-aaaa']);
@@ -127,10 +146,14 @@ test('only the v1 units v2 replaces are stopped, and only the v1 links that outr
   const s = scratch();
   assert.equal(run(s).status, 0);
   assert.deepEqual(calls(s).filter((c) => c.includes('disable')), ['--user disable --now qshell.service', '--user disable --now qshell-sync.service', '--user disable --now update-all.timer', '--user disable --now taildrop-receive.service']);
-  assert.deepEqual(readdirSync(s.units).sort(), ['hub-local.service.active', 'hub-local.service.enabled']);
+  // v1's mail watcher only stops: disabling it would drop the wants link v2's instance of the same name starts from.
+  assert.deepEqual(calls(s).filter((c) => /imapnotify|daemon-reload/.test(c)), ['--user stop imapnotify@icloud.service', '--user daemon-reload']);
+  assert.deepEqual(readdirSync(s.units).sort(), ['hub-local.service.active', 'hub-local.service.enabled', 'imapnotify@icloud.service.enabled']);
   assert.equal(existsSync(join(s.home, '.gitconfig')), false);
   assert.equal(existsSync(join(s.home, '.config/fish/conf.d/10-history.fish')), false);
   assert.ok(existsSync(join(s.home, '.config/fish/conf.d/aliases.fish')), 'a link into the v2 repo stays');
+  assert.ok(existsSync(join(s.home, '.local/share/applications/kak.desktop')), 'a desktop entry from the v2 repo stays');
+  assert.deepEqual(v1Links(s.home), ['.config/systemd/user/bt-agent.service']);
   assert.ok(existsSync(join(s.home, '.dotfiles/home/dot_gitconfig')), '~/.dotfiles stays in place');
 });
 
