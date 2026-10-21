@@ -234,9 +234,10 @@ fresh=$(notmuch count -- tag:new and tag:inbox and tag:screened and tag:unread 2
 notmuch tag -new -- tag:new 2>>"$LOG"
 
 count() { notmuch count -- "$@" 2>/dev/null || echo 0; }
-# kak-mail also writes the count to the file the shell's margin watches; its box list holds the Imbox query.
-if command -v kak-mail >/dev/null 2>&1; then
-    imbox=$(kak-mail count 2>>"$LOG") || imbox=0
+# kak-mail also writes the count to the file the shell's margin watches; its box list holds the Imbox query. The user manager's PATH may lack the repo's bin/, so it is looked for where mail-sync.service runs it from too.
+kak_mail=$(command -v kak-mail || echo "$HOME/Codes/dotfiles/bin/kak-mail")
+if [ -x "$kak_mail" ]; then
+    imbox=$("$kak_mail" count 2>>"$LOG") || imbox=0
 else
     imbox=$(count tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled)
 fi

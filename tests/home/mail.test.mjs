@@ -307,3 +307,16 @@ test('a failing count still opens the thread and keeps the old file', (t) => {
   assert.match(readFileSync(join(f.dir, 'thread'), 'utf8'), /^Subject: hi$/m);
   assert.equal(readFileSync(f.file, 'utf8'), '5\n');
 });
+
+// mail-sync.service names bin/ by absolute path because the user manager's PATH may lack it, so the hook must find kak-mail without PATH too.
+test('the post-new hook writes the count for the margin with kak-mail off PATH', (t) => {
+  const f = countFake(t);
+  mkdirSync(join(f.dir, 'Codes/dotfiles/bin'), { recursive: true });
+  cpSync(join(repo, 'bin/kak-mail'), join(f.dir, 'Codes/dotfiles/bin/kak-mail'));
+  writeFileSync(join(f.dir, 'notify-send'), `#!/bin/sh\necho "$*" >> ${f.dir}/notified\n`, { mode: 0o755 });
+  const env = { PATH: `${f.dir}:/usr/bin:/bin`, HOME: f.dir, XDG_STATE_HOME: join(f.dir, 'state'), DBUS_SESSION_BUS_ADDRESS: 'unix:path=/nonexistent' };
+  const r = spawnSync('bash', [join(repo, 'home/dot_config/notmuch/hooks/executable_post-new')], { env, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readFileSync(f.file, 'utf8'), '2\n');
+  assert.match(readFileSync(join(f.dir, 'notified'), 'utf8'), /2 unread/);
+});
