@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, chipLook, MODES, inOrder } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, chipLook, clockLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -427,4 +427,27 @@ test("a chip reads the file's extension or the count, and the drag image names t
   assert.equal(p.name(['/d/a\nb‮\u0007c.jpg']), 'a bc.jpg');
   assert.equal(p.name(['/d/a', '/d/b']), '2 FILES');
   assert.equal(p.label(['/d/x.he‮ic']), 'HEIC');
+});
+
+const clock = (name) => clockLook(theme(name));
+
+test("Paper's world clock: a WORLD CLOCK head, a serif Dhaka with a HOME chip at 34 px, and each offset beside its city", () => {
+  const p = clock('paper');
+  assert.deepEqual([p.gridWidth, p.gap, p.head, p.city('Dhaka'), p.mark], [238, 20, 'WORLD CLOCK', 'Dhaka', { text: 'HOME', boxed: true }]);
+  assert.deepEqual([p.homeTime.font, p.homeTime.size, p.time.size, p.name.size, p.offset.size, p.offset.spacing], ['Instrument Serif', 34, 28, 20, 10, 1.4]);
+  assert.deepEqual([p.place, p.city('New York'), p.offsetText('−10h'), p.dayText('tomorrow'), p.rule.dashed], ['name', 'New York', '−10h', 'TOMORROW', false]);
+});
+
+test("Artboard's world clock: Dhaka · home over a bold 26 px time, the offset under each city and #2B2F36 rules", () => {
+  const a = clock('artboard');
+  assert.deepEqual([a.gridWidth, a.gap, a.head, a.city('Dhaka') + a.mark.text, a.mark.boxed], [224, 22, '', 'Dhaka · home', false]);
+  assert.deepEqual([a.homeTime.size, a.homeTime.weight, a.time.size, a.time.weight, a.name.size, a.name.weight], [26, 700, 17, 700, 14, 500]);
+  assert.deepEqual([a.place, a.offset.size, a.offset.color, a.rule.color, a.rule.dashed, a.dayText('yesterday')], ['under', 12, '#A3A9B4', '#2B2F36', false, 'yesterday']);
+});
+
+test("Blueprint's world clock: uppercase cities, a cyan home time, the offset at the right as −10H and dashed rules", () => {
+  const b = clock('blueprint');
+  assert.deepEqual([b.gridWidth, b.gap, b.head, b.city('Dhaka') + b.mark.text, b.mark.boxed], [224, 20, '', 'DHAKA · HOME', false]);
+  assert.deepEqual([b.homeTime.size, b.homeTime.color, b.time.size, b.time.color, b.name.size, b.name.color], [15, '#7FE3F0', 15, '#D6F4F8', 10, '#80A4C2']);
+  assert.deepEqual([b.place, b.city('New York'), b.offsetText('−10h'), b.offsetWidth, b.rule.color, b.rule.dashed], ['right', 'NEW YORK', '−10H', 34, '#2E5A72', true]);
 });

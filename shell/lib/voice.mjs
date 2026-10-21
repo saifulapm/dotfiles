@@ -454,6 +454,71 @@ export function osdLook(tokens) {
   });
 }
 
+// How the calendar card's city column reads, as each m24 board draws it beside the month: home first and large with its mark (Paper's boxed HOME), then a rule above each city. place puts the offset beside the city's name, under it or at the row's right; the day word always sits under the name. A colour left empty is the island's own text colour.
+export function clockLook(tokens) {
+  const c = (tokens || UNTHEMED).color;
+  const t = (tokens || UNTHEMED).type;
+  const voice = t.voice;
+  const text = (font, size, extra) => Object.assign({ font, size, weight: 400, spacing: 0, color: '' }, extra);
+  if (voice === 'plain') {
+    const head = ISLAND.plain.head;
+    return {
+      gridWidth: 224,
+      gap: 22,
+      head: '',
+      homeLabel: text(t.ui, 12, { color: head }),
+      mark: { text: ' · home', boxed: false },
+      homeTime: text(t.ui, 26, { weight: 700 }),
+      name: text(t.ui, 14, { weight: 500 }),
+      time: text(t.ui, 17, { weight: 700 }),
+      offset: text(t.ui, 12, { color: head }),
+      place: 'under',
+      offsetWidth: 0,
+      city: same,
+      offsetText: same,
+      dayText: same,
+      rule: { color: ISLAND.plain.tile, dashed: false },
+    };
+  }
+  if (voice === 'bracket') {
+    const small = text(t.mono, 10, { spacing: 1.6, color: c.muted });
+    return {
+      gridWidth: 224,
+      gap: 20,
+      head: '',
+      homeLabel: small,
+      mark: { text: ' · HOME', boxed: false },
+      homeTime: text(t.mono, 15, { weight: 700, color: c.accent }),
+      name: small,
+      time: text(t.mono, 15, { weight: 700, color: c.ink }),
+      offset: text(t.mono, 10, { spacing: 1.2, color: c.muted }),
+      place: 'right',
+      offsetWidth: 34,
+      city: upper,
+      offsetText: upper,
+      dayText: upper,
+      rule: { color: c.line, dashed: true },
+    };
+  }
+  return {
+    gridWidth: 238,
+    gap: 20,
+    head: 'WORLD CLOCK',
+    homeLabel: text(t.display, 24),
+    mark: { text: 'HOME', boxed: true },
+    homeTime: text(t.display, 34),
+    name: text(t.display, 20),
+    time: text(t.display, 28),
+    offset: text(t.ui, 10, { spacing: 1.4 }),
+    place: 'name',
+    offsetWidth: 0,
+    city: same,
+    offsetText: same,
+    dayText: upper,
+    rule: { color: '', dashed: false },
+  };
+}
+
 // Control, the notification centre, the cheat sheet, polkit and the recorder draw as the launcher does: its cursor row, rules and legend.
 export function listLook(tokens) {
   const l = launcherLook(tokens);
