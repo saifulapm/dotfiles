@@ -650,3 +650,22 @@ test('add refuses a MAC with no lease and one already listed, writing nothing', 
   assert.deepEqual(writes(ctx).filter((c) => c[0] !== 'date'), []);
   for (const bad of [['add', 'not-a-mac', 'x'], ['add', '02:00:00:00:00:42', '\n']]) assert.equal((await run(ctx, ...bad)).status, 2, bad.join(' '));
 });
+
+// The surface draws the last state at once on a cold open, so `state --cached` answers from disk without the network or the router.
+test('state --cached prints the last full state without a request or an ssh', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  const empty = await run(ctx, 'state', '--cached');
+  assert.equal(empty.status, 0, empty.stderr);
+  assert.deepEqual(JSON.parse(empty.stdout).devices, []);
+  const full = await state(ctx);
+  const seen = s.seen.length;
+  const sshCalls = readFileSync(join(ctx.ctl, 'ssh.log'), 'utf8');
+  s.down = true;
+  writeFileSync(join(ctx.ctl, 'ssh-down'), '');
+  const r = await run(ctx, 'state', '--cached');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), full);
+  assert.equal(s.seen.length, seen);
+  assert.equal(readFileSync(join(ctx.ctl, 'ssh.log'), 'utf8'), sshCalls);
+});

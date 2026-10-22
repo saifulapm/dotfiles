@@ -360,7 +360,19 @@ async function state() {
     d.open_until = until;
     d.categories = d.path === 'router' ? { youtube: true, social: true, adult: true, gambling: true } : kept(d.key.slice('carried:'.length));
   }
-  return JSON.stringify(out) + '\n';
+  const text = JSON.stringify(out) + '\n';
+  mkdirSync(CACHE, { recursive: true });
+  save(join(CACHE, 'state.json'), text);
+  return text;
+}
+
+// The last full state, for a surface that draws at once and asks for a fresh one after.
+function cachedState() {
+  try {
+    return JSON.stringify(JSON.parse(readFileSync(join(CACHE, 'state.json'), 'utf8'))) + '\n';
+  } catch {
+    return JSON.stringify({ as_of: null, carried: { ok: true, error: null }, router: { ok: true, as_of: null, error: null }, devices: [] }) + '\n';
+  }
 }
 
 async function profiles() {
@@ -571,7 +583,7 @@ async function addDevice(mac, name) {
   await kidRouter(mac, true);
 }
 
-const USAGE = 'usage: dots-dns state | profiles | profile <key> | kid <key> on|off | category <key> youtube|social|adult|gambling on|off | allow|unallow <key> <domain> | open <key> 30m|2h | reconcile | leases | add <mac> <name>';
+const USAGE = 'usage: dots-dns state [--cached] | profiles | profile <key> | kid <key> on|off | category <key> youtube|social|adult|gambling on|off | allow|unallow <key> <domain> | open <key> 30m|2h | reconcile | leases | add <mac> <name>';
 
 function usage(why = USAGE) {
   process.stderr.write((why === USAGE ? '' : 'dots-dns: ') + why + '\n');
@@ -637,7 +649,7 @@ async function main() {
   const [verb, ...args] = process.argv.slice(2);
   let out;
   try {
-    if (verb === 'state') out = await state();
+    if (verb === 'state') out = args[0] === '--cached' ? cachedState() : await state();
     else if (verb === 'reconcile') {
       holdLock();
       await reconcile();
