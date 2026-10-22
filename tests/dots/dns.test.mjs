@@ -86,6 +86,12 @@ if (fs.existsSync(ctl + '/ssh-down')) {
   process.exit(r.status === null ? 1 : r.status);
 }
 `,
+  'systemd-run': String.raw`
+require('fs').appendFileSync(process.env.STUB_CTL + '/systemd.log', JSON.stringify(['systemd-run', ...process.argv.slice(2)]) + '\n');
+`,
+  systemctl: String.raw`
+require('fs').appendFileSync(process.env.STUB_CTL + '/systemd.log', JSON.stringify(['systemctl', ...process.argv.slice(2)]) + '\n');
+`,
 };
 const ROUTER = {
   uci: String.raw`
@@ -109,14 +115,22 @@ if (a[0] === 'show') {
   process.exit(0);
 }
 if (a[0] === 'commit') process.exit(0);
-const m = a[1].match(/^(\w+)\.@(\w+)\[(\d+)\]\.(\w+)(?:=(.*))?$/s);
-const s = m && db[m[1]].filter((x) => x['.type'] === m[2])[Number(m[3])];
+if (a[0] === 'add') {
+  db[a[1]].push({ '.type': a[2] });
+  fs.writeFileSync(file, JSON.stringify(db));
+  console.log('cfg0' + db[a[1]].length);
+  process.exit(0);
+}
+const m = a[1].match(/^(\w+)\.@(\w+)\[(-?\d+)\]\.(\w+)(?:=(.*))?$/s);
+const all = m ? db[m[1]].filter((x) => x['.type'] === m[2]) : [];
+const s = m && all[Number(m[3]) < 0 ? all.length + Number(m[3]) : Number(m[3])];
 if (!s) process.exit(1);
 if (a[0] === 'get') {
   if (s[m[4]] === undefined) process.exit(1);
   console.log([].concat(s[m[4]]).join(' '));
 } else if (a[0] === 'add_list') s[m[4]] = [].concat(s[m[4]] || [], m[5]);
 else if (a[0] === 'del_list') s[m[4]] = [].concat(s[m[4]] || []).filter((x) => x !== m[5]);
+else if (a[0] === 'set') s[m[4]] = m[5];
 fs.writeFileSync(file, JSON.stringify(db));
 `,
   nft: String.raw`
@@ -127,6 +141,13 @@ process.stdout.write(require('fs').readFileSync(process.env.STUB_CTL + '/router/
 `,
 };
 const ROUTER_NOW = 1792677600;
+// One lease is a listed reservation (the nuc); the forged hostname and the * stand for what any device can send in DHCP.
+const LEASES = [
+  '1792720263 02:00:00:00:00:01 192.168.0.102 nuc 01:02:00:00:00:00:01',
+  '1792720138 02:00:00:00:00:41 192.168.0.143 Galaxy-A54 01:02:00:00:00:00:41',
+  '1792710997 02:00:00:00:00:42 192.168.0.151 * 01:02:00:00:00:00:42',
+  '1792696551 02:00:00:00:00:43 192.168.0.160 Chrome\u202Ecast *',
+].join('\n') + '\n';
 const host = (name, mac, ip) => ({ '.type': 'host', name, mac, ip, dns: '1' });
 const ipset = (name, match, entry) => ({ '.type': 'ipset', name, family: 'ipv4', match, entry });
 const UCI = {
@@ -142,6 +163,8 @@ function fakeRouter(ctl, uci = UCI) {
   mkdirSync(join(r, 'etc', 'init.d'), { recursive: true });
   for (const [name, code] of Object.entries(ROUTER)) writeFileSync(join(r, 'bin', name), `#!${process.execPath}\n${code}`, { mode: 0o755 });
   writeFileSync(join(r, 'etc', 'init.d', 'dns-shield'), `#!${process.execPath}\nrequire('fs').appendFileSync(process.env.STUB_CTL + '/router.log', JSON.stringify(['dns-shield', ...process.argv.slice(2)]) + '\\n');\n`, { mode: 0o755 });
+  writeFileSync(join(r, 'etc', 'init.d', 'dnsmasq'), `#!${process.execPath}\nrequire('fs').appendFileSync(process.env.STUB_CTL + '/router.log', JSON.stringify(['dnsmasq', ...process.argv.slice(2)]) + '\\n');\n`, { mode: 0o755 });
+  writeFileSync(join(r, 'tmp', 'dhcp.leases'), LEASES);
   writeFileSync(join(r, 'uci.json'), JSON.stringify(uci));
   writeFileSync(join(r, 'now'), ROUTER_NOW + '\n');
   writeFileSync(join(r, 'tmp', 'dns-shield', 'kid.log'), readFileSync(fixture('dns-kid.log')));
@@ -498,4 +521,132 @@ test('a router allow goes into the shared allow file and reloads the Kid resolve
   assert.deepEqual(routerRows(out).map((d) => d.allow), [[], ['khanacademy.org', 'wikipedia.org'], [], ['khanacademy.org', 'wikipedia.org'], []]);
   await ok(ctx, 'unallow', 'router:02:00:00:00:00:21', 'wikipedia.org');
   assert.equal(readFileSync(allowFile, 'utf8'), 'khanacademy.org\n');
+});
+
+// t6: a timed open is Kid off with a deadline file and a transient timer; reconcile, run by the timer, by state and at the shell's start, ends it.
+const systemd = (ctx) => (existsSync(join(ctx.ctl, 'systemd.log')) ? readFileSync(join(ctx.ctl, 'systemd.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : []);
+const openFile = (ctx, key) => join(ctx.state, 'open-' + key.replace(/[^A-Za-z0-9_-]/g, '_'));
+const deadline = (ctx, key) => Number(readFileSync(openFile(ctx, key), 'utf8').split(' ')[0]);
+
+test('open turns Kid off, keeps a deadline and starts a timer that reconciles, and state reads the device open with its categories paused', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  const t0 = Math.floor(Date.now() / 1000);
+  await ok(ctx, 'open', 'carried:dev00ipad', '30m');
+  assert.deepEqual(ipad(s).policy_modules, { 'social-apps': false, 'adult-content': false, gambling: false, dating: true });
+  const until = deadline(ctx, 'carried:dev00ipad');
+  assert.ok(until >= t0 + 1800 && until <= t0 + 1802, String(until));
+  assert.equal(readFileSync(openFile(ctx, 'carried:dev00ipad'), 'utf8').trim().split(' ')[1], 'carried:dev00ipad');
+  const run1 = systemd(ctx).find((c) => c[0] === 'systemd-run');
+  assert.ok(run1.includes('--user') && run1.includes('--on-active=1800s') && run1.includes('--unit') && run1.at(-1) === 'reconcile', JSON.stringify(run1));
+  assert.equal(run1[run1.indexOf('--unit') + 1], 'dots-dns-open-carried_dev00ipad');
+  const row = (await state(ctx)).devices.find((d) => d.key === 'carried:dev00ipad');
+  assert.equal(row.open_until, until);
+  assert.equal(row.kid, false);
+  assert.deepEqual(row.categories, { youtube: false, social: false, adult: true, gambling: true });
+});
+
+test('open again restarts the deadline and the timer with the new length', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'open', 'carried:dev00ipad', '30m');
+  await ok(ctx, 'open', 'carried:dev00ipad', '2h');
+  assert.ok(deadline(ctx, 'carried:dev00ipad') >= Math.floor(Date.now() / 1000) + 7190);
+  const log = systemd(ctx);
+  assert.ok(log.some((c) => c[0] === 'systemctl' && c.includes('stop') && c.includes('dots-dns-open-carried_dev00ipad.timer')));
+  assert.ok(log.filter((c) => c[0] === 'systemd-run').at(-1).includes('--on-active=7200s'));
+  assert.deepEqual(JSON.parse(readFileSync(join(ctx.state, 'kid-dev00ipad.json'), 'utf8')), { youtube: false, social: false, adult: true, gambling: true });
+});
+
+test('reconcile brings Kid back for a passed deadline and leaves a running one', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'open', 'carried:dev00ipad', '30m');
+  await ok(ctx, 'open', 'router:02:00:00:00:00:21', '2h');
+  writeFileSync(openFile(ctx, 'carried:dev00ipad'), `${Math.floor(Date.now() / 1000) - 5} carried:dev00ipad\n`);
+  await ok(ctx, 'reconcile');
+  assert.deepEqual(ipad(s).policy_modules, { 'social-apps': false, 'adult-content': true, gambling: true, dating: true });
+  assert.ok(!existsSync(openFile(ctx, 'carried:dev00ipad')));
+  assert.ok(existsSync(openFile(ctx, 'router:02:00:00:00:00:21')));
+  assert.deepEqual(kidSets(ctx), { kid: ['192.168.0.238'], kid_mac: ['02:00:00:00:00:18'] });
+});
+
+test('a router open takes the device out of the Kid sets until reconcile puts it back', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'open', 'router:02:00:00:00:00:21', '30m');
+  assert.deepEqual(kidSets(ctx), { kid: ['192.168.0.238'], kid_mac: ['02:00:00:00:00:18'] });
+  const row = (await state(ctx)).devices.find((d) => d.key === 'router:02:00:00:00:00:21');
+  assert.equal(row.kid, false);
+  assert.ok(row.open_until > Date.now() / 1000);
+  assert.deepEqual(row.categories, ALL(true));
+  writeFileSync(openFile(ctx, 'router:02:00:00:00:00:21'), `${Math.floor(Date.now() / 1000) - 1} router:02:00:00:00:00:21\n`);
+  const after = (await state(ctx)).devices.find((d) => d.key === 'router:02:00:00:00:00:21');
+  assert.equal(after.kid, true);
+  assert.equal(after.open_until, null);
+  assert.deepEqual(kidSets(ctx), { kid: ['192.168.0.238', '192.168.0.143'], kid_mac: ['02:00:00:00:00:18', '02:00:00:00:00:21'] });
+});
+
+test('kid on ends a timed open at once and stops its timer', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'open', 'carried:dev00ipad', '30m');
+  await ok(ctx, 'kid', 'carried:dev00ipad', 'on');
+  assert.ok(!existsSync(openFile(ctx, 'carried:dev00ipad')));
+  assert.ok(systemd(ctx).filter((c) => c[0] === 'systemctl').length >= 2);
+  assert.equal((await state(ctx)).devices.find((d) => d.key === 'carried:dev00ipad').open_until, null);
+});
+
+test('a reconcile that cannot reach the router keeps the deadline for the next try and fails', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'open', 'router:02:00:00:00:00:21', '30m');
+  writeFileSync(openFile(ctx, 'router:02:00:00:00:00:21'), `${Math.floor(Date.now() / 1000) - 1} router:02:00:00:00:00:21\n`);
+  writeFileSync(join(ctx.ctl, 'ssh-down'), '');
+  const r = await run(ctx, 'reconcile');
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /router unreachable/);
+  assert.ok(existsSync(openFile(ctx, 'router:02:00:00:00:00:21')));
+});
+
+// t7: the add list is the router's leases less the listed devices, and an add is a reservation in Kid mode.
+test('leases lists the leases of devices not yet listed, with hostnames made safe', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  const r = await run(ctx, 'leases');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), [
+    { mac: '02:00:00:00:00:41', ip: '192.168.0.143', hostname: 'Galaxy-A54' },
+    { mac: '02:00:00:00:00:42', ip: '192.168.0.151', hostname: '' },
+    { mac: '02:00:00:00:00:43', ip: '192.168.0.160', hostname: 'Chromecast' },
+  ]);
+});
+
+test('add reserves the lease address under a DNS-safe host name, keeps the name to show, and puts the device in Kid mode', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'add', '02:00:00:00:00:42', "Sister's phone");
+  const host = JSON.parse(readFileSync(join(ctx.ctl, 'router', 'uci.json'), 'utf8')).dhcp.at(-1);
+  assert.deepEqual(host, { '.type': 'host', name: 'sister-s-phone', dns_shield_name: "Sister's phone", mac: '02:00:00:00:00:42', ip: '192.168.0.151' });
+  const log = routerLog(ctx);
+  assert.ok(log.some((c) => c[0] === 'uci' && c[1] === 'commit' && c[2] === 'dhcp'));
+  assert.ok(log.some((c) => c[0] === 'dnsmasq' && c[1] === 'reload'));
+  assert.ok(kidSets(ctx).kid.includes('192.168.0.151'));
+  assert.ok(kidSets(ctx).kid_mac.includes('02:00:00:00:00:42'));
+  const row = (await state(ctx)).devices.find((d) => d.key === 'router:02:00:00:00:00:42');
+  assert.equal(row.name, "Sister's phone");
+  assert.equal(row.kid, true);
+});
+
+test('add refuses a MAC with no lease and one already listed, writing nothing', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  const none = await run(ctx, 'add', '02:00:00:00:00:99', 'Ghost');
+  assert.equal(none.status, 1);
+  assert.match(none.stderr, /no lease/);
+  const listed = await run(ctx, 'add', '02:00:00:00:00:01', 'nuc again');
+  assert.equal(listed.status, 1);
+  assert.match(listed.stderr, /already listed/);
+  assert.deepEqual(writes(ctx).filter((c) => c[0] !== 'date'), []);
+  for (const bad of [['add', 'not-a-mac', 'x'], ['add', '02:00:00:00:00:42', '\n']]) assert.equal((await run(ctx, ...bad)).status, 2, bad.join(' '));
 });

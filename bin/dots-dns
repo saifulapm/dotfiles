@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Reads every DNS Shield device into one `state` JSON and writes their Kid mode, categories and allow rules. Carried devices are uBlockDNS profiles reached over its API; router devices are reservations on the home OpenWrt router, reached over ssh.
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -286,7 +286,7 @@ function routerRows(sections, now) {
   const recent = kidBlocks(log, now);
   return uciShow(dhcp)
     .filter((s) => s.type === 'host')
-    .map((s) => ({ name: clean((s.o.name || [''])[0]), mac: ((s.o.mac || [''])[0].split(' ')[0] || '').toLowerCase(), ip: (s.o.ip || [''])[0] }))
+    .map((s) => ({ name: clean((s.o.dns_shield_name || s.o.name || [''])[0]), mac: ((s.o.mac || [''])[0].split(' ')[0] || '').toLowerCase(), ip: (s.o.ip || [''])[0] }))
     .filter((h) => MAC.test(h.mac))
     .map((h) => {
       const ip = IPV4.test(h.ip) ? h.ip : null;
@@ -298,10 +298,22 @@ function routerRows(sections, now) {
 
 const CACHE = join(env.XDG_CACHE_HOME || join(env.HOME, '.cache'), 'dots', 'dns');
 
+// A lease line is `expiry mac ip hostname clientid`; a device's own DHCP hostname is anything it likes, `*` for none.
+function leaseRows(text, listed) {
+  const known = new Set(listed.map((d) => d.mac));
+  const seen = new Set();
+  return text
+    .split('\n')
+    .map((l) => l.split(' '))
+    .filter((f) => f.length >= 4 && MAC.test((f[1] || '').toLowerCase()) && IPV4.test(f[2]))
+    .map((f) => ({ mac: f[1].toLowerCase(), ip: f[2], hostname: f[3] === '*' ? '' : clean(f[3]) }))
+    .filter((l) => !known.has(l.mac) && !seen.has(l.mac) && seen.add(l.mac));
+}
+
 // Each section starts on a marker line made fresh per read, so text on the router cannot fake one.
 async function routerRead(asOf) {
   const mark = '@@' + randomBytes(8).toString('hex');
-  const parts = ['date +%s', 'uci show dhcp', 'uci show firewall', 'tail -n 2000 "$R/tmp/dns-shield/kid.log" 2>/dev/null', 'cat "$R/etc/dns-shield/allow" 2>/dev/null'];
+  const parts = ['date +%s', 'uci show dhcp', 'uci show firewall', 'tail -n 2000 "$R/tmp/dns-shield/kid.log" 2>/dev/null', 'cat "$R/etc/dns-shield/allow" 2>/dev/null', 'cat "$R/tmp/dhcp.leases" 2>/dev/null'];
   const script = ['R=${DOTS_DNS_ROUTER_ROOT:-}', ...parts.flatMap((p) => [`echo ${mark}`, p]), `echo ${mark}`].join('\n') + '\n';
   let error;
   try {
@@ -312,7 +324,7 @@ async function routerRead(asOf) {
       const out = { as_of: asOf, devices: routerRows(sections.slice(1), now) };
       mkdirSync(CACHE, { recursive: true });
       save(join(CACHE, 'router.json'), JSON.stringify(out));
-      return { ok: true, as_of: out.as_of, error: null, devices: out.devices };
+      return { ok: true, as_of: out.as_of, error: null, devices: out.devices, leases: leaseRows(sections[5], out.devices) };
     }
     error = r.code === 0 ? 'router read failed (unexpected answer)' : `router unreachable (ssh exit ${r.code === null ? 'killed' : r.code})`;
   } catch (e) {
@@ -328,6 +340,7 @@ async function routerRead(asOf) {
 }
 
 async function state() {
+  if ([...deadlines().values()].some((until) => until <= Date.now() / 1000)) spawnSync(process.execPath, [process.argv[1], 'reconcile'], { stdio: ['ignore', 'ignore', 'inherit'], env });
   const out = { as_of: Math.floor(Date.now() / 1000), carried: { ok: true, error: null }, router: null, devices: [] };
   const router = routerRead(out.as_of);
   try {
@@ -337,9 +350,16 @@ async function state() {
     out.carried = { ok: false, error: e.message };
     process.stderr.write(`dots-dns: ${e.message}\n`);
   }
-  const { devices, ...status } = await router;
+  const { devices, leases, ...status } = await router;
   out.router = status;
   out.devices.push(...devices);
+  const open = deadlines();
+  for (const d of out.devices) {
+    const until = open.get(d.key);
+    if (!until || d.kid) continue;
+    d.open_until = until;
+    d.categories = d.path === 'router' ? { youtube: true, social: true, adult: true, gambling: true } : kept(d.key.slice('carried:'.length));
+  }
   return JSON.stringify(out) + '\n';
 }
 
@@ -391,13 +411,19 @@ function kidCarried(id, on) {
       for (const c of CATS) setCategory(dev, c, false);
       return;
     }
-    let kept = null;
-    try {
-      kept = JSON.parse(readFileSync(kidFile(id), 'utf8'));
-    } catch {}
-    if (!kept || !CATS.some((c) => kept[c] === true)) kept = { youtube: true, social: true, adult: true, gambling: true };
-    for (const c of CATS) if (kept[c] === true) setCategory(dev, c, true);
+    const cats = kept(id);
+    for (const c of CATS) if (cats[c]) setCategory(dev, c, true);
   });
+}
+
+// The categories Kid on brings back: those Kid off kept, or all four when none were kept.
+function kept(id) {
+  let k = null;
+  try {
+    k = JSON.parse(readFileSync(kidFile(id), 'utf8'));
+  } catch {}
+  if (!k || !CATS.some((c) => k[c] === true)) return { youtube: true, social: true, adult: true, gambling: true };
+  return Object.fromEntries(CATS.map((c) => [c, k[c] === true]));
 }
 
 function allowCarried(id, domain, on) {
@@ -408,7 +434,7 @@ function allowCarried(id, domain, on) {
   });
 }
 
-const ROUTER_FAIL = { 3: 'the router has no reservation for that device', 4: 'the router has no kid and kid_mac ipsets', 5: 'router write failed (uci commit)', 6: 'router write failed (nft)', 7: 'router write failed (dns-shield reload)' };
+const ROUTER_FAIL = { 3: 'the router has no reservation for that device', 4: 'the router has no kid and kid_mac ipsets', 5: 'router write failed (uci commit)', 6: 'router write failed (nft)', 7: 'router write failed (dns-shield reload)', 8: 'that device is already listed', 9: 'the router has no lease for that device', 10: 'router write failed (dnsmasq reload)' };
 
 async function writeRouter(lines) {
   const r = await ssh(['R=${DOTS_DNS_ROUTER_ROOT:-}', ...lines].join('\n') + '\n');
@@ -463,7 +489,89 @@ function normalize(raw) {
   return d;
 }
 
-const USAGE = 'usage: dots-dns state | profiles | profile <key> | kid <key> on|off | category <key> youtube|social|adult|gambling on|off | allow|unallow <key> <domain>';
+const OPEN = { '30m': 1800, '2h': 7200 };
+const slug = (key) => key.replace(/[^A-Za-z0-9_-]/g, '_');
+const openFile = (key) => join(STATE, 'open-' + slug(key));
+const timerUnit = (key) => 'dots-dns-open-' + slug(key);
+
+// A timed open is a deadline file, `<epoch> <key>`, which outlives a reboot; the transient timer only makes it end on time while the machine is up.
+function deadlines() {
+  const out = new Map();
+  let names = [];
+  try {
+    names = readdirSync(STATE).filter((n) => n.startsWith('open-'));
+  } catch {}
+  for (const n of names) {
+    const [until, key] = firstLine(join(STATE, n)).split(' ');
+    if (Number(until) > 0 && key && slug(key) === n.slice('open-'.length)) out.set(key, Number(until));
+  }
+  return out;
+}
+
+function clearOpen(key) {
+  rmSync(openFile(key), { force: true });
+  spawnSync('systemctl', ['--user', 'stop', timerUnit(key) + '.timer'], { stdio: 'ignore', env });
+}
+
+const kidAny = (key, on) => (key.path === 'carried' ? kidCarried(key.id, on) : kidRouter(key.id, on));
+
+async function openDevice(key, keyText, secs) {
+  await kidAny(key, false);
+  save(openFile(keyText), `${Math.floor(Date.now() / 1000) + secs} ${keyText}\n`, 0o600);
+  spawnSync('systemctl', ['--user', 'stop', timerUnit(keyText) + '.timer'], { stdio: 'ignore', env });
+  spawnSync('systemd-run', ['--user', '--quiet', '--collect', '--unit', timerUnit(keyText), `--on-active=${secs}s`, process.execPath, process.argv[1], 'reconcile'], { stdio: 'ignore', env });
+}
+
+// A deadline whose Kid on fails stays for the next reconcile, so a router that is down only delays the end of an open.
+async function reconcile() {
+  let failed = 0;
+  for (const [keyText, until] of deadlines()) {
+    if (until > Date.now() / 1000) continue;
+    try {
+      await kidAny(parseKey(keyText), true);
+      clearOpen(keyText);
+    } catch (e) {
+      if (!(e instanceof Failure)) throw e;
+      failed++;
+      process.stderr.write(`dots-dns: ${keyText}: ${e.message}\n`);
+    }
+  }
+  if (failed) throw new Failure(`${failed} timed open could not end yet`);
+}
+
+async function leases() {
+  const r = await routerRead(Math.floor(Date.now() / 1000));
+  if (!r.ok) throw new Failure(r.error);
+  return JSON.stringify(r.leases) + '\n';
+}
+
+const sq = (v) => "'" + v.replace(/'/g, "'\\''") + "'";
+
+// OpenWrt hands a reservation's name to dnsmasq as a DNS host name, so the name to show lives in its own option and `name` is a safe slug.
+async function addDevice(mac, name) {
+  const host = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'device-' + mac.slice(-5).replace(':', '');
+  await writeRouter([
+    `mac=${mac}`,
+    'ip=$(awk -v m="$mac" \'tolower($2) == m { print $3; exit }\' "$R/tmp/dhcp.leases")',
+    '[ -n "$ip" ] || exit 9',
+    'i=0',
+    'while m=$(uci -q get "dhcp.@host[$i].mac"); do',
+    '  m=$(echo "$m" | tr A-F a-f)',
+    '  case " $m " in *" $mac "*) exit 8 ;; esac',
+    '  i=$((i + 1))',
+    'done',
+    'uci add dhcp host >/dev/null',
+    `uci set "dhcp.@host[-1].name=${host}"`,
+    `uci set dhcp.@host[-1].dns_shield_name=${sq(name)}`,
+    'uci set "dhcp.@host[-1].mac=$mac"',
+    'uci set "dhcp.@host[-1].ip=$ip"',
+    'uci commit dhcp || exit 5',
+    '"$R/etc/init.d/dnsmasq" reload || exit 10',
+  ]);
+  await kidRouter(mac, true);
+}
+
+const USAGE = 'usage: dots-dns state | profiles | profile <key> | kid <key> on|off | category <key> youtube|social|adult|gambling on|off | allow|unallow <key> <domain> | open <key> 30m|2h | reconcile | leases | add <mac> <name>';
 
 function usage(why = USAGE) {
   process.stderr.write((why === USAGE ? '' : 'dots-dns: ') + why + '\n');
@@ -502,7 +610,14 @@ async function write(verb, args) {
   let run;
   if (verb === 'kid') {
     const on = onOff(args[1]);
-    run = () => (key.path === 'carried' ? kidCarried(key.id, on) : kidRouter(key.id, on));
+    run = async () => {
+      await kidAny(key, on);
+      clearOpen(args[0]);
+    };
+  } else if (verb === 'open') {
+    const secs = OPEN[args[1]];
+    if (!secs) usage();
+    run = () => openDevice(key, args[0], secs);
   } else if (verb === 'category') {
     if (key.path === 'router') usage('router devices carry one Kid policy');
     if (!CATS.includes(args[1])) usage();
@@ -523,9 +638,22 @@ async function main() {
   let out;
   try {
     if (verb === 'state') out = await state();
+    else if (verb === 'reconcile') {
+      holdLock();
+      await reconcile();
+      out = '';
+    } else if (verb === 'leases') out = await leases();
+    else if (verb === 'add') {
+      const mac = String(args[0] || '').toLowerCase();
+      const name = clean(args[1]).slice(0, 40);
+      if (!MAC.test(mac) || !name) usage();
+      holdLock();
+      await addDevice(mac, name);
+      out = '';
+    }
     else if (verb === 'profiles') out = await profiles();
     else if (verb === 'profile') out = await profile(carriedKey(args[0]));
-    else if (['kid', 'category', 'allow', 'unallow'].includes(verb)) out = await write(verb, args);
+    else if (['kid', 'category', 'allow', 'unallow', 'open'].includes(verb)) out = await write(verb, args);
     else usage();
   } catch (e) {
     if (!(e instanceof Failure)) throw e;
