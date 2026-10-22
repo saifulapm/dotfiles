@@ -96,6 +96,17 @@ check "and j crosses into the router group at macbook" until_ok 1000 state_is '.
 
 cursor_to "$sister"
 check "Sister's phone reads Home router with all five categories on" state_is '.pane | .path == "Home router" and .badge == "KID" and ([.categories[].value] == ["ON", "ON", "ON", "ON", "ON"])'
+check "and says under YouTube Kids that every home-router device shares it" state_is '[.pane.categories[] | .note] == ["", "shared by every home-router device", "", "", ""]'
+
+# YouTube Kids on a router row is one setting for every router device: 2 on Sister's phone allows it on the TV too.
+wtype 2
+check "2 on Sister's phone logs one category $sister youtube_kids off" until_ok 3000 logged_is "category $sister youtube_kids off" 1
+check "and her YouTube Kids reads OFF" until_ok 3000 state_is '.busy == false and ([.pane.categories[].value] == ["ON", "OFF", "ON", "ON", "ON"])'
+wtype j
+until_ok 1000 state_is --arg k "$tv" '.cursor == $k'
+check "the Living-room TV's YouTube Kids reads OFF too ($(dns_state | jq -c '[.pane.categories[].value]'))" state_is '[.pane.categories[].value] == ["ON", "OFF", "ON", "ON", "ON"]'
+wtype k
+until_ok 1000 state_is --arg k "$sister" '.cursor == $k'
 wtype -k space
 check "space on Sister's phone logs one kid $sister off" until_ok 3000 logged_is "kid $sister off" 1
 check "and its row reads OPEN" until_ok 3000 badge_is "$sister" OPEN
@@ -103,10 +114,10 @@ idle
 
 wtype j
 check "j moves on to the Living-room TV ($(dns_state | jq -c .cursor))" until_ok 1000 state_is --arg k "$tv" '.cursor == $k'
-wtype 12345
+wtype 1345
 sleep 1
-check "1-5 on a router row log no category write ($(grep -c '^category router:' "$log"))" test "$(grep -c '^category router:' "$log")" = 0
-check "and leave its categories on ($(dns_state | jq -c '[.pane.categories[].value]'))" state_is '[.pane.categories[].value] == ["ON", "ON", "ON", "ON", "ON"]'
+check "1, 3, 4 and 5 on a router row log no category write ($(grep -c "^category $tv" "$log"))" test "$(grep -c "^category $tv" "$log")" = 0
+check "and leave its categories as they were ($(dns_state | jq -c '[.pane.categories[].value]'))" state_is '[.pane.categories[].value] == ["ON", "OFF", "ON", "ON", "ON"]'
 
 wtype a
 check "a opens the allow field, empty" until_ok 1000 state_is '.field == ""'

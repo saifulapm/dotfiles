@@ -16,7 +16,7 @@ sample() {
     def router($n; $name; $kid; $ago):
       device("router:02:00:00:00:00:" + $n; $name; "router"; $kid; cats($kid; $kid; $kid; $kid; $kid); [];
         (if $ago then [{domain: "youtube.com", at: ($now - $ago)}] else [] end); "02:00:00:00:00:" + $n);
-    {as_of: $now, carried: {ok: true, error: null}, router: {ok: true, as_of: $now, error: null},
+    {as_of: $now, carried: {ok: true, error: null}, router: {ok: true, as_of: $now, error: null, youtube_kids_allowed: false},
      devices: [
        device("carried:dev00iphone"; "Saiful'\''s iPhone"; "carried"; false; cats(false; false; false; false; false); []; []; null),
        device("carried:dev00ipad"; "iPad"; "carried"; true; cats(true; false; true; true; false); ["khanacademy.org", "wikipedia.org"];
@@ -71,7 +71,7 @@ state)
   [ -e "$dir/dns-slow-state" ] && sleep 2
   reconcile
   if [ -e "$dir/dns-router-down" ]; then
-    current | jq --argjson now "$EPOCHSECONDS" '.router = {ok: false, as_of: ($now - 840), error: "unreachable"}'
+    current | jq --argjson now "$EPOCHSECONDS" '.router += {ok: false, as_of: ($now - 840), error: "unreachable"}'
   else
     current
   fi
@@ -91,9 +91,16 @@ kid)
   [ "$3" = on ] && jq -e --arg k "$key" '.devices[] | select(.key == $k) | .open_until != null' "$file" >/dev/null &&
     cats=$(jq -c --arg k "$key" '.devices[] | select(.key == $k) | .categories' "$file")
   [ "$3" = off ] && cats='{"youtube":false,"youtube_kids":false,"social":false,"adult":false,"gambling":false}'
-  write --arg k "$key" --argjson c "$cats" '(.devices[] | select(.key == $k)) |= (.categories = $c | .kid = ([$c[]] | any) | .open_until = null)'
+  # A Kid router row blocks YouTube Kids unless the router allows it for every device.
+  write --arg k "$key" --argjson c "$cats" '(.devices[] | select(.key == $k)) |= (.categories = $c | .kid = ([$c[]] | any) | .open_until = null)
+    | (.router.youtube_kids_allowed // false) as $a | (.devices[] | select(.key == $k and .path == "router" and .kid)) |= (.categories.youtube_kids = ($a | not))'
   ;;
 category)
+  if [ "${key%%:*}" = router ] && [ "$3" = youtube_kids ]; then
+    write --argjson on "$([ "$4" = on ] && echo true || echo false)" \
+      '.router.youtube_kids_allowed = ($on | not) | (.devices[] | select(.path == "router" and .kid)) |= (.categories.youtube_kids = $on)'
+    exit 0
+  fi
   if [ "${key%%:*}" = router ]; then
     echo "router devices carry one Kid policy" >&2
     exit 2
@@ -121,9 +128,9 @@ add)
     exit 1
   fi
   write --argjson l "$lease" --arg n "$3" '
-    ([.devices[] | select(.path == "router") | .allow][0] // []) as $allow
+    ([.devices[] | select(.path == "router") | .allow][0] // []) as $allow | (.router.youtube_kids_allowed // false) as $a
     | .devices += [{key: ("router:" + $l.mac), name: $n, path: "router", kid: true,
-        categories: {youtube: true, youtube_kids: true, social: true, adult: true, gambling: true}, open_until: null, allow: $allow,
+        categories: {youtube: true, youtube_kids: ($a | not), social: true, adult: true, gambling: true}, open_until: null, allow: $allow,
         last_block: null, blocks: [], ip: $l.ip, mac: $l.mac}]'
   ;;
 *)

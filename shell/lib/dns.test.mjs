@@ -92,6 +92,7 @@ test("a carried KID device's pane: its path, KID, the five categories with YouTu
     ],
     paused: '',
     until: '',
+    shared: '',
     allow: ['khanacademy.org', 'wikipedia.org'],
     blocks: [{ domain: 'youtube.com', age: '2m' }, { domain: 'i.ytimg.com', age: '2m' }, { domain: 'tiktok.com', age: '1h' }],
     hint: '',
@@ -107,6 +108,7 @@ test("an OPEN device's pane shows its recent blocks and that space turns Kid mod
     categories: [],
     paused: '',
     until: '',
+    shared: '',
     allow: [],
     blocks: [{ domain: 'reddit.com', age: '10m' }],
     hint: 'space turns Kid mode on',
@@ -118,6 +120,13 @@ test("a router KID device's pane reads Home router with all five categories on w
   assert.deepEqual([pane.name, pane.path, pane.badge, pane.hint], ["Sister's phone", 'Home router', 'KID', '']);
   assert.deepEqual(pane.categories.map((c) => `${c.n} ${c.label} ${c.value}`), ['1 YouTube ON', '2 YouTube Kids ON', '3 Social ON', '4 Adult ON', '5 Gambling ON']);
   assert.deepEqual(pane.allow, ['wikipedia.org']);
+  assert.equal(pane.shared, 'shared by every home-router device');
+});
+
+test("a router allowing YouTube Kids reads it OFF on every Kid router row's pane", () => {
+  const off = { categories: { youtube: true, youtube_kids: false, social: true, adult: true, gambling: true } };
+  const v = view({ 'router:02:00:00:00:00:04': off, 'router:02:00:00:00:00:05': off });
+  assert.deepEqual(['router:02:00:00:00:00:04', 'router:02:00:00:00:00:05'].map((k) => paneOf(at(v, k)).categories[1].value), ['OFF', 'OFF']);
 });
 
 test('space turns Kid off on a KID device and on on an OPEN one', () => {
@@ -127,7 +136,7 @@ test('space turns Kid off on a KID device and on on an OPEN one', () => {
   assert.deepEqual(kidArgs(at(v, 'router:02:00:00:00:00:04')), ['kid', 'router:02:00:00:00:00:04', 'off']);
 });
 
-test('1-5 flip a category on a carried KID device only', () => {
+test('1-5 flip a category on a carried KID device; on a Kid router row only 2 does, the one YouTube Kids setting every router device shares', () => {
   const v = view();
   const ipad = at(v, 'carried:dev00ipad');
   assert.deepEqual([1, 2, 5].map((n) => categoryArgs(ipad, n)), [
@@ -136,7 +145,11 @@ test('1-5 flip a category on a carried KID device only', () => {
     ['category', 'carried:dev00ipad', 'gambling', 'on'],
   ]);
   assert.equal(categoryArgs(at(v, 'carried:dev00wife'), 1), null);
-  assert.equal(categoryArgs(at(v, 'router:02:00:00:00:00:04'), 2), null);
+  const sister = at(v, 'router:02:00:00:00:00:04');
+  assert.deepEqual([1, 2, 3, 4, 5].map((n) => categoryArgs(sister, n)), [null, ['category', 'router:02:00:00:00:00:04', 'youtube_kids', 'off'], null, null, null]);
+  assert.equal(categoryArgs(at(v, 'router:02:00:00:00:00:01'), 2), null);
+  assert.equal(categoryArgs(at(dnsView(JSON.stringify(down()), NOW), 'router:02:00:00:00:00:04'), 2), null);
+  assert.equal(paneOf(ipad).shared, '');
   assert.equal(categoryArgs(ipad, 6), null);
 });
 

@@ -104,6 +104,8 @@ export function paneOf(d) {
     categories: shown ? d.categories.map((c) => ({ n: c.n, key: c.key, label: c.label, value: timed(d) ? 'paused' : c.on ? 'ON' : 'OFF' })) : [],
     paused: timed(d) ? 'paused while open' : '',
     until: timed(d) ? `Open until ${timeOf(d.openUntil)}` : '',
+    // A router's YouTube Kids is one setting that every home-router device shares.
+    shared: d.path === 'router' && shown ? 'shared by every home-router device' : '',
     allow: shown ? d.allow : [],
     blocks: d.blocks,
     hint: shown ? '' : 'space turns Kid mode on',
@@ -112,10 +114,10 @@ export function paneOf(d) {
 
 export const kidArgs = (d) => (d.dim ? null : ['kid', d.key, d.kid ? 'off' : 'on']);
 
-// Router devices carry one Kid policy, so 1-5 flip a category on a carried KID device only.
+// Router devices carry one Kid policy, so 1-5 flip a category on a carried KID device; on a Kid router row only YouTube Kids flips, for every router device at once.
 export function categoryArgs(d, n) {
   const c = d.categories[n - 1];
-  if (!c || !d.kid || d.path !== 'carried') return null;
+  if (!c || !d.kid || d.dim || (d.path !== 'carried' && c.key !== 'youtube_kids')) return null;
   return ['category', d.key, c.key, c.on ? 'off' : 'on'];
 }
 

@@ -783,17 +783,21 @@ Item {
                         Repeater {
                             id: catRepeater
                             model: panel.paneView ? panel.paneView.categories : []
-                            RowLayout {
+                            ColumnLayout {
                                 id: catRow
                                 required property var modelData
                                 readonly property bool isOn: modelData.value === "ON"
                                 readonly property bool isPaused: modelData.value === "paused"
+                                readonly property bool hasNote: modelData.key === "youtube_kids" && !!panel.paneView && panel.paneView.shared !== ""
                                 function drawn() {
-                                    return { n: Number(catKey.text), label: catLabel.text, value: catValue.text };
+                                    return { n: Number(catKey.text), label: catLabel.text, value: catValue.text, note: hasNote ? catNote.text : "" };
                                 }
                                 Layout.fillWidth: true
                                 Layout.topMargin: 5
                                 Layout.bottomMargin: 5
+                                spacing: 2
+                                RowLayout {
+                                Layout.fillWidth: true
                                 spacing: 12
                                 Text {
                                     id: catKey
@@ -841,6 +845,18 @@ Item {
                                     font.family: fonts.mono
                                     font.pixelSize: 11
                                     font.weight: catRow.isOn ? Font.DemiBold : Font.Normal
+                                }
+                                }
+                                // On a router row YouTube Kids is one setting for every home-router device, so 2 changes them all.
+                                Text {
+                                    id: catNote
+                                    visible: catRow.hasNote
+                                    Layout.leftMargin: 26
+                                    textFormat: Text.PlainText
+                                    text: panel.paneView ? panel.paneView.shared : ""
+                                    color: c.muted
+                                    font.family: fonts.ui
+                                    font.pixelSize: 12
                                 }
                             }
                         }
