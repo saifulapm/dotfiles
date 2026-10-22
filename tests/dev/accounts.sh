@@ -178,6 +178,7 @@ check "nothing is drawn as an error" state_is 'all((.balances + .usage)[]; .erro
 inside() { state_is '.cardBox as $c | all(.rows[]; .right <= $c.x + $c.w + 0.5)'; }
 edges() { acc_state | jq -c '[(.cardBox.x + .cardBox.w | floor), ([.rows[].right] | max | floor)]'; }
 check "offline, every row stays inside the card (card, rows right: $(edges))" inside
+check "offline, no note is cut short ($(acc_state | jq -c '[.rows[] | select(.noteElided) | .note]'))" state_is 'all(.rows[]; .noteElided != true)'
 rm "$DOTS_DEV_DIR/accounts-offline"
 close_acc
 
@@ -200,6 +201,7 @@ for t in paper artboard blueprint; do
   open_acc
   fetched 6000
   check "$t: forged rows stay inside the card (card, rows right: $(edges))" inside
+  check "$t: no note is cut short ($(acc_state | jq -c '[.rows[] | select(.noteElided) | .note]'))" state_is 'all(.rows[]; .noteElided != true)'
   check "$t: the expired account's note is whole or ends in an ellipsis, never cut at its start ($(acc_state | jq -c '[.rows[] | select(.kind == "account") | .note]'))" state_is 'any(.rows[]; .kind == "account" and (.note | test("^(stale|STALE)")) and .noteCut == false)'
   check "$t: a thousand rows draw at most 50, on a card no taller than the screen ($(acc_state | jq -c '[(.rows | length), (.cardBox.h | floor)]') of $out_h)" state_is --argjson h "$out_h" '(.rows | length) <= 50 and .cardBox.h <= $h'
   close_acc

@@ -355,6 +355,7 @@ Item {
                                 elided: nameText.truncated,
                                 figureElided: figMain.truncated || figTail.truncated,
                                 noteCut: noteText.visible && (noteText.x < 0 || noteText.x + noteText.width > noteBox.width + 0.5),
+                                noteElided: noteText.visible && noteText.truncated,
                                 // The farthest right any drawn text of the row reaches, in the window, to compare with cardBox.
                                 right: [nameText, noteText, figMain, figTail, resetText, activeMark].filter(t => t.visible).reduce((m, t) => Math.max(m, t.mapToItem(null, t.width, 0).x), 0)
                             };
@@ -593,11 +594,8 @@ Item {
                                 id: noteBox
                                 readonly property real pad: bracket && rowItem.it.error ? 16 : 0
                                 visible: rowItem.hasNote
-                                // An account's line says what to do, so it may run longer; either gives way to the row and ends in an ellipsis.
-                                Layout.fillWidth: true
-                                Layout.minimumWidth: 0
-                                Layout.preferredWidth: implicitWidth
-                                Layout.maximumWidth: Math.min(implicitWidth, (rowItem.isAccount ? 360 : 200) + pad)
+                                // Fixed at its text's width up to a cap, so the figure gives way to it, never the other way; an account's line says what to do and may run longer. Past the cap it ends in an ellipsis.
+                                Layout.preferredWidth: Math.min(implicitWidth, (rowItem.isAccount ? 360 : 200) + pad)
                                 implicitWidth: noteText.implicitWidth + pad
                                 implicitHeight: noteText.implicitHeight + (bracket && rowItem.it.error ? 2 : 0)
                                 color: "transparent"
