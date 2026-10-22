@@ -103,7 +103,8 @@ island_state() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_says() { island_state | jq -e --arg t "$1" '.mode == "notification" and (.text | startswith("Reminders · " + $t + " · set "))' >/dev/null; }
 rung() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -e --arg t "$1" 'any(.summaries[]; . == $t)' >/dev/null; }
 
-# A reminder that came due while the shell was stopped rings when it starts. The dev unit is transient, so it restarts rather than stops; the running shell writes the file only when one rings, and none is due.
+# A reminder that came due while the shell was stopped rings when it starts. The dev unit is transient, so it restarts rather than stops; the old shell is frozen first, or its file watch rings the reminder before the restart.
+kill -STOP "$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")"
 now=$(($(date +%s) * 1000))
 jq -n --argjson now "$now" '[{id: "m1", text: "missed", due: ($now - 300000), created: ($now - 900000)}]' >"$store"
 systemctl --user restart "$DOTS_DEV_UNIT"
