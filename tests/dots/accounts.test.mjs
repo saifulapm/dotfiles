@@ -246,7 +246,7 @@ test('an expired token with no cache gives one auth placeholder', async (t) => {
   creds(ctx.homes.main, TOKEN.main, Date.now() - 1000);
   const { out } = await rows(ctx);
   assert.equal(s.seen.length, 0);
-  assert.deepEqual(strip(out), [{ provider: 'claude', label: 'main', account: 'main', metric: null, kind: null, value: null, limit: null, unit: null, resets_at: null, state: 'auth', reason: 'expired' }]);
+  assert.deepEqual(strip(out), [{ provider: 'claude', label: 'main', account: 'main', metric: null, kind: 'percent', value: null, limit: null, unit: null, resets_at: null, state: 'auth', reason: 'expired' }]);
 });
 
 test('a 429 is asked once and serves stale rows', async (t) => {
@@ -265,7 +265,7 @@ test('an account whose home is missing gets a no-home row and main still draws',
   const ctx = scratch(t, s.url, ['main', 'ghost'], ['ghost']);
   const { out } = await rows(ctx);
   assert.deepEqual(strip(of(out, 'main')), limits('main'));
-  assert.deepEqual(strip(of(out, 'ghost')), [{ provider: 'claude', label: 'ghost', account: 'ghost', metric: null, kind: null, value: null, limit: null, unit: null, resets_at: null, state: 'error', reason: 'no-home' }]);
+  assert.deepEqual(strip(of(out, 'ghost')), [{ provider: 'claude', label: 'ghost', account: 'ghost', metric: null, kind: 'percent', value: null, limit: null, unit: null, resets_at: null, state: 'error', reason: 'no-home' }]);
   assert.equal(s.seen.length, 1);
 });
 
@@ -337,7 +337,9 @@ const FAL_ROW = R('fal', 'fal', 'balance', 'money', 24.5, null, 'USD', null);
 const CODEX_ROW = R('codex', 'Codex', 'monthly', 'percent', 0, 100, '%', '2026-11-21T09:41:22Z');
 const PXY_KEYS = new Set(['deepseek-ai', 'openrouter', 'zenmux', 'vercel', 'aihubmix']);
 const pxyRows = (out) => out.filter((row) => PXY_KEYS.has(row.provider));
-const placeholder = (provider, label, state, reason) => R(provider, label, null, null, null, null, null, null, state, reason);
+// A placeholder keeps its source's kind, so the card knows which group it draws in.
+const KIND = { codex: 'percent', elevenlabs: 'count' };
+const placeholder = (provider, label, state, reason) => R(provider, label, null, KIND[provider] || 'money', null, null, null, null, state, reason);
 const ctlLog = (ctx, name) => (existsSync(join(ctx.ctl, name)) ? readFileSync(join(ctx.ctl, name), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : []);
 const OPTS = '--pinentry-mode error';
 

@@ -81,7 +81,7 @@ function claudeRows(account, body) {
   return rows;
 }
 
-const names = (account) => ({ provider: 'claude', label: account.id, account: account.id });
+const names = (account) => ({ provider: 'claude', label: account.id, account: account.id, kind: 'percent' });
 
 // The credentials file is only read, and only the access token and its expiry; the refresh token stays where it is.
 async function claude(account, signal) {
@@ -128,7 +128,8 @@ const amount = (v) => (typeof v === 'string' && v.trim() !== '' ? num(Number(v))
 const currency = (v) => (typeof v === 'string' && /^[A-Za-z]{3}$/.test(v) ? v.toUpperCase() : 'USD');
 const unix = (v) => (typeof v === 'number' ? iso(v * 1000) : null);
 
-const own = (provider, label) => ({ provider, label, account: null });
+// The kind travels with the names, so a placeholder still says which group of the card it belongs to.
+const own = (provider, label, kind = 'money') => ({ provider, label, account: null, kind });
 const money = (names, value, limit, unit) => ({ ...names, metric: 'balance', kind: 'money', value, limit, unit, resets_at: null });
 
 async function elevenlabs(signal) {
@@ -230,7 +231,7 @@ function balances(data, names) {
   return null;
 }
 
-const failed = (names, reason) => ({ ...names, metric: null, kind: null, value: null, limit: null, unit: null, resets_at: null, reason });
+const failed = (names, reason) => ({ ...names, metric: null, kind: names.kind || null, value: null, limit: null, unit: null, resets_at: null, reason });
 
 // A provider pxy could not read says why in a summary; the summary only picks one of the fixed reasons.
 function pxyReason(summary) {
@@ -262,9 +263,9 @@ function sources() {
   return [
     ...claudes,
     { name: 'pxy', names: own('pxy', 'pxy'), run: pxy },
-    { name: 'elevenlabs', names: own('elevenlabs', 'ElevenLabs'), run: elevenlabs },
+    { name: 'elevenlabs', names: own('elevenlabs', 'ElevenLabs', 'count'), run: elevenlabs },
     { name: 'fal', names: own('fal', 'fal'), run: fal },
-    { name: 'codex', names: own('codex', 'Codex'), run: codex },
+    { name: 'codex', names: own('codex', 'Codex', 'percent'), run: codex },
   ];
 }
 
