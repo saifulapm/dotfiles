@@ -38,11 +38,26 @@ export function whenText(due, now) {
   return `${WEEKDAYS[new Date(due).getDay()]} ${clock(due)}`;
 }
 
+const oneLine = (s) => line(s.replace(CONTROL, ' ').replace(MARK, ''));
+const isReminder = (r) => r !== null && typeof r === 'object' && typeof r.id === 'string' && typeof r.text === 'string' && Number.isFinite(r.due) && Number.isFinite(r.created);
+
+// reminders.json's text as the pending list. Anything in it that is not a reminder makes it broken, so nothing is set over what it holds; each text is drawn as one line, as a typed one is.
+export function readReminders(text) {
+  let l;
+  try {
+    l = JSON.parse(text);
+  } catch (e) {
+    return { list: [], broken: true };
+  }
+  if (!Array.isArray(l) || !l.every(isReminder)) return { list: [], broken: true };
+  return { list: l.map((r) => Object.assign({}, r, { text: oneLine(r.text) })), broken: false };
+}
+
 // The query after `r `: "20m tea", "1h30m tea" or "17:30 call". Null while it has no time or no text yet; {error} for a time no clock has.
 export function parseReminder(q, now) {
   const m = /^\s*(\S+)\s+([\s\S]*\S)/.exec(q);
   if (!m) return null;
-  const text = line(m[2].replace(CONTROL, ' ').replace(MARK, ''));
+  const text = oneLine(m[2]);
   if (!text) return null;
   const rel = /^(?:(\d+)h)?(?:(\d+)m)?$/.exec(m[1]);
   const at = /^(\d{1,2}):(\d{2})$/.exec(m[1]);

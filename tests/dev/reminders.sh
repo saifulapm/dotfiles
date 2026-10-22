@@ -68,6 +68,22 @@ check "a broken reminders.json makes the r row say so" state_is '.results[0] | s
 wtype -k Return
 check "Enter keeps the launcher open and the file as it was" bash -c "[ \"\$(cat '$store')\" = 'not json' ] && timeout 0.5 qs ipc call launcher state | jq -e .open >/dev/null"
 close_launcher
+# One entry that is not a reminder breaks the file the same way, so a new one never drops it.
+junk='[{"id":"a","text":"keep","due":"abc","created":0},1]'
+printf '%s' "$junk" >"$store"
+open_launcher
+wtype "r 5m x"
+until_ok 3000 state_is '.results[0] // "" | startswith("reminders.json does not parse")'
+wtype -k Return
+check "a reminders.json with an entry that is not a reminder refuses Enter and keeps every byte" bash -c "[ \"\$(cat '$store')\" = '$junk' ]"
+close_launcher
+# A forged text in the file draws as one line with no control or bidi characters.
+jq -n --argjson due "$((($(date +%s) + 3600) * 1000))" '[{id: "f", text: "a\nb‮c\u001b[31md", due: $due, created: 0}]' >"$store"
+open_launcher
+wtype "r "
+until_ok 3000 state_is '.results[0] == "a bc [31md"'
+check "a stored text with a newline, ESC and U+202E is one line in the pending row" state_is '.results == ["a bc [31md"]'
+close_launcher
 echo '[]' >"$store"
 open_launcher
 wtype "r 5m x"

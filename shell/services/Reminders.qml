@@ -60,16 +60,14 @@ Scope {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
-            try {
-                reminders.broken = false;
-                const l = JSON.parse(text());
-                reminders.list = Array.isArray(l) ? l.filter(r => r && typeof r.text === "string" && typeof r.due === "number") : [];
+            const r = R.readReminders(text());
+            reminders.broken = r.broken;
+            reminders.list = r.list;
+            if (r.broken)
+                console.warn("reminders: " + store.path + " does not parse; leaving it as it is");
+            else
                 // One that came due while the shell was stopped rings now.
                 reminders.ring();
-            } catch (e) {
-                reminders.broken = true;
-                console.warn("reminders: " + store.path + " does not parse; leaving it as it is: " + e.message);
-            }
         }
     }
 }
