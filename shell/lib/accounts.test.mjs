@@ -200,3 +200,20 @@ test('the island says which account new sessions use, in its cleaned label', () 
   const work = accountsItems(view(rows, reg)).find((i) => i.kind === 'account' && i.account === 'work');
   assert.equal(activeNotice(work.label), 'Claude · wo rk is active for new sessions');
 });
+
+// The rows come from a cache file anyone can write: a thousand of them made a card 36366 px tall and froze the shell.
+test('a flood of rows is cut to what one card can show', () => {
+  const many = [];
+  for (let i = 0; i < 1000; i++) {
+    many.push(claude('main', `weekly M${i}`, 1, null));
+    many.push(row({ provider: `p${i}`, label: `P${i}`, metric: 'balance', kind: 'money', value: 1, unit: 'USD' }));
+    many.push(row({ provider: `u${i}`, label: `U${i}`, metric: 'characters', kind: 'count', value: 1, limit: 2, unit: 'characters' }));
+  }
+  const reg = JSON.stringify({ active: 'a0', accounts: Array.from({ length: 50 }, (_, i) => ({ id: `a${i}`, label: `a${i}`, home: '/h' })) });
+  const v = view(many, reg);
+  assert.ok(v.accounts.length <= 4, v.accounts.length);
+  assert.ok(v.accounts.every((a) => a.limits.length <= 4));
+  assert.ok(v.balances.length <= 10, v.balances.length);
+  assert.ok(v.usage.length <= 6, v.usage.length);
+  assert.ok(accountsItems(v).length <= 50);
+});

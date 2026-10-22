@@ -174,8 +174,35 @@ echo "     offline: $(acc_state | jq -c '{accounts: [.accounts[].note], provider
 check "offline, every account reads stale · as of HH:MM" state_is 'all(.accounts[]; .note | test("^stale · as of [0-9]{2}:[0-9]{2}$"))'
 check "every balance and usage row keeps its figure with as of HH:MM" state_is 'all((.balances + .usage)[]; (.note | test("^as of [0-9]{2}:[0-9]{2}$")) and .figure != "")'
 check "nothing is drawn as an error" state_is 'all((.balances + .usage)[]; .error == false) and all(.rows[]; (.note | startswith("✕")) | not)'
+# Every drawn text of a row ends inside the card: Paper's stale Codex row once ran its reset past the right border.
+inside() { state_is '.cardBox as $c | all(.rows[]; .right <= $c.x + $c.w + 0.5)'; }
+edges() { acc_state | jq -c '[(.cardBox.x + .cardBox.w | floor), ([.rows[].right] | max | floor)]'; }
+check "offline, every row stays inside the card (card, rows right: $(edges))" inside
 rm "$DOTS_DEV_DIR/accounts-offline"
 close_acc
+
+# Rows from a file anyone can write: a 200-character unit and label, a stale usage row with its reset, and a thousand balances.
+node -e '
+  const now = Date.now(), iso = (t) => new Date(t).toISOString();
+  const row = (o) => Object.assign({ account: null, limit: null, unit: "USD", resets_at: null, as_of: iso(now - 7200e3), state: "stale", reason: "network" }, o);
+  const rows = [
+    row({ provider: "codex", label: "Codex", metric: "monthly", kind: "percent", value: 0, limit: 100, unit: "%", resets_at: iso(now + 30 * 86400e3) }),
+    row({ provider: "elevenlabs", label: "ElevenLabs", metric: "characters", kind: "count", value: 1, limit: 2, unit: "L".repeat(200), resets_at: iso(now + 12 * 86400e3) }),
+    row({ provider: "x", label: "W".repeat(200), metric: "balance", kind: "money", value: 123456789.12, limit: 999999999 }),
+  ];
+  for (let i = 0; i < 1000; i++) rows.push(row({ provider: "p" + i, label: "P" + i, metric: "balance", kind: "money", value: i }));
+  console.log(JSON.stringify(rows));
+' >"$DOTS_DEV_DIR/accounts-rows.json"
+out_h=$(niri msg -j outputs | jq -r 'first(.[]).logical.height')
+for t in paper artboard blueprint; do
+  in_theme "$t"
+  open_acc
+  fetched 6000
+  check "$t: forged rows stay inside the card (card, rows right: $(edges))" inside
+  check "$t: a thousand rows draw at most 50, on a card no taller than the screen ($(acc_state | jq -c '[(.rows | length), (.cardBox.h | floor)]') of $out_h)" state_is --argjson h "$out_h" '(.rows | length) <= 50 and .cardBox.h <= $h'
+  close_acc
+done
+rm "$DOTS_DEV_DIR/accounts-rows.json"
 
 exit $((fails > 0))
 }

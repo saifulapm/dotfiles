@@ -23,6 +23,9 @@ const REASONS = {
 };
 const reasonText = (r) => REASONS[r] || "can't read";
 
+// One card fits this many; the rows come from files anyone can write, and a thousand froze the shell.
+const MOST = { accounts: 4, limits: 4, balances: 10, usage: 6 };
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const pad = (n) => String(n).padStart(2, '0');
@@ -101,7 +104,7 @@ export function accountsView(registryText, rowsText, now, busy) {
   const parsed = parse(rowsText, []);
   const rows = Array.isArray(parsed) ? parsed.filter((r) => r && typeof r === 'object') : [];
   const reg = accountsOf(registryText);
-  const accounts = reg.list.map((a) => {
+  const accounts = reg.list.slice(0, MOST.accounts).map((a) => {
     const own = rows.filter((r) => r.provider === 'claude' && r.account === a.id);
     const failed = own.find((r) => !num(r.value));
     const stale = own.find((r) => r.state === 'stale');
@@ -115,12 +118,12 @@ export function accountsView(registryText, rowsText, now, busy) {
       active: a.id === reg.active,
       note,
       dim: note !== '',
-      limits: own.filter((r) => num(r.value)).map((r) => Object.assign(figureOf(r, now), { name: cap(clean(r.metric)) })),
+      limits: own.filter((r) => num(r.value)).slice(0, MOST.limits).map((r) => Object.assign(figureOf(r, now), { name: cap(clean(r.metric)) })),
     };
   });
   const others = rows.filter((r) => r.provider !== 'claude');
-  const balances = others.filter((r) => r.kind === 'money').map((r) => figureOf(r, now));
-  const usage = others.filter((r) => r.kind === 'percent' || r.kind === 'count').map((r) => figureOf(r, now));
+  const balances = others.filter((r) => r.kind === 'money').slice(0, MOST.balances).map((r) => figureOf(r, now));
+  const usage = others.filter((r) => r.kind === 'percent' || r.kind === 'count').slice(0, MOST.usage).map((r) => figureOf(r, now));
   const groups = [['Claude', accounts.length]];
   if (balances.length) groups.push(['Balances', balances.length]);
   if (usage.length) groups.push(['Usage', usage.length]);

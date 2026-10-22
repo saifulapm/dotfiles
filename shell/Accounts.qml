@@ -350,7 +350,10 @@ Item {
                                 note: noteText.visible ? noteText.text : "",
                                 warning: triangle.visible,
                                 lines: nameText.lineCount,
-                                elided: nameText.truncated
+                                elided: nameText.truncated,
+                                figureElided: figMain.truncated || figTail.truncated,
+                                // The farthest right any drawn text of the row reaches, in the window, to compare with cardBox.
+                                right: [nameText, noteText, figMain, figTail, resetText, activeMark].filter(t => t.visible).reduce((m, t) => Math.max(m, t.mapToItem(null, t.width, 0).x), 0)
                             };
                         }
                         function drawnGroup() {
@@ -585,6 +588,8 @@ Item {
                             // A stale account's line, or a provider's stale time or failure; a failure speaks in the danger token.
                             Rectangle {
                                 visible: noteText.visible
+                                Layout.maximumWidth: 200
+                                clip: true
                                 implicitWidth: noteText.implicitWidth + (bracket && rowItem.it.error ? 16 : 0)
                                 implicitHeight: noteText.implicitHeight + (bracket && rowItem.it.error ? 2 : 0)
                                 color: "transparent"
@@ -609,9 +614,13 @@ Item {
                             Item {
                                 id: figure
                                 visible: rowItem.fig !== null && rowItem.fig.main !== ""
-                                Layout.fillWidth: !caps && !(plain && rowItem.isLimit)
+                                // Paper's 230 px and the others' natural width give way to a note or a long figure, so the row never runs past the card.
+                                Layout.fillWidth: !(plain && rowItem.isLimit)
                                 Layout.preferredWidth: caps ? 230 : plain && rowItem.isLimit ? 56 : figRow.implicitWidth
+                                Layout.maximumWidth: caps ? 230 : Number.POSITIVE_INFINITY
+                                Layout.minimumWidth: 0
                                 implicitHeight: figRow.implicitHeight
+                                clip: true
 
                                 Row {
                                     id: figRow
@@ -667,6 +676,8 @@ Item {
                                     Text {
                                         id: figMain
                                         anchors.verticalCenter: parent.verticalCenter
+                                        width: Math.min(implicitWidth, Math.max(0, figure.width - (triangle.visible ? triangle.width + 6 : 0) - (figTail.visible ? Math.min(figTail.implicitWidth, figure.width / 2) + 6 : 0)))
+                                        elide: Text.ElideRight
                                         textFormat: Text.PlainText
                                         text: rowItem.fig ? rowItem.fig.main : ""
                                         color: rowItem.warn ? marks.warn : rowItem.ink
@@ -678,6 +689,8 @@ Item {
                                         id: figTail
                                         visible: text !== ""
                                         anchors.verticalCenter: parent.verticalCenter
+                                        width: Math.min(implicitWidth, figure.width / 2)
+                                        elide: Text.ElideRight
                                         textFormat: Text.PlainText
                                         text: rowItem.fig ? rowItem.fig.tail : ""
                                         color: rowItem.isCurrent ? look.cursor.detail : c.muted
