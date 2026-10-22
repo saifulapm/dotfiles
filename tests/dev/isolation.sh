@@ -24,6 +24,7 @@ check "DOTS_HUB_QUESTIONS is inside the temp dir" under_dev "${DOTS_HUB_QUESTION
 check "the shell unit carries DOTS_HUB_QUESTIONS" unit_has DOTS_HUB_QUESTIONS "${DOTS_HUB_QUESTIONS:-}"
 check "the shell unit's DOTS_NOTIFY_PHONE is the fake" unit_has DOTS_NOTIFY_PHONE "$repo/bin/dev-fake-notify-phone"
 check "the shell unit's DOTS_PICK_FILES is the fake" unit_has DOTS_PICK_FILES "$repo/bin/dev-fake-pick-files"
+check "the shell unit's DOTS_ACCOUNTS is the fake" unit_has DOTS_ACCOUNTS "$repo/bin/dev-fake-accounts"
 check "the shell unit's system bus is the nested session bus" unit_has DBUS_SYSTEM_BUS_ADDRESS "$DBUS_SESSION_BUS_ADDRESS"
 check "the shell unit carries the PATH bin/dots-dev set, less bin/" unit_has PATH "$(tr ':' '\n' <<<"$PATH" | grep -vxF "$repo/bin" | paste -sd:)"
 # The unit resolves ddcutil with its own PATH, so a real one on it would probe the live I2C buses.
