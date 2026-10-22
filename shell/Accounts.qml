@@ -15,8 +15,10 @@ Item {
     property bool shown: false
     property int opens: 0
     property var openMs: null
-    // When the open being timed was requested, or -1 once its first frame is swapped.
+    // When the open being timed was requested, or -1 once its first frame with rows is swapped.
     property real openT0: -1
+    // True once this open's rows are in: the cache's answer, or the rows a fetch still running at the open had drawn.
+    property bool rowsIn: false
     property string registryText: ""
     property string rowsText: "[]"
     // The cursor's place among the rows it stops on.
@@ -49,6 +51,7 @@ Item {
         openMs = null;
         opens += 1;
         selected = 0;
+        rowsIn = busy;
         if (!busy)
             registryReader.running = true;
         shown = true;
@@ -76,9 +79,9 @@ Item {
         user.running = true;
     }
 
-    // Called on each of the host window's frames; the first one after open() ends the timing.
+    // Called on each of the host window's frames; the first one drawn with this open's rows ends the timing.
     function swapped() {
-        if (shown && openT0 >= 0) {
+        if (shown && openT0 >= 0 && rowsIn) {
             openMs = Date.now() - openT0;
             openT0 = -1;
         }
@@ -92,6 +95,7 @@ Item {
     function take(text) {
         if (text.trim().charAt(0) === "[")
             rowsText = text;
+        rowsIn = true;
     }
 
     function state() {
@@ -108,7 +112,7 @@ Item {
         for (let i = 0; i < keyRepeater.count; i++)
             keys.push((keyRepeater.itemAt(i).keyLabel + " " + keyRepeater.itemAt(i).wordLabel).trim());
         const limit = l => ({ name: l.name, figure: l.figure, reset: l.reset, warning: l.warning });
-        const other = r => ({ label: r.label, figure: r.figure, note: r.note, warning: r.warning });
+        const other = r => ({ label: r.label, figure: r.figure, note: r.note, warning: r.warning, error: r.error });
         return JSON.stringify({
             loaded: true,
             open: shown,

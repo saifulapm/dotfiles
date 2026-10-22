@@ -133,5 +133,28 @@ until_ok 33000 state_is '.loaded == false'
 check "30 s after close shell status no longer lists accounts as loaded" bash -c "timeout 0.5 qs ipc call shell status | jq -e 'all(.loaded[]; . != \"accounts\")' >/dev/null"
 check "and its timers are back to $timers_before ($(shell_status | jq .timers))" test "$(shell_status | jq .timers)" = "$timers_before"
 
+# With no network the collector serves every source's cached rows as stale, and the card still opens with them. A cold open is timed to its first frame drawn with rows; building the 17 rows takes 45 to 80 ms, so the times are printed, not yet held to 50 ms.
+touch "$DOTS_DEV_DIR/accounts-offline"
+cold=()
+for i in 1 2 3 4 5; do
+  until_ok 33000 state_is '.loaded == false'
+  niri msg action spawn -- dots-call accounts toggle
+  until_ok 3000 state_is '.openMs != null'
+  cold+=("$(acc_state | jq .openMs)")
+  fetched 6000
+  [ "$i" = 5 ] || close_acc
+done
+echo "     cold opens: ${cold[*]} ms"
+timed() { jq -e 'type == "number" and . > 0' <<<"$1" >/dev/null; }
+for ms in "${cold[@]}"; do
+  check "a cold open is timed to its first frame with rows ($ms ms)" timed "$ms"
+done
+echo "     offline: $(acc_state | jq -c '{accounts: [.accounts[].note], providers: [(.balances + .usage)[] | [.note, .error]]}')"
+check "offline, every account reads stale · as of HH:MM" state_is 'all(.accounts[]; .note | test("^stale · as of [0-9]{2}:[0-9]{2}$"))'
+check "every balance and usage row keeps its figure with as of HH:MM" state_is 'all((.balances + .usage)[]; (.note | test("^as of [0-9]{2}:[0-9]{2}$")) and .figure != "")'
+check "nothing is drawn as an error" state_is 'all((.balances + .usage)[]; .error == false) and all(.rows[]; (.note | startswith("✕")) | not)'
+rm "$DOTS_DEV_DIR/accounts-offline"
+close_acc
+
 exit $((fails > 0))
 }
