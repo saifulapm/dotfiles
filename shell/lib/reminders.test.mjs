@@ -117,7 +117,7 @@ test('reminders.json is read as the list, each text one line with no control or 
 
 test('a reminders.json holding anything but reminders is broken, so nothing is set over it', () => {
   const good = { id: 'b', text: 'valid', due: now + 60000, created: now };
-  for (const file of ['{', '', '{"a":1}', '[1,"a",null,[],{"x":1}]', JSON.stringify([{ id: 'a', text: 'keep', due: 'abc', created: now }, good]), JSON.stringify([{ ...good, text: 5 }]), JSON.stringify([{ ...good, id: undefined }])]) {
+  for (const file of ['{', '', '{"a":1}', '[1,"a",null,[],{"x":1}]', JSON.stringify([{ id: 'a', text: 'keep', due: 'abc', created: now }, good]), JSON.stringify([{ ...good, text: 5 }]), JSON.stringify([{ ...good, id: undefined }]), JSON.stringify([{ ...good, due: 1e300 }]), JSON.stringify([{ ...good, created: 1e300 }])]) {
     assert.equal(readReminders(file).broken, true, file);
   }
   assert.deepEqual(readReminders(JSON.stringify([good])), { list: [good], broken: false });

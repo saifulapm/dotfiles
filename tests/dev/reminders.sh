@@ -77,6 +77,13 @@ until_ok 3000 state_is '.results[0] // "" | startswith("reminders.json does not 
 wtype -k Return
 check "a reminders.json with an entry that is not a reminder refuses Enter and keeps every byte" bash -c "[ \"\$(cat '$store')\" = '$junk' ]"
 close_launcher
+# A due no Date holds would draw as NaN:NaN, so it breaks the file too.
+far='[{"id":"a","text":"far","due":1e300,"created":0}]'
+printf '%s' "$far" >"$store"
+open_launcher
+wtype "r 5m x"
+check "a due past what a Date holds makes the r row say the file does not parse" until_ok 3000 state_is '.results[0] // "" | startswith("reminders.json does not parse")'
+close_launcher
 # A forged text in the file draws as one line with no control or bidi characters.
 jq -n --argjson due "$((($(date +%s) + 3600) * 1000))" '[{id: "f", text: "a\nb‮c\u001b[31md", due: $due, created: 0}]' >"$store"
 open_launcher

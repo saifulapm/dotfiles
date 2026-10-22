@@ -39,7 +39,9 @@ export function whenText(due, now) {
 }
 
 const oneLine = (s) => line(s.replace(CONTROL, ' ').replace(MARK, ''));
-const isReminder = (r) => r !== null && typeof r === 'object' && typeof r.id === 'string' && typeof r.text === 'string' && Number.isFinite(r.due) && Number.isFinite(r.created);
+// A time a Date can hold; past about 8.64e15 ms it is Invalid Date, which draws as NaN:NaN.
+const isTime = (ms) => typeof ms === 'number' && !Number.isNaN(new Date(ms).getTime());
+const isReminder = (r) => r !== null && typeof r === 'object' && typeof r.id === 'string' && typeof r.text === 'string' && isTime(r.due) && isTime(r.created);
 
 // reminders.json's text as the pending list. Anything in it that is not a reminder makes it broken, so nothing is set over what it holds; each text is drawn as one line, as a typed one is.
 export function readReminders(text) {
