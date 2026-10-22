@@ -268,7 +268,7 @@ test('the nft include loads into a fw4 table that declares the Kid sets', (t) =>
   for (const re of [/ip saddr @kid ip daddr @kid_block reject/, /th dport 853 reject/, /ether saddr @kid_mac meta nfproto ipv6 reject/, /dnat ip to 192\.168\.0\.1:5353/]) assert.match(include, re);
 });
 
-// A fake opkg whose feed holds dnsmasq-full's real dependency tree from the router: libgmp10 and the conntrack module are two levels down.
+// A fake opkg with dnsmasq-full's real dependency tree from the router: libgmp10 and the conntrack module are two levels down, and libc is held.
 const OPKG = `#!/bin/sh
 db='dnsmasq-full:libc, libubus20250102, libnettle8, libnetfilter-conntrack3 (>= 1.0), nftables-json
 libnettle8:libc, libgmp10
@@ -278,7 +278,7 @@ kmod-nf-conntrack-netlink:kernel
 libnfnetlink0:libc'
 installed=' libc libubus20250102 nftables-json libnfnetlink0 libmnl0 kernel '
 case $1 in
-  status) case $installed in *" $2 "*) echo 'Status: install ok installed' ;; esac ;;
+  status) case $2 in libc) echo 'Status: install hold installed' ;; *) case $installed in *" $2 "*) echo 'Status: install ok installed' ;; esac ;; esac ;;
   info) echo "$db" | sed -n "s/^$2:/Depends: /p" ;;
   download) echo "$2" >>downloads; : >"$2.ipk" ;;
 esac

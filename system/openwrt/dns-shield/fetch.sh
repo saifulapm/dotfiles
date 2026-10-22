@@ -9,7 +9,7 @@ while [ -n "$todo" ]; do
 	todo=$*
 	case $seen in *" $p "*) continue ;; esac
 	seen="$seen$p "
-	opkg status "$p" | grep -q 'install ok installed' && continue
+	opkg status "$p" | grep -q '^Status: .* installed$' && continue
 	opkg download "$p" >/dev/null 2>&1 || { echo "dns-shield: cannot download $p"; exit 1; }
 	todo="$todo $(opkg info "$p" | sed -n 's/^Depends: //p' | head -n 1 | sed 's/([^)]*)//g' | tr ',' ' ')"
 done
