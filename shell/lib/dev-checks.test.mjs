@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // A redirect on a check line silences the check's own ok or FAIL line, so the run hides the result.
 const dir = new URL('../../tests/dev/', import.meta.url).pathname;
@@ -56,4 +59,25 @@ test('no tests/dev script floors a centred card x position', () => {
       });
   }
   assert.deepEqual(found, [], 'card x floored, use (ow - N + 1) / 2');
+});
+
+// An agent shell without WAYLAND_DISPLAY gets niri's "error initializing the TTY backend" minutes into a run, so lib.sh stops first and names the fix.
+test('lib.sh stops at once on an empty WAYLAND_DISPLAY, naming the fix, before it starts dots-dev', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dev-lib-'));
+  try {
+    mkdirSync(join(root, 'tests/dev'), { recursive: true });
+    mkdirSync(join(root, 'bin'));
+    copyFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), join(root, 'tests/dev/lib.sh'));
+    writeFileSync(join(root, 'bin/dots-dev'), `#!/bin/sh\ntouch ${root}/started\n`, { mode: 0o755 });
+    const r = spawnSync('bash', ['-c', `source ${root}/tests/dev/lib.sh`], {
+      env: { ...process.env, WAYLAND_DISPLAY: '', XDG_RUNTIME_DIR: root },
+      encoding: 'utf8',
+      timeout: 3000,
+    });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /WAYLAND_DISPLAY=wayland-1/);
+    assert.ok(!existsSync(join(root, 'started')), 'dots-dev never ran');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

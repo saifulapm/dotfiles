@@ -38,6 +38,12 @@ mean_rgb() {
   '
 }
 
+# Without the live display, niri fails minutes in with "error initializing the TTY backend".
+if [ -z "${WAYLAND_DISPLAY:-}" ]; then
+  echo "FAIL WAYLAND_DISPLAY is empty: run with WAYLAND_DISPLAY=wayland-1"
+  exit 1
+fi
+
 # Two nested sessions at once stretch every timing, so each check waits for the one before it to finish.
 exec 9>"${XDG_RUNTIME_DIR:-/tmp}/dots-dev-check.lock"
 flock -w 900 9 || { echo "FAIL another nested check held the lock for 15 min"; exit 1; }
