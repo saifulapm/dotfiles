@@ -187,7 +187,8 @@ function routerEnv() {
 // One ssh per read or write, with the script on stdin. The timer is a backstop past ConnectTimeout for a link that connects and then hangs.
 function ssh(script) {
   const r = routerEnv();
-  const args = [...(r.ROUTER_JUMP ? ['-J', r.ROUTER_JUMP] : []), '-i', r.SSH_KEY, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', 'root@' + r.ROUTER_HOST, 'sh', '-s'];
+  mkdirSync(STATE, { recursive: true });
+  const args = [...(r.ROUTER_JUMP ? ['-J', r.ROUTER_JUMP] : []), '-i', r.SSH_KEY, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'UserKnownHostsFile=' + join(STATE, 'router_known_hosts'), 'root@' + r.ROUTER_HOST, 'sh', '-s'];
   return new Promise((resolve) => {
     const child = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'ignore'] });
     let stdout = '';

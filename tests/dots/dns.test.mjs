@@ -332,7 +332,9 @@ test('state lists the router reservations after the carried devices, with one ss
   assert.deepEqual(out.router, { ok: true, as_of: out.as_of, error: null });
   assert.deepEqual(out.devices.map((d) => d.key), ['carried:dev00phone', 'carried:dev00ipad', 'carried:dev00wife', ...ROUTER_KEYS]);
   assert.deepEqual(routerRows(out), ROUTER_ROWS);
-  assert.deepEqual(sshLog(ctx), [['-i', join(ctx.home, '.ssh', 'router'), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', 'root@192.168.0.1', 'sh', '-s']]);
+  // The router's host key is kept in the file dots-dns-router uses, since BatchMode cannot ask about an unknown key.
+  const known = join(ctx.home, '.local', 'state', 'dns-helper', 'router_known_hosts');
+  assert.deepEqual(sshLog(ctx), [['-i', join(ctx.home, '.ssh', 'router'), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=accept-new', '-o', `UserKnownHostsFile=${known}`, 'root@192.168.0.1', 'sh', '-s']]);
   assert.deepEqual(JSON.parse(readFileSync(join(ctx.cache, 'router.json'), 'utf8')), { as_of: out.as_of, devices: ROUTER_ROWS });
 });
 
