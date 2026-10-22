@@ -454,6 +454,7 @@ Item {
             settled: motion.settled,
             drawing: picker.visible,
             cardBox: card.drawnBox(),
+            frameLabel: card.frameLabel(),
             keyboard: picker.Window.active
         });
     }

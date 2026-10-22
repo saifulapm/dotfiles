@@ -182,7 +182,9 @@ Item {
 
     // The label as drawn: the Text item's own text and visibility, for the state functions.
     function frameLabel() {
-        return { text: frameText.text, visible: frameText.visible };
+        const a = frameText.mapToItem(null, 0, 0);
+        const b = frameText.mapToItem(null, frameText.width, frameText.height);
+        return { text: frameText.text, visible: frameText.visible, truncated: frameText.truncated, box: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y } };
     }
 
     Text {
@@ -191,6 +193,10 @@ Item {
         visible: surface.style.handles && surface.label !== ""
         opacity: surface.pose.fill
         y: -20
+        // One line no wider than the card, so a long label, such as a 200-character app id, elides at the card's right edge.
+        width: surface.width
+        maximumLineCount: 1
+        elide: Text.ElideRight
         text: surface.label
         color: surface.accent
         font.family: surface.tokens ? surface.tokens.type.ui : ""

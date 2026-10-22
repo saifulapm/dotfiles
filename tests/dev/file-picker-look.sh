@@ -124,6 +124,8 @@ for t in "paper|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|||$dotted|3 MAR
   wtype down
   until_ok 3000 state_is '.match != ""'
   check "$name: a 200-character app elides the heading and keeps the query and '$match' in the card ($(pk_state | jq -c '{headingTruncated, typed, match, cardSize, boxes}'))" state_is --arg m "$match" ".headingTruncated and (.typed | endswith(\"down\")) and .match == \$m and ($inside)"
+  # Artboard draws the heading again as the frame label above the card; it elides at the card's right edge.
+  [ "$name" = artboard ] && check "artboard: a 200-character app elides the frame label inside the card ($(pk_state | jq -c '{frameLabel, cardBox}'))" state_is '.frameLabel.visible and .frameLabel.truncated and .frameLabel.box.x + .frameLabel.box.w <= .cardBox.x + .cardBox.w + 0.5'
   cancel "long-$name"
 done
 
