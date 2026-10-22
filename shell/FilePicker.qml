@@ -29,12 +29,44 @@ Item {
     readonly property string name: seen?.name ?? ""
     readonly property string accept: seen?.accept ?? ""
     property string folder: ""
-    property var rows: []
+    // Every entry of the folder, dotfiles too, so ctrl+h, the query and the filter never relist.
+    property var entries: []
+    readonly property var allPlaces: places.concat(pins)
+    property string query: ""
+    readonly property var matches: P.placeMatches(allPlaces, query)
+    property bool hidden: false
+    property int filterAt: 0
+    readonly property var currentFilter: filters[filterAt] ?? null
+    readonly property string filterName: P.oneLine(currentFilter?.name ?? "")
+    // A query that matches places narrows them and leaves the rows alone.
+    readonly property var rows: P.shownRows(entries, {
+        hidden: hidden,
+        filter: currentFilter,
+        query: matches.length > 0 ? "" : query
+    })
     property bool listed: false
     // A folder change while a listing runs asks for one more after it.
     property bool stale: false
+    // The row to put the cursor on once the listing lands: the folder just left.
+    property string landOn: ""
     property int selected: 0
     property var pins: []
+    // "list" or "places": where Up, Down and Enter act.
+    property string side: "list"
+    property int placeAt: 0
+    property bool typingPath: false
+    property string typed: ""
+    readonly property var split: P.splitPath(typed, home, folder)
+    // The typed path's parent as last listed, and whether that listing worked.
+    property string pathFolder: ""
+    property var pathEntries: []
+    property bool pathOk: false
+    property bool pathStale: false
+    readonly property var choices: pathFolder === split.parent ? P.completions(pathEntries, split.tail) : []
+    property int choice: 0
+    readonly property var cursorRow: rows[selected] ?? null
+    readonly property bool previewing: !typingPath && cursorRow !== null && !cursorRow.dir
+    readonly property bool preview: previewing && previewImage.status === Image.Ready
     readonly property bool busy: request !== null || lister.running
 
     readonly property string home: Quickshell.env("HOME")
@@ -66,6 +98,10 @@ Item {
         openMs = null;
         opens += 1;
         bookmarksFile.reload();
+        hidden = false;
+        side = "list";
+        typingPath = false;
+        filterAt = r.filter >= 0 && r.filter < r.filters.length ? r.filter : 0;
         enter(r.folder.charAt(0) === "/" ? r.folder.replace(/\/+$/, "") || "/" : home);
         shown = true;
         keyTarget.forceActiveFocus();
@@ -101,16 +137,91 @@ Item {
         return (folder === "/" ? "" : folder) + "/" + row.name;
     }
 
-    function enter(path) {
+    // Walking to a folder clears the query; a query that opened a place keeps it.
+    function enter(path, keepQuery) {
+        if (!keepQuery)
+            query = "";
         folder = path;
         selected = 0;
+        landOn = "";
         listed = false;
         list();
     }
 
     function up() {
-        if (folder !== "/")
-            enter(folder.slice(0, folder.lastIndexOf("/")) || "/");
+        if (folder === "/")
+            return;
+        const left = folder.slice(folder.lastIndexOf("/") + 1);
+        enter(folder.slice(0, folder.lastIndexOf("/")) || "/");
+        landOn = left;
+    }
+
+    // Exactly one place matching opens it; otherwise the query narrows places or rows by binding.
+    function setQuery(q) {
+        query = q;
+        selected = 0;
+        if (matches.length === 1 && allPlaces[matches[0].index].path !== folder)
+            enter(allPlaces[matches[0].index].path, true);
+    }
+
+    function setTyped(t) {
+        typed = t;
+        choice = 0;
+        completeList();
+    }
+
+    function completeList() {
+        if (completer.running) {
+            pathStale = true;
+            return;
+        }
+        if (pathFolder === split.parent && pathOk)
+            return;
+        completer.asked = split.parent;
+        completer.command = ["python3", "-c", lister.script, split.parent];
+        completer.running = true;
+    }
+
+    function togglePath() {
+        typingPath = !typingPath;
+        if (typingPath)
+            setTyped("");
+    }
+
+    // Tab puts the cursor row's name in place of the begun one.
+    function completePath() {
+        const c = choices[choice];
+        if (c)
+            setTyped((typed === "~" ? "~/" : typed.slice(0, typed.length - split.tail.length)) + c.name + "/");
+    }
+
+    // Enter goes to the typed folder when it is one, else to the cursor row.
+    function goPath() {
+        const base = split.parent === "/" ? "" : split.parent;
+        let to = "";
+        if (pathFolder === split.parent && pathOk && split.tail === "")
+            to = split.parent;
+        else if (pathEntries.some(e => e.dir && e.name === split.tail) && pathFolder === split.parent)
+            to = base + "/" + split.tail;
+        else if (choices[choice])
+            to = base + "/" + choices[choice].name;
+        if (to === "")
+            return;
+        typingPath = false;
+        enter(to);
+    }
+
+    function cycleFilter() {
+        if (filters.length > 1)
+            filterAt = (filterAt + 1) % filters.length;
+    }
+
+    function toSide() {
+        side = side === "list" ? "places" : "list";
+        if (side === "places") {
+            const here = allPlaces.findIndex(p => p.path === folder);
+            placeAt = here >= 0 ? here : 0;
+        }
     }
 
     function list() {
@@ -123,11 +234,20 @@ Item {
     }
 
     function move(by) {
-        selected = Math.max(0, Math.min(rows.length - 1, selected + by));
+        if (typingPath)
+            choice = Math.max(0, Math.min(choices.length - 1, choice + by));
+        else if (side === "places")
+            placeAt = Math.max(0, Math.min(allPlaces.length - 1, placeAt + by));
+        else
+            selected = Math.max(0, Math.min(rows.length - 1, selected + by));
     }
 
-    // Enter answers a file and opens a folder.
+    // Enter answers a file and opens a folder or the place under the cursor.
     function choose() {
+        if (typingPath)
+            return goPath();
+        if (side === "places")
+            return enter(allPlaces[placeAt].path);
         const row = rows[selected];
         if (!row)
             return;
@@ -149,8 +269,15 @@ Item {
                 drawn.push(item.drawn());
         }
         const shownPlaces = [];
-        for (let i = 0; i < placeRepeater.count; i++)
+        const lit = [];
+        for (let i = 0; i < placeRepeater.count; i++) {
             shownPlaces.push(placeRepeater.itemAt(i).drawn());
+            if (placeRepeater.itemAt(i).hit)
+                lit.push(placeRepeater.itemAt(i).drawn());
+        }
+        const done = [];
+        for (let i = 0; i < completionRepeater.count; i++)
+            done.push(completionRepeater.itemAt(i).drawn());
         const keys = [];
         for (let i = 0; i < keyRepeater.count; i++)
             keys.push((keyRepeater.itemAt(i).keyLabel + " " + keyRepeater.itemAt(i).wordLabel).trim());
@@ -170,6 +297,21 @@ Item {
             rows: drawn,
             selected: selected,
             places: shownPlaces,
+            matches: lit,
+            focus: side,
+            typed: typedLabel.text,
+            prompt: promptLabel.text,
+            match: matchLabel.text,
+            hidden: hidden,
+            pathMode: typingPath,
+            completionHead: typingPath ? completionHeadLabel.text : "",
+            completions: typingPath ? done : [],
+            choice: choice,
+            previewShown: previewName.visible,
+            preview: preview,
+            previewName: previewName.text,
+            previewDims: previewDims.text,
+            previewDetail: previewDetail.text,
             hint: keys.join(" · "),
             busy: busy,
             openMs: openMs,
@@ -182,11 +324,13 @@ Item {
     }
 
     onSelectedChanged: rowList.positionViewAtIndex(selected, ListView.Contain)
+    onRowsChanged: if (selected >= rows.length)
+        selected = Math.max(0, rows.length - 1)
 
-    // One JSON array of the folder's entries off the render loop: names as they are spelt, a folder with how many entries it holds; dotfiles stay hidden.
+    // One JSON array of the folder's entries off the render loop: names as they are spelt, dotfiles too, a folder with how many visible entries it holds, a file with its guessed mime type for the app's filters.
     Process {
         id: lister
-        readonly property string script: "import json, os, sys\n" + "out = []\n" + "for e in os.scandir(sys.argv[1]):\n" + "    if e.name.startswith('.'):\n" + "        continue\n" + "    try:\n" + "        st = e.stat()\n" + "        d = e.is_dir()\n" + "        n = 0\n" + "        if d:\n" + "            try:\n" + "                n = sum(1 for x in os.scandir(e.path) if not x.name.startswith('.'))\n" + "            except OSError:\n" + "                pass\n" + "        out.append({'name': e.name, 'dir': d, 'size': st.st_size, 'mtime': st.st_mtime * 1000, 'count': n})\n" + "    except OSError:\n" + "        pass\n" + "print(json.dumps(out, ensure_ascii=False))\n"
+        readonly property string script: "import json, mimetypes, os, sys\n" + "out = []\n" + "for e in os.scandir(sys.argv[1]):\n" + "    try:\n" + "        st = e.stat()\n" + "        d = e.is_dir()\n" + "        n = 0\n" + "        if d:\n" + "            try:\n" + "                n = sum(1 for x in os.scandir(e.path) if not x.name.startswith('.'))\n" + "            except OSError:\n" + "                pass\n" + "        m = '' if d else (mimetypes.guess_type(e.name)[0] or '')\n" + "        out.append({'name': e.name, 'dir': d, 'size': st.st_size, 'mtime': st.st_mtime * 1000, 'count': n, 'mime': m})\n" + "    except OSError:\n" + "        pass\n" + "print(json.dumps(out, ensure_ascii=False))\n"
         stdout: StdioCollector {
             id: listOut
         }
@@ -202,9 +346,37 @@ Item {
             } catch (e) {
                 entries = [];
             }
-            picker.rows = P.sortRows(entries);
-            picker.selected = 0;
+            picker.entries = entries;
+            const back = picker.rows.findIndex(r => r.name === picker.landOn);
+            picker.selected = back >= 0 ? back : 0;
             picker.listed = true;
+        }
+    }
+
+    // The typed path's parent, listed by the same script, for the completions.
+    Process {
+        id: completer
+        property string asked: ""
+        stdout: StdioCollector {
+            id: completeOut
+        }
+        onExited: code => {
+            if (picker.pathStale) {
+                picker.pathStale = false;
+                Qt.callLater(picker.completeList);
+                return;
+            }
+            let found = [];
+            try {
+                found = JSON.parse(completeOut.text);
+            } catch (e) {
+                found = [];
+            }
+            picker.pathEntries = Array.isArray(found) ? found : [];
+            picker.pathOk = code === 0;
+            picker.pathFolder = asked;
+            if (asked !== picker.split.parent)
+                Qt.callLater(picker.completeList);
         }
     }
 
@@ -221,23 +393,52 @@ Item {
 
     visible: motion.drawing
 
-    // Up and Down move the cursor; letters are left free for the filter.
+    // Up and Down move the cursor of the list, the places or the completions; letters type the query or the path.
     Item {
         id: keyTarget
         Keys.onPressed: event => {
-            if (event.key === Qt.Key_Down)
+            const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
+            if (ctrl && event.key === Qt.Key_L)
+                picker.togglePath();
+            else if (ctrl && event.key === Qt.Key_H)
+                picker.hidden = !picker.hidden;
+            else if (event.key === Qt.Key_Down)
                 picker.move(1);
             else if (event.key === Qt.Key_Up)
                 picker.move(-1);
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 picker.choose();
-            else if (event.key === Qt.Key_Right) {
-                if (picker.rows[picker.selected]?.dir)
+            else if (event.key === Qt.Key_Backtab || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier)))
+                picker.cycleFilter();
+            else if (event.key === Qt.Key_Tab) {
+                if (picker.typingPath)
+                    picker.completePath();
+                else
+                    picker.toSide();
+            } else if (event.key === Qt.Key_Escape) {
+                if (picker.typingPath)
+                    picker.typingPath = false;
+                else
+                    picker.close();
+            } else if (picker.typingPath) {
+                if (event.key === Qt.Key_Backspace)
+                    picker.setTyped(picker.typed.slice(0, -1));
+                else if (!ctrl && event.text.length > 0 && event.text.charCodeAt(0) >= 32)
+                    picker.setTyped(picker.typed + event.text);
+                else
+                    return;
+            } else if (event.key === Qt.Key_Right) {
+                if (picker.side === "list" && picker.cursorRow?.dir)
                     picker.choose();
-            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Backspace)
+            } else if (event.key === Qt.Key_Backspace) {
+                if (picker.query !== "")
+                    picker.setQuery(picker.query.slice(0, -1));
+                else
+                    picker.up();
+            } else if (event.key === Qt.Key_Left)
                 picker.up();
-            else if (event.key === Qt.Key_Escape)
-                picker.close();
+            else if (!ctrl && event.text.length > 0 && event.text.charCodeAt(0) >= 32)
+                picker.setQuery(picker.query + event.text);
             else
                 return;
             event.accepted = true;
@@ -295,8 +496,48 @@ Item {
                     }
                 }
 
-                Item {
+                // ctrl+l turns the query into the path, with a focus ring, as every theme board draws it.
+                Text {
+                    id: promptLabel
+                    visible: text !== ""
+                    textFormat: Text.PlainText
+                    text: bracket ? (picker.typingPath ? "> PATH" : ">") : picker.typingPath ? (plain ? "path" : "PATH") : ""
+                    color: bracket ? c.accent : look.small.color
+                    font.family: look.small.font
+                    font.pixelSize: look.small.size + 1
+                    font.letterSpacing: look.small.spacing
+                }
+                Rectangle {
                     Layout.fillWidth: true
+                    implicitHeight: typedLabel.implicitHeight + 8
+                    radius: plain ? 6 : 0
+                    color: "transparent"
+                    border.width: picker.typingPath ? 2 : 0
+                    border.color: c.accent
+
+                    Text {
+                        id: typedLabel
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: picker.typingPath ? 8 : 0
+                        width: parent.width - 2 * x
+                        textFormat: Text.PlainText
+                        text: P.oneLine(picker.typingPath ? picker.typed : picker.query)
+                        maximumLineCount: 1
+                        elide: Text.ElideLeft
+                        color: c.ink
+                        font.family: picker.typingPath || bracket ? fonts.mono : fonts.ui
+                        font.pixelSize: picker.typingPath ? 15 : 20
+                    }
+                }
+                Text {
+                    id: matchLabel
+                    visible: text !== ""
+                    textFormat: Text.PlainText
+                    text: picker.typingPath ? P.matchText(picker.voice, "path", picker.choices.length, "") : picker.matches.length > 0 ? P.matchText(picker.voice, "places", picker.matches.length, P.oneLine(picker.allPlaces[picker.matches[0].index].label)) : ""
+                    color: look.small.color
+                    font.family: look.small.font
+                    font.pixelSize: look.small.size + 1
+                    font.letterSpacing: look.small.spacing
                 }
             }
 
@@ -334,7 +575,7 @@ Item {
                 Text {
                     id: countLabel
                     textFormat: Text.PlainText
-                    text: picker.rows.length + (plain ? " items" : " ITEMS")
+                    text: picker.typingPath && plain ? "typing a path" : P.countText(picker.voice, picker.rows.length, picker.filterName, picker.hidden)
                     color: look.small.color
                     font.family: look.small.font
                     font.pixelSize: look.small.size + 1
@@ -360,16 +601,22 @@ Item {
 
                     Repeater {
                         id: placeRepeater
-                        model: picker.places.concat(picker.pins)
+                        model: picker.allPlaces
 
                         Column {
                             id: placeItem
                             required property var modelData
                             required property int index
                             readonly property bool here: modelData.path === picker.folder
+                            readonly property var hit: picker.matches.find(m => m.index === index) ?? null
+                            readonly property bool atCursor: picker.side === "places" && picker.placeAt === index
+                            readonly property bool lit: hit !== null || (here && picker.matches.length === 0)
                             function drawn() {
-                                return (numberText.visible ? numberText.text + " " : "") + labelText.text;
+                                return (numberText.visible ? numberText.text + " " : "") + labelText.drawn();
                             }
+                            // Blueprint's caps are for its own places; a pin is a folder name and keeps its case.
+                            readonly property string label: bracket && index < picker.places.length ? P.oneLine(modelData.label).toUpperCase() : P.oneLine(modelData.label)
+                            readonly property int marks: hit ? hit.length : 0
                             width: 184
 
                             Text {
@@ -388,8 +635,8 @@ Item {
                             Rectangle {
                                 width: parent.width
                                 height: 32
-                                radius: plain ? 8 : 0
-                                color: placeItem.here && plain ? look.tile.fill : "transparent"
+                                radius: plain ? 8 : look.cursor.radius
+                                color: placeItem.atCursor ? look.cursor.fill : placeItem.here && plain ? look.tile.fill : "transparent"
 
                                 Row {
                                     anchors.verticalCenter: parent.verticalCenter
@@ -406,17 +653,14 @@ Item {
                                         font.family: fonts.mono
                                         font.pixelSize: 13
                                     }
-                                    Text {
+                                    Marked {
                                         id: labelText
                                         width: parent.width - (numberText.visible ? numberText.width + 10 : 0)
-                                        textFormat: Text.PlainText
-                                        text: bracket ? P.oneLine(placeItem.modelData.label).toUpperCase() : P.oneLine(placeItem.modelData.label)
-                                        maximumLineCount: 1
-                                        elide: Text.ElideRight
-                                        color: placeItem.here ? (bracket ? c.accent : c.ink) : c.muted
-                                        font.family: bracket ? fonts.mono : fonts.ui
-                                        font.pixelSize: 14
-                                        font.weight: placeItem.here ? Font.Medium : Font.Normal
+                                        mark: placeItem.label.slice(0, placeItem.marks)
+                                        rest: placeItem.label.slice(placeItem.marks)
+                                        tint: placeItem.atCursor ? look.cursor.text : placeItem.lit ? (bracket ? c.accent : c.ink) : c.muted
+                                        family: bracket ? fonts.mono : fonts.ui
+                                        weight: placeItem.here ? Font.Medium : Font.Normal
                                     }
                                 }
                             }
@@ -463,10 +707,15 @@ Item {
                         }
                     }
 
-                    ListView {
-                        id: rowList
+                    Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+
+                    ListView {
+                        id: rowList
+                        anchors.fill: parent
+                        // The list dims behind the completions while a path is typed.
+                        opacity: picker.typingPath ? 0.3 : 1
                         clip: true
                         model: picker.rows
                         boundsBehavior: Flickable.StopAtBounds
@@ -560,6 +809,97 @@ Item {
                             }
                         }
                     }
+
+                    // The folders the typed path completes to, over the list: the begun name underlined, the first row holding the cursor.
+                    Rectangle {
+                        visible: picker.typingPath
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: Math.min(parent.height, completionColumn.implicitHeight + 12)
+                        radius: look.cursor.radius
+                        color: c.paper
+                        border.width: 1
+                        border.color: c.ink
+                        clip: true
+
+                        Column {
+                            id: completionColumn
+                            x: 6
+                            y: 6
+                            width: parent.width - 12
+
+                            Text {
+                                id: completionHeadLabel
+                                width: parent.width
+                                leftPadding: 12
+                                topPadding: 4
+                                bottomPadding: 6
+                                textFormat: Text.PlainText
+                                text: P.completionHead(picker.voice, picker.choices.length, P.oneLine(picker.tilde(picker.split.parent)), P.oneLine(picker.split.tail))
+                                maximumLineCount: 1
+                                elide: Text.ElideMiddle
+                                color: look.small.color
+                                font.family: look.small.font
+                                font.pixelSize: look.small.size
+                                font.letterSpacing: look.small.spacing
+                            }
+
+                            Repeater {
+                                id: completionRepeater
+                                model: picker.choices
+
+                                Rectangle {
+                                    id: completionItem
+                                    required property var modelData
+                                    required property int index
+                                    readonly property bool isCurrent: index === picker.choice
+                                    // Paper lists the whole path with its date, Artboard the name with the path, Blueprint the name with DIR.
+                                    readonly property string lead: picker.caps ? P.oneLine(picker.tilde(picker.split.parent === "/" ? "/" : picker.split.parent + "/")) : ""
+                                    readonly property string name: P.oneLine(modelData.name)
+                                    function drawn() {
+                                        return {
+                                            name: completionName.drawn(),
+                                            detail: completionDetail.text
+                                        };
+                                    }
+                                    width: parent.width
+                                    height: 32
+                                    radius: look.cursor.radius
+                                    color: isCurrent ? look.cursor.fill : "transparent"
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 12
+                                        spacing: 12
+
+                                        Marked {
+                                            id: completionName
+                                            Layout.fillWidth: true
+                                            lead: completionItem.lead
+                                            mark: completionItem.name.slice(0, picker.split.tail.length)
+                                            rest: completionItem.name.slice(picker.split.tail.length) + (picker.plain ? "" : "/")
+                                            tint: completionItem.isCurrent ? look.cursor.text : c.ink
+                                            family: fonts.mono
+                                            size: 13
+                                        }
+                                        Text {
+                                            id: completionDetail
+                                            textFormat: Text.PlainText
+                                            text: picker.plain ? P.oneLine(picker.tilde((picker.split.parent === "/" ? "" : picker.split.parent) + "/" + completionItem.modelData.name)) : picker.bracket ? "DIR" : P.dateText(picker.voice, completionItem.modelData.mtime, Date.now())
+                                            Layout.maximumWidth: 280
+                                            maximumLineCount: 1
+                                            elide: Text.ElideMiddle
+                                            color: completionItem.isCurrent ? look.cursor.detail : c.muted
+                                            font.family: fonts.mono
+                                            font.pixelSize: 12
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    }
                 }
 
                 Rectangle {
@@ -568,10 +908,69 @@ Item {
                     color: look.rule.color
                 }
 
-                // The cursor file's preview goes here.
+                // The cursor file: its picture when Qt decodes it, then its name, size, kind and date; hidden while a path is typed.
                 Item {
                     Layout.preferredWidth: 280
                     Layout.fillHeight: true
+
+                    Column {
+                        visible: picker.previewing
+                        x: 18
+                        y: 18
+                        width: parent.width - 36
+                        spacing: 8
+
+                        Image {
+                            id: previewImage
+                            // Sized by hand: PreserveAspectFit makes Qt decode to fill the bound, scaling a small image up and losing its size.
+                            readonly property real fit: Math.min(1, parent.width / Math.max(1, implicitWidth), 186 / Math.max(1, implicitHeight))
+                            width: implicitWidth * fit
+                            height: implicitHeight * fit
+                            asynchronous: true
+                            cache: false
+                            // A bound keeps a 12 MP photo from decoding whole; without a fill mode Qt never scales up, so an image within 1024 px reads its true size.
+                            sourceSize.width: 1024
+                            sourceSize.height: 1024
+                            source: picker.previewing ? "file://" + picker.pathOf(picker.cursorRow).split("/").map(encodeURIComponent).join("/") : ""
+                        }
+                        Text {
+                            id: previewName
+                            width: parent.width
+                            textFormat: Text.PlainText
+                            text: picker.cursorRow ? P.oneLine(picker.cursorRow.name) : ""
+                            maximumLineCount: 1
+                            elide: Text.ElideMiddle
+                            color: c.ink
+                            font.family: bracket ? fonts.mono : fonts.ui
+                            font.pixelSize: 14
+                            font.weight: Font.Medium
+                        }
+                        Text {
+                            id: previewDims
+                            visible: text !== ""
+                            textFormat: Text.PlainText
+                            text: picker.cursorRow ? P.previewText(picker.voice, picker.cursorRow, picker.preview ? previewImage.implicitWidth : 0, previewImage.implicitHeight).dims : ""
+                            color: c.ink
+                            font.family: fonts.mono
+                            font.pixelSize: 15
+                        }
+                        Text {
+                            id: previewDetail
+                            textFormat: Text.PlainText
+                            text: picker.cursorRow ? P.previewText(picker.voice, picker.cursorRow, 0, 0).detail : ""
+                            color: c.muted
+                            font.family: fonts.mono
+                            font.pixelSize: 12
+                        }
+                        Text {
+                            id: previewDate
+                            textFormat: Text.PlainText
+                            text: picker.cursorRow ? P.stampText(picker.voice, picker.cursorRow.mtime) : ""
+                            color: c.muted
+                            font.family: fonts.mono
+                            font.pixelSize: 12
+                        }
+                    }
                 }
             }
 
@@ -587,7 +986,7 @@ Item {
 
                 Repeater {
                     id: keyRepeater
-                    model: P.pickerKeys(picker.voice)
+                    model: picker.typingPath ? P.pathKeys(picker.voice) : P.pickerKeys(picker.voice)
 
                     Rectangle {
                         id: keyPair
@@ -641,6 +1040,57 @@ Item {
             visible: look.rule.dashed
             anchors.fill: parent
             color: look.rule.color
+        }
+    }
+
+    // A name with its matched letters underlined, in three plain texts so a file's name never reads as markup; the end elides.
+    component Marked: RowLayout {
+        id: markedRow
+        property string lead: ""
+        property string mark: ""
+        property string rest: ""
+        property color tint: c.ink
+        property string family: fonts.ui
+        property int size: 14
+        property int weight: Font.Normal
+        // As drawn, the underlined letters between <u> and </u>.
+        function drawn() {
+            return leadText.text + (markText.text !== "" && markText.font.underline ? "<u>" + markText.text + "</u>" : markText.text) + restText.text;
+        }
+        spacing: 0
+
+        Text {
+            id: leadText
+            visible: text !== ""
+            textFormat: Text.PlainText
+            text: markedRow.lead
+            color: markedRow.tint
+            font.family: markedRow.family
+            font.pixelSize: markedRow.size
+            font.weight: markedRow.weight
+        }
+        Text {
+            id: markText
+            visible: text !== ""
+            textFormat: Text.PlainText
+            text: markedRow.mark
+            color: markedRow.tint
+            font.family: markedRow.family
+            font.pixelSize: markedRow.size
+            font.weight: markedRow.weight
+            font.underline: true
+        }
+        Text {
+            id: restText
+            Layout.fillWidth: true
+            textFormat: Text.PlainText
+            text: markedRow.rest
+            maximumLineCount: 1
+            elide: Text.ElideRight
+            color: markedRow.tint
+            font.family: markedRow.family
+            font.pixelSize: markedRow.size
+            font.weight: markedRow.weight
         }
     }
 

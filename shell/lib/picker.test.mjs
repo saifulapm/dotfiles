@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerLine, appName, completionHead, completions, countText, dateText, headingText, marked, matchText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, shownRows, sizeText, sortRows, splitPath, stampText } from './picker.mjs';
+import { answerLine, appName, completionHead, completions, countText, dateText, headingText, matchText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, shownRows, sizeText, sortRows, splitPath, stampText } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -178,13 +178,6 @@ test('completions are folders that start with the tail, most recently changed fi
   assert.deepEqual(names(completions(list, 'la')), ['lareys', 'lareys-mobile', 'laravel-demo']);
   assert.deepEqual(names(completions(list, '')), ['dotfiles', 'lareys', 'lareys-mobile', 'laravel-demo']);
   assert.deepEqual(names(completions(list, '.l')), ['.lab']);
-});
-
-test('a marked name underlines its matched letters and escapes the rest for styled text', () => {
-  assert.equal(marked('Downloads', 0, 4), '<u>Down</u>loads');
-  assert.equal(marked('~/Codes/lareys/', 8, 2), '~/Codes/<u>la</u>reys/');
-  assert.equal(marked('a<b>&c', 0, 2), '<u>a&lt;</u>b&gt;&amp;c');
-  assert.equal(marked('Home', 0, 0), 'Home');
 });
 
 test('the typed match in each voice: Paper and Blueprint count, Artboard names the place', () => {

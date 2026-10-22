@@ -156,14 +156,6 @@ export function completions(entries, tail) {
     .sort((a, b) => b.mtime - a.mtime);
 }
 
-const html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-// Styled text with `length` letters from `from` underlined, everything else escaped.
-export function marked(text, from, length) {
-  if (!length) return html(text);
-  return html(text.slice(0, from)) + '<u>' + html(text.slice(from, from + length)) + '</u>' + html(text.slice(from + length));
-}
-
 const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 // Beside the query: how many places it matched, or how many folders the typed path completes to.
