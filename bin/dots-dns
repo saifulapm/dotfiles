@@ -468,7 +468,7 @@ async function writeRouter(lines) {
 function kidRouter(mac, on) {
   const change = on
     ? ['uci del_list "firewall.@ipset[$k].entry=$ip"', 'uci add_list "firewall.@ipset[$k].entry=$ip"', 'uci del_list "firewall.@ipset[$km].entry=$mac"', 'uci add_list "firewall.@ipset[$km].entry=$mac"', 'uci commit firewall || exit 5', 'nft add element inet fw4 kid "{ $ip }" || exit 6', 'nft add element inet fw4 kid_mac "{ $mac }" || exit 6']
-    : ['uci del_list "firewall.@ipset[$k].entry=$ip"', 'uci del_list "firewall.@ipset[$km].entry=$mac"', 'uci commit firewall || exit 5', 'nft delete element inet fw4 kid "{ $ip }" 2>/dev/null', 'nft delete element inet fw4 kid_mac "{ $mac }" 2>/dev/null'];
+    : ['uci del_list "firewall.@ipset[$k].entry=$ip"', 'uci del_list "firewall.@ipset[$km].entry=$mac"', 'uci commit firewall || exit 5', 'nft delete element inet fw4 kid "{ $ip }" 2>/dev/null', 'nft delete element inet fw4 kid_mac "{ $mac }" 2>/dev/null', 'exit 0'];
   return writeRouter([
     `mac=${mac}`,
     'ip=',

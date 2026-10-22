@@ -135,7 +135,19 @@ else if (a[0] === 'set') s[m[4]] = m[5];
 fs.writeFileSync(file, JSON.stringify(db));
 `,
   nft: String.raw`
-require('fs').appendFileSync(process.env.STUB_CTL + '/router.log', JSON.stringify(['nft', ...process.argv.slice(2)]) + '\n');
+// Like the real nft, deleting an element the set does not hold fails.
+const fs = require('fs');
+const ctl = process.env.STUB_CTL;
+fs.appendFileSync(ctl + '/router.log', JSON.stringify(['nft', ...process.argv.slice(2)]) + '\n');
+const [verb, what, , , set, el] = process.argv.slice(2);
+if (what !== 'element') process.exit(0);
+const file = ctl + '/router/nft.json';
+const sets = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+const e = el.replace(/[{} ]/g, '');
+const have = sets[set] || [];
+if (verb === 'delete' && !have.includes(e)) process.exit(1);
+sets[set] = verb === 'add' ? [...new Set([...have, e])] : have.filter((x) => x !== e);
+fs.writeFileSync(file, JSON.stringify(sets));
 `,
   date: String.raw`
 process.stdout.write(require('fs').readFileSync(process.env.STUB_CTL + '/router/now', 'utf8'));
@@ -167,6 +179,8 @@ function fakeRouter(ctl, uci = UCI) {
   writeFileSync(join(r, 'etc', 'init.d', 'dnsmasq'), `#!${process.execPath}\nrequire('fs').appendFileSync(process.env.STUB_CTL + '/router.log', JSON.stringify(['dnsmasq', ...process.argv.slice(2)]) + '\\n');\n`, { mode: 0o755 });
   writeFileSync(join(r, 'tmp', 'dhcp.leases'), LEASES);
   writeFileSync(join(r, 'uci.json'), JSON.stringify(uci));
+  const live = (name) => (uci.firewall.find((x) => x.name === name) || {}).entry || [];
+  writeFileSync(join(r, 'nft.json'), JSON.stringify({ kid: live('kid'), kid_mac: live('kid_mac').map((m) => m.toLowerCase()) }));
   writeFileSync(join(r, 'now'), ROUTER_NOW + '\n');
   writeFileSync(join(r, 'tmp', 'dns-shield', 'kid.log'), readFileSync(fixture('dns-kid.log')));
   writeFileSync(join(r, 'etc', 'dns-shield', 'allow'), 'khanacademy.org\n');
@@ -750,4 +764,12 @@ test('a passed deadline that could not be ended reads as no open', async (t) => 
   const row = (await state(ctx)).devices.find((d) => d.key === 'router:02:00:00:00:00:21');
   assert.equal(row.open_until, null);
   assert.ok(existsSync(openFile(ctx, 'router:02:00:00:00:00:21')), 'the deadline stays for the next reconcile');
+});
+
+test('kid off on a router device that is not in the Kid sets succeeds and changes nothing', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'kid', 'router:02:00:00:00:00:02', 'off');
+  assert.deepEqual(kidSets(ctx), { kid: ['192.168.0.143', '192.168.0.238'], kid_mac: ['02:00:00:00:00:21', '02:00:00:00:00:18'] });
+  await ok(ctx, 'open', 'router:02:00:00:00:00:02', '30m');
 });
