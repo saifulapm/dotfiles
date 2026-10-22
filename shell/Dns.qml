@@ -158,7 +158,7 @@ Item {
             pane: {
                 name: paneName.text,
                 path: panePath.text,
-                badge: paneBadge.label,
+                badge: paneBadge.drawnText,
                 categories: cats,
                 allow: allow,
                 blocks: blocks,
@@ -304,7 +304,7 @@ Item {
                             readonly property string groupRight: groupRightText.text
                             readonly property color ink: isCurrent ? look.cursor.text : c.ink
                             function drawn() {
-                                return { key: it.key, name: nameText.text, badge: rowBadge.label, age: ageText.text, truncated: nameText.truncated, lines: nameText.lineCount };
+                                return { key: it.key, name: nameText.text, badge: rowBadge.drawnText, age: ageText.text, truncated: nameText.truncated, lines: nameText.lineCount };
                             }
                             // The row as drawn this frame, in the window's pixels.
                             function drawnBox() {
@@ -822,6 +822,8 @@ Item {
         property string label: ""
         property bool cursorRow: false
         readonly property color tone: cursorRow ? look.cursor.text : kid ? c.ink : c.muted
+        // The badge as drawn, for the state function.
+        readonly property string drawnText: badgeText.text
         implicitWidth: badgeRow.implicitWidth + 17
         implicitHeight: badgeRow.implicitHeight + 4
         radius: plain ? height / 2 : 0
@@ -842,6 +844,7 @@ Item {
                 border.color: badgeRoot.tone
             }
             Text {
+                id: badgeText
                 textFormat: Text.PlainText
                 text: badgeRoot.label
                 color: badgeRoot.tone
