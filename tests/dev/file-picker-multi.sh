@@ -108,6 +108,21 @@ for i in 1 2 3 4 5; do
   check "run $i: Enter then ctrl+Enter at once answers Codes ($(cat "$out/fast-$i" 2>/dev/null))" answer_is "fast-$i" "$(chosen "$pick/Codes")"
 done
 
+# An Enter that waits on a listing of a folder already listed: BackSpace lists the parent, / returns to the listed folder before that ends, and Enter must still go.
+for i in 1 2 3 4 5; do
+  ask "relist-$i" "$(request open "$dl")"
+  shown
+  wtype -M ctrl l -m ctrl
+  until_ok 2000 state_is '.pathMode'
+  wtype "$pick/Codes/"
+  until_ok 2000 state_is '[.completions[].name] == ["lareys", "scratch"] or [.completions[].name] == ["scratch", "lareys"]'
+  wtype -k BackSpace / -k Return
+  check "run $i: Enter during a re-list of the listed folder enters it ($(until_ok 2000 state_is '.pathMode == false'; pk_state | jq -c '[.folder, .pathMode]'))" until_ok 2000 state_is --arg f "$pick/Codes" '.folder == $f and .pathMode == false'
+  until_ok 1000 state_is '.pathMode == false' || wtype -k Escape
+  wtype -k Escape
+  until_ok 3000 answered "relist-$i"
+done
+
 # Each theme heads both cards in its voice and writes the folder strip.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }

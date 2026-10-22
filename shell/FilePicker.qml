@@ -191,8 +191,14 @@ Item {
             pathStale = true;
             return;
         }
-        if (pathFolder === split.parent && pathOk)
+        // A listing that ran stale leaves no exit to send an Enter typed during it, so a parent already listed sends it here.
+        if (pathFolder === split.parent && pathOk) {
+            if (goPending && typingPath) {
+                goPending = false;
+                goPath();
+            }
             return;
+        }
         completer.asked = split.parent;
         completer.command = ["python3", "-c", lister.script, split.parent];
         completer.running = true;
@@ -372,8 +378,7 @@ Item {
             previewDetail: previewDetail.text,
             foot: footLabel.visible ? footLabel.text : "",
             hint: (noticeLabel.visible ? [noticeLabel.text] : []).concat(keys).join(" · "),
-            busy: busy,
-            openMs: openMs,
+            busy: busy,            openMs: openMs,
             opens: opens,
             settled: motion.settled,
             drawing: picker.visible,
