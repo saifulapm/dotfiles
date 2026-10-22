@@ -30,8 +30,9 @@ PanelWindow {
     readonly property var pass: passLoader.item
     readonly property var tailscale: tailscaleLoader.item
     readonly property var accounts: accountsLoader.item
+    readonly property var dns: dnsLoader.item
     // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
-    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass, tailscale, accounts]
+    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass, tailscale, accounts, dns]
     readonly property bool shown: all.some(s => s?.shown ?? false)
 
     // Only one surface shows at a time, so another's close is cut short.
@@ -111,6 +112,12 @@ PanelWindow {
         accountsLoader.active = true;
         closeOthers(accounts);
         accounts.open(t0);
+    }
+
+    function openDns(t0) {
+        dnsLoader.active = true;
+        closeOthers(dns);
+        dns.open(t0);
     }
 
     // The Pinentry service calls this with each gpg request it shows.
@@ -304,6 +311,21 @@ PanelWindow {
         interval: 30000
         running: !!host.accounts && !host.accounts.visible && !host.accounts.busy
         onTriggered: accountsLoader.active = false
+    }
+
+    Loader {
+        id: dnsLoader
+        anchors.fill: parent
+        active: false
+        sourceComponent: Root.Dns {
+            theme: host.theme
+        }
+    }
+
+    Root.Tick {
+        interval: 30000
+        running: !!host.dns && !host.dns.visible && !host.dns.busy
+        onTriggered: dnsLoader.active = false
     }
 
     Loader {

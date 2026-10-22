@@ -352,6 +352,33 @@ ShellRoot {
     }
 
     Root.Ipc {
+        target: "dns"
+
+        function open(): void {
+            const t0 = Date.now();
+            surfacesLoader.active = true;
+            surfacesLoader.item.openDns(t0);
+        }
+
+        function close(): void {
+            surfacesLoader.item?.dns?.close();
+        }
+
+        function toggle(): void {
+            if (surfacesLoader.item?.dns?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (surfacesLoader.item?.dns)
+                return surfacesLoader.item.dns.state();
+            return JSON.stringify({ loaded: false, open: false, visible: false, drawing: false, busy: false, cursor: "", carried: 0, router: 0, groups: [], rows: [], pane: null, field: null, footer: "", opens: 0 });
+        }
+    }
+
+    Root.Ipc {
         target: "goals"
 
         // The store lives in the Desk, so Goals opens only once the Desk has loaded.

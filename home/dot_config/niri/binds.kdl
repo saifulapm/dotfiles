@@ -22,6 +22,7 @@ binds {
     Mod+P hotkey-overlay-title="Pass" { spawn "dots-call" "pass" "toggle"; }
     Mod+T hotkey-overlay-title="Tailscale" { spawn "dots-call" "tailscale" "toggle"; }
     Mod+U hotkey-overlay-title="Accounts" { spawn "dots-call" "accounts" "toggle"; }
+    Mod+Shift+D hotkey-overlay-title="DNS Shield" { spawn "dots-call" "dns" "toggle"; }
     Mod+Escape hotkey-overlay-title="Lock" { spawn "dots-call" "lock" "lock"; }
     Mod+Shift+Escape hotkey-overlay-title="System Monitor: btop" { spawn "dots-foot" "btop"; }
     Mod+O repeat=false hotkey-overlay-title="Overview" { toggle-overview; }
