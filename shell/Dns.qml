@@ -350,7 +350,7 @@ Item {
                 panel.move(-1);
             else if (event.key === Qt.Key_Space)
                 panel.act({ kind: "kid" });
-            else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_4)
+            else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5)
                 panel.act({ kind: "category", n: event.key - Qt.Key_0 });
             else if (event.key === Qt.Key_O)
                 panel.act({ kind: "open", length: event.text === "O" ? "2h" : "30m" });

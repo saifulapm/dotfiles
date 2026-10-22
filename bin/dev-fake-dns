@@ -8,20 +8,20 @@ file=$dir/dns-state.json
 
 sample() {
   jq -n --argjson now "$EPOCHSECONDS" '
-    def cats($y; $s; $a; $g): {youtube: $y, social: $s, adult: $a, gambling: $g};
+    def cats($y; $k; $s; $a; $g): {youtube: $y, youtube_kids: $k, social: $s, adult: $a, gambling: $g};
     def device($key; $name; $path; $kid; $cats; $allow; $blocks; $mac):
       {key: $key, name: $name, path: $path, kid: $kid, categories: $cats, open_until: null, allow: $allow,
        last_block: (if ($blocks | length) > 0 then $blocks[0].at else null end), blocks: $blocks,
        ip: (if $mac then "192.168.0.1" + $mac[-2:] else null end), mac: $mac};
     def router($n; $name; $kid; $ago):
-      device("router:02:00:00:00:00:" + $n; $name; "router"; $kid; cats($kid; $kid; $kid; $kid); [];
+      device("router:02:00:00:00:00:" + $n; $name; "router"; $kid; cats($kid; $kid; $kid; $kid; $kid); [];
         (if $ago then [{domain: "youtube.com", at: ($now - $ago)}] else [] end); "02:00:00:00:00:" + $n);
     {as_of: $now, carried: {ok: true, error: null}, router: {ok: true, as_of: $now, error: null},
      devices: [
-       device("carried:dev00iphone"; "Saiful'\''s iPhone"; "carried"; false; cats(false; false; false; false); []; []; null),
-       device("carried:dev00ipad"; "iPad"; "carried"; true; cats(true; true; true; false); ["khanacademy.org", "wikipedia.org"];
+       device("carried:dev00iphone"; "Saiful'\''s iPhone"; "carried"; false; cats(false; false; false; false; false); []; []; null),
+       device("carried:dev00ipad"; "iPad"; "carried"; true; cats(true; false; true; true; false); ["khanacademy.org", "wikipedia.org"];
          [{domain: "youtube.com", at: ($now - 120)}, {domain: "i.ytimg.com", at: ($now - 125)}, {domain: "tiktok.com", at: ($now - 3700)}]; null),
-       device("carried:dev00wife"; "Wife'\''s iPhone"; "carried"; false; cats(false; false; false; false); []; []; null),
+       device("carried:dev00wife"; "Wife'\''s iPhone"; "carried"; false; cats(false; false; false; false; false); []; []; null),
        router("01"; "macbook"; false; null),
        router("02"; "nuc"; false; null),
        router("03"; "mini"; false; null),
@@ -80,17 +80,17 @@ reconcile)
   reconcile
   ;;
 kid)
-  # Kid off remembers a carried device's categories, and Kid on brings them back, all four the first time; ending a timed open brings back the ones it kept.
+  # Kid off remembers a carried device's categories, and Kid on brings them back, all five the first time; ending a timed open brings back the ones it kept.
   remembered=$dir/dns-kid-${key#*:}.json
   [ -e "$file" ] || sample >"$file"
   if [ "$3" = off ] && [ "${key%%:*}" = carried ]; then
     jq -c --arg k "$key" '.devices[] | select(.key == $k) | .categories' "$file" >"$remembered"
   fi
-  cats='{"youtube":true,"social":true,"adult":true,"gambling":true}'
+  cats='{"youtube":true,"youtube_kids":true,"social":true,"adult":true,"gambling":true}'
   [ "$3" = on ] && [ -e "$remembered" ] && cats=$(cat "$remembered")
   [ "$3" = on ] && jq -e --arg k "$key" '.devices[] | select(.key == $k) | .open_until != null' "$file" >/dev/null &&
     cats=$(jq -c --arg k "$key" '.devices[] | select(.key == $k) | .categories' "$file")
-  [ "$3" = off ] && cats='{"youtube":false,"social":false,"adult":false,"gambling":false}'
+  [ "$3" = off ] && cats='{"youtube":false,"youtube_kids":false,"social":false,"adult":false,"gambling":false}'
   write --arg k "$key" --argjson c "$cats" '(.devices[] | select(.key == $k)) |= (.categories = $c | .kid = ([$c[]] | any) | .open_until = null)'
   ;;
 category)
@@ -123,7 +123,7 @@ add)
   write --argjson l "$lease" --arg n "$3" '
     ([.devices[] | select(.path == "router") | .allow][0] // []) as $allow
     | .devices += [{key: ("router:" + $l.mac), name: $n, path: "router", kid: true,
-        categories: {youtube: true, social: true, adult: true, gambling: true}, open_until: null, allow: $allow,
+        categories: {youtube: true, youtube_kids: true, social: true, adult: true, gambling: true}, open_until: null, allow: $allow,
         last_block: null, blocks: [], ip: $l.ip, mac: $l.mac}]'
   ;;
 *)

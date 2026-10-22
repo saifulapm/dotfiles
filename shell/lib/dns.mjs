@@ -5,7 +5,7 @@ import { line, listLook } from './voice.mjs';
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
 const clean = (s) => line(String(s == null ? '' : s).replace(CONTROL, ' '));
 
-const CATEGORIES = [['youtube', 'YouTube'], ['social', 'Social'], ['adult', 'Adult'], ['gambling', 'Gambling']];
+const CATEGORIES = [['youtube', 'YouTube'], ['youtube_kids', 'YouTube Kids'], ['social', 'Social'], ['adult', 'Adult'], ['gambling', 'Gambling']];
 const PATHS = { carried: 'Carried profile · uBlockDNS', router: 'Home router' };
 const PATH_NAMES = { carried: 'Carried profile', router: 'Home router' };
 
@@ -112,7 +112,7 @@ export function paneOf(d) {
 
 export const kidArgs = (d) => (d.dim ? null : ['kid', d.key, d.kid ? 'off' : 'on']);
 
-// Router devices carry one Kid policy, so 1-4 flip a category on a carried KID device only.
+// Router devices carry one Kid policy, so 1-5 flip a category on a carried KID device only.
 export function categoryArgs(d, n) {
   const c = d.categories[n - 1];
   if (!c || !d.kid || d.path !== 'carried') return null;
@@ -127,7 +127,7 @@ export function allowArgs(d, text) {
 // o and O open a KID device, and restart or lengthen a timed open.
 export const openArgs = (d, length) => ((d.kid || timed(d)) && !d.dim ? ['open', d.key, length] : null);
 
-export const dnsKeys = (look) => look.keys([['space', 'kid mode'], ['1-4', 'categories'], ['o', 'open 30m'], ['O', '2h'], ['a', 'allow'], ['n', 'add device'], ['esc', '']]);
+export const dnsKeys = (look) => look.keys([['space', 'kid mode'], ['1-5', 'categories'], ['o', 'open 30m'], ['O', '2h'], ['a', 'allow'], ['n', 'add device'], ['esc', '']]);
 
 // `dots-dns leases`: the router's leases not yet listed, each with the name the field starts from.
 export function leasesView(text) {

@@ -44,7 +44,7 @@ check "o on the iPad logs one open $ipad 30m" until_ok 3000 logged_is "open $ipa
 check "its row's badge reads open · 30:00 left or a second or so less ($(badge_of "$ipad"))" until_ok 3000 badge_like "$ipad" '^open · (30:00|29:5[0-9]) left$'
 echo "     pane: $(dns_state | jq -c '.pane | {path, badge, paused, categories: [.categories[].value], until, left}')"
 check "the pane says Kid mode is paused until HH:MM" state_is '.pane.path | test("^Carried profile · Kid mode paused until [0-9]{2}:[0-9]{2}$")'
-check "its categories read paused while open" state_is '.pane.paused == "paused while open" and ([.pane.categories[].value] == ["paused", "paused", "paused", "paused"])'
+check "its categories read paused while open" state_is '.pane.paused == "paused while open" and ([.pane.categories[].value] == ["paused", "paused", "paused", "paused", "paused"])'
 check "and OPEN reads Open until HH:MM with the time left" state_is '(.pane.until | test("^Open until [0-9]{2}:[0-9]{2}$")) and (.pane.left | test("^(30:00|29:[0-9]{2}) left$"))'
 first=$(badge_of "$ipad")
 sleep 1.5
@@ -56,7 +56,7 @@ check "and the badge reads open · 120:00 left or a little less ($(badge_of "$ip
 idle
 wtype -k space
 check "space ends the open: one kid $ipad on" until_ok 3000 logged_is "kid $ipad on" 1
-check "and the row reads KID with its categories back" until_ok 3000 state_is --arg k "$ipad" 'any(.rows[]; .key == $k and .badge == "KID") and ([.pane.categories[].value] == ["ON", "ON", "ON", "OFF"])'
+check "and the row reads KID with its categories back" until_ok 3000 state_is --arg k "$ipad" 'any(.rows[]; .key == $k and .badge == "KID") and ([.pane.categories[].value] == ["ON", "OFF", "ON", "ON", "OFF"])'
 
 # A 5-second open runs out with the card shown: the card reads state again at 0:00 and the collector brings Kid back.
 idle

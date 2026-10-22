@@ -10,10 +10,10 @@ process.env.TZ = 'Asia/Dhaka';
 // 2026-10-22 15:12 in Dhaka.
 const NOW = Date.parse('2026-10-22T09:12:00Z');
 const S = NOW / 1000;
-const cats = (y, s, a, g) => ({ youtube: y, social: s, adult: a, gambling: g });
-const device = (o) => Object.assign({ path: 'carried', kid: false, categories: cats(false, false, false, false), open_until: null, allow: [], last_block: null, blocks: [], ip: null, mac: null }, o);
+const cats = (y, k, s, a, g) => ({ youtube: y, youtube_kids: k, social: s, adult: a, gambling: g });
+const device = (o) => Object.assign({ path: 'carried', kid: false, categories: cats(false, false, false, false, false), open_until: null, allow: [], last_block: null, blocks: [], ip: null, mac: null }, o);
 const router = (n, name, kid, last) =>
-  device({ key: `router:02:00:00:00:00:0${n}`, name, path: 'router', kid, categories: cats(kid, kid, kid, kid), allow: kid ? ['wikipedia.org'] : [], last_block: last, blocks: last ? [{ domain: 'tiktok.com', at: last }] : [], ip: `192.168.0.10${n}`, mac: `02:00:00:00:00:0${n}` });
+  device({ key: `router:02:00:00:00:00:0${n}`, name, path: 'router', kid, categories: cats(kid, kid, kid, kid, kid), allow: kid ? ['wikipedia.org'] : [], last_block: last, blocks: last ? [{ domain: 'tiktok.com', at: last }] : [], ip: `192.168.0.10${n}`, mac: `02:00:00:00:00:0${n}` });
 const sample = (over) => ({
   as_of: S,
   carried: { ok: true, error: null },
@@ -24,7 +24,7 @@ const sample = (over) => ({
       key: 'carried:dev00ipad',
       name: 'iPad',
       kid: true,
-      categories: cats(true, true, true, false),
+      categories: cats(true, false, true, true, false),
       allow: ['khanacademy.org', 'wikipedia.org'],
       last_block: S - 120,
       blocks: [{ domain: 'youtube.com', at: S - 120 }, { domain: 'i.ytimg.com', at: S - 125 }, { domain: 'tiktok.com', at: S - 3700 }],
@@ -74,20 +74,21 @@ test("each theme labels the groups in its voice: Paper's and Blueprint's caps, A
 
 test("each theme's key strip is the board's", () => {
   const strip = (n) => dnsKeys(listLook(theme(n))).map((k) => `${k.key} ${k.word}`.trim());
-  assert.deepEqual(strip('artboard'), ['space kid mode', '1-4 categories', 'o open 30m', 'O 2h', 'a allow', 'n add device', 'esc']);
-  assert.deepEqual(strip('paper'), ['SPACE KID MODE', '1-4 CATEGORIES', 'O OPEN 30M', 'O 2H', 'A ALLOW', 'N ADD DEVICE', 'ESC']);
+  assert.deepEqual(strip('artboard'), ['space kid mode', '1-5 categories', 'o open 30m', 'O 2h', 'a allow', 'n add device', 'esc']);
+  assert.deepEqual(strip('paper'), ['SPACE KID MODE', '1-5 CATEGORIES', 'O OPEN 30M', 'O 2H', 'A ALLOW', 'N ADD DEVICE', 'ESC']);
 });
 
-test("a carried KID device's pane: its path, KID, the four categories with Gambling off, its allow list and recent blocks", () => {
+test("a carried KID device's pane: its path, KID, the five categories with YouTube Kids and Gambling off, its allow list and recent blocks", () => {
   assert.deepEqual(paneOf(at(view(), 'carried:dev00ipad')), {
     name: 'iPad',
     path: 'Carried profile · uBlockDNS',
     badge: 'KID',
     categories: [
       { n: 1, key: 'youtube', label: 'YouTube', value: 'ON' },
-      { n: 2, key: 'social', label: 'Social', value: 'ON' },
-      { n: 3, key: 'adult', label: 'Adult', value: 'ON' },
-      { n: 4, key: 'gambling', label: 'Gambling', value: 'OFF' },
+      { n: 2, key: 'youtube_kids', label: 'YouTube Kids', value: 'OFF' },
+      { n: 3, key: 'social', label: 'Social', value: 'ON' },
+      { n: 4, key: 'adult', label: 'Adult', value: 'ON' },
+      { n: 5, key: 'gambling', label: 'Gambling', value: 'OFF' },
     ],
     paused: '',
     until: '',
@@ -112,10 +113,10 @@ test("an OPEN device's pane shows its recent blocks and that space turns Kid mod
   });
 });
 
-test("a router KID device's pane reads Home router with all four categories on with Kid and the shared allow list", () => {
+test("a router KID device's pane reads Home router with all five categories on with Kid and the shared allow list", () => {
   const pane = paneOf(at(view(), 'router:02:00:00:00:00:04'));
   assert.deepEqual([pane.name, pane.path, pane.badge, pane.hint], ["Sister's phone", 'Home router', 'KID', '']);
-  assert.deepEqual(pane.categories.map((c) => `${c.n} ${c.label} ${c.value}`), ['1 YouTube ON', '2 Social ON', '3 Adult ON', '4 Gambling ON']);
+  assert.deepEqual(pane.categories.map((c) => `${c.n} ${c.label} ${c.value}`), ['1 YouTube ON', '2 YouTube Kids ON', '3 Social ON', '4 Adult ON', '5 Gambling ON']);
   assert.deepEqual(pane.allow, ['wikipedia.org']);
 });
 
@@ -126,13 +127,17 @@ test('space turns Kid off on a KID device and on on an OPEN one', () => {
   assert.deepEqual(kidArgs(at(v, 'router:02:00:00:00:00:04')), ['kid', 'router:02:00:00:00:00:04', 'off']);
 });
 
-test('1-4 flip a category on a carried KID device only', () => {
+test('1-5 flip a category on a carried KID device only', () => {
   const v = view();
   const ipad = at(v, 'carried:dev00ipad');
-  assert.deepEqual([1, 4].map((n) => categoryArgs(ipad, n)), [['category', 'carried:dev00ipad', 'youtube', 'off'], ['category', 'carried:dev00ipad', 'gambling', 'on']]);
+  assert.deepEqual([1, 2, 5].map((n) => categoryArgs(ipad, n)), [
+    ['category', 'carried:dev00ipad', 'youtube', 'off'],
+    ['category', 'carried:dev00ipad', 'youtube_kids', 'on'],
+    ['category', 'carried:dev00ipad', 'gambling', 'on'],
+  ]);
   assert.equal(categoryArgs(at(v, 'carried:dev00wife'), 1), null);
   assert.equal(categoryArgs(at(v, 'router:02:00:00:00:00:04'), 2), null);
-  assert.equal(categoryArgs(ipad, 5), null);
+  assert.equal(categoryArgs(ipad, 6), null);
 });
 
 test('a adds a typed domain, one-lined, on a KID device only, and an empty one adds nothing', () => {
@@ -179,7 +184,7 @@ test("a timed open's pane: Kid paused until HH:MM, its categories paused, the op
   const pane = paneOf(ipad);
   assert.equal(pane.path, 'Carried profile · Kid mode paused until 15:36');
   assert.equal(pane.badge, 'OPEN');
-  assert.deepEqual(pane.categories.map((c) => `${c.n} ${c.label} ${c.value}`), ['1 YouTube paused', '2 Social paused', '3 Adult paused', '4 Gambling paused']);
+  assert.deepEqual(pane.categories.map((c) => `${c.n} ${c.label} ${c.value}`), ['1 YouTube paused', '2 YouTube Kids paused', '3 Social paused', '4 Adult paused', '5 Gambling paused']);
   assert.equal(pane.paused, 'paused while open');
   assert.equal(pane.until, 'Open until 15:36');
   assert.deepEqual(pane.allow, ['khanacademy.org', 'wikipedia.org']);

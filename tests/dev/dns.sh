@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mod+Shift+D draws DNS Shield's carried and router devices from dots-dns state; space, 1-4 and a write through dots-dns and the card reads state again.
+# Mod+Shift+D draws DNS Shield's carried and router devices from dots-dns state; space, 1-5 and a write through dots-dns and the card reads state again.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -60,7 +60,7 @@ check "the cursor starts on the first device" state_is '.cursor == "carried:dev0
 wtype j
 check "j moves to the iPad" until_ok 1000 state_is --arg k "$ipad" '.cursor == $k'
 echo "     pane: $(dns_state | jq -c .pane)"
-check "the iPad's pane reads its path, KID and Gambling off" state_is '.pane | .name == "iPad" and .path == "Carried profile · uBlockDNS" and .badge == "KID" and ([.categories[] | "\(.n) \(.label) \(.value)"] == ["1 YouTube ON", "2 Social ON", "3 Adult ON", "4 Gambling OFF"])'
+check "the iPad's pane reads its path, KID, YouTube Kids and Gambling off" state_is '.pane | .name == "iPad" and .path == "Carried profile · uBlockDNS" and .badge == "KID" and ([.categories[] | "\(.n) \(.label) \(.value)"] == ["1 YouTube ON", "2 YouTube Kids OFF", "3 Social ON", "4 Adult ON", "5 Gambling OFF"])'
 check "and its allow list and recent blocks" state_is '.pane | .allow == ["khanacademy.org", "wikipedia.org"] and ([.blocks[].domain] == ["youtube.com", "i.ytimg.com", "tiktok.com"])'
 
 wtype -k space
@@ -71,7 +71,11 @@ idle
 wtype -k space
 check "space again logs one kid $ipad on" until_ok 3000 logged_is "kid $ipad on" 1
 check "and the row reads KID" until_ok 3000 badge_is "$ipad" KID
-check "with the remembered categories back ($(dns_state | jq -c '[.pane.categories[].value]'))" until_ok 1000 state_is '[.pane.categories[].value] == ["ON", "ON", "ON", "OFF"]'
+check "with the remembered categories back ($(dns_state | jq -c '[.pane.categories[].value]'))" until_ok 1000 state_is '[.pane.categories[].value] == ["ON", "OFF", "ON", "ON", "OFF"]'
+idle
+wtype 2
+check "2 on the iPad logs one category $ipad youtube_kids on" until_ok 3000 logged_is "category $ipad youtube_kids on" 1
+check "and YouTube Kids reads ON ($(dns_state | jq -c '[.pane.categories[].value]'))" until_ok 3000 state_is '[.pane.categories[].value] == ["ON", "ON", "ON", "ON", "OFF"]'
 
 # Each write takes 1 s here, so the second space comes while the first runs, and must wait for it rather than be lost.
 idle
@@ -91,7 +95,7 @@ wtype j
 check "and j crosses into the router group at macbook" until_ok 1000 state_is '.cursor == "router:02:00:00:00:00:01"'
 
 cursor_to "$sister"
-check "Sister's phone reads Home router with all four categories on" state_is '.pane | .path == "Home router" and .badge == "KID" and ([.categories[].value] == ["ON", "ON", "ON", "ON"])'
+check "Sister's phone reads Home router with all five categories on" state_is '.pane | .path == "Home router" and .badge == "KID" and ([.categories[].value] == ["ON", "ON", "ON", "ON", "ON"])'
 wtype -k space
 check "space on Sister's phone logs one kid $sister off" until_ok 3000 logged_is "kid $sister off" 1
 check "and its row reads OPEN" until_ok 3000 badge_is "$sister" OPEN
@@ -99,10 +103,10 @@ idle
 
 wtype j
 check "j moves on to the Living-room TV ($(dns_state | jq -c .cursor))" until_ok 1000 state_is --arg k "$tv" '.cursor == $k'
-wtype 1234
+wtype 12345
 sleep 1
-check "1-4 on a router row log no category write ($(grep -c '^category' "$log"))" test "$(grep -c '^category' "$log")" = 0
-check "and leave its categories on ($(dns_state | jq -c '[.pane.categories[].value]'))" state_is '[.pane.categories[].value] == ["ON", "ON", "ON", "ON"]'
+check "1-5 on a router row log no category write ($(grep -c '^category router:' "$log"))" test "$(grep -c '^category router:' "$log")" = 0
+check "and leave its categories on ($(dns_state | jq -c '[.pane.categories[].value]'))" state_is '[.pane.categories[].value] == ["ON", "ON", "ON", "ON", "ON"]'
 
 wtype a
 check "a opens the allow field, empty" until_ok 1000 state_is '.field == ""'
@@ -135,6 +139,9 @@ for t in "paper|CARRIED PROFILE · 3|HOME ROUTER · 5|#FAF6EC" "artboard|Carried
   check "$name: the groups read $carried and $router ($(dns_state | jq -c '[.groups[].text]'))" state_is --arg a "$carried" --arg b "$router" '[.groups[].text] == [$a, $b]'
   px=$(off_colour "$(cursor_geo)" "$card")
   check "$name: the cursor row's strip $(cursor_geo) draws $px px off the card's $card, over half of it" test "$px" -ge 10000
+  wtype j
+  until_ok 1000 state_is --arg k "$ipad" '.cursor == $k'
+  check "$name: the iPad's pane draws 5 category rows, 1-5 ($(dns_state | jq -c '[.pane.categories[] | "\(.n) \(.label)"]'))" state_is '[.pane.categories[] | "\(.n) \(.label)"] == ["1 YouTube", "2 YouTube Kids", "3 Social", "4 Adult", "5 Gambling"]'
 done
 in_theme paper
 close_dns
