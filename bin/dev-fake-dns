@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# just dev's dots-dns: answers state, kid, category and allow as the collector does, from a state file in the temp dir, so a nested check never reaches uBlockDNS or the router. Each call appends its arguments as one line to DOTS_DEV_DIR/dns.log. state prints DOTS_DEV_DIR/dns-state.json when it exists, else the boards' sample of 3 carried and 5 router devices; a write first copies the sample into that file, then changes it, so the next state shows the write. A file DOTS_DEV_DIR/dns-slow makes each write take 1 s, so a check can press a second key while one runs.
+# just dev's dots-dns: answers state, kid, category, allow, open, reconcile, leases and add as the collector does, from a state file in the temp dir, so a nested check never reaches uBlockDNS or the router. Each call appends its arguments as one line to DOTS_DEV_DIR/dns.log. state prints DOTS_DEV_DIR/dns-state.json when it exists, else the boards' sample of 3 carried and 5 router devices; a write first copies the sample into that file, then changes it, so the next state shows the write. state ends opens whose time has passed first, as the collector does; state --cached prints the file as it is, at once. Flag files in DOTS_DEV_DIR: dns-slow makes each write take 1 s, so a check can press a second key while one runs; dns-slow-state makes a full state take 2 s, so a check sees the cached rows first; dns-open-seconds holds the length of every open in seconds; dns-router-down makes state report the router unreachable since 14 minutes ago, keeping its rows; dns-leases.json replaces the 3 sample leases.
 set -euo pipefail
 {
 dir=${DOTS_DEV_DIR:-${XDG_STATE_HOME:?dev-fake-dns: run it from a sourced just dev env}}
@@ -30,44 +30,101 @@ sample() {
      ]}'
 }
 
+current() { if [ -e "$file" ]; then cat "$file"; else sample; fi; }
+
 # Applies a jq program to the state file, made from the sample on the first write.
 change() {
-  [ -e "$dir/dns-slow" ] && sleep 1
   [ -e "$file" ] || sample >"$file"
   jq "$@" "$file" >"$file.tmp"
   mv "$file.tmp" "$file"
+}
+write() {
+  [ -e "$dir/dns-slow" ] && sleep 1
+  change "$@"
+}
+
+# An open whose time has passed ends: Kid comes back with the categories it kept.
+reconcile() {
+  [ -e "$file" ] || return 0
+  change --argjson now "$EPOCHSECONDS" '.devices |= map(if .open_until != null and .open_until <= $now then .kid = true | .open_until = null else . end)'
+}
+
+leases() {
+  local all
+  if [ -e "$dir/dns-leases.json" ]; then
+    all=$(cat "$dir/dns-leases.json")
+  else
+    all='[{"mac":"02:00:00:00:00:41","ip":"192.168.0.143","hostname":"Galaxy-A54"},{"mac":"02:00:00:00:00:42","ip":"192.168.0.151","hostname":"android-7f2c"},{"mac":"02:00:00:00:00:43","ip":"192.168.0.160","hostname":"Chromecast"}]'
+  fi
+  # A lease whose MAC is already a listed device is left out.
+  current | jq -c --argjson all "$all" '[.devices[].mac] as $listed | [$all[] | select(.mac as $m | $listed | index($m) | not)]'
 }
 
 verb=${1:-}
 key=${2:-}
 case $verb in
 state)
-  if [ -e "$file" ]; then cat "$file"; else sample; fi
+  if [ "$key" = --cached ]; then
+    current
+    exit 0
+  fi
+  [ -e "$dir/dns-slow-state" ] && sleep 2
+  reconcile
+  if [ -e "$dir/dns-router-down" ]; then
+    current | jq --argjson now "$EPOCHSECONDS" '.router = {ok: false, as_of: ($now - 840), error: "unreachable"}'
+  else
+    current
+  fi
+  ;;
+reconcile)
+  reconcile
   ;;
 kid)
-  # Kid off remembers a carried device's categories, and Kid on brings them back, all four the first time.
+  # Kid off remembers a carried device's categories, and Kid on brings them back, all four the first time; ending a timed open brings back the ones it kept.
   remembered=$dir/dns-kid-${key#*:}.json
+  [ -e "$file" ] || sample >"$file"
   if [ "$3" = off ] && [ "${key%%:*}" = carried ]; then
-    [ -e "$file" ] || sample >"$file"
     jq -c --arg k "$key" '.devices[] | select(.key == $k) | .categories' "$file" >"$remembered"
   fi
   cats='{"youtube":true,"social":true,"adult":true,"gambling":true}'
   [ "$3" = on ] && [ -e "$remembered" ] && cats=$(cat "$remembered")
+  [ "$3" = on ] && jq -e --arg k "$key" '.devices[] | select(.key == $k) | .open_until != null' "$file" >/dev/null &&
+    cats=$(jq -c --arg k "$key" '.devices[] | select(.key == $k) | .categories' "$file")
   [ "$3" = off ] && cats='{"youtube":false,"social":false,"adult":false,"gambling":false}'
-  change --arg k "$key" --argjson c "$cats" '(.devices[] | select(.key == $k)) |= (.categories = $c | .kid = ([$c[]] | any))'
+  write --arg k "$key" --argjson c "$cats" '(.devices[] | select(.key == $k)) |= (.categories = $c | .kid = ([$c[]] | any) | .open_until = null)'
   ;;
 category)
   if [ "${key%%:*}" = router ]; then
     echo "router devices carry one Kid policy" >&2
     exit 2
   fi
-  change --arg k "$key" --arg c "$3" --argjson on "$([ "$4" = on ] && echo true || echo false)" \
+  write --arg k "$key" --arg c "$3" --argjson on "$([ "$4" = on ] && echo true || echo false)" \
     '(.devices[] | select(.key == $k)) |= (.categories[$c] = $on | .kid = ([.categories[]] | any))'
   ;;
 allow)
   # A router allow is one list that every router device shares.
-  change --arg k "$key" --arg d "$3" '
+  write --arg k "$key" --arg d "$3" '
     (.devices[] | select(.key == $k or ($k | startswith("router:")) and .path == "router")) |= (.allow = (.allow - [$d]) + [$d])'
+  ;;
+open)
+  seconds=$([ "$3" = 2h ] && echo 7200 || echo 1800)
+  [ -e "$dir/dns-open-seconds" ] && seconds=$(cat "$dir/dns-open-seconds")
+  write --arg k "$key" --argjson until $((EPOCHSECONDS + seconds)) '(.devices[] | select(.key == $k)) |= (.kid = false | .open_until = $until)'
+  ;;
+leases)
+  leases
+  ;;
+add)
+  lease=$(leases | jq -c --arg m "$key" '.[] | select(.mac == $m)')
+  if [ -z "$lease" ]; then
+    echo "no lease" >&2
+    exit 1
+  fi
+  write --argjson l "$lease" --arg n "$3" '
+    ([.devices[] | select(.path == "router") | .allow][0] // []) as $allow
+    | .devices += [{key: ("router:" + $l.mac), name: $n, path: "router", kid: true,
+        categories: {youtube: true, social: true, adult: true, gambling: true}, open_until: null, allow: $allow,
+        last_block: null, blocks: [], ip: $l.ip, mac: $l.mac}]'
   ;;
 *)
   echo "dev-fake-dns: no verb $verb" >&2
