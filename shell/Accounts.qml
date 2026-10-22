@@ -292,10 +292,10 @@ Item {
                             return {
                                 kind: it.kind,
                                 name: nameText.text,
-                                plan: planText.visible ? planText.text : "",
+                                plan: planText.visible ? planText.text : isAccount && resetUnder.visible ? resetUnder.text : "",
                                 active: activeMark.visible ? activeText.text : "",
-                                figure: (figMain.visible ? figMain.text : "") + (figTail.visible ? " " + figTail.text : ""),
-                                reset: resetText.visible ? resetText.text : resetUnder.visible ? resetUnder.text : "",
+                                figure: (figure.visible ? figMain.text : "") + (figure.visible && figTail.visible ? " " + figTail.text : ""),
+                                reset: resetText.visible ? resetText.text : !isAccount && resetUnder.visible ? resetUnder.text : "",
                                 note: noteText.visible ? noteText.text : "",
                                 warning: triangle.visible,
                                 lines: nameText.lineCount,
