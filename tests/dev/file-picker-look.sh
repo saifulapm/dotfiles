@@ -48,6 +48,16 @@ mark() { wtype -M ctrl -k space -m ctrl; }
 preview_of() { pk_state | jq -c '{previewName, preview, previewHead, previewBadge, previewLines}'; }
 # Every drawn box lies inside the card.
 inside='. as $s | [.boxes[] | select(. != null)] | all(.x >= 0 and .y >= 0 and .x + .width <= $s.cardSize[0] + 0.5 and .y + .height <= $s.cardSize[1] + 0.5)'
+# A row's drawn mark, name colour, the colour under it and their WCAG contrast, from theme.mjs.
+row_look() {
+  pk_state | node --input-type=module -e '
+    const { contrast } = await import(process.argv[1] + "/shell/lib/theme.mjs");
+    const { readFileSync } = await import("node:fs");
+    const r = JSON.parse(readFileSync(0, "utf8")).rows.find((r) => r.name === process.argv[2]);
+    console.log(JSON.stringify(r ? { mark: r.mark, ink: r.ink, behind: r.behind, contrast: Number(contrast(r.ink, r.behind).toFixed(2)) } : null));
+  ' "$repo" "$1"
+}
+ratio_at_least() { row_look "$2" | jq -e --argjson min "$1" '.contrast >= $min' >/dev/null; }
 long=$(printf 'chrome-%0193d' 0)
 
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
@@ -55,10 +65,10 @@ in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme 
 iso='^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$'
 dotted='^[0-9]{1,2} [A-Z][a-z]{2} [0-9]{4} · [0-9]{2}:[0-9]{2}$'
 comma='^[0-9]{1,2} [A-Z][a-z]{2} [0-9]{4}, [0-9]{2}:[0-9]{2}$'
-for t in "paper|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|||$dotted|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ MARK · ESC|SAVE IN|3 ITEMS|1 PLACE" \
-  "artboard|,,|1600 × 1200 px|640 × 480 px||PNG|$comma|3 marked|folders only|2 folders · files hidden|Name ↑,Items,Modified|↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · esc||3 items|→ Downloads" \
-  "blueprint|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|PREVIEW IMAGE||$iso|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [ESC]|> FOLDER|3 ITEMS|1 PLACE"; do
-  IFS='|' read -r name labels png jpg head badge date marked only folders heads strip lead items match <<<"$t"
+for t in "paper|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|||$dotted|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ MARK · ESC|SAVE IN|3 ITEMS|1 PLACE|✓|" \
+  "artboard|,,|1600 × 1200 px|640 × 480 px||PNG|$comma|3 marked|folders only|2 folders · files hidden|Name ↑,Items,Modified|↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · esc||3 items|→ Downloads|✓|" \
+  "blueprint|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|PREVIEW IMAGE||$iso|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [ESC]|> FOLDER|3 ITEMS|1 PLACE|[x]|[ ]"; do
+  IFS='|' read -r name labels png jpg head badge date marked only folders heads strip lead items match on off <<<"$t"
   in_theme "$name"
 
   # The preview: the header's size, not the bounded one Qt decoded, in the theme's labels; no dimensions for a PDF.
@@ -91,6 +101,9 @@ for t in "paper|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|||$dotted|3 MAR
     mark
   done
   check "$name: three marked files chip the heading $marked ($(pk_state | jq -c '[.chip, .marked]'))" until_ok 1000 state_is --arg c "$marked" '.chip == $c'
+  # IMG_2039 is marked and off the cursor, Photo.jpg is an unmarked file.
+  check "$name: a marked row off the cursor draws its name at contrast 4.5 or more ($(row_look IMG_2039.HEIC))" ratio_at_least 4.5 IMG_2039.HEIC
+  check "$name: a marked file draws '$on' and an unmarked one '$off' ($(row_look IMG_2039.HEIC) $(row_look Photo.jpg))" state_is --arg on "$on" --arg off "$off" '(.rows[] | select(.name == "IMG_2039.HEIC") | .mark) == $on and (.rows[] | select(.name == "Photo.jpg") | .mark) == $off'
   cancel "multi-$name"
 
   # A folder request: its chip, the path row's count and the Items head.

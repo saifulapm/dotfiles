@@ -891,7 +891,7 @@ Item {
                         spacing: 12
 
                         Item {
-                            implicitWidth: 16
+                            implicitWidth: bracket && picker.multiple ? 28 : 16
                         }
                         Head {
                             id: nameHead
@@ -932,6 +932,8 @@ Item {
                             required property int index
                             readonly property bool isCurrent: index === picker.selected
                             readonly property bool isMarked: !modelData.dir && picker.marked.indexOf(modelData.name) >= 0
+                            // Blueprint's several-files list draws an empty [ ] on each file not marked.
+                            readonly property bool boxed: bracket && picker.multiple && !modelData.dir && !isMarked
                             readonly property color ink: isCurrent ? look.cursor.text : c.ink
                             readonly property color dim: isCurrent ? look.cursor.detail : c.muted
                             // The row as drawn, for the state function.
@@ -942,6 +944,10 @@ Item {
                                     size: sizeLabel.text,
                                     tag: tagLabel.visible ? tagLabel.text : "",
                                     marked: markLabel.visible,
+                                    mark: markLabel.visible ? markLabel.text : boxLabel.visible ? boxLabel.text : "",
+                                    // The name's colour and the one under it: the row's fill, or the card's where the row draws none.
+                                    ink: String(nameText.color),
+                                    behind: rowItem.color.a > 0 ? String(rowItem.color) : String(card.style.fill),
                                     modified: dateLabel.text,
                                     elided: nameText.truncated,
                                     lines: nameText.lineCount
@@ -950,8 +956,8 @@ Item {
                             width: rowList.width
                             height: 34
                             radius: look.cursor.radius
-                            // A marked row is tinted; the cursor row stays inverted.
-                            color: isCurrent ? look.cursor.fill : isMarked ? look.tile.fill : "transparent"
+                            // Only the cursor row is filled; a marked row shows its mark and keeps the list's colours, as every board draws it.
+                            color: isCurrent ? look.cursor.fill : "transparent"
 
                             RowLayout {
                                 anchors.fill: parent
@@ -959,9 +965,9 @@ Item {
                                 anchors.rightMargin: 12
                                 spacing: 12
 
-                                // Paper and Blueprint mark the cursor row; Artboard draws a folder or a page; a marked file shows a tick instead.
+                                // Paper and Blueprint mark the cursor row; Artboard draws a folder or a page; a marked file shows a tick instead, Blueprint an [x].
                                 Item {
-                                    implicitWidth: 16
+                                    implicitWidth: bracket && picker.multiple ? 28 : 16
                                     implicitHeight: 16
 
                                     Text {
@@ -969,14 +975,25 @@ Item {
                                         visible: rowItem.isMarked
                                         anchors.centerIn: parent
                                         textFormat: Text.PlainText
-                                        text: "✓"
-                                        color: rowItem.isCurrent ? look.cursor.text : bracket ? c.accent : c.ink
-                                        font.family: fonts.ui
+                                        text: bracket ? "[x]" : "✓"
+                                        color: rowItem.isCurrent ? look.cursor.text : bracket ? c.muted : c.ink
+                                        font.family: bracket ? fonts.mono : fonts.ui
                                         font.pixelSize: 14
-                                        font.bold: true
+                                        font.bold: !bracket || rowItem.isCurrent
                                     }
                                     Text {
-                                        visible: !plain && !rowItem.isMarked
+                                        id: boxLabel
+                                        visible: rowItem.boxed
+                                        anchors.centerIn: parent
+                                        textFormat: Text.PlainText
+                                        text: "[ ]"
+                                        color: rowItem.isCurrent ? look.cursor.text : c.muted
+                                        font.family: fonts.mono
+                                        font.pixelSize: 14
+                                        font.bold: rowItem.isCurrent
+                                    }
+                                    Text {
+                                        visible: !plain && !rowItem.isMarked && !rowItem.boxed
                                         anchors.centerIn: parent
                                         textFormat: Text.PlainText
                                         text: "▸"
