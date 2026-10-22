@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { accountsView, accountsItems, accountsKeys } from './accounts.mjs';
+import { readFileSync } from 'node:fs';
+import { parseToml } from './toml.mjs';
+import { listLook } from './voice.mjs';
+import { accountsView, accountsItems, accountsKeys, accountsLook } from './accounts.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
 
@@ -142,4 +145,45 @@ test('the cursor stops on account and provider rows, never on a limit or a group
 test('the key strip is the board\'s', () => {
   const look = { keys: (pairs) => pairs };
   assert.deepEqual(accountsKeys(look), [['↵', 'make active'], ['r', 'refresh'], ['esc', '']]);
+});
+
+const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
+const looks = () => ['paper', 'artboard', 'blueprint'].map((n) => accountsLook(theme(n)));
+
+test("each theme labels the groups as its board: Paper's caps with a count, Artboard's plain word, Blueprint's caps counting windows", () => {
+  const [paper, artboard, blueprint] = looks();
+  const groups = view().groups;
+  assert.deepEqual(groups.map(paper.group), [{ text: 'CLAUDE', right: '2 ACCOUNTS' }, { text: 'BALANCES', right: '5 PROVIDERS' }, { text: 'USAGE', right: '2 PROVIDERS' }]);
+  assert.deepEqual(groups.map(artboard.group), [{ text: 'Claude', right: '' }, { text: 'Balances', right: '' }, { text: 'Usage', right: '' }]);
+  assert.deepEqual(groups.map(blueprint.group), [{ text: 'CLAUDE', right: '2 ACCOUNTS' }, { text: 'BALANCES', right: '5 PROVIDERS' }, { text: 'USAGE', right: '2 WINDOWS' }]);
+  assert.deepEqual(paper.group(['Claude', 1]), { text: 'CLAUDE', right: '1 ACCOUNT' });
+});
+
+test("each theme's key strip is its board's: Paper's caps, Artboard's plain words, Blueprint's brackets", () => {
+  const strip = (n) => accountsKeys(listLook(theme(n))).map((k) => `${k.key} ${k.word}`.trim());
+  assert.deepEqual(strip('paper'), ['↵ MAKE ACTIVE', 'R REFRESH', 'ESC']);
+  assert.deepEqual(strip('artboard'), ['↵ make active', 'r refresh', 'esc']);
+  assert.deepEqual(strip('blueprint'), ['[↵] MAKE ACTIVE', '[R] REFRESH', '[ESC]']);
+});
+
+test('each theme draws a figure as its board: a bare percent in Paper and Artboard, Blueprint\'s figure with its words after it', () => {
+  const [paper, artboard, blueprint] = looks();
+  const v = view();
+  const five = Object.assign({ kind: 'limit' }, v.accounts[0].limits[0]);
+  const open = Object.assign({ kind: 'balance' }, v.balances[1]);
+  const eleven = Object.assign({ kind: 'usage' }, v.usage[0]);
+  const codex = Object.assign({ kind: 'usage' }, v.usage[1]);
+  assert.deepEqual([five, open, eleven].map(paper.figure), [{ main: '34%', tail: '' }, { main: '$3.10 of $10', tail: '' }, { main: '11,500 of 32,000 characters', tail: '' }]);
+  assert.deepEqual([five, open, eleven].map(artboard.figure), [{ main: '34%', tail: '' }, { main: '$3.10 of $10 left', tail: '' }, { main: '11,500 of 32,000 chars', tail: '' }]);
+  assert.deepEqual([five, open, eleven, codex].map(blueprint.figure), [{ main: '34%', tail: 'USED' }, { main: '$3.10', tail: 'OF $10' }, { main: '11,500', tail: 'OF 32,000 CHARS' }, { main: '0%', tail: 'OF MONTHLY' }]);
+  assert.deepEqual([paper.limitName('Weekly Fable'), artboard.limitName('Weekly'), blueprint.limitName('Weekly Fable')], ['weekly Fable', 'weekly', 'WEEKLY FABLE']);
+});
+
+test("a warning draws in each theme's danger token, a stale row in its muted one, and ACTIVE in each board's mark", () => {
+  const [paper, artboard, blueprint] = looks();
+  assert.deepEqual([paper.warn, artboard.warn, blueprint.warn], ['#C8381E', '#CF222E', '#FFB547']);
+  assert.deepEqual([paper.dim, artboard.dim, blueprint.dim], ['#575653', '#57606A', '#80A4C2']);
+  assert.deepEqual(paper.active, { text: 'ACTIVE', color: '#1C1915', fill: 'transparent', border: '#1C1915', radius: 0, dot: '' });
+  assert.deepEqual(artboard.active, { text: 'ACTIVE', color: '#FFFFFF', fill: '#15171B', border: 'transparent', radius: 8, dot: '#6C83FF' });
+  assert.deepEqual(blueprint.active, { text: '[ACTIVE]', color: '#7FE3F0', fill: 'transparent', border: 'transparent', radius: 0, dot: '' });
 });
