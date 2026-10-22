@@ -1,0 +1,165 @@
+#!/usr/bin/env node
+// Prints every account limit and balance as one JSON array of rows. `--cached` prints each source's last good rows from the cache, with no network. Each source is one entry in sources(): a name for its cache file, the placeholder row's names, and run(signal), which resolves its rows or throws Failure.
+import { existsSync, mkdirSync, openSync, closeSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const env = process.env;
+const LIMIT_MS = 10000;
+const STATE = env.XDG_STATE_HOME || env.HOME + '/.local/state';
+const CACHE = join(env.XDG_CACHE_HOME || env.HOME + '/.cache', 'dots', 'accounts');
+const ANTHROPIC = env.DOTS_ACCOUNTS_ANTHROPIC_URL || 'https://api.anthropic.com';
+const AUTH = new Set(['expired', 'forbidden', 'locked', 'no-key']);
+
+// A source's failure carries only a reason from the fixed list, never text from a response.
+class Failure extends Error {
+  constructor(reason) {
+    super(reason);
+    this.reason = reason;
+  }
+}
+
+// Seconds precision, in UTC, so no local time zone reaches a row.
+const iso = (t) => {
+  const d = new Date(t);
+  return isNaN(d) ? null : d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+};
+
+const readJSON = (path) => {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return null;
+  }
+};
+
+// One request, never retried; the status alone picks the reason.
+async function fetchJSON(url, headers, signal) {
+  let res;
+  try {
+    res = await fetch(url, { headers, signal });
+  } catch (e) {
+    throw new Failure(e.name === 'TimeoutError' ? 'timeout' : 'network');
+  }
+  if (res.status === 401) throw new Failure('expired');
+  if (res.status === 403) throw new Failure('forbidden');
+  if (res.status === 429) throw new Failure('rate-limited');
+  if (!res.ok) throw new Failure('network');
+  try {
+    return await res.json();
+  } catch {
+    throw new Failure('shape');
+  }
+}
+
+function registry() {
+  const reg = readJSON(join(STATE, 'dots', 'claude-accounts.json'));
+  const accounts = reg ? reg.accounts : [{ id: 'main', label: 'main', home: env.HOME + '/.claude' }];
+  // The id names a cache file, so anything but the label alphabet is refused.
+  return Array.isArray(accounts) ? accounts.filter((a) => a && typeof a.id === 'string' && /^[a-z0-9-]+$/.test(a.id)) : [];
+}
+
+// The model name comes from the response: one line of letters, digits, spaces, dots and dashes, 32 at most.
+const modelName = (scope) => {
+  const name = scope && scope.model && scope.model.display_name;
+  return typeof name === 'string' ? name.replace(/[^\p{L}\p{N} .-]/gu, '').trim().slice(0, 32) : '';
+};
+
+function claudeRows(account, body) {
+  if (!body || !Array.isArray(body.limits)) throw new Failure('shape');
+  const rows = [];
+  for (const l of body.limits) {
+    if (!l || typeof l.percent !== 'number' || !isFinite(l.percent)) continue;
+    let metric = { session: '5-hour', weekly_all: 'weekly' }[l.kind];
+    if (l.kind === 'weekly_scoped' && modelName(l.scope)) metric = 'weekly ' + modelName(l.scope);
+    if (!metric) continue;
+    rows.push({ ...names(account), metric, kind: 'percent', value: l.percent, limit: 100, unit: '%', resets_at: l.resets_at ? iso(l.resets_at) : null });
+  }
+  return rows;
+}
+
+const names = (account) => ({ provider: 'claude', label: account.id, account: account.id });
+
+// The credentials file is only read, and only the access token and its expiry; the refresh token stays where it is.
+async function claude(account, signal) {
+  if (typeof account.home !== 'string' || !existsSync(account.home)) throw new Failure('no-home');
+  const oauth = (readJSON(join(account.home, '.credentials.json')) || {}).claudeAiOauth;
+  if (!oauth || typeof oauth.accessToken !== 'string') throw new Failure('no-key');
+  if (typeof oauth.expiresAt !== 'number' || oauth.expiresAt <= Date.now()) throw new Failure('expired');
+  const headers = { authorization: 'Bearer ' + oauth.accessToken, 'anthropic-beta': 'oauth-2025-04-20' };
+  return claudeRows(account, await fetchJSON(ANTHROPIC + '/api/oauth/usage', headers, signal));
+}
+
+function sources() {
+  return registry().map((a) => ({ name: 'claude-' + a.id, names: names(a), run: (signal) => claude(a, signal) }));
+}
+
+const cached = (name) => {
+  const rows = readJSON(join(CACHE, name + '.json'));
+  return Array.isArray(rows) ? rows : null;
+};
+
+// Runs one source within the limit; a failure serves the cached rows as stale, or one placeholder row.
+async function settle(source) {
+  const now = iso(Date.now());
+  const signal = AbortSignal.timeout(LIMIT_MS);
+  const late = new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Failure('timeout')), { once: true }));
+  try {
+    const rows = await Promise.race([source.run(signal), late]);
+    return { fresh: true, rows: rows.map((r) => ({ ...r, as_of: now, state: 'ok', reason: null })) };
+  } catch (e) {
+    const reason = e instanceof Failure ? e.reason : 'shape';
+    const old = cached(source.name);
+    if (old) return { rows: old.map((r) => ({ ...r, state: 'stale', reason })) };
+    const state = AUTH.has(reason) ? 'auth' : 'error';
+    return { rows: [{ ...source.names, metric: null, kind: null, value: null, limit: null, unit: null, resets_at: null, as_of: now, state, reason }] };
+  }
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Two collectors write the cache one at a time: the lock file is created exclusively, and one older than 15 s was left by a collector that died holding it.
+async function locked(write) {
+  mkdirSync(CACHE, { recursive: true });
+  const lock = join(CACHE, '.lock');
+  for (let tries = 0; ; tries++) {
+    try {
+      closeSync(openSync(lock, 'wx'));
+      break;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > 15000) unlinkSync(lock);
+      } catch {}
+      if (tries >= 250) return;
+      await sleep(20);
+    }
+  }
+  try {
+    write();
+  } finally {
+    unlinkSync(lock);
+  }
+}
+
+// A reader only ever sees a whole file: each write goes to a temp file renamed over the old one.
+function save(name, rows) {
+  const tmp = join(CACHE, `.${name}.${process.pid}.tmp`);
+  writeFileSync(tmp, JSON.stringify(rows));
+  renameSync(tmp, join(CACHE, name + '.json'));
+}
+
+async function main() {
+  const list = sources();
+  let out;
+  if (process.argv[2] === '--cached') {
+    out = list.flatMap((s) => cached(s.name) || []);
+  } else {
+    const results = await Promise.all(list.map(settle));
+    await locked(() => results.forEach((r, i) => r.fresh && save(list[i].name, r.rows)));
+    out = results.flatMap((r) => r.rows);
+  }
+  // Exits at once so a source still running past its limit cannot hold the process.
+  process.stdout.write(JSON.stringify(out) + '\n', () => process.exit(0));
+}
+
+main();
