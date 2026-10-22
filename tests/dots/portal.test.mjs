@@ -194,6 +194,17 @@ test('a socket a killed shell left behind sends the call to gtk too', async (t) 
   assert.equal(p.gtkCalls().length, 1);
 });
 
+test("an app's Close on a call handed to gtk closes gtk's dialog", async (t) => {
+  const p = await scratch(t, { gtk: true, gtkDelay: 15000 });
+  const pending = p.call('OpenFile', H, '', 'wayland:abc', 'Open File', CHROMIUM);
+  for (let i = 0; i < 100 && p.gtkCalls().length === 0; i++) await sleep(25);
+  const c = await p.close(H);
+  assert.equal(c.code, 0, c.stderr);
+  const r = await pending;
+  assert.equal(r.stdout, '(uint32 2, @a{sv} {})\n', r.stderr);
+  assert.deepEqual(p.gtkCalls().map((c) => [c[0], c[1]]), [['OpenFile', H], ['Close', H]]);
+});
+
 test('SaveFile asks for a save with the suggested name and folder', async (t) => {
   const p = await scratch(t);
   const sh = await shell(t, p.sock, (_, n) => (n === 1 ? { response: 0, paths: ['/tmp/x/report.pdf'] } : { response: 1, paths: [] }));

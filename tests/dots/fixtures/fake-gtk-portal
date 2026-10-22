@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# fake-gtk-portal: plays org.freedesktop.impl.portal.desktop.gtk for the dots-portal tests, writing each call it gets to $FAKE_GTK_REC and answering one canned URI after $FAKE_GTK_DELAY_MS.
+# fake-gtk-portal: plays org.freedesktop.impl.portal.desktop.gtk for the dots-portal tests, writing each call it gets to $FAKE_GTK_REC and answering one canned URI after $FAKE_GTK_DELAY_MS, or response 2 at once when the request is closed, as gtk does.
 import json
 import os
 
@@ -10,19 +10,41 @@ from gi.repository import Gio, GLib
 
 XML = """<node><interface name="org.freedesktop.impl.portal.FileChooser">
 <method name="OpenFile"><arg type="o" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="a{sv}" direction="in"/><arg type="u" direction="out"/><arg type="a{sv}" direction="out"/></method>
-</interface></node>"""
+</interface>
+<interface name="org.freedesktop.impl.portal.Request"><method name="Close"/></interface></node>"""
 
 
-def on_call(_conn, _sender, _path, _iface, method, params, invocation):
-    handle, app_id, parent, title, options = params.unpack()
+NODE = Gio.DBusNodeInfo.new_for_xml(XML)
+
+
+def record(*fields):
     with open(os.environ["FAKE_GTK_REC"], "a") as rec:
-        rec.write(json.dumps([method, handle, app_id, parent, title, params.get_child_value(4).print_(True)]) + "\n")
-    reply = GLib.Variant("(ua{sv})", (0, {"uris": GLib.Variant("as", ["file:///gtk/picked.txt"])}))
-    GLib.timeout_add(int(os.environ.get("FAKE_GTK_DELAY_MS", "0")), lambda: invocation.return_value(reply) or False)
+        rec.write(json.dumps(list(fields)) + "\n")
+
+
+def on_call(conn, _sender, _path, _iface, method, params, invocation):
+    handle, app_id, parent, title, options = params.unpack()
+    record(method, handle, app_id, parent, title, params.get_child_value(4).print_(True))
+    done = []
+
+    def answer(response, results):
+        if not done:
+            done.append(True)
+            conn.unregister_object(request)
+            invocation.return_value(GLib.Variant("(ua{sv})", (response, results)))
+        return False
+
+    def on_close(_c, _s, path, _i, _m, _p, close):
+        record("Close", path)
+        close.return_value(None)
+        answer(2, {})
+
+    request = conn.register_object_with_closures2(handle, NODE.interfaces[1], on_close, None, None)
+    GLib.timeout_add(int(os.environ.get("FAKE_GTK_DELAY_MS", "0")), lambda: answer(0, {"uris": GLib.Variant("as", ["file:///gtk/picked.txt"])}))
 
 
 def on_bus(conn, _name):
-    conn.register_object_with_closures2("/org/freedesktop/portal/desktop", Gio.DBusNodeInfo.new_for_xml(XML).interfaces[0], on_call, None, None)
+    conn.register_object_with_closures2("/org/freedesktop/portal/desktop", NODE.interfaces[0], on_call, None, None)
 
 
 Gio.bus_own_name(Gio.BusType.SESSION, "org.freedesktop.impl.portal.desktop.gtk", Gio.BusNameOwnerFlags.NONE, on_bus, None, None)

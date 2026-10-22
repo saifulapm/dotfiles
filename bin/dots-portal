@@ -159,12 +159,20 @@ class Call:
 class Delegated:
     """A call gtk answers; it holds the idle exit like a call to the shell does."""
 
-    def __init__(self, conn, invocation, method, params):
+    def __init__(self, conn, invocation, method, handle, params):
+        self.conn = conn
         self.invocation = invocation
+        self.handle = handle
+        # The app's Close comes to this name, so it is passed on to gtk's dialog under the same handle.
+        self.request_id = conn.register_object_with_closures2(handle, NODE.interfaces[1], self.on_close, None, None)
         pending.add(self)
         arm_idle()
         log("no shell picker, handing %s to gtk" % method)
         conn.call(GTK_NAME, OBJECT_PATH, IFACE, method, params, GLib.VariantType("(ua{sv})"), Gio.DBusCallFlags.NONE, GLib.MAXINT, None, self.on_reply)
+
+    def on_close(self, conn, _sender, _path, _iface, _method, _params, invocation):
+        invocation.return_value(None)
+        conn.call(GTK_NAME, self.handle, "org.freedesktop.impl.portal.Request", "Close", None, None, Gio.DBusCallFlags.NONE, -1, None, None)
 
     def on_reply(self, conn, result):
         try:
@@ -173,6 +181,7 @@ class Delegated:
             log("gtk failed too: %s" % error.message)
             reply = GLib.Variant("(ua{sv})", (2, {}))
         pending.discard(self)
+        conn.unregister_object(self.request_id)
         self.invocation.return_value(reply)
         arm_idle()
 
@@ -187,7 +196,7 @@ def on_call(conn, _sender, _path, _iface, method, params, invocation):
     except OSError:
         # No socket file, or one a killed shell left behind: the shell is not running.
         sock.close()
-        Delegated(conn, invocation, method, params)
+        Delegated(conn, invocation, method, handle, params)
         return
     Call(conn, invocation, method, handle, options, sock).start(line)
 
