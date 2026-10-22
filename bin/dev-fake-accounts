@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# just dev's dots-accounts: prints the collector's rows for two Claude accounts and the other providers, so a nested check never reaches a provider or pass. Each call appends its arguments as one line to DOTS_DEV_DIR/accounts.log; --cached prints the same rows fetched two hours before. A file DOTS_DEV_DIR/accounts-near-full puts main at 92% and 79% and makes a full fetch take 3 s, so a check sees the warning and "refreshing…".
+set -euo pipefail
+{
+dir=${DOTS_DEV_DIR:-${XDG_STATE_HOME:?dev-fake-accounts: run it from a sourced just dev env}}
+printf '%s\n' "$*" >>"$dir/accounts.log"
+
+five=34 weekly=61
+if [ -e "$dir/accounts-near-full" ]; then
+  five=92 weekly=79
+  [ "${1:-}" = --cached ] || sleep 3
+fi
+if [ "${1:-}" = --cached ]; then as_of=$(date -u -Iseconds -d '-2 hours'); else as_of=$(date -u -Iseconds); fi
+# Resets in local time, so the card reads 17:00 and 16:40 whatever the zone.
+five_main=$(date -Iseconds -d 'today 17:00')
+five_work=$(date -Iseconds -d 'today 16:40')
+week=$(date -u -Iseconds -d '+6 days')
+month=$(date -u -Iseconds -d '+12 days')
+codex=$(date -u -Iseconds -d '+28 days')
+
+row() {
+  # provider label account metric kind value limit unit resets_at
+  local account=null resets=null limit=null
+  [ "$3" = - ] || account="\"$3\""
+  [ "$7" = - ] || limit=$7
+  [ "$9" = - ] || resets="\"$9\""
+  printf '{"provider":"%s","label":"%s","account":%s,"metric":"%s","kind":"%s","value":%s,"limit":%s,"unit":"%s","resets_at":%s,"as_of":"%s","state":"ok","reason":null}' \
+    "$1" "$2" "$account" "$4" "$5" "$6" "$limit" "$8" "$resets" "$as_of"
+}
+
+rows=(
+  "$(row claude main main 5-hour percent "$five" 100 % "$five_main")"
+  "$(row claude main main weekly percent "$weekly" 100 % "$week")"
+  "$(row claude main main 'weekly Fable' percent 22 100 % "$week")"
+  "$(row claude work work 5-hour percent 8 100 % "$five_work")"
+  "$(row claude work work weekly percent 12 100 % -)"
+  "$(row deepseek-ai DeepSeek - balance money 12.4 - USD -)"
+  "$(row openrouter OpenRouter - balance money 3.1 10 USD -)"
+  "$(row zenmux ZenMux - balance money 7 - USD -)"
+  "$(row vercel 'Vercel AI' - balance money 4.5 - USD -)"
+  "$(row fal fal - balance money 18.2 - USD -)"
+  "$(row elevenlabs ElevenLabs - characters count 11500 32000 characters "$month")"
+  "$(row codex Codex - monthly percent 0 100 % "$codex")"
+)
+(IFS=,; printf '[%s]\n' "${rows[*]}")
+exit
+}
