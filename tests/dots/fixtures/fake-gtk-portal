@@ -1,0 +1,29 @@
+#!/usr/bin/python3
+# fake-gtk-portal: plays org.freedesktop.impl.portal.desktop.gtk for the dots-portal tests, writing each call it gets to $FAKE_GTK_REC and answering one canned URI after $FAKE_GTK_DELAY_MS.
+import json
+import os
+
+import gi
+
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib
+
+XML = """<node><interface name="org.freedesktop.impl.portal.FileChooser">
+<method name="OpenFile"><arg type="o" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="a{sv}" direction="in"/><arg type="u" direction="out"/><arg type="a{sv}" direction="out"/></method>
+</interface></node>"""
+
+
+def on_call(_conn, _sender, _path, _iface, method, params, invocation):
+    handle, app_id, parent, title, options = params.unpack()
+    with open(os.environ["FAKE_GTK_REC"], "a") as rec:
+        rec.write(json.dumps([method, handle, app_id, parent, title, params.get_child_value(4).print_(True)]) + "\n")
+    reply = GLib.Variant("(ua{sv})", (0, {"uris": GLib.Variant("as", ["file:///gtk/picked.txt"])}))
+    GLib.timeout_add(int(os.environ.get("FAKE_GTK_DELAY_MS", "0")), lambda: invocation.return_value(reply) or False)
+
+
+def on_bus(conn, _name):
+    conn.register_object_with_closures2("/org/freedesktop/portal/desktop", Gio.DBusNodeInfo.new_for_xml(XML).interfaces[0], on_call, None, None)
+
+
+Gio.bus_own_name(Gio.BusType.SESSION, "org.freedesktop.impl.portal.desktop.gtk", Gio.BusNameOwnerFlags.NONE, on_bus, None, None)
+GLib.MainLoop().run()

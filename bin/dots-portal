@@ -1,0 +1,201 @@
+#!/usr/bin/python3
+# dots-portal: the xdg-desktop-portal FileChooser backend that asks the shell's picker over its socket, one connection per call, and hands the call to the gtk backend when no shell listens.
+
+# Python with Gio, since every portal call waits on a person: each one is answered later from the main loop, when its connection to the shell gives a line, hangs up, or the app closes the request.
+import json
+import os
+import socket
+import subprocess
+import sys
+
+import gi
+
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib
+
+BUS_NAME = "org.freedesktop.impl.portal.desktop.dots"
+GTK_NAME = "org.freedesktop.impl.portal.desktop.gtk"
+OBJECT_PATH = "/org/freedesktop/portal/desktop"
+IFACE = "org.freedesktop.impl.portal.FileChooser"
+# The impl interface declares no version, so this is the FileChooser version xdg-desktop-portal 1.22 serves to apps.
+VERSION = 4
+IDLE_EXIT_SEC = int(os.environ.get("DOTS_PORTAL_IDLE_S", "30"))
+
+CALL = '<arg type="o" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="a{sv}" direction="in"/><arg type="u" direction="out"/><arg type="a{sv}" direction="out"/>'
+NODE = Gio.DBusNodeInfo.new_for_xml(
+    '<node><interface name="%s">%s<property name="version" type="u" access="read"/></interface>'
+    '<interface name="org.freedesktop.impl.portal.Request"><method name="Close"/></interface></node>'
+    % (IFACE, "".join('<method name="%s">%s</method>' % (m, CALL) for m in ("OpenFile", "SaveFile", "SaveFiles")))
+)
+
+loop = GLib.MainLoop()
+pending = set()
+idle_source = None
+
+
+def log(message):
+    print("dots-portal: %s" % message, file=sys.stderr, flush=True)
+
+
+def arm_idle():
+    global idle_source
+    if idle_source is not None:
+        GLib.source_remove(idle_source)
+        idle_source = None
+    if not pending:
+        idle_source = GLib.timeout_add_seconds(IDLE_EXIT_SEC, lambda: loop.quit() or False)
+
+
+# current_folder, current_file and each of files arrive as a NUL-terminated ay.
+def unpack_path(value):
+    return bytes(value or b"").split(b"\0", 1)[0].decode("utf-8", "replace")
+
+
+# Unsandboxed apps such as Chromium send an empty app_id, so the heading names the window that has focus.
+def focused_app():
+    try:
+        out = subprocess.run(["niri", "msg", "-j", "focused-window"], capture_output=True, timeout=1)
+        if out.returncode != 0:
+            return ""
+        return (json.loads(out.stdout) or {}).get("app_id") or ""
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return ""
+
+
+def build_request(method, app_id, title, options):
+    filters = [
+        {"name": name, "globs": [p for kind, p in rules if kind == 0], "mimes": [p for kind, p in rules if kind == 1]}
+        for name, rules in options.get("filters", [])
+    ]
+    current = options.get("current_filter")
+    names = [f["name"] for f in filters]
+    current_file = unpack_path(options.get("current_file"))
+    folder = unpack_path(options.get("current_folder")) or (os.path.dirname(current_file) if current_file else "")
+    if method == "SaveFiles" or options.get("directory"):
+        mode = "folder"
+    else:
+        mode = "save" if method == "SaveFile" else "open"
+    return {
+        "mode": mode,
+        "multiple": bool(options.get("multiple", False)) if method == "OpenFile" else False,
+        "title": title,
+        "app": app_id or focused_app(),
+        "folder": folder,
+        "name": options.get("current_name") or os.path.basename(current_file),
+        "filters": filters,
+        "filter": names.index(current[0]) if current and current[0] in names else 0,
+        "accept": options.get("accept_label", ""),
+    }
+
+
+class Call:
+    """One portal call waiting on its own connection to the shell."""
+
+    def __init__(self, conn, invocation, method, handle, options, sock):
+        self.conn = conn
+        self.invocation = invocation
+        self.method = method
+        self.options = options
+        self.sock = sock
+        self.buffer = b""
+        self.watch = None
+        self.request_id = conn.register_object_with_closures2(handle, NODE.interfaces[1], self.on_close, None, None)
+        pending.add(self)
+        arm_idle()
+
+    def start(self, line):
+        self.sock.sendall(line)
+        self.sock.setblocking(False)
+        self.watch = GLib.io_add_watch(self.sock.fileno(), GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, self.on_readable)
+
+    def on_close(self, _conn, _sender, _path, _iface, _method, _params, invocation):
+        invocation.return_value(None)
+        self.settle(1, [])
+
+    def on_readable(self, _fd, _cond):
+        try:
+            chunk = self.sock.recv(65536)
+        except BlockingIOError:
+            return True
+        except OSError:
+            chunk = b""
+        self.buffer += chunk
+        if b"\n" in self.buffer:
+            self.answer(self.buffer.split(b"\n", 1)[0])
+            return False
+        if not chunk:
+            # The shell hung up without an answer, as a restarting shell does.
+            self.settle(2, [])
+            return False
+        return True
+
+    def answer(self, line):
+        try:
+            answer = json.loads(line)
+            response = int(answer["response"])
+            paths = [str(p) for p in answer.get("paths", [])]
+            if response == 0 and self.method == "SaveFiles":
+                names = [os.path.basename(unpack_path(n)) for n in self.options.get("files", [])]
+                paths = [os.path.join(paths[0], n) for n in names if n]
+            uris = [GLib.filename_to_uri(p, None) for p in paths] if response == 0 else []
+        except (ValueError, KeyError, TypeError, IndexError, GLib.Error) as error:
+            log("unusable answer from the shell: %s" % error)
+            response, uris = 2, []
+        self.settle(response, uris, keep_watch=True)
+
+    def settle(self, response, uris, keep_watch=False):
+        if self not in pending:
+            return
+        pending.discard(self)
+        if self.watch is not None and not keep_watch:
+            GLib.source_remove(self.watch)
+        self.sock.close()
+        self.conn.unregister_object(self.request_id)
+        results = {"uris": GLib.Variant("as", uris)} if response == 0 else {}
+        self.invocation.return_value(GLib.Variant("(ua{sv})", (response, results)))
+        arm_idle()
+
+
+class Delegated:
+    """A call gtk answers; it holds the idle exit like a call to the shell does."""
+
+    def __init__(self, conn, invocation, method, params):
+        self.invocation = invocation
+        pending.add(self)
+        arm_idle()
+        log("no shell picker, handing %s to gtk" % method)
+        conn.call(GTK_NAME, OBJECT_PATH, IFACE, method, params, GLib.VariantType("(ua{sv})"), Gio.DBusCallFlags.NONE, GLib.MAXINT, None, self.on_reply)
+
+    def on_reply(self, conn, result):
+        try:
+            reply = conn.call_finish(result)
+        except GLib.Error as error:
+            log("gtk failed too: %s" % error.message)
+            reply = GLib.Variant("(ua{sv})", (2, {}))
+        pending.discard(self)
+        self.invocation.return_value(reply)
+        arm_idle()
+
+
+def on_call(conn, _sender, _path, _iface, method, params, invocation):
+    handle, app_id, _parent, title, options = params.unpack()
+    line = (json.dumps(build_request(method, app_id, title, options), ensure_ascii=False) + "\n").encode()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", ""), "dots-picker-%s.sock" % os.environ.get("WAYLAND_DISPLAY", ""))
+    try:
+        sock.connect(path)
+    except OSError:
+        # No socket file, or one a killed shell left behind: the shell is not running.
+        sock.close()
+        Delegated(conn, invocation, method, params)
+        return
+    Call(conn, invocation, method, handle, options, sock).start(line)
+
+
+def on_bus(conn, _name):
+    conn.register_object_with_closures2(OBJECT_PATH, NODE.interfaces[0], on_call, lambda *_: GLib.Variant("u", VERSION), None)
+
+
+Gio.bus_own_name(Gio.BusType.SESSION, BUS_NAME, Gio.BusNameOwnerFlags.DO_NOT_QUEUE, on_bus, None, lambda *_: loop.quit())
+arm_idle()
+loop.run()
