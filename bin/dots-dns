@@ -2,7 +2,7 @@
 // Reads every DNS Shield device into one `state` JSON and writes their Kid mode, categories and allow rules. Carried devices are uBlockDNS profiles reached over its API; router devices are reservations on the home OpenWrt router, reached over ssh.
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 
 const env = process.env;
@@ -298,7 +298,7 @@ function routerRows(sections, now) {
 const CACHE = join(env.XDG_CACHE_HOME || join(env.HOME, '.cache'), 'dots', 'dns');
 
 // Each section starts on a marker line made fresh per read, so text on the router cannot fake one.
-async function routerRead() {
+async function routerRead(asOf) {
   const mark = '@@' + randomBytes(8).toString('hex');
   const parts = ['date +%s', 'uci show dhcp', 'uci show firewall', 'tail -n 2000 "$R/tmp/dns-shield/kid.log" 2>/dev/null', 'cat "$R/etc/dns-shield/allow" 2>/dev/null'];
   const script = ['R=${DOTS_DNS_ROUTER_ROOT:-}', ...parts.flatMap((p) => [`echo ${mark}`, p]), `echo ${mark}`].join('\n') + '\n';
@@ -308,7 +308,7 @@ async function routerRead() {
     const sections = r.stdout.split(mark + '\n').slice(1);
     const now = Number(sections[0]);
     if (r.code === 0 && sections.length === parts.length + 1 && now > 0) {
-      const out = { as_of: Math.floor(Date.now() / 1000), devices: routerRows(sections.slice(1), now) };
+      const out = { as_of: asOf, devices: routerRows(sections.slice(1), now) };
       mkdirSync(CACHE, { recursive: true });
       save(join(CACHE, 'router.json'), JSON.stringify(out));
       return { ok: true, as_of: out.as_of, error: null, devices: out.devices };
@@ -328,7 +328,7 @@ async function routerRead() {
 
 async function state() {
   const out = { as_of: Math.floor(Date.now() / 1000), carried: { ok: true, error: null }, router: null, devices: [] };
-  const router = routerRead();
+  const router = routerRead(out.as_of);
   try {
     out.devices.push(...(await carriedRows()));
   } catch (e) {
@@ -360,17 +360,161 @@ async function profile(id) {
   return path + '\n';
 }
 
-const USAGE = 'usage: dots-dns state | profiles | profile <key>';
+const CATS = ['youtube', 'social', 'adult', 'gambling'];
 
-function carriedKey(key) {
-  const m = typeof key === 'string' && key.match(/^carried:([A-Za-z0-9_-]{1,64})$/);
-  if (!m) usage();
-  return m[1];
+function setCategory(dev, cat, on) {
+  const rules = dev.custom_rules;
+  if (cat === 'youtube') dev.custom_rules = on ? [...rules, ...YOUTUBE.filter((r) => !rules.includes(r))] : rules.filter((r) => !YOUTUBE.includes(r));
+  else dev.policy_modules = { ...dev.policy_modules, [MODULES[cat]]: on };
 }
 
-function usage() {
-  process.stderr.write(USAGE + '\n');
+// PUT replaces the whole config, so every write reads the device first and sends back the five keys with only its own change made.
+async function writeCarried(id, change) {
+  const acct = await account();
+  const path = `/account/${acct}/device/${id}`;
+  const dev = await api('read device', 'GET', path);
+  if (!dev || !Array.isArray(dev.custom_rules)) throw new Failure('read device failed (unexpected answer)');
+  change(dev);
+  const { lists, custom_rules, dns_provider, preset_id, policy_modules } = dev;
+  await api('write device', 'PUT', path, { lists, custom_rules, dns_provider, preset_id, policy_modules });
+}
+
+const kidFile = (id) => join(STATE, `kid-${id}.json`);
+
+// Kid off keeps the categories it turns off, so Kid on brings back the same ones; with nothing kept it turns all four on.
+function kidCarried(id, on) {
+  return writeCarried(id, (dev) => {
+    if (!on) {
+      const cats = categories(dev);
+      if (CATS.some((c) => cats[c])) save(kidFile(id), JSON.stringify(cats) + '\n');
+      for (const c of CATS) setCategory(dev, c, false);
+      return;
+    }
+    let kept = null;
+    try {
+      kept = JSON.parse(readFileSync(kidFile(id), 'utf8'));
+    } catch {}
+    if (!kept || !CATS.some((c) => kept[c] === true)) kept = { youtube: true, social: true, adult: true, gambling: true };
+    for (const c of CATS) if (kept[c] === true) setCategory(dev, c, true);
+  });
+}
+
+function allowCarried(id, domain, on) {
+  const rule = `@@||${domain}^`;
+  return writeCarried(id, (dev) => {
+    const rest = dev.custom_rules.filter((r) => r !== rule);
+    dev.custom_rules = on && rest.length === dev.custom_rules.length ? [...rest, rule] : on ? dev.custom_rules : rest;
+  });
+}
+
+const ROUTER_FAIL = { 3: 'the router has no reservation for that device', 4: 'the router has no kid and kid_mac ipsets', 5: 'router write failed (uci commit)', 6: 'router write failed (nft)', 7: 'router write failed (dns-shield reload)' };
+
+async function writeRouter(lines) {
+  const r = await ssh(['R=${DOTS_DNS_ROUTER_ROOT:-}', ...lines].join('\n') + '\n');
+  if (r.code === 0) return;
+  if (r.code === 255 || r.code === null) throw new Failure(`router unreachable (ssh exit ${r.code === null ? 'killed' : r.code})`);
+  throw new Failure(ROUTER_FAIL[r.code] || `router write failed (exit ${r.code})`);
+}
+
+// The MAC was checked against MAC before it reaches the script. The IP is the reservation's, found on the router, and both Kid sets change in uci and in the live nft set so no fw4 reload is needed.
+function kidRouter(mac, on) {
+  const change = on
+    ? ['uci del_list "firewall.@ipset[$k].entry=$ip"', 'uci add_list "firewall.@ipset[$k].entry=$ip"', 'uci del_list "firewall.@ipset[$km].entry=$mac"', 'uci add_list "firewall.@ipset[$km].entry=$mac"', 'uci commit firewall || exit 5', 'nft add element inet fw4 kid "{ $ip }" || exit 6', 'nft add element inet fw4 kid_mac "{ $mac }" || exit 6']
+    : ['uci del_list "firewall.@ipset[$k].entry=$ip"', 'uci del_list "firewall.@ipset[$km].entry=$mac"', 'uci commit firewall || exit 5', 'nft delete element inet fw4 kid "{ $ip }" 2>/dev/null', 'nft delete element inet fw4 kid_mac "{ $mac }" 2>/dev/null'];
+  return writeRouter([
+    `mac=${mac}`,
+    'ip=',
+    'i=0',
+    'while m=$(uci -q get "dhcp.@host[$i].mac"); do',
+    '  m=$(echo "$m" | tr A-F a-f)',
+    '  case " $m " in *" $mac "*) ip=$(uci -q get "dhcp.@host[$i].ip") ;; esac',
+    '  i=$((i + 1))',
+    'done',
+    '[ -n "$ip" ] || exit 3',
+    'k=',
+    'km=',
+    'i=0',
+    'while n=$(uci -q get "firewall.@ipset[$i].name"); do',
+    '  if [ "$n" = kid ]; then k=$i; fi',
+    '  if [ "$n" = kid_mac ]; then km=$i; fi',
+    '  i=$((i + 1))',
+    'done',
+    '[ -n "$k" ] && [ -n "$km" ] || exit 4',
+    ...change,
+  ]);
+}
+
+// dnsmasq has no per-client policy, so a router allow is one shared file the Kid resolver reads for every Kid device.
+function allowRouter(domain, on) {
+  const edit = on ? 'grep -qxF "$d" "$f" || echo "$d" >>"$f"' : 'grep -vxF "$d" "$f" >"$f.new"; mv "$f.new" "$f"';
+  return writeRouter([`d=${domain}`, 'f="$R/etc/dns-shield/allow"', 'mkdir -p "$R/etc/dns-shield"', 'touch "$f"', edit, '"$R/etc/init.d/dns-shield" reload || exit 7']);
+}
+
+// What a person pastes, a URL or a mixed-case host, becomes the bare domain, the way v1's normalize_domain reads it.
+function normalize(raw) {
+  const d = String(raw || '')
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/[/?:].*$/s, '')
+    .replace(/^\./, '')
+    .replace(/\.$/, '');
+  if (!DOMAIN.test(d)) usage('that is not a domain name');
+  return d;
+}
+
+const USAGE = 'usage: dots-dns state | profiles | profile <key> | kid <key> on|off | category <key> youtube|social|adult|gambling on|off | allow|unallow <key> <domain>';
+
+function usage(why = USAGE) {
+  process.stderr.write((why === USAGE ? '' : 'dots-dns: ') + why + '\n');
   process.exit(2);
+}
+
+function parseKey(key) {
+  const m = typeof key === 'string' && key.match(/^(carried):([A-Za-z0-9_-]{1,64})$|^(router):([0-9a-f]{2}(?::[0-9a-f]{2}){5})$/);
+  if (!m) usage();
+  return m[1] ? { path: 'carried', id: m[2] } : { path: 'router', id: m[4] };
+}
+
+function carriedKey(key) {
+  const k = parseKey(key);
+  if (k.path !== 'carried') usage('a router device has no profile');
+  return k.id;
+}
+
+function onOff(v) {
+  if (v !== 'on' && v !== 'off') usage();
+  return v === 'on';
+}
+
+// Every write holds v1's flock file, so dots-dns and dns-filter never interleave a read-modify-write; the run starts itself again under flock(1).
+function holdLock() {
+  if (env.DOTS_DNS_LOCK_HELD === '1') return;
+  mkdirSync(STATE, { recursive: true });
+  const r = spawnSync('flock', ['-w', '30', '-E', '75', join(STATE, 'lock'), process.execPath, process.argv[1], ...process.argv.slice(2)], { stdio: 'inherit', env: { ...env, DOTS_DNS_LOCK_HELD: '1' } });
+  if (r.error) throw new Failure('flock is not installed');
+  if (r.status === 75) throw new Failure('another dots-dns or dns-filter run holds the lock');
+  process.exit(r.status === null ? 1 : r.status);
+}
+
+async function write(verb, args) {
+  const key = parseKey(args[0]);
+  let run;
+  if (verb === 'kid') {
+    const on = onOff(args[1]);
+    run = () => (key.path === 'carried' ? kidCarried(key.id, on) : kidRouter(key.id, on));
+  } else if (verb === 'category') {
+    if (key.path === 'router') usage('router devices carry one Kid policy');
+    if (!CATS.includes(args[1])) usage();
+    const on = onOff(args[2]);
+    run = () => writeCarried(key.id, (dev) => setCategory(dev, args[1], on));
+  } else {
+    const domain = normalize(args[1]);
+    const on = verb === 'allow';
+    run = () => (key.path === 'carried' ? allowCarried(key.id, domain, on) : allowRouter(domain, on));
+  }
+  holdLock();
+  await run();
+  return '';
 }
 
 async function main() {
@@ -380,6 +524,7 @@ async function main() {
     if (verb === 'state') out = await state();
     else if (verb === 'profiles') out = await profiles();
     else if (verb === 'profile') out = await profile(carriedKey(args[0]));
+    else if (['kid', 'category', 'allow', 'unallow'].includes(verb)) out = await write(verb, args);
     else usage();
   } catch (e) {
     if (!(e instanceof Failure)) throw e;

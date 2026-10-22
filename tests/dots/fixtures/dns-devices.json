@@ -19,7 +19,7 @@
     "name": "iPad",
     "icon": "tablet",
     "lists": ["hagezi-pro"],
-    "custom_rules": ["||mask.icloud.com^", "||youtube.com^", "@@||khanacademy.org^", "||mask-h2.icloud.com^", "||ads.example.net^", "@@||wikipedia.org^"],
+    "custom_rules": ["||mask.icloud.com^", "||youtube.com^", "@@||scratch.mit.edu^", "||mask-h2.icloud.com^", "||ads.example.net^", "@@||wikipedia.org^"],
     "dns_provider": "quad9",
     "preset_id": "family",
     "policy_modules": { "social-apps": false, "adult-content": true, "gambling": true, "dating": true },

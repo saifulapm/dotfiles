@@ -49,7 +49,10 @@ async function stub(t) {
         if (!dev) return send(404, { error: 'not found' });
         if (m[2] === '/queries') return send(200, s.queries);
         if (m[2] === '/apple-profile') return send(200, PROFILE, 'application/x-apple-aspen-config');
-        if (req.method === 'GET') return setTimeout(() => send(200, structuredClone(dev)), s.hold);
+        if (req.method === 'GET') {
+          const read = structuredClone(dev);
+          return setTimeout(() => send(200, read), s.hold);
+        }
         if (req.method === 'PUT') {
           Object.assign(dev, JSON.parse(body));
           return send(200, dev);
@@ -213,7 +216,7 @@ test('state lists each carried device with its categories, Kid, allow list and b
   assert.deepEqual(out.carried, { ok: true, error: null });
   assert.deepEqual(carried(out), [
     row('carried:dev00phone', "Saiful's iPhone", true, { youtube: true, social: true, adult: true, gambling: false }, ['wikipedia.org']),
-    row('carried:dev00ipad', 'iPad', true, { youtube: false, social: false, adult: true, gambling: true }, ['khanacademy.org', 'wikipedia.org']),
+    row('carried:dev00ipad', 'iPad', true, { youtube: false, social: false, adult: true, gambling: true }, ['scratch.mit.edu', 'wikipedia.org']),
     row('carried:dev00wife', "Wife's iPhone", false, { youtube: false, social: false, adult: false, gambling: false }, []),
   ]);
   assert.equal(readFileSync(join(ctx.config, 'account'), 'utf8').trim(), 'acct0001');
@@ -364,4 +367,133 @@ test('an unreachable router with nothing cached gives no router rows', async (t)
   assert.deepEqual(out.router, { ok: false, as_of: null, error: 'router unreachable (ssh exit 255)' });
   assert.deepEqual(routerRows(out), []);
   assert.equal(carried(out).length, 3);
+});
+
+const IPAD = DEVICES[1];
+const puts = (s) => s.seen.filter((r) => r.method === 'PUT');
+const ipad = (s) => s.devices.find((d) => d.id === 'dev00ipad');
+const ok = async (ctx, ...args) => {
+  const r = await run(ctx, ...args);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, '');
+  return r;
+};
+
+test('kid on puts the whole Kid set on the one device and keeps every other rule', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'kid', 'carried:dev00ipad', 'on');
+  assert.deepEqual(
+    puts(s).map((r) => r.path),
+    ['/api/account/acct0001/device/dev00ipad'],
+  );
+  const body = JSON.parse(puts(s)[0].body);
+  assert.deepEqual(Object.keys(body).sort(), ['custom_rules', 'dns_provider', 'lists', 'policy_modules', 'preset_id']);
+  assert.deepEqual(body.lists, ['hagezi-pro']);
+  assert.equal(body.dns_provider, 'quad9');
+  assert.equal(body.preset_id, 'family');
+  assert.deepEqual(body.custom_rules, ['||mask.icloud.com^', '||youtube.com^', '@@||scratch.mit.edu^', '||mask-h2.icloud.com^', '||ads.example.net^', '@@||wikipedia.org^', '||youtu.be^', '||googlevideo.com^', '||ytimg.com^', '||youtubekids.com^', '||youtube-nocookie.com^', '||youtubei.googleapis.com^']);
+  assert.deepEqual(body.policy_modules, { 'social-apps': true, 'adult-content': true, gambling: true, dating: true });
+  assert.deepEqual(s.devices[0], DEVICES[0]);
+  assert.deepEqual(s.devices[2], DEVICES[2]);
+});
+
+test('kid off remembers the categories it turns off and kid on brings back exactly those', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'kid', 'carried:dev00ipad', 'off');
+  assert.deepEqual(JSON.parse(readFileSync(join(ctx.state, 'kid-dev00ipad.json'), 'utf8')), { youtube: false, social: false, adult: true, gambling: true });
+  assert.deepEqual(ipad(s).custom_rules, ['||mask.icloud.com^', '@@||scratch.mit.edu^', '||mask-h2.icloud.com^', '||ads.example.net^', '@@||wikipedia.org^']);
+  assert.deepEqual(ipad(s).policy_modules, { 'social-apps': false, 'adult-content': false, gambling: false, dating: true });
+  await ok(ctx, 'kid', 'carried:dev00ipad', 'on');
+  assert.deepEqual(ipad(s).custom_rules, ['||mask.icloud.com^', '@@||scratch.mit.edu^', '||mask-h2.icloud.com^', '||ads.example.net^', '@@||wikipedia.org^']);
+  assert.deepEqual(ipad(s).policy_modules, { 'social-apps': false, 'adult-content': true, gambling: true, dating: true });
+});
+
+test('category flips one category on one device', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'category', 'carried:dev00ipad', 'gambling', 'off');
+  assert.deepEqual(ipad(s), { ...IPAD, policy_modules: { ...IPAD.policy_modules, gambling: false } });
+  assert.equal(puts(s).length, 1);
+});
+
+test('two category writes started together both land, one after the other', async (t) => {
+  const s = await stub(t);
+  s.hold = 300;
+  const ctx = scratch(t, s.url);
+  const first = run(ctx, 'category', 'carried:dev00ipad', 'gambling', 'off');
+  await new Promise((r) => setTimeout(r, 100));
+  const second = run(ctx, 'category', 'carried:dev00ipad', 'social', 'on');
+  for (const r of await Promise.all([first, second])) assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(ipad(s).policy_modules, { 'social-apps': true, 'adult-content': true, gambling: false, dating: true });
+});
+
+test('allow adds one exception rule for the normalised domain and unallow takes it out', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'allow', 'carried:dev00ipad', 'https://KhanAcademy.org/x');
+  await ok(ctx, 'allow', 'carried:dev00ipad', 'khanacademy.org');
+  assert.deepEqual(ipad(s).custom_rules, [...IPAD.custom_rules, '@@||khanacademy.org^']);
+  await ok(ctx, 'unallow', 'carried:dev00ipad', 'KHANACADEMY.org');
+  assert.deepEqual(ipad(s).custom_rules, IPAD.custom_rules);
+  const r = await run(ctx, 'allow', 'carried:dev00ipad', 'not a domain');
+  assert.equal(r.status, 2);
+});
+
+const routerLog = (ctx) => (existsSync(join(ctx.ctl, 'router.log')) ? readFileSync(join(ctx.ctl, 'router.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : []);
+const kidSets = (ctx) => {
+  const fw = JSON.parse(readFileSync(join(ctx.ctl, 'router', 'uci.json'), 'utf8')).firewall;
+  return { kid: fw.find((s) => s.name === 'kid').entry, kid_mac: fw.find((s) => s.name === 'kid_mac').entry };
+};
+const writes = (ctx) => routerLog(ctx).filter((c) => !(c[0] === 'uci' && ['get', 'show', '-q'].includes(c[1])));
+
+test('kid on a router device adds it to both Kid sets, saved and live', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'kid', 'router:02:00:00:00:00:02', 'on');
+  assert.deepEqual(kidSets(ctx), { kid: ['192.168.0.143', '192.168.0.238', '192.168.0.105'], kid_mac: ['02:00:00:00:00:21', '02:00:00:00:00:18', '02:00:00:00:00:02'] });
+  assert.deepEqual(writes(ctx), [
+    ['uci', 'del_list', 'firewall.@ipset[1].entry=192.168.0.105'],
+    ['uci', 'add_list', 'firewall.@ipset[1].entry=192.168.0.105'],
+    ['uci', 'del_list', 'firewall.@ipset[2].entry=02:00:00:00:00:02'],
+    ['uci', 'add_list', 'firewall.@ipset[2].entry=02:00:00:00:00:02'],
+    ['uci', 'commit', 'firewall'],
+    ['nft', 'add', 'element', 'inet', 'fw4', 'kid', '{ 192.168.0.105 }'],
+    ['nft', 'add', 'element', 'inet', 'fw4', 'kid_mac', '{ 02:00:00:00:00:02 }'],
+  ]);
+  assert.equal(sshLog(ctx).length, 1);
+  rmSync(join(ctx.ctl, 'router.log'));
+  await ok(ctx, 'kid', 'router:02:00:00:00:00:02', 'off');
+  assert.deepEqual(kidSets(ctx), { kid: ['192.168.0.143', '192.168.0.238'], kid_mac: ['02:00:00:00:00:21', '02:00:00:00:00:18'] });
+  assert.deepEqual(writes(ctx), [
+    ['uci', 'del_list', 'firewall.@ipset[1].entry=192.168.0.105'],
+    ['uci', 'del_list', 'firewall.@ipset[2].entry=02:00:00:00:00:02'],
+    ['uci', 'commit', 'firewall'],
+    ['nft', 'delete', 'element', 'inet', 'fw4', 'kid', '{ 192.168.0.105 }'],
+    ['nft', 'delete', 'element', 'inet', 'fw4', 'kid_mac', '{ 02:00:00:00:00:02 }'],
+  ]);
+});
+
+test('a router device has no categories of its own', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  const r = await run(ctx, 'category', 'router:02:00:00:00:00:21', 'youtube', 'off');
+  assert.equal(r.status, 2);
+  assert.equal(r.stderr, 'dots-dns: router devices carry one Kid policy\n');
+  assert.deepEqual(sshLog(ctx), []);
+});
+
+test('a router allow goes into the shared allow file and reloads the Kid resolver', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  const allowFile = join(ctx.ctl, 'router', 'etc', 'dns-shield', 'allow');
+  await ok(ctx, 'allow', 'router:02:00:00:00:00:21', 'https://Wikipedia.org/wiki/Cat');
+  await ok(ctx, 'allow', 'router:02:00:00:00:00:21', 'wikipedia.org');
+  assert.equal(readFileSync(allowFile, 'utf8'), 'khanacademy.org\nwikipedia.org\n');
+  assert.deepEqual(routerLog(ctx), [['dns-shield', 'reload'], ['dns-shield', 'reload']]);
+  const out = await state(ctx);
+  assert.deepEqual(routerRows(out).map((d) => d.allow), [[], ['khanacademy.org', 'wikipedia.org'], [], ['khanacademy.org', 'wikipedia.org'], []]);
+  await ok(ctx, 'unallow', 'router:02:00:00:00:00:21', 'wikipedia.org');
+  assert.equal(readFileSync(allowFile, 'utf8'), 'khanacademy.org\n');
 });
