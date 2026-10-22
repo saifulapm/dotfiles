@@ -47,7 +47,8 @@ console.log('FAKEKEY-' + process.argv[3].replace(/\\//g, '-') + '\\nsecond line'
 const fs = require('fs');
 const ctl = process.env.STUB_CTL;
 fs.appendFileSync(ctl + '/pxy.log', JSON.stringify({ argv: process.argv.slice(2), opts: process.env.PASSWORD_STORE_GPG_OPTS }) + '\\n');
-process.stdout.write(fs.readFileSync(ctl + '/pxy.json'));
+const delay = fs.existsSync(ctl + '/pxy-delay') ? Number(fs.readFileSync(ctl + '/pxy-delay', 'utf8')) : 0;
+setTimeout(() => process.stdout.write(fs.readFileSync(ctl + '/pxy.json')), delay);
 `,
   codex: `
 const fs = require('fs');
@@ -94,6 +95,7 @@ async function stub(t) {
     else if (s.mode === 'slow') setTimeout(() => send(200, usage), 300);
     else if (s.mode === 'forged') send(200, JSON.stringify({ limits: FORGED.map((display_name, i) => ({ kind: 'weekly_scoped', percent: i + 1, resets_at: null, scope: { model: { display_name } } })) }));
     else if (s.mode === 'nolimits') send(200, JSON.stringify({ five_hour: { utilization: 34 } }));
+    else if (s.mode === 'newkinds') send(200, JSON.stringify({ limits: [{ kind: 'five_hour_v2', utilization: 34 }] }));
     else send(s.mode, '{"error":{"message":"sk-ant-oat01-ECHO forged\\n reason"}}');
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -225,6 +227,17 @@ test('a failing fetch serves the cached rows as stale with their old time', asyn
     const at = Date.parse(row.as_of);
     assert.ok(at < start && at >= testStart - 1000, row.as_of);
   }
+});
+
+// The endpoint is unofficial and has changed shape before: a body whose limits name nothing known is a failure, never an empty success that wipes the cache.
+test('a usage body whose limits are all of unknown kinds serves the cached rows as stale shape', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  await rows(ctx);
+  s.mode = 'newkinds';
+  const { out } = await rows(ctx);
+  assert.deepEqual(strip(out), limits('main', 'stale', 'shape'));
+  assert.deepEqual(JSON.parse(readFileSync(join(ctx.cache, 'claude-main.json'), 'utf8')).map((r) => [r.metric, r.value]), [['5-hour', 34], ['weekly', 61], ['weekly Fable', 22]]);
 });
 
 test('an expired token sends nothing and leaves the credentials file as it was', async (t) => {
@@ -392,6 +405,20 @@ test('pxy with the store locked: every pxy row is locked, and pxy ran without a 
   );
   assert.deepEqual(ctlLog(ctx, 'pxy.log').map((l) => l.opts), [OPTS]);
   assert.ok(!JSON.stringify(out).includes('pinentry'), 'no text from the summary reaches a row');
+});
+
+test('pxy timing out after a good run keeps OpenRouter at its cached value, as of before the run', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  await everything(ctx);
+  ctx.env.DOTS_ACCOUNTS_LIMIT_MS = '800';
+  writeFileSync(join(ctx.ctl, 'pxy-delay'), '5000');
+  const start = Date.now();
+  const { out } = await everything(ctx);
+  const openrouter = out.find((row) => row.provider === 'openrouter');
+  assert.deepEqual([openrouter.value, openrouter.limit, openrouter.state, openrouter.reason], [17.5, 25, 'stale', 'timeout']);
+  assert.ok(Date.parse(openrouter.as_of) < start, openrouter.as_of);
+  assert.equal(pxyRows(out).filter((row) => row.state !== 'stale').length, 0);
 });
 
 test('pxy locked after a good run serves the cached rows as stale', async (t) => {

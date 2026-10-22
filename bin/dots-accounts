@@ -78,6 +78,8 @@ function claudeRows(account, body) {
     if (!metric) continue;
     rows.push({ ...names(account), metric, kind: 'percent', value: l.percent, limit: 100, unit: '%', resets_at: l.resets_at ? iso(l.resets_at) : null });
   }
+  // Limits that name nothing known mean the endpoint changed shape, so the cache stays and serves stale.
+  if (!rows.length) throw new Failure('shape');
   return rows;
 }
 
