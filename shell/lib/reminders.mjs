@@ -2,6 +2,8 @@
 import { line } from './voice.mjs';
 
 export const MAX_PENDING = 50;
+// What the preview row says while the file does not parse; nothing is set over it.
+export const BROKEN = 'reminders.json does not parse; fix or remove it first';
 
 const MIN = 60000;
 const DAY = 86400000;
@@ -81,9 +83,9 @@ export function firedText(r, now) {
 }
 
 // The launcher's rows in `r ` mode: the reminder the query would set (or why it cannot), then the pending ones, the first under the pending head.
-export function reminderRows(q, now, list) {
+export function reminderRows(q, now, list, broken) {
   const parsed = parseReminder(q, now);
-  const error = parsed && (parsed.error || (list.length >= MAX_PENDING ? `At most ${MAX_PENDING} reminders can wait` : ''));
+  const error = parsed && (parsed.error || (broken ? BROKEN : list.length >= MAX_PENDING ? `At most ${MAX_PENDING} reminders can wait` : ''));
   const top = !parsed ? [] : error ? [{ title: error, detail: '' }] : [{ title: parsed.text, detail: parsed.when, remind: { text: parsed.text, due: parsed.due } }];
   return top.concat(list.map((r, i) => ({ title: r.text, detail: whenText(r.due, now), reminderId: r.id, head: i === 0 })));
 }

@@ -32,7 +32,7 @@ Scope {
     // Sets a parsed reminder as of now; returns why it was not set, or "".
     function add(remind, now) {
         if (broken)
-            return "reminders.json does not parse; fix or remove it first";
+            return R.BROKEN;
         const r = R.addReminder(list, remind, now);
         if (r.error)
             return r.error;
@@ -56,6 +56,9 @@ Scope {
         blockLoading: true
         atomicWrites: true
         printErrors: false
+        // A file fixed or emptied by hand is read again at once.
+        watchChanges: true
+        onFileChanged: reload()
         onLoaded: {
             try {
                 reminders.broken = false;

@@ -59,6 +59,22 @@ until_ok 3000 state_is '.results[0] // "" | startswith("Cannot set")'
 check "r 0m x says it cannot set that" state_is '.results[0] | startswith("Cannot set 0m")'
 close_launcher
 
+# A file that does not parse refuses a new reminder in its row and is left as it is; fixed by hand, it is read again at once.
+printf 'not json' >"$store"
+open_launcher
+wtype "r 5m x"
+until_ok 3000 state_is '.results[0] // "" | startswith("reminders.json does not parse")'
+check "a broken reminders.json makes the r row say so" state_is '.results[0] | startswith("reminders.json does not parse")'
+wtype -k Return
+check "Enter keeps the launcher open and the file as it was" bash -c "[ \"\$(cat '$store')\" = 'not json' ] && timeout 0.5 qs ipc call launcher state | jq -e .open >/dev/null"
+close_launcher
+echo '[]' >"$store"
+open_launcher
+wtype "r 5m x"
+until_ok 3000 state_is '.results[0] == "x"'
+check "once fixed by hand, r previews again without a restart" state_is '.results == ["x"]'
+close_launcher
+
 island_state() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 # The island's notification text is its app, summary and body, joined by " · ".
 island_says() { island_state | jq -e --arg t "$1" '.mode == "notification" and (.text | startswith("Reminders · " + $t + " · set "))' >/dev/null; }

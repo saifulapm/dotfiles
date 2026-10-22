@@ -57,7 +57,7 @@ Item {
                 return sum.length ? sum : Lib.convertRows(parsed.q, Date.now(), zones);
             }
         case "reminder":
-            return Rem.reminderRows(parsed.q, Date.now(), pending);
+            return Rem.reminderRows(parsed.q, Date.now(), pending, reminders ? reminders.broken : false);
         case "commands":
             return Lib.commandRows(parsed.q, Quickshell.shellDir + "/../bin");
         case "apps":
@@ -136,13 +136,15 @@ Item {
         // A pending reminder or one that cannot be set has nothing to run.
         if (!row || (mode === "reminder" && !row.remind))
             return;
-        close();
         if (row.remind) {
-            // "20m" counts from Enter, not from when it was typed.
+            // "20m" counts from Enter, not from when it was typed; a refusal keeps the launcher open on the row that says why.
             const now = Date.now();
-            reminders.add(Rem.parseReminder(parsed.q, now), now);
+            if (!reminders.add(Rem.parseReminder(parsed.q, now), now))
+                close();
+            return;
         }
-        else if (row.exec)
+        close();
+        if (row.exec)
             Quickshell.execDetached(row.exec);
         else if (row.copy)
             Quickshell.execDetached(["wl-copy", "--", row.copy]);

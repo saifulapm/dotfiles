@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 // Reminders read and write the local clock, so every test runs at home.
 process.env.TZ = 'Asia/Dhaka';
-const { parseReminder, whenText, addReminder, dueReminders, firedText, reminderRows, MAX_PENDING } = await import('./reminders.mjs');
+const { parseReminder, whenText, addReminder, dueReminders, firedText, reminderRows, MAX_PENDING, BROKEN } = await import('./reminders.mjs');
 
 const at = (s) => new Date(s).getTime();
 const now = at('2026-10-22T14:52:00+06:00');
@@ -96,4 +96,12 @@ test('with 50 waiting the preview row says no more can be set', () => {
   const top = reminderRows('5m one more', now, full)[0];
   assert.match(top.title, /50/);
   assert.equal(top.remind, undefined);
+});
+
+test('while reminders.json does not parse, the preview row says so and sets nothing', () => {
+  const top = reminderRows('5m tea', now, pending, true)[0];
+  assert.equal(top.title, BROKEN);
+  assert.match(BROKEN, /reminders\.json does not parse/);
+  assert.equal(top.remind, undefined);
+  assert.equal(reminderRows('', now, pending, true).length, 2);
 });
