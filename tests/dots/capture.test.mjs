@@ -95,7 +95,7 @@ test('qr copies the code as sensitive, so the clip store drops it', (t) => {
   s.run('qr');
   assert.equal(s.read('wl-copy.stdin'), 'https://example.com/x');
   assert.equal(s.read('wl-copy.args'), '--sensitive\n');
-  assert.match(s.read('argv.log'), /^zbarimg --raw -q -$/m);
+  assert.match(s.read('argv.log'), /^zbarimg --raw -q -Sbinary -$/m);
   assert.deepEqual(s.pill(), ['island', 'capture', 'qr', 'QR code copied', '']);
 });
 
