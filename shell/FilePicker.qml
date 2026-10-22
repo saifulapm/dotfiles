@@ -74,8 +74,8 @@ Item {
     property bool pathStale: false
     // Enter came before the typed path's folder was listed, so it goes once the listing lands.
     property bool goPending: false
-    // Enter came before the folder shown was listed, so it acts on that folder's rows once they land; any other key drops it.
-    property bool choosePending: false
+    // Up and Down (as -1 and 1) and Enter (as "enter") that came before the folder shown was listed act in order on its rows once they land; any other key drops them.
+    property var held: []
     readonly property var choices: pathFolder === split.parent ? P.completions(pathEntries, split.tail) : []
     property int choice: 0
     readonly property var cursorRow: rows[selected] ?? null
@@ -125,7 +125,7 @@ Item {
         hidden = false;
         side = "list";
         typingPath = false;
-        choosePending = false;
+        held = [];
         notice = "";
         dims = {
             path: "",
@@ -313,6 +313,8 @@ Item {
             choice = Math.max(0, Math.min(choices.length - 1, choice + by));
         else if (side === "places")
             placeAt = Math.max(0, Math.min(allPlaces.length - 1, placeAt + by));
+        else if (!listed)
+            held = held.concat([by]);
         else {
             selected = Math.max(0, Math.min(rows.length - 1, selected + by));
             if (saving && cursorRow && !cursorRow.dir) {
@@ -329,7 +331,7 @@ Item {
         if (side === "places")
             return enter(allPlaces[placeAt].path);
         if (!listed) {
-            choosePending = true;
+            held = held.concat(["enter"]);
             return;
         }
         const row = rows[selected];
@@ -485,9 +487,14 @@ Item {
             const back = picker.rows.findIndex(r => r.name === picker.landOn);
             picker.selected = back >= 0 ? back : picker.saving ? -1 : 0;
             picker.listed = true;
-            if (picker.choosePending) {
-                picker.choosePending = false;
-                picker.choose();
+            // An Enter here that opens a folder holds the keys after it again, for that folder's rows.
+            const keys = picker.held;
+            picker.held = [];
+            for (const k of keys) {
+                if (k === "enter")
+                    picker.choose();
+                else
+                    picker.move(k);
             }
         }
     }
@@ -573,8 +580,8 @@ Item {
                 event.accepted = true;
                 return;
             }
-            if (event.key !== Qt.Key_Return && event.key !== Qt.Key_Enter)
-                picker.choosePending = false;
+            if (![Qt.Key_Return, Qt.Key_Enter, Qt.Key_Up, Qt.Key_Down].includes(event.key))
+                picker.held = [];
             const onList = !picker.typingPath && picker.side === "list";
             if (ctrl && event.key === Qt.Key_L)
                 picker.togglePath();
