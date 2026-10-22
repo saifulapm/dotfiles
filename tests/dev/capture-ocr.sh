@@ -29,7 +29,8 @@ capture() { "$repo/bin/dots-capture" "$@"; }
 
 until_ok 5000 shell_status >/dev/null
 qr=$(mktemp --suffix=.png)
-cleanup() { rm -f "$qr"; }
+# imv outlives the nested niri that spawned it and then spins a core, so it goes before the session does.
+cleanup() { pkill -f -- "imv-wayland $qr"; rm -f "$qr"; }
 
 # Black on white at 36 pt with the cursor hidden, as a page of text reads; the live foot.ini's colours win over [colors], so both themes are set.
 niri msg action spawn -- foot -c /dev/null -f monospace:size=36 -o colors-dark.background=ffffff -o colors-light.background=ffffff -o colors-dark.foreground=000000 -o colors-light.foreground=000000 \
