@@ -11,7 +11,7 @@ test('every measure within budget reads ok and passes', () => {
   assert.equal(r.over, false);
   assert.deepEqual(r.lines, [
     'first frame   130 ms  ≤ 150 ms   ok',
-    'idle rss      149 MiB ≤ 190 MiB  ok',
+    'idle rss      149 MiB ≤ 200 MiB  ok',
     'cgroup mem    231 MiB',
     'panel cold    48 ms   ≤ 50 ms    ok',
     'panel warm    4 ms    ≤ 16 ms    ok',
@@ -36,9 +36,9 @@ test('a first frame of 150 ms passes and 160 ms is OVER', () => {
   assert.equal(report({ ...good, firstFrameMs: 160 }, BUDGETS).over, true);
 });
 
-test('RSS a KiB over the 190 MiB budget is OVER, not rounded down into it', () => {
-  assert.equal(report({ ...good, rssKiB: 190 * 1024 }, BUDGETS).over, false);
-  assert.equal(report({ ...good, rssKiB: 190 * 1024 + 1 }, BUDGETS).over, true);
+test('RSS a KiB over the 200 MiB budget is OVER, not rounded down into it', () => {
+  assert.equal(report({ ...good, rssKiB: 200 * 1024 }, BUDGETS).over, false);
+  assert.equal(report({ ...good, rssKiB: 200 * 1024 + 1 }, BUDGETS).over, true);
 });
 
 // Pass loads on open and unloads 30 s after it closes, so its first open after that answers to the cold budget.

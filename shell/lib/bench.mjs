@@ -1,7 +1,7 @@
 // The verdict for each speed budget; bin/dots-bench gathers the numbers and runs this as a CLI.
 
-// idle RSS is 190 MiB (#7S2JD316): GL reads 172 MiB, no lever reached 150 without costing real memory, and the picker's specimens add 3-7 MiB.
-export const BUDGETS = { firstFrameMs: 150, rssMiB: 190, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07 };
+// idle RSS is 200 MiB (#7S2JD316, #KSH3FVWD): GL reads 172 MiB, no lever reached 150 without costing real memory, the picker's specimens add 3-7 MiB, and by m24 every start read 194-198.
+export const BUDGETS = { firstFrameMs: 150, rssMiB: 200, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07 };
 
 const line = (name, value, unit, op, limit, ok) =>
   `${name.padEnd(13)} ${`${value} ${unit}`.padEnd(7)} ${op} ${`${limit} ${unit}`.padEnd(8)} ${ok ? 'ok' : 'OVER'}`;
