@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Reads every DNS Shield device into one `state` JSON and writes their Kid mode, categories and allow rules. Carried devices are uBlockDNS profiles reached over its API.
+// Reads every DNS Shield device into one `state` JSON and writes their Kid mode, categories and allow rules. Carried devices are uBlockDNS profiles reached over its API; router devices are reservations on the home OpenWrt router, reached over ssh.
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 
 const env = process.env;
 const API = env.DOTS_DNS_API || 'https://ublockdns.com/api';
@@ -165,8 +167,168 @@ async function carriedRows() {
   );
 }
 
+// Only the three keys dots-dns needs are read from router.env; the rest of it is secrets.
+function routerEnv() {
+  const vars = { ROUTER_HOST: '192.168.0.1' };
+  let text = '';
+  try {
+    text = readFileSync(join(CONFIG, 'router.env'), 'utf8');
+  } catch {}
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\s*(?:export\s+)?(SSH_KEY|ROUTER_HOST|ROUTER_JUMP)=(.*)$/);
+    if (!m) continue;
+    const v = m[2].trim().replace(/^'(.*)'$|^"(.*)"$/, '$1$2');
+    vars[m[1]] = v.replace(/^~(?=\/)/, env.HOME).replace(/\$\{HOME\}|\$HOME\b/g, env.HOME);
+  }
+  if (!vars.SSH_KEY) throw new Failure('no SSH_KEY in ~/.config/dns-helper/router.env');
+  return vars;
+}
+
+// One ssh per read or write, with the script on stdin. The timer is a backstop past ConnectTimeout for a link that connects and then hangs.
+function ssh(script) {
+  const r = routerEnv();
+  const args = [...(r.ROUTER_JUMP ? ['-J', r.ROUTER_JUMP] : []), '-i', r.SSH_KEY, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', 'root@' + r.ROUTER_HOST, 'sh', '-s'];
+  return new Promise((resolve) => {
+    const child = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'ignore'] });
+    let stdout = '';
+    const timer = setTimeout(() => child.kill('SIGKILL'), 20000);
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stdin.on('error', () => {});
+    child.on('error', () => {});
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ code, stdout });
+    });
+    child.stdin.end(script);
+  });
+}
+
+// `uci show` quotes each value and writes a quote inside one as '\'' ; a value may run over lines, so the text is walked whole.
+function uciShow(text) {
+  const sections = new Map();
+  let i = 0;
+  const lineEnd = () => {
+    const e = text.indexOf('\n', i);
+    i = e < 0 ? text.length : e + 1;
+  };
+  while (i < text.length) {
+    const eq = text.indexOf('=', i);
+    const nl = text.indexOf('\n', i);
+    if (eq < 0) break;
+    if (nl >= 0 && nl < eq) {
+      i = nl + 1;
+      continue;
+    }
+    const key = text.slice(i, eq).split('.');
+    i = eq + 1;
+    const vals = [];
+    if (text[i] === "'") {
+      while (text[i] === "'") {
+        let v = '';
+        i++;
+        for (;;) {
+          const j = text.indexOf("'", i);
+          if (j < 0) {
+            v += text.slice(i);
+            i = text.length;
+            break;
+          }
+          v += text.slice(i, j);
+          i = j + 1;
+          if (!text.startsWith("\\''", i)) break;
+          v += "'";
+          i += 3;
+        }
+        vals.push(v);
+        if (text[i] === ' ' && text[i + 1] === "'") i++;
+      }
+      lineEnd();
+    } else {
+      const start = i;
+      lineEnd();
+      vals.push(text.slice(start, i).replace(/\n$/, ''));
+    }
+    if (key.length === 2) sections.set(key[1], { type: vals[0], o: {} });
+    else if (key.length === 3 && sections.has(key[1])) sections.get(key[1]).o[key[2]] = vals;
+  }
+  return [...sections.values()];
+}
+
+const MONTHS = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
+const MAC = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/;
+const DOMAIN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+// The Kid dnsmasq logs with log-queries=extra and no year, on the router's UTC clock; a date past the router's now belongs to last year. A block is a name it answered from its own config.
+function kidBlocks(log, now) {
+  const year = new Date(now * 1000).getUTCFullYear();
+  const byIp = new Map();
+  for (const line of log.split('\n')) {
+    const m = line.match(/^(\w{3}) +(\d{1,2}) (\d\d):(\d\d):(\d\d) dnsmasq\[\d+\]: (?:\d+ )?([\d.]+)\/\d+ config (\S+) is (NXDOMAIN|0\.0\.0\.0|::|NODATA\S*)$/);
+    if (!m || MONTHS[m[1]] === undefined) continue;
+    const t = (y) => Date.UTC(y, MONTHS[m[1]], Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5])) / 1000;
+    const at = t(year) > now + 86400 ? t(year - 1) : t(year);
+    if (!byIp.has(m[6])) byIp.set(m[6], []);
+    byIp.get(m[6]).push({ domain: clean(m[7]), at });
+  }
+  for (const list of byIp.values()) list.sort((a, b) => b.at - a.at).splice(20);
+  return byIp;
+}
+
+function routerRows(sections, now) {
+  const [dhcp, firewall, log, allowFile] = sections;
+  const ipsets = uciShow(firewall).filter((s) => s.type === 'ipset');
+  const set = (name) => new Set(ipsets.filter((s) => (s.o.name || [])[0] === name).flatMap((s) => s.o.entry || []).map((e) => e.toLowerCase()));
+  const kidIps = set('kid');
+  const kidMacs = set('kid_mac');
+  const allow = allowFile.split('\n').map(clean).filter((d) => DOMAIN.test(d));
+  const recent = kidBlocks(log, now);
+  return uciShow(dhcp)
+    .filter((s) => s.type === 'host')
+    .map((s) => ({ name: clean((s.o.name || [''])[0]), mac: ((s.o.mac || [''])[0].split(' ')[0] || '').toLowerCase(), ip: (s.o.ip || [''])[0] }))
+    .filter((h) => MAC.test(h.mac))
+    .map((h) => {
+      const ip = IPV4.test(h.ip) ? h.ip : null;
+      const kid = kidMacs.has(h.mac) || (ip !== null && kidIps.has(ip));
+      const blocks = (ip && recent.get(ip)) || [];
+      return { key: 'router:' + h.mac, name: h.name, path: 'router', kid, categories: { youtube: kid, social: kid, adult: kid, gambling: kid }, open_until: null, allow: kid ? allow : [], last_block: blocks.length ? blocks[0].at : null, blocks, ip, mac: h.mac };
+    });
+}
+
+const CACHE = join(env.XDG_CACHE_HOME || join(env.HOME, '.cache'), 'dots', 'dns');
+
+// Each section starts on a marker line made fresh per read, so text on the router cannot fake one.
+async function routerRead() {
+  const mark = '@@' + randomBytes(8).toString('hex');
+  const parts = ['date +%s', 'uci show dhcp', 'uci show firewall', 'tail -n 2000 "$R/tmp/dns-shield/kid.log" 2>/dev/null', 'cat "$R/etc/dns-shield/allow" 2>/dev/null'];
+  const script = ['R=${DOTS_DNS_ROUTER_ROOT:-}', ...parts.flatMap((p) => [`echo ${mark}`, p]), `echo ${mark}`].join('\n') + '\n';
+  let error;
+  try {
+    const r = await ssh(script);
+    const sections = r.stdout.split(mark + '\n').slice(1);
+    const now = Number(sections[0]);
+    if (r.code === 0 && sections.length === parts.length + 1 && now > 0) {
+      const out = { as_of: Math.floor(Date.now() / 1000), devices: routerRows(sections.slice(1), now) };
+      mkdirSync(CACHE, { recursive: true });
+      save(join(CACHE, 'router.json'), JSON.stringify(out));
+      return { ok: true, as_of: out.as_of, error: null, devices: out.devices };
+    }
+    error = r.code === 0 ? 'router read failed (unexpected answer)' : `router unreachable (ssh exit ${r.code === null ? 'killed' : r.code})`;
+  } catch (e) {
+    if (!(e instanceof Failure)) throw e;
+    error = e.message;
+  }
+  let cached = null;
+  try {
+    cached = JSON.parse(readFileSync(join(CACHE, 'router.json'), 'utf8'));
+  } catch {}
+  const ok = cached && Array.isArray(cached.devices);
+  return { ok: false, as_of: ok ? cached.as_of : null, error, devices: ok ? cached.devices : [] };
+}
+
 async function state() {
-  const out = { as_of: Math.floor(Date.now() / 1000), carried: { ok: true, error: null }, devices: [] };
+  const out = { as_of: Math.floor(Date.now() / 1000), carried: { ok: true, error: null }, router: null, devices: [] };
+  const router = routerRead();
   try {
     out.devices.push(...(await carriedRows()));
   } catch (e) {
@@ -174,6 +336,9 @@ async function state() {
     out.carried = { ok: false, error: e.message };
     process.stderr.write(`dots-dns: ${e.message}\n`);
   }
+  const { devices, ...status } = await router;
+  out.router = status;
+  out.devices.push(...devices);
   return JSON.stringify(out) + '\n';
 }
 

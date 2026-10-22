@@ -1,0 +1,7 @@
+Dec 31 23:59:00 dnsmasq[2345]: 3 192.168.0.143/40003 config old.example is NXDOMAIN
+Oct 22 13:37:46 dnsmasq[2345]: 17 192.168.0.143/53211 query[A] youtube.com from 192.168.0.143
+Oct 22 13:37:46 dnsmasq[2345]: 17 192.168.0.143/53211 config youtube.com is NXDOMAIN
+Oct 22 13:40:02 dnsmasq[2345]: 18 192.168.0.143/40001 query[A] tiktok.com from 192.168.0.143
+Oct 22 13:40:02 dnsmasq[2345]: 18 192.168.0.143/40001 config tiktok.com is 0.0.0.0
+Oct 22 13:45:00 dnsmasq[2345]: 19 192.168.0.143/40002 forwarded khanacademy.org to 94.140.14.14
+Oct 22 13:45:00 dnsmasq[2345]: 19 192.168.0.143/40002 reply khanacademy.org is 104.16.1.1

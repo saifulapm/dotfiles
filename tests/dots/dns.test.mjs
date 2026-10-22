@@ -67,10 +67,88 @@ async function stub(t) {
   return s;
 }
 
+// The fake router: ssh runs the collector's script with sh against fake uci, nft, date and dns-shield commands that keep their state in the ctl dir, and its file paths sit under DOTS_DNS_ROUTER_ROOT.
+const STUBS = {
+  ssh: String.raw`
+const fs = require('fs');
+const ctl = process.env.STUB_CTL;
+fs.appendFileSync(ctl + '/ssh.log', JSON.stringify(process.argv.slice(2)) + '\n');
+if (fs.existsSync(ctl + '/ssh-down')) {
+  setTimeout(() => {
+    process.stderr.write('ssh: connect to host 192.168.0.1 port 22: Connection timed out\n');
+    process.exit(255);
+  }, 300);
+} else {
+  const r = require('child_process').spawnSync('/bin/sh', ['-s'], { input: fs.readFileSync(0), stdio: ['pipe', 'inherit', 'inherit'], env: { PATH: ctl + '/router/bin:/usr/bin:/bin', STUB_CTL: ctl, DOTS_DNS_ROUTER_ROOT: ctl + '/router' } });
+  process.exit(r.status === null ? 1 : r.status);
+}
+`,
+};
+const ROUTER = {
+  uci: String.raw`
+const fs = require('fs');
+const ctl = process.env.STUB_CTL;
+const file = ctl + '/router/uci.json';
+fs.appendFileSync(ctl + '/router.log', JSON.stringify(['uci', ...process.argv.slice(2)]) + '\n');
+const a = process.argv.slice(2).filter((x) => x !== '-q');
+const db = JSON.parse(fs.readFileSync(file, 'utf8'));
+const q = (v) => "'" + v.replace(/'/g, "'\\''") + "'";
+if (a[0] === 'show') {
+  const n = {};
+  let out = '';
+  for (const s of db[a[1]]) {
+    n[s['.type']] = (n[s['.type']] ?? -1) + 1;
+    const id = a[1] + '.@' + s['.type'] + '[' + n[s['.type']] + ']';
+    out += id + '=' + s['.type'] + '\n';
+    for (const [k, v] of Object.entries(s)) if (k !== '.type') out += id + '.' + k + '=' + (Array.isArray(v) ? v.map(q).join(' ') : q(v)) + '\n';
+  }
+  process.stdout.write(out);
+  process.exit(0);
+}
+if (a[0] === 'commit') process.exit(0);
+const m = a[1].match(/^(\w+)\.@(\w+)\[(\d+)\]\.(\w+)(?:=(.*))?$/s);
+const s = m && db[m[1]].filter((x) => x['.type'] === m[2])[Number(m[3])];
+if (!s) process.exit(1);
+if (a[0] === 'get') {
+  if (s[m[4]] === undefined) process.exit(1);
+  console.log([].concat(s[m[4]]).join(' '));
+} else if (a[0] === 'add_list') s[m[4]] = [].concat(s[m[4]] || [], m[5]);
+else if (a[0] === 'del_list') s[m[4]] = [].concat(s[m[4]] || []).filter((x) => x !== m[5]);
+fs.writeFileSync(file, JSON.stringify(db));
+`,
+  nft: String.raw`
+require('fs').appendFileSync(process.env.STUB_CTL + '/router.log', JSON.stringify(['nft', ...process.argv.slice(2)]) + '\n');
+`,
+  date: String.raw`
+process.stdout.write(require('fs').readFileSync(process.env.STUB_CTL + '/router/now', 'utf8'));
+`,
+};
+const ROUTER_NOW = 1792677600;
+const host = (name, mac, ip) => ({ '.type': 'host', name, mac, ip, dns: '1' });
+const ipset = (name, match, entry) => ({ '.type': 'ipset', name, family: 'ipv4', match, entry });
+const UCI = {
+  dhcp: [{ '.type': 'dnsmasq', domainneeded: '1' }, host('nuc', '02:00:00:00:00:01', '192.168.0.102'), host('Kids-Tablet', '02:00:00:00:00:21', '192.168.0.143'), host('macbook', '02:00:00:00:00:02', '192.168.0.105'), host("Living-room 'TV'", '02:00:00:00:00:18', '192.168.0.238'), host('printer', '02:00:00:00:00:1B', '192.168.0.164')],
+  firewall: [ipset('dns_exempt', 'src_net', ['192.168.0.105', '192.168.0.102']), ipset('kid', 'src_ip', ['192.168.0.143', '192.168.0.238']), ipset('kid_mac', 'src_mac', ['02:00:00:00:00:21', '02:00:00:00:00:18']), { '.type': 'redirect', ipset: '!dns_exempt' }],
+};
+
+function fakeRouter(ctl, uci = UCI) {
+  const r = join(ctl, 'router');
+  mkdirSync(join(r, 'bin'), { recursive: true });
+  mkdirSync(join(r, 'tmp', 'dns-shield'), { recursive: true });
+  mkdirSync(join(r, 'etc', 'dns-shield'), { recursive: true });
+  mkdirSync(join(r, 'etc', 'init.d'), { recursive: true });
+  for (const [name, code] of Object.entries(ROUTER)) writeFileSync(join(r, 'bin', name), `#!${process.execPath}\n${code}`, { mode: 0o755 });
+  writeFileSync(join(r, 'etc', 'init.d', 'dns-shield'), `#!${process.execPath}\nrequire('fs').appendFileSync(process.env.STUB_CTL + '/router.log', JSON.stringify(['dns-shield', ...process.argv.slice(2)]) + '\\n');\n`, { mode: 0o755 });
+  writeFileSync(join(r, 'uci.json'), JSON.stringify(uci));
+  writeFileSync(join(r, 'now'), ROUTER_NOW + '\n');
+  writeFileSync(join(r, 'tmp', 'dns-shield', 'kid.log'), readFileSync(fixture('dns-kid.log')));
+  writeFileSync(join(r, 'etc', 'dns-shield', 'allow'), 'khanacademy.org\n');
+}
+
 const jar = (value) => `# Netscape HTTP Cookie File\n\n#HttpOnly_127.0.0.1\tFALSE\t/api\tFALSE\t1820303639\tubd_session\t${value}\n127.0.0.1\tFALSE\t/\tFALSE\t1792873281\tAWSALB\tlbvalue\n`;
 
-// HOME and every XDG dir in a scratch root; PATH holds only node and flock.
-function scratch(t, url, { session = 'GOODSESSION', account = true } = {}) {
+// HOME and every XDG dir in a scratch root; PATH holds only node, flock and the stub ssh.
+function scratch(t, url, { session = 'GOODSESSION', account = true, uci } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'dns-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const home = join(root, 'home');
@@ -86,6 +164,10 @@ function scratch(t, url, { session = 'GOODSESSION', account = true } = {}) {
   mkdirSync(stubBin);
   symlinkSync(process.execPath, join(stubBin, 'node'));
   symlinkSync('/usr/bin/flock', join(stubBin, 'flock'));
+  for (const [name, code] of Object.entries(STUBS)) writeFileSync(join(stubBin, name), `#!${process.execPath}\n${code}`, { mode: 0o755 });
+  const ctl = join(root, 'ctl');
+  fakeRouter(ctl, uci);
+  writeFileSync(join(config, 'router.env'), "# router identity\nWIFI_PSK='wifisecret'\nSSH_KEY=$HOME/.ssh/router\n");
   const env = {
     HOME: home,
     XDG_CONFIG_HOME: join(root, 'config'),
@@ -95,8 +177,9 @@ function scratch(t, url, { session = 'GOODSESSION', account = true } = {}) {
     XDG_RUNTIME_DIR: join(root, 'run'),
     DOTS_DNS_API: url,
     PATH: stubBin,
+    STUB_CTL: ctl,
   };
-  return { root, home, config, state, env, stubBin };
+  return { root, home, config, state, env, stubBin, ctl, cache: join(root, 'cache', 'dots', 'dns') };
 }
 
 function run(ctx, ...args) {
@@ -211,4 +294,74 @@ test('uBlockDNS down still prints state, with carried not ok and an error line',
   assert.deepEqual(out.carried, { ok: false, error: 'list devices failed (HTTP 503)' });
   assert.deepEqual(carried(out), []);
   assert.equal(r.stderr, 'dots-dns: list devices failed (HTTP 503)\n');
+  assert.equal(out.router.ok, true);
+  assert.deepEqual(routerRows(out).map((d) => d.key), ROUTER_KEYS);
+});
+
+const routerRows = (out) => out.devices.filter((d) => d.path === 'router');
+const ROUTER_KEYS = ['router:02:00:00:00:00:01', 'router:02:00:00:00:00:21', 'router:02:00:00:00:00:02', 'router:02:00:00:00:00:18', 'router:02:00:00:00:00:1b'];
+const ALL = (on) => ({ youtube: on, social: on, adult: on, gambling: on });
+const routerRow = (name, mac, ip, kid, blocks = []) => ({ key: 'router:' + mac, name, path: 'router', kid, categories: ALL(kid), open_until: null, allow: kid ? ['khanacademy.org'] : [], last_block: blocks.length ? blocks[0].at : null, blocks, ip, mac });
+const ROUTER_ROWS = [
+  routerRow('nuc', '02:00:00:00:00:01', '192.168.0.102', false),
+  routerRow('Kids-Tablet', '02:00:00:00:00:21', '192.168.0.143', true, [
+    { domain: 'tiktok.com', at: 1792676402 },
+    { domain: 'youtube.com', at: 1792676266 },
+    { domain: 'old.example', at: 1767225540 },
+  ]),
+  routerRow('macbook', '02:00:00:00:00:02', '192.168.0.105', false),
+  routerRow("Living-room 'TV'", '02:00:00:00:00:18', '192.168.0.238', true),
+  routerRow('printer', '02:00:00:00:00:1b', '192.168.0.164', false),
+];
+const sshLog = (ctx) => (existsSync(join(ctx.ctl, 'ssh.log')) ? readFileSync(join(ctx.ctl, 'ssh.log'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
+
+test('the collector finds the stub ssh, never the real one', () => {
+  const ctx = scratch({ after() {} }, 'http://127.0.0.1:9/api');
+  const r = spawnSync('/bin/sh', ['-c', 'command -v ssh'], { env: ctx.env, encoding: 'utf8' });
+  assert.equal(r.stdout.trim(), join(ctx.stubBin, 'ssh'));
+  rmSync(ctx.root, { recursive: true, force: true });
+});
+
+test('state lists the router reservations after the carried devices, with one ssh', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  const out = await state(ctx);
+  assert.deepEqual(out.router, { ok: true, as_of: out.as_of, error: null });
+  assert.deepEqual(out.devices.map((d) => d.key), ['carried:dev00phone', 'carried:dev00ipad', 'carried:dev00wife', ...ROUTER_KEYS]);
+  assert.deepEqual(routerRows(out), ROUTER_ROWS);
+  assert.deepEqual(sshLog(ctx), [['-i', join(ctx.home, '.ssh', 'router'), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', 'root@192.168.0.1', 'sh', '-s']]);
+  assert.deepEqual(JSON.parse(readFileSync(join(ctx.cache, 'router.json'), 'utf8')), { as_of: out.as_of, devices: ROUTER_ROWS });
+});
+
+test('router names are one-lined and stripped of controls and bidi marks', async (t) => {
+  const s = await stub(t);
+  const uci = { dhcp: FORGED.map((name, i) => host(name, `02:00:00:00:00:3${i}`, `192.168.0.3${i}`)), firewall: [] };
+  const ctx = scratch(t, s.url, { uci });
+  const out = await state(ctx);
+  assert.deepEqual(routerRows(out).map((d) => d.name), ['Fa ke', 'Fakeevil', 'Fake[31m', '', 'x'.repeat(200)]);
+  assert.deepEqual(routerRows(out).map((d) => d.ip), ['192.168.0.30', '192.168.0.31', '192.168.0.32', '192.168.0.33', '192.168.0.34']);
+});
+
+test('an unreachable router serves the last good read with its own as_of', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  mkdirSync(ctx.cache, { recursive: true });
+  writeFileSync(join(ctx.cache, 'router.json'), JSON.stringify({ as_of: 1792600000, devices: ROUTER_ROWS.slice(0, 2) }));
+  writeFileSync(join(ctx.ctl, 'ssh-down'), '');
+  const out = await state(ctx);
+  assert.deepEqual(out.router, { ok: false, as_of: 1792600000, error: 'router unreachable (ssh exit 255)' });
+  assert.deepEqual(routerRows(out), ROUTER_ROWS.slice(0, 2));
+  assert.deepEqual(out.carried, { ok: true, error: null });
+  assert.equal(carried(out).length, 3);
+  assert.equal(sshLog(ctx).length, 1);
+});
+
+test('an unreachable router with nothing cached gives no router rows', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  writeFileSync(join(ctx.ctl, 'ssh-down'), '');
+  const out = await state(ctx);
+  assert.deepEqual(out.router, { ok: false, as_of: null, error: 'router unreachable (ssh exit 255)' });
+  assert.deepEqual(routerRows(out), []);
+  assert.equal(carried(out).length, 3);
 });
