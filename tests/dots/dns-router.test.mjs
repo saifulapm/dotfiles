@@ -251,6 +251,7 @@ test('the Kid resolver config passes dnsmasq --test', (t) => {
   writeFileSync(join(dir, 'blocks.conf'), readFileSync(join(files, 'blocks.conf')));
   writeFileSync(join(dir, 'gambling.conf'), 'address=/bet0.example/\n');
   writeFileSync(join(dir, 'allow.conf'), 'server=/khanacademy.org/94.140.14.14\n');
+  writeFileSync(join(dir, 'youtube.conf'), 'address=/youtube.com/\naddress=/youtubekids.com/\n');
   const r = spawnSync('dnsmasq', ['--test', '-C', join(dir, 'kid.conf')], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   assert.match(conf, /^port=5353$/m);
@@ -292,4 +293,32 @@ test('fetch.sh downloads dnsmasq-full with every dependency not installed, howev
   const r = spawnSync('sh', [join(files, 'fetch.sh'), 'dnsmasq-full'], { cwd: dir, env: { PATH: `${join(dir, 'bin')}:/usr/bin:/bin` }, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.deepEqual(readFileSync(join(dir, 'downloads'), 'utf8').trim().split('\n').sort(), ['dnsmasq-full', 'kmod-nf-conntrack-netlink', 'libgmp10', 'libnetfilter-conntrack3', 'libnettle8']);
+});
+
+// YouTube Kids is one router setting (ruling 58KWPAQA): the init script writes the Kid resolver's YouTube lines from the flag file.
+function youtubeConf(t, allowed) {
+  const dir = mkdtempSync(join(tmpdir(), 'dns-yt-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(dir, 'etc'));
+  if (allowed) writeFileSync(join(dir, 'etc', 'youtube-kids-allowed'), '');
+  const r = spawnSync('sh', ['-c', `. "$1"; DIR="$2/etc"; RUN="$2/run"; youtube_conf; cat "$2/run/youtube.conf"`, 'sh', join(files, 'dns-shield.init'), dir], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout.trim().split('\n');
+}
+
+const OWN = ['address=/youtube.com/', 'address=/youtu.be/', 'address=/yt.be/', 'address=/youtube-nocookie.com/'];
+const KIDS = ['address=/youtubekids.com/', 'address=/googlevideo.com/', 'address=/ytimg.com/', 'address=/youtubei.googleapis.com/'];
+
+test('the Kid resolver refuses YouTube Kids and the shared servers until the router allows YouTube Kids', (t) => {
+  assert.deepEqual(youtubeConf(t, false), [...OWN, ...KIDS]);
+  assert.deepEqual(youtubeConf(t, true), OWN);
+  const kid = readFileSync(join(files, 'kid.conf'), 'utf8');
+  assert.match(kid, /^conf-file=\/tmp\/dns-shield\/youtube\.conf$/m);
+  assert.doesNotMatch(readFileSync(join(files, 'blocks.conf'), 'utf8'), /youtube|googlevideo|ytimg/);
+});
+
+test('install keeps googlevideo.com out of the drop set while the router allows YouTube Kids', () => {
+  const s = readFileSync(join(files, 'install.sh'), 'utf8');
+  assert.match(s, /\[ -e \/etc\/dns-shield\/youtube-kids-allowed \] \|\| uci add_list dhcp\.dns_shield\.domain=googlevideo\.com/);
+  assert.doesNotMatch(s, /for d in googlevideo\.com/);
 });

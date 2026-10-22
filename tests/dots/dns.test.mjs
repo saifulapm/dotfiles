@@ -352,13 +352,13 @@ test('state lists the router reservations after the carried devices, with one ss
   const s = await stub(t);
   const ctx = scratch(t, s.url);
   const out = await state(ctx);
-  assert.deepEqual(out.router, { ok: true, as_of: out.as_of, error: null });
+  assert.deepEqual(out.router, { ok: true, as_of: out.as_of, error: null, youtube_kids_allowed: false });
   assert.deepEqual(out.devices.map((d) => d.key), ['carried:dev00phone', 'carried:dev00ipad', 'carried:dev00wife', ...ROUTER_KEYS]);
   assert.deepEqual(routerRows(out), ROUTER_ROWS);
   // The router's host key is kept in the file dots-dns-router uses, since BatchMode cannot ask about an unknown key.
   const known = join(ctx.home, '.local', 'state', 'dns-helper', 'router_known_hosts');
   assert.deepEqual(sshLog(ctx), [['-i', join(ctx.home, '.ssh', 'router'), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=accept-new', '-o', `UserKnownHostsFile=${known}`, 'root@192.168.0.1', 'sh', '-s']]);
-  assert.deepEqual(JSON.parse(readFileSync(join(ctx.cache, 'router.json'), 'utf8')), { as_of: out.as_of, devices: ROUTER_ROWS });
+  assert.deepEqual(JSON.parse(readFileSync(join(ctx.cache, 'router.json'), 'utf8')), { as_of: out.as_of, youtube_kids_allowed: false, devices: ROUTER_ROWS });
 });
 
 test('router names are one-lined and stripped of controls and bidi marks', async (t) => {
@@ -377,7 +377,7 @@ test('an unreachable router serves the last good read with its own as_of', async
   writeFileSync(join(ctx.cache, 'router.json'), JSON.stringify({ as_of: 1792600000, devices: ROUTER_ROWS.slice(0, 2) }));
   writeFileSync(join(ctx.ctl, 'ssh-down'), '');
   const out = await state(ctx);
-  assert.deepEqual(out.router, { ok: false, as_of: 1792600000, error: 'router unreachable (ssh exit 255)' });
+  assert.deepEqual(out.router, { ok: false, as_of: 1792600000, error: 'router unreachable (ssh exit 255)', youtube_kids_allowed: false });
   assert.deepEqual(routerRows(out), ROUTER_ROWS.slice(0, 2));
   assert.deepEqual(out.carried, { ok: true, error: null });
   assert.equal(carried(out).length, 3);
@@ -389,7 +389,7 @@ test('an unreachable router with nothing cached gives no router rows', async (t)
   const ctx = scratch(t, s.url);
   writeFileSync(join(ctx.ctl, 'ssh-down'), '');
   const out = await state(ctx);
-  assert.deepEqual(out.router, { ok: false, as_of: null, error: 'router unreachable (ssh exit 255)' });
+  assert.deepEqual(out.router, { ok: false, as_of: null, error: 'router unreachable (ssh exit 255)', youtube_kids_allowed: false });
   assert.deepEqual(routerRows(out), []);
   assert.equal(carried(out).length, 3);
 });
@@ -698,6 +698,32 @@ test('a device with v1 whole YouTube group reads both YouTube and YouTube Kids o
   const row = (await state(ctx)).devices.find((d) => d.key === 'carried:dev00ipad');
   assert.equal(row.categories.youtube, true);
   assert.equal(row.categories.youtube_kids, true);
-  const r = await run(ctx, 'category', 'router:02:00:00:00:00:21', 'youtube_kids', 'off');
+  const r = await run(ctx, 'category', 'router:02:00:00:00:00:21', 'social', 'off');
   assert.equal(r.status, 2);
+});
+
+// On the router YouTube Kids is one shared setting (ruling 58KWPAQA): a flag file for the Kid resolver, and googlevideo.com in or out of the drop set.
+const withDropSet = () => ({ ...structuredClone(UCI), dhcp: [...structuredClone(UCI.dhcp), { '.type': 'ipset', name: ['kid_block'], domain: ['facebook.com', 'googlevideo.com'] }] });
+const dropDomains = (ctx) => JSON.parse(readFileSync(join(ctx.ctl, 'router', 'uci.json'), 'utf8')).dhcp.find((x) => x['.type'] === 'ipset').domain;
+
+test('YouTube Kids on a router row flips the shared router setting and every Kid router row reads it', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, { uci: withDropSet() });
+  const flag = join(ctx.ctl, 'router', 'etc', 'dns-shield', 'youtube-kids-allowed');
+  let rows = (await state(ctx)).devices.filter((d) => d.path === 'router' && d.kid);
+  assert.ok(rows.length >= 2 && rows.every((d) => d.categories.youtube_kids === true));
+  await ok(ctx, 'category', 'router:02:00:00:00:00:21', 'youtube_kids', 'off');
+  assert.ok(existsSync(flag));
+  assert.deepEqual(dropDomains(ctx), ['facebook.com']);
+  const log = routerLog(ctx);
+  for (const c of [['uci', 'commit', 'dhcp'], ['nft', 'flush', 'set', 'inet', 'fw4', 'kid_block'], ['dnsmasq', 'reload'], ['dns-shield', 'reload']]) assert.ok(log.some((l) => JSON.stringify(l) === JSON.stringify(c)), JSON.stringify(c));
+  const out = await state(ctx);
+  assert.equal(out.router.youtube_kids_allowed, true);
+  rows = out.devices.filter((d) => d.path === 'router' && d.kid);
+  assert.ok(rows.every((d) => d.categories.youtube_kids === false && d.categories.youtube === true));
+  await ok(ctx, 'category', 'router:02:00:00:00:00:18', 'youtube_kids', 'on');
+  assert.ok(!existsSync(flag));
+  assert.deepEqual(dropDomains(ctx), ['facebook.com', 'googlevideo.com']);
+  assert.equal((await state(ctx)).router.youtube_kids_allowed, false);
+  assert.equal((await run(ctx, 'category', 'router:02:00:00:00:00:21', 'social', 'off')).status, 2);
 });

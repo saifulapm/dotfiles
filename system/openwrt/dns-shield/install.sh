@@ -47,7 +47,8 @@ uci set "$M.noresolv=1"
 uci -q delete dhcp.dns_shield
 uci set dhcp.dns_shield=ipset
 uci add_list dhcp.dns_shield.name=kid_block
-for d in googlevideo.com facebook.com fbcdn.net instagram.com cdninstagram.com; do uci add_list "dhcp.dns_shield.domain=$d"; done
+for d in facebook.com fbcdn.net instagram.com cdninstagram.com; do uci add_list "dhcp.dns_shield.domain=$d"; done
+[ -e /etc/dns-shield/youtube-kids-allowed ] || uci add_list dhcp.dns_shield.domain=googlevideo.com
 uci set dhcp.dns_shield.table=fw4
 uci set dhcp.dns_shield.table_family=inet
 uci set dhcp.dns_shield.family=4

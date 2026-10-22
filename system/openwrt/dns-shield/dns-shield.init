@@ -14,8 +14,18 @@ allow_conf() {
 	done <"$DIR/allow"
 }
 
+# YouTube's own names always; YouTube Kids streams from googlevideo, ytimg and youtubei, so those go only while the router blocks YouTube Kids too.
+youtube_conf() {
+	mkdir -p "$RUN"
+	: >"$RUN/youtube.conf"
+	for d in youtube.com youtu.be yt.be youtube-nocookie.com; do echo "address=/$d/" >>"$RUN/youtube.conf"; done
+	[ -e "$DIR/youtube-kids-allowed" ] && return 0
+	for d in youtubekids.com googlevideo.com ytimg.com youtubei.googleapis.com; do echo "address=/$d/" >>"$RUN/youtube.conf"; done
+}
+
 start_service() {
 	allow_conf
+	youtube_conf
 	touch "$RUN/kid.log"
 	chown dnsmasq:dnsmasq "$RUN/kid.log"
 	procd_open_instance
