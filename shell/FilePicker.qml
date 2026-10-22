@@ -74,6 +74,8 @@ Item {
     property bool pathStale: false
     // Enter came before the typed path's folder was listed, so it goes once the listing lands.
     property bool goPending: false
+    // Enter came before the folder shown was listed, so it acts on that folder's rows once they land; any other key drops it.
+    property bool choosePending: false
     readonly property var choices: pathFolder === split.parent ? P.completions(pathEntries, split.tail) : []
     property int choice: 0
     readonly property var cursorRow: rows[selected] ?? null
@@ -123,6 +125,7 @@ Item {
         hidden = false;
         side = "list";
         typingPath = false;
+        choosePending = false;
         notice = "";
         dims = {
             path: "",
@@ -174,6 +177,8 @@ Item {
         marked = [];
         selected = saving ? -1 : 0;
         landOn = saving ? saveName : "";
+        // The last folder's rows go with it, so no key acts on them here and no card draws them.
+        entries = [];
         listed = false;
         list();
     }
@@ -323,6 +328,10 @@ Item {
             return goPath();
         if (side === "places")
             return enter(allPlaces[placeAt].path);
+        if (!listed) {
+            choosePending = true;
+            return;
+        }
         const row = rows[selected];
         // A name that is not UTF-8 shows with U+FFFD, so its path names no file to answer or enter.
         if (row?.undecodable)
@@ -475,6 +484,10 @@ Item {
             const back = picker.rows.findIndex(r => r.name === picker.landOn);
             picker.selected = back >= 0 ? back : picker.saving ? -1 : 0;
             picker.listed = true;
+            if (picker.choosePending) {
+                picker.choosePending = false;
+                picker.choose();
+            }
         }
     }
 
@@ -559,6 +572,8 @@ Item {
                 event.accepted = true;
                 return;
             }
+            if (event.key !== Qt.Key_Return && event.key !== Qt.Key_Enter)
+                picker.choosePending = false;
             const onList = !picker.typingPath && picker.side === "list";
             if (ctrl && event.key === Qt.Key_L)
                 picker.togglePath();
