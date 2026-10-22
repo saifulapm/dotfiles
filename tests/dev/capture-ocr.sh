@@ -15,8 +15,8 @@ rests() { island | jq -e '.mode == "rest"' >/dev/null 2>&1; }
 clip() { cliphist -db-path "$XDG_STATE_HOME/dots/clips.db" "$@"; }
 listed() { clip list 2>/dev/null | cut -f2- | grep -qxF "$1"; }
 focused() { niri msg -j windows | jq -e --arg a "$1" 'any(.[]; .is_focused and .app_id == $a)' >/dev/null; }
-# niri reports no place for a tiled window, so the focused one floats at 200,200 and its contents start there plus the border.
-origin() { niri msg -j windows | jq -r 'first(.[] | select(.is_focused)).layout | select(.tile_pos_in_workspace_view == [200, 200]) | "\(200 + .window_offset_in_tile[0] | floor) \(200 + .window_offset_in_tile[1] | floor) \(.window_size[0]) \(.window_size[1])"'; }
+# niri reports no place for a tiled window, so the focused one floats at 200,200 in the area under the margins' 41 px zone, 200,241 on screen, and its contents start there plus the border.
+origin() { niri msg -j windows | jq -r 'first(.[] | select(.is_focused)).layout | select(.tile_pos_in_workspace_view == [200, 241]) | "\(200 + .window_offset_in_tile[0] | floor) \(241 + .window_offset_in_tile[1] | floor) \(.window_size[0]) \(.window_size[1])"'; }
 float() {
   niri msg action toggle-window-floating
   niri msg action move-floating-window -x 200 -y 200

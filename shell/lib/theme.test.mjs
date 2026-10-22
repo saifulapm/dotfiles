@@ -55,9 +55,9 @@ test('the niri fragment sets the paper as background and the ink frame', () => {
   assert.match(kdl, /geometry-corner-radius 0/);
 });
 
-test('windows sit 56 px down and 32 px in, clear of the margins, with niri drawing their frames', () => {
+test('windows sit 56 px down and 32 px in, under the margins\' 41 px zone, with niri drawing their frames', () => {
   const kdl = renderNiri(validateTheme(paper));
-  assert.match(kdl, /struts \{\s*top 32\s*bottom 4\s*left 8\s*right 8\s*\}/);
+  assert.match(kdl, /struts \{\s*top -9\s*bottom 4\s*left 8\s*right 8\s*\}/);
   assert.match(kdl, /^prefer-no-csd$/m);
 });
 

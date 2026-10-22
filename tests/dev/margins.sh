@@ -20,6 +20,14 @@ edge_is_ink() { edge=$(grim -s 1 -t ppm -g "32,300 1x10" - | mean_rgb); [ "$edge
 until_ok 1000 edge_is_ink
 check "niri draws foot's ink frame at x=32 ($edge)" edge_is_ink
 
+# Maximized to edges, foot fills the output below the margins' 41 px zone, so no margin word lands on it.
+niri msg action maximize-window-to-edges
+out_h=$(niri msg -j outputs | jq '.[].logical.height' | head -n1)
+under_margins() { [ "$(niri msg -j focused-window | jq '.layout.tile_size[1] | floor')" = $((out_h - 41)) ]; }
+until_ok 1000 under_margins
+check "a window maximized to edges is $((out_h - 41)) px tall, under the margins" under_margins
+niri msg action maximize-window-to-edges
+
 # foot's shell retitles the window once it starts, so the title is read again on every poll.
 left_is_foot() {
   title=$(niri msg -j focused-window | jq -r .title)

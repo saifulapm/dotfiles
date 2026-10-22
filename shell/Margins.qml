@@ -31,7 +31,8 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "dots-margins"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    exclusionMode: ExclusionMode.Ignore
+    // Auto reserves the 41 px strip, so a window maximized to edges stops under the rule; the theme's top strut takes the 41 back for tiled windows.
+    exclusionMode: ExclusionMode.Auto
     anchors {
         top: true
         left: true

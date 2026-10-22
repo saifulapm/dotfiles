@@ -255,9 +255,9 @@ export function renderNiri(t) {
     insert-hint {
         color "${c.accent}80"
     }
-    // Windows start 56 px down and 32 px in, below the margins, as on the approved artboard.
+    // Windows start 56 px down and 32 px in, below the margins, as on the approved artboard; the margins already reserve the top 41 px.
     struts {
-        top ${56 - t.niri.gaps}
+        top ${56 - 41 - t.niri.gaps}
         bottom ${28 - t.niri.gaps}
         left ${32 - t.niri.gaps}
         right ${32 - t.niri.gaps}
