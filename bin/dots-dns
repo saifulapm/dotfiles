@@ -1,0 +1,227 @@
+#!/usr/bin/env node
+// Reads every DNS Shield device into one `state` JSON and writes their Kid mode, categories and allow rules. Carried devices are uBlockDNS profiles reached over its API.
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const env = process.env;
+const API = env.DOTS_DNS_API || 'https://ublockdns.com/api';
+const CONFIG = join(env.HOME, '.config', 'dns-helper');
+const STATE = join(env.HOME, '.local', 'state', 'dns-helper');
+const SESSION = join(STATE, 'session');
+const ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+// The service has no YouTube module, so YouTube is this group of custom rules; the apps keep playing if only youtube.com goes.
+const YOUTUBE = ['||youtube.com^', '||youtu.be^', '||googlevideo.com^', '||ytimg.com^', '||youtubekids.com^', '||youtube-nocookie.com^', '||youtubei.googleapis.com^'];
+const MODULES = { social: 'social-apps', adult: 'adult-content', gambling: 'gambling' };
+
+// A failure's message names the step and the HTTP code only, never a token, an account id or a device id.
+class Failure extends Error {}
+
+// Text a server controls reaches the state as one line with no control characters or bidi marks, so it cannot forge a row when drawn.
+const clean = (v) =>
+  typeof v === 'string'
+    ? v
+        .replace(/[\r\n\t\u2028\u2029]+/g, ' ')
+        .replace(/[\p{Cc}\u202A-\u202E\u2066-\u2069\u200E\u200F]/gu, '')
+        .trim()
+    : '';
+
+const firstLine = (path) => {
+  try {
+    return readFileSync(path, 'utf8').split('\n')[0];
+  } catch {
+    return '';
+  }
+};
+
+// Each write goes to a temp file renamed over the old one, so a reader only ever sees a whole file.
+function save(path, data, mode = 0o644) {
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, data, { mode });
+  renameSync(tmp, path);
+}
+
+// The cookie jar is curl's, shared with v1's dns-filter; only its ubd_session row is read or replaced.
+function jarCookie() {
+  try {
+    for (const line of readFileSync(SESSION, 'utf8').split('\n')) {
+      const f = line.split('\t');
+      if (f.length >= 7 && f[5] === 'ubd_session') return f[6];
+    }
+  } catch {}
+  return null;
+}
+
+function saveCookie(value, maxAge) {
+  const url = new URL(API);
+  let lines;
+  try {
+    lines = readFileSync(SESSION, 'utf8').split('\n').filter((l) => l.split('\t')[5] !== 'ubd_session');
+  } catch {
+    lines = ['# Netscape HTTP Cookie File', ''];
+  }
+  while (lines.length && lines[lines.length - 1] === '') lines.pop();
+  const expires = Math.floor(Date.now() / 1000) + maxAge;
+  lines.push(['#HttpOnly_' + url.hostname, 'FALSE', url.pathname.replace(/\/$/, '') || '/', url.protocol === 'https:' ? 'TRUE' : 'FALSE', expires, 'ubd_session', value].join('\t'));
+  mkdirSync(STATE, { recursive: true });
+  save(SESSION, lines.join('\n') + '\n', 0o600);
+}
+
+let session;
+let login;
+
+async function call(method, path, body) {
+  if (session === undefined) session = jarCookie();
+  const headers = {};
+  if (session) headers.cookie = 'ubd_session=' + session;
+  if (body) headers['content-type'] = 'application/json';
+  try {
+    return await fetch(API + path, { method, headers, body: body && JSON.stringify(body), signal: AbortSignal.timeout(25000) });
+  } catch {
+    return null;
+  }
+}
+
+// The session cookie lasts a year, so a login happens only when the server refuses it, and at most once per run.
+async function signIn() {
+  const token = firstLine(join(CONFIG, 'token')).replace(/\s/g, '');
+  if (!token) throw new Failure('no account token in ~/.config/dns-helper/token');
+  let res;
+  try {
+    res = await fetch(API + '/auth', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }), signal: AbortSignal.timeout(25000) });
+  } catch {
+    throw new Failure('login failed (no answer)');
+  }
+  if (res.status !== 200) throw new Failure(`login failed (HTTP ${res.status})`);
+  for (const c of res.headers.getSetCookie()) {
+    const m = c.match(/^ubd_session=([^;]*)/);
+    if (!m) continue;
+    const age = c.match(/;\s*max-age=(\d+)/i);
+    session = m[1];
+    saveCookie(session, age ? Number(age[1]) : 365 * 86400);
+  }
+}
+
+async function api(step, method, path, body, raw = false) {
+  let res = await call(method, path, body);
+  if (res && (res.status === 401 || res.status === 403)) {
+    await (login ??= signIn());
+    res = await call(method, path, body);
+  }
+  if (!res) throw new Failure(`${step} failed (no answer)`);
+  if (res.status !== 200) throw new Failure(`${step} failed (HTTP ${res.status})`);
+  if (raw) return Buffer.from(await res.arrayBuffer());
+  try {
+    return await res.json();
+  } catch {
+    throw new Failure(`${step} failed (not JSON)`);
+  }
+}
+
+// The account id is found once from v1's profile id and kept beside it.
+async function account() {
+  const known = firstLine(join(CONFIG, 'account')).trim();
+  if (ID.test(known)) return known;
+  const profile = firstLine(join(CONFIG, 'profile')).trim();
+  if (!ID.test(profile)) throw new Failure('no account id in ~/.config/dns-helper/account');
+  const id = (await api('read profile', 'GET', '/profile/' + profile)).account_id;
+  if (typeof id !== 'string' || !ID.test(id)) throw new Failure('read profile failed (no account id)');
+  save(join(CONFIG, 'account'), id + '\n');
+  return id;
+}
+
+async function devices(acct) {
+  const list = await api('list devices', 'GET', `/account/${acct}/devices`);
+  if (!Array.isArray(list)) throw new Failure('list devices failed (not a list)');
+  return list.filter((d) => d && typeof d.id === 'string' && ID.test(d.id));
+}
+
+function categories(dev) {
+  const rules = Array.isArray(dev.custom_rules) ? dev.custom_rules : [];
+  const on = { youtube: YOUTUBE.every((r) => rules.includes(r)) };
+  for (const [cat, mod] of Object.entries(MODULES)) on[cat] = (dev.policy_modules || {})[mod] === true;
+  return on;
+}
+
+const allowList = (dev) => (Array.isArray(dev.custom_rules) ? dev.custom_rules : []).map((r) => typeof r === 'string' && r.match(/^@@\|\|(.+)\^$/)).filter(Boolean).map((m) => clean(m[1]));
+
+// The server ignores action=blocked, so the allowed answers are dropped here.
+const blocks = (body) =>
+  (Array.isArray(body && body.entries) ? body.entries : [])
+    .filter((e) => e && e.action === 'blocked' && typeof e.timestamp === 'number')
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 20)
+    .map((e) => ({ domain: clean(e.domain), at: e.timestamp }));
+
+async function carriedRows() {
+  const acct = await account();
+  return Promise.all(
+    (await devices(acct)).map(async ({ id }) => {
+      const [dev, queries] = await Promise.all([api('read device', 'GET', `/account/${acct}/device/${id}`), api('read queries', 'GET', `/account/${acct}/device/${id}/queries?limit=100&action=blocked`)]);
+      const cats = categories(dev);
+      const recent = blocks(queries);
+      return { key: 'carried:' + id, name: clean(dev.name), path: 'carried', kid: Object.values(cats).some(Boolean), categories: cats, open_until: null, allow: allowList(dev), last_block: recent.length ? recent[0].at : null, blocks: recent, ip: null, mac: null };
+    }),
+  );
+}
+
+async function state() {
+  const out = { as_of: Math.floor(Date.now() / 1000), carried: { ok: true, error: null }, devices: [] };
+  try {
+    out.devices.push(...(await carriedRows()));
+  } catch (e) {
+    if (!(e instanceof Failure)) throw e;
+    out.carried = { ok: false, error: e.message };
+    process.stderr.write(`dots-dns: ${e.message}\n`);
+  }
+  return JSON.stringify(out) + '\n';
+}
+
+async function profiles() {
+  return (await devices(await account())).map((d) => `${clean(d.name)}\t${d.id}\n`).join('');
+}
+
+// The file is named after the device, with the characters a file name cannot hold replaced.
+async function profile(id) {
+  const acct = await account();
+  const dev = (await devices(acct)).find((d) => d.id === id);
+  if (!dev) throw new Failure('no such carried device');
+  const body = await api('read apple-profile', 'GET', `/account/${acct}/device/${id}/apple-profile`, null, true);
+  const name = clean(dev.name).replace(/[/\\:*?"<>|]/g, '-').replace(/^\.+/, '').slice(0, 100) || id;
+  const dir = join(env.HOME, 'Downloads');
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, name + '.mobileconfig');
+  save(path, body);
+  return path + '\n';
+}
+
+const USAGE = 'usage: dots-dns state | profiles | profile <key>';
+
+function carriedKey(key) {
+  const m = typeof key === 'string' && key.match(/^carried:([A-Za-z0-9_-]{1,64})$/);
+  if (!m) usage();
+  return m[1];
+}
+
+function usage() {
+  process.stderr.write(USAGE + '\n');
+  process.exit(2);
+}
+
+async function main() {
+  const [verb, ...args] = process.argv.slice(2);
+  let out;
+  try {
+    if (verb === 'state') out = await state();
+    else if (verb === 'profiles') out = await profiles();
+    else if (verb === 'profile') out = await profile(carriedKey(args[0]));
+    else usage();
+  } catch (e) {
+    if (!(e instanceof Failure)) throw e;
+    process.stderr.write(`dots-dns: ${e.message}\n`);
+    process.exit(1);
+  }
+  process.stdout.write(out);
+}
+
+main();

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "dev00phone",
+    "account_id": "acct0001",
+    "name": "Saiful's iPhone",
+    "icon": "phone",
+    "lists": ["hagezi-pro", "oisd-small"],
+    "custom_rules": ["||mask.icloud.com^", "||youtube.com^", "||youtu.be^", "||googlevideo.com^", "||ytimg.com^", "||youtubekids.com^", "||youtube-nocookie.com^", "||youtubei.googleapis.com^", "||mask-h2.icloud.com^", "@@||wikipedia.org^"],
+    "dns_provider": "cloudflare",
+    "preset_id": "custom",
+    "policy_modules": { "social-apps": true, "adult-content": true, "gambling": false, "dating": false },
+    "rules_version": 41,
+    "rules_updated_at": 1792600000,
+    "created_at": 1790000000
+  },
+  {
+    "id": "dev00ipad",
+    "account_id": "acct0001",
+    "name": "iPad",
+    "icon": "tablet",
+    "lists": ["hagezi-pro"],
+    "custom_rules": ["||mask.icloud.com^", "||youtube.com^", "@@||khanacademy.org^", "||mask-h2.icloud.com^", "||ads.example.net^", "@@||wikipedia.org^"],
+    "dns_provider": "quad9",
+    "preset_id": "family",
+    "policy_modules": { "social-apps": false, "adult-content": true, "gambling": true, "dating": true },
+    "rules_version": 7,
+    "rules_updated_at": 1792500000,
+    "created_at": 1790000100
+  },
+  {
+    "id": "dev00wife",
+    "account_id": "acct0001",
+    "name": "Wife's iPhone",
+    "icon": "phone",
+    "lists": [],
+    "custom_rules": ["||mask.icloud.com^", "||mask-h2.icloud.com^"],
+    "dns_provider": "cloudflare",
+    "preset_id": "basic",
+    "policy_modules": { "social-apps": false, "adult-content": false, "gambling": false },
+    "rules_version": 3,
+    "rules_updated_at": 1792400000,
+    "created_at": 1790000200
+  }
+]
