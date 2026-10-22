@@ -331,6 +331,8 @@ Item {
                         readonly property var it: modelData
                         readonly property bool isGroup: it.kind === "group"
                         readonly property bool isLimit: it.kind === "limit"
+                        // The note's box shows on this, never on its own Text: a child's visible stays false while its parent hides, so the box never came back once the card had closed.
+                        readonly property bool hasNote: !isGroup && !isLimit && (it.note || "") !== ""
                         readonly property bool isAccount: it.kind === "account"
                         readonly property bool isCurrent: index === panel.current
                         readonly property var group: isGroup ? marks.group([it.label, it.count]) : null
@@ -352,6 +354,7 @@ Item {
                                 lines: nameText.lineCount,
                                 elided: nameText.truncated,
                                 figureElided: figMain.truncated || figTail.truncated,
+                                noteCut: noteText.visible && (noteText.x < 0 || noteText.x + noteText.width > noteBox.width + 0.5),
                                 // The farthest right any drawn text of the row reaches, in the window, to compare with cardBox.
                                 right: [nameText, noteText, figMain, figTail, resetText, activeMark].filter(t => t.visible).reduce((m, t) => Math.max(m, t.mapToItem(null, t.width, 0).x), 0)
                             };
@@ -587,18 +590,26 @@ Item {
 
                             // A stale account's line, or a provider's stale time or failure; a failure speaks in the danger token.
                             Rectangle {
-                                visible: noteText.visible
-                                Layout.maximumWidth: 200
-                                clip: true
-                                implicitWidth: noteText.implicitWidth + (bracket && rowItem.it.error ? 16 : 0)
+                                id: noteBox
+                                readonly property real pad: bracket && rowItem.it.error ? 16 : 0
+                                visible: rowItem.hasNote
+                                // An account's line says what to do, so it may run longer; either gives way to the row and ends in an ellipsis.
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                Layout.preferredWidth: implicitWidth
+                                Layout.maximumWidth: Math.min(implicitWidth, (rowItem.isAccount ? 360 : 200) + pad)
+                                implicitWidth: noteText.implicitWidth + pad
                                 implicitHeight: noteText.implicitHeight + (bracket && rowItem.it.error ? 2 : 0)
                                 color: "transparent"
                                 border.width: bracket && rowItem.it.error ? 1 : 0
                                 border.color: marks.warn
                                 Text {
                                     id: noteText
-                                    visible: !rowItem.isGroup && !rowItem.isLimit && (rowItem.it.note || "") !== ""
-                                    anchors.centerIn: parent
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: noteBox.pad / 2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: Math.min(implicitWidth, parent.width - noteBox.pad)
+                                    elide: Text.ElideRight
                                     textFormat: Text.PlainText
                                     text: bracket ? (rowItem.it.error ? "✕ " : "") + (rowItem.it.note || "").toUpperCase() : rowItem.it.note || ""
                                     color: rowItem.it.error ? marks.warn : rowItem.isCurrent ? look.cursor.detail : marks.dim

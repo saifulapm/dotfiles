@@ -186,6 +186,7 @@ node -e '
   const now = Date.now(), iso = (t) => new Date(t).toISOString();
   const row = (o) => Object.assign({ account: null, limit: null, unit: "USD", resets_at: null, as_of: iso(now - 7200e3), state: "stale", reason: "network" }, o);
   const rows = [
+    row({ provider: "claude", label: "work", account: "work", metric: "5-hour", kind: "percent", value: 12, limit: 100, unit: "%", reason: "expired" }),
     row({ provider: "codex", label: "Codex", metric: "monthly", kind: "percent", value: 0, limit: 100, unit: "%", resets_at: iso(now + 30 * 86400e3) }),
     row({ provider: "elevenlabs", label: "ElevenLabs", metric: "characters", kind: "count", value: 1, limit: 2, unit: "L".repeat(200), resets_at: iso(now + 12 * 86400e3) }),
     row({ provider: "x", label: "W".repeat(200), metric: "balance", kind: "money", value: 123456789.12, limit: 999999999 }),
@@ -199,7 +200,13 @@ for t in paper artboard blueprint; do
   open_acc
   fetched 6000
   check "$t: forged rows stay inside the card (card, rows right: $(edges))" inside
+  check "$t: the expired account's note is whole or ends in an ellipsis, never cut at its start ($(acc_state | jq -c '[.rows[] | select(.kind == "account") | .note]'))" state_is 'any(.rows[]; .kind == "account" and (.note | test("^(stale|STALE)")) and .noteCut == false)'
   check "$t: a thousand rows draw at most 50, on a card no taller than the screen ($(acc_state | jq -c '[(.rows | length), (.cardBox.h | floor)]') of $out_h)" state_is --argjson h "$out_h" '(.rows | length) <= 50 and .cardBox.h <= $h'
+  close_acc
+  # The same rows again keep their delegates, which must draw their notes after the card was hidden.
+  open_acc
+  fetched 6000
+  check "$t: reopened with the same rows, every balance and usage row draws its note ($(acc_state | jq -c '[.rows[] | select(.kind == "balance" or .kind == "usage") | .note] | unique'))" state_is '[.rows[] | select(.kind == "balance" or .kind == "usage") | .note] | length > 0 and all(test("as of"; "i"))'
   close_acc
 done
 rm "$DOTS_DEV_DIR/accounts-rows.json"
