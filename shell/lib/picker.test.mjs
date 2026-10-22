@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerLine, appName, dateText, headingText, oneLine, parseBookmarks, parseRequest, pickerKeys, sizeText, sortRows } from './picker.mjs';
+import { answerLine, appName, completionHead, completions, countText, dateText, headingText, marked, matchText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, shownRows, sizeText, sortRows, splitPath, stampText } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -108,4 +108,125 @@ test('GTK bookmarks become pins: the URI decoded, the label or else the folder n
     { path: '/home/s/Documents/My Invoices ü', label: 'Invoices' },
   ]);
   assert.deepEqual(parseBookmarks(''), []);
+});
+
+const places = [
+  { path: '/home/s', label: 'Home' },
+  { path: '/home/s/Downloads', label: 'Downloads' },
+  { path: '/home/s/Codes', label: 'Codes' },
+  { path: '/home/s/Pictures', label: 'Pictures' },
+  { path: '/home/s/Codes/lareys', label: 'lareys' },
+];
+
+test('a query matches places whose names start with it, whatever its case', () => {
+  assert.deepEqual(placeMatches(places, 'down'), [{ index: 1, length: 4 }]);
+  assert.deepEqual(placeMatches(places, 'P'), [{ index: 3, length: 1 }]);
+  assert.deepEqual(placeMatches(places, 'o'), []);
+  assert.deepEqual(placeMatches(places, '2041'), []);
+  assert.deepEqual(placeMatches(places, ''), []);
+});
+
+const entries = [
+  { name: 'report.pdf', dir: false, mime: 'application/pdf' },
+  { name: 'shot.PNG', dir: false, mime: 'image/png' },
+  { name: 'IMG_2041.HEIC', dir: false, mime: 'image/heic' },
+  { name: 'Taildrop', dir: true, mime: '' },
+  { name: '.config', dir: true, mime: '' },
+  { name: '.hidden.txt', dir: false, mime: 'text/plain' },
+];
+const names = (rows) => rows.map((r) => r.name);
+
+test('the rows shown: dotfiles only when asked, then the query, folders first', () => {
+  assert.deepEqual(names(shownRows(entries, { hidden: false, filter: null, query: '' })), ['Taildrop', 'IMG_2041.HEIC', 'report.pdf', 'shot.PNG']);
+  assert.deepEqual(names(shownRows(entries, { hidden: true, filter: null, query: '' })), ['.config', 'Taildrop', '.hidden.txt', 'IMG_2041.HEIC', 'report.pdf', 'shot.PNG']);
+  assert.deepEqual(names(shownRows(entries, { hidden: false, filter: null, query: '2041' })), ['IMG_2041.HEIC']);
+  assert.deepEqual(names(shownRows(entries, { hidden: false, filter: null, query: 'heic' })), ['IMG_2041.HEIC']);
+});
+
+test("an app's filter hides files its globs or mimes miss, never folders", () => {
+  const images = { name: 'Images', globs: ['*.png', '*.jpg'], mimes: [] };
+  assert.deepEqual(names(shownRows(entries, { hidden: false, filter: images, query: '' })), ['Taildrop', 'shot.PNG']);
+  const byMime = { name: 'Pictures', globs: [], mimes: ['image/*'] };
+  assert.deepEqual(names(shownRows(entries, { hidden: false, filter: byMime, query: '' })), ['Taildrop', 'IMG_2041.HEIC', 'shot.PNG']);
+  const pdf = { name: 'PDF', globs: [], mimes: ['application/pdf'] };
+  assert.deepEqual(names(shownRows(entries, { hidden: false, filter: pdf, query: '' })), ['Taildrop', 'report.pdf']);
+  const all = { name: 'All', globs: ['*'], mimes: [] };
+  assert.deepEqual(names(shownRows(entries, { hidden: false, filter: all, query: '' })), ['Taildrop', 'IMG_2041.HEIC', 'report.pdf', 'shot.PNG']);
+  const odd = { name: 'Odd', globs: ['a+b?.[ch]'], mimes: [] };
+  assert.deepEqual(names(shownRows([{ name: 'a+b1.c', dir: false }, { name: 'aab1.c', dir: false }], { hidden: false, filter: odd, query: '' })), ['a+b1.c']);
+});
+
+test('a typed path splits into the folder to list and the name begun in it, ~ as Home', () => {
+  assert.deepEqual(splitPath('~/Codes/la', '/home/s', '/tmp'), { parent: '/home/s/Codes', tail: 'la' });
+  assert.deepEqual(splitPath('~/', '/home/s', '/tmp'), { parent: '/home/s', tail: '' });
+  assert.deepEqual(splitPath('~', '/home/s', '/tmp'), { parent: '/home/s', tail: '' });
+  assert.deepEqual(splitPath('/etc/sy', '/home/s', '/tmp'), { parent: '/etc', tail: 'sy' });
+  assert.deepEqual(splitPath('/et', '/home/s', '/tmp'), { parent: '/', tail: 'et' });
+  assert.deepEqual(splitPath('sub/x', '/home/s', '/tmp'), { parent: '/tmp/sub', tail: 'x' });
+  assert.deepEqual(splitPath('', '/home/s', '/tmp'), { parent: '/tmp', tail: '' });
+});
+
+test('completions are folders that start with the tail, most recently changed first', () => {
+  const list = [
+    { name: 'laravel-demo', dir: true, mtime: 100 },
+    { name: 'lareys', dir: true, mtime: 300 },
+    { name: 'lareys-mobile', dir: true, mtime: 200 },
+    { name: 'lareys-notes.txt', dir: false, mtime: 400 },
+    { name: 'dotfiles', dir: true, mtime: 500 },
+    { name: '.lab', dir: true, mtime: 600 },
+  ];
+  assert.deepEqual(names(completions(list, 'la')), ['lareys', 'lareys-mobile', 'laravel-demo']);
+  assert.deepEqual(names(completions(list, '')), ['dotfiles', 'lareys', 'lareys-mobile', 'laravel-demo']);
+  assert.deepEqual(names(completions(list, '.l')), ['.lab']);
+});
+
+test('a marked name underlines its matched letters and escapes the rest for styled text', () => {
+  assert.equal(marked('Downloads', 0, 4), '<u>Down</u>loads');
+  assert.equal(marked('~/Codes/lareys/', 8, 2), '~/Codes/<u>la</u>reys/');
+  assert.equal(marked('a<b>&c', 0, 2), '<u>a&lt;</u>b&gt;&amp;c');
+  assert.equal(marked('Home', 0, 0), 'Home');
+});
+
+test('the typed match in each voice: Paper and Blueprint count, Artboard names the place', () => {
+  assert.equal(matchText('caps', 'places', 1, 'Downloads'), '1 PLACE');
+  assert.equal(matchText('caps', 'places', 3, ''), '3 PLACES');
+  assert.equal(matchText('bracket', 'places', 1, 'Downloads'), '1 PLACE');
+  assert.equal(matchText('plain', 'places', 1, 'Downloads'), '→ Downloads');
+  assert.equal(matchText('plain', 'places', 2, ''), '2 places');
+  assert.equal(matchText('caps', 'path', 4, ''), '4 MATCHES');
+  assert.equal(matchText('bracket', 'path', 1, ''), '1 MATCH');
+  assert.equal(matchText('plain', 'path', 4, ''), '');
+});
+
+test('the folder row counts its items, names the filter and says whether dotfiles show', () => {
+  assert.equal(countText('plain', 11, '', false), '11 items · hidden off');
+  assert.equal(countText('plain', 1, 'Images', true), '1 item · Images · hidden on');
+  assert.equal(countText('caps', 9, 'Images', false), '9 ITEMS · IMAGES · HIDDEN OFF');
+  assert.equal(countText('bracket', 9, '', true), '9 ITEMS · HIDDEN ON');
+});
+
+test('the completions heading in each voice', () => {
+  assert.equal(completionHead('plain', 3, '~/Codes', 'la'), '3 folders in ~/Codes start with la');
+  assert.equal(completionHead('plain', 1, '~/Codes', 'la'), '1 folder in ~/Codes starts with la');
+  assert.equal(completionHead('caps', 3, '~/Codes', 'la'), 'FOLDERS');
+  assert.equal(completionHead('bracket', 3, '~/Codes', 'la'), 'COMPLETING IN ~/Codes');
+});
+
+test('the path mode key strip in each voice', () => {
+  const strip = (v) => pathKeys(v).map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
+  assert.equal(strip('plain'), 'tab complete · ↵ go · ctrl+l filter · esc');
+  assert.equal(strip('caps'), '↵ GO · TAB COMPLETE · ⌃L BACK TO LIST · ESC');
+  assert.equal(strip('bracket'), '[↵] GO · [TAB] COMPLETE · [⌃L] BACK TO LIST · [ESC]');
+});
+
+test('the preview reads the decoded size, the file size and kind, and when it changed', () => {
+  const png = { name: 'shot.png', dir: false, size: 12000, mime: 'image/png' };
+  assert.deepEqual(previewText('plain', png, 640, 480), { dims: '640 × 480 px', detail: '12 KB · PNG image' });
+  assert.deepEqual(previewText('caps', png, 640, 480), { dims: '640 × 480', detail: '12 KB · PNG image' });
+  const pdf = { name: 'report.pdf', dir: false, size: 184000, mime: 'application/pdf' };
+  assert.deepEqual(previewText('bracket', pdf, 0, 0), { dims: '', detail: '184 KB · PDF file' });
+  const at = new Date(2026, 9, 14, 16, 41).getTime();
+  assert.equal(stampText('caps', at), '14 Oct 2026 · 16:41');
+  assert.equal(stampText('plain', at), '14 Oct 2026, 16:41');
+  assert.equal(stampText('bracket', at), '2026-10-14 16:41');
 });
