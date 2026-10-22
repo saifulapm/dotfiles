@@ -107,7 +107,10 @@ until [ -S "$PIPEWIRE_RUNTIME_DIR/pipewire-0" ]; do
   sleep 0.02
 done
 
-dbus-run-session niri -c "$D/niri.kdl" &
+# The nested bus starts file dialogs with the nested shell's picker; its daemon never sees the live display, so nothing it starts before niri's own can draw there (bin/dots-dev-shell hands it the nested one).
+mkdir -p "$XDG_DATA_HOME/dbus-1/services"
+printf '[D-BUS Service]\nName=org.freedesktop.impl.portal.desktop.dots\nExec=%s\n' "$repo/bin/dots-portal" >"$XDG_DATA_HOME/dbus-1/services/org.freedesktop.impl.portal.desktop.dots.service"
+env -u WAYLAND_DISPLAY -u DISPLAY dbus-run-session -- env WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" ${DISPLAY+DISPLAY="$DISPLAY"} niri -c "$D/niri.kdl" &
 session=$!
 until [ -f "$D/env" ]; do
   kill -0 "$session" 2>/dev/null || exit 1

@@ -77,6 +77,27 @@ check "the nested tmux socket is inside the temp dir" under_dev "$sock"
 live_tmux_lists() { env -u TMUX_TMPDIR tmux ls 2>/dev/null | grep -q '^dots-iso:'; }
 check "the live tmux does not list dots-iso" eval '! live_tmux_lists'
 
+# The nested bus answers its own file dialogs: dots-portal is activatable there, and what it starts draws on the nested display, never the live one.
+activatable() { gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus --method org.freedesktop.DBus.ListActivatableNames | grep -qF "'org.freedesktop.impl.portal.desktop.dots'"; }
+check "the nested bus can start dots-portal" activatable
+picker_open() { dots-call picker state | jq -e '.open' >/dev/null; }
+gdbus call --session --timeout 20 --dest org.freedesktop.impl.portal.desktop.dots --object-path /org/freedesktop/portal/desktop --method org.freedesktop.impl.portal.FileChooser.OpenFile /org/freedesktop/portal/desktop/request/1_1/iso '' '' 'Open File' '{}' >/dev/null 2>&1 &
+caller=$!
+check "a FileChooser call on the nested bus opens the nested shell's picker" until_ok 5000 picker_open
+wtype -k Escape
+wait "$caller"
+# Every process on the nested bus that the bus itself started carries the nested display or none.
+bus_display_ok() {
+  local p e
+  for p in $(pgrep -f 'xdg-desktop-portal|dots-portal'); do
+    e=$(tr '\0' '\n' <"/proc/$p/environ" 2>/dev/null) || continue
+    grep -qxF "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" <<<"$e" || continue
+    grep -q '^WAYLAND_DISPLAY=' <<<"$e" && ! grep -qxF "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" <<<"$e" && return 1
+  done
+  return 0
+}
+check "nothing the nested bus started carries the live display" bus_display_ok
+
 dev_stop
 check "the temp dir is deleted" test ! -e "$dev"
 tmux_left() { pgrep -af '[t]mux' | grep -qF "$dev"; }

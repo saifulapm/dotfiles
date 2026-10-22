@@ -3,6 +3,8 @@
 set -euo pipefail
 {
 
+# What the nested bus starts from now on, a portal among them, draws on the nested display.
+dbus-update-activation-environment WAYLAND_DISPLAY NIRI_SOCKET
 # The nested session bus stands in for the system bus, so UPower and NetworkManager doubles run there.
 export DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS
 # A user manager need not have bin/ on PATH, so the nested shell runs without it, and starts what it needs from bin/ by absolute path.
