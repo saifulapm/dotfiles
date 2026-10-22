@@ -25,6 +25,9 @@ Item {
     readonly property string mode: seen?.mode ?? ""
     readonly property bool saving: mode === "save"
     readonly property bool multiple: seen?.multiple ?? false
+    readonly property bool choosingFolder: mode === "folder"
+    // The marked files' names; a folder change clears them, so a name is enough.
+    property var marked: []
     readonly property var filters: seen?.filters ?? []
     readonly property int filter: seen?.filter ?? 0
     readonly property string name: seen?.name ?? ""
@@ -48,7 +51,8 @@ Item {
     readonly property var rows: P.shownRows(entries, {
         hidden: hidden,
         filter: currentFilter,
-        query: matches.length > 0 ? "" : query
+        query: matches.length > 0 ? "" : query,
+        folders: choosingFolder
     })
     property bool listed: false
     // A folder change while a listing runs asks for one more after it.
@@ -73,7 +77,7 @@ Item {
     readonly property var choices: pathFolder === split.parent ? P.completions(pathEntries, split.tail) : []
     property int choice: 0
     readonly property var cursorRow: rows[selected] ?? null
-    readonly property bool previewing: !saving && !typingPath && cursorRow !== null && !cursorRow.dir
+    readonly property bool previewing: !saving && !choosingFolder && !typingPath && cursorRow !== null && !cursorRow.dir
     readonly property bool preview: previewing && previewImage.status === Image.Ready
     readonly property bool busy: request !== null || lister.running
 
@@ -152,6 +156,7 @@ Item {
         if (!keepQuery)
             query = "";
         folder = path;
+        marked = [];
         selected = saving ? -1 : 0;
         landOn = saving ? saveName : "";
         listed = false;
@@ -295,6 +300,17 @@ Item {
             reply(P.answerLine(0, [pathOf(row)]));
     }
 
+    // ctrl+Enter answers the folder shown, which enter() sets before its listing runs, or the marked files; false leaves it to Enter.
+    function chooseAll() {
+        if (choosingFolder)
+            reply(P.answerLine(0, [folder]));
+        else if (multiple && marked.length > 0)
+            reply(P.answerLine(0, P.markedPaths(entries, marked, folder)));
+        else
+            return false;
+        return true;
+    }
+
     function tilde(path) {
         return path === home ? "~" : path.indexOf(home + "/") === 0 ? "~" + path.slice(home.length) : path;
     }
@@ -336,6 +352,7 @@ Item {
             selected: selected,
             places: shownPlaces,
             matches: lit,
+            marked: marked,
             focus: saving && side === "list" && !typingPath && !asking ? "name" : side,
             name: saving && !typingPath ? typedLabel.text : "",
             question: asking && noticeLabel.visible,
@@ -353,6 +370,7 @@ Item {
             previewName: previewName.text,
             previewDims: previewDims.text,
             previewDetail: previewDetail.text,
+            foot: footLabel.visible ? footLabel.text : "",
             hint: (noticeLabel.visible ? [noticeLabel.text] : []).concat(keys).join(" · "),
             busy: busy,
             openMs: openMs,
@@ -453,8 +471,16 @@ Item {
                 event.accepted = true;
                 return;
             }
+            const onList = !picker.typingPath && picker.side === "list";
             if (ctrl && event.key === Qt.Key_L)
                 picker.togglePath();
+            else if (ctrl && event.key === Qt.Key_Space) {
+                if (picker.multiple && onList)
+                    picker.marked = P.toggleMark(picker.marked, picker.cursorRow);
+            } else if (ctrl && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !picker.typingPath) {
+                if (!picker.chooseAll())
+                    picker.choose();
+            }
             else if (ctrl && event.key === Qt.Key_H)
                 picker.hidden = !picker.hidden;
             else if (event.key === Qt.Key_Down)
@@ -544,7 +570,7 @@ Item {
                         anchors.centerIn: parent
                         width: Math.min(implicitWidth, card.width - 80)
                         textFormat: Text.PlainText
-                        text: P.headingText(picker.voice, picker.appText, picker.mode)
+                        text: P.headingText(picker.voice, picker.appText, picker.mode, picker.multiple)
                         maximumLineCount: 1
                         elide: Text.ElideRight
                         color: look.label.kind === "header" ? look.small.color : look.label.color
@@ -785,6 +811,7 @@ Item {
                             required property var modelData
                             required property int index
                             readonly property bool isCurrent: index === picker.selected
+                            readonly property bool isMarked: !modelData.dir && picker.marked.indexOf(modelData.name) >= 0
                             readonly property color ink: isCurrent ? look.cursor.text : c.ink
                             readonly property color dim: isCurrent ? look.cursor.detail : c.muted
                             // The row as drawn, for the state function.
@@ -794,6 +821,7 @@ Item {
                                     dir: modelData.dir,
                                     size: sizeLabel.text,
                                     tag: tagLabel.visible ? tagLabel.text : "",
+                                    marked: markLabel.visible,
                                     modified: dateLabel.text,
                                     elided: nameText.truncated,
                                     lines: nameText.lineCount
@@ -802,7 +830,8 @@ Item {
                             width: rowList.width
                             height: 34
                             radius: look.cursor.radius
-                            color: isCurrent ? look.cursor.fill : "transparent"
+                            // A marked row is tinted; the cursor row stays inverted.
+                            color: isCurrent ? look.cursor.fill : isMarked ? look.tile.fill : "transparent"
 
                             RowLayout {
                                 anchors.fill: parent
@@ -810,13 +839,24 @@ Item {
                                 anchors.rightMargin: 12
                                 spacing: 12
 
-                                // Paper and Blueprint mark the cursor row; Artboard draws a folder or a page.
+                                // Paper and Blueprint mark the cursor row; Artboard draws a folder or a page; a marked file shows a tick instead.
                                 Item {
                                     implicitWidth: 16
                                     implicitHeight: 16
 
                                     Text {
-                                        visible: !plain
+                                        id: markLabel
+                                        visible: rowItem.isMarked
+                                        anchors.centerIn: parent
+                                        textFormat: Text.PlainText
+                                        text: "✓"
+                                        color: rowItem.isCurrent ? look.cursor.text : bracket ? c.accent : c.ink
+                                        font.family: fonts.ui
+                                        font.pixelSize: 14
+                                        font.bold: true
+                                    }
+                                    Text {
+                                        visible: !plain && !rowItem.isMarked
                                         anchors.centerIn: parent
                                         textFormat: Text.PlainText
                                         text: "▸"
@@ -825,7 +865,7 @@ Item {
                                         font.pixelSize: 14
                                     }
                                     Rectangle {
-                                        visible: plain
+                                        visible: plain && !rowItem.isMarked
                                         anchors.centerIn: parent
                                         width: rowItem.modelData.dir ? 14 : 11
                                         height: rowItem.modelData.dir ? 10 : 13
@@ -975,7 +1015,7 @@ Item {
                 }
 
                 Rectangle {
-                    visible: !picker.saving
+                    visible: !picker.saving && !picker.choosingFolder
                     Layout.fillHeight: true
                     implicitWidth: 1
                     color: look.rule.color
@@ -983,7 +1023,7 @@ Item {
 
                 // The cursor file: its picture when Qt decodes it, then its name, size, kind and date; hidden while a path is typed, and gone in save mode.
                 Item {
-                    visible: !picker.saving
+                    visible: !picker.saving && !picker.choosingFolder
                     Layout.preferredWidth: 280
                     Layout.fillHeight: true
 
@@ -1049,6 +1089,25 @@ Item {
             }
 
             Rule {}
+
+            // How many files ctrl+Enter opens, or the folder it chooses, in the slot above the key strip.
+            Text {
+                id: footLabel
+                visible: text !== "" && !picker.typingPath && !picker.saving
+                Layout.fillWidth: true
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.topMargin: 12
+                textFormat: Text.PlainText
+                text: P.oneLine(P.footText(picker.voice, picker.mode, picker.marked.length, picker.tilde(picker.folder)))
+                maximumLineCount: 1
+                elide: Text.ElideMiddle
+                color: c.ink
+                font.family: look.small.font
+                font.pixelSize: look.small.size + 1
+                font.letterSpacing: look.small.spacing
+                font.bold: true
+            }
 
             Flow {
                 Layout.fillWidth: true

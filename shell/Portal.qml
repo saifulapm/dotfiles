@@ -80,7 +80,7 @@ Scope {
         target: "picker"
 
         function state(): string {
-            const shown = portal.card ? JSON.parse(portal.card.state()) : { loaded: false, open: false, settled: false, keyboard: false, mode: "", app: "", heading: "", folder: "", rows: [], selected: 0, openMs: null, opens: 0 };
+            const shown = portal.card ? JSON.parse(portal.card.state()) : { loaded: false, open: false, settled: false, keyboard: false, mode: "", app: "", heading: "", folder: "", rows: [], selected: 0, name: "", question: false, notice: "", marked: [], foot: "", openMs: null, opens: 0 };
             return JSON.stringify(Object.assign(shown, { waiting: portal.waiting.length }));
         }
     }
