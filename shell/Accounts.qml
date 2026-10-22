@@ -633,6 +633,8 @@ Item {
 
                                 Row {
                                     id: figRow
+                                    // What the figure's two texts share once the triangle and the gap are taken: the main part keeps at least half, the tail takes what the main leaves.
+                                    readonly property real room: Math.max(0, figure.width - (triangle.visible ? triangle.width + spacing : 0) - (figTail.visible ? spacing : 0))
                                     anchors.left: caps ? parent.left : undefined
                                     anchors.right: caps ? undefined : parent.right
                                     anchors.verticalCenter: parent.verticalCenter
@@ -685,7 +687,7 @@ Item {
                                     Text {
                                         id: figMain
                                         anchors.verticalCenter: parent.verticalCenter
-                                        width: Math.min(implicitWidth, Math.max(0, figure.width - (triangle.visible ? triangle.width + 6 : 0) - (figTail.visible ? Math.min(figTail.implicitWidth, figure.width / 2) + 6 : 0)))
+                                        width: Math.min(implicitWidth, figTail.visible ? Math.max(figRow.room - figTail.implicitWidth, figRow.room / 2) : figRow.room)
                                         elide: Text.ElideRight
                                         textFormat: Text.PlainText
                                         text: rowItem.fig ? rowItem.fig.main : ""
@@ -698,7 +700,7 @@ Item {
                                         id: figTail
                                         visible: text !== ""
                                         anchors.verticalCenter: parent.verticalCenter
-                                        width: Math.min(implicitWidth, figure.width / 2)
+                                        width: Math.min(implicitWidth, Math.max(0, figRow.room - figMain.width))
                                         elide: Text.ElideRight
                                         textFormat: Text.PlainText
                                         text: rowItem.fig ? rowItem.fig.tail : ""
@@ -753,7 +755,11 @@ Item {
                             Text {
                                 id: resetText
                                 visible: !rowItem.isGroup && !rowItem.isAccount && !(plain && rowItem.it.kind === "usage") && (rowItem.isLimit || rowItem.it.kind === "usage")
+                                // A column when the row has room; when it has none, the column's slack goes to the figure, never the reset's own text.
+                                Layout.fillWidth: !caps
                                 Layout.preferredWidth: caps ? -1 : bracket ? 140 : 112
+                                Layout.maximumWidth: caps ? Number.POSITIVE_INFINITY : bracket ? 140 : 112
+                                Layout.minimumWidth: caps ? -1 : implicitWidth
                                 horizontalAlignment: Text.AlignRight
                                 textFormat: Text.PlainText
                                 text: marks.words(rowItem.it.reset || "")

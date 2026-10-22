@@ -179,6 +179,8 @@ inside() { state_is '.cardBox as $c | all(.rows[]; .right <= $c.x + $c.w + 0.5)'
 edges() { acc_state | jq -c '[(.cardBox.x + .cardBox.w | floor), ([.rows[].right] | max | floor)]'; }
 check "offline, every row stays inside the card (card, rows right: $(edges))" inside
 check "offline, no note is cut short ($(acc_state | jq -c '[.rows[] | select(.noteElided) | .note]'))" state_is 'all(.rows[]; .noteElided != true)'
+# Blueprint's reset column once kept 50 px idle while Codex's figure beside its note read "0% OF MON…"; ElevenLabs' longer figure fills its row and may elide.
+check "offline, Codex's figure is whole beside its note ($(acc_state | jq -c '[.rows[] | select(.name | test("codex"; "i")) | [.figure, .figureElided]]'))" state_is 'any(.rows[]; (.name | test("codex"; "i")) and .figureElided == false)'
 rm "$DOTS_DEV_DIR/accounts-offline"
 close_acc
 
