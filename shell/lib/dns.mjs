@@ -129,7 +129,10 @@ export function allowArgs(d, text) {
 // o and O open a KID device, and restart or lengthen a timed open.
 export const openArgs = (d, length) => ((d.kid || timed(d)) && !d.dim ? ['open', d.key, length] : null);
 
-export const dnsKeys = (look) => look.keys([['space', 'kid mode'], ['1-5', 'categories'], ['o', 'open 30m'], ['O', '2h'], ['a', 'allow'], ['n', 'add device'], ['esc', '']]);
+// A key chip draws its key as typed, since o and O are two keys; the words take the theme's voice and Blueprint keeps its brackets.
+const keys = (look, pairs) => pairs.map(([k, w]) => ({ key: look.voice === 'bracket' ? `[${k}]` : k, word: look.tabText(w) }));
+
+export const dnsKeys = (look) => keys(look, [['space', 'kid mode'], ['1-5', 'categories'], ['o', 'open 30m'], ['O', '2h'], ['a', 'allow'], ['n', 'add device'], ['esc', '']]);
 
 // `dots-dns leases`: the router's leases not yet listed, each with the name the field starts from.
 export function leasesView(text) {
@@ -147,7 +150,7 @@ export function addArgs(lease, text) {
   return lease && name ? ['add', lease.mac, name] : null;
 }
 
-export const addKeys = (look) => look.keys([['↵', 'add in kid mode'], ['tab', 'name'], ['j/k', 'lease'], ['esc', 'back']]);
+export const addKeys = (look) => keys(look, [['↵', 'add in kid mode'], ['tab', 'name'], ['j/k', 'lease'], ['esc', 'back']]);
 
 // A group label in the theme's voice, its count after it, a column word at the right; the heading, and a failure in the theme's error voice.
 export function dnsLook(tokens) {

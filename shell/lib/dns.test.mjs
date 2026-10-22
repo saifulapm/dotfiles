@@ -72,10 +72,11 @@ test("each theme labels the groups in its voice: Paper's and Blueprint's caps, A
   assert.deepEqual(label('blueprint'), [{ text: 'CARRIED PROFILE · 3', right: 'LAST BLOCK' }, { text: 'HOME ROUTER · 5', right: 'LAST BLOCK' }]);
 });
 
-test("each theme's key strip is the board's", () => {
+test("each theme's key strip is the board's, each key as typed so o and O read apart", () => {
   const strip = (n) => dnsKeys(listLook(theme(n))).map((k) => `${k.key} ${k.word}`.trim());
   assert.deepEqual(strip('artboard'), ['space kid mode', '1-5 categories', 'o open 30m', 'O 2h', 'a allow', 'n add device', 'esc']);
-  assert.deepEqual(strip('paper'), ['SPACE KID MODE', '1-5 CATEGORIES', 'O OPEN 30M', 'O 2H', 'A ALLOW', 'N ADD DEVICE', 'ESC']);
+  assert.deepEqual(strip('paper'), ['space KID MODE', '1-5 CATEGORIES', 'o OPEN 30M', 'O 2H', 'a ALLOW', 'n ADD DEVICE', 'esc']);
+  assert.deepEqual(strip('blueprint'), ['[space] KID MODE', '[1-5] CATEGORIES', '[o] OPEN 30M', '[O] 2H', '[a] ALLOW', '[n] ADD DEVICE', '[esc]']);
 });
 
 test("a carried KID device's pane: its path, KID, the five categories with YouTube Kids and Gambling off, its allow list and recent blocks", () => {
@@ -275,4 +276,5 @@ test('Enter adds the lease under the typed name, one-lined, and an empty name ad
 
 test("the add list's key strip is the board's", () => {
   assert.deepEqual(addKeys(listLook(theme('artboard'))).map((k) => `${k.key} ${k.word}`.trim()), ['↵ add in kid mode', 'tab name', 'j/k lease', 'esc back']);
+  assert.deepEqual(addKeys(listLook(theme('paper'))).map((k) => `${k.key} ${k.word}`.trim()), ['↵ ADD IN KID MODE', 'tab NAME', 'j/k LEASE', 'esc BACK']);
 });

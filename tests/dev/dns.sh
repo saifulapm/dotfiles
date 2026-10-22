@@ -141,13 +141,15 @@ idle
 check "reopened with identical data, the drawn rows read back the same ($(dns_state | jq -c '[.rows[] | [.name, .badge]]'))" test "$(dns_state | jq -c '[.rows[] | [.name, .badge]]')" = "$before"
 check "and the pane is drawn" state_is '.pane.name != ""'
 
-for t in "paper|CARRIED PROFILE · 3|HOME ROUTER · 5|#FAF6EC" "artboard|Carried profile · 3|Home router · 5|#FFFFFF" "blueprint|CARRIED PROFILE · 3|HOME ROUTER · 5|#0A1526"; do
-  IFS='|' read -r name carried router card <<<"$t"
+for t in "paper|CARRIED PROFILE · 3|HOME ROUTER · 5|#FAF6EC|space 1-5 o O a n esc" "artboard|Carried profile · 3|Home router · 5|#FFFFFF|space 1-5 o O a n esc" "blueprint|CARRIED PROFILE · 3|HOME ROUTER · 5|#0A1526|[space] [1-5] [o] [O] [a] [n] [esc]"; do
+  IFS='|' read -r name carried router card keys <<<"$t"
   close_dns
   in_theme "$name"
   open_dns
   idle
   check "$name: the groups read $carried and $router ($(dns_state | jq -c '[.groups[].text]'))" state_is --arg a "$carried" --arg b "$router" '[.groups[].text] == [$a, $b]'
+  # o opens for 30 minutes and O for 2 hours, so a theme's caps voice must not draw both as O.
+  check "$name: the key strip draws each key as typed, $keys ($(dns_state | jq -c .keys))" state_is --arg k "$keys" '.keys == ($k | split(" "))'
   px=$(off_colour "$(cursor_geo)" "$card")
   check "$name: the cursor row's strip $(cursor_geo) draws $px px off the card's $card, over half of it" test "$px" -ge 10000
   wtype j

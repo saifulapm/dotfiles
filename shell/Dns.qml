@@ -219,6 +219,9 @@ Item {
         const leaseRows = [];
         for (let i = 0; i < leaseRepeater.count; i++)
             leaseRows.push(leaseRepeater.itemAt(i).drawn());
+        const keys = [];
+        for (let i = 0; i < keyRepeater.count; i++)
+            keys.push(keyRepeater.itemAt(i).drawnKey);
         return JSON.stringify({
             loaded: true,
             open: shown,
@@ -257,7 +260,8 @@ Item {
                 host: leaseHost.text,
                 address: leaseAddress.text
             } : null,
-            footer: footerText.text
+            footer: footerText.text,
+            keys: keys
         });
     }
 
@@ -1239,10 +1243,12 @@ Item {
                 spacing: plain ? 8 : 14
 
                 Repeater {
+                    id: keyRepeater
                     model: panel.adding ? D.addKeys(look) : D.dnsKeys(look)
                     Rectangle {
                         id: keyPair
                         required property var modelData
+                        readonly property string drawnKey: chipKey.text
                         width: pair.implicitWidth + (plain ? 14 : 0)
                         height: pair.implicitHeight + (plain ? 6 : 0)
                         radius: 6
@@ -1252,6 +1258,7 @@ Item {
                             anchors.centerIn: parent
                             spacing: plain ? 6 : 5
                             Text {
+                                id: chipKey
                                 textFormat: Text.PlainText
                                 text: keyPair.modelData.key
                                 color: look.chip.key
