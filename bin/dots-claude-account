@@ -66,12 +66,15 @@ add() {
 }
 
 use() {
-  local id=${1:-}
+  local id=${1:-} home
   if [ ! -f "$reg" ]; then
     [ "$id" = main ] || die "no account $id"
     return 0
   fi
   jq -e --arg id "$id" 'any(.accounts[]; .id == $id)' "$reg" >/dev/null || die "no account $id"
+  # A hand-edited account with no home would start claude in a fresh, logged-out config dir.
+  home=$(jq -r --arg id "$id" 'first(.accounts[] | select(.id == $id)) | .home // ""' "$reg")
+  [ -n "$home" ] && [ -d "$home" ] || die "account $id has no home${home:+ at $home}"
   jq --arg id "$id" '.active = $id' "$reg" | save
 }
 

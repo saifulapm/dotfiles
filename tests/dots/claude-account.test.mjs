@@ -110,3 +110,26 @@ test('cx sets CLAUDE_CONFIG_DIR only for a second active account', (t) => {
   assert.equal(s.run(['use', 'work']).status, 0);
   assert.equal(cx(), `dir=${join(s.root, 'state/dots/claude-accounts/work')} argv=--allow-dangerously-skip-permissions -p hi`);
 });
+
+// A registry edited by hand can name an account with no home, or one gone; claude would take that path as a fresh, logged-out config dir.
+test('use and cx refuse an account whose home is not a directory', (t) => {
+  const s = scratch(t);
+  assert.equal(s.run(['add', 'work']).status, 0);
+  const reg = JSON.parse(readFileSync(s.reg, 'utf8'));
+  reg.accounts.push({ id: 'nohome', label: 'nohome' }, { id: 'gone', label: 'gone', home: join(s.root, 'gone') });
+  writeFileSync(s.reg, JSON.stringify(reg));
+  const before = readFileSync(s.reg);
+  for (const id of ['nohome', 'gone']) {
+    const r = s.run(['use', id]);
+    assert.notEqual(r.status, 0, id);
+    assert.match(r.stderr, /home/);
+  }
+  assert.deepEqual(readFileSync(s.reg), before);
+  for (const id of ['nohome', 'gone']) {
+    writeFileSync(s.reg, JSON.stringify(Object.assign({}, reg, { active: id })));
+    const r = spawnSync('fish', ['-c', `source ${cxFn}; cx -p hi`], { env: s.env, encoding: 'utf8' });
+    assert.notEqual(r.status, 0, id);
+    assert.equal(r.stdout.trim(), '', `cx ran claude for ${id}`);
+    assert.match(r.stderr, /home/);
+  }
+});
