@@ -230,6 +230,7 @@ PanelWindow {
             height: paper.height
             tokens: sheet.tokens
             dir: paper.theme.dir
+            readAhead: paper.swapped
             // The zoom fades the sheet, not the fill, so the fill blends by the sheet's opacity.
             blending: sheet.opacity < 1
         }
