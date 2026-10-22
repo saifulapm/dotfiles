@@ -1,0 +1,5 @@
+# The shell's file picker as a portal backend: bin/dots-portal, started by D-Bus. Root-owned under /usr/share/xdg-desktop-portal/portals, the one directory xdg-desktop-portal reads.
+[portal]
+DBusName=org.freedesktop.impl.portal.desktop.dots
+Interfaces=org.freedesktop.impl.portal.FileChooser;
+UseIn=niri

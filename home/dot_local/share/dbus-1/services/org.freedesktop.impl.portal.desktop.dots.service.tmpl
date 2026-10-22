@@ -1,0 +1,4 @@
+# xdg-desktop-portal starts the file picker's backend on the first request; it exits after 30 s idle.
+[D-BUS Service]
+Name=org.freedesktop.impl.portal.desktop.dots
+Exec={{ joinPath .chezmoi.workingTree "bin/dots-portal" }}

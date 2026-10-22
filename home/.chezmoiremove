@@ -9,3 +9,5 @@
 .config/systemd/user/sockets.target.wants/php84-fpm-proxy.socket
 .config/php-fpm/php83-dev.conf
 .config/php-fpm/php84-dev.conf
+# v1 started its own file picker backend, bin/qshell-portal.
+.local/share/dbus-1/services/org.freedesktop.impl.portal.desktop.qshell.service

@@ -1,0 +1,8 @@
+#!/bin/bash
+# portal hashes: {{ joinPath .chezmoi.workingTree "system/xdg-desktop-portal/portals/dots.portal" | include | sha256sum }} {{ joinPath .chezmoi.sourceDir "dot_config/xdg-desktop-portal/niri-portals.conf" | include | sha256sum }}
+{{ template "lib.sh" . }}
+# xdg-desktop-portal reads backends only from /usr/share; v1's qshell backend goes with it.
+root install -D -m 0644 {{ joinPath .chezmoi.workingTree "system/xdg-desktop-portal/portals/dots.portal" | quote }} /usr/share/xdg-desktop-portal/portals/dots.portal || die "could not register the file picker's portal"
+root rm -f /usr/share/xdg-desktop-portal/portals/qshell.portal || die "could not remove v1's portal"
+# The frontend reads the backends and portals.conf once, at its start; D-Bus starts it again on the next request.
+systemctl --user restart xdg-desktop-portal.service 2>/dev/null || log "the file picker answers from the next login"

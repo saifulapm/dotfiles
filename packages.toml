@@ -413,7 +413,7 @@ why = "zbarimg reads a QR code off the screen"
 [[package]]
 name = "python3-gobject"
 arch = "all"
-why = "gi, which the dev-fake D-Bus services in bin/ import"
+why = "gi, which bin/dots-portal and the dev-fake D-Bus services import"
 
 [[package]]
 name = "just"
@@ -541,3 +541,8 @@ why = "VA-API video decode on the NUC's Intel GPU, RPM Fusion's build with the c
 name = "libva-utils"
 arch = "x86_64"
 why = "vainfo, which shows the NUC's VA driver loads"
+
+[[package]]
+name = "xdg-desktop-portal-gtk"
+arch = "all"
+why = "answers open and save dialogs when the shell's picker cannot"
