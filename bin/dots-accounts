@@ -2,12 +2,16 @@
 // Prints every account limit and balance as one JSON array of rows. `--cached` prints each source's last good rows from the cache, with no network. Each source is one entry in sources(): a name for its cache file, the placeholder row's names, and run(signal), which resolves its rows or throws Failure.
 import { existsSync, mkdirSync, openSync, closeSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 
 const env = process.env;
-const LIMIT_MS = 10000;
+// Only a test shortens the limit.
+const LIMIT_MS = Number(env.DOTS_ACCOUNTS_LIMIT_MS) || 10000;
 const STATE = env.XDG_STATE_HOME || env.HOME + '/.local/state';
 const CACHE = join(env.XDG_CACHE_HOME || env.HOME + '/.cache', 'dots', 'accounts');
 const ANTHROPIC = env.DOTS_ACCOUNTS_ANTHROPIC_URL || 'https://api.anthropic.com';
+const ELEVENLABS = env.DOTS_ACCOUNTS_ELEVENLABS_URL || 'https://api.elevenlabs.io';
+const FAL = env.DOTS_ACCOUNTS_FAL_URL || 'https://api.fal.ai';
 const AUTH = new Set(['expired', 'forbidden', 'locked', 'no-key']);
 
 // A source's failure carries only a reason from the fixed list, never text from a response.
@@ -32,15 +36,15 @@ const readJSON = (path) => {
   }
 };
 
-// One request, never retried; the status alone picks the reason.
-async function fetchJSON(url, headers, signal) {
+// One request, never retried; the status alone picks the reason. A 401 means an expired login for Claude and a bad key for a source that reads its key from pass, so the caller names it.
+async function fetchJSON(url, headers, signal, unauthorized = 'expired') {
   let res;
   try {
     res = await fetch(url, { headers, signal });
   } catch (e) {
     throw new Failure(e.name === 'TimeoutError' ? 'timeout' : 'network');
   }
-  if (res.status === 401) throw new Failure('expired');
+  if (res.status === 401) throw new Failure(unauthorized);
   if (res.status === 403) throw new Failure('forbidden');
   if (res.status === 429) throw new Failure('rate-limited');
   if (!res.ok) throw new Failure('network');
@@ -89,8 +93,179 @@ async function claude(account, signal) {
   return claudeRows(account, await fetchJSON(ANTHROPIC + '/api/oauth/usage', headers, signal));
 }
 
+// A child runs in its own process group so killing it takes its helpers too, and the limit's abort kills it.
+function exec(cmd, args, signal) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { env: { ...env, PASSWORD_STORE_GPG_OPTS: '--pinentry-mode error' }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+    signal.addEventListener('abort', () => (killGroup(child), reject(new Failure('timeout'))), { once: true });
+    child.on('error', (e) => reject(new Failure(e.code === 'ENOENT' ? 'no-key' : 'network')));
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
+  });
+}
+
+const killGroup = (child) => {
+  try {
+    process.kill(-child.pid, 'SIGKILL');
+  } catch {}
+};
+
+// pass runs with no passphrase prompt: a locked store fails at once and says so on stderr.
+async function key(name, signal) {
+  const r = await exec('pass', ['show', name], signal);
+  if (r.code !== 0) throw new Failure(/pinentry|decryption failed/.test(r.stderr) ? 'locked' : 'no-key');
+  const first = r.stdout.split('\n')[0].trim();
+  if (!first) throw new Failure('no-key');
+  return first;
+}
+
+// Text from a response reaches a row only as a number or as a three-letter currency code.
+const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 1e6) / 1e6 : null);
+const amount = (v) => (typeof v === 'string' && v.trim() !== '' ? num(Number(v)) : null);
+const currency = (v) => (typeof v === 'string' && /^[A-Za-z]{3}$/.test(v) ? v.toUpperCase() : 'USD');
+const unix = (v) => (typeof v === 'number' ? iso(v * 1000) : null);
+
+const own = (provider, label) => ({ provider, label, account: null });
+const money = (names, value, limit, unit) => ({ ...names, metric: 'balance', kind: 'money', value, limit, unit, resets_at: null });
+
+async function elevenlabs(signal) {
+  const body = await fetchJSON(ELEVENLABS + '/v1/user/subscription', { 'xi-api-key': await key('AI/elevenlabs/main', signal) }, signal, 'no-key');
+  const used = num(body && body.character_count);
+  const cap = num(body && body.character_limit);
+  if (used === null || cap === null) throw new Failure('shape');
+  return [{ ...own('elevenlabs', 'ElevenLabs'), metric: 'characters', kind: 'count', value: used, limit: cap, unit: 'characters', resets_at: unix(body.next_character_count_reset_unix) }];
+}
+
+// The billing key has the usage scope; the main key is the fallback when the billing key is not in the store.
+async function fal(signal) {
+  let k;
+  try {
+    k = await key('AI/fal/billing', signal);
+  } catch (e) {
+    if (!(e instanceof Failure) || e.reason !== 'no-key') throw e;
+    k = await key('AI/fal/main', signal);
+  }
+  const body = await fetchJSON(FAL + '/v1/account/billing?expand=credits', { authorization: 'Key ' + k }, signal, 'no-key');
+  const left = num(body && body.credits && body.credits.current_balance);
+  if (left === null) throw new Failure('shape');
+  return [money(own('fal', 'fal'), left, null, currency(body.credits.currency))];
+}
+
+// One rate-limit window as a percent row, named by its length.
+const window = (w) => {
+  const mins = w.windowDurationMins;
+  const metric = { 300: '5-hour', 10080: 'weekly', 43200: 'monthly' }[mins] || (typeof mins === 'number' && mins > 0 ? Math.round(mins / 60) + 'h' : null);
+  if (!metric || num(w.usedPercent) === null) throw new Failure('shape');
+  return { ...own('codex', 'Codex'), metric, kind: 'percent', value: num(w.usedPercent), limit: 100, unit: '%', resets_at: unix(w.resetsAt) };
+};
+
+// Codex answers JSON-RPC lines on stdout. The child is killed on every path, and the limit's abort rejects the wait.
+async function codex(signal) {
+  const child = spawn('codex', ['-s', 'read-only', 'app-server'], { detached: true, stdio: ['pipe', 'pipe', 'ignore'] });
+  try {
+    const waiting = new Map();
+    const answered = new Map();
+    const answer = (id) => answered.get(id) || new Promise((resolve) => waiting.set(id, resolve));
+    let buf = '';
+    child.stdout.on('data', (d) => {
+      buf += d;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        let msg = null;
+        try {
+          msg = JSON.parse(buf.slice(0, i));
+        } catch {}
+        buf = buf.slice(i + 1);
+        if (msg && msg.id !== undefined) {
+          answered.set(msg.id, msg);
+          if (waiting.has(msg.id)) waiting.get(msg.id)(msg);
+        }
+      }
+    });
+    const dead = new Promise((_, reject) => {
+      child.on('error', () => reject(new Failure('network')));
+      child.on('close', () => reject(new Failure('network')));
+      signal.addEventListener('abort', () => reject(new Failure('timeout')), { once: true });
+    });
+    dead.catch(() => {});
+    child.stdin.on('error', () => {});
+    const send = (msg) => child.stdin.write(JSON.stringify(msg) + '\n');
+    const ask = async (id) => {
+      const msg = await Promise.race([answer(id), dead]);
+      if (msg.error || !msg.result) throw new Failure('shape');
+      return msg.result;
+    };
+    send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'dots-accounts', version: '1' } } });
+    await ask(1);
+    send({ method: 'initialized', params: {} });
+    send({ id: 2, method: 'account/read', params: {} });
+    send({ id: 3, method: 'account/rateLimits/read', params: {} });
+    if (!(await ask(2)).account) throw new Failure('no-key');
+    const limits = (await ask(3)).rateLimits;
+    const rows = limits ? [limits.primary, limits.secondary].filter((w) => w && typeof w === 'object').map(window) : [];
+    if (!rows.length) throw new Failure('shape');
+    return rows;
+  } finally {
+    killGroup(child);
+  }
+}
+
+// pxy names its providers; only these have a balance body read here, under the label the card shows.
+const PXY = { 'deepseek-ai': 'DeepSeek', openrouter: 'OpenRouter', zenmux: 'ZenMux', vercel: 'Vercel AI', aihubmix: 'AIHubMix' };
+
+// The shapes pxy's own parsers know, tried in its order (it has none for Vercel: that is the gateway's {balance, total_used} in strings). A shape none of them knows returns null.
+function balances(data, names) {
+  const d = data.data;
+  if (d && num(d.total_credits) !== null && num(d.total_usage) !== null) return [money(names, num(d.total_credits - d.total_usage), num(d.total_credits), 'USD')];
+  if (data.success === true && d && typeof d.currency === 'string' && num(d.total_credits) !== null) return [money(names, num(d.total_credits), null, currency(d.currency))];
+  if (d && num(d.quota) !== null && num(d.used_quota) !== null) return [money(names, num(d.quota / 500000), num((d.quota + d.used_quota) / 500000), 'USD')];
+  if (Array.isArray(data.balance_infos) && data.balance_infos.length) {
+    const rows = data.balance_infos.map((b) => (amount(b && b.total_balance) === null ? null : money(names, amount(b.total_balance), null, currency(b.currency))));
+    return rows.includes(null) ? null : rows;
+  }
+  if (names.provider === 'vercel' && amount(data.balance) !== null) return [money(names, amount(data.balance), null, 'USD')];
+  return null;
+}
+
+const failed = (names, reason) => ({ ...names, metric: null, kind: null, value: null, limit: null, unit: null, resets_at: null, reason });
+
+// A provider pxy could not read says why in a summary; the summary only picks one of the fixed reasons.
+function pxyReason(summary) {
+  if (typeof summary !== 'string') return 'network';
+  if (summary.includes('No pinentry')) return 'locked';
+  return /^(credential|balance_key) error/.test(summary) ? 'no-key' : 'network';
+}
+
+// One source, many rows: a provider that failed is a row with its own reason, and the frame turns it into stale or a placeholder.
+async function pxy(signal) {
+  const r = await exec('pxy', ['status', '--remote', '--json'], signal);
+  let remote;
+  try {
+    remote = JSON.parse(r.stdout).remote;
+  } catch {}
+  if (!remote || typeof remote !== 'object') throw new Failure(r.code === 0 ? 'shape' : 'network');
+  return Object.keys(PXY)
+    .filter((k) => remote[k])
+    .flatMap((k) => {
+      const names = own(k, PXY[k]);
+      const entry = remote[k];
+      if (!entry.data || typeof entry.data !== 'object') return [failed(names, pxyReason(entry.summary))];
+      return balances(entry.data, names) || [failed(names, 'shape')];
+    });
+}
+
 function sources() {
-  return registry().map((a) => ({ name: 'claude-' + a.id, names: names(a), run: (signal) => claude(a, signal) }));
+  const claudes = registry().map((a) => ({ name: 'claude-' + a.id, names: names(a), run: (signal) => claude(a, signal) }));
+  return [
+    ...claudes,
+    { name: 'pxy', names: own('pxy', 'pxy'), run: pxy },
+    { name: 'elevenlabs', names: own('elevenlabs', 'ElevenLabs'), run: elevenlabs },
+    { name: 'fal', names: own('fal', 'fal'), run: fal },
+    { name: 'codex', names: own('codex', 'Codex'), run: codex },
+  ];
 }
 
 const cached = (name) => {
@@ -98,20 +273,37 @@ const cached = (name) => {
   return Array.isArray(rows) ? rows : null;
 };
 
-// Runs one source within the limit; a failure serves the cached rows as stale, or one placeholder row.
+// What a failure shows: the cached rows as stale, or one placeholder row. `only` limits the cached rows to one provider's, for a source with many.
+function fallback(source, reason, now, names = source.names, only) {
+  const old = (cached(source.name) || []).filter((r) => !only || r.provider === only);
+  if (old.length) return { shown: old.map((r) => ({ ...r, state: 'stale', reason })), kept: old };
+  const state = AUTH.has(reason) ? 'auth' : 'error';
+  return { shown: [{ ...failed(names, reason), as_of: now, state }], kept: [] };
+}
+
+// Runs one source within the limit. A source that throws shows its fallback; a row that carries its own reason shows that provider's fallback beside the rows that were read. The cache keeps the good rows and the old rows of providers that failed.
 async function settle(source) {
   const now = iso(Date.now());
   const signal = AbortSignal.timeout(LIMIT_MS);
   const late = new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Failure('timeout')), { once: true }));
   try {
     const rows = await Promise.race([source.run(signal), late]);
-    return { fresh: true, rows: rows.map((r) => ({ ...r, as_of: now, state: 'ok', reason: null })) };
+    const shown = [];
+    const kept = [];
+    for (const r of rows) {
+      if (r.reason) {
+        const f = fallback(source, r.reason, now, r, r.provider);
+        shown.push(...f.shown);
+        kept.push(...f.kept);
+      } else {
+        const ok = { ...r, as_of: now, state: 'ok', reason: null };
+        shown.push(ok);
+        kept.push(ok);
+      }
+    }
+    return { fresh: shown.some((r) => r.state === 'ok'), rows: shown, kept };
   } catch (e) {
-    const reason = e instanceof Failure ? e.reason : 'shape';
-    const old = cached(source.name);
-    if (old) return { rows: old.map((r) => ({ ...r, state: 'stale', reason })) };
-    const state = AUTH.has(reason) ? 'auth' : 'error';
-    return { rows: [{ ...source.names, metric: null, kind: null, value: null, limit: null, unit: null, resets_at: null, as_of: now, state, reason }] };
+    return { rows: fallback(source, e instanceof Failure ? e.reason : 'shape', now).shown };
   }
 }
 
@@ -155,7 +347,7 @@ async function main() {
     out = list.flatMap((s) => cached(s.name) || []);
   } else {
     const results = await Promise.all(list.map(settle));
-    await locked(() => results.forEach((r, i) => r.fresh && save(list[i].name, r.rows)));
+    await locked(() => results.forEach((r, i) => r.fresh && save(list[i].name, r.kept)));
     out = results.flatMap((r) => r.rows);
   }
   // Exits at once so a source still running past its limit cannot hold the process.
