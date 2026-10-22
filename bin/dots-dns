@@ -359,7 +359,7 @@ async function state() {
   const open = deadlines();
   for (const d of out.devices) {
     const until = open.get(d.key);
-    if (!until || d.kid) continue;
+    if (!until || until <= Date.now() / 1000 || d.kid) continue;
     d.open_until = until;
     d.categories = d.path === 'router' ? { youtube: true, youtube_kids: !out.router.youtube_kids_allowed, social: true, adult: true, gambling: true } : kept(d.key.slice('carried:'.length));
   }

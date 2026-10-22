@@ -727,3 +727,17 @@ test('YouTube Kids on a router row flips the shared router setting and every Kid
   assert.equal((await state(ctx)).router.youtube_kids_allowed, false);
   assert.equal((await run(ctx, 'category', 'router:02:00:00:00:00:21', 'social', 'off')).status, 2);
 });
+
+// A passed deadline that reconcile could not end must not read as a running open, or the card would count down from below zero and re-read every second.
+test('a passed deadline that could not be ended reads as no open', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  await ok(ctx, 'open', 'router:02:00:00:00:00:21', '30m');
+  await state(ctx);
+  writeFileSync(openFile(ctx, 'router:02:00:00:00:00:21'), `${Math.floor(Date.now() / 1000) - 1} router:02:00:00:00:00:21\n`);
+  s.down = true;
+  writeFileSync(join(ctx.ctl, 'ssh-down'), '');
+  const row = (await state(ctx)).devices.find((d) => d.key === 'router:02:00:00:00:00:21');
+  assert.equal(row.open_until, null);
+  assert.ok(existsSync(openFile(ctx, 'router:02:00:00:00:00:21')), 'the deadline stays for the next reconcile');
+});
