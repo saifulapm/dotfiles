@@ -8,8 +8,16 @@ idle_is() { timeout 0.5 qs ipc call idle state 2>/dev/null | jq -e "$1" >/dev/nu
 locked() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e .locked >/dev/null 2>&1; }
 has() { [ -e "$flags/$1" ]; }
 hasnt() { [ ! -e "$flags/$1" ]; }
+field_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e ".secure and .field == $1" >/dev/null 2>&1; }
+# A fresh lock can drop the first keys typed into it, so a field short of the 14 characters is refused and typed again.
 unlock() {
-  wtype dots-test-pass
+  local _
+  for _ in 1 2 3; do
+    until_ok 3000 field_is 0
+    wtype dots-test-pass
+    until_ok 1000 field_is 14 && break
+    wtype -k Return
+  done
   wtype -k Return
   until_ok 3000 bash -c "! timeout 0.5 qs ipc call lock state | jq -e .locked >/dev/null"
 }
