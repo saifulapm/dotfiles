@@ -63,6 +63,33 @@ check "j moves past main's limits to work" until_ok 1000 state_is '.selected == 
 wtype -k Down
 check "Down moves on to the first balance" until_ok 1000 state_is '.selected == "balance:DeepSeek"'
 
+# Enter on a provider row runs nothing: the registry keeps its bytes and the island says nothing about Claude.
+reg=$XDG_STATE_HOME/dots/claude-accounts.json
+island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
+reg_sum=$(sha256sum <"$reg")
+wtype -k Return
+sleep 1
+check "Enter on DeepSeek leaves the registry's bytes as they were" test "$(sha256sum <"$reg")" = "$reg_sum"
+check "and the island says nothing of Claude ($(island | jq -c .text))" eval "! island | jq -e '.text | contains(\"Claude\")' >/dev/null"
+check "and main stays active" state_is '[.accounts[] | [.id, .active]] == [["main", true], ["work", false]]'
+
+wtype k
+until_ok 1000 state_is '.selected == "account:work"'
+wtype -k Return
+active_is() { [ "$(jq -r .active "$reg")" = "$1" ]; }
+check "Enter on work makes it the registry's active account" until_ok 3000 active_is work
+check "and moves ACTIVE to work ($(acc_state | jq -c '[.accounts[] | [.id, .active]]'))" until_ok 2000 state_is '[.accounts[] | [.id, .active]] == [["main", false], ["work", true]]'
+check "the drawn ACTIVE mark sits on work's row" state_is '[.rows[] | select(.kind == "account") | [.name, .active]] == [["main", ""], ["work", "ACTIVE"]]'
+island_says() { island | jq -e '.text == "Claude · work is active for new sessions"' >/dev/null; }
+check "the island reads Claude · work is active for new sessions ($(island | jq -c .text))" until_ok 3000 island_says
+
+# A new cx session runs claude in work's home: a stub claude first on PATH prints the CLAUDE_CONFIG_DIR it was given.
+mkdir -p "$DOTS_DEV_DIR/stub"
+printf '#!/bin/sh\nprintf "%%s\\n" "$CLAUDE_CONFIG_DIR"\n' >"$DOTS_DEV_DIR/stub/claude"
+chmod +x "$DOTS_DEV_DIR/stub/claude"
+cx_dir=$(PATH=$DOTS_DEV_DIR/stub:$PATH fish --no-config -c "source $repo/home/dot_config/fish/functions/cx.fish; cx")
+check "a new cx session runs in work's home ($cx_dir)" test "$cx_dir" = "$XDG_STATE_HOME/dots/claude-accounts/work"
+
 wtype r
 check "r runs one more full fetch" until_ok 3000 bash -c "[ \"\$(paste -sd'|' '$log')\" = '--cached||' ]"
 fetched

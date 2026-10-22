@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { listLook } from './voice.mjs';
-import { accountsView, accountsItems, accountsKeys, accountsLook } from './accounts.mjs';
+import { accountsView, accountsItems, accountsKeys, accountsLook, useTarget, activeNotice } from './accounts.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
 
@@ -186,4 +186,17 @@ test("a warning draws in each theme's danger token, a stale row in its muted one
   assert.deepEqual(paper.active, { text: 'ACTIVE', color: '#1C1915', fill: 'transparent', border: '#1C1915', radius: 0, dot: '' });
   assert.deepEqual(artboard.active, { text: 'ACTIVE', color: '#FFFFFF', fill: '#15171B', border: 'transparent', radius: 8, dot: '#6C83FF' });
   assert.deepEqual(blueprint.active, { text: '[ACTIVE]', color: '#7FE3F0', fill: 'transparent', border: 'transparent', radius: 0, dot: '' });
+});
+
+test('Enter makes an account that is not active the active one, and does nothing on a balance, a usage row or the active account', () => {
+  const items = accountsItems(view());
+  const at = (kind, label) => items.find((i) => i.kind === kind && i.label === label);
+  assert.deepEqual([at('account', 'work'), at('account', 'main'), at('balance', 'DeepSeek'), at('usage', 'Codex')].map(useTarget), ['work', null, null, null]);
+  assert.equal(useTarget(undefined), null);
+});
+
+test('the island says which account new sessions use, in its cleaned label', () => {
+  const reg = JSON.stringify({ active: 'main', accounts: [{ id: 'main', label: 'main' }, { id: 'work', label: 'wo\nrk‮' }] });
+  const work = accountsItems(view(rows, reg)).find((i) => i.kind === 'account' && i.account === 'work');
+  assert.equal(activeNotice(work.label), 'Claude · wo rk is active for new sessions');
 });

@@ -148,6 +148,12 @@ export function accountsItems(view) {
 
 export const accountsKeys = (look) => look.keys([['↵', 'make active'], ['r', 'refresh'], ['esc', '']]);
 
+// The account Enter makes active: an account row that is not active already; a provider row takes no Enter.
+export const useTarget = (item) => (item && item.kind === 'account' && !item.active ? item.account : null);
+
+// What the island says once the registry names the account; the label is the card's, already one line.
+export const activeNotice = (label) => `Claude · ${label} is active for new sessions`;
+
 // The boards' marks that no token carries: Artboard's bar track and the dot in its ACTIVE chip.
 const MARKS = { plain: { track: '#E3E6EB', dot: '#6C83FF', on: '#FFFFFF' } };
 const upper = (s) => String(s).toUpperCase();

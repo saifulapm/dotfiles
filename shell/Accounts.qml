@@ -21,7 +21,8 @@ Item {
     property string rowsText: "[]"
     // The cursor's place among the rows it stops on.
     property int selected: 0
-    readonly property bool busy: registryReader.running || cachedReader.running || fetcher.running
+    readonly property bool busy: registryReader.running || cachedReader.running || fetcher.running || user.running || registryRereader.running
+    readonly property string dotsBin: Quickshell.shellDir + "/../bin/dots"
 
     readonly property string command: Quickshell.env("DOTS_ACCOUNTS") || "dots-accounts"
     readonly property string registryPath: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/claude-accounts.json"
@@ -62,6 +63,17 @@ Item {
     function refresh() {
         if (!busy)
             fetcher.running = true;
+    }
+
+    // dots claude-account is the registry's only writer, so ACTIVE moves only once it has written and the registry is read again.
+    function use() {
+        const id = A.useTarget(items[current]);
+        if (!id || user.running)
+            return;
+        user.account = id;
+        user.label = items[current].label;
+        user.command = [dotsBin, "claude-account", "use", id];
+        user.running = true;
     }
 
     // Called on each of the host window's frames; the first one after open() ends the timing.
@@ -154,6 +166,31 @@ Item {
         onExited: panel.take(fetchOut.text)
     }
 
+    Process {
+        id: user
+        property string account: ""
+        property string label: ""
+        onExited: code => {
+            registryRereader.used = code === 0;
+            registryRereader.running = true;
+        }
+    }
+
+    // A refused use leaves the registry as it was, so ACTIVE stays where it names and the island says nothing.
+    Process {
+        id: registryRereader
+        property bool used: false
+        command: ["cat", panel.registryPath]
+        stdout: StdioCollector {
+            id: rereadOut
+        }
+        onExited: {
+            panel.registryText = rereadOut.text;
+            if (used && panel.activeAccount && panel.activeAccount.id === user.account)
+                panel.theme.notice(A.activeNotice(user.label));
+        }
+    }
+
     Component.onCompleted: Root.State.loaded.push("accounts")
     Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "accounts")
 
@@ -169,6 +206,8 @@ Item {
                 panel.move(-1);
             else if (event.key === Qt.Key_R)
                 panel.refresh();
+            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                panel.use();
             else if (event.key === Qt.Key_Escape)
                 panel.close();
             else
