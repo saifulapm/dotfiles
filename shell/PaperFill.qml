@@ -1,4 +1,3 @@
-import Quickshell
 import Quickshell.Io
 import QtQuick
 
@@ -15,12 +14,8 @@ Item {
     property bool blending: opacity < 1
     // flat and gradient stay the plain fill below.
     readonly property string shader: ({ grain: "grain", dots: "dots", grid: "grid" })[tokens?.primitive.paper] ?? ""
-    // Paper reads every shader once its first frame is up, so a switch finds its shader at once; until then, and in a specimen, only its own is read.
-    property bool readAhead: false
-    // Each shader's read so far: true once its .qsb has loaded, false when it cannot.
-    property var shaderRead: ({})
-    readonly property string shaderUrl: shaderRead[shader] === true ? "file://" + dir + "/shaders/" + shader + ".frag.qsb" : ""
-    readonly property bool shaderFailed: shaderRead[shader] === false
+    property string shaderUrl: ""
+    property bool shaderFailed: false
     readonly property bool ready: shader === "" || shaderFailed || effect.item !== null
 
     // The shader paints the whole fill, so the fill only shows until it loads; both at once would fade twice.
@@ -30,25 +25,15 @@ Item {
         color: fill.tokens?.color.paper ?? "transparent"
     }
 
-    // A missing .qsb crashes qs, so the effect gets a shader only once a read of it succeeds; a read made only after a switch would land after the switch's rebinding.
-    Variants {
-        model: fill.readAhead ? ["grain", "dots", "grid"] : fill.shader ? [fill.shader] : []
-
-        FileView {
-            required property string modelData
-
-            path: fill.dir + "/shaders/" + modelData + ".frag.qsb"
-            watchChanges: true
-            onFileChanged: reload()
-            onLoaded: fill.markShader(modelData, true)
-            onLoadFailed: fill.markShader(modelData, false)
+    // A missing .qsb crashes qs, so the effect gets a shader only once this read of it succeeds.
+    FileView {
+        path: fill.shader ? fill.dir + "/shaders/" + fill.shader + ".frag.qsb" : ""
+        onPathChanged: {
+            fill.shaderUrl = "";
+            fill.shaderFailed = false;
         }
-    }
-
-    function markShader(name, ok) {
-        const r = Object.assign({}, shaderRead);
-        r[name] = ok;
-        shaderRead = r;
+        onLoaded: fill.shaderUrl = "file://" + path
+        onLoadFailed: fill.shaderFailed = true
     }
 
     // A ShaderEffect with no fragmentShader runs Qt's default one, which wants a source texture.
