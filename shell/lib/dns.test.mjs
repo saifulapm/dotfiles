@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { listLook } from './voice.mjs';
-import { dnsView, dnsItems, dnsLook, dnsKeys, paneOf, kidArgs, categoryArgs, allowArgs } from './dns.mjs';
+import { dnsView, dnsItems, dnsLook, dnsKeys, paneOf, kidArgs, categoryArgs, allowArgs, badgeText, openFraction, openArgs, leasesView, addArgs, addKeys } from './dns.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
 
@@ -89,6 +89,8 @@ test("a carried KID device's pane: its path, KID, the four categories with Gambl
       { n: 3, key: 'adult', label: 'Adult', value: 'ON' },
       { n: 4, key: 'gambling', label: 'Gambling', value: 'OFF' },
     ],
+    paused: '',
+    until: '',
     allow: ['khanacademy.org', 'wikipedia.org'],
     blocks: [{ domain: 'youtube.com', age: '2m' }, { domain: 'i.ytimg.com', age: '2m' }, { domain: 'tiktok.com', age: '1h' }],
     hint: '',
@@ -102,6 +104,8 @@ test("an OPEN device's pane shows its recent blocks and that space turns Kid mod
     path: 'Carried profile · uBlockDNS',
     badge: 'OPEN',
     categories: [],
+    paused: '',
+    until: '',
     allow: [],
     blocks: [{ domain: 'reddit.com', age: '10m' }],
     hint: 'space turns Kid mode on',
@@ -156,4 +160,101 @@ test('forged names and domains are one-lined and stripped of controls and bidi m
 test('state that will not parse draws no devices and no footer', () => {
   const v = dnsView('not json', NOW);
   assert.deepEqual([v.carried, v.router, v.footer], [[], [], '']);
+});
+
+// A timed open: the iPad paused until 15:36, 24:10 left of 30 minutes, as DnsOpen draws it.
+const opened = (over) => view(Object.assign({ 'carried:dev00ipad': { kid: false, open_until: S + 24 * 60 + 10 } }, over));
+
+test('a timed open reads open · mm:ss left in its badge and counts down from the clock', () => {
+  const ipad = at(opened(), 'carried:dev00ipad');
+  assert.deepEqual([badgeText(ipad, NOW), badgeText(ipad, NOW + 70e3), badgeText(ipad, NOW + 3600e3)], ['open · 24:10 left', 'open · 23:00 left', 'open · 00:00 left']);
+  assert.equal(badgeText(at(opened(), 'carried:dev00wife'), NOW), 'OPEN');
+  assert.equal(badgeText(at(opened(), 'router:02:00:00:00:00:04'), NOW), 'KID');
+  const twoHours = at(opened({ 'carried:dev00ipad': { kid: false, open_until: S + 7200 } }), 'carried:dev00ipad');
+  assert.equal(badgeText(twoHours, NOW), 'open · 120:00 left');
+});
+
+test("a timed open's pane: Kid paused until HH:MM, its categories paused, the open's end and bar, its allow list and blocks", () => {
+  const ipad = at(opened(), 'carried:dev00ipad');
+  const pane = paneOf(ipad);
+  assert.equal(pane.path, 'Carried profile · Kid mode paused until 15:36');
+  assert.equal(pane.badge, 'OPEN');
+  assert.deepEqual(pane.categories.map((c) => `${c.n} ${c.label} ${c.value}`), ['1 YouTube paused', '2 Social paused', '3 Adult paused', '4 Gambling paused']);
+  assert.equal(pane.paused, 'paused while open');
+  assert.equal(pane.until, 'Open until 15:36');
+  assert.deepEqual(pane.allow, ['khanacademy.org', 'wikipedia.org']);
+  assert.equal(pane.hint, '');
+  // 24:10 of the 30 minutes is about 81%; with more than 30 minutes left the bar is of 2 hours.
+  assert.equal(Math.round(openFraction(ipad, NOW) * 100), 81);
+  assert.equal(openFraction(ipad, NOW + 3600e3), 0);
+  const twoHours = at(opened({ 'carried:dev00ipad': { kid: false, open_until: S + 3600 } }), 'carried:dev00ipad');
+  assert.equal(openFraction(twoHours, NOW), 0.5);
+  assert.deepEqual([paneOf(at(view(), 'carried:dev00ipad')).until, paneOf(at(view(), 'carried:dev00ipad')).paused], ['', '']);
+});
+
+test('o and O open a KID device for 30m and 2h and restart a timed one, but not an OPEN one; space ends a timed open', () => {
+  const v = opened();
+  assert.deepEqual(openArgs(at(view(), 'carried:dev00ipad'), '30m'), ['open', 'carried:dev00ipad', '30m']);
+  assert.deepEqual(openArgs(at(v, 'carried:dev00ipad'), '2h'), ['open', 'carried:dev00ipad', '2h']);
+  assert.deepEqual(openArgs(at(v, 'router:02:00:00:00:00:05'), '30m'), ['open', 'router:02:00:00:00:00:05', '30m']);
+  assert.equal(openArgs(at(v, 'carried:dev00wife'), '30m'), null);
+  assert.deepEqual(kidArgs(at(v, 'carried:dev00ipad')), ['kid', 'carried:dev00ipad', 'on']);
+  assert.equal(categoryArgs(at(v, 'carried:dev00ipad'), 1), null);
+  assert.deepEqual(allowArgs(at(v, 'carried:dev00ipad'), 'x.org'), ['allow', 'carried:dev00ipad', 'x.org']);
+});
+
+const down = (o) => Object.assign(sample(o), { router: { ok: false, as_of: S - 14 * 60, error: 'unreachable' } });
+
+test('an unreachable router dims its rows, says since when under its label, and the footer gives both ages', () => {
+  const v = dnsView(JSON.stringify(down()), NOW);
+  assert.deepEqual([v.carried.map((d) => d.dim), v.router.map((d) => d.dim)], [[false, false, false], [true, true, true, true, true]]);
+  assert.deepEqual(v.router.map((d) => d.badge), ['OPEN', 'OPEN', 'OPEN', 'KID', 'KID']);
+  assert.equal(v.footer, 'profiles as of 15:12 · router as of 14:58');
+  const groups = dnsItems(v).filter((i) => i.kind === 'group');
+  assert.deepEqual(groups.map((g) => g.line), ['', 'router unreachable · as of 14:58']);
+  assert.deepEqual(dnsItems(view()).filter((i) => i.kind === 'group').map((g) => g.line), ['', '']);
+});
+
+test('while the router is unreachable a router row takes no write, and a carried row still does', () => {
+  const v = dnsView(JSON.stringify(down()), NOW);
+  const tv = at(v, 'router:02:00:00:00:00:05');
+  assert.deepEqual([kidArgs(tv), openArgs(tv, '30m'), allowArgs(tv, 'x.org')], [null, null, null]);
+  assert.deepEqual(kidArgs(at(v, 'carried:dev00ipad')), ['kid', 'carried:dev00ipad', 'off']);
+});
+
+test('each theme draws the unreachable line in its error voice, and the heading in its own', () => {
+  const line = 'router unreachable · as of 14:58';
+  const looks = ['paper', 'artboard', 'blueprint'].map((n) => dnsLook(theme(n)));
+  assert.deepEqual(looks.map((l) => l.errorText(line)), [line, line, '✕ ROUTER UNREACHABLE · AS OF 14:58']);
+  assert.deepEqual(looks.map((l) => l.heading(true)), ['DNS SHIELD › ADD DEVICE', 'DNS Shield › Add device', 'DNS SHIELD // ADD DEVICE']);
+  assert.deepEqual(looks.map((l) => l.heading(false)), ['DNS SHIELD', 'DNS Shield', 'DNS SHIELD // DEVICES']);
+});
+
+const leases = [
+  { mac: '02:00:00:00:00:41', ip: '192.168.0.143', hostname: 'Galaxy-A54' },
+  { mac: '02:00:00:00:00:42', ip: '192.168.0.151', hostname: '' },
+  { mac: '02:00:00:00:00:43', ip: '192.168.0.160', hostname: 'Chrome\ncast‮\u001b' },
+];
+
+test('the leases read as hostname or unnamed with their address, one-lined, and their count in each voice', () => {
+  const l = leasesView(JSON.stringify(leases));
+  assert.deepEqual(l.map((x) => [x.mac, x.name, x.ip, x.field]), [
+    ['02:00:00:00:00:41', 'Galaxy-A54', '192.168.0.143', 'Galaxy-A54'],
+    ['02:00:00:00:00:42', 'unnamed', '192.168.0.151', ''],
+    ['02:00:00:00:00:43', 'Chrome cast', '192.168.0.160', 'Chrome cast'],
+  ]);
+  assert.deepEqual(leasesView('nope'), []);
+  assert.deepEqual(['paper', 'artboard'].map((n) => dnsLook(theme(n)).leasesHead(3)), [{ text: 'ON THE NETWORK NOW · 3', right: 'IP' }, { text: 'On the network now · 3', right: 'IP' }]);
+});
+
+test('Enter adds the lease under the typed name, one-lined, and an empty name adds nothing', () => {
+  const [galaxy] = leasesView(JSON.stringify(leases));
+  assert.deepEqual(addArgs(galaxy, "Sister's phone"), ['add', '02:00:00:00:00:41', "Sister's phone"]);
+  assert.deepEqual(addArgs(galaxy, 'two\nlines‮'), ['add', '02:00:00:00:00:41', 'two lines']);
+  assert.equal(addArgs(galaxy, ' \n'), null);
+  assert.equal(addArgs(undefined, 'x'), null);
+});
+
+test("the add list's key strip is the board's", () => {
+  assert.deepEqual(addKeys(listLook(theme('artboard'))).map((k) => `${k.key} ${k.word}`.trim()), ['↵ add in kid mode', 'tab name', 'j/k lease', 'esc back']);
 });
