@@ -12,8 +12,10 @@ const STATE = join(env.HOME, '.local', 'state', 'dns-helper');
 const SESSION = join(STATE, 'session');
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
-// The service has no YouTube module, so YouTube is this group of custom rules; the apps keep playing if only youtube.com goes.
-const YOUTUBE = ['||youtube.com^', '||youtu.be^', '||googlevideo.com^', '||ytimg.com^', '||youtubekids.com^', '||youtube-nocookie.com^', '||youtubei.googleapis.com^'];
+// The service has no YouTube module, so YouTube is custom rules; YouTube Kids streams from YouTube's servers, so those go only while both are blocked (ruling VADJ4635).
+const YT_OWN = ['||youtube.com^', '||youtu.be^', '||youtube-nocookie.com^'];
+const YT_KIDS = ['||youtubekids.com^'];
+const YT_SHARED = ['||googlevideo.com^', '||ytimg.com^', '||youtubei.googleapis.com^'];
 const MODULES = { social: 'social-apps', adult: 'adult-content', gambling: 'gambling' };
 
 // A failure's message names the step and the HTTP code only, never a token, an account id or a device id.
@@ -140,7 +142,7 @@ async function devices(acct) {
 
 function categories(dev) {
   const rules = Array.isArray(dev.custom_rules) ? dev.custom_rules : [];
-  const on = { youtube: YOUTUBE.every((r) => rules.includes(r)) };
+  const on = { youtube: YT_OWN.every((r) => rules.includes(r)), youtube_kids: YT_KIDS.every((r) => rules.includes(r)) };
   for (const [cat, mod] of Object.entries(MODULES)) on[cat] = (dev.policy_modules || {})[mod] === true;
   return on;
 }
@@ -292,7 +294,7 @@ function routerRows(sections, now) {
       const ip = IPV4.test(h.ip) ? h.ip : null;
       const kid = kidMacs.has(h.mac) || (ip !== null && kidIps.has(ip));
       const blocks = (ip && recent.get(ip)) || [];
-      return { key: 'router:' + h.mac, name: h.name, path: 'router', kid, categories: { youtube: kid, social: kid, adult: kid, gambling: kid }, open_until: null, allow: kid ? allow : [], last_block: blocks.length ? blocks[0].at : null, blocks, ip, mac: h.mac };
+      return { key: 'router:' + h.mac, name: h.name, path: 'router', kid, categories: { youtube: kid, youtube_kids: kid, social: kid, adult: kid, gambling: kid }, open_until: null, allow: kid ? allow : [], last_block: blocks.length ? blocks[0].at : null, blocks, ip, mac: h.mac };
     });
 }
 
@@ -358,7 +360,7 @@ async function state() {
     const until = open.get(d.key);
     if (!until || d.kid) continue;
     d.open_until = until;
-    d.categories = d.path === 'router' ? { youtube: true, social: true, adult: true, gambling: true } : kept(d.key.slice('carried:'.length));
+    d.categories = d.path === 'router' ? { youtube: true, youtube_kids: true, social: true, adult: true, gambling: true } : kept(d.key.slice('carried:'.length));
   }
   const text = JSON.stringify(out) + '\n';
   mkdirSync(CACHE, { recursive: true });
@@ -393,11 +395,17 @@ async function profile(id) {
   return path + '\n';
 }
 
-const CATS = ['youtube', 'social', 'adult', 'gambling'];
+const CATS = ['youtube', 'youtube_kids', 'social', 'adult', 'gambling'];
 
 function setCategory(dev, cat, on) {
   const rules = dev.custom_rules;
-  if (cat === 'youtube') dev.custom_rules = on ? [...rules, ...YOUTUBE.filter((r) => !rules.includes(r))] : rules.filter((r) => !YOUTUBE.includes(r));
+  if (cat === 'youtube' || cat === 'youtube_kids') {
+    const now = categories(dev);
+    const yt = cat === 'youtube' ? on : now.youtube;
+    const kids = cat === 'youtube_kids' ? on : now.youtube_kids;
+    const all = [...YT_OWN, ...YT_KIDS, ...YT_SHARED];
+    dev.custom_rules = [...rules.filter((r) => !all.includes(r)), ...(yt ? YT_OWN : []), ...(kids ? YT_KIDS : []), ...(yt && kids ? YT_SHARED : [])];
+  }
   else dev.policy_modules = { ...dev.policy_modules, [MODULES[cat]]: on };
 }
 
@@ -434,7 +442,7 @@ function kept(id) {
   try {
     k = JSON.parse(readFileSync(kidFile(id), 'utf8'));
   } catch {}
-  if (!k || !CATS.some((c) => k[c] === true)) return { youtube: true, social: true, adult: true, gambling: true };
+  if (!k || !CATS.some((c) => k[c] === true)) return { youtube: true, youtube_kids: true, social: true, adult: true, gambling: true };
   return Object.fromEntries(CATS.map((c) => [c, k[c] === true]));
 }
 
@@ -583,7 +591,7 @@ async function addDevice(mac, name) {
   await kidRouter(mac, true);
 }
 
-const USAGE = 'usage: dots-dns state [--cached] | profiles | profile <key> | kid <key> on|off | category <key> youtube|social|adult|gambling on|off | allow|unallow <key> <domain> | open <key> 30m|2h | reconcile | leases | add <mac> <name>';
+const USAGE = 'usage: dots-dns state [--cached] | profiles | profile <key> | kid <key> on|off | category <key> youtube|youtube_kids|social|adult|gambling on|off | allow|unallow <key> <domain> | open <key> 30m|2h | reconcile | leases | add <mac> <name>';
 
 function usage(why = USAGE) {
   process.stderr.write((why === USAGE ? '' : 'dots-dns: ') + why + '\n');

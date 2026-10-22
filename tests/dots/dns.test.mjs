@@ -238,9 +238,9 @@ test('state lists each carried device with its categories, Kid, allow list and b
   assert.ok(out.as_of >= before && out.as_of <= before + 5, String(out.as_of));
   assert.deepEqual(out.carried, { ok: true, error: null });
   assert.deepEqual(carried(out), [
-    row('carried:dev00phone', "Saiful's iPhone", true, { youtube: true, social: true, adult: true, gambling: false }, ['wikipedia.org']),
-    row('carried:dev00ipad', 'iPad', true, { youtube: false, social: false, adult: true, gambling: true }, ['scratch.mit.edu', 'wikipedia.org']),
-    row('carried:dev00wife', "Wife's iPhone", false, { youtube: false, social: false, adult: false, gambling: false }, []),
+    row('carried:dev00phone', "Saiful's iPhone", true, { youtube: true, youtube_kids: true, social: true, adult: true, gambling: false }, ['wikipedia.org']),
+    row('carried:dev00ipad', 'iPad', true, { youtube: false, youtube_kids: false, social: false, adult: true, gambling: true }, ['scratch.mit.edu', 'wikipedia.org']),
+    row('carried:dev00wife', "Wife's iPhone", false, { youtube: false, youtube_kids: false, social: false, adult: false, gambling: false }, []),
   ]);
   assert.equal(readFileSync(join(ctx.config, 'account'), 'utf8').trim(), 'acct0001');
   assert.deepEqual(
@@ -326,7 +326,7 @@ test('uBlockDNS down still prints state, with carried not ok and an error line',
 
 const routerRows = (out) => out.devices.filter((d) => d.path === 'router');
 const ROUTER_KEYS = ['router:02:00:00:00:00:01', 'router:02:00:00:00:00:21', 'router:02:00:00:00:00:02', 'router:02:00:00:00:00:18', 'router:02:00:00:00:00:1b'];
-const ALL = (on) => ({ youtube: on, social: on, adult: on, gambling: on });
+const ALL = (on) => ({ youtube: on, youtube_kids: on, social: on, adult: on, gambling: on });
 const routerRow = (name, mac, ip, kid, blocks = []) => ({ key: 'router:' + mac, name, path: 'router', kid, categories: ALL(kid), open_until: null, allow: kid ? ['khanacademy.org'] : [], last_block: blocks.length ? blocks[0].at : null, blocks, ip, mac });
 const ROUTER_ROWS = [
   routerRow('nuc', '02:00:00:00:00:01', '192.168.0.102', false),
@@ -417,7 +417,7 @@ test('kid on puts the whole Kid set on the one device and keeps every other rule
   assert.deepEqual(body.lists, ['hagezi-pro']);
   assert.equal(body.dns_provider, 'quad9');
   assert.equal(body.preset_id, 'family');
-  assert.deepEqual(body.custom_rules, ['||mask.icloud.com^', '||youtube.com^', '@@||scratch.mit.edu^', '||mask-h2.icloud.com^', '||ads.example.net^', '@@||wikipedia.org^', '||youtu.be^', '||googlevideo.com^', '||ytimg.com^', '||youtubekids.com^', '||youtube-nocookie.com^', '||youtubei.googleapis.com^']);
+  assert.deepEqual(body.custom_rules, ['||mask.icloud.com^', '@@||scratch.mit.edu^', '||mask-h2.icloud.com^', '||ads.example.net^', '@@||wikipedia.org^', '||youtube.com^', '||youtu.be^', '||youtube-nocookie.com^', '||youtubekids.com^', '||googlevideo.com^', '||ytimg.com^', '||youtubei.googleapis.com^']);
   assert.deepEqual(body.policy_modules, { 'social-apps': true, 'adult-content': true, gambling: true, dating: true });
   assert.deepEqual(s.devices[0], DEVICES[0]);
   assert.deepEqual(s.devices[2], DEVICES[2]);
@@ -427,7 +427,7 @@ test('kid off remembers the categories it turns off and kid on brings back exact
   const s = await stub(t);
   const ctx = scratch(t, s.url);
   await ok(ctx, 'kid', 'carried:dev00ipad', 'off');
-  assert.deepEqual(JSON.parse(readFileSync(join(ctx.state, 'kid-dev00ipad.json'), 'utf8')), { youtube: false, social: false, adult: true, gambling: true });
+  assert.deepEqual(JSON.parse(readFileSync(join(ctx.state, 'kid-dev00ipad.json'), 'utf8')), { youtube: false, youtube_kids: false, social: false, adult: true, gambling: true });
   assert.deepEqual(ipad(s).custom_rules, ['||mask.icloud.com^', '@@||scratch.mit.edu^', '||mask-h2.icloud.com^', '||ads.example.net^', '@@||wikipedia.org^']);
   assert.deepEqual(ipad(s).policy_modules, { 'social-apps': false, 'adult-content': false, gambling: false, dating: true });
   await ok(ctx, 'kid', 'carried:dev00ipad', 'on');
@@ -543,7 +543,7 @@ test('open turns Kid off, keeps a deadline and starts a timer that reconciles, a
   const row = (await state(ctx)).devices.find((d) => d.key === 'carried:dev00ipad');
   assert.equal(row.open_until, until);
   assert.equal(row.kid, false);
-  assert.deepEqual(row.categories, { youtube: false, social: false, adult: true, gambling: true });
+  assert.deepEqual(row.categories, { youtube: false, youtube_kids: false, social: false, adult: true, gambling: true });
 });
 
 test('open again restarts the deadline and the timer with the new length', async (t) => {
@@ -555,7 +555,7 @@ test('open again restarts the deadline and the timer with the new length', async
   const log = systemd(ctx);
   assert.ok(log.some((c) => c[0] === 'systemctl' && c.includes('stop') && c.includes('dots-dns-open-carried_dev00ipad.timer')));
   assert.ok(log.filter((c) => c[0] === 'systemd-run').at(-1).includes('--on-active=7200s'));
-  assert.deepEqual(JSON.parse(readFileSync(join(ctx.state, 'kid-dev00ipad.json'), 'utf8')), { youtube: false, social: false, adult: true, gambling: true });
+  assert.deepEqual(JSON.parse(readFileSync(join(ctx.state, 'kid-dev00ipad.json'), 'utf8')), { youtube: false, youtube_kids: false, social: false, adult: true, gambling: true });
 });
 
 test('reconcile brings Kid back for a passed deadline and leaves a running one', async (t) => {
@@ -668,4 +668,36 @@ test('state --cached prints the last full state without a request or an ssh', as
   assert.deepEqual(JSON.parse(r.stdout), full);
   assert.equal(s.seen.length, seen);
   assert.equal(readFileSync(join(ctx.ctl, 'ssh.log'), 'utf8'), sshCalls);
+});
+
+// YouTube Kids streams from YouTube's servers, so those are blocked only while both YouTube and YouTube Kids are (ruling VADJ4635).
+const OWN = ['||youtube.com^', '||youtu.be^', '||youtube-nocookie.com^'];
+const KIDS = ['||youtubekids.com^'];
+const SHARED = ['||googlevideo.com^', '||ytimg.com^', '||youtubei.googleapis.com^'];
+const others = (rules) => rules.filter((r) => ![...OWN, ...KIDS, ...SHARED].includes(r));
+
+test('YouTube and YouTube Kids block on their own, and the shared servers only with both', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url);
+  const before = others(ipad(s).custom_rules);
+  await ok(ctx, 'category', 'carried:dev00ipad', 'youtube', 'on');
+  assert.deepEqual(ipad(s).custom_rules, [...before, ...OWN]);
+  await ok(ctx, 'category', 'carried:dev00ipad', 'youtube_kids', 'on');
+  assert.deepEqual(ipad(s).custom_rules, [...before, ...OWN, ...KIDS, ...SHARED]);
+  await ok(ctx, 'category', 'carried:dev00ipad', 'youtube', 'off');
+  assert.deepEqual(ipad(s).custom_rules, [...before, ...KIDS]);
+  const row = (await state(ctx)).devices.find((d) => d.key === 'carried:dev00ipad');
+  assert.equal(row.categories.youtube, false);
+  assert.equal(row.categories.youtube_kids, true);
+});
+
+test('a device with v1 whole YouTube group reads both YouTube and YouTube Kids on', async (t) => {
+  const s = await stub(t);
+  ipad(s).custom_rules = [...ipad(s).custom_rules.filter((r) => r !== '||youtube.com^'), '||youtube.com^', '||youtu.be^', '||googlevideo.com^', '||ytimg.com^', '||youtubekids.com^', '||youtube-nocookie.com^', '||youtubei.googleapis.com^'];
+  const ctx = scratch(t, s.url);
+  const row = (await state(ctx)).devices.find((d) => d.key === 'carried:dev00ipad');
+  assert.equal(row.categories.youtube, true);
+  assert.equal(row.categories.youtube_kids, true);
+  const r = await run(ctx, 'category', 'router:02:00:00:00:00:21', 'youtube_kids', 'off');
+  assert.equal(r.status, 2);
 });
