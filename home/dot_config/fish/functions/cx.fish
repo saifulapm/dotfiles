@@ -1,5 +1,5 @@
 # Claude Code in the active account's home, as dots claude-account keeps it; the main account uses the default home.
-function cx
+function cx --wraps claude --description 'Claude Code in the active account'
     set -l state $HOME/.local/state
     set -q XDG_STATE_HOME; and set state $XDG_STATE_HOME
     set -l reg $state/dots/claude-accounts.json
@@ -8,6 +8,6 @@ function cx
     if test -n "$dir" -a "$dir" != "$HOME/.claude"
         env CLAUDE_CONFIG_DIR=$dir claude --allow-dangerously-skip-permissions $argv
     else
-        claude --allow-dangerously-skip-permissions $argv
+        env -u CLAUDE_CONFIG_DIR claude --allow-dangerously-skip-permissions $argv
     end
 end

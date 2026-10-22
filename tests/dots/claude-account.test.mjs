@@ -104,6 +104,9 @@ test('cx sets CLAUDE_CONFIG_DIR only for a second active account', (t) => {
   assert.equal(cx(), 'dir=unset argv=--allow-dangerously-skip-permissions -p hi');
   assert.equal(s.run(['add', 'work']).status, 0);
   assert.equal(cx(), 'dir=unset argv=--allow-dangerously-skip-permissions -p hi');
+  // A home left in the caller's environment does not pick the account; the registry does.
+  const inherited = spawnSync('fish', ['-c', `source ${cxFn}; cx -p hi`], { env: Object.assign({}, s.env, { CLAUDE_CONFIG_DIR: '/elsewhere' }), encoding: 'utf8' }).stdout.trim();
+  assert.equal(inherited, 'dir=unset argv=--allow-dangerously-skip-permissions -p hi');
   assert.equal(s.run(['use', 'work']).status, 0);
   assert.equal(cx(), `dir=${join(s.root, 'state/dots/claude-accounts/work')} argv=--allow-dangerously-skip-permissions -p hi`);
 });
