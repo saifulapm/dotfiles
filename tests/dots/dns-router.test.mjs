@@ -89,7 +89,7 @@ function scratch(t, { backup = true, jump = 'nuc' } = {}) {
   for (const d of [ctl, stubBin, join(home, '.config', 'dns-helper')]) mkdirSync(d, { recursive: true });
   writeFileSync(join(stubBin, 'ssh'), `#!${process.execPath}\n${SSH}`, { mode: 0o755 });
   writeFileSync(join(stubBin, 'curl'), `#!${process.execPath}\n${CURL}`, { mode: 0o755 });
-  writeFileSync(join(home, '.config', 'dns-helper', 'router.env'), `WIFI_PSK='secret-psk'\nSSH_KEY=~/.ssh/router\n${jump ? `ROUTER_JUMP=${jump}\n` : ''}`);
+  writeFileSync(join(home, '.config', 'dns-helper', 'router.env'), `WIFI_PSK='secret-psk'\nSSH_KEY=$HOME/.ssh/router\n${jump ? `ROUTER_JUMP=${jump}\n` : ''}`);
   const tgz = backupTgz(ctl);
   const state = join(home, '.local', 'state', 'dns-helper');
   if (backup) {
@@ -161,9 +161,10 @@ test('install sends the files, the oldest backup and only ranked gambling names,
     assert.ok(a.includes('BatchMode=yes'));
     assert.ok(a.includes(`UserKnownHostsFile=${join(s.state, 'router_known_hosts')}`));
     assert.equal(a[a.length - 2], 'root@192.168.0.1');
+    assert.equal(a[a.indexOf('-i') + 1], join(s.home, '.ssh', 'router'));
   }
   assert.ok(/rm -rf \/tmp\/dns-shield-setup$/.test(calls[calls.length - 1].at(-1)), 'the setup dir with the backup is removed');
-  assert.doesNotMatch(r.stdout + r.stderr, /secret-psk/);
+  assert.doesNotMatch(r.stdout + r.stderr, /secret-psk|unbound variable/);
 });
 
 test('a failed install exits non-zero and takes the backup off the router', (t) => {
@@ -183,6 +184,7 @@ test('restore sends only restore.sh and the backup, and follows the log to resto
   writeFileSync(join(s.ctl, 'run.log'), 'dns-shield: restored\n');
   const r = run(s, 'restore');
   assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.stderr, /unbound variable/);
   assert.deepEqual(readdirSync(payload(s)).sort(), ['backup.tar.gz', 'restore.sh']);
   assert.ok(sshCalls(s).some((a) => /setsid sh restore\.sh/.test(a.at(-1))));
 });

@@ -29,6 +29,7 @@ load_env() {
   ROUTER_HOST=$(sed -n 's/^ROUTER_HOST=//p' "$conf/router.env" | tr -d "\"'")
   ROUTER_JUMP=$(sed -n 's/^ROUTER_JUMP=//p' "$conf/router.env" | tr -d "\"'")
   SSH_KEY=${SSH_KEY/#\~/$HOME}
+  SSH_KEY=${SSH_KEY/#\$HOME/$HOME}
   [ -n "$SSH_KEY" ] || die "router.env names no SSH_KEY"
 }
 
@@ -98,7 +99,7 @@ run() {
 }
 
 install() {
-  local b tmp
+  local b
   b=$(first_backup) || exit 1
   tmp=$(mktemp -d) || die "no temp dir"
   trap 'rm -rf "$tmp"' EXIT
@@ -111,7 +112,7 @@ install() {
 }
 
 restore() {
-  local b tmp
+  local b
   b=$(first_backup) || exit 1
   tmp=$(mktemp -d) || die "no temp dir"
   trap 'rm -rf "$tmp"' EXIT
