@@ -215,7 +215,7 @@ Item {
             return;
         }
         completer.asked = split.parent;
-        completer.command = ["python3", "-c", lister.script, split.parent];
+        completer.command = ["python3", "-c", P.LIST_SCRIPT, split.parent];
         completer.running = true;
     }
 
@@ -286,7 +286,7 @@ Item {
             stale = true;
             return;
         }
-        lister.command = ["python3", "-c", lister.script, folder];
+        lister.command = ["python3", "-c", P.LIST_SCRIPT, folder];
         lister.running = true;
     }
 
@@ -450,10 +450,9 @@ Item {
     onRowsChanged: if (selected >= rows.length)
         selected = saving ? -1 : Math.max(0, rows.length - 1)
 
-    // One JSON array of the folder's entries off the render loop: names as they are spelt, dotfiles too, a folder with how many visible entries it holds, a file with its guessed mime type for the app's filters.
+    // The folder's entries, listed off the render loop.
     Process {
         id: lister
-        readonly property string script: "import json, mimetypes, os, sys\n" + "out = []\n" + "for e in os.scandir(sys.argv[1]):\n" + "    try:\n" + "        st = e.stat()\n" + "        d = e.is_dir()\n" + "        n = 0\n" + "        if d:\n" + "            try:\n" + "                n = sum(1 for x in os.scandir(e.path) if not x.name.startswith('.'))\n" + "            except OSError:\n" + "                pass\n" + "        m = '' if d else (mimetypes.guess_type(e.name)[0] or '')\n" + "        out.append({'name': e.name, 'dir': d, 'size': st.st_size, 'mtime': st.st_mtime * 1000, 'count': n, 'mime': m})\n" + "    except OSError:\n" + "        pass\n" + "print(json.dumps(out, ensure_ascii=False))\n"
         stdout: StdioCollector {
             id: listOut
         }

@@ -166,9 +166,9 @@ export function shownRows(entries, opts) {
   return sortRows(entries.filter((e) => (opts.hidden || e.name.charAt(0) !== '.') && (!opts.folders || e.dir) && allows(opts.filter, e) && (!q || e.name.toLowerCase().indexOf(q) >= 0)));
 }
 
-// ctrl+space marks the cursor file or unmarks it; a folder is walked into, never marked.
+// ctrl+space marks the cursor file or unmarks it; a folder is walked into, never marked, and an undecodable name's path would name another file.
 export function toggleMark(marked, row) {
-  if (!row || row.dir) return marked;
+  if (!row || row.dir || row.undecodable) return marked;
   return marked.indexOf(row.name) >= 0 ? marked.filter((n) => n !== row.name) : marked.concat([row.name]);
 }
 
@@ -236,6 +236,32 @@ export function pathKeys(voice) {
   const pairs = [['↵', 'GO'], ['TAB', 'COMPLETE'], ['⌃L', 'BACK TO LIST'], ['ESC', '']];
   return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? `[${k}]` : k, word: w }));
 }
+
+// Prints one JSON array of a folder's entries: names as they are spelt, dotfiles too, a folder with how many visible entries it holds, a file with its guessed mime type for the app's filters. A name that is not UTF-8 would stop the print, so it shows with U+FFFD and is marked undecodable; a dangling link lists as itself, so a save over it still asks.
+export const LIST_SCRIPT = [
+  'import json, mimetypes, os, sys',
+  'out = []',
+  'for e in os.scandir(sys.argv[1]):',
+  '    try:',
+  '        try:',
+  '            st = e.stat()',
+  '        except OSError:',
+  '            st = e.stat(follow_symlinks=False)',
+  "        name = os.fsencode(e.name).decode('utf-8', 'replace')",
+  '        d = e.is_dir()',
+  '        n = 0',
+  '        if d:',
+  '            try:',
+  "                n = sum(1 for x in os.scandir(e.path) if not x.name.startswith('.'))",
+  '            except OSError:',
+  '                pass',
+  "        m = '' if d else (mimetypes.guess_type(e.name)[0] or '')",
+  "        out.append({'name': name, 'undecodable': name != e.name, 'dir': d, 'size': st.st_size, 'mtime': st.st_mtime * 1000, 'count': n, 'mime': m})",
+  '    except OSError:',
+  '        pass',
+  'print(json.dumps(out, ensure_ascii=False))',
+  '',
+].join('\n');
 
 // Prints an image's "width height" from its header: PNG's IHDR, GIF's screen, WebP's VP8, VP8L or VP8X chunk, JPEG's frame header past the segments before it. Qt's Image reports the bounded size it decoded, so the picker runs this instead; any other file prints nothing.
 export const SIZE_SCRIPT = [

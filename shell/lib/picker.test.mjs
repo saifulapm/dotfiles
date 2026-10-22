@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { answerLine, appName, chipText, completionHead, completions, countText, dateText, footText, headingText, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
+import { answerLine, appName, chipText, completionHead, completions, countText, dateText, footText, headingText, LIST_SCRIPT, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -371,6 +371,10 @@ test('ctrl+space marks and unmarks a file, never a folder', () => {
   assert.deepEqual(toggleMark(['a.png'], null), ['a.png']);
 });
 
+test('a name that is not UTF-8 is never marked, as its path would name another file', () => {
+  assert.deepEqual(toggleMark(['a.png'], { name: 'caf\uFFFD.txt', dir: false, undecodable: true }), ['a.png']);
+});
+
 test('the marked files answer in list order, a file the query hides too', () => {
   const entries = [{ name: 'c.png', dir: false }, { name: 'shots', dir: true }, { name: 'A.png', dir: false }, { name: 'b.png', dir: false }];
   assert.deepEqual(markedPaths(entries, ['c.png', 'A.png', 'b.png'], '/home/s/Downloads'), ['/home/s/Downloads/A.png', '/home/s/Downloads/b.png', '/home/s/Downloads/c.png']);
@@ -429,4 +433,22 @@ test("the size script reads an image's true size from its header, and nothing fr
     'cut.png': '',
     'cut.jpg': '',
   });
+});
+
+test('the lister keeps every entry when one name is not UTF-8 or a link is dangling', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'list-'));
+  for (const name of ['ok.txt', 'report.pdf']) writeFileSync(join(dir, name), '');
+  writeFileSync(Buffer.concat([Buffer.from(dir + '/caf'), Buffer.from([0xe9]), Buffer.from('.txt')]), '');
+  symlinkSync('/nonexistent', join(dir, 'gone.pdf'));
+  // The shell runs under a UTF-8 locale, where Python's stdout refuses a name's stray byte; under C it would pass it through.
+  const run = spawnSync('python3', ['-c', LIST_SCRIPT, dir], { encoding: 'utf8', env: { ...process.env, LC_ALL: 'en_US.UTF-8' } });
+  rmSync(dir, { recursive: true });
+  assert.equal(run.status, 0, run.stderr);
+  const rows = sortRows(JSON.parse(run.stdout)).map((e) => [e.name, e.dir, e.undecodable]);
+  assert.deepEqual(rows, [
+    ['caf\uFFFD.txt', false, true],
+    ['gone.pdf', false, false],
+    ['ok.txt', false, false],
+    ['report.pdf', false, false],
+  ]);
 });
