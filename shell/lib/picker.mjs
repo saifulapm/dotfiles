@@ -72,15 +72,16 @@ export function dateText(voice, ms, now) {
   return voice === 'caps' && today ? `${day} ${time}` : day;
 }
 
-export function headingText(voice, app, mode) {
-  const head = mode === 'save' ? (voice === 'plain' ? 'Save as' : 'SAVE AS') : voice === 'plain' ? 'Open file' : 'OPEN FILE';
+export function headingText(voice, app, mode, multiple) {
+  const word = mode === 'save' ? 'Save as' : mode === 'folder' ? 'Choose folder' : multiple ? 'Open files' : 'Open file';
+  const head = voice === 'plain' ? word : word.toUpperCase();
   if (!app) return head;
   return voice === 'plain' ? `${head} · ${app}` : `${head}${voice === 'bracket' ? ' // ' : ' · '}${app.toUpperCase()}`;
 }
 
 // Artboard spells the keys out; Paper and Blueprint draw ctrl as ⌃ and space as ␣.
 export function pickerKeys(voice, mode) {
-  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', 'select'], ['esc', '']];
+  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['esc', '']] : mode === 'folder' ? [['↵', 'enter folder'], ['ctrl+↵', 'choose this folder'], ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', 'select'], ['esc', '']];
   if (voice === 'plain') return pairs.map(([k, w]) => ({ key: k, word: w }));
   const key = (k) => k.replace('ctrl+space', '⌃␣').replace('ctrl+', '⌃').toUpperCase();
   return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? `[${key(k)}]` : key(k), word: w.toUpperCase() }));
@@ -158,10 +159,30 @@ function allows(filter, row) {
   return globs.some((g) => globRe(String(g)).test(row.name)) || mimes.some((m) => mimeHit(row.mime, String(m)));
 }
 
-// The folder's entries as the list draws them: dotfiles when shown, the app's filter, the typed query anywhere in a name.
+// The folder's entries as the list draws them: dotfiles when shown, only folders when a folder is asked for, the app's filter, the typed query anywhere in a name.
 export function shownRows(entries, opts) {
   const q = (opts.query || '').toLowerCase();
-  return sortRows(entries.filter((e) => (opts.hidden || e.name.charAt(0) !== '.') && allows(opts.filter, e) && (!q || e.name.toLowerCase().indexOf(q) >= 0)));
+  return sortRows(entries.filter((e) => (opts.hidden || e.name.charAt(0) !== '.') && (!opts.folders || e.dir) && allows(opts.filter, e) && (!q || e.name.toLowerCase().indexOf(q) >= 0)));
+}
+
+// ctrl+space marks the cursor file or unmarks it; a folder is walked into, never marked.
+export function toggleMark(marked, row) {
+  if (!row || row.dir) return marked;
+  return marked.indexOf(row.name) >= 0 ? marked.filter((n) => n !== row.name) : marked.concat([row.name]);
+}
+
+// What ctrl+Enter answers: every marked file in the folder, in the list's order, whatever the query hides.
+export function markedPaths(entries, marked, folder) {
+  const base = folder === '/' ? '' : folder;
+  return sortRows(entries.filter((e) => !e.dir && marked.indexOf(e.name) >= 0)).map((e) => base + '/' + e.name);
+}
+
+// The line above the key strip: how many files ctrl+Enter opens, or the folder it chooses, which is a path and keeps its case.
+export function footText(voice, mode, n, here) {
+  if (mode === 'folder') return voice === 'plain' ? `ctrl+↵ chooses ${here}, the folder you are in` : `THIS FOLDER ${here}`;
+  if (n === 0) return '';
+  if (voice === 'plain') return `${n} selected · ctrl+↵ open all`;
+  return `${n} SELECTED · ${voice === 'bracket' ? '[⌃↵]' : '⌃↵'} OPEN ALL`;
 }
 
 // "~/Codes/la" is the folder ~/Codes to list and "la" begun in it; a path without / or ~ starts at the folder shown.

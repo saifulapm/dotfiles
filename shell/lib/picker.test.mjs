@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerLine, appName, completionHead, completions, countText, dateText, headingText, matchText, nameText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, sizeText, sortRows, splitPath, stampText } from './picker.mjs';
+import { answerLine, appName, completionHead, completions, countText, dateText, footText, headingText, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -267,4 +267,50 @@ test('the preview reads the decoded size, the file size and kind, and when it ch
   assert.equal(stampText('caps', at), '14 Oct 2026 · 16:41');
   assert.equal(stampText('plain', at), '14 Oct 2026, 16:41');
   assert.equal(stampText('bracket', at), '2026-10-14 16:41');
+});
+
+test('an app that allows several files heads the card Open files, and a folder request Choose folder', () => {
+  assert.equal(headingText('caps', 'Chromium', 'open', true), 'OPEN FILES · CHROMIUM');
+  assert.equal(headingText('plain', 'Chromium', 'open', true), 'Open files · Chromium');
+  assert.equal(headingText('bracket', 'Chromium', 'open', true), 'OPEN FILES // CHROMIUM');
+  assert.equal(headingText('caps', 'Chromium', 'folder'), 'CHOOSE FOLDER · CHROMIUM');
+  assert.equal(headingText('plain', 'Chromium', 'folder'), 'Choose folder · Chromium');
+  assert.equal(headingText('bracket', 'Chromium', 'folder'), 'CHOOSE FOLDER // CHROMIUM');
+  assert.equal(headingText('plain', '', 'folder'), 'Choose folder');
+});
+
+test('the folder strip enters with Enter and chooses with ctrl+Enter', () => {
+  const strip = (v) => pickerKeys(v, 'folder').map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
+  assert.equal(strip('plain'), '↵ enter folder · ctrl+↵ choose this folder · esc');
+  assert.equal(strip('caps'), '↵ ENTER FOLDER · ⌃↵ CHOOSE THIS FOLDER · ESC');
+  assert.equal(strip('bracket'), '[↵] ENTER FOLDER · [⌃↵] CHOOSE THIS FOLDER · [ESC]');
+});
+
+test('a folder request lists only folders, dot folders when shown', () => {
+  const entries = [{ name: 'notes.txt', dir: false }, { name: 'lareys', dir: true }, { name: '.config', dir: true }, { name: 'Codes', dir: true }];
+  assert.deepEqual(shownRows(entries, { hidden: false, filter: null, query: '', folders: true }).map((r) => r.name), ['Codes', 'lareys']);
+  assert.deepEqual(shownRows(entries, { hidden: true, filter: null, query: '', folders: true }).map((r) => r.name), ['.config', 'Codes', 'lareys']);
+});
+
+test('ctrl+space marks and unmarks a file, never a folder', () => {
+  assert.deepEqual(toggleMark([], { name: 'b.png', dir: false }), ['b.png']);
+  assert.deepEqual(toggleMark(['a.png', 'b.png'], { name: 'a.png', dir: false }), ['b.png']);
+  assert.deepEqual(toggleMark(['a.png'], { name: 'shots', dir: true }), ['a.png']);
+  assert.deepEqual(toggleMark(['a.png'], null), ['a.png']);
+});
+
+test('the marked files answer in list order, a file the query hides too', () => {
+  const entries = [{ name: 'c.png', dir: false }, { name: 'shots', dir: true }, { name: 'A.png', dir: false }, { name: 'b.png', dir: false }];
+  assert.deepEqual(markedPaths(entries, ['c.png', 'A.png', 'b.png'], '/home/s/Downloads'), ['/home/s/Downloads/A.png', '/home/s/Downloads/b.png', '/home/s/Downloads/c.png']);
+  assert.deepEqual(markedPaths(entries, ['b.png'], '/'), ['/b.png']);
+});
+
+test('the footer line: how many are marked, or the folder ctrl+Enter chooses', () => {
+  assert.equal(footText('plain', 'open', 3, '~/Downloads'), '3 selected · ctrl+↵ open all');
+  assert.equal(footText('caps', 'open', 3, '~/Downloads'), '3 SELECTED · ⌃↵ OPEN ALL');
+  assert.equal(footText('bracket', 'open', 1, '~/Downloads'), '1 SELECTED · [⌃↵] OPEN ALL');
+  assert.equal(footText('plain', 'open', 0, '~/Downloads'), '');
+  assert.equal(footText('plain', 'folder', 0, '~/Codes'), 'ctrl+↵ chooses ~/Codes, the folder you are in');
+  assert.equal(footText('caps', 'folder', 0, '~/Codes'), 'THIS FOLDER ~/Codes');
+  assert.equal(footText('bracket', 'folder', 0, '~/Codes'), 'THIS FOLDER ~/Codes');
 });
