@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# Installs DNS Shield on the home OpenWrt router over ssh, and puts the router's config from before it back in one command.
+set -uo pipefail
+{
+
+repo=$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")
+files=$repo/system/openwrt/dns-shield
+conf=$HOME/.config/dns-helper
+state=$HOME/.local/state/dns-helper
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/dots/dns
+setup=/tmp/dns-shield-setup
+gambling_url=${DOTS_DNS_GAMBLING_URL:-https://raw.githubusercontent.com/hagezi/dns-blocklists/main/dnsmasq/gambling.mini.txt}
+tranco_url=${DOTS_DNS_TRANCO_URL:-https://tranco-list.eu/top-1m.csv.zip}
+
+die() {
+  echo "dots-dns-router: $1" >&2
+  exit "${2:-1}"
+}
+
+usage() {
+  echo "usage: dots-dns-router backup|install|restore|status" >&2
+  exit 2
+}
+
+# router.env holds Wi-Fi and WAN secrets too, so only the three ssh keys are read from it.
+load_env() {
+  [ -r "$conf/router.env" ] || die "no $conf/router.env"
+  SSH_KEY=$(sed -n 's/^SSH_KEY=//p' "$conf/router.env" | tr -d "\"'")
+  ROUTER_HOST=$(sed -n 's/^ROUTER_HOST=//p' "$conf/router.env" | tr -d "\"'")
+  ROUTER_JUMP=$(sed -n 's/^ROUTER_JUMP=//p' "$conf/router.env" | tr -d "\"'")
+  SSH_KEY=${SSH_KEY/#\~/$HOME}
+  [ -n "$SSH_KEY" ] || die "router.env names no SSH_KEY"
+}
+
+router() {
+  mkdir -p "$state"
+  ssh ${ROUTER_JUMP:+-J "$ROUTER_JUMP"} -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=5 \
+    -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$state/router_known_hosts" -o LogLevel=ERROR \
+    "root@${ROUTER_HOST:-192.168.0.1}" "$@"
+}
+
+# The oldest backup is the router's config from before DNS Shield, which restore must bring back.
+first_backup() {
+  local b
+  b=$(find "$state" -maxdepth 2 -path "$state/router-backup-*/sysupgrade-backup.tar.gz" 2>/dev/null | sort | head -n 1)
+  [ -n "$b" ] || die "no router backup in $state/router-backup-*/; run dots-dns-router backup first"
+  echo "$b"
+}
+
+backup() {
+  local dir=$state/router-backup-$(date +%F) out
+  router 'test ! -e /etc/dns-shield' || die "DNS Shield is already on the router, so a backup now would not be the old config"
+  mkdir -p -m 700 "$dir"
+  out=$dir/sysupgrade-backup.tar.gz
+  router 'sysupgrade -b /tmp/dns-shield-backup.tar.gz >/dev/null 2>&1 && cat /tmp/dns-shield-backup.tar.gz; rm -f /tmp/dns-shield-backup.tar.gz' >"$out.tmp" || die "the backup failed"
+  tar tzf "$out.tmp" etc/config/dhcp etc/config/firewall >/dev/null 2>&1 || { rm -f "$out.tmp"; die "the backup holds no dhcp and firewall config"; }
+  chmod 600 "$out.tmp"
+  mv -f "$out.tmp" "$out"
+  echo "$out"
+}
+
+# Only the ranked names of HaGeZi's gambling list: the whole list is 126k names, more than the router's free memory holds.
+gambling_conf() {
+  local out=$1 n
+  mkdir -p "$cache"
+  curl -fsSL -m 120 -o "$cache/gambling.mini.txt" "$gambling_url" || die "could not fetch the gambling list"
+  curl -fsSL -m 300 -o "$cache/tranco.zip" "$tranco_url" || die "could not fetch the Tranco top list"
+  unzip -p "$cache/tranco.zip" | tr -d '\r' | awk -F, '
+    NR == FNR { if (sub(/^local=\//, "")) { sub(/\/$/, ""); g[tolower($0)] = 1 }; next }
+    (tolower($2) in g) { print "address=/" tolower($2) "/" }' "$cache/gambling.mini.txt" - >"$out"
+  n=$(wc -l <"$out")
+  [ "$n" -ge 1000 ] || die "the gambling list came out with $n names"
+}
+
+# Sends the payload, starts the script detached so a dropped ssh cannot cut it short, and follows its log to the end; a failed install restores itself, so FAILED wins over restored.
+run() {
+  local script=$1 payload=$2 log='' last='' tries=0
+  tar czf - -C "$payload" . | router "rm -rf $setup && mkdir -p $setup && tar xzf - -C $setup" || die "could not send the payload to the router"
+  router "cd $setup && setsid sh $script >$setup/run.log 2>&1 </dev/null &" || die "could not start $script on the router"
+  while [ "$tries" -lt 200 ]; do
+    sleep "${DOTS_DNS_ROUTER_POLL:-3}"
+    log=$(router "cat $setup/run.log" 2>/dev/null) || { tries=$((tries + 1)); continue; }
+    [ "$log" != "$last" ] && printf '%s\n' "${log#"$last"}" | sed '/^$/d'
+    last=$log
+    case "$log" in
+      *"dns-shield: FAILED"*)
+        router "rm -f $setup/backup.tar.gz"
+        return 1
+        ;;
+      *"dns-shield: installed"* | *"dns-shield: restored"*)
+        router "rm -rf $setup"
+        return 0
+        ;;
+    esac
+    tries=$((tries + 1))
+  done
+  die "$script gave no result in time; read $setup/run.log on the router"
+}
+
+install() {
+  local b tmp
+  b=$(first_backup) || exit 1
+  tmp=$(mktemp -d) || die "no temp dir"
+  trap 'rm -rf "$tmp"' EXIT
+  mkdir -p "$tmp/stage"
+  cp "$files/kid.conf" "$files/blocks.conf" "$files/dns-shield.init" "$files/20-dns-shield.nft" "$tmp/stage/"
+  gambling_conf "$tmp/stage/gambling.conf"
+  cp "$files/install.sh" "$files/restore.sh" "$tmp/"
+  cp "$b" "$tmp/backup.tar.gz"
+  run install.sh "$tmp"
+}
+
+restore() {
+  local b tmp
+  b=$(first_backup) || exit 1
+  tmp=$(mktemp -d) || die "no temp dir"
+  trap 'rm -rf "$tmp"' EXIT
+  cp "$files/restore.sh" "$tmp/"
+  cp "$b" "$tmp/backup.tar.gz"
+  run restore.sh "$tmp"
+}
+
+status() {
+  router 'opkg list-installed | grep -q "^dnsmasq-full " && echo "dnsmasq-full: installed" || echo "dnsmasq-full: missing"
+    [ -e /etc/dns-shield ] && echo "dns-shield: installed" || echo "dns-shield: not installed"
+    ps w | grep -q "[d]ns-shield/kid.conf" && echo "kid resolver: running" || echo "kid resolver: stopped"
+    echo "kid devices: $(uci -q get firewall.kid.entry | wc -w)"
+    echo "flash free: $(df -k /overlay | awk "NR==2 {print \$4}") KB"
+    echo "ram available: $(awk "/MemAvailable/ {print \$2}" /proc/meminfo) KB"'
+}
+
+[ $# -eq 1 ] || usage
+case $1 in
+  backup | install | restore | status)
+    load_env
+    "$1"
+    ;;
+  *) usage ;;
+esac
+exit
+}

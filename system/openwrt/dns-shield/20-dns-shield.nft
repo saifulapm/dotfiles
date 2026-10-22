@@ -1,0 +1,25 @@
+# DNS Shield: a device in the Kid sets loses its own DNS, DoT, the DoH resolvers, IPv6 and the addresses the main dnsmasq saw for the blocked services.
+set kid_block {
+	type ipv4_addr
+	flags timeout
+	timeout 6h
+}
+
+set kid_doh {
+	type ipv4_addr
+	flags interval
+	elements = { 1.0.0.1, 1.1.1.1, 8.8.4.4, 8.8.8.8, 9.9.9.9, 149.112.112.112, 94.140.14.14, 94.140.14.15, 94.140.14.140, 94.140.14.141, 94.140.15.15, 94.140.15.16, 208.67.220.220, 208.67.222.222, 45.90.28.0/24, 45.90.30.0/24, 185.228.168.0/24, 185.228.169.0/24, 194.242.2.0/24, 185.222.222.222, 45.11.45.11 }
+}
+
+chain dns_shield_dstnat {
+	type nat hook prerouting priority dstnat - 5; policy accept;
+	iifname "br-lan" ip saddr @kid meta l4proto { tcp, udp } th dport 53 dnat ip to 192.168.0.1:5353
+}
+
+chain dns_shield_forward {
+	type filter hook forward priority filter - 5; policy accept;
+	ip saddr @kid ip daddr @kid_block reject
+	ip saddr @kid ip daddr @kid_doh reject
+	ip saddr @kid meta l4proto { tcp, udp } th dport 853 reject
+	ether saddr @kid_mac meta nfproto ipv6 reject
+}
