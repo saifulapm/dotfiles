@@ -46,7 +46,8 @@ start=$(now_ms)
 kill -9 "$pid"
 until_ok 3000 new_pid && until_ok 3000 paper_layer && until_ok 3000 shell_status >/dev/null
 elapsed=$(($(now_ms) - start))
-check "status answers again ${elapsed} ms after kill -9" test "$elapsed" -le 1000
+# The paper is back at about 750 ms; the build after its first frame answers by about 1000 since m24, so 1100 (#9CZXS2QM).
+check "status answers again ${elapsed} ms after kill -9" test "$elapsed" -le 1100
 
 dev_stop
 check "the transient unit is gone" test "$(systemctl --user show -p LoadState --value "$DOTS_DEV_UNIT")" = not-found
