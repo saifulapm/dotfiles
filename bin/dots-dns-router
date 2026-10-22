@@ -73,7 +73,7 @@ gambling_conf() {
   [ "$n" -ge 1000 ] || die "the gambling list came out with $n names"
 }
 
-# Sends the payload, starts the script detached so a dropped ssh cannot cut it short, and follows its log to the end; a failed install restores itself, so FAILED wins over restored.
+# Sends the payload, starts the script detached so a dropped ssh cannot cut it short, and follows its log to the end; a failed install restores itself, so its backup stays until that restore ends.
 run() {
   local script=$1 payload=$2 log='' last='' tries=0
   tar czf - -C "$payload" . | router "rm -rf $setup && mkdir -p $setup && tar xzf - -C $setup" || die "could not send the payload to the router"
@@ -84,10 +84,15 @@ run() {
     [ "$log" != "$last" ] && printf '%s\n' "${log#"$last"}" | sed '/^$/d'
     last=$log
     case "$log" in
-      *"dns-shield: FAILED"*)
+      *"dns-shield: FAILED"*"dns-shield: restored"* | *"dns-shield: FAILED restore"*)
         router "rm -f $setup/backup.tar.gz"
         return 1
         ;;
+      *"dns-shield: FAILED"*"nothing written"*)
+        router "rm -f $setup/backup.tar.gz"
+        return 1
+        ;;
+      *"dns-shield: FAILED"*) ;;
       *"dns-shield: installed"* | *"dns-shield: restored"*)
         router "rm -rf $setup"
         return 0
@@ -106,7 +111,7 @@ install() {
   mkdir -p "$tmp/stage"
   cp "$files/kid.conf" "$files/blocks.conf" "$files/dns-shield.init" "$files/20-dns-shield.nft" "$tmp/stage/"
   gambling_conf "$tmp/stage/gambling.conf"
-  cp "$files/install.sh" "$files/restore.sh" "$tmp/"
+  cp "$files/install.sh" "$files/restore.sh" "$files/fetch.sh" "$tmp/"
   cp "$b" "$tmp/backup.tar.gz"
   run install.sh "$tmp"
 }

@@ -20,7 +20,12 @@ fs.appendFileSync(ctl + '/ssh.log', JSON.stringify(args) + '\\n');
 if (/tar xzf - -C/.test(cmd)) { fs.writeFileSync(ctl + '/payload.tgz', fs.readFileSync(0)); process.exit(0); }
 if (/^test ! -e/.test(cmd)) process.exit(fs.existsSync(ctl + '/installed') ? 1 : 0);
 if (/sysupgrade -b/.test(cmd)) { process.stdout.write(fs.readFileSync(ctl + '/router-backup.tgz')); process.exit(0); }
-if (/cat .*run\\.log/.test(cmd)) { process.stdout.write(fs.readFileSync(ctl + '/run.log', 'utf8')); process.exit(0); }
+if (/cat .*run\\.log/.test(cmd)) {
+  // run.log.1, when there, is what the log held before the script finished.
+  if (fs.existsSync(ctl + '/run.log.1')) { process.stdout.write(fs.readFileSync(ctl + '/run.log.1', 'utf8')); fs.rmSync(ctl + '/run.log.1'); process.exit(0); }
+  process.stdout.write(fs.readFileSync(ctl + '/run.log', 'utf8'));
+  process.exit(0);
+}
 process.exit(0);
 `;
 
@@ -151,7 +156,7 @@ test('install sends the files, the oldest backup and only ranked gambling names,
   assert.deepEqual(readdirSync(join(p, 'stage')).sort(), ['20-dns-shield.nft', 'blocks.conf', 'dns-shield.init', 'gambling.conf', 'kid.conf']);
   for (const f of ['kid.conf', 'blocks.conf', 'dns-shield.init', '20-dns-shield.nft']) assert.equal(readFileSync(join(p, 'stage', f), 'utf8'), readFileSync(join(files, f), 'utf8'), f);
   assert.deepEqual(readFileSync(join(p, 'backup.tar.gz')), readFileSync(s.tgz));
-  assert.ok(existsSync(join(p, 'install.sh')) && existsSync(join(p, 'restore.sh')));
+  for (const f of ['install.sh', 'restore.sh', 'fetch.sh']) assert.equal(readFileSync(join(p, f), 'utf8'), readFileSync(join(files, f), 'utf8'), f);
   const gambling = readFileSync(join(p, 'stage', 'gambling.conf'), 'utf8').trim().split('\n');
   assert.deepEqual(gambling, ranked.map((d) => `address=/${d}/`));
   const calls = sshCalls(s);
@@ -170,11 +175,15 @@ test('install sends the files, the oldest backup and only ranked gambling names,
 test('a failed install exits non-zero and takes the backup off the router', (t) => {
   const s = scratch(t, { jump: '' });
   lists(s.ctl);
+  writeFileSync(join(s.ctl, 'run.log.1'), 'dns-shield: FAILED fw4 check, restoring\n');
   writeFileSync(join(s.ctl, 'run.log'), 'dns-shield: FAILED fw4 check, restoring\ndns-shield: restored\n');
   const r = run(s, 'install');
   assert.notEqual(r.status, 0);
   assert.match(r.stdout, /FAILED fw4 check/);
+  assert.match(r.stdout, /dns-shield: restored/);
   const calls = sshCalls(s);
+  // The restore reads the backup, so it stays on the router until the log says restored.
+  assert.equal(calls.filter((a) => /cat .*run\.log/.test(a.at(-1))).length, 2);
   assert.ok(!calls[0].includes('-J'));
   assert.match(calls[calls.length - 1].at(-1), /rm -f \/tmp\/dns-shield-setup\/backup\.tar\.gz/);
 });
@@ -202,8 +211,8 @@ test('backup refuses once DNS Shield is on the router, and otherwise keeps the r
 });
 
 // The remote scripts run under busybox ash on the router.
-test('install.sh and restore.sh are plain sh', () => {
-  for (const f of ['install.sh', 'restore.sh']) {
+test('install.sh, restore.sh and fetch.sh are plain sh', () => {
+  for (const f of ['install.sh', 'restore.sh', 'fetch.sh']) {
     const r = spawnSync('bash', ['--posix', '-n', join(files, f)], { encoding: 'utf8' });
     assert.equal(r.status, 0, `${f}: ${r.stderr}`);
   }
@@ -257,4 +266,30 @@ test('the nft include loads into a fw4 table that declares the Kid sets', (t) =>
   if (r.status !== 0 && /unshare/.test(r.stderr)) return t.skip('no user namespaces here');
   assert.equal(r.status, 0, r.stderr);
   for (const re of [/ip saddr @kid ip daddr @kid_block reject/, /th dport 853 reject/, /ether saddr @kid_mac meta nfproto ipv6 reject/, /dnat ip to 192\.168\.0\.1:5353/]) assert.match(include, re);
+});
+
+// A fake opkg whose feed holds dnsmasq-full's real dependency tree from the router: libgmp10 and the conntrack module are two levels down.
+const OPKG = `#!/bin/sh
+db='dnsmasq-full:libc, libubus20250102, libnettle8, libnetfilter-conntrack3 (>= 1.0), nftables-json
+libnettle8:libc, libgmp10
+libgmp10:libc
+libnetfilter-conntrack3:libc, libnfnetlink0, kmod-nf-conntrack-netlink, libmnl0
+kmod-nf-conntrack-netlink:kernel
+libnfnetlink0:libc'
+installed=' libc libubus20250102 nftables-json libnfnetlink0 libmnl0 kernel '
+case $1 in
+  status) case $installed in *" $2 "*) echo 'Status: install ok installed' ;; esac ;;
+  info) echo "$db" | sed -n "s/^$2:/Depends: /p" ;;
+  download) echo "$2" >>downloads; : >"$2.ipk" ;;
+esac
+`;
+
+test('fetch.sh downloads dnsmasq-full with every dependency not installed, however deep', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'dns-fetch-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(dir, 'bin'));
+  writeFileSync(join(dir, 'bin', 'opkg'), OPKG, { mode: 0o755 });
+  const r = spawnSync('sh', [join(files, 'fetch.sh'), 'dnsmasq-full'], { cwd: dir, env: { PATH: `${join(dir, 'bin')}:/usr/bin:/bin` }, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.deepEqual(readFileSync(join(dir, 'downloads'), 'utf8').trim().split('\n').sort(), ['dnsmasq-full', 'kmod-nf-conntrack-netlink', 'libgmp10', 'libnetfilter-conntrack3', 'libnettle8']);
 });

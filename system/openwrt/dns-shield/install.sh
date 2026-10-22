@@ -16,16 +16,16 @@ if ! opkg list-installed | grep -q '^dnsmasq-full '; then
 	opkg update >/dev/null 2>&1 || { log "FAILED opkg update, nothing written"; exit 1; }
 	mkdir -p "$S/ipk"
 	cd "$S/ipk" || exit 1
-	for p in dnsmasq-full libnettle8 libnetfilter-conntrack3 libnfnetlink0 dnsmasq; do
-		opkg download "$p" >/dev/null 2>&1 || { log "FAILED download $p, nothing written"; exit 1; }
-	done
+	sh "$S/fetch.sh" dnsmasq-full || { log "FAILED download, nothing written"; exit 1; }
+	opkg download dnsmasq >/dev/null 2>&1 || { log "FAILED download dnsmasq, nothing written"; exit 1; }
 	cd / || exit 1
 	rm -rf /var/opkg-lists
 	# The dhcp config belongs to the dnsmasq package, so it is kept across the swap.
 	cp /etc/config/dhcp "$S/dhcp.keep"
 	log "swapping dnsmasq for dnsmasq-full"
 	opkg remove dnsmasq >/dev/null 2>&1
-	if ! opkg install "$S"/ipk/lib*.ipk "$S"/ipk/dnsmasq-full_*.ipk >/dev/null 2>&1; then
+	if ! opkg install $(ls "$S"/ipk/*.ipk | grep -v '/dnsmasq_') >"$S/opkg.log" 2>&1; then
+		cat "$S/opkg.log"
 		opkg install "$S"/ipk/dnsmasq_*.ipk >/dev/null 2>&1
 		cp "$S/dhcp.keep" /etc/config/dhcp
 		fail "dnsmasq-full install"
