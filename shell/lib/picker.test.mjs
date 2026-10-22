@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerLine, appName, completionHead, completions, countText, dateText, headingText, matchText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, shownRows, sizeText, sortRows, splitPath, stampText } from './picker.mjs';
+import { answerLine, appName, completionHead, completions, countText, dateText, headingText, matchText, nameText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, sizeText, sortRows, splitPath, stampText } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -80,11 +80,56 @@ test('the heading names the app in each voice, and stands alone without one', ()
   assert.equal(headingText('bracket', ''), 'OPEN FILE');
 });
 
+test('a save request heads the card Save as, in each voice', () => {
+  assert.equal(headingText('caps', 'kak', 'save'), 'SAVE AS · KAK');
+  assert.equal(headingText('plain', 'kak', 'save'), 'Save as · kak');
+  assert.equal(headingText('bracket', 'kak', 'save'), 'SAVE AS // KAK');
+  assert.equal(headingText('plain', '', 'save'), 'Save as');
+});
+
 test('the key strip in each voice', () => {
   const strip = (v) => pickerKeys(v).map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
   assert.equal(strip('plain'), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · esc');
   assert.equal(strip('caps'), '↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ SELECT · ESC');
   assert.equal(strip('bracket'), '[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [ESC]');
+});
+
+test('the save strip saves and selects nothing', () => {
+  const strip = (v) => pickerKeys(v, 'save').map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
+  assert.equal(strip('plain'), '↵ save · tab places · ctrl+l path · ctrl+h hidden · esc');
+  assert.equal(strip('caps'), '↵ SAVE · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ESC');
+  assert.equal(strip('bracket'), '[↵] SAVE · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [ESC]');
+});
+
+test('a name to save is refused when empty, a path, a dot name or a folder, and asked about when it exists', () => {
+  const entries = [{ name: 'drafts', dir: true }, { name: 'report.pdf', dir: false }, { name: '.env', dir: false }];
+  assert.equal(saveProblem('notes 2.txt', entries), '');
+  assert.equal(saveProblem('report.pdf', entries), 'exists');
+  assert.equal(saveProblem('.env', entries), 'exists');
+  assert.equal(saveProblem('', entries), 'empty');
+  assert.equal(saveProblem('a/b.txt', entries), 'slash');
+  assert.equal(saveProblem('.', entries), 'dots');
+  assert.equal(saveProblem('..', entries), 'dots');
+  assert.equal(saveProblem('drafts', entries), 'folder');
+});
+
+test('the save notice replaces the strip in the error voice; the name keeps its case', () => {
+  const said = (v, tag, name) => {
+    const n = saveNotice(v, tag, name);
+    return [n.say].concat(n.keys.map((k) => (k.key + ' ' + k.word).trim())).join(' · ');
+  };
+  assert.equal(said('plain', 'exists', 'report.pdf'), 'report.pdf exists · ↵ replace · esc keep');
+  assert.equal(said('caps', 'exists', 'report.pdf'), 'report.pdf exists · ↵ REPLACE · ESC KEEP');
+  assert.equal(said('bracket', 'exists', 'Report.pdf'), '! Report.pdf EXISTS · [↵] REPLACE · [ESC] KEEP');
+  assert.equal(said('plain', 'empty', ''), 'type a name to save as');
+  assert.equal(said('plain', 'slash', 'a/b'), 'a name cannot hold /');
+  assert.equal(said('caps', 'dots', '..'), '.. is not a file name');
+  assert.equal(said('bracket', 'folder', 'drafts'), '! drafts IS A FOLDER');
+});
+
+test('a typed name loses controls and bidi marks and keeps its spaces', () => {
+  assert.equal(nameText('notes '), 'notes ');
+  assert.equal(nameText('a\u202eb\u200fc\u0007d\n'), 'abcd');
 });
 
 test('text another program controls draws as one line, without controls or bidi marks', () => {

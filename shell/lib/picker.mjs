@@ -72,19 +72,43 @@ export function dateText(voice, ms, now) {
   return voice === 'caps' && today ? `${day} ${time}` : day;
 }
 
-export function headingText(voice, app) {
-  const head = voice === 'plain' ? 'Open file' : 'OPEN FILE';
+export function headingText(voice, app, mode) {
+  const head = mode === 'save' ? (voice === 'plain' ? 'Save as' : 'SAVE AS') : voice === 'plain' ? 'Open file' : 'OPEN FILE';
   if (!app) return head;
   return voice === 'plain' ? `${head} · ${app}` : `${head}${voice === 'bracket' ? ' // ' : ' · '}${app.toUpperCase()}`;
 }
 
 // Artboard spells the keys out; Paper and Blueprint draw ctrl as ⌃ and space as ␣.
-export function pickerKeys(voice) {
-  const pairs = [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', 'select'], ['esc', '']];
+export function pickerKeys(voice, mode) {
+  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', 'select'], ['esc', '']];
   if (voice === 'plain') return pairs.map(([k, w]) => ({ key: k, word: w }));
   const key = (k) => k.replace('ctrl+space', '⌃␣').replace('ctrl+', '⌃').toUpperCase();
   return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? `[${key(k)}]` : key(k), word: w.toUpperCase() }));
 }
+
+// Why a name cannot be saved as it is, or "exists" when saving it replaces a file; checked against every entry, as a hidden file is replaced all the same.
+export function saveProblem(name, entries) {
+  if (name === '') return 'empty';
+  if (name.indexOf('/') >= 0) return 'slash';
+  if (name === '.' || name === '..') return 'dots';
+  const found = entries.find((e) => e.name === name);
+  return found ? (found.dir ? 'folder' : 'exists') : '';
+}
+
+// The line that takes the key strip's place: the replace question with its two keys, or why the name was refused.
+export function saveNotice(voice, tag, name) {
+  const SAY = { exists: `${name} exists`, empty: 'type a name to save as', slash: 'a name cannot hold /', dots: `${name} is not a file name`, folder: `${name} is a folder` };
+  const say = SAY[tag] || '';
+  const keys = tag === 'exists' ? [['↵', 'replace'], ['esc', 'keep']] : [];
+  if (voice === 'plain') return { say: say, keys: keys.map(([k, w]) => ({ key: k, word: w })) };
+  // Blueprint's error line is caps after a bang, but the name is the file's own and keeps its case.
+  const lead = tag === 'exists' || tag === 'dots' || tag === 'folder' ? name : '';
+  const text = voice === 'bracket' ? '! ' + lead + say.slice(lead.length).toUpperCase() : say;
+  return { say: text, keys: keys.map(([k, w]) => ({ key: voice === 'bracket' ? `[${k.toUpperCase()}]` : k.toUpperCase(), word: w.toUpperCase() })) };
+}
+
+// A name as typed into the save field: controls and bidi marks dropped, spaces kept, so "notes " can grow into "notes 2".
+export const nameText = (s) => str(s).replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]/g, '');
 
 // ~/.config/gtk-3.0/bookmarks: one "file:///percent/encoded Optional Label" a line; other schemes are not folders here.
 export function parseBookmarks(text) {
