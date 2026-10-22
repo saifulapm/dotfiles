@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# just dev's dots-dns: answers state, kid, category and allow as the collector does, from a state file in the temp dir, so a nested check never reaches uBlockDNS or the router. Each call appends its arguments as one line to DOTS_DEV_DIR/dns.log. state prints DOTS_DEV_DIR/dns-state.json when it exists, else the boards' sample of 3 carried and 5 router devices; a write first copies the sample into that file, then changes it, so the next state shows the write. A file DOTS_DEV_DIR/dns-slow makes each write take 1 s, so a check can press a second key while one runs.
+set -euo pipefail
+{
+dir=${DOTS_DEV_DIR:-${XDG_STATE_HOME:?dev-fake-dns: run it from a sourced just dev env}}
+printf '%s\n' "$*" >>"$dir/dns.log"
+file=$dir/dns-state.json
+
+sample() {
+  jq -n --argjson now "$EPOCHSECONDS" '
+    def cats($y; $s; $a; $g): {youtube: $y, social: $s, adult: $a, gambling: $g};
+    def device($key; $name; $path; $kid; $cats; $allow; $blocks; $mac):
+      {key: $key, name: $name, path: $path, kid: $kid, categories: $cats, open_until: null, allow: $allow,
+       last_block: (if ($blocks | length) > 0 then $blocks[0].at else null end), blocks: $blocks,
+       ip: (if $mac then "192.168.0.1" + $mac[-2:] else null end), mac: $mac};
+    def router($n; $name; $kid; $ago):
+      device("router:02:00:00:00:00:" + $n; $name; "router"; $kid; cats($kid; $kid; $kid; $kid); [];
+        (if $ago then [{domain: "youtube.com", at: ($now - $ago)}] else [] end); "02:00:00:00:00:" + $n);
+    {as_of: $now, carried: {ok: true, error: null}, router: {ok: true, as_of: $now, error: null},
+     devices: [
+       device("carried:dev00iphone"; "Saiful'\''s iPhone"; "carried"; false; cats(false; false; false; false); []; []; null),
+       device("carried:dev00ipad"; "iPad"; "carried"; true; cats(true; true; true; false); ["khanacademy.org", "wikipedia.org"];
+         [{domain: "youtube.com", at: ($now - 120)}, {domain: "i.ytimg.com", at: ($now - 125)}, {domain: "tiktok.com", at: ($now - 3700)}]; null),
+       device("carried:dev00wife"; "Wife'\''s iPhone"; "carried"; false; cats(false; false; false; false); []; []; null),
+       router("01"; "macbook"; false; null),
+       router("02"; "nuc"; false; null),
+       router("03"; "mini"; false; null),
+       router("04"; "Sister'\''s phone"; true; 2460),
+       router("05"; "Living-room TV"; true; 3600)
+     ]}'
+}
+
+# Applies a jq program to the state file, made from the sample on the first write.
+change() {
+  [ -e "$dir/dns-slow" ] && sleep 1
+  [ -e "$file" ] || sample >"$file"
+  jq "$@" "$file" >"$file.tmp"
+  mv "$file.tmp" "$file"
+}
+
+verb=${1:-}
+key=${2:-}
+case $verb in
+state)
+  if [ -e "$file" ]; then cat "$file"; else sample; fi
+  ;;
+kid)
+  # Kid off remembers a carried device's categories, and Kid on brings them back, all four the first time.
+  remembered=$dir/dns-kid-${key#*:}.json
+  if [ "$3" = off ] && [ "${key%%:*}" = carried ]; then
+    [ -e "$file" ] || sample >"$file"
+    jq -c --arg k "$key" '.devices[] | select(.key == $k) | .categories' "$file" >"$remembered"
+  fi
+  cats='{"youtube":true,"social":true,"adult":true,"gambling":true}'
+  [ "$3" = on ] && [ -e "$remembered" ] && cats=$(cat "$remembered")
+  [ "$3" = off ] && cats='{"youtube":false,"social":false,"adult":false,"gambling":false}'
+  change --arg k "$key" --argjson c "$cats" '(.devices[] | select(.key == $k)) |= (.categories = $c | .kid = ([$c[]] | any))'
+  ;;
+category)
+  if [ "${key%%:*}" = router ]; then
+    echo "router devices carry one Kid policy" >&2
+    exit 2
+  fi
+  change --arg k "$key" --arg c "$3" --argjson on "$([ "$4" = on ] && echo true || echo false)" \
+    '(.devices[] | select(.key == $k)) |= (.categories[$c] = $on | .kid = ([.categories[]] | any))'
+  ;;
+allow)
+  # A router allow is one list that every router device shares.
+  change --arg k "$key" --arg d "$3" '
+    (.devices[] | select(.key == $k or ($k | startswith("router:")) and .path == "router")) |= (.allow = (.allow - [$d]) + [$d])'
+  ;;
+*)
+  echo "dev-fake-dns: no verb $verb" >&2
+  exit 2
+  ;;
+esac
+exit
+}

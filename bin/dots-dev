@@ -35,6 +35,8 @@ export PASSWORD_STORE_DIR=$D/password-store GNUPGHOME=$D/gnupg
 export DOTS_WORKFLOW=$repo/bin/dev-fake-workflow
 # Accounts runs a fake collector that logs each call in the temp dir, never the real one, which reads pass and calls every provider.
 export DOTS_ACCOUNTS=$repo/bin/dev-fake-accounts
+# DNS Shield runs a fake collector that keeps its devices in the temp dir, never the real one, which writes to uBlockDNS and the router.
+export DOTS_DNS=$repo/bin/dev-fake-dns
 # An agent lease tells the phone through a fake that records each call in the temp dir, never a real Slack DM.
 export DOTS_NOTIFY_PHONE=$repo/bin/dev-fake-notify-phone
 # Taildrop's s picks files through a fake that reads DOTS_DEV_DIR/picked, since the nested bus has no portal.
