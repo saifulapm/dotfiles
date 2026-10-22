@@ -81,3 +81,16 @@ test('lib.sh stops at once on an empty WAYLAND_DISPLAY, naming the fix, before i
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// The shell unit gets the live user manager's env, so a DOTS_* that bin/dots-dev exports reaches the nested shell only through its -E.
+test('every DOTS_* that dots-dev exports is passed to the shell unit by name', () => {
+  const dev = readFileSync(new URL('../../bin/dots-dev', import.meta.url), 'utf8');
+  const unit = readFileSync(new URL('../../bin/dots-dev-shell', import.meta.url), 'utf8');
+  const exported = [...dev.matchAll(/^export\s+(.*)$/gm)].flatMap((m) => [...m[1].matchAll(/\b(DOTS_\w+)=/g)].map((v) => v[1]));
+  const qs = unit.slice(0, unit.indexOf('qs --log-rules'));
+  const passed = new Set([...qs.matchAll(/-E\s+(\w+)/g)].map((m) => m[1]));
+  // DOTS_DEV_UNIT names the unit itself, and only dots-dev-shell and the bench read it.
+  const missing = exported.filter((v) => v !== 'DOTS_DEV_UNIT' && !passed.has(v));
+  assert.ok(exported.includes('DOTS_ACCOUNTS'), 'read the exports of bin/dots-dev');
+  assert.deepEqual(missing, []);
+});
