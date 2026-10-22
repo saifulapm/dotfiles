@@ -83,6 +83,20 @@ wtype -k Escape
 until_ok 3000 answered refuse
 check "Esc in the name field answers a cancel ($(cat "$out/refuse" 2>/dev/null))" answer_is refuse '{"response":1,"paths":[]}'
 
+# ctrl+l still types a path in save mode; an Enter sent with the path goes there once the path's folder is listed, and the name stays.
+for i in 1 2 3 4 5; do
+  ask "path-$i" "$(request "$fresh")"
+  shown
+  wtype -M ctrl l -m ctrl
+  until_ok 2000 state_is '.pathMode'
+  wtype "$docs/drafts/" -k Return
+  check "run $i: a path typed with Enter at once enters it ($(until_ok 2000 state_is '.pathMode == false'; pk_state | jq -c '[.folder, .pathMode, .name]'))" until_ok 2000 state_is --arg f "$docs/drafts" '.folder == $f and .pathMode == false and .name == "report.pdf"'
+  wtype -k Escape
+  until_ok 1000 state_is '.pathMode == false'
+  wtype -k Escape
+  until_ok 3000 answered "path-$i"
+done
+
 # Each theme writes the heading and the question in its voice; the file's name keeps its case.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }

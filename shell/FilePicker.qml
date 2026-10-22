@@ -68,6 +68,8 @@ Item {
     property var pathEntries: []
     property bool pathOk: false
     property bool pathStale: false
+    // Enter came before the typed path's folder was listed, so it goes once the listing lands.
+    property bool goPending: false
     readonly property var choices: pathFolder === split.parent ? P.completions(pathEntries, split.tail) : []
     property int choice: 0
     readonly property var cursorRow: rows[selected] ?? null
@@ -175,6 +177,7 @@ Item {
     function setTyped(t) {
         typed = t;
         choice = 0;
+        goPending = false;
         completeList();
     }
 
@@ -205,6 +208,10 @@ Item {
 
     // Enter goes to the typed folder when it is one, else to the cursor row.
     function goPath() {
+        if (completer.running || pathFolder !== split.parent) {
+            goPending = true;
+            return;
+        }
         const base = split.parent === "/" ? "" : split.parent;
         let to = "";
         if (pathFolder === split.parent && pathOk && split.tail === "")
@@ -411,6 +418,10 @@ Item {
             picker.pathFolder = asked;
             if (asked !== picker.split.parent)
                 Qt.callLater(picker.completeList);
+            else if (picker.goPending && picker.typingPath) {
+                picker.goPending = false;
+                picker.goPath();
+            }
         }
     }
 
