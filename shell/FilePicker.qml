@@ -324,6 +324,9 @@ Item {
         if (side === "places")
             return enter(allPlaces[placeAt].path);
         const row = rows[selected];
+        // A name that is not UTF-8 shows with U+FFFD, so its path names no file to answer or enter.
+        if (row?.undecodable)
+            return;
         if (saving && !row?.dir)
             return save();
         if (!row)
