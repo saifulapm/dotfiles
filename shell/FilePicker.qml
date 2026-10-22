@@ -23,11 +23,17 @@ Item {
     // The request as the card draws it, kept while its close still plays; open mode reads only its app and folder so far.
     property var seen: null
     readonly property string mode: seen?.mode ?? ""
+    readonly property bool saving: mode === "save"
     readonly property bool multiple: seen?.multiple ?? false
     readonly property var filters: seen?.filters ?? []
     readonly property int filter: seen?.filter ?? 0
     readonly property string name: seen?.name ?? ""
     readonly property string accept: seen?.accept ?? ""
+    // The save field: the app's suggested name, then what is typed; typed characters go here, not to the query.
+    property string saveName: ""
+    // "exists" while the replace question shows, else why the last Enter refused the name, until the next edit.
+    property string notice: ""
+    readonly property bool asking: notice === "exists"
     property string folder: ""
     // Every entry of the folder, dotfiles too, so ctrl+h, the query and the filter never relist.
     property var entries: []
@@ -65,7 +71,7 @@ Item {
     readonly property var choices: pathFolder === split.parent ? P.completions(pathEntries, split.tail) : []
     property int choice: 0
     readonly property var cursorRow: rows[selected] ?? null
-    readonly property bool previewing: !typingPath && cursorRow !== null && !cursorRow.dir
+    readonly property bool previewing: !saving && !typingPath && cursorRow !== null && !cursorRow.dir
     readonly property bool preview: previewing && previewImage.status === Image.Ready
     readonly property bool busy: request !== null || lister.running
 
@@ -101,6 +107,8 @@ Item {
         hidden = false;
         side = "list";
         typingPath = false;
+        notice = "";
+        saveName = P.oneLine(r.name);
         filterAt = r.filter >= 0 && r.filter < r.filters.length ? r.filter : 0;
         enter(r.folder.charAt(0) === "/" ? r.folder.replace(/\/+$/, "") || "/" : home);
         shown = true;
@@ -142,8 +150,8 @@ Item {
         if (!keepQuery)
             query = "";
         folder = path;
-        selected = 0;
-        landOn = "";
+        selected = saving ? -1 : 0;
+        landOn = saving ? saveName : "";
         listed = false;
         list();
     }
@@ -211,6 +219,22 @@ Item {
         enter(to);
     }
 
+    // The cursor sits on the file the name would replace, and on no row otherwise, so Enter saves unless Up or Down picked a folder.
+    function setName(n) {
+        saveName = P.nameText(n);
+        notice = "";
+        selected = rows.findIndex(r => !r.dir && r.name === saveName);
+    }
+
+    // Enter asks first about a name already there, and answers nothing for a name it refuses.
+    function save() {
+        const problem = P.saveProblem(saveName, entries);
+        if (problem !== "")
+            notice = problem;
+        else
+            reply(P.answerLine(0, [pathOf({ name: saveName })]));
+    }
+
     function cycleFilter() {
         if (filters.length > 1)
             filterAt = (filterAt + 1) % filters.length;
@@ -238,8 +262,13 @@ Item {
             choice = Math.max(0, Math.min(choices.length - 1, choice + by));
         else if (side === "places")
             placeAt = Math.max(0, Math.min(allPlaces.length - 1, placeAt + by));
-        else
+        else {
             selected = Math.max(0, Math.min(rows.length - 1, selected + by));
+            if (saving && cursorRow && !cursorRow.dir) {
+                saveName = P.nameText(cursorRow.name);
+                notice = "";
+            }
+        }
     }
 
     // Enter answers a file and opens a folder or the place under the cursor.
@@ -249,6 +278,8 @@ Item {
         if (side === "places")
             return enter(allPlaces[placeAt].path);
         const row = rows[selected];
+        if (saving && !row?.dir)
+            return save();
         if (!row)
             return;
         if (row.dir)
@@ -298,7 +329,10 @@ Item {
             selected: selected,
             places: shownPlaces,
             matches: lit,
-            focus: side,
+            focus: saving && side === "list" && !typingPath && !asking ? "name" : side,
+            name: saving && !typingPath ? typedLabel.text : "",
+            question: asking && noticeLabel.visible,
+            notice: notice,
             typed: typedLabel.text,
             prompt: promptLabel.text,
             match: matchLabel.text,
@@ -312,7 +346,7 @@ Item {
             previewName: previewName.text,
             previewDims: previewDims.text,
             previewDetail: previewDetail.text,
-            hint: keys.join(" · "),
+            hint: (noticeLabel.visible ? [noticeLabel.text] : []).concat(keys).join(" · "),
             busy: busy,
             openMs: openMs,
             opens: opens,
@@ -325,7 +359,7 @@ Item {
 
     onSelectedChanged: rowList.positionViewAtIndex(selected, ListView.Contain)
     onRowsChanged: if (selected >= rows.length)
-        selected = Math.max(0, rows.length - 1)
+        selected = saving ? -1 : Math.max(0, rows.length - 1)
 
     // One JSON array of the folder's entries off the render loop: names as they are spelt, dotfiles too, a folder with how many visible entries it holds, a file with its guessed mime type for the app's filters.
     Process {
@@ -348,7 +382,7 @@ Item {
             }
             picker.entries = entries;
             const back = picker.rows.findIndex(r => r.name === picker.landOn);
-            picker.selected = back >= 0 ? back : 0;
+            picker.selected = back >= 0 ? back : picker.saving ? -1 : 0;
             picker.listed = true;
         }
     }
@@ -398,6 +432,16 @@ Item {
         id: keyTarget
         Keys.onPressed: event => {
             const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
+            // The replace question takes only Enter, which replaces, and Esc, which keeps the file.
+            if (picker.asking) {
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    picker.notice = "";
+                    picker.reply(P.answerLine(0, [picker.pathOf({ name: picker.saveName })]));
+                } else if (event.key === Qt.Key_Escape)
+                    picker.notice = "";
+                event.accepted = true;
+                return;
+            }
             if (ctrl && event.key === Qt.Key_L)
                 picker.togglePath();
             else if (ctrl && event.key === Qt.Key_H)
@@ -427,7 +471,11 @@ Item {
                     picker.setTyped(picker.typed + event.text);
                 else
                     return;
-            } else if (event.key === Qt.Key_Right) {
+            } else if (picker.saving && event.key === Qt.Key_Backspace)
+                picker.setName(picker.saveName.slice(0, -1));
+            else if (picker.saving && !ctrl && event.text.length > 0 && event.text.charCodeAt(0) >= 32)
+                picker.setName(picker.saveName + event.text);
+            else if (event.key === Qt.Key_Right) {
                 if (picker.side === "list" && picker.cursorRow?.dir)
                     picker.choose();
             } else if (event.key === Qt.Key_Backspace) {
@@ -485,7 +533,7 @@ Item {
                         anchors.centerIn: parent
                         width: Math.min(implicitWidth, card.width - 80)
                         textFormat: Text.PlainText
-                        text: P.headingText(picker.voice, picker.appText)
+                        text: P.headingText(picker.voice, picker.appText, picker.mode)
                         maximumLineCount: 1
                         elide: Text.ElideRight
                         color: look.label.kind === "header" ? look.small.color : look.label.color
@@ -501,7 +549,7 @@ Item {
                     id: promptLabel
                     visible: text !== ""
                     textFormat: Text.PlainText
-                    text: bracket ? (picker.typingPath ? "> PATH" : ">") : picker.typingPath ? (plain ? "path" : "PATH") : ""
+                    text: picker.typingPath ? (bracket ? "> PATH" : plain ? "path" : "PATH") : picker.saving ? (bracket ? "> NAME" : plain ? "Name" : "NAME") : bracket ? ">" : ""
                     color: bracket ? c.accent : look.small.color
                     font.family: look.small.font
                     font.pixelSize: look.small.size + 1
@@ -512,21 +560,22 @@ Item {
                     implicitHeight: typedLabel.implicitHeight + 8
                     radius: plain ? 6 : 0
                     color: "transparent"
-                    border.width: picker.typingPath ? 2 : 0
+                    border.width: picker.typingPath || picker.saving ? 2 : 0
                     border.color: c.accent
 
                     Text {
                         id: typedLabel
                         anchors.verticalCenter: parent.verticalCenter
-                        x: picker.typingPath ? 8 : 0
+                        x: picker.typingPath || picker.saving ? 8 : 0
                         width: parent.width - 2 * x
                         textFormat: Text.PlainText
-                        text: P.oneLine(picker.typingPath ? picker.typed : picker.query)
+                        // The save name is stripped as it is typed and drawn as is, so a space typed last still shows.
+                        text: picker.typingPath ? P.oneLine(picker.typed) : picker.saving ? picker.saveName : P.oneLine(picker.query)
                         maximumLineCount: 1
                         elide: Text.ElideLeft
                         color: c.ink
                         font.family: picker.typingPath || bracket ? fonts.mono : fonts.ui
-                        font.pixelSize: picker.typingPath ? 15 : 20
+                        font.pixelSize: picker.typingPath || picker.saving ? 15 : 20
                     }
                 }
                 Text {
@@ -733,6 +782,7 @@ Item {
                                     name: nameText.text,
                                     dir: modelData.dir,
                                     size: sizeLabel.text,
+                                    tag: tagLabel.visible ? tagLabel.text : "",
                                     modified: dateLabel.text,
                                     elided: nameText.truncated,
                                     lines: nameText.lineCount
@@ -785,6 +835,17 @@ Item {
                                     font.family: bracket ? fonts.mono : fonts.ui
                                     font.pixelSize: 14
                                     font.weight: rowItem.modelData.dir || rowItem.isCurrent ? Font.Medium : Font.Normal
+                                }
+                                // The file a save would replace.
+                                Text {
+                                    id: tagLabel
+                                    visible: picker.saving && !rowItem.modelData.dir && rowItem.modelData.name === picker.saveName
+                                    textFormat: Text.PlainText
+                                    text: plain ? "· exists" : "EXISTS"
+                                    color: rowItem.isCurrent ? look.cursor.text : c.danger
+                                    font.family: look.small.font
+                                    font.pixelSize: look.small.size
+                                    font.letterSpacing: look.small.spacing
                                 }
                                 Text {
                                     id: sizeLabel
@@ -903,13 +964,15 @@ Item {
                 }
 
                 Rectangle {
+                    visible: !picker.saving
                     Layout.fillHeight: true
                     implicitWidth: 1
                     color: look.rule.color
                 }
 
-                // The cursor file: its picture when Qt decodes it, then its name, size, kind and date; hidden while a path is typed.
+                // The cursor file: its picture when Qt decodes it, then its name, size, kind and date; hidden while a path is typed, and gone in save mode.
                 Item {
+                    visible: !picker.saving
                     Layout.preferredWidth: 280
                     Layout.fillHeight: true
 
@@ -984,9 +1047,22 @@ Item {
                 Layout.bottomMargin: 12
                 spacing: plain ? 8 : 16
 
+                // The replace question or a refusal, in the error colour, in place of the strip.
+                Text {
+                    id: noticeLabel
+                    visible: picker.notice !== ""
+                    textFormat: Text.PlainText
+                    text: P.oneLine(P.saveNotice(picker.voice, picker.notice, picker.saveName).say)
+                    color: c.danger
+                    font.family: look.small.font
+                    font.pixelSize: look.small.size
+                    font.letterSpacing: look.small.spacing
+                    font.bold: true
+                }
+
                 Repeater {
                     id: keyRepeater
-                    model: picker.typingPath ? P.pathKeys(picker.voice) : P.pickerKeys(picker.voice)
+                    model: picker.notice !== "" ? P.saveNotice(picker.voice, picker.notice, picker.saveName).keys : picker.typingPath ? P.pathKeys(picker.voice) : P.pickerKeys(picker.voice, picker.mode)
 
                     Rectangle {
                         id: keyPair
