@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# just dev's dots-accounts: prints the collector's rows for two Claude accounts and the other providers, so a nested check never reaches a provider or pass. Each call appends its arguments as one line to DOTS_DEV_DIR/accounts.log; --cached prints the same rows fetched two hours before. A file DOTS_DEV_DIR/accounts-near-full puts main at 92% and 79% and makes a full fetch take 3 s, so a check sees the warning and "refreshing…". A file DOTS_DEV_DIR/accounts-offline makes a full fetch answer as the collector does with no network: every cached row, stale, with its old time.
+# just dev's dots-accounts: prints the collector's rows for two Claude accounts and the other providers, so a nested check never reaches a provider or pass. Each call appends its arguments as one line to DOTS_DEV_DIR/accounts.log; --cached prints the same rows fetched two hours before. A file DOTS_DEV_DIR/accounts-near-full puts main at 92% and 79% and makes a full fetch take 3 s, so a check sees the warning and "refreshing…". A file DOTS_DEV_DIR/accounts-offline makes a full fetch answer as the collector does with no network: every cached row, stale, with its old time. A file DOTS_DEV_DIR/accounts-rows.json is printed as it is for both calls, so a walk can show the real collector's rows or forged ones.
 set -euo pipefail
 {
 dir=${DOTS_DEV_DIR:-${XDG_STATE_HOME:?dev-fake-accounts: run it from a sourced just dev env}}
 printf '%s\n' "$*" >>"$dir/accounts.log"
+if [ -e "$dir/accounts-rows.json" ]; then
+  cat "$dir/accounts-rows.json"
+  exit 0
+fi
 
 five=34 weekly=61 state=ok reason=null
 if [ -e "$dir/accounts-near-full" ]; then
