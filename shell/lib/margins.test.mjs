@@ -76,6 +76,9 @@ test('the mail count reads only a positive whole number from its file', () => {
   assert.equal(mailCount('3\n'), 3);
   assert.equal(mailCount('12'), 12);
   for (const bad of ['0\n', '', '-2\n', '2.5\n', 'three\n', '3 4\n', null, undefined]) assert.equal(mailCount(bad), 0, String(bad));
+  // The margin keeps the count in a QML int, which wraps past 2^31; no Imbox holds a million unread.
+  assert.equal(mailCount('999999'), 999999);
+  for (const big of ['1000000', '4294967296', '99999999999999999999']) assert.equal(mailCount(big), 0, big);
 });
 
 test('unread mail sits between the goal and wifi, and 0 leaves no item', () => {

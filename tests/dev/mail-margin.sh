@@ -28,6 +28,9 @@ write_count 1
 check "a count of 1 renamed over the file draws MAIL 1 first" shows 1
 write_count 4
 check "a count of 4 renamed over the file draws MAIL 4 first" shows 4
+write_count 99999999999999999999
+check "a count past what an int holds draws no mail item, not a wrapped number" shows 0
+write_count 4
 write_count 0
 check "a count back at 0 takes the mail item away" shows 0
 

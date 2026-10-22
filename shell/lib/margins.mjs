@@ -25,10 +25,10 @@ export function marginState(view, now, right) {
   };
 }
 
-// The Imbox unread count kak-mail writes; anything but a positive whole number reads as no mail.
+// The Imbox unread count kak-mail writes; anything but a positive whole number of at most six digits reads as no mail, since the margin keeps it in a QML int.
 export function mailCount(text) {
   const s = String(text ?? '').trim();
-  return /^[1-9][0-9]*$/.test(s) ? Number(s) : 0;
+  return /^[1-9][0-9]{0,5}$/.test(s) ? Number(s) : 0;
 }
 
 // Quickshell's UPower gives the percentage as 0 to 1.
