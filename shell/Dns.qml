@@ -241,6 +241,7 @@ Item {
             pane: {
                 name: paneName.text,
                 path: panePath.text,
+                pathTruncated: panePath.truncated,
                 badge: paneBadge.drawnText,
                 paused: pausedText.visible ? pausedText.text : "",
                 categories: cats,
@@ -717,12 +718,13 @@ Item {
                     Layout.bottomMargin: 18
                     spacing: 16
 
-                    RowLayout {
+                    // The path's line runs under the badge, so it has the pane's whole width.
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: 12
-                        ColumnLayout {
+                        spacing: 3
+                        RowLayout {
                             Layout.fillWidth: true
-                            spacing: 3
+                            spacing: 12
                             Text {
                                 id: paneName
                                 Layout.fillWidth: true
@@ -735,24 +737,24 @@ Item {
                                 font.pixelSize: 17
                                 font.weight: Font.Medium
                             }
-                            Text {
-                                id: panePath
-                                Layout.fillWidth: true
-                                textFormat: Text.PlainText
-                                text: panel.paneView ? panel.paneView.path : ""
-                                elide: Text.ElideRight
-                                color: c.muted
-                                font.family: fonts.mono
-                                font.pixelSize: 12
+                            Badge {
+                                id: paneBadge
+                                Layout.alignment: Qt.AlignTop
+                                kid: !!panel.device && panel.device.kid
+                                timed: panel.timedOpen
+                                label: panel.device ? D.badgeText(panel.device, panel.clock) : ""
+                                cursorRow: false
                             }
                         }
-                        Badge {
-                            id: paneBadge
-                            Layout.alignment: Qt.AlignTop
-                            kid: !!panel.device && panel.device.kid
-                            timed: panel.timedOpen
-                            label: panel.device ? D.badgeText(panel.device, panel.clock) : ""
-                            cursorRow: false
+                        Text {
+                            id: panePath
+                            Layout.fillWidth: true
+                            textFormat: Text.PlainText
+                            text: panel.paneView ? panel.paneView.path : ""
+                            elide: Text.ElideRight
+                            color: c.muted
+                            font.family: fonts.mono
+                            font.pixelSize: 12
                         }
                     }
 

@@ -21,6 +21,8 @@ open_dns() { niri msg action spawn -- dots-call dns toggle; until_ok 3000 state_
 close_dns() { wtype -k Escape; until_ok 3000 state_is '.drawing == false'; }
 idle() { until_ok "${1:-3000}" state_is '.busy == false and (.rows | length) > 0'; }
 badge_of() { dns_state | jq -r --arg k "$1" '.rows[] | select(.key == $k) | .badge'; }
+status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
+in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
 badge_like() { state_is --arg k "$1" --arg re "$2" 'any(.rows[]; .key == $k and (.badge | test($re)))'; }
 ipad=carried:dev00ipad
 
@@ -53,6 +55,17 @@ check "the badge counts down while the card shows ($first, then $(badge_of "$ipa
 wtype O
 check "O logs one open $ipad 2h" until_ok 3000 logged_is "open $ipad 2h" 1
 check "and the badge reads open · 120:00 left or a little less ($(badge_of "$ipad"))" until_ok 3000 badge_like "$ipad" '^open · (120:00|119:5[0-9]) left$'
+# The path's line runs under the badge with the pane's width, so it draws whole in every theme; Paper goes last, so the checks below run in it on the iPad.
+for t in artboard blueprint paper; do
+  idle
+  close_dns
+  in_theme "$t"
+  open_dns
+  idle
+  wtype j
+  until_ok 1000 state_is --arg k "$ipad" '.cursor == $k'
+  check "$t: the pane draws Carried profile · Kid mode paused until HH:MM whole ($(dns_state | jq -c '.pane | [.path, .pathTruncated]'))" state_is '(.pane.path | test("^Carried profile · Kid mode paused until [0-9]{2}:[0-9]{2}$")) and .pane.pathTruncated == false'
+done
 idle
 wtype -k space
 check "space ends the open: one kid $ipad on" until_ok 3000 logged_is "kid $ipad on" 1
