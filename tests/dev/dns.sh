@@ -89,6 +89,33 @@ check "and the iPad reads KID after both" badge_is "$ipad" KID
 check "the off ran before the on ($(grep -n "^kid $ipad" "$log" | tail -2 | paste -sd' '))" test "$(grep "^kid $ipad" "$log" | tail -2 | paste -sd'|')" = "kid $ipad off|kid $ipad on"
 rm "$DOTS_DEV_DIR/dns-slow"
 
+# A refused write: the fake prints the collector's line on stderr and exits 1, changing nothing.
+check "before any refused write the card draws no error" state_is '.error == ""'
+echo "dots-dns: router unreachable (ssh exit 255)" >"$DOTS_DEV_DIR/dns-fail"
+wtype -k space
+check "space on the iPad with the write refused logs a third kid $ipad off" until_ok 3000 logged_is "kid $ipad off" 3
+check "the card draws the reason under the pane ($(dns_state | jq -c .error))" until_ok 3000 state_is '.error == "router unreachable (ssh exit 255)"'
+shown_at=$(now_ms)
+check "in Paper's danger colour ($(dns_state | jq -c .errorColor))" state_is '.errorColor == "#c8381e" and .errorLines == 1'
+idle
+check "and the iPad still reads KID with its categories ($(row "$ipad"))" state_is --arg k "$ipad" 'any(.rows[]; .key == $k and .badge == "KID") and ([.pane.categories[].value] == ["ON", "ON", "ON", "ON", "OFF"])'
+check "the reason goes within 7 s" until_ok 7000 state_is '.error == ""'
+gone=$(($(now_ms) - shown_at))
+check "after about 5 s on screen, not before 4 s ($gone ms)" test "$gone" -ge 4000
+
+# A forged reason: an escape sequence, a bidi override, 200 characters and a second line.
+printf 'dots-dns: esc\033[2Jape evil‮gnp.exe %s\nsecond line\n' "$(printf 'W%.0s' $(seq 1 200))" >"$DOTS_DEV_DIR/dns-fail"
+wtype -k space
+check "a forged reason draws ($(dns_state | jq -c '[.error[0:40], .errorLines, .errorTruncated]'))" until_ok 3000 state_is '.error | startswith("esc [2Jape evilgnp.exe WWW")'
+check "on one line, elided, with no newline, bidi mark or escape" state_is '.errorLines == 1 and .errorTruncated and (.error | test("[\n‮\u001b]") | not) and (.error | contains("second") | not)'
+idle
+wtype -k space
+check "a write that succeeds logs kid $ipad off and draws no error" until_ok 3000 logged_is "kid $ipad off" 5
+check "and the iPad reads OPEN with no error drawn" until_ok 3000 state_is --arg k "$ipad" '.busy == false and .error == "" and any(.rows[]; .key == $k and .badge == "OPEN")'
+wtype -k space
+check "space turns the iPad back to KID" until_ok 3000 badge_is "$ipad" KID
+idle
+
 wtype j
 check "j moves on to Wife's iPhone" until_ok 1000 state_is '.cursor == "carried:dev00wife"'
 wtype j
@@ -141,8 +168,8 @@ idle
 check "reopened with identical data, the drawn rows read back the same ($(dns_state | jq -c '[.rows[] | [.name, .badge]]'))" test "$(dns_state | jq -c '[.rows[] | [.name, .badge]]')" = "$before"
 check "and the pane is drawn" state_is '.pane.name != ""'
 
-for t in "paper|CARRIED PROFILE · 3|HOME ROUTER · 5|#FAF6EC|space 1-5 o O a n esc" "artboard|Carried profile · 3|Home router · 5|#FFFFFF|space 1-5 o O a n esc" "blueprint|CARRIED PROFILE · 3|HOME ROUTER · 5|#0A1526|[space] [1-5] [o] [O] [a] [n] [esc]"; do
-  IFS='|' read -r name carried router card keys <<<"$t"
+for t in "paper|CARRIED PROFILE · 3|HOME ROUTER · 5|#FAF6EC|space 1-5 o O a n esc|router unreachable (ssh exit 255)|#c8381e" "artboard|Carried profile · 3|Home router · 5|#FFFFFF|space 1-5 o O a n esc|router unreachable (ssh exit 255)|#cf222e" "blueprint|CARRIED PROFILE · 3|HOME ROUTER · 5|#0A1526|[space] [1-5] [o] [O] [a] [n] [esc]|✕ ROUTER UNREACHABLE (SSH EXIT 255)|#ffb547"; do
+  IFS='|' read -r name carried router card keys reason danger <<<"$t"
   close_dns
   in_theme "$name"
   open_dns
@@ -155,6 +182,12 @@ for t in "paper|CARRIED PROFILE · 3|HOME ROUTER · 5|#FAF6EC|space 1-5 o O a n 
   wtype j
   until_ok 1000 state_is --arg k "$ipad" '.cursor == $k'
   check "$name: the iPad's pane draws 5 category rows, 1-5 ($(dns_state | jq -c '[.pane.categories[] | "\(.n) \(.label)"]'))" state_is '[.pane.categories[] | "\(.n) \(.label)"] == ["1 YouTube", "2 YouTube Kids", "3 Social", "4 Adult", "5 Gambling"]'
+  until_ok 7000 state_is '.error == ""'
+  echo "dots-dns: router unreachable (ssh exit 255)" >"$DOTS_DEV_DIR/dns-fail"
+  wtype 2
+  check "$name: a refused 2 draws $reason in $danger ($(dns_state | jq -c '[.error, .errorColor]'))" until_ok 3000 state_is --arg e "$reason" --arg c "$danger" '.error == $e and .errorColor == $c'
+  idle
+  check "$name: and leaves the iPad's categories as they were" state_is '[.pane.categories[].value] == ["ON", "ON", "ON", "ON", "OFF"]'
 done
 in_theme paper
 close_dns

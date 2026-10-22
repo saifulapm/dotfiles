@@ -150,6 +150,9 @@ export function addArgs(lease, text) {
   return lease && name ? ['add', lease.mac, name] : null;
 }
 
+// A refused write's reason: the first line dots-dns wrote to stderr, after its "dots-dns: ". It can quote a name or domain anyone on the network set, so it is cleaned like one.
+export const writeError = (stderr) => clean(String(stderr).split('\n')[0].replace(/^dots-dns: /, ''));
+
 export const addKeys = (look) => keys(look, [['↵', 'add in kid mode'], ['tab', 'name'], ['j/k', 'lease'], ['esc', 'back']]);
 
 // A group label in the theme's voice, its count after it, a column word at the right; the heading, and a failure in the theme's error voice.

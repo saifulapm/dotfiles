@@ -30,6 +30,8 @@ Item {
     property string leasesText: "[]"
     property int leaseSelected: 0
     property bool naming: false
+    // The reason dots-dns gave for the last refused write, drawn under the pane until the tick clears it.
+    property string writeError: ""
     readonly property bool busy: cachedReader.running || reader.running || writer.running || leasesReader.running
 
     readonly property string command: Quickshell.env("DOTS_DNS") || "dots-dns"
@@ -263,6 +265,10 @@ Item {
                 host: leaseHost.text,
                 address: leaseAddress.text
             } : null,
+            error: writeErrorText.visible ? writeErrorText.text : "",
+            errorLines: writeErrorText.lineCount,
+            errorTruncated: writeErrorText.truncated,
+            errorColor: String(writeErrorText.color),
             footer: footerText.text,
             keys: keys
         });
@@ -294,10 +300,16 @@ Item {
         }
     }
 
-    // The card reads state after every write, so a refused write leaves the rows as dots-dns has them.
+    // The card reads state after every write, so a refused write leaves the rows as dots-dns has them, and shows dots-dns's reason.
     Process {
         id: writer
-        onExited: {
+        stderr: StdioCollector {
+            id: writerErr
+        }
+        onExited: code => {
+            panel.writeError = code === 0 ? "" : D.writeError(writerErr.text);
+            if (panel.writeError !== "")
+                writeErrorTick.restart();
             if (panel.shown)
                 reader.running = true;
         }
@@ -314,6 +326,12 @@ Item {
             nameInput.text = panel.lease ? panel.lease.field : "";
             panel.next();
         }
+    }
+
+    Root.Tick {
+        id: writeErrorTick
+        interval: 5000
+        onTriggered: panel.writeError = ""
     }
 
     // A timed open counts down once a second while the card shows; at its end the collector brings Kid back, so the card reads state again.
@@ -1077,6 +1095,24 @@ Item {
                             font.family: fonts.ui
                             font.pixelSize: 13
                         }
+                    }
+
+                    // Why the last write was refused, for 5 s, in the theme's error voice.
+                    Text {
+                        id: writeErrorText
+                        visible: panel.writeError !== ""
+                        Layout.fillWidth: true
+                        // The reason can quote a name anyone on the network set, so it elides in the pane's room and never widens the pane into the list.
+                        Layout.preferredWidth: 0
+                        textFormat: Text.PlainText
+                        text: marks.errorText(panel.writeError)
+                        elide: Text.ElideRight
+                        color: c.danger
+                        font.family: caps ? fonts.display : look.small.font
+                        font.pixelSize: caps ? 15 : 11
+                        font.italic: caps
+                        font.weight: bracket ? Font.Bold : Font.Normal
+                        font.letterSpacing: bracket ? 1.2 : 0
                     }
                 }
 

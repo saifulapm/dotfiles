@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { listLook } from './voice.mjs';
-import { dnsView, dnsItems, dnsLook, dnsKeys, paneOf, kidArgs, categoryArgs, allowArgs, badgeText, openFraction, openArgs, leasesView, addArgs, addKeys } from './dns.mjs';
+import { dnsView, dnsItems, dnsLook, dnsKeys, paneOf, kidArgs, categoryArgs, allowArgs, badgeText, openFraction, openArgs, leasesView, addArgs, addKeys, writeError } from './dns.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
 
@@ -277,4 +277,17 @@ test('Enter adds the lease under the typed name, one-lined, and an empty name ad
 test("the add list's key strip is the board's", () => {
   assert.deepEqual(addKeys(listLook(theme('artboard'))).map((k) => `${k.key} ${k.word}`.trim()), ['↵ add in kid mode', 'tab name', 'j/k lease', 'esc back']);
   assert.deepEqual(addKeys(listLook(theme('paper'))).map((k) => `${k.key} ${k.word}`.trim()), ['↵ ADD IN KID MODE', 'tab NAME', 'j/k LEASE', 'esc BACK']);
+});
+
+test("a refused write reads as the collector's reason, one-lined and stripped, in each theme's error voice", () => {
+  assert.equal(writeError('dots-dns: that is not a domain name\n'), 'that is not a domain name');
+  assert.equal(writeError('dots-dns: router unreachable (ssh exit 255)\n'), 'router unreachable (ssh exit 255)');
+  assert.equal(writeError('dots-dns: esc\u001b[2Jape evil‮gnp.exe\tW\nsecond line\n'), 'esc [2Jape evilgnp.exe W');
+  assert.equal(writeError(''), '');
+  const looks = ['paper', 'artboard', 'blueprint'].map((n) => dnsLook(theme(n)));
+  assert.deepEqual(looks.map((l) => l.errorText(writeError('dots-dns: the router has no lease for that device'))), [
+    'the router has no lease for that device',
+    'the router has no lease for that device',
+    '✕ THE ROUTER HAS NO LEASE FOR THAT DEVICE',
+  ]);
 });

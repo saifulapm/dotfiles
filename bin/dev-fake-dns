@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# just dev's dots-dns: answers state, kid, category, allow, open, reconcile, leases and add as the collector does, from a state file in the temp dir, so a nested check never reaches uBlockDNS or the router. Each call appends its arguments as one line to DOTS_DEV_DIR/dns.log. state prints DOTS_DEV_DIR/dns-state.json when it exists, else the boards' sample of 3 carried and 5 router devices; a write first copies the sample into that file, then changes it, so the next state shows the write. state ends opens whose time has passed first, as the collector does; state --cached prints the file as it is, at once. Flag files in DOTS_DEV_DIR: dns-slow makes each write take 1 s, so a check can press a second key while one runs; dns-slow-state makes a full state take 2 s, so a check sees the cached rows first; dns-open-seconds holds the length of every open in seconds; dns-router-down makes state report the router unreachable since 14 minutes ago, keeping its rows; dns-leases.json replaces the 3 sample leases.
+# just dev's dots-dns: answers state, kid, category, allow, open, reconcile, leases and add as the collector does, from a state file in the temp dir, so a nested check never reaches uBlockDNS or the router. Each call appends its arguments as one line to DOTS_DEV_DIR/dns.log. state prints DOTS_DEV_DIR/dns-state.json when it exists, else the boards' sample of 3 carried and 5 router devices; a write first copies the sample into that file, then changes it, so the next state shows the write. state ends opens whose time has passed first, as the collector does; state --cached prints the file as it is, at once. Flag files in DOTS_DEV_DIR: dns-slow makes each write take 1 s, so a check can press a second key while one runs; dns-slow-state makes a full state take 2 s, so a check sees the cached rows first; dns-open-seconds holds the length of every open in seconds; dns-router-down makes state report the router unreachable since 14 minutes ago, keeping its rows; dns-leases.json replaces the 3 sample leases; dns-fail makes the next write change nothing, print the file on stderr and exit 1, as a refused write does.
 set -euo pipefail
 {
 dir=${DOTS_DEV_DIR:-${XDG_STATE_HOME:?dev-fake-dns: run it from a sourced just dev env}}
@@ -40,6 +40,11 @@ change() {
 }
 write() {
   [ -e "$dir/dns-slow" ] && sleep 1
+  if [ -e "$dir/dns-fail" ]; then
+    cat "$dir/dns-fail" >&2
+    rm "$dir/dns-fail"
+    exit 1
+  fi
   change "$@"
 }
 
