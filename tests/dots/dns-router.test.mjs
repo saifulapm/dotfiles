@@ -235,7 +235,6 @@ test('install.sh downloads before it removes dnsmasq, checks fw4 before it resta
 
 test('restore.sh brings back exactly dhcp, firewall and https-dns-proxy and removes what install added', () => {
   const s = readFileSync(join(files, 'restore.sh'), 'utf8');
-  assert.match(s, /tar xzf "\$S\/backup\.tar\.gz" etc\/config\/dhcp etc\/config\/firewall etc\/config\/https-dns-proxy \|\|/);
   for (const p of ['/etc/nftables.d/20-dns-shield.nft', '/etc/init.d/dns-shield', '/etc/dns-shield']) assert.ok(s.includes(p), p);
   assert.match(s, /https-dns-proxy enable/);
 });
@@ -267,6 +266,10 @@ test('the nft include loads into a fw4 table that declares the Kid sets', (t) =>
   if (r.status !== 0 && /unshare/.test(r.stderr)) return t.skip('no user namespaces here');
   assert.equal(r.status, 0, r.stderr);
   for (const re of [/ip saddr @kid ip daddr @kid_block reject/, /th dport 853 reject/, /ether saddr @kid_mac meta nfproto ipv6 reject/, /dnat ip to 192\.168\.0\.1:5353/]) assert.match(include, re);
+  // The router offers its own IPv6 address as a DNS server, so a Kid device asking it there would reach the unfiltered house resolver on the input path.
+  assert.match(include, /type filter hook input priority filter - 5;[^}]*ether saddr @kid_mac meta nfproto ipv6 meta l4proto \{ tcp, udp \} th dport \{ 53, 853 \} reject/s);
+  // A Kid device that picks its own IPv4 address keeps its MAC, so every IPv4 rule also keys on kid_mac.
+  for (const rule of ['meta l4proto { tcp, udp } th dport 53 dnat ip to 192.168.0.1:5353', 'ip daddr @kid_block reject', 'ip daddr @kid_doh reject', 'meta l4proto { tcp, udp } th dport 853 reject']) assert.ok(include.includes(`ether saddr @kid_mac ${rule.startsWith('meta') ? 'meta nfproto ipv4 ' + rule : rule}`), rule);
 });
 
 // A fake opkg with dnsmasq-full's real dependency tree from the router: libgmp10 and the conntrack module are two levels down, and libc is held.
@@ -321,4 +324,20 @@ test('install keeps googlevideo.com out of the drop set while the router allows 
   const s = readFileSync(join(files, 'install.sh'), 'utf8');
   assert.match(s, /\[ -e \/etc\/dns-shield\/youtube-kids-allowed \] \|\| uci add_list dhcp\.dns_shield\.domain=googlevideo\.com/);
   assert.doesNotMatch(s, /for d in googlevideo\.com/);
+});
+
+// The Kid resolver logs every query to tmpfs, which is the router's RAM, so the log is cut back every 10 minutes once it passes 1 MB.
+test('install caps the Kid query log and replaces an older cron line', () => {
+  const s = readFileSync(join(files, 'install.sh'), 'utf8');
+  assert.match(s, /sed -i '\/dns-shield\/d' \/etc\/crontabs\/root/);
+  const line = s.match(/echo '(\*\/10 [^']*# dns-shield)'/);
+  assert.ok(line, 'a 10-minute cron line');
+  assert.match(line[1], /\[ "\$\(wc -c <\/tmp\/dns-shield\/kid\.log\)" -gt 1000000 \]/);
+});
+
+test('restore takes https-dns-proxy only when the backup has it, and fails when dnsmasq is not running after', () => {
+  const s = readFileSync(join(files, 'restore.sh'), 'utf8');
+  assert.match(s, /tar xzf "\$S\/backup\.tar\.gz" etc\/config\/dhcp etc\/config\/firewall \|\|/);
+  assert.match(s, /tar tzf "\$S\/backup\.tar\.gz" etc\/config\/https-dns-proxy >\/dev\/null 2>&1 && tar xzf "\$S\/backup\.tar\.gz" etc\/config\/https-dns-proxy/);
+  assert.match(s, /pgrep -x dnsmasq >\/dev\/null \|\| \{ echo "dns-shield: FAILED restore: dnsmasq is not running"; exit 1; \}/);
 });

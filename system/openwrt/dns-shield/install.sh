@@ -76,8 +76,10 @@ chmod 755 /etc/init.d/dns-shield
 cp "$S/stage/20-dns-shield.nft" /etc/nftables.d/20-dns-shield.nft
 fw4 check >/dev/null 2>&1 || fail "fw4 check"
 
+# The Kid query log sits in tmpfs, which is RAM, so it is cut back every 10 minutes once it passes 1 MB.
 touch /etc/crontabs/root
-grep -q 'dns-shield' /etc/crontabs/root || echo '17 */6 * * * tail -n 3000 /tmp/dns-shield/kid.log >/tmp/dns-shield/kid.trim && cat /tmp/dns-shield/kid.trim >/tmp/dns-shield/kid.log # dns-shield' >>/etc/crontabs/root
+sed -i '/dns-shield/d' /etc/crontabs/root
+echo '*/10 * * * * [ "$(wc -c </tmp/dns-shield/kid.log)" -gt 1000000 ] && tail -n 3000 /tmp/dns-shield/kid.log >/tmp/dns-shield/kid.trim && cat /tmp/dns-shield/kid.trim >/tmp/dns-shield/kid.log # dns-shield' >>/etc/crontabs/root
 /etc/init.d/cron enable
 /etc/init.d/cron restart
 

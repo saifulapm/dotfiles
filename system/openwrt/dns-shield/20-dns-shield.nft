@@ -14,12 +14,22 @@ set kid_doh {
 chain dns_shield_dstnat {
 	type nat hook prerouting priority dstnat - 5; policy accept;
 	iifname "br-lan" ip saddr @kid meta l4proto { tcp, udp } th dport 53 dnat ip to 192.168.0.1:5353
+	iifname "br-lan" ether saddr @kid_mac meta nfproto ipv4 meta l4proto { tcp, udp } th dport 53 dnat ip to 192.168.0.1:5353
 }
 
 chain dns_shield_forward {
 	type filter hook forward priority filter - 5; policy accept;
 	ip saddr @kid ip daddr @kid_block reject
+	ether saddr @kid_mac ip daddr @kid_block reject
 	ip saddr @kid ip daddr @kid_doh reject
+	ether saddr @kid_mac ip daddr @kid_doh reject
 	ip saddr @kid meta l4proto { tcp, udp } th dport 853 reject
+	ether saddr @kid_mac meta nfproto ipv4 meta l4proto { tcp, udp } th dport 853 reject
 	ether saddr @kid_mac meta nfproto ipv6 reject
+}
+
+# The router offers its own IPv6 address as a DNS server, and the house resolver behind it is unfiltered, so a Kid device must ask over IPv4.
+chain dns_shield_input {
+	type filter hook input priority filter - 5; policy accept;
+	ether saddr @kid_mac meta nfproto ipv6 meta l4proto { tcp, udp } th dport { 53, 853 } reject
 }
