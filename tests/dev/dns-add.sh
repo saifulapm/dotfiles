@@ -32,6 +32,8 @@ adding
 echo "     add: $(dns_state | jq -c '{heading, add}')"
 check "n heads the card DNS SHIELD › ADD DEVICE in Paper" state_is '.heading == "DNS SHIELD › ADD DEVICE"'
 check "and lists the 3 leases with their addresses under ON THE NETWORK NOW · 3" state_is '.add.head == "ON THE NETWORK NOW · 3" and ([.add.leases[] | [.name, .ip]] == [["Galaxy-A54", "192.168.0.143"], ["android-7f2c", "192.168.0.151"], ["Chromecast", "192.168.0.160"]])'
+list_width=$(dns_state | jq .add.listWidth)
+check "the lease list is $list_width px wide, its note on one line" state_is '(.add.listWidth | type) == "number" and .add.listWidth > 300 and .add.noteLines == 1'
 check "the cursor lease's hostname and address show at the right, and the name field starts from it" state_is --arg m "$galaxy" '.add.cursor == $m and .add.host == "Galaxy-A54" and .add.address == "192.168.0.143" and .add.name == "Galaxy-A54"'
 wtype j
 check "j moves to android-7f2c and the field follows" until_ok 1000 state_is '.add.cursor == "02:00:00:00:00:42" and .add.name == "android-7f2c"'
@@ -68,6 +70,11 @@ echo "     forged leases: $(dns_state | jq -c '[.add.leases[] | [.name, .lines, 
 check "no lease draws a newline, a bidi mark or an escape" state_is 'all(.add.leases[]; (.name | test("[\n‮\u001b]")) | not) and all(.add.leases[]; .lines == 1)'
 check "a lease with no hostname reads unnamed, the others one-lined" state_is '[.add.leases[0:4][].name] == ["two lines", "evilgnp.exe", "esc [2Jape", "unnamed"]'
 check "the 200-character hostname is elided" state_is '.add.leases[4].truncated == true'
+# With the cursor on it, the pane at the right shows the long hostname too.
+wtype jjjj
+until_ok 1000 state_is '.add.cursor == "02:00:00:00:00:55"'
+check "the list keeps its $list_width px with a 200-character hostname ($(dns_state | jq .add.listWidth))" state_is --argjson w "$list_width" '.add.listWidth == $w'
+check "and its note stays one line ($(dns_state | jq .add.noteLines))" state_is '.add.noteLines == 1'
 wtype -k Escape
 until_ok 1000 state_is '.add == null'
 close_dns

@@ -255,6 +255,8 @@ Item {
             add: adding ? {
                 head: leasesHead.text,
                 leases: leaseRows,
+                listWidth: addList.width,
+                noteLines: addNote.lineCount,
                 cursor: lease ? lease.mac : "",
                 name: nameInput.text,
                 naming: naming,
@@ -611,6 +613,7 @@ Item {
 
                 // The add sub-list in place of the devices: the router's leases not yet listed.
                 ColumnLayout {
+                    id: addList
                     visible: panel.adding
                     Layout.preferredWidth: Math.round(card.width * 0.54)
                     Layout.alignment: Qt.AlignTop
@@ -689,6 +692,7 @@ Item {
                     }
 
                     Text {
+                        id: addNote
                         Layout.fillWidth: true
                         Layout.leftMargin: 12
                         Layout.topMargin: 10
@@ -1150,6 +1154,8 @@ Item {
                             Text {
                                 id: leaseHost
                                 Layout.fillWidth: true
+                                // Any device names its own lease, so the hostname takes the room the row has and never widens the pane into the list.
+                                Layout.preferredWidth: 0
                                 horizontalAlignment: Text.AlignRight
                                 textFormat: Text.PlainText
                                 text: panel.lease ? panel.lease.name : ""
