@@ -325,6 +325,33 @@ ShellRoot {
     }
 
     Root.Ipc {
+        target: "accounts"
+
+        function open(): void {
+            const t0 = Date.now();
+            surfacesLoader.active = true;
+            surfacesLoader.item.openAccounts(t0);
+        }
+
+        function close(): void {
+            surfacesLoader.item?.accounts?.close();
+        }
+
+        function toggle(): void {
+            if (surfacesLoader.item?.accounts?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (surfacesLoader.item?.accounts)
+                return surfacesLoader.item.accounts.state();
+            return JSON.stringify({ loaded: false, open: false, visible: false, busy: false, accounts: [], balances: [], usage: [], groups: [], footer: "", openMs: null, opens: 0 });
+        }
+    }
+
+    Root.Ipc {
         target: "goals"
 
         // The store lives in the Desk, so Goals opens only once the Desk has loaded.

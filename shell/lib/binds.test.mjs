@@ -31,6 +31,10 @@ test('Mod+T toggles Tailscale', () => {
   assert.match(binds, spawns('Mod+T', ['dots-call', 'tailscale', 'toggle']));
 });
 
+test('Mod+U toggles Accounts', () => {
+  assert.match(binds, /^\s*Mod\+U hotkey-overlay-title="Accounts" \{ spawn "dots-call" "accounts" "toggle"; \}$/m);
+});
+
 test('workspace up and down keep a bind now that Mod+I is the island', () => {
   assert.match(binds, /^\s*Mod\+Page_Up hotkey-overlay-title="[^"]+" \{ focus-workspace-up; \}$/m);
   assert.match(binds, /^\s*Mod\+Page_Down hotkey-overlay-title="[^"]+" \{ focus-workspace-down; \}$/m);
@@ -93,12 +97,13 @@ test('Mod+D toggles Do Not Disturb, Mod+Shift+A clears the notifications and Mod
   assert.match(binds, spawns('Mod+Shift+Escape', ['dots-foot', 'btop']));
 });
 
-test('J and K cross into the next workspace at the edge, and U is no longer bound', () => {
+test('J and K cross into the next workspace at the edge, and U no longer moves between workspaces', () => {
   assert.match(binds, acts('Mod+J', 'focus-window-or-workspace-down'));
   assert.match(binds, acts('Mod+K', 'focus-window-or-workspace-up'));
   assert.match(binds, acts('Mod+Ctrl+J', 'move-window-down-or-to-workspace-down'));
   assert.match(binds, acts('Mod+Ctrl+K', 'move-window-up-or-to-workspace-up'));
-  assert.doesNotMatch(binds, /^\s*Mod\+(Ctrl\+)?U /m);
+  assert.doesNotMatch(binds, /^\s*Mod\+U [^{]*\{ [^}]*workspace/m);
+  assert.doesNotMatch(binds, /^\s*Mod\+Ctrl\+U /m);
   assert.doesNotMatch(binds, /^\s*Mod\+Ctrl\+I /m);
 });
 
