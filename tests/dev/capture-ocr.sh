@@ -64,6 +64,16 @@ check "the clip history does not hold the URL" bash -c "! cliphist -db-path '$XD
 check "the clip history still holds the copy before it" listed 'Ship v2 today'
 until_ok 3000 rests
 
+# qrencode writes UTF-8 with no ECI, which zbar would read as Shift-JIS.
+niri msg action close-window
+qrencode -s 8 -o "$qr" 'নমস্কার café'
+niri msg action spawn -- imv "$qr"
+until_ok 5000 focused imv
+sleep 0.5
+capture qr --region "$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x),\(.y) \(.width)x\(.height)"')"
+check "qr copies Bangla and an accent byte for byte (got '$(wl-paste)')" test "$(wl-paste)" = 'নমস্কার café'
+until_ok 3000 rests
+
 capture qr --region "0,0 40x40"
 check "qr with no code in the region says No QR code found" until_ok 1000 shows 'No QR code found' '.title == "" and .detail == "No QR code found"'
 until_ok 3000 rests

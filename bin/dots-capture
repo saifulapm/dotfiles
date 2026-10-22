@@ -33,7 +33,8 @@ ocr)
   ;;
 qr)
   pick_region
-  text=$(grim -g "$region" - | zbarimg --raw -q - 2>/dev/null)
+  # A code with no ECI is most often UTF-8, which zbar would read as Shift-JIS; -Sbinary hands back its bytes.
+  text=$(grim -g "$region" - | zbarimg --raw -q -Sbinary - 2>/dev/null)
   if [[ -z $text ]]; then
     pill qr '' 'No QR code found'
     exit 0
