@@ -1,5 +1,6 @@
 // dots-dns against a local stub of the uBlockDNS API, with a scratch HOME and XDG dirs.
 import { test } from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -523,10 +524,14 @@ test('a router allow goes into the shared allow file and reloads the Kid resolve
   assert.equal(readFileSync(allowFile, 'utf8'), 'khanacademy.org\n');
 });
 
-// t6: a timed open is Kid off with a deadline file and a transient timer; reconcile, run by the timer, by state and at the shell's start, ends it.
+// A timed open is Kid off with a deadline file and a transient timer; reconcile, run by the timer, by state and at the shell's start, ends it.
 const systemd = (ctx) => (existsSync(join(ctx.ctl, 'systemd.log')) ? readFileSync(join(ctx.ctl, 'systemd.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : []);
 const openFile = (ctx, key) => join(ctx.state, 'open-' + key.replace(/[^A-Za-z0-9_-]/g, '_'));
 const deadline = (ctx, key) => Number(readFileSync(openFile(ctx, key), 'utf8').split(' ')[0]);
+// The unit name reaches the journal, so it carries a hash of the key, never the device id or MAC.
+const unitFor = (key) => 'dots-dns-open-' + createHash('sha256').update(key).digest('hex').slice(0, 12);
+// A wall-clock time, so the timer counts the hours the laptop slept and fires on resume if they passed.
+const calendar = (epoch) => new Date(epoch * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
 
 test('open turns Kid off, keeps a deadline and starts a timer that reconciles, and state reads the device open with its categories paused', async (t) => {
   const s = await stub(t);
@@ -538,8 +543,9 @@ test('open turns Kid off, keeps a deadline and starts a timer that reconciles, a
   assert.ok(until >= t0 + 1800 && until <= t0 + 1802, String(until));
   assert.equal(readFileSync(openFile(ctx, 'carried:dev00ipad'), 'utf8').trim().split(' ')[1], 'carried:dev00ipad');
   const run1 = systemd(ctx).find((c) => c[0] === 'systemd-run');
-  assert.ok(run1.includes('--user') && run1.includes('--on-active=1800s') && run1.includes('--unit') && run1.at(-1) === 'reconcile', JSON.stringify(run1));
-  assert.equal(run1[run1.indexOf('--unit') + 1], 'dots-dns-open-carried_dev00ipad');
+  assert.ok(run1.includes('--user') && run1.includes(`--on-calendar=${calendar(until)}`) && run1.includes('--unit') && run1.at(-1) === 'reconcile', JSON.stringify(run1));
+  assert.equal(run1[run1.indexOf('--unit') + 1], unitFor('carried:dev00ipad'));
+  assert.ok(!JSON.stringify(systemd(ctx)).includes('dev00ipad'), 'no device id in a unit name');
   const row = (await state(ctx)).devices.find((d) => d.key === 'carried:dev00ipad');
   assert.equal(row.open_until, until);
   assert.equal(row.kid, false);
@@ -553,8 +559,8 @@ test('open again restarts the deadline and the timer with the new length', async
   await ok(ctx, 'open', 'carried:dev00ipad', '2h');
   assert.ok(deadline(ctx, 'carried:dev00ipad') >= Math.floor(Date.now() / 1000) + 7190);
   const log = systemd(ctx);
-  assert.ok(log.some((c) => c[0] === 'systemctl' && c.includes('stop') && c.includes('dots-dns-open-carried_dev00ipad.timer')));
-  assert.ok(log.filter((c) => c[0] === 'systemd-run').at(-1).includes('--on-active=7200s'));
+  assert.ok(log.some((c) => c[0] === 'systemctl' && c.includes('stop') && c.includes(unitFor('carried:dev00ipad') + '.timer')));
+  assert.ok(log.filter((c) => c[0] === 'systemd-run').at(-1).includes(`--on-calendar=${calendar(deadline(ctx, 'carried:dev00ipad'))}`));
   assert.deepEqual(JSON.parse(readFileSync(join(ctx.state, 'kid-dev00ipad.json'), 'utf8')), { youtube: false, youtube_kids: false, social: false, adult: true, gambling: true });
 });
 
@@ -606,10 +612,14 @@ test('a reconcile that cannot reach the router keeps the deadline for the next t
   const r = await run(ctx, 'reconcile');
   assert.equal(r.status, 1);
   assert.match(r.stderr, /router unreachable/);
+  assert.doesNotMatch(r.stderr, /02:00:00:00:00:21/);
   assert.ok(existsSync(openFile(ctx, 'router:02:00:00:00:00:21')));
+  // Nothing else would end it while the router is down, so a failed reconcile tries again in two minutes.
+  const retry = systemd(ctx).filter((c) => c[0] === 'systemd-run').at(-1);
+  assert.ok(retry.includes('--on-active=120s') && retry[retry.indexOf('--unit') + 1] === 'dots-dns-retry' && retry.at(-1) === 'reconcile', JSON.stringify(retry));
 });
 
-// t7: the add list is the router's leases less the listed devices, and an add is a reservation in Kid mode.
+// The add list is the router's leases less the listed devices, and an add is a reservation in Kid mode.
 test('leases lists the leases of devices not yet listed, with hostnames made safe', async (t) => {
   const s = await stub(t);
   const ctx = scratch(t, s.url);

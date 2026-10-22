@@ -3,7 +3,7 @@
 import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 const env = process.env;
 const API = env.DOTS_DNS_API || 'https://ublockdns.com/api';
@@ -534,7 +534,8 @@ function normalize(raw) {
 const OPEN = { '30m': 1800, '2h': 7200 };
 const slug = (key) => key.replace(/[^A-Za-z0-9_-]/g, '_');
 const openFile = (key) => join(STATE, 'open-' + slug(key));
-const timerUnit = (key) => 'dots-dns-open-' + slug(key);
+// The unit name reaches the journal, so it carries a hash of the key, never a device id or MAC.
+const timerUnit = (key) => 'dots-dns-open-' + createHash('sha256').update(key).digest('hex').slice(0, 12);
 
 // A timed open is a deadline file, `<epoch> <key>`, which outlives a reboot; the transient timer only makes it end on time while the machine is up.
 function deadlines() {
@@ -559,9 +560,12 @@ const kidAny = (key, on) => (key.path === 'carried' ? kidCarried(key.id, on) : k
 
 async function openDevice(key, keyText, secs) {
   await kidAny(key, false);
-  save(openFile(keyText), `${Math.floor(Date.now() / 1000) + secs} ${keyText}\n`, 0o600);
+  const until = Math.floor(Date.now() / 1000) + secs;
+  save(openFile(keyText), `${until} ${keyText}\n`, 0o600);
   spawnSync('systemctl', ['--user', 'stop', timerUnit(keyText) + '.timer'], { stdio: 'ignore', env });
-  spawnSync('systemd-run', ['--user', '--quiet', '--collect', '--unit', timerUnit(keyText), `--on-active=${secs}s`, process.execPath, process.argv[1], 'reconcile'], { stdio: 'ignore', env });
+  // A wall-clock time keeps counting while the laptop sleeps, and a time passed in sleep fires on resume.
+  const at = new Date(until * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
+  spawnSync('systemd-run', ['--user', '--quiet', '--collect', '--unit', timerUnit(keyText), `--on-calendar=${at}`, '--timer-property=AccuracySec=1s', process.execPath, process.argv[1], 'reconcile'], { stdio: 'ignore', env });
 }
 
 // A deadline whose Kid on fails stays for the next reconcile, so a router that is down only delays the end of an open.
@@ -575,10 +579,14 @@ async function reconcile() {
     } catch (e) {
       if (!(e instanceof Failure)) throw e;
       failed++;
-      process.stderr.write(`dots-dns: ${keyText}: ${e.message}\n`);
+      process.stderr.write(`dots-dns: a timed open: ${e.message}\n`);
     }
   }
-  if (failed) throw new Failure(`${failed} timed open could not end yet`);
+  if (!failed) return;
+  // Nothing else ends an open while the router or the network is down, so a failed reconcile tries again in two minutes.
+  spawnSync('systemctl', ['--user', 'stop', 'dots-dns-retry.timer'], { stdio: 'ignore', env });
+  spawnSync('systemd-run', ['--user', '--quiet', '--collect', '--unit', 'dots-dns-retry', '--on-active=120s', process.execPath, process.argv[1], 'reconcile'], { stdio: 'ignore', env });
+  throw new Failure(`${failed} timed open could not end yet`);
 }
 
 async function leases() {
