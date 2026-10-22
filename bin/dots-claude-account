@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Keeps the registry of Claude accounts: add makes a home that shares the main account's settings and logs in, use picks the active one.
+set -uo pipefail
+{
+
+state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
+reg=$state/claude-accounts.json
+main_home=$HOME/.claude
+
+die() {
+  echo "dots claude-account: $1" >&2
+  exit "${2:-1}"
+}
+
+# Prints "email<TAB>plan" for the home given, or for main when it is empty. Blank fields when the status cannot be read.
+status() {
+  local json
+  if [ -n "${1:-}" ]; then
+    json=$(CLAUDE_CONFIG_DIR=$1 claude auth status --json 2>/dev/null)
+  else
+    json=$(env -u CLAUDE_CONFIG_DIR claude auth status --json 2>/dev/null)
+  fi
+  jq -r '[.email // "", .subscriptionType // ""] | @tsv' <<<"$json" 2>/dev/null || printf '\t\n'
+}
+
+# Writes stdin to the registry through a temp file and a rename.
+save() {
+  local tmp
+  mkdir -p "$state"
+  tmp=$(mktemp "$reg.XXXXXX") || die "cannot write $reg"
+  if cat >"$tmp" && [ -s "$tmp" ]; then
+    mv -f "$tmp" "$reg"
+  else
+    rm -f "$tmp"
+    die "cannot write $reg"
+  fi
+}
+
+add() {
+  local id=${1:-} home email plan made='' i memail mplan
+  [[ $id =~ ^[a-z0-9-]+$ ]] || die "label must be lowercase letters, digits and -"
+  if [ -f "$reg" ]; then
+    ! jq -e --arg id "$id" 'any(.accounts[]; .id == $id)' "$reg" >/dev/null || die "account $id already exists"
+  else
+    [ "$id" != main ] || die "account main already exists"
+  fi
+  home=$state/claude-accounts/$id
+  [ -e "$home" ] || made=1
+  mkdir -p "$home" || die "cannot make $home"
+  for i in skills agents settings.json CLAUDE.md history.jsonl projects; do
+    ln -sfn "$main_home/$i" "$home/$i"
+  done
+  # claude keeps the terminal here, since the login opens a browser and may ask for a code.
+  if ! CLAUDE_CONFIG_DIR=$home claude auth login; then
+    [ -z "$made" ] || rm -rf "$home"
+    die "claude auth login failed, nothing recorded"
+  fi
+  IFS=$'\t' read -r email plan < <(status "$home")
+  if [ ! -f "$reg" ]; then
+    IFS=$'\t' read -r memail mplan < <(status "")
+    jq -n --arg h "$main_home" --arg e "$memail" --arg p "$mplan" \
+      '{active: "main", accounts: [{id: "main", label: "main", home: $h, email: (if $e == "" then null else $e end), plan: (if $p == "" then null else $p end)}]}' | save
+  fi
+  jq --arg id "$id" --arg h "$home" --arg e "$email" --arg p "$plan" \
+    '.accounts += [{id: $id, label: $id, home: $h, email: (if $e == "" then null else $e end), plan: (if $p == "" then null else $p end)}]' "$reg" | save
+}
+
+use() {
+  local id=${1:-}
+  if [ ! -f "$reg" ]; then
+    [ "$id" = main ] || die "no account $id"
+    return 0
+  fi
+  jq -e --arg id "$id" 'any(.accounts[]; .id == $id)' "$reg" >/dev/null || die "no account $id"
+  jq --arg id "$id" '.active = $id' "$reg" | save
+}
+
+case ${1:-} in
+  add) add "${2:-}" ;;
+  use) use "${2:-}" ;;
+  *) die "usage: dots claude-account add <label> | use <id>" 2 ;;
+esac
+exit
+}

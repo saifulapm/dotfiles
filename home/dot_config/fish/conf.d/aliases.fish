@@ -11,7 +11,6 @@ alias ... "cd ../.."
 alias .... "cd ../../.."
 
 alias s "npx skills"
-alias cx "claude --allow-dangerously-skip-permissions"
 alias pa "pi --approve"
 
 alias p pnpm
