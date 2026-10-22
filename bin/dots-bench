@@ -77,6 +77,25 @@ pass_cold=$(pass_once) || exit 1
 # Its unload Tick would count as a running timer, and the loaded card as memory, in what follows.
 until_ok 35000 pass_is '.loaded == false' || die "pass never unloaded"
 
+# The file picker loads on a request and unloads 30 s after it closes, so the request after that opens it cold; socat plays the portal, its connection open until the picker answers.
+files_state() { timeout 0.5 qs ipc call picker state 2>/dev/null; }
+files_is() { files_state | jq -e "$1" >/dev/null; }
+files_once() {
+  local request client
+  request=$(jq -cn --arg f "$HOME" '{mode: "open", multiple: false, title: "", app: "", folder: $f, name: "", filters: [], filter: 0, accept: ""}')
+  { printf '%s\n' "$request"; sleep 10; } | socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/dots-picker-$WAYLAND_DISPLAY.sock" >/dev/null 2>&1 &
+  client=$!
+  until_ok 3000 files_is '.opens == 1 and (.openMs | type) == "number"' || die "the file picker never reported openMs"
+  files_state | jq -r .openMs
+  wtype -k Escape
+  until_ok 3000 files_is '.open == false' || die "the file picker never closed"
+  kill "$client" 2>/dev/null
+}
+files_once >/dev/null || exit 1
+until_ok 35000 files_is '.loaded == false' || die "the file picker never unloaded"
+files_cold=$(files_once) || exit 1
+until_ok 35000 files_is '.loaded == false' || die "the file picker never unloaded"
+
 switch_json=$XDG_STATE_HOME/dots/theme-switch.json
 theme_index() { themes_state | jq -r --arg n "$1" '.themes | index($n)'; }
 selected_is() { themes_state | jq -e --arg t "$1" '.selected == $t' >/dev/null; }
@@ -168,6 +187,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm" "$pass_cold"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm" "$pass_cold" "$files_cold"
 exit
 }
