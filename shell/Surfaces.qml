@@ -31,8 +31,9 @@ PanelWindow {
     readonly property var tailscale: tailscaleLoader.item
     readonly property var accounts: accountsLoader.item
     readonly property var dns: dnsLoader.item
+    readonly property var picker: pickerLoader.item
     // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
-    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass, tailscale, accounts, dns]
+    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass, tailscale, accounts, dns, picker]
     readonly property bool shown: all.some(s => s?.shown ?? false)
 
     // Only one surface shows at a time, so another's close is cut short.
@@ -125,6 +126,13 @@ PanelWindow {
         pinentryLoader.active = true;
         closeOthers(pinentry);
         pinentry.show(request);
+    }
+
+    // The Portal service calls this with each file chooser request it shows.
+    function openPicker(request) {
+        pickerLoader.active = true;
+        closeOthers(picker);
+        picker.show(request);
     }
 
     // Each surface is made in turn, one per tick, so none holds a frame long and a first open finds it built; Goals waits for the Desk's store.
@@ -326,6 +334,22 @@ PanelWindow {
         interval: 30000
         running: !!host.dns && !host.dns.visible && !host.dns.busy
         onTriggered: dnsLoader.active = false
+    }
+
+    Loader {
+        id: pickerLoader
+        anchors.fill: parent
+        active: false
+        sourceComponent: Root.FilePicker {
+            theme: host.theme
+            apps: host.apps
+        }
+    }
+
+    Root.Tick {
+        interval: 30000
+        running: !!host.picker && !host.picker.visible && !host.picker.busy
+        onTriggered: pickerLoader.active = false
     }
 
     Loader {
