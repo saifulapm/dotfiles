@@ -15,6 +15,8 @@ Item {
     property bool shown: false
     property int opens: 0
     property var openMs: null
+    // The open's first frame, the card drawn with or without its rows: the open Saiful's budget times (#166PQ300).
+    property var cardMs: null
     // When the open being timed was requested, or -1 once its first frame with rows is swapped.
     property real openT0: -1
     // True once this open's rows are in: the cache's answer, or the rows a fetch still running at the open had drawn.
@@ -49,6 +51,7 @@ Item {
     function open(t0) {
         openT0 = t0;
         openMs = null;
+        cardMs = null;
         opens += 1;
         selected = 0;
         rowsIn = busy;
@@ -58,7 +61,7 @@ Item {
         keyTarget.forceActiveFocus();
     }
 
-    // A fetch that is running finishes on its own, so the collector never leaves its cache half written.
+    // A fetch that is running finishes within its 10 s limit: killing node would orphan codex's process group.
     function close() {
         shown = false;
     }
@@ -81,6 +84,8 @@ Item {
 
     // Called on each of the host window's frames; the first one drawn with this open's rows ends the timing.
     function swapped() {
+        if (shown && openT0 >= 0 && cardMs === null)
+            cardMs = Date.now() - openT0;
         if (shown && openT0 >= 0 && rowsIn) {
             openMs = Date.now() - openT0;
             openT0 = -1;
@@ -128,6 +133,7 @@ Item {
             footer: (caps ? stripFooter : footerLine).text,
             hint: keys.join(" · "),
             openMs: openMs,
+            cardMs: cardMs,
             opens: opens,
             settled: motion.settled,
             cardBox: card.drawnBox(),
@@ -155,9 +161,11 @@ Item {
         stdout: StdioCollector {
             id: cachedOut
         }
+        // A card closed while the cache was read, as by a quick second Mod+U, starts no fetch.
         onExited: {
             panel.take(cachedOut.text);
-            fetcher.running = true;
+            if (panel.shown)
+                fetcher.running = true;
         }
     }
 

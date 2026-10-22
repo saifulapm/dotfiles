@@ -11,7 +11,8 @@ if ! grep -qxF "DOTS_ACCOUNTS=$repo/bin/dev-fake-accounts" <<<"$unit_env"; then
 fi
 
 log=$DOTS_DEV_DIR/accounts.log
-mkdir -p "$XDG_STATE_HOME/dots"
+# use refuses an account whose home is not a directory, so work has one.
+mkdir -p "$XDG_STATE_HOME/dots/claude-accounts/work"
 cat >"$XDG_STATE_HOME/dots/claude-accounts.json" <<EOF
 { "active": "main",
   "accounts": [
@@ -127,27 +128,47 @@ for t in "paper|CLAUDE|#FAF6EC" "artboard|Claude|#FFFFFF" "blueprint|CLAUDE|#0A1
   check "$name: the label's strip $(group_geo) draws $px px off the card's $card" test "$px" -ge 10
 done
 
+# A quick second Mod+U closes the card while the cache is read; that close starts no full fetch.
+close_acc
+touch "$DOTS_DEV_DIR/accounts-slow-cached"
+before=$(ncalls)
+niri msg action spawn -- dots-call accounts toggle
+until_ok 3000 state_is '.open'
+niri msg action spawn -- dots-call accounts toggle
+until_ok 3000 state_is '.drawing == false'
+sleep 1.5
+check "a card closed while the cache was read starts no fetch ($(tail -n +$((before + 1)) "$log" | paste -sd'|'))" test "$(tail -n +$((before + 1)) "$log" | paste -sd'|')" = "--cached"
+rm "$DOTS_DEV_DIR/accounts-slow-cached"
+open_acc
+fetched 6000
+
 close_acc
 check "within 10 s of Esc no dev-fake-accounts runs" until_ok 10000 eval '! fakes'
 until_ok 33000 state_is '.loaded == false'
 check "30 s after close shell status no longer lists accounts as loaded" bash -c "timeout 0.5 qs ipc call shell status | jq -e 'all(.loaded[]; . != \"accounts\")' >/dev/null"
 check "and its timers are back to $timers_before ($(shell_status | jq .timers))" test "$(shell_status | jq .timers)" = "$timers_before"
 
-# With no network the collector serves every source's cached rows as stale, and the card still opens with them. A cold open is timed to its first frame drawn with rows; building the 17 rows takes 45 to 80 ms, so the times are printed, not yet held to 50 ms.
+# With no network the collector serves every source's cached rows as stale, and the card still opens with them. A cold open draws its card within 50 ms (#166PQ300); its rows follow once the 17 delegates are built, 45 to 80 ms, so that time is printed only.
 touch "$DOTS_DEV_DIR/accounts-offline"
 cold=()
+card=()
 for i in 1 2 3 4 5; do
   until_ok 33000 state_is '.loaded == false'
   niri msg action spawn -- dots-call accounts toggle
   until_ok 3000 state_is '.openMs != null'
   cold+=("$(acc_state | jq .openMs)")
+  card+=("$(acc_state | jq .cardMs)")
   fetched 6000
   [ "$i" = 5 ] || close_acc
 done
-echo "     cold opens: ${cold[*]} ms"
+echo "     cold opens: card ${card[*]} ms, rows ${cold[*]} ms"
 timed() { jq -e 'type == "number" and . > 0' <<<"$1" >/dev/null; }
+within() { jq -e --argjson most "$2" 'type == "number" and . > 0 and . <= $most' <<<"$1" >/dev/null; }
+for ms in "${card[@]}"; do
+  check "a cold open draws its card within 50 ms ($ms ms)" within "$ms" 50
+done
 for ms in "${cold[@]}"; do
-  check "a cold open is timed to its first frame with rows ($ms ms)" timed "$ms"
+  check "and its rows are timed to their first frame ($ms ms)" timed "$ms"
 done
 echo "     offline: $(acc_state | jq -c '{accounts: [.accounts[].note], providers: [(.balances + .usage)[] | [.note, .error]]}')"
 check "offline, every account reads stale · as of HH:MM" state_is 'all(.accounts[]; .note | test("^stale · as of [0-9]{2}:[0-9]{2}$"))'
