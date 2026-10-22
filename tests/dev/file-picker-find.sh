@@ -142,11 +142,11 @@ cancel hidden
 ask preview "$(request "$dl")"
 shown
 cursor_to IMG_2041.HEIC
-check "a HEIC does not preview, and still reads its size and kind" until_ok 2000 state_is '.preview == false and .previewName == "IMG_2041.HEIC" and .previewDetail == "3.1 MB · HEIC image"'
+check "a HEIC does not preview, and still reads its size and date" until_ok 2000 state_is '.preview == false and .previewName == "IMG_2041.HEIC" and .previewLines[0] == {label: "SIZE", value: "3.1 MB"} and .previewLines[1].label == "MODIFIED"'
 cursor_to report-october.pdf
-check "nor does a PDF ($(pk_state | jq -c '[.preview, .previewDetail]'))" until_ok 2000 state_is '.preview == false and .previewName == "report-october.pdf" and .previewDetail == "184 KB · PDF file"'
+check "nor does a PDF ($(pk_state | jq -c '[.preview, .previewLines]'))" until_ok 2000 state_is '.preview == false and .previewName == "report-october.pdf" and .previewLines[0] == {label: "SIZE", value: "184 KB"} and .previewDims == ""'
 cursor_to shot.png
-check "a PNG under the cursor previews at its size ($(until_ok 2000 state_is .preview; pk_state | jq -c '[.preview, .previewName, .previewDims, .previewDetail]'))" until_ok 2000 state_is '.preview and .previewDims == "640 × 480" and .previewName == "shot.png"'
+check "a PNG under the cursor previews at its size ($(until_ok 2000 state_is .preview; pk_state | jq -c '[.preview, .previewName, .previewLines]'))" until_ok 2000 state_is '.preview and .previewDims == "640 × 480" and .previewName == "shot.png"'
 cancel preview
 
 # An app's filters hide files and cycle.

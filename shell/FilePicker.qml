@@ -79,6 +79,16 @@ Item {
     readonly property var cursorRow: rows[selected] ?? null
     readonly property bool previewing: !saving && !choosingFolder && !typingPath && cursorRow !== null && !cursorRow.dir
     readonly property bool preview: previewing && previewImage.status === Image.Ready
+    readonly property string cursorPath: previewing ? pathOf(cursorRow) : ""
+    // The size the header reader last found, and for which file; a file it has not read yet draws no dimensions line.
+    property var dims: ({
+            path: "",
+            width: 0,
+            height: 0
+        })
+    property bool sizeStale: false
+    readonly property var meta: previewing ? P.previewText(voice, cursorRow, dims.path === cursorPath ? dims.width : 0, dims.height) : null
+    onCursorPathChanged: measure()
     readonly property bool busy: request !== null || lister.running
 
     readonly property string home: Quickshell.env("HOME")
@@ -114,6 +124,11 @@ Item {
         side = "list";
         typingPath = false;
         notice = "";
+        dims = {
+            path: "",
+            width: 0,
+            height: 0
+        };
         saveName = P.oneLine(r.name);
         filterAt = r.filter >= 0 && r.filter < r.filters.length ? r.filter : 0;
         enter(r.folder.charAt(0) === "/" ? r.folder.replace(/\/+$/, "") || "/" : home);
@@ -275,6 +290,19 @@ Item {
         lister.running = true;
     }
 
+    // One header read at a time; a cursor that moved on during it asks again for the file it rests on.
+    function measure() {
+        if (sizer.running) {
+            sizeStale = true;
+            return;
+        }
+        if (cursorPath === "" || dims.path === cursorPath)
+            return;
+        sizer.asked = cursorPath;
+        sizer.command = ["python3", "-c", P.SIZE_SCRIPT, cursorPath];
+        sizer.running = true;
+    }
+
     function move(by) {
         if (typingPath)
             choice = Math.max(0, Math.min(choices.length - 1, choice + by));
@@ -321,6 +349,19 @@ Item {
         return path === home ? "~" : path.indexOf(home + "/") === 0 ? "~" + path.slice(home.length) : path;
     }
 
+    // Where an item draws, in the card's own coordinates.
+    function box(item) {
+        if (!item.visible)
+            return null;
+        const p = item.mapToItem(card, 0, 0);
+        return {
+            x: p.x,
+            y: p.y,
+            width: item.width,
+            height: item.height
+        };
+    }
+
     function state() {
         const drawn = [];
         for (let i = 0; i < rowList.count; i++) {
@@ -338,6 +379,9 @@ Item {
         const done = [];
         for (let i = 0; i < completionRepeater.count; i++)
             done.push(completionRepeater.itemAt(i).drawn());
+        const lines = [];
+        for (let i = 0; i < metaRepeater.count; i++)
+            lines.push(metaRepeater.itemAt(i).drawn());
         const keys = [];
         for (let i = 0; i < keyRepeater.count; i++)
             keys.push((keyRepeater.itemAt(i).keyLabel + " " + keyRepeater.itemAt(i).wordLabel).trim());
@@ -366,6 +410,18 @@ Item {
             typed: typedLabel.text,
             prompt: promptLabel.text,
             match: matchLabel.text,
+            chip: chipLabel.visible ? chipLabel.text : "",
+            heads: [nameHead.text, sizeHead.text, dateHead.text],
+            pathLead: pathLeadLabel.visible ? pathLeadLabel.text : "",
+            cardSize: [card.width, card.height],
+            boxes: {
+                heading: box(headingLabel),
+                query: box(typedLabel),
+                match: box(matchLabel),
+                chip: box(chipLabel),
+                path: box(pathLabel),
+                count: box(countLabel)
+            },
             hidden: hidden,
             pathMode: typingPath,
             completionHead: typingPath ? completionHeadLabel.text : "",
@@ -374,8 +430,11 @@ Item {
             previewShown: previewName.visible,
             preview: preview,
             previewName: previewName.text,
-            previewDims: previewDims.text,
-            previewDetail: previewDetail.text,
+            previewHead: previewHeadRow.visible ? headLabel.text + " " + kindLabel.text : "",
+            previewBadge: badgeBox.visible ? badgeLabel.text : "",
+            previewNameFont: [previewName.font.family, previewName.font.pixelSize],
+            previewLines: lines,
+            previewDims: lines.length > 0 && lines[0].value.indexOf(" × ") > 0 ? lines[0].value : "",
             foot: footLabel.visible ? footLabel.text : "",
             hint: (noticeLabel.visible ? [noticeLabel.text] : []).concat(keys).join(" · "),
             busy: busy,            openMs: openMs,
@@ -414,6 +473,28 @@ Item {
             const back = picker.rows.findIndex(r => r.name === picker.landOn);
             picker.selected = back >= 0 ? back : picker.saving ? -1 : 0;
             picker.listed = true;
+        }
+    }
+
+    // The cursor file's width and height from its header, read off the render loop.
+    Process {
+        id: sizer
+        property string asked: ""
+        stdout: StdioCollector {
+            id: sizeOut
+        }
+        onExited: {
+            if (picker.sizeStale) {
+                picker.sizeStale = false;
+                Qt.callLater(picker.measure);
+                return;
+            }
+            const wh = sizeOut.text.trim().split(" ").map(Number);
+            picker.dims = {
+                path: asked,
+                width: wh.length === 2 && wh[0] > 0 ? wh[0] : 0,
+                height: wh.length === 2 && wh[1] > 0 ? wh[1] : 0
+            };
         }
     }
 
@@ -573,7 +654,8 @@ Item {
                     Text {
                         id: headingLabel
                         anchors.centerIn: parent
-                        width: Math.min(implicitWidth, card.width - 80)
+                        // Under half the card, so a 200-character app name elides and the query and its chips stay inside.
+                        width: Math.min(implicitWidth, Math.round(card.width * 0.45) - 16)
                         textFormat: Text.PlainText
                         text: P.headingText(picker.voice, picker.appText, picker.mode, picker.multiple)
                         maximumLineCount: 1
@@ -630,6 +712,16 @@ Item {
                     font.pixelSize: look.small.size + 1
                     font.letterSpacing: look.small.spacing
                 }
+                Text {
+                    id: chipLabel
+                    visible: text !== ""
+                    textFormat: Text.PlainText
+                    text: P.chipText(picker.voice, picker.mode, picker.marked.length)
+                    color: look.small.color
+                    font.family: look.small.font
+                    font.pixelSize: look.small.size + 1
+                    font.letterSpacing: look.small.spacing
+                }
             }
 
             Rule {}
@@ -643,14 +735,16 @@ Item {
                 Layout.bottomMargin: 10
                 spacing: 10
 
+                // Blueprint names the folder; Paper's save card says it saves in it.
                 Text {
-                    visible: bracket
+                    id: pathLeadLabel
+                    visible: text !== ""
                     textFormat: Text.PlainText
-                    text: "> FOLDER"
-                    color: c.accent
-                    font.family: fonts.mono
-                    font.pixelSize: 12
-                    font.letterSpacing: 1.4
+                    text: bracket ? "> FOLDER" : caps && picker.saving ? "SAVE IN" : ""
+                    color: bracket ? c.accent : look.small.color
+                    font.family: bracket ? fonts.mono : look.small.font
+                    font.pixelSize: bracket ? 12 : look.small.size + 1
+                    font.letterSpacing: bracket ? 1.4 : look.small.spacing
                 }
                 Text {
                     id: pathLabel
@@ -666,7 +760,7 @@ Item {
                 Text {
                     id: countLabel
                     textFormat: Text.PlainText
-                    text: picker.typingPath && plain ? "typing a path" : P.countText(picker.voice, picker.rows.length, picker.filterName, picker.hidden)
+                    text: picker.typingPath && plain ? "typing a path" : P.countText(picker.voice, picker.rows.length, picker.filterName, picker.hidden, picker.mode)
                     color: look.small.color
                     font.family: look.small.font
                     font.pixelSize: look.small.size + 1
@@ -783,15 +877,19 @@ Item {
                             implicitWidth: 16
                         }
                         Head {
+                            id: nameHead
                             Layout.fillWidth: true
                             text: plain ? "Name ↑" : "NAME"
                         }
+                        // A folder request lists folders, so the column counts their items.
                         Head {
+                            id: sizeHead
                             Layout.preferredWidth: 90
                             horizontalAlignment: Text.AlignRight
-                            text: plain ? "Size" : "SIZE"
+                            text: picker.choosingFolder ? (plain ? "Items" : "ITEMS") : plain ? "Size" : "SIZE"
                         }
                         Head {
+                            id: dateHead
                             Layout.preferredWidth: 130
                             horizontalAlignment: Text.AlignRight
                             text: plain ? "Modified" : "MODIFIED"
@@ -1026,7 +1124,7 @@ Item {
                     color: look.rule.color
                 }
 
-                // The cursor file: its picture when Qt decodes it, then its name, size, kind and date; hidden while a path is typed, and gone in save mode.
+                // The cursor file: its picture when Qt decodes it, its name, then its meta lines in the theme's idiom; hidden while a path is typed, and gone in save mode.
                 Item {
                     visible: !picker.saving && !picker.choosingFolder
                     Layout.preferredWidth: 280
@@ -1039,19 +1137,75 @@ Item {
                         width: parent.width - 36
                         spacing: 8
 
-                        Image {
-                            id: previewImage
-                            // Sized by hand: PreserveAspectFit makes Qt decode to fill the bound, scaling a small image up and losing its size.
-                            readonly property real fit: Math.min(1, parent.width / Math.max(1, implicitWidth), 186 / Math.max(1, implicitHeight))
-                            width: implicitWidth * fit
-                            height: implicitHeight * fit
-                            asynchronous: true
-                            cache: false
-                            // A bound keeps a 12 MP photo from decoding whole; without a fill mode Qt never scales up, so an image within 1024 px reads its true size.
-                            sourceSize.width: 1024
-                            sourceSize.height: 1024
-                            source: picker.previewing ? "file://" + picker.pathOf(picker.cursorRow).split("/").map(encodeURIComponent).join("/") : ""
+                        // Blueprint heads the pane with PREVIEW and the file's kind.
+                        Item {
+                            id: previewHeadRow
+                            visible: headLabel.text !== ""
+                            width: parent.width
+                            height: headLabel.implicitHeight
+
+                            Text {
+                                id: headLabel
+                                textFormat: Text.PlainText
+                                text: picker.meta?.head ?? ""
+                                color: look.small.color
+                                font.family: look.small.font
+                                font.pixelSize: look.small.size
+                                font.letterSpacing: look.small.spacing
+                            }
+                            Text {
+                                id: kindLabel
+                                anchors.right: parent.right
+                                textFormat: Text.PlainText
+                                text: picker.meta?.kind ?? ""
+                                color: look.small.color
+                                font.family: look.small.font
+                                font.pixelSize: look.small.size
+                                font.letterSpacing: look.small.spacing
+                            }
                         }
+
+                        // Artboard's badge sits on the picture's corner, or alone when Qt draws no picture.
+                        Item {
+                            width: parent.width
+                            height: picker.preview ? previewImage.height : badgeBox.visible ? badgeBox.height : 0
+
+                            Image {
+                                id: previewImage
+                                // Sized by hand: PreserveAspectFit makes Qt decode to fill the bound, scaling a small image up.
+                                readonly property real fit: Math.min(1, parent.width / Math.max(1, implicitWidth), 186 / Math.max(1, implicitHeight))
+                                width: implicitWidth * fit
+                                height: implicitHeight * fit
+                                asynchronous: true
+                                cache: false
+                                // A bound keeps a 12 MP photo from decoding whole; the dimensions line reads the header, not this.
+                                sourceSize.width: 1024
+                                sourceSize.height: 1024
+                                source: picker.previewing ? "file://" + picker.cursorPath.split("/").map(encodeURIComponent).join("/") : ""
+                            }
+                            Rectangle {
+                                id: badgeBox
+                                visible: badgeLabel.text !== ""
+                                x: picker.preview ? 8 : 0
+                                y: picker.preview ? parent.height - height - 8 : 0
+                                width: badgeLabel.implicitWidth + 14
+                                height: badgeLabel.implicitHeight + 4
+                                radius: 6
+                                color: picker.preview ? c.paper : look.tile.fill
+
+                                Text {
+                                    id: badgeLabel
+                                    anchors.centerIn: parent
+                                    textFormat: Text.PlainText
+                                    text: P.oneLine(picker.meta?.badge ?? "")
+                                    color: c.ink
+                                    font.family: fonts.ui
+                                    font.pixelSize: 11
+                                    font.weight: Font.Medium
+                                }
+                            }
+                        }
+                        // Paper sets the name in its serif at 24 px, Blueprint in bold mono; the name keeps its case in every theme.
                         Text {
                             id: previewName
                             width: parent.width
@@ -1060,34 +1214,53 @@ Item {
                             maximumLineCount: 1
                             elide: Text.ElideMiddle
                             color: c.ink
-                            font.family: bracket ? fonts.mono : fonts.ui
-                            font.pixelSize: 14
-                            font.weight: Font.Medium
+                            font.family: caps ? fonts.display : bracket ? fonts.mono : fonts.ui
+                            font.pixelSize: caps ? 24 : bracket ? 15 : 14
+                            font.weight: caps ? Font.Normal : bracket ? Font.Bold : Font.Medium
                         }
-                        Text {
-                            id: previewDims
-                            visible: text !== ""
-                            textFormat: Text.PlainText
-                            text: picker.cursorRow ? P.previewText(picker.voice, picker.cursorRow, picker.preview ? previewImage.implicitWidth : 0, previewImage.implicitHeight).dims : ""
-                            color: c.ink
-                            font.family: fonts.mono
-                            font.pixelSize: 15
-                        }
-                        Text {
-                            id: previewDetail
-                            textFormat: Text.PlainText
-                            text: picker.cursorRow ? P.previewText(picker.voice, picker.cursorRow, 0, 0).detail : ""
-                            color: c.muted
-                            font.family: fonts.mono
-                            font.pixelSize: 12
-                        }
-                        Text {
-                            id: previewDate
-                            textFormat: Text.PlainText
-                            text: picker.cursorRow ? P.stampText(picker.voice, picker.cursorRow.mtime) : ""
-                            color: c.muted
-                            font.family: fonts.mono
-                            font.pixelSize: 12
+                        // Paper stacks each label over its value, Blueprint sets them on one row, Artboard draws the values alone.
+                        Repeater {
+                            id: metaRepeater
+                            model: picker.meta?.lines ?? []
+
+                            Item {
+                                id: metaLine
+                                required property var modelData
+                                function drawn() {
+                                    return {
+                                        label: metaLabel.visible ? metaLabel.text : "",
+                                        value: metaValue.text
+                                    };
+                                }
+                                width: parent.width
+                                height: caps ? metaLabel.implicitHeight + 3 + metaValue.implicitHeight : Math.max(metaLabel.implicitHeight, metaValue.implicitHeight)
+
+                                Text {
+                                    id: metaLabel
+                                    visible: text !== ""
+                                    anchors.verticalCenter: bracket ? parent.verticalCenter : undefined
+                                    textFormat: Text.PlainText
+                                    text: metaLine.modelData.label
+                                    color: look.small.color
+                                    font.family: look.small.font
+                                    font.pixelSize: look.small.size
+                                    font.letterSpacing: look.small.spacing
+                                }
+                                Text {
+                                    id: metaValue
+                                    x: bracket ? parent.width - width : 0
+                                    y: caps ? metaLabel.implicitHeight + 3 : 0
+                                    anchors.verticalCenter: bracket ? parent.verticalCenter : undefined
+                                    width: Math.min(implicitWidth, parent.width)
+                                    textFormat: Text.PlainText
+                                    text: metaLine.modelData.value
+                                    maximumLineCount: 1
+                                    elide: Text.ElideRight
+                                    color: plain ? c.muted : c.ink
+                                    font.family: fonts.mono
+                                    font.pixelSize: caps ? 13 : 12
+                                }
+                            }
                         }
                     }
                 }
@@ -1137,7 +1310,7 @@ Item {
 
                 Repeater {
                     id: keyRepeater
-                    model: picker.notice !== "" ? P.saveNotice(picker.voice, picker.notice, picker.saveName).keys : picker.typingPath ? P.pathKeys(picker.voice) : P.pickerKeys(picker.voice, picker.mode)
+                    model: picker.notice !== "" ? P.saveNotice(picker.voice, picker.notice, picker.saveName).keys : picker.typingPath ? P.pathKeys(picker.voice) : P.pickerKeys(picker.voice, picker.mode, picker.multiple)
 
                     Rectangle {
                         id: keyPair

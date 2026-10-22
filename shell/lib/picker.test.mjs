@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerLine, appName, completionHead, completions, countText, dateText, footText, headingText, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { answerLine, appName, chipText, completionHead, completions, countText, dateText, footText, headingText, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -92,6 +96,23 @@ test('the key strip in each voice', () => {
   assert.equal(strip('plain'), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · esc');
   assert.equal(strip('caps'), '↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ SELECT · ESC');
   assert.equal(strip('bracket'), '[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [ESC]');
+});
+
+test("a several-files strip marks in Paper's words, and selects in Artboard's and Blueprint's", () => {
+  const strip = (v) => pickerKeys(v, 'open', true).map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
+  assert.equal(strip('caps'), '↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ MARK · ESC');
+  assert.equal(strip('plain'), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · esc');
+  assert.equal(strip('bracket'), '[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [ESC]');
+});
+
+test('the heading chip counts the marked files, or says a folder request lists folders only', () => {
+  assert.equal(chipText('plain', 'open', 3), '3 marked');
+  assert.equal(chipText('caps', 'open', 1), '1 MARKED');
+  assert.equal(chipText('bracket', 'open', 2), '2 MARKED');
+  assert.equal(chipText('caps', 'open', 0), '');
+  assert.equal(chipText('plain', 'folder', 0), 'folders only');
+  assert.equal(chipText('bracket', 'folder', 0), 'FOLDERS ONLY');
+  assert.equal(chipText('caps', 'save', 0), '');
 });
 
 test('the save strip saves and selects nothing', () => {
@@ -243,6 +264,15 @@ test('the folder row counts its items, names the filter and says whether dotfile
   assert.equal(countText('bracket', 9, '', true), '9 ITEMS · HIDDEN ON');
 });
 
+test('a folder request counts folders with files hidden, and a save counts what the folder holds', () => {
+  assert.equal(countText('plain', 6, '', false, 'folder'), '6 folders · files hidden');
+  assert.equal(countText('caps', 1, '', true, 'folder'), '1 FOLDER · FILES HIDDEN');
+  assert.equal(countText('bracket', 6, '', false, 'folder'), '6 FOLDERS · FILES HIDDEN');
+  assert.equal(countText('plain', 7, '', false, 'save'), '7 items');
+  assert.equal(countText('caps', 7, '', true, 'save'), '7 ITEMS');
+  assert.equal(countText('bracket', 1, '', false, 'save'), '1 ITEM');
+});
+
 test('the completions heading in each voice', () => {
   assert.equal(completionHead('plain', 3, '~/Codes', 'la'), '3 folders in ~/Codes start with la');
   assert.equal(completionHead('plain', 1, '~/Codes', 'la'), '1 folder in ~/Codes starts with la');
@@ -257,12 +287,54 @@ test('the path mode key strip in each voice', () => {
   assert.equal(strip('bracket'), '[↵] GO · [TAB] COMPLETE · [⌃L] BACK TO LIST · [ESC]');
 });
 
-test('the preview reads the decoded size, the file size and kind, and when it changed', () => {
-  const png = { name: 'shot.png', dir: false, size: 12000, mime: 'image/png' };
-  assert.deepEqual(previewText('plain', png, 640, 480), { dims: '640 × 480 px', detail: '12 KB · PNG image' });
-  assert.deepEqual(previewText('caps', png, 640, 480), { dims: '640 × 480', detail: '12 KB · PNG image' });
-  const pdf = { name: 'report.pdf', dir: false, size: 184000, mime: 'application/pdf' };
-  assert.deepEqual(previewText('bracket', pdf, 0, 0), { dims: '', detail: '184 KB · PDF file' });
+test("the preview's meta lines in each theme's idiom: Paper's and Blueprint's labels, Blueprint's header, Artboard's badge and plain lines", () => {
+  const heic = { name: 'IMG_2041.HEIC', dir: false, size: 2800000, mime: 'image/heic', mtime: new Date(2026, 9, 18, 14, 7).getTime() };
+  assert.deepEqual(previewText('caps', heic, 4032, 3024), {
+    head: '',
+    kind: '',
+    badge: '',
+    lines: [
+      { label: 'DIMENSIONS', value: '4032 × 3024' },
+      { label: 'SIZE', value: '2.8 MB' },
+      { label: 'MODIFIED', value: '18 Oct 2026 · 14:07' },
+    ],
+  });
+  assert.deepEqual(previewText('plain', heic, 4032, 3024), {
+    head: '',
+    kind: '',
+    badge: 'HEIC',
+    lines: [
+      { label: '', value: '4032 × 3024 px' },
+      { label: '', value: '2.8 MB' },
+      { label: '', value: '18 Oct 2026, 14:07' },
+    ],
+  });
+  assert.deepEqual(previewText('bracket', heic, 4032, 3024), {
+    head: 'PREVIEW',
+    kind: 'IMAGE',
+    badge: '',
+    lines: [
+      { label: 'DIMENSIONS', value: '4032 × 3024' },
+      { label: 'SIZE', value: '2.8 MB' },
+      { label: 'MODIFIED', value: '2026-10-18 14:07' },
+    ],
+  });
+  // A file without a size read from its header has no dimensions line at all.
+  const pdf = { name: 'report.pdf', dir: false, size: 184000, mime: 'application/pdf', mtime: new Date(2026, 9, 14, 16, 41).getTime() };
+  assert.deepEqual(previewText('bracket', pdf, 0, 0), {
+    head: 'PREVIEW',
+    kind: 'FILE',
+    badge: '',
+    lines: [
+      { label: 'SIZE', value: '184 KB' },
+      { label: 'MODIFIED', value: '2026-10-14 16:41' },
+    ],
+  });
+  assert.equal(previewText('plain', pdf, 0, 0).badge, 'PDF');
+  assert.equal(previewText('plain', { name: 'Makefile', dir: false, size: 10, mime: '', mtime: 0 }, 0, 0).badge, '');
+});
+
+test('the full date in each voice', () => {
   const at = new Date(2026, 9, 14, 16, 41).getTime();
   assert.equal(stampText('caps', at), '14 Oct 2026 · 16:41');
   assert.equal(stampText('plain', at), '14 Oct 2026, 16:41');
@@ -313,4 +385,48 @@ test('the footer line: how many are marked, or the folder ctrl+Enter chooses', (
   assert.equal(footText('plain', 'folder', 0, '~/Codes'), 'ctrl+↵ chooses ~/Codes, the folder you are in');
   assert.equal(footText('caps', 'folder', 0, '~/Codes'), 'THIS FOLDER ~/Codes');
   assert.equal(footText('bracket', 'folder', 0, '~/Codes'), 'THIS FOLDER ~/Codes');
+});
+
+// Only the header bytes each format keeps its size in; the rest of a fixture is filler.
+test("the size script reads an image's true size from its header, and nothing from a PDF or a cut file", () => {
+  const dir = mkdtempSync(join(tmpdir(), 'picker-size-'));
+  const u16be = (n) => [n >> 8, n & 255];
+  const u16le = (n) => [n & 255, n >> 8];
+  const u24le = (n) => [n & 255, (n >> 8) & 255, n >> 16];
+  const u32be = (n) => [n >>> 24, (n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const u32le = (n) => u32be(n).reverse();
+  const ascii = (s) => [...s].map((c) => c.charCodeAt(0));
+  // An APP1 of junk before the tables, so the reader walks segments to reach the frame header.
+  const jpeg = (sof, junk) => [0xff, 0xd8, 0xff, 0xe1, ...u16be(junk + 2), ...new Array(junk).fill(7), 0xff, 0xdb, 0, 4, 1, 2, 0xff, 0xc4, 0, 3, 9, 0xff, sof, 0, 17, 8, ...u16be(3024), ...u16be(4032), 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1, 0xff, 0xda];
+  const riff = (chunk, body) => [...ascii('RIFF'), ...u32le(4 + 8 + body.length), ...ascii('WEBP'), ...ascii(chunk), ...u32le(body.length), ...body];
+  const files = {
+    'shot.png': [0x89, ...ascii('PNG\r\n\x1a\n'), 0, 0, 0, 13, ...ascii('IHDR'), ...u32be(1600), ...u32be(1200), 8, 2, 0, 0, 0, 1, 2, 3, 4],
+    'base.jpg': jpeg(0xc0, 9000),
+    'prog.jpg': jpeg(0xc2, 30),
+    'anim.gif': [...ascii('GIF89a'), ...u16le(320), ...u16le(240), 0xf7, 0, 0],
+    'lossy.webp': riff('VP8 ', [0, 0, 0, 0x9d, 0x01, 0x2a, ...u16le(800), ...u16le(600), 0, 0]),
+    'lossless.webp': riff('VP8L', [0x2f, ...u32le(1023 | (767 << 14)), 0]),
+    'extended.webp': riff('VP8X', [16, 0, 0, 0, ...u24le(4031), ...u24le(3023)]),
+    'report.pdf': ascii('%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n'),
+    'cut.png': [0x89, ...ascii('PNG\r\n\x1a\n'), 0, 0, 0, 13, ...ascii('IHDR'), 0, 0],
+    'cut.jpg': [0xff, 0xd8, 0xff, 0xe1, 0x40, 0, 1, 2, 3],
+  };
+  const size = {};
+  for (const [name, bytes] of Object.entries(files)) {
+    writeFileSync(join(dir, name), Buffer.from(bytes));
+    size[name] = spawnSync('python3', ['-c', SIZE_SCRIPT, join(dir, name)], { encoding: 'utf8' }).stdout.trim();
+  }
+  rmSync(dir, { recursive: true });
+  assert.deepEqual(size, {
+    'shot.png': '1600 1200',
+    'base.jpg': '4032 3024',
+    'prog.jpg': '4032 3024',
+    'anim.gif': '320 240',
+    'lossy.webp': '800 600',
+    'lossless.webp': '1024 768',
+    'extended.webp': '4032 3024',
+    'report.pdf': '',
+    'cut.png': '',
+    'cut.jpg': '',
+  });
 });

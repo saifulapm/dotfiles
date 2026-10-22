@@ -79,9 +79,10 @@ export function headingText(voice, app, mode, multiple) {
   return voice === 'plain' ? `${head} · ${app}` : `${head}${voice === 'bracket' ? ' // ' : ' · '}${app.toUpperCase()}`;
 }
 
-// Artboard spells the keys out; Paper and Blueprint draw ctrl as ⌃ and space as ␣.
-export function pickerKeys(voice, mode) {
-  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['esc', '']] : mode === 'folder' ? [['↵', 'enter folder'], ['ctrl+↵', 'choose this folder'], ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', 'select'], ['esc', '']];
+// Artboard spells the keys out; Paper and Blueprint draw ctrl as ⌃ and space as ␣. Paper's several-files strip calls ctrl+space MARK.
+export function pickerKeys(voice, mode, multiple) {
+  const space = multiple && voice === 'caps' ? 'mark' : 'select';
+  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['esc', '']] : mode === 'folder' ? [['↵', 'enter folder'], ['ctrl+↵', 'choose this folder'], ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', space], ['esc', '']];
   if (voice === 'plain') return pairs.map(([k, w]) => ({ key: k, word: w }));
   const key = (k) => k.replace('ctrl+space', '⌃␣').replace('ctrl+', '⌃').toUpperCase();
   return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? `[${key(k)}]` : key(k), word: w.toUpperCase() }));
@@ -210,9 +211,16 @@ export function matchText(voice, kind, n, label) {
   return counted(n, 'PLACE', 'PLACES');
 }
 
-export function countText(voice, n, filterName, hidden) {
-  const parts = [counted(n, 'item', 'items')].concat(filterName ? [filterName] : [], [hidden ? 'hidden on' : 'hidden off']);
+// A folder request counts the folders and says files are hidden; a save counts what the folder holds, as the save boards draw it.
+export function countText(voice, n, filterName, hidden, mode) {
+  const parts = mode === 'folder' ? [counted(n, 'folder', 'folders'), 'files hidden'] : mode === 'save' ? [counted(n, 'item', 'items')] : [counted(n, 'item', 'items')].concat(filterName ? [filterName] : [], [hidden ? 'hidden on' : 'hidden off']);
   const text = parts.join(' · ');
+  return voice === 'plain' ? text : text.toUpperCase();
+}
+
+// Beside the query: how many files are marked, or that a folder request lists folders only.
+export function chipText(voice, mode, marked) {
+  const text = mode === 'folder' ? 'folders only' : marked > 0 ? `${marked} marked` : '';
   return voice === 'plain' ? text : text.toUpperCase();
 }
 
@@ -229,11 +237,54 @@ export function pathKeys(voice) {
   return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? `[${k}]` : k, word: w }));
 }
 
-// The decoded picture's size, when there is one, then the file's size and kind from its extension.
+// Prints an image's "width height" from its header: PNG's IHDR, GIF's screen, WebP's VP8, VP8L or VP8X chunk, JPEG's frame header past the segments before it. Qt's Image reports the bounded size it decoded, so the picker runs this instead; any other file prints nothing.
+export const SIZE_SCRIPT = [
+  'import struct, sys',
+  "f = open(sys.argv[1], 'rb')",
+  'h = f.read(32)',
+  's = None',
+  "if h[:8] == bytes([137, 80, 78, 71, 13, 10, 26, 10]) and h[12:16] == b'IHDR' and len(h) >= 24:",
+  "    s = struct.unpack('>II', h[16:24])",
+  "elif h[:6] in (b'GIF87a', b'GIF89a') and len(h) >= 10:",
+  "    s = struct.unpack('<HH', h[6:10])",
+  "elif h[:4] == b'RIFF' and h[8:12] == b'WEBP' and len(h) >= 25:",
+  "    if h[12:16] == b'VP8 ' and len(h) >= 30:",
+  "        w, v = struct.unpack('<HH', h[26:30])",
+  '        s = (w & 0x3fff, v & 0x3fff)',
+  "    elif h[12:16] == b'VP8L':",
+  "        b = struct.unpack('<I', h[21:25])[0]",
+  '        s = ((b & 0x3fff) + 1, ((b >> 14) & 0x3fff) + 1)',
+  "    elif h[12:16] == b'VP8X' and len(h) >= 30:",
+  "        s = (int.from_bytes(h[24:27], 'little') + 1, int.from_bytes(h[27:30], 'little') + 1)",
+  'elif h[:2] == bytes([255, 216]):',
+  '    f.seek(2)',
+  '    while True:',
+  '        m = f.read(4)',
+  '        if len(m) < 4 or m[0] != 255 or m[1] in (216, 217, 218):',
+  '            break',
+  '        if 192 <= m[1] <= 207 and m[1] not in (196, 200, 204):',
+  '            d = f.read(5)',
+  '            if len(d) == 5:',
+  "                v, w = struct.unpack('>HH', d[1:5])",
+  '                s = (w, v)',
+  '            break',
+  "        f.seek(struct.unpack('>H', m[2:4])[0] - 2, 1)",
+  'if s and s[0] > 0 and s[1] > 0:',
+  '    print(s[0], s[1])',
+  '',
+].join('\n');
+
+// The cursor file's meta lines: the size read from its header when there is one, the file's size, its date. Paper and Blueprint label each line, Blueprint heads the pane with the file's kind, Artboard badges the extension.
 export function previewText(voice, row, width, height) {
   const ext = row.name.indexOf('.') > 0 ? row.name.slice(row.name.lastIndexOf('.') + 1).toUpperCase() : '';
-  const kind = (ext ? ext + ' ' : '') + (String(row.mime || '').indexOf('image/') === 0 ? 'image' : 'file');
-  return { dims: width > 0 ? `${width} × ${height}${voice === 'plain' ? ' px' : ''}` : '', detail: `${sizeText(row)} · ${kind}` };
+  const image = String(row.mime || '').indexOf('image/') === 0;
+  const lines = (width > 0 ? [['DIMENSIONS', `${width} × ${height}${voice === 'plain' ? ' px' : ''}`]] : []).concat([['SIZE', sizeText(row)], ['MODIFIED', stampText(voice, row.mtime)]]);
+  return {
+    head: voice === 'bracket' ? 'PREVIEW' : '',
+    kind: voice === 'bracket' ? (image ? 'IMAGE' : 'FILE') : '',
+    badge: voice === 'plain' ? ext : '',
+    lines: lines.map(([label, value]) => ({ label: voice === 'plain' ? '' : label, value: value })),
+  };
 }
 
 // The preview's full date: Paper's dot, Artboard's comma, Blueprint's ISO.
