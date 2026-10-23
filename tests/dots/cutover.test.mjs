@@ -67,8 +67,8 @@ function scratch() {
   writeFileSync(join(home, '.local/share/fish/test_box_history'), entry('ls', 100) + entry('make', 200));
   writeFileSync(join(home, '.local/share/fish/fish_history'), entry('ls', 100) + entry('v2 only', 300));
 
-  // qshell.service is enabled and running, update-all.timer only enabled, v1's taildrop-receive.service and homepod-sink.service enabled and running, a static qshell-sync.service mid-run, and an unrelated v1 unit is enabled too.
-  for (const f of ['qshell.service.enabled', 'qshell.service.active', 'update-all.timer.enabled', 'taildrop-receive.service.enabled', 'taildrop-receive.service.active', 'homepod-sink.service.enabled', 'homepod-sink.service.active', 'hub-local.service.enabled', 'hub-local.service.active', 'imapnotify@icloud.service.enabled', 'imapnotify@icloud.service.active']) writeFileSync(join(units, f), '');
+  // qshell.service is enabled and running, update-all.timer only enabled, v1's taildrop-receive.service, homepod-sink.service and havit-guard.service enabled and running, a static qshell-sync.service mid-run, and an unrelated v1 unit is enabled too.
+  for (const f of ['qshell.service.enabled', 'qshell.service.active', 'update-all.timer.enabled', 'taildrop-receive.service.enabled', 'taildrop-receive.service.active', 'homepod-sink.service.enabled', 'homepod-sink.service.active', 'havit-guard.service.enabled', 'havit-guard.service.active', 'hub-local.service.enabled', 'hub-local.service.active', 'imapnotify@icloud.service.enabled', 'imapnotify@icloud.service.active']) writeFileSync(join(units, f), '');
   writeFileSync(join(units, 'qshell-sync.service.active'), 'activating');
   writeFileSync(
     join(stubs, 'systemctl'),
@@ -126,7 +126,7 @@ test('cutover imports v1 notes, goals and history, stops the units v2 replaces, 
   const s = scratch();
   const r = run(s);
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(lastLine(r), 'notes: 2 imported · goals: 2 imported · history: 1 merged · v1 units: 6 stopped');
+  assert.equal(lastLine(r), 'notes: 2 imported · goals: 2 imported · history: 1 merged · v1 units: 7 stopped');
 
   const notes = store(s, 'notes').notes;
   assert.deepEqual(notes.filter((n) => !n.deleted).map((n) => n.id).sort(), ['0mt0a0001-aaaa', '0mt0a0002-aaaa']);
@@ -145,7 +145,7 @@ test('cutover imports v1 notes, goals and history, stops the units v2 replaces, 
 test('only the v1 units v2 replaces are stopped, and only the v1 links that outrank v2 are removed', () => {
   const s = scratch();
   assert.equal(run(s).status, 0);
-  assert.deepEqual(calls(s).filter((c) => c.includes('disable')), ['--user disable --now qshell.service', '--user disable --now qshell-sync.service', '--user disable --now update-all.timer', '--user disable --now taildrop-receive.service', '--user disable --now homepod-sink.service']);
+  assert.deepEqual(calls(s).filter((c) => c.includes('disable')), ['--user disable --now qshell.service', '--user disable --now qshell-sync.service', '--user disable --now update-all.timer', '--user disable --now taildrop-receive.service', '--user disable --now homepod-sink.service', '--user disable --now havit-guard.service']);
   // v1's mail watcher only stops: disabling it would drop the wants link v2's instance of the same name starts from.
   assert.deepEqual(calls(s).filter((c) => /imapnotify|daemon-reload/.test(c)), ['--user stop imapnotify@icloud.service', '--user daemon-reload']);
   assert.deepEqual(readdirSync(s.units).sort(), ['hub-local.service.active', 'hub-local.service.enabled', 'imapnotify@icloud.service.enabled']);
