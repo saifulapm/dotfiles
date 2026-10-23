@@ -1,0 +1,62 @@
+{{- $versions := include (joinPath .chezmoi.workingTree "versions.toml") | fromToml -}}
+{{- $t := dict -}}
+{{- range $versions.toolchain }}{{ $_ := set $t .name . }}{{ end -}}
+{{- $tools := index $t "cmdline-tools" -}}
+{{- $gradle := index $t "gradle" -}}
+#!/bin/bash
+{{ template "lib.sh" . }}
+# The toolchain lareys-mobile's Android shell and Rust engine build with, at the versions.toml [[toolchain]] numbers its engine also pins.
+sdk=$HOME/Android/Sdk
+tools_version={{ $tools.version | quote }}
+tools_url={{ $tools.url | replace "{version}" $tools.version | quote }}
+tools_sha256={{ $tools.sha256 | quote }}
+packages=(platform-tools{{ range list "platform" "build-tools" "ndk" }}{{ $p := index $t . }} {{ $p.package | replace "{version}" $p.version | quote }}{{ end }})
+gradle_version={{ $gradle.version | quote }}
+gradle_url={{ $gradle.url | replace "{version}" $gradle.version | quote }}
+gradle_sha256={{ $gradle.sha256 | quote }}
+
+# On disk, not in /tmp: /tmp is a small tmpfs on the Macs and the NDK does not fit.
+mkdir -p "$HOME/.cache"
+tmp=$(mktemp -d -p "$HOME/.cache" dots-mobile-XXXXXX)
+trap 'rm -rf "$tmp"' EXIT
+# fetch <url> <sha256>: downloads into the temp dir and prints the file; a wrong sha256 stops the script.
+fetch() {
+  local file=$tmp/${1##*/}
+  curl -fsSL -o "$file" "$1" || die "mobile: could not download $1"
+  echo "$2  $file" | sha256sum -c --status || die "mobile: sha256 of $1 is not $2"
+  echo "$file"
+}
+
+"$HOME/.cargo/bin/rustup" target add aarch64-linux-android x86_64-linux-android || die "mobile: rustup could not add the Android targets"
+
+# The tools' own version file names a release, not the zip's build number, so the number the zip came from is kept beside them.
+tools=$sdk/cmdline-tools/latest
+if [[ $(cat "$tools/.dots-version" 2>/dev/null) != "$tools_version" ]]; then
+  zip=$(fetch "$tools_url" "$tools_sha256")
+  unzip -q "$zip" -d "$tmp/tools"
+  rm -rf "$tools"
+  mkdir -p "$sdk/cmdline-tools"
+  mv "$tmp/tools/cmdline-tools" "$tools"
+  echo "$tools_version" >"$tools/.dots-version"
+  log "mobile: Android command-line tools $tools_version"
+fi
+
+# Only what is missing goes to sdkmanager, so an apply with everything in place makes no call to Google.
+missing=()
+for p in "${packages[@]}"; do [[ -d $sdk/${p//;//} ]] || missing+=("$p"); done
+if ((${#missing[@]})); then
+  # printf finishes before sdkmanager exits, so no SIGPIPE under pipefail.
+  printf 'y\n%.0s' {1..50} | "$tools/bin/sdkmanager" --sdk_root="$sdk" --licenses >/dev/null || die "mobile: sdkmanager could not accept the licenses"
+  "$tools/bin/sdkmanager" --sdk_root="$sdk" "${missing[@]}" >"$tmp/sdkmanager.log" 2>&1 || { cat "$tmp/sdkmanager.log" >&2; die "mobile: sdkmanager could not install ${missing[*]}"; }
+  log "mobile: ${missing[*]}"
+fi
+
+gradle_home=$HOME/.local/opt/gradle-$gradle_version
+if [[ ! -x $gradle_home/bin/gradle ]]; then
+  zip=$(fetch "$gradle_url" "$gradle_sha256")
+  mkdir -p "$HOME/.local/opt"
+  unzip -q -o "$zip" -d "$HOME/.local/opt"
+  log "mobile: Gradle $gradle_version"
+fi
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$gradle_home/bin/gradle" "$HOME/.local/bin/gradle"
