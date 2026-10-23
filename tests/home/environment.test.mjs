@@ -36,7 +36,7 @@ test('the environment.d generator expands every file', { skip: !existsSync(gener
   const out = execFileSync(generator, { env: { XDG_CONFIG_HOME: home, XDG_RUNTIME_DIR: '/run/user/1000', HOME: home, PATH: '/usr/bin' }, encoding: 'utf8' });
   assert.match(out, /^SSH_AUTH_SOCK=\/run\/user\/1000\/ssh-agent\.socket$/m);
   assert.match(out, new RegExp(`^ANDROID_HOME=${home}/Android/Sdk$`, 'm'));
-  assert.match(out, new RegExp(`^PATH=/usr/bin:${home}/Android/Sdk/platform-tools:${home}/Android/Sdk/cmdline-tools/latest/bin:${home}/Android/Sdk/emulator$`, 'm'));
+  assert.match(out, new RegExp(`^PATH=${home}/\\.cargo/bin:/usr/bin:${home}/\\.local/bin:${home}/Android/Sdk/platform-tools:${home}/Android/Sdk/cmdline-tools/latest/bin:${home}/Android/Sdk/emulator$`, 'm'));
   assert.match(out, /^CHROMIUM_USER_FLAGS=.*--force-color-profile=srgb.*AimEnabled/m);
   assert.match(out, new RegExp(`^CHROMIUM_USER_FLAGS=.* --load-extension=${home}/\\.local/state/dots/theme-out/chromium-theme"?$`, 'm'));
 });
