@@ -1,0 +1,15 @@
+# Each file starts where it last stopped.
+save-position-on-quit=yes
+vo=gpu-next
+video-sync=display-resample
+interpolation=yes
+tscale=oversample
+{{ if hasPrefix "mac" .machine -}}
+# Zero-copy vaapi draws corrupt frames on the Macs' decoder, and vaapi-copy saves CPU only on HEVC; the rest decode in software.
+hwdec=vaapi-copy
+hwdec-codecs=hevc
+{{ else -}}
+hwdec=vaapi
+{{ end -}}
+# dots theme renders the OSD and OSC colours here.
+include=~/.local/state/dots/theme-out/mpv.conf

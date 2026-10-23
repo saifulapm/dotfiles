@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
 import { validateTheme, contrast } from './theme.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderAmx } from './apps.mjs';
+import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderAmx, renderMpv } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const blueprint = load('blueprint');
@@ -243,4 +243,17 @@ test('helix takes the kak look: syntax colours, a flat status line, and the menu
   assert.match(hx, /^"ui\.menu\.selected" = \{ fg = "#faf6ec", bg = "#c8381e" \}$/m);
   assert.match(hx, /^"diagnostic\.error" = \{ underline = \{ color = "#c8381e", style = "curl" \} \}$/m);
   assert.match(renderHelix(blueprint), /^"function" = "#82aaff"$/m);
+});
+
+// mpv reads # as a comment, so every colour is quoted; the OSC takes its colours through script-opts.
+test('the mpv fragment sets the OSD, the subtitle font and the OSC colours from the tokens', () => {
+  const conf = renderMpv(blueprint);
+  assert.match(conf, /^osd-color="#d6f4f8"$/m);
+  assert.match(conf, /^osd-back-color="#0a1526"$/m);
+  assert.match(conf, /^osd-border-color="#0a1526"$/m);
+  assert.match(conf, /^osd-font="Maple Mono"$/m);
+  assert.match(conf, /^script-opts-append="osc-background_color=#0a1526"$/m);
+  assert.match(conf, /^script-opts-append="osc-held_element_color=#7fe3f0"$/m);
+  assert.match(renderMpv(paper), /^sub-font="Instrument Serif"$/m);
+  for (const line of conf.trim().split('\n')) assert.match(line, /^[a-z-]+="[^"]+"$/);
 });

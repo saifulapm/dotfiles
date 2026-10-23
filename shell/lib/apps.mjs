@@ -1,4 +1,4 @@
-// Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
+// Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, mpv, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
 import { mix } from './notes-look.mjs';
 
 const lower = (s) => s.toLowerCase();
@@ -278,6 +278,19 @@ export function renderGtkSettings(t) {
 
 export function renderChromium(t) {
   return JSON.stringify({ BrowserThemeColor: lower(t.color.surface), BrowserColorScheme: t.mode }, null, 2) + '\n';
+}
+
+// mpv.conf includes this; the OSC sits on surface with ink controls and holds a pressed control in the accent. mpv reads # as a comment, so each value is quoted.
+export function renderMpv(t) {
+  const c = t.color;
+  const [ink, surface, accent] = [c.ink, c.surface, c.accent].map(lower);
+  const osc = [
+    ['background_color', surface], ['timecode_color', ink], ['title_color', ink], ['time_pos_color', ink], ['time_pos_outline_color', surface],
+    ['buttons_color', ink], ['top_buttons_color', ink], ['small_buttonsL_color', ink], ['small_buttonsR_color', ink], ['held_element_color', accent],
+  ];
+  const opts = [['osd-color', ink], ['osd-back-color', surface], ['osd-border-color', surface], ['osd-font', t.type.ui], ['sub-font', t.type.display]];
+  for (const [k, v] of osc) opts.push(['script-opts-append', `osc-${k}=${v}`]);
+  return opts.map(([k, v]) => `${k}="${v}"`).join('\n') + '\n';
 }
 
 // The coding agents draw inside foot, so each sits on surface with ink text; Claude Code, pi and amx name the theme dots.
