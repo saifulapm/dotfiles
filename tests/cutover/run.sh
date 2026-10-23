@@ -83,6 +83,13 @@ as_user '
   for f in conf.d/00-env.fish functions/hdl.fish completions/theme-set.fish; do echo "# v1" > ~/.dotfiles/home/fish/${f#*/}; ln -s ~/.dotfiles/home/fish/${f#*/} ~/.config/fish/$f; done
   printf "[Desktop Entry]\nType=Application\nName=X\nExec=webapp-launch https://x.com/\n" > ~/.dotfiles/home/webapp-x.desktop
   ln -s ~/.dotfiles/home/webapp-x.desktop ~/.local/share/applications/webapp-x.desktop
+  # v1 linked its environment.d files from ~/.dotfiles, the chromium one carrying its extension flag.
+  mkdir -p ~/.dotfiles/home/dot_config/environment.d ~/.config/environment.d
+  for f in 60-chromium 65-ssh-agent 70-claude-presence; do
+    echo "V1_$f=1" > ~/.dotfiles/home/dot_config/environment.d/$f.conf
+    ln -s ~/.dotfiles/home/dot_config/environment.d/$f.conf ~/.config/environment.d/$f.conf
+  done
+  echo "CHROMIUM_USER_FLAGS=--load-extension=$HOME/.dotfiles/chromium/extensions/copy-url" > ~/.dotfiles/home/dot_config/environment.d/60-chromium.conf
   echo test-box > ~/.config/qshell/machine
   printf "\x89PNG\r\n\x1a\nnot really an image\n" > ~/.local/state/qshell/notes/attachments/paste-1.png
   printf -- "- cmd: ls\n  when: 1760000000\n- cmd: make\n  when: 1760000100\n- cmd: git status\n  when: 1760000200\n" > ~/.local/share/fish/test_box_history
@@ -190,6 +197,24 @@ check "claude-rc@nope.service is not failed (got '$got')" test "$got" = inactive
 as_user "systemctl --user disable claude-rc@nope.service 2>/dev/null"
 check "v1's ~/.gitconfig and 10-history.fish links are gone" as_user "test ! -e ~/.gitconfig -a ! -e ~/.config/fish/conf.d/10-history.fish"
 check "~/.dotfiles stays in place" as_user "test -f ~/.dotfiles/home/dot_gitconfig"
+
+got=$(as_user "readlink -f ~/.config/environment.d/60-chromium.conf")
+check "60-chromium.conf resolves to v2's file (got '$got')" test "$got" = "$home/Codes/dotfiles/home/dot_config/environment.d/60-chromium.conf"
+got=$(as_user "readlink -f ~/.config/environment.d/65-ssh-agent.conf")
+check "65-ssh-agent.conf resolves to v2's file (got '$got')" test "$got" = "$home/Codes/dotfiles/home/dot_config/environment.d/65-ssh-agent.conf"
+as_user "systemctl --user daemon-reload"
+env=$(as_user "systemctl --user show-environment")
+for flag in --ozone-platform-hint=auto --force-color-profile=srgb OverlayScrollbar AimEnabled; do
+  check "show-environment has CHROMIUM_USER_FLAGS with $flag" grep -q "^CHROMIUM_USER_FLAGS=.*$flag" <<<"$env"
+done
+check "show-environment has no .dotfiles in CHROMIUM_USER_FLAGS" bash -c '! grep "^CHROMIUM_USER_FLAGS=" <<<"$1" | grep -q "\.dotfiles"' _ "$env"
+check "show-environment has SSH_AUTH_SOCK in the user's runtime dir" grep -qx 'SSH_AUTH_SOCK=/run/user/1000/ssh-agent.socket' <<<"$env"
+got=$(unit_state ssh-agent.socket)
+check "ssh-agent.socket is enabled and active (got '$got')" test "$got" = "enabled active"
+got=$(as_user "export \$(systemctl --user show-environment | grep ^SSH_AUTH_SOCK=); ssh-add -l >/dev/null 2>&1; echo \$?")
+check "ssh-add -l exits 0 or 1 against the agent socket (got '$got')" bash -c '[[ $1 = 0 || $1 = 1 ]]' _ "$got"
+got=$(as_user "ls ~/.config/environment.d")
+echo "environment.d after the cutover: $(echo $got)"
 
 echo "--- dots cutover again"
 before=$(snapshot)
