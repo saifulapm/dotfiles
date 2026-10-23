@@ -89,6 +89,28 @@ export function shareRow(voice, machine) {
   return { name: oneLine(machine.name), detail: say(voice, detail), status: say(voice, machine.online ? 'online' : 'offline') };
 }
 
+// The preview's three lines: the image's size from its header, the file's size and kind, its full date.
+export function previewMeta(voice, row, width, height) {
+  const d = new Date(row.mtime);
+  const dot = row.name.lastIndexOf('.');
+  const ext = dot > 0 ? row.name.slice(dot + 1).toUpperCase() : '';
+  // An image is named by its type, as the board's JPEG image is a .jpg; any other file by its extension.
+  const mime = String(row.mime || '');
+  const kind = row.dir ? 'folder' : mime.indexOf('image/') === 0 ? `${mime.slice(6).split('+')[0].toUpperCase()} image` : ext ? `${ext} file` : 'file';
+  const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const date = voice === 'bracket' ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} · ${time}` : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} · ${time}`;
+  return { dims: width > 0 ? `${width} × ${height}` : '', kind: say(voice, `${pickerSize(row)} · ${kind}`), date };
+}
+
+// The place a find query opens: the only one whose name starts with it, or -1 (#NYNGZ3NC).
+export function findPlace(places, query) {
+  const q = query.toLowerCase();
+  const hits = q ? places.map((p, i) => (p.label.toLowerCase().indexOf(q) === 0 ? i : -1)).filter((i) => i >= 0) : [];
+  return hits.length === 1 ? hits[0] : -1;
+}
+
+export const findText = (voice, query) => `/ ${oneLine(query)}`;
+
 export const tilde = (home, path) => (path === home ? '~' : path.indexOf(home + '/') === 0 ? '~' + path.slice(home.length) : path);
 
 const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], ['tab', 'places'], ['esc', 'close']];

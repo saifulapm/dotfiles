@@ -69,6 +69,30 @@ test('an action takes the marked rows in the list\'s order, or the cursor row wh
   assert.deepEqual(F.targets([], [], '/home/s', null), []);
 });
 
+test('the preview names an image\'s size, kind and date, Blueprint in caps and ISO', () => {
+  const row = { name: 'IMG_2041.jpg', dir: false, size: 3100000, mime: 'image/jpeg', mtime: new Date(2026, 9, 14, 16, 41).getTime() };
+  assert.deepEqual(F.previewMeta('caps', row, 4032, 3024), { dims: '4032 × 3024', kind: '3.1 MB · JPEG image', date: '14 Oct 2026 · 16:41' });
+  assert.deepEqual(F.previewMeta('bracket', row, 4032, 3024), { dims: '4032 × 3024', kind: '3.1 MB · JPEG IMAGE', date: '2026-10-14 · 16:41' });
+  const pdf = { name: 'invoice-0912.pdf', dir: false, size: 184000, mime: 'application/pdf', mtime: row.mtime };
+  assert.deepEqual(F.previewMeta('plain', pdf, 0, 0), { dims: '', kind: '184 KB · PDF file', date: '14 Oct 2026 · 16:41' });
+  assert.equal(F.previewMeta('caps', { name: 'Makefile', dir: false, size: 10, mime: '', mtime: row.mtime }, 0, 0).kind, '10 B · file');
+  assert.equal(F.previewMeta('caps', { name: 'shots', dir: true, count: 8, mtime: row.mtime }, 0, 0).kind, '8 items · folder');
+});
+
+test('a find query that starts exactly one place\'s name opens it; any other narrows the rows', () => {
+  const places = [{ label: 'Home' }, { label: 'Downloads' }, { label: 'Codes' }, { label: 'Pictures' }, { label: 'Documents' }];
+  assert.equal(F.findPlace(places, 'do'), -1);
+  assert.equal(F.findPlace(places, 'dow'), 1);
+  assert.equal(F.findPlace(places, 'DOWN'), 1);
+  assert.equal(F.findPlace(places, '2041'), -1);
+  assert.equal(F.findPlace(places, ''), -1);
+});
+
+test('the path line shows the find query in place of the counts while one is typed', () => {
+  assert.equal(F.findText('caps', '2041'), '/ 2041');
+  assert.equal(F.findText('bracket', 'a\nb'), '/ a b');
+});
+
 test('a path is written from ~ inside the home folder', () => {
   assert.equal(F.tilde('/home/s', '/home/s/Downloads/IMG_2041.jpg'), '~/Downloads/IMG_2041.jpg');
   assert.equal(F.tilde('/home/s', '/home/s'), '~');

@@ -19,6 +19,16 @@ ShellRoot {
     property var firstFrameMs: null
     property var entries: []
     property bool hidden: false
+    // / starts a find: typed letters narrow the rows, or open the one place they start (#NYNGZ3NC).
+    property bool finding: false
+    property string query: ""
+    // The cursor file's width and height, read from its header off the render loop.
+    property var dims: ({
+            path: "",
+            width: 0,
+            height: 0
+        })
+    property bool sizeStale: false
     // What a drag out carries: the rows, their paths, and the chip's image grabbed as it starts.
     property var dragRows: []
     readonly property var dragPaths: dragRows.map(r => pathOf(r))
@@ -40,9 +50,12 @@ ShellRoot {
     property var pins: []
 
     readonly property var rows: P.shownRows(entries, {
-        hidden: hidden
+        hidden: hidden,
+        query: query
     })
     readonly property var cursorRow: rows[selected] ?? null
+    readonly property string cursorPath: cursorRow && !cursorRow.dir ? pathOf(cursorRow) : ""
+    readonly property bool cursorImage: cursorPath !== "" && String(cursorRow.mime || "").indexOf("image/") === 0
     readonly property var fixedPlaces: F.places(home).map(p => Object.assign({ group: "places" }, p))
     readonly property var trash: ({
             label: "Trash",
@@ -75,6 +88,8 @@ ShellRoot {
     }
 
     function enter(path) {
+        finding = false;
+        query = "";
         folder = path;
         marked = [];
         selected = 0;
@@ -122,6 +137,27 @@ ShellRoot {
             enter(pathOf(cursorRow));
         else if (!cursorRow.undecodable)
             Quickshell.execDetached(["gio", "open", pathOf(cursorRow)]);
+    }
+
+    function setQuery(q) {
+        query = q;
+        selected = 0;
+        const at = F.findPlace(fixedPlaces.concat(pins), q);
+        if (at >= 0 && allPlaces[at].path !== folder)
+            enter(allPlaces[at].path);
+    }
+
+    // One header read at a time; a cursor that moved on during it asks again for the file it rests on.
+    function measure() {
+        if (sizer.running) {
+            sizeStale = true;
+            return;
+        }
+        if (!cursorImage || dims.path === cursorPath)
+            return;
+        sizer.asked = cursorPath;
+        sizer.command = ["python3", "-c", P.SIZE_SCRIPT, cursorPath];
+        sizer.running = true;
     }
 
     // Space marks the cursor row and steps down, as yazi's does.
@@ -173,6 +209,7 @@ ShellRoot {
 
     onRowsChanged: if (selected >= rows.length)
         selected = Math.max(0, rows.length - 1)
+    onCursorPathChanged: measure()
 
     Component.onCompleted: list()
 
@@ -219,6 +256,28 @@ ShellRoot {
             app.held = [];
             for (const k of keys)
                 app.rowKey(k);
+        }
+    }
+
+    Process {
+        id: sizer
+        property string asked: ""
+        stdout: StdioCollector {
+            id: sizeOut
+        }
+        onExited: {
+            if (app.sizeStale) {
+                app.sizeStale = false;
+                Qt.callLater(app.measure);
+                return;
+            }
+            const wh = sizeOut.text.trim().split(" ").map(Number);
+            app.dims = {
+                path: asked,
+                width: wh.length === 2 && wh[0] > 0 ? wh[0] : 0,
+                height: wh.length === 2 && wh[1] > 0 ? wh[1] : 0
+            };
+            Qt.callLater(app.measure);
         }
     }
 
@@ -273,6 +332,17 @@ ShellRoot {
                 placeAt: app.placeAt,
                 path: pathLine.text,
                 count: countLabel.text,
+                finding: app.finding,
+                query: app.query,
+                hidden: app.hidden,
+                preview: {
+                    shown: previewPane.visible,
+                    name: previewName.text,
+                    dims: previewDims.text,
+                    kind: previewKind.text,
+                    date: previewDate.text,
+                    image: previewImage.status === Image.Ready
+                },
                 status: {
                     path: statusPath.text,
                     counts: statusCounts.text,
@@ -332,7 +402,24 @@ ShellRoot {
             Keys.onPressed: event => {
                 const k = event.key;
                 const t = event.text;
-                if (k === Qt.Key_Escape)
+                if (app.finding) {
+                    if (k === Qt.Key_Escape) {
+                        app.finding = false;
+                        app.setQuery("");
+                    } else if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                        app.finding = false;
+                    else if (k === Qt.Key_Backspace)
+                        app.setQuery(app.query.slice(0, -1));
+                    else if (t !== "" && t.charCodeAt(0) >= 32)
+                        app.setQuery(app.query + t);
+                    event.accepted = true;
+                    return;
+                }
+                if (t === "/")
+                    app.finding = true;
+                else if (t === ".")
+                    app.hidden = !app.hidden;
+                else if (k === Qt.Key_Escape)
                     app.quit();
                 else if (k === Qt.Key_Tab)
                     app.toSide();
@@ -432,8 +519,8 @@ ShellRoot {
                 Text {
                     id: countLabel
                     textFormat: Text.PlainText
-                    text: F.countText(app.voice, app.rows.length, app.hidden)
-                    color: look.small.color
+                    text: app.finding || app.query ? F.findText(app.voice, app.query) : F.countText(app.voice, app.rows.length, app.hidden)
+                    color: app.finding ? c.accent ?? "red" : look.small.color
                     font.family: look.small.font
                     font.pixelSize: 11
                     font.letterSpacing: look.small.spacing
@@ -621,6 +708,97 @@ ShellRoot {
                             }
                         }
                     }
+                    }
+                }
+
+                // The cursor file: its picture when it is one, its size, kind and date; a narrow window has no room for it.
+                Rectangle {
+                    id: previewPane
+                    visible: win.width >= 980 && app.cursorRow !== null
+                    Layout.fillHeight: true
+                    implicitWidth: 1
+                    color: look.rule.color
+                }
+                ColumnLayout {
+                    visible: previewPane.visible
+                    Layout.preferredWidth: 300
+                    Layout.maximumWidth: 300
+                    Layout.fillHeight: true
+                    Layout.margins: 18
+                    spacing: 14
+
+                    Head {
+                        text: plain ? "Preview" : "PREVIEW"
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 186
+                        color: "transparent"
+                        border.width: 1
+                        border.color: c.muted ?? "gray"
+                        clip: true
+
+                        Image {
+                            id: previewImage
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            asynchronous: true
+                            fillMode: Image.PreserveAspectFit
+                            // Bounded, so a 12-megapixel photo decodes to a few MB.
+                            sourceSize.width: 1024
+                            sourceSize.height: 1024
+                            source: app.cursorImage ? "file://" + app.cursorPath.split("/").map(encodeURIComponent).join("/") : ""
+                        }
+                        Text {
+                            id: previewName
+                            anchors.left: parent.left
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 8
+                            width: Math.min(implicitWidth, parent.width - 16)
+                            textFormat: Text.PlainText
+                            text: app.cursorRow ? P.oneLine(app.cursorRow.name) : ""
+                            maximumLineCount: 1
+                            elide: Text.ElideMiddle
+                            color: c.muted ?? "gray"
+                            font.family: fonts.mono ?? ""
+                            font.pixelSize: 11
+
+                            Rectangle {
+                                z: -1
+                                anchors.fill: parent
+                                anchors.margins: -3
+                                color: c.surface ?? "white"
+                            }
+                        }
+                    }
+                    Text {
+                        id: previewDims
+                        visible: text !== ""
+                        textFormat: Text.PlainText
+                        text: app.cursorRow ? F.previewMeta(app.voice, app.cursorRow, app.dims.path === app.cursorPath ? app.dims.width : 0, app.dims.height).dims : ""
+                        color: c.ink ?? "black"
+                        font.family: fonts.mono ?? ""
+                        font.pixelSize: 14
+                        font.weight: Font.Medium
+                    }
+                    Text {
+                        id: previewKind
+                        textFormat: Text.PlainText
+                        text: app.cursorRow ? F.previewMeta(app.voice, app.cursorRow, 0, 0).kind : ""
+                        color: c.muted ?? "gray"
+                        font.family: fonts.mono ?? ""
+                        font.pixelSize: 12
+                    }
+                    Text {
+                        id: previewDate
+                        textFormat: Text.PlainText
+                        text: app.cursorRow ? F.previewMeta(app.voice, app.cursorRow, 0, 0).date : ""
+                        color: c.muted ?? "gray"
+                        font.family: fonts.mono ?? ""
+                        font.pixelSize: 12
+                    }
+                    Item {
+                        Layout.fillHeight: true
                     }
                 }
             }
