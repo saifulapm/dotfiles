@@ -1,0 +1,9 @@
+{{- /* Only the mini sends to the office HomePod, so every other machine renders an empty script, which chezmoi skips. */ -}}
+{{- if eq (get . "machine") "mac-mini-m2" -}}
+#!/bin/bash
+{{ template "lib.sh" . }}
+# cliairplay follows the HomePod's own PTP clock, which answers on UDP 319 and 320; with them closed the HomePod stays silent.
+if root firewall-cmd --state >/dev/null 2>&1; then
+  root firewall-cmd -q --add-port=319/udp --add-port=320/udp && root firewall-cmd -q --permanent --add-port=319/udp --add-port=320/udp || die "could not open the HomePod's PTP ports 319 and 320"
+fi
+{{ end -}}
