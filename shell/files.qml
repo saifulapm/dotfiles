@@ -29,6 +29,14 @@ ShellRoot {
             height: 0
         })
     property bool sizeStale: false
+    // r turns the cursor row's name into a field; d and a ask in the bar above the keys.
+    property bool renaming: false
+    // The rename field's selection, for checks.
+    property string renameSelected: ""
+    property string asking: ""
+    property var trashPaths: []
+    // Why the last rename, folder or trash failed, on the status line until the next key.
+    property string notice: ""
     // What a drag out carries: the rows, their paths, and the chip's image grabbed as it starts.
     property var dragRows: []
     readonly property var dragPaths: dragRows.map(r => pathOf(r))
@@ -160,6 +168,56 @@ ShellRoot {
         sizer.running = true;
     }
 
+    function startRename() {
+        if (!listed || !cursorRow || cursorRow.undecodable)
+            return;
+        renaming = true;
+    }
+
+    function finishRename(name) {
+        renaming = false;
+        if (name === cursorRow.name)
+            return;
+        const why = F.nameProblem(name, entries);
+        if (why) {
+            notice = F.noticeText(voice, why, name);
+            return;
+        }
+        doer.land = name;
+        doer.command = ["python3", "-c", F.RENAME_SCRIPT, pathOf(cursorRow), pathOf({
+                name: name
+            })];
+        doer.running = true;
+    }
+
+    function startTrash() {
+        trashPaths = F.targets(rows, marked, folder, cursorRow);
+        if (listed && trashPaths.length)
+            asking = "trash";
+    }
+
+    function doTrash() {
+        asking = "";
+        doer.land = "";
+        doer.command = ["trash-put", "--"].concat(trashPaths);
+        doer.running = true;
+        marked = [];
+    }
+
+    function finishMkdir(name) {
+        asking = "";
+        const why = F.nameProblem(name, entries);
+        if (why) {
+            notice = F.noticeText(voice, why, name);
+            return;
+        }
+        doer.land = name;
+        doer.command = ["mkdir", "--", pathOf({
+                name: name
+            })];
+        doer.running = true;
+    }
+
     // Space marks the cursor row and steps down, as yazi's does.
     function mark() {
         marked = F.toggleMark(marked, cursorRow);
@@ -210,6 +268,10 @@ ShellRoot {
     onRowsChanged: if (selected >= rows.length)
         selected = Math.max(0, rows.length - 1)
     onCursorPathChanged: measure()
+    onAskingChanged: if (asking === "mkdir") {
+        mkdirField.text = "";
+        mkdirField.forceActiveFocus();
+    }
 
     Component.onCompleted: list()
 
@@ -281,6 +343,23 @@ ShellRoot {
         }
     }
 
+    // A rename, a new folder or a trash, then the folder listed again with the cursor on what it made.
+    Process {
+        id: doer
+        property string land: ""
+        stderr: StdioCollector {
+            id: doerErr
+        }
+        onExited: code => {
+            if (code !== 0)
+                app.notice = app.voice === "bracket" ? "! " + P.oneLine(doerErr.text).toUpperCase() : P.oneLine(doerErr.text) || F.noticeText(app.voice, "failed", "");
+            // The name it made may not match the find, which would hide it.
+            app.query = "";
+            app.landOn = land;
+            app.list();
+        }
+    }
+
     FileView {
         id: bookmarksFile
         path: (Quickshell.env("XDG_CONFIG_HOME") || app.home + "/.config") + "/gtk-3.0/bookmarks"
@@ -335,6 +414,11 @@ ShellRoot {
                 finding: app.finding,
                 query: app.query,
                 hidden: app.hidden,
+                renaming: app.renaming,
+                renameSelected: app.renameSelected,
+                asking: app.asking,
+                ask: askText.visible ? askText.text : "",
+                notice: app.notice,
                 preview: {
                     shown: previewPane.visible,
                     name: previewName.text,
@@ -402,6 +486,15 @@ ShellRoot {
             Keys.onPressed: event => {
                 const k = event.key;
                 const t = event.text;
+                app.notice = "";
+                if (app.asking === "trash") {
+                    if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                        app.doTrash();
+                    else if (k === Qt.Key_Escape)
+                        app.asking = "";
+                    event.accepted = true;
+                    return;
+                }
                 if (app.finding) {
                     if (k === Qt.Key_Escape) {
                         app.finding = false;
@@ -419,6 +512,12 @@ ShellRoot {
                     app.finding = true;
                 else if (t === ".")
                     app.hidden = !app.hidden;
+                else if (t === "r")
+                    app.startRename();
+                else if (t === "d")
+                    app.startTrash();
+                else if (t === "a" && app.listed)
+                    app.asking = "mkdir";
                 else if (k === Qt.Key_Escape)
                     app.quit();
                 else if (k === Qt.Key_Tab)
@@ -684,6 +783,67 @@ ShellRoot {
                                     font.family: bracket ? fonts.mono ?? "" : fonts.ui ?? ""
                                     font.pixelSize: 13
                                     font.weight: rowItem.isCurrent ? look.cursor.weight : rowItem.modelData.dir ? Font.Medium : Font.Normal
+                                    opacity: renameLoader.active ? 0 : 1
+
+                                    // r: the name becomes a field over itself, the part before the extension selected.
+                                    Loader {
+                                        id: renameLoader
+                                        active: rowItem.isCurrent && app.renaming
+                                        anchors.left: parent.left
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width
+
+                                        sourceComponent: Row {
+                                            spacing: 12
+
+                                            Rectangle {
+                                                width: Math.min(renameField.contentWidth + 18, renameLoader.width - renameHint.width - 12)
+                                                height: 24
+                                                color: c.surface ?? "white"
+                                                border.width: 2
+                                                border.color: c.accent ?? "red"
+
+                                                TextInput {
+                                                    id: renameField
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: 8
+                                                    anchors.rightMargin: 8
+                                                    verticalAlignment: TextInput.AlignVCenter
+                                                    clip: true
+                                                    text: rowItem.modelData.name
+                                                    color: c.ink ?? "black"
+                                                    selectionColor: c.accent ?? "red"
+                                                    selectedTextColor: c.surface ?? "white"
+                                                    font.family: bracket ? fonts.mono ?? "" : fonts.ui ?? ""
+                                                    font.pixelSize: 13
+                                                    onSelectedTextChanged: app.renameSelected = selectedText
+                                                    Component.onCompleted: {
+                                                        select(0, F.stemLength(rowItem.modelData));
+                                                        forceActiveFocus();
+                                                    }
+                                                    Keys.onPressed: event => {
+                                                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                                                            app.finishRename(text);
+                                                        else if (event.key === Qt.Key_Escape)
+                                                            app.renaming = false;
+                                                        else
+                                                            return;
+                                                        event.accepted = true;
+                                                        keys.forceActiveFocus();
+                                                    }
+                                                }
+                                            }
+                                            Text {
+                                                id: renameHint
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                textFormat: Text.PlainText
+                                                text: F.promptText(app.voice, [["↵", "save"], ["esc", "cancel"]])
+                                                color: c.muted ?? "gray"
+                                                font.family: look.small.font
+                                                font.pixelSize: 11
+                                            }
+                                        }
+                                    }
                                 }
                                 Text {
                                     id: sizeLabel
@@ -828,8 +988,8 @@ ShellRoot {
                 Text {
                     id: statusCounts
                     textFormat: Text.PlainText
-                    text: app.dragging ? F.dragText(app.voice, app.dragRows).counts : app.status.counts
-                    color: look.small.color
+                    text: app.notice ? app.notice : app.dragging ? F.dragText(app.voice, app.dragRows).counts : app.status.counts
+                    color: app.notice ? c.danger ?? "red" : look.small.color
                     font.family: look.small.font
                     font.pixelSize: 11
                 }
@@ -840,6 +1000,79 @@ ShellRoot {
                     color: c.ink ?? "black"
                     font.family: fonts.mono ?? ""
                     font.pixelSize: 11
+                }
+            }
+
+            // The bar above the keys: d's question, or a's field for the new folder's name.
+            RowLayout {
+                visible: app.asking !== ""
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Layout.topMargin: 6
+                Layout.bottomMargin: 6
+                spacing: 10
+
+                Text {
+                    id: askText
+                    visible: app.asking === "trash"
+                    textFormat: Text.PlainText
+                    text: {
+                        const a = F.trashAsk(app.voice, app.trashPaths.length);
+                        return [a.say].concat(a.keys.map(k => k.key + " " + k.word)).join(" ");
+                    }
+                    color: c.danger ?? "red"
+                    font.family: look.small.font
+                    font.pixelSize: 12
+                }
+                Text {
+                    visible: app.asking === "mkdir"
+                    textFormat: Text.PlainText
+                    text: plain ? "New folder" : bracket ? "> NEW FOLDER" : "NEW FOLDER"
+                    color: look.small.color
+                    font.family: look.small.font
+                    font.pixelSize: 11
+                }
+                Rectangle {
+                    visible: app.asking === "mkdir"
+                    Layout.preferredWidth: 280
+                    implicitHeight: 24
+                    color: c.surface ?? "white"
+                    border.width: 2
+                    border.color: c.accent ?? "red"
+
+                    TextInput {
+                        id: mkdirField
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        verticalAlignment: TextInput.AlignVCenter
+                        clip: true
+                        color: c.ink ?? "black"
+                        font.family: bracket ? fonts.mono ?? "" : fonts.ui ?? ""
+                        font.pixelSize: 13
+                        Keys.onPressed: event => {
+                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                                app.finishMkdir(text);
+                            else if (event.key === Qt.Key_Escape)
+                                app.asking = "";
+                            else
+                                return;
+                            event.accepted = true;
+                            keys.forceActiveFocus();
+                        }
+                    }
+                }
+                Text {
+                    visible: app.asking === "mkdir"
+                    textFormat: Text.PlainText
+                    text: F.promptText(app.voice, [["↵", "make"], ["esc", "cancel"]])
+                    color: c.muted ?? "gray"
+                    font.family: look.small.font
+                    font.pixelSize: 11
+                }
+                Item {
+                    Layout.fillWidth: true
                 }
             }
 

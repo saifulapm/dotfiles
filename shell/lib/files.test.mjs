@@ -93,6 +93,35 @@ test('the path line shows the find query in place of the counts while one is typ
   assert.equal(F.findText('bracket', 'a\nb'), '/ a b');
 });
 
+test('rename selects the name without its extension; a folder or a dotfile is selected whole', () => {
+  assert.equal(F.stemLength({ name: 'invoice-0912.pdf', dir: false }), 12);
+  assert.equal(F.stemLength({ name: 'a.tar.gz', dir: false }), 5);
+  assert.equal(F.stemLength({ name: '.bashrc', dir: false }), 7);
+  assert.equal(F.stemLength({ name: 'v1.2', dir: true }), 4);
+});
+
+test('a new name is refused when empty, holding /, . or .., or taken; never overwritten', () => {
+  const entries = [{ name: 'notes.txt' }, { name: 'shots' }];
+  assert.equal(F.nameProblem('', entries), 'empty');
+  assert.equal(F.nameProblem('a/b', entries), 'slash');
+  assert.equal(F.nameProblem('..', entries), 'dots');
+  assert.equal(F.nameProblem('shots', entries), 'exists');
+  assert.equal(F.nameProblem('invoice-0913.pdf', entries), '');
+});
+
+test('a refused name says why on the status line, the name in its own case', () => {
+  assert.equal(F.noticeText('caps', 'exists', 'Notes.txt'), 'Notes.txt exists');
+  assert.equal(F.noticeText('bracket', 'exists', 'Notes.txt'), '! Notes.txt EXISTS');
+  assert.equal(F.noticeText('plain', 'slash', 'a/b'), 'a name cannot hold /');
+});
+
+test('the prompts pair their keys as each theme writes them', () => {
+  assert.equal(F.promptText('caps', [['↵', 'save'], ['esc', 'cancel']]), '↵ save · esc cancel');
+  assert.equal(F.promptText('bracket', [['↵', 'save'], ['esc', 'cancel']]), '[↵] SAVE · [ESC] CANCEL');
+  assert.deepEqual(F.trashAsk('caps', 2), { say: 'trash 2 files ·', keys: [{ key: '↵', word: 'trash ·' }, { key: 'esc', word: 'keep' }] });
+  assert.deepEqual(F.trashAsk('bracket', 1), { say: 'TRASH 1 FILE ·', keys: [{ key: '[↵]', word: 'TRASH ·' }, { key: '[ESC]', word: 'KEEP' }] });
+});
+
 test('a path is written from ~ inside the home folder', () => {
   assert.equal(F.tilde('/home/s', '/home/s/Downloads/IMG_2041.jpg'), '~/Downloads/IMG_2041.jpg');
   assert.equal(F.tilde('/home/s', '/home/s'), '~');

@@ -111,6 +111,44 @@ export function findPlace(places, query) {
 
 export const findText = (voice, query) => `/ ${oneLine(query)}`;
 
+// How much of a name r selects: up to its last dot, so a rename keeps the extension; a folder or a dotfile whole.
+export function stemLength(row) {
+  const dot = row.name.lastIndexOf('.');
+  return row.dir || dot <= 0 ? row.name.length : dot;
+}
+
+// Why a typed name cannot be made, or "" when it can; a taken name is refused, never overwritten (#GMXENA6Y).
+export function nameProblem(name, entries) {
+  if (name === '') return 'empty';
+  if (name.indexOf('/') >= 0) return 'slash';
+  if (name === '.' || name === '..') return 'dots';
+  return entries.some((e) => e.name === name) ? 'exists' : '';
+}
+
+// Blueprint's error line is caps after a bang, but the name is the file's own and keeps its case.
+export function noticeText(voice, tag, name) {
+  const shown = oneLine(name);
+  const SAY = { exists: [shown, ' exists'], empty: ['', 'type a name'], slash: ['', 'a name cannot hold /'], dots: [shown, ' is not a name'], failed: ['', 'could not do that'] };
+  const [lead, rest] = SAY[tag] || ['', tag];
+  return voice === 'bracket' ? `! ${lead}${rest.toUpperCase()}` : lead + rest;
+}
+
+const keyPair = (voice, [k, w]) => (voice === 'bracket' ? { key: `[${k.toUpperCase()}]`, word: w.toUpperCase() } : { key: k, word: w });
+
+export const promptText = (voice, pairs) => pairs.map((p) => keyPair(voice, p)).map((p) => `${p.key} ${p.word}`).join(' · ');
+
+// d asks first, in the bar above the keys.
+export const trashAsk = (voice, n) => ({ say: say(voice, `trash ${counted(n, 'file', 'files')} ·`), keys: [keyPair(voice, ['↵', 'trash ·']), keyPair(voice, ['esc', 'keep'])] });
+
+// Renames argv[1] to argv[2] with RENAME_NOREPLACE, so a name taken since it was checked is never overwritten; prints why it failed.
+export const RENAME_SCRIPT = [
+  'import ctypes, os, sys',
+  'libc = ctypes.CDLL(None, use_errno=True)',
+  'if libc.renameat2(-100, os.fsencode(sys.argv[1]), -100, os.fsencode(sys.argv[2]), 1) != 0:',
+  '    sys.exit(os.strerror(ctypes.get_errno()))',
+  '',
+].join('\n');
+
 export const tilde = (home, path) => (path === home ? '~' : path.indexOf(home + '/') === 0 ? '~' + path.slice(home.length) : path);
 
 const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], ['tab', 'places'], ['esc', 'close']];
