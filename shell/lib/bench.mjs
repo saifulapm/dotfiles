@@ -1,7 +1,7 @@
 // The verdict for each speed budget; bin/dots-bench gathers the numbers and runs this as a CLI.
 
 // idle RSS is 200 MiB (#7S2JD316, #KSH3FVWD): GL reads 172 MiB, no lever reached 150 without costing real memory, the picker's specimens add 3-7 MiB, and by m24 every start read 194-198.
-export const BUDGETS = { firstFrameMs: 150, rssMiB: 200, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07 };
+export const BUDGETS = { firstFrameMs: 150, rssMiB: 200, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07, appFirstFrameMs: 500, appRssMiB: 250, appLeft: 0 };
 
 const line = (name, value, unit, op, limit, ok) =>
   `${name.padEnd(13)} ${`${value} ${unit}`.padEnd(7)} ${op} ${`${limit} ${unit}`.padEnd(8)} ${ok ? 'ok' : 'OVER'}`;
@@ -26,6 +26,10 @@ export function report(m, b) {
     line('theme switch', m.switchMs, 'ms', '≤', b.switchMs, m.switchMs <= b.switchMs),
     // Read with Blueprint on, the theme whose grid paper is the costliest to draw: m1's 0.02 % plus 0.05.
     line('idle cpu', m.cpu, '%', '≤', b.idleCpu, Number(m.cpu) <= b.idleCpu),
+    // Files is an App, its own qs process: a first frame and an RSS of its own, and no process once its window closes.
+    line('app 1st frame', m.appFirstFrameMs, 'ms', '≤', b.appFirstFrameMs, m.appFirstFrameMs <= b.appFirstFrameMs),
+    line('app open rss', Math.floor(m.appRssKiB / 1024), 'MiB', '≤', b.appRssMiB, m.appRssKiB <= b.appRssMiB * 1024),
+    line('app closed', m.appLeft, 'left', '=', b.appLeft, m.appLeft === b.appLeft),
   ];
   // Every theme's shaders and effects loaded once; reported, not budgeted.
   const switched = `${'rss switched'.padEnd(13)} ${Math.floor(m.switchedKiB / 1024)} MiB`;
@@ -53,8 +57,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const pickerWarmMs = Number(process.argv[12]);
   const passColdMs = Number(process.argv[13]);
   const filesColdMs = Number(process.argv[14]);
+  const [appFirstFrameMs, appRssKiB, appLeft] = process.argv.slice(15, 18).map(Number);
   const env = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
-  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, pickerColdMs, pickerWarmMs, passColdMs, filesColdMs, cpu: process.argv[7] }, {
+  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, pickerColdMs, pickerWarmMs, passColdMs, filesColdMs, appFirstFrameMs, appRssKiB, appLeft, cpu: process.argv[7] }, {
     firstFrameMs: env('DOTS_BUDGET_FIRST_FRAME_MS', BUDGETS.firstFrameMs),
     rssMiB: env('DOTS_BUDGET_RSS_MIB', BUDGETS.rssMiB),
     coldMs: env('DOTS_BUDGET_COLD_MS', BUDGETS.coldMs),
@@ -62,6 +67,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     timers: env('DOTS_BUDGET_TIMERS', BUDGETS.timers),
     switchMs: env('DOTS_BUDGET_SWITCH_MS', BUDGETS.switchMs),
     idleCpu: env('DOTS_BUDGET_IDLE_CPU', BUDGETS.idleCpu),
+    appFirstFrameMs: env('DOTS_BUDGET_APP_FIRST_FRAME_MS', BUDGETS.appFirstFrameMs),
+    appRssMiB: env('DOTS_BUDGET_APP_RSS_MIB', BUDGETS.appRssMiB),
+    appLeft: env('DOTS_BUDGET_APP_LEFT', BUDGETS.appLeft),
   });
   console.log(r.lines.join('\n'));
   process.exit(r.over ? 1 : 0);

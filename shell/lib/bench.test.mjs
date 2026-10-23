@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { report, switchCycle, BUDGETS } from './bench.mjs';
 
 const cli = new URL('./bench.mjs', import.meta.url).pathname;
-const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 48, warmMs: 4, pickerColdMs: 41, pickerWarmMs: 9, passColdMs: 37, filesColdMs: 33, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03' };
+const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 48, warmMs: 4, pickerColdMs: 41, pickerWarmMs: 9, passColdMs: 37, filesColdMs: 33, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03' };
 
 test('every measure within budget reads ok and passes', () => {
   const r = report(good, BUDGETS);
@@ -22,6 +22,9 @@ test('every measure within budget reads ok and passes', () => {
     'timers        1       = 1        ok',
     'theme switch  120 ms  ≤ 300 ms   ok',
     'idle cpu      0.03 %  ≤ 0.07 %   ok',
+    'app 1st frame 310 ms  ≤ 500 ms   ok',
+    'app open rss  176 MiB ≤ 250 MiB  ok',
+    'app closed    0 left  = 0 left   ok',
     'rss switched  153 MiB',
   ]);
 });
@@ -62,7 +65,7 @@ test('a timer count other than the budget is OVER either way', () => {
 });
 
 test('the CLI exits 1 when an env budget is exceeded and 0 otherwise', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33'];
+  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0'];
   assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /panel warm {4}4 ms/);
   assert.throws(
     () => execFileSync('node', [cli, ...args], { env: { ...process.env, DOTS_BUDGET_FIRST_FRAME_MS: '1' }, stdio: 'pipe' }),
@@ -100,7 +103,7 @@ test('the cgroup anon+shmem is reported beside idle rss but never OVER', () => {
 });
 
 test('the CLI prints the cgroup memory from its ninth argument', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33'];
+  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0'];
   assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /cgroup mem {4}231 MiB/);
 });
 
@@ -117,23 +120,56 @@ test('a picker cold of 51 ms is OVER and 50 ok, a picker warm of 17 ms is OVER a
 
 test('the CLI prints both picker lines from its tenth and eleventh arguments and exits 1 when either is over', () => {
   const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544'];
-  const out = execFileSync('node', [cli, ...args, '41', '9', '37', '33'], { encoding: 'utf8' });
+  const out = execFileSync('node', [cli, ...args, '41', '9', '37', '33', '310', '180224', '0'], { encoding: 'utf8' });
   assert.match(out, /picker cold {3}41 ms +≤ 50 ms +ok/);
   assert.match(out, /picker warm {3}9 ms +≤ 16 ms +ok/);
   for (const [c, w] of [['51', '9'], ['41', '17']]) {
     assert.throws(
-      () => execFileSync('node', [cli, ...args, c, w, '37', '33'], { stdio: 'pipe' }),
+      () => execFileSync('node', [cli, ...args, c, w, '37', '33', '310', '180224', '0'], { stdio: 'pipe' }),
       (e) => e.status === 1 && /OVER/.test(e.stdout.toString()),
     );
   }
 });
 
 test('the CLI prints pass cold from its twelfth argument', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33'];
+  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0'];
   assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /pass cold {5}37 ms +≤ 50 ms +ok/);
 });
 
 test('the CLI prints files cold from its thirteenth argument', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33'];
+  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0'];
   assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /files cold {4}33 ms +≤ 50 ms +ok/);
+});
+
+// Files is its own qs process: its first frame is held to 500 ms, its RSS to 250 MiB, and nothing of it may outlive its window.
+test('an App first frame of 501 ms is OVER and 500 ok', () => {
+  assert.equal(report({ ...good, appFirstFrameMs: 500 }, BUDGETS).over, false);
+  const r = report({ ...good, appFirstFrameMs: 501 }, BUDGETS);
+  assert.equal(r.over, true);
+  assert.equal(r.lines[12], 'app 1st frame 501 ms  ≤ 500 ms   OVER');
+});
+
+test('an App open RSS a KiB over 250 MiB is OVER and 250 MiB ok', () => {
+  assert.equal(report({ ...good, appRssKiB: 250 * 1024 }, BUDGETS).over, false);
+  const r = report({ ...good, appRssKiB: 250 * 1024 + 1 }, BUDGETS);
+  assert.equal(r.over, true);
+  assert.equal(r.lines[13], 'app open rss  250 MiB ≤ 250 MiB  OVER');
+});
+
+test('one App process left after its window closes is OVER and none is ok', () => {
+  assert.equal(report({ ...good, appLeft: 0 }, BUDGETS).over, false);
+  const r = report({ ...good, appLeft: 1 }, BUDGETS);
+  assert.equal(r.over, true);
+  assert.equal(r.lines[14], 'app closed    1 left  = 0 left   OVER');
+});
+
+test('the CLI prints the App lines from its fourteenth to sixteenth arguments and exits 1 when one is over', () => {
+  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33'];
+  assert.match(execFileSync('node', [cli, ...args, '310', '180224', '0'], { encoding: 'utf8' }), /app 1st frame 310 ms +≤ 500 ms +ok/);
+  for (const tail of [['501', '180224', '0'], ['310', String(250 * 1024 + 1), '0'], ['310', '180224', '1']]) {
+    assert.throws(
+      () => execFileSync('node', [cli, ...args, ...tail], { stdio: 'pipe' }),
+      (e) => e.status === 1 && /app .*OVER/.test(e.stdout.toString()),
+    );
+  }
 });
