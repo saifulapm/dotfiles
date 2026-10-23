@@ -1,5 +1,4 @@
-// Alt+E in a throwaway tmux running fish with only the repo's function and bind, against a stub of pxy's
-// chat endpoint on a free port. No test connects to 4100, where the real pxy spends real quota.
+// Alt+E in a throwaway tmux running fish with only the repo's function and bind, against a stub of pxy's chat endpoint on a free port; no test connects to 4100, where the real pxy spends real quota.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
@@ -35,8 +34,7 @@ const answer = (content) => (req, res) => {
   });
 };
 
-// Starts fish in tmux with DOTS_AI_URL at url, types the task and presses M-e. Returns the scratch dir,
-// a screen reader and the time M-e went in.
+// Starts fish in tmux with DOTS_AI_URL at url, types the task and presses M-e; returns the scratch dir, a screen reader and the time M-e went in.
 async function altE(t, url) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'alt-e-')));
   const home = join(root, 'home');
