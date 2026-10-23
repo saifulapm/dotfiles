@@ -400,6 +400,7 @@ ShellRoot {
                 firstFrameMs: app.firstFrameMs,
                 rssKiB: Status.rssKiB(procStatus.text()),
                 listed: app.listed,
+                openWith: openWith.state(),
                 side: app.side,
                 selected: app.selected,
                 cursor: app.cursorRow ? app.cursorRow.name : null,
@@ -524,6 +525,8 @@ ShellRoot {
                     app.toSide();
                 else if (t === "j" || k === Qt.Key_Down)
                     app.rowKey("down");
+                else if (t === "o")
+                    openWith.show(F.targets(app.rows, app.marked, app.folder, app.cursorRow));
                 else if (t === "k" || k === Qt.Key_Up)
                     app.rowKey("up");
                 else if (t === "l" || k === Qt.Key_Right || k === Qt.Key_Return || k === Qt.Key_Enter)
@@ -540,6 +543,15 @@ ShellRoot {
                     return;
                 event.accepted = true;
             }
+        }
+
+        FilesOpenWith {
+            id: openWith
+            anchors.fill: parent
+            look: app.look
+            c: app.c
+            fonts: app.fonts
+            rowKeys: keys
         }
 
         ColumnLayout {

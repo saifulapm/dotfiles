@@ -181,3 +181,22 @@ test('a device row reads its name on one line, its address when online and when 
   assert.deepEqual(F.shareRow('bracket', off), { name: 'fed ora', detail: 'OFFLINE, SEEN 55D AGO', status: 'OFFLINE' });
   assert.deepEqual(F.shareRow('caps', { name: 'mini', ip: '', online: false, age: '' }), { name: 'mini', detail: 'offline', status: 'offline' });
 });
+
+test('open with names how many files of which type and how many apps, Blueprint in caps', () => {
+  assert.deepEqual(F.openWithHead('caps', 3, 'JPEG image', 3), { title: '3 JPEG images', count: '3 apps' });
+  assert.deepEqual(F.openWithHead('bracket', 3, 'JPEG image', 3), { title: '3 JPEG IMAGES', count: '3 APPS' });
+  assert.deepEqual(F.openWithHead('plain', 1, 'PDF document', 1), { title: '1 PDF document', count: '1 app' });
+  assert.deepEqual(F.openWithHead('plain', 2, null, 0), { title: '2 files', count: '0 apps' });
+});
+
+test('an app row is its name, its kind and command, and the default\'s badge in the theme\'s idiom', () => {
+  const imv = { id: 'imv.desktop', name: 'imv', generic: 'Image viewer', exec: 'imv', default: true };
+  assert.deepEqual(F.appText('caps', imv), { name: 'imv', sub: 'Image viewer · imv', badge: 'default' });
+  assert.deepEqual(F.appText('plain', imv), { name: 'imv', sub: 'Image viewer · imv', badge: 'default' });
+  assert.deepEqual(F.appText('bracket', imv), { name: 'imv', sub: 'IMAGE VIEWER · imv', badge: '[DEFAULT]' });
+  assert.deepEqual(F.appText('caps', { name: 'Zathura', generic: null, exec: 'zathura', default: false }), { name: 'Zathura', sub: 'zathura', badge: '' });
+});
+
+test('an app name or kind with a newline or U+202E is one plain line', () => {
+  assert.deepEqual(F.appText('plain', { name: 'bad\nname‮x', generic: 'a\nb', exec: 'v', default: false }), { name: 'bad namex', sub: 'a b · v', badge: '' });
+});

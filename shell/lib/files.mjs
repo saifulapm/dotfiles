@@ -151,6 +151,19 @@ export const RENAME_SCRIPT = [
 
 export const tilde = (home, path) => (path === home ? '~' : path.indexOf(home + '/') === 0 ? '~' + path.slice(home.length) : path);
 
+// Open with's head: "3 JPEG images" from the type's own description, or files when the targets' types differ.
+export function openWithHead(voice, n, description, apps) {
+  const title = description ? `${n} ${description}${n === 1 ? '' : 's'}` : counted(n, 'file', 'files');
+  return { title: say(voice, title), count: say(voice, counted(apps, 'app', 'apps')) };
+}
+
+// An app's row: its name, then its kind and command, which keeps its case as a name does; a desktop entry may hold any text.
+export function appText(voice, app) {
+  const kind = app.generic ? say(voice, oneLine(app.generic)) + ' · ' : '';
+  return { name: oneLine(app.name), sub: kind + oneLine(app.exec), badge: app.default ? (voice === 'bracket' ? '[DEFAULT]' : 'default') : '' };
+}
+
+
 const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], ['tab', 'places'], ['esc', 'close']];
 
 // Paper and Artboard write keys as typed, Blueprint brackets them and every word in caps.
