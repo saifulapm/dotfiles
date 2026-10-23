@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Files
+GenericName=File Manager
+Comment=Manage files by keys, drag them into apps, open or share them
+Exec=dots-files
+Icon=system-file-manager
+Terminal=false
+Categories=Utility;FileManager;

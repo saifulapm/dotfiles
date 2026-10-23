@@ -89,10 +89,10 @@ test('Print opens niri screenshot UI and center-column moves to Mod+Shift+C', ()
   assert.match(binds, /^\s*Mod\+Shift\+C hotkey-overlay-title="[^"]+" \{ center-column; \}$/m);
 });
 
-test('the keymap opens Chromium on Mod+B, kak on Mod+E, yazi on Mod+Y and the overview on Mod+O', () => {
+test('the keymap opens Chromium on Mod+B, kak on Mod+E, Files on Mod+Y and the overview on Mod+O', () => {
   assert.match(binds, spawns('Mod+B', ['chromium-browser']));
   assert.match(binds, spawns('Mod+E', ['dots-foot', 'kak']));
-  assert.match(binds, spawns('Mod+Y', ['dots-foot', 'yazi']));
+  assert.match(binds, spawns('Mod+Y', ['dots-files']));
   assert.doesNotMatch(binds, /^\s*Mod\+Shift\+E /m);
   assert.match(binds, /^\s*Mod\+O repeat=false hotkey-overlay-title="[^"]+" \{ toggle-overview; \}$/m);
 });
