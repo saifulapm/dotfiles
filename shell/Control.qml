@@ -78,6 +78,7 @@ Item {
             sections: Lib.SECTIONS,
             selected: section.selected,
             rows: rows.map(r => r.title),
+            detailsDrawn: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).drawnDetail),
             openMs: openMs,
             opens: opens,
             motion: motion.curves?.kind ?? null,
@@ -269,6 +270,7 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property bool on: index === control.section.selected
+                        readonly property string drawnDetail: detailLabel.text
                         width: list.width
                         implicitHeight: row.implicitHeight + 22
                         radius: look.cursor.radius
@@ -310,6 +312,7 @@ Item {
                                     font.letterSpacing: look.name.spacing
                                 }
                                 Text {
+                                    id: detailLabel
                                     textFormat: Text.PlainText
                                     text: look.detailText(modelData.detail)
                                     color: on ? look.cursor.detail : look.detail.color

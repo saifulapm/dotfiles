@@ -7,6 +7,8 @@ control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
 section_is() { state_is --arg s "$1" '.open and .section == $s'; }
 detail_is() { state_is --arg t "$1" --arg d "$2" '.details[.rows | index($t)] == $d'; }
+# The detail as the row's Text draws it, which a caps voice draws upper case.
+drawn_detail_is() { state_is --arg t "$1" --arg d "$2" '.detailsDrawn[.rows | index($t)] | ascii_downcase == $d'; }
 # Presses j until the row titled $1 is selected.
 select_row() {
   local i n
@@ -73,8 +75,8 @@ check "Enter connects Test Headphones (BlueZ reports Connected true)" connected_
 until_ok 2000 detail_is "Test Headphones" connected
 check "its row reads connected" detail_is "Test Headphones" connected
 # BlueZ adds Battery1 about a second after Connect, so the percentage arrives later than the row.
-until_ok 4000 detail_is "Test Headphones" "connected · 80%"
-check "its row then reads the headset battery, connected · 80%" detail_is "Test Headphones" "connected · 80%"
+until_ok 4000 drawn_detail_is "Test Headphones" "connected · 80%"
+check "its row then draws the headset battery, connected · 80%" drawn_detail_is "Test Headphones" "connected · 80%"
 
 until_ok 3000 select_row "Test Headphones"
 wtype -k Return
