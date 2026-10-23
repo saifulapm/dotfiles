@@ -326,12 +326,13 @@ export function renderNewtabHtml(t) {
 // Board hexes for the new-tab page that no token carries: Paper's tile, Artboard's field, tile, row tint and its deep blue.
 const NEWTAB_BOARD = { paper: { tile: '#E8DEC6' }, artboard: { tile: '#F2F3F6', field: '#F6F7F9', tint: '#EEF1FF', deep: '#2638C9' } };
 
-// The page's paper, drawn as the shell draws it: Paper's grain as the board's noise, Blueprint's grid from its paper tokens, Artboard's dots.
+// The page's paper, drawn as the shell draws it: Paper's grain scales the paper by 1 +- grain as its shader does, Blueprint's grid from its paper tokens, Artboard's dots.
 function newtabTexture(t) {
   const p = t.paper || {};
   if (t.primitive.paper === 'grain') {
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.11 0 0 0 0 0.09 0 0 0 0 0.07 0 0 0 0.18 0'/></filter><rect width='300' height='300' filter='url(%23g)' opacity='0.55'/></svg>`;
-    return `background-image: url("data:image/svg+xml,${svg.replace(/</g, '%3C').replace(/>/g, '%3E')}");`;
+    const g = p.grain;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='g' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 1' result='n'/><feFlood flood-color='${t.color.paper}'/><feComposite in2='n' operator='arithmetic' k1='${+(2 * g).toFixed(4)}' k2='${+(1 - g).toFixed(4)}' k3='0' k4='0'/></filter><rect width='300' height='300' filter='url(#g)'/></svg>`;
+    return `background-image: url("data:image/svg+xml,${svg.replace(/</g, '%3C').replace(/>/g, '%3E').replace(/#/g, '%23')}");`;
   }
   if (t.primitive.paper === 'grid') {
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(t.color.accent.slice(i, i + 2), 16));

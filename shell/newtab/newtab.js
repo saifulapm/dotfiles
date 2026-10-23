@@ -3,11 +3,18 @@ import { dateLines, readQuery, siteRows, digitSite, words } from './words.mjs';
 
 // Chromium hands an overridden new tab's keys to its address bar; a tab the page opens itself takes them, so the first load only swaps itself for one.
 if (!location.search) {
-  chrome.tabs.getCurrent((tab) => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html?f'), index: tab.index + 1, windowId: tab.windowId }, () => chrome.tabs.remove(tab.id));
-  });
+  chrome.tabs.getCurrent((tab) => swap(tab, 20));
 } else {
   draw();
+}
+
+// Chromium refuses tab edits while its tab strip animates, so a refused swap tries again, and after 2 s the page draws where it is.
+function swap(tab, tries) {
+  chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html?f'), index: tab.index + 1, windowId: tab.windowId }, (made) => {
+    if (made && !chrome.runtime.lastError) chrome.tabs.remove(tab.id);
+    else if (tries > 0) setTimeout(() => swap(tab, tries - 1), 100);
+    else draw();
+  });
 }
 
 function draw() {

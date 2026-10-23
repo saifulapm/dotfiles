@@ -159,6 +159,9 @@ test('the new-tab page draws in the theme\'s paper, ink and fonts, on its paper\
   assert.match(renderNewtabCss(artboard), /radial-gradient\(#B4BAC4 1px, transparent 1.3px\)/);
   assert.match(renderNewtabCss(artboard), /background-size: 16px 16px;/);
   assert.match(renderNewtabCss(paper), /feTurbulence/);
+  // As the shell's grain shader does, the noise scales the paper by 1 +- grain, so its mean stays the paper colour.
+  assert.match(renderNewtabCss(paper), /flood-color='%23F1E9D8'/);
+  assert.match(renderNewtabCss(paper), /operator='arithmetic' k1='0.12' k2='0.94' k3='0' k4='0'/);
   assert.match(renderNewtabCss(paper), /color-scheme: light;/);
   assert.match(renderNewtabCss(blueprint), /color-scheme: dark;/);
 });
