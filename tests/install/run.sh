@@ -198,6 +198,12 @@ oomd=$(podman exec "$name" systemctl is-enabled systemd-oomd.service systemd-oom
 check "systemd-oomd.service and .socket are masked (got '$(tr '\n' ' ' <<<"$oomd")')" test "$oomd" = $'masked\nmasked'
 check "no journald drop-in caps the journal at 200M" podman exec "$name" bash -c "! grep -rqx 'SystemMaxUse=200M' /etc/systemd/journald.conf.d"
 check "the container has no Wi-Fi power-save file" podman exec "$name" test ! -e /etc/NetworkManager/conf.d/wifi-powersave-off.conf
+check "the container has no HDA power-save option" podman exec "$name" test ! -e /etc/modprobe.d/hda-power-save.conf
+if podman exec "$name" test -d /sys/module/snd_hda_intel; then
+  check "with snd_hda_intel loaded, the wireplumber keepalive is installed" as_user "grep -q 'dither.noise = 2' ~/.config/wireplumber/wireplumber.conf.d/sink-keepalive.conf"
+else
+  check "without snd_hda_intel, there is no wireplumber keepalive" as_user "test ! -e ~/.config/wireplumber/wireplumber.conf.d/sink-keepalive.conf"
+fi
 check "zswap compresses with zstd from boot" podman exec "$name" bash -c "grep -qx zstd /etc/modules-load.d/zstd.conf && grep -q 'zswap/parameters/compressor - - - - zstd' /etc/tmpfiles.d/zswap.conf"
 check "gpg-agent caches a passphrase for 400 days" as_user "grep -qx 'default-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf && grep -qx 'max-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf"
 check "imapnotify@icloud starts with the session" as_user "test -L ~/.config/systemd/user/graphical-session.target.wants/imapnotify@icloud.service"

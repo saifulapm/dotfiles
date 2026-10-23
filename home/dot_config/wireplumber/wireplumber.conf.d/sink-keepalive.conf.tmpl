@@ -1,0 +1,34 @@
+{{- /* Only where snd_hda_intel is loaded (the NUC); empty elsewhere, so chezmoi removes the file and v1's link. */ -}}
+{{- if stat "/sys/module/snd_hda_intel" -}}
+## Keeps sinks open between sounds: a suspended HDA sink loses its first seconds on resume, and AirPods lose 2-3 s re-acquiring the transport; dither.noise keeps the monitor's amplifier from muting itself on digital silence while the sink stays open (pipewire-props(7)).
+monitor.alsa.rules = [
+  {
+    matches = [
+      {
+        node.name = "~alsa_output.*"
+      }
+    ]
+    actions = {
+      update-props = {
+        session.suspend-timeout-seconds = 0
+        dither.noise = 2
+      }
+    }
+  }
+]
+
+monitor.bluez.rules = [
+  {
+    matches = [
+      {
+        node.name = "~bluez_output.*"
+      }
+    ]
+    actions = {
+      update-props = {
+        session.suspend-timeout-seconds = 0
+      }
+    }
+  }
+]
+{{ end -}}
