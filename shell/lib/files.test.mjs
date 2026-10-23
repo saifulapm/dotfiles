@@ -106,3 +106,25 @@ test('while dragging, the key strip says where a drop goes', () => {
   assert.deepEqual(F.dragKeys('caps')[1], { key: 'drag', word: 'drop on a window or a folder row' });
   assert.deepEqual(F.dragKeys('bracket')[1], { key: '[DRAG]', word: 'DROP ON A WINDOW OR A FOLDER ROW' });
 });
+
+test('share names the files to send and their size, in each theme\'s voice', () => {
+  assert.deepEqual(F.shareHead('caps', 3, 8900000), { label: 'SHARE', count: '3 files · 8.9 MB', tag: 'tailnet' });
+  assert.deepEqual(F.shareHead('plain', 1, 2000), { label: 'Share', count: '1 file · 2 KB', tag: 'tailnet' });
+  assert.deepEqual(F.shareHead('bracket', 3, 8900000), { label: 'SHARE', count: '3 FILES · 8.9 MB', tag: 'TAILNET' });
+});
+
+test('share counts the marked files and their bytes, or the cursor file when none is marked', () => {
+  const rows = [{ name: 'a.txt', size: 1000 }, { name: 'b.txt', size: 2000 }, { name: 'c.txt', size: 4000 }];
+  assert.deepEqual(F.shareSet(rows, ['c.txt', 'a.txt'], '/h', rows[1]), { paths: ['/h/a.txt', '/h/c.txt'], bytes: 5000 });
+  assert.deepEqual(F.shareSet(rows, [], '/h', rows[1]), { paths: ['/h/b.txt'], bytes: 2000 });
+  assert.deepEqual(F.shareSet([], [], '/h', null), { paths: [], bytes: 0 });
+});
+
+test('a device row reads its name on one line, its address when online and when it was seen when offline', () => {
+  const on = { name: 'iPhone', ip: '100.95.3.21', online: true, age: '' };
+  const off = { name: 'fed\nora‮', ip: '', online: false, age: '55d' };
+  assert.deepEqual(F.shareRow('caps', on), { name: 'iPhone', detail: '100.95.3.21', status: 'online' });
+  assert.deepEqual(F.shareRow('plain', off), { name: 'fed ora', detail: 'offline, seen 55d ago', status: 'offline' });
+  assert.deepEqual(F.shareRow('bracket', off), { name: 'fed ora', detail: 'OFFLINE, SEEN 55D AGO', status: 'OFFLINE' });
+  assert.deepEqual(F.shareRow('caps', { name: 'mini', ip: '', online: false, age: '' }), { name: 'mini', detail: 'offline', status: 'offline' });
+});

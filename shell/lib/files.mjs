@@ -71,6 +71,24 @@ export const dragText = (voice, rows) => ({ counts: say(voice, `${rows.length} m
 
 const DRAG_KEYS = [['space', 'mark'], ['drag', 'drop on a window or a folder row'], ['e', 'eject drive'], ['esc', 'close']];
 
+// The Share list's head: what goes and where it can go; Paper and Blueprint write the label in caps.
+export function shareHead(voice, n, bytes) {
+  return { label: voice === 'plain' ? 'Share' : 'SHARE', count: say(voice, `${counted(n, 'file', 'files')} · ${pickerSize({ size: bytes })}`), tag: say(voice, 'tailnet') };
+}
+
+// What s sends: the rows y and x act on, with their bytes; a folder has no bytes of its own to count.
+export function shareSet(rows, marked, folder, cursor) {
+  const names = marked.length ? marked : cursor ? [cursor.name] : [];
+  const bytes = rows.filter((r) => names.indexOf(r.name) >= 0 && !r.dir).reduce((sum, r) => sum + r.size, 0);
+  return { paths: targets(rows, marked, folder, cursor), bytes };
+}
+
+// A tailnet machine as the Share list draws it: its address while online, when it was last seen once offline.
+export function shareRow(voice, machine) {
+  const detail = machine.online ? machine.ip : machine.age ? `offline, seen ${machine.age} ago` : 'offline';
+  return { name: oneLine(machine.name), detail: say(voice, detail), status: say(voice, machine.online ? 'online' : 'offline') };
+}
+
 export const tilde = (home, path) => (path === home ? '~' : path.indexOf(home + '/') === 0 ? '~' + path.slice(home.length) : path);
 
 const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], ['tab', 'places'], ['esc', 'close']];
