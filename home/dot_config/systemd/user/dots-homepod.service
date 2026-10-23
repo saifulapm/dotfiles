@@ -1,0 +1,14 @@
+[Unit]
+Description=dots office HomePod sender
+# Only the mini shares the office LAN with the HomePod; Restart=always must never give up.
+ConditionHost=mac-mini-m2
+After=pipewire.service
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=%h/.local/bin/dots-homepod
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

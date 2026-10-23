@@ -1,0 +1,17 @@
+{{- /* Only the mini sends to the office HomePod, so every other machine renders an empty file, which chezmoi leaves out. */ -}}
+{{- if eq (get . "machine") "mac-mini-m2" -}}
+## The office HomePod as an output: dots-homepod sends what plays here to it, and its monitor carries the sink's volume.
+context.objects = [
+  {
+    factory = adapter
+    args = {
+      factory.name = support.null-audio-sink
+      node.name = homepod
+      node.description = "HomePod (Office)"
+      media.class = Audio/Sink
+      audio.position = [ FL FR ]
+      monitor.channel-volumes = true
+    }
+  }
+]
+{{ end -}}

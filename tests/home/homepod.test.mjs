@@ -11,6 +11,8 @@ const repo = new URL('../../', import.meta.url).pathname;
 const read = (f) => readFileSync(join(repo, f), 'utf8');
 const PIN = 'home/.chezmoiscripts/run_onchange_after_29-pin-cliairplay.sh.tmpl';
 const FIREWALL = 'home/.chezmoiscripts/run_onchange_after_46-homepod.sh.tmpl';
+const SINK = 'home/dot_config/pipewire/pipewire.conf.d/homepod-sink.conf.tmpl';
+const LINK = 'home/.chezmoiscripts/run_onchange_after_15-homepod.sh.tmpl';
 
 // The template rendered as chezmoi would on the named machine, from the given source dir.
 function render(file, machine, source = repo) {
@@ -84,4 +86,55 @@ test("the mini's firewalld opens UDP 319 and 320 for the HomePod's PTP clock, no
   );
   assert.equal(firewall(252), 'sudo firewall-cmd --state\n', 'a machine without firewalld, as the install container, opens nothing');
   for (const machine of ['macbook-m2', 'nuc']) assert.equal(render(FIREWALL, machine).trim(), '', machine);
+});
+
+test('the mini has a "HomePod (Office)" sink whose monitor carries its volume, and no other machine has one', () => {
+  for (const machine of ['macbook-m2', 'nuc']) assert.equal(render(SINK, machine).trim(), '', machine);
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'homepod-sink-')));
+  writeFileSync(join(root, 'homepod-sink.conf'), render(SINK, 'mac-mini-m2'));
+  const r = spawnSync('spa-json-dump', [join(root, 'homepod-sink.conf')], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout)['context.objects'], [
+    {
+      factory: 'adapter',
+      args: {
+        'factory.name': 'support.null-audio-sink',
+        'node.name': 'homepod',
+        'node.description': 'HomePod (Office)',
+        'media.class': 'Audio/Sink',
+        'audio.position': ['FL', 'FR'],
+        'monitor.channel-volumes': true,
+      },
+    },
+  ]);
+});
+
+test('the sender runs from ~/.local/bin as a user unit at login, on the mini only, and never gives up', () => {
+  const unit = read('home/dot_config/systemd/user/dots-homepod.service');
+  assert.match(unit, /^ConditionHost=mac-mini-m2$/m);
+  assert.match(unit, /^ExecStart=%h\/\.local\/bin\/dots-homepod$/m);
+  assert.match(unit, /^Restart=always$/m);
+  assert.match(unit, /^StartLimitIntervalSec=0$/m);
+  assert.equal(read('home/dot_config/systemd/user/default.target.wants/symlink_dots-homepod.service').trim(), '../dots-homepod.service');
+});
+
+// The link script run on the mini with systemctl and pw-link stubbed; ports is what pw-link -l -i lists.
+function link(ports) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'homepod-link-')));
+  const bin = join(root, 'bin');
+  mkdirSync(bin);
+  const log = join(root, 'calls');
+  writeFileSync(join(bin, 'systemctl'), `#!/bin/bash\necho "systemctl $*" >>${log}\n`, { mode: 0o755 });
+  writeFileSync(join(bin, 'pw-link'), `#!/bin/bash\nprintf '${ports}'\n`, { mode: 0o755 });
+  const r = spawnSync('bash', ['-c', render(LINK, 'mac-mini-m2')], { encoding: 'utf8', env: { PATH: `${bin}:${process.env.PATH}`, HOME: root } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(realpathSync(join(root, '.local/bin/dots-homepod')), join(repo, 'bin/dots-homepod'));
+  return readFileSync(log, 'utf8');
+}
+
+test('on the mini the sender is linked and restarted, and PipeWire restarts only while the sink is missing', () => {
+  for (const machine of ['macbook-m2', 'nuc']) assert.equal(render(LINK, machine).trim(), '', machine);
+  const restarts = ['systemctl --user daemon-reload', 'systemctl --user restart dots-homepod.service', ''];
+  assert.equal(link('homepod:playback_FL\\nhomepod:playback_FR\\n'), restarts.join('\n'));
+  assert.equal(link('alsa_output.x:playback_FL\\n'), ['systemctl --user restart pipewire.service', ...restarts].join('\n'));
 });

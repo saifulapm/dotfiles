@@ -1,0 +1,12 @@
+{{- /* Only the mini sends to the office HomePod, so every other machine renders an empty script, which chezmoi skips. */ -}}
+{{- if eq (get . "machine") "mac-mini-m2" -}}
+#!/bin/bash
+# sender, unit and sink hashes: {{ joinPath .chezmoi.workingTree "bin/dots-homepod" | include | sha256sum }} {{ joinPath .chezmoi.sourceDir "dot_config/systemd/user/dots-homepod.service" | include | sha256sum }} {{ joinPath .chezmoi.sourceDir "dot_config/pipewire/pipewire.conf.d/homepod-sink.conf.tmpl" | include | sha256sum }}
+{{ template "lib.sh" . }}
+# dots-homepod.service runs the sender from ~/.local/bin, since the repo's bin/ is not on the user manager's PATH.
+mkdir -p "$HOME/.local/bin"
+ln -sfn {{ joinPath .chezmoi.workingTree "bin/dots-homepod" | quote }} "$HOME/.local/bin/dots-homepod" || die "could not link the HomePod sender"
+# PipeWire reads the sink only as it starts, so it restarts once, when the sink is missing; a changed sender takes over from the old one.
+pw-link -l -i 2>/dev/null | grep -q '^homepod:playback_' || systemctl --user restart pipewire.service 2>/dev/null || true
+systemctl --user daemon-reload 2>/dev/null && systemctl --user restart dots-homepod.service 2>/dev/null || true
+{{ end -}}
