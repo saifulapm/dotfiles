@@ -6,7 +6,7 @@ const pad2 = (n) => String(n).padStart(2, '0');
 
 // Page titles are whatever a site's author wrote, so controls become spaces and bidi marks go.
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
-const BIDI = /[‎‏؜‪-‮⁦-⁩]/g;
+const BIDI = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g;
 const clean = (s) => String(s || '').replace(CONTROL, ' ').replace(BIDI, '').replace(/\s+/g, ' ').trim();
 
 export function dateLines(voice, d) {
@@ -41,7 +41,7 @@ export function siteRows(sites, voice) {
     .slice(0, 6)
     .map((s, i) => {
       const where = address(s.url);
-      const title = clean(s.title) || where;
+      const title = (s.title === s.url ? '' : clean(s.title)) || where;
       const tile = firstMark(title) || firstMark(where) || '•';
       return { n: String(i + 1), url: s.url, tile: voice === 'bracket' ? tile.toUpperCase() : tile, title, address: where };
     });

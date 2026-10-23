@@ -60,15 +60,19 @@ test('the six most visited web sites become rows with a number, a letter tile, a
 
 // A page's title is whatever its author wrote, so it is one line with no control characters or bidi marks.
 test('a forged or missing title still draws one line and a letter tile', () => {
-  const forged = 'x\ny\u001bz\u0007q\u0085w‮v‎u' + 'A'.repeat(300);
-  const [row] = siteRows([{ url: 'https://evil.example/‮gnp.exe', title: forged }], 'plain');
+  const forged = 'x\ny\u001bz\u0007q\u0085w\u202Ev\u200Eu' + 'A'.repeat(300);
+  const [row] = siteRows([{ url: 'https://evil.example/\u202Egnp.exe', title: forged }], 'plain');
   assert.equal(row.title, 'x y z q wvu' + 'A'.repeat(300));
   assert.equal(row.tile, 'x');
   assert.equal(row.address, 'evil.example/gnp.exe');
   assert.deepEqual(siteRows([{ url: 'https://www.themoviedb.org/movie', title: '' }], 'plain')[0], {
     n: '1', url: 'https://www.themoviedb.org/movie', tile: 't', title: 'themoviedb.org/movie', address: 'themoviedb.org/movie',
   });
-  assert.equal(siteRows([{ url: 'https://8.8.8.8/', title: '‮\u0000 ' }], 'bracket')[0].tile, '8');
+  assert.equal(siteRows([{ url: 'https://8.8.8.8/', title: '\u202E\u0000 ' }], 'bracket')[0].tile, '8');
+  // Chromium gives a page with no title its URL as the title.
+  assert.deepEqual(siteRows([{ url: 'http://localhost:8000/notes.html?v=2', title: 'http://localhost:8000/notes.html?v=2' }], 'plain')[0], {
+    n: '1', url: 'http://localhost:8000/notes.html?v=2', tile: 'l', title: 'localhost:8000/notes.html?v=2', address: 'localhost:8000/notes.html?v=2',
+  });
   assert.equal(siteRows([{ url: 'https://example.com/', title: '— «»' }], 'plain')[0].tile, 'e');
 });
 
