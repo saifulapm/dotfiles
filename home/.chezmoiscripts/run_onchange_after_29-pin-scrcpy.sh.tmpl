@@ -1,0 +1,19 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "scrcpy") }}
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+{{ if eq .chezmoi.arch "arm64" -}}
+# scrcpy ships no arm64 Linux release, so the Macs build the client and take the server from the scrcpy-server pin.
+src=$pin_tmp/scrcpy-$pin_version
+meson setup "$pin_tmp/build" "$src" --prefix="$HOME/.local" --buildtype=release -Dcompile_server=false >/dev/null || die "pin $pin_name: meson setup failed"
+ninja -C "$pin_tmp/build" install >/dev/null || die "pin $pin_name: build failed"
+{{- else -}}
+# The release is a portable build that finds scrcpy-server beside its real path, so the link keeps the whole directory.
+dest=$HOME/.local/opt/scrcpy-$pin_version
+rm -rf "$dest"
+mkdir -p "$HOME/.local/opt" "$HOME/.local/bin"
+mv "$pin_tmp/scrcpy-linux-x86_64-v$pin_version" "$dest"
+ln -sfn "$dest/scrcpy" "$HOME/.local/bin/scrcpy"
+{{- end }}
+pin_done

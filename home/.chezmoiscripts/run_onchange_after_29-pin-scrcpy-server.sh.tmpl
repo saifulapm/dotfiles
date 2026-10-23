@@ -1,0 +1,9 @@
+{{- /* Only the Macs build scrcpy from source and so need the prebuilt server, so x86_64 renders an empty script, which chezmoi skips. */ -}}
+{{- if eq .chezmoi.arch "arm64" -}}
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "scrcpy-server") }}
+server=$(pin_fetch)
+install -D -m 0644 "$server" "$HOME/.local/share/scrcpy/scrcpy-server"
+pin_done
+{{ end -}}
