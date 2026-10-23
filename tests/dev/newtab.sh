@@ -28,6 +28,19 @@ centre_is() { local r g b; read -r r g b < <(page_centre); read -r -a want <<<"$
 # Every font Chromium drew the element's text in is the family, at any weight: Artboard's 600 draws as Maple Mono SemiBold.
 drawn_in() { local f; f=$(cdp fonts newtab.html "$1") && [ -n "$f" ] && ! tr ',' '\n' <<<"$f" | grep -qvE "^$2( |$)"; }
 
+# The contrast of row 1's tile letter against its fill, or the row's when the tile has none, with row 1 focused.
+tile_contrast='(() => {
+  const r = document.querySelector(".row"); r.focus();
+  const rgb = (c) => c.match(/[\d.]+/g).map(Number);
+  const lum = (c) => { const [R, G, B] = rgb(c).slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * R + 0.7152 * G + 0.0722 * B; };
+  const t = getComputedStyle(r.querySelector(".tile"));
+  const behind = (rgb(t.backgroundColor)[3] ?? 1) === 0 ? getComputedStyle(r).backgroundColor : t.backgroundColor;
+  const [a, b] = [lum(t.color), lum(behind)].sort((x, y) => y - x);
+  const ratio = (a + 0.05) / (b + 0.05);
+  document.getElementById("q").focus();
+  return ratio;
+})()'
+
 # The day and date each voice writes for today, as the boards draw them.
 date_line() {
   case $1 in
@@ -141,6 +154,8 @@ for theme in paper blueprint artboard; do
   check "$theme: the date reads $(page '[document.getElementById("day").textContent, document.getElementById("date").textContent].join(" ")') in $theme's voice" \
     is "[document.getElementById('day').textContent, document.getElementById('date').textContent].join(' ') === '$(date_line "$theme")'"
   check "$theme: Chromium draws the date in $theme's $(jq -r .type.display "$out/shell.json") ($(cdp fonts newtab.html '#date'))" drawn_in '#date' "$(jq -r .type.display "$out/shell.json")"
+  # A focused row turns its colours over, and its tile's letter must still read: at least 3:1 against what is behind it.
+  check "$theme: the focused row's tile letter reads ($(page "$tile_contrast" | cut -c1-5):1)" is "$tile_contrast >= 3"
   check "$theme: no text on the page names the goal" is '!/goal|ship the new tab/i.test(document.body.innerText)'
   wtype -k Return
   until_ok 10000 searched

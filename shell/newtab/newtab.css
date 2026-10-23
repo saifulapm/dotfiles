@@ -27,6 +27,8 @@ main[hidden] { display: none; }
 .title { font-size: 14px; font-weight: 500; }
 .address { font-size: 12px; color: var(--muted); }
 .row:focus .n, .row:focus .address, .row:focus .tile { color: inherit; border-color: currentColor; }
+/* A focused row turns over, so its tile drops its light fill and the letter sits on the row's own colour. */
+.row:focus .tile { background: transparent; }
 .empty { padding: 11px 14px; border-top: 1px solid var(--line); font-size: 12px; letter-spacing: 0.14em; color: var(--muted); }
 
 .keys { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
