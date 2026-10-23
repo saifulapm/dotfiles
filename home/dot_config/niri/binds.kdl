@@ -145,3 +145,17 @@ binds {
     XF86Search hotkey-overlay-title="Launcher" { spawn "dots-call" "launcher" "toggle"; }
     XF86PowerOff hotkey-overlay-title="Power" { spawn "dots-call" "control" "section" "power"; }
 }
+
+// Naming any switcher bind drops niri's defaults, so the app-id ones are kept here, and the cheat sheet reads these rows.
+recent-windows {
+    binds {
+        Alt+Tab hotkey-overlay-title="Switch Windows" { next-window; }
+        Alt+Shift+Tab hotkey-overlay-title="Switch Windows Back" { previous-window; }
+        Mod+Tab hotkey-overlay-title="Switch Windows" { next-window; }
+        Mod+Shift+Tab hotkey-overlay-title="Switch Windows Back" { previous-window; }
+        Alt+grave { next-window filter="app-id"; }
+        Alt+Shift+grave { previous-window filter="app-id"; }
+        Mod+grave { next-window filter="app-id"; }
+        Mod+Shift+grave { previous-window filter="app-id"; }
+    }
+}

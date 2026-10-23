@@ -16,6 +16,14 @@ test('the repo binds give one row per titled bind, each with a title, key and gr
   }
 });
 
+test('the switcher keys and the column and shortcut-inhibit binds are rows', () => {
+  const keys = (title) => parseBinds(binds).filter((r) => r.title === title).map((r) => r.key);
+  assert.deepEqual(keys('Switch Windows'), ['⌥ Tab', 'Mod Tab']);
+  assert.deepEqual(keys('Switch Windows Back'), ['⌥ ⇧ Tab', 'Mod ⇧ Tab']);
+  assert.deepEqual(keys('Expel Window from Column'), ['Mod ⇧ ,']);
+  assert.deepEqual(keys('Toggle Shortcut Inhibit'), ['Mod ⌃ Esc']);
+});
+
 test('a bind without a title gives no row', () => {
   assert.deepEqual(parseBinds('    Mod+Z { spawn "foot"; }\n'), []);
 });
@@ -63,6 +71,7 @@ test('a filter matches the title or the key text, ignoring case', () => {
     'Mail: kak-mail', 'Themes', 'Clear Notifications', 'Pin Notes', 'DNS Shield', 'System Monitor: btop', 'Quit niri', 'Screens Off', 'Screenshot: Screen', 'Screenshot: Region',
     'Screenshot: Window', 'Copy Text from a Region', 'Annotate a Region', 'Record a Region', 'Cast: Focused Window', 'Cast: Focused Screen', 'Cast: Nothing', 'Window Shorter', 'Window Taller',
     'Fullscreen Window', 'Expel Window from Column', 'Focus Floating or Tiled', 'Center Column', 'Move Workspace Down', 'Move Workspace Up',
+    'Switch Windows Back',
   ]);
   assert.equal(filterRows(rows, '').length, rows.length);
 });

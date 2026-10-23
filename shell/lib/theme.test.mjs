@@ -281,6 +281,16 @@ test('niri shows where a moved window lands in the theme accent at half strength
   assert.match(renderNiri(load('blueprint')), /^    insert-hint \{\n        color "#7FE3F080"\n    \}$/m);
 });
 
+test('niri dresses the Alt+Tab switcher: the highlight takes the accent, danger for urgent, and the corner primitive', () => {
+  for (const name of ['paper', 'blueprint', 'artboard']) {
+    const t = load(name);
+    const hl = renderNiri(t).match(/^recent-windows \{\n    highlight \{\n([^]*?)\n    \}\n\}$/m)?.[1] ?? '';
+    assert.match(hl, new RegExp(`^        active-color "${t.color.accent}"$`, 'm'), name);
+    assert.match(hl, new RegExp(`^        urgent-color "${t.color.danger}"$`, 'm'), name);
+    assert.match(hl, new RegExp(`^        corner-radius ${t.primitive.corner === 'round' ? 14 : 0}$`, 'm'), name);
+  }
+});
+
 test('a tab position outside left, right, top and bottom is refused by name', () => {
   const bad = structuredClone(paper);
   bad.niri.tab_position = 'middle';

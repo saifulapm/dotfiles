@@ -27,6 +27,7 @@ until_ok 3000 sheet_shown
 check "Mod+/ shows the cheat sheet with exclusive keyboard" sheet_shown
 check "state counts $titled rows, one per titled bind" state_is --argjson n "$titled" '.rows == $n'
 check "no row's title is cut short" state_is '.truncated == 0'
+check "the drawn rows include the switcher's Alt+Tab key" state_is '.rowKeys | index("⌥ TAB") != null'
 check "state lists the four groups" state_is '.groups == ["SURFACES", "WORK", "WINDOWS", "SYSTEM"]'
 
 wtype -k Escape

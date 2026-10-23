@@ -271,6 +271,16 @@ overview {
     backdrop-color "${c.paper}"
 }
 
+// The Alt+Tab switcher's highlight wears the theme. Its binds sit in binds.kdl, since niri merges this section only across includes.
+recent-windows {
+    highlight {
+        active-color "${c.accent}"
+        urgent-color "${c.danger}"
+        padding ${radius ? 24 : 16}
+        corner-radius ${radius}
+    }
+}
+
 window-rule {
     geometry-corner-radius ${radius}
     clip-to-geometry true
