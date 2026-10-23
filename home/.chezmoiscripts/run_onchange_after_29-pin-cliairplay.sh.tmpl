@@ -1,0 +1,9 @@
+{{- /* Only the mini sits on the office LAN with the HomePod, so every other machine renders an empty script, which chezmoi skips. */ -}}
+{{- if eq (get . "machine") "mac-mini-m2" -}}
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "cliairplay") }}
+binary=$(pin_fetch)
+install -D -m 0755 "$binary" "$HOME/.local/bin/cliairplay"
+pin_done
+{{ end -}}

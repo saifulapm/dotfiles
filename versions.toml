@@ -134,3 +134,11 @@ install = "~/.local/bin/kak-ansi-filter, built with cc, which kak's ansi.kak cal
 runs = "kak-ansi-filter </dev/null"
 url = "https://github.com/eraserhd/kak-ansi/archive/{version}.tar.gz"
 sha256 = "ce94c3c3e9ec611404930afa7a19e80f1de445bd65442a78070e2c3effe7cc44"
+
+[[pin]]
+name = "cliairplay"
+version = "0.5.9"
+repo = "music-assistant/airplay-cli"
+install = "~/.local/bin/cliairplay on the mini, the office HomePod's AirPlay 2 sender"
+url = "https://github.com/music-assistant/airplay-cli/releases/download/v{version}/cliairplay-linux-aarch64"
+sha256 = "37fcc7dc59e4878f465afd2520923baefeb2c9b761c29f4d7fe5b2815bb3b354"
