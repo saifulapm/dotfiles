@@ -8,9 +8,10 @@ if (!location.search) {
   draw();
 }
 
-// Chromium refuses tab edits while its tab strip animates, so a refused swap tries again, and after 2 s the page draws where it is.
+// Chromium refuses tab edits while its tab strip animates, so a refused swap tries again, and after 2 s the page draws where it is. The new tab takes the first one's opener, so closing it goes back to the tab Ctrl+T was pressed on.
 function swap(tab, tries) {
-  chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html?f'), index: tab.index + 1, windowId: tab.windowId }, (made) => {
+  const opener = tab.openerTabId === undefined ? {} : { openerTabId: tab.openerTabId };
+  chrome.tabs.create(Object.assign({ url: chrome.runtime.getURL('newtab.html?f'), index: tab.index + 1, windowId: tab.windowId }, opener), (made) => {
     if (made && !chrome.runtime.lastError) chrome.tabs.remove(tab.id);
     else if (tries > 0) setTimeout(() => swap(tab, tries - 1), 100);
     else draw();

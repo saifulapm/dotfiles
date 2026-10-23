@@ -1,4 +1,4 @@
-// node cdp.mjs <port> urls | open <url> | eval <url-part> <js> | shot <url-part> <png> | fonts <url-part> <selector> | visit <url>: reads and drives a Chromium started with --remote-debugging-port.
+// node cdp.mjs <port> urls | open <url> | eval <url-part> <js> | shot <url-part> <png> | fonts <url-part> <selector> | activate <url-part> | visit <url>: reads and drives a Chromium started with --remote-debugging-port.
 const [port, cmd, ...args] = process.argv.slice(2);
 const base = `http://127.0.0.1:${port}`;
 const pages = async () => (await (await fetch(`${base}/json/list`)).json()).filter((t) => t.type === 'page');
@@ -56,6 +56,9 @@ if (cmd === 'urls') {
   s.close();
   if (!fonts.result) process.exit(1);
   console.log(fonts.result.fonts.map((f) => f.familyName).join(','));
+} else if (cmd === 'activate') {
+  const target = (await pages()).find((t) => t.url.includes(args[0]));
+  if (!target || !(await fetch(`${base}/json/activate/${target.id}`)).ok) process.exit(1);
 } else if (cmd === 'visit') {
   // A typed visit, as from the address bar, which Chromium counts toward its most visited sites.
   const s = await session((await pages())[0]);

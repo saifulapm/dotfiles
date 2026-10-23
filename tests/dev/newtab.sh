@@ -95,6 +95,7 @@ new_tab() {
 }
 close_tab() { wtype -M ctrl w -m ctrl; sleep 0.5; }
 tab_at() { cdp urls | grep -qF "$1"; }
+visible() { cdp eval "$1" 'document.visibilityState' | grep -qx '"visible"'; }
 searched() { cdp urls | grep -qE '[?&]q=fedora'; }
 
 # A goal in the store, which the margins show and the page must not.
@@ -201,8 +202,21 @@ check "github.com then Enter opens https://github.com ($(cdp urls | tr '\n' ' ')
 new_tab
 until_ok 10000 ready
 wtype 2
-until_ok 3000 tab_at "$(site Bravo)" || { echo "     2 did not open: field $(page 'JSON.stringify([document.getElementById("q").value, document.activeElement.className || document.activeElement.id, document.querySelectorAll(".row").length, document.querySelector("#sites").innerText.slice(0, 80)])')"; wtype 2; until_ok 3000 tab_at "$(site Bravo)"; }
+until_ok 5000 tab_at "$(site Bravo)"
 check "with the field empty, 2 opens the second site, Bravo ($(cdp urls | tr '\n' ' '))" tab_at "$(site Bravo)"
+quit_chromium
+
+# Ctrl+T then Ctrl+W goes back to the tab Ctrl+T was pressed on, as on Chromium's own new tab, however many tabs are open.
+chromium seeded
+cdp open "$(site Charlie)" >/dev/null
+cdp open "$(site Delta)" >/dev/null
+until_ok 5000 tab_at "$(site Delta)"
+cdp activate data: && until_ok 3000 visible data:
+new_tab
+until_ok 10000 ready
+wtype -M ctrl w -m ctrl
+until_ok 3000 bash -c "! node '$repo/tests/dev/cdp.mjs' $dport urls | grep -q newtab.html"
+check "Ctrl+T then Ctrl+W on the first of three tabs returns to it ($(for u in data: charlie delta; do echo -n "$u $(cdp eval "$u" document.visibilityState) "; done))" until_ok 3000 visible data:
 quit_chromium
 
 ((fails > 0)) && grim -s 1 "${DOTS_CHECK_SHOTS:-/tmp}/newtab-fail.png" 2>/dev/null
