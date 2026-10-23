@@ -90,9 +90,10 @@ reload_helix() {
 reload_mpv() {
   local dir=${XDG_RUNTIME_DIR:-/run/user/$UID} sock pid
   for sock in "$dir"/mpv-*.sock; do
-    [[ -S $sock ]] || continue
     pid=${sock##*/mpv-}
     pid=${pid%.sock}
+    # A player given its own socket name keeps it; only a pid's socket can be stale.
+    [[ -S $sock && $pid =~ ^[0-9]+$ ]] || continue
     [[ $(cat "/proc/$pid/comm" 2>/dev/null) == mpv ]] || rm -f "$sock"
   done
   for pid in $(session_pids mpv); do
@@ -106,7 +107,8 @@ reload_mpv() {
 reload_zathura() {
   local name
   for name in $(busctl --user list --no-legend 2>/dev/null | awk '$1 ~ /^org\.pwmt\.zathura\.PID-/ {print $1}'); do
-    busctl --user call "$name" /org/pwmt/zathura org.pwmt.zathura SourceConfig >/dev/null || return 1
+    # A stopped zathura would hold the switch, and the theme lock, for busctl's default 25 s.
+    busctl --user --timeout=1 call "$name" /org/pwmt/zathura org.pwmt.zathura SourceConfig >/dev/null || return 1
   done
 }
 
