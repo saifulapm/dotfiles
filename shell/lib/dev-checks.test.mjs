@@ -94,3 +94,27 @@ test('every DOTS_* that dots-dev exports is passed to the shell unit by name', (
   assert.ok(exported.includes('DOTS_ACCOUNTS'), 'read the exports of bin/dots-dev');
   assert.deepEqual(missing, []);
 });
+
+// A DevTools eval exits 0 whatever it answers, so `check ... page '<js>'` passed on false in m33; check refuses page, row and cdp as its command.
+test('check refuses a DevTools eval as its command, bare or under until_ok', () => {
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  const fn = lib.match(/^check\(\) \{[\s\S]*?^\}/m);
+  assert.ok(fn, 'lib.sh defines check()');
+  const script = `${fn[0]}
+fails=0
+page() { echo false; }
+row() { echo false; }
+cdp() { echo false; }
+yes_fn() { true; }
+check "bare page" page 'x'
+check "waited row" until_ok 100 row a b
+check "cdp eval" cdp eval newtab.html 'x'
+check "a function" yes_fn
+echo "fails=$fails"`;
+  const r = spawnSync('bash', ['-c', script], { encoding: 'utf8', timeout: 3000 });
+  assert.match(r.stdout, /^FAIL bare page/m);
+  assert.match(r.stdout, /^FAIL waited row/m);
+  assert.match(r.stdout, /^FAIL cdp eval/m);
+  assert.match(r.stdout, /^ok   a function$/m);
+  assert.match(r.stdout, /^fails=3$/m);
+});

@@ -6,8 +6,17 @@ live_bus=${DBUS_SESSION_BUS_ADDRESS:-}
 fails=0
 
 check() {
-  local name=$1
+  local name=$1 cmd
   shift
+  # A DevTools eval exits 0 whatever it answers, so it is checked inside a function ending in | grep -qx true.
+  cmd=$1
+  [ "$cmd" = until_ok ] && cmd=${3:-}
+  case $cmd in page | row | cdp)
+    echo "FAIL $name: $cmd exits 0 on false, so check a function that ends in | grep -qx true"
+    fails=$((fails + 1))
+    return
+    ;;
+  esac
   if "$@"; then echo "ok   $name"; else echo "FAIL $name"; fails=$((fails + 1)); fi
 }
 

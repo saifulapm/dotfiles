@@ -61,8 +61,8 @@ echo "     calendar: $(jq -c '{width, drawn, cities: .calendar.cities}' <<<"$sta
 wide() { jq -e '(.width | type) == "number" and .width == 560 and .drawn == 560' <<<"$state" >/dev/null; }
 check "the calendar card is 560 px wide, as drawn" wide
 
-# row <index> <zone> <utc-shift>: the drawn row names the zone's city, its time and day at either read, and its offset from home.
-row() {
+# zone_row <index> <zone> <utc-shift>: the drawn row names the zone's city, its time and day at either read, and its offset from home.
+zone_row() {
   local i=$1 id=$2 shift=${3:-} city=${2##*/} t1 t2 off want_off
   city=${city//_/ }
   t1=$(TZ=$id date -d "@$((before + ${shift:-0}))" +%H:%M)
@@ -76,10 +76,10 @@ row() {
       and ($r.offset | ascii_downcase) == ($off | ascii_downcase)
       and ($r.day | ascii_downcase) == $day' <<<"$state" >/dev/null
 }
-check "home, $home_city, is the first row with its time and no offset" row 0 "$home"
-check "UTC is drawn with its time and offset from home" row 1 UTC
-check "London is drawn with its time and offset from home" row 2 Europe/London
-check "New York is drawn with its time and offset from home" row 3 America/New_York
+check "home, $home_city, is the first row with its time and no offset" zone_row 0 "$home"
+check "UTC is drawn with its time and offset from home" zone_row 1 UTC
+check "London is drawn with its time and offset from home" zone_row 2 Europe/London
+check "New York is drawn with its time and offset from home" zone_row 3 America/New_York
 check "the calendar's first open ran dots-zones once ($(calls))" test "$(calls)" = 1
 
 # The first answer's next change is a second away, so the next minute tick reruns dots-zones and London's offset moves an hour.
@@ -89,7 +89,7 @@ before=$(date +%s)
 state=$(island)
 after=$(date +%s)
 echo "     after the change: $(jq -c '.calendar.cities[2]' <<<"$state")"
-check "after the change London is drawn an hour back, without a restart" row 2 Europe/London -3600
+check "after the change London is drawn an hour back, without a restart" zone_row 2 Europe/London -3600
 check "and dots-zones ran just once more ($(calls))" test "$(calls)" = 2
 
 wtype -k Escape
