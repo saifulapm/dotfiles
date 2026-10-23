@@ -54,9 +54,28 @@ export function targets(rows, marked, folder, cursor) {
   return picked.map((r) => `${base}/${r.name}`);
 }
 
+// A drag that starts on a marked row carries every marked row, as the marked board draws it; on any other row, only that row.
+export function dragPaths(rows, marked, folder, pressed) {
+  return targets(rows, marked.indexOf(pressed.name) >= 0 ? marked : [], folder, pressed);
+}
+
+const fileUri = (path) => 'file://' + path.split('/').map(encodeURIComponent).join('/');
+
+// text/uri-list as foot and Chromium read it: one encoded URI a line, each ended by CRLF.
+export const uriList = (paths) => paths.map((p) => fileUri(p) + '\r\n').join('');
+
+export const chipText = (voice, n) => say(voice, counted(n, 'file', 'files'));
+
+// While a drag runs, the status line counts what it carries and says so.
+export const dragText = (voice, rows) => ({ counts: say(voice, `${rows.length} marked · ${pickerSize({ dir: false, size: rows.reduce((n, r) => n + (r.dir ? 0 : r.size), 0) })}`), at: say(voice, 'dragging') });
+
+const DRAG_KEYS = [['space', 'mark'], ['drag', 'drop on a window or a folder row'], ['e', 'eject drive'], ['esc', 'close']];
+
 export const tilde = (home, path) => (path === home ? '~' : path.indexOf(home + '/') === 0 ? '~' + path.slice(home.length) : path);
 
 const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], ['tab', 'places'], ['esc', 'close']];
 
 // Paper and Artboard write keys as typed, Blueprint brackets them and every word in caps.
-export const keyStrip = (voice) => KEYS.map(([k, w]) => (voice === 'bracket' ? { key: `[${k.toUpperCase()}]`, word: w.toUpperCase() } : { key: k, word: w }));
+const strip = (voice, pairs) => pairs.map(([k, w]) => (voice === 'bracket' ? { key: `[${k.toUpperCase()}]`, word: w.toUpperCase() } : { key: k, word: w }));
+export const keyStrip = (voice) => strip(voice, KEYS);
+export const dragKeys = (voice) => strip(voice, DRAG_KEYS);

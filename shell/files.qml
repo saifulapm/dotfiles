@@ -19,6 +19,11 @@ ShellRoot {
     property var firstFrameMs: null
     property var entries: []
     property bool hidden: false
+    // What a drag out carries: the rows, their paths, and the chip's image grabbed as it starts.
+    property var dragRows: []
+    readonly property var dragPaths: dragRows.map(r => pathOf(r))
+    property url chipUrl: ""
+    property bool dragging: false
     // False from leaving a folder until its rows are listed, so no key acts on the last folder's rows.
     property bool listed: false
     // A folder changed while it was being listed is listed again.
@@ -153,6 +158,13 @@ ShellRoot {
             mark();
     }
 
+    // A press on a row readies its drag: the rows it carries and the chip that will follow the pointer.
+    function pressRow(row) {
+        const paths = F.dragPaths(rows, marked, folder, row);
+        dragRows = rows.filter(r => paths.indexOf(pathOf(r)) >= 0);
+        dragChip.grabToImage(r => app.chipUrl = r.url);
+    }
+
     // The cursor row as drawn, for checks that read the window rather than the data.
     function drawnCursor() {
         const item = rowList.itemAtIndex(selected);
@@ -265,8 +277,21 @@ ShellRoot {
                     counts: statusCounts.text,
                     at: statusAt.text
                 },
-                drawn: app.drawnCursor()
+                drawn: app.drawnCursor(),
+                dragging: app.dragging,
+                dragUris: F.uriList(app.dragPaths),
+                chip: chipLabel.text
             });
+        }
+
+        // A row's box in the window, for a check that drags it.
+        function box(name: string): string {
+            const i = app.rows.findIndex(r => r.name === name);
+            const item = i >= 0 ? rowList.itemAtIndex(i) : null;
+            if (!item)
+                return "null";
+            const p = item.mapToItem(null, 0, 0);
+            return JSON.stringify({ x: p.x, y: p.y, w: item.width, h: item.height });
         }
     }
 
@@ -475,15 +500,31 @@ ShellRoot {
                         }
                     }
 
-                    ListView {
-                        id: rowList
+                    // The mouse is for dragging: a press on a row readies the drag, crossing the threshold starts it.
+                    MouseArea {
+                        id: dragArea
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        drag.target: dragOffer
+                        onPressed: mouse => {
+                            const i = rowList.indexAt(mouse.x, mouse.y + rowList.contentY);
+                            if (i < 0) {
+                                mouse.accepted = false;
+                                return;
+                            }
+                            app.pressRow(app.rows[i]);
+                        }
+
+                    ListView {
+                        id: rowList
+                        anchors.fill: parent
                         clip: true
                         model: app.rows
                         currentIndex: app.selected
                         highlightMoveDuration: 0
                         boundsBehavior: Flickable.StopAtBounds
+                        // The keys scroll it with the cursor; a flick would take the press a drag starts with.
+                        interactive: false
 
                         delegate: Rectangle {
                             id: rowItem
@@ -565,6 +606,7 @@ ShellRoot {
                             }
                         }
                     }
+                    }
                 }
             }
 
@@ -593,7 +635,7 @@ ShellRoot {
                 Text {
                     id: statusCounts
                     textFormat: Text.PlainText
-                    text: app.status.counts
+                    text: app.dragging ? F.dragText(app.voice, app.dragRows).counts : app.status.counts
                     color: look.small.color
                     font.family: look.small.font
                     font.pixelSize: 11
@@ -601,7 +643,7 @@ ShellRoot {
                 Text {
                     id: statusAt
                     textFormat: Text.PlainText
-                    text: app.status.at
+                    text: app.dragging ? F.dragText(app.voice, app.dragRows).at : app.status.at
                     color: c.ink ?? "black"
                     font.family: fonts.mono ?? ""
                     font.pixelSize: 11
@@ -620,7 +662,7 @@ ShellRoot {
                 spacing: 14
 
                 Repeater {
-                    model: F.keyStrip(app.voice)
+                    model: app.dragging ? F.dragKeys(app.voice) : F.keyStrip(app.voice)
 
                     Row {
                         required property var modelData
@@ -639,6 +681,71 @@ ShellRoot {
                             text: modelData.word
                             color: look.small.color
                             font.family: look.small.font
+                            font.pixelSize: 11
+                        }
+                    }
+                }
+            }
+        }
+
+        // What a row's MouseArea drags: the platform drag carries the files' URIs into any app, foot among them.
+        Item {
+            id: dragOffer
+            Drag.active: dragArea.drag.active
+            Drag.dragType: Drag.Automatic
+            Drag.supportedActions: Qt.CopyAction
+            Drag.mimeData: ({
+                    "text/uri-list": F.uriList(app.dragPaths)
+                })
+            Drag.imageSource: app.chipUrl
+            Drag.hotSpot.x: -14
+            Drag.hotSpot.y: -18
+            Drag.onDragStarted: app.dragging = true
+            Drag.onDragFinished: app.dragging = false
+        }
+
+        // Out of sight: the drag image, a chip reading "3 files" with its count badge, is grabbed from here.
+        Item {
+            width: 0
+            height: 0
+            clip: true
+
+            Rectangle {
+                id: dragChip
+                width: chipRow.implicitWidth + 20
+                height: 30
+                radius: plain ? 15 : 0
+                color: c.surface ?? "white"
+                border.width: 1
+                border.color: c.ink ?? "black"
+
+                Row {
+                    id: chipRow
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    Text {
+                        id: chipLabel
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: F.chipText(app.voice, app.dragRows.length)
+                        color: c.ink ?? "black"
+                        font.family: bracket ? fonts.mono ?? "" : fonts.ui ?? ""
+                        font.pixelSize: 12
+                    }
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 18
+                        height: 18
+                        radius: plain ? 9 : 0
+                        color: c.accent ?? "red"
+
+                        Text {
+                            anchors.centerIn: parent
+                            textFormat: Text.PlainText
+                            text: String(app.dragRows.length)
+                            color: c.surface ?? "white"
+                            font.family: fonts.mono ?? ""
                             font.pixelSize: 11
                         }
                     }

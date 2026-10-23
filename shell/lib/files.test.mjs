@@ -81,3 +81,28 @@ test('the key strip pairs each key with its word in the theme\'s idiom', () => {
   assert.deepEqual(F.keyStrip('bracket')[0], { key: '[J/K]', word: 'MOVE' });
   assert.deepEqual(paper.map((k) => k.key), ['j/k', 'h/l', 'space', 'y x p', 'r', 'a', 'd', 'o', 's', 'e', '/', 'tab', 'esc']);
 });
+
+test('a drag offers the marked rows when it starts on one, else only the row it starts on', () => {
+  const rows = [{ name: 'a.jpg', dir: false }, { name: 'b c#é.jpg', dir: false }, { name: 'd.jpg', dir: false }];
+  assert.deepEqual(F.dragPaths(rows, ['d.jpg', 'a.jpg'], '/h/D', rows[2]), ['/h/D/a.jpg', '/h/D/d.jpg']);
+  assert.deepEqual(F.dragPaths(rows, ['d.jpg'], '/h/D', rows[1]), ['/h/D/b c#é.jpg']);
+});
+
+test('a drag offers its files as text/uri-list, each URI encoded and ended by CRLF', () => {
+  assert.equal(F.uriList(['/h/D/a.jpg', '/h/D/b c#é.jpg']), 'file:///h/D/a.jpg\r\nfile:///h/D/b%20c%23%C3%A9.jpg\r\n');
+});
+
+test('the drag chip counts the files, and the status line says what is dragged', () => {
+  assert.equal(F.chipText('caps', 3), '3 files');
+  assert.equal(F.chipText('plain', 1), '1 file');
+  assert.equal(F.chipText('bracket', 3), '3 FILES');
+  const rows = [{ name: 'a', dir: false, size: 4400000 }, { name: 'b', dir: false, size: 4500000 }];
+  assert.deepEqual(F.dragText('caps', rows.map((r) => r)), { counts: '2 marked · 8.9 MB', at: 'dragging' });
+  assert.deepEqual(F.dragText('bracket', rows), { counts: '2 MARKED · 8.9 MB', at: 'DRAGGING' });
+});
+
+test('while dragging, the key strip says where a drop goes', () => {
+  assert.deepEqual(F.dragKeys('caps').map((k) => k.key), ['space', 'drag', 'e', 'esc']);
+  assert.deepEqual(F.dragKeys('caps')[1], { key: 'drag', word: 'drop on a window or a folder row' });
+  assert.deepEqual(F.dragKeys('bracket')[1], { key: '[DRAG]', word: 'DROP ON A WINDOW OR A FOLDER ROW' });
+});
