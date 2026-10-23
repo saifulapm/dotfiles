@@ -60,7 +60,7 @@ async function altE(t, url) {
   await tmux('send-keys', '-l', typed);
   await until((l) => l.at(-1) === `$ ${typed}`, 5000);
   await tmux('send-keys', 'M-e');
-  return { root, screen, until, pressed: Date.now() };
+  return { root, tmux, screen, until, pressed: Date.now() };
 }
 
 const errorLines = (lines) => lines.filter((l) => l.startsWith('Alt+E:'));
@@ -96,12 +96,18 @@ test('Alt+E strips a markdown fence around the answer', async (t) => {
   assert.equal(lines.at(-1), '$ find . -size +100M');
 });
 
-test('Alt+E keeps one line of the answer, without ESC or bidi marks', async (t) => {
+test('Alt+E keeps one line of the answer, without escape sequences or bidi marks', async (t) => {
   const { screen, until } = await altE(t, await stub(t, answer('find .\x1b[31m -size‮ +100M\nrm -rf ~')));
-  await until((l) => l.at(-1) === '$ find .[31m -size +100M', 5000);
+  await until((l) => l.at(-1) === '$ find . -size +100M', 5000);
   const lines = await screen();
-  assert.equal(lines.at(-1), '$ find .[31m -size +100M');
+  assert.equal(lines.at(-1), '$ find . -size +100M');
   assert.equal(lines.some((l) => l.includes('rm -rf')), false, lines.join('\n'));
+});
+
+test('Alt+E turns a tab in the answer into a space', async (t) => {
+  const { until } = await altE(t, await stub(t, answer('echo\tone\ttwo')));
+  const lines = await until((l) => l.at(-1) === '$ echo one two', 5000);
+  assert.equal(lines.at(-1), '$ echo one two');
 });
 
 test('Alt+E with nothing listening keeps the typed line and prints one error', async (t) => {
@@ -126,7 +132,7 @@ test('Alt+E on an HTTP error shows pxy\'s message on one clean line', async (t) 
   }));
   const lines = await until(failed, 5000);
   assertRestored(lines);
-  assert.equal(errorLines(lines)[0], 'Alt+E: all providers failed [2J' + 'x'.repeat(176));
+  assert.equal(errorLines(lines)[0], 'Alt+E: all providers failed ' + 'x'.repeat(179));
 });
 
 test('Alt+E on an empty answer keeps the typed line and prints one error', async (t) => {
@@ -134,4 +140,18 @@ test('Alt+E on an empty answer keeps the typed line and prints one error', async
   const lines = await until(failed, 5000);
   assertRestored(lines);
   assert.equal(errorLines(lines)[0], 'Alt+E: pxy gave no command');
+});
+
+// Keys typed while pxy thinks queue up behind the binding; an Enter among them must not run the answer.
+test('an Enter pressed while Alt+E waits does not run the answer', async (t) => {
+  const marker = join(realpathSync(mkdtempSync(join(tmpdir(), 'alt-e-ahead-'))), 'ran');
+  t.after(() => rmSync(join(marker, '..'), { recursive: true, force: true }));
+  const late = (req, res) => setTimeout(() => answer(`touch ${marker}`)(req, res), 2000);
+  const { tmux, until } = await altE(t, await stub(t, late));
+  await sleep(300);
+  await tmux('send-keys', 'Enter');
+  const lines = await until((l) => l.at(-1) === `$ touch ${marker}`, 5000);
+  await sleep(500);
+  assert.equal(lines.at(-1), `$ touch ${marker}`, lines.join('\n'));
+  assert.equal(existsSync(marker), false);
 });
