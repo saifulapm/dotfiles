@@ -70,6 +70,9 @@ test('kak keeps hop and ansi, and has no plugin for a tool v2 does not install',
     'hop-kak': 'defined', 'ansi-render-selection': 'defined', docs: 'missing', popup: 'missing', spell: 'missing',
   });
   assert.match(read('dedoc'), /'dedoc': no such command$/);
+  // A machine applied before they went keeps their links, dangling, until chezmoi removes them.
+  const removed = readFileSync(join(repo, 'home/.chezmoiremove'), 'utf8').split('\n');
+  for (const f of ['ast-grep.kak', 'usql.kak', 'spell.kak', 'popup.kak']) assert.ok(removed.includes(`.config/kak/autoload/tools/${f}`), f);
 });
 
 test('kak loads the carried autoload, and nothing from kak-lsp', () => {

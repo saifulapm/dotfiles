@@ -11,3 +11,8 @@
 .config/php-fpm/php84-dev.conf
 # v1 started its own file picker backend, bin/qshell-portal.
 .local/share/dbus-1/services/org.freedesktop.impl.portal.desktop.qshell.service
+# kak plugins for tools v2 does not install.
+.config/kak/autoload/tools/ast-grep.kak
+.config/kak/autoload/tools/usql.kak
+.config/kak/autoload/tools/spell.kak
+.config/kak/autoload/tools/popup.kak
