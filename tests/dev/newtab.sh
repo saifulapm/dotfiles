@@ -25,6 +25,18 @@ page_centre() {
 }
 centre_is() { local r g b; read -r r g b < <(page_centre); read -r -a want <<<"$(rgb "$1")"; near "$r" "${want[0]}" && near "$g" "${want[1]}" && near "$b" "${want[2]}"; }
 
+# Every font Chromium drew the element's text in is the family, at any weight: Artboard's 600 draws as Maple Mono SemiBold.
+drawn_in() { local f; f=$(cdp fonts newtab.html "$1") && [ -n "$f" ] && ! tr ',' '\n' <<<"$f" | grep -qvE "^$2( |$)"; }
+
+# The day and date each voice writes for today, as the boards draw them.
+date_line() {
+  case $1 in
+    paper) LC_ALL=C date '+%A %-d %B %Y' | sed 's/^[A-Za-z]*/\U&/' ;;
+    blueprint) LC_ALL=C date '+%A %Y-%m-%d' | sed 's/^[A-Za-z]*/\U&/' ;;
+    artboard) LC_ALL=C date '+%A %-d %B %Y' ;;
+  esac
+}
+
 # Seven local pages to visit, so the list has one more site than it shows.
 names=(Alpha Bravo Charlie Delta Echo Foxtrot Golf)
 for n in "${names[@]}"; do echo "<title>$n</title><p>$n</p>" >"$work/site/${n,,}.html"; done
@@ -35,18 +47,24 @@ site() { echo "http://127.0.0.1:$port/${1,,}.html"; }
 dport=$((30000 + RANDOM % 10000))
 cdp() { node "$repo/tests/dev/cdp.mjs" "$dport" "$@" 2>/dev/null; }
 page() { cdp eval newtab.html "$1"; }
+# A check on the page passes only when the expression is true; eval itself succeeds whatever it returns.
+is() { page "$1" | grep -qx true; }
 
 # Chromium reads the managed policy from /etc, so an empty policy dir is bound there, as on a machine the apply has cleaned; each profile is the check's own.
 chromium() {
   niri msg action spawn -- bwrap --dev-bind / / --bind "$work/policy" /etc/chromium/policies/managed \
     chromium-browser --user-data-dir="$work/$1" --no-first-run --ozone-platform=wayland --remote-debugging-port="$dport" \
-    --disable-features=NtpFooter "--load-extension=$out/chromium-theme,$out/chromium-newtab" "$(site Alpha)"
+    --disable-features=NtpFooter "--load-extension=$out/chromium-theme,$out/chromium-newtab" 'data:text/html,<title>start</title><input id="k" autofocus>'
   until_ok 15000 cdp urls >/dev/null
   until_ok 15000 bash -c 'niri msg -j windows | jq -e "any(.[]; .app_id == \"chromium-browser\")" >/dev/null'
-  # Ctrl+T before the window has the keyboard is lost, so the start page must have focus first.
-  until_ok 15000 start_focused
+  # For some seconds after it starts, Chromium drops the keys it is sent, so the start page's field must take a typed key before any check types.
+  until_ok 20000 keys_reach
+  cdp eval data: 'document.getElementById("k").value = ""' >/dev/null
 }
-start_focused() { cdp eval alpha.html 'document.readyState === "complete" && document.hasFocus()' | grep -qx true; }
+keys_reach() {
+  wtype k
+  until_ok 1000 bash -c "node '$repo/tests/dev/cdp.mjs' $dport eval data: 'document.getElementById(\"k\").value.includes(\"k\")' 2>/dev/null | grep -qx true"
+}
 chromium_gone() { ! pgrep -x chromium-browse | while read -r p; do grep -qzF "$work/" "/proc/$p/cmdline" 2>/dev/null && echo x; done | grep -q x; }
 quit_chromium() {
   local id
@@ -72,6 +90,7 @@ new_tab() {
     until_ok 3000 more_tabs "$before" && return 0
     echo "     Chromium saw no Ctrl+T, press $try"
   done
+  grim -s 1 "${DOTS_CHECK_SHOTS:-/tmp}/newtab-no-ctrl-t.png"
   return 1
 }
 close_tab() { wtype -M ctrl w -m ctrl; sleep 0.5; }
@@ -89,7 +108,7 @@ chromium fresh
 new_tab
 until_ok 10000 ready
 check "a fresh profile's list reads $(page 'document.querySelector(".empty")?.textContent') on one line, with no row" \
-  page '!document.querySelector(".row") && document.querySelector(".empty").textContent === "NOTHING VISITED YET" && document.querySelector(".empty").getClientRects().length === 1 && document.querySelector(".empty").offsetHeight < 40'
+  is '!document.querySelector(".row") && document.querySelector(".empty").textContent === "NOTHING VISITED YET" && document.querySelector(".empty").getClientRects().length === 1 && document.querySelector(".empty").offsetHeight < 40'
 quit_chromium
 
 # Seven sites visited 7, 6, 5 ... 1 times from the address bar, so the list reads Alpha to Foxtrot in that order.
@@ -98,6 +117,7 @@ for i in "${!names[@]}"; do
   for ((v = 0; v < 7 - i; v++)); do cdp visit "$(site "${names[$i]}")?v=$v"; done
 done
 # Chromium refreshes its top sites on a timer and keeps them in its profile, so the seeding run waits until they list all seven before it quits.
+forged_listed() { cdp eval newtab.html 'new Promise((r) => chrome.topSites.get((s) => r(s.some((x) => x.url.includes("forged")) && s.some((x) => x.url.includes("untitled")))))' | grep -qx true; }
 seeded_seven() { cdp eval newtab.html 'new Promise((r) => chrome.topSites.get((s) => r(s.length >= 7)))' | grep -qx true; }
 cdp open chrome://newtab/
 until_ok 10000 ready
@@ -114,15 +134,61 @@ for theme in paper blueprint artboard; do
   until_ok 10000 ready || { echo "     not ready: $(cdp urls | tr '\n' ' ')"; grim -s 1 "${DOTS_CHECK_SHOTS:-/tmp}/newtab-$theme-notready.png"; }
   until_ok 3000 centre_is "$(token paper)"
   check "$theme: Ctrl+T draws $theme's paper $(token paper) at the page's centre ($(page_centre))" centre_is "$(token paper)"
-  check "$theme: the keys typed after Ctrl+T are in the page's field ($(page 'document.getElementById("q").value'))" page 'document.getElementById("q").value === "fedora" && document.activeElement.id === "q" && document.hasFocus()'
+  check "$theme: the keys typed after Ctrl+T are in the page's field ($(page 'document.getElementById("q").value'))" is 'document.getElementById("q").value === "fedora" && document.activeElement.id === "q" && document.hasFocus()'
   check "$theme: the list reads the six most visited sites, numbered ($(page '[...document.querySelectorAll(".row")].map((r) => r.querySelector(".n").textContent + " " + r.querySelector(".title").textContent).join(", ")'))" \
-    page '[...document.querySelectorAll(".row")].map((r) => r.querySelector(".n").textContent + " " + r.querySelector(".title").textContent).join(", ") === "1 Alpha, 2 Bravo, 3 Charlie, 4 Delta, 5 Echo, 6 Foxtrot"'
-  check "$theme: no text on the page names the goal" page '!/goal|ship the new tab/i.test(document.body.innerText)'
+    is '[...document.querySelectorAll(".row")].map((r) => r.querySelector(".n").textContent + " " + r.querySelector(".title").textContent).join(", ") === "1 Alpha, 2 Bravo, 3 Charlie, 4 Delta, 5 Echo, 6 Foxtrot"'
+  check "$theme: the date reads $(page '[document.getElementById("day").textContent, document.getElementById("date").textContent].join(" ")') in $theme's voice" \
+    is "[document.getElementById('day').textContent, document.getElementById('date').textContent].join(' ') === '$(date_line "$theme")'"
+  check "$theme: Chromium draws the date in $theme's $(jq -r .type.display "$out/shell.json") ($(cdp fonts newtab.html '#date'))" drawn_in '#date' "$(jq -r .type.display "$out/shell.json")"
+  check "$theme: no text on the page names the goal" is '!/goal|ship the new tab/i.test(document.body.innerText)'
   wtype -k Return
   until_ok 10000 searched
   check "$theme: Enter searches the default engine for fedora ($(cdp urls | grep -m1 'q=fedora' | cut -c1-60))" until_ok 3000 searched
   quit_chromium
 done
+
+# A switch takes effect at Chromium's next start: Artboard's Chromium quits, dots theme paper, and the next start draws Paper.
+"$repo/bin/dots" theme paper
+chromium seeded
+new_tab
+until_ok 10000 ready
+until_ok 3000 centre_is "$(token paper)"
+check "after dots theme paper and a restart, Ctrl+T draws Paper's paper ($(page_centre))" centre_is "$(token paper)"
+check "and Paper's date, $(date_line paper), in $(cdp fonts newtab.html '#date')" \
+  is "document.documentElement.dataset.theme === 'paper' && [document.getElementById('day').textContent, document.getElementById('date').textContent].join(' ') === '$(date_line paper)'"
+check "and its date face is Instrument Serif as drawn ($(cdp fonts newtab.html '#date'))" drawn_in '#date' "Instrument Serif"
+quit_chromium
+
+# A title is whatever a page sets: controls, a bidi override and 300 characters must draw on one elided line, and a page with no title or icon still gets a letter tile.
+forged=$'x\ny\x1bz\x07q\u0085w\u202ev\u200eu'
+cat >"$work/site/forged.html" <<HTML
+<meta charset="utf-8"><script>document.title = $(jq -n --arg t "$forged" '$t + ("A" * 300)')</script>
+HTML
+echo "<p>untitled</p>" >"$work/site/untitled.html"
+chromium forged
+for v in 1 2 3; do cdp visit "http://127.0.0.1:$port/forged.html?v=$v"; done
+for v in 1 2; do cdp visit "http://localhost:$port/untitled.html?v=$v"; done
+cdp open chrome://newtab/
+until_ok 10000 ready
+until_ok 60000 forged_listed || echo "     the top sites never listed the forged pages"
+quit_chromium
+chromium forged
+new_tab
+until_ok 10000 ready
+row() { page "(() => { const r = [...document.querySelectorAll('.row')].find((r) => r.href.includes('$1')); return r && $2; })()"; }
+row_is() { row "$1" "$2" | grep -qx true; }
+# Chromium turns the newline, ESC and BEL into spaces itself; U+0085, U+202E and U+200E reach the page as they are.
+check "the forged title reaches Chromium's top sites with its U+0085, U+202E and U+200E" \
+  is 'new Promise((r) => chrome.topSites.get((s) => r(s.some((x) => /\u0085.*\u202e.*\u200e/s.test(x.title)))))'
+echo "     forged row: $(row forged.html 'JSON.stringify(r.querySelector(".title").textContent.slice(0, 40))')"
+check "the forged title draws on one line ($(row forged.html 'r.querySelector(".title").getClientRects().length + " box, " + r.offsetHeight + " px"'))" \
+  row_is forged.html 'r.querySelector(".title").getClientRects().length === 1 && r.offsetHeight < 60'
+check "the forged title is elided, with no control or bidi character" \
+  row_is forged.html 'r.querySelector(".title").scrollWidth > r.querySelector(".title").clientWidth && getComputedStyle(r.querySelector(".title")).textOverflow === "ellipsis" && !/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(r.querySelector(".title").textContent + r.querySelector(".address").textContent)'
+check "the forged row still draws its letter tile ($(row forged.html 'r.querySelector(".tile").textContent'))" row_is forged.html 'r.querySelector(".tile").textContent === "x"'
+check "a page with no title or icon shows its address and the host's letter ($(row untitled.html 'r.querySelector(".tile").textContent + " " + r.querySelector(".title").textContent'))" \
+  row_is untitled.html 'r.querySelector(".tile").textContent === "l" && r.querySelector(".title").textContent.startsWith("localhost:")'
+quit_chromium
 
 # The address and the digit keys, once, in the last theme.
 chromium seeded

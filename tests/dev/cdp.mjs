@@ -1,4 +1,4 @@
-// node cdp.mjs <port> urls | open <url> | eval <url-part> <js> | shot <url-part> <png> | visit <url>: reads and drives a Chromium started with --remote-debugging-port.
+// node cdp.mjs <port> urls | open <url> | eval <url-part> <js> | shot <url-part> <png> | fonts <url-part> <selector> | visit <url>: reads and drives a Chromium started with --remote-debugging-port.
 const [port, cmd, ...args] = process.argv.slice(2);
 const base = `http://127.0.0.1:${port}`;
 const pages = async () => (await (await fetch(`${base}/json/list`)).json()).filter((t) => t.type === 'page');
@@ -43,6 +43,19 @@ if (cmd === 'urls') {
   s.close();
   if (!r.result) process.exit(1);
   (await import('node:fs')).writeFileSync(args[1], Buffer.from(r.result.data, 'base64'));
+} else if (cmd === 'fonts') {
+  // The fonts Chromium drew the element's text in, which a missing font cannot fake the way a computed font-family can.
+  const target = (await pages()).find((t) => t.url.includes(args[0]));
+  if (!target) process.exit(1);
+  const s = await session(target);
+  await s.send('DOM.enable');
+  await s.send('CSS.enable');
+  const doc = await s.send('DOM.getDocument', { depth: 0 });
+  const node = await s.send('DOM.querySelector', { nodeId: doc.result.root.nodeId, selector: args[1] });
+  const fonts = await s.send('CSS.getPlatformFontsForNode', { nodeId: node.result.nodeId });
+  s.close();
+  if (!fonts.result) process.exit(1);
+  console.log(fonts.result.fonts.map((f) => f.familyName).join(','));
 } else if (cmd === 'visit') {
   // A typed visit, as from the address bar, which Chromium counts toward its most visited sites.
   const s = await session((await pages())[0]);
