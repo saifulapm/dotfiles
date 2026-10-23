@@ -1,0 +1,15 @@
+[Unit]
+Description=Bluetooth pairing agent that confirms every request, so Control's pair completes
+# A machine with no adapter, or a container, leaves the agent inactive, never failed.
+ConditionDirectoryNotEmpty=/sys/class/bluetooth
+
+[Service]
+# A user unit cannot order itself after bluetooth.service, so it waits for bluetoothd's name on the system bus.
+ExecStartPre=/bin/sh -c 'until busctl --system status org.bluez >/dev/null 2>&1; do sleep 1; done'
+TimeoutStartSec=infinity
+ExecStart=/usr/bin/bt-agent -c NoInputNoOutput
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

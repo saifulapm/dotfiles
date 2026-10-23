@@ -8,7 +8,7 @@ config=${XDG_CONFIG_HOME:-$HOME/.config}
 data=${XDG_DATA_HOME:-$HOME/.local/share}
 fish=$data/fish
 units=$config/systemd/user
-# v2 takes over hub-local and pxy under the same names; every other v1 unit (bt-agent...) has no v2 replacement and keeps running from ~/.dotfiles.
+# v2 takes over hub-local, pxy, bt-agent and dufs under the same names; every other v1 unit (mempressure...) has no v2 replacement and keeps running from ~/.dotfiles.
 replaced=(qshell.service qshell-dshift.service qshell-sync.service qshell-sync.timer qshell-sync-notes.path qshell-sync-notes.service
   qshell-sync-goals.path qshell-sync-goals.service qshell-updates.service qshell-updates.timer update-all.service update-all.timer vicinae.service taildrop-receive.service)
 
@@ -34,6 +34,10 @@ fi
 links=("$HOME/.gitconfig" "$units/imapnotify@icloud.service")
 for unit in "${replaced[@]}"; do links+=("$units/$unit"); done
 while IFS= read -r -d '' link; do links+=("$link"); done < <(find "$config/fish" "$data/applications" -type l -print0 2>/dev/null)
+# A unit v2 took over keeps v1's wants link, which names v1's file and starts it at the next login.
+for link in "$units"/*.wants/*; do
+  [[ -e $units/${link##*/} ]] && ! v1_link "$units/${link##*/}" && links+=("$link")
+done
 reload=0
 for link in "${links[@]}"; do
   v1_link "$link" || continue
