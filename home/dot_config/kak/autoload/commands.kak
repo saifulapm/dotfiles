@@ -110,11 +110,7 @@ define-command hurl -docstring 'hurl [<arguments>]: Hurl, run and test HTTP requ
 
 define-command artisan -docstring 'artisan [<arguments>]: Laravel artisan utility' -params 1.. %{
   evaluate-commands %sh{
-    if [ "$1" = "tinker" ]; then
-      printf 'popup --title tinker -- php artisan tinker'
-    else
-      printf "fifo -name \"'php artisan %s'\" -scroll -- php artisan --ansi %s" "$*" "$*"
-    fi
+    printf "fifo -name \"'php artisan %s'\" -scroll -- php artisan --ansi %s" "$*" "$*"
   }
 }
 
@@ -354,81 +350,6 @@ define-command explore -params 0..1 %{
   }
 }
 complete-command explore file
-
-define-command yazi -docstring "File manager with yazi in popup" -params .. %{
-    popup --title yazi \
-        --kak-script %{ 
-            evaluate-commands %sh{
-                if [ -n "$kak_opt_popup_output" ]; then
-                    while IFS= read -r file; do
-                        printf "edit '%s'\n" "$file"
-                    done <<< "$kak_opt_popup_output"
-                fi
-            }
-        } \
-        -- yazi --chooser-file=/dev/stdout %arg{@}
-}
-
-define-command lf -docstring "File manager with lf in popup" -params .. %{
-    popup --title lf \
-        --kak-script %{ 
-            evaluate-commands %sh{
-                if [ -n "$kak_opt_popup_output" ]; then
-                    while IFS= read -r file; do
-                        printf "edit '%s'\n" "$file"
-                    done <<< "$kak_opt_popup_output"
-                fi
-            }
-        } \
-        -- lf -print-selection %arg{@}
-}
-
-
-define-command sk -docstring "Find a file to open with sk" -params .. %{
-    popup --title open --kak-script %{
-        evaluate-commands %sh{
-            while IFS= read -r file; do
-                [ -f "$file" ] && printf "edit '%s'\n" "$file"
-            done <<< "$kak_opt_popup_output"
-        }
-    } -- sk -c "fd --type f --hidden --exclude .git" -m --preview "bat -pp --color=always {}"
-}
-
-define-command sk-live-grep -docstring "Live grep with sk and jump to line" -params .. %{
-    popup --title open --kak-script %{
-        evaluate-commands %sh{
-            while IFS= read -r match; do
-                file=$(printf '%s' "$match" | cut -d: -f1)
-                line=$(printf '%s' "$match" | cut -d: -f2)
-                if [ -f "$file" ] && [ -n "$line" ]; then
-                    printf "edit '%s' %s\n" "$file" "$line"
-                fi
-            done <<< "$kak_opt_popup_output"
-        }
-    } -- sk -m --ansi -i -c 'rg --color=always --line-number "{}"'
-}
-
-define-command fzf -docstring "Find a file to open with sk" -params .. %{
-    popup --title open --kak-script %{edit %opt{popup_output}} -- fzf --preview "bat -pp --color=always {}"
-}
-
-define-command zf -docstring "Find a file to open with sk" -params .. %{
-    popup --title open --kak-script %{
-        evaluate-commands %sh{
-            while IFS= read -r file; do
-                printf "edit '%s'\n" "$file"
-            done <<< "$kak_opt_popup_output"
-        }
-    } -- sh -c 'fd --hidden --type=file --exclude=.git | zf --height "$kak_window_height" --preview "bat -pp {}"'
-}
-
-define-command lazygit -docstring 'Lazygit wrapper' %{
-  popup --title lazygit -- lazygit
-}
-
-define-command gitui -docstring 'Gitui wrapper' %{
-  popup --title gitui -- gitui
-}
 
 # ----------------------------
 # File Utils

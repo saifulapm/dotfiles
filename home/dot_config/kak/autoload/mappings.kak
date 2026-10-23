@@ -55,10 +55,6 @@ map global picker d ':swiper-file-picker<ret>'   -docstring 'swiper file picker'
 map global picker l ':open_line_picker<ret>' -docstring 'open line picker'
 map global picker b ':buffer<space>'   -docstring 'buffer picker'
 map global picker m ':open_changed_file_picker<ret>'   -docstring 'pick modified file'
-map global picker z ':fzf<ret>'   -docstring 'fzf picker'
-map global picker s ':sk<ret>'   -docstring 'sk picker'
-map global picker g ':zf<ret>'   -docstring 'zf picker'
-map global picker e ':lf<ret>'   -docstring 'Explorer (lf)'
 
 # Goto Mode
 map global goto u '<esc>: url-open<ret>' -docstring 'Open url in browser'
@@ -77,7 +73,6 @@ map global normal M ':enter-user-mode match-extend<ret>' -docstring 'match mode 
 map global user <space> ':open_file_picker<ret>'   -docstring 'pick file'
 map global user , ':buffer<space>'   -docstring 'buffer picker'
 map global user / ':live-grep<ret>'   -docstring 'Grep Search'
-map global user "\" ':sk-live-grep<ret>'   -docstring 'SK Grep Search'
 
 # Git support
 map global user g ':enter-user-mode git<ret>' -docstring 'git mode'
@@ -148,7 +143,6 @@ map -docstring 'enter letter case mode' global user ` ':enter-user-mode letter_c
 # fifo mappings
 hook global -always BufOpenFifo '\*grep\*' %{ map global normal <minus> ': grep-next-match<ret>' }
 hook global -always BufOpenFifo '\*make\*' %{ map global normal <minus> ': make-next-error<ret>' }
-hook global -always BufOpenFifo '\*sg-grep\*' %{ map global normal <minus> ': sg-grep-next-match<ret>' }
 
 # Case-insensitive Search
 # map -docstring 'case insensitive search' global user '/' /(?i)
