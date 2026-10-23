@@ -1,0 +1,104 @@
+#!/usr/bin/python3
+# dots-files-apps: Files' Open with. list <path>... prints the apps whose desktop entries declare every file's type as JSON, the default first; open <id> <path>... opens the files in that app in one launch; default <type> <id> makes it the type's default.
+import json
+import os
+import sys
+
+import gi
+
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio
+
+
+# The type as gio info gives it: from the name and, where the name is not enough, the first bytes.
+def content_type(path):
+    return Gio.File.new_for_path(path).query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None).get_content_type()
+
+
+def list_apps(paths):
+    types = list(dict.fromkeys(content_type(p) for p in paths))
+    ids = None
+    apps = {}
+    for t in types:
+        found = Gio.AppInfo.get_all_for_type(t)
+        apps.update((a.get_id(), a) for a in found)
+        have = [a.get_id() for a in found]
+        ids = have if ids is None else [i for i in ids if i in have]
+    default = Gio.AppInfo.get_default_for_type(types[0], False)
+    default_id = default.get_id() if default else None
+    if default_id in ids:
+        ids.remove(default_id)
+        ids.insert(0, default_id)
+    rows = []
+    for i in ids:
+        a = apps[i]
+        exe = a.get_executable()
+        rows.append({
+            "id": i,
+            "name": a.get_name(),
+            "generic": a.get_generic_name() or None,
+            "exec": os.path.basename(exe) if exe else None,
+            "default": i == default_id,
+        })
+    description = Gio.content_type_get_description(types[0]) if len(types) == 1 else None
+    return {"type": types[0], "description": description, "apps": rows}
+
+
+# One launch with every file, so an app that takes a list (%F, %U) gets them all at once.
+def open_in(app_id, paths):
+    app = Gio.DesktopAppInfo.new(app_id)
+    if app is None:
+        print("dots-files-apps: no app %s" % app_id, file=sys.stderr)
+        return 1
+    app.launch([Gio.File.new_for_path(p) for p in paths], None)
+    return 0
+
+
+# mimeapps.list is often a link into a dotfiles repo, and Gio or xdg-mime would replace the link with a plain file, so the default is written into the file it points to.
+def set_default(content, app_id):
+    path = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "mimeapps.list")
+    real = os.path.realpath(path)
+    try:
+        with open(real) as f:
+            lines = f.read().splitlines()
+    except FileNotFoundError:
+        lines = []
+    entry = "%s=%s" % (content, app_id)
+    section, last, done = None, None, False
+    for n, line in enumerate(lines):
+        s = line.strip()
+        if s.startswith("["):
+            section = s
+            if s == "[Default Applications]":
+                last = n
+        elif section == "[Default Applications]" and s:
+            if s.split("=", 1)[0].strip() == content:
+                lines[n] = entry
+                done = True
+                break
+            last = n
+    if not done:
+        if last is None:
+            lines += ([""] if lines else []) + ["[Default Applications]", entry]
+        else:
+            lines.insert(last + 1, entry)
+    with open(real, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return 0
+
+
+def main():
+    args = sys.argv[1:]
+    if len(args) >= 2 and args[0] == "list":
+        print(json.dumps(list_apps(args[1:])))
+        return 0
+    if len(args) >= 3 and args[0] == "open":
+        return open_in(args[1], args[2:])
+    if len(args) == 3 and args[0] == "default":
+        return set_default(args[1], args[2])
+    print("usage: dots-files-apps list <path>... | open <id> <path>... | default <type> <id>", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
