@@ -5,12 +5,12 @@ Documentation=https://github.com/sigoden/dufs
 ConditionPathExists=%h/.config/dufs/config.yaml
 
 [Service]
-# dufs serves a root holding only the four folders, so a symlink inside one cannot reach ~/.ssh or the rest of the home. A folder a machine lacks is left out.
+# dufs serves a root holding only the four folders, so a symlink inside one cannot reach ~/.ssh or the rest of the home.
 TemporaryFileSystem=%t/dufs:ro
 BindReadOnlyPaths=-%h/Codes:%t/dufs/Codes -%h/Documents:%t/dufs/Documents -%h/Downloads:%t/dufs/Downloads -%h/Pictures:%t/dufs/Pictures
 BindPaths=-%h/Downloads/inbox:%t/dufs/Downloads/inbox
-# The home stays visible to this step, so mkdir makes a missing inbox for the bind dufs gets. A + prefix would fail here: the user manager cannot skip the namespace.
-ExecStartPre=/usr/bin/mkdir -p %h/Downloads/inbox
+# The home stays visible to this step, so mkdir makes the four folders and the inbox a machine lacks for the binds dufs gets. A + prefix would fail here: the user manager cannot skip the namespace.
+ExecStartPre=/usr/bin/mkdir -p %h/Codes %h/Documents %h/Downloads/inbox %h/Pictures
 # The shim and not a bare dufs: v1's cargo build in ~/.cargo/bin comes first on PATH.
 ExecStart=%h/.local/share/mise/shims/dufs --config %h/.config/dufs/config.yaml --bind 127.0.0.1 --port 5000 --hidden .* --allow-upload %t/dufs
 # A machine whose tailscaled is down, has no operator or hangs on a prompt still serves on localhost.

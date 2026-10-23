@@ -47,7 +47,8 @@ let port;
 
 before(async () => {
   home = realpathSync(mkdtempSync(join(tmpdir(), 'dufs-home-')));
-  for (const d of ['Codes', 'Documents', 'Downloads', 'Pictures', 'Music', '.ssh', '.config/dufs']) mkdirSync(join(home, d), { recursive: true });
+  // No Documents or Pictures, as on a machine that never made them: the unit makes the four folders it serves.
+  for (const d of ['Codes', 'Downloads', 'Music', '.ssh', '.config/dufs']) mkdirSync(join(home, d), { recursive: true });
   writeFileSync(join(home, 'Codes/a.txt'), 'a\n');
   writeFileSync(join(home, 'Codes/.env'), 'SECRET=1\n');
   writeFileSync(join(home, '.ssh/config'), 'Host nuc\n');
