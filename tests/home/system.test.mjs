@@ -44,3 +44,20 @@ test('the diagnose-crash skill says oomd is masked and swap is files plus zswap'
   assert.match(skill, /systemd-oomd is masked/);
   assert.match(skill, /zswap/);
 });
+
+test('Wi-Fi power save is off only where the device tree names an Apple machine, and never in a container', () => {
+  assert.match(read('system/NetworkManager/conf.d/wifi-powersave-off.conf'), /^\[connection\]\nwifi\.powersave = 2$/m);
+  const script = read('home/.chezmoiscripts/run_onchange_after_42-tunings.sh.tmpl');
+  assert.match(script, /^# tunings source hashes:.*NetworkManager\/conf\.d\/wifi-powersave-off\.conf.*sha256sum/m);
+  const gate = script.indexOf("grep -qx 'apple,.*'");
+  const install = script.indexOf('/etc/NetworkManager/conf.d/wifi-powersave-off.conf');
+  assert.ok(gate > 0 && install > gate, 'the file is installed only past the Apple gate');
+  assert.ok(script.indexOf('systemd-detect-virt -q --container') < install, 'a container stops before the Wi-Fi file');
+});
+
+test("v1's 200M journald cap is removed on every machine, a container included", () => {
+  const script = read('home/.chezmoiscripts/run_onchange_after_42-tunings.sh.tmpl');
+  const cap = script.indexOf("grep -lx 'SystemMaxUse=200M' /etc/systemd/journald.conf.d/*.conf");
+  assert.ok(cap > 0 && cap < script.indexOf('systemd-detect-virt'), 'the cap goes before the container exit');
+  assert.doesNotMatch(script, /SystemMaxUse=(?!200M)/);
+});

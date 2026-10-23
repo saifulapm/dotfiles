@@ -84,6 +84,9 @@ as_root "
   printf '#!/bin/bash\necho \"\$*\" >> $curl_log\nexec /usr/bin/curl \"\$@\"\n' > /opt/shim/curl
   chmod 755 /opt/shim/curl
   install -o saiful -m 644 /dev/null $curl_log
+  # v1 capped the journal at 200M.
+  mkdir -p /etc/systemd/journald.conf.d
+  printf '[Journal]\nSystemMaxUse=200M\n' > /etc/systemd/journald.conf.d/50-size-cap.conf
   # A v1 machine already has a chezmoi config, pointing at the old repo.
   install -d -o saiful $home/.config $home/.config/chezmoi
   echo 'sourceDir = \"~/.dotfiles\"' > $home/.config/chezmoi/chezmoi.toml
@@ -193,6 +196,8 @@ tools=$(as_user "command -v grim slurp wlrctl ydotool tesseract wtype" 2>&1)
 check "the desktop skill's six tools are on PATH (got $(wc -l <<<"$tools"): $(tr '\n' ' ' <<<"$tools"))" test "$(grep -c '^/' <<<"$tools")" = 6
 oomd=$(podman exec "$name" systemctl is-enabled systemd-oomd.service systemd-oomd.socket 2>&1)
 check "systemd-oomd.service and .socket are masked (got '$(tr '\n' ' ' <<<"$oomd")')" test "$oomd" = $'masked\nmasked'
+check "no journald drop-in caps the journal at 200M" podman exec "$name" bash -c "! grep -rqx 'SystemMaxUse=200M' /etc/systemd/journald.conf.d"
+check "the container has no Wi-Fi power-save file" podman exec "$name" test ! -e /etc/NetworkManager/conf.d/wifi-powersave-off.conf
 check "zswap compresses with zstd from boot" podman exec "$name" bash -c "grep -qx zstd /etc/modules-load.d/zstd.conf && grep -q 'zswap/parameters/compressor - - - - zstd' /etc/tmpfiles.d/zswap.conf"
 check "gpg-agent caches a passphrase for 400 days" as_user "grep -qx 'default-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf && grep -qx 'max-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf"
 check "imapnotify@icloud starts with the session" as_user "test -L ~/.config/systemd/user/graphical-session.target.wants/imapnotify@icloud.service"

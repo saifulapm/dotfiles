@@ -1,0 +1,23 @@
+#!/bin/bash
+# tunings source hashes:{{ range list "NetworkManager/conf.d/wifi-powersave-off.conf" }} {{ joinPath $.chezmoi.workingTree "system" . | include | sha256sum }}{{ end }}
+{{ template "lib.sh" . }}
+system={{ joinPath .chezmoi.workingTree "system" | quote }}
+# journald keeps Fedora's own size limit, so v1's 200M cap goes.
+for conf in $(grep -lx 'SystemMaxUse=200M' /etc/systemd/journald.conf.d/*.conf 2>/dev/null); do
+  root rm -f "$conf" || die "could not remove $conf"
+  root systemctl restart systemd-journald 2>/dev/null || log "journald drops the 200M cap at the next boot"
+done
+if systemd-detect-virt -q --container; then
+  log "Wi-Fi power save: left to the host in a container"
+  exit 0
+fi
+if tr '\0' '\n' </proc/device-tree/compatible 2>/dev/null | grep -qx 'apple,.*'; then
+  root install -D -m 0644 "$system/NetworkManager/conf.d/wifi-powersave-off.conf" /etc/NetworkManager/conf.d/wifi-powersave-off.conf || die "could not turn Wi-Fi power save off"
+  # NetworkManager reads power save when a connection comes up, so the running radio is set by hand.
+  root nmcli general reload conf 2>/dev/null || true
+  for phy in /sys/class/net/*/phy80211; do
+    [[ -e $phy ]] || continue
+    dev=$(basename "$(dirname "$phy")")
+    root iw dev "$dev" set power_save off 2>/dev/null || log "Wi-Fi power save on $dev goes off at the next connect"
+  done
+fi
