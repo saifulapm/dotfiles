@@ -1,0 +1,12 @@
+[Unit]
+Description=udiskie, which mounts USB drives under /run/media/%u
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+# Files lists and ejects the drives, so udiskie needs no tray of its own.
+ExecStart=/usr/bin/udiskie --automount --no-tray
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

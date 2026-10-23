@@ -588,6 +588,11 @@ arch = "all"
 why = "trash-put, a delete that can be undone"
 
 [[package]]
+name = "udiskie"
+arch = "all"
+why = "mounts USB drives as they are plugged in, for Files' drives"
+
+[[package]]
 name = "uv"
 arch = "all"
 why = "runs Python projects and their tools"
