@@ -128,3 +128,10 @@ test('Alt+E on an HTTP error shows pxy\'s message on one clean line', async (t) 
   assertRestored(lines);
   assert.equal(errorLines(lines)[0], 'Alt+E: all providers failed [2J' + 'x'.repeat(176));
 });
+
+test('Alt+E on an empty answer keeps the typed line and prints one error', async (t) => {
+  const { until } = await altE(t, await stub(t, answer('')));
+  const lines = await until(failed, 5000);
+  assertRestored(lines);
+  assert.equal(errorLines(lines)[0], 'Alt+E: pxy gave no command');
+});
