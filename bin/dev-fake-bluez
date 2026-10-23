@@ -17,6 +17,7 @@ ADAPTER = "org.bluez.Adapter1"
 DEVICE = "org.bluez.Device1"
 PROPS = "org.freedesktop.DBus.Properties"
 MANAGER = "org.freedesktop.DBus.ObjectManager"
+BATTERY = "org.bluez.Battery1"
 HCI0 = "/org/bluez/hci0"
 
 
@@ -26,9 +27,13 @@ class Object(dbus.service.Object):
         self.path = path
         self.interface = interface
         self.props = props
+        self.extra = {}
 
     def managed(self):
-        return {self.interface: dbus.Dictionary(self.props, signature="sv")}
+        out = {self.interface: dbus.Dictionary(self.props, signature="sv")}
+        for interface, props in self.extra.items():
+            out[interface] = dbus.Dictionary(props, signature="sv")
+        return out
 
     def change(self, **changed):
         self.props.update(changed)
@@ -36,11 +41,11 @@ class Object(dbus.service.Object):
 
     @dbus.service.method(PROPS, in_signature="ss", out_signature="v")
     def Get(self, interface, name):
-        return self.props[name]
+        return self.extra[interface][name] if interface in self.extra else self.props[name]
 
     @dbus.service.method(PROPS, in_signature="s", out_signature="a{sv}")
     def GetAll(self, interface):
-        return dbus.Dictionary(self.props if interface == self.interface else {}, signature="sv")
+        return dbus.Dictionary(self.extra.get(interface, self.props if interface == self.interface else {}), signature="sv")
 
     @dbus.service.method(PROPS, in_signature="ssv")
     def Set(self, interface, name, value):
@@ -51,8 +56,12 @@ class Object(dbus.service.Object):
         pass
 
 
+# Test Headphones reports a Battery1 of 80% a second after Connect and drops it on Disconnect, as BlueZ does once the HFP link is up.
 class Device(Object):
-    def __init__(self, bus, mac, name, paired):
+    def __init__(self, bus, root, mac, name, paired, battery=None):
+        self.root = root
+        self.battery = battery
+        self.battery_timer = None
         super().__init__(bus, HCI0 + "/dev_" + mac.replace(":", "_"), DEVICE, {
             "Address": dbus.String(mac),
             "Name": dbus.String(name),
@@ -70,10 +79,25 @@ class Device(Object):
     @dbus.service.method(DEVICE)
     def Connect(self):
         self.change(Connected=dbus.Boolean(True))
+        if self.battery is not None and self.battery_timer is None:
+            self.battery_timer = GLib.timeout_add(1000, self.add_battery)
 
     @dbus.service.method(DEVICE)
     def Disconnect(self):
         self.change(Connected=dbus.Boolean(False))
+        if self.battery_timer is not None:
+            GLib.source_remove(self.battery_timer)
+            self.battery_timer = None
+        if BATTERY in self.extra:
+            del self.extra[BATTERY]
+            self.root.InterfacesRemoved(dbus.ObjectPath(self.path), dbus.Array([BATTERY], signature="s"))
+
+    def add_battery(self):
+        self.battery_timer = None
+        props = {"Percentage": dbus.Byte(self.battery)}
+        self.extra[BATTERY] = props
+        self.root.InterfacesAdded(dbus.ObjectPath(self.path), {BATTERY: dbus.Dictionary(props, signature="sv")})
+        return False
 
     @dbus.service.method(DEVICE)
     def Pair(self):
@@ -139,7 +163,7 @@ DBusGMainLoop(set_as_default=True)
 bus = dbus.bus.BusConnection(address)
 root = Root(bus)
 root.add(Adapter(bus, root))
-root.add(Device(bus, "00:00:00:00:00:02", "Test Headphones", True))
-root.add(Device(bus, "00:00:00:00:00:03", "Test Speaker", False))
+root.add(Device(bus, root, "00:00:00:00:00:02", "Test Headphones", True, 80))
+root.add(Device(bus, root, "00:00:00:00:00:03", "Test Speaker", False))
 name = dbus.service.BusName("org.bluez", bus, do_not_queue=True)
 GLib.MainLoop().run()

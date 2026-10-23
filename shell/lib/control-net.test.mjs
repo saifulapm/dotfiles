@@ -18,6 +18,12 @@ test('a Bluetooth row names the device and reads connected, paired or new', () =
   assert.deepEqual(btRow({ name: 'Test Speaker', connected: false, paired: false }), { title: 'Test Speaker', detail: 'new' });
 });
 
+test('a connected Bluetooth device with a battery reads its percentage', () => {
+  assert.equal(btRow({ name: 'H', connected: true, paired: true, batteryAvailable: true, battery: 0.8 }).detail, 'connected · 80%');
+  assert.equal(btRow({ name: 'H', connected: true, paired: true, batteryAvailable: false, battery: 0 }).detail, 'connected');
+  assert.equal(btRow({ name: 'H', connected: false, paired: true, batteryAvailable: true, battery: 0.8 }).detail, 'paired');
+});
+
 test('Wi-Fi lists the connected network, then known ones, then the rest by signal', () => {
   const nets = [
     { name: 'cafe', connected: false, known: false, signalStrength: 0.4 },

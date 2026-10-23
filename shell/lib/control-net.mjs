@@ -8,7 +8,8 @@ export function btOrder(devs) {
 }
 
 export function btRow(dev) {
-  return { title: dev.name, detail: dev.connected ? 'connected' : dev.paired ? 'paired' : 'new' };
+  const battery = dev.connected && dev.batteryAvailable ? ' · ' + Math.round(dev.battery * 100) + '%' : '';
+  return { title: dev.name, detail: (dev.connected ? 'connected' : dev.paired ? 'paired' : 'new') + battery };
 }
 
 export function wifiOrder(nets) {

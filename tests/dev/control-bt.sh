@@ -72,6 +72,9 @@ until_ok 3000 connected_is true
 check "Enter connects Test Headphones (BlueZ reports Connected true)" connected_is true
 until_ok 2000 detail_is "Test Headphones" connected
 check "its row reads connected" detail_is "Test Headphones" connected
+# BlueZ adds Battery1 about a second after Connect, so the percentage arrives later than the row.
+until_ok 4000 detail_is "Test Headphones" "connected · 80%"
+check "its row then reads the headset battery, connected · 80%" detail_is "Test Headphones" "connected · 80%"
 
 until_ok 3000 select_row "Test Headphones"
 wtype -k Return
