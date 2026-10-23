@@ -289,8 +289,8 @@ export function renderChromiumTheme(t) {
   return JSON.stringify({ manifest_version: 3, name: 'dots', version: '1', description: `The ${t.name} theme`, theme: { colors } }, null, 2) + '\n';
 }
 
-// mpv.conf includes this; the OSC sits on surface with ink controls and holds a pressed control in the accent. mpv reads # as a comment, so each value is quoted.
-export function renderMpv(t) {
+// mpv.conf includes this; the OSC sits on surface with ink controls and holds a pressed control in the accent.
+function mpvOptions(t) {
   const c = t.color;
   const [ink, surface, accent] = [c.ink, c.surface, c.accent].map(lower);
   const osc = [
@@ -299,7 +299,18 @@ export function renderMpv(t) {
   ];
   const opts = [['osd-color', ink], ['osd-back-color', surface], ['osd-border-color', surface], ['osd-font', t.type.ui], ['sub-font', t.type.display]];
   for (const [k, v] of osc) opts.push(['script-opts-append', `osc-${k}=${v}`]);
-  return opts.map(([k, v]) => `${k}="${v}"`).join('\n') + '\n';
+  return opts;
+}
+
+// mpv reads # as a comment, so each value is quoted.
+export function renderMpv(t) {
+  return mpvOptions(t).map(([k, v]) => `${k}="${v}"`).join('\n') + '\n';
+}
+
+// The same options as IPC commands, one per line, which dots theme sends each open player.
+export function renderMpvIpc(t) {
+  const cmd = ([k, v]) => (k === 'script-opts-append' ? ['change-list', 'script-opts', 'append', v] : ['set_property', k, v]);
+  return mpvOptions(t).map((o) => JSON.stringify({ command: cmd(o) })).join('\n') + '\n';
 }
 
 // The coding agents draw inside foot, so each sits on surface with ink text; Claude Code, pi and amx name the theme dots.

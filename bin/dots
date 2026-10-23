@@ -86,6 +86,22 @@ reload_helix() {
   return 0
 }
 
+# Each mpv opens $XDG_RUNTIME_DIR/mpv-<pid>.sock (scripts/dots-ipc.lua); a killed one leaves its socket behind, which goes here.
+reload_mpv() {
+  local dir=${XDG_RUNTIME_DIR:-/run/user/$UID} sock pid
+  for sock in "$dir"/mpv-*.sock; do
+    [[ -S $sock ]] || continue
+    pid=${sock##*/mpv-}
+    pid=${pid%.sock}
+    [[ $(cat "/proc/$pid/comm" 2>/dev/null) == mpv ]] || rm -f "$sock"
+  done
+  for pid in $(session_pids mpv); do
+    sock=$dir/mpv-$pid.sock
+    [[ -S $sock ]] || continue
+    socat -t 0.2 - "UNIX-CONNECT:$sock" <"$1/mpv.ipc" >/dev/null || return 1
+  done
+}
+
 # Each coding agent's config names the theme file below, and an agent not installed gets no file; cp writes in place, so a watcher on the file itself sees the change.
 reload_agents() {
   local home=${DOTS_AGENT_HOME:-$HOME} src dst
@@ -141,6 +157,7 @@ theme() {
   { tmux has-session 2>/dev/null && { tmux source-file "$out/tmux.conf" || echo tmux >>"$failed"; }; } &
   { command -v kak >/dev/null && reload_kak; } &
   reload_helix &
+  { reload_mpv "$out" || echo mpv >>"$failed"; } &
   { gsettings set org.gnome.desktop.interface color-scheme "$scheme" &&
     gsettings set org.gnome.desktop.interface font-name "$ui 11" &&
     gsettings set org.gnome.desktop.interface monospace-font-name "$mono 11" || echo gsettings >>"$failed"; } &
