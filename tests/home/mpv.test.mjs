@@ -26,7 +26,7 @@ test('every machine plays on gpu-next with display-resample and interpolation, a
   }
 });
 
-// Zero-copy vaapi draws corrupt frames on the Macs' decoder (research-mpv), and vaapi-copy only pays for HEVC there.
+// Zero-copy vaapi draws corrupt frames on the Macs' decoder, and vaapi-copy only pays for HEVC there.
 test('the Macs decode only HEVC in hardware, through vaapi-copy; the NUC decodes through vaapi', () => {
   for (const m of ['macbook-m2', 'mac-mini-m2']) {
     const o = opts(render(m).text);

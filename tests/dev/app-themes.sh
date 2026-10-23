@@ -92,9 +92,12 @@ for theme in "${themes[@]}"; do
   check "zathura's background is $theme's paper $(($(now_ms) - start)) ms after the call" pixel_is $side_x $page_y "$paper"
   check "zathura's page is $page in $theme ($(pixel $page_x $page_y))" pixel_is $page_x $page_y "$page"
 done
-# A switch while zathura shows its index, and then its search bar, still recolours the page.
+# A switch while zathura shows its index, and then its search bar, still recolours the page. The index and the page share the paper, so the window's pixels prove the index is up.
+window_sum() { grim -s 1 -t ppm -g "$zx,$zy ${zw}x${zh}" - | md5sum; }
+document=$(window_sum)
 wtype -k Tab
 sleep 0.3
+check "Tab shows zathura's index in place of the page" test "$(window_sum)" != "$document"
 "$repo/bin/dots" theme blueprint
 until_ok 1000 pixel_is $side_x $page_y "$(token paper)"
 check "with the index open, zathura's background is Blueprint's paper ($(pixel $side_x $page_y))" pixel_is $side_x $page_y "$(token paper)"

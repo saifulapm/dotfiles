@@ -61,8 +61,10 @@ if [ "${1:-}" = --play ]; then
     play "$f.hw" --start=1.5 --pause --script-opts-append=probe-mode=shot --script-opts-append="probe-shot=$scratch/hw.png" "$samples/$f"
     play "$f.sw" --start=1.5 --pause --hwdec=no --script-opts-append=probe-mode=shot --script-opts-append="probe-shot=$scratch/sw.png" "$samples/$f"
     avg=$(ffmpeg -hide_banner -i "$scratch/hw.png" -i "$scratch/sw.png" -lavfi psnr -f null - 2>&1 | sed -n 's/.*average:\([0-9.inf]*\).*/\1/p')
-    check "$f frame at 1.5 s through hwdec $(get "$f.hw" hwdec) matches software at ${avg:-no} dB (want >= 40)" \
-      awk -v a="${avg:-0}" 'BEGIN { exit !(a == "inf" || a + 0 >= 40) }'
+    # A shot that fell back to software would match software exactly, so the hardware shot must name its decoder.
+    hw=$(get "$f.hw" hwdec)
+    check "$f frame at 1.5 s through hwdec $hw matches software at ${avg:-no} dB (want $(expect_hwdec "$f"), >= 40)" \
+      awk -v a="${avg:-0}" -v hw="$hw" -v want="$(expect_hwdec "$f")" 'BEGIN { exit !(hw == want && (a == "inf" || a + 0 >= 40)) }'
     rm -f "$scratch/hw.png" "$scratch/sw.png"
   done
 
