@@ -210,6 +210,9 @@ out=$(as_user "fish -c 'echo ok'" 2>/dev/null)
 check "fish -c 'echo ok' prints ok and nothing else (got '$out', stderr '$err')" test "$out" = ok -a -z "$err"
 excludes=$(as_user "git config --get-all --path core.excludesFile")
 check "git has one excludes file, under ~/.config/git (got '$excludes')" test "$excludes" = "$home/.config/git/ignore"
+pager=$(as_user "git config --global core.pager")
+check "git pages through delta (got '$pager')" test "$pager" = delta
+check "git dft diffs two commits" as_user "rm -rf /tmp/dft && git init -q /tmp/dft && cd /tmp/dft && echo a > a && git add a && git -c user.name=t -c user.email=t@t commit -qm 1 && echo b >> a && git -c user.name=t -c user.email=t@t commit -qam 2 && git dft HEAD~1 | grep -q 'a --- Text'"
 check "claude's settings render with its hooks" as_user "jq -e .hooks ~/.claude/settings.json >/dev/null"
 for s in mem plan orchestrate grill tdd diagnose dogfood amx playwright-cli desktop; do
   check "\$HOME/.claude/skills/$s/SKILL.md exists" as_user "test -f ~/.claude/skills/$s/SKILL.md"

@@ -11,6 +11,7 @@
 	autocrlf = input
 	safecrlf = warn
 	# No core.editor: it outranks $VISUAL/$EDITOR, which config.fish sets.
+	pager = delta
 
 [init]
 	defaultBranch = main
@@ -30,6 +31,9 @@
 	algorithm = histogram
 [branch]
 	sort = -committerdate
+[alias]
+	# A syntax-aware diff, by difftastic.
+	dft = -c diff.external=difft diff
 
 [credential "https://github.com"]
 	helper =

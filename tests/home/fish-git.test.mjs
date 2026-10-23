@@ -130,6 +130,23 @@ test('git has one excludes file under ~/.config/git and both accounts rewrite', 
   ]) assert.ok(urls.includes(line), line);
 });
 
+test('git pages through delta, and git dft diffs with difftastic', () => {
+  assert.equal(run('git', ['config', '--global', 'core.pager']).stdout, 'delta\n');
+  const repoDir = join(home, 'dft');
+  mkdirSync(repoDir);
+  const git = (...args) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { env, cwd: repoDir, encoding: 'utf8' });
+  git('init', '-q');
+  writeFileSync(join(repoDir, 'a.txt'), 'a\n');
+  git('add', 'a.txt');
+  git('commit', '-qm', 'one');
+  writeFileSync(join(repoDir, 'a.txt'), 'a\nb\n');
+  git('commit', '-qam', 'two');
+  const r = git('dft', 'HEAD~1');
+  assert.equal(r.status, 0, r.stderr);
+  // difftastic heads each file with its name and the language it parsed.
+  assert.match(r.stdout, /^a\.txt --- Text/m);
+});
+
 test('no config file hard-codes the home path', () => {
   const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
   const all = [...walk(fishDir), ...walk(gitDir)];
