@@ -1,0 +1,10 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "kak-ansi") }}
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+make -C "$pin_tmp/kak-ansi-$pin_version" kak-ansi-filter || die "pin $pin_name: make failed"
+mkdir -p "$HOME/.local/bin"
+# A rename, not a write over the file a running kak may be piping through.
+install -m 0755 "$pin_tmp/kak-ansi-$pin_version/kak-ansi-filter" "$HOME/.local/bin/.kak-ansi-filter.new" && mv -f "$HOME/.local/bin/.kak-ansi-filter.new" "$HOME/.local/bin/kak-ansi-filter" || die "pin $pin_name: could not install kak-ansi-filter"
+pin_done

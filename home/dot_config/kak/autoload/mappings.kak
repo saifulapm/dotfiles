@@ -91,9 +91,6 @@ map global user n ':enter-user-mode notes<ret>' -docstring 'Notes mode'
 map global user b ':enter-buffers-mode<ret>'              -docstring 'buffers…'
 map global user B ':enter-user-mode -lock buffers<ret>'   -docstring 'buffers (lock)…'
 
-# Spell
-map -docstring 'spelling' global user S ': enter-user-mode spell<ret>'
-
 # Tree-sitter objects (works with ] [ <a-i> <a-a>)
 # ]f = next function, [f = prev function, <a-i>f = inner, <a-a>f = around
 define-command -hidden tree-object -params 2 %{

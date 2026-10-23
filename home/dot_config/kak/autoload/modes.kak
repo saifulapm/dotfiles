@@ -66,18 +66,6 @@ map global symbol h ':syms -kind hook<ret>'        -docstring 'hooks'
 map global symbol x ':syms -kind test<ret>'        -docstring 'tests'
 map global symbol p ':syms -exported<ret>'         -docstring 'public/exported'
 
-# -------------------------------
-# Spell
-# -------------------------------
-declare-user-mode spell
-map -docstring 'autospell toggle' global spell t ': autospell-toggle<ret>'
-map -docstring 'show spell' global spell s ': spell<ret>'
-map -docstring 'spell next' global spell i ': spell-next<ret>'
-map -docstring 'spell prev' global spell m ': spell-prev<ret>'
-map -docstring 'spell clear' global spell c ': spell-clear<ret>'
-map -docstring 'spell add' global spell a ': spell-add<ret>'
-map -docstring 'spell replace' global spell r ': spell-replace<ret>'
-
 #--------------------------------
 # Match Mode
 # -------------------------------

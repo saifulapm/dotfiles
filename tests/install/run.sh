@@ -253,6 +253,8 @@ check "the dev quadlets generate units" as_user "/usr/lib/systemd/user-generator
 check "the dev sockets are enabled" as_user "test -f ~/.config/systemd/user/sockets.target.wants/mysql84-proxy.socket -a -f ~/.config/systemd/user/sockets.target.wants/caddy-dev-https.socket -a -f ~/.config/systemd/user/sockets.target.wants/php-fpm-proxy.socket"
 
 check "kak opens with the carried config" as_user "kak -ui dummy -e 'eval -buffer *debug* %{ write /tmp/kak-debug }; quit!' && ! grep -Eiq 'error|could not load' /tmp/kak-debug"
+check "hop-kak --version exits 0 through mise" as_user "mise exec -- hop-kak --version >/dev/null"
+check "kak-ansi-filter strips an ANSI colour" as_user "printf '\\033[31mred\\033[0m\\n' | kak-ansi-filter | grep -qx red"
 check "kak finds the helix grammars" as_user "fish -c 'test -d \$HELIX_RUNTIME/grammars'"
 check "mail-sync.timer waits for ~/.mbsyncrc, which a keyless install does not write" \
   as_user "grep -qx 'ConditionPathExists=%h/.mbsyncrc' ~/.config/systemd/user/mail-sync.timer && test ! -e ~/.mbsyncrc"

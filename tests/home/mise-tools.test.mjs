@@ -22,6 +22,7 @@ test('mise declares sd, television, hurl, ast-grep and usql from aqua, and bun',
     assert.match(config, new RegExp(`^"aqua:${tool}" = "latest"$`, 'm'), tool);
   }
   assert.match(config, /^bun = "latest"$/m);
+  assert.match(config, /^"cargo:hop-kak" = "0\.2\.0"$/m);
 });
 
 test('the cloudflared dev tunnel config renders with this home for the credentials file', (t) => {

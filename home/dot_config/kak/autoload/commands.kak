@@ -296,30 +296,6 @@ define-command -docstring "Open the URL the cursor is on with url_open_cmd." url
 # ---------------------------
 # Docs Helpers
 # ---------------------------
-define-command docs -docstring 'docs <docset> <args> : search for an api within a dedoc docset' -params 1.. %{
-  popup --title dedoc --kak-script 'fifo -name docs -- printf %opt{popup_output}' -- docs %arg{@}
-}
-
-complete-command docs shell-script-candidates %{
-  if [ $kak_token_to_complete = 0 ]; then
-    dedoc ls -ln | awk -v ft="$kak_opt_filetype" '
-      {
-        if ($1 ~ ft)
-          a[NR] = $1
-        else
-          b[NR] = $1
-      }
-      END {
-        for (i in a)
-          print a[i]
-        for (i in b)
-          print b[i]
-      }'
-  elif [ $kak_token_to_complete = 1 ]; then
-    dedoc ss -i --porcelain "$1"
-  fi
-}
-
 define-command grep_doc -params 1 -docstring 'grep doc' %{
   grep %arg{1} "%val{runtime}/doc"
 }

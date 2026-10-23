@@ -52,8 +52,24 @@ test('kak opens with the carried config and the debug buffer holds no error', ()
   const errors = readFileSync(debug, 'utf8')
     .split('\n')
     // kak's own kakrc sources each autoload file in a try and logs a failure as "could not load".
-    .filter((l) => /error|could not load/i.test(l));
+    .filter((l) => /error|could not load|no such command/i.test(l));
   assert.deepEqual(errors, []);
+});
+
+// ast-grep, usql, aspell, kak-popup and dedoc are not installed, so their plugins went; hop-kak and kak-ansi-filter are.
+test('kak keeps hop and ansi, and has no plugin for a tool v2 does not install', () => {
+  const tools = join(env.XDG_CONFIG_HOME, 'kak/autoload/tools');
+  for (const f of ['ast-grep.kak', 'usql.kak', 'spell.kak', 'popup.kak']) assert.equal(existsSync(join(tools, f)), false, f);
+  const out = join(root, 'kept.txt');
+  const probe = (name) => `try %{ define-command ${name} nop; echo -to-file ${out}.${name} missing } catch %{ echo -to-file ${out}.${name} defined }`;
+  const names = ['hop-kak', 'ansi-render-selection', 'docs', 'popup', 'spell'];
+  const r = kak(`${names.map(probe).join('; ')}; try %{ dedoc } catch %{ echo -to-file ${out}.dedoc %val{error} }; quit!`);
+  assert.equal(r.status, 0, r.stderr);
+  const read = (name) => (existsSync(`${out}.${name}`) ? readFileSync(`${out}.${name}`, 'utf8') : 'not run');
+  assert.deepEqual(Object.fromEntries(names.map((n) => [n, read(n)])), {
+    'hop-kak': 'defined', 'ansi-render-selection': 'defined', docs: 'missing', popup: 'missing', spell: 'missing',
+  });
+  assert.match(read('dedoc'), /'dedoc': no such command$/);
 });
 
 test('kak loads the carried autoload, and nothing from kak-lsp', () => {

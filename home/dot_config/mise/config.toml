@@ -21,6 +21,8 @@ deno = "latest"
 "aqua:Orange-OpenSource/hurl" = "latest"
 "aqua:ast-grep/ast-grep" = "latest"
 "aqua:xo/usql" = "latest"
+# hop-kak, kak's hop.kak jumps; its repo is gone, and crates.io keeps the last release.
+"cargo:hop-kak" = "0.2.0"
 # Some projects lock with bun.lock.
 bun = "latest"
 # Mail IMAP IDLE watcher. Not packaged for Fedora and upstream ships no binaries, so mise builds it with go; the tag has no v, which go install accepts as a revision.

@@ -124,3 +124,13 @@ fetch = "gh"
 install = "~/.local/bin/elfeed-kak, built with cargo from a private repo, so it waits for the gh login"
 url = "https://github.com/saifulapm/kakfeed/archive/{version}.tar.gz"
 sha256 = "1664096dbe4675ed3d41d5bad0d8a67397dfd853de0f2817c4729c5cf80e58da"
+
+[[pin]]
+name = "kak-ansi"
+version = "856c27ff5b1769cfe45b8c33acf4b449773fde21"
+repo = "eraserhd/kak-ansi"
+track = "commit"
+install = "~/.local/bin/kak-ansi-filter, built with cc, which kak's ansi.kak calls"
+runs = "kak-ansi-filter </dev/null"
+url = "https://github.com/eraserhd/kak-ansi/archive/{version}.tar.gz"
+sha256 = "ce94c3c3e9ec611404930afa7a19e80f1de445bd65442a78070e2c3effe7cc44"
