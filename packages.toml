@@ -546,3 +546,73 @@ why = "vainfo, which shows the NUC's VA driver loads"
 name = "xdg-desktop-portal-gtk"
 arch = "all"
 why = "answers open and save dialogs when the shell's picker cannot"
+
+[[package]]
+name = "git-delta"
+arch = "all"
+why = "git's pager"
+
+[[package]]
+name = "difftastic"
+arch = "all"
+why = "difft, the syntax-aware diff behind git dft"
+
+[[package]]
+name = "tree"
+arch = "all"
+why = "prints a directory as a tree"
+
+[[package]]
+name = "yq"
+arch = "all"
+why = "jq for YAML and TOML"
+
+[[package]]
+name = "glow"
+arch = "all"
+why = "renders Markdown in the terminal"
+
+[[package]]
+name = "gum"
+arch = "all"
+why = "prompts and spinners for shell scripts"
+
+[[package]]
+name = "tokei"
+arch = "all"
+why = "counts lines of code by language"
+
+[[package]]
+name = "trash-cli"
+arch = "all"
+why = "trash-put, a delete that can be undone"
+
+[[package]]
+name = "uv"
+arch = "all"
+why = "runs Python projects and their tools"
+
+[[package]]
+name = "ShellCheck"
+arch = "all"
+why = "lints shell scripts; agents run it weekly"
+
+[[package]]
+name = "GraphicsMagick"
+arch = "all"
+why = "gm, the image tool agents convert and resize with"
+
+[[package]]
+name = "bind-utils"
+arch = "all"
+why = "dig and host for DNS checks"
+
+[[package]]
+name = "podman-docker"
+arch = "all"
+why = "a docker command that runs podman, for agents and scripts that type docker"
+
+[[package]]
+name = "bluez-tools"
+arch = "all"
+why = "bt-agent, which answers Bluetooth pairing for Control"

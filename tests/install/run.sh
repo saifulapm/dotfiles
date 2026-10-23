@@ -162,6 +162,15 @@ check "shopify version prints 4.9.4 or newer (got '$shopify')" bash -c "[[ \$1 =
 for tool in "pnpm --version" "cloudflared --version" "goimapnotify -h"; do
   check "'$tool' runs through mise" as_user "mise exec -- $tool >/dev/null 2>&1"
 done
+for tool in "delta --version" "difft --version" "tree --version" "yq --version" "glow --version" "gum --version" "tokei --version" "trash-put --version" "shellcheck --version" "gm version" "dig -v" "uv --version"; do
+  check "'$tool' exits 0" as_user "$tool >/dev/null 2>&1"
+done
+for tool in "sd --version" "tv --version" "hurl --version" "sg --version" "usql --version" "bun --version"; do
+  check "'$tool' exits 0 through mise" as_user "mise exec -- $tool >/dev/null 2>&1"
+done
+docker=$(as_user "docker --version" 2>&1)
+check "docker --version names podman (got '$docker')" grep -q podman <<<"$docker"
+check "eza is not installed" as_user "! command -v eza"
 check "goimapnotify has the shim imapnotify@ runs" as_user "test -x ~/.local/share/mise/shims/goimapnotify"
 # kakfeed is private, so elfeed-kak waits for the gh login dots secrets writes.
 check "elfeed-kak waits for dots secrets" as_user "test ! -e ~/.local/bin/elfeed-kak"

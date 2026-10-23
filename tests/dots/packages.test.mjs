@@ -32,6 +32,15 @@ test('the AVD firmware and VA driver build tools are declared for the Macs only'
   }
 });
 
+// The tools Saiful and his agents reach for (v2.2): delta and difft for diffs, gm, shellcheck, dig and docker for the agents.
+test('the everyday CLI tools are declared for every arch, and eza is not', () => {
+  for (const name of ['git-delta', 'difftastic', 'tree', 'yq', 'glow', 'gum', 'tokei', 'trash-cli', 'uv', 'ShellCheck', 'GraphicsMagick', 'bind-utils', 'podman-docker', 'bluez-tools']) {
+    assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
+    assert.match(byName.get(name).why, /\w/, `${name} why`);
+  }
+  assert.equal(byName.has('eza'), false);
+});
+
 // Fedora's ffmpeg-free also answers to "ffmpeg", so a plain dnf install of it succeeds without RPM Fusion's build.
 test('ffmpeg comes from RPM Fusion free', () => {
   assert.equal(byName.get('ffmpeg')?.rpmfusion, 'free');

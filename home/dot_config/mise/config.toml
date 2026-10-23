@@ -15,6 +15,14 @@ deno = "latest"
 "npm:@shopify/cli" = "latest"
 # The dev tunnel client that home/private_dot_cloudflared configures.
 "aqua:cloudflare/cloudflared" = "latest"
+# Fedora 44 packages none of these five, so they come as aqua's prebuilt binaries: sd, tv, hurl, sg and usql.
+"aqua:chmln/sd" = "latest"
+"aqua:alexpasmantier/television" = "latest"
+"aqua:Orange-OpenSource/hurl" = "latest"
+"aqua:ast-grep/ast-grep" = "latest"
+"aqua:xo/usql" = "latest"
+# Some projects lock with bun.lock.
+bun = "latest"
 # Mail IMAP IDLE watcher. Not packaged for Fedora and upstream ships no binaries, so mise builds it with go; the tag has no v, which go install accepts as a revision.
 "go:gitlab.com/shackra/goimapnotify/cmd/goimapnotify" = "2.5.8"
 
