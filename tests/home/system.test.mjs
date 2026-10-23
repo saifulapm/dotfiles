@@ -72,3 +72,15 @@ test("v1's LAN port for dufs is closed wherever firewalld runs, so dufs is reach
 test("a kernel OOM kill takes only its process, never the rest of the user unit it ran in", () => {
   assert.match(read('home/dot_config/systemd/user.conf.d/50-oom-policy.conf'), /^\[Manager\]\nDefaultOOMPolicy=continue$/m);
 });
+
+test('the tailnet, and only the tailnet, reaches tailscale serve on 8443 through firewalld', () => {
+  const script = read('home/.chezmoiscripts/run_onchange_after_45-dufs.sh.tmpl');
+  for (const rule of [
+    'rule family="ipv4" source address="100.64.0.0/10" port port="8443" protocol="tcp" accept',
+    'rule family="ipv6" source address="fd7a:115c:a1e0::/48" port port="8443" protocol="tcp" accept',
+  ]) {
+    assert.ok(script.includes(`'${rule}'`), rule);
+  }
+  assert.match(script, /root firewall-cmd -q --add-rich-rule="\$rule" && root firewall-cmd -q --permanent --add-rich-rule="\$rule"/);
+  assert.doesNotMatch(script, /--add-port|--add-interface|trusted/);
+});

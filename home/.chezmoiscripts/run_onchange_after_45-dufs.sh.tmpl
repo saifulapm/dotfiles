@@ -1,6 +1,11 @@
 #!/bin/bash
 {{ template "lib.sh" . }}
-# v1 opened 5000/tcp for dufs on the LAN; v2's dufs listens on 127.0.0.1 and reaches the tailnet through tailscale serve.
 if root firewall-cmd --state >/dev/null 2>&1; then
+  # v1 opened 5000/tcp for dufs on the LAN; v2's dufs listens on 127.0.0.1 and reaches the tailnet through tailscale serve.
   root firewall-cmd -q --remove-port=5000/tcp && root firewall-cmd -q --permanent --remove-port=5000/tcp || die "could not close v1's dufs port 5000"
+  # tailscale0 falls in the default zone, which drops tailscale serve's 8443, so only the tailnet's own addresses get through.
+  for rule in 'rule family="ipv4" source address="100.64.0.0/10" port port="8443" protocol="tcp" accept' \
+    'rule family="ipv6" source address="fd7a:115c:a1e0::/48" port port="8443" protocol="tcp" accept'; do
+    root firewall-cmd -q --add-rich-rule="$rule" && root firewall-cmd -q --permanent --add-rich-rule="$rule" || die "could not let the tailnet reach dufs on 8443"
+  done
 fi
