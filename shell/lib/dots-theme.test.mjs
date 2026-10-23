@@ -11,7 +11,7 @@ const dots = new URL('../../bin/dots', import.meta.url).pathname;
 function isolated(state) {
   const env = Object.assign({}, process.env, {
     XDG_STATE_HOME: state, WAYLAND_DISPLAY: '', DBUS_SESSION_BUS_ADDRESS: `unix:path=${state}/no-bus`,
-    TMUX_TMPDIR: state, DCONF_PROFILE: `${state}/no-profile`, DOTS_CHROMIUM_POLICY_DIR: `${state}/no-policy`,
+    TMUX_TMPDIR: state, DCONF_PROFILE: `${state}/no-profile`,
     DOTS_AGENT_HOME: `${state}/agents`,
   });
   delete env.TMUX;
@@ -66,13 +66,12 @@ test('a switch names the apps that did not reload in the notice the island shows
   const state = mkdtempSync(join(tmpdir(), 'dots-notice-'));
   t.after(() => rmSync(state, { recursive: true, force: true }));
   const notice = () => readFileSync(join(state, 'dots/theme-out/notice'), 'utf8');
-  // No session bus refuses gsettings, and no policy dir refuses chromium.
+  // No session bus refuses gsettings.
   assert.equal(spawnSync(dots, ['theme', 'blueprint'], { env: isolated(state) }).status, 0);
-  assert.equal(notice(), 'theme blueprint: chromium, gsettings did not reload\n');
-  mkdirSync(join(state, 'no-policy'));
+  assert.equal(notice(), 'theme blueprint: gsettings did not reload\n');
+  writeFileSync(join(state, 'dots/theme-out/notice'), 'theme blueprint: tmux did not reload\n');
   assert.equal(spawnSync(dots, ['theme', 'paper'], { env: isolated(state) }).status, 0);
   assert.equal(notice(), 'theme paper: gsettings did not reload\n');
-  assert.match(readFileSync(join(state, 'no-policy/color.json'), 'utf8'), /BrowserThemeColor/);
 });
 
 // The agents' configs name the theme qshell, and each reloads its file when it changes.

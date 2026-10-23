@@ -1,9 +1,10 @@
 #!/bin/bash
 # extension policy hash: {{ joinPath .chezmoi.workingTree "system/chromium/extensions.json" | include | sha256sum }}
 {{ template "lib.sh" . }}
-# dots theme copies chromium.json here as color.json, so the directory belongs to the user.
 command -v chromium-browser >/dev/null || exit 0
 dir=${DOTS_CHROMIUM_POLICY_DIR:-/etc/chromium/policies/managed}
 [[ -w $dir ]] || { root mkdir -p "$dir" && root chown "$(id -un)" "$dir"; }
 # Chromium installs the Playwright Extension from the Web Store and keeps it updated, so playwright-cli attach --extension finds it on a fresh machine.
 install -m 0644 {{ joinPath .chezmoi.workingTree "system/chromium/extensions.json" | quote }} "$dir/extensions.json" || die "could not write Chromium's extension policy"
+# A BrowserThemeColor policy blocks the theme extension that carries the theme, so the one an older dots theme wrote goes.
+rm -f "$dir/color.json"

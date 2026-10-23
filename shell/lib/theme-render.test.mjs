@@ -26,9 +26,10 @@ test('renders the app fragments and no kitty or opencode file', (t) => {
   t.after(() => rmSync(state, { recursive: true, force: true }));
   execFileSync('node', [cli, 'blueprint'], { env: { ...process.env, XDG_STATE_HOME: state } });
   const names = readdirSync(join(state, 'dots/theme-out'));
-  for (const f of ['tmux.conf', 'dots.kak', 'helix.toml', 'yazi-theme.toml', 'colors.fish', 'gtk.css', 'gtk-settings.ini', 'chromium.json']) {
+  for (const f of ['tmux.conf', 'dots.kak', 'helix.toml', 'yazi-theme.toml', 'colors.fish', 'gtk.css', 'gtk-settings.ini', 'mpv.conf']) {
     assert.ok(names.includes(f), f);
   }
+  assert.equal(JSON.parse(readFileSync(join(state, 'dots/theme-out/chromium-theme/manifest.json'), 'utf8')).name, 'dots');
   assert.deepEqual(names.filter((n) => /kitty|opencode/i.test(n)), []);
 });
 

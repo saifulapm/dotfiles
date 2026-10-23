@@ -14,7 +14,7 @@ export PATH=$repo/dev/path:$repo/bin:$PATH
 # The nested session must never reach the live tmux server, dconf database or Chromium policy dir.
 dconf_name=dots_dev_${D##*-}
 dconf_name=${dconf_name//[^[:alnum:]_]/_}
-export TMUX_TMPDIR=$D/tmux DCONF_PROFILE=$D/dconf-profile DOTS_CHROMIUM_POLICY_DIR=$D/chromium-policy
+export TMUX_TMPDIR=$D/tmux DCONF_PROFILE=$D/dconf-profile
 # Nor the live coding agents' theme files.
 export DOTS_AGENT_HOME=$D/agents
 # A fixed machine id names the notes store dev.json, whatever the live chezmoi config says.
@@ -82,7 +82,7 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME/applications" "$TMUX_TMPDIR" "$DOTS_CHROMIUM_POLICY_DIR" "$PIPEWIRE_RUNTIME_DIR"
+mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME/applications" "$TMUX_TMPDIR" "$PIPEWIRE_RUNTIME_DIR"
 printf 'user-db:%s\n' "$dconf_name" >"$DCONF_PROFILE"
 mkdir -p "$D/remote"
 printf '[Dropbox]\ntype = alias\nremote = %s\n' "$D/remote" >"$RCLONE_CONFIG"

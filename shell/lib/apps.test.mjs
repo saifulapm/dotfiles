@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
 import { validateTheme, contrast } from './theme.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromium, renderClaude, renderPi, renderAmx, renderMpv } from './apps.mjs';
+import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const blueprint = load('blueprint');
@@ -107,9 +107,18 @@ test('gtk settings prefer dark exactly for dark mode', () => {
   assert.match(renderGtkSettings(paper), /^gtk-font-name=Maple Mono 11$/m);
 });
 
-test('chromium policy holds the surface colour and the mode', () => {
-  assert.deepEqual(JSON.parse(renderChromium(blueprint)), { BrowserThemeColor: '#0a1526', BrowserColorScheme: 'dark' });
-  assert.equal(JSON.parse(renderChromium(paper)).BrowserColorScheme, 'light');
+// A colour policy would block the theme extension, so the manifest alone carries the exact colours, from Chromium's next start.
+test('the chromium theme extension frames the window in paper and draws the toolbar on surface', () => {
+  const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  for (const t of [paper, blueprint, artboard]) {
+    const m = JSON.parse(renderChromiumTheme(t));
+    assert.equal(m.manifest_version, 3);
+    assert.deepEqual(m.theme.colors.frame, rgbOf(t.color.paper), t.name);
+    assert.deepEqual(m.theme.colors.toolbar, rgbOf(t.color.surface), t.name);
+    assert.deepEqual(m.theme.colors.toolbar_text, rgbOf(t.color.ink), t.name);
+    assert.deepEqual(m.theme.colors.ntp_background, rgbOf(t.color.paper), t.name);
+  }
+  assert.deepEqual(JSON.parse(renderChromiumTheme(blueprint)).theme.colors.frame, [12, 26, 46]);
 });
 
 test('colors.fish sets fish and fzf colours', () => {

@@ -276,8 +276,17 @@ export function renderGtkSettings(t) {
   return `[Settings]\ngtk-application-prefer-dark-theme=${t.mode === 'dark'}\ngtk-font-name=${t.type.ui} 11\n`;
 }
 
-export function renderChromium(t) {
-  return JSON.stringify({ BrowserThemeColor: lower(t.color.surface), BrowserColorScheme: t.mode }, null, 2) + '\n';
+// Chromium loads this theme extension at its start; a BrowserThemeColor policy would block it, so the theme carries no policy.
+export function renderChromiumTheme(t) {
+  const c = t.color;
+  const rgb3 = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const [ink, muted, paper, surface, accent] = [c.ink, c.muted, c.paper, c.surface, c.accent].map(rgb3);
+  const colors = {
+    frame: paper, frame_inactive: paper, background_tab: paper, toolbar: surface, toolbar_text: ink, toolbar_button_icon: ink,
+    tab_text: ink, tab_background_text: muted, bookmark_text: ink, omnibox_background: paper, omnibox_text: ink,
+    ntp_background: paper, ntp_text: ink, ntp_link: accent,
+  };
+  return JSON.stringify({ manifest_version: 3, name: 'dots', version: '1', description: `The ${t.name} theme`, theme: { colors } }, null, 2) + '\n';
 }
 
 // mpv.conf includes this; the OSC sits on surface with ink controls and holds a pressed control in the accent. mpv reads # as a comment, so each value is quoted.

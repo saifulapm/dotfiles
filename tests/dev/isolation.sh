@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
-# just dev: its tmux server, dconf database, Chromium policy dir, hub file, PipeWire and rclone config all live inside its temp dir.
+# just dev: its tmux server, dconf database, hub file, PipeWire and rclone config all live inside its temp dir.
 {
 source "$(dirname "$0")/lib.sh"
 
 dev=$DOTS_DEV_DIR
 tmux_dir=${TMUX_TMPDIR:-}
 profile=${DCONF_PROFILE:-}
-policy=${DOTS_CHROMIUM_POLICY_DIR:-}
 db_name=$(sed -n 's/^user-db://p' "$profile" 2>/dev/null)
 
 under_dev() { case $1 in "$dev"/*) true ;; *) false ;; esac; }
 check "TMUX_TMPDIR is inside the temp dir" under_dev "$tmux_dir"
 check "DCONF_PROFILE is inside the temp dir" under_dev "$profile"
-check "DOTS_CHROMIUM_POLICY_DIR is inside the temp dir" under_dev "$policy"
 
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
 unit_has() { grep -qzxF "$1=$2" "/proc/$pid/environ"; }
 check "the shell unit carries TMUX_TMPDIR" unit_has TMUX_TMPDIR "$tmux_dir"
 check "the shell unit carries DCONF_PROFILE" unit_has DCONF_PROFILE "$profile"
-check "the shell unit carries DOTS_CHROMIUM_POLICY_DIR" unit_has DOTS_CHROMIUM_POLICY_DIR "$policy"
 
 check "DOTS_HUB_QUESTIONS is inside the temp dir" under_dev "${DOTS_HUB_QUESTIONS:-}"
 check "the shell unit carries DOTS_HUB_QUESTIONS" unit_has DOTS_HUB_QUESTIONS "${DOTS_HUB_QUESTIONS:-}"
