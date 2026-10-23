@@ -209,8 +209,10 @@ for flag in --ozone-platform-hint=auto --force-color-profile=srgb OverlayScrollb
 done
 check "show-environment has no .dotfiles in CHROMIUM_USER_FLAGS" bash -c '! grep "^CHROMIUM_USER_FLAGS=" <<<"$1" | grep -q "\.dotfiles"' _ "$env"
 check "show-environment has SSH_AUTH_SOCK in the user's runtime dir" grep -qx 'SSH_AUTH_SOCK=/run/user/1000/ssh-agent.socket' <<<"$env"
-got=$(unit_state ssh-agent.socket)
-check "ssh-agent.socket is enabled and active (got '$got')" test "$got" = "enabled active"
+# The link takes effect at the next login; starting the socket stands in for it.
+got=$(as_user "systemctl --user is-enabled ssh-agent.socket")
+check "ssh-agent.socket is enabled (got '$got')" test "$got" = enabled
+as_user "systemctl --user start ssh-agent.socket"
 got=$(as_user "export \$(systemctl --user show-environment | grep ^SSH_AUTH_SOCK=); ssh-add -l >/dev/null 2>&1; echo \$?")
 check "ssh-add -l exits 0 or 1 against the agent socket (got '$got')" bash -c '[[ $1 = 0 || $1 = 1 ]]' _ "$got"
 got=$(as_user "ls ~/.config/environment.d")
