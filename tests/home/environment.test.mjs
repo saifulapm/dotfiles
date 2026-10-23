@@ -1,4 +1,4 @@
-// environment.d gives the systemd user manager Chromium's flags and the ssh-agent socket.
+// environment.d gives the systemd user manager Chromium's flags, the ssh-agent socket and the Android SDK.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -29,12 +29,14 @@ test('ssh-agent.socket is enabled at login from the packaged unit', () => {
   assert.equal(readFileSync(join(repo, 'home/dot_config/systemd/user/sockets.target.wants/symlink_ssh-agent.socket'), 'utf8').trim(), '/usr/lib/systemd/user/ssh-agent.socket');
 });
 
-test('the environment.d generator expands both files', { skip: !existsSync(generator) }, () => {
+test('the environment.d generator expands every file', { skip: !existsSync(generator) }, () => {
   const home = mkdtempSync(join(tmpdir(), 'envd-'));
   mkdirSync(join(home, 'environment.d'));
-  for (const f of ['60-chromium.conf', '65-ssh-agent.conf']) copyFileSync(join(dir, f), join(home, 'environment.d', f));
+  for (const f of ['60-chromium.conf', '65-ssh-agent.conf', '70-android.conf']) copyFileSync(join(dir, f), join(home, 'environment.d', f));
   const out = execFileSync(generator, { env: { XDG_CONFIG_HOME: home, XDG_RUNTIME_DIR: '/run/user/1000', HOME: home, PATH: '/usr/bin' }, encoding: 'utf8' });
   assert.match(out, /^SSH_AUTH_SOCK=\/run\/user\/1000\/ssh-agent\.socket$/m);
+  assert.match(out, new RegExp(`^ANDROID_HOME=${home}/Android/Sdk$`, 'm'));
+  assert.match(out, new RegExp(`^PATH=/usr/bin:${home}/Android/Sdk/platform-tools:${home}/Android/Sdk/cmdline-tools/latest/bin:${home}/Android/Sdk/emulator$`, 'm'));
   assert.match(out, /^CHROMIUM_USER_FLAGS=.*--force-color-profile=srgb.*AimEnabled/m);
   assert.match(out, new RegExp(`^CHROMIUM_USER_FLAGS=.* --load-extension=${home}/\\.local/state/dots/theme-out/chromium-theme"?$`, 'm'));
 });

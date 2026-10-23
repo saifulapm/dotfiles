@@ -61,10 +61,10 @@ test('every kept alias and function is defined, and none is named for a dropped 
 });
 
 test('the tool directories that exist join PATH, and SSH asks pinentry for curses', () => {
-  for (const d of ['.cargo/bin', '.opencode/bin', '.local/share/pnpm', '.local/share/go/bin', 'Android/Sdk/platform-tools', '.local/share/mise/shims']) mkdirSync(join(home, d), { recursive: true });
+  for (const d of ['.cargo/bin', '.opencode/bin', '.local/share/pnpm', '.local/share/go/bin', 'Android/Sdk/platform-tools', 'Android/Sdk/cmdline-tools/latest/bin', 'Android/Sdk/emulator', '.local/share/mise/shims']) mkdirSync(join(home, d), { recursive: true });
   const r = run('fish', ['-i', '-c', 'string join \\n -- $PATH; echo "go=$GOBIN pnpm=$PNPM_HOME android=$ANDROID_HOME"']);
   const lines = r.stdout.trim().split('\n');
-  for (const d of ['.cargo/bin', '.local/share/pnpm', '.local/share/go/bin', 'Android/Sdk/platform-tools', '.local/share/mise/shims']) {
+  for (const d of ['.cargo/bin', '.local/share/pnpm', '.local/share/go/bin', 'Android/Sdk/platform-tools', 'Android/Sdk/cmdline-tools/latest/bin', 'Android/Sdk/emulator', '.local/share/mise/shims']) {
     assert.ok(lines.includes(join(home, d)), `${d} on PATH`);
   }
   assert.ok(!lines.includes(join(home, '.opencode/bin')), 'opencode is not on PATH');
