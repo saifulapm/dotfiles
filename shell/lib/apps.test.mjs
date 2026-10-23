@@ -4,9 +4,10 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { parseToml } from './toml.mjs';
 import { validateTheme, contrast } from './theme.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv } from './apps.mjs';
+import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const blueprint = load('blueprint');
@@ -119,6 +120,47 @@ test('the chromium theme extension frames the window in paper and draws the tool
     assert.deepEqual(m.theme.colors.ntp_background, rgbOf(t.color.paper), t.name);
   }
   assert.deepEqual(JSON.parse(renderChromiumTheme(blueprint)).theme.colors.frame, [12, 26, 46]);
+});
+
+// Chromium ignores a new-tab override inside a theme, so the page is its own extension; its key fixes the id whatever folder it loads from.
+test('the new-tab extension overrides the new tab with a fixed id and reads the top sites and the search engine', () => {
+  const m = JSON.parse(renderNewtabManifest());
+  assert.equal(m.manifest_version, 3);
+  assert.deepEqual(m.chrome_url_overrides, { newtab: 'newtab.html' });
+  assert.deepEqual(m.permissions, ['topSites', 'search']);
+  assert.equal(m.theme, undefined);
+  const der = Buffer.from(m.key, 'base64');
+  const id = createHash('sha256').update(der).digest('hex').slice(0, 32).replace(/[0-9a-f]/g, (c) => 'abcdefghijklmnop'[parseInt(c, 16)]);
+  assert.equal(id, 'aakconifmcmaooplokgfeaepglecbmaf');
+});
+
+test('the new-tab page names its theme\'s voice and loads its theme, its look and its script', () => {
+  for (const [t, voice] of [[paper, 'caps'], [blueprint, 'bracket'], [artboard, 'plain']]) {
+    const html = renderNewtabHtml(t);
+    assert.match(html, new RegExp(`<html lang="en" data-voice="${voice}" data-theme="${t.name}">`), t.name);
+    assert.match(html, /<title>New Tab<\/title>/);
+    assert.match(html, /<link rel="stylesheet" href="theme.css">\s*<link rel="stylesheet" href="newtab.css">/);
+    assert.match(html, /<script type="module" src="newtab.js"><\/script>/);
+    assert.match(html, /<input id="q" type="text"[^>]*aria-label="Search"/);
+  }
+});
+
+test('the new-tab page draws in the theme\'s paper, ink and fonts, on its paper\'s texture', () => {
+  const vars = (t) => Object.fromEntries([...renderNewtabCss(t).matchAll(/--([a-z-]+): ([^;]+);/g)].map((m) => [m[1], m[2]]));
+  assert.deepEqual(
+    { paper: vars(paper).paper, ink: vars(paper).ink, surface: vars(paper).surface, accent: vars(paper).accent, display: vars(paper).display, ui: vars(paper).ui },
+    { paper: '#F1E9D8', ink: '#1C1915', surface: '#FAF6EC', accent: '#C8381E', display: '"Instrument Serif"', ui: '"Maple Mono"' },
+  );
+  assert.equal(vars(blueprint).paper, '#0C1A2E');
+  assert.equal(vars(blueprint).display, '"Maple Mono"');
+  assert.equal(vars(artboard).paper, '#E4E6EA');
+  assert.match(renderNewtabCss(blueprint), /linear-gradient\(rgba\(127, 227, 240, 0.13\) 1px, transparent 1px\)/);
+  assert.match(renderNewtabCss(blueprint), /background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;/);
+  assert.match(renderNewtabCss(artboard), /radial-gradient\(#B4BAC4 1px, transparent 1.3px\)/);
+  assert.match(renderNewtabCss(artboard), /background-size: 16px 16px;/);
+  assert.match(renderNewtabCss(paper), /feTurbulence/);
+  assert.match(renderNewtabCss(paper), /color-scheme: light;/);
+  assert.match(renderNewtabCss(blueprint), /color-scheme: dark;/);
 });
 
 test('colors.fish sets fish and fzf colours', () => {

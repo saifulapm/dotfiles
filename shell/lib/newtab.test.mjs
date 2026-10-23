@@ -54,6 +54,8 @@ test('the six most visited web sites become rows with a number, a letter tile, a
   ]);
   assert.equal(siteRows([{ url: 'https://github.com/', title: 'dotfiles' }], 'bracket')[0].tile, 'D');
   assert.deepEqual(siteRows([], 'plain'), []);
+  // Chromium lists its Web Store on a profile with no history, so a fresh profile would never read empty.
+  assert.deepEqual(siteRows([{ url: 'https://chrome.google.com/webstore?hl=en', title: 'Web Store' }, { url: 'https://chromewebstore.google.com/', title: 'Chrome Web Store' }], 'plain'), []);
 });
 
 // A page's title is whatever its author wrote, so it is one line with no control characters or bidi marks.

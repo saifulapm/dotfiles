@@ -32,9 +32,12 @@ export function readQuery(text) {
 const address = (url) => clean(url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, ''));
 const firstMark = (s) => (s.match(/[\p{L}\p{N}]/u) || [''])[0];
 
+// The Web Store Chromium puts in the top sites of a profile with no history.
+const PREPOPULATED = /^https:\/\/(chrome\.google\.com\/webstore|chromewebstore\.google\.com\/)/i;
+
 export function siteRows(sites, voice) {
   return sites
-    .filter((s) => /^https?:\/\//i.test(s.url))
+    .filter((s) => /^https?:\/\//i.test(s.url) && !PREPOPULATED.test(s.url))
     .slice(0, 6)
     .map((s, i) => {
       const where = address(s.url);

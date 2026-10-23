@@ -289,6 +289,80 @@ export function renderChromiumTheme(t) {
   return JSON.stringify({ manifest_version: 3, name: 'dots', version: '1', description: `The ${t.name} theme`, theme: { colors } }, null, 2) + '\n';
 }
 
+// A public key with no private half kept: it only fixes the extension's id, so a session restored after the folder moves finds its tabs.
+const NEWTAB_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxNRYiohE0fP20hRqfa91D2XxIKYYeYUEf0kw1kdbyCPofUsWdfJHxjZt8cia3CwHgQDAV96pfSk4GOt8jWMMHJWIf3Eh1ajUml7Rn/1+P4YAKM2u9qnOuv1pEIh+MYCGqc1BDM1GPcjSWbN5oak6xIBs8Kr+HEkW/NZYWGWWlcY9J/XTDIDLyJl63yit+0BLXQNSEtrm74cVhknmHlkSp+yFPp3h2mN1ghjU/UGxUn+jXHxyi0Yt5aDQJhvpSUGsGYSafQSlx/aStq2WUji65wqge2bQwocd84u4y1g1H+zav0Zua3bRmXELYioNOLMPRLgGbU1rG0fcy05VfUV2rwIDAQAB';
+
+export function renderNewtabManifest() {
+  const m = {
+    manifest_version: 3, name: 'dots new tab', version: '1', description: "The theme's new-tab page", key: NEWTAB_KEY,
+    chrome_url_overrides: { newtab: 'newtab.html' }, permissions: ['topSites', 'search'],
+  };
+  return JSON.stringify(m, null, 2) + '\n';
+}
+
+export function renderNewtabHtml(t) {
+  const voice = t.type.voice;
+  return `<!doctype html>
+<html lang="en" data-voice="${voice}" data-theme="${t.name}">
+<head>
+<meta charset="utf-8">
+<title>New Tab</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="newtab.css">
+<script type="module" src="newtab.js"></script>
+</head>
+<body>
+<main hidden>
+<div class="when"><span id="day"></span><span id="date"></span></div>
+<label class="field"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><input id="q" type="text" autocomplete="off" spellcheck="false" aria-label="Search"><span class="go"></span></label>
+<section class="list"><span class="head"></span><div id="sites"></div></section>
+<div class="keys"></div>
+</main>
+</body>
+</html>
+`;
+}
+
+// Board hexes for the new-tab page that no token carries: Paper's tile, Artboard's field, tile, row tint and its deep blue.
+const NEWTAB_BOARD = { paper: { tile: '#E8DEC6' }, artboard: { tile: '#F2F3F6', field: '#F6F7F9', tint: '#EEF1FF', deep: '#2638C9' } };
+
+// The page's paper, drawn as the shell draws it: Paper's grain as the board's noise, Blueprint's grid from its paper tokens, Artboard's dots.
+function newtabTexture(t) {
+  const p = t.paper || {};
+  if (t.primitive.paper === 'grain') {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.11 0 0 0 0 0.09 0 0 0 0 0.07 0 0 0 0.18 0'/></filter><rect width='300' height='300' filter='url(%23g)' opacity='0.55'/></svg>`;
+    return `background-image: url("data:image/svg+xml,${svg.replace(/</g, '%3C').replace(/>/g, '%3E')}");`;
+  }
+  if (t.primitive.paper === 'grid') {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(t.color.accent.slice(i, i + 2), 16));
+    const lines = (a) => `linear-gradient(rgba(${r}, ${g}, ${b}, ${a}) 1px, transparent 1px), linear-gradient(90deg, rgba(${r}, ${g}, ${b}, ${a}) 1px, transparent 1px)`;
+    return `background-image: ${lines(p.major_alpha)}, ${lines(p.minor_alpha)};\n  background-size: ${p.major}px ${p.major}px, ${p.major}px ${p.major}px, ${p.minor}px ${p.minor}px, ${p.minor}px ${p.minor}px;`;
+  }
+  if (t.primitive.paper === 'dots') {
+    return `background-image: radial-gradient(${p.dot} 1px, transparent 1.3px);\n  background-size: ${p.spacing}px ${p.spacing}px;\n  background-position: ${p.spacing / 2}px ${p.spacing / 2}px;`;
+  }
+  return '';
+}
+
+export function renderNewtabCss(t) {
+  const c = t.color;
+  const board = NEWTAB_BOARD[t.name] || {};
+  const vars = [
+    ['paper', c.paper], ['ink', c.ink], ['muted', c.muted], ['line', c.line], ['surface', c.surface], ['accent', c.accent],
+    ['display', `"${t.type.display}"`], ['ui', `"${t.type.ui}"`],
+    ['tile', board.tile || 'transparent'], ['field', board.field || c.surface], ['tint', board.tint || c.ink], ['deep', board.deep || c.surface],
+  ];
+  return `:root {
+  color-scheme: ${t.mode === 'dark' ? 'dark' : 'light'};
+${vars.map(([k, v]) => `  --${k}: ${v};`).join('\n')}
+}
+html {
+  background-color: var(--paper);
+  ${newtabTexture(t)}
+}
+`;
+}
+
 // mpv.conf includes this; the OSC sits on surface with ink controls and holds a pressed control in the accent.
 function mpvOptions(t) {
   const c = t.color;

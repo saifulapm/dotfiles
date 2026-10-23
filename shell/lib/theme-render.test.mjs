@@ -33,6 +33,17 @@ test('renders the app fragments and no kitty or opencode file', (t) => {
   assert.deepEqual(names.filter((n) => /kitty|opencode/i.test(n)), []);
 });
 
+test('renders the new-tab extension beside the theme, with the page\'s words copied from the shell', (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-theme-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  execFileSync('node', [cli, 'blueprint'], { env: { ...process.env, XDG_STATE_HOME: state } });
+  const dir = join(state, 'dots/theme-out/chromium-newtab');
+  assert.deepEqual(readdirSync(dir).sort(), ['manifest.json', 'newtab.css', 'newtab.html', 'newtab.js', 'theme.css', 'words.mjs']);
+  assert.equal(readFileSync(join(dir, 'words.mjs'), 'utf8'), readFileSync(new URL('./newtab.mjs', import.meta.url), 'utf8'));
+  assert.match(readFileSync(join(dir, 'newtab.html'), 'utf8'), /data-voice="bracket"/);
+  assert.match(readFileSync(join(dir, 'newtab.js'), 'utf8'), /from '\.\/words\.mjs'/);
+});
+
 test('an unknown theme exits non-zero and names it', () => {
   assert.throws(
     () => execFileSync('node', [cli, 'nope'], { stdio: 'pipe' }),
@@ -56,6 +67,7 @@ test('themes.json lists every valid theme, paper first, and skips a broken one',
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const repo = new URL('../..', import.meta.url).pathname;
   cpSync(join(repo, 'shell/lib'), join(root, 'shell/lib'), { recursive: true });
+  cpSync(join(repo, 'shell/newtab'), join(root, 'shell/newtab'), { recursive: true });
   cpSync(join(repo, 'themes'), join(root, 'themes'), { recursive: true });
   mkdirSync(join(root, 'themes/broken'));
   writeFileSync(join(root, 'themes/broken/theme.toml'), '[meta]\nname = "broken"\nmode = "dim"\n');
