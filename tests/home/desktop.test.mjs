@@ -60,14 +60,14 @@ test('a mailto link opens mail-open', () => {
   assert.match(entry, /^MimeType=x-scheme-handler\/mailto;$/m);
 });
 
-test('WirePlumber connects A2DP and retries HFP on attach, with a dummy AVRCP player and no SBC-XQ', () => {
+test('WirePlumber connects A2DP and retries HFP on attach, with a dummy AVRCP player, no SBC-XQ and wideband calls', () => {
   const r = spawnSync('spa-json-dump', [join(home, '.config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf')], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   const conf = JSON.parse(r.stdout);
   assert.deepEqual(conf['monitor.bluez.properties'], {
     'bluez5.roles': ['a2dp_source', 'hfp_ag'],
     'bluez5.dummy-avrcp-player': true,
-    'bluez5.codecs': ['sbc', 'aac'],
+    'bluez5.codecs': ['sbc', 'aac', 'msbc', 'lc3_swb'],
   });
   assert.deepEqual(conf['monitor.bluez.rules'], [
     {

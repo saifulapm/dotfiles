@@ -29,7 +29,9 @@ const FAKES = {
   dig: `host=\${4#@}; name=$7; type=$8
 echo "$host $type" >>"$FAKE/dig.log"
 [[ -f $FAKE/dns/$host ]] || exit 0
-if [[ $type == PTR ]]; then head -1 "$FAKE/dns/$host"; else tail -1 "$FAKE/dns/$host" | sed 's/[^ ]*/"&"/g'; fi
+if [[ $type == PTR ]]; then cat "$FAKE/dns/$host.ptr" 2>/dev/null; head -1 "$FAKE/dns/$host"
+elif [[ $name == "$(head -1 "$FAKE/dns/$host")" ]]; then tail -1 "$FAKE/dns/$host" | sed 's/[^ ]*/"&"/g'
+else echo '"deviceid=AA:BB:CC:DD:EE:FF" "model=Macmini9,1"'; fi
 `,
   cliairplay: `run=$FAKE/runs/$(date +%s%N); mkdir -p "$run"; printf '%s\\n' "$@" >"$run/argv"
 while (($#)); do [[ $1 == --cmdpipe ]] && cmd=$2; shift; done
@@ -52,6 +54,11 @@ while :; do
       echo '[STATUS] started requested_unix_ms=0 at_unix_ms=1792774045151'
       if [[ $(cat "$FAKE/mode") == stalled ]]; then
         echo '[STATUS] clock_ready mode=ptp state=stalled streak_ms=0 exchanges=0 ready_in_ms=0 ready_at_unix_ms=0'
+      elif [[ $(cat "$FAKE/mode") == recovers ]]; then
+        echo '[STATUS] clock_ready mode=ptp state=stalled streak_ms=0 exchanges=0 ready_in_ms=0 ready_at_unix_ms=0'
+        sleep 0.4
+        echo '[STATUS] clock_ready mode=ptp state=probing streak_ms=0 exchanges=2 ready_in_ms=2300 ready_at_unix_ms=1792774047451'
+        echo '[STATUS] clock_ready mode=ptp state=ready streak_ms=2300 exchanges=12 ready_in_ms=0 ready_at_unix_ms=1792774047451'
       else
         echo '[STATUS] clock_ready mode=ptp state=ready streak_ms=2300 exchanges=12 ready_in_ms=0 ready_at_unix_ms=1792774047451'
       fi ;;
@@ -96,8 +103,8 @@ function setup({ mode = 'ok', links = '', addrs = '' } = {}) {
         }),
     host: () => (existsSync(join(root, 'state/dots-homepod/host')) ? readFileSync(join(root, 'state/dots-homepod/host'), 'utf8').trim() : null),
     digs: () => (existsSync(join(fake, 'dig.log')) ? readFileSync(join(fake, 'dig.log'), 'utf8') : ''),
-    start() {
-      t.proc = spawn('bash', [bin], { env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    start(nets) {
+      t.proc = spawn('bash', [bin], { env: nets ? { ...env, DOTS_HOMEPOD_NETS: nets[0] } : env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
       t.proc.stdout.on('data', (d) => (t.out += d));
       t.proc.stderr.on('data', (d) => (t.out += d));
     },
@@ -166,6 +173,16 @@ test('a HomePod at neither known address is found by a sweep of the office net, 
   assert.match(h.digs(), /^127\.0\.0\.7 PTR\n/, 'the last address is asked before any other');
 });
 
+test('a machine anywhere in the office net sweeps all of it, not only its own /24', async (t) => {
+  const port = await airplayPort('127.0.1.7');
+  t.after(() => port.close());
+  const h = setup({ links: STREAM, addrs: '1: lo    inet 127.0.0.1/8 scope host lo\n' });
+  h.homepod('127.0.1.7');
+  h.start(['127.0.0 127.0.1']);
+  t.after(h.stop);
+  await until('a session starts at the host in the other /24', () => h.runs()[0]?.argv.at(-1) === '127.0.1.7', 15000);
+});
+
 test('a machine with no address in the office net sweeps nothing', async (t) => {
   const port = await airplayPort('127.0.0.7');
   t.after(() => port.close());
@@ -197,7 +214,52 @@ test('a HomePod that never answers the PTP clock ends the session, naming the po
   h.start();
   t.after(h.stop);
   await until('the stall is logged', () => /does not answer the PTP clock; UDP 319 and 320 must reach this machine/.test(h.out));
+  assert.ok(h.runs()[0].cmds.includes('ACTION=DISCONNECT'), 'the session is ended, not just killed');
   await until('a later try', () => h.runs().length >= 2);
+});
+
+test('a clock that stalls for a moment and then answers keeps the session', async (t) => {
+  const h = setup({ mode: 'recovers', links: STREAM });
+  h.homepod('192.168.68.50');
+  h.start();
+  t.after(h.stop);
+  await until('a session starts', () => h.runs()[0]?.cmds.includes('ACTION=START'));
+  await sleep(2000);
+  assert.doesNotMatch(h.out, /does not answer the PTP clock/);
+  assert.deepEqual(h.runs().map((r) => r.cmds), ['ACTION=START\n']);
+});
+
+test('a missing cliairplay says so in the journal', async (t) => {
+  const h = setup({ links: STREAM });
+  rmSync(join(h.root, 'bin/cliairplay'));
+  h.homepod('192.168.68.50');
+  h.start();
+  t.after(h.stop);
+  await until('the failure is logged', () => /cliairplay: command not found/.test(h.out));
+});
+
+test('a HomePod that is found nowhere is looked for again after 30 ticks, then after twice as long each time', async (t) => {
+  const h = setup({ links: STREAM });
+  h.start();
+  t.after(h.stop);
+  const tries = () => [...h.digs().matchAll(/^192\.168\.68\.50 PTR$/gm)].length;
+  const at = [];
+  await until('three looks', () => {
+    if (tries() > at.length) at.push(Date.now());
+    return at.length >= 3;
+  }, 15000);
+  assert.ok(at[1] - at[0] >= 2900, `second look after ${at[1] - at[0]} ms`);
+  assert.ok(at[2] - at[1] >= 5900, `third look after ${at[2] - at[1]} ms`);
+});
+
+test('a HomePod answering beside another AirPlay service on the same host is still found', async (t) => {
+  const h = setup({ links: STREAM });
+  h.homepod('192.168.68.50');
+  writeFileSync(join(h.fake, 'dns', '192.168.68.50.ptr'), 'Studio Mac._airplay._tcp.local.\n');
+  h.start();
+  t.after(h.stop);
+  await until('a session starts', () => h.runs()[0]?.cmds.includes('ACTION=START'));
+  assert.equal(h.runs()[0].argv[7], 'Office');
 });
 
 test('a HomePod that moves to a new address mid-session plays again there', async (t) => {

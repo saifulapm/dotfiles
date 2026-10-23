@@ -17,16 +17,18 @@ playing() {
   pw-link -l -i 2>/dev/null | awk '/^homepod:playback_/ { on = 1; next } /^[^ ]/ { on = 0 } on && /\|<-/ { found = 1 } END { exit !found }'
 }
 
-# record <host>: prints "<name><TAB><txt>" when <host> answers unicast mDNS as our HomePod's _airplay._tcp service; anyone on the LAN can answer, so the name is printable and short before it reaches the journal.
+# record <host>: prints "<name><TAB><txt>" when one of <host>'s _airplay._tcp services on unicast mDNS is our HomePod (a sleep proxy answers for others too); anyone on the LAN can answer, so the name is printable and short before it reaches the journal.
 record() {
   local service txt
-  service=$(dig +short +time=1 +tries=1 @"$1" -p 5353 _airplay._tcp.local PTR 2>/dev/null | head -1)
-  [[ -n $service ]] || return 1
-  txt=$(dig +short +time=1 +tries=1 @"$1" -p 5353 "$service" TXT 2>/dev/null | tr -d '"')
-  [[ " $txt " == *" deviceid=$id "* ]] || return 1
-  service=${service%%._airplay._tcp.local.}
-  service=${service//[^[:alnum:] ._()-]/}
-  printf '%s\t%s\n' "${service:0:40}" "${txt//[^[:print:]]/}"
+  while read -r service; do
+    txt=$(dig +short +time=1 +tries=1 @"$1" -p 5353 "$service" TXT 2>/dev/null | tr -d '"')
+    [[ " $txt " == *" deviceid=$id "* ]] || continue
+    service=${service%%._airplay._tcp.local.}
+    service=${service//[^[:alnum:] ._()-]/}
+    printf '%s\t%s\n' "${service:0:40}" "${txt//[^[:print:]]/}"
+    return 0
+  done < <(dig +short +time=1 +tries=1 @"$1" -p 5353 _airplay._tcp.local PTR 2>/dev/null)
+  return 1
 }
 
 # sweep <net>: every host of <net>.0/24 that accepts a connection on 7000, AirPlay's port.
@@ -35,15 +37,14 @@ sweep() {
   seq 1 254 | xargs -P 64 -I{} bash -c 'timeout 0.3 bash -c "echo >/dev/tcp/$0/7000" 2>/dev/null && echo "$0"' "$1.{}"
 }
 
-# resolve: sets host, name and txt; the sweep runs only while this machine holds an address in a net, so it never probes a LAN that is not the office's.
+# resolve: sets host, name and txt; the sweep covers every net, and only while this machine holds an address in one of them, so it never probes a LAN that is not the office's.
 resolve() {
   local cand found="" net
   for cand in $(cat "$state/host" 2>/dev/null) 192.168.68.50 192.168.68.51; do
     found=$(record "$cand") && break
   done
-  if [[ -z $found ]]; then
+  if [[ -z $found ]] && ip -4 -o addr show 2>/dev/null | grep -qE " inet (${nets// /|})\."; then
     for net in $nets; do
-      ip -4 -o addr show 2>/dev/null | grep -qF " $net." || continue
       while read -r cand; do
         found=$(record "$cand") && break 2
       done < <(sweep "$net")
@@ -57,7 +58,7 @@ resolve() {
 
 # send: one AirPlay session; 0 when nothing has played for 10 s, 1 when the HomePod failed or left it.
 send() {
-  local cmd=$run/cmd audio=$run/audio out=$run/cliairplay.log rec pid t=0 idle=0 misses=0 rc=1
+  local cmd=$run/cmd audio=$run/audio out=$run/cliairplay.log rec pid t=0 idle=0 stalled=0 misses=0 rc=1
   rm -f "$cmd" "$audio" && mkfifo "$cmd" "$audio" || return 1
   exec 3<>"$cmd"
   # 44.1 kHz s16 stereo is cliairplay's input format; the sink's monitor carries its volume, so Control's slider sets how loud the HomePod plays.
@@ -74,13 +75,14 @@ send() {
       idle=0
     elif ((++idle >= 10)); then
       log "nothing plays; ending the session"
-      echo ACTION=DISCONNECT >&3
       rc=0
       break
     fi
+    # cliairplay calls a clock stalled after 5 s unanswered, and a late HomePod can still answer.
     if grep -a 'clock_ready' "$out" | tail -1 | grep -q 'state=stalled'; then
-      log "the HomePod does not answer the PTP clock; UDP 319 and 320 must reach this machine"
-      break
+      ((++stalled >= 10)) && { log "the HomePod does not answer the PTP clock; UDP 319 and 320 must reach this machine"; break; }
+    else
+      stalled=0
     fi
     if grep -aq '^\[STATUS\] eof' "$out"; then
       log "pw-record stopped"
@@ -96,7 +98,11 @@ send() {
       fi
     fi
   done
-  grep -a '^\[STATUS\] error' "$out" | tail -1
+  if kill -0 "$pid" 2>/dev/null; then
+    echo ACTION=DISCONNECT >&3
+  else
+    grep -aE '^\[STATUS\] error|^\[ERROR\]|not found' "$out" | tail -2
+  fi
   for ((t = 0; t < 30; t++)); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
   kill "$pid" "$rec" 2>/dev/null
   wait "$pid" "$rec" 2>/dev/null
@@ -104,14 +110,22 @@ send() {
   return "$rc"
 }
 
+# A HomePod found nowhere is looked for after 30 s, then twice as long each time up to 10 minutes, so an unplugged one does not get the LAN swept all day.
+away=15
 while :; do
   until playing; do sleep "$tick"; done
   if ! resolve; then
-    log "the HomePod answers nowhere on the office LAN"
+    away=$((away * 2 > 600 ? 600 : away * 2))
+    log "the HomePod answers nowhere on the office LAN; looking again in $away s"
+    pause=$away
   elif send; then
+    away=15
     continue
+  else
+    away=15
+    pause=10
   fi
-  for ((i = 0; i < 10; i++)); do sleep "$tick"; done
+  for ((i = 0; i < pause; i++)); do sleep "$tick"; done
 done
 exit
 }

@@ -113,6 +113,7 @@ test('the sender runs from ~/.local/bin as a user unit at login, on the mini onl
   const unit = read('home/dot_config/systemd/user/dots-homepod.service');
   assert.match(unit, /^ConditionHost=mac-mini-m2$/m);
   assert.match(unit, /^ExecStart=%h\/\.local\/bin\/dots-homepod$/m);
+  assert.match(unit, /^Environment=PATH=%h\/\.local\/bin:\/usr\/local\/bin:\/usr\/bin:\/bin$/m, 'cliairplay is found at boot, before the manager has ~/.local/bin');
   assert.match(unit, /^Restart=always$/m);
   assert.match(unit, /^StartLimitIntervalSec=0$/m);
   assert.equal(read('home/dot_config/systemd/user/default.target.wants/symlink_dots-homepod.service').trim(), '../dots-homepod.service');
