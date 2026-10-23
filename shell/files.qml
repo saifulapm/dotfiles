@@ -268,6 +268,7 @@ ShellRoot {
                 rows: app.rows.map(r => r.name),
                 dirs: app.rows.filter(r => r.dir).map(r => r.name),
                 marked: app.marked,
+                share: share.state(),
                 places: app.allPlaces.map(p => p.group + ":" + p.label),
                 placeAt: app.placeAt,
                 path: pathLine.text,
@@ -313,6 +314,16 @@ ShellRoot {
             }
         }
 
+        FilesShare {
+            id: share
+            // Above the column that is declared after it.
+            z: 10
+            c: app.c
+            fonts: app.fonts
+            look: app.look
+            onClosed: keys.forceActiveFocus()
+        }
+
         Item {
             id: keys
             anchors.fill: parent
@@ -331,6 +342,10 @@ ShellRoot {
                     app.rowKey("up");
                 else if (t === "l" || k === Qt.Key_Right || k === Qt.Key_Return || k === Qt.Key_Enter)
                     app.rowKey("in");
+                else if (t === "s" && app.side === "list" && app.listed) {
+                    const set = F.shareSet(app.rows, app.marked, app.folder, app.cursorRow);
+                    share.show(set.paths, set.bytes);
+                }
                 else if (t === "h" || k === Qt.Key_Left || k === Qt.Key_Backspace)
                     app.rowKey("out");
                 else if (k === Qt.Key_Space)
