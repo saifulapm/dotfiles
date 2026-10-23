@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { home, must, run, scratch, secrets } from './secrets-lib.mjs';
+import { dufsConfig, home, must, run, scratch, secrets } from './secrets-lib.mjs';
 
 const repo = new URL('../..', import.meta.url).pathname;
 const KEY = '-----BEGIN OPENSSH PRIVATE KEY-----\nsecrets-test-key\n-----END OPENSSH PRIVATE KEY-----\n';
@@ -14,6 +14,7 @@ const PASS = {
   'AI/context7/main': 'ctx7sk-test',
   'workflow/hub-peer-token': 'peer-test',
   'workflow/slack-bot-token': 'xoxb-test',
+  'dufs/saiful': 'dufs-test-password',
 };
 
 let w;
@@ -121,6 +122,13 @@ test('a fresh machine gets the Dropbox remote, age key, ~/.ssh, GPG key, pass st
   const env = join(m.XDG_CONFIG_HOME, 'hub/local.env');
   assert.equal(readFileSync(env, 'utf8'), 'HUB_PEER_TOKEN=peer-test\nSLACK_BOT_TOKEN=xoxb-test\n');
   assert.equal(mode(env), '600');
+
+  const dufs = join(m.XDG_CONFIG_HOME, 'dufs/config.yaml');
+  const hash = readFileSync(dufs, 'utf8').match(/saiful:(\$6\$[^@]+)@/)[1];
+  assert.equal(readFileSync(dufs, 'utf8'), dufsConfig(hash));
+  assert.equal(mode(dufs), '600');
+  const salt = hash.split('$')[2];
+  assert.equal(await must(m, 'openssl', ['passwd', '-6', '-salt', salt, '-stdin'], 'dufs-test-password\n'), hash + '\n');
 });
 
 test('a second run changes no file in the scratch home', async () => {
@@ -223,4 +231,19 @@ test('with no base and an id_ed25519 that differs from the blob, it stops on the
   assert.match(r.stderr, /conflict, run dots sync --adopt local or remote/);
   assert.deepEqual(readdirSync(join(m.HOME, '.ssh')), ['id_ed25519']);
   assert.equal(readFileSync(join(m.HOME, '.ssh/id_ed25519'), 'utf8'), 'another key\n');
+});
+
+// Last in the file: killing this home's gpg-agent also drops the fresh home's secret keys, which the tests above still use.
+test('with no dufs/saiful in pass it names pass insert, writes no dufs config and finishes', async () => {
+  const m = { ...home(w.root, 'nodufs', w.conf), DOTS_PASS_REPO: w.m.DOTS_PASS_REPO };
+  await must(m, 'git', ['clone', '--quiet', w.m.DOTS_PASS_REPO, m.PASSWORD_STORE_DIR]);
+  await must(m, 'pass', ['rm', '-f', 'dufs/saiful']);
+  try {
+    const r = await secrets(m);
+    assert.equal(r.code, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^dots: no dufs\/saiful in pass; dufs stays off\. Next: pass insert dufs\/saiful, then dots secrets$/m);
+    assert.equal(existsSync(join(m.XDG_CONFIG_HOME, 'dufs/config.yaml')), false);
+  } finally {
+    await run(m, 'gpgconf', ['--kill', 'gpg-agent']);
+  }
 });
