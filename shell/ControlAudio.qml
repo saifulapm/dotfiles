@@ -14,8 +14,13 @@ Item {
     readonly property var all: Pipewire.nodes.values.filter(n => n.audio && !n.isStream)
     readonly property var nodes: all.filter(n => n.isSink).concat(all.filter(n => !n.isSink))
     // The preferred node is the one Enter sets; the session manager then makes it the default.
-    readonly property PwNode defaultSink: Pipewire.preferredDefaultAudioSink ?? Pipewire.defaultAudioSink
-    readonly property PwNode defaultSource: Pipewire.preferredDefaultAudioSource ?? Pipewire.defaultAudioSource
+    // One binding per Pipewire property: Quickshell 0.3.2 hands a binding that reads both a freed node while the default vanishes.
+    readonly property PwNode preferredSink: Pipewire.preferredDefaultAudioSink
+    readonly property PwNode currentSink: Pipewire.defaultAudioSink
+    readonly property PwNode preferredSource: Pipewire.preferredDefaultAudioSource
+    readonly property PwNode currentSource: Pipewire.defaultAudioSource
+    readonly property PwNode defaultSink: preferredSink ?? currentSink
+    readonly property PwNode defaultSource: preferredSource ?? currentSource
     readonly property var rows: nodes.map(n => Lib.audioRow({
                 name: n.name,
                 description: n.description,
