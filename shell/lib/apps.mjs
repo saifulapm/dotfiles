@@ -1,4 +1,4 @@
-// Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, mpv, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
+// Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, mpv, zathura, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
 import { mix } from './notes-look.mjs';
 
 const lower = (s) => s.toLowerCase();
@@ -311,6 +311,23 @@ export function renderMpv(t) {
 export function renderMpvIpc(t) {
   const cmd = ([k, v]) => (k === 'script-opts-append' ? ['change-list', 'script-opts', 'append', v] : ['set_property', k, v]);
   return mpvOptions(t).map((o) => JSON.stringify({ command: cmd(o) })).join('\n') + '\n';
+}
+
+// zathurarc includes this. Dark themes recolour the page into paper and ink, keeping image hues; a light theme says recolor false, since a re-source keeps any option it does not name.
+export function renderZathura(t) {
+  const c = t.color;
+  const [ink, muted, paper, surface, accent, danger] = [c.ink, c.muted, c.paper, c.surface, c.accent, c.danger].map(lower);
+  const pairs = [
+    ['default', paper, ink], ['statusbar', surface, ink], ['inputbar', surface, ink], ['index', paper, ink], ['index-active', accent, surface],
+    ['completion', surface, ink], ['completion-group', paper, muted], ['completion-highlight', accent, surface],
+    ['notification', surface, ink], ['notification-error', danger, surface], ['notification-warning', accent, surface],
+  ];
+  const lines = [];
+  for (const [k, bg, fg] of pairs) lines.push(`set ${k}-bg "${bg}"`, `set ${k}-fg "${fg}"`);
+  lines.push(`set highlight-color "${accent}"`, `set highlight-active-color "${danger}"`, `set font "${t.type.ui} 11"`);
+  const dark = t.mode === 'dark';
+  lines.push(`set recolor ${dark}`, `set recolor-keephue ${dark}`, `set recolor-lightcolor "${paper}"`, `set recolor-darkcolor "${ink}"`);
+  return lines.join('\n') + '\n';
 }
 
 // The coding agents draw inside foot, so each sits on surface with ink text; Claude Code, pi and amx name the theme dots.

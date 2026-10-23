@@ -102,6 +102,14 @@ reload_mpv() {
   done
 }
 
+# Each zathura answers on the session bus by its pid and rereads its zathurarc, and with it the fragment, on SourceConfig.
+reload_zathura() {
+  local name
+  for name in $(busctl --user list --no-legend 2>/dev/null | awk '$1 ~ /^org\.pwmt\.zathura\.PID-/ {print $1}'); do
+    busctl --user call "$name" /org/pwmt/zathura org.pwmt.zathura SourceConfig >/dev/null || return 1
+  done
+}
+
 # Each coding agent's config names the theme file below, and an agent not installed gets no file; cp writes in place, so a watcher on the file itself sees the change.
 reload_agents() {
   local home=${DOTS_AGENT_HOME:-$HOME} src dst
@@ -158,6 +166,7 @@ theme() {
   { command -v kak >/dev/null && reload_kak; } &
   reload_helix &
   { reload_mpv "$out" || echo mpv >>"$failed"; } &
+  { reload_zathura || echo zathura >>"$failed"; } &
   { gsettings set org.gnome.desktop.interface color-scheme "$scheme" &&
     gsettings set org.gnome.desktop.interface font-name "$ui 11" &&
     gsettings set org.gnome.desktop.interface monospace-font-name "$mono 11" || echo gsettings >>"$failed"; } &

@@ -191,3 +191,24 @@ test('a socket left by a killed mpv is removed by the next switch, which still r
   assert.equal((await mpvAsk(liveSock, ['get_property', 'osd-color'])).toLowerCase(), '#ffd6f4f8');
   assert.equal(readFileSync(join(state, 'dots/theme-out/notice'), 'utf8'), 'theme blueprint: gsettings did not reload\n');
 });
+
+// zathura answers on the session bus as org.pwmt.zathura.PID-<pid>; this busctl stands in for that bus and logs each call, and the nested check drives a real zathura.
+test('a switch has every zathura on the session bus re-source its config', (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-zathura-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  const bin = join(state, 'bin');
+  mkdirSync(bin);
+  const log = join(state, 'busctl.log');
+  writeFileSync(join(bin, 'busctl'), `#!/bin/bash
+echo "$*" >>${log}
+[[ $* == *' list'* ]] && printf '%s\\n' ':1.7 4242 zathura saiful :1.7 - - -' 'org.pwmt.zathura.PID-4242 4242 zathura saiful :1.7 - - -' 'org.pwmt.zathura.PID-77 77 zathura saiful :1.9 - - -' 'org.freedesktop.Notifications 12 qs saiful :1.2 - - -'
+exit 0
+`, { mode: 0o755 });
+  const env = Object.assign(isolated(state), { PATH: `${bin}:${process.env.PATH}` });
+  assert.equal(spawnSync(dots, ['theme', 'blueprint'], { env }).status, 0);
+  const calls = readFileSync(log, 'utf8').trim().split('\n').filter((l) => l.includes(' call '));
+  assert.deepEqual(calls.sort(), [
+    '--user call org.pwmt.zathura.PID-4242 /org/pwmt/zathura org.pwmt.zathura SourceConfig',
+    '--user call org.pwmt.zathura.PID-77 /org/pwmt/zathura org.pwmt.zathura SourceConfig',
+  ]);
+});

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
 import { validateTheme, contrast } from './theme.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv } from './apps.mjs';
+import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv, renderZathura } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const blueprint = load('blueprint');
@@ -265,4 +265,25 @@ test('the mpv fragment sets the OSD, the subtitle font and the OSC colours from 
   assert.match(conf, /^script-opts-append="osc-held_element_color=#7fe3f0"$/m);
   assert.match(renderMpv(paper), /^sub-font="Instrument Serif"$/m);
   for (const line of conf.trim().split('\n')) assert.match(line, /^[a-z-]+="[^"]+"$/);
+});
+
+// Dark themes recolour the page, keeping image hues, as v1 did; a light theme sets recolor false outright, since a re-source keeps any option it does not name.
+test('the zathura fragment sets every colour, the font, and recolours pages only in dark themes', () => {
+  const z = renderZathura(blueprint);
+  assert.match(z, /^set default-bg "#0c1a2e"$/m);
+  assert.match(z, /^set statusbar-fg "#d6f4f8"$/m);
+  assert.match(z, /^set index-active-bg "#7fe3f0"$/m);
+  assert.match(z, /^set font "Maple Mono 11"$/m);
+  assert.match(z, /^set recolor true$/m);
+  assert.match(z, /^set recolor-keephue true$/m);
+  assert.match(z, /^set recolor-lightcolor "#0c1a2e"$/m);
+  assert.match(z, /^set recolor-darkcolor "#d6f4f8"$/m);
+  for (const t of [paper, artboard]) {
+    assert.match(renderZathura(t), /^set recolor false$/m, t.name);
+    assert.match(renderZathura(t), new RegExp(`^set default-bg "${t.color.paper.toLowerCase()}"$`, 'm'), t.name);
+  }
+  for (const k of ['default', 'statusbar', 'inputbar', 'index', 'index-active', 'completion', 'completion-group', 'completion-highlight', 'notification', 'notification-error', 'notification-warning']) {
+    assert.match(z, new RegExp(`^set ${k}-bg "#[0-9a-f]{6}"$`, 'm'), k);
+    assert.match(z, new RegExp(`^set ${k}-fg "#[0-9a-f]{6}"$`, 'm'), k);
+  }
 });
