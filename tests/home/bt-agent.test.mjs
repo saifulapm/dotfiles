@@ -14,8 +14,10 @@ test('bt-agent runs at login with NoInputNoOutput, and a machine with no adapter
   assert.match(unit, /^ConditionDirectoryNotEmpty=\/sys\/class\/bluetooth$/m);
   assert.match(unit, /^ExecStart=\/usr\/bin\/bt-agent -c NoInputNoOutput$/m);
   assert.match(unit, /^Restart=on-failure$/m);
-  assert.match(unit, /^WantedBy=default\.target$/m);
-  assert.equal(read('home/dot_config/systemd/user/default.target.wants/symlink_bt-agent.service').trim(), '../bt-agent.service');
+  // The user manager's bluetooth.target starts once udev sees an adapter, so a login racing the adapter still gets the agent.
+  assert.match(unit, /^After=bluetooth\.target$/m);
+  assert.match(unit, /^WantedBy=bluetooth\.target$/m);
+  assert.equal(read('home/dot_config/systemd/user/bluetooth.target.wants/symlink_bt-agent.service').trim(), '../bt-agent.service');
 });
 
 test('bt-agent waits for bluetoothd on the system bus instead of failing', () => {

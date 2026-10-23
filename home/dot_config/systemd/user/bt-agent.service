@@ -1,5 +1,7 @@
 [Unit]
 Description=Bluetooth pairing agent that confirms every request, so Control's pair completes
+# udev pulls in the user manager's bluetooth.target once an adapter shows, so a login that beats the adapter still gets the agent.
+After=bluetooth.target
 # A machine with no adapter, or a container, leaves the agent inactive, never failed.
 ConditionDirectoryNotEmpty=/sys/class/bluetooth
 
@@ -12,4 +14,4 @@ Restart=on-failure
 RestartSec=2
 
 [Install]
-WantedBy=default.target
+WantedBy=bluetooth.target
