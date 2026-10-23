@@ -16,6 +16,11 @@ tools_version={{ $tools.version | quote }}
 tools_url={{ $tools.url | replace "{version}" $tools.version | quote }}
 tools_sha256={{ $tools.sha256 | quote }}
 packages=(platform-tools{{ range list "platform" "build-tools" "ndk" }}{{ $p := index $t . }} {{ $p.package | replace "{version}" $p.version | quote }}{{ end }})
+{{- if eq .chezmoi.arch "amd64" }}
+# Google ships the emulator for x86_64 Linux only; the image is the one the NUC's lareys AVD already runs.
+image="system-images;android-35;google_apis;x86_64"
+packages+=(emulator "$image")
+{{- end }}
 gradle_version={{ $gradle.version | quote }}
 gradle_url={{ $gradle.url | replace "{version}" $gradle.version | quote }}
 gradle_sha256={{ $gradle.sha256 | quote }}
@@ -78,6 +83,14 @@ touch "$HOME/.gradle/gradle.properties"
 { grep -v '^android.aapt2FromMavenOverride=' "$HOME/.gradle/gradle.properties" || true; echo "android.aapt2FromMavenOverride=$build_tools/aapt2"; } >"$tmp/gradle.properties"
 cat "$tmp/gradle.properties" >"$HOME/.gradle/gradle.properties"
 for f in adb fastboot; do ln -sfn "/usr/bin/$f" "$sdk/platform-tools/$f"; done
+{{ end -}}
+
+{{ if eq .chezmoi.arch "amd64" -}}
+if [[ ! -f $HOME/.android/avd/lareys.ini ]]; then
+  # avdmanager asks whether to make a custom hardware profile; the answer is no.
+  echo no | "$tools/bin/avdmanager" create avd -n lareys -k "$image" -d pixel_8 >"$tmp/avdmanager.log" 2>&1 || { cat "$tmp/avdmanager.log" >&2; die "mobile: avdmanager could not create the lareys AVD"; }
+  log "mobile: the lareys AVD"
+fi
 {{ end -}}
 
 gradle_home=$HOME/.local/opt/gradle-$gradle_version

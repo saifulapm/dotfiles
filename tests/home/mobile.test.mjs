@@ -21,6 +21,14 @@ for a in "$@"; do
 done
 `;
 
+// avdmanager logs each call and writes the AVD's ini where the emulator looks for it.
+const AVDMANAGER = `#!/bin/bash
+echo "avdmanager $*" >> "$HOME/calls.log"
+cat > /dev/null
+mkdir -p "$HOME/.android/avd"
+echo "path=$HOME/.android/avd/$4.avd" > "$HOME/.android/avd/$4.ini"
+`;
+
 // swiftly logs each call: init moves it into SWIFTLY_BIN_DIR, install makes the toolchain and its proxies, and SWIFT_DEPS stands for the packages a toolchain wants.
 const SWIFTLY = `#!/bin/bash
 [ "$1" = --version ] && { echo 1.1.3; exit 0; }
@@ -57,7 +65,7 @@ function world({ tools = '15859902', badSha = false } = {}) {
   mkdirSync(join(home, '.cargo/bin'), { recursive: true });
   writeFileSync(join(home, '.cargo/bin/rustup'), '#!/bin/sh\necho "rustup $*" >> "$HOME/calls.log"\n', { mode: 0o755 });
   mkdirSync(files);
-  const toolsZip = zip(files, `commandlinetools-linux-${tools}_latest.zip`, { 'cmdline-tools/bin/sdkmanager': [SDKMANAGER, 0o755], 'cmdline-tools/NOTICE.txt': [tools, 0o644] });
+  const toolsZip = zip(files, `commandlinetools-linux-${tools}_latest.zip`, { 'cmdline-tools/bin/sdkmanager': [SDKMANAGER, 0o755], 'cmdline-tools/bin/avdmanager': [AVDMANAGER, 0o755], 'cmdline-tools/NOTICE.txt': [tools, 0o644] });
   const gradleZip = zip(files, 'gradle-9.7.1-bin.zip', { 'gradle-9.7.1/bin/gradle': ['#!/bin/sh\necho "Gradle 9.7.1"\n', 0o755] });
   const swiftlyDir = mkdtempSync(join(files, 'swiftly-'));
   writeFileSync(join(swiftlyDir, 'swiftly'), SWIFTLY, { mode: 0o755 });
@@ -214,4 +222,29 @@ test('a Swift that wants system packages stops the script and names them', () =>
   const r = run(w, 'arm64', { SWIFT_DEPS: 'dnf -y install libstdc++-static\n' });
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /dots: mobile: Swift 6\.3\.3 wants system packages packages\.toml lacks: dnf -y install libstdc\+\+-static/);
+});
+
+// Google ships the emulator for x86_64 Linux only, so the NUC alone gets it, with the image and AVD it already runs.
+test('x86_64 gets the emulator, its system image and the lareys AVD, once', () => {
+  const w = world();
+  const r = run(w, 'amd64');
+  assert.equal(r.status, 0, r.stderr);
+  const sdk = join(w.home, 'Android/Sdk');
+  const mine = calls(w).filter((c) => /^(sdkmanager --sdk_root=\S+ platform|avdmanager)/.test(c));
+  assert.deepEqual(mine, [
+    `sdkmanager --sdk_root=${sdk} platform-tools platforms;android-37.0 build-tools;37.0.0 ndk;29.0.14206865 emulator system-images;android-35;google_apis;x86_64`,
+    'avdmanager create avd -n lareys -k system-images;android-35;google_apis;x86_64 -d pixel_8',
+  ]);
+  assert.ok(existsSync(join(sdk, 'system-images/android-35/google_apis/x86_64')));
+  assert.ok(existsSync(join(w.home, '.android/avd/lareys.ini')));
+  rmSync(join(w.home, 'calls.log'));
+  assert.equal(run(w, 'amd64').status, 0);
+  assert.deepEqual(calls(w).filter((c) => /^(sdkmanager|avdmanager)/.test(c)), []);
+});
+
+test('the Macs get no emulator, system image or AVD', () => {
+  const w = world();
+  assert.equal(run(w, 'arm64').status, 0);
+  assert.equal(calls(w).some((c) => /emulator|system-images|avdmanager/.test(c)), false);
+  assert.equal(existsSync(join(w.home, '.android/avd')), false);
 });
