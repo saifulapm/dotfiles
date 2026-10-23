@@ -1,4 +1,7 @@
 // Control's Bluetooth and Wi-Fi row order and text; an order is a list of indices, so the section maps rows back to its devices.
+import { line } from './voice.mjs';
+
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
 const btRank = (d) => (d.connected ? 0 : d.paired ? 1 : 2);
 const wifiRank = (n) => (n.connected ? 0 : n.known ? 1 : 2);
 
@@ -7,9 +10,11 @@ export function btOrder(devs) {
   return devs.map((d, i) => i).sort((a, b) => btRank(devs[a]) - btRank(devs[b]) || devs[a].name.localeCompare(devs[b].name));
 }
 
+// A headset sends its own name and battery, so the name is one line without controls, and a percentage past 0-100 is not drawn.
 export function btRow(dev) {
-  const battery = dev.connected && dev.batteryAvailable ? ' · ' + Math.round(dev.battery * 100) + '%' : '';
-  return { title: dev.name, detail: (dev.connected ? 'connected' : dev.paired ? 'paired' : 'new') + battery };
+  const percent = Math.round(dev.battery * 100);
+  const battery = dev.connected && dev.batteryAvailable && percent >= 0 && percent <= 100 ? ' · ' + percent + '%' : '';
+  return { title: line((dev.name || '').replace(CONTROL, ' ')) || dev.address, detail: (dev.connected ? 'connected' : dev.paired ? 'paired' : 'new') + battery };
 }
 
 export function wifiOrder(nets) {

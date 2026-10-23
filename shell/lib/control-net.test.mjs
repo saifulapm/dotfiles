@@ -24,6 +24,21 @@ test('a connected Bluetooth device with a battery reads its percentage', () => {
   assert.equal(btRow({ name: 'H', connected: false, paired: true, batteryAvailable: true, battery: 0.8 }).detail, 'paired');
 });
 
+test('a battery outside 0-100, which only a forged headset reports, draws no percentage', () => {
+  for (const battery of [2.55, 1.01, -0.1, NaN]) assert.equal(btRow({ name: 'H', connected: true, paired: true, batteryAvailable: true, battery }).detail, 'connected', battery);
+  assert.equal(btRow({ name: 'H', connected: true, paired: true, batteryAvailable: true, battery: 1 }).detail, 'connected · 100%');
+  assert.equal(btRow({ name: 'H', connected: true, paired: true, batteryAvailable: true, battery: 0 }).detail, 'connected · 0%');
+});
+
+test('a headset-controlled name draws on one line without controls or bidi marks, and an empty one as the address', () => {
+  const row = (name) => btRow({ name, address: '67:6D:E6:03:06:ED', connected: false, paired: true }).title;
+  assert.equal(row('Evil\nSecond line'), 'Evil Second line');
+  assert.equal(row('Bad\x1b[31mRED'), 'Bad [31mRED');
+  assert.equal(row('Pwn\u202etxt.exe'), 'Pwntxt.exe');
+  assert.equal(row(''), '67:6D:E6:03:06:ED');
+  assert.equal(row('\u202e \n'), '67:6D:E6:03:06:ED');
+});
+
 test('Wi-Fi lists the connected network, then known ones, then the rest by signal', () => {
   const nets = [
     { name: 'cafe', connected: false, known: false, signalStrength: 0.4 },
