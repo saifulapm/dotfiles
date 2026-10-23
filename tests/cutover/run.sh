@@ -43,12 +43,14 @@ printf 'FROM docker.io/library/fedora:44\nRUN echo keepcache=True >> /etc/dnf/dn
 podman run -d --name "$name" --user root --systemd=always --userns=keep-id --security-opt label=disable --security-opt mask=/sys/class/bluetooth \
   --passwd-entry "saiful:*:1000:1000::$home:/bin/bash" \
   -v "$snap/src.git:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 \
+  -v dots-install-android-sdk:$home/Android -v dots-install-swiftly:$home/.local/share/swiftly \
   "$image" >/dev/null || { echo "FAIL: container did not start"; exit 1; }
 
 as_root "
   set -e
   until systemctl is-system-running 2>/dev/null | grep -qE 'running|degraded'; do sleep 0.2; done
-  mkdir -p $home && chown saiful: $home
+  # podman makes the volumes' mount points and their parents as root; what is inside them is saiful's from earlier runs.
+  mkdir -p $home && chown saiful: $home $home/.local $home/.local/share $home/Android $home/.local/share/swiftly
   echo 'saiful ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/saiful
   loginctl enable-linger saiful
   until systemctl is-active -q user@1000.service; do sleep 0.2; done

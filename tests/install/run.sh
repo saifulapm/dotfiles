@@ -69,6 +69,7 @@ trap 'podman rm -f -t 0 "$name" >/dev/null 2>&1; rm -rf "$snap"' EXIT
 podman run -d --rm --name "$name" --userns=keep-id --security-opt label=disable \
   --passwd-entry "saiful:*:1000:1000::$home:/bin/bash" \
   -v "$snap/src.git:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 -v dots-install-cargo-cache:$home/.cargo:U -v dots-install-rustup-cache:$home/.rustup:U \
+  -v dots-install-android-sdk:$home/Android:U -v dots-install-swiftly:$home/.local/share/swiftly:U \
   docker.io/library/fedora:44 sleep infinity >/dev/null || { echo "FAIL: container did not start"; exit 1; }
 
 as_root "
@@ -76,7 +77,8 @@ as_root "
   # Downloaded rpms stay in the cache volume, so the next run fetches only what changed.
   echo keepcache=True >> /etc/dnf/dnf.conf
   command -v sudo >/dev/null || dnf -y -q install sudo
-  mkdir -p $home && chown saiful: $home
+  # podman makes the parents of the volumes' mount points as root.
+  mkdir -p $home && chown saiful: $home $home/.local $home/.local/share
   echo 'saiful ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/saiful
   mkdir -p /opt/shim
   printf '#!/bin/bash\necho \"\$*\" >> $log\nexec /usr/bin/sudo \"\$@\"\n' > /opt/shim/sudo
@@ -176,6 +178,32 @@ check "rustup --version exits 0" as_user "~/.cargo/bin/rustup --version >/dev/nu
 rustc=$(as_user "fish -c 'command -v rustc'" 2>&1)
 check "fish finds rustup's rustc first (got '$rustc')" test "$rustc" = "$home/.cargo/bin/rustc"
 check "Fedora's rustc stays for the pins" as_user "test -x /usr/bin/rustc"
+# The mobile toolchain at the versions.toml [[toolchain]] numbers, with the Macs' arm64 swaps and the NUC's emulator.
+tc() { committed versions.toml | awk -F' = ' -v want="$1" '/^\[\[/ { t = /^\[\[toolchain\]\]/; n = ""; next } t && $1 == "name" { gsub(/"/, "", $2); n = $2 } t && n == want && $1 == "version" { gsub(/"/, "", $2); print $2 }'; }
+installed=$(as_user "fish -c 'sdkmanager --list_installed'" 2>&1)
+for pkg in "platforms;android-$(tc platform)" "build-tools;$(tc build-tools)" "ndk;$(tc ndk)"; do
+  check "sdkmanager --list_installed lists $pkg" grep -qF -- "$pkg " <<<"$installed"
+done
+gradle=$(as_user "gradle --version" 2>&1)
+check "gradle --version shows $(tc gradle)" grep -qx "Gradle $(tc gradle)" <<<"$gradle"
+java=$(as_user "java -version" 2>&1)
+check "java -version shows 25 (got '${java%%$'\n'*}')" grep -q '^openjdk version "25' <<<"$java"
+swift=$(as_user "swift --version" 2>&1)
+check "swift --version shows $(tc swift) (got '${swift%%$'\n'*}')" grep -qF "Swift version $(tc swift) " <<<"$swift"
+check "swiftly's clang stays off PATH" as_user "test \"\$(fish -c 'command -v clang')\" = /usr/bin/clang"
+targets=$(as_user "~/.cargo/bin/rustup target list --installed" 2>&1)
+check "rustup has the aarch64-linux-android and x86_64-linux-android targets" bash -c 'grep -qx aarch64-linux-android <<<"$1" && grep -qx x86_64-linux-android <<<"$1"' _ "$targets"
+bt=$home/Android/Sdk/build-tools/$(tc build-tools)
+if [ "$(uname -m)" = aarch64 ]; then
+  check "aapt2 is an arm64 binary and runs" as_user "file -L $bt/aapt2 | grep -q 'ARM aarch64' && $bt/aapt2 version"
+  check "zipalign is an arm64 binary" as_user "file -L $bt/zipalign | grep -q 'ARM aarch64'"
+  check "gradle.properties points AGP at the arm64 aapt2" as_user "grep -qx 'android.aapt2FromMavenOverride=$bt/aapt2' ~/.gradle/gradle.properties"
+  check "the SDK's adb is Fedora's, and runs" as_user "test \"\$(readlink ~/Android/Sdk/platform-tools/adb)\" = /usr/bin/adb && ~/Android/Sdk/platform-tools/adb version >/dev/null"
+  check "the Macs have no emulator, system image or AVD" as_user "test ! -e ~/Android/Sdk/emulator -a ! -e ~/Android/Sdk/system-images -a ! -e ~/.android/avd/lareys.ini"
+else
+  check "x86_64 keeps Google's aapt2" as_user "file -L $bt/aapt2 | grep -q x86-64"
+  check "the emulator, its system image and the lareys AVD are in place" as_user "test -x ~/Android/Sdk/emulator/emulator -a -d ~/Android/Sdk/system-images/android-35/google_apis/x86_64 -a -f ~/.android/avd/lareys.ini"
+fi
 docker=$(as_user "docker --version" 2>&1)
 check "docker --version names podman (got '$docker')" grep -q podman <<<"$docker"
 check "eza is not installed" as_user "! command -v eza"
