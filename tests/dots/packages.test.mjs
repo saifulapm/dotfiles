@@ -54,3 +54,11 @@ test('the NUC\'s wifi firmware, VA driver and vainfo are declared for x86_64 onl
   assert.equal(byName.get('libva-utils')?.arch, 'x86_64');
   for (const name of ['iwlwifi-mvm-firmware', 'intel-media-driver', 'libva-utils']) assert.match(byName.get(name).why, /\w/, `${name} why`);
 });
+
+// Google's adb, aapt2 and NDK hosts are x86_64 only, so the Macs take adb from Fedora and build scrcpy against RPM Fusion's ffmpeg.
+test('the mobile toolchain\'s packages: JDK 25, clang and lld everywhere, adb and scrcpy\'s build deps on the Macs', () => {
+  for (const name of ['java-25-openjdk-devel', 'clang', 'lld']) assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
+  for (const name of ['android-tools', 'SDL3-devel', 'libusb1-devel', 'ffmpeg-devel']) assert.equal(byName.get(name)?.arch, 'aarch64', `${name} arch`);
+  assert.equal(byName.get('ffmpeg-devel').rpmfusion, 'free');
+  for (const name of ['java-25-openjdk-devel', 'clang', 'lld', 'android-tools', 'SDL3-devel', 'libusb1-devel', 'ffmpeg-devel']) assert.match(byName.get(name).why, /\w/, `${name} why`);
+});

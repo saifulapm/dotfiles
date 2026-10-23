@@ -489,12 +489,12 @@ why = "kak-mail renders HTML mail with it"
 [[package]]
 name = "meson"
 arch = "aarch64"
-why = "builds the libva-v4l2-request pin on the Macs"
+why = "builds the libva-v4l2-request and scrcpy pins on the Macs"
 
 [[package]]
 name = "ninja-build"
 arch = "aarch64"
-why = "meson's build backend for the libva-v4l2-request pin"
+why = "meson's build backend for the libva-v4l2-request and scrcpy pins"
 
 [[package]]
 name = "arm-none-eabi-gcc-cs"
@@ -524,7 +524,7 @@ why = "nm, which the AVD firmware build reads symbols with"
 [[package]]
 name = "pkgconf-pkg-config"
 arch = "aarch64"
-why = "pkg-config, which meson finds libva and libdrm with"
+why = "pkg-config, which meson finds libva, libdrm and scrcpy's libraries with"
 
 [[package]]
 name = "iwlwifi-mvm-firmware"
@@ -621,3 +621,39 @@ why = "bt-agent, which answers Bluetooth pairing for Control"
 name = "rustup"
 arch = "all"
 why = "rustup-init, which installs the per-user toolchain into ~/.cargo/bin"
+
+[[package]]
+name = "java-25-openjdk-devel"
+arch = "all"
+why = "the JDK Gradle and sdkmanager run on for lareys-mobile's Android shell"
+
+[[package]]
+name = "clang"
+arch = "all"
+why = "links the Rust engine's Android libraries on the Macs, where the NDK's own clang is x86_64"
+
+[[package]]
+name = "lld"
+arch = "all"
+why = "the linker clang uses for the Rust engine's Android libraries"
+
+[[package]]
+name = "android-tools"
+arch = "aarch64"
+why = "adb and fastboot on the Macs, where Google's platform-tools are x86_64"
+
+[[package]]
+name = "SDL3-devel"
+arch = "aarch64"
+why = "builds the scrcpy pin on the Macs, which have no scrcpy release"
+
+[[package]]
+name = "libusb1-devel"
+arch = "aarch64"
+why = "builds the scrcpy pin's USB support on the Macs"
+
+[[package]]
+name = "ffmpeg-devel"
+arch = "aarch64"
+rpmfusion = "free"
+why = "builds the scrcpy pin on the Macs against RPM Fusion's ffmpeg, which Fedora's -free devel packages conflict with"
