@@ -68,3 +68,7 @@ test("v1's LAN port for dufs is closed wherever firewalld runs, so dufs is reach
   assert.ok(state > 0 && state < script.indexOf('--remove-port=5000/tcp'), 'it asks firewalld first, so a container skips it');
   assert.match(script, /root firewall-cmd -q --remove-port=5000\/tcp && root firewall-cmd -q --permanent --remove-port=5000\/tcp/);
 });
+
+test("a kernel OOM kill takes only its process, never the rest of the user unit it ran in", () => {
+  assert.match(read('home/dot_config/systemd/user.conf.d/50-oom-policy.conf'), /^\[Manager\]\nDefaultOOMPolicy=continue$/m);
+});
