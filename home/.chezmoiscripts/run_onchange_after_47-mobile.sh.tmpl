@@ -67,7 +67,7 @@ if ((${#missing[@]})); then
 fi
 
 {{ if eq .chezmoi.arch "arm64" -}}
-# Google builds aapt2, zipalign and adb for x86_64 only, so the Macs swap in arm64 builds and Fedora's adb, each checked every run since an sdkmanager update puts Google's back.
+# Google builds aapt2, zipalign and adb for x86_64 only, so the Macs swap in arm64 builds and Fedora's adb, each checked whenever this script runs, so the next toolchain change undoes an sdkmanager update that put Google's back.
 build_tools=$sdk/build-tools/{{ $buildTools.version }}
 {{- range $f := list "aapt2" "zipalign" }}
 sum={{ index $arm.sha256 $f | quote }}
@@ -112,10 +112,10 @@ if [[ $("$SWIFTLY_BIN_DIR/swiftly" --version 2>/dev/null) != "$swiftly_version" 
   log "mobile: swiftly $swiftly_version"
 fi
 if [[ ! -d $SWIFTLY_HOME_DIR/toolchains/$swift_version ]]; then
-  # swiftly writes the system packages the toolchain lacks to this file instead of running sudo dnf from inside an apply.
+  # With a file to write them to, swiftly never runs sudo dnf for the system packages it thinks are missing; its yum check answers yes on dnf5 anyway, so the run below is the check.
   "$SWIFTLY_BIN_DIR/swiftly" install "$swift_version" --use --assume-yes --post-install-file "$tmp/swift-deps" >"$tmp/swiftly.log" 2>&1 || { cat "$tmp/swiftly.log" >&2; die "mobile: swiftly could not install Swift $swift_version"; }
-  [[ ! -s $tmp/swift-deps ]] || die "mobile: Swift $swift_version wants system packages packages.toml lacks: $(tr '\n' ' ' <"$tmp/swift-deps")"
   log "mobile: Swift $swift_version"
 fi
+out=$("$SWIFTLY_BIN_DIR/swift" --version 2>&1) || die "mobile: Swift $swift_version does not run: $out"
 # swiftly's bin dir also proxies clang and lld, which would shadow the distribution clang the engine's Android linker runs, so only these two are linked.
 for b in swift swiftc; do ln -sfn "$SWIFTLY_BIN_DIR/$b" "$HOME/.local/bin/$b"; done

@@ -29,7 +29,7 @@ mkdir -p "$HOME/.android/avd"
 echo "path=$HOME/.android/avd/$4.avd" > "$HOME/.android/avd/$4.ini"
 `;
 
-// swiftly logs each call: init moves it into SWIFTLY_BIN_DIR, install makes the toolchain and its proxies, and SWIFT_DEPS stands for the packages a toolchain wants.
+// swiftly logs each call: init moves it into SWIFTLY_BIN_DIR, and install makes the toolchain and its proxies, whose swift fails when SWIFT_BROKEN is set.
 const SWIFTLY = `#!/bin/bash
 [ "$1" = --version ] && { echo 1.1.3; exit 0; }
 echo "swiftly $*" | sed "s|$HOME/.cache/[^ ]*|<tmp>|g" >> "$HOME/calls.log"
@@ -37,8 +37,7 @@ case $1 in
   init) mkdir -p "$SWIFTLY_BIN_DIR"; cp "$0" "$SWIFTLY_BIN_DIR/swiftly" ;;
   install)
     mkdir -p "$SWIFTLY_HOME_DIR/toolchains/$2"
-    for b in swift swiftc clang; do printf '#!/bin/sh\\necho "%s"\\n' "$b $2" > "$SWIFTLY_BIN_DIR/$b"; chmod +x "$SWIFTLY_BIN_DIR/$b"; done
-    while [ $# -gt 0 ]; do [ "$1" = --post-install-file ] && printf '%s' "$SWIFT_DEPS" > "$2"; shift; done
+    for b in swift swiftc clang; do printf '#!/bin/sh\\n[ -n "$SWIFT_BROKEN" ] && { echo "error while loading shared libraries" >&2; exit 127; }\\necho "%s"\\n' "$b $2" > "$SWIFTLY_BIN_DIR/$b"; chmod +x "$SWIFTLY_BIN_DIR/$b"; done
     ;;
 esac
 `;
@@ -216,12 +215,12 @@ test('Swift comes through swiftly, and only swift and swiftc are linked into ~/.
   assert.equal(existsSync(join(w.home, '.local/bin/clang')), false);
 });
 
-// The system packages a toolchain needs come from packages.toml, so an apply that lacks one says which.
-test('a Swift that wants system packages stops the script and names them', () => {
+// swiftly checks a toolchain's system packages with yum, which on dnf5 answers yes for any package the repos have, so the script runs swift itself.
+test('a Swift that does not run stops the script', () => {
   const w = world();
-  const r = run(w, 'arm64', { SWIFT_DEPS: 'dnf -y install libstdc++-static\n' });
+  const r = run(w, 'arm64', { SWIFT_BROKEN: '1' });
   assert.notEqual(r.status, 0);
-  assert.match(r.stderr, /dots: mobile: Swift 6\.3\.3 wants system packages packages\.toml lacks: dnf -y install libstdc\+\+-static/);
+  assert.match(r.stderr, /dots: mobile: Swift 6\.3\.3 does not run: error while loading shared libraries/);
 });
 
 // Google ships the emulator for x86_64 Linux only, so the NUC alone gets it, with the image and AVD it already runs.
