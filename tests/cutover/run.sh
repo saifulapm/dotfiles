@@ -85,7 +85,7 @@ as_user '
   ln -s ~/.dotfiles/home/webapp-x.desktop ~/.local/share/applications/webapp-x.desktop
   # v1 linked its environment.d files from ~/.dotfiles, the chromium one carrying its extension flag.
   mkdir -p ~/.dotfiles/home/dot_config/environment.d ~/.config/environment.d
-  for f in 60-chromium 65-ssh-agent 70-claude-presence; do
+  for f in 60-chromium 65-ssh-agent; do
     echo "V1_$f=1" > ~/.dotfiles/home/dot_config/environment.d/$f.conf
     ln -s ~/.dotfiles/home/dot_config/environment.d/$f.conf ~/.config/environment.d/$f.conf
   done

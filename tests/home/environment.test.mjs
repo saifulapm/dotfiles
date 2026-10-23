@@ -25,6 +25,10 @@ test('SSH_AUTH_SOCK points at the user ssh-agent socket', () => {
   assert.match(read('65-ssh-agent.conf'), /^SSH_AUTH_SOCK=\$\{XDG_RUNTIME_DIR\}\/ssh-agent\.socket$/m);
 });
 
+test('ssh-agent.socket is enabled at login from the packaged unit', () => {
+  assert.equal(readFileSync(join(repo, 'home/dot_config/systemd/user/sockets.target.wants/symlink_ssh-agent.socket'), 'utf8').trim(), '/usr/lib/systemd/user/ssh-agent.socket');
+});
+
 test('the environment.d generator expands both files', { skip: !existsSync(generator) }, () => {
   const home = mkdtempSync(join(tmpdir(), 'envd-'));
   mkdirSync(join(home, 'environment.d'));
