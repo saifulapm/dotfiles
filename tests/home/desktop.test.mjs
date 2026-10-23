@@ -60,9 +60,19 @@ test('a mailto link opens mail-open', () => {
   assert.match(entry, /^MimeType=x-scheme-handler\/mailto;$/m);
 });
 
-test('WirePlumber offers A2DP to headsets and connects it on attach', () => {
-  const conf = readFileSync(join(home, '.config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf'), 'utf8');
-  assert.match(conf, /bluez5\.roles = \[ a2dp_source hfp_ag \]/);
-  assert.match(conf, /bluez5\.auto-connect = \[ a2dp_sink \]/);
-  assert.match(conf, /session\.dont-restore-off-profile = true/);
+test('WirePlumber connects A2DP and retries HFP on attach, with a dummy AVRCP player and no SBC-XQ', () => {
+  const r = spawnSync('spa-json-dump', [join(home, '.config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf')], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const conf = JSON.parse(r.stdout);
+  assert.deepEqual(conf['monitor.bluez.properties'], {
+    'bluez5.roles': ['a2dp_source', 'hfp_ag'],
+    'bluez5.dummy-avrcp-player': true,
+    'bluez5.codecs': ['sbc', 'aac'],
+  });
+  assert.deepEqual(conf['monitor.bluez.rules'], [
+    {
+      matches: [{ 'device.name': '~bluez_card.*' }],
+      actions: { 'update-props': { 'bluez5.auto-connect': ['a2dp_sink', 'hfp_hf'], 'session.dont-restore-off-profile': true } },
+    },
+  ]);
 });
