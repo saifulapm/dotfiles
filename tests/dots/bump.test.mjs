@@ -136,8 +136,16 @@ test('a gh failure leaves that pin untouched, bumps the other and exits 1', () =
 // amx, workflow and pxy follow main's head; with every other pin current, a bump names those three, one line each.
 test('the agent tools move to their repos\' head commits, one line each', () => {
   const file = readFileSync(new URL('../../versions.toml', import.meta.url), 'utf8');
-  const pins = file.split('[[pin]]').slice(1).map((p) => Object.fromEntries([...p.matchAll(/^(name|version|repo|track|url) = "([^"]*)"/gm)].map((m) => [m[1], m[2]])));
+  const entries = (table) => file.split(/^(?=\[\[)/m).filter((b) => b.startsWith(`[[${table}]]`))
+    .map((p) => Object.fromEntries([...p.matchAll(/^(name|version|repo|track|url|latest|package) = "([^"]*)"/gm)].map((m) => [m[1], m[2]])));
+  const pins = entries('pin');
+  const toolchain = entries('toolchain');
   const w = world({ yaziTag: 'v26.9.1', kakSha: KAK_OLD, file });
+  // Every toolchain entry's upstream answers with the version it already has.
+  const v = (name) => toolchain.find((t) => t.name === name).version;
+  w.serve(SDK, sdkXml({ ndk: v('ndk'), tools: v('cmdline-tools'), platform: v('platform'), buildTools: v('build-tools') }));
+  w.serve(SWIFT, swiftJson([v('swift')]));
+  for (const t of toolchain.filter((t) => t.latest === 'github')) writeFileSync(join(w.fix, 'gh', t.repo.replace('/', '_')), `v${t.version}\n`);
   const head = { amx: 'a'.repeat(40), workflow: 'b'.repeat(40), pxy: 'c'.repeat(40) };
   for (const p of pins) {
     const latest = head[p.name] ?? (p.track === 'commit' ? p.version : `v${p.version}`);
@@ -147,7 +155,7 @@ test('the agent tools move to their repos\' head commits, one line each', () => 
   const r = w.bump();
   assert.equal(r.status, 0, r.stderr);
   const old = Object.fromEntries(pins.map((p) => [p.name, p.version]));
-  assert.equal(r.stdout, ['amx', 'workflow', 'pxy'].map((n) => `${n} ${old[n]} → ${head[n]}\n`).join(''));
+  assert.equal(r.stdout, ['amx', 'workflow', 'pxy'].map((n) => `${n} ${old[n]} → ${head[n]}\n`).join('') + toolchain.map((t) => `toolchain ${t.name} ${t.version} is current\n`).join(''));
   for (const n of ['amx', 'workflow', 'pxy']) assert.match(w.read(), new RegExp(`name = "${n}"\nversion = "${head[n]}"`));
 });
 
@@ -171,4 +179,122 @@ sha256 = "${OLD}"
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, `kakfeed ${KAK_OLD} → ${KAK_NEW}\n`);
   assert.deepEqual(changed(before, w.read()), [`version = "${KAK_NEW}"`, `sha256 = "${sha('kakfeed private tarball')}"`]);
+});
+
+const SDK = 'https://dl.google.com/android/repository/repository2-3.xml';
+const SWIFT = 'https://www.swift.org/api/v1/install/releases.json';
+const TOOLCHAIN = `
+[[toolchain]]
+name = "cmdline-tools"
+version = "15859902"
+latest = "sdk"
+package = "cmdline-tools;latest"
+url = "https://dl.google.com/android/repository/commandlinetools-linux-{version}_latest.zip"
+sha256 = "${OLD}"
+
+[[toolchain]]
+name = "platform"
+version = "37.0"
+latest = "sdk"
+package = "platforms;android-{version}"
+
+[[toolchain]]
+name = "ndk"
+version = "29.0.14206865"
+latest = "sdk"
+package = "ndk;{version}"
+
+[[toolchain]]
+name = "gradle"
+version = "9.7.1"
+latest = "github"
+repo = "gradle/gradle"
+url = "https://services.gradle.org/distributions/gradle-{version}-bin.zip"
+sha256 = "${OLD}"
+
+[[toolchain]]
+name = "swift"
+version = "6.3.3"
+latest = "swift"
+`;
+
+// Google's repository lists previews beside stable releases; only channel-0 is stable.
+const sdkXml = ({ ndk = '29.0.14206865', tools = '15859902', platform = '37.1', buildTools = '37.0.0' } = {}) => `<?xml version="1.0"?>
+<sdk:sdk-repository>
+  <channel id="channel-0">stable</channel>
+  <remotePackage path="cmdline-tools;latest">
+    <channelRef ref="channel-0"/>
+    <archives>
+      <archive>
+        <complete>
+          <url>commandlinetools-linux-${tools}_latest.zip</url>
+        </complete>
+        <host-os>linux</host-os>
+      </archive>
+      <archive>
+        <complete>
+          <url>commandlinetools-mac_arm64-99999999_latest.zip</url>
+        </complete>
+      </archive>
+    </archives>
+  </remotePackage>
+  <remotePackage path="cmdline-tools;14.0-alpha01">
+    <channelRef ref="channel-2"/>
+    <archives><archive><complete><url>commandlinetools-linux-99999999_latest.zip</url></complete></archive></archives>
+  </remotePackage>
+  <remotePackage path="platforms;android-37.0">
+    <channelRef ref="channel-0"/>
+  </remotePackage>
+  <remotePackage path="platforms;android-${platform}">
+    <channelRef ref="channel-0"/>
+  </remotePackage>
+  <remotePackage path="build-tools;${buildTools}">
+    <channelRef ref="channel-0"/>
+  </remotePackage>
+  <remotePackage path="platforms;android-37.2-beta3">
+    <channelRef ref="channel-0"/>
+  </remotePackage>
+  <remotePackage path="platforms;android-CANARY">
+    <channelRef ref="channel-0"/>
+  </remotePackage>
+  <remotePackage path="ndk;${ndk}">
+    <channelRef ref="channel-0"/>
+  </remotePackage>
+  <remotePackage path="ndk;31.0.1">
+    <channelRef ref="channel-1"/>
+  </remotePackage>
+</sdk:sdk-repository>
+`;
+
+const swiftJson = (names) => JSON.stringify(names.map((name) => ({ name, platforms: [{ name: 'Fedora 41' }] })), null, 2);
+
+test('toolchain entries are each listed with their upstream and never rewritten', () => {
+  const w = world({ yaziTag: 'v26.9.1', kakSha: KAK_OLD, file: FILE + TOOLCHAIN });
+  w.serve(SDK, sdkXml({ ndk: '30.0.16248370' }));
+  w.serve(SWIFT, swiftJson(['6.3.2', '6.3.3', '6.4.1']));
+  writeFileSync(join(w.fix, 'gh/gradle_gradle'), 'v9.8.2\n');
+  const before = w.read();
+  const r = w.bump();
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, [
+    'all pins current',
+    'toolchain cmdline-tools 15859902 is current',
+    'toolchain platform 37.0, upstream 37.1 (by hand)',
+    'toolchain ndk 29.0.14206865, upstream 30.0.16248370 (by hand)',
+    'toolchain gradle 9.7.1, upstream 9.8.2 (by hand)',
+    'toolchain swift 6.3.3, upstream 6.4.1 (by hand)',
+    '',
+  ].join('\n'));
+  assert.equal(w.read(), before);
+});
+
+test('a toolchain entry whose upstream cannot be read is named and bump exits 1', () => {
+  const w = world({ yaziTag: 'v26.10.0', kakSha: KAK_OLD, file: FILE + TOOLCHAIN });
+  w.serve(SWIFT, swiftJson(['6.3.3']));
+  writeFileSync(join(w.fix, 'gh/gradle_gradle'), 'v9.7.1\n');
+  const r = w.bump();
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /dots bump: cmdline-tools: could not read Google's SDK repository/);
+  assert.match(r.stdout, /^yazi 26\.9\.1 → 26\.10\.0\n/);
+  assert.match(r.stdout, /^toolchain gradle 9\.7\.1 is current$/m);
 });

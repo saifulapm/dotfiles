@@ -122,7 +122,9 @@ test('changing one pin re-renders only that pin\'s script', () => {
 });
 
 test('every pin in versions.toml has its own script, and every pin script a pin', () => {
-  const pins = [...readFileSync(join(repo, 'versions.toml'), 'utf8').matchAll(/^name = "([^"]+)"/gm)].map((m) => m[1]).sort();
+  // [[toolchain]] entries belong to the mobile script, so only [[pin]] blocks name a pin script.
+  const blocks = readFileSync(join(repo, 'versions.toml'), 'utf8').split(/^(?=\[\[)/m).filter((b) => b.startsWith('[[pin]]'));
+  const pins = blocks.map((b) => b.match(/^name = "([^"]+)"/m)[1]).sort();
   const scripts = readdirSync(join(repo, 'home/.chezmoiscripts'))
     .map((f) => f.match(/^run_onchange_after_2\d-pin-(.+)\.sh\.tmpl$/)?.[1])
     .filter(Boolean)

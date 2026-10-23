@@ -40,15 +40,16 @@ committed() { git -C "$snap/src.git" show "$branch:$1"; }
 pins() {
   committed versions.toml | awk -F' = ' '
     function flush() { if (n != "" && c != "") print n "\t" v "\t" c }
-    /^\[\[pin\]\]/ { flush(); n = v = c = ""; next }
+    /^\[\[/ { flush(); n = v = c = ""; pin = /^\[\[pin\]\]/; next }
+    !pin { next }
     $1 == "name" { n = $2 } $1 == "version" { v = $2 } $1 == "check" { c = $2 }
     END { flush() }' | tr -d '"'
 }
 # One "name<TAB>command" line per pin whose runs command only has to exit 0.
 runs() {
   committed versions.toml | awk -F' = ' '
-    /^\[\[pin\]\]/ { n = ""; next }
-    $1 == "name" { n = $2 } $1 == "runs" { print n "\t" $2 }' | tr -d '"'
+    /^\[\[/ { n = ""; pin = /^\[\[pin\]\]/; next }
+    pin && $1 == "name" { n = $2 } pin && $1 == "runs" { print n "\t" $2 }' | tr -d '"'
 }
 # Every packages.toml name for the container's arch.
 packages() {

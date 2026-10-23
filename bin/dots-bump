@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots bump: moves each versions.toml pin to its upstream's latest release (or head commit for track = "commit"), rewriting only that pin's version and sha256 lines; the commit is left to the user.
+# dots bump: moves each versions.toml pin to its upstream's latest release (or head commit for track = "commit"), rewriting only that pin's version and sha256 lines; the commit is left to the user. A [[toolchain]] entry is only listed beside its upstream's newest stable version, since another repo pins the same numbers and the two move by hand.
 set -euo pipefail
 {
 
@@ -54,9 +54,67 @@ bump_pin() {
   echo "$name $version → $latest" >>"$work/report"
 }
 
-# flush: bumps the pin read so far, if any.
+# sdk_versions <package template> <url template>: the versions on Google's stable channel (channel-0), read from the version in the package's path or, for a path without one, from its archives' file names.
+sdk_versions() {
+  local pre post
+  if [[ ! -f $work/sdk ]]; then
+    curl -fsSL https://dl.google.com/android/repository/repository2-3.xml -o "$work/sdk.xml" || return 1
+    # One "path<TAB>archive" line per stable package archive, and one "path<TAB>" line per stable package.
+    awk '
+      /<remotePackage / { match($0, /path="[^"]*"/); path = substr($0, RSTART + 6, RLENGTH - 7); stable = 0 }
+      /<channelRef / { stable = ($0 ~ /ref="channel-0"/); if (stable) print path "\t" }
+      stable && /<url>/ { gsub(/.*<url>|<\/url>.*/, ""); print path "\t" $0 }
+    ' "$work/sdk.xml" >"$work/sdk"
+  fi
+  local template=$1 field=1
+  [[ $template == *'{version}'* ]] || template=${2##*/} field=2
+  local pre=${template%%'{version}'*} post=${template#*'{version}'}
+  awk -F'\t' -v pkg="$1" -v field="$field" 'field == 1 && $2 == "" { print $1 } field == 2 && $1 == pkg && $2 != "" { print $2 }' "$work/sdk" |
+    while IFS= read -r found; do
+      [[ $found == "$pre"*"$post" ]] || continue
+      found=${found#"$pre"}
+      found=${found%"$post"}
+      [[ $found =~ ^[0-9][0-9.]*$ ]] && echo "$found"
+    done
+  return 0
+}
+
+# check_toolchain: lists the toolchain entry read so far beside its upstream's newest stable version.
+check_toolchain() {
+  local latest
+  case $latest_from in
+    sdk) latest=$(sdk_versions "$package" "${urls[single]:-}" | sort -V | tail -n 1) || latest='' ;;
+    github)
+      latest=$(upstream "repos/$repo_name/releases/latest" --jq .tag_name) || latest=''
+      [[ $latest =~ ([0-9][0-9.]*)$ ]] && latest=${BASH_REMATCH[1]} || latest=''
+      ;;
+    swift)
+      latest=$(curl -fsSL https://www.swift.org/api/v1/install/releases.json | grep -oE '"name" *: *"[0-9.]+"' | grep -oE '[0-9.]+' | sort -V | tail -n 1) || latest=''
+      ;;
+    *) echo "dots bump: $name: latest must be sdk, github or swift" >&2; return 1 ;;
+  esac
+  if [[ -z $latest ]]; then
+    case $latest_from in
+      sdk) echo "dots bump: $name: could not read Google's SDK repository" >&2 ;;
+      github) echo "dots bump: $name: could not ask $repo_name for its latest release" >&2 ;;
+      swift) echo "dots bump: $name: could not read swift.org's release list" >&2 ;;
+    esac
+    return 1
+  fi
+  if [[ $latest == "$version" ]]; then
+    echo "toolchain $name $version is current" >>"$work/toolchain"
+  else
+    echo "toolchain $name $version, upstream $latest (by hand)" >>"$work/toolchain"
+  fi
+}
+
+# flush: bumps the pin read so far, or lists the toolchain entry, if any.
 flush() {
   [[ -n $name ]] || return 0
+  if [[ $table == toolchain ]]; then
+    check_toolchain || failed=1
+    return 0
+  fi
   [[ -n $repo_name && -n $version_line ]] || { echo "dots bump: ${name:-?}: needs repo and version" >&2; failed=1; return 0; }
   bump_pin || failed=1
 }
@@ -65,19 +123,24 @@ declare -A urls sha_lines
 failed=0
 : >"$work/edits"
 : >"$work/report"
+: >"$work/toolchain"
 
 reset() {
-  name='' repo_name='' version='' version_line='' track='' fetch=''
+  name='' repo_name='' version='' version_line='' track='' fetch='' latest_from='' package=''
   urls=() sha_lines=()
 }
 reset
 
 n=0
+table=''
 while IFS= read -r line || [[ -n $line ]]; do
   n=$((n + 1))
-  if [[ $line == '[[pin]]'* ]]; then
+  if [[ $line =~ ^\[\[(pin|toolchain)\]\] ]]; then
+    # flush runs its own matches, so the table name is kept first.
+    next_table=${BASH_REMATCH[1]}
     flush
     reset
+    table=$next_table
     continue
   fi
   [[ $line =~ ^([a-z0-9_.]+)[[:space:]]*=[[:space:]]*\"([^\"]*)\" ]] || continue
@@ -87,6 +150,8 @@ while IFS= read -r line || [[ -n $line ]]; do
     repo) repo_name=$value ;;
     track) track=$value ;;
     fetch) fetch=$value ;;
+    latest) latest_from=$value ;;
+    package) package=$value ;;
     version) version=$value version_line=$n ;;
     url) urls[single]=$value ;;
     url.*) urls[${key#url.}]=$value ;;
@@ -107,5 +172,6 @@ if [[ -s $work/edits ]]; then
 fi
 
 if [[ -s $work/report ]]; then cat "$work/report"; elif ((!failed)); then echo "all pins current"; fi
+cat "$work/toolchain"
 exit "$failed"
 }

@@ -142,3 +142,66 @@ repo = "music-assistant/airplay-cli"
 install = "~/.local/bin/cliairplay on the mini, the office HomePod's AirPlay 2 sender"
 url = "https://github.com/music-assistant/airplay-cli/releases/download/v{version}/cliairplay-linux-aarch64"
 sha256 = "37fcc7dc59e4878f465afd2520923baefeb2c9b761c29f4d7fe5b2815bb3b354"
+
+# The mobile toolchain lareys-mobile builds with, installed by run_onchange_after_47-mobile. dots bump lists each entry beside its upstream's newest stable version and rewrites none: lareys-mobile's engine pins the same platform, build-tools, NDK and Gradle in its android/setup-toolchain.sh and linker.sh, so the two move together by hand. latest says where bump looks: sdk is Google's stable channel, read from package's path or url's file name; github a repo's latest release; swift swift.org's release list.
+
+[[toolchain]]
+name = "cmdline-tools"
+version = "15859902"
+latest = "sdk"
+package = "cmdline-tools;latest"
+url = "https://dl.google.com/android/repository/commandlinetools-linux-{version}_latest.zip"
+sha256 = "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583"
+
+[[toolchain]]
+name = "platform"
+version = "37.0"
+latest = "sdk"
+package = "platforms;android-{version}"
+
+[[toolchain]]
+name = "build-tools"
+version = "37.0.0"
+latest = "sdk"
+package = "build-tools;{version}"
+
+[[toolchain]]
+name = "ndk"
+version = "29.0.14206865"
+latest = "sdk"
+package = "ndk;{version}"
+
+# Google builds aapt2 and zipalign for x86_64 only, so the Macs swap in these arm64 builds of the same build-tools release.
+[[toolchain]]
+name = "arm-build-tools"
+version = "37.0.0"
+latest = "github"
+repo = "Commit451/android-arm-build-tools"
+url = "https://github.com/Commit451/android-arm-build-tools/releases/download/platform-tools-{version}"
+sha256.aapt2 = "a41b31103da2bac2fadb53017b57e8d1f11499b8e2ff9ed89d5e31158406ae4d"
+sha256.zipalign = "8d04801629e7021c10ee419a3e22a9ebc382289911ac366a94a09db798eb5d07"
+
+[[toolchain]]
+name = "gradle"
+version = "9.7.1"
+latest = "github"
+repo = "gradle/gradle"
+url = "https://services.gradle.org/distributions/gradle-{version}-bin.zip"
+sha256 = "acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a"
+
+[[toolchain]]
+name = "swiftly"
+version = "1.1.3"
+latest = "github"
+repo = "swiftlang/swiftly"
+url.aarch64 = "https://download.swift.org/swiftly/linux/swiftly-{version}-aarch64.tar.gz"
+url.x86_64 = "https://download.swift.org/swiftly/linux/swiftly-{version}-x86_64.tar.gz"
+sha256.aarch64 = "cc4f912fff6c7f53704fc6d22f9e8ee7fdf6bd574ad276998f7502418bf5a45a"
+sha256.x86_64 = "4c4adb7b7ad7910f38c52b94a938c309586fe395e1fe1538c397384ee36bfff0"
+
+# swift.org builds Linux toolchains for Fedora 39 and none newer that this Swift has, so swiftly installs that platform's on every machine.
+[[toolchain]]
+name = "swift"
+version = "6.3.3"
+latest = "swift"
+platform = "fedora39"
