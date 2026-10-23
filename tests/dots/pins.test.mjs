@@ -82,7 +82,7 @@ function cargo(root, env = {}) {
   mkdirSync(join(root, 'stubs'));
   writeFileSync(join(root, 'stubs/cargo'), CARGO, { mode: 0o755 });
   const script = SCRIPT.replace('{{ template "pin.sh"', '{{ template "cargo.sh" . }}\n{{ template "pin.sh"').replace('cat "$file"', 'mkdir -p "$pin_tmp/src"; pin_cargo "$pin_tmp/src" hello');
-  const r = run(root, script, `${root}/stubs:`, env);
+  const r = run(root, script, `${root}/stubs:`, { DOTS_CARGO: `${root}/stubs/cargo`, ...env });
   return r;
 }
 
@@ -99,7 +99,7 @@ test('a failed cargo build stops the script, naming the pin', () => {
   const r = cargo(source(sha('hello pin\n')), { CARGO_FAIL: '1' });
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /dots: pin hello: cargo build failed/);
-  assert.doesNotMatch(r.stdout, /dots: pin hello/);
+  assert.doesNotMatch(r.stdout, /^dots: pin hello [^:]*$/m);
 });
 
 // run_onchange keys a script on its rendered text, so a pin's change must show in its own script and no other.

@@ -12,6 +12,7 @@ const BINS = ['amx', 'mem', 'workflow', 'hub', 'pxy'];
 
 // The stub cargo writes every binary a pin may ask for, each appending "<name> <args>" to ~/calls.log.
 const CARGO = `#!/bin/sh
+echo "cargo RUSTC=$RUSTC" >> "$HOME/calls.log"
 while [ $# -gt 0 ]; do [ "$1" = --target-dir ] && t=$2; shift; done
 mkdir -p "$t/release"
 for b in ${BINS.join(' ')}; do printf '#!/bin/sh\\necho "%s $*" >> "$HOME/calls.log"\\n' "$b" > "$t/release/$b"; chmod +x "$t/release/$b"; done
@@ -46,7 +47,7 @@ function scratch(files = {}) {
 }
 
 function run(root, pin) {
-  const env = { PATH: `${root}/stubs:${process.env.PATH}`, HOME: root };
+  const env = { PATH: `${root}/stubs:${process.env.PATH}`, HOME: root, DOTS_CARGO: `${root}/stubs/cargo` };
   const script = readFileSync(join(repo, 'home/.chezmoiscripts', pin), 'utf8');
   const rendered = spawnSync('chezmoi', ['--config', join(root, 'none.toml'), '--source', root, 'execute-template'], { input: script, encoding: 'utf8', env });
   assert.equal(rendered.status, 0, rendered.stderr);
@@ -59,14 +60,14 @@ test('the amx pin runs amx setup twice, once for claude and once for pi with its
   const root = scratch();
   const r = run(root, 'run_onchange_after_26-pin-amx.sh.tmpl');
   assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(calls(root), ['amx setup claude', 'amx setup pi --subagent']);
+  assert.deepEqual(calls(root), ['cargo RUSTC=/usr/bin/rustc', 'amx setup claude', 'amx setup pi --subagent']);
 });
 
 test('the workflow pin runs workflow install and mem doctor --fix once each', () => {
   const root = scratch();
   const r = run(root, 'run_onchange_after_27-pin-workflow.sh.tmpl');
   assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(calls(root), ['workflow install', 'mem doctor --fix']);
+  assert.deepEqual(calls(root), ['cargo RUSTC=/usr/bin/rustc', 'cargo RUSTC=/usr/bin/rustc', 'cargo RUSTC=/usr/bin/rustc', 'workflow install', 'mem doctor --fix']);
 });
 
 // pxy's checkout ships its pi extension with placeholders that pxy launch would fill; the pin fills them from the port this repo configures.
@@ -94,4 +95,20 @@ test('a placeholder the pin does not know stops it, naming the placeholder, and 
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /__PXY_KEY__/);
   assert.equal(existsSync(join(root, '.pi/agent/extensions/pxy.ts')), false);
+});
+
+// rustup's cargo and rustc sit ahead of Fedora's on a user's PATH, and would build the pinned commit with a toolchain it never saw.
+test('a pin builds with Fedora\'s cargo and rustc even when rustup\'s come first on PATH, and says so', () => {
+  const root = scratch();
+  mkdirSync(join(root, '.cargo/bin'), { recursive: true });
+  for (const tool of ['cargo', 'rustc']) writeFileSync(join(root, '.cargo/bin', tool), `#!/bin/sh\necho "rustup ${tool}" >> "$HOME/calls.log"\nexit 1\n`, { mode: 0o755 });
+  const env = { PATH: `${root}/.cargo/bin:${process.env.PATH}`, HOME: root };
+  const script = readFileSync(join(repo, 'home/.chezmoiscripts/run_onchange_after_28-pin-pxy.sh.tmpl'), 'utf8');
+  const rendered = spawnSync('chezmoi', ['--config', join(root, 'none.toml'), '--source', root, 'execute-template'], { input: script, encoding: 'utf8', env });
+  assert.equal(rendered.status, 0, rendered.stderr);
+  // The tarball holds no crate, so the real cargo fails; the log line comes first.
+  const r = spawnSync('bash', ['-c', rendered.stdout], { encoding: 'utf8', env });
+  assert.match(r.stdout, /^dots: pin pxy: building with \/usr\/bin\/cargo and \/usr\/bin\/rustc$/m);
+  assert.match(r.stderr, /Cargo\.toml/);
+  assert.deepEqual(calls(root), []);
 });

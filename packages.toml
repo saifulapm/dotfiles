@@ -616,3 +616,8 @@ why = "a docker command that runs podman, for agents and scripts that type docke
 name = "bluez-tools"
 arch = "all"
 why = "bt-agent, which answers Bluetooth pairing for Control"
+
+[[package]]
+name = "rustup"
+arch = "all"
+why = "rustup-init, which installs the per-user toolchain into ~/.cargo/bin"

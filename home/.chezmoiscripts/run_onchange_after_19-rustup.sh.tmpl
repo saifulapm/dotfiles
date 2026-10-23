@@ -1,0 +1,5 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+# rustup's toolchains are Saiful's own, per user, ahead of Fedora's in fish's PATH; the pins keep building with Fedora's (cargo.sh). A rustup that already has a default toolchain is left alone.
+"$HOME/.cargo/bin/rustup" default >/dev/null 2>&1 && exit 0
+rustup-init -y --no-modify-path --default-toolchain stable || die "rustup-init failed"

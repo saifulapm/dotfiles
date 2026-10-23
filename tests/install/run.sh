@@ -67,7 +67,7 @@ trap 'podman rm -f -t 0 "$name" >/dev/null 2>&1; rm -rf "$snap"' EXIT
 # label=disable lets the container read the checkout without relabelling it on the host.
 podman run -d --rm --name "$name" --userns=keep-id --security-opt label=disable \
   --passwd-entry "saiful:*:1000:1000::$home:/bin/bash" \
-  -v "$snap/src.git:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 -v dots-install-cargo-cache:$home/.cargo:U \
+  -v "$snap/src.git:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 -v dots-install-cargo-cache:$home/.cargo:U -v dots-install-rustup-cache:$home/.rustup:U \
   docker.io/library/fedora:44 sleep infinity >/dev/null || { echo "FAIL: container did not start"; exit 1; }
 
 as_root "
@@ -168,6 +168,10 @@ done
 for tool in "sd --version" "tv --version" "hurl --version" "sg --version" "usql --version" "bun --version"; do
   check "'$tool' exits 0 through mise" as_user "mise exec -- $tool >/dev/null 2>&1"
 done
+check "rustup --version exits 0" as_user "~/.cargo/bin/rustup --version >/dev/null 2>&1"
+rustc=$(as_user "fish -c 'command -v rustc'" 2>&1)
+check "fish finds rustup's rustc first (got '$rustc')" test "$rustc" = "$home/.cargo/bin/rustc"
+check "Fedora's rustc stays for the pins" as_user "test -x /usr/bin/rustc"
 docker=$(as_user "docker --version" 2>&1)
 check "docker --version names podman (got '$docker')" grep -q podman <<<"$docker"
 check "eza is not installed" as_user "! command -v eza"
