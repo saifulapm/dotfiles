@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# dots dev: state of the six socket-activated dev services; dots dev stop <name> stops one and its proxies, its sockets keep listening.
+set -euo pipefail
+
+die() {
+  echo "dots dev: $*" >&2
+  exit 2
+}
+
+# name: main unit, proxy services, sockets. The quadlets (mysql84, postgres18, redis7, mailpit) generate their .service from the .container file.
+declare -A MAIN=([caddy-dev]=caddy-dev [php-fpm]=php-fpm [mysql84]=mysql84 [postgres18]=postgres18 [redis7]=redis7 [mailpit]=mailpit)
+declare -A PROXIES=(
+  [caddy-dev]="caddy-dev-http caddy-dev-https"
+  [php-fpm]="php-fpm-proxy"
+  [mysql84]="mysql84-proxy"
+  [postgres18]="postgres18-proxy"
+  [redis7]="redis7-proxy"
+  [mailpit]="mailpit-smtp-proxy mailpit-web-proxy"
+)
+ORDER=(caddy-dev php-fpm mysql84 postgres18 redis7 mailpit)
+
+sc() { systemctl --user "$@"; }
+
+uptime_of() {
+  local since secs
+  since=$(date -d "$(sc show -p ActiveEnterTimestamp --value "$1.service")" +%s)
+  secs=$(($(date +%s) - since))
+  if ((secs >= 3600)); then
+    echo "$((secs / 3600))h $((secs % 3600 / 60))m"
+  else
+    echo "$((secs / 60))m"
+  fi
+}
+
+status() {
+  local name p
+  for name in "${ORDER[@]}"; do
+    if sc is-active -q "${MAIN[$name]}.service"; then
+      echo "$name running $(uptime_of "${MAIN[$name]}")"
+      continue
+    fi
+    for p in ${PROXIES[$name]}; do
+      sc is-active -q "$p.socket" || { echo "$name off"; continue 2; }
+    done
+    echo "$name listening"
+  done
+}
+
+stop() {
+  local name=${1:-} p units=()
+  [[ -n $name ]] || { echo "usage: dots dev stop <name>" >&2; exit 2; }
+  [[ -v MAIN[$name] ]] || die "no service $name"
+  for p in ${PROXIES[$name]}; do units+=("$p.service"); done
+  sc stop "${units[@]}" "${MAIN[$name]}.service"
+}
+
+main() {
+  case ${1:-} in
+    '') status ;;
+    stop) stop "${2:-}" ;;
+    *) die "usage: dots dev | dots dev stop <name>" ;;
+  esac
+}
+
+# Everything runs from here, so bash has read the whole script before a pipe could cut it short.
+main "$@"; exit

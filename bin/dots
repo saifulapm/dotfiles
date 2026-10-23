@@ -167,9 +167,10 @@ main() {
   case ${1:-} in
     install) install ;;
     theme) theme "${2:-}" ;;
+    dev) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-services" "${@:2}" ;;
     sync | update | bump | secrets | cutover | claude-account | dns) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-$1" "${@:2}" ;;
     *)
-      echo "usage: dots install | dots update | dots bump | dots secrets | dots theme <name> | dots cutover | dots claude-account add <label> | use <id> | dots dns <verb> | dots sync [--only notes|goals|fish|ssh | --adopt local|remote]" >&2
+      echo "usage: dots install | dots update | dots bump | dots secrets | dots theme <name> | dots cutover | dots claude-account add <label> | use <id> | dots dns <verb> | dots dev [stop <name>] | dots sync [--only notes|goals|fish|ssh | --adopt local|remote]" >&2
       exit 2
       ;;
   esac
