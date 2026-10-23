@@ -48,6 +48,9 @@ export function home(root, id, conf) {
   return env;
 }
 
+// The dufs config dots secrets writes for a $6$ hash: the auth rule alone, as the unit carries every other flag. tests/home/dufs.test.mjs serves it.
+export const dufsConfig = (hash) => `auth:\n  - 'saiful:${hash}@/Codes,/Documents,/Downloads,/Pictures,/Downloads/inbox:rw'\n`;
+
 export const scratch = () => realpathSync(mkdtempSync(join(tmpdir(), 'dots-secrets-')));
 
 export const secrets = (env) => run(env, dots, ['secrets']);

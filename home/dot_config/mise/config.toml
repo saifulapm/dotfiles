@@ -27,6 +27,8 @@ deno = "latest"
 bun = "latest"
 # Mail IMAP IDLE watcher. Not packaged for Fedora and upstream ships no binaries, so mise builds it with go; the tag has no v, which go install accepts as a revision.
 "go:gitlab.com/shackra/goimapnotify/cmd/goimapnotify" = "2.5.8"
+# The file server dufs.service runs. Neither Fedora nor the aqua registry has it, so mise takes the release binary from GitHub.
+"github:sigoden/dufs" = "0.47.0"
 
 [env]
 # mise activate moves its tool bin dirs to the front of PATH; this keeps the dotfiles bin dir, and so the playwright-cli wrapper, ahead of them.

@@ -1,0 +1,22 @@
+[Unit]
+Description=dufs, the file server for the home folders, published to the tailnet
+Documentation=https://github.com/sigoden/dufs
+# dots secrets writes the config, the auth rule with the hash of pass's dufs/saiful; a machine without it skips the unit instead of failing it.
+ConditionPathExists=%h/.config/dufs/config.yaml
+
+[Service]
+# dufs serves a root holding only the four folders, so a symlink inside one cannot reach ~/.ssh or the rest of the home. A folder a machine lacks is left out.
+TemporaryFileSystem=%t/dufs:ro
+BindReadOnlyPaths=-%h/Codes:%t/dufs/Codes -%h/Documents:%t/dufs/Documents -%h/Downloads:%t/dufs/Downloads -%h/Pictures:%t/dufs/Pictures
+BindPaths=-%h/Downloads/inbox:%t/dufs/Downloads/inbox
+# The home stays visible to this step, so mkdir makes a missing inbox for the bind dufs gets. A + prefix would fail here: the user manager cannot skip the namespace.
+ExecStartPre=/usr/bin/mkdir -p %h/Downloads/inbox
+# The shim and not a bare dufs: v1's cargo build in ~/.cargo/bin comes first on PATH.
+ExecStart=%h/.local/share/mise/shims/dufs --config %h/.config/dufs/config.yaml --bind 127.0.0.1 --port 5000 --hidden .* --allow-upload %t/dufs
+# A machine whose tailscaled is down, or has no operator, still serves on localhost.
+ExecStartPost=-/usr/bin/tailscale serve --bg --https=8443 http://127.0.0.1:5000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
