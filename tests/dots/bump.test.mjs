@@ -298,3 +298,16 @@ test('a toolchain entry whose upstream cannot be read is named and bump exits 1'
   assert.match(r.stdout, /^yazi 26\.9\.1 → 26\.10\.0\n/);
   assert.match(r.stdout, /^toolchain gradle 9\.7\.1 is current$/m);
 });
+
+// A release tag is text its repo's owner controls, so one that is not a plain version cannot reach the terminal or versions.toml.
+test('a pin whose upstream answers with a control character, a quote or an & is left alone, named, and exits 1', () => {
+  for (const tag of ['v9.9\u001b[2J', 'v9.9‮1', 'v9.9"x', 'v9.9&x']) {
+    const w = world({ yaziTag: tag, kakSha: KAK_OLD });
+    const before = w.read();
+    const r = w.bump();
+    assert.equal(r.status, 1, JSON.stringify(tag));
+    assert.equal(r.stdout, '', JSON.stringify(tag));
+    assert.match(r.stderr, /^dots bump: yazi: sxyazi\/yazi answered something that is not a version$/m, JSON.stringify(tag));
+    assert.equal(w.read(), before, JSON.stringify(tag));
+  }
+});

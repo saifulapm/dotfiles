@@ -32,6 +32,8 @@ bump_pin() {
     latest=$(upstream "repos/$repo_name/releases/latest" --jq .tag_name) || { echo "dots bump: $name: could not ask $repo_name for its latest release" >&2; return 1; }
     latest=${latest#v}
   fi
+  # A tag is text the repo's owner controls, so only a plain version may reach the terminal and versions.toml.
+  [[ $latest =~ ^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$ ]] || { echo "dots bump: $name: $repo_name answered something that is not a version" >&2; return 1; }
   [[ $latest != "$version" ]] || return 0
 
   local arch template url sum pending=$work/pending
