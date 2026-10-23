@@ -189,6 +189,10 @@ check "the forged title is elided, with no control or bidi character" \
 check "the forged row still draws its letter tile ($(row forged.html 'r.querySelector(".tile").textContent'))" row_is forged.html 'r.querySelector(".tile").textContent === "x"'
 check "a page with no title or icon shows its address and the host's letter ($(row untitled.html 'r.querySelector(".tile").textContent + " " + r.querySelector(".title").textContent'))" \
   row_is untitled.html 'r.querySelector(".tile").textContent === "l" && r.querySelector(".title").textContent.startsWith("localhost:")'
+# At 390 px, a phone's width, a long address gives way: every title stays at least as wide as its address.
+widths='[...document.querySelectorAll(".row")].map((r) => r.querySelector(".title").clientWidth + "/" + r.querySelector(".address").clientWidth).join(" ")'
+check "at 390 px no title is narrower than its address (title/address: $(cdp narrow newtab.html 390 "$widths"))" \
+  bash -c "node '$repo/tests/dev/cdp.mjs' $dport narrow newtab.html 390 '[...document.querySelectorAll(\".row\")].every((r) => r.querySelector(\".title\").clientWidth >= r.querySelector(\".address\").clientWidth)' | grep -qx true"
 quit_chromium
 
 # The address and the digit keys, once, in the last theme.

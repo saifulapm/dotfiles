@@ -1,4 +1,4 @@
-// node cdp.mjs <port> urls | open <url> | eval <url-part> <js> | shot <url-part> <png> | fonts <url-part> <selector> | activate <url-part> | visit <url>: reads and drives a Chromium started with --remote-debugging-port.
+// node cdp.mjs <port> urls | open <url> | eval <url-part> <js> | shot <url-part> <png> | fonts <url-part> <selector> | activate <url-part> | narrow <url-part> <px> <js> | visit <url>: reads and drives a Chromium started with --remote-debugging-port.
 const [port, cmd, ...args] = process.argv.slice(2);
 const base = `http://127.0.0.1:${port}`;
 const pages = async () => (await (await fetch(`${base}/json/list`)).json()).filter((t) => t.type === 'page');
@@ -59,6 +59,18 @@ if (cmd === 'urls') {
 } else if (cmd === 'activate') {
   const target = (await pages()).find((t) => t.url.includes(args[0]));
   if (!target || !(await fetch(`${base}/json/activate/${target.id}`)).ok) process.exit(1);
+} else if (cmd === 'narrow') {
+  // The page laid out <px> wide, as Chromium's window cannot be made narrower than 500 px; the width holds only while this session lasts.
+  const target = (await pages()).find((t) => t.url.includes(args[0]));
+  if (!target) process.exit(1);
+  const s = await session(target);
+  await s.send('Emulation.setDeviceMetricsOverride', { width: Number(args[1]), height: 800, deviceScaleFactor: 1, mobile: false });
+  await new Promise((ok) => setTimeout(ok, 300));
+  const r = await s.send('Runtime.evaluate', { expression: args[2], returnByValue: true });
+  await s.send('Emulation.clearDeviceMetricsOverride');
+  s.close();
+  if (r.result?.exceptionDetails || !r.result) process.exit(1);
+  console.log(JSON.stringify(r.result.result.value));
 } else if (cmd === 'visit') {
   // A typed visit, as from the address bar, which Chromium counts toward its most visited sites.
   const s = await session((await pages())[0]);
