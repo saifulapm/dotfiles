@@ -191,6 +191,8 @@ check "systemctl --user is-enabled dots-taildrop prints enabled (got '$enabled')
 check "the Taildrop receiver is linked into ~/.local/bin and its node is /usr/bin's" as_user "test -x ~/.local/bin/dots-taildrop && test -x /usr/bin/node"
 tools=$(as_user "command -v grim slurp wlrctl ydotool tesseract wtype" 2>&1)
 check "the desktop skill's six tools are on PATH (got $(wc -l <<<"$tools"): $(tr '\n' ' ' <<<"$tools"))" test "$(grep -c '^/' <<<"$tools")" = 6
+oomd=$(podman exec "$name" systemctl is-enabled systemd-oomd.service systemd-oomd.socket 2>&1)
+check "systemd-oomd.service and .socket are masked (got '$(tr '\n' ' ' <<<"$oomd")')" test "$oomd" = $'masked\nmasked'
 check "zswap compresses with zstd from boot" podman exec "$name" bash -c "grep -qx zstd /etc/modules-load.d/zstd.conf && grep -q 'zswap/parameters/compressor - - - - zstd' /etc/tmpfiles.d/zswap.conf"
 check "gpg-agent caches a passphrase for 400 days" as_user "grep -qx 'default-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf && grep -qx 'max-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf"
 check "imapnotify@icloud starts with the session" as_user "test -L ~/.config/systemd/user/graphical-session.target.wants/imapnotify@icloud.service"

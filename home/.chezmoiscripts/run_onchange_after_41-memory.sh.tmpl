@@ -4,6 +4,9 @@
 system={{ joinPath .chezmoi.workingTree "system" | quote }}
 root install -D -m 0644 "$system/modules-load.d/zstd.conf" /etc/modules-load.d/zstd.conf || die "could not load zstd at boot"
 root install -D -m 0644 "$system/tmpfiles.d/zswap.conf" /etc/tmpfiles.d/zswap.conf || die "could not make zswap compress with zstd"
+# oomd closed working apps under pressure; masked, a machine slows into swap and the kernel's OOM killer is the last resort.
+root systemctl mask systemd-oomd.service systemd-oomd.socket >/dev/null || die "could not mask systemd-oomd"
+root systemctl stop systemd-oomd.service systemd-oomd.socket 2>/dev/null || true
 # A container has neither the module nor its own swap, so both wait for a real boot.
 if systemd-detect-virt -q --container; then
   log "swap and zswap: left to the host in a container"

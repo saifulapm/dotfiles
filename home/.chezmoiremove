@@ -16,3 +16,5 @@
 .config/kak/autoload/tools/usql.kak
 .config/kak/autoload/tools/spell.kak
 .config/kak/autoload/tools/popup.kak
+# v1 eased oomd's kill line; v2 masks oomd.
+.config/systemd/user/slice.d/50-oomd-patient.conf
