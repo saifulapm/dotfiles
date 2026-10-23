@@ -25,6 +25,10 @@ test-dots:
 test-dev:
     tests/dev/run.sh
 
+# 60 s of 4K60 per codec through mpv on the repo's mpv.conf, here or on mini or nuc over ssh
+test-mpv host="":
+    tests/mpv/run.sh {{host}}
+
 # speed budgets against a fresh nested session
 bench:
     bin/dots-bench
