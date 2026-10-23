@@ -11,12 +11,12 @@ const dir = join(repo, 'home/dot_config/environment.d');
 const read = (f) => readFileSync(join(dir, f), 'utf8');
 const generator = '/usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator';
 
-test('chromium gets v1\'s flags and the rendered theme extension on one CHROMIUM_USER_FLAGS line, without the v1 extension', () => {
+test('chromium gets v1\'s flags, no new-tab footer, and the rendered theme and new-tab extensions on one CHROMIUM_USER_FLAGS line, without the v1 extension', () => {
   const lines = read('60-chromium.conf').split('\n').filter((l) => l.startsWith('CHROMIUM_USER_FLAGS='));
   assert.equal(lines.length, 1);
   assert.equal(
     lines[0],
-    'CHROMIUM_USER_FLAGS=--ozone-platform-hint=auto --force-color-profile=srgb --no-default-browser-check --enable-features=TouchpadOverscrollHistoryNavigation,WaylandPerSurfaceScale,WaylandUiScale,OverlayScrollbar --disable-features=AimEnabled,AiMode,AiModeOmniboxEntryPoint,AiModePageActionIconView,AiModeEntryPointAlwaysNavigates,AiModeStartPack,AimEligibilityService,AimUrlNavigation,AimUrlInterceptPassthrough,Compose,LensOverlay,OptimizationGuideOnDeviceModel,OptimizationGuideModelDownloading,WallpaperSearch --load-extension=${HOME}/.local/state/dots/theme-out/chromium-theme',
+    'CHROMIUM_USER_FLAGS=--ozone-platform-hint=auto --force-color-profile=srgb --no-default-browser-check --enable-features=TouchpadOverscrollHistoryNavigation,WaylandPerSurfaceScale,WaylandUiScale,OverlayScrollbar --disable-features=AimEnabled,AiMode,AiModeOmniboxEntryPoint,AiModePageActionIconView,AiModeEntryPointAlwaysNavigates,AiModeStartPack,AimEligibilityService,AimUrlNavigation,AimUrlInterceptPassthrough,Compose,LensOverlay,OptimizationGuideOnDeviceModel,OptimizationGuideModelDownloading,WallpaperSearch,NtpFooter --load-extension=${HOME}/.local/state/dots/theme-out/chromium-theme,${HOME}/.local/state/dots/theme-out/chromium-newtab',
   );
   assert.doesNotMatch(read('60-chromium.conf'), /\.dotfiles/);
 });
@@ -38,5 +38,5 @@ test('the environment.d generator expands every file', { skip: !existsSync(gener
   assert.match(out, new RegExp(`^ANDROID_HOME=${home}/Android/Sdk$`, 'm'));
   assert.match(out, new RegExp(`^PATH=${home}/\\.cargo/bin:/usr/bin:${home}/\\.local/bin:${home}/Android/Sdk/platform-tools:${home}/Android/Sdk/cmdline-tools/latest/bin:${home}/Android/Sdk/emulator$`, 'm'));
   assert.match(out, /^CHROMIUM_USER_FLAGS=.*--force-color-profile=srgb.*AimEnabled/m);
-  assert.match(out, new RegExp(`^CHROMIUM_USER_FLAGS=.* --load-extension=${home}/\\.local/state/dots/theme-out/chromium-theme"?$`, 'm'));
+  assert.match(out, new RegExp(`^CHROMIUM_USER_FLAGS=.* --load-extension=${home}/\\.local/state/dots/theme-out/chromium-theme,${home}/\\.local/state/dots/theme-out/chromium-newtab"?$`, 'm'));
 });
