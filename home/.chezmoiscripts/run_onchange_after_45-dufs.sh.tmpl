@@ -1,0 +1,6 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+# v1 opened 5000/tcp for dufs on the LAN; v2's dufs listens on 127.0.0.1 and reaches the tailnet through tailscale serve.
+if root firewall-cmd --state >/dev/null 2>&1; then
+  root firewall-cmd -q --remove-port=5000/tcp && root firewall-cmd -q --permanent --remove-port=5000/tcp || die "could not close v1's dufs port 5000"
+fi

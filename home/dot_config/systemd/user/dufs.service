@@ -13,8 +13,8 @@ BindPaths=-%h/Downloads/inbox:%t/dufs/Downloads/inbox
 ExecStartPre=/usr/bin/mkdir -p %h/Downloads/inbox
 # The shim and not a bare dufs: v1's cargo build in ~/.cargo/bin comes first on PATH.
 ExecStart=%h/.local/share/mise/shims/dufs --config %h/.config/dufs/config.yaml --bind 127.0.0.1 --port 5000 --hidden .* --allow-upload %t/dufs
-# A machine whose tailscaled is down, or has no operator, still serves on localhost.
-ExecStartPost=-/usr/bin/tailscale serve --bg --https=8443 http://127.0.0.1:5000
+# A machine whose tailscaled is down, has no operator or hangs on a prompt still serves on localhost.
+ExecStartPost=-/usr/bin/timeout 30 /usr/bin/tailscale serve --bg --yes --https=8443 http://127.0.0.1:5000
 Restart=on-failure
 RestartSec=5
 

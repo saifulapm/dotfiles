@@ -61,3 +61,10 @@ test("v1's 200M journald cap is removed on every machine, a container included",
   assert.ok(cap > 0 && cap < script.indexOf('systemd-detect-virt'), 'the cap goes before the container exit');
   assert.doesNotMatch(script, /SystemMaxUse=(?!200M)/);
 });
+
+test("v1's LAN port for dufs is closed wherever firewalld runs, so dufs is reached only through tailscale serve", () => {
+  const script = read('home/.chezmoiscripts/run_onchange_after_45-dufs.sh.tmpl');
+  const state = script.indexOf('root firewall-cmd --state');
+  assert.ok(state > 0 && state < script.indexOf('--remove-port=5000/tcp'), 'it asks firewalld first, so a container skips it');
+  assert.match(script, /root firewall-cmd -q --remove-port=5000\/tcp && root firewall-cmd -q --permanent --remove-port=5000\/tcp/);
+});

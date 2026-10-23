@@ -136,7 +136,7 @@ test('the unit runs mise shim dufs on 127.0.0.1 only, once the config exists', (
   assert.match(lines('ExecStart')[0], /^%h\/\.local\/share\/mise\/shims\/dufs --config %h\/\.config\/dufs\/config\.yaml .*--bind 127\.0\.0\.1 --port 5000 /);
   assert.doesNotMatch(unit, /0\.0\.0\.0/);
   assert.deepEqual(lines('ConditionPathExists'), ['%h/.config/dufs/config.yaml']);
-  assert.deepEqual(lines('ExecStartPost'), ['-/usr/bin/tailscale serve --bg --https=8443 http://127.0.0.1:5000']);
+  assert.deepEqual(lines('ExecStartPost'), ['-/usr/bin/timeout 30 /usr/bin/tailscale serve --bg --yes --https=8443 http://127.0.0.1:5000']);
   assert.deepEqual(lines('WantedBy'), ['default.target']);
   assert.equal(readFileSync(join(units, 'default.target.wants/symlink_dufs.service'), 'utf8').trim(), '../dufs.service');
 });

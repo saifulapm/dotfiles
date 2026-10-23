@@ -204,6 +204,8 @@ if podman exec "$name" test -d /sys/module/snd_hda_intel; then
 else
   check "without snd_hda_intel, there is no wireplumber keepalive" as_user "test ! -e ~/.config/wireplumber/wireplumber.conf.d/sink-keepalive.conf"
 fi
+dufs=$(as_user "~/.local/share/mise/shims/dufs --version" 2>&1)
+check "the dufs shim runs mise's dufs 0.47.0 (got '$dufs')" test "$dufs" = "dufs 0.47.0"
 check "zswap compresses with zstd from boot" podman exec "$name" bash -c "grep -qx zstd /etc/modules-load.d/zstd.conf && grep -q 'zswap/parameters/compressor - - - - zstd' /etc/tmpfiles.d/zswap.conf"
 check "gpg-agent caches a passphrase for 400 days" as_user "grep -qx 'default-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf && grep -qx 'max-cache-ttl 34560000' ~/.gnupg/gpg-agent.conf"
 check "imapnotify@icloud starts with the session" as_user "test -L ~/.config/systemd/user/graphical-session.target.wants/imapnotify@icloud.service"

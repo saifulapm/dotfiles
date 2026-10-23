@@ -179,6 +179,14 @@ got=$(unit_state bt-agent.service)
 check "with no Bluetooth adapter, bt-agent.service is enabled and inactive (got '$got')" test "$got" = "enabled inactive"
 got=$(as_user "systemctl --user is-failed bt-agent.service")
 check "bt-agent.service is not failed (got '$got')" test "$got" = inactive
+got=$(as_user "readlink -f \$(systemctl --user show -p FragmentPath --value dufs.service)")
+check "dufs.service loads from v2's unit (got '$got')" test "$got" = "$home/Codes/dotfiles/home/dot_config/systemd/user/dufs.service"
+# Before dots secrets writes its config, a login's start skips it.
+as_user "systemctl --user start dufs.service"
+got=$(unit_state dufs.service)
+check "with no dufs config, dufs.service is enabled and inactive (got '$got')" test "$got" = "enabled inactive"
+got=$(as_user "systemctl --user is-failed dufs.service")
+check "dufs.service is not failed (got '$got')" test "$got" = inactive
 got=$(as_user "find ~/.config ~/.local/share -type l -lname '*/.dotfiles/*'")
 check "no link under ~/.config or ~/.local/share points into ~/.dotfiles (got '$got')" test -z "$got"
 got=$(as_user "fish -c 'echo \$fish_history'")
