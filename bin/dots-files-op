@@ -1,0 +1,242 @@
+#!/usr/bin/python3
+# dots-files-op copy|move <target-folder> <source>...: copies or moves files and folders into a folder for the Files app, printing one JSON event per line and asking stdin for retry, skip or cancel when a file fails.
+
+# Nothing is ever overwritten: a clashing name gets " (1)", " (2)", ..., and each destination is created exclusively so a race cannot clobber one either.
+import collections
+import ctypes
+import errno
+import json
+import os
+import shutil
+import signal
+import stat
+import sys
+import time
+
+CHUNK = 4 * 1024 * 1024
+PROGRESS_EVERY = 0.1
+RENAME_NOREPLACE = 1
+AT_FDCWD = -100
+libc = ctypes.CDLL(None, use_errno=True)
+
+
+class Skip(Exception):
+    pass
+
+
+class Cancel(Exception):
+    pass
+
+
+class Terminated(BaseException):
+    pass
+
+
+def say(**event):
+    print(json.dumps(event, separators=(",", ":")), flush=True)
+
+
+# Bytes of the regular files under path, symlinks not followed.
+def size_of(path):
+    if not os.path.isdir(path) or os.path.islink(path):
+        return os.lstat(path).st_size if stat.S_ISREG(os.lstat(path).st_mode) else 0
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for name in files:
+            st = os.lstat(os.path.join(root, name))
+            total += st.st_size if stat.S_ISREG(st.st_mode) else 0
+    return total
+
+
+# "name (n).ext", with the extension from the last dot; a folder or a name whose only dot leads it has no extension.
+def candidates(target, name, is_dir):
+    yield os.path.join(target, name)
+    dot = name.rfind(".")
+    stem, ext = (name, "") if is_dir or dot <= 0 else (name[:dot], name[dot:])
+    n = 1
+    while True:
+        yield os.path.join(target, "%s (%d)%s" % (stem, n, ext))
+        n += 1
+
+
+# Answers the first candidate make(path) creates; make raises FileExistsError when the name is taken.
+def claim(target, name, is_dir, make):
+    for path in candidates(target, name, is_dir):
+        if os.path.lexists(path):
+            continue
+        try:
+            make(path)
+            return path
+        except FileExistsError:
+            continue
+
+
+def rename_noreplace(src, dest):
+    if libc.renameat2(AT_FDCWD, os.fsencode(src), AT_FDCWD, os.fsencode(dest), RENAME_NOREPLACE) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), dest)
+
+
+class Op:
+    def __init__(self, sources, sizes):
+        self.sources, self.sizes, self.total = sources, sizes, sum(sizes)
+        self.done, self.last = 0, 0.0
+        self.copied = []
+        self.index = 0
+        # Bytes written at each recent moment, so the rate covers about the last second.
+        self.samples = collections.deque()
+
+    def add(self, n):
+        self.done += n
+        now = time.monotonic()
+        self.samples.append((now, self.done))
+        while self.samples and now - self.samples[0][0] > 1:
+            self.samples.popleft()
+        if now - self.last < PROGRESS_EVERY and self.done != self.total:
+            return
+        self.last = now
+        t0, d0 = self.samples[0]
+        rate = int((self.done - d0) / (now - t0)) if now > t0 else 0
+        say(event="progress", done=self.done, total=self.total, rate=rate)
+
+    # Runs step until it works, asking stdin after each failure; skip and cancel come back as exceptions.
+    def attempt(self, path, step):
+        while True:
+            try:
+                return step()
+            except OSError as e:
+                say(event="failed", index=self.index, src=self.sources[self.index], file=path, error=e.strerror or str(e), copied=self.copied, pending=list(range(self.index + 1, len(self.sources))))
+                answer = sys.stdin.readline().strip()
+                if answer == "skip":
+                    raise Skip()
+                if answer != "retry":
+                    raise Cancel()
+
+    def copy_file(self, src, dest_dir, name):
+        written = [0]
+
+        def step():
+            # Checked before the open, since opening a fifo would wait for a writer.
+            if not stat.S_ISREG(os.lstat(src).st_mode):
+                raise OSError(errno.EINVAL, "not a regular file", src)
+            fd_in = os.open(src, os.O_RDONLY | os.O_NOFOLLOW)
+            try:
+                dest = claim(dest_dir, name, False, lambda p: os.close(os.open(p, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)))
+                # Whatever stops the copy, failure or SIGTERM, the partial file goes and its bytes come off the progress.
+                try:
+                    fd_out = os.open(dest, os.O_WRONLY)
+                    try:
+                        while chunk := os.read(fd_in, CHUNK):
+                            view = memoryview(chunk)
+                            while view:
+                                n = os.write(fd_out, view)
+                                view = view[n:]
+                                written[0] += n
+                                self.add(n)
+                    finally:
+                        os.close(fd_out)
+                    shutil.copystat(src, dest)
+                    return dest
+                except BaseException:
+                    os.unlink(dest)
+                    self.done -= written[0]
+                    written[0] = 0
+                    raise
+            finally:
+                os.close(fd_in)
+
+        return self.attempt(src, step)
+
+    def copy_link(self, src, dest_dir, name):
+        def step():
+            target = os.readlink(src)
+            dest = claim(dest_dir, name, False, lambda p: os.symlink(target, p))
+            shutil.copystat(src, dest, follow_symlinks=False)
+            return dest
+
+        return self.attempt(src, step)
+
+    def copy_any(self, src, dest_dir, name):
+        if os.path.islink(src):
+            return self.copy_link(src, dest_dir, name)
+        if os.path.isdir(src):
+            dest = self.attempt(src, lambda: claim(dest_dir, name, True, os.mkdir))
+            entries = self.attempt(src, lambda: sorted(os.listdir(src)))
+            for entry in entries:
+                self.copy_any(os.path.join(src, entry), dest, entry)
+            # The folder's mtime is set last, since writing its contents moves it.
+            shutil.copystat(src, dest)
+            return dest
+        return self.copy_file(src, dest_dir, name)
+
+    # Same filesystem: a rename that refuses to replace. Across filesystems: a copy, then the source goes.
+    def move(self, src, target, name):
+        if os.path.realpath(os.path.dirname(src)) == os.path.realpath(target):
+            return src
+        is_dir = os.path.isdir(src) and not os.path.islink(src)
+        dest = self.attempt(src, lambda: self.rename(src, target, name, is_dir))
+        if dest:
+            self.add(self.sizes[self.index])
+            return dest
+        dest = self.copy_any(src, target, name)
+        self.attempt(src, lambda: shutil.rmtree(src) if is_dir else os.unlink(src))
+        return dest
+
+    # Answers the new path, or None when src is on another filesystem.
+    def rename(self, src, target, name, is_dir):
+        for dest in candidates(target, name, is_dir):
+            try:
+                rename_noreplace(src, dest)
+                return dest
+            except FileExistsError:
+                continue
+            except OSError as e:
+                if e.errno == errno.EXDEV:
+                    return None
+                raise
+
+
+def main():
+    if len(sys.argv) < 4 or sys.argv[1] not in ("copy", "move") or not os.path.isdir(sys.argv[2]):
+        print("usage: dots-files-op copy|move <target-folder> <source>...", file=sys.stderr)
+        return 2
+    mode, target, sources = sys.argv[1], sys.argv[2], sys.argv[3:]
+    real_target = os.path.realpath(target)
+    for src in sources:
+        if not os.path.lexists(src):
+            say(event="refused", why="missing", src=src)
+            return 3
+        if os.path.isdir(src) and not os.path.islink(src):
+            real = os.path.realpath(src)
+            if real_target == real or real_target.startswith(real.rstrip("/") + "/"):
+                say(event="refused", why="into-itself", src=src)
+                return 3
+    op = Op(sources, [size_of(s) for s in sources])
+    say(event="start", items=len(sources), bytes=op.total)
+
+    def terminate(*_):
+        raise Terminated()
+
+    signal.signal(signal.SIGTERM, terminate)
+    try:
+        for i, src in enumerate(sources):
+            op.index = i
+            name = os.path.basename(src.rstrip("/"))
+            try:
+                dest = op.copy_any(src, target, name) if mode == "copy" else op.move(src, target, name)
+            except Skip:
+                continue
+            op.copied.append(i)
+            say(event="item", index=i, src=src, dest=dest)
+    except Cancel:
+        say(event="cancelled", copied=op.copied)
+        return 1
+    except Terminated:
+        say(event="cancelled", copied=op.copied)
+        return 130
+    say(event="done", copied=op.copied)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
