@@ -25,6 +25,7 @@ binds {
     Mod+Shift+D hotkey-overlay-title="DNS Shield" { spawn "dots-call" "dns" "toggle"; }
     Mod+Escape hotkey-overlay-title="Lock" { spawn "dots-call" "lock" "lock"; }
     Mod+Shift+Escape hotkey-overlay-title="System Monitor: btop" { spawn "dots-foot" "btop"; }
+    Mod+Ctrl+Escape allow-inhibiting=false hotkey-overlay-title="Toggle Shortcut Inhibit" { toggle-keyboard-shortcuts-inhibit; }
     Mod+O repeat=false hotkey-overlay-title="Overview" { toggle-overview; }
     Mod+Q repeat=false hotkey-overlay-title="Close Window" { close-window; }
     Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }
@@ -78,6 +79,7 @@ binds {
     Mod+BracketLeft hotkey-overlay-title="Pull In or Push Out Left" { consume-or-expel-window-left; }
     Mod+BracketRight hotkey-overlay-title="Pull In or Push Out Right" { consume-or-expel-window-right; }
     Mod+Comma hotkey-overlay-title="Take Next Window into Column" { consume-window-into-column; }
+    Mod+Shift+Comma hotkey-overlay-title="Expel Window from Column" { expel-window-from-column; }
     Mod+Ctrl+V hotkey-overlay-title="Float or Tile Window" { toggle-window-floating; }
     Mod+Shift+V hotkey-overlay-title="Focus Floating or Tiled" { switch-focus-between-floating-and-tiling; }
     Mod+Shift+C hotkey-overlay-title="Center Column" { center-column; }
@@ -87,11 +89,17 @@ binds {
     Mod+Page_Up hotkey-overlay-title="Focus Workspace Up" { focus-workspace-up; }
     Mod+Ctrl+Page_Down hotkey-overlay-title="Move Column to Workspace Down" { move-column-to-workspace-down; }
     Mod+Ctrl+Page_Up hotkey-overlay-title="Move Column to Workspace Up" { move-column-to-workspace-up; }
+    Mod+Shift+Page_Down hotkey-overlay-title="Move Workspace Down" { move-workspace-down; }
+    Mod+Shift+Page_Up hotkey-overlay-title="Move Workspace Up" { move-workspace-up; }
     Mod+Ctrl+Tab hotkey-overlay-title="Previous Workspace" { focus-workspace-previous; }
     Mod+WheelScrollDown cooldown-ms=150 { focus-workspace-down; }
     Mod+WheelScrollUp cooldown-ms=150 { focus-workspace-up; }
     Mod+Shift+WheelScrollDown { focus-column-right; }
     Mod+Shift+WheelScrollUp { focus-column-left; }
+    Mod+WheelScrollRight { focus-column-right; }
+    Mod+WheelScrollLeft { focus-column-left; }
+    Mod+Ctrl+WheelScrollRight { move-column-right; }
+    Mod+Ctrl+WheelScrollLeft { move-column-left; }
 
     Mod+1 hotkey-overlay-title="Focus Workspace 1" { focus-workspace 1; }
     Mod+2 hotkey-overlay-title="Focus Workspace 2" { focus-workspace 2; }

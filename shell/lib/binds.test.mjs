@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // niri matches the key itself; this checks that Mod+Space runs the launcher's toggle.
 const binds = readFileSync(new URL('../../home/dot_config/niri/binds.kdl', import.meta.url), 'utf8');
@@ -178,4 +182,23 @@ test('the power key opens Control on Power instead of suspending', () => {
 test('niri shows no hotkey overlay at login, so the artboard is the first thing on screen', () => {
   const config = readFileSync(new URL('../../home/dot_config/niri/config.kdl', import.meta.url), 'utf8');
   assert.match(config, /^hotkey-overlay \{\n\s+skip-at-startup\n\}$/m);
+});
+
+test('Mod+Ctrl+Escape toggles the shortcut inhibitor and ignores inhibiting itself', () => {
+  assert.match(binds, /^\s*Mod\+Ctrl\+Escape allow-inhibiting=false hotkey-overlay-title="[^"]+" \{ toggle-keyboard-shortcuts-inhibit; \}$/m);
+});
+
+test('the horizontal wheel moves focus, and with Ctrl the column', () => {
+  assert.match(binds, /^\s*Mod\+WheelScrollRight [^{]*\{ focus-column-right; \}$/m);
+  assert.match(binds, /^\s*Mod\+WheelScrollLeft [^{]*\{ focus-column-left; \}$/m);
+  assert.match(binds, /^\s*Mod\+Ctrl\+WheelScrollRight [^{]*\{ move-column-right; \}$/m);
+  assert.match(binds, /^\s*Mod\+Ctrl\+WheelScrollLeft [^{]*\{ move-column-left; \}$/m);
+});
+
+test('binds.kdl passes niri validate', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'dots-binds-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const config = join(dir, 'config.kdl');
+  writeFileSync(config, `include "${fileURLToPath(new URL('../../home/dot_config/niri/binds.kdl', import.meta.url))}"\n`);
+  execFileSync('niri', ['validate', '-c', config], { stdio: 'pipe' });
 });
