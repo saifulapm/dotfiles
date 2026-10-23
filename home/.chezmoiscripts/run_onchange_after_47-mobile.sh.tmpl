@@ -5,6 +5,9 @@
 {{- $gradle := index $t "gradle" -}}
 {{- $buildTools := index $t "build-tools" -}}
 {{- $arm := index $t "arm-build-tools" -}}
+{{- $swiftly := index $t "swiftly" -}}
+{{- $swift := index $t "swift" -}}
+{{- $arch := .chezmoi.arch | replace "arm64" "aarch64" | replace "amd64" "x86_64" -}}
 #!/bin/bash
 {{ template "lib.sh" . }}
 # The toolchain lareys-mobile's Android shell and Rust engine build with, at the versions.toml [[toolchain]] numbers its engine also pins.
@@ -16,6 +19,11 @@ packages=(platform-tools{{ range list "platform" "build-tools" "ndk" }}{{ $p := 
 gradle_version={{ $gradle.version | quote }}
 gradle_url={{ $gradle.url | replace "{version}" $gradle.version | quote }}
 gradle_sha256={{ $gradle.sha256 | quote }}
+swiftly_version={{ $swiftly.version | quote }}
+swiftly_url={{ index $swiftly.url $arch | replace "{version}" $swiftly.version | quote }}
+swiftly_sha256={{ index $swiftly.sha256 $arch | quote }}
+swift_version={{ $swift.version | quote }}
+swift_platform={{ $swift.platform | quote }}
 
 # On disk, not in /tmp: /tmp is a small tmpfs on the Macs and the NDK does not fit.
 mkdir -p "$HOME/.cache"
@@ -81,3 +89,20 @@ if [[ ! -x $gradle_home/bin/gradle ]]; then
 fi
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$gradle_home/bin/gradle" "$HOME/.local/bin/gradle"
+
+export SWIFTLY_HOME_DIR=$HOME/.local/share/swiftly SWIFTLY_BIN_DIR=$HOME/.local/share/swiftly/bin
+# init with a newer swiftly updates the one in place and leaves its toolchains alone.
+if [[ $("$SWIFTLY_BIN_DIR/swiftly" --version 2>/dev/null) != "$swiftly_version" ]]; then
+  tarball=$(fetch "$swiftly_url" "$swiftly_sha256")
+  tar -xzf "$tarball" -C "$tmp"
+  "$tmp/swiftly" init --platform "$swift_platform" --skip-install --no-modify-profile --quiet-shell-followup --assume-yes >"$tmp/swiftly.log" 2>&1 || { cat "$tmp/swiftly.log" >&2; die "mobile: swiftly init failed"; }
+  log "mobile: swiftly $swiftly_version"
+fi
+if [[ ! -d $SWIFTLY_HOME_DIR/toolchains/$swift_version ]]; then
+  # swiftly writes the system packages the toolchain lacks to this file instead of running sudo dnf from inside an apply.
+  "$SWIFTLY_BIN_DIR/swiftly" install "$swift_version" --use --assume-yes --post-install-file "$tmp/swift-deps" >"$tmp/swiftly.log" 2>&1 || { cat "$tmp/swiftly.log" >&2; die "mobile: swiftly could not install Swift $swift_version"; }
+  [[ ! -s $tmp/swift-deps ]] || die "mobile: Swift $swift_version wants system packages packages.toml lacks: $(tr '\n' ' ' <"$tmp/swift-deps")"
+  log "mobile: Swift $swift_version"
+fi
+# swiftly's bin dir also proxies clang and lld, which would shadow the distribution clang the engine's Android linker runs, so only these two are linked.
+for b in swift swiftc; do ln -sfn "$SWIFTLY_BIN_DIR/$b" "$HOME/.local/bin/$b"; done
