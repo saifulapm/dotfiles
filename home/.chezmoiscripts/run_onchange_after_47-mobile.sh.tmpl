@@ -3,6 +3,8 @@
 {{- range $versions.toolchain }}{{ $_ := set $t .name . }}{{ end -}}
 {{- $tools := index $t "cmdline-tools" -}}
 {{- $gradle := index $t "gradle" -}}
+{{- $buildTools := index $t "build-tools" -}}
+{{- $arm := index $t "arm-build-tools" -}}
 #!/bin/bash
 {{ template "lib.sh" . }}
 # The toolchain lareys-mobile's Android shell and Rust engine build with, at the versions.toml [[toolchain]] numbers its engine also pins.
@@ -50,6 +52,25 @@ if ((${#missing[@]})); then
   "$tools/bin/sdkmanager" --sdk_root="$sdk" "${missing[@]}" >"$tmp/sdkmanager.log" 2>&1 || { cat "$tmp/sdkmanager.log" >&2; die "mobile: sdkmanager could not install ${missing[*]}"; }
   log "mobile: ${missing[*]}"
 fi
+
+{{ if eq .chezmoi.arch "arm64" -}}
+# Google builds aapt2, zipalign and adb for x86_64 only, so the Macs swap in arm64 builds and Fedora's adb, each checked every run since an sdkmanager update puts Google's back.
+build_tools=$sdk/build-tools/{{ $buildTools.version }}
+{{- range $f := list "aapt2" "zipalign" }}
+sum={{ index $arm.sha256 $f | quote }}
+if ! echo "$sum  $build_tools/{{ $f }}" | sha256sum -c --status 2>/dev/null; then
+  file=$(fetch {{ print ($arm.url | replace "{version}" $arm.version) "/" $f | quote }} "$sum")
+  install -m 0755 "$file" "$build_tools/{{ $f }}"
+  log "mobile: arm64 {{ $f }}"
+fi
+{{- end }}
+# AGP runs the aapt2 it fetches from Maven, which is x86_64, unless gradle.properties names another.
+mkdir -p "$HOME/.gradle"
+touch "$HOME/.gradle/gradle.properties"
+{ grep -v '^android.aapt2FromMavenOverride=' "$HOME/.gradle/gradle.properties" || true; echo "android.aapt2FromMavenOverride=$build_tools/aapt2"; } >"$tmp/gradle.properties"
+cat "$tmp/gradle.properties" >"$HOME/.gradle/gradle.properties"
+for f in adb fastboot; do ln -sfn "/usr/bin/$f" "$sdk/platform-tools/$f"; done
+{{ end -}}
 
 gradle_home=$HOME/.local/opt/gradle-$gradle_version
 if [[ ! -x $gradle_home/bin/gradle ]]; then

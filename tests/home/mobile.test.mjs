@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -45,6 +45,8 @@ function world({ tools = '15859902', badSha = false } = {}) {
   mkdirSync(files);
   const toolsZip = zip(files, `commandlinetools-linux-${tools}_latest.zip`, { 'cmdline-tools/bin/sdkmanager': [SDKMANAGER, 0o755], 'cmdline-tools/NOTICE.txt': [tools, 0o644] });
   const gradleZip = zip(files, 'gradle-9.7.1-bin.zip', { 'gradle-9.7.1/bin/gradle': ['#!/bin/sh\necho "Gradle 9.7.1"\n', 0o755] });
+  mkdirSync(join(files, 'arm'));
+  for (const f of ['aapt2', 'zipalign']) writeFileSync(join(files, 'arm', f), `arm64 ${f}\n`);
   writeFileSync(join(src, 'versions.toml'), `[[toolchain]]
 name = "cmdline-tools"
 version = "${tools}"
@@ -65,6 +67,13 @@ package = "build-tools;{version}"
 name = "ndk"
 version = "29.0.14206865"
 package = "ndk;{version}"
+
+[[toolchain]]
+name = "arm-build-tools"
+version = "37.0.0"
+url = "file://${files}/arm"
+sha256.aapt2 = "${sha(join(files, 'arm/aapt2'))}"
+sha256.zipalign = "${sha(join(files, 'arm/zipalign'))}"
 
 [[toolchain]]
 name = "gradle"
@@ -127,4 +136,29 @@ test('a command-line tools zip with the wrong sha256 stops the script and instal
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /dots: mobile: sha256 of .*commandlinetools-linux-15859902_latest\.zip is not 0{64}/);
   assert.equal(existsSync(join(w.home, 'Android/Sdk/cmdline-tools')), false);
+});
+
+// Google builds aapt2, zipalign and adb for x86_64 only, and AGP runs the aapt2 it fetches from Maven unless gradle.properties names another.
+test('on the Macs the arm64 aapt2 and zipalign replace Google\'s, Gradle is pointed at that aapt2, and adb is Fedora\'s', () => {
+  const w = world();
+  mkdirSync(join(w.home, '.gradle'));
+  writeFileSync(join(w.home, '.gradle/gradle.properties'), 'org.gradle.daemon=false\nandroid.aapt2FromMavenOverride=/old/build-tools/36.0.0/aapt2\n');
+  const r = run(w, 'arm64');
+  assert.equal(r.status, 0, r.stderr);
+  const bt = join(w.home, 'Android/Sdk/build-tools/37.0.0');
+  for (const f of ['aapt2', 'zipalign']) {
+    assert.equal(readFileSync(join(bt, f), 'utf8'), `arm64 ${f}\n`);
+    assert.equal(statSync(join(bt, f)).mode & 0o777, 0o755, f);
+  }
+  assert.equal(readFileSync(join(w.home, '.gradle/gradle.properties'), 'utf8'), `org.gradle.daemon=false\nandroid.aapt2FromMavenOverride=${bt}/aapt2\n`);
+  for (const f of ['adb', 'fastboot']) assert.equal(readlinkSync(join(w.home, 'Android/Sdk/platform-tools', f)), `/usr/bin/${f}`);
+});
+
+test('x86_64 keeps Google\'s build tools and adb and leaves gradle.properties alone', () => {
+  const w = world();
+  const r = run(w, 'amd64');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(existsSync(join(w.home, 'Android/Sdk/build-tools/37.0.0/aapt2')), false);
+  assert.equal(existsSync(join(w.home, '.gradle/gradle.properties')), false);
+  assert.equal(existsSync(join(w.home, 'Android/Sdk/platform-tools/adb')), false);
 });
