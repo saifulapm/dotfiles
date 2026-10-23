@@ -17,8 +17,8 @@ const ARTBOARD = { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6' };
 // An open can come before the theme's tokens load; until then the launcher draws in black and white.
 const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '', voice: 'caps' } };
 
-// Bidi embedding, override and isolate controls, which let an app's name redraw itself in another order.
-const BIDI = /[\u202A-\u202E\u2066-\u2069]/g;
+// Bidi marks, embeddings, overrides and isolates, which let an app's name redraw itself in another order.
+const BIDI = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g;
 const same = (s) => (s || '').replace(BIDI, '');
 // Text a sender wrote, drawn in the order it is spelt; its lines stay.
 export const inOrder = same;
@@ -640,8 +640,10 @@ export function marginLook(tokens) {
     numberWeight: plain ? 600 : bracket ? 400 : 700,
     tail(view) {
       if (view.app === null && view.title === null) return '';
-      const app = say(view.app ?? '');
-      const title = say(view.title ?? '');
+      // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
+      const words = (s) => say(line((s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')));
+      const app = words(view.app);
+      const title = words(view.title);
       return plain ? ` / ${app} — ${title}` : bracket ? ` ${app} — ${title}` : ` — ${app} · ${title}`;
     },
     goal(g) {

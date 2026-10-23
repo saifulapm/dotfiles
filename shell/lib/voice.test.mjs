@@ -529,3 +529,14 @@ test("Blueprint's month grid: [ CALENDAR ] and OCT 2026 across the card, Monday 
   assert.deepEqual([g.title.place, g.title.left.size, g.title.left.color, g.weekday.size, g.weekday.color, g.rowGap], ['header', 10, '#80A4C2', 10, '#80A4C2', 2]);
   assert.deepEqual([g.today.w, g.today.h, g.today.inverted, g.today.fill, g.today.border], [32, 26, true, '#7FE3F0', 0]);
 });
+
+// A window's title is its file's name, which anyone who sends a file controls: a newline stacked a second line under the margin rule, and ESC or BEL drew tofu.
+test('the margin draws a window title on one line, with no control characters or bidi marks', () => {
+  for (const name of ['paper', 'artboard', 'blueprint']) {
+    for (const title of ['line1\nline2 INJECT.pdf', 'esc\u001b[31mred\u001b]0;pwn\u0007.pdf', 'a\u0085b\u009bc', 'rtl‮fdp.exe', 'mark‎‏؜s']) {
+      const tail = margin(name).tail({ idx: 1, app: 'org.pwmt\u0007zathura\n', title });
+      assert.doesNotMatch(tail, /[\u0000-\u001f\u007f-\u009f‎‏؜‪-‮⁦-⁩]/, `${name}: ${JSON.stringify(tail)}`);
+    }
+    assert.match(margin(name).tail({ idx: 1, app: 'zathura', title: 'line1\nline2 INJECT.pdf' }), /line1 line2 INJECT\.pdf/i);
+  }
+});
