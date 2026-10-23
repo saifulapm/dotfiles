@@ -38,10 +38,11 @@ journalctl --since "7 days ago" -o json MESSAGE_ID=fc2e22bc6ee647b6b90729ab34a25
 Check resource exhaustion before blaming the program: `free -h`, and the journal
 for OOM kills. A process killed by the OOM killer is not a bug in that process.
 
-systemd-oomd is masked on these machines, so nothing kills an app for memory
-pressure alone: the machine slows into swap (16 G of swap files, with zswap in
-front on the Macs and zram on the NUC). Only the kernel's OOM killer acts, once
-RAM and all swap are full; `journalctl -k -g 'Out of memory'` finds its kills.
+systemd-oomd closes a user app only after 95% memory pressure held for 60 s,
+and never a system service, so the machine slows into swap first (16 G of swap
+files, with zswap in front on the Macs and zram on the NUC).
+`journalctl -u systemd-oomd` finds its kills; the kernel's OOM killer, once RAM
+and all swap are full, logs to `journalctl -k -g 'Out of memory'`.
 zswap counts compressed pages at full size, so swap can read full while RAM
 still holds them.
 

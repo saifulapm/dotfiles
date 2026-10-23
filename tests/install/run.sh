@@ -195,7 +195,9 @@ check "the Taildrop receiver is linked into ~/.local/bin and its node is /usr/bi
 tools=$(as_user "command -v grim slurp wlrctl ydotool tesseract wtype" 2>&1)
 check "the desktop skill's six tools are on PATH (got $(wc -l <<<"$tools"): $(tr '\n' ' ' <<<"$tools"))" test "$(grep -c '^/' <<<"$tools")" = 6
 oomd=$(podman exec "$name" systemctl is-enabled systemd-oomd.service systemd-oomd.socket 2>&1)
-check "systemd-oomd.service and .socket are masked (got '$(tr '\n' ' ' <<<"$oomd")')" test "$oomd" = $'masked\nmasked'
+check "systemd-oomd.service and .socket are enabled (got '$(tr '\n' ' ' <<<"$oomd")')" test "$oomd" = $'enabled\nenabled'
+check "oomd leaves system services alone" podman exec "$name" grep -qx 'ManagedOOMMemoryPressure=auto' /etc/systemd/system/system.slice.d/50-dots-oomd.conf
+check "oomd waits for 95% pressure held 60 s on user slices" as_user "grep -qx 'ManagedOOMMemoryPressureLimit=95%' ~/.config/systemd/user/slice.d/50-oomd-patient.conf && grep -qx 'ManagedOOMMemoryPressureDurationSec=60s' ~/.config/systemd/user/slice.d/50-oomd-patient.conf"
 check "no journald drop-in caps the journal at 200M" podman exec "$name" bash -c "! grep -rqx 'SystemMaxUse=200M' /etc/systemd/journald.conf.d"
 check "the container has no Wi-Fi power-save file" podman exec "$name" test ! -e /etc/NetworkManager/conf.d/wifi-powersave-off.conf
 check "the container has no HDA power-save option" podman exec "$name" test ! -e /etc/modprobe.d/hda-power-save.conf

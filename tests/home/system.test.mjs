@@ -29,19 +29,31 @@ test('zswap compresses with zstd from boot, and swap adds up to 16 G', () => {
   assert.match(script, /swapon --fixpgsz/);
 });
 
-test('systemd-oomd is masked on every machine, before the container exit, and swap is left as it is', () => {
+test('systemd-oomd runs on every machine, a container included, and swap is left as it is', () => {
   const script = read('home/.chezmoiscripts/run_onchange_after_41-memory.sh.tmpl');
-  const mask = script.indexOf('root systemctl mask systemd-oomd.service systemd-oomd.socket');
-  assert.ok(mask > 0, 'the memory script masks both oomd units');
-  assert.ok(mask < script.indexOf('systemd-detect-virt'), 'the mask runs in a container too');
-  assert.doesNotMatch(script, /swapoff|zram-generator/);
-  assert.match(read('home/.chezmoiremove'), /^\.config\/systemd\/user\/slice\.d\/50-oomd-patient\.conf$/m);
+  const unmask = script.indexOf('root systemctl unmask systemd-oomd.service systemd-oomd.socket');
+  const enable = script.indexOf('root systemctl enable systemd-oomd.service systemd-oomd.socket');
+  assert.ok(unmask > 0 && enable > unmask, 'the memory script undoes the m29 mask, then enables oomd');
+  assert.ok(enable < script.indexOf('systemd-detect-virt'), 'it runs in a container too');
+  assert.doesNotMatch(script, /systemctl mask|swapoff|zram-generator/);
 });
 
-test('the diagnose-crash skill says oomd is masked and swap is files plus zswap', () => {
+test('oomd closes a user app only after 95% pressure held 60 s, and never a system service', () => {
+  assert.equal(
+    read('home/dot_config/systemd/user/slice.d/50-oomd-patient.conf').replace(/^#.*\n/gm, ''),
+    '[Slice]\nManagedOOMMemoryPressure=kill\nManagedOOMMemoryPressureLimit=95%\nManagedOOMMemoryPressureDurationSec=60s\n',
+  );
+  assert.doesNotMatch(read('home/.chezmoiremove'), /50-oomd-patient/);
+  assert.equal(read('system/systemd/system.slice.d/50-dots-oomd.conf').replace(/^#.*\n/gm, ''), '[Slice]\nManagedOOMMemoryPressure=auto\n');
+  const script = read('home/.chezmoiscripts/run_onchange_after_41-memory.sh.tmpl');
+  assert.match(script, /root install -D -m 0644 "\$system\/systemd\/system\.slice\.d\/50-dots-oomd\.conf" \/etc\/systemd\/system\/system\.slice\.d\/50-dots-oomd\.conf/);
+  assert.match(script, /^# memory source hashes:.*systemd\/system\.slice\.d\/50-dots-oomd\.conf/m);
+});
+
+test('the diagnose-crash skill says oomd closes user apps at 95% for 60 s and swap is files plus zswap', () => {
   const skill = read('home/dot_claude/skills/diagnose-crash/SKILL.md');
-  assert.doesNotMatch(skill, /95%|swap on zram/);
-  assert.match(skill, /systemd-oomd is masked/);
+  assert.doesNotMatch(skill, /systemd-oomd is masked|swap on zram/);
+  assert.match(skill, /95% memory pressure held for 60 s/);
   assert.match(skill, /zswap/);
 });
 

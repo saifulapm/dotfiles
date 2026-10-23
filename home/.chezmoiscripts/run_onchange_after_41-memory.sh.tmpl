@@ -1,12 +1,14 @@
 #!/bin/bash
-# memory source hashes:{{ range list "modules-load.d/zstd.conf" "tmpfiles.d/zswap.conf" }} {{ joinPath $.chezmoi.workingTree "system" . | include | sha256sum }}{{ end }}
+# memory source hashes:{{ range list "modules-load.d/zstd.conf" "tmpfiles.d/zswap.conf" "systemd/system.slice.d/50-dots-oomd.conf" }} {{ joinPath $.chezmoi.workingTree "system" . | include | sha256sum }}{{ end }}
 {{ template "lib.sh" . }}
 system={{ joinPath .chezmoi.workingTree "system" | quote }}
 root install -D -m 0644 "$system/modules-load.d/zstd.conf" /etc/modules-load.d/zstd.conf || die "could not load zstd at boot"
 root install -D -m 0644 "$system/tmpfiles.d/zswap.conf" /etc/tmpfiles.d/zswap.conf || die "could not make zswap compress with zstd"
-# oomd closed working apps under pressure; masked, a machine slows into swap and the kernel's OOM killer is the last resort.
-root systemctl mask systemd-oomd.service systemd-oomd.socket >/dev/null || die "could not mask systemd-oomd"
-root systemctl stop systemd-oomd.service systemd-oomd.socket 2>/dev/null || true
+# oomd closes only user apps, and only after a minute near a freeze; the user slice.d drop-in sets that, this one keeps it off system services. An m29 machine had oomd masked.
+root install -D -m 0644 "$system/systemd/system.slice.d/50-dots-oomd.conf" /etc/systemd/system/system.slice.d/50-dots-oomd.conf || die "could not keep oomd off system services"
+root systemctl unmask systemd-oomd.service systemd-oomd.socket 2>/dev/null || die "could not unmask systemd-oomd"
+root systemctl enable systemd-oomd.service systemd-oomd.socket 2>/dev/null || die "could not enable systemd-oomd"
+root systemctl daemon-reload 2>/dev/null && root systemctl start systemd-oomd.socket systemd-oomd.service 2>/dev/null || log "systemd-oomd starts at the next boot"
 # A container has neither the module nor its own swap, so both wait for a real boot.
 if systemd-detect-virt -q --container; then
   log "swap and zswap: left to the host in a container"
