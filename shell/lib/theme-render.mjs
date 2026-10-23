@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
 import { validateTheme, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
 import { listLook } from './voice.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura } from './apps.mjs';
+import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv } from './apps.mjs';
 
 // Board hexes for the kak-mail list that no token carries: Paper's sender blue, Artboard's date orange.
 const MAIL_BOARD = { paper: { sender: '#2C4A9A' }, artboard: { date: '#C2410C' } };
@@ -76,6 +76,7 @@ const files = {
   'mpv.conf': renderMpv(theme),
   'mpv.ipc': renderMpvIpc(theme),
   zathura: renderZathura(theme),
+  'imv.conf': renderImv(theme),
   'claude.json': renderClaude(theme),
   'pi.json': renderPi(theme),
   'amx.toml': renderAmx(theme),

@@ -1,4 +1,4 @@
-// Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, mpv, zathura, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
+// Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, mpv, zathura, imv, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
 import { mix } from './notes-look.mjs';
 
 const lower = (s) => s.toLowerCase();
@@ -328,6 +328,16 @@ export function renderZathura(t) {
   const dark = t.mode === 'dark';
   lines.push(`set recolor ${dark}`, `set recolor-keephue ${dark}`, `set recolor-lightcolor "${paper}"`, `set recolor-darkcolor "${ink}"`);
   return lines.join('\n') + '\n';
+}
+
+// imv has no include, so this is its whole config, v1's trash binds with it; dots theme changes an open window's background, and the overlay takes its colours at imv's next start.
+export function renderImv(t) {
+  const c = t.color;
+  const [ink, paper, surface] = [c.ink, c.paper, c.surface].map((x) => lower(x).slice(1));
+  return [
+    '[options]', `background = ${paper}`, `overlay_font = ${t.type.ui}:14`, `overlay_text_color = ${ink}`, `overlay_background_color = ${surface}`, '',
+    '[binds]', '<Ctrl+x> = exec gio trash -- "$imv_current_file"; quit', '<Ctrl+Shift+X> = exec gio trash -- "$imv_current_file"; close', '',
+  ].join('\n');
 }
 
 // The coding agents draw inside foot, so each sits on surface with ink text; Claude Code, pi and amx name the theme dots.

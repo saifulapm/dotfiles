@@ -212,3 +212,20 @@ exit 0
     '--user call org.pwmt.zathura.PID-77 /org/pwmt/zathura org.pwmt.zathura SourceConfig',
   ]);
 });
+
+// imv answers imv-msg on $XDG_RUNTIME_DIR/imv-<pid>.sock; only background changes live. These stand-ins run on the test's empty display, and the nested check drives a real imv.
+test('a switch sends each imv on this display its new background', async (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-imv-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  const bin = join(state, 'bin');
+  mkdirSync(bin);
+  const log = join(state, 'imv-msg.log');
+  writeFileSync(join(bin, 'imv-wayland'), '#!/bin/bash\nwhile :; do sleep 0.05; done\n', { mode: 0o755 });
+  writeFileSync(join(bin, 'imv-msg'), `#!/bin/bash\necho "$*" >>${log}\n`, { mode: 0o755 });
+  const env = Object.assign(isolated(state), { PATH: `${bin}:${process.env.PATH}` });
+  const imv = spawn(join(bin, 'imv-wayland'), [], { env, stdio: 'ignore' });
+  t.after(() => imv.kill('SIGKILL'));
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(spawnSync(dots, ['theme', 'blueprint'], { env }).status, 0);
+  assert.equal(readFileSync(log, 'utf8'), `${imv.pid} background 0c1a2e\n`);
+});

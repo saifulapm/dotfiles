@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
 import { validateTheme, contrast } from './theme.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv, renderZathura } from './apps.mjs';
+import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const blueprint = load('blueprint');
@@ -286,4 +286,16 @@ test('the zathura fragment sets every colour, the font, and recolours pages only
     assert.match(z, new RegExp(`^set ${k}-bg "#[0-9a-f]{6}"$`, 'm'), k);
     assert.match(z, new RegExp(`^set ${k}-fg "#[0-9a-f]{6}"$`, 'm'), k);
   }
+});
+
+// imv has no include, so the theme renders its whole config, v1's binds with it.
+test('the imv config sits the image on paper with the overlay in ink on surface, and keeps v1\'s trash binds', () => {
+  const imv = renderImv(blueprint);
+  assert.match(imv, /^\[options\]$/m);
+  assert.match(imv, /^background = 0c1a2e$/m);
+  assert.match(imv, /^overlay_text_color = d6f4f8$/m);
+  assert.match(imv, /^overlay_background_color = 0a1526$/m);
+  assert.match(imv, /^overlay_font = Maple Mono:14$/m);
+  assert.match(imv, /^\[binds\]\n<Ctrl\+x> = exec gio trash -- "\$imv_current_file"; quit\n<Ctrl\+Shift\+X> = exec gio trash -- "\$imv_current_file"; close$/m);
+  assert.match(renderImv(paper), /^background = f1e9d8$/m);
 });

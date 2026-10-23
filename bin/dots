@@ -110,6 +110,14 @@ reload_zathura() {
   done
 }
 
+# imv takes only its background live, over imv-msg; the overlay's colours wait for its next start.
+reload_imv() {
+  local pid
+  for pid in $(session_pids imv-wayland); do
+    imv-msg "$pid" background "$(jq -r '.color.paper[1:] | ascii_downcase' "$1/shell.json")" || return 1
+  done
+}
+
 # Each coding agent's config names the theme file below, and an agent not installed gets no file; cp writes in place, so a watcher on the file itself sees the change.
 reload_agents() {
   local home=${DOTS_AGENT_HOME:-$HOME} src dst
@@ -167,6 +175,7 @@ theme() {
   reload_helix &
   { reload_mpv "$out" || echo mpv >>"$failed"; } &
   { reload_zathura || echo zathura >>"$failed"; } &
+  { reload_imv "$out" || echo imv >>"$failed"; } &
   { gsettings set org.gnome.desktop.interface color-scheme "$scheme" &&
     gsettings set org.gnome.desktop.interface font-name "$ui 11" &&
     gsettings set org.gnome.desktop.interface monospace-font-name "$mono 11" || echo gsettings >>"$failed"; } &
