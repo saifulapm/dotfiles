@@ -137,12 +137,16 @@ test('the unit runs mise shim dufs on 127.0.0.1 only, once the config exists', (
   assert.doesNotMatch(unit, /0\.0\.0\.0/);
   assert.deepEqual(lines('ConditionPathExists'), ['%h/.config/dufs/config.yaml']);
   assert.deepEqual(lines('ExecStartPost'), ['-/usr/bin/timeout 30 /usr/bin/tailscale serve --bg --yes --https=8443 http://127.0.0.1:5000']);
+  // A stopped dufs takes its tailnet mapping with it, so :8443 never forwards to another server on port 5000.
+  assert.deepEqual(lines('ExecStopPost'), ['-/usr/bin/timeout 30 /usr/bin/tailscale serve --https=8443 off']);
   assert.deepEqual(lines('WantedBy'), ['default.target']);
   assert.equal(readFileSync(join(units, 'default.target.wants/symlink_dufs.service'), 'utf8').trim(), '../dufs.service');
 });
 
 test('mise pins dufs 0.47.0 from its github backend', () => {
   assert.match(readFileSync(join(repo, 'home/dot_config/mise/config.toml'), 'utf8'), /^"github:sigoden\/dufs" = "0\.47\.0"$/m);
+  // A manager still holding v1's dufs.service, which served all of $HOME on 0.0.0.0, reloads before the restart.
+  assert.match(readFileSync(join(repo, 'bin/dots-secrets'), 'utf8'), /systemctl --user daemon-reload 2>\/dev\/null && systemctl --user restart dufs\.service/);
 });
 
 test('the repo holds no sha-512 crypt hash', () => {
