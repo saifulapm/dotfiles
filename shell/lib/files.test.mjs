@@ -282,3 +282,43 @@ test('the drives head and the eject badge in each theme', () => {
   assert.deepEqual(F.driveText('plain'), { head: 'Drives', badge: 'e' });
   assert.deepEqual(F.driveText('bracket'), { head: 'DRIVES', badge: 'E' });
 });
+
+test('a row draws the boards\' folder or page icon; an image is a page too, as every board draws diagram-v2.png', () => {
+  assert.equal(F.rowIcon({ name: 'screenshots', dir: true }), 'folder');
+  assert.equal(F.rowIcon({ name: 'IMG_2041.jpg', dir: false, mime: 'image/jpeg' }), 'file');
+});
+
+test('each place draws its own icon: the five places, a pin, a drive and Trash', () => {
+  const kinds = F.places('/home/s')
+    .map((p) => Object.assign({ group: 'places' }, p))
+    .concat([{ label: 'lareys', group: 'pinned' }, { label: 'T7', group: 'drives' }, { label: 'Trash', group: 'trash' }])
+    .map(F.placeIcon);
+  assert.deepEqual(kinds, ['home', 'download', 'code', 'picture', 'document', 'bookmark', 'drive', 'trash']);
+});
+
+test('the icons are the boards\' own paths: Paper and Blueprint share a set, Artboard rounds its own', () => {
+  assert.equal(F.iconPath('caps', 'folder'), 'M1.8 4.2h4l1.4 1.6h7v6.6H1.8z');
+  assert.equal(F.iconPath('bracket', 'download'), 'M8 2.5v8M4.8 7.5L8 10.7l3.2-3.2M3 13.5h10');
+  assert.equal(F.iconPath('plain', 'folder'), 'M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.8h5A1.5 1.5 0 0 1 14 6.3v5.2a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z');
+  assert.equal(F.iconPath('plain', 'bookmark'), 'M9.6 2l4.4 4.4-2.2.5-2.1 2.9.2 2.2L8.2 11 4 14.2 5 10 3 7.8l2.2.2L8.1 5.9z');
+  assert.equal(F.iconPath('caps', 'tick'), 'M3.5 8.5l3 3 6-7');
+  assert.equal(F.iconPath('plain', 'tick'), 'M1.5 4.6l2 2L7.5 2.4');
+});
+
+test('the path line splits into the muted lead and the folder\'s own name', () => {
+  assert.deepEqual(F.pathParts('/home/s', '/home/s/Downloads'), { lead: '~/', name: 'Downloads' });
+  assert.deepEqual(F.pathParts('/home/s', '/home/s/Downloads/screenshots'), { lead: '~/Downloads/', name: 'screenshots' });
+  assert.deepEqual(F.pathParts('/home/s', '/home/s'), { lead: '', name: '~' });
+  assert.deepEqual(F.pathParts('/home/s', '/'), { lead: '', name: '/' });
+  assert.deepEqual(F.pathParts('/home/s', '/etc'), { lead: '/', name: 'etc' });
+  assert.deepEqual(F.pathParts('/home/s', '/home/s/a\nb‮c'), { lead: '~/', name: 'a bc' });
+});
+
+test('each theme\'s listing as its board draws it: marks, row height, the date\'s face and the key strip', () => {
+  const caps = F.filesLook('caps');
+  assert.deepEqual([caps.mark, caps.row, caps.date, caps.strip], ['box', 32, { face: 'display', italic: true, size: 17 }, { caps: true, size: 10, spacing: 1, keyWeight: 700, chip: false }]);
+  const plain = F.filesLook('plain');
+  assert.deepEqual([plain.mark, plain.row, plain.tile, plain.date.italic, plain.strip.chip, plain.head], ['circle', 38, true, false, true, { face: 'ui', size: 14, weight: 700 }]);
+  const bracket = F.filesLook('bracket');
+  assert.deepEqual([bracket.mark, bracket.date.face, bracket.strip.keyWeight, bracket.head], ['bracket', 'mono', 700, { face: 'mono', size: 12, weight: 700 }]);
+});

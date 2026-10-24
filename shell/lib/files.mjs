@@ -263,3 +263,52 @@ const strip = (voice, pairs) => pairs.map(([k, w]) => (voice === 'bracket' ? { k
 export const keyStrip = (voice) => strip(voice, KEYS);
 export const dragKeys = (voice) => strip(voice, DRAG_KEYS);
 export const dropKeys = (voice) => strip(voice, DROP_KEYS);
+
+// Every board draws a file row with the page icon, an image too; only a folder differs.
+export const rowIcon = (row) => (row.dir ? 'folder' : 'file');
+
+const PLACE_ICONS = { Home: 'home', Downloads: 'download', Codes: 'code', Pictures: 'picture', Documents: 'document' };
+export const placeIcon = (place) => (place.group === 'places' ? PLACE_ICONS[place.label] : { pinned: 'bookmark', drives: 'drive', trash: 'trash' }[place.group]);
+
+// The boards' 16 px line icons; a tick is in its own box, 16 for Paper's mark and 9 for Artboard's circle.
+const ICONS = {
+  folder: 'M1.8 4.2h4l1.4 1.6h7v6.6H1.8z',
+  file: 'M3.5 1.8h6l3 3v9.4h-9z M9.5 1.8v3h3',
+  home: 'M2 7.5L8 2.5l6 5M3.8 6.8v6.4h8.4V6.8',
+  download: 'M8 2.5v8M4.8 7.5L8 10.7l3.2-3.2M3 13.5h10',
+  code: 'M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5',
+  picture: 'M2 3.2h12v9.6H2z M2 11l3.6-3.4 3 3 2-1.8L14 11',
+  document: 'M3.5 1.8h9v12.4h-9z M5.5 5h5 M5.5 8h5 M5.5 11h3',
+  bookmark: 'M4.5 2.5h7v11L8 10.8l-3.5 2.7z',
+  drive: 'M3 6.5h10v6H3z M5.5 6.5v-3h5v3 M6.5 9.5h.01 M9.5 9.5h.01',
+  trash: 'M3 4.5h10 M6 4.5V2.8h4v1.7 M4.2 4.5l.6 9h6.4l.6-9',
+  tick: 'M3.5 8.5l3 3 6-7',
+};
+const ROUND_ICONS = Object.assign({}, ICONS, {
+  folder: 'M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.8h5A1.5 1.5 0 0 1 14 6.3v5.2a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z',
+  file: 'M4 1.8h5l3 3V13a1.2 1.2 0 0 1-1.2 1.2H4A1.2 1.2 0 0 1 2.8 13V3A1.2 1.2 0 0 1 4 1.8zM9 1.8V5h3',
+  home: 'M2.2 7.6L8 2.6l5.8 5M3.8 6.8V13h8.4V6.8',
+  download: 'M8 2.5v8M4.8 7.6L8 10.8l3.2-3.2M3 13.5h10',
+  code: 'M5.6 4.4L2 8l3.6 3.6M10.4 4.4L14 8l-3.6 3.6',
+  // The board's rect and filled dot as one stroked path: a dot of radius .4 under a 1.5 stroke is 2.3 px across, the board's is 2.2.
+  picture: 'M4 2.5h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z M3 11.5l3.2-3.4 2.6 2.6 1.8-1.8 2.4 2.6 M10.1 5.6a.4 .4 0 1 0 .8 0a.4 .4 0 1 0-.8 0',
+  document: 'M4 1.8h5l3 3V13a1.2 1.2 0 0 1-1.2 1.2H4A1.2 1.2 0 0 1 2.8 13V3A1.2 1.2 0 0 1 4 1.8zM9 1.8V5h3M5 8.5h5M5 11h3',
+  bookmark: 'M9.6 2l4.4 4.4-2.2.5-2.1 2.9.2 2.2L8.2 11 4 14.2 5 10 3 7.8l2.2.2L8.1 5.9z',
+  tick: 'M1.5 4.6l2 2L7.5 2.4',
+});
+export const iconPath = (voice, kind) => (voice === 'plain' ? ROUND_ICONS : ICONS)[kind] || '';
+
+// The path line: "~/" muted, then the folder's own name; home and the root are one part.
+export function pathParts(home, folder) {
+  const path = tilde(home, folder);
+  const cut = path.lastIndexOf('/') + 1;
+  return path === '/' || cut === 0 ? { lead: '', name: oneLine(path) } : { lead: oneLine(path.slice(0, cut)), name: oneLine(path.slice(cut)) };
+}
+
+// What differs between the three Files boards beyond the tokens: the mark, the row, the date's face, the header and the key strip.
+const LOOKS = {
+  caps: { mark: 'box', stroke: 1.3, row: 32, tile: false, date: { face: 'display', italic: true, size: 17 }, head: { face: 'display', size: 18, weight: 400 }, strip: { caps: true, size: 10, spacing: 1, keyWeight: 700, chip: false } },
+  plain: { mark: 'circle', stroke: 1.5, row: 38, tile: true, date: { face: 'mono', italic: false, size: 12 }, head: { face: 'ui', size: 14, weight: 700 }, strip: { caps: false, size: 11, spacing: 0, keyWeight: 500, chip: true } },
+  bracket: { mark: 'bracket', stroke: 1.3, row: 32, tile: false, date: { face: 'mono', italic: false, size: 12 }, head: { face: 'mono', size: 12, weight: 700 }, strip: { caps: false, size: 11, spacing: 1.5, keyWeight: 700, chip: false } },
+};
+export const filesLook = (voice) => LOOKS[voice] || LOOKS.caps;
