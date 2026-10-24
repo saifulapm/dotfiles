@@ -132,7 +132,13 @@ ShellRoot {
                 rssKiB: Status.rssKiB(procStatus.text()),
                 voice: app.voice,
                 opened: app.opened
-            }, home.state(), titlePage.state()));
+            }, home.state(), titlePage.state(),
+            // t8: releases state
+            {},
+            // t9: browse state
+            {},
+            // t10: person state
+            {}));
         }
     }
 
