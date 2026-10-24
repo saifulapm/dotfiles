@@ -75,6 +75,10 @@ FocusScope {
         });
     }
 
+    function focusSearch() {
+        field.forceActiveFocus();
+    }
+
     function leaveSearch() {
         searching = false;
         asked = "";

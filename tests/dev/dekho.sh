@@ -73,6 +73,8 @@ check "j then l l moves to the third trending series ($(dekho_state | jq -c .foc
 wtype -k Return
 until_ok 1000 dekho_is '.opened == 302'
 check "Enter opens Paper Birds' id ($(dekho_state | jq -c .opened))" dekho_is '.opened == 302'
+wtype -k Escape
+until_ok 1000 dekho_is '.page == "home"'
 wtype lllllll
 until_ok 1000 dekho_is '.focus.col == 9'
 check "l to the tenth title scrolls it into view ($(dekho_state | jq -c '.rows.series[9].shown'))" dekho_is '.focus.col == 9 and .rows.series[9].shown'

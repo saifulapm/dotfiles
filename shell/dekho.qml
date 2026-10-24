@@ -63,6 +63,8 @@ ShellRoot {
     function openTitle(hit) {
         opened = hit.id;
         // t7: title page
+        titlePage.load(hit);
+        open("title", hit);
     }
 
     Services.Theme {
@@ -130,7 +132,7 @@ ShellRoot {
                 rssKiB: Status.rssKiB(procStatus.text()),
                 voice: app.voice,
                 opened: app.opened
-            }, home.state()));
+            }, home.state(), titlePage.state()));
         }
     }
 
@@ -158,6 +160,19 @@ ShellRoot {
             visible: app.page === "home"
             focus: visible
             dekho: app
+        }
+
+        DekhoTitle {
+            id: titlePage
+            anchors.fill: parent
+            visible: app.page === "title"
+            focus: visible
+            dekho: app
+            // / searches from Home's field, with Home's rows behind it.
+            onSearch: {
+                app.back();
+                home.focusSearch();
+            }
         }
 
         // t8: releases and starting
