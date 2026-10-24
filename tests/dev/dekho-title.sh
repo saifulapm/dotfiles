@@ -31,6 +31,11 @@ status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 ep() { dekho_state | jq -c ".title.episodes[$1]"; }
+layout() { dekho_state | jq -c .title.layout; }
+# A film's page draws the series page's header band (its rule's y), and its block starts the same distance under it.
+film_layout_is() {
+  dekho_is --argjson s "$1" '.title.layout as $f | ($f.header | type) == "number" and $f.header > 0 and $f.header == $s.header and $f.blockTop == $s.blockTop and $f.blockTop > $f.header and $f.blockTop - $f.header <= 24'
+}
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
@@ -129,14 +134,32 @@ wtype -k Return
 until_ok 3000 title_loaded
 check "paper: an aired date is set in Instrument Serif italic, as the Paper board sets it ($(dekho_state | jq -c '.title.look | {datedFont, datedItalic}'))" \
   dekho_is '.title.look.datedFont == "Instrument Serif" and .title.look.datedItalic and .title.episodes[4].font == "Maple Mono"'
+series_paper=$(layout)
 in_theme artboard
 until_ok 3000 dekho_is '.voice == "plain"'
 check "artboard: season tabs are rounded 10 px and the tag reads next up, as the Artboard board draws them ($(dekho_state | jq -c '[.title.look.tabRadius, .title.episodes[3].tag]'))" \
   dekho_is '.title.look.tabRadius == 10 and .title.episodes[3].tag == "next up" and .title.count == "3 of 8 watched"'
+series_artboard=$(layout)
 in_theme blueprint
 until_ok 3000 dekho_is '.voice == "bracket"'
 check "blueprint: the tag reads [NEXT UP] and a date to come AIRS, as the Blueprint board writes them ($(dekho_state | jq -c '[.title.episodes[3].tag, .title.episodes[4].date, .title.count]'))" \
   dekho_is --arg airs "${airs^^}" '.title.episodes[3].tag == "[NEXT UP]" and .title.episodes[4].date == $airs and .title.count == "3 OF 8 WATCHED"'
+series_blueprint=$(layout)
+wtype -k Escape
+until_ok 1000 dekho_is '.page == "home"'
+
+# A Quiet Verdict, the first trending film, has no seasons or episodes; its crew comes only with the detail.
+wtype jhh
+until_ok 1000 dekho_is '.focus == {"row": "movies", "col": 0}'
+wtype -k Return
+until_ok 3000 dekho_is '.page == "title" and .title.name == "A Quiet Verdict" and (.title.crew | length) == 3'
+check "blueprint: a film's page draws the series page's header and its block under it (film $(layout), series $series_blueprint)" film_layout_is "$series_blueprint"
+in_theme artboard
+until_ok 3000 dekho_is '.voice == "plain"'
+check "artboard: a film's page draws the series page's header and its block under it (film $(layout), series $series_artboard)" film_layout_is "$series_artboard"
+in_theme paper
+until_ok 3000 dekho_is '.voice == "caps"'
+check "paper: a film's page draws the series page's header and its block under it (film $(layout), series $series_paper)" film_layout_is "$series_paper"
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 wtype -k Escape

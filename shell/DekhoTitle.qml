@@ -256,6 +256,11 @@ FocusScope {
                 cursor: items[row] ? items[row].episode : null,
                 episodes: drawnList(episodeRows),
                 episodesShown: episodeView.visible && episodeView.height > 0,
+                layout: {
+                    header: headRule.y,
+                    blockTop: sideColumn.mapToItem(page, 0, 0).y,
+                    nameTop: bigName.mapToItem(page, 0, 0).y
+                },
                 backdrop: {
                     image: picture.status === Image.Ready,
                     placeholder: placeholder.visible,
@@ -385,6 +390,7 @@ FocusScope {
         }
 
         Rule {
+            id: headRule
             Layout.fillWidth: true
             dashed: bracket
             color: caps ? c.ink ?? "black" : c.line ?? "gray"
@@ -400,6 +406,7 @@ FocusScope {
             spacing: 28
 
             ColumnLayout {
+                id: sideColumn
                 Layout.preferredWidth: 220
                 Layout.minimumWidth: 220
                 Layout.maximumWidth: 220
@@ -758,6 +765,12 @@ FocusScope {
                             }
                         }
                     }
+                }
+
+                // A film has no episodes to take the height; without a filler the page's layout spreads the spare height over the header and the keys too.
+                Item {
+                    Layout.fillHeight: true
+                    visible: !page.tv
                 }
             }
         }

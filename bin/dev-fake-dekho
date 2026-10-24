@@ -85,9 +85,9 @@ case "${1:-} ${2:-}" in
   if [ "${*,,}" = tide ]; then answer search-tide; else echo '{"items":[]}'; fi
   ;;
 "api title")
-  # Harbour Lights has no backdrop; every other id answers as The Long Tide under its own id.
+  # Harbour Lights has no backdrop, A Quiet Verdict is a film; every other id answers as The Long Tide under its own id.
   id=$(sed -n 's/.*--id \([0-9]*\).*/\1/p' <<<"$*")
-  if [ "$id" = 300 ]; then answer title-300; else jq -c --argjson id "$id" '.id = $id' "$fixtures/title-101.json"; fi
+  if [ "$id" = 300 ] || [ "$id" = 400 ]; then answer "title-$id"; else jq -c --argjson id "$id" '.id = $id' "$fixtures/title-101.json"; fi
   ;;
 "api episodes")
   # Air dates count in days from today, so one to come still reads airs; w's marks are kept in DOTS_DEV_DIR and outlast the call.
