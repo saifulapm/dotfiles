@@ -72,6 +72,8 @@ until_ok 1000 deen_is '.tab == "hadith"'
 until_ok 2000 hadith_is '.download.percent != "0%" and .download.speed != ""'
 check "state 1 draws the download ($(hadith '.download | [.title, .percent, .size, .speed, .left, .saving]'))" \
   hadith_is '.download.shown and .download.title == "Getting the hadith corpus" and (.download.percent | test("^[0-9]+%$")) and (.download.size | test("^[0-9]+ of 124 MB$")) and .download.speed == "6.2 MB/s" and (.download.left | test("^about [0-9]+ s$")) and (.download.saving | endswith("/.local/share/deen/hadith"))'
+# Esc ends the App and its download with it, which the next open resumes (#80V1JZ2Q, #V5Z5V6QF).
+check "its keys say Esc closes and the next open carries on ($(hadith '.download.keyLine'))" hadith_is '.download.keyLine == "esc closes; the next open carries on"'
 check "state 1 says what works meanwhile ($(hadith '.download.meanwhile'))" \
   hadith_is '.download.meanwhile == ["MEANWHILE", "Read, Duas and Prayer work now.", "Hadith search waits for the download."]'
 check "still one fetch, the one from the open ($(fetches))" fetches_are 1

@@ -523,7 +523,7 @@ FocusScope {
 
                         Repeater {
                             id: cardKeyList
-                            model: card.failed ? [["r", "retry"], ["esc", "leave"]] : [["esc", "leaves; the download carries on"]]
+                            model: card.failed ? [["r", "retry"], ["esc", "leave"]] : [["esc", "closes; the next open carries on"]]
 
                             Rectangle {
                                 required property var modelData
