@@ -6,7 +6,7 @@ import "." as Root
 import "lib/cheatsheet.mjs" as Lib
 import "lib/voice.mjs" as V
 
-// Every titled niri bind in four columns, drawn in the Surfaces window.
+// Every titled niri bind and the touchpad's gestures in five columns, drawn in the Surfaces window.
 Item {
     id: sheet
 
@@ -18,7 +18,7 @@ Item {
     // How many row titles are cut short on screen, so a check can tell every bind apart.
     property int truncated: 0
     readonly property string query: input.text
-    readonly property var columns: Lib.groupRows(Lib.filterRows(rows, query))
+    readonly property var columns: Lib.columnsOf(Lib.groupRows(Lib.filterRows(rows, query)))
     property int opens: 0
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
@@ -59,9 +59,12 @@ Item {
         // The keys as drawn, read from the row and legend items.
         const rowKeys = [];
         for (let i = 0; i < groupRepeater.count; i++) {
-            const g = groupRepeater.itemAt(i).groupRows;
-            for (let j = 0; j < g.count; j++)
-                rowKeys.push(g.itemAt(j).keyLabel);
+            const col = groupRepeater.itemAt(i).columnGroups;
+            for (let k = 0; k < col.count; k++) {
+                const g = col.itemAt(k).groupRows;
+                for (let j = 0; j < g.count; j++)
+                    rowKeys.push(g.itemAt(j).keyLabel);
+            }
         }
         const legend = [];
         for (let i = 0; i < legendRepeater.count; i++)
@@ -99,7 +102,7 @@ Item {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
-            sheet.rows = Lib.parseBinds(text());
+            sheet.rows = Lib.parseBinds(text()).concat(Lib.TOUCHPAD);
             sheet.bindsRead = true;
         }
         onLoadFailed: sheet.bindsRead = true
@@ -265,62 +268,76 @@ Item {
                             id: groupRepeater
                             model: sheet.columns
 
+                            // A column holds one group, or SYSTEM with the touchpad under it.
                             Column {
-                                id: group
+                                id: column
                                 required property var modelData
-                                readonly property alias groupRows: rowRepeater
+                                readonly property alias columnGroups: columnRepeater
                                 width: (groups.width - 3 * groups.spacing) / 4
-                                spacing: 6
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    bottomPadding: 4
-                                    text: group.modelData.name
-                                    color: look.small.color
-                                    font.family: look.small.font
-                                    font.pixelSize: look.small.size
-                                    font.letterSpacing: look.small.spacing
-                                }
+                                spacing: 18
 
                                 Repeater {
-                                    id: rowRepeater
-                                    model: group.modelData.rows
+                                    id: columnRepeater
+                                    model: column.modelData
 
-                                    RowLayout {
+                                    Column {
+                                        id: group
                                         required property var modelData
-                                        readonly property string keyLabel: rowKey.text
-                                        width: group.width
+                                        readonly property alias groupRows: rowRepeater
+                                        width: column.width
                                         spacing: 6
 
                                         Text {
                                             textFormat: Text.PlainText
-                                            Layout.maximumWidth: group.width - rowKey.implicitWidth - 24
-                                            text: modelData.title
-                                            // Titles wrap rather than elide: Mod+Ctrl+1 to 9 differ only past "Move Column to Workspace".
-                                            wrapMode: Text.Wrap
-                                            onTruncatedChanged: sheet.truncated += truncated ? 1 : -1
-                                            Component.onDestruction: if (truncated) sheet.truncated -= 1
-                                            color: c.ink
-                                            font.family: fonts.ui
-                                            font.pixelSize: 13
-                                        }
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            Layout.fillWidth: true
-                                            text: "........................................................................"
-                                            clip: true
-                                            color: c.line
-                                            font.family: fonts.mono
-                                            font.pixelSize: 11
-                                        }
-                                        Text {
-                                            id: rowKey
-                                            textFormat: Text.PlainText
-                                            text: look.keyText(modelData.key)
-                                            color: c.ink
-                                            font.family: fonts.mono
-                                            font.pixelSize: 11
+                                            bottomPadding: 4
+                                            text: group.modelData.name
+                                            color: look.small.color
+                                            font.family: look.small.font
+                                            font.pixelSize: look.small.size
                                             font.letterSpacing: look.small.spacing
+                                        }
+
+                                        Repeater {
+                                            id: rowRepeater
+                                            model: group.modelData.rows
+
+                                            RowLayout {
+                                                required property var modelData
+                                                readonly property string keyLabel: rowKey.text
+                                                width: group.width
+                                                spacing: 6
+
+                                                Text {
+                                                    textFormat: Text.PlainText
+                                                    Layout.maximumWidth: group.width - rowKey.implicitWidth - 24
+                                                    text: modelData.title
+                                                    // Titles wrap rather than elide: Mod+Ctrl+1 to 9 differ only past "Move Column to Workspace".
+                                                    wrapMode: Text.Wrap
+                                                    onTruncatedChanged: sheet.truncated += truncated ? 1 : -1
+                                                    Component.onDestruction: if (truncated) sheet.truncated -= 1
+                                                    color: c.ink
+                                                    font.family: fonts.ui
+                                                    font.pixelSize: 13
+                                                }
+                                                Text {
+                                                    textFormat: Text.PlainText
+                                                    Layout.fillWidth: true
+                                                    text: "........................................................................"
+                                                    clip: true
+                                                    color: c.line
+                                                    font.family: fonts.mono
+                                                    font.pixelSize: 11
+                                                }
+                                                Text {
+                                                    id: rowKey
+                                                    textFormat: Text.PlainText
+                                                    text: look.keyText(modelData.key)
+                                                    color: c.ink
+                                                    font.family: fonts.mono
+                                                    font.pixelSize: 11
+                                                    font.letterSpacing: look.small.spacing
+                                                }
+                                            }
                                         }
                                     }
                                 }

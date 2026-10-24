@@ -1,5 +1,16 @@
-// The cheat sheet's rows: every niri bind with a hotkey-overlay-title, its key as the designs write it, and its group.
-export const GROUPS = ['SURFACES', 'WORK', 'WINDOWS', 'SYSTEM'];
+// The cheat sheet's rows: every niri bind with a hotkey-overlay-title, its key as the designs write it, and its group, then the touchpad's.
+export const GROUPS = ['SURFACES', 'WORK', 'WINDOWS', 'SYSTEM', 'TOUCHPAD'];
+
+// No bind holds these: niri's own swipes and bottom-left corner (gestures.kdl), dots-gestures' pinches, and the margins' Notes corner.
+export const TOUCHPAD = [
+  ['3-finger ↕', 'Switch Workspace'],
+  ['3-finger ↔', 'Scroll Columns'],
+  ['4-finger ↕', 'Overview'],
+  ['4-finger pinch', 'Launcher'],
+  ['4-finger spread', 'Overview'],
+  ['↙ corner', 'Overview'],
+  ['↗ corner', 'Notes'],
+].map(([key, title]) => ({ title, key, group: 'TOUCHPAD' }));
 
 const MODS = { Mod: 'Mod', Shift: '⇧', Ctrl: '⌃', Alt: '⌥', Super: 'Super' };
 const KEYS = { Slash: '/', Return: '↵', Page_Up: 'PgUp', Page_Down: 'PgDn', Escape: 'Esc', Period: '.', Comma: ',' };
@@ -33,6 +44,11 @@ export function parseBinds(text) {
 
 export function groupRows(rows) {
   return GROUPS.map((name) => ({ name, rows: rows.filter((r) => r.group === name) }));
+}
+
+// SYSTEM is the shortest group, so the touchpad sits under it and the sheet keeps four columns.
+export function columnsOf(groups) {
+  return [groups.slice(0, 1), groups.slice(1, 2), groups.slice(2, 3), groups.slice(3)];
 }
 
 export function filterRows(rows, query) {

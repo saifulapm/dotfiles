@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseBinds, groupRows, filterRows } from './cheatsheet.mjs';
+import { parseBinds, groupRows, columnsOf, filterRows, TOUCHPAD } from './cheatsheet.mjs';
 
 const binds = readFileSync(new URL('../../home/dot_config/niri/binds.kdl', import.meta.url), 'utf8');
 const row = (line) => parseBinds(line)[0];
@@ -56,12 +56,31 @@ test('binds group into surfaces, work, windows and system', () => {
   assert.equal(row('    XF86AudioMute allow-when-locked=true hotkey-overlay-title="Mute" { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }').group, 'SYSTEM');
 });
 
-test('rows group into the four columns in order, empty ones kept', () => {
+test('rows group into the five groups in order, empty ones kept', () => {
   const rows = parseBinds('    Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }\n    Mod+Space hotkey-overlay-title="Launcher" { spawn "qs" "ipc" "call" "launcher" "toggle"; }\n');
   assert.deepEqual(
     groupRows(rows).map((g) => [g.name, g.rows.map((r) => r.title)]),
-    [['SURFACES', ['Launcher']], ['WORK', []], ['WINDOWS', []], ['SYSTEM', ['Quit niri']]],
+    [['SURFACES', ['Launcher']], ['WORK', []], ['WINDOWS', []], ['SYSTEM', ['Quit niri']], ['TOUCHPAD', []]],
   );
+});
+
+// Four columns as before, so no column narrows: the short SYSTEM one also holds the touchpad.
+test('the five groups lay out in four columns, TOUCHPAD under SYSTEM', () => {
+  assert.deepEqual(columnsOf(groupRows([])).map((col) => col.map((g) => g.name)), [['SURFACES'], ['WORK'], ['WINDOWS'], ['SYSTEM', 'TOUCHPAD']]);
+});
+
+// binds.kdl cannot hold these: niri's own swipes and corner, and dots-gestures' pinches and the margins' corner.
+test('the touchpad rows name niri\'s swipes and corner, the two pinches and the Notes corner', () => {
+  assert.deepEqual(TOUCHPAD.map((r) => [r.key, r.title, r.group]), [
+    ['3-finger ↕', 'Switch Workspace', 'TOUCHPAD'],
+    ['3-finger ↔', 'Scroll Columns', 'TOUCHPAD'],
+    ['4-finger ↕', 'Overview', 'TOUCHPAD'],
+    ['4-finger pinch', 'Launcher', 'TOUCHPAD'],
+    ['4-finger spread', 'Overview', 'TOUCHPAD'],
+    ['↙ corner', 'Overview', 'TOUCHPAD'],
+    ['↗ corner', 'Notes', 'TOUCHPAD'],
+  ]);
+  assert.deepEqual(filterRows(TOUCHPAD, 'pinch').map((r) => r.title), ['Launcher']);
 });
 
 test('a filter matches the title or the key text, ignoring case', () => {

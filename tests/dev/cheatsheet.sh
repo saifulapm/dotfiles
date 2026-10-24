@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mod+/ shows every titled niri bind in four groups, and Esc gives the keyboard back.
+# Mod+/ shows every titled niri bind and the touchpad's gestures in five groups, and Esc gives the keyboard back.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -25,10 +25,12 @@ sheet_gone() { state_is '.open == false and .drawing == false' && sheet_focus No
 mod_slash
 until_ok 3000 sheet_shown
 check "Mod+/ shows the cheat sheet with exclusive keyboard" sheet_shown
-check "state counts $titled rows, one per titled bind" state_is --argjson n "$titled" '.rows == $n'
+# Seven touchpad rows follow the binds: three swipes, two pinches and two corners.
+check "state counts $titled rows, one per titled bind, and the 7 touchpad rows" state_is --argjson n "$((titled + 7))" '.rows == $n'
 check "no row's title is cut short" state_is '.truncated == 0'
 check "the drawn rows include the switcher's Alt+Tab key" state_is '.rowKeys | index("⌥ TAB") != null'
-check "state lists the four groups" state_is '.groups == ["SURFACES", "WORK", "WINDOWS", "SYSTEM"]'
+check "the drawn rows include the Notes corner" state_is '.rowKeys | index("↗ CORNER") != null'
+check "state lists the five groups" state_is '.groups == ["SURFACES", "WORK", "WINDOWS", "SYSTEM", "TOUCHPAD"]'
 
 wtype -k Escape
 until_ok 2000 sheet_gone
