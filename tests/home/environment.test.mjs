@@ -33,6 +33,11 @@ test('ssh-agent.socket is enabled at login from the packaged unit', () => {
   assert.equal(readFileSync(join(repo, 'home/dot_config/systemd/user/sockets.target.wants/symlink_ssh-agent.socket'), 'utf8').trim(), '/usr/lib/systemd/user/ssh-agent.socket');
 });
 
+// An agent a caller starts lives in the caller's unit and dies with it, mail-sync's every 15 minutes, and its cached passphrase with it.
+test('gpg-agent.socket is enabled at login from the packaged unit', () => {
+  assert.equal(readFileSync(join(repo, 'home/dot_config/systemd/user/sockets.target.wants/symlink_gpg-agent.socket'), 'utf8').trim(), '/usr/lib/systemd/user/gpg-agent.socket');
+});
+
 test('the environment.d generator expands every file', { skip: !existsSync(generator) }, () => {
   const home = mkdtempSync(join(tmpdir(), 'envd-'));
   mkdirSync(join(home, 'environment.d'));
