@@ -119,6 +119,13 @@ case "${1:-} ${2:-}" in
 "play --json")
   # The Starting events contract over about 3 s, then a sleep stands in for mpv until the unit is stopped.
   emit() { printf '%s\n' "$1"; sleep 0.35; }
+  # With DOTS_DEV_DIR/dekho-play-fails present the play fails before it plays: the file's text is the error's, then the backend exits 1.
+  if [ -f "$DOTS_DEV_DIR/dekho-play-fails" ]; then
+    emit '{"event":"status","text":"looking for releases"}'
+    jq -nc --rawfile text "$DOTS_DEV_DIR/dekho-play-fails" '{event: "error", text: $text}'
+    echo '{"event":"exit","code":1}'
+    exit 1
+  fi
   mb=1048576
   emit '{"event":"status","text":"looking for releases"}'
   emit '{"event":"trying","quality":"720p","size":"1.1 GB","seeders":530,"audio":"EN 2.0","needed_bps":4000000}'

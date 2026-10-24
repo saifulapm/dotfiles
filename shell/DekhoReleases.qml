@@ -41,6 +41,17 @@ FocusScope {
     // The last playing event, kept for checks once Starting has gone.
     property var playing: null
     readonly property var st: R.starting(events)
+    // Why a play failed before it played, on one line: an error event's text, else a non-zero exit's code. "" while it goes well.
+    readonly property string failure: {
+        for (const e of events) {
+            if (e.event === "error")
+                return D.title(e.text) || "dekho could not start playback";
+            if (e.event === "exit" && e.code !== 0)
+                return "dekho stopped with code " + e.code;
+        }
+        return "";
+    }
+    readonly property var failKeys: [["r", "try again"], ["esc", "back"]]
     readonly property bool tv: target.kind === "tv"
     readonly property string episodeTag: tv && target.season ? "S" + target.season + " E" + target.episode : ""
     readonly property string today: Qt.formatDate(new Date(), "yyyy-MM-dd")
@@ -93,6 +104,12 @@ FocusScope {
         playArgs = args;
         mode = "starting";
         starter.running = true;
+    }
+
+    // r on a failed start runs the same play again, in a new session; the old tail would follow the old file.
+    function retry() {
+        tail.running = false;
+        start(playArgs);
     }
 
     function stream() {
@@ -169,7 +186,16 @@ FocusScope {
                     peers: peersText.text,
                     down: downText.text,
                     up: upText.text,
-                    shown: startBox.visible
+                    shown: startBox.visible,
+                    fail: {
+                        shown: failBox.visible,
+                        text: failText.text,
+                        lines: failText.lineCount,
+                        truncated: failText.truncated,
+                        keys: Array.from({
+                            length: keyRepeater.count
+                        }, (_, i) => keyRepeater.itemAt(i).drawn())
+                    }
                 },
                 playing: playing,
                 session: session,
@@ -226,6 +252,8 @@ FocusScope {
             if (page.mode === "starting") {
                 if (k === Qt.Key_Escape)
                     page.cancel();
+                else if (t === "r" && page.failure !== "")
+                    page.retry();
             } else if (k === Qt.Key_Escape)
                 page.close();
             else if (page.mode === "none" && t === "r")
@@ -519,6 +547,26 @@ FocusScope {
                 }
             }
 
+            // A start that failed: the error on one line, laid out as No releases is.
+            ColumnLayout {
+                id: failBox
+                Layout.fillWidth: true
+                Layout.margins: 20
+                visible: page.mode === "starting" && page.failure !== ""
+
+                Text {
+                    id: failText
+                    Layout.fillWidth: true
+                    textFormat: Text.PlainText
+                    text: page.words.up(page.failure)
+                    color: page.c.ink ?? "black"
+                    font.family: page.bodyFont
+                    font.pixelSize: 13
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                }
+            }
+
             // Starting: progress to what mpv needs, the steps, and the swarm.
             ColumnLayout {
                 id: startBox
@@ -527,7 +575,7 @@ FocusScope {
                 Layout.rightMargin: 20
                 Layout.topMargin: 20
                 Layout.bottomMargin: 22
-                visible: page.mode === "starting"
+                visible: page.mode === "starting" && page.failure === ""
                 spacing: 18
 
                 Text {
@@ -635,10 +683,16 @@ FocusScope {
                 spacing: plain ? 8 : 16
 
                 Repeater {
-                    model: page.look.keys(page.mode === "starting" ? page.words.startKeys : page.mode === "none" ? page.words.noneKeys : page.words.keys)
+                    id: keyRepeater
+                    model: page.look.keys(page.mode === "starting" ? (page.failure !== "" ? page.failKeys : page.words.startKeys) : page.mode === "none" ? page.words.noneKeys : page.words.keys)
 
                     Rectangle {
                         required property var modelData
+
+                        function drawn() {
+                            return [keyName.text, keyWord.text];
+                        }
+
                         implicitWidth: keyPair.implicitWidth + (page.plain ? 14 : 0)
                         implicitHeight: keyPair.implicitHeight + (page.plain ? 6 : 0)
                         radius: 6
@@ -650,6 +704,7 @@ FocusScope {
                             spacing: page.bracket ? 8 : 6
 
                             Text {
+                                id: keyName
                                 textFormat: Text.PlainText
                                 text: modelData.key
                                 color: (page.bracket ? page.c.accent : page.c.ink) ?? "black"
@@ -659,6 +714,7 @@ FocusScope {
                                 font.letterSpacing: page.caps ? 1 : page.bracket ? 1.5 : 0
                             }
                             Text {
+                                id: keyWord
                                 textFormat: Text.PlainText
                                 text: modelData.word
                                 color: page.c.muted ?? "gray"

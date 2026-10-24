@@ -101,6 +101,64 @@ check "on playing, Starting goes and the title page is back, the play kept ($(de
   dekho_is '.page == "title" and .releases.mode == "" and .releases.shown == false and .releases.playing.event == "playing"'
 check "and the unit plays on behind it" unit_active
 
+# A play that fails before it plays: the fake answers an error event and exit 1 with the text in this file.
+failing=$DOTS_DEV_DIR/dekho-play-fails
+play_line='play --json --id 101 --kind tv -s 3 -e 4 --release b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2'
+plays() { grep -cx "$play_line" "$fake_log"; }
+failed() { dekho_is '.releases.mode == "starting" and .releases.starting.fail.shown'; }
+fail_fills() { dekho_is --arg t "$1" '.releases.starting.fail.text == $t and .releases.starting.fail.lines == 1'; }
+printf 'no source answered for this release' >"$failing"
+wtype -k Return
+until_ok 3000 listed
+wtype -k Return
+until_ok 5000 failed
+note_session
+check "an error before playing leaves Starting stuck no more: it draws the error on one line ($(rel .starting.fail))" fail_fills 'no source answered for this release'
+check "the progress, the steps and the swarm are gone, only the failure is drawn ($(rel '.starting.shown'))" \
+  dekho_is '.releases.starting.shown == false and .releases.starting.fail.shown'
+check "the keys are r try again and esc back, in Paper's capitals ($(rel '.starting.fail.keys'))" \
+  dekho_is '.releases.starting.fail.keys == [["R", "TRY AGAIN"], ["ESC", "BACK"]]'
+before=$(plays)
+printf 'boom\nquit\xe2\x80\xaeed\x1b[31m red' >"$failing"
+wtype r
+until_ok 5000 bash -c "[ \$(grep -cx '$play_line' '$fake_log') = $((before + 1)) ]"
+until_ok 5000 failed
+note_session
+check "r runs the same play again: the fake heard it a second time ($before, then $(plays))" test "$(plays)" = $((before + 1))
+check "an error with a newline, U+202E and ESC draws on one line without them ($(rel .starting.fail))" \
+  dekho_is '.releases.starting.fail | .lines == 1 and (.text | startswith("boom quit")) and (.text | test("[\n‮\u001b]") | not)'
+printf '%0300d' 0 | tr 0 x >"$failing"
+wtype r
+until_ok 5000 dekho_is '.releases.starting.fail.shown | not'
+until_ok 5000 failed
+note_session
+check "a 300-character error draws on one elided line ($(rel '.starting.fail | [.lines, .truncated]'))" \
+  dekho_is '.releases.starting.fail | .lines == 1 and .truncated and (.text | length) == 300'
+: >"$failing"
+wtype r
+until_ok 5000 dekho_is '.releases.starting.fail.shown | not'
+until_ok 5000 failed
+note_session
+check "an error with no text still says something ($(rel .starting.fail.text))" dekho_is '.releases.starting.fail.text == "dekho could not start playback"'
+rm -f "$failing"
+wtype r
+until_ok 5000 dekho_is '.releases.mode == "" and .releases.playing != null'
+note_session
+check "r once the cause is gone plays: Starting goes and the title page is back ($(dekho_state | jq -c '[.page, .releases.mode, .releases.playing.event]'))" \
+  dekho_is '.page == "title" and .releases.mode == "" and .releases.playing.event == "playing"'
+check "and the unit plays on" unit_active
+printf 'no source answered' >"$failing"
+wtype -k Return
+until_ok 3000 listed
+wtype -k Return
+until_ok 5000 failed
+note_session
+wtype -k Escape
+until_ok 1000 dekho_is '.releases.mode == ""'
+rm -f "$failing"
+check "esc on the failure goes back to the title page and the unit is stopped ($(dekho_state | jq -c '[.page, .releases.mode]'))" \
+  bash -c "! systemctl --user is-active --quiet '$DOTS_DEKHO_UNIT.service' && timeout 0.5 qs ipc -p '$dekho_qml' call dekho state | jq -e '.page == \"title\" and .releases.mode == \"\"' >/dev/null"
+
 # A second run, cancelled.
 wtype -k Return
 until_ok 3000 listed
