@@ -147,10 +147,13 @@ until_ok 15000 dekho_up
 until_ok 5000 dekho_is '(.rows.continue | length) > 0'
 check "reopened, Continue watching's first card is the series at S1 E1 with its time left ($(dekho_state | jq -c '.rows.continue[0] | [.title, .line, .progress]'))" \
   dekho_is '.focus == {"row": "continue", "col": 0} and .rows.continue[0].title == "Test Pattern Show" and .rows.continue[0].line == "S1 E1 · 2 min left"'
+# A window opened since wtype's last key is handed niri's own keymap, and niri does not resend wtype's when it has not changed, so a Return after the last run's Return reads as Escape and closes Dekho; a Shift first carries wtype's keymap over and does nothing.
+wtype -k Shift_L
 t0=$(now_ms)
 wtype -k Return
 watch_starting
 resume_ms=$(($(now_ms) - t0))
+played_ms=$(now_ms)
 note_session
 playing=$(session_event playing)
 check "Enter on it goes through Starting ($release, steps $steps) to playing in ${resume_ms} ms ($playing)" \
@@ -159,6 +162,18 @@ check "and resumes within 2 s of $position s, where it stopped (resumed_at $(jq 
   bash -c "jq -e --argjson p '$position' '(.resumed_at - \$p) | fabs <= 2' <<<'$playing' >/dev/null"
 until_ok 10000 mpv_up
 check "mpv's window maps again ($(window_of mpv))" mpv_up
+# mpv's own playhead, over the IPC socket dekho opens for it, so the check does not rest on dekho's word; it plays on after starting, so the seconds since playing are allowed on top.
+mpv_time() {
+  local pid
+  pid=$(systemctl --user show -p MainPID --value "$DOTS_DEKHO_UNIT.service")
+  printf '{"command":["get_property","time-pos"]}\n' | timeout 1 socat - "UNIX-CONNECT:/tmp/dekho-mpv-$pid.sock" 2>/dev/null | jq -r 'select(.error == "success") | .data' | head -n 1
+}
+mpv_answers() { [ -n "$(mpv_time)" ]; }
+until_ok 5000 mpv_answers
+mpv_at=$(mpv_time)
+since=$((($(now_ms) - played_ms) / 1000 + 1))
+check "mpv itself plays from $mpv_at s, within 2 s of $position s plus the ${since} s since playing" \
+  awk -v t="${mpv_at:--1}" -v p="$position" -v s="$since" 'BEGIN { exit !(t >= p - 2 && t <= p + 2 + s) }'
 
 quit_mpv
 check "closing mpv ends the unit in ${quit_ms} ms, with no dekho (pid $dekho_pid) or mpv (pid $mpv_pid) left" \
