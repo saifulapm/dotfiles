@@ -37,6 +37,10 @@ check "the preview of IMG_2041.jpg reads 4032 × 3024 and draws the picture ($(f
 wtype -k Return
 until_ok 1000 files_is '.finding == false'
 check "Enter ends the find and keeps its rows" files_is '.finding == false and .rows == ["IMG_2041.jpg"]'
+wtype /2040
+until_ok 1000 files_is '.query == "2040"'
+check "a second / starts a new find, not the last one's tail ($(files_state | jq -c .query))" files_is '.query == "2040" and .rows == ["IMG_2040.jpg"]'
+wtype -k Return
 wtype /
 wtype -k Escape
 until_ok 1000 files_is '.finding == false and .query == ""'

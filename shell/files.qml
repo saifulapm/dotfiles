@@ -45,6 +45,17 @@ ShellRoot {
             app.notice = app.voice === "bracket" ? "! " + error.toUpperCase() : error
     }
     property var driveRows: []
+    // y or x: what p pastes, and whether it copies or moves; the sources are named as they were yanked.
+    property var yank: null
+    property FilesOps ops: FilesOps {
+        onEnded: last => app.opEnded(last)
+    }
+    readonly property var opFail: ops.failed ? F.failText(voice, {
+            mode: ops.mode,
+            to: ops.to,
+            items: ops.items,
+            failed: ops.failed
+        }) : null
     // What a drag out carries: the rows, their paths, and the chip's image grabbed as it starts.
     property var dragRows: []
     readonly property var dragPaths: dragRows.map(r => pathOf(r))
@@ -85,6 +96,11 @@ ShellRoot {
                 group: "pinned"
             }))).concat(drivesWatch.drives).concat([trash])
     readonly property var status: F.statusText(voice, rows, marked, selected)
+    // A stopped copy, then a notice, then a drag, else the counts: what the status line says.
+    readonly property var statusShown: ops.failed ? F.stoppedText(voice, ops.to, ops.copied.length, ops.items.length) : notice ? {
+        counts: notice,
+        at: status.at
+    } : dragging ? F.dragText(voice, dragRows) : status
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -224,6 +240,48 @@ ShellRoot {
                 name: name
             })];
         doer.running = true;
+    }
+
+    // y and x remember the targets with their sizes, for the progress and the failure card.
+    function yankTargets(how) {
+        const paths = F.targets(rows, marked, folder, cursorRow);
+        if (!listed || !paths.length)
+            return;
+        yank = {
+            mode: how,
+            from: folder,
+            items: rows.filter(r => paths.indexOf(pathOf(r)) >= 0).map(r => ({
+                        path: pathOf(r),
+                        name: r.name,
+                        size: r.size,
+                        dir: r.dir
+                    }))
+        };
+    }
+
+    // A drive's label names a target inside it, as the failure board's "T7 Shield is full" does.
+    function placeName(path) {
+        const drive = drivesWatch.drives.find(d => path === d.path || path.indexOf(d.path + "/") === 0);
+        return drive ? drive.label : F.folderName(home, path);
+    }
+
+    function paste() {
+        if (!yank || !listed)
+            return;
+        ops.start(yank.mode, yank.items, yank.from, folder, placeName(folder));
+    }
+
+    function opEnded(last) {
+        if (last && last.event === "refused")
+            notice = F.noticeText(voice, last.why === "into-itself" ? "itself" : "missing", last.src.slice(last.src.lastIndexOf("/") + 1));
+        else if (last && last.event === "cancelled" && last.copied.length < ops.items.length && last.copied.length > 0) {
+            const t = F.stoppedText(voice, ops.to, last.copied.length, ops.items.length);
+            notice = t.counts + " · " + t.at;
+        }
+        if (last && last.event === "done" && ops.mode === "move")
+            yank = null;
+        if (folder === ops.target || folder === ops.from)
+            list();
     }
 
     // Space marks the cursor row and steps down, as yazi's does.
@@ -421,6 +479,15 @@ ShellRoot {
                 share: share.state(),
                 places: app.allPlaces.map(p => p.group + ":" + p.label),
                 placeAt: app.placeAt,
+                op: {
+                    running: app.ops.running,
+                    yank: app.yank ? app.yank.mode + " " + app.yank.items.length : "",
+                    say: opSay.text,
+                    progress: opProgress.text,
+                    keys: opKeys.text,
+                    shown: opSay.visible,
+                    card: failCard.visible ? failCard.drawn() : null
+                },
                 drives: app.driveRows.slice().sort((a, b) => a.at - b.at).map(r => r.drawn()),
                 driveError: app.drivesWatch.error,
                 path: pathLine.text,
@@ -501,6 +568,22 @@ ShellRoot {
                 const k = event.key;
                 const t = event.text;
                 app.notice = "";
+                // The failure card waits for r, s or esc; the copy waits with it.
+                if (app.ops.failed) {
+                    if (t === "r")
+                        app.ops.answer("retry");
+                    else if (t === "s")
+                        app.ops.answer("skip");
+                    else if (k === Qt.Key_Escape)
+                        app.ops.answer("cancel");
+                    event.accepted = true;
+                    return;
+                }
+                if (app.ops.running && k === Qt.Key_C && (event.modifiers & Qt.ControlModifier)) {
+                    app.ops.cancel();
+                    event.accepted = true;
+                    return;
+                }
                 if (app.asking === "trash") {
                     if (k === Qt.Key_Return || k === Qt.Key_Enter)
                         app.doTrash();
@@ -522,8 +605,11 @@ ShellRoot {
                     event.accepted = true;
                     return;
                 }
-                if (t === "/")
+                if (t === "/") {
+                    // A new find starts empty, as yazi's and vim's do.
+                    app.setQuery("");
                     app.finding = true;
+                }
                 else if (t === ".")
                     app.hidden = !app.hidden;
                 else if (t === "r")
@@ -554,6 +640,12 @@ ShellRoot {
                     app.rowKey("out");
                 else if (k === Qt.Key_Space)
                     app.rowKey("mark");
+                else if (t === "y")
+                    app.yankTargets("copy");
+                else if (t === "x")
+                    app.yankTargets("move");
+                else if (t === "p")
+                    app.paste();
                 else
                     return;
                 event.accepted = true;
@@ -992,6 +1084,49 @@ ShellRoot {
 
             Rule {}
 
+            // A running copy or move: what, from where, how far, and how to stop it.
+            RowLayout {
+                visible: app.ops.running && !app.ops.failed
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Layout.topMargin: 7
+                Layout.bottomMargin: 7
+                spacing: 14
+
+                Text {
+                    id: opSay
+                    Layout.fillWidth: true
+                    textFormat: Text.PlainText
+                    text: app.ops.running ? F.opLine(app.voice, app.home, app.ops).say : ""
+                    maximumLineCount: 1
+                    elide: Text.ElideMiddle
+                    color: c.ink ?? "black"
+                    font.family: look.small.font
+                    font.pixelSize: 12
+                }
+                Text {
+                    id: opProgress
+                    textFormat: Text.PlainText
+                    text: app.ops.running ? F.opLine(app.voice, app.home, app.ops).progress : ""
+                    color: c.accent ?? "red"
+                    font.family: fonts.mono ?? ""
+                    font.pixelSize: 12
+                }
+                Text {
+                    id: opKeys
+                    textFormat: Text.PlainText
+                    text: app.ops.running ? F.opLine(app.voice, app.home, app.ops).keys : ""
+                    color: look.small.color
+                    font.family: look.small.font
+                    font.pixelSize: 11
+                }
+            }
+
+            Rule {
+                visible: app.ops.running && !app.ops.failed
+            }
+
             // The status line: the cursor's path, the counts and where the cursor is.
             RowLayout {
                 Layout.fillWidth: true
@@ -1015,15 +1150,15 @@ ShellRoot {
                 Text {
                     id: statusCounts
                     textFormat: Text.PlainText
-                    text: app.notice ? app.notice : app.dragging ? F.dragText(app.voice, app.dragRows).counts : app.status.counts
-                    color: app.notice ? c.danger ?? "red" : look.small.color
+                    text: app.statusShown.counts
+                    color: app.notice || app.ops.failed ? c.danger ?? "red" : look.small.color
                     font.family: look.small.font
                     font.pixelSize: 11
                 }
                 Text {
                     id: statusAt
                     textFormat: Text.PlainText
-                    text: app.dragging ? F.dragText(app.voice, app.dragRows).at : app.status.at
+                    text: app.statusShown.at
                     color: c.ink ?? "black"
                     font.family: fonts.mono ?? ""
                     font.pixelSize: 11
@@ -1137,6 +1272,137 @@ ShellRoot {
                             font.pixelSize: 11
                         }
                     }
+                }
+            }
+        }
+
+        // The copy-failure card over the window: the error, each file's fate, and r, s or esc.
+        Rectangle {
+            id: failCard
+            function drawn() {
+                const rows = [];
+                for (let i = 0; i < failRows.count; i++)
+                    rows.push(failRows.itemAt(i).drawn());
+                return {
+                    head: failHead.text,
+                    title: failTitle.text,
+                    why: failWhy.text,
+                    rows: rows,
+                    foot: failFoot.text,
+                    keys: failKeys.text
+                };
+            }
+            visible: app.opFail !== null
+            z: 20
+            anchors.centerIn: parent
+            width: Math.min(560, parent.width - 48)
+            height: failColumn.implicitHeight + 36
+            color: c.surface ?? "white"
+            radius: plain ? 12 : 0
+            border.width: 1
+            border.color: c.danger ?? "red"
+
+            Column {
+                id: failColumn
+                x: 18
+                y: 18
+                width: parent.width - 36
+                spacing: 10
+
+                Text {
+                    id: failHead
+                    textFormat: Text.PlainText
+                    text: app.opFail ? app.opFail.head : ""
+                    color: c.danger ?? "red"
+                    font.family: look.small.font
+                    font.pixelSize: 10
+                    font.letterSpacing: look.small.spacing
+                }
+                Text {
+                    id: failTitle
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: app.opFail ? app.opFail.title : ""
+                    maximumLineCount: 1
+                    elide: Text.ElideRight
+                    color: c.ink ?? "black"
+                    font.family: bracket ? fonts.mono ?? "" : fonts.display ?? ""
+                    font.pixelSize: 20
+                }
+                Text {
+                    id: failWhy
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: app.opFail ? app.opFail.why : ""
+                    wrapMode: Text.Wrap
+                    color: c.muted ?? "gray"
+                    font.family: fonts.ui ?? ""
+                    font.pixelSize: 12
+                }
+                Repeater {
+                    id: failRows
+                    model: app.opFail ? app.opFail.rows : []
+
+                    Row {
+                        id: failRow
+                        required property var modelData
+                        function drawn() {
+                            return {
+                                name: failName.text,
+                                state: failState.text,
+                                lines: failName.lineCount
+                            };
+                        }
+                        width: failColumn.width
+                        spacing: 10
+
+                        Text {
+                            width: 14
+                            textFormat: Text.PlainText
+                            text: failRow.modelData.stopped ? "!" : ""
+                            color: c.danger ?? "red"
+                            font.family: fonts.mono ?? ""
+                            font.pixelSize: 12
+                            font.weight: Font.Bold
+                        }
+                        Text {
+                            id: failName
+                            width: Math.min(implicitWidth, failColumn.width * 0.45)
+                            textFormat: Text.PlainText
+                            text: failRow.modelData.name
+                            maximumLineCount: 1
+                            elide: Text.ElideMiddle
+                            color: c.ink ?? "black"
+                            font.family: fonts.mono ?? ""
+                            font.pixelSize: 12
+                        }
+                        Text {
+                            id: failState
+                            textFormat: Text.PlainText
+                            text: failRow.modelData.state
+                            color: failRow.modelData.stopped ? c.danger ?? "red" : c.muted ?? "gray"
+                            font.family: look.small.font
+                            font.pixelSize: 11
+                        }
+                    }
+                }
+                Text {
+                    id: failFoot
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    text: app.opFail ? app.opFail.foot : ""
+                    wrapMode: Text.Wrap
+                    color: c.muted ?? "gray"
+                    font.family: fonts.ui ?? ""
+                    font.pixelSize: 11
+                }
+                Text {
+                    id: failKeys
+                    textFormat: Text.PlainText
+                    text: app.opFail ? app.opFail.keys : ""
+                    color: c.ink ?? "black"
+                    font.family: look.small.font
+                    font.pixelSize: 11
                 }
             }
         }

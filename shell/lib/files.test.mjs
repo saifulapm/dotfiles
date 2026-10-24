@@ -122,6 +122,58 @@ test('the prompts pair their keys as each theme writes them', () => {
   assert.deepEqual(F.trashAsk('bracket', 1), { say: 'TRASH 1 FILE ·', keys: [{ key: '[↵]', word: 'TRASH ·' }, { key: '[ESC]', word: 'KEEP' }] });
 });
 
+test('a drop takes the local files it carries, decoded, and nothing else', () => {
+  assert.deepEqual(F.dropPaths(['file:///h/Downloads/report%20final.pdf', 'https://example.com/a.pdf', 'file:///h/%C3%A9.txt']), ['/h/Downloads/report final.pdf', '/h/é.txt']);
+  assert.deepEqual(F.dropPaths(['file:///h/bad%E0%A4%A.txt']), []);
+});
+
+test('while a drop hovers, the status line says what it will do and the row says drop here', () => {
+  assert.deepEqual(F.dropText('caps', ['/d/report-final.pdf'], 'screenshots'), { counts: 'copy 1 file into screenshots/', at: 'report-final.pdf' });
+  assert.deepEqual(F.dropText('bracket', ['/d/a', '/d/b'], 'Shots'), { counts: 'COPY 2 FILES INTO Shots/', at: '2 FILES' });
+  assert.equal(F.dropText('caps', ['/d/a', '/d/b'], 'shots').at, '2 files');
+  assert.equal(F.dropHere('caps'), 'drop here');
+  assert.equal(F.dropHere('bracket'), '[DROP HERE]');
+  assert.deepEqual(F.dropKeys('caps').map((k) => k.key), ['drop', 'esc']);
+});
+
+test('a running copy says what it copies from where, its percent, sizes and rate', () => {
+  const op = { mode: 'copy', items: [{ name: 'a' }, { name: 'b' }, { name: 'c' }], from: '/h/Pictures', done: 41000000, total: 96000000, rate: 12000000 };
+  assert.deepEqual(F.opLine('caps', '/h', op), { say: 'copying 3 files from ~/Pictures', progress: '43% · 41 of 96 MB · 12 MB/s', keys: 'ctrl+c cancels' });
+  assert.deepEqual(F.opLine('bracket', '/h', op), { say: 'COPYING 3 FILES FROM ~/Pictures', progress: '43% · 41 OF 96 MB · 12 MB/S', keys: '[CTRL+C] CANCELS' });
+  const move = { mode: 'move', items: [{ name: 'a' }], from: '/h/D', done: 500, total: 2000, rate: 0 };
+  assert.deepEqual(F.opLine('plain', '/h', move), { say: 'moving 1 file from ~/D', progress: '25% · 0.5 of 2 KB', keys: 'ctrl+c cancels' });
+  assert.equal(F.opLine('caps', '/h', Object.assign({}, move, { done: 0, total: 0 })).progress, '');
+});
+
+test('a failed copy names each file as copied, stopped or not started, and what to press', () => {
+  const op = {
+    mode: 'copy', to: 'T7 Shield',
+    items: [{ name: 'IMG_2039.jpg', size: 2800000 }, { name: 'IMG_2040.jpg', size: 3000000 }, { name: 'IMG_2041.jpg', size: 3100000 }, { name: 'diagram\nv2.png', size: 412000 }],
+    failed: { index: 2, error: 'No space left on device', copied: [0, 1], pending: [3] },
+  };
+  const f = F.failText('caps', op);
+  assert.equal(f.head, 'Copy failed');
+  assert.equal(f.title, 'T7 Shield is full');
+  assert.equal(f.why, 'No space left on T7 Shield. 2 of 4 files were copied; 2 were not.');
+  assert.deepEqual(f.rows, [
+    { name: 'IMG_2039.jpg', state: 'copied · 2.8 MB', stopped: false },
+    { name: 'IMG_2040.jpg', state: 'copied · 3.0 MB', stopped: false },
+    { name: 'IMG_2041.jpg', state: 'stopped · partial removed', stopped: true },
+    { name: 'diagram v2.png', state: 'not started · 412 KB', stopped: false },
+  ]);
+  assert.equal(f.foot, 'Nothing half-written is left: the partial IMG_2041.jpg was deleted, and the 2 copied files are whole.');
+  assert.equal(f.keys, 'r retry · s skip this file · esc cancel the rest');
+  const b = F.failText('bracket', Object.assign({}, op, { failed: { index: 0, error: 'Permission denied', copied: [], pending: [1, 2, 3] } }));
+  assert.equal(b.title, 'PERMISSION DENIED');
+  assert.equal(b.rows[0].state, 'STOPPED · PARTIAL REMOVED');
+  assert.equal(b.keys, '[R] RETRY · [S] SKIP THIS FILE · [ESC] CANCEL THE REST');
+});
+
+test('a stopped copy says so on the status line', () => {
+  assert.deepEqual(F.stoppedText('caps', 'T7 Shield', 2, 4), { counts: 'copy to T7 Shield stopped', at: '2 of 4 copied' });
+  assert.deepEqual(F.stoppedText('bracket', 'T7 Shield', 2, 4), { counts: 'COPY TO T7 SHIELD STOPPED', at: '2 OF 4 COPIED' });
+});
+
 test('a path is written from ~ inside the home folder', () => {
   assert.equal(F.tilde('/home/s', '/home/s/Downloads/IMG_2041.jpg'), '~/Downloads/IMG_2041.jpg');
   assert.equal(F.tilde('/home/s', '/home/s'), '~');

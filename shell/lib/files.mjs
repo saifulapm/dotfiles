@@ -23,6 +23,8 @@ export function headText(voice, home, folder) {
 
 export const places = (home) => ['Home', 'Downloads', 'Codes', 'Pictures', 'Documents'].map((label) => ({ label, path: label === 'Home' ? home : `${home}/${label}` }));
 
+export const tilde = (home, path) => (path === home ? '~' : path.indexOf(home + '/') === 0 ? '~' + path.slice(home.length) : path);
+
 // Every board writes a row's day, month and time; a row from another year names the year instead.
 export function dateText(voice, ms, now) {
   const d = new Date(ms);
@@ -128,7 +130,7 @@ export function nameProblem(name, entries) {
 // Blueprint's error line is caps after a bang, but the name is the file's own and keeps its case.
 export function noticeText(voice, tag, name) {
   const shown = oneLine(name);
-  const SAY = { exists: [shown, ' exists'], empty: ['', 'type a name'], slash: ['', 'a name cannot hold /'], dots: [shown, ' is not a name'], failed: ['', 'could not do that'] };
+  const SAY = { exists: [shown, ' exists'], empty: ['', 'type a name'], slash: ['', 'a name cannot hold /'], dots: [shown, ' is not a name'], failed: ['', 'could not do that'], itself: [shown, ' cannot go into itself'], missing: [shown, ' is gone'] };
   const [lead, rest] = SAY[tag] || ['', tag];
   return voice === 'bracket' ? `! ${lead}${rest.toUpperCase()}` : lead + rest;
 }
@@ -166,8 +168,75 @@ export function drives(voice, text, user) {
 // Every board heads the drives DRIVES but Artboard, and Blueprint writes the eject key in caps.
 export const driveText = (voice) => ({ head: voice === 'plain' ? 'Drives' : 'DRIVES', badge: voice === 'bracket' ? 'E' : 'e' });
 
+// A drop's local files; a web URL or an undecodable one is not a file Files can copy.
+export function dropPaths(urls) {
+  const paths = [];
+  for (const u of urls) {
+    const m = String(u).match(/^file:\/\/(\/.*)$/);
+    if (!m) continue;
+    try {
+      paths.push(decodeURIComponent(m[1]));
+    } catch (e) {
+      continue;
+    }
+  }
+  return paths;
+}
 
-export const tilde = (home, path) => (path === home ? '~' : path.indexOf(home + '/') === 0 ? '~' + path.slice(home.length) : path);
+// What a hovering drop will do; a drop always copies. The folder's name keeps its case in Blueprint's caps.
+export function dropText(voice, paths, folder) {
+  const what = say(voice, `copy ${counted(paths.length, 'file', 'files')} into `) + oneLine(folder) + '/';
+  return { counts: what, at: paths.length === 1 ? oneLine(paths[0].slice(paths[0].lastIndexOf('/') + 1)) : say(voice, counted(paths.length, 'file', 'files')) };
+}
+
+export const dropHere = (voice) => (voice === 'bracket' ? '[DROP HERE]' : 'drop here');
+
+const DROP_KEYS = [['drop', 'copy into the folder under the pointer'], ['esc', 'cancel the drag']];
+
+// Bytes in another size's unit, so the progress reads "41 of 96 MB".
+function inUnitOf(n, total) {
+  const unit = total < 1e6 ? 1e3 : total < 1e9 ? 1e6 : 1e9;
+  const v = n / unit;
+  return v === 0 ? '0' : v < 10 ? v.toFixed(1) : String(Math.round(v));
+}
+
+// The line above the status line while a copy or move runs; the folder it comes from is a path and keeps its case.
+export function opLine(voice, home, op) {
+  const verb = op.mode === 'move' ? 'moving' : 'copying';
+  const pct = op.total > 0 ? (op.done >= op.total ? 100 : Math.min(99, Math.round((op.done * 100) / op.total))) : 0;
+  const parts = [`${pct}%`, `${inUnitOf(op.done, op.total)} of ${pickerSize({ size: op.total })}`].concat(op.rate > 0 ? [`${pickerSize({ size: op.rate })}/s`] : []);
+  return {
+    say: say(voice, `${verb} ${counted(op.items.length, 'file', 'files')} from `) + oneLine(tilde(home, op.from)),
+    // Until the op has summed its sources there is no size to give.
+    progress: op.total > 0 ? say(voice, parts.join(' · ')) : '',
+    keys: voice === 'bracket' ? '[CTRL+C] CANCELS' : 'ctrl+c cancels',
+  };
+}
+
+// The copy-failure card: the error, then each source as copied, stopped (its partial copy removed) or not started.
+export function failText(voice, op) {
+  const f = op.failed;
+  const full = f.error === 'No space left on device';
+  const names = op.items.map((i) => oneLine(i.name));
+  const size = (i) => (i.dir ? '' : ` · ${pickerSize({ size: i.size })}`);
+  const rows = op.items.map((item, i) => ({
+    name: names[i],
+    state: say(voice, f.copied.indexOf(i) >= 0 ? `copied${size(item)}` : i === f.index ? 'stopped · partial removed' : `not started${size(item)}`),
+    stopped: i === f.index,
+  }));
+  const left = op.items.length - f.copied.length;
+  const why = `${full ? `No space left on ${oneLine(op.to)}` : oneLine(f.error)}. ${f.copied.length} of ${counted(op.items.length, 'file', 'files')} ${f.copied.length === 1 ? 'was' : 'were'} copied; ${left} ${left === 1 ? 'was' : 'were'} not.`;
+  return {
+    head: say(voice, op.mode === 'move' ? 'Move failed' : 'Copy failed'),
+    title: say(voice, full ? `${oneLine(op.to)} is full` : oneLine(f.error)),
+    why,
+    rows,
+    foot: say(voice, 'Nothing half-written is left: the partial ') + names[f.index] + say(voice, ` was deleted, and the ${f.copied.length} copied ${f.copied.length === 1 ? 'file is' : 'files are'} whole.`),
+    keys: promptText(voice, [['r', 'retry'], ['s', 'skip this file'], ['esc', 'cancel the rest']]),
+  };
+}
+
+export const stoppedText = (voice, to, copied, n) => ({ counts: say(voice, `copy to ${oneLine(to)} stopped`), at: say(voice, `${copied} of ${n} copied`) });
 
 // Open with's head: "3 JPEG images" from the type's own description, or files when the targets' types differ.
 export function openWithHead(voice, n, description, apps) {
@@ -188,3 +257,4 @@ const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 
 const strip = (voice, pairs) => pairs.map(([k, w]) => (voice === 'bracket' ? { key: `[${k.toUpperCase()}]`, word: w.toUpperCase() } : { key: k, word: w }));
 export const keyStrip = (voice) => strip(voice, KEYS);
 export const dragKeys = (voice) => strip(voice, DRAG_KEYS);
+export const dropKeys = (voice) => strip(voice, DROP_KEYS);
