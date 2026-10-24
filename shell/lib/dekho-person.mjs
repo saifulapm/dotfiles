@@ -21,7 +21,7 @@ const roleLine = (key, role) => {
 
 // The credits by role, a role with none left out.
 export function groups(credits) {
-  return ORDER.map((key) => ({ key, rows: ((credits || {})[key] || []).map((h) => Object.assign({}, h, { titleText: oneLine(h.title), roleText: roleLine(key, h.role) })) }))
+  return ORDER.map((key) => ({ key, rows: ((credits || {})[key] || []).map((h) => Object.assign({}, h, { titleText: oneLine(h.title), roleText: roleLine(key, h.role), voteText: `★ ${Number(h.vote || 0).toFixed(1)}` })) }))
     .filter((g) => g.rows.length)
     .map((g) => Object.assign(g, { count: g.rows.length }));
 }
