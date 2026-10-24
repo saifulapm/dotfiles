@@ -12,6 +12,8 @@
 	safecrlf = warn
 	# No core.editor: it outranks $VISUAL/$EDITOR, which config.fish sets.
 	pager = delta
+	# workflow install writes its hook stubs here, and each one chains into the repo's own hook.
+	hooksPath = ~/.config/git/hooks
 
 [init]
 	defaultBranch = main

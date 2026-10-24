@@ -130,6 +130,12 @@ test('git has one excludes file under ~/.config/git and both accounts rewrite', 
   ]) assert.ok(urls.includes(line), line);
 });
 
+// workflow install writes its hook stubs there, and they chain into each repo's own hooks.
+test('every repo runs the hooks in ~/.config/git/hooks', () => {
+  const r = run('git', ['config', '--type=path', '--get-all', 'core.hooksPath']);
+  assert.equal(r.stdout, join(home, '.config/git/hooks') + '\n');
+});
+
 test('git pages through delta, and git dft diffs with difftastic', () => {
   assert.equal(run('git', ['config', '--global', 'core.pager']).stdout, 'delta\n');
   const repoDir = join(home, 'dft');
