@@ -45,8 +45,9 @@ check "its title is the folder, Home ($(niri msg -j windows | jq -r '.[] | selec
 check "the header reads FILES · Home · MOD Y in Paper ($(files_state | jq -c .head))" \
   files_is '.head == {"label": "FILES", "folder": "Home", "chip": "MOD Y"}'
 
+# A drive mounted on this machine lists between the pins and Trash, and is no part of this check.
 check "the places are Home, Downloads, Codes, Pictures, Documents, the two bookmarks under PINNED, and Trash ($(files_state | jq -c .places))" \
-  files_is '.places == ["places:Home", "places:Downloads", "places:Codes", "places:Pictures", "places:Documents", "pinned:lareys", "pinned:invoices", "trash:Trash"]'
+  files_is '[.places[] | select(startswith("drives:") | not)] == ["places:Home", "places:Downloads", "places:Codes", "places:Pictures", "places:Documents", "pinned:lareys", "pinned:invoices", "trash:Trash"]'
 until_ok 2000 files_is '.listed'
 wtype jj
 until_ok 1000 files_is '.cursor == "Downloads"'

@@ -40,6 +40,9 @@ ShellRoot {
     // The mounted drives, and their drawn rows, which each drive's PlaceRow adds itself to for state().
     property FilesDrives drivesWatch: FilesDrives {
         voice: app.voice
+        // A drive that would not eject stays listed, and the status line says why.
+        onErrorChanged: if (error)
+            app.notice = app.voice === "bracket" ? "! " + error.toUpperCase() : error
     }
     property var driveRows: []
     // What a drag out carries: the rows, their paths, and the chip's image grabbed as it starts.
@@ -273,6 +276,9 @@ ShellRoot {
     onRowsChanged: if (selected >= rows.length)
         selected = Math.max(0, rows.length - 1)
     onCursorPathChanged: measure()
+    // A drive that leaves while the cursor is on the last places would leave it past the end.
+    onAllPlacesChanged: if (placeAt >= allPlaces.length)
+        placeAt = allPlaces.length - 1
     onAskingChanged: if (asking === "mkdir") {
         mkdirField.text = "";
         mkdirField.forceActiveFocus();
