@@ -500,7 +500,7 @@ FocusScope {
                     id: noneWhy
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
-                    text: page.words.noneWhy + (page.target.air_date === page.today ? " " + page.words.noneToday : "")
+                    text: page.words.noneWhy(page.target.kind) + (page.target.air_date === page.today ? " " + page.words.noneToday : "")
                     color: page.c.ink ?? "black"
                     font.family: page.bodyFont
                     font.pixelSize: 13
@@ -522,7 +522,7 @@ FocusScope {
                     font.letterSpacing: page.plain ? 0 : 1.4
                 }
                 Repeater {
-                    model: page.words.tries
+                    model: page.words.tries(page.target.kind)
 
                     Row {
                         required property var modelData

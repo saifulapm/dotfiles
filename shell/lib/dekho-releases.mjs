@@ -53,12 +53,14 @@ export function starting(events) {
   }
   const at = steps.findIndex((s) => !s.done);
   const needed = buffer && buffer.needed_bytes;
-  const progress = ready || playing ? 1 : needed ? Math.min(1, (buffer.bytes || 0) / needed) : 0;
+  // mpv starts on the run buffered from the file's start; bytes counts every piece on disk, which can pass needed long before.
+  const have = buffer ? buffer.buffered ?? buffer.bytes ?? 0 : 0;
+  const progress = ready || playing ? 1 : needed ? Math.min(1, have / needed) : 0;
   return {
     steps: steps.map((s, i) => ({ text: s.text, state: s.done ? 'done' : i === at ? 'current' : 'pending' })),
     progress,
     percent: `buffering ${Math.round(progress * 100)}%`,
-    amount: needed ? ofText(Math.min(buffer.bytes || 0, needed), needed) : '',
+    amount: needed ? ofText(ready || playing ? needed : Math.min(have, needed), needed) : '',
     peers: buffer ? `${buffer.peers || 0} peers · ${buffer.sending || 0} sending` : '',
     down: buffer ? `${rateText(buffer.down_bps)} down` : '',
     up: buffer ? `${rateText(buffer.up_bps)} up` : '',
@@ -81,10 +83,13 @@ export function releasesText(voice) {
     keys: [['↵', 'stream'], ['j/k', 'move'], ['esc', 'back']],
     startKeys: [['esc', 'cancel and stop the download']],
     none: 'No releases found',
-    noneWhy: 'Both sources answered and neither lists this episode yet.',
+    noneWhy: (kind) => `Both sources answered and neither lists this ${kind === 'movie' ? 'film' : 'episode'} yet.`,
     noneToday: 'It aired today, and releases often take a day to appear.',
     tryHead: caps ? 'WHAT TO TRY' : 'What to try',
-    tries: [['r', 'ask again in a few minutes'], ['/', 'search by name for a season pack'], ['esc', 'go back and pick an earlier episode']],
+    tries: (kind) =>
+      kind === 'movie'
+        ? [['r', 'ask again in a few minutes'], ['/', 'search by name for another release'], ['esc', 'go back']]
+        : [['r', 'ask again in a few minutes'], ['/', 'search by name for a season pack'], ['esc', 'go back and pick an earlier episode']],
     noneKeys: [['r', 'ask again'], ['/', 'search by name'], ['esc', 'back']],
   };
 }

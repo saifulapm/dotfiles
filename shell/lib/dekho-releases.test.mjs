@@ -77,3 +77,25 @@ test('progress is the bytes over what mpv needs, with the peers and rates of the
   assert.equal(none.amount, '');
   assert.equal(R.starting(run.concat([{ event: 'ready' }])).progress, 1);
 });
+
+// mpv starts on the sequential run from the file's start, not on whatever pieces arrived (#1FTZTF75).
+test('Starting counts the bytes buffered from the start, not every piece on disk', () => {
+  const mb = 1048576;
+  const s = R.starting([
+    { event: 'trying', seeders: 9, quality: '1080p', size: '2.1 GB' },
+    { event: 'buffer', peers: 4, sending: 3, buffered: 21 * mb, bytes: 95 * mb, needed_bytes: 31 * mb, down_bps: 8e6, up_bps: 1e6 },
+  ]);
+  assert.ok(s.progress > 0.6 && s.progress < 0.7, String(s.progress));
+  assert.equal(s.amount, '21 of 31 MB');
+  assert.equal(s.percent, 'buffering 68%');
+});
+
+// A film has no episodes to point at (#J0ZGNW4N).
+test('the no-releases words name an episode for a series and the film for a film', () => {
+  const w = R.releasesText('plain');
+  assert.match(w.noneWhy('tv'), /this episode/);
+  assert.doesNotMatch(w.noneWhy('movie'), /episode/);
+  assert.match(w.noneWhy('movie'), /this film/);
+  assert.ok(w.tries('tv').some(([, t]) => /earlier episode/.test(t)));
+  assert.ok(w.tries('movie').every(([, t]) => !/episode|season/.test(t)));
+});
