@@ -96,7 +96,9 @@ until_ok 1000 dekho_is '.title.zone == "crew"'
 check "tab from the episodes reaches the crew, on Mara Lindqvist ($(dekho_state | jq -c '[.title.zone, .title.crew[0].focused]'))" dekho_is '.title.zone == "crew" and .title.crew[0].focused'
 wtype -k Return
 until_ok 1000 dekho_is '.person != null'
-check "Enter on a crew name opens that person ($(dekho_state | jq -c .person))" dekho_is '.person == 1001'
+check "Enter on a crew name opens that person ($(dekho_state | jq -c '[.page, .person]'))" dekho_is '.page == "person" and .person == 1001'
+wtype -k Escape
+until_ok 1000 dekho_is '.page == "title"'
 wtype f
 until_ok 1000 dekho_is '.filter != null'
 check "f asks Browse for this title's kind, genre and language ($(dekho_state | jq -c .filter))" dekho_is '.filter == {"kind": "tv", "genre": "Drama", "language": "English"}'

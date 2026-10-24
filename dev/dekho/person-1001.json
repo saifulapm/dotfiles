@@ -1,0 +1,108 @@
+{
+  "id": 1001,
+  "name": "Mara\nLindqvist‮\u001b",
+  "biography": "Directed her first feature in 2012 after a decade on stage. Moved into series with The Long Tide, which she created and directed, and still takes the occasional acting role.\nA second paragraph keeps the biography well past what one short box would hold: she trained in Gothenburg, taught for a few years, and has never once said which of her films is her favourite.",
+  "birthday": "1978-04-12",
+  "deathday": null,
+  "place_of_birth": "Gothenburg, Sweden",
+  "profile": "/m1001.png",
+  "known_for": [
+    "The Long Tide"
+  ],
+  "credits": {
+    "directing": [
+      {
+        "id": 101,
+        "kind": "tv",
+        "title": "The Long Tide",
+        "year": "2024",
+        "vote": 8.1,
+        "poster": null,
+        "backdrop": null,
+        "overview": "",
+        "role": "Director"
+      },
+      {
+        "id": 102,
+        "kind": "movie",
+        "title": "Night Ferry",
+        "year": "2025",
+        "vote": 7.3,
+        "poster": null,
+        "backdrop": null,
+        "overview": "",
+        "role": "Director"
+      },
+      {
+        "id": 103,
+        "kind": "movie",
+        "title": "Seven Stations",
+        "year": "2026",
+        "vote": 7.6,
+        "poster": null,
+        "backdrop": null,
+        "overview": "",
+        "role": "Director"
+      }
+    ],
+    "acting": [
+      {
+        "id": 104,
+        "kind": "movie",
+        "title": "A Quiet\nVerdict‮\u001b",
+        "year": "2026",
+        "vote": 7.8,
+        "poster": null,
+        "backdrop": null,
+        "overview": "",
+        "role": "Judge\nHale‮\u001b"
+      },
+      {
+        "id": 105,
+        "kind": "tv",
+        "title": "Salt Road",
+        "year": "2025",
+        "vote": 7.4,
+        "poster": null,
+        "backdrop": null,
+        "overview": "",
+        "role": "Nora Vell"
+      },
+      {
+        "id": 106,
+        "kind": "movie",
+        "title": "Copper Hill",
+        "year": "2024",
+        "vote": 7.1,
+        "poster": null,
+        "backdrop": null,
+        "overview": "",
+        "role": "Dr. Anya Rask"
+      }
+    ],
+    "writing": [
+      {
+        "id": 102,
+        "kind": "movie",
+        "title": "Night Ferry",
+        "year": "2025",
+        "vote": 7.3,
+        "poster": null,
+        "backdrop": null,
+        "overview": "",
+        "role": "Screenplay"
+      },
+      {
+        "id": 101,
+        "kind": "tv",
+        "title": "The Long Tide",
+        "year": "2024",
+        "vote": 8.1,
+        "poster": null,
+        "backdrop": null,
+        "overview": "",
+        "role": "Creator"
+      }
+    ]
+  }
+}

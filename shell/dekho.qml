@@ -137,7 +137,7 @@ ShellRoot {
             // t9: browse state
             browsePage.state(),
             // t10: person state
-            {}));
+            personPage.state()));
         }
     }
 
@@ -213,5 +213,17 @@ ShellRoot {
         }
 
         // t10: person
+        DekhoPerson {
+            id: personPage
+            anchors.fill: parent
+            visible: app.page === "person"
+            focus: visible
+            dekho: app
+            // / searches from Home's field, past every page opened since.
+            onSearch: {
+                app.stack = app.stack.slice(0, 1);
+                home.focusSearch();
+            }
+        }
     }
 }

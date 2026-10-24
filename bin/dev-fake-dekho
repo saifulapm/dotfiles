@@ -136,6 +136,16 @@ case "${1:-} ${2:-}" in
   printf '%s\n' '{"event":"playing","title":"The Long Tide","kind":"tv","id":101,"resumed_at":0,"bitrate":4000000}'
   exec sleep infinity
   ;;
+"api person")
+  # Only the ids with a fixture are known people, as TMDB knows only its own.
+  id=$(sed -n 's/.*--id \([0-9]*\).*/\1/p' <<<"$*")
+  if [ -f "$fixtures/person-$id.json" ]; then
+    answer "person-$id"
+  else
+    echo '{"error":"no such person"}'
+    exit 1
+  fi
+  ;;
 "api prefetch")
   # As the real one: each image it holds is copied into the cache and named; one it lacks is left out, as a 404 is.
   dir=$DOTS_DEV_DIR/img/w780

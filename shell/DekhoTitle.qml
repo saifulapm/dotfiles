@@ -154,11 +154,19 @@ FocusScope {
                 title: shown.title
             });
         } else if (zone === "crew" && crew[crewCol])
-            person = crew[crewCol].id;
+            openPerson(crew[crewCol]);
         else if (zone === "cast" && cast[castCol])
-            person = cast[castCol].id;
+            openPerson(cast[castCol]);
         else if (zone === "seasons")
             zone = "episodes";
+    }
+
+    function openPerson(p) {
+        person = p.id;
+        dekho.open("person", {
+            id: p.id,
+            name: p.name
+        });
     }
 
     // w marks the cursor's aired episode, or unmarks it; the mark redraws from the backend's answer.

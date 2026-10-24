@@ -1,0 +1,27 @@
+{
+  "id": 1002,
+  "name": "Tomas Eze",
+  "biography": "",
+  "birthday": "1931-05-02",
+  "deathday": "2004-11-30",
+  "place_of_birth": null,
+  "profile": null,
+  "known_for": [],
+  "credits": {
+    "directing": [],
+    "acting": [],
+    "writing": [
+      {
+        "id": 107,
+        "kind": "movie",
+        "title": "Grey Harbour",
+        "year": "1979",
+        "vote": 7.0,
+        "poster": null,
+        "backdrop": null,
+        "overview": "",
+        "role": "Writer"
+      }
+    ]
+  }
+}
