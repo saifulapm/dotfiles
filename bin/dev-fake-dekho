@@ -101,6 +101,26 @@ case "${1:-} ${2:-}" in
   mv "$marks.new" "$marks"
   echo "{\"watched\":$to}"
   ;;
+"api releases")
+  # The Long Tide's S3 E3 has no releases, so a check can draw that board; every other choice lists the fixture's, out of rank order.
+  case "$*" in
+  *"--id 101 "*"-s 3 -e 3"*) echo '{"items":[],"dropped":0,"failed":[]}' ;;
+  *) answer releases ;;
+  esac
+  ;;
+"play --json")
+  # The Starting events contract over about 3 s, then a sleep stands in for mpv until the unit is stopped.
+  emit() { printf '%s\n' "$1"; sleep 0.35; }
+  mb=1048576
+  emit '{"event":"status","text":"looking for releases"}'
+  emit '{"event":"trying","quality":"720p","size":"1.1 GB","seeders":530,"audio":"EN 2.0","needed_bps":4000000}'
+  for i in 0 1 2 3 4; do
+    emit "{\"event\":\"buffer\",\"buffered\":$((i * 27 * mb)),\"rate_bps\":31876710,\"live_peers\":$((i * 4)),\"seen_peers\":20,\"needed_bps\":4000000,\"bytes\":$((i * 27 * mb)),\"needed_bytes\":$((108 * mb)),\"peers\":$((i * 4)),\"sending\":$((i * 2)),\"down_bps\":$((i * 8000000)),\"up_bps\":3355443}"
+  done
+  emit "{\"event\":\"ready\",\"rate_bps\":31876710,\"buffered\":$((108 * mb)),\"cached\":false}"
+  printf '%s\n' '{"event":"playing","title":"The Long Tide","kind":"tv","id":101,"resumed_at":0,"bitrate":4000000}'
+  exec sleep infinity
+  ;;
 "api prefetch")
   # As the real one: each image it holds is copied into the cache and named; one it lacks is left out, as a 404 is.
   dir=$DOTS_DEV_DIR/img/w780
