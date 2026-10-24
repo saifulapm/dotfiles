@@ -114,6 +114,14 @@ ShellRoot {
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
     readonly property var head: F.headText(voice, home, folder)
+    readonly property var boardLook: F.filesLook(voice)
+    readonly property int markWidth: boardLook.mark === "bracket" ? 22 : boardLook.mark === "circle" ? 16 : 14
+    // Paper tints the current place and the marked rows a shade off its surface; its paper token is that shade.
+    readonly property color hereFill: plain ? look.cursor.fill : bracket ? Qt.alpha(c.accent ?? "red", 0.1) : c.paper ?? "white"
+
+    function face(kind) {
+        return (kind === "display" ? fonts.display : kind === "mono" ? fonts.mono : fonts.ui) ?? "";
+    }
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.
     function quit() {
@@ -552,7 +560,16 @@ ShellRoot {
                 },
                 drives: app.driveRows.slice().sort((a, b) => a.at - b.at).map(r => r.drawn()),
                 driveError: app.drivesWatch.error,
-                path: pathLine.text,
+                path: pathLead.text + pathName.text,
+                pathParts: {
+                    icon: pathIcon.path,
+                    lead: pathLead.text,
+                    leadColor: String(pathLead.color),
+                    name: pathName.text,
+                    nameWeight: pathName.font.weight
+                },
+                width: win.width,
+                strip: stripRepeater.count ? stripRepeater.itemAt(0).drawn() : null,
                 count: countLabel.text,
                 finding: app.finding,
                 query: app.query,
@@ -590,6 +607,20 @@ ShellRoot {
                 return "null";
             const p = item.mapToItem(null, 0, 0);
             return JSON.stringify({ x: p.x, y: p.y, w: item.width, h: item.height });
+        }
+
+        // A row as drawn, its mark, icon and date face, for a check that reads rows off the cursor.
+        function row(name: string): string {
+            const i = app.rows.findIndex(r => r.name === name);
+            const item = i >= 0 ? rowList.itemAtIndex(i) : null;
+            return item ? JSON.stringify(item.drawn()) : "null";
+        }
+
+        // A place as drawn: its fill, label and icon.
+        function place(label: string): string {
+            const i = app.allPlaces.slice(0, -1).findIndex(p => p.label === label);
+            const item = i >= 0 ? placeRepeater.itemAt(i) : label === app.trash.label ? trashRow : null;
+            return item ? JSON.stringify(item.drawnLook()) : "null";
         }
     }
 
@@ -711,22 +742,33 @@ ShellRoot {
             anchors.fill: parent
             spacing: 0
 
-            // The header: Files' label, the folder in the display face, the key that opens it.
+            // The header: Files' label, the folder in the theme's face, the key that opens it; Artboard pills the label in its accent and the key in grey.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.leftMargin: 14
-                Layout.rightMargin: 14
-                Layout.topMargin: 12
-                Layout.bottomMargin: 12
-                spacing: 10
+                Layout.preferredHeight: plain ? 51 : -1
+                Layout.leftMargin: plain ? 18 : 14
+                Layout.rightMargin: plain ? 18 : 14
+                Layout.topMargin: plain ? 0 : 12
+                Layout.bottomMargin: plain ? 0 : 12
+                spacing: plain ? 12 : 10
 
-                Text {
-                    textFormat: Text.PlainText
-                    text: app.head.label
-                    color: look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: 10
-                    font.letterSpacing: plain ? 0 : 1.4
+                Rectangle {
+                    implicitWidth: headLabel.implicitWidth + (plain ? 18 : 0)
+                    implicitHeight: headLabel.implicitHeight + (plain ? 6 : 0)
+                    radius: plain ? 8 : 0
+                    color: plain ? look.label.fill : "transparent"
+
+                    Text {
+                        id: headLabel
+                        anchors.centerIn: parent
+                        textFormat: Text.PlainText
+                        text: app.head.label
+                        color: plain ? c.accent ?? "blue" : look.small.color
+                        font.family: look.small.font
+                        font.pixelSize: plain ? 12 : 10
+                        font.weight: plain ? Font.Medium : Font.Normal
+                        font.letterSpacing: plain ? 0 : 1.4
+                    }
                 }
                 Text {
                     Layout.fillWidth: true
@@ -735,50 +777,80 @@ ShellRoot {
                     maximumLineCount: 1
                     elide: Text.ElideRight
                     color: c.ink ?? "black"
-                    font.family: bracket ? fonts.mono ?? "" : fonts.display ?? ""
-                    font.pixelSize: 18
+                    font.family: app.face(boardLook.head.face)
+                    font.pixelSize: boardLook.head.size
+                    font.weight: boardLook.head.weight
+                    font.letterSpacing: plain ? -0.14 : 0
                 }
                 Rectangle {
                     readonly property bool boxed: look.label.kind !== "header"
-                    implicitWidth: chipText.implicitWidth + (boxed ? 14 : 0)
-                    implicitHeight: chipText.implicitHeight + (boxed ? 4 : 0)
-                    radius: look.label.kind === "pill" ? 8 : 0
-                    color: boxed ? look.label.fill : "transparent"
+                    implicitWidth: chipText.implicitWidth + (plain ? 18 : boxed ? 14 : 0)
+                    implicitHeight: chipText.implicitHeight + (plain ? 6 : boxed ? 4 : 0)
+                    radius: plain ? 8 : 0
+                    color: plain ? look.tile.fill : boxed ? look.label.fill : "transparent"
 
                     Text {
                         id: chipText
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: app.head.chip
-                        color: parent.boxed ? look.label.color : c.accent
+                        color: plain ? c.muted ?? "gray" : parent.boxed ? look.label.color : c.accent ?? "red"
                         font.family: look.small.font
-                        font.pixelSize: 10
-                        font.letterSpacing: plain ? 0 : 1.4
+                        font.pixelSize: plain ? 11 : 10
+                        font.weight: plain ? Font.Medium : bracket ? Font.Bold : Font.Normal
+                        font.letterSpacing: plain ? 0 : bracket ? 1.2 : 1.4
                     }
                 }
             }
 
             Rule {}
 
-            // The folder from ~, and how many rows it holds.
+            // The folder from ~ after a folder icon, the lead muted and the name medium, and how many rows it holds.
             RowLayout {
+                id: pathRow
+                readonly property var parts: F.pathParts(app.home, app.folder)
                 Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Layout.topMargin: 9
-                Layout.bottomMargin: 9
+                Layout.preferredHeight: plain ? 37 : -1
+                Layout.leftMargin: plain ? 20 : 16
+                Layout.rightMargin: plain ? 20 : 16
+                Layout.topMargin: plain ? 0 : 9
+                Layout.bottomMargin: plain ? 0 : 9
                 spacing: 10
 
-                Text {
-                    id: pathLine
+                FilesIcon {
+                    id: pathIcon
+                    path: F.iconPath(app.voice, "folder")
+                    stroke: boardLook.stroke
+                    color: plain ? c.muted ?? "gray" : bracket ? c.accent ?? "red" : c.ink ?? "black"
+                }
+                Item {
                     Layout.fillWidth: true
-                    textFormat: Text.PlainText
-                    text: P.oneLine(F.tilde(app.home, app.folder))
-                    maximumLineCount: 1
-                    elide: Text.ElideMiddle
-                    color: c.ink ?? "black"
-                    font.family: fonts.mono ?? ""
-                    font.pixelSize: 13
+                    implicitHeight: pathName.implicitHeight
+
+                    Text {
+                        id: pathLead
+                        width: Math.min(implicitWidth, Math.max(0, parent.width - Math.min(pathName.implicitWidth, parent.width / 2)))
+                        textFormat: Text.PlainText
+                        text: pathRow.parts.lead
+                        maximumLineCount: 1
+                        elide: Text.ElideLeft
+                        color: c.muted ?? "gray"
+                        font.family: fonts.mono ?? ""
+                        font.pixelSize: 13
+                    }
+                    Text {
+                        id: pathName
+                        x: pathLead.width
+                        width: Math.min(implicitWidth, parent.width - pathLead.width)
+                        textFormat: Text.PlainText
+                        text: pathRow.parts.name
+                        maximumLineCount: 1
+                        elide: Text.ElideRight
+                        color: c.ink ?? "black"
+                        font.family: fonts.mono ?? ""
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
+                    }
                 }
                 Text {
                     id: countLabel
@@ -786,7 +858,7 @@ ShellRoot {
                     text: app.finding || app.query ? F.findText(app.voice, app.query) : F.countText(app.voice, app.rows.length, app.hidden)
                     color: app.finding ? c.accent ?? "red" : look.small.color
                     font.family: look.small.font
-                    font.pixelSize: 11
+                    font.pixelSize: bracket ? 10 : 11
                     font.letterSpacing: look.small.spacing
                 }
             }
@@ -807,6 +879,7 @@ ShellRoot {
                     spacing: 0
 
                     Repeater {
+                        id: placeRepeater
                         model: app.allPlaces.slice(0, -1)
 
                         PlaceRow {
@@ -821,6 +894,7 @@ ShellRoot {
                         Layout.fillHeight: true
                     }
                     PlaceRow {
+                        id: trashRow
                         place: app.trash
                         at: app.allPlaces.length - 1
                         heading: ""
@@ -847,8 +921,12 @@ ShellRoot {
                         Layout.bottomMargin: 6
                         spacing: 12
 
+                        // The mark's column and the icon's, as wide as the rows draw them.
                         Item {
-                            implicitWidth: 20
+                            implicitWidth: app.markWidth
+                        }
+                        Item {
+                            implicitWidth: boardLook.tile ? 28 : 16
                         }
                         Head {
                             Layout.fillWidth: true
@@ -860,10 +938,18 @@ ShellRoot {
                             text: plain ? "Size" : "SIZE"
                         }
                         Head {
-                            Layout.preferredWidth: 130
+                            Layout.preferredWidth: 120
                             horizontalAlignment: Text.AlignRight
                             text: plain ? "Modified" : "MODIFIED"
                         }
+                    }
+                    // Paper and Blueprint rule the head off from the rows in the line colour.
+                    Rectangle {
+                        visible: !plain
+                        Layout.fillWidth: true
+                        Layout.bottomMargin: 2
+                        implicitHeight: 1
+                        color: c.line ?? "gray"
                     }
 
                     // The mouse is for dragging: a press on a row readies the drag, crossing the threshold starts it.
@@ -899,8 +985,17 @@ ShellRoot {
                             readonly property bool isCurrent: index === app.selected && app.side === "list"
                             readonly property bool isMarked: app.marked.indexOf(modelData.name) >= 0
                             readonly property bool dropHere: app.dropping && app.dropAt === index
-                            readonly property color ink: isCurrent ? look.cursor.text : c.ink ?? "black"
+                            // Artboard draws a marked row's name and icon in the cursor's deep blue too.
+                            readonly property bool lit: isCurrent || (plain && isMarked)
+                            readonly property color ink: lit ? look.cursor.text : c.ink ?? "black"
                             readonly property color dim: isCurrent ? look.cursor.detail : c.muted ?? "gray"
+                            // A box or circle reads as the shape drawn, filled or empty; Blueprint's mark is its text.
+                            function markDrawn() {
+                                if (markText.visible)
+                                    return markText.text;
+                                const filled = markBox.color.a > 0;
+                                return markBox.radius * 2 >= markBox.width ? (filled ? "●" : "○") : (filled ? "■" : "□");
+                            }
                             function drawn() {
                                 return {
                                     name: nameText.text,
@@ -909,16 +1004,23 @@ ShellRoot {
                                     size: sizeLabel.text,
                                     dropHere: dropHere,
                                     modified: dateLabel.text,
-                                    mark: markLabel.visible ? markLabel.text : ""
+                                    mark: markDrawn(),
+                                    markFill: markBox.visible ? String(markBox.color) : "",
+                                    icon: rowIcon.path,
+                                    dateFont: {
+                                        family: dateLabel.font.family,
+                                        italic: dateLabel.font.italic,
+                                        size: dateLabel.font.pixelSize
+                                    }
                                 };
                             }
                             width: rowList.width
-                            height: 32
-                            radius: look.cursor.radius
-                            // The cursor row is filled; a marked row is tinted and boxed, as the marked board draws it.
-                            color: dropHere ? Qt.alpha(c.accent ?? "red", 0.12) : isCurrent ? look.cursor.fill : isMarked ? Qt.alpha(c.accent ?? "red", 0.1) : "transparent"
-                            // The folder a drop will land in is outlined in the accent, as the drop board draws it.
-                            border.width: dropHere ? 2 : 0
+                            height: boardLook.row
+                            radius: plain ? 10 : look.cursor.radius
+                            // The cursor row is filled; a marked row is tinted, as the marked board draws it.
+                            color: dropHere ? Qt.alpha(c.accent ?? "red", 0.12) : isCurrent ? look.cursor.fill : isMarked ? app.hereFill : "transparent"
+                            // The folder a drop will land in is outlined in the accent, as the drop board draws it; Artboard outlines its cursor row too.
+                            border.width: dropHere ? 2 : plain && isCurrent ? 1.5 : 0
                             border.color: c.accent ?? "red"
 
                             RowLayout {
@@ -927,19 +1029,61 @@ ShellRoot {
                                 anchors.rightMargin: 12
                                 spacing: 12
 
+                                // Every row has its mark: Paper's box, filled ink with a tick when marked; Artboard's circle, filled accent; Blueprint's [ ] or [x].
                                 Item {
-                                    implicitWidth: 20
+                                    implicitWidth: app.markWidth
                                     implicitHeight: 16
 
+                                    Rectangle {
+                                        id: markBox
+                                        visible: !bracket
+                                        anchors.centerIn: parent
+                                        width: plain ? 16 : 14
+                                        height: width
+                                        radius: plain ? 8 : 0
+                                        color: !rowItem.isMarked ? "transparent" : plain ? c.accent ?? "blue" : c.ink ?? "black"
+                                        border.width: rowItem.isMarked ? (plain ? 0 : 1) : plain ? 1.5 : 1
+                                        // Artboard's empty circle is #B4BAC4, its dot grid's grey, which no token carries: the muted token at 45% on white lands within 10 of it.
+                                        border.color: rowItem.isMarked ? c.ink ?? "black" : plain ? Qt.alpha(c.muted ?? "gray", 0.45) : rowItem.isCurrent ? look.cursor.detail : c.muted ?? "gray"
+
+                                        FilesIcon {
+                                            visible: rowItem.isMarked
+                                            anchors.centerIn: parent
+                                            path: F.iconPath(app.voice, "tick")
+                                            box: plain ? 9 : 16
+                                            size: plain ? 9 : 10
+                                            stroke: plain ? 1.5 : 2.2 * 10 / 16
+                                            color: c.surface ?? "white"
+                                        }
+                                    }
                                     Text {
-                                        id: markLabel
-                                        visible: rowItem.isMarked
+                                        id: markText
+                                        visible: bracket
                                         anchors.centerIn: parent
                                         textFormat: Text.PlainText
-                                        text: bracket ? "[x]" : "■"
-                                        color: rowItem.isCurrent ? look.cursor.text : bracket ? c.accent ?? "red" : c.ink ?? "black"
+                                        text: rowItem.isMarked ? "[x]" : "[ ]"
+                                        color: rowItem.isCurrent ? look.cursor.text : rowItem.isMarked ? c.accent ?? "red" : c.muted ?? "gray"
                                         font.family: fonts.mono ?? ""
-                                        font.pixelSize: bracket ? 12 : 10
+                                        font.pixelSize: 12
+                                    }
+                                }
+                                // The board's line icon, a folder or a page; Artboard sets it on a rounded tile.
+                                Item {
+                                    implicitWidth: boardLook.tile ? 28 : 16
+                                    implicitHeight: implicitWidth
+
+                                    Rectangle {
+                                        visible: boardLook.tile
+                                        anchors.fill: parent
+                                        radius: 9
+                                        color: rowItem.isCurrent || rowItem.isMarked ? c.surface ?? "white" : look.tile.fill
+                                    }
+                                    FilesIcon {
+                                        id: rowIcon
+                                        anchors.centerIn: parent
+                                        path: F.iconPath(app.voice, F.rowIcon(rowItem.modelData))
+                                        stroke: boardLook.stroke
+                                        color: rowItem.lit ? look.cursor.text : plain ? c.muted ?? "gray" : bracket ? c.accent ?? "red" : c.ink ?? "black"
                                     }
                                 }
                                 Text {
@@ -951,8 +1095,9 @@ ShellRoot {
                                     elide: Text.ElideMiddle
                                     color: rowItem.ink
                                     font.family: bracket ? fonts.mono ?? "" : fonts.ui ?? ""
-                                    font.pixelSize: 13
-                                    font.weight: rowItem.isCurrent ? look.cursor.weight : rowItem.modelData.dir ? Font.Medium : Font.Normal
+                                    font.pixelSize: plain ? 14 : 13
+                                    // Blueprint's cursor row is bold; Paper's keeps the weight of the row it fills, Artboard's is medium.
+                                    font.weight: rowItem.isCurrent && bracket ? Font.Bold : rowItem.modelData.dir || (rowItem.isCurrent && plain) ? Font.Medium : Font.Normal
                                     opacity: renameLoader.active ? 0 : 1
 
                                     // r: the name becomes a field over itself, the part before the extension selected.
@@ -1024,16 +1169,20 @@ ShellRoot {
                                     color: rowItem.dropHere ? c.accent ?? "red" : rowItem.dim
                                     font.family: fonts.mono ?? ""
                                     font.pixelSize: 12
+                                    font.letterSpacing: bracket ? 0.7 : 0
                                 }
+                                // Paper sets the date in its display face, italic, as its board does.
                                 Text {
                                     id: dateLabel
-                                    Layout.preferredWidth: 130
+                                    Layout.preferredWidth: 120
                                     horizontalAlignment: Text.AlignRight
                                     textFormat: Text.PlainText
                                     text: F.dateText(app.voice, rowItem.modelData.mtime, Date.now())
                                     color: rowItem.dim
-                                    font.family: fonts.mono ?? ""
-                                    font.pixelSize: 12
+                                    font.family: app.face(boardLook.date.face)
+                                    font.italic: boardLook.date.italic
+                                    font.pixelSize: boardLook.date.size
+                                    font.letterSpacing: bracket ? 0.7 : 0
                                 }
                             }
                         }
@@ -1049,13 +1198,15 @@ ShellRoot {
                     implicitWidth: 1
                     color: look.rule.color
                 }
+                // 280 px with its padding, as the boards draw it; Artboard's picture sits on a grey rounded tile, Blueprint's in an accent frame.
                 ColumnLayout {
                     visible: previewPane.visible
-                    Layout.preferredWidth: 300
-                    Layout.maximumWidth: 300
+                    Layout.preferredWidth: 244
+                    Layout.maximumWidth: 244
                     Layout.fillHeight: true
                     Layout.margins: 18
-                    spacing: 14
+                    Layout.topMargin: plain ? 16 : 18
+                    spacing: plain ? 12 : 14
 
                     Head {
                         text: plain ? "Preview" : "PREVIEW"
@@ -1063,9 +1214,10 @@ ShellRoot {
                     Rectangle {
                         Layout.fillWidth: true
                         implicitHeight: 186
-                        color: "transparent"
-                        border.width: 1
-                        border.color: c.muted ?? "gray"
+                        radius: plain ? 10 : 0
+                        color: plain ? look.tile.fill : "transparent"
+                        border.width: plain ? 0 : 1
+                        border.color: bracket ? c.accent ?? "red" : c.muted ?? "gray"
                         clip: true
 
                         Image {
@@ -1089,14 +1241,20 @@ ShellRoot {
                             text: app.cursorRow ? P.oneLine(app.cursorRow.name) : ""
                             maximumLineCount: 1
                             elide: Text.ElideMiddle
-                            color: c.muted ?? "gray"
+                            color: plain ? c.ink ?? "black" : c.muted ?? "gray"
                             font.family: fonts.mono ?? ""
-                            font.pixelSize: 11
+                            font.pixelSize: bracket ? 10 : 11
+                            font.weight: plain ? Font.Medium : Font.Normal
+                            font.letterSpacing: bracket ? 1.4 : 0
 
                             Rectangle {
                                 z: -1
                                 anchors.fill: parent
-                                anchors.margins: -3
+                                anchors.leftMargin: plain ? -7 : -6
+                                anchors.rightMargin: plain ? -7 : -6
+                                anchors.topMargin: -2
+                                anchors.bottomMargin: -2
+                                radius: plain ? 6 : 0
                                 color: c.surface ?? "white"
                             }
                         }
@@ -1108,7 +1266,7 @@ ShellRoot {
                         text: app.cursorRow ? F.previewMeta(app.voice, app.cursorRow, app.dims.path === app.cursorPath ? app.dims.width : 0, app.dims.height).dims : ""
                         color: c.ink ?? "black"
                         font.family: fonts.mono ?? ""
-                        font.pixelSize: 14
+                        font.pixelSize: plain ? 15 : 14
                         font.weight: Font.Medium
                     }
                     Text {
@@ -1118,6 +1276,7 @@ ShellRoot {
                         color: c.muted ?? "gray"
                         font.family: fonts.mono ?? ""
                         font.pixelSize: 12
+                        font.letterSpacing: bracket ? 0.7 : 0
                     }
                     Text {
                         id: previewDate
@@ -1126,6 +1285,7 @@ ShellRoot {
                         color: c.muted ?? "gray"
                         font.family: fonts.mono ?? ""
                         font.pixelSize: 12
+                        font.letterSpacing: bracket ? 0.7 : 0
                     }
                     Item {
                         Layout.fillHeight: true
@@ -1178,18 +1338,20 @@ ShellRoot {
                 visible: app.ops.running && !app.ops.failed
             }
 
-            // The status line: the cursor's path, the counts and where the cursor is.
+            // The status line: the cursor's path, the counts beside it, and where the cursor is, muted at the right.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Layout.topMargin: 7
-                Layout.bottomMargin: 7
-                spacing: 16
+                Layout.preferredHeight: plain ? 33 : -1
+                Layout.leftMargin: plain ? 20 : 16
+                Layout.rightMargin: plain ? 20 : 16
+                Layout.topMargin: plain ? 0 : 8
+                Layout.bottomMargin: plain ? 0 : 8
+                spacing: 18
 
                 Text {
                     id: statusPath
                     Layout.fillWidth: true
+                    Layout.maximumWidth: implicitWidth
                     textFormat: Text.PlainText
                     text: app.cursorRow ? P.oneLine(F.tilde(app.home, app.pathOf(app.cursorRow))) : ""
                     maximumLineCount: 1
@@ -1197,6 +1359,7 @@ ShellRoot {
                     color: c.ink ?? "black"
                     font.family: fonts.mono ?? ""
                     font.pixelSize: 12
+                    font.letterSpacing: bracket ? 0.7 : 0
                 }
                 Text {
                     id: statusCounts
@@ -1205,9 +1368,13 @@ ShellRoot {
                     elide: Text.ElideMiddle
                     textFormat: Text.PlainText
                     text: app.statusShown.counts
-                    color: app.notice || app.ops.failed ? c.danger ?? "red" : look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: 11
+                    color: app.notice || app.ops.failed ? c.danger ?? "red" : c.muted ?? "gray"
+                    font.family: fonts.mono ?? ""
+                    font.pixelSize: 12
+                    font.letterSpacing: bracket ? 0.7 : 0
+                }
+                Item {
+                    Layout.fillWidth: true
                 }
                 Text {
                     id: statusAt
@@ -1216,9 +1383,10 @@ ShellRoot {
                     elide: Text.ElideMiddle
                     textFormat: Text.PlainText
                     text: app.statusShown.at
-                    color: c.ink ?? "black"
+                    color: c.muted ?? "gray"
                     font.family: fonts.mono ?? ""
-                    font.pixelSize: 11
+                    font.pixelSize: 12
+                    font.letterSpacing: bracket ? 0.7 : 0
                 }
             }
 
@@ -1297,36 +1465,63 @@ ShellRoot {
 
             Rule {}
 
-            // The keys, each with its word.
+            // The keys, each with its word: Paper's in tracked caps, Artboard's on grey chips, Blueprint's bracketed in its accent.
             Flow {
                 Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                Layout.topMargin: 8
-                Layout.bottomMargin: 10
-                spacing: 14
+                Layout.leftMargin: plain ? 14 : 16
+                Layout.rightMargin: plain ? 14 : 16
+                Layout.topMargin: plain ? 10 : 11
+                Layout.bottomMargin: plain ? 10 : 11
+                spacing: plain ? 8 : 16
 
                 Repeater {
+                    id: stripRepeater
                     model: app.dropping ? F.dropKeys(app.voice) : app.dragging ? F.dragKeys(app.voice) : F.keyStrip(app.voice)
 
-                    Row {
+                    Rectangle {
                         required property var modelData
-                        spacing: 6
-
-                        Text {
-                            textFormat: Text.PlainText
-                            text: modelData.key
-                            color: bracket ? c.accent ?? "red" : c.ink ?? "black"
-                            font.family: fonts.mono ?? ""
-                            font.pixelSize: 11
-                            font.weight: Font.Medium
+                        // The pair as drawn, in the case the font draws it.
+                        function drawn() {
+                            const up = t => keyText.font.capitalization === Font.AllUppercase ? t.toUpperCase() : t;
+                            return {
+                                key: up(keyText.text),
+                                word: up(wordText.text),
+                                keyWeight: keyText.font.weight,
+                                keyColor: String(keyText.color),
+                                spacing: keyText.font.letterSpacing
+                            };
                         }
-                        Text {
-                            textFormat: Text.PlainText
-                            text: modelData.word
-                            color: look.small.color
-                            font.family: look.small.font
-                            font.pixelSize: 11
+                        implicitWidth: pair.implicitWidth + (boardLook.strip.chip ? 14 : 0)
+                        implicitHeight: pair.implicitHeight + (boardLook.strip.chip ? 6 : 0)
+                        radius: boardLook.strip.chip ? look.keyChip.radius : 0
+                        color: boardLook.strip.chip ? look.keyChip.fill : "transparent"
+
+                        Row {
+                            id: pair
+                            anchors.centerIn: parent
+                            spacing: 6
+
+                            Text {
+                                id: keyText
+                                textFormat: Text.PlainText
+                                text: modelData.key
+                                color: bracket ? c.accent ?? "red" : c.ink ?? "black"
+                                font.family: fonts.mono ?? ""
+                                font.pixelSize: boardLook.strip.size
+                                font.weight: boardLook.strip.keyWeight
+                                font.letterSpacing: boardLook.strip.spacing
+                                font.capitalization: boardLook.strip.caps ? Font.AllUppercase : Font.MixedCase
+                            }
+                            Text {
+                                id: wordText
+                                textFormat: Text.PlainText
+                                text: modelData.word
+                                color: c.muted ?? "gray"
+                                font.family: fonts.mono ?? ""
+                                font.pixelSize: boardLook.strip.size
+                                font.letterSpacing: boardLook.strip.spacing
+                                font.capitalization: keyText.font.capitalization
+                            }
                         }
                     }
                 }
@@ -1592,7 +1787,7 @@ ShellRoot {
         textFormat: Text.PlainText
         color: look.small.color
         font.family: look.small.font
-        font.pixelSize: 10
+        font.pixelSize: look.small.size
         font.letterSpacing: look.small.spacing
     }
 
@@ -1615,6 +1810,16 @@ ShellRoot {
                 badge: badgeText.font.capitalization === Font.AllUppercase ? badgeText.text.toUpperCase() : badgeText.text
             };
         }
+        // How the place is drawn, apart from drawn(), whose fields the drives check reads whole.
+        function drawnLook() {
+            return {
+                fill: String(placeBox.color),
+                label: labelText.text,
+                labelColor: String(labelText.color),
+                weight: labelText.font.weight,
+                icon: placeIcon.path
+            };
+        }
         Layout.fillWidth: true
         spacing: 0
 
@@ -1632,29 +1837,56 @@ ShellRoot {
             text: placeRow.drive ? placeRow.driveText.head : plain ? placeRow.heading.charAt(0).toUpperCase() + placeRow.heading.slice(1) : placeRow.heading.toUpperCase()
             color: look.small.color
             font.family: look.small.font
-            font.pixelSize: 10
+            font.pixelSize: look.small.size
             font.letterSpacing: look.small.spacing
         }
+        // The current place is filled as its board does: Paper's paper shade, Artboard's tint, Blueprint's accent wash in an accent outline.
         Rectangle {
+            id: placeBox
+            readonly property color tint: placeRow.atCursor ? look.cursor.text : placeRow.here ? (plain ? look.cursor.text : bracket ? c.accent ?? "red" : c.ink ?? "black") : plain ? c.ink ?? "black" : c.muted ?? "gray"
             Layout.fillWidth: true
-            implicitHeight: 32
-            radius: plain ? 8 : look.cursor.radius
-            color: placeRow.atCursor ? look.cursor.fill : placeRow.here ? Qt.alpha(c.ink ?? "black", 0.06) : "transparent"
+            implicitHeight: boardLook.row
+            radius: plain ? 10 : look.cursor.radius
+            color: placeRow.atCursor ? look.cursor.fill : placeRow.here ? app.hereFill : "transparent"
+            border.width: bracket && placeRow.here && !placeRow.atCursor ? 1 : 0
+            border.color: c.accent ?? "red"
 
+            Item {
+                id: placeIconBox
+                anchors.verticalCenter: parent.verticalCenter
+                x: placeRow.drive && plain ? 8 : 10
+                width: boardLook.tile ? 28 : 16
+                height: width
+
+                Rectangle {
+                    visible: boardLook.tile
+                    anchors.fill: parent
+                    radius: 9
+                    color: placeRow.here || placeRow.atCursor ? c.surface ?? "white" : look.tile.fill
+                }
+                FilesIcon {
+                    id: placeIcon
+                    anchors.centerIn: parent
+                    path: F.iconPath(app.voice, F.placeIcon(placeRow.place))
+                    stroke: boardLook.stroke
+                    // Artboard's idle icons are muted under ink labels.
+                    color: plain && !placeRow.here && !placeRow.atCursor ? c.muted ?? "gray" : placeBox.tint
+                }
+            }
             Text {
                 id: labelText
                 anchors.verticalCenter: parent.verticalCenter
-                x: 10
-                width: parent.width - 20 - (placeRow.drive ? badge.width + 8 : 0)
+                x: placeIconBox.x + placeIconBox.width + (placeRow.drive ? 8 : 10)
+                width: parent.width - x - 10 - (placeRow.drive ? badge.width + 8 : 0)
                 textFormat: Text.PlainText
                 // A pin is a folder's own name and keeps its case.
                 text: P.oneLine(placeRow.place.label) + (placeRow.drive ? " · " + placeRow.place.size : "")
                 maximumLineCount: 1
                 elide: Text.ElideRight
-                color: placeRow.atCursor ? look.cursor.text : placeRow.here ? c.ink ?? "black" : c.muted ?? "gray"
+                color: placeBox.tint
                 font.family: bracket ? fonts.mono ?? "" : fonts.ui ?? ""
-                font.pixelSize: placeRow.drive ? 12 : 13
-                font.weight: placeRow.here ? Font.Medium : Font.Normal
+                font.pixelSize: placeRow.drive ? 12 : plain ? 14 : 13
+                font.weight: placeRow.here ? (bracket ? Font.Bold : Font.Medium) : Font.Normal
             }
             // Paper's badge is boxed and in caps, Artboard's filled and rounded, Blueprint's boxed in the mono face.
             Rectangle {
