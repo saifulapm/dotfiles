@@ -62,7 +62,8 @@ test('the cursor stops at the ends, and n wraps to the first dua', () => {
 });
 
 test('the pane\'s head counts the dua within its chapter', () => {
-  assert.equal(U.duaHead(7, 13), 'dua 7 of 13');
+  assert.equal(U.duaHead(7, 13, false), 'dua 7 of 13');
+  assert.equal(U.duaHead(7, 13, true), 'DUA 7 OF 13');
 });
 
 test('the source is the dua\'s ref then the book and its id', () => {
@@ -73,4 +74,11 @@ test('the source is the dua\'s ref then the book and its id', () => {
 test('a copy is four lines: Arabic, transliteration, meaning, source', () => {
   const d = { id: '105', ar: 'ع', tr: 'T', en: 'E', ref: 'R' };
   assert.equal(U.copyText(d), 'ع\nT\nE\nR · Hisn al-Muslim 105');
+});
+
+test('a long dua draws smaller so it fits the pane, the board\'s 46 px for a short one', () => {
+  assert.equal(U.arabicSize('x'.repeat(40)), 46);
+  assert.equal(U.arabicSize('x'.repeat(100)), 34);
+  assert.equal(U.arabicSize('x'.repeat(240)), 26);
+  assert.equal(U.arabicSize('x'.repeat(1800)), 20);
 });

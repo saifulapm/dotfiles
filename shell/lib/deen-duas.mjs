@@ -36,8 +36,12 @@ export const step = (i, by, len) => Math.max(0, Math.min(len - 1, i + by));
 // n wraps from a chapter's last dua to its first.
 export const nextDua = (k, m) => (k + 1) % m;
 
-export const duaHead = (k, m) => `dua ${k} of ${m}`;
+// Blueprint writes it in capitals.
+export const duaHead = (k, m, upper) => (upper ? `DUA ${k} OF ${m}` : `dua ${k} of ${m}`);
 
 export const sourceLine = (d) => (d.ref ? `${d.ref} · ${BOOK} ${d.id}` : `${BOOK} ${d.id}`);
 
 export const copyText = (d) => [d.ar, d.tr, d.en, sourceLine(d)].join('\n');
+
+// The board sets one short dua at 46 px; the book's longest runs to 1800 letters, so the size steps down with the length.
+export const arabicSize = (text) => (text.length <= 45 ? 46 : text.length <= 110 ? 34 : text.length <= 250 ? 26 : 20);
