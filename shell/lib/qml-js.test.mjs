@@ -32,6 +32,15 @@ test('no shared module or QML file calls trimStart or trimEnd', () => {
   );
 });
 
+// Object.fromEntries is ES2019 too; the cheat sheet once met it in QML.
+test('no shared module or QML file calls Object.fromEntries', () => {
+  const files = readdirSync(qml, { recursive: true }).filter((f) => (f.endsWith('.qml') || f.endsWith('.mjs')) && !f.endsWith('.test.mjs'));
+  assert.deepEqual(
+    files.filter((f) => /Object\.fromEntries\(/.test(readFileSync(qml + f, 'utf8'))),
+    [],
+  );
+});
+
 // A catch with no binding is ES2019 as well; QML refuses the whole module as a syntax error, and the shell with it.
 test('no shared module or QML file catches without a binding', () => {
   const files = readdirSync(qml, { recursive: true }).filter((f) => (f.endsWith('.qml') || f.endsWith('.mjs')) && !f.endsWith('.test.mjs'));
