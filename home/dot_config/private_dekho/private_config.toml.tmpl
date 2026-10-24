@@ -1,0 +1,6 @@
+{{- $dekho := fromToml (includeTemplate "dekho.toml" .) -}}
+{{- $key := index $dekho "tmdb_api_key" -}}
+{{- if $key -}}
+# dekho's TMDB key: a template, so the key never sits in the public repo unsealed; dekho reads $TMDB_API_KEY first, but Dekho's window has no shell to set it.
+tmdb_api_key = {{ $key | quote }}
+{{- end -}}

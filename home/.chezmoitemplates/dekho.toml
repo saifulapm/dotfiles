@@ -1,0 +1,4 @@
+{{- /* dekho's TMDB key, the plaintext of dekho.toml.age; empty without the age key, as mail-identities.toml is, so a keyless apply writes no dekho config. */ -}}
+{{- if stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt") -}}
+{{- decrypt (include ".chezmoitemplates/dekho.toml.age") -}}
+{{- end -}}
