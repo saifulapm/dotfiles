@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# just dev's deen: answers each call from the canned JSON in dev/deen named by its arguments joined with -, so `api surah 36` reads dev/deen/api-surah-36.json; a nested check never reaches the network, and each call is logged to DOTS_DEV_DIR/deen.log.
+# just dev's deen: answers each call from the canned JSON in dev/deen named by its arguments joined with -, so `api surah 36` reads dev/deen/api-surah-36.json, or runs dev/deen/<name>.sh when that is there; a nested check never reaches the network, and each call is logged to DOTS_DEV_DIR/deen.log.
 set -euo pipefail
 {
 [ -n "${DOTS_DEV_DIR:-}" ] || { echo "dev-fake-deen: run it from a sourced just dev env" >&2; exit 1; }
 fixtures=$(dirname "$(realpath "$0")")/../dev/deen
 echo "$*" >>"$DOTS_DEV_DIR/deen.log"
 name=$(IFS=-; echo "$*")
+# A fixture that must take time or change between calls, such as the hadith download, is a script of that name, run in place of the call.
+[ ! -x "$fixtures/$name.sh" ] || exec "$fixtures/$name.sh" "$@"
 # A fixture may be NDJSON, so it is printed as it is, one object per line.
 [ -f "$fixtures/$name.json" ] || { echo "{\"error\":\"dev-fake-deen has no fixture $name.json\"}"; exit 1; }
 cat "$fixtures/$name.json"
