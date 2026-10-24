@@ -49,11 +49,12 @@ FocusScope {
     // A title's context chooses its kind, genre and language once the tables can name them.
     function load(ctx) {
         from = D.title(ctx.from || "");
-        prefilled = !!ctx.kind;
+        prefilled = !!ctx.kind || !!ctx.person;
         picking = false;
         results = [];
         withTables(() => {
-            page.filters = ctx.kind ? B.fromTitle(ctx, page.tables.languages) : B.empty();
+            const base = ctx.kind ? B.fromTitle(ctx, page.tables.languages) : B.empty();
+            page.filters = ctx.person ? B.withPerson(base, ctx.person) : base;
             page.refresh();
         });
     }
