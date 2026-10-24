@@ -30,6 +30,10 @@ export function report(m, b) {
     line('app 1st frame', m.appFirstFrameMs, 'ms', '≤', b.appFirstFrameMs, m.appFirstFrameMs <= b.appFirstFrameMs),
     line('app open rss', Math.floor(m.appRssKiB / 1024), 'MiB', '≤', b.appRssMiB, m.appRssKiB <= b.appRssMiB * 1024),
     line('app closed', m.appLeft, 'left', '=', b.appLeft, m.appLeft === b.appLeft),
+    // Dekho, the second App, answers to the same budgets.
+    line('dekho frame', m.dekhoFirstFrameMs, 'ms', '≤', b.appFirstFrameMs, m.dekhoFirstFrameMs <= b.appFirstFrameMs),
+    line('dekho rss', Math.floor(m.dekhoRssKiB / 1024), 'MiB', '≤', b.appRssMiB, m.dekhoRssKiB <= b.appRssMiB * 1024),
+    line('dekho closed', m.dekhoLeft, 'left', '=', b.appLeft, m.dekhoLeft === b.appLeft),
   ];
   // Every theme's shaders and effects loaded once; reported, not budgeted.
   const switched = `${'rss switched'.padEnd(13)} ${Math.floor(m.switchedKiB / 1024)} MiB`;
@@ -58,8 +62,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const passColdMs = Number(process.argv[13]);
   const filesColdMs = Number(process.argv[14]);
   const [appFirstFrameMs, appRssKiB, appLeft] = process.argv.slice(15, 18).map(Number);
+  const [dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft] = process.argv.slice(18, 21).map(Number);
   const env = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
-  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, pickerColdMs, pickerWarmMs, passColdMs, filesColdMs, appFirstFrameMs, appRssKiB, appLeft, cpu: process.argv[7] }, {
+  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, pickerColdMs, pickerWarmMs, passColdMs, filesColdMs, appFirstFrameMs, appRssKiB, appLeft, dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft, cpu: process.argv[7] }, {
     firstFrameMs: env('DOTS_BUDGET_FIRST_FRAME_MS', BUDGETS.firstFrameMs),
     rssMiB: env('DOTS_BUDGET_RSS_MIB', BUDGETS.rssMiB),
     coldMs: env('DOTS_BUDGET_COLD_MS', BUDGETS.coldMs),

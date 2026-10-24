@@ -175,41 +175,47 @@ status=$(shell_status) || die "status did not answer after the switches"
 switched_kib=$(jq -r .rssKiB <<<"$status")
 timers=$(jq -r .timers <<<"$status")
 
-# Files is an App, its own qs process, started the way Mod+Y starts it and ended by closing its window. It runs before the idle window and is gone by then, so it cannot skew idle cpu.
-files_qml=$repo/shell/files.qml
-app_state() { timeout 0.5 qs ipc -p "$files_qml" call files state 2>/dev/null; }
-app_is() { app_state | jq -e "$1" >/dev/null 2>&1; }
-app_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "files")] | length'; }
-app_up() { [ "$(app_windows)" = 1 ] && app_is '.firstFrameMs != null'; }
-# The App's own qs, found by its command line, never by pgrep -f, which matches this shell too; one that exits mid-scan has no cmdline left.
-app_pids() {
-  local pid
-  for pid in $(pgrep -x qs); do
-    tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "-p $files_qml" && echo "$pid"
-  done
-  return 0
-}
-app_gone() { [ -z "$(app_pids)" ]; }
-app_frames=() app_rss_kib=0 app_left=0
-for i in 1 2 3 4 5; do
-  niri msg action spawn -- "$repo/bin/dots-files" >/dev/null || die "spawning dots-files failed"
-  until_ok 5000 app_up || die "Files never drew its first frame"
-  app_frames+=("$(app_state | jq -r .firstFrameMs)")
-  # Its listing has a second to settle before the memory is read; the largest of the five starts is kept.
-  sleep 1
-  kib=$(app_state | jq -r .rssKiB) || die "Files did not report rssKiB"
-  [[ $kib =~ ^[0-9]+$ ]] && ((kib > 0)) || die "Files reported rssKiB '$kib', not a size"
-  ((kib > app_rss_kib)) && app_rss_kib=$kib
-  niri msg action close-window >/dev/null || die "closing Files failed"
-  until_ok 3000 app_gone || {
-    left=$(app_pids | wc -l)
-    ((left > app_left)) && app_left=$left
-    kill $(app_pids) 2>/dev/null
-    sleep 0.3
+# Files and Dekho are Apps, each its own qs process, started the way the desktop starts them and closed by window, before the idle window so they cannot skew idle cpu; bench_app <entry qml> <bin> <app id> sets app_first_frame (median of five), app_rss_kib (largest) and app_left (most left over).
+bench_app() {
+  local qml=$repo/shell/$1 bin=$repo/bin/$2 appid=$3 i kib left
+  app_state() { timeout 0.5 qs ipc -p "$qml" call "$appid" state 2>/dev/null; }
+  app_is() { app_state | jq -e "$1" >/dev/null 2>&1; }
+  app_windows() { niri msg -j windows | jq --arg a "$appid" '[.[] | select(.app_id == $a)] | length'; }
+  app_up() { [ "$(app_windows)" = 1 ] && app_is '.firstFrameMs != null'; }
+  # The App's own qs, found by its command line, never by pgrep -f, which matches this shell too; one that exits mid-scan has no cmdline left.
+  app_pids() {
+    local pid
+    for pid in $(pgrep -x qs); do
+      tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "-p $qml" && echo "$pid"
+    done
+    return 0
   }
-done
-echo "     app first frames: ${app_frames[*]}"
-app_first_frame=$(median "${app_frames[@]}")
+  app_gone() { [ -z "$(app_pids)" ]; }
+  local frames=()
+  app_rss_kib=0 app_left=0
+  for i in 1 2 3 4 5; do
+    niri msg action spawn -- "$bin" >/dev/null || die "spawning $2 failed"
+    until_ok 5000 app_up || die "$appid never drew its first frame"
+    frames+=("$(app_state | jq -r .firstFrameMs)")
+    # Its rows have a second to settle before the memory is read; the largest of the five starts is kept.
+    sleep 1
+    kib=$(app_state | jq -r .rssKiB) || die "$appid did not report rssKiB"
+    [[ $kib =~ ^[0-9]+$ ]] && ((kib > 0)) || die "$appid reported rssKiB '$kib', not a size"
+    ((kib > app_rss_kib)) && app_rss_kib=$kib
+    niri msg action close-window >/dev/null || die "closing $appid failed"
+    until_ok 3000 app_gone || {
+      left=$(app_pids | wc -l)
+      ((left > app_left)) && app_left=$left
+      kill $(app_pids) 2>/dev/null
+      sleep 0.3
+    }
+  done
+  echo "     $appid first frames: ${frames[*]}"
+  app_first_frame=$(median "${frames[@]}")
+}
+bench_app dekho.qml dots-dekho dekho
+dekho_first_frame=$app_first_frame dekho_rss_kib=$app_rss_kib dekho_left=$app_left
+bench_app files.qml dots-files files
 
 "$(dirname "$0")/dots" theme blueprint >/dev/null || die "dots theme blueprint failed"
 until_ok 3000 status_has '.theme == "blueprint"' || die "the shell never reported blueprint"
@@ -223,6 +229,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left"
 exit
 }
