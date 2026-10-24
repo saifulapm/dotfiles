@@ -49,11 +49,13 @@ before(() => {
   writeFileSync(plain, `primary = "${address}"\nothers = ["a@example.org", "b@example.net"]\n`);
   const enc = run('age', ['-a', '-r', recipient, '-o', join(src, '.chezmoitemplates/mail-identities.toml.age'), plain]);
   assert.equal(enc.status, 0, enc.stderr);
-  // The keyed apply decrypts every age blob, so dekho's TMDB key is sealed to the scratch key too.
-  const dekho = join(root, 'dekho.toml');
-  writeFileSync(dekho, 'tmdb_api_key = "test"\n');
-  const encDekho = run('age', ['-a', '-r', recipient, '-o', join(src, '.chezmoitemplates/dekho.toml.age'), dekho]);
-  assert.equal(encDekho.status, 0, encDekho.stderr);
+  // The keyed apply decrypts every age blob, so each other one is sealed to the scratch key as an empty TOML, a blob added later included.
+  const empty = join(root, 'empty.toml');
+  writeFileSync(empty, '');
+  for (const blob of readdirSync(join(src, '.chezmoitemplates')).filter((f) => f.endsWith('.age') && f !== 'mail-identities.toml.age')) {
+    const r = run('age', ['-a', '-r', recipient, '-o', join(src, '.chezmoitemplates', blob), empty]);
+    assert.equal(r.status, 0, r.stderr);
+  }
   keyed.result = apply(keyed.home, src);
 
   porcelainAfter = run('git', ['-C', repo, 'status', '--porcelain']).stdout;

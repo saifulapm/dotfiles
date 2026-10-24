@@ -2,7 +2,7 @@
 import { before, after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,6 +10,15 @@ const repo = new URL('../../', import.meta.url).pathname.replace(/\/$/, '');
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', ...opts });
 
 let root, keyless, keyed;
+
+function sealOthers(src, recipient, own) {
+  const empty = join(root, 'empty.toml');
+  writeFileSync(empty, '');
+  for (const blob of readdirSync(join(src, '.chezmoitemplates')).filter((f) => f.endsWith('.age') && f !== own)) {
+    const r = run('age', ['-a', '-r', recipient, '-o', join(src, '.chezmoitemplates', blob), empty]);
+    assert.equal(r.status, 0, r.stderr);
+  }
+}
 
 const scratchHome = (name) => {
   const home = join(root, name);
@@ -40,11 +49,8 @@ before(() => {
   writeFileSync(plain, 'tmdb_api_key = "test-key-0123"\n');
   const enc = run('age', ['-a', '-r', recipient, '-o', join(src, '.chezmoitemplates/dekho.toml.age'), plain]);
   assert.equal(enc.status, 0, enc.stderr);
-  // The keyed apply decrypts every age blob, so the mail identities are sealed to the scratch key too.
-  const identities = join(root, 'identities.toml');
-  writeFileSync(identities, 'primary = "test@example.com"\nothers = []\n');
-  const encMail = run('age', ['-a', '-r', recipient, '-o', join(src, '.chezmoitemplates/mail-identities.toml.age'), identities]);
-  assert.equal(encMail.status, 0, encMail.stderr);
+  // The keyed apply decrypts every age blob, so each other one is sealed to the scratch key as an empty TOML, a blob added later included.
+  sealOthers(src, recipient, 'dekho.toml.age');
   keyed.result = apply(keyed.home, src);
 });
 
