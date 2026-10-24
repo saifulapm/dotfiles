@@ -16,3 +16,7 @@
 .config/kak/autoload/tools/usql.kak
 .config/kak/autoload/tools/spell.kak
 .config/kak/autoload/tools/popup.kak
+# v2.2's libinput-gestures, which dots-gestures replaced.
+.config/libinput-gestures.conf
+.config/systemd/user/libinput-gestures.service
+.local/bin/libinput-gestures

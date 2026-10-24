@@ -50,6 +50,16 @@ arch = "all"
 why = "builds the double-Shift watcher"
 
 [[package]]
+name = "libinput-devel"
+arch = "all"
+why = "libinput's headers, which the pinch watcher builds against"
+
+[[package]]
+name = "systemd-devel"
+arch = "all"
+why = "libudev's headers, through which the pinch watcher follows touchpads plugged in later"
+
+[[package]]
 name = "rust"
 arch = "all"
 why = "builds amx, workflow and pxy from their versions.toml pins"

@@ -159,6 +159,12 @@ Scope {
             goals: goalsService
             sync: syncService
             islandWidth: island.boxWidth
+            // The corner opens Notes or brings it forward, and never closes it as Mod+N would.
+            onNotesCornerReached: {
+                notesLoader.active = true;
+                if (!notesLoader.item.shown || !notesLoader.item.focused)
+                    notesLoader.item.toggle();
+            }
         }
     }
 

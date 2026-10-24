@@ -1,0 +1,6 @@
+// niri's corners can only toggle the overview, so it has bottom-left alone; the margins' top-right corner opens Notes.
+gestures {
+    hot-corners {
+        bottom-left
+    }
+}

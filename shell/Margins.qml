@@ -40,8 +40,13 @@ PanelWindow {
     }
     implicitHeight: 41
     color: "transparent"
-    // An empty mask lets clicks through to the windows under the margins.
-    mask: Region {}
+    // Only the Notes corner takes the pointer; clicks anywhere else go through to the windows under the margins.
+    mask: Region {
+        item: notesCorner
+    }
+
+    // The pointer pushed into the top-right corner opens Notes, as niri's bottom-left corner opens the overview.
+    signal notesCornerReached
 
     readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots"
 
@@ -216,5 +221,18 @@ PanelWindow {
         width: Math.max(0, root.lineEnd - 32)
         height: 1
         color: root.theme.color.ink ?? "black"
+    }
+
+    Item {
+        id: notesCorner
+        anchors.top: parent.top
+        anchors.right: parent.right
+        width: 2
+        height: 2
+
+        HoverHandler {
+            onHoveredChanged: if (hovered)
+                root.notesCornerReached()
+        }
     }
 }

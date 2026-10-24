@@ -1,0 +1,7 @@
+#!/bin/bash
+# watcher source hash: {{ joinPath .chezmoi.workingTree "bin/dots-gestures.c" | include | sha256sum }}
+{{ template "lib.sh" . }}
+mkdir -p "$HOME/.local/bin"
+# The input group the watcher reads the touchpads through is joined by the dshift step.
+gcc -O2 -Wall -o "$HOME/.local/bin/dots-gestures" {{ joinPath .chezmoi.workingTree "bin/dots-gestures.c" | quote }} -linput -ludev || die "gestures build failed"
+systemctl --user try-restart dots-gestures.service 2>/dev/null || true
