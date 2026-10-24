@@ -118,3 +118,16 @@ echo "fails=$fails"`;
   assert.match(r.stdout, /^ok   a function$/m);
   assert.match(r.stdout, /^fails=3$/m);
 });
+
+// qs writes its log and QML warnings to stdout, so a check that kept only Files' stderr read an empty log and its "no QML errors" passed blind (m34).
+test('every tests/dev script that starts Files keeps its stdout and stderr in one log', () => {
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
+    readFileSync(dir + f, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (/exec dots-files\b/.test(line) && !/exec dots-files\s*>>?\s*\S+\s+2>&1/.test(line)) found.push(`${f}:${i + 1}`);
+      });
+  }
+  assert.deepEqual(found, []);
+});
