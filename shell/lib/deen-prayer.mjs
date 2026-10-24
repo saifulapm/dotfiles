@@ -1,6 +1,6 @@
 // Deen's Prayer: a day's five prayers read from `deen prayer`, which one is next, and the words the page draws; the clock is always passed in.
 import { oneLine } from './deen.mjs';
-import { pad2 } from './margins.mjs';
+import { clockText, pad2 } from './margins.mjs';
 
 const PRAYERS = [
   ['fajr', 'Fajr'],
@@ -15,6 +15,10 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const minutesOf = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const clockMinutes = (now) => now.getHours() * 60 + now.getMinutes();
 const utc = (key) => Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)));
+
+export const nameOf = (key) => PRAYERS.filter(([k]) => k === key)[0][1];
+
+export const clock = clockText;
 
 // DOTS_DEEN_NOW as an ISO local time such as 2026-10-23T14:32; anything else is no time.
 export function parseNow(text) {
@@ -89,7 +93,7 @@ export function parsePrayer(answer) {
     city: oneLine(answer.city),
     date: String(answer.date),
     times,
-    method: oneLine(answer.method?.name),
+    method: oneLine(answer.method && answer.method.name),
     cached: answer.cached === true,
   };
 }

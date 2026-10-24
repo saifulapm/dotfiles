@@ -89,6 +89,11 @@ test('the backend\'s answer is read, and an error or a short answer is none', ()
   assert.equal(P.parsePrayer({ city: 'Dhaka', times: { fajr: '04:43' } }), null);
 });
 
+test('a prayer is named by its key and the minute is drawn as HH:MM', () => {
+  assert.equal(P.nameOf('maghrib'), 'Maghrib');
+  assert.equal(P.clock(at(9, 5)), '09:05');
+});
+
 test('a city is one line without controls or overrides', () => {
   const p = P.parsePrayer(fixture('prayer---date-2026-10-21'));
   assert.equal(p.city, 'Forged city [31mred');
