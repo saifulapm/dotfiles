@@ -47,6 +47,11 @@ ShellRoot {
     property var driveRows: []
     // y or x: what p pastes, and whether it copies or moves; the sources are named as they were yanked.
     property var yank: null
+    // A drag from any app hovering the listing: the files it carries and the folder row under it, or -1 for the folder shown.
+    property bool dropping: false
+    property var dropPaths: []
+    property int dropAt: -1
+    readonly property string dropTarget: dropAt >= 0 && rows[dropAt] ? pathOf(rows[dropAt]) : folder
     property FilesOps ops: FilesOps {
         onEnded: last => app.opEnded(last)
     }
@@ -100,7 +105,7 @@ ShellRoot {
     readonly property var statusShown: ops.failed ? F.stoppedText(voice, ops.to, ops.copied.length, ops.items.length) : notice ? {
         counts: notice,
         at: status.at
-    } : dragging ? F.dragText(voice, dragRows) : status
+    } : dropping ? F.dropText(voice, dropPaths, placeName(dropTarget)) : dragging ? F.dragText(voice, dragRows) : status
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -263,6 +268,26 @@ ShellRoot {
     function placeName(path) {
         const drive = drivesWatch.drives.find(d => path === d.path || path.indexOf(d.path + "/") === 0);
         return drive ? drive.label : F.folderName(home, path);
+    }
+
+    // A drop always copies, into the folder row under it or the folder shown; Files' own drag only onto another folder.
+    function dropInto(paths, own) {
+        const target = dropTarget;
+        dropping = false;
+        dropAt = -1;
+        if (own && target === folder)
+            return false;
+        return ops.start("copy", paths.map(p => ({
+                    path: p,
+                    name: p.slice(p.lastIndexOf("/") + 1),
+                    size: null,
+                    dir: false
+                })), paths[0].slice(0, paths[0].lastIndexOf("/")) || "/", target, placeName(target));
+    }
+
+    function hoverDrop(y) {
+        const i = rowList.indexAt(10, y + rowList.contentY);
+        dropAt = i >= 0 && rows[i].dir ? i : -1;
     }
 
     function paste() {
@@ -481,6 +506,8 @@ ShellRoot {
                 placeAt: app.placeAt,
                 op: {
                     running: app.ops.running,
+                    dropping: app.dropping,
+                    dropAt: app.dropAt >= 0 && app.rows[app.dropAt] ? app.rows[app.dropAt].name : null,
                     yank: app.yank ? app.yank.mode + " " + app.yank.items.length : "",
                     say: opSay.text,
                     progress: opProgress.text,
@@ -852,6 +879,7 @@ ShellRoot {
                             required property int index
                             readonly property bool isCurrent: index === app.selected && app.side === "list"
                             readonly property bool isMarked: app.marked.indexOf(modelData.name) >= 0
+                            readonly property bool dropHere: app.dropping && app.dropAt === index
                             readonly property color ink: isCurrent ? look.cursor.text : c.ink ?? "black"
                             readonly property color dim: isCurrent ? look.cursor.detail : c.muted ?? "gray"
                             function drawn() {
@@ -860,6 +888,7 @@ ShellRoot {
                                     lines: nameText.lineCount,
                                     elided: nameText.truncated,
                                     size: sizeLabel.text,
+                                    dropHere: dropHere,
                                     modified: dateLabel.text,
                                     mark: markLabel.visible ? markLabel.text : ""
                                 };
@@ -868,7 +897,10 @@ ShellRoot {
                             height: 32
                             radius: look.cursor.radius
                             // The cursor row is filled; a marked row is tinted and boxed, as the marked board draws it.
-                            color: isCurrent ? look.cursor.fill : isMarked ? Qt.alpha(c.accent ?? "red", 0.1) : "transparent"
+                            color: dropHere ? Qt.alpha(c.accent ?? "red", 0.12) : isCurrent ? look.cursor.fill : isMarked ? Qt.alpha(c.accent ?? "red", 0.1) : "transparent"
+                            // The folder a drop will land in is outlined in the accent, as the drop board draws it.
+                            border.width: dropHere ? 2 : 0
+                            border.color: c.accent ?? "red"
 
                             RowLayout {
                                 anchors.fill: parent
@@ -969,8 +1001,8 @@ ShellRoot {
                                     Layout.preferredWidth: 90
                                     horizontalAlignment: Text.AlignRight
                                     textFormat: Text.PlainText
-                                    text: F.sizeText(app.voice, rowItem.modelData)
-                                    color: rowItem.dim
+                                    text: rowItem.dropHere ? F.dropHere(app.voice) : F.sizeText(app.voice, rowItem.modelData)
+                                    color: rowItem.dropHere ? c.accent ?? "red" : rowItem.dim
                                     font.family: fonts.mono ?? ""
                                     font.pixelSize: 12
                                 }
@@ -1250,7 +1282,7 @@ ShellRoot {
                 spacing: 14
 
                 Repeater {
-                    model: app.dragging ? F.dragKeys(app.voice) : F.keyStrip(app.voice)
+                    model: app.dropping ? F.dropKeys(app.voice) : app.dragging ? F.dragKeys(app.voice) : F.keyStrip(app.voice)
 
                     Row {
                         required property var modelData
@@ -1273,6 +1305,44 @@ ShellRoot {
                         }
                     }
                 }
+            }
+        }
+
+        // Files from another app, or Files' own drag, over the listing: a folder row under the pointer is the target, else the folder shown; a drop anywhere else in the window is refused.
+        DropArea {
+            id: dropArea
+            anchors.fill: parent
+            function inList(drag) {
+                const p = rowList.mapFromItem(dropArea, drag.x, drag.y);
+                return p.x >= 0 && p.y >= 0 && p.x < rowList.width && p.y < rowList.height ? p : null;
+            }
+            // Files' own drag is a drop only over a folder row; over its own folder it is still a drag out.
+            function hover(drag) {
+                const p = inList(drag);
+                if (p)
+                    app.hoverDrop(p.y);
+                else
+                    app.dropAt = -1;
+                app.dropping = p !== null && app.dropPaths.length > 0 && (drag.source !== dragOffer || app.dropAt >= 0);
+            }
+            onEntered: drag => {
+                app.dropPaths = F.dropPaths(drag.urls.map(u => String(u)));
+                if (!app.dropPaths.length) {
+                    drag.accepted = false;
+                    return;
+                }
+                hover(drag);
+            }
+            onPositionChanged: drag => hover(drag)
+            onExited: {
+                app.dropping = false;
+                app.dropAt = -1;
+            }
+            onDropped: drop => {
+                if (inList(drop) && app.dropInto(F.dropPaths(drop.urls.map(u => String(u))), drop.source === dragOffer))
+                    drop.accept(Qt.CopyAction);
+                app.dropping = false;
+                app.dropAt = -1;
             }
         }
 

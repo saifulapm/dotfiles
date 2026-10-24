@@ -218,7 +218,8 @@ export function failText(voice, op) {
   const f = op.failed;
   const full = f.error === 'No space left on device';
   const names = op.items.map((i) => oneLine(i.name));
-  const size = (i) => (i.dir ? '' : ` · ${pickerSize({ size: i.size })}`);
+  // A dropped file's size is not known here, nor a folder's.
+  const size = (i) => (i.dir || i.size == null ? '' : ` · ${pickerSize({ size: i.size })}`);
   const rows = op.items.map((item, i) => ({
     name: names[i],
     state: say(voice, f.copied.indexOf(i) >= 0 ? `copied${size(item)}` : i === f.index ? 'stopped · partial removed' : `not started${size(item)}`),
