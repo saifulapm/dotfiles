@@ -13,7 +13,7 @@ test('next up is the first aired episode not watched, one aired today counting a
 
 test('a season all watched, or none aired yet, has no next up', () => {
   assert.equal(T.nextUp([ep(1, '2026-01-01', true), ep(2, '2026-01-08', true)], today), -1);
-  assert.equal(T.nextUp([ep(1, '2026-10-30', false), ep(2, '', false)], today), -1);
+  assert.equal(T.nextUp([ep(1, '2026-10-30', false), ep(2, '2026-11-06', false)], today), -1);
 });
 
 test('an unwatched episode before a watched one is still next up', () => {
@@ -78,4 +78,15 @@ test('each board writes the next-up tag its own way', () => {
   assert.equal(T.titleText('bracket').nextUp, '[NEXT UP]');
   assert.equal(T.titleText('plain').crew, 'Crew');
   assert.equal(T.titleText('caps').crew, 'CREW');
+});
+
+// Only a date after today holds an episode back; TMDB leaves some specials and older episodes undated.
+test('an episode with no air date can be opened and be next up, and draws no date', () => {
+  const items = [
+    { episode: 1, air_date: null, watched: false },
+    { episode: 2, air_date: '2099-01-01', watched: false },
+  ];
+  assert.equal(T.aired(items[0], '2026-10-24'), true);
+  assert.equal(T.nextUp(items, '2026-10-24'), 0);
+  assert.equal(T.dateText('caps', null, '2026-10-24'), '');
 });

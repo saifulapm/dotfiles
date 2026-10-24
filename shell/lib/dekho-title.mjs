@@ -3,8 +3,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 const upper = (voice, s) => (voice === 'bracket' ? s.toUpperCase() : s);
 
-// Dates stay YYYY-MM-DD strings, compared as text: a Date parsed from one is UTC midnight, a day off west of Greenwich.
-export const aired = (ep, today) => !!ep.air_date && ep.air_date <= today;
+// Dates stay YYYY-MM-DD strings, compared as text: a Date parsed from one is UTC midnight, a day off west of Greenwich. Only a date after today holds an episode back, so an undated one opens.
+export const aired = (ep, today) => !ep.air_date || ep.air_date <= today;
 
 // The index of the first aired episode not watched, or -1.
 export function nextUp(items, today) {
