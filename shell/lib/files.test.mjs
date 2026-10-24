@@ -67,6 +67,7 @@ test('an action takes the marked rows in the list\'s order, or the cursor row wh
   assert.deepEqual(F.targets(rows, [], '/home/s', rows[1]), ['/home/s/a.jpg']);
   assert.deepEqual(F.targets(rows, [], '/', rows[0]), ['/shots']);
   assert.deepEqual(F.targets([], [], '/home/s', null), []);
+  assert.deepEqual(F.targets(rows, [], '/home/s', { name: 'caf\ufffd.txt', dir: false, undecodable: true }), []);
 });
 
 test('the preview names an image\'s size, kind and date, Blueprint in caps and ISO', () => {
@@ -113,6 +114,8 @@ test('a refused name says why on the status line, the name in its own case', () 
   assert.equal(F.noticeText('caps', 'exists', 'Notes.txt'), 'Notes.txt exists');
   assert.equal(F.noticeText('bracket', 'exists', 'Notes.txt'), '! Notes.txt EXISTS');
   assert.equal(F.noticeText('plain', 'slash', 'a/b'), 'a name cannot hold /');
+  assert.equal(F.noticeText('caps', 'busy', ''), 'a copy is running; wait for it to finish');
+  assert.equal(F.noticeText('caps', 'unreadable', 'secret'), 'secret cannot be read');
 });
 
 test('the prompts pair their keys as each theme writes them', () => {
@@ -125,6 +128,7 @@ test('the prompts pair their keys as each theme writes them', () => {
 test('a drop takes the local files it carries, decoded, and nothing else', () => {
   assert.deepEqual(F.dropPaths(['file:///h/Downloads/report%20final.pdf', 'https://example.com/a.pdf', 'file:///h/%C3%A9.txt']), ['/h/Downloads/report final.pdf', '/h/é.txt']);
   assert.deepEqual(F.dropPaths(['file:///h/bad%E0%A4%A.txt']), []);
+  assert.deepEqual(F.dropPaths(['file:///home/s/Documents%00x']), []);
 });
 
 test('while a drop hovers, the status line says what it will do and the row says drop here', () => {
@@ -163,6 +167,8 @@ test('a failed copy names each file as copied, stopped or not started, and what 
   ]);
   assert.equal(f.foot, 'Nothing half-written is left: the partial IMG_2041.jpg was deleted, and the 2 copied files are whole.');
   assert.equal(f.keys, 'r retry · s skip this file · esc cancel the rest');
+  const inFolder = F.failText('caps', Object.assign({}, op, { items: [{ name: 'photos', dir: true }], failed: { index: 0, file: '/h/photos/b.jpg', error: 'Permission denied', copied: [], pending: [] } }));
+  assert.equal(inFolder.foot, 'Nothing half-written is left: the partial b.jpg was deleted, and the 0 copied files are whole.');
   const b = F.failText('bracket', Object.assign({}, op, { failed: { index: 0, error: 'Permission denied', copied: [], pending: [1, 2, 3] } }));
   assert.equal(b.title, 'PERMISSION DENIED');
   assert.equal(b.rows[0].state, 'STOPPED · PARTIAL REMOVED');

@@ -198,6 +198,7 @@ for i in 1 2 3 4 5; do
   # Its listing has a second to settle before the memory is read; the largest of the five starts is kept.
   sleep 1
   kib=$(app_state | jq -r .rssKiB) || die "Files did not report rssKiB"
+  [[ $kib =~ ^[0-9]+$ ]] && ((kib > 0)) || die "Files reported rssKiB '$kib', not a size"
   ((kib > app_rss_kib)) && app_rss_kib=$kib
   niri msg action close-window >/dev/null || die "closing Files failed"
   until_ok 3000 app_gone || {

@@ -101,11 +101,11 @@ ShellRoot {
                 group: "pinned"
             }))).concat(drivesWatch.drives).concat([trash])
     readonly property var status: F.statusText(voice, rows, marked, selected)
-    // A stopped copy, then a notice, then a drag, else the counts: what the status line says.
-    readonly property var statusShown: ops.failed ? F.stoppedText(voice, ops.to, ops.copied.length, ops.items.length) : notice ? {
+    // A stopped copy, then a drop, then a notice, then a drag, else the counts: what the status line says.
+    readonly property var statusShown: ops.failed ? F.stoppedText(voice, ops.to, ops.copied.length, ops.items.length) : dropping ? F.dropText(voice, dropPaths, placeName(dropTarget)) : notice ? {
         counts: notice,
         at: status.at
-    } : dropping ? F.dropText(voice, dropPaths, placeName(dropTarget)) : dragging ? F.dragText(voice, dragRows) : status
+    } : dragging ? F.dragText(voice, dragRows) : status
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -145,6 +145,9 @@ ShellRoot {
     }
 
     function list() {
+        // A relist of the same folder, after a paste or a trash, keeps the cursor on its row.
+        if (!landOn && cursorRow)
+            landOn = cursorRow.name;
         if (lister.running) {
             stale = true;
             return;
@@ -277,6 +280,10 @@ ShellRoot {
         dropAt = -1;
         if (own && target === folder)
             return false;
+        if (ops.running) {
+            notice = F.noticeText(voice, "busy", "");
+            return false;
+        }
         return ops.start("copy", paths.map(p => ({
                     path: p,
                     name: p.slice(p.lastIndexOf("/") + 1),
@@ -293,6 +300,10 @@ ShellRoot {
     function paste() {
         if (!yank || !listed)
             return;
+        if (ops.running) {
+            notice = F.noticeText(voice, "busy", "");
+            return;
+        }
         ops.start(yank.mode, yank.items, yank.from, folder, placeName(folder));
     }
 
@@ -341,6 +352,26 @@ ShellRoot {
             up();
         else if (k === "mark")
             mark();
+        // The other keys act on the rows, never on what the places' cursor rests on.
+        else if (side !== "list")
+            return;
+        else if (k === "r")
+            startRename();
+        else if (k === "d")
+            startTrash();
+        else if (k === "a")
+            asking = "mkdir";
+        else if (k === "o")
+            openWith.show(F.targets(rows, marked, folder, cursorRow));
+        else if (k === "s") {
+            const set = F.shareSet(rows, marked, folder, cursorRow);
+            share.show(set.paths, set.bytes);
+        } else if (k === "y")
+            yankTargets("copy");
+        else if (k === "x")
+            yankTargets("move");
+        else if (k === "p")
+            paste();
     }
 
     // A press on a row readies its drag: the rows it carries and the chip that will follow the pointer.
@@ -375,7 +406,8 @@ ShellRoot {
 
     Process {
         id: ender
-        command: ["sh", "-c", "kill -TERM $PPID"]
+        // Its children first: qs dies on SIGTERM without ending them, which would leave the drives watch, or a copy (which then removes its partial file), running on.
+        command: ["sh", "-c", "for p in $(pgrep -P $PPID); do [ \"$p\" = $$ ] || kill -TERM \"$p\"; done; kill -TERM $PPID"]
     }
 
     Connections {
@@ -391,12 +423,15 @@ ShellRoot {
         stdout: StdioCollector {
             id: listOut
         }
-        onExited: {
+        onExited: code => {
             if (app.stale) {
                 app.stale = false;
                 Qt.callLater(app.list);
                 return;
             }
+            // A folder that cannot be read lists as empty, and says why.
+            if (code !== 0)
+                app.notice = F.noticeText(app.voice, "unreadable", F.folderName(app.home, app.folder));
             let found = [];
             try {
                 found = JSON.parse(listOut.text);
@@ -639,12 +674,6 @@ ShellRoot {
                 }
                 else if (t === ".")
                     app.hidden = !app.hidden;
-                else if (t === "r")
-                    app.startRename();
-                else if (t === "d")
-                    app.startTrash();
-                else if (t === "a" && app.listed)
-                    app.asking = "mkdir";
                 else if (k === Qt.Key_Escape)
                     app.quit();
                 else if (k === Qt.Key_Tab)
@@ -653,26 +682,16 @@ ShellRoot {
                     app.drivesWatch.eject(app.allPlaces[app.placeAt].path);
                 else if (t === "j" || k === Qt.Key_Down)
                     app.rowKey("down");
-                else if (t === "o")
-                    openWith.show(F.targets(app.rows, app.marked, app.folder, app.cursorRow));
                 else if (t === "k" || k === Qt.Key_Up)
                     app.rowKey("up");
                 else if (t === "l" || k === Qt.Key_Right || k === Qt.Key_Return || k === Qt.Key_Enter)
                     app.rowKey("in");
-                else if (t === "s" && app.side === "list" && app.listed) {
-                    const set = F.shareSet(app.rows, app.marked, app.folder, app.cursorRow);
-                    share.show(set.paths, set.bytes);
-                }
                 else if (t === "h" || k === Qt.Key_Left || k === Qt.Key_Backspace)
                     app.rowKey("out");
                 else if (k === Qt.Key_Space)
                     app.rowKey("mark");
-                else if (t === "y")
-                    app.yankTargets("copy");
-                else if (t === "x")
-                    app.yankTargets("move");
-                else if (t === "p")
-                    app.paste();
+                else if (t !== "" && "rdaosyxp".indexOf(t) >= 0)
+                    app.rowKey(t);
                 else
                     return;
                 event.accepted = true;
@@ -1181,6 +1200,9 @@ ShellRoot {
                 }
                 Text {
                     id: statusCounts
+                    Layout.maximumWidth: win.width * 0.45
+                    maximumLineCount: 1
+                    elide: Text.ElideMiddle
                     textFormat: Text.PlainText
                     text: app.statusShown.counts
                     color: app.notice || app.ops.failed ? c.danger ?? "red" : look.small.color
@@ -1189,6 +1211,9 @@ ShellRoot {
                 }
                 Text {
                     id: statusAt
+                    Layout.maximumWidth: win.width * 0.25
+                    maximumLineCount: 1
+                    elide: Text.ElideMiddle
                     textFormat: Text.PlainText
                     text: app.statusShown.at
                     color: c.ink ?? "black"
@@ -1351,15 +1376,19 @@ ShellRoot {
             id: failCard
             function drawn() {
                 const rows = [];
-                for (let i = 0; i < failRows.count; i++)
-                    rows.push(failRows.itemAt(i).drawn());
+                for (let i = 0; i < failRows.count; i++) {
+                    const row = failRows.itemAtIndex(i);
+                    if (row)
+                        rows.push(row.drawn());
+                }
                 return {
                     head: failHead.text,
                     title: failTitle.text,
                     why: failWhy.text,
                     rows: rows,
                     foot: failFoot.text,
-                    keys: failKeys.text
+                    keys: failKeys.text,
+                    fits: failCard.height <= win.height
                 };
             }
             visible: app.opFail !== null
@@ -1409,13 +1438,21 @@ ShellRoot {
                     font.family: fonts.ui ?? ""
                     font.pixelSize: 12
                 }
-                Repeater {
+                // Up to eight rows show, scrolled to the one that stopped, so a drop of 500 files keeps the card inside the window.
+                ListView {
                     id: failRows
+                    width: parent.width
+                    height: Math.min(contentHeight, 8 * 22)
+                    clip: true
+                    interactive: false
                     model: app.opFail ? app.opFail.rows : []
+                    onCountChanged: if (app.ops.failed)
+                        positionViewAtIndex(app.ops.failed.index, ListView.Contain)
 
-                    Row {
+                    delegate: Row {
                         id: failRow
                         required property var modelData
+                        height: 22
                         function drawn() {
                             return {
                                 name: failName.text,
@@ -1423,7 +1460,7 @@ ShellRoot {
                                 lines: failName.lineCount
                             };
                         }
-                        width: failColumn.width
+                        width: failRows.width
                         spacing: 10
 
                         Text {
@@ -1462,6 +1499,8 @@ ShellRoot {
                     textFormat: Text.PlainText
                     text: app.opFail ? app.opFail.foot : ""
                     wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideMiddle
                     color: c.muted ?? "gray"
                     font.family: fonts.ui ?? ""
                     font.pixelSize: 11

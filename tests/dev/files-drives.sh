@@ -18,6 +18,7 @@ udisks() { env -u DBUS_SYSTEM_BUS_ADDRESS udisksctl "$@" --no-user-interaction; 
 ours() { [ -n "$loop" ] && [ "$(losetup -n -O BACK-FILE "$loop" 2>/dev/null)" = "$img" ]; }
 cleanup() {
   niri msg action close-window >/dev/null 2>&1
+  [ -n "${automounter:-}" ] && kill "$automounter" 2>/dev/null
   if ours; then
     udisks unmount -b "$loop" >/dev/null 2>&1
     udisks loop-delete -b "$loop" >/dev/null 2>&1
@@ -42,17 +43,21 @@ in_theme paper
 echo "     USER=$USER, the drives folder is $mnt"
 check "before the drive, no TESTUSB in the places ($(files_state | jq -c .places))" unlisted
 
+# The unit's own command automounts unless a udiskie already runs here (a v1 desktop starts one).
+automounter=
+if ! pgrep -x udiskie >/dev/null && ! pgrep -f '[b]in/udiskie' >/dev/null; then
+  exec_start=$(sed -n 's/^ExecStart=//p' "$repo/home/dot_config/systemd/user/udiskie.service")
+  env -u DBUS_SYSTEM_BUS_ADDRESS $exec_start >/dev/null 2>&1 &
+  automounter=$!
+  sleep 1
+fi
 truncate -s 20M "$img"
 mkfs.vfat -n TESTUSB "$img" >/dev/null
 setup=$(udisks loop-setup -f "$img" 2>&1)
 loop=$(grep -o '/dev/loop[0-9]*' <<<"$setup")
 check "udisksctl sets up a loop device for the image ($setup)" test -n "$loop"
 until_ok 3000 mounted
-if ! mounted; then
-  echo "     nothing mounted $loop in 3 s, so the check mounts it with udisksctl"
-  udisks mount -b "$loop" >/dev/null
-fi
-check "the loop drive is mounted at $mnt" mounted
+check "udiskie automounts the drive at $mnt within 3 s" mounted
 t0=$(now_ms)
 until_ok 3000 listed
 check "Files lists it under DRIVES in $(($(now_ms) - t0)) ms, between the pins and Trash ($(files_state | jq -c .places))" \

@@ -123,6 +123,11 @@ until_ok 3000 files_gone
 check "Esc closes the window" files_gone
 until_ok 3000 no_files_process
 check "and its process exits" no_files_process
+# Its children go with it: qs dies on SIGTERM without ending them, and the drives watch would run on.
+watch_left() { local p; for p in $(pgrep -x findmnt); do tr '\0' '\n' 2>/dev/null <"/proc/$p/environ" | grep -qx "HOME=$h" && return 0; done; return 1; }
+no_watch_left() { ! watch_left; }
+until_ok 3000 no_watch_left
+check "and no findmnt watch of its own is left running" no_watch_left
 
 mod_y
 until_ok 5000 files_up

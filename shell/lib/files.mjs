@@ -52,7 +52,8 @@ export function toggleMark(marked, row) {
 // What y, x, d, o and s act on: the marked rows in the list's order, or the cursor row when nothing is marked (#Q4T3GECS).
 export function targets(rows, marked, folder, cursor) {
   const base = folder === '/' ? '' : folder;
-  const picked = marked.length ? sortRows(rows.filter((r) => marked.indexOf(r.name) >= 0)) : cursor ? [cursor] : [];
+  // An undecodable name's path would name another file, as toggleMark refuses it.
+  const picked = marked.length ? sortRows(rows.filter((r) => marked.indexOf(r.name) >= 0)) : cursor && !cursor.undecodable ? [cursor] : [];
   return picked.map((r) => `${base}/${r.name}`);
 }
 
@@ -130,7 +131,7 @@ export function nameProblem(name, entries) {
 // Blueprint's error line is caps after a bang, but the name is the file's own and keeps its case.
 export function noticeText(voice, tag, name) {
   const shown = oneLine(name);
-  const SAY = { exists: [shown, ' exists'], empty: ['', 'type a name'], slash: ['', 'a name cannot hold /'], dots: [shown, ' is not a name'], failed: ['', 'could not do that'], itself: [shown, ' cannot go into itself'], missing: [shown, ' is gone'] };
+  const SAY = { exists: [shown, ' exists'], empty: ['', 'type a name'], slash: ['', 'a name cannot hold /'], dots: [shown, ' is not a name'], failed: ['', 'could not do that'], itself: [shown, ' cannot go into itself'], missing: [shown, ' is gone'], busy: ['', 'a copy is running; wait for it to finish'], unreadable: [shown, ' cannot be read'] };
   const [lead, rest] = SAY[tag] || ['', tag];
   return voice === 'bracket' ? `! ${lead}${rest.toUpperCase()}` : lead + rest;
 }
@@ -174,11 +175,14 @@ export function dropPaths(urls) {
   for (const u of urls) {
     const m = String(u).match(/^file:\/\/(\/.*)$/);
     if (!m) continue;
+    let path;
     try {
-      paths.push(decodeURIComponent(m[1]));
+      path = decodeURIComponent(m[1]);
     } catch (e) {
       continue;
     }
+    // A NUL would end the argument there and name the folder above it.
+    if (path.indexOf('\0') < 0) paths.push(path);
   }
   return paths;
 }
@@ -232,7 +236,7 @@ export function failText(voice, op) {
     title: say(voice, full ? `${oneLine(op.to)} is full` : oneLine(f.error)),
     why,
     rows,
-    foot: say(voice, 'Nothing half-written is left: the partial ') + names[f.index] + say(voice, ` was deleted, and the ${f.copied.length} copied ${f.copied.length === 1 ? 'file is' : 'files are'} whole.`),
+    foot: say(voice, 'Nothing half-written is left: the partial ') + (f.file ? oneLine(f.file.slice(f.file.lastIndexOf('/') + 1)) : names[f.index]) + say(voice, ` was deleted, and the ${f.copied.length} copied ${f.copied.length === 1 ? 'file is' : 'files are'} whole.`),
     keys: promptText(voice, [['r', 'retry'], ['s', 'skip this file'], ['esc', 'cancel the rest']]),
   };
 }

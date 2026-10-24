@@ -93,6 +93,8 @@ test('the keymap opens Chromium on Mod+B, kak on Mod+E, Files on Mod+Y and the o
   assert.match(binds, spawns('Mod+B', ['chromium-browser']));
   assert.match(binds, spawns('Mod+E', ['dots-foot', 'kak']));
   assert.match(binds, spawns('Mod+Y', ['dots-files']));
+  // A held or double-tapped Mod+Y before the first window maps would start a second Files.
+  assert.match(binds, /^\s*Mod\+Y repeat=false /m);
   assert.doesNotMatch(binds, /^\s*Mod\+Shift\+E /m);
   assert.match(binds, /^\s*Mod\+O repeat=false hotkey-overlay-title="[^"]+" \{ toggle-overview; \}$/m);
 });

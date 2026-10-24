@@ -98,18 +98,30 @@ go down /Downloads
 ( for _ in $(seq 2000); do op=$(pgrep -f '[d]ots-files-op (copy|move)') && { kill -STOP $op; echo "$op" >"$work/op.pid"; exit; }; done ) &
 wtype p
 until_ok 5000 test -s "$work/op.pid"
-# Stopped before it summed its sources, the op runs in 2 ms slices until the line has a size.
-for _ in $(seq 100); do
-  files_is '.op.progress | test("of 96 MB")' && break
-  kill -CONT "$(cat "$work/op.pid")"
-  sleep 0.002
-  kill -STOP "$(cat "$work/op.pid")"
-done
+# Stopped before it summed its sources, the op runs in slices of well under a millisecond until the line has a size.
+op=$(cat "$work/op.pid")
+python3 - "$op" "$files_qml" <<'PY'
+import json, os, signal, subprocess, sys, time
+op, qml = int(sys.argv[1]), sys.argv[2]
+for _ in range(400):
+    out = subprocess.run(["timeout", "2", "qs", "ipc", "-p", qml, "call", "files", "state"], capture_output=True, text=True).stdout
+    try:
+        if "of 96 MB" in json.loads(out)["op"]["progress"]:
+            break
+    except (ValueError, KeyError):
+        pass
+    os.kill(op, signal.SIGCONT)
+    time.sleep(0.0005)
+    os.kill(op, signal.SIGSTOP)
+PY
 check "a 96 MB copy shows its progress line ($(files_state | jq -c '[.op.say, .op.progress, .op.keys]'))" \
   files_is '(.op.say == "copying 1 file from ~/Pictures") and (.op.progress | test("^[0-9]+% · [0-9.]+ of 96 MB")) and .op.keys == "ctrl+c cancels"'
+wtype p
+until_ok 2000 files_is '.notice != ""'
+check "p while the copy runs says so and starts nothing ($(files_state | jq -c .notice))" files_is '.notice == "a copy is running; wait for it to finish" and .op.running'
 wtype -M ctrl c -m ctrl
 sleep 0.3
-kill -CONT "$(cat "$work/op.pid")"
+kill -CONT "$op"
 until_ok 5000 files_is '.op.running == false'
 check "ctrl+c cancels it, leaving no partial file ($(ls "$h/Downloads" | tr '\n' ' '))" \
   bash -c "[ ! -e '$h/Downloads/setup-1.4.2.AppImage' ] && ! ls '$h/Downloads' | grep -q AppImage"
@@ -158,7 +170,7 @@ open_files
 go down /Downloads
 copy_to_drive
 check "a copy onto a full drive stops on c.bin with the card up ($(files_state | jq -c '.op.card | {title, rows: [.rows[].state]}'))" \
-  files_is '.op.card.title == "FULLDRIVE is full" and ([.op.card.rows[].state] | .[0:2] == [.[0], .[1]] and (.[0] | startswith("copied")) and (.[1] | startswith("copied")) and .[2] == "stopped · partial removed" and (.[3] | startswith("not started")))'
+  files_is '.op.card.title == "FULLDRIVE is full" and ([.op.card.rows[].state] | (.[0] | startswith("copied")) and (.[1] | startswith("copied")) and .[2] == "stopped · partial removed" and (.[3] | startswith("not started")))'
 check "it reports 2 of 4 copied on the status line ($(files_state | jq -c .status))" files_is '.status.counts == "copy to FULLDRIVE stopped" and .status.at == "2 of 4 copied"'
 check "and leaves no partial c.bin ($(ls "$drive" | tr '\n' ' '))" bash -c "[ ! -e '$drive/c.bin' ]"
 wtype s
@@ -206,6 +218,31 @@ for t in artboard blueprint; do
   close_files
 done
 "$repo/bin/dots" theme paper >/dev/null
+
+# Thirty files onto the full drive: the card lists them in a scrolled list and stays inside the window.
+rm -f "$drive"/*.bin
+head -c "$free" /dev/zero >"$drive/fill.bin" 2>/dev/null
+mkdir -p "$h/Downloads/thirty"
+for i in $(seq -w 1 30); do head -c 4096 /dev/urandom >"$h/Downloads/thirty/t$i.bin"; done
+open_files
+go down /Downloads
+wtype /thirty
+wtype -k Return
+wtype l
+until_ok 3000 files_is '.listed and (.folder | endswith("/thirty")) and (.rows | length) == 30'
+for i in $(seq 30); do wtype -k space; done
+wtype y
+wtype -k Tab
+at=$(files_state | jq '.places | index("drives:FULLDRIVE")')
+for ((i = $(files_state | jq .placeAt); i < at; i++)); do wtype j; done
+wtype -k Return
+until_ok 3000 files_is --arg d "$drive" '.listed and .folder == $d'
+wtype p
+until_ok 8000 files_is '.op.card != null'
+check "a failure with 30 files keeps the card inside the window ($(files_state | jq -c '.op.card | {fits, title}'))" files_is '.op.card.fits and .op.card.title == "FULLDRIVE is full"'
+wtype -k Escape
+until_ok 5000 files_is '.op.running == false'
+close_files
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Files' log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"
