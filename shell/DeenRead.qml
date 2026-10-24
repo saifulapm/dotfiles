@@ -47,10 +47,15 @@ FocusScope {
 
     function openSurah(n) {
         deen.api(["api", "surah", String(n)], answer => {
+            // A surah that fails to open while another shows leaves that one on the page, with a note in the bar.
             if (!R.readable(answer)) {
-                page.failed = true;
+                if (page.surah)
+                    page.note = "Could not open surah " + n;
+                else
+                    page.failed = true;
                 return;
             }
+            page.failed = false;
             page.surah = answer;
             page.cursor = {
                 a: 1,
