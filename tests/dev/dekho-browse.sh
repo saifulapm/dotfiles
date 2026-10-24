@@ -93,6 +93,8 @@ check "f on The Long Tide opens Browse with Series, Drama and English as chips (
 check "and keeps the title's filter in state ($(dekho_state | jq -c .filter))" dekho_is '.filter == {"kind": "tv", "genre": "Drama", "language": "English"}'
 check "it asks for series in Drama, English ($(asked)) and draws the fake's answer ($(titles | jq -c '.[0:3]'))" \
   bash -c "[ \"\$(asked_since $mark)\" = 'api discover --kind tv --genre 18 --lang en' ] && drawn_matches $mark"
+check "each row draws its language and genres, as the board's last two columns ($(dekho_state | jq -c '.browse.rows[0] | [.title, .language, .genres]'))" \
+  dekho_is '.browse.rows[0] | .language == "English" and .genres == "Drama · Mystery"'
 check "the header reads where it came from and the chips are marked prefilled ($(dekho_state | jq -c '.browse | [.from, .prefilled]'))" \
   dekho_is '.browse.from == "from The Long Tide" and .browse.prefilled == "PREFILLED FROM THE LONG TIDE"'
 check "the facets read Popular, Drama, English and Any for the rest, and the kind tab Series ($(dekho_state | jq -c '[.browse.facets[] | .value]'))" \

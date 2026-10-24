@@ -623,6 +623,8 @@ FocusScope {
                                     title: rowCells.text(1),
                                     year: rowCells.text(2),
                                     rating: rowCells.text(3),
+                                    language: rowCells.text(4),
+                                    genres: rowCells.text(5),
                                     lines: rowCells.lines(1),
                                     elided: rowCells.elided(1),
                                     cursor: cursor,
@@ -641,7 +643,7 @@ FocusScope {
                                 anchors.fill: parent
                                 inverse: resultRow.cursor && !page.plain
                                 lit: resultRow.cursor && page.plain
-                                cells: [D.title(resultRow.modelData.title), String(resultRow.modelData.year || ""), "★ " + Number(resultRow.modelData.vote || 0).toFixed(1)]
+                                cells: [D.title(resultRow.modelData.title), String(resultRow.modelData.year || ""), "★ " + Number(resultRow.modelData.vote || 0).toFixed(1)].concat(page.words.hitCells(resultRow.modelData))
                             }
                         }
                     }
@@ -854,7 +856,7 @@ FocusScope {
         }
     }
 
-    // A row's cells: the poster's place, the title, its year and rating, as the board's grid lays them.
+    // A row's cells: the poster's place, the title, its year, rating, language and genres, as the board's grid lays them.
     component Columns: Item {
         id: columns
         property var cells: []
@@ -864,13 +866,13 @@ FocusScope {
         readonly property color soft: inverse ? page.onInk : page.c.muted ?? "gray"
 
         function text(i) {
-            return [null, titleCell, yearCell, ratingCell][i].text;
+            return [null, titleCell, yearCell, ratingCell, languageCell, genresCell][i].text;
         }
         function lines(i) {
-            return [null, titleCell, yearCell, ratingCell][i].lineCount;
+            return [null, titleCell, yearCell, ratingCell, languageCell, genresCell][i].lineCount;
         }
         function elided(i) {
-            return [null, titleCell, yearCell, ratingCell][i].truncated;
+            return [null, titleCell, yearCell, ratingCell, languageCell, genresCell][i].truncated;
         }
 
         RowLayout {
@@ -943,6 +945,30 @@ FocusScope {
                 font.family: page.bodyFont
                 font.pixelSize: columns.head ? (page.caps ? 10 : 11) : 12
                 font.letterSpacing: columns.head && !page.plain ? 1.4 : page.bracket ? 0.7 : 0
+            }
+            Text {
+                id: languageCell
+                Layout.preferredWidth: 110
+                textFormat: Text.PlainText
+                text: columns.cells[3] ?? ""
+                color: columns.soft
+                font.family: page.bodyFont
+                font.pixelSize: columns.head ? (page.caps ? 10 : 11) : 12
+                font.letterSpacing: columns.head && !page.plain ? 1.4 : page.bracket ? 0.7 : 0
+                elide: Text.ElideRight
+                maximumLineCount: 1
+            }
+            Text {
+                id: genresCell
+                Layout.preferredWidth: 180
+                textFormat: Text.PlainText
+                text: columns.cells[4] ?? ""
+                color: columns.soft
+                font.family: page.bodyFont
+                font.pixelSize: columns.head ? (page.caps ? 10 : 11) : 12
+                font.letterSpacing: columns.head && !page.plain ? 1.4 : page.bracket ? 0.7 : 0
+                elide: Text.ElideRight
+                maximumLineCount: 1
             }
         }
     }

@@ -44,7 +44,8 @@ case "${1:-} ${2:-}" in
     echo "{\"error\":\"unknown --lang \\\"$lang\\\"; try a code like \`bn\` or a name like \`Bangla\`\"}"
     exit 1
   fi
-  jq -c --arg kind "$kind" --arg sort "$sort" --arg genre "$genre" --arg lang "$lang" --arg rating "$rating" --arg year "$year" --arg person "$person" '
+  # A real hit names its language and genres, as the board's last two columns draw them.
+  jq -c --slurpfile langs "$fixtures/languages.json" --slurpfile genres "$fixtures/genres-${kind:-tv}.json" --arg kind "$kind" --arg sort "$sort" --arg genre "$genre" --arg lang "$lang" --arg rating "$rating" --arg year "$year" --arg person "$person" '
     ($year | split("-") | map(tonumber)) as $y
     | [.[] | select(.kind == $kind)
       | select($genre == "" or (.genre_ids | index($genre | tonumber)))
@@ -57,7 +58,9 @@ case "${1:-} ${2:-}" in
       elif $sort == "oldest" then sort_by(.year)
       elif $sort == "box-office" then sort_by(-.revenue)
       else . end
-    | {items: map(del(.lang, .genre_ids, .person_ids, .revenue)), page: 1, total_pages: 1}' "$fixtures/discover.json"
+    | {items: map(. as $h | .language = ([$langs[0].items[] | select(.code == $h.lang) | .name] | .[0] // "")
+        | .genres = [.genre_ids[] as $g | $genres[0].items[] | select(.id == $g) | .name]
+        | del(.lang, .genre_ids, .person_ids, .revenue)), page: 1, total_pages: 1}' "$fixtures/discover.json"
   ;;
 "api genres")
   case "$*" in

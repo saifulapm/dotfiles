@@ -143,7 +143,8 @@ export function browseText(voice) {
     clear: up('x clear all'),
     typing: 'typing…',
     person: voice === 'bracket' ? '[PERSON]' : 'Person',
-    columns: caps ? ['TITLE', 'YEAR', 'RATING'] : ['Title', 'Year', 'Rating'],
+    columns: caps ? ['TITLE', 'YEAR', 'RATING', 'LANGUAGE', 'GENRES'] : ['Title', 'Year', 'Rating', 'Language', 'Genres'],
+    hitCells: (hit) => [up(oneLine(hit.language || '')), up((hit.genres || []).map((g) => oneLine(g)).join(' · '))],
     pick: [['↵', 'add as a filter'], ['esc', 'close']],
     keys: [['f', 'filters'], ['s g l d r p', 'sort genre language decade rating person'], ['t', 'movies / series'], ['x', 'clear'], ['j/k', 'move'], ['↵', 'open'], ['esc', 'back']],
   };
