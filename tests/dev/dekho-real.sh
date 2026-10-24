@@ -118,9 +118,11 @@ note_session
 check "Enter on the release starts the unit and Starting draws the real events: $release, steps $steps" \
   test "$release|$steps" = "720p · 3.8 MB|Found 25 seeders|Connected to peers|Buffering the start of the file|mpv starts at 3.8 MB"
 check "dekho says playing, ${play_ms} ms after Enter ($(session_event playing))" \
-  dekho_is '.releases.playing.event == "playing" and .releases.playing.id == 900002 and .releases.mode == ""'
+  dekho_is '.releases.playing.event == "playing" and .releases.playing.id == 900002'
 until_ok 10000 mpv_up
 check "mpv opens its window by itself in the nested session ($(window_of mpv))" mpv_up
+until_ok 3000 dekho_is '.releases.mode == ""'
+check "and Starting, which waited on it, closes ($(dekho_state | jq -c .releases.mode))" dekho_is '.releases.mode == ""'
 check "the test unit $DOTS_DEKHO_UNIT runs it" unit_active
 
 # About 10 s of play, from the window's map.
