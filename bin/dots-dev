@@ -41,6 +41,8 @@ export DOTS_DNS=$repo/bin/dev-fake-dns
 export DOTS_NOTIFY_PHONE=$repo/bin/dev-fake-notify-phone
 # Taildrop's s picks files through a fake that reads DOTS_DEV_DIR/picked, since the nested bus has no portal.
 export DOTS_PICK_FILES=$repo/bin/dev-fake-pick-files
+# Dekho asks a fake that answers from dev/dekho's canned JSON and logs each call in the temp dir, never the real dekho, which reaches TMDB.
+export DOTS_DEKHO=$repo/bin/dev-fake-dekho
 # The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.
 export DOTS_NIRI_BINDS=$repo/home/dot_config/niri/binds.kdl
 # The lock's PAM service accepts only dev/pam-test-password's test password, and pam_exec needs its absolute path.

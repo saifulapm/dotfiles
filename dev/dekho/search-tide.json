@@ -1,0 +1,34 @@
+{
+ "items": [
+  {
+   "id": 101,
+   "kind": "tv",
+   "title": "The Long Tide",
+   "year": "2024",
+   "vote": 8.1,
+   "poster": "/p101.jpg",
+   "backdrop": "/b101.jpg",
+   "overview": "The Long Tide, a sample overview."
+  },
+  {
+   "id": 305,
+   "kind": "tv",
+   "title": "Low Tide Radio",
+   "year": "2023",
+   "vote": 7.3,
+   "poster": "/p305.jpg",
+   "backdrop": "/b305.jpg",
+   "overview": "Low Tide Radio, a sample overview."
+  },
+  {
+   "id": 406,
+   "kind": "movie",
+   "title": "Tide Tables",
+   "year": "2019",
+   "vote": 6.2,
+   "poster": "/p406.jpg",
+   "backdrop": "/b406.jpg",
+   "overview": "Tide Tables, a sample overview."
+  }
+ ]
+}

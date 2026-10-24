@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# just dev's dekho: answers the api verbs from the canned JSON in dev/dekho, so a nested check never reaches TMDB, and logs each call to DOTS_DEV_DIR/dekho.log.
+set -euo pipefail
+{
+[ -n "${DOTS_DEV_DIR:-}" ] || { echo "dev-fake-dekho: run it from a sourced just dev env" >&2; exit 1; }
+fixtures=$(dirname "$(realpath "$0")")/../dev/dekho
+echo "$*" >>"$DOTS_DEV_DIR/dekho.log"
+
+# The real dekho prints one compact JSON object on stdout.
+answer() { jq -c . "$fixtures/$1.json"; }
+
+case "${1:-} ${2:-}" in
+"api history")
+  answer history
+  ;;
+"api trending")
+  case "$*" in
+  *"--kind tv"*) answer trending-tv ;;
+  *"--kind movie"*) answer trending-movie ;;
+  *) echo "dev-fake-dekho: trending needs --kind tv or movie: $*" >&2; exit 2 ;;
+  esac
+  ;;
+"api search")
+  shift 2
+  if [ "${*,,}" = tide ]; then answer search-tide; else echo '{"items":[]}'; fi
+  ;;
+*)
+  echo "dev-fake-dekho: unknown command: $*" >&2
+  exit 2
+  ;;
+esac
+exit
+}
