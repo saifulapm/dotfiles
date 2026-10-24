@@ -175,7 +175,7 @@ status=$(shell_status) || die "status did not answer after the switches"
 switched_kib=$(jq -r .rssKiB <<<"$status")
 timers=$(jq -r .timers <<<"$status")
 
-# Files and Dekho are Apps, each its own qs process, started the way the desktop starts them and closed by window, before the idle window so they cannot skew idle cpu; bench_app <entry qml> <bin> <app id> sets app_first_frame (median of five), app_rss_kib (largest) and app_left (most left over).
+# Files, Dekho and Deen are Apps, each its own qs process, started the way the desktop starts them and closed by window, before the idle window so they cannot skew idle cpu; bench_app <entry qml> <bin> <app id> sets app_first_frame (median of five), app_rss_kib (largest) and app_left (most left over).
 bench_app() {
   local qml=$repo/shell/$1 bin=$repo/bin/$2 appid=$3 i kib left
   app_state() { timeout 0.5 qs ipc -p "$qml" call "$appid" state 2>/dev/null; }
@@ -215,6 +215,8 @@ bench_app() {
 }
 bench_app dekho.qml dots-dekho dekho
 dekho_first_frame=$app_first_frame dekho_rss_kib=$app_rss_kib dekho_left=$app_left
+bench_app deen.qml dots-deen deen
+deen_first_frame=$app_first_frame deen_rss_kib=$app_rss_kib deen_left=$app_left
 bench_app files.qml dots-files files
 
 "$(dirname "$0")/dots" theme blueprint >/dev/null || die "dots theme blueprint failed"
@@ -229,6 +231,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left"
 exit
 }

@@ -43,6 +43,8 @@ export DOTS_NOTIFY_PHONE=$repo/bin/dev-fake-notify-phone
 export DOTS_PICK_FILES=$repo/bin/dev-fake-pick-files
 # Dekho asks a fake that answers from dev/dekho's canned JSON and logs each call in the temp dir, never the real dekho, which reaches TMDB.
 export DOTS_DEKHO=$repo/bin/dev-fake-dekho
+# Deen asks a fake that answers from dev/deen's canned JSON, never the real deen, which reaches aladhan, quran.com's audio and the hadith CDN.
+export DOTS_DEEN=$repo/bin/dev-fake-deen
 # The nested niri includes the repo binds, so the cheat sheet reads them, never the live ones.
 export DOTS_NIRI_BINDS=$repo/home/dot_config/niri/binds.kdl
 # The lock's PAM service accepts only dev/pam-test-password's test password, and pam_exec needs its absolute path.

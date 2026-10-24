@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Deen
+GenericName=Quran, Duas and Prayer Times
+Comment=Read and memorise the Quran, find duas and hadith, and see prayer times
+Exec=dots-deen
+Icon=accessories-dictionary
+Terminal=false
+Categories=Education;
