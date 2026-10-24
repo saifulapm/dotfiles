@@ -643,7 +643,7 @@ FocusScope {
                                 anchors.fill: parent
                                 inverse: resultRow.cursor && !page.plain
                                 lit: resultRow.cursor && page.plain
-                                cells: [D.title(resultRow.modelData.title), String(resultRow.modelData.year || ""), "★ " + Number(resultRow.modelData.vote || 0).toFixed(1)].concat(page.words.hitCells(resultRow.modelData))
+                                cells: [D.title(resultRow.modelData.title), String(resultRow.modelData.year || ""), D.stars(resultRow.modelData.vote)].concat(page.words.hitCells(resultRow.modelData))
                             }
                         }
                     }

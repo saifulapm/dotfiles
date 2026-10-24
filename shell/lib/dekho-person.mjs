@@ -1,4 +1,5 @@
 // The Person page's words and choices: life years, credits split by role, and each board's wording.
+import { stars } from './dekho.mjs';
 import { oneLine } from './picker.mjs';
 
 const upper = (voice, s) => (voice === 'plain' ? s : s.toUpperCase());
@@ -21,7 +22,7 @@ const roleLine = (key, role) => {
 
 // The credits by role, a role with none left out.
 export function groups(credits) {
-  return ORDER.map((key) => ({ key, rows: ((credits || {})[key] || []).map((h) => Object.assign({}, h, { titleText: oneLine(h.title), roleText: roleLine(key, h.role), voteText: `★ ${Number(h.vote || 0).toFixed(1)}` })) }))
+  return ORDER.map((key) => ({ key, rows: ((credits || {})[key] || []).map((h) => Object.assign({}, h, { titleText: oneLine(h.title), roleText: roleLine(key, h.role), voteText: stars(h.vote) })) }))
     .filter((g) => g.rows.length)
     .map((g) => Object.assign(g, { count: g.rows.length }));
 }

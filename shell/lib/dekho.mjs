@@ -14,3 +14,6 @@ export function answer(text) {
   }
   return a && typeof a === 'object' && !Array.isArray(a) ? a : null;
 }
+
+// TMDB gives 0 to a title nobody has voted on, which would read as the worst rating, so it reads nothing.
+export const stars = (vote) => (Number(vote) > 0 ? `★ ${Number(vote).toFixed(1)}` : '');

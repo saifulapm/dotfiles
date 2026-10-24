@@ -29,6 +29,8 @@ FocusScope {
     property string asked: ""
     property string row: "continue"
     property int col: 0
+    // Set by the first key that moves the cursor; until then it follows the first row with titles.
+    property bool moved: false
     // How each trending answer came: fresh, a stale copy the backend saved (dated by seriesSaved and moviesSaved), or an error with nothing to show.
     property string seriesKind: "fresh"
     property string moviesKind: "fresh"
@@ -56,6 +58,7 @@ FocusScope {
     }
 
     function moveRow(by) {
+        moved = true;
         const names = rowNames;
         if (names.length === 0)
             return;
@@ -66,6 +69,7 @@ FocusScope {
     }
 
     function moveCol(by) {
+        moved = true;
         col = Math.max(0, Math.min(itemsOf(row).length - 1, col + by));
         stripOf(row).reveal(col);
     }
@@ -176,9 +180,9 @@ FocusScope {
 
     Component.onCompleted: reload()
 
-    // The cursor lands on the first row that has titles, once one does.
-    onRowNamesChanged: if (!searching && rowNames.indexOf(row) < 0 && rowNames.length)
-        row = rowNames[0]
+    // The trending rows land in either order, so the cursor follows the first row with titles until a key moves it.
+    onRowNamesChanged: if (!searching)
+        row = H.cursorRow(rowNames, row, moved)
 
     Item {
         id: rowKeys

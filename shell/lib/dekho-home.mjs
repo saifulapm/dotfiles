@@ -1,4 +1,5 @@
 // Home's words: a continued title's episode or length and the time left, a trending title's year and rating, in each theme's voice.
+import { stars } from './dekho.mjs';
 import { pad2 } from './margins.mjs';
 
 const clock = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)}h ${pad2(min % 60)}`);
@@ -16,7 +17,7 @@ export function continueLine(voice, item) {
 }
 
 export function hitLine(hit) {
-  return [hit.year, `★ ${Number(hit.vote || 0).toFixed(1)}`].filter((p) => p).join(' · ');
+  return [hit.year, stars(hit.vote)].filter((p) => p).join(' · ');
 }
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -61,4 +62,10 @@ export function homeText(voice) {
     offlineKeys: [['r', 'retry'], ['h/j/k/l', 'move'], ['↵', 'open'], ['esc', 'close']],
     keys: [['h/j/k/l', 'move'], ['↵', 'open'], ['/', 'search'], ['f', 'filters: genre, language, person…'], ['tab', 'next row'], ['esc', 'close']],
   };
+}
+
+// The cursor's row as answers land: the first row with titles until a key has moved it, then where it was while that row still has titles.
+export function cursorRow(names, row, moved) {
+  if (names.length === 0) return row;
+  return moved && names.includes(row) ? row : names[0];
 }

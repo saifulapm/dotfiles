@@ -1,4 +1,5 @@
 // The Title page's words and choices: which episode is next up, how a date and the watched count read, which crew to name, in each theme's voice.
+import { stars } from './dekho.mjs';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const upper = (voice, s) => (voice === 'bracket' ? s.toUpperCase() : s);
@@ -53,7 +54,7 @@ export function metaText(voice, title) {
   const ended = tv && title.in_production === false && title.last_air;
   const years = tv ? `${title.year} –${ended ? ` ${title.last_air.slice(0, 4)}` : ''}` : title.year;
   const length = !min ? '' : tv ? `${min} min episodes` : clock(min);
-  return [years, `★ ${Number(title.vote || 0).toFixed(1)}`, upper(voice, length)].filter((p) => p).join(' · ');
+  return [years, stars(title.vote), upper(voice, length)].filter((p) => p).join(' · ');
 }
 
 export const episodeLength = (voice, secs) => (secs ? upper(voice, `${Math.round(secs / 60)} min`) : '');

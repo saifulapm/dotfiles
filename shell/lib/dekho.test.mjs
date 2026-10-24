@@ -18,3 +18,11 @@ test('the backend\'s answer is its one JSON object, or null for anything else', 
   assert.equal(D.answer('error: no network'), null);
   assert.equal(D.answer('[1,2]'), null);
 });
+
+// TMDB gives 0 to a title nobody has voted on yet, which would read as the worst rating (#2EW5X9NG).
+test('a rating reads a star and one decimal, and no votes read nothing', () => {
+  assert.equal(D.stars(8.43), '★ 8.4');
+  assert.equal(D.stars(7), '★ 7.0');
+  assert.equal(D.stars(0), '');
+  assert.equal(D.stars(undefined), '');
+});

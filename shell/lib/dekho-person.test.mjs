@@ -35,9 +35,9 @@ test('an acting role reads "as <character>", another group names its job, and a 
   assert.equal(g[1].rows[1].roleText, '');
 });
 
-test('a vote reads a star and one decimal, and none reads 0.0', () => {
+test('a vote reads a star and one decimal, and none reads nothing', () => {
   const g = P.groups({ directing: [hit(1, 'tv', 'A', '2024', 8.1, 'Director'), hit(2, 'tv', 'B', '2024', undefined, 'Director')] });
-  assert.deepEqual(g[0].rows.map((r) => r.voteText), ['★ 8.1', '★ 0.0']);
+  assert.deepEqual(g[0].rows.map((r) => r.voteText), ['★ 8.1', '']);
 });
 
 test('a group with no credits is left out, and a missing credits object gives none', () => {

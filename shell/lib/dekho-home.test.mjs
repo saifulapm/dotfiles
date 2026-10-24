@@ -30,6 +30,7 @@ test('a trending title reads its year and its rating to one decimal', () => {
   assert.equal(H.hitLine({ year: '2026', vote: 8.43 }), '2026 · ★ 8.4');
   assert.equal(H.hitLine({ year: '2024', vote: 7 }), '2024 · ★ 7.0');
   assert.equal(H.hitLine({ year: '', vote: 6.5 }), '★ 6.5');
+  assert.equal(H.hitLine({ year: '2026', vote: 0 }), '2026');
 });
 
 test('the saved date is the answer\'s age before now, in local time, as the boards write it', () => {
@@ -64,4 +65,14 @@ test('the offline words follow each board: the date in the row mark, the retry k
   assert.equal(H.homeText('plain').unreachable, 'TMDB is unreachable.');
   assert.equal(H.homeText('plain').showing(day), 'Showing saved rows from 21 Oct 18:40.');
   assert.equal(H.homeText('plain').showing(null), '');
+});
+
+// Trending series and movies are asked at once and land in either order (#VQDTEX0S).
+test('until a key moves it, the cursor is on the first row with titles in Home order, whichever answer lands first', () => {
+  assert.equal(H.cursorRow(['movies'], 'continue', false), 'movies');
+  assert.equal(H.cursorRow(['series', 'movies'], 'movies', false), 'series');
+  assert.equal(H.cursorRow(['continue', 'series', 'movies'], 'series', false), 'continue');
+  assert.equal(H.cursorRow(['series', 'movies'], 'movies', true), 'movies');
+  assert.equal(H.cursorRow(['series'], 'movies', true), 'series');
+  assert.equal(H.cursorRow([], 'continue', false), 'continue');
 });

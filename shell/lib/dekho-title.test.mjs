@@ -70,6 +70,7 @@ test('the lines under the title read its years, rating and episode length, and i
   assert.equal(T.sideText('bracket', show), 'DRAMA · MYSTERY · 4 SEASONS');
   assert.equal(T.metaText('caps', { kind: 'tv', year: '2019', vote: 7, runtime: 2700, in_production: false, last_air: '2021-05-02' }), '2019 – 2021 · ★ 7.0 · 45 min episodes');
   assert.equal(T.metaText('plain', { kind: 'movie', year: '2026', vote: 7.8, runtime: 6720 }), '2026 · ★ 7.8 · 1h 52');
+  assert.equal(T.metaText('plain', { kind: 'movie', year: '2026', vote: 0, runtime: 6720 }), '2026 · 1h 52');
 });
 
 test('each board writes the next-up tag its own way', () => {
