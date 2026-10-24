@@ -156,6 +156,16 @@ url = "https://github.com/eraserhd/kak-ansi/archive/{version}.tar.gz"
 sha256 = "ce94c3c3e9ec611404930afa7a19e80f1de445bd65442a78070e2c3effe7cc44"
 
 [[pin]]
+name = "libinput-gestures"
+version = "87e81bbec9dc3599653612a0ba560af1ba2989e5"
+repo = "bulletmark/libinput-gestures"
+track = "commit"
+install = "~/.local/bin/libinput-gestures, the touchpad pinches niri cannot bind"
+runs = "libinput-gestures --help >/dev/null"
+url = "https://github.com/bulletmark/libinput-gestures/archive/{version}.tar.gz"
+sha256 = "55e0c5d9f5de5409ab083a599f6c3f2ce6c1dce4bb8f4ca9420aecd09941b5cf"
+
+[[pin]]
 name = "cliairplay"
 version = "0.5.9"
 repo = "music-assistant/airplay-cli"

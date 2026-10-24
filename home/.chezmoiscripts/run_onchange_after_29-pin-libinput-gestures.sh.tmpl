@@ -1,0 +1,10 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "libinput-gestures") }}
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+mkdir -p "$HOME/.local/bin"
+install -m 0755 "$pin_tmp/libinput-gestures-$pin_version/libinput-gestures" "$HOME/.local/bin/libinput-gestures" || die "pin $pin_name: could not install libinput-gestures"
+# A running watcher keeps the old script until it restarts.
+systemctl --user try-restart libinput-gestures.service 2>/dev/null || true
+pin_done
