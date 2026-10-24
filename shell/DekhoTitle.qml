@@ -51,13 +51,16 @@ FocusScope {
     readonly property var zones: (tv ? ["seasons", "episodes"] : []).concat(crew.length ? ["crew"] : [], cast.length ? ["cast"] : [])
 
     signal search
+    // Enter chose an episode, or the movie: the release list opens over this page.
+    signal release(var target)
 
     function load(h) {
         entry = h;
         detail = null;
         bySeason = {};
         season = 0;
-        zone = h.kind === "tv" ? "episodes" : "crew";
+        // A movie opens on no person, so Enter chooses its release and tab reaches the people.
+        zone = h.kind === "tv" ? "episodes" : "";
         row = 0;
         crewCol = 0;
         castCol = 0;
@@ -126,12 +129,31 @@ FocusScope {
 
     function choose() {
         const ep = items[row];
-        if (zone === "episodes" && ep && T.aired(ep, today))
+        if (zone === "episodes" && ep && T.aired(ep, today)) {
             chose = {
                 season: ep.season,
                 episode: ep.episode
             };
-        else if (zone === "crew" && crew[crewCol])
+            release({
+                id: page.entry.id,
+                kind: "tv",
+                title: shown.title,
+                season: ep.season,
+                episode: ep.episode,
+                name: ep.name,
+                air_date: ep.air_date
+            });
+        } else if (!tv && zone === "") {
+            chose = {
+                season: null,
+                episode: null
+            };
+            release({
+                id: page.entry.id,
+                kind: shown.kind,
+                title: shown.title
+            });
+        } else if (zone === "crew" && crew[crewCol])
             person = crew[crewCol].id;
         else if (zone === "cast" && cast[castCol])
             person = cast[castCol].id;

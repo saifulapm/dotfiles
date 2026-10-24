@@ -30,6 +30,9 @@ FocusScope {
     property string row: "continue"
     property int col: 0
 
+    // Enter on a title to continue plays it from where it stopped, with no release list.
+    signal resume(var item)
+
     readonly property var rowNames: searching ? ["results"] : ["continue", "series", "movies"].filter(r => itemsOf(r).length > 0)
 
     function itemsOf(name) {
@@ -156,7 +159,9 @@ FocusScope {
                 home.moveCol(-1);
             else if (k === Qt.Key_Return || k === Qt.Key_Enter) {
                 const item = home.itemsOf(home.row)[home.col];
-                if (item)
+                if (item && home.row === "continue")
+                    home.resume(item);
+                else if (item)
                     home.dekho.openTitle(item);
             } else
                 return;

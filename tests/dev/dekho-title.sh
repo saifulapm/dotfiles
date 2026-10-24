@@ -72,6 +72,9 @@ until_ok 1000 dekho_is '.title.cursor == 4'
 wtype -k Return
 until_ok 1000 dekho_is '.chose != null'
 check "Enter on E4, next up, chooses it for a release ($(dekho_state | jq -c .chose))" dekho_is '.chose == {"season": 3, "episode": 4}'
+# Enter opened the release list over the page; esc closes it before the Title page's own keys.
+wtype -k Escape
+until_ok 1000 dekho_is '.page == "title" and .releases.mode == ""'
 
 wtype w
 until_ok 3000 dekho_is '.title.episodes[3].watched'

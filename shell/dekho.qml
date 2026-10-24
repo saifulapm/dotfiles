@@ -134,7 +134,7 @@ ShellRoot {
                 opened: app.opened
             }, home.state(), titlePage.state(),
             // t8: releases state
-            {},
+            releases.state(),
             // t9: browse state
             browsePage.state(),
             // t10: person state
@@ -182,6 +182,27 @@ ShellRoot {
         }
 
         // t8: releases and starting
+        DekhoReleases {
+            id: releases
+            anchors.fill: parent
+            dekho: app
+            onSearch: {
+                app.back();
+                home.focusSearch();
+            }
+        }
+        Connections {
+            target: titlePage
+            function onRelease(t) {
+                releases.choose(t, titlePage);
+            }
+        }
+        Connections {
+            target: home
+            function onResume(item) {
+                releases.resume(item, home);
+            }
+        }
 
         // t9: browse
         DekhoBrowse {
