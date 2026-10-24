@@ -41,6 +41,14 @@ test('the everyday CLI tools are declared for every arch, and eza is not', () =>
   assert.equal(byName.has('eza'), false);
 });
 
+// The shell, Chromium and the clipboard endpoint use these, and a minimal Fedora need not have them.
+test('what the shell and Chromium call is declared, not left to the base image', () => {
+  for (const name of ['upower', 'power-profiles-daemon', 'ddcutil', 'pipewire-pulseaudio', 'pandoc-cli']) {
+    assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
+    assert.match(byName.get(name).why, /\w/, `${name} why`);
+  }
+});
+
 // Fedora's ffmpeg-free also answers to "ffmpeg", so a plain dnf install of it succeeds without RPM Fusion's build.
 test('ffmpeg comes from RPM Fusion free', () => {
   assert.equal(byName.get('ffmpeg')?.rpmfusion, 'free');

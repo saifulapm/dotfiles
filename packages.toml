@@ -628,6 +628,31 @@ arch = "all"
 why = "bt-agent, which answers Bluetooth pairing for Control"
 
 [[package]]
+name = "upower"
+arch = "all"
+why = "the battery the margin and Control's Power section read"
+
+[[package]]
+name = "power-profiles-daemon"
+arch = "all"
+why = "the power profile Control's Power section switches"
+
+[[package]]
+name = "ddcutil"
+arch = "all"
+why = "an external monitor's brightness, from Control's Display section"
+
+[[package]]
+name = "pipewire-pulseaudio"
+arch = "all"
+why = "the PulseAudio API Chromium plays sound through"
+
+[[package]]
+name = "pandoc-cli"
+arch = "all"
+why = "turns the rich text an iPhone posts to the clipboard endpoint into plain text"
+
+[[package]]
 name = "rustup"
 arch = "all"
 why = "rustup-init, which installs the per-user toolchain into ~/.cargo/bin"
