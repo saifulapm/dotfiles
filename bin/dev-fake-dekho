@@ -20,6 +20,55 @@ case "${1:-} ${2:-}" in
   *) echo "dev-fake-dekho: trending needs --kind tv or movie: $*" >&2; exit 2 ;;
   esac
   ;;
+"api discover")
+  # Filters the fixture catalog as TMDB would, then prints only the fields a real hit carries.
+  shift 2
+  kind='' sort=popular genre='' lang='' rating='' year='' person=''
+  while [ $# -gt 0 ]; do
+    case $1 in
+    --kind) kind=$2 ;; --sort) sort=$2 ;; --genre) genre=$2 ;; --lang) lang=$2 ;;
+    --min-rating) rating=$2 ;; --year) year=$2 ;; --person) person=$2 ;; --page) ;;
+    *) echo "dev-fake-dekho: unknown discover flag: $1" >&2; exit 2 ;;
+    esac
+    shift 2
+  done
+  if [ "$kind" = tv ] && [ "$sort" = box-office ]; then
+    echo '{"error":"--sort box-office only applies to movies"}'
+    exit 1
+  fi
+  if [ -n "$lang" ] && ! jq -e --arg l "$lang" 'any(.items[]; .code == $l)' "$fixtures/languages.json" >/dev/null; then
+    echo "{\"error\":\"unknown --lang \\\"$lang\\\"; try a code like \`bn\` or a name like \`Bangla\`\"}"
+    exit 1
+  fi
+  jq -c --arg kind "$kind" --arg sort "$sort" --arg genre "$genre" --arg lang "$lang" --arg rating "$rating" --arg year "$year" --arg person "$person" '
+    ($year | split("-") | map(tonumber)) as $y
+    | [.[] | select(.kind == $kind)
+      | select($genre == "" or (.genre_ids | index($genre | tonumber)))
+      | select($lang == "" or .lang == $lang)
+      | select($rating == "" or .vote >= ($rating | tonumber))
+      | select($year == "" or ((.year | tonumber) >= $y[0] and (.year | tonumber) <= ($y[1] // $y[0])))
+      | select($person == "" or (.person_ids | index($person | tonumber)))]
+    | if $sort == "top-rated" then sort_by(-.vote)
+      elif $sort == "newest" then sort_by(.year) | reverse
+      elif $sort == "oldest" then sort_by(.year)
+      elif $sort == "box-office" then sort_by(-.revenue)
+      else . end
+    | {items: map(del(.lang, .genre_ids, .person_ids, .revenue)), page: 1, total_pages: 1}' "$fixtures/discover.json"
+  ;;
+"api genres")
+  case "$*" in
+  *"--kind tv"*) answer genres-tv ;;
+  *"--kind movie"*) answer genres-movie ;;
+  *) echo '{"error":"genres needs --kind movie or tv"}'; exit 1 ;;
+  esac
+  ;;
+"api languages")
+  answer languages
+  ;;
+"api people")
+  shift 2
+  jq -c --arg q "${*,,}" '{items: [.items[] | select(.name | ascii_downcase | contains($q))]}' "$fixtures/people.json"
+  ;;
 "api search")
   shift 2
   if [ "${*,,}" = tide ]; then answer search-tide; else echo '{"items":[]}'; fi
