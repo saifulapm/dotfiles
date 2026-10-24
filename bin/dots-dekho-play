@@ -48,9 +48,13 @@ esac
 mkdir -p "$runtime"
 stop_wait
 printf '%s\n' "$session" >"$current"
-# The unit gets the user manager's environment, not this one's, so a nested check's fake gets its dir passed on.
+# The unit gets the user manager's environment, not this one's, so whatever dekho reads (its hosts, key and dirs, and the display mpv opens on) is passed on by name when set, as is a nested check's fake dir.
+pass=()
+for name in $(compgen -e); do
+  case $name in DEKHO_* | TMDB_API_KEY | XDG_CONFIG_HOME | XDG_CACHE_HOME | XDG_STATE_HOME | MPV_HOME | WAYLAND_DISPLAY | DOTS_DEV_DIR) pass+=("--setenv=$name") ;; esac
+done
 exec systemd-run --user --collect --quiet --unit "$unit" \
-  ${DOTS_DEV_DIR:+--setenv=DOTS_DEV_DIR} \
+  "${pass[@]}" \
   -p "StandardOutput=truncate:$session" -p "StandardError=append:$log" \
   -- "${DOTS_DEKHO:-dekho}" play --json "$@"
 exit
