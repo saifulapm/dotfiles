@@ -130,3 +130,15 @@ test('nothing in Deen records audio or opens the microphone', () => {
   const banned = /pw-record|parecord|arecord|voxtype|whisper|MediaDevices|AudioInput|CaptureSession|MediaRecorder/;
   for (const f of files) assert.doesNotMatch(readFileSync(f, 'utf8'), banned, f);
 });
+
+// An Again card is due in 10 minutes, so a page left open on "done" must ask for the deck again then (review of m36).
+test('the page knows when its first rated card comes back, and reloads once that time has passed', () => {
+  const t = 1_700_000_000_000;
+  assert.equal(M.backAt(null, t, { due_in_days: 600 / 86400 }), t + 600_000);
+  assert.equal(M.backAt(t + 600_000, t + 1000, { due_in_days: 1 }), t + 600_000);
+  assert.equal(M.backAt(null, t, null), null);
+  assert.equal(M.reloadNow('done', t + 600_000, t + 599_999), false);
+  assert.equal(M.reloadNow('done', t + 600_000, t + 600_000), true);
+  assert.equal(M.reloadNow('card', t + 600_000, t + 700_000), false);
+  assert.equal(M.reloadNow('done', null, t), false);
+});

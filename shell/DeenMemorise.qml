@@ -31,6 +31,8 @@ FocusScope {
     property bool surahsAsked: false
     // The number of the deck being asked for; an older answer is dropped.
     property int asked: 0
+    // When the first card rated on this page comes back, in ms; the page asks for the deck again then.
+    property var back: null
 
     readonly property var head: session ? M.current(session) : null
     readonly property string status: failed ? "failed" : !session ? "loading" : head ? "card" : session.rated > 0 ? "done" : "empty"
@@ -68,6 +70,7 @@ FocusScope {
             if (mine !== page.asked)
                 return;
             page.saving = false;
+            page.back = M.backAt(page.back, Date.now(), answer);
             const after = M.rate(page.session, answer);
             page.unsaved = after === null;
             if (after === null)
@@ -113,6 +116,19 @@ FocusScope {
             },
             keys: keyStrip.drawn()
         };
+    }
+
+    // A page left open on "done" shows an Again card again when it is due.
+    Tick {
+        interval: 15000
+        repeat: true
+        running: page.visible && page.status === "done" && page.back !== null
+        onTriggered: {
+            if (!M.reloadNow(page.status, page.back, Date.now()))
+                return;
+            page.back = null;
+            page.load();
+        }
     }
 
     Component.onCompleted: load()

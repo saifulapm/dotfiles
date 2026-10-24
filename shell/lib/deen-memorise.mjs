@@ -88,3 +88,13 @@ export function words(voice) {
     unsaved: t('Could not save that rating. Try again.'),
   };
 }
+
+// When the first card rated so far comes back, in ms since the epoch; a grade that did not save changes nothing.
+export function backAt(prev, now, graded) {
+  if (!graded || typeof graded.due_in_days !== 'number') return prev;
+  const at = now + Math.round(graded.due_in_days * 86400000);
+  return prev === null ? at : Math.min(prev, at);
+}
+
+// A page that has rated every card asks for the deck again once a rated card is due, so an Again card shows ten minutes on.
+export const reloadNow = (status, at, now) => status === 'done' && at !== null && now >= at;

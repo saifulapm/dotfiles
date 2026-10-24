@@ -44,8 +44,9 @@ until_ok 5000 deen_up
 check "Deen opens ($(deen_windows) window)" deen_up
 
 # The deck and the surah names are asked for when the App opens, so the page is ready.
-check "the deck is asked for with a limit of 40 and the surah names once" \
-  bash -c "grep -cxF 'hifz due --limit 40' '$calls' | grep -qx 1 && grep -cxF 'api surahs' '$calls' | grep -qx 1"
+# Read asks for the surah names as well, so they are asked for at least once here.
+check "the deck is asked for once with a limit of 40, and the surah names" \
+  bash -c "grep -cxF 'hifz due --limit 40' '$calls' | grep -qx 1 && grep -qxF 'api surahs' '$calls'"
 
 wtype -k Shift_L
 wtype -k Tab
