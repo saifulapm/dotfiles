@@ -87,6 +87,8 @@ until_ok 1000 dekho_is '.page == "person"'
 # Tomas Eze, the writer: no portrait, dead, one group.
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "title"'
+check "esc from her page comes back to The Long Tide, not the credit opened from it, with the cursor on her ($(dekho_state | jq -c '[.title.tmdbId, .title.zone]'))" \
+  dekho_is '.title.tmdbId == 101 and .title.zone == "crew"'
 wtype l
 wtype -k Return
 until_ok 3000 person_loaded

@@ -36,6 +36,10 @@ ShellRoot {
     }
 
     function open(page, args) {
+        // Leaving a Title page keeps it, since a credit's title opened further on reloads the one shared page.
+        const top = stack[stack.length - 1];
+        if (top && top.page === "title")
+            top.title = titlePage.snapshot();
         stack = stack.concat([
             {
                 page: page,
@@ -45,10 +49,12 @@ ShellRoot {
     }
 
     function back() {
-        if (stack.length > 1)
-            stack = stack.slice(0, -1);
-        else
-            quit();
+        if (stack.length <= 1)
+            return quit();
+        stack = stack.slice(0, -1);
+        const top = stack[stack.length - 1];
+        if (top.page === "title" && top.title && top.title.entry !== titlePage.entry)
+            titlePage.restore(top.title);
     }
 
     // Runs `dekho <args>` off the render loop and hands done its one JSON answer, or null when it failed.

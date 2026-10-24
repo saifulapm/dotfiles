@@ -54,6 +54,36 @@ FocusScope {
     // Enter chose an episode, or the movie: the release list opens over this page.
     signal release(var target)
 
+    // The router keeps one Title page, so a title opened from a person's credits replaces this one; it keeps what was drawn and where the cursor was, to come back to.
+    function snapshot() {
+        return {
+            entry: entry,
+            detail: detail,
+            bySeason: bySeason,
+            season: season,
+            zone: zone,
+            row: row,
+            crewCol: crewCol,
+            castCol: castCol,
+            image: image,
+            today: today
+        };
+    }
+
+    function restore(s) {
+        asked = s.entry.kind + " " + s.entry.id;
+        entry = s.entry;
+        detail = s.detail;
+        bySeason = s.bySeason;
+        season = s.season;
+        zone = s.zone;
+        row = s.row;
+        crewCol = s.crewCol;
+        castCol = s.castCol;
+        image = s.image;
+        today = s.today;
+    }
+
     function load(h) {
         entry = h;
         detail = null;
