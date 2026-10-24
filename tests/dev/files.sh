@@ -33,7 +33,7 @@ files_pids() {
 }
 no_files_process() { [ -z "$(files_pids)" ]; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command, dots-files, through niri.
-mod_y() { niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files 2>>'$log'"; }
+mod_y() { niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"; }
 
 mod_y
 until_ok 5000 files_up

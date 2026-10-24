@@ -51,7 +51,7 @@ share_to() {
 }
 cp_log() { cat "$ts_dir/cp.log" 2>/dev/null; }
 
-niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files 2>>'$log'"
+niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"
 until_ok 5000 files_up
 in_theme paper
 wtype -k space -k space -k space

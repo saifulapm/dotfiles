@@ -27,7 +27,7 @@ files_state() { timeout 0.5 qs ipc -p "$files_qml" call files state 2>/dev/null;
 files_is() { files_state | jq -e "$@" >/dev/null 2>&1; }
 files_up() { files_is '.firstFrameMs != null'; }
 files_gone() { [ "$(niri msg -j windows | jq '[.[] | select(.app_id == "files")] | length')" = 0 ]; }
-mod_y() { niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files 2>>'$log'"; }
+mod_y() { niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"; }
 ow() { files_state | jq -c ".openWith$1"; }
 # Moves the list's cursor to the app with this desktop id.
 to_app() {

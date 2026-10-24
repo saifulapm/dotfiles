@@ -28,7 +28,7 @@ files_state() { timeout 2 qs ipc -p "$files_qml" call files state 2>/dev/null; }
 files_is() { files_state | jq -e "$@" >/dev/null 2>&1; }
 focused() { niri msg -j windows | jq -e 'any(.[]; .app_id == "files" and .is_focused)' >/dev/null; }
 open_files() {
-  niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files 2>>'$log'"
+  niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"
   until_ok 8000 files_is '.listed and .firstFrameMs != null'
   until_ok 3000 focused
 }

@@ -18,7 +18,7 @@ files_is() { files_state | jq -e "$@" >/dev/null 2>&1; }
 # The nested session's XDG_DATA_HOME is a temp dir, so this is its own trash, never the live one.
 trashed() { trash-list 2>/dev/null | grep -c "$h/Downloads/$1\$"; }
 
-niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files 2>>'$log'"
+niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"
 until_ok 5000 files_is '.listed and .firstFrameMs != null'
 # Keys typed before niri focuses the new window go nowhere.
 until_ok 3000 bash -c "niri msg -j windows | jq -e 'any(.[]; .app_id == \"files\" and .is_focused)' >/dev/null"

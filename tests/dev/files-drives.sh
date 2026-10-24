@@ -36,7 +36,7 @@ mounted() { findmnt -n "$mnt" >/dev/null; }
 listed() { files_is '.places | index("drives:TESTUSB") != null'; }
 unlisted() { files_is '.places | index("drives:TESTUSB") == null'; }
 
-niri msg action spawn -- sh -c "unset DBUS_SYSTEM_BUS_ADDRESS; HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files 2>>'$log'"
+niri msg action spawn -- sh -c "unset DBUS_SYSTEM_BUS_ADDRESS; HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"
 until_ok 5000 files_up
 in_theme paper
 echo "     USER=$USER, the drives folder is $mnt"
