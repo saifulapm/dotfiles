@@ -1,4 +1,4 @@
-// Root steps v1 had and v2 brings back: ydotoold with its uinput rule, and swap with zswap on zstd.
+// Root steps v1 had and v2 brings back: ydotoold with its uinput rule, swap with zswap on zstd, and tailscaled enabled.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -95,4 +95,11 @@ test('the tailnet, and only the tailnet, reaches tailscale serve on 8443 through
   }
   assert.match(script, /root firewall-cmd -q --add-rich-rule="\$rule" && root firewall-cmd -q --permanent --add-rich-rule="\$rule"/);
   assert.doesNotMatch(script, /--add-port|--add-interface|trusted/);
+});
+
+// Fedora's preset leaves tailscaled off, and `tailscale up` cannot reach a daemon that is not running.
+test('tailscaled is enabled at install and started where systemd runs', () => {
+  const script = read('home/.chezmoiscripts/run_onchange_after_18-tailscale.sh.tmpl');
+  assert.match(script, /^root systemctl enable tailscaled\.service .*\|\| die /m);
+  assert.match(script, /root systemctl start tailscaled\.service .*\|\| log /);
 });

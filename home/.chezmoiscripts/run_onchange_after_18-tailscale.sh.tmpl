@@ -1,0 +1,5 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+# Fedora's preset leaves tailscaled off, so `tailscale up` would find no daemon to talk to.
+root systemctl enable tailscaled.service >/dev/null 2>&1 || die "could not enable tailscaled"
+root systemctl start tailscaled.service 2>/dev/null || log "tailscaled starts at the next boot"
