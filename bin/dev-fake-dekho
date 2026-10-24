@@ -120,7 +120,7 @@ case "${1:-} ${2:-}" in
   esac
   ;;
 "play --json")
-  # The Starting events contract over about 3 s, then a sleep stands in for mpv until the unit is stopped.
+  # The Starting events contract over about 3 s, then dev/fake-mpv.qml stands in for mpv until the unit is stopped.
   emit() { printf '%s\n' "$1"; sleep 0.35; }
   # With DOTS_DEV_DIR/dekho-play-fails present the play fails before it plays: the file's text is the error's, then the backend exits 1.
   if [ -f "$DOTS_DEV_DIR/dekho-play-fails" ]; then
@@ -137,7 +137,9 @@ case "${1:-} ${2:-}" in
   done
   emit "{\"event\":\"ready\",\"rate_bps\":31876710,\"buffered\":$((108 * mb)),\"cached\":false}"
   printf '%s\n' '{"event":"playing","title":"The Long Tide","kind":"tv","id":101,"resumed_at":0,"bitrate":4000000}'
-  exec sleep infinity
+  # mpv maps its window a while after playing; the stand-in runs in place of the backend, so it lives and dies with the unit, and keeps its output out of the session file.
+  sleep 1.5
+  exec env -u QS_CONFIG_PATH qs -p "$fixtures/../fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1
   ;;
 "api person")
   # Only the ids with a fixture are known people, as TMDB knows only its own.

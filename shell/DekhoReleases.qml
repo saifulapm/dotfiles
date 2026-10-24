@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import QtQuick.Shapes
 import "lib/dekho.mjs" as D
 import "lib/dekho-releases.mjs" as R
+import "lib/dekho-starting.mjs" as S
 
 // The release list over the page it was opened from, the no-releases card, and Starting while a playback buffers in its own user unit.
 FocusScope {
@@ -41,6 +42,8 @@ FocusScope {
     // The last playing event, kept for checks once Starting has gone.
     property var playing: null
     readonly property var st: R.starting(events)
+    // Played, and Starting waits on mpv's window, which can take up to a minute to map.
+    readonly property bool opening: mode === "starting" && st.playing
     // Why a play failed before it played, on one line: an error event's text, else a non-zero exit's code. "" while it goes well.
     readonly property string failure: {
         for (const e of events) {
@@ -143,7 +146,6 @@ FocusScope {
         if (e.event === "playing") {
             playing = e;
             tail.running = false;
-            close();
         }
     }
 
@@ -239,6 +241,33 @@ FocusScope {
     Process {
         id: stopper
         command: [page.bin, "--stop"]
+    }
+
+    // Starting closes once niri lists mpv's window, asked every 500 ms only while it waits, or after 120 s.
+    Tick {
+        interval: 500
+        repeat: true
+        triggeredOnStart: true
+        running: page.opening
+        onTriggered: {
+            if (!mpvProbe.running)
+                mpvProbe.running = true;
+        }
+    }
+    Tick {
+        interval: 120000
+        running: page.opening
+        onTriggered: page.close()
+    }
+    Process {
+        id: mpvProbe
+        command: ["niri", "msg", "-j", "windows"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (page.opening && S.mpvMapped(text))
+                    page.close();
+            }
+        }
     }
 
     Item {
@@ -639,7 +668,7 @@ FocusScope {
 
                     Repeater {
                         id: stepRepeater
-                        model: page.st.steps
+                        model: S.steps(page.st)
 
                         StepRow {}
                     }

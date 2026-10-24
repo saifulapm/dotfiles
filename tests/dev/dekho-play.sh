@@ -34,6 +34,31 @@ note_session() { rel .session | jq -r . >>"$sessions"; }
 listed() { dekho_is '.releases.mode == "list" and (.releases.rows | length) == 5'; }
 started() { dekho_is '.releases.mode == "starting" and (.releases.starting.steps | length) > 0'; }
 buffering() { dekho_is '.releases.mode == "starting" and .releases.starting.down != ""'; }
+# The fake's play opens dev/fake-mpv.qml, a window with mpv's app id, about 1.5 s after playing.
+mpv_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "mpv")] | length'; }
+mpv_up() { [ "$(mpv_windows)" -gt 0 ]; }
+no_mpv() { [ "$(mpv_windows)" = 0 ]; }
+fake_mpv_pids() {
+  local pid
+  for pid in $(pgrep -x qs); do
+    tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "/fake-mpv.qml" && echo "$pid"
+  done
+  return 0
+}
+no_fake_mpv() { [ -z "$(fake_mpv_pids)" ]; }
+opening() { dekho_is '.releases.mode == "starting" and .releases.starting.steps[-1] == {"text": "mpv is opening", "state": "current"}'; }
+waiting_on_mpv() {
+  no_mpv && opening && dekho_is '.releases.shown and .releases.starting.shown and .releases.playing.event == "playing" and ([.releases.starting.steps[] | select(.state != "done")] | length) == 1'
+}
+left_nothing() { [ "${1:-0}" -gt 0 ] && ! kill -0 "$1" 2>/dev/null && no_mpv && no_fake_mpv; }
+closed_on_mpv() { [ "$(mpv_windows)" = 1 ] && dekho_is '.page == "title" and .releases.mode == "" and .releases.shown == false and .releases.playing.event == "playing"'; }
+dekho_focused() { niri msg -j focused-window | jq -e '.app_id == "dekho"' >/dev/null; }
+# niri focuses the window mpv maps, so the keys after it go back to Dekho by hand, with a key first to hand it niri's keymap.
+refocus() {
+  niri msg action focus-window --id "$(niri msg -j windows | jq '[.[] | select(.app_id == "dekho")][0].id')"
+  until_ok 1000 dekho_focused
+  wtype -k Shift_L
+}
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
@@ -62,12 +87,13 @@ check "a 300-character release name draws on one elided line ($(rel '.rows[2] | 
 check "paper: the cursor row inverts in ink and the card casts Paper's hard shadow ($(rel '.look | [.cursorFill, .ink, .shadow]'))" \
   dekho_is '.releases.look | (.cursorFill | ascii_downcase) == (.ink | ascii_downcase) and .shadow and .chamfer == false'
 
+check "no mpv window is up before the play ($(mpv_windows))" no_mpv
 wtype -k Return
 until_ok 3000 unit_active
 note_session
 check "Enter on the best starts the test unit $DOTS_DEKHO_UNIT" unit_active
 check "the fake was asked to play that release" grep -qx 'play --json --id 101 --kind tv -s 3 -e 4 --release b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2' "$fake_log"
-# Starting is read every 100 ms until it goes: the fill and the step names, in the order they came.
+# Starting is read every 100 ms until playing: the fill and the step names, in the order they came.
 fills=()
 order=$work/order
 : >"$order"
@@ -79,6 +105,7 @@ while (($(now_ms) < deadline)); do
   fills+=("$(jq .releases.starting.fill <<<"$s")")
   jq -r '.releases.starting.steps[].text' <<<"$s" >>"$order"
   if [ -z "$paper_look" ] && jq -e '(.releases.starting.steps | length) > 0' <<<"$s" >/dev/null; then paper_look=$(jq -c '.releases | [.starting.release, .look.barFill, .look.accent, .look.markRadius]' <<<"$s"); fi
+  jq -e '.releases.playing != null' <<<"$s" >/dev/null && break
   sleep 0.1
 done
 steps=$(awk '!seen[$0]++' "$order" | paste -sd '|')
@@ -93,13 +120,17 @@ rising() {
   (($(sort -u <<<"$mids" | grep -c .) >= 2))
 }
 check "Starting's progress rose through at least two values between empty and full, never going back (${fills[*]})" rising
-check "the steps appeared in order ($steps)" test "$steps" = "Found 530 seeders|Connected to peers|Buffering the start of the file|mpv starts at 108 MB"
+check "the steps appeared in order ($steps)" test "$steps" = "Found 530 seeders|Connected to peers|Buffering the start of the file|mpv starts at 108 MB|mpv is opening"
 check "paper: the bar fills in the accent and the marks are square, under the stream's quality and size ($paper_look)" \
   bash -c "jq -e '.[0] == \"720p · 1.1 GB\" and (.[1] | ascii_downcase) == (.[2] | ascii_downcase) and .[3] == 0' <<<'$paper_look' >/dev/null"
+check "on playing, before mpv's window maps, Starting still draws with mpv is opening as the current step ($(rel '.starting.steps[-1]'), $(mpv_windows) mpv windows)" \
+  waiting_on_mpv
+until_ok 5000 mpv_up
 until_ok 2000 dekho_is '.releases.mode == ""'
-check "on playing, Starting goes and the title page is back, the play kept ($(dekho_state | jq -c '[.page, .releases.mode, .releases.playing.event]'))" \
-  dekho_is '.page == "title" and .releases.mode == "" and .releases.shown == false and .releases.playing.event == "playing"'
+check "once the fake mpv's window maps, Starting goes and the title page is back, the play kept ($(dekho_state | jq -c '[.page, .releases.mode, .releases.playing.event]'))" \
+  closed_on_mpv
 check "and the unit plays on behind it" unit_active
+refocus
 
 # A play that fails before it plays: the fake answers an error event and exit 1 with the text in this file.
 failing=$DOTS_DEV_DIR/dekho-play-fails
@@ -142,11 +173,12 @@ note_session
 check "an error with no text still says something ($(rel .starting.fail.text))" dekho_is '.releases.starting.fail.text == "dekho could not start playback"'
 rm -f "$failing"
 wtype r
-until_ok 5000 dekho_is '.releases.mode == "" and .releases.playing != null'
+until_ok 10000 dekho_is '.releases.mode == "" and .releases.playing != null'
 note_session
 check "r once the cause is gone plays: Starting goes and the title page is back ($(dekho_state | jq -c '[.page, .releases.mode, .releases.playing.event]'))" \
   dekho_is '.page == "title" and .releases.mode == "" and .releases.playing.event == "playing"'
 check "and the unit plays on" unit_active
+refocus
 printf 'no source answered' >"$failing"
 wtype -k Return
 until_ok 3000 listed
@@ -171,6 +203,24 @@ wtype -k Escape
 until_ok 3000 unit_inactive
 check "esc in Starting stops the unit within 3 s" unit_inactive
 check "and the fake it ran, pid $pid, is gone" bash -c "[ '${pid:-0}' -gt 0 ] && ! kill -0 '$pid' 2>/dev/null"
+check "esc leaves the title page with its keys ($(dekho_state | jq -c '[.page, .releases.mode]'))" dekho_is '.page == "title" and .releases.mode == ""'
+
+# A third run, cancelled after playing while Starting waits on mpv's window.
+wtype -k Return
+until_ok 3000 listed
+wtype -k Return
+until_ok 2000 unit_active
+note_session
+until_ok 8000 opening
+pid=$(systemctl --user show -p MainPID --value "$DOTS_DEKHO_UNIT.service")
+check "Starting waits on mpv with no window up yet ($(rel '.starting.steps[-1]'))" waiting_on_mpv
+wtype -k Escape
+until_ok 3000 unit_inactive
+check "esc while it waits on mpv stops the unit within 3 s" unit_inactive
+# Past the 1.5 s the fake waits before opening its window, so a stand-in that escaped the stop would be up by now.
+sleep 2
+check "and leaves nothing of it: the fake, pid $pid, no mpv window ($(mpv_windows)) and no fake mpv qs ($(fake_mpv_pids | paste -sd ' '))" \
+  left_nothing "$pid"
 check "esc leaves the title page with its keys ($(dekho_state | jq -c '[.page, .releases.mode]'))" dekho_is '.page == "title" and .releases.mode == ""'
 
 # S3 E3 has no releases.
@@ -226,7 +276,8 @@ note_session
 check "Enter on Continue watching starts the unit with no release list ($(dekho_state | jq -c '[.page, .releases.mode]'))" \
   bash -c "systemctl --user is-active --quiet '$DOTS_DEKHO_UNIT.service' && timeout 0.5 qs ipc -p '$dekho_qml' call dekho state | jq -e '.page == \"home\" and .releases.mode == \"starting\"' >/dev/null"
 check "the fake was asked to play The Long Tide with --resume" grep -qx 'play --json --id 101 --kind tv --resume' "$fake_log"
-until_ok 6000 dekho_is '.releases.mode == "" and .releases.playing != null'
+until_ok 10000 dekho_is '.releases.mode == "" and .releases.playing != null'
+refocus
 wtype -k Escape
 until_ok 3000 dekho_gone
 check "esc on Home closes Dekho" dekho_gone
