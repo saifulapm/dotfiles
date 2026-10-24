@@ -107,6 +107,9 @@ FocusScope {
             load(false);
         }
     }
+    // Past midnight the open page's today is another day, so it shows that day's times.
+    onTodayKeyChanged: if (asked)
+        show(0)
     onAfterIshaChanged: if (afterIsha)
         askTomorrow()
 
