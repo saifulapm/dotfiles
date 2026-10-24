@@ -46,6 +46,19 @@ open_deen() { niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"; }
 # No corpus yet, and the fake's download is cut at 38 MB.
 touch "$DOTS_DEV_DIR/deen-hadith-cut"
 in_theme paper
+# Esc while the fetch runs ends it with the window; the fetch is Deen's child, never left behind.
+open_deen
+until_ok 5000 deen_up
+until_ok 2000 eval '[ -n "$(fetch_pids)" ]'
+running_pid=$(fetch_pids | head -1)
+wtype -k Shift_L
+wtype -k Escape
+until_ok 3000 no_deen_process
+until_ok 3000 eval '[ ! -d "/proc/$running_pid" ]'
+check "Esc during the download ends Deen and its running fetch (${running_pid:-none})" \
+  eval '[ -n "$running_pid" ] && [ ! -d "/proc/$running_pid" ] && no_deen_process'
+rm "$calls"
+
 open_deen
 until_ok 5000 deen_up
 check "Deen opens one window" deen_up
@@ -136,6 +149,11 @@ check "Enter moved to the results, and the forged pane wraps without controls ($
 fetch_now=$(fetch_pids)
 wtype /
 until_ok 1000 hadith_is '.focus == "field"'
+wtype -k Tab
+until_ok 1000 deen_is '.tab == "prayer"'
+check "Tab from the field reaches the frame ($(deen_state | jq -c .tab))" deen_is '.tab == "prayer"'
+wtype -M shift -k Tab -m shift
+until_ok 1000 deen_is '.tab == "hadith" and .hadith.focus == "field"'
 wtype -k Escape
 until_ok 3000 deen_gone
 check "Esc from the field closes the window" deen_gone
