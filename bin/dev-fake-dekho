@@ -9,14 +9,18 @@ echo "$*" >>"$DOTS_DEV_DIR/dekho.log"
 # The real dekho prints one compact JSON object on stdout.
 answer() { jq -c . "$fixtures/$1.json"; }
 
+# With DOTS_DEV_DIR/dekho-offline present TMDB is unreachable: trending comes back as the backend's saved copy from two days ago, 9 titles of the fixture's 12, and search has no saved copy to serve.
+offline() { [ -f "$DOTS_DEV_DIR/dekho-offline" ]; }
+saved() { jq -c '.items |= .[:9] | . + {cached: true, stale: true, age_secs: 172800}' "$fixtures/$1.json"; }
+
 case "${1:-} ${2:-}" in
 "api history")
   answer history
   ;;
 "api trending")
   case "$*" in
-  *"--kind tv"*) answer trending-tv ;;
-  *"--kind movie"*) answer trending-movie ;;
+  *"--kind tv"*) if offline; then saved trending-tv; else answer trending-tv; fi ;;
+  *"--kind movie"*) if offline; then saved trending-movie; else answer trending-movie; fi ;;
   *) echo "dev-fake-dekho: trending needs --kind tv or movie: $*" >&2; exit 2 ;;
   esac
   ;;
@@ -70,6 +74,10 @@ case "${1:-} ${2:-}" in
   jq -c --arg q "${*,,}" '{items: [.items[] | select(.name | ascii_downcase | contains($q))]}' "$fixtures/people.json"
   ;;
 "api search")
+  if offline; then
+    echo '{"error":"tmdb: network unreachable"}'
+    exit 1
+  fi
   shift 2
   if [ "${*,,}" = tide ]; then answer search-tide; else echo '{"items":[]}'; fi
   ;;

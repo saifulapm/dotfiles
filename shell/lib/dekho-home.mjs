@@ -19,6 +19,24 @@ export function hitLine(hit) {
   return [hit.year, `★ ${Number(hit.vote || 0).toFixed(1)}`].filter((p) => p).join(' · ');
 }
 
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// When a saved answer was saved: its age before now. Null when the answer carries no age.
+export function savedAt(answer, nowMs) {
+  const age = answer && answer.age_secs != null ? Number(answer.age_secs) : -1;
+  return age >= 0 ? new Date(nowMs - age * 1000) : null;
+}
+
+// The boards write a day as "21 Oct" and a moment as "21 Oct 18:40", in local time with English month names.
+export const savedDay = (d) => `${d.getDate()} ${months[d.getMonth()]}`;
+export const savedStamp = (d) => `${savedDay(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
+// The backend marks an answer it served from its saved copy as stale; no answer at all is null or an error object.
+export function kindOfAnswer(answer) {
+  if (!answer || typeof answer.error === 'string') return 'error';
+  return answer.stale === true ? 'stale' : 'fresh';
+}
+
 // The words each board writes on Home: Paper's caps with a lower-case week, Artboard's sentence case, Blueprint's capitals and bracketed slash.
 export function homeText(voice) {
   const caps = voice !== 'plain';
@@ -34,6 +52,13 @@ export function homeText(voice) {
     week: voice === 'bracket' ? 'THIS WEEK' : 'this week',
     search: 'Search films and series',
     hint: voice === 'bracket' ? '[/]' : '/',
+    machine: voice === 'bracket' ? 'FROM THIS MACHINE' : 'from this machine',
+    saved: (d) => (voice === 'bracket' ? `SAVED ${savedDay(d).toUpperCase()}` : `saved ${savedDay(d)}`),
+    unreachable: 'TMDB is unreachable.',
+    showing: (d) => (d ? `Showing saved rows from ${savedStamp(d)}.` : ''),
+    retry: voice === 'bracket' ? ['[R]', 'RETRY'] : ['r', 'retry'],
+    searchOff: 'Search needs TMDB',
+    offlineKeys: [['r', 'retry'], ['h/j/k/l', 'move'], ['↵', 'open'], ['esc', 'close']],
     keys: [['h/j/k/l', 'move'], ['↵', 'open'], ['/', 'search'], ['f', 'filters: genre, language, person…'], ['tab', 'next row'], ['esc', 'close']],
   };
 }

@@ -81,7 +81,6 @@ ShellRoot {
             }
             onExited: {
                 const answer = D.answer(answerOut.text);
-                // t11: saved rows
                 if (done)
                     done(answer);
                 destroy();

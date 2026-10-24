@@ -31,3 +31,37 @@ test('a trending title reads its year and its rating to one decimal', () => {
   assert.equal(H.hitLine({ year: '2024', vote: 7 }), '2024 · ★ 7.0');
   assert.equal(H.hitLine({ year: '', vote: 6.5 }), '★ 6.5');
 });
+
+test('the saved date is the answer\'s age before now, in local time, as the boards write it', () => {
+  const now = new Date(2026, 9, 23, 18, 40).getTime();
+  const saved = H.savedAt({ age_secs: 2 * 86400 }, now);
+  assert.equal(H.savedDay(saved), '21 Oct');
+  assert.equal(H.savedStamp(saved), '21 Oct 18:40');
+  assert.equal(H.savedStamp(H.savedAt({ age_secs: 3600 + 5 * 60 }, new Date(2026, 0, 3, 9, 5).getTime())), '3 Jan 08:00');
+});
+
+test('an answer with no age has no saved date', () => {
+  assert.equal(H.savedAt({}, 1), null);
+  assert.equal(H.savedAt(null, 1), null);
+});
+
+test('an answer is fresh, a saved copy marked stale, or no answer: null or an error object', () => {
+  assert.equal(H.kindOfAnswer({ items: [] }), 'fresh');
+  assert.equal(H.kindOfAnswer({ items: [], cached: true, age_secs: 60, stale: false }), 'fresh');
+  assert.equal(H.kindOfAnswer({ items: [], cached: true, age_secs: 172800, stale: true }), 'stale');
+  assert.equal(H.kindOfAnswer({ error: 'tmdb: network unreachable' }), 'error');
+  assert.equal(H.kindOfAnswer(null), 'error');
+});
+
+test('the offline words follow each board: the date in the row mark, the retry key, search off', () => {
+  const day = new Date(2026, 9, 21, 18, 40);
+  assert.equal(H.homeText('caps').saved(day), 'saved 21 Oct');
+  assert.equal(H.homeText('plain').saved(day), 'saved 21 Oct');
+  assert.equal(H.homeText('bracket').saved(day), 'SAVED 21 OCT');
+  assert.deepEqual(H.homeText('caps').retry, ['r', 'retry']);
+  assert.deepEqual(H.homeText('bracket').retry, ['[R]', 'RETRY']);
+  assert.equal(H.homeText('plain').searchOff, 'Search needs TMDB');
+  assert.equal(H.homeText('plain').unreachable, 'TMDB is unreachable.');
+  assert.equal(H.homeText('plain').showing(day), 'Showing saved rows from 21 Oct 18:40.');
+  assert.equal(H.homeText('plain').showing(null), '');
+});

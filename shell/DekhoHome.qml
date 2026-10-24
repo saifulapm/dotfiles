@@ -29,6 +29,14 @@ FocusScope {
     property string asked: ""
     property string row: "continue"
     property int col: 0
+    // How each trending answer came: fresh, a stale copy the backend saved (dated by seriesSaved and moviesSaved), or an error with nothing to show.
+    property string seriesKind: "fresh"
+    property string moviesKind: "fresh"
+    property var seriesSaved: null
+    property var moviesSaved: null
+    readonly property bool offline: seriesKind !== "fresh" || moviesKind !== "fresh"
+    // The older of the saved rows' dates, for the notice.
+    readonly property var savedFrom: seriesSaved && moviesSaved ? (seriesSaved < moviesSaved ? seriesSaved : moviesSaved) : seriesSaved || moviesSaved
 
     // Enter on a title to continue plays it from where it stopped, with no release list.
     signal resume(var item)
@@ -62,6 +70,30 @@ FocusScope {
         stripOf(row).reveal(col);
     }
 
+    // A trending answer: a stale copy is drawn marked with its date; an error leaves the rows as they are.
+    function take(kind, answer) {
+        const k = H.kindOfAnswer(answer);
+        const saved = k === "stale" ? H.savedAt(answer, Date.now()) : null;
+        if (kind === "tv") {
+            seriesKind = k;
+            seriesSaved = saved;
+            if (k !== "error")
+                series = listOf(answer, 10);
+        } else {
+            moviesKind = k;
+            moviesSaved = saved;
+            if (k !== "error")
+                movies = listOf(answer, 10);
+        }
+    }
+
+    // Every home row is asked for again; r runs it, and a fresh answer replaces a saved one.
+    function reload() {
+        dekho.api(["api", "history", "--limit", "20"], answer => home.continued = home.listOf(answer, 20));
+        dekho.api(["api", "trending", "--kind", "tv"], answer => home.take("tv", answer));
+        dekho.api(["api", "trending", "--kind", "movie"], answer => home.take("movie", answer));
+    }
+
     function search() {
         const words = D.title(field.text);
         if (!words)
@@ -79,7 +111,8 @@ FocusScope {
     }
 
     function focusSearch() {
-        field.forceActiveFocus();
+        if (!offline)
+            field.forceActiveFocus();
     }
 
     function leaveSearch() {
@@ -109,6 +142,29 @@ FocusScope {
                 series: seriesStrip.drawn(),
                 movies: moviesStrip.drawn()
             },
+            marks: {
+                continue: continueStrip.tailDrawn,
+                series: seriesStrip.tailDrawn,
+                movies: moviesStrip.tailDrawn
+            },
+            offline: {
+                shown: notice.visible,
+                notice: [noticeLead.text, noticeRest.text].filter(t => t).join(" "),
+                retry: retryKey.text + " " + retryWord.text,
+                keys: Array.from({
+                    length: keyList.count
+                }, (_, i) => keyList.itemAt(i).drawn()),
+                search: {
+                    text: searchOff.visible ? searchOff.text : "",
+                    field: field.visible
+                },
+                look: {
+                    noticeFill: notice.color.a > 0 ? String(notice.color) : "",
+                    noticeRadius: notice.radius,
+                    markFill: String(noticeMark.color),
+                    markRadius: noticeMark.radius
+                }
+            },
             look: {
                 homeFont: pageName.font.family,
                 rowHead: continueStrip.headText,
@@ -118,11 +174,7 @@ FocusScope {
         };
     }
 
-    Component.onCompleted: {
-        dekho.api(["api", "history", "--limit", "20"], answer => home.continued = home.listOf(answer, 20));
-        dekho.api(["api", "trending", "--kind", "tv"], answer => home.series = home.listOf(answer, 10));
-        dekho.api(["api", "trending", "--kind", "movie"], answer => home.movies = home.listOf(answer, 10));
-    }
+    Component.onCompleted: reload()
 
     // The cursor lands on the first row that has titles, once one does.
     onRowNamesChanged: if (!searching && rowNames.indexOf(row) < 0 && rowNames.length)
@@ -137,7 +189,9 @@ FocusScope {
             const k = event.key;
             const t = event.text;
             if (t === "/")
-                field.forceActiveFocus();
+                home.focusSearch();
+            else if (t === "r" && home.offline)
+                home.reload();
             else if (t === "f")
                 home.dekho.open("browse", {
                     from: "home"
@@ -240,6 +294,90 @@ FocusScope {
             color: voice === "caps" ? c.ink ?? "black" : c.line ?? "gray"
         }
 
+        // With TMDB unreachable: Paper's ruled box with an ink mark, Artboard's peach block, Blueprint's accent-ruled box with an amber mark.
+        Rectangle {
+            id: notice
+            Layout.fillWidth: true
+            Layout.topMargin: 14
+            Layout.leftMargin: 18
+            Layout.rightMargin: 18
+            visible: home.offline
+            implicitHeight: noticeRow.implicitHeight + 20
+            radius: plain ? 12 : 0
+            color: plain ? "#FFF1E8" : "transparent"
+            border.width: plain ? 0 : 1
+            border.color: (bracket ? c.accent : c.ink) ?? "black"
+
+            RowLayout {
+                id: noticeRow
+                anchors.fill: parent
+                anchors.leftMargin: 14
+                anchors.rightMargin: 14
+                spacing: 12
+
+                Rectangle {
+                    id: noticeMark
+                    implicitWidth: 18
+                    implicitHeight: 18
+                    radius: plain ? 9 : 0
+                    color: (plain ? "#B4380B" : bracket ? c.danger : c.ink) ?? "black"
+
+                    Text {
+                        anchors.centerIn: parent
+                        textFormat: Text.PlainText
+                        text: "!"
+                        color: (plain ? "white" : c.surface) ?? "white"
+                        font.family: home.bodyFont
+                        font.pixelSize: bracket ? 10 : 11
+                        font.weight: Font.Bold
+                    }
+                }
+                Text {
+                    id: noticeLead
+                    textFormat: Text.PlainText
+                    text: words.unreachable
+                    color: (plain ? "#B4380B" : c.ink) ?? "black"
+                    font.family: home.bodyFont
+                    font.pixelSize: plain ? 13 : 12
+                    font.weight: Font.Bold
+                }
+                Text {
+                    id: noticeRest
+                    Layout.fillWidth: true
+                    textFormat: Text.PlainText
+                    text: words.showing(home.savedFrom)
+                    color: (plain ? "#B4380B" : c.ink) ?? "black"
+                    font.family: home.bodyFont
+                    font.pixelSize: plain ? 13 : 12
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                }
+                Row {
+                    spacing: 5
+
+                    Text {
+                        id: retryKey
+                        textFormat: Text.PlainText
+                        text: words.retry[0]
+                        color: (bracket ? c.accent : plain ? "#B4380B" : c.ink) ?? "black"
+                        font.family: home.bodyFont
+                        font.pixelSize: 12
+                        font.weight: Font.Bold
+                        font.letterSpacing: bracket ? 0.72 : 0
+                    }
+                    Text {
+                        id: retryWord
+                        textFormat: Text.PlainText
+                        text: words.retry[1]
+                        color: (plain ? "#B4380B" : c.ink) ?? "black"
+                        font.family: home.bodyFont
+                        font.pixelSize: 12
+                        font.letterSpacing: bracket ? 0.72 : 0
+                    }
+                }
+            }
+        }
+
         // The search field: Paper's and Blueprint's ruled box, Artboard's filled pill.
         Rectangle {
             Layout.fillWidth: true
@@ -251,10 +389,24 @@ FocusScope {
             radius: plain ? 14 : 0
             color: plain ? "#F6F7F9" : "transparent"
             border.width: plain ? 0 : 1
-            border.color: (bracket ? c.line : c.muted) ?? "gray"
+            border.color: (bracket ? c.line : home.offline && voice === "caps" ? c.ink : c.muted) ?? "gray"
 
+            // Search is off while TMDB is unreachable: the box says so in the field's place.
+            Text {
+                id: searchOff
+                anchors.left: parent.left
+                anchors.leftMargin: 14
+                anchors.verticalCenter: parent.verticalCenter
+                visible: home.offline
+                textFormat: Text.PlainText
+                text: words.searchOff
+                color: c.muted ?? "gray"
+                font.family: home.bodyFont
+                font.pixelSize: plain ? 14 : 13
+            }
             FilesIcon {
                 id: searchIcon
+                visible: !home.offline
                 anchors.left: parent.left
                 anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
@@ -265,6 +417,7 @@ FocusScope {
             }
             TextInput {
                 id: field
+                visible: !home.offline
                 anchors.left: searchIcon.right
                 anchors.leftMargin: 12
                 anchors.right: hint.left
@@ -297,6 +450,7 @@ FocusScope {
             }
             Rectangle {
                 id: hint
+                visible: !home.offline
                 anchors.right: parent.right
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
@@ -334,7 +488,7 @@ FocusScope {
                 name: "continue"
                 items: home.continued
                 headText: words.continue
-                tailText: String(home.continued.length)
+                tailText: home.offline ? words.machine : String(home.continued.length)
             }
             Strip {
                 id: seriesStrip
@@ -343,7 +497,7 @@ FocusScope {
                 name: "series"
                 items: home.series
                 headText: words.series
-                tailText: words.week
+                tailText: home.seriesSaved ? words.saved(home.seriesSaved) : words.week
             }
             Strip {
                 id: moviesStrip
@@ -352,7 +506,7 @@ FocusScope {
                 name: "movies"
                 items: home.movies
                 headText: words.movies
-                tailText: words.week
+                tailText: home.moviesSaved ? words.saved(home.moviesSaved) : words.week
             }
         }
 
@@ -389,10 +543,15 @@ FocusScope {
             spacing: plain ? 8 : 16
 
             Repeater {
-                model: home.look.keys(home.words.keys)
+                id: keyList
+                model: home.look.keys(home.offline ? home.words.offlineKeys : home.words.keys)
 
                 Rectangle {
                     required property var modelData
+
+                    function drawn() {
+                        return [keyName.text, keyWord.text];
+                    }
                     implicitWidth: keyPair.implicitWidth + (home.plain ? 14 : 0)
                     implicitHeight: keyPair.implicitHeight + (home.plain ? 6 : 0)
                     radius: 6
@@ -404,6 +563,7 @@ FocusScope {
                         spacing: home.bracket ? 8 : 6
 
                         Text {
+                            id: keyName
                             textFormat: Text.PlainText
                             text: modelData.key
                             color: (home.bracket ? home.c.accent : home.c.ink) ?? "black"
@@ -413,6 +573,7 @@ FocusScope {
                             font.letterSpacing: home.voice === "caps" ? 1 : home.bracket ? 1.5 : 0
                         }
                         Text {
+                            id: keyWord
                             textFormat: Text.PlainText
                             text: modelData.word
                             color: home.c.muted ?? "gray"
@@ -455,6 +616,7 @@ FocusScope {
         property string tailText: ""
         readonly property real cardWidth: Math.max(0, (width - 4 * 14) / 5)
         readonly property real cardRadius: page.plain ? 12 : 0
+        readonly property string tailDrawn: tailLabel.text
 
         function reveal(i) {
             const card = cards.itemAt(i);
@@ -491,6 +653,7 @@ FocusScope {
                 font.letterSpacing: strip.page.plain ? 0 : strip.page.bracket ? 1.54 : 1.4
             }
             Text {
+                id: tailLabel
                 textFormat: Text.PlainText
                 text: strip.tailText
                 color: strip.page.c.muted ?? "gray"
