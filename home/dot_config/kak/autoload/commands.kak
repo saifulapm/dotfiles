@@ -178,14 +178,6 @@ define-command tldr -docstring 'tldr <command>: Cheatsheet for the given command
   }
 }
 
-define-command watchexec -docstring 'watchexec [<args>] <command>: execute the given command when the current directory changes' -shell-completion -params 0.. %{
-  fifo -scroll -- watchexec %arg{@}
-}
-
-define-command watchthis -docstring 'watchexec [<args>] <command>: execute the given command when the current file changes' -shell-completion -params 0.. %{
-  fifo -scroll -- watchexec --watch %val{buffile} %arg{@}
-}
-
 define-command xargs -docstring '
   xargs [<arguments>]: xargs utility wrapper
   execute a command with each selection, selections are represented with {} as a placeholder

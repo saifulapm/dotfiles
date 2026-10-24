@@ -60,59 +60,10 @@ define-command jump_to_previous_file %{
 alias global fn jump_to_next_file
 alias global fp jump_to_previous_file
 
-# File Picker
-declare-option str picker_interface %sh{
-    if ! [[ -z "$TMUX" ]]; then
-        echo sk --tmux center,75% --prompt
-    elif command -v bemenu &>/dev/null; then
-        echo bemenu -l '20 down' -P » -if --prompt
-    fi
-}
-
-define-command -docstring 'buffer-picker: filter and jump to buffers' buffer-picker %{
-    try %{
-      buffer %sh{
-        xargs -n1 <<< "$kak_quoted_buflist" | $kak_opt_picker_interface buffer
-      }
-    }
-}
-
-define-command -docstring 'file-picker: filter and jump to files' file-picker %{
-    try %{
-      edit -existing %sh{
-        fd -t file | $kak_opt_picker_interface 'file relative to root: '
-      }
-    }
-}
-
-define-command -docstring 'file-picker-dir: filter and jump to files from the current directory' file-picker-dir %{
-    try %{
-      edit -existing %sh{
-        fd -t file . $(dirname $kak_buffile) | $kak_opt_picker_interface 'file around buffer: '
-      }
-    }
-}
-
 define-command -hidden open_file_picker %{
 	prompt open: -menu -shell-script-candidates %opt{find_completion} %{
         edit -existing -- %val{text}
 	}
-}
-
-define-command -docstring 'buffer-picker: filter and jump to buffers' -hidden tmux-buffer-picker %{
-  try %{
-    buffer %sh{
-      xargs -n1 <<< "$kak_quoted_buflist" | sk --prompt 'buffer: ' --tmux
-    }
-  }
-}
-
-define-command -docstring 'file-picker: filter and jump to files' -hidden tmux-file-picker %{
-  try %{
-    edit -existing %sh{
-      fd -t file | sk --prompt 'file relative to root: ' --tmux
-    }
-  }
 }
 
 define-command -hidden file-picker-open-selections %{

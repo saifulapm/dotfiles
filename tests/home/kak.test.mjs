@@ -63,7 +63,7 @@ test('kak keeps hop and ansi, and has no plugin for a tool v2 does not install',
   const out = join(root, 'kept.txt');
   const probe = (name) => `try %{ define-command ${name} nop; echo -to-file ${out}.${name} missing } catch %{ echo -to-file ${out}.${name} defined }`;
   // fzf through gitui opened in kak-popup, which v2 does not install either (#FCRCW316).
-  const gone = ['fzf', 'sk', 'zf', 'sk-live-grep', 'yazi', 'lf', 'lazygit', 'gitui'];
+  const gone = ['fzf', 'sk', 'zf', 'sk-live-grep', 'yazi', 'lf', 'lazygit', 'gitui', 'buffer-picker', 'file-picker', 'file-picker-dir', 'tmux-buffer-picker', 'tmux-file-picker', 'watchexec', 'watchthis'];
   const names = ['hop-kak', 'ansi-render-selection', 'docs', 'popup', 'spell', ...gone];
   const r = kak(`${names.map(probe).join('; ')}; try %{ dedoc } catch %{ echo -to-file ${out}.dedoc %val{error} }; quit!`);
   assert.equal(r.status, 0, r.stderr);
@@ -73,7 +73,7 @@ test('kak keeps hop and ansi, and has no plugin for a tool v2 does not install',
     ...Object.fromEntries(gone.map((n) => [n, 'missing'])),
   });
   const kakDir = join(repo, 'home/dot_config/kak');
-  const mentions = spawnSync('grep', ['-rlE', 'popup --|popup_output|sg-grep', kakDir, '--include=*.kak'], { encoding: 'utf8' }).stdout.trim();
+  const mentions = spawnSync('grep', ['-rlE', 'popup --|popup_output|sg-grep|\\bsk\\b|watchexec|picker_interface', kakDir, '--include=*.kak'], { encoding: 'utf8' }).stdout.trim();
   assert.equal(mentions, '');
   assert.match(read('dedoc'), /'dedoc': no such command$/);
   // A machine applied before they went keeps their links, dangling, until chezmoi removes them.

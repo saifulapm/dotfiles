@@ -126,10 +126,4 @@ provide-module tmux %{
   map global window-tmux v ':tmux-split -h<ret>'       -docstring 'vertical split'
 
   map global user w ':enter-user-mode window-tmux<ret>' -docstring 'window mode'
-
-  # Override pickers
-  # map global picker f ':tmux-file-picker<ret>'   -docstring 'file picker'
-  # map global user <space> ':tmux-file-picker<ret>'   -docstring 'pick file'
-  # map global user , ':tmux-buffer-picker<ret>'   -docstring 'buffer picker'
-  # map global picker b ':tmux-buffer-picker<ret>'   -docstring 'buffer picker'
 }
