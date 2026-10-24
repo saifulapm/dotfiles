@@ -991,8 +991,6 @@ ShellRoot {
                             readonly property color dim: isCurrent ? look.cursor.detail : c.muted ?? "gray"
                             // A box or circle reads as the shape drawn, filled or empty; Blueprint's mark is its text.
                             function markDrawn() {
-                                if (markText.visible)
-                                    return markText.text;
                                 const filled = markBox.color.a > 0;
                                 return markBox.radius * 2 >= markBox.width ? (filled ? "●" : "○") : (filled ? "■" : "□");
                             }
@@ -1029,20 +1027,19 @@ ShellRoot {
                                 anchors.rightMargin: 12
                                 spacing: 12
 
-                                // Every row has its mark: Paper's box, filled ink with a tick when marked; Artboard's circle, filled accent; Blueprint's [ ] or [x].
+                                // Every row has its mark: Paper's box, filled ink with a tick when marked; Artboard's circle, filled accent; Blueprint's box, filled with its accent.
                                 Item {
                                     implicitWidth: app.markWidth
                                     implicitHeight: 16
 
                                     Rectangle {
                                         id: markBox
-                                        visible: !bracket
                                         anchors.centerIn: parent
                                         width: plain ? 16 : 14
                                         height: width
                                         radius: plain ? 8 : 0
-                                        color: !rowItem.isMarked ? "transparent" : plain ? c.accent ?? "blue" : c.ink ?? "black"
-                                        border.width: rowItem.isMarked ? (plain ? 0 : 1) : plain ? 1.5 : 1
+                                        color: !rowItem.isMarked ? "transparent" : plain || bracket ? c.accent ?? "blue" : c.ink ?? "black"
+                                        border.width: rowItem.isMarked ? (plain || bracket ? 0 : 1) : plain ? 1.5 : 1
                                         // Artboard's empty circle is #B4BAC4, its dot grid's grey, which no token carries: the muted token at 45% on white lands within 10 of it.
                                         border.color: rowItem.isMarked ? c.ink ?? "black" : plain ? Qt.alpha(c.muted ?? "gray", 0.45) : rowItem.isCurrent ? look.cursor.detail : c.muted ?? "gray"
 
@@ -1055,16 +1052,6 @@ ShellRoot {
                                             stroke: plain ? 1.5 : 2.2 * 10 / 16
                                             color: c.surface ?? "white"
                                         }
-                                    }
-                                    Text {
-                                        id: markText
-                                        visible: bracket
-                                        anchors.centerIn: parent
-                                        textFormat: Text.PlainText
-                                        text: rowItem.isMarked ? "[x]" : "[ ]"
-                                        color: rowItem.isCurrent ? look.cursor.text : rowItem.isMarked ? c.accent ?? "red" : c.muted ?? "gray"
-                                        font.family: fonts.mono ?? ""
-                                        font.pixelSize: 12
                                     }
                                 }
                                 // The board's line icon, a folder or a page; Artboard sets it on a rounded tile.

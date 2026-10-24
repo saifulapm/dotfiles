@@ -31,7 +31,7 @@ file_round='M4 1.8h5l3 3V13a1.2 1.2 0 0 1-1.2 1.2H4A1.2 1.2 0 0 1 2.8 13V3A1.2 1
 # theme | marked mark | its fill | unmarked mark | folder icon | file icon | date face,italic,size | first key | its word | key weight | current place fill | lead colour
 for t in "paper|■|#1c1915|□|$folder_sharp|$file_sharp|Instrument Serif,true,17|J/K|MOVE|700|#f1e9d8|#575653" \
   "artboard|●|#3d5afe|○|$folder_round|$file_round|Maple Mono,false,12|j/k|move|500|#eef1ff|#57606a" \
-  "blueprint|[x]||[ ]|$folder_sharp|$file_sharp|Maple Mono,false,12|[J/K]|MOVE|700|#1a7fe3f0|#80a4c2"; do
+  "blueprint|■|#7fe3f0|□|$folder_sharp|$file_sharp|Maple Mono,false,12|[J/K]|MOVE|700|#1a7fe3f0|#80a4c2"; do
   IFS='|' read -r name on onfill off folder file date key word weight here lead <<<"$t"
   in_theme "$name"
   niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"
