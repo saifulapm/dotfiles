@@ -92,7 +92,10 @@ test('the narrations sum every collection with a thousands comma', () => {
 });
 
 test('a query runs as its words split on spaces with the limit, and an empty one runs none', () => {
-  assert.deepEqual(H.searchArgs('  actions  intentions '), ['hadith', 'search', 'actions', 'intentions', '--limit', '40']);
+  assert.deepEqual(H.searchArgs('  actions  intentions '), ['hadith', 'search', '--limit', '40', '--', 'actions', 'intentions']);
+  // A typed word that starts with a dash is a word to find, never one of deen's flags; a pasted newline splits words as a space does.
+  assert.deepEqual(H.searchArgs('--collection muslim'), ['hadith', 'search', '--limit', '40', '--', '--collection', 'muslim']);
+  assert.deepEqual(H.searchArgs('a\nb\tc'), ['hadith', 'search', '--limit', '40', '--', 'a', 'b', 'c']);
   assert.equal(H.searchArgs('   '), null);
   assert.equal(H.resultsText(4), '4 results');
   assert.equal(H.resultsText(1), '1 result');

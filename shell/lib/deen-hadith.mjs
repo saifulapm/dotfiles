@@ -90,9 +90,10 @@ export function narrations(a) {
   return String(n).replace(/\B(?=(\d{3})+$)/g, ',');
 }
 
+// The flags come first and -- before the words, so a typed word that starts with a dash is searched for, not obeyed.
 export function searchArgs(query) {
-  const words = String(query || '').split(' ').filter((w) => w);
-  return words.length ? ['hadith', 'search'].concat(words, ['--limit', '40']) : null;
+  const words = String(query || '').split(/\s+/).filter((w) => w);
+  return words.length ? ['hadith', 'search', '--limit', '40', '--'].concat(words) : null;
 }
 
 export const resultsText = (n) => `${n} ${n === 1 ? 'result' : 'results'}`;

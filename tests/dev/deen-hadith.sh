@@ -9,7 +9,7 @@ work=$(mktemp -d)
 cleanup() { rm -rf "$work"; }
 log=$work/deen.log
 calls=$DOTS_DEV_DIR/deen.log
-bukhari1_ar=$(jq -r '.hits[0].hadith.ar' "$repo/dev/deen/hadith-search-intentions---limit-40.json")
+bukhari1_ar=$(jq -r '.hits[0].hadith.ar' "$repo/dev/deen/hadith-search---limit-40----intentions.json")
 
 deen_state() { timeout 0.5 qs ipc -p "$deen_qml" call deen state 2>/dev/null; }
 deen_is() { deen_state | jq -e "$@" >/dev/null 2>&1; }
@@ -116,7 +116,7 @@ check "typing intentions lists 35 results, Sahih al-Bukhari #1 first graded Sahi
   hadith_is '.search.text == "intentions" and .search.count == "35 results" and .search.rows[0].name == "Sahih al-Bukhari" and .search.rows[0].n == "#1" and .search.rows[0].grade == "Sahih" and .search.rows[0].on and .search.detail.grade == "SAHIH"'
 check "the right pane shows it in full with its narrator ($(hadith '.search.detail | [.title, .grade, .narrator, .en[0:40], .arAlign]'))" \
   deen_is --arg ar "$bukhari1_ar" '.hadith | .search.detail.title == "Sahih al-Bukhari · 1" and .search.detail.narrator == "Narrated by '"'"'Umar bin Al-Khattab" and (.search.detail.en | startswith("I heard Allah")) and .search.detail.ar == $ar and .search.detail.arAlign == "right"'
-check "intentions ran once the typing stopped ($(grep -c '^hadith search' "$calls") searches)" grep -qx 'hadith search intentions --limit 40' "$calls"
+check "intentions ran once the typing stopped ($(grep -c '^hadith search' "$calls") searches)" grep -qx 'hadith search --limit 40 -- intentions' "$calls"
 check "paper: the field is a square box ruled in two pixels ($(hadith '.search.look'))" hadith_is '.search.look.fieldRadius == 0 and .search.look.fieldBorder == 2'
 
 wtype -k Down j
