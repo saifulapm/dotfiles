@@ -15,31 +15,34 @@ export const TOUCHPAD = [
 const MODS = { Mod: 'Mod', Shift: '⇧', Ctrl: '⌃', Alt: '⌥', Super: 'Super' };
 const KEYS = { Slash: '/', Return: '↵', Page_Up: 'PgUp', Page_Down: 'PgDn', Escape: 'Esc', Period: '.', Comma: ',' };
 
-function keyText(combo, title) {
-  // A media key has no printed name the designs use, so its row shows the title.
-  if (combo.startsWith('XF86')) return title;
+// media: each bare media key's title, which names that key under a modifier too.
+function keyText(combo, title, media) {
   const parts = combo.split('+');
   const key = parts.pop();
-  return parts.map((m) => MODS[m] || m).concat([KEYS[key] || key]).join(' ');
+  // A media key has no printed name the designs use, so its row shows the title, or the bare key's behind a modifier.
+  const name = key.startsWith('XF86') ? (parts.length ? media[key] || title : title) : KEYS[key] || key;
+  return parts.map((m) => MODS[m] || m).concat([name]).join(' ');
 }
 
 function groupOf(combo, action) {
-  if (combo.startsWith('XF86')) return 'SYSTEM';
-  if (/^spawn "qs" "ipc" "call"/.test(action)) return 'SURFACES';
+  if (combo.split('+').pop().startsWith('XF86')) return 'SYSTEM';
+  if (/^spawn "(qs" "ipc" "call|dots-call)"/.test(action)) return 'SURFACES';
   if (/^spawn\b/.test(action)) return 'WORK';
   if (/window|column|workspace/.test(action)) return 'WINDOWS';
   return 'SYSTEM';
 }
 
 export function parseBinds(text) {
-  const rows = [];
+  const binds = [];
   for (const line of text.split('\n')) {
     const m = line.match(/^\s*(\S+)\s([^{]*)\{(.*)\}\s*$/);
     const title = m && m[2].match(/hotkey-overlay-title="([^"]*)"/);
-    if (!title) continue;
-    rows.push({ title: title[1], key: keyText(m[1], title[1]), group: groupOf(m[1], m[3].trim()) });
+    if (title) binds.push({ combo: m[1], title: title[1], action: m[3].trim() });
   }
-  return rows;
+  // QML's engine has no Object.fromEntries.
+  const media = {};
+  for (const b of binds) if (b.combo.startsWith('XF86')) media[b.combo] = b.title;
+  return binds.map((b) => ({ title: b.title, key: keyText(b.combo, b.title, media), group: groupOf(b.combo, b.action) }));
 }
 
 export function groupRows(rows) {

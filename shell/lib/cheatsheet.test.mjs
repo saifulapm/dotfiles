@@ -56,6 +56,24 @@ test('binds group into surfaces, work, windows and system', () => {
   assert.equal(row('    XF86AudioMute allow-when-locked=true hotkey-overlay-title="Mute" { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }').group, 'SYSTEM');
 });
 
+// The binds reach the shell through dots-call now, and a surface is still a surface.
+test('the shell\'s surfaces group as SURFACES, not WORK', () => {
+  assert.equal(row('    Mod+N hotkey-overlay-title="Notes" { spawn "dots-call" "notes" "toggle"; }').group, 'SURFACES');
+  const rows = parseBinds(binds);
+  const titles = (g) => rows.filter((r) => r.group === g).map((r) => r.title);
+  for (const t of ['Launcher', 'Notes', 'Control', 'Pass']) assert.ok(titles('SURFACES').includes(t), t);
+  assert.deepEqual(titles('WORK').filter((t) => titles('SURFACES').includes(t)), []);
+});
+
+// A media key under a modifier reads as that key's own row does, behind the modifier, and stays a system key.
+test('a media key with a modifier shows the modifier and the bare key\'s name', () => {
+  const rows = parseBinds(binds);
+  const of = (title) => rows.find((r) => r.title === title);
+  assert.deepEqual([of('Volume Up 1%').key, of('Volume Up 1%').group], ['⌥ Volume Up', 'SYSTEM']);
+  assert.deepEqual([of('Brightness Full').key, of('Brightness Full').group], ['⇧ Brightness Up', 'SYSTEM']);
+  assert.deepEqual([of('Brightness Down 1%').key, of('Brightness Down 1%').group], ['⌥ Brightness Down', 'SYSTEM']);
+});
+
 test('rows group into the five groups in order, empty ones kept', () => {
   const rows = parseBinds('    Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }\n    Mod+Space hotkey-overlay-title="Launcher" { spawn "qs" "ipc" "call" "launcher" "toggle"; }\n');
   assert.deepEqual(
