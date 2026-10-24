@@ -143,10 +143,16 @@ FocusScope {
         if (!e || mode !== "starting")
             return;
         events = events.concat([e]);
-        if (e.event === "playing") {
+        if (e.event === "playing")
             playing = e;
-            tail.running = false;
-        }
+        else if (opening && (e.event === "ended" || e.event === "exit"))
+            opened();
+    }
+
+    // The wait on mpv ends: its window mapped, or mpv already quit, which a window up for less than one 500 ms poll would not show, or 120 s passed.
+    function opened() {
+        tail.running = false;
+        close();
     }
 
     function drawnRows() {
@@ -257,7 +263,7 @@ FocusScope {
     Tick {
         interval: 120000
         running: page.opening
-        onTriggered: page.close()
+        onTriggered: page.opened()
     }
     Process {
         id: mpvProbe
@@ -265,7 +271,7 @@ FocusScope {
         stdout: StdioCollector {
             onStreamFinished: {
                 if (page.opening && S.mpvMapped(text))
-                    page.close();
+                    page.opened();
             }
         }
     }
