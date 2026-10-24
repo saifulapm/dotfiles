@@ -244,13 +244,18 @@ FocusScope {
                 page.choose();
             else if (t === "w")
                 page.toggleWatched();
-            else if (t === "f")
+            else if (t === "f") {
                 page.filter = {
                     kind: page.shown.kind,
                     genre: (page.shown.genres || [])[0] ?? null,
                     language: page.shown.language || null
                 };
-            else
+                // Browse filters a language by its code and names it from its own table.
+                page.dekho.open("browse", Object.assign({
+                    language_code: page.shown.language_code || null,
+                    from: page.shown.title
+                }, page.filter));
+            } else
                 return;
             event.accepted = true;
         }

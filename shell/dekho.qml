@@ -136,7 +136,7 @@ ShellRoot {
             // t8: releases state
             {},
             // t9: browse state
-            {},
+            browsePage.state(),
             // t10: person state
             {}));
         }
@@ -184,6 +184,13 @@ ShellRoot {
         // t8: releases and starting
 
         // t9: browse
+        DekhoBrowse {
+            id: browsePage
+            anchors.fill: parent
+            visible: app.page === "browse"
+            focus: visible
+            dekho: app
+        }
 
         // t10: person
     }

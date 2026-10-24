@@ -135,6 +135,10 @@ FocusScope {
             const t = event.text;
             if (t === "/")
                 field.forceActiveFocus();
+            else if (t === "f")
+                home.dekho.open("browse", {
+                    from: "home"
+                });
             else if (k === Qt.Key_Escape) {
                 if (home.searching)
                     home.leaveSearch();
