@@ -149,6 +149,24 @@ export const RENAME_SCRIPT = [
   '',
 ].join('\n');
 
+// The drives udiskie mounted, from findmnt --list --json -b -o TARGET,LABEL,SIZE: a drive is named by its label, else its folder.
+export function drives(voice, text, user) {
+  let found = [];
+  try {
+    found = JSON.parse(text).filesystems;
+  } catch (e) {
+    return [];
+  }
+  const root = `/run/media/${user}/`;
+  return found
+    .filter((m) => m.target.indexOf(root) === 0)
+    .map((m) => ({ label: oneLine(m.label || m.target.slice(root.length)), path: m.target, size: sizeText(voice, { size: m.size }), group: 'drives' }));
+}
+
+// Every board heads the drives DRIVES but Artboard, and Blueprint writes the eject key in caps.
+export const driveText = (voice) => ({ head: voice === 'plain' ? 'Drives' : 'DRIVES', badge: voice === 'bracket' ? 'E' : 'e' });
+
+
 export const tilde = (home, path) => (path === home ? '~' : path.indexOf(home + '/') === 0 ? '~' + path.slice(home.length) : path);
 
 // Open with's head: "3 JPEG images" from the type's own description, or files when the targets' types differ.

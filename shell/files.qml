@@ -37,6 +37,11 @@ ShellRoot {
     property var trashPaths: []
     // Why the last rename, folder or trash failed, on the status line until the next key.
     property string notice: ""
+    // The mounted drives, and their drawn rows, which each drive's PlaceRow adds itself to for state().
+    property FilesDrives drivesWatch: FilesDrives {
+        voice: app.voice
+    }
+    property var driveRows: []
     // What a drag out carries: the rows, their paths, and the chip's image grabbed as it starts.
     property var dragRows: []
     readonly property var dragPaths: dragRows.map(r => pathOf(r))
@@ -75,7 +80,7 @@ ShellRoot {
                 label: p.label,
                 path: p.path,
                 group: "pinned"
-            }))).concat([trash])
+            }))).concat(drivesWatch.drives).concat([trash])
     readonly property var status: F.statusText(voice, rows, marked, selected)
 
     readonly property var c: theme.color
@@ -410,6 +415,8 @@ ShellRoot {
                 share: share.state(),
                 places: app.allPlaces.map(p => p.group + ":" + p.label),
                 placeAt: app.placeAt,
+                drives: app.driveRows.slice().sort((a, b) => a.at - b.at).map(r => r.drawn()),
+                driveError: app.drivesWatch.error,
                 path: pathLine.text,
                 count: countLabel.text,
                 finding: app.finding,
@@ -523,6 +530,8 @@ ShellRoot {
                     app.quit();
                 else if (k === Qt.Key_Tab)
                     app.toSide();
+                else if (t === "e" && app.side === "places" && app.allPlaces[app.placeAt].group === "drives")
+                    app.drivesWatch.eject(app.allPlaces[app.placeAt].path);
                 else if (t === "j" || k === Qt.Key_Down)
                     app.rowKey("down");
                 else if (t === "o")
@@ -1214,16 +1223,32 @@ ShellRoot {
         property string heading
         readonly property bool here: place.path === app.folder
         readonly property bool atCursor: app.side === "places" && app.placeAt === at
+        // A drive draws its size and an e badge, as the board does.
+        readonly property bool drive: place.group === "drives"
+        readonly property var driveText: F.driveText(app.voice)
+        function drawn() {
+            return {
+                head: headText.visible ? headText.text : "",
+                label: labelText.text,
+                lines: labelText.lineCount,
+                badge: badgeText.font.capitalization === Font.AllUppercase ? badgeText.text.toUpperCase() : badgeText.text
+            };
+        }
         Layout.fillWidth: true
         spacing: 0
 
+        Component.onCompleted: if (drive)
+            app.driveRows = app.driveRows.concat([placeRow])
+        Component.onDestruction: app.driveRows = app.driveRows.filter(r => r !== placeRow)
+
         Text {
+            id: headText
             visible: placeRow.heading !== ""
             topPadding: placeRow.at === 0 ? 4 : 10
             bottomPadding: 6
             leftPadding: 12
             textFormat: Text.PlainText
-            text: plain ? placeRow.heading.charAt(0).toUpperCase() + placeRow.heading.slice(1) : placeRow.heading.toUpperCase()
+            text: placeRow.drive ? placeRow.driveText.head : plain ? placeRow.heading.charAt(0).toUpperCase() + placeRow.heading.slice(1) : placeRow.heading.toUpperCase()
             color: look.small.color
             font.family: look.small.font
             font.pixelSize: 10
@@ -1236,18 +1261,45 @@ ShellRoot {
             color: placeRow.atCursor ? look.cursor.fill : placeRow.here ? Qt.alpha(c.ink ?? "black", 0.06) : "transparent"
 
             Text {
+                id: labelText
                 anchors.verticalCenter: parent.verticalCenter
                 x: 10
-                width: parent.width - 20
+                width: parent.width - 20 - (placeRow.drive ? badge.width + 8 : 0)
                 textFormat: Text.PlainText
                 // A pin is a folder's own name and keeps its case.
-                text: P.oneLine(placeRow.place.label)
+                text: P.oneLine(placeRow.place.label) + (placeRow.drive ? " · " + placeRow.place.size : "")
                 maximumLineCount: 1
                 elide: Text.ElideRight
                 color: placeRow.atCursor ? look.cursor.text : placeRow.here ? c.ink ?? "black" : c.muted ?? "gray"
                 font.family: bracket ? fonts.mono ?? "" : fonts.ui ?? ""
-                font.pixelSize: 13
+                font.pixelSize: placeRow.drive ? 12 : 13
                 font.weight: placeRow.here ? Font.Medium : Font.Normal
+            }
+            // Paper's badge is boxed and in caps, Artboard's filled and rounded, Blueprint's boxed in the mono face.
+            Rectangle {
+                id: badge
+                visible: placeRow.drive
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                width: badgeText.implicitWidth + (plain ? 12 : 8)
+                height: badgeText.implicitHeight + 2
+                radius: plain ? 6 : 0
+                color: plain ? Qt.alpha(c.ink ?? "black", 0.06) : "transparent"
+                border.width: plain ? 0 : 1
+                border.color: placeRow.atCursor ? look.cursor.text : c.muted ?? "gray"
+
+                Text {
+                    id: badgeText
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: placeRow.driveText.badge
+                    color: placeRow.atCursor ? look.cursor.text : c.muted ?? "gray"
+                    font.family: bracket ? fonts.mono ?? "" : fonts.ui ?? ""
+                    font.pixelSize: plain ? 11 : 10
+                    font.weight: plain ? Font.Medium : Font.Normal
+                    font.capitalization: voice === "caps" ? Font.AllUppercase : Font.MixedCase
+                }
             }
         }
     }

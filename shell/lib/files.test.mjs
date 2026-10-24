@@ -200,3 +200,27 @@ test('an app row is its name, its kind and command, and the default\'s badge in 
 test('an app name or kind with a newline or U+202E is one plain line', () => {
   assert.deepEqual(F.appText('plain', { name: 'bad\nname‮x', generic: 'a\nb', exec: 'v', default: false }), { name: 'bad namex', sub: 'a b · v', badge: '' });
 });
+
+test('the drives are the mounts under /run/media/<user>, each with its label, else its folder, and its size', () => {
+  const findmnt = JSON.stringify({
+    filesystems: [
+      { target: '/', label: 'fedora', size: 172457197568 },
+      { target: '/run/media/saiful/TESTUSB', label: 'TESTUSB', size: 20912128 },
+      { target: '/run/media/saiful/4A1F-09C2', label: null, size: 1000204886016 },
+      { target: '/run/media/saiful/evil', label: 'T7\nShield‮', size: 512 },
+      { target: '/run/media/saiful2/X', label: 'X', size: 1 },
+    ],
+  });
+  assert.deepEqual(F.drives('caps', findmnt, 'saiful'), [
+    { label: 'TESTUSB', path: '/run/media/saiful/TESTUSB', size: '21 MB', group: 'drives' },
+    { label: '4A1F-09C2', path: '/run/media/saiful/4A1F-09C2', size: '1000 GB', group: 'drives' },
+    { label: 'T7 Shield', path: '/run/media/saiful/evil', size: '512 B', group: 'drives' },
+  ]);
+  assert.deepEqual(F.drives('caps', 'not json', 'saiful'), []);
+});
+
+test('the drives head and the eject badge in each theme', () => {
+  assert.deepEqual(F.driveText('caps'), { head: 'DRIVES', badge: 'e' });
+  assert.deepEqual(F.driveText('plain'), { head: 'Drives', badge: 'e' });
+  assert.deepEqual(F.driveText('bracket'), { head: 'DRIVES', badge: 'E' });
+});
