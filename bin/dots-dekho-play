@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# dots-dekho-play: runs `dekho play --json` in a transient user unit, so playback outlives Dekho's window and qs, and writes its NDJSON to a file Dekho tails; --stop stops it (mpv is in its cgroup) and waits, --status prints {active, session}.
+
+# The caller names the file, a new path each run: its tail starts at once, and a reused path would replay the last run's events.
+set -uo pipefail
+{
+unit=${DOTS_DEKHO_UNIT:-dekho-play}
+runtime=${XDG_RUNTIME_DIR:-/tmp}/dekho
+log=$runtime/$unit.log
+# --status reads the session back from here, since the unit's own properties do not name it plainly.
+current=$runtime/$unit.session
+
+active() { systemctl --user is-active --quiet "$unit.service"; }
+
+# systemctl stop returns before the cgroup drains, and systemd-run refuses a unit still active; bounded at 2 s so a stuck unit cannot hang the App.
+stop_wait() {
+  systemctl --user stop "$unit.service" >/dev/null 2>&1 || true
+  local _
+  for _ in $(seq 1 40); do
+    active || return 0
+    sleep 0.05
+  done
+}
+
+case "${1:-}" in
+--stop)
+  stop_wait
+  exit 0
+  ;;
+--status)
+  if active && [ -f "$current" ]; then
+    jq -nc --arg s "$(cat "$current")" '{active: true, session: $s}'
+  else
+    echo '{"active":false,"session":""}'
+  fi
+  exit 0
+  ;;
+--session)
+  session=${2:?dots-dekho-play: --session needs a path}
+  shift 2
+  ;;
+*)
+  echo "dots-dekho-play: usage: --session <file> <play args...> | --stop | --status" >&2
+  exit 2
+  ;;
+esac
+
+mkdir -p "$runtime"
+stop_wait
+printf '%s\n' "$session" >"$current"
+# The unit gets the user manager's environment, not this one's, so a nested check's fake gets its dir passed on.
+exec systemd-run --user --collect --quiet --unit "$unit" \
+  ${DOTS_DEV_DIR:+--setenv=DOTS_DEV_DIR} \
+  -p "StandardOutput=truncate:$session" -p "StandardError=append:$log" \
+  -- "${DOTS_DEKHO:-dekho}" play --json "$@"
+exit
+}
