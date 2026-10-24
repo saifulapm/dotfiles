@@ -87,6 +87,16 @@ url = "https://github.com/saifulapm/dekho/archive/{version}.tar.gz"
 sha256 = "cda1f75957a997f39edad1c0324d094a7b08e07e8a53212f061cb475b33292df"
 
 [[pin]]
+name = "deen"
+version = "afe8af5db9cc5b32cc3bb66939b064d55ff8a153"
+repo = "saifulapm/deen"
+track = "commit"
+install = "~/.local/bin/deen, Deen's backend, built with cargo, and the Quran text, word meanings and Hisn al-Muslim in ~/.local/share/deen"
+runs = "deen --version"
+url = "https://github.com/saifulapm/deen/archive/{version}.tar.gz"
+sha256 = "f3660718224c03ece10b97a7dce17ce8a2a076e900919f4bb3805eba28941211"
+
+[[pin]]
 name = "lazygit"
 version = "0.66.2"
 repo = "jesseduffield/lazygit"

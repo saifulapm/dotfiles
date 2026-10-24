@@ -130,6 +130,11 @@ arch = "all"
 why = "Arabic, the fallback for every font"
 
 [[package]]
+name = "amiri-fonts"
+arch = "all"
+why = "Amiri, the face Deen's boards draw the Quran and duas in"
+
+[[package]]
 name = "google-noto-color-emoji-fonts"
 arch = "all"
 why = "emoji outside foot"
