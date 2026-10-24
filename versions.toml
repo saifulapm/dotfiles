@@ -77,6 +77,16 @@ url = "https://github.com/saifulapm/pxy/archive/{version}.tar.gz"
 sha256 = "5dfbdd21fcabc2f8ba9cf69d476fa79b67622a98ffcebcb46a6440d11f1906b5"
 
 [[pin]]
+name = "dekho"
+version = "98a0af936cf229e58516931ba50b6199f0e86e3a"
+repo = "saifulapm/dekho"
+track = "commit"
+install = "~/.local/bin/dekho, Dekho's backend, built with cargo"
+runs = "dekho --version"
+url = "https://github.com/saifulapm/dekho/archive/{version}.tar.gz"
+sha256 = "519cd5630c9c4adf6c6dbcd79deecabb9d717bf600026bae749c3acbf9a90fdb"
+
+[[pin]]
 name = "lazygit"
 version = "0.66.2"
 repo = "jesseduffield/lazygit"
