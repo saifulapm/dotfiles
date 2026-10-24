@@ -68,7 +68,6 @@ ShellRoot {
 
     function openTitle(hit) {
         opened = hit.id;
-        // t7: title page
         titlePage.load(hit);
         open("title", hit);
     }
@@ -138,11 +137,8 @@ ShellRoot {
                 voice: app.voice,
                 opened: app.opened
             }, home.state(), titlePage.state(),
-            // t8: releases state
             releases.state(),
-            // t9: browse state
             browsePage.state(),
-            // t10: person state
             personPage.state()));
         }
     }
@@ -186,7 +182,6 @@ ShellRoot {
             }
         }
 
-        // t8: releases and starting
         DekhoReleases {
             id: releases
             anchors.fill: parent
@@ -209,7 +204,6 @@ ShellRoot {
             }
         }
 
-        // t9: browse
         DekhoBrowse {
             id: browsePage
             anchors.fill: parent
@@ -218,7 +212,6 @@ ShellRoot {
             dekho: app
         }
 
-        // t10: person
         DekhoPerson {
             id: personPage
             anchors.fill: parent

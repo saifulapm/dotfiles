@@ -740,12 +740,15 @@ FocusScope {
                             font.letterSpacing: page.caps ? 1 : page.bracket ? 1.5 : 0
                         }
                         Text {
+                            // The f key's word carries the person's name, which TMDB controls.
+                            width: Math.min(implicitWidth, 360)
                             textFormat: Text.PlainText
                             text: D.title(modelData.word)
                             color: page.c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: page.caps ? 10 : 11
                             font.letterSpacing: page.caps ? 1 : page.bracket ? 1.5 : 0
+                            elide: Text.ElideRight
                         }
                     }
                 }
