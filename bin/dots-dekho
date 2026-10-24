@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# dots-dekho: opens Dekho, or focuses its window when one is open, since a second qs -p would draw a second window.
+set -euo pipefail
+{
+repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+id=$(niri msg -j windows | jq -r 'first(.[] | select(.app_id == "dekho") | .id) // empty')
+[ -z "$id" ] || exec niri msg action focus-window --id "$id"
+# As the shell's unit runs qs: no platform theme's start-up cost, one render loop, only the themes' faces.
+export QT_QPA_PLATFORMTHEME= QSG_RENDER_LOOP=basic FONTCONFIG_FILE=$repo/shell/fonts.conf
+exec qs -p "$repo/shell/dekho.qml"
+exit
+}

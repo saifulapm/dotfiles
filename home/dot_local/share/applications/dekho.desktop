@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Dekho
+GenericName=Films and Series
+Comment=Find films and series, and stream them into mpv
+Exec=dots-dekho
+Icon=video-x-generic
+Terminal=false
+Categories=AudioVideo;Video;
