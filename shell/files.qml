@@ -191,7 +191,13 @@ ShellRoot {
         query = q;
         selected = 0;
         const at = F.findPlace(fixedPlaces.concat(pins), q);
-        if (at >= 0 && allPlaces[at].path !== folder)
+        if (at < 0)
+            return;
+        // A find that names the folder already shown has found it: it ends, rather than narrowing to nothing.
+        if (allPlaces[at].path === folder) {
+            finding = false;
+            query = "";
+        } else
             enter(allPlaces[at].path);
     }
 
@@ -589,6 +595,7 @@ ShellRoot {
                 },
                 status: {
                     path: statusPath.text,
+                    pathElided: statusPath.truncated,
                     counts: statusCounts.text,
                     at: statusAt.text
                 },
@@ -1335,10 +1342,18 @@ ShellRoot {
                 Layout.bottomMargin: plain ? 0 : 8
                 spacing: 18
 
+                // The path takes its whole width and gives way only when the row runs out; bound to its implicitWidth it stayed elided with room beside it (#KYZ754D8), so the measure is the text's own.
+                TextMetrics {
+                    id: pathMetrics
+                    font: statusPath.font
+                    text: statusPath.text
+                }
                 Text {
                     id: statusPath
                     Layout.fillWidth: true
-                    Layout.maximumWidth: implicitWidth
+                    Layout.preferredWidth: Math.ceil(pathMetrics.advanceWidth) + 1
+                    Layout.maximumWidth: Math.ceil(pathMetrics.advanceWidth) + 1
+                    Layout.minimumWidth: 40
                     textFormat: Text.PlainText
                     text: app.cursorRow ? P.oneLine(F.tilde(app.home, app.pathOf(app.cursorRow))) : ""
                     maximumLineCount: 1
