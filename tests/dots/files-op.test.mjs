@@ -215,6 +215,38 @@ test('retry after room is made copies the file that failed', async (t) => {
   assert.equal(r.seen.split('--\n').at(-1), `four.bin ${MiB}\nthree.bin ${2 * MiB}\n`);
 });
 
+// A file inside a pasted folder that cannot be copied: a fifo fails as "not a regular file" for any user.
+function folderWithFifo(root) {
+  const photos = join(root, 'photos');
+  mkdirSync(photos);
+  writeFileSync(join(photos, 'a.txt'), 'a');
+  spawnSync('mkfifo', [join(photos, 'b')]);
+  writeFileSync(join(photos, 'c.txt'), 'c');
+  return photos;
+}
+
+test('skip on a file inside a pasted folder skips only that file and copies the rest', (t) => {
+  const { root, dst } = scratch(t);
+  const photos = folderWithFifo(root);
+  const r = spawnSync(bin, ['copy', dst, photos], { input: 'skip\n', encoding: 'utf8', timeout: 10000 });
+  const events = r.stdout.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(events.find((e) => e.event === 'failed').file, join(photos, 'b'));
+  assert.deepEqual(readdirSync(join(dst, 'photos')).sort(), ['a.txt', 'c.txt']);
+});
+
+test('a folder moved across filesystems with a skipped file keeps its source whole', (t) => {
+  const { root } = scratch(t);
+  const photos = folderWithFifo(root);
+  const mnt = join(root, 'mnt');
+  mkdirSync(mnt);
+  const r = spawnSync('unshare', ['--user', '--map-root-user', '--mount', 'sh', '-c', `mount -t tmpfs tmpfs '${mnt}' && printf 'skip\\n' | '${bin}' move '${mnt}' '${photos}' && ls '${mnt}/photos'`], { encoding: 'utf8', timeout: 10000 });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /"event":"done"/);
+  assert.match(r.stdout, /^a\.txt\nc\.txt$/m);
+  assert.deepEqual(readdirSync(photos).sort(), ['a.txt', 'b', 'c.txt']);
+});
+
 test('bad usage exits 2', (t) => {
   const { root, dst } = scratch(t);
   const a = join(root, 'a.txt');

@@ -83,6 +83,7 @@ class Op:
         self.done, self.last = 0, 0.0
         self.copied = []
         self.index = 0
+        self.skipped = False
         # Bytes written at each recent moment, so the rate covers about the last second.
         self.samples = collections.deque()
 
@@ -124,7 +125,7 @@ class Op:
                 dest = claim(dest_dir, name, False, lambda p: os.close(os.open(p, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)))
                 # Whatever stops the copy, failure or SIGTERM, the partial file goes and its bytes come off the progress.
                 try:
-                    fd_out = os.open(dest, os.O_WRONLY)
+                    fd_out = os.open(dest, os.O_WRONLY | os.O_NOFOLLOW)
                     try:
                         while chunk := os.read(fd_in, CHUNK):
                             view = memoryview(chunk)
@@ -162,8 +163,12 @@ class Op:
         if os.path.isdir(src):
             dest = self.attempt(src, lambda: claim(dest_dir, name, True, os.mkdir))
             entries = self.attempt(src, lambda: sorted(os.listdir(src)))
+            # s skips the one file that failed; the rest of the folder still copies.
             for entry in entries:
-                self.copy_any(os.path.join(src, entry), dest, entry)
+                try:
+                    self.copy_any(os.path.join(src, entry), dest, entry)
+                except Skip:
+                    self.skipped = True
             # The folder's mtime is set last, since writing its contents moves it.
             shutil.copystat(src, dest)
             return dest
@@ -178,8 +183,11 @@ class Op:
         if dest:
             self.add(self.sizes[self.index])
             return dest
+        self.skipped = False
         dest = self.copy_any(src, target, name)
-        self.attempt(src, lambda: shutil.rmtree(src) if is_dir else os.unlink(src))
+        # A folder with a skipped file was not all copied, so its source stays whole.
+        if not self.skipped:
+            self.attempt(src, lambda: shutil.rmtree(src) if is_dir else os.unlink(src))
         return dest
 
     # Answers the new path, or None when src is on another filesystem.
