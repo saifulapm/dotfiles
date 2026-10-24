@@ -92,6 +92,8 @@ check "Enter on a crew name opens that person ($(dekho_state | jq -c .person))" 
 wtype f
 until_ok 1000 dekho_is '.filter != null'
 check "f asks Browse for this title's kind, genre and language ($(dekho_state | jq -c .filter))" dekho_is '.filter == {"kind": "tv", "genre": "Drama", "language": "English"}'
+wtype -k Escape
+until_ok 1000 dekho_is '.page == "title"'
 
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
