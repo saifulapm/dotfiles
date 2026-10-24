@@ -55,7 +55,7 @@ asked() { asked_since "$mark" | tr '\n' ';'; }
 export -f asked_since answer_for drawn_matches dekho_state titles chips
 export calls work repo dekho_qml
 
-no_code() { dekho_is '[.browse.chips[].text, .browse.rows[] | (.title, .year, .rating)] | all(test("^[a-z]{2}$") or test("^[A-Z]{2}$") | not)'; }
+no_code() { dekho_is '[.browse.chips[].text, (.browse.rows[] | .title, .year, .rating)] | all(test("^[a-z]{2}$") or test("^[A-Z]{2}$") | not)'; }
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"

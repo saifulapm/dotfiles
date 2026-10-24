@@ -34,16 +34,16 @@ FocusScope {
     property int asked: 0
     // The stack entry last loaded, so going back to Browse keeps its filters.
     property var loaded: null
-    readonly property var top: dekho.stack[dekho.stack.length - 1]
+    readonly property var entry: dekho.stack[dekho.stack.length - 1]
 
     property bool picking: false
     property var people: []
     property int pick: 0
     property string peopleAsked: ""
 
-    onTopChanged: if (top.page === "browse" && top.args !== loaded) {
-        loaded = top.args;
-        load(top.args || {});
+    onEntryChanged: if (entry.page === "browse" && entry.args !== loaded) {
+        loaded = entry.args;
+        load(entry.args || {});
     }
 
     // A title's context chooses its kind, genre and language once the tables can name them.
