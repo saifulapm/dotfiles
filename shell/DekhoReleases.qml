@@ -227,10 +227,10 @@ FocusScope {
         }
     }
 
-    // tail ends with the App; the unit does not, so closing Dekho never stops a film. Where tail polls, its 1 s default drew the buffers in bursts, so it polls every 0.1 s.
+    // tail ends with the App, even one killed outright, by watching qs's pid; the unit does not, so closing Dekho never stops a film. Where tail polls, its 1 s default drew the buffers in bursts, so it polls every 0.1 s.
     Process {
         id: tail
-        command: ["tail", "-n", "+1", "-s", "0.1", "-F", page.session]
+        command: ["sh", "-c", "exec tail --pid=\"$PPID\" -n +1 -s 0.1 -F \"$1\"", "sh", page.session]
         stdout: SplitParser {
             onRead: line => page.heard(line)
         }

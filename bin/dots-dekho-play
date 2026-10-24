@@ -46,6 +46,8 @@ case "${1:-}" in
 esac
 
 mkdir -p "$runtime"
+# Each play leaves its session file; a day on, nothing tails it any more.
+find "$runtime" -maxdepth 1 -name 'session-*.ndjson' -mmin +1440 -delete 2>/dev/null
 stop_wait
 printf '%s\n' "$session" >"$current"
 # The unit gets the user manager's environment, not this one's, so whatever dekho reads (its hosts, key and dirs, and the display mpv opens on) is passed on by name when set, as is a nested check's fake dir.
@@ -53,9 +55,18 @@ pass=()
 for name in $(compgen -e); do
   case $name in DEKHO_* | TMDB_API_KEY | XDG_CONFIG_HOME | XDG_CACHE_HOME | XDG_STATE_HOME | MPV_HOME | WAYLAND_DISPLAY | DOTS_DEV_DIR) pass+=("--setenv=$name") ;; esac
 done
-exec systemd-run --user --collect --quiet --unit "$unit" \
+# A play that never starts writes no event, and Starting would wait on an empty file, so this writes the error and exit Starting draws.
+failed() {
+  jq -nc --arg t "dekho did not start; $unit.log in $runtime says why" '{event: "error", text: $t}' >"$session"
+  echo '{"event":"exit","code":1}' >>"$session"
+  exit 1
+}
+systemd-run --user --collect --quiet --unit "$unit" \
   "${pass[@]}" \
   -p "StandardOutput=truncate:$session" -p "StandardError=append:$log" \
-  -- "${DOTS_DEKHO:-dekho}" play --json "$@"
+  -- "${DOTS_DEKHO:-dekho}" play --json "$@" || failed
+# A dekho that is missing or dies at once leaves its unit gone with nothing written.
+sleep 0.3
+active || [ -s "$session" ] || failed
 exit
 }

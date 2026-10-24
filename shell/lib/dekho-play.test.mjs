@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,7 +12,8 @@ test('the play unit is given every DEKHO_* and the key, dirs and display the cal
   const dir = mkdtempSync(join(tmpdir(), 'dekho-play-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const log = join(dir, 'argv');
-  writeFileSync(join(dir, 'systemd-run'), `#!/bin/sh\nprintf '%s\\n' "$@" > "${log}"\n`);
+  // As the unit would, it writes dekho's first event into the session file it was handed.
+  writeFileSync(join(dir, 'systemd-run'), `#!/bin/sh\nprintf '%s\\n' "$@" > "${log}"\nfor a; do case $a in StandardOutput=truncate:*) echo '{"event":"status"}' > "\${a#StandardOutput=truncate:}" ;; esac; done\n`);
   // Inactive, so the stop before the run returns at once.
   writeFileSync(join(dir, 'systemctl'), '#!/bin/sh\nexit 3\n');
   chmodSync(join(dir, 'systemd-run'), 0o755);
@@ -31,4 +32,53 @@ test('the play unit is given every DEKHO_* and the key, dirs and display the cal
     '--setenv=XDG_CACHE_HOME', '--setenv=XDG_CONFIG_HOME', '--setenv=XDG_STATE_HOME',
   ]);
   assert.deepEqual(argv.slice(argv.indexOf('--')), ['--', '/opt/dekho', 'play', '--json', '--id', '900002', '--kind', 'tv']);
+});
+
+// A fake systemd-run and an always-inactive systemctl in a scratch dir; returns the dir and a runner.
+function rig(t, systemdRun) {
+  const dir = mkdtempSync(join(tmpdir(), 'dekho-play-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, 'systemd-run'), `#!/bin/sh\n${systemdRun}\n`);
+  writeFileSync(join(dir, 'systemctl'), '#!/bin/sh\nexit 3\n');
+  chmodSync(join(dir, 'systemd-run'), 0o755);
+  chmodSync(join(dir, 'systemctl'), 0o755);
+  const env = { PATH: `${dir}:${process.env.PATH}`, HOME: dir, XDG_RUNTIME_DIR: dir, DOTS_DEKHO_UNIT: 'dekho-play-unit-test' };
+  const play = (session) => spawnSync('bash', [bin, '--session', session, '--id', '1', '--kind', 'movie'], { env, encoding: 'utf8', timeout: 5000 });
+  return { dir, play };
+}
+
+const events = (file) => readFileSync(file, 'utf8').trimEnd().split('\n').map((l) => JSON.parse(l));
+
+// Starting draws an error and its exit; a play that never starts writes no event of its own, so the script writes them.
+test('a unit systemd-run refuses leaves an error and exit 1 in the session file', (t) => {
+  const { dir, play } = rig(t, 'exit 1');
+  const r = play(`${dir}/s.ndjson`);
+  assert.equal(r.status, 1);
+  const got = events(`${dir}/s.ndjson`);
+  assert.equal(got[0].event, 'error');
+  assert.match(got[0].text, /dekho did not start/);
+  assert.deepEqual(got[1], { event: 'exit', code: 1 });
+});
+
+test('a unit that ends at once without an event, as one whose dekho is missing does, leaves an error and exit 1', (t) => {
+  const { dir, play } = rig(t, 'exit 0');
+  const r = play(`${dir}/s.ndjson`);
+  assert.equal(r.status, 1);
+  assert.deepEqual(events(`${dir}/s.ndjson`).map((e) => e.event), ['error', 'exit']);
+});
+
+test('session files over a day old are swept, a newer one is kept', (t) => {
+  const { dir, play } = rig(t, 'for a; do case $a in StandardOutput=truncate:*) echo \'{"event":"status"}\' > "${a#StandardOutput=truncate:}" ;; esac; done');
+  const runtime = join(dir, 'dekho');
+  spawnSync('mkdir', ['-p', runtime]);
+  const old = join(runtime, 'session-1.ndjson');
+  const recent = join(runtime, 'session-2.ndjson');
+  writeFileSync(old, '{}\n');
+  writeFileSync(recent, '{}\n');
+  const twoDays = Date.now() / 1000 - 2 * 86400;
+  utimesSync(old, twoDays, twoDays);
+  const r = play(join(runtime, 'session-3.ndjson'));
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(existsSync(old), false);
+  assert.equal(existsSync(recent), true);
 });
