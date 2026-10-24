@@ -1,0 +1,11 @@
+[Unit]
+Description=dots clipboard sync, which pushes each copy to the other machines
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/wl-paste --type text --watch %h/.local/bin/dots-clip-push
+# The other machines post to port 80 of this one's tailnet name; a machine whose tailscaled is down still pushes.
+ExecStartPost=-/usr/bin/timeout 30 /usr/bin/tailscale serve --bg --yes --http=80 http://127.0.0.1:9411
+Restart=on-failure
+RestartSec=5

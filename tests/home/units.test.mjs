@@ -31,7 +31,9 @@ test('every timer, path and socket has the service it triggers', () => {
   const triggers = readdirSync(units).filter((f) => /\.(timer|path|socket)(\.tmpl)?$/.test(f)).map((f) => f.replace(/\.tmpl$/, ''));
   const missing = triggers.filter((t) => {
     const named = unitText(t).match(/^Unit=(\S+)/m);
-    return !shipped(named ? named[1] : t.replace(/\.(timer|path|socket)$/, '.service'));
+    // An Accept=yes socket starts one instance of its template per connection.
+    const service = /^Accept=yes$/m.test(unitText(t)) ? '@.service' : '.service';
+    return !shipped(named ? named[1] : t.replace(/\.(timer|path|socket)$/, service));
   });
   assert.deepEqual(missing, []);
 });

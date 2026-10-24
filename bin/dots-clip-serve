@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# dots-clip-serve: answers one HTTP connection dots-clip-serve.socket hands it; GET / returns this machine's clipboard, POST / replaces it. The other machines post through tailscale serve on port 80, the phone straight to 10.99.99.99:9411; the protocol is v1's, so v1 machines and v2 ones sync with each other.
+set -uo pipefail
+{
+
+runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+# dots-clip-push skips a copy that matches this file, so a copy received from a peer is not sent back.
+last=$runtime/dots-clip-sync.last
+max_bytes=1048576
+
+respond() {
+  printf 'HTTP/1.1 %s\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' "$1" "${#2}" "$2"
+}
+
+# systemd hands over the peer, an IPv4 one in its v6-mapped form; tailscale serve connects from 127.0.0.1, and the phone through the VIP from its tailnet address.
+peer=${REMOTE_ADDR:-}
+peer=${peer#::ffff:}
+case $peer in
+  "" | 127.* | ::1 | 10.99.99.99 | 100.* | fd7a:115c:a1e0:*) ;;
+  *)
+    respond "403 Forbidden" $'tailnet only\n'
+    exit 0
+    ;;
+esac
+
+# A client that connects and says nothing gets 10 s a read; the unit's RuntimeMaxSec is the backstop.
+read -r -t 10 method _target _proto || exit 0
+case $method in
+  GET | POST) ;;
+  *)
+    respond "405 Method Not Allowed" $'method not allowed\n'
+    exit 0
+    ;;
+esac
+
+length=""
+expect=""
+relay=""
+xff=""
+while IFS= read -r -t 10 header; do
+  header=${header%$'\r'}
+  [[ -n $header ]] || break
+  case ${header,,} in
+    content-length:*)
+      length=${header#*:}
+      length=${length//[[:space:]]/}
+      ;;
+    expect:*100-continue*) expect=1 ;;
+    x-clipboard-relay:*) relay=1 ;;
+    # tailscale serve passes the real caller on here; it only names the sender in the notification.
+    x-forwarded-for:*)
+      xff=${header#*:}
+      xff=${xff//[[:space:]]/}
+      xff=${xff%%,*}
+      ;;
+  esac
+done
+
+if [[ $method == GET ]]; then
+  tmp=$(mktemp -p "$runtime" dots-clip-serve.XXXXXX) || exit 1
+  trap 'rm -f "$tmp"' EXIT
+  # A clipboard with no text, or an owner that stalls, answers as empty.
+  timeout 2s wl-paste --no-newline --type text >"$tmp" 2>/dev/null || : >"$tmp"
+  printf 'HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %s\r\nConnection: close\r\n\r\n' "$(stat -c %s "$tmp")"
+  cat "$tmp"
+  exit 0
+fi
+
+[[ $length =~ ^[0-9]+$ ]] || {
+  respond "411 Length Required" $'content-length required\n'
+  exit 0
+}
+((length <= max_bytes)) || {
+  respond "413 Content Too Large" $'too large\n'
+  exit 0
+}
+((length > 0)) || {
+  respond "200 OK" $'empty, ignored\n'
+  exit 0
+}
+
+# curl waits about a second for this before sending a body over 1 KiB.
+[[ -z $expect ]] || printf 'HTTP/1.1 100 Continue\r\n\r\n'
+
+tmp=$(mktemp -p "$runtime" dots-clip-serve.XXXXXX) || exit 1
+trap 'rm -f "$tmp" "$tmp.txt"' EXIT
+head -c "$length" >"$tmp"
+
+# iOS apps often copy only rich text, so an RTF body becomes plain text; on any failure the bytes go through as they came.
+if [[ $(head -c 6 "$tmp") == '{\rtf1' ]] && command -v pandoc >/dev/null 2>&1; then
+  if pandoc -f rtf -t plain --wrap=none <"$tmp" >"$tmp.txt" 2>/dev/null && [[ -s $tmp.txt ]]; then
+    mv "$tmp.txt" "$tmp"
+  else
+    rm -f "$tmp.txt"
+  fi
+fi
+
+# A post without the relay header came from a person, the phone, and is the one worth a notification; the preview is read now because wl-copy's unit removes the file.
+preview=""
+[[ -n $relay ]] || preview=$(head -c 200 "$tmp" | tr -s '[:space:]' ' ' | iconv -f utf-8 -t utf-8 -c 2>/dev/null)
+
+notify_arrival() {
+  local who=${xff:-$peer} sender=""
+  case $who in
+    "" | 127.* | ::1 | 10.99.99.99) ;;
+    *) sender=$(tailscale whois --json "$who" 2>/dev/null | jq -r '.Node.ComputedName // empty' 2>/dev/null) ;;
+  esac
+  notify-send -a Clipboard -- "Clipboard from ${sender:-tailnet}" "$preview" >/dev/null 2>&1 || true
+}
+
+# A relay reaches every machine already, so it is marked to keep this one from sending it on; the phone's post reaches only this machine, which passes it on.
+[[ -z $relay ]] || cp "$tmp" "$last" 2>/dev/null || true
+# Bytes the clipboard already holds are a relay back at its origin, and stopping here is what ends every chain.
+if cmp -s "$tmp" <(timeout 2s wl-paste --no-newline --type text 2>/dev/null); then
+  [[ -n $relay ]] || notify_arrival
+  respond "200 OK" $'unchanged\n'
+  exit 0
+fi
+
+# wl-copy must outlive this connection's unit to answer later pastes, so it runs in a unit of its own, which removes the file once it has it open.
+if systemd-run --user --quiet --collect sh -c 'exec 0<"$1"; rm -f -- "$1"; exec wl-copy --foreground --type text/plain' sh "$tmp"; then
+  trap - EXIT
+  [[ -n $relay ]] || notify_arrival
+  respond "200 OK" $'ok\n'
+else
+  respond "500 Internal Server Error" $'wl-copy failed\n'
+fi
+exit
+}

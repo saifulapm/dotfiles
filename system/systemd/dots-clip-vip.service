@@ -1,0 +1,10 @@
+[Unit]
+Description=dots clipboard VIP, 10.99.99.99 on loopback, which the phone reaches on whichever machine is awake
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/ip addr replace 10.99.99.99/32 dev lo
+
+[Install]
+WantedBy=multi-user.target

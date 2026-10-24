@@ -1,5 +1,7 @@
 #!/bin/bash
 {{ template "lib.sh" . }}
-# dots-clip.service runs the store script from ~/.local/bin, since the repo's bin/ is not on the user manager's PATH.
+# The clipboard units run their scripts from ~/.local/bin, since the repo's bin/ is not on the user manager's PATH.
 mkdir -p "$HOME/.local/bin"
 ln -sfn {{ joinPath .chezmoi.workingTree "bin/dots-clip-store" | quote }} "$HOME/.local/bin/dots-clip-store" || die "could not link the clipboard store script"
+ln -sfn {{ joinPath .chezmoi.workingTree "bin/dots-clip-serve" | quote }} "$HOME/.local/bin/dots-clip-serve" || die "could not link the clipboard endpoint"
+ln -sfn {{ joinPath .chezmoi.workingTree "bin/dots-clip-push" | quote }} "$HOME/.local/bin/dots-clip-push" || die "could not link the clipboard push"

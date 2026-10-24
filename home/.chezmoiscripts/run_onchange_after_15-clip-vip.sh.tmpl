@@ -1,0 +1,12 @@
+#!/bin/bash
+# VIP unit hash: {{ joinPath .chezmoi.workingTree "system/systemd/dots-clip-vip.service" | include | sha256sum }}
+{{ template "lib.sh" . }}
+# Every machine holds the VIP and advertises its route (dots install's tailscale up), and Tailscale sends the phone to one that is online.
+root install -D -m 0644 {{ joinPath .chezmoi.workingTree "system/systemd/dots-clip-vip.service" | quote }} /etc/systemd/system/dots-clip-vip.service || die "could not install the clipboard VIP unit"
+root systemctl enable dots-clip-vip.service >/dev/null 2>&1 || die "could not enable the clipboard VIP"
+root systemctl daemon-reload 2>/dev/null && root systemctl restart dots-clip-vip.service 2>/dev/null || log "the clipboard VIP comes up at the next boot"
+if root firewall-cmd --state >/dev/null 2>&1; then
+  # tailscale0 falls in the default zone, which drops the phone's connection to 9411.
+  rule='rule family="ipv4" source address="100.64.0.0/10" port port="9411" protocol="tcp" accept'
+  root firewall-cmd -q --add-rich-rule="$rule" && root firewall-cmd -q --permanent --add-rich-rule="$rule" || die "could not let the tailnet reach the clipboard on 9411"
+fi

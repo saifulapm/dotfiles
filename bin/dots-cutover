@@ -8,9 +8,10 @@ config=${XDG_CONFIG_HOME:-$HOME/.config}
 data=${XDG_DATA_HOME:-$HOME/.local/share}
 fish=$data/fish
 units=$config/systemd/user
-# v2 takes over hub-local, pxy, bt-agent and dufs under the same names, homepod-sink as dots-homepod, and havit-guard with WirePlumber's HFP retry, since cycling the link under music is what that retry avoids; every other v1 unit (mempressure...) has no v2 replacement and keeps running from ~/.dotfiles.
+# v2 takes over hub-local, pxy, bt-agent, dufs and libinput-gestures under the same names, homepod-sink as dots-homepod, clipboard-sync and clipboard-serve as dots-clip-sync and dots-clip-serve on the same port, and havit-guard with WirePlumber's HFP retry, since cycling the link under music is what that retry avoids; every other v1 unit (mempressure...) has no v2 replacement and keeps running from ~/.dotfiles.
 replaced=(qshell.service qshell-dshift.service qshell-sync.service qshell-sync.timer qshell-sync-notes.path qshell-sync-notes.service
-  qshell-sync-goals.path qshell-sync-goals.service qshell-updates.service qshell-updates.timer update-all.service update-all.timer vicinae.service taildrop-receive.service homepod-sink.service havit-guard.service)
+  qshell-sync-goals.path qshell-sync-goals.service qshell-updates.service qshell-updates.timer update-all.service update-all.timer vicinae.service taildrop-receive.service homepod-sink.service havit-guard.service
+  clipboard-sync.service clipboard-serve.socket)
 
 # v1 has stopped writing by the time its data is read.
 stopped=0

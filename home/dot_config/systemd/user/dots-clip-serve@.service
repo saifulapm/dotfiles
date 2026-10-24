@@ -1,0 +1,10 @@
+[Unit]
+Description=dots clipboard endpoint, one connection
+CollectMode=inactive-or-failed
+
+[Service]
+ExecStart=%h/.local/bin/dots-clip-serve
+StandardInput=socket
+StandardError=journal
+# A caller that stalls cannot hold a handler past this.
+RuntimeMaxSec=30

@@ -1,0 +1,12 @@
+[Unit]
+Description=dots clipboard endpoint, for the other machines through tailscale serve and for the phone through 10.99.99.99
+
+[Socket]
+ListenStream=127.0.0.1:9411
+ListenStream=10.99.99.99:9411
+# The VIP may reach loopback after the user manager starts this socket.
+FreeBind=yes
+Accept=yes
+
+[Install]
+WantedBy=sockets.target

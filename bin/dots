@@ -43,7 +43,8 @@ install() {
   cat <<'EOF'
 dots: installed. Next:
   dots secrets
-  sudo tailscale up --operator=$USER
+  sudo tailscale up --operator=$USER --advertise-routes=10.99.99.99/32
+  approve the 10.99.99.99/32 route for this machine in Tailscale's admin console
   reboot
 EOF
 }
