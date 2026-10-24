@@ -78,6 +78,15 @@ deen_pids() {
   return 0
 }
 no_deen_process() { [ -z "$(deen_pids)" ]; }
+# Whatever this run's Deen started (mpv, deen, its curl and python3) names the run's work dir in its command line or environment.
+left_over() {
+  local pid
+  for pid in $(pgrep -x 'mpv|deen|curl|python3'); do
+    cat "/proc/$pid/cmdline" "/proc/$pid/environ" 2>/dev/null | tr '\0' '\n' | grep -qF -- "$work" && echo "$pid"
+  done
+  return 0
+}
+nothing_left() { [ -z "$(deen_pids)" ] && [ -z "$(left_over)" ]; }
 # The App's mpv, a child of its qs, found by its own cmdline.
 mpv_playing() {
   local qs pid
@@ -162,8 +171,8 @@ check "searching intentions finds Sahih al-Bukhari 1, offline on the saved corpu
 wtype -k Escape
 until_ok 3000 deen_gone
 check "Esc closes the window" deen_gone
-until_ok 3000 no_deen_process
-check "and no deen qs, mpv or fetch is left" no_deen_process
+until_ok 3000 nothing_left
+check "and no deen qs, mpv, deen, curl or python3 of this run is left ($(left_over | tr '\n' ' '))" nothing_left
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Deen's log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"
