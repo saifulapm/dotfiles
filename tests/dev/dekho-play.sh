@@ -33,6 +33,7 @@ unit_inactive() { ! unit_active; }
 note_session() { rel .session | jq -r . >>"$sessions"; }
 listed() { dekho_is '.releases.mode == "list" and (.releases.rows | length) == 5'; }
 started() { dekho_is '.releases.mode == "starting" and (.releases.starting.steps | length) > 0'; }
+buffering() { dekho_is '.releases.mode == "starting" and .releases.starting.down != ""'; }
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
@@ -81,16 +82,17 @@ while (($(now_ms) < deadline)); do
   sleep 0.1
 done
 steps=$(awk '!seen[$0]++' "$order" | paste -sd '|')
+# Two different values between empty and full: a tail that drew the buffers in one burst shows at most one.
 rising() {
-  local prev=-1 f mid=0
+  local prev=-1 f mids=
   for f in "${fills[@]}"; do
     awk -v a="$f" -v b="$prev" 'BEGIN { exit !(a >= b) }' || return 1
-    awk -v a="$f" 'BEGIN { exit !(a > 0 && a < 1) }' && mid=1
+    awk -v a="$f" 'BEGIN { exit !(a > 0 && a < 1) }' && mids+="$f"$'\n'
     prev=$f
   done
-  [ "$mid" = 1 ] && awk -v a="$prev" 'BEGIN { exit !(a == 1) }'
+  (($(sort -u <<<"$mids" | grep -c .) >= 2))
 }
-check "Starting's progress rose to full without going back (${fills[*]})" rising
+check "Starting's progress rose through at least two values between empty and full, never going back (${fills[*]})" rising
 check "the steps appeared in order ($steps)" test "$steps" = "Found 530 seeders|Connected to peers|Buffering the start of the file|mpv starts at 108 MB"
 check "paper: the bar fills in the accent and the marks are square, under the stream's quality and size ($paper_look)" \
   bash -c "jq -e '.[0] == \"720p · 1.1 GB\" and (.[1] | ascii_downcase) == (.[2] | ascii_downcase) and .[3] == 0' <<<'$paper_look' >/dev/null"
@@ -139,7 +141,7 @@ board() {
   until_ok 3000 listed
   check "$1: $3 ($(rel .look) $(rel '.rows[0].best'))" dekho_is "$4"
   wtype -k Return
-  until_ok 4000 started
+  until_ok 4000 buffering
   note_session
   check "$1: $5 ($(rel '.starting | [.percent, .down]') $(rel .look))" dekho_is "$6"
   wtype -k Escape
