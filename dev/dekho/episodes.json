@@ -1,0 +1,362 @@
+{
+ "1": [
+  {
+   "season": 1,
+   "episode": 1,
+   "name": "Arrival",
+   "overview": "",
+   "runtime": 2880,
+   "still": null,
+   "days": -700,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 1,
+   "episode": 2,
+   "name": "Ballast",
+   "overview": "",
+   "runtime": 3060,
+   "still": null,
+   "days": -693,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 1,
+   "episode": 3,
+   "name": "Foghorn",
+   "overview": "",
+   "runtime": 2760,
+   "still": null,
+   "days": -686,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 1,
+   "episode": 4,
+   "name": "Mooring",
+   "overview": "",
+   "runtime": 3000,
+   "still": null,
+   "days": -679,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 1,
+   "episode": 5,
+   "name": "Ebb",
+   "overview": "",
+   "runtime": 2940,
+   "still": null,
+   "days": -672,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 1,
+   "episode": 6,
+   "name": "Undertow",
+   "overview": "",
+   "runtime": 3120,
+   "still": null,
+   "days": -665,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 1,
+   "episode": 7,
+   "name": "Breakwater",
+   "overview": "",
+   "runtime": 2820,
+   "still": null,
+   "days": -658,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 1,
+   "episode": 8,
+   "name": "Landfall",
+   "overview": "",
+   "runtime": 3300,
+   "still": null,
+   "days": -651,
+   "vote": 7.5,
+   "watched": true
+  }
+ ],
+ "2": [
+  {
+   "season": 2,
+   "episode": 1,
+   "name": "Return",
+   "overview": "",
+   "runtime": 2880,
+   "still": null,
+   "days": -350,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 2,
+   "episode": 2,
+   "name": "The Ledger",
+   "overview": "",
+   "runtime": 3060,
+   "still": null,
+   "days": -343,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 2,
+   "episode": 3,
+   "name": "Pilot Light",
+   "overview": "",
+   "runtime": 2760,
+   "still": null,
+   "days": -336,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 2,
+   "episode": 4,
+   "name": "Keel",
+   "overview": "",
+   "runtime": 3000,
+   "still": null,
+   "days": -329,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 2,
+   "episode": 5,
+   "name": "Driftwood",
+   "overview": "",
+   "runtime": 2940,
+   "still": null,
+   "days": -322,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 2,
+   "episode": 6,
+   "name": "Tidewrack",
+   "overview": "",
+   "runtime": 3120,
+   "still": null,
+   "days": -315,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 2,
+   "episode": 7,
+   "name": "Bellbuoy",
+   "overview": "",
+   "runtime": 2820,
+   "still": null,
+   "days": -308,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 2,
+   "episode": 8,
+   "name": "Lee Shore",
+   "overview": "",
+   "runtime": 3300,
+   "still": null,
+   "days": -301,
+   "vote": 7.5,
+   "watched": true
+  }
+ ],
+ "3": [
+  {
+   "season": 3,
+   "episode": 1,
+   "name": "Low Water",
+   "overview": "",
+   "runtime": 2880,
+   "still": null,
+   "days": -21,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 3,
+   "episode": 2,
+   "name": "The Tide\nBook\u202e\u001b",
+   "overview": "",
+   "runtime": 3060,
+   "still": null,
+   "days": -14,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 3,
+   "episode": 3,
+   "name": "Salt and Iron",
+   "overview": "",
+   "runtime": 2760,
+   "still": null,
+   "days": -7,
+   "vote": 7.5,
+   "watched": true
+  },
+  {
+   "season": 3,
+   "episode": 4,
+   "name": "Quay Nine",
+   "overview": "",
+   "runtime": 3000,
+   "still": null,
+   "days": 0,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 3,
+   "episode": 5,
+   "name": "What the Bell Said",
+   "overview": "",
+   "runtime": 2940,
+   "still": null,
+   "days": 7,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 3,
+   "episode": 6,
+   "name": "Spring Tide",
+   "overview": "",
+   "runtime": 3120,
+   "still": null,
+   "days": 14,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 3,
+   "episode": 7,
+   "name": "Old Charts",
+   "overview": "",
+   "runtime": 2820,
+   "still": null,
+   "days": 21,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 3,
+   "episode": 8,
+   "name": "Slack Water",
+   "overview": "",
+   "runtime": 3300,
+   "still": null,
+   "days": 28,
+   "vote": 7.5,
+   "watched": false
+  }
+ ],
+ "4": [
+  {
+   "season": 4,
+   "episode": 1,
+   "name": "Neap",
+   "overview": "",
+   "runtime": 2880,
+   "still": null,
+   "days": 200,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 4,
+   "episode": 2,
+   "name": "Sounding",
+   "overview": "",
+   "runtime": 3060,
+   "still": null,
+   "days": 207,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 4,
+   "episode": 3,
+   "name": "Fathom",
+   "overview": "",
+   "runtime": 2760,
+   "still": null,
+   "days": 214,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 4,
+   "episode": 4,
+   "name": "Wake",
+   "overview": "",
+   "runtime": 3000,
+   "still": null,
+   "days": 221,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 4,
+   "episode": 5,
+   "name": "Swell",
+   "overview": "",
+   "runtime": 2940,
+   "still": null,
+   "days": 228,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 4,
+   "episode": 6,
+   "name": "Shoal",
+   "overview": "",
+   "runtime": 3120,
+   "still": null,
+   "days": 235,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 4,
+   "episode": 7,
+   "name": "Riptide",
+   "overview": "",
+   "runtime": 2820,
+   "still": null,
+   "days": 242,
+   "vote": 7.5,
+   "watched": false
+  },
+  {
+   "season": 4,
+   "episode": 8,
+   "name": "High Water",
+   "overview": "",
+   "runtime": 3300,
+   "still": null,
+   "days": 249,
+   "vote": 7.5,
+   "watched": false
+  }
+ ]
+}

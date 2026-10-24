@@ -24,6 +24,47 @@ case "${1:-} ${2:-}" in
   shift 2
   if [ "${*,,}" = tide ]; then answer search-tide; else echo '{"items":[]}'; fi
   ;;
+"api title")
+  # Harbour Lights has no backdrop; every other id answers as The Long Tide under its own id.
+  id=$(sed -n 's/.*--id \([0-9]*\).*/\1/p' <<<"$*")
+  if [ "$id" = 300 ]; then answer title-300; else jq -c --argjson id "$id" '.id = $id' "$fixtures/title-101.json"; fi
+  ;;
+"api episodes")
+  # Air dates count in days from today, so one to come still reads airs; w's marks are kept in DOTS_DEV_DIR and outlast the call.
+  id=$(sed -n 's/.*--id \([0-9]*\).*/\1/p' <<<"$*")
+  season=$(sed -n 's/.* -s \([0-9]*\).*/\1/p' <<<"$*")
+  marks=$DOTS_DEV_DIR/dekho-watched.json
+  [ -f "$marks" ] || echo '{}' >"$marks"
+  jq -c --arg today "$(date -d today +%F)" --arg key "$id $season" --slurpfile marks "$marks" '
+    {items: [(.[$key | split(" ")[1]] // [])[]
+      | .watched = ($marks[0][$key + " " + (.episode | tostring)] // .watched)
+      | .air_date = (($today + "T00:00:00Z" | fromdate) + .days * 86400 | strftime("%Y-%m-%d"))
+      | del(.days)]}' "$fixtures/episodes.json"
+  ;;
+"api watched")
+  id=$(sed -n 's/.*--id \([0-9]*\).*/\1/p' <<<"$*")
+  season=$(sed -n 's/.* -s \([0-9]*\).*/\1/p' <<<"$*")
+  episode=$(sed -n 's/.* -e \([0-9]*\).*/\1/p' <<<"$*")
+  marks=$DOTS_DEV_DIR/dekho-watched.json
+  [ -f "$marks" ] || echo '{}' >"$marks"
+  case "$*" in *--unset*) to=false ;; *) to=true ;; esac
+  jq --arg key "$id $season $episode" --argjson to "$to" '.[$key] = $to' "$marks" >"$marks.new"
+  mv "$marks.new" "$marks"
+  echo "{\"watched\":$to}"
+  ;;
+"api prefetch")
+  # As the real one: each image it holds is copied into the cache and named; one it lacks is left out, as a 404 is.
+  dir=$DOTS_DEV_DIR/img/w780
+  mkdir -p "$dir"
+  files='{}'
+  for path in "${@:5}"; do
+    name=${path#/}
+    [ -f "$fixtures/$name" ] || continue
+    cp "$fixtures/$name" "$dir/$name"
+    files=$(jq -c --arg p "$path" --arg f "$dir/$name" '.[$p] = $f' <<<"$files")
+  done
+  jq -nc --arg dir "$dir" --argjson files "$files" '{dir: $dir, files: $files}'
+  ;;
 *)
   echo "dev-fake-dekho: unknown command: $*" >&2
   exit 2
