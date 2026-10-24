@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # Enter on a title in Dekho's Home opens its Title page: the cursor on the episode next up, later episodes dimmed with their air date, w marking watched, people to open, and each board's look.
 {
+# A Return that played by mistake would start a unit on this machine's real user manager, so it gets this run's own name, stopped at the end.
+export DOTS_DEKHO_UNIT=dekho-play-title-test-$$
 source "$(dirname "$0")/lib.sh"
 
 dekho_qml=$repo/shell/dekho.qml
 entry=$repo/home/dot_local/share/applications/dekho.desktop
 work=$(mktemp -d)
-cleanup() { rm -rf "$work"; }
+cleanup() {
+  systemctl --user stop "$DOTS_DEKHO_UNIT.service" 2>/dev/null
+  rm -rf "$work"
+}
 log=$work/dekho.log
 
 dekho_state() { timeout 0.5 qs ipc -p "$dekho_qml" call dekho state 2>/dev/null; }
@@ -115,9 +120,9 @@ check "/ goes to Home's search field ($(dekho_state | jq -c '[.page, .search.foc
 wtype -k Escape
 until_ok 1000 dekho_is '.search.focused == false'
 
-# Each board's own detail, on The Long Tide's page.
-wtype l
-until_ok 1000 dekho_is '.focus.col == 1'
+# Each board's own detail, on The Long Tide's page; leaving the search put the cursor back on Continue watching, where Enter would play.
+wtype jl
+until_ok 1000 dekho_is '.focus == {"row": "series", "col": 1}'
 wtype -k Return
 until_ok 3000 title_loaded
 check "paper: an aired date is set in Instrument Serif italic, as the Paper board sets it ($(dekho_state | jq -c '.title.look | {datedFont, datedItalic}'))" \
