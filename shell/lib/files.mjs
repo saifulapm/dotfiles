@@ -105,10 +105,10 @@ export function previewMeta(voice, row, width, height) {
   return { dims: width > 0 ? `${width} × ${height}` : '', kind: say(voice, `${pickerSize(row)} · ${kind}`), date };
 }
 
-// The place a find query opens: the only one whose name starts with it, or -1 (#NYNGZ3NC).
+// The place a find query opens: the only one whose name starts with it, from three letters on, or -1 (#NYNGZ3NC).
 export function findPlace(places, query) {
   const q = query.toLowerCase();
-  const hits = q ? places.map((p, i) => (p.label.toLowerCase().indexOf(q) === 0 ? i : -1)).filter((i) => i >= 0) : [];
+  const hits = q.length >= 3 ? places.map((p, i) => (p.label.toLowerCase().indexOf(q) === 0 ? i : -1)).filter((i) => i >= 0) : [];
   return hits.length === 1 ? hits[0] : -1;
 }
 

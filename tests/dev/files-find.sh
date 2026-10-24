@@ -27,6 +27,11 @@ until_ok 2000 files_is '.listed and (.folder | endswith("/Downloads"))'
 check "/down opens Downloads, the one place it starts, and ends the find ($(files_state | jq -c '{folder, finding, query}'))" \
   files_is '(.folder | endswith("/Downloads")) and .finding == false and .query == ""'
 
+wtype /down
+until_ok 1000 files_is '.finding == false'
+check "/down again, in Downloads, ends the find with every row still shown ($(files_state | jq -c '{finding, query, n: (.rows | length)}'))" \
+  files_is '.finding == false and .query == "" and (.rows | length) == 5'
+
 wtype /2041
 until_ok 1000 files_is '.query == "2041"'
 check "/ then 2041 leaves only IMG_2041.jpg ($(files_state | jq -c .rows))" files_is '.rows == ["IMG_2041.jpg"]'

@@ -87,6 +87,9 @@ test('a find query that starts exactly one place\'s name opens it; any other nar
   assert.equal(F.findPlace(places, 'DOWN'), 1);
   assert.equal(F.findPlace(places, '2041'), -1);
   assert.equal(F.findPlace(places, ''), -1);
+  // One or two letters narrow the rows: /I in a folder of IMG_ files must not jump to a pin named invoices.
+  assert.equal(F.findPlace(places.concat([{ label: 'invoices' }]), 'i'), -1);
+  assert.equal(F.findPlace(places.concat([{ label: 'invoices' }]), 'inv'), 5);
 });
 
 test('the path line shows the find query in place of the counts while one is typed', () => {
