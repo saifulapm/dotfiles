@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-# dots-dekho-play: runs `dekho play --json` in a transient user unit, so playback outlives Dekho's window and qs, and writes its NDJSON to a file Dekho tails; --stop stops it (mpv is in its cgroup) and waits, --status prints {active, session}.
+# dots-dekho-play: runs `dekho play --json` in a transient user unit, so playback outlives Dekho's window and qs, and writes its NDJSON to a file Dekho tails; --stop stops it (mpv is in its cgroup) and waits, --status prints {active, session}. With --trailer first, each of these runs `dekho trailer --json` under a unit of its own instead, so a trailer never stops a film.
 
 # The caller names the file, a new path each run: its tail starts at once, and a reused path would replay the last run's events.
 set -uo pipefail
 {
 unit=${DOTS_DEKHO_UNIT:-dekho-play}
+verb=play
+if [ "${1:-}" = --trailer ]; then
+  unit=$unit-trailer verb=trailer
+  shift
+fi
 runtime=${XDG_RUNTIME_DIR:-/tmp}/dekho
 log=$runtime/$unit.log
 # --status reads the session back from here, since the unit's own properties do not name it plainly.
@@ -40,7 +45,7 @@ case "${1:-}" in
   shift 2
   ;;
 *)
-  echo "dots-dekho-play: usage: --session <file> <play args...> | --stop | --status" >&2
+  echo "dots-dekho-play: usage: [--trailer] --session <file> <play args...> | [--trailer] --stop | [--trailer] --status" >&2
   exit 2
   ;;
 esac
@@ -64,7 +69,7 @@ failed() {
 systemd-run --user --collect --quiet --unit "$unit" \
   "${pass[@]}" \
   -p "StandardOutput=truncate:$session" -p "StandardError=append:$log" \
-  -- "${DOTS_DEKHO:-dekho}" play --json "$@" || failed
+  -- "${DOTS_DEKHO:-dekho}" "$verb" --json "$@" || failed
 # A dekho that is missing or dies at once leaves its unit gone with nothing written.
 sleep 0.3
 active || [ -s "$session" ] || failed

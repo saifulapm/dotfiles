@@ -82,3 +82,48 @@ test('session files over a day old are swept, a newer one is kept', (t) => {
   assert.equal(existsSync(old), false);
   assert.equal(existsSync(recent), true);
 });
+
+// A trailer runs `dekho trailer` under a unit of its own, so its stop before each run, --stop and --status never touch the film's; a systemctl stub logs what it was asked.
+function trailerRig(t) {
+  const dir = mkdtempSync(join(tmpdir(), 'dekho-play-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const runLog = join(dir, 'run-argv');
+  const ctlLog = join(dir, 'ctl-argv');
+  writeFileSync(join(dir, 'systemd-run'), `#!/bin/sh\nprintf '%s\\n' "$@" > "${runLog}"\nfor a; do case $a in StandardOutput=truncate:*) echo '{"event":"status"}' > "\${a#StandardOutput=truncate:}" ;; esac; done\n`);
+  writeFileSync(join(dir, 'systemctl'), `#!/bin/sh\necho "$*" >> "${ctlLog}"\nexit 3\n`);
+  chmodSync(join(dir, 'systemd-run'), 0o755);
+  chmodSync(join(dir, 'systemctl'), 0o755);
+  const env = { PATH: `${dir}:${process.env.PATH}`, HOME: dir, XDG_RUNTIME_DIR: dir, DOTS_DEKHO_UNIT: 'dekho-play-unit-test', DOTS_DEKHO: '/opt/dekho' };
+  const run = (...args) => spawnSync('bash', [bin, ...args], { env, encoding: 'utf8', timeout: 5000 });
+  const lines = (f) => (existsSync(f) ? readFileSync(f, 'utf8').trimEnd().split('\n') : []);
+  return { dir, run, runArgv: () => lines(runLog), ctl: () => lines(ctlLog) };
+}
+
+test("--trailer runs dekho trailer under the film's unit name with -trailer, and its stop first touches only that unit", (t) => {
+  const { dir, run, runArgv, ctl } = trailerRig(t);
+  const r = run('--trailer', '--session', `${dir}/t.ndjson`, '--id', '401', '--kind', 'movie');
+  assert.equal(r.status, 0, r.stderr);
+  const argv = runArgv();
+  assert.equal(argv[argv.indexOf('--unit') + 1], 'dekho-play-unit-test-trailer');
+  assert.deepEqual(argv.slice(argv.indexOf('--')), ['--', '/opt/dekho', 'trailer', '--json', '--id', '401', '--kind', 'movie']);
+  assert.ok(ctl().length > 0);
+  assert.ok(ctl().every((l) => l.includes('dekho-play-unit-test-trailer.service')), ctl().join('\n'));
+  assert.equal(readFileSync(join(dir, 'dekho', 'dekho-play-unit-test-trailer.session'), 'utf8').trim(), `${dir}/t.ndjson`);
+});
+
+test('a film run still runs dekho play under its own unit', (t) => {
+  const { dir, run, runArgv, ctl } = trailerRig(t);
+  assert.equal(run('--session', `${dir}/s.ndjson`, '--id', '1', '--kind', 'movie').status, 0);
+  const argv = runArgv();
+  assert.equal(argv[argv.indexOf('--unit') + 1], 'dekho-play-unit-test');
+  assert.deepEqual(argv.slice(argv.indexOf('--') + 1, argv.indexOf('--') + 4), ['/opt/dekho', 'play', '--json']);
+  assert.ok(ctl().every((l) => l.includes('dekho-play-unit-test.service')), ctl().join('\n'));
+});
+
+test('--trailer --stop and --trailer --status act on the trailer unit alone', (t) => {
+  const { run, ctl } = trailerRig(t);
+  assert.equal(run('--trailer', '--stop').status, 0);
+  assert.deepEqual(JSON.parse(run('--trailer', '--status').stdout), { active: false, session: '' });
+  assert.ok(ctl().length > 0);
+  assert.ok(ctl().every((l) => l.includes('dekho-play-unit-test-trailer.service')), ctl().join('\n'));
+});
