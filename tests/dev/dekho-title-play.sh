@@ -56,7 +56,7 @@ until_ok 1000 dekho_is '.focus == {"row": "movies", "col": 1}'
 wtype -k Return
 until_ok 3000 title_is "Seven Stations"
 until_ok 3000 bash -c "grep -qx 'api history --limit 20' '$fake_log' && [ \$(grep -c '^api history' '$fake_log') -ge 2 ]"
-check "a film with no history shows only ▶ Play ($(buttons))" buttons_are '["▶ Play"]'
+check "a film with no history shows ▶ Play and its ▶ Trailer, no Resume ($(buttons))" buttons_are '["▶ Play", "▶ Trailer"]'
 check "the footer lists r for resume ($(dekho_state | jq -c '[.title.keys[] | select(.[0] | ascii_downcase == "r")]'))" \
   dekho_is '[.title.keys[] | map(ascii_downcase) | select(.[0] == "r")] == [["r", "resume"]]'
 before=$(plays 'play --json --id 401 --kind movie --resume')
@@ -94,8 +94,8 @@ wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 wtype -k Return
 until_ok 3000 title_is "Seven Stations"
-until_ok 3000 buttons_are '["▶ Play", "▶ Resume · 1h 45 · 1h 35 left"]'
-check "with history it shows ▶ Play and ▶ Resume with its length and time left ($(buttons))" buttons_are '["▶ Play", "▶ Resume · 1h 45 · 1h 35 left"]'
+until_ok 3000 buttons_are '["▶ Play", "▶ Resume · 1h 45 · 1h 35 left", "▶ Trailer"]'
+check "with history it shows ▶ Play and ▶ Resume with its length and time left ($(buttons))" buttons_are '["▶ Play", "▶ Resume · 1h 45 · 1h 35 left", "▶ Trailer"]'
 wtype r
 until_ok 3000 unit_active
 note_session
@@ -115,7 +115,7 @@ wtype -k Tab
 until_ok 1000 dekho_is '.title.zone == "buttons"'
 wtype l
 until_ok 1000 dekho_is '.title.buttons[1].focused'
-check "l moves the focus to Resume ($(dekho_state | jq -c '[.title.buttons[] | .focused]'))" dekho_is '[.title.buttons[] | .focused] == [false, true]'
+check "l moves the focus to Resume ($(dekho_state | jq -c '[.title.buttons[] | .focused]'))" dekho_is '[.title.buttons[] | .focused] == [false, true, false]'
 wtype -k Return
 until_ok 3000 unit_active
 note_session
@@ -134,8 +134,8 @@ wtype khl
 until_ok 1000 dekho_is '.focus == {"row": "series", "col": 1}'
 wtype -k Return
 until_ok 3000 dekho_is '.page == "title" and .title.name == "The Long Tide" and .title.cursor == 4'
-until_ok 3000 buttons_are '["▶ Play", "▶ Resume · S3 E4 · 31 min left"]'
-check "a series in history shows ▶ Resume with its episode and time left ($(buttons))" buttons_are '["▶ Play", "▶ Resume · S3 E4 · 31 min left"]'
+until_ok 3000 buttons_are '["▶ Play", "▶ Resume · S3 E4 · 31 min left", "▶ Trailer"]'
+check "a series in history shows ▶ Resume with its episode and time left ($(buttons))" buttons_are '["▶ Play", "▶ Resume · S3 E4 · 31 min left", "▶ Trailer"]'
 wtype r
 until_ok 3000 unit_active
 note_session
