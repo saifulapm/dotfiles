@@ -141,6 +141,13 @@ FocusScope {
         listView.reveal(row);
     }
 
+    // A click on a row moves the cursor there and does what Enter does.
+    function pick(at) {
+        row = at;
+        listView.reveal(at);
+        stream();
+    }
+
     function stream() {
         const r = rows[row];
         if (!r)
@@ -357,6 +364,12 @@ FocusScope {
         radius: plain ? 14 : 0
     }
 
+    // The overlay takes every click, so none reaches the page beneath; the rows' own click areas sit above it.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.AllButtons
+    }
+
     Item {
         id: card
         anchors.horizontalCenter: parent.horizontalCenter
@@ -571,6 +584,13 @@ FocusScope {
                     contentHeight: listColumn.implicitHeight
                     interactive: false
                     clip: true
+
+                    // Under the rows, the wheel scrolls the list and leaves the cursor where it is.
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.NoButton
+                        onWheel: event => listView.contentY = D.wheeled(listView.contentY, event.angleDelta.y, listView.contentHeight, listView.height)
+                    }
 
                     function reveal(i) {
                         const r = rowRepeater.itemAt(i);
@@ -1017,6 +1037,11 @@ FocusScope {
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
+        }
+
+        DekhoClick {
+            name: "release:" + rel.index
+            onTapped: page.pick(rel.index)
         }
     }
 
