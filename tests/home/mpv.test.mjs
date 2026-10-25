@@ -35,6 +35,12 @@ test('the Macs decode only HEVC in hardware, through vaapi-copy; the NUC decodes
   assert.deepEqual(opts(render('nuc').text).filter((l) => l.startsWith('hwdec')), ['hwdec=vaapi']);
 });
 
+// The NUC's Intel UHD cannot upscale 1080p to its 4K panel with lanczos and interpolate to 60 Hz in one refresh: about 7 frames a second dropped, none with bilinear.
+test('the NUC upscales with bilinear; the Macs keep the default scaler', () => {
+  assert.deepEqual(opts(render('nuc').text).filter((l) => l.startsWith('scale=')), ['scale=bilinear']);
+  for (const m of ['macbook-m2', 'mac-mini-m2']) assert.deepEqual(opts(render(m).text).filter((l) => l.startsWith('scale=')), [], m);
+});
+
 function ask(sock, command) {
   return new Promise((resolve, reject) => {
     const c = connect(sock);
