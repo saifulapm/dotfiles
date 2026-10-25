@@ -87,7 +87,7 @@ export const tagline = (title) => (typeof title.tagline === 'string' ? title.tag
 export function links(voice, title) {
   const out = [{ id: 'tmdb', text: 'TMDB', url: `https://www.themoviedb.org/${title.kind === 'tv' ? 'tv' : 'movie'}/${title.id}` }];
   if (typeof title.imdb_id === 'string' && /^tt[0-9]+$/.test(title.imdb_id)) out.push({ id: 'imdb', text: 'IMDb', url: `https://www.imdb.com/title/${title.imdb_id}` });
-  if (typeof title.homepage === 'string' && /^https?:\/\/[^\s\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩﻿]+$/.test(title.homepage)) out.push({ id: 'homepage', text: 'Homepage', url: title.homepage });
+  if (typeof title.homepage === 'string' && /^https?:\/\/[^\s\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+$/.test(title.homepage)) out.push({ id: 'homepage', text: 'Homepage', url: title.homepage });
   return out.map((l) => Object.assign({}, l, { text: upper(voice, l.text) }));
 }
 
@@ -103,6 +103,6 @@ export function titleText(voice) {
     nextUp: voice === 'bracket' ? '[NEXT UP]' : caps ? 'NEXT UP' : 'next up',
     filters: upper(voice, 'f filters by these'),
     more: (n) => upper(voice, `${n > 0 ? `+ ${n} · ` : ''}tab to reach, ↵ opens a person`),
-    keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['r', 'resume'], ['t', 'trailer'], ['w', 'mark watched'], ['tab', 'buttons, seasons, episodes, crew, cast'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],
+    keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['r', 'resume'], ['t', 'trailer'], ['w', 'mark watched'], ['tab', 'buttons, links, seasons, episodes, crew, cast'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],
   };
 }
