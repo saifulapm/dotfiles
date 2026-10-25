@@ -13,7 +13,7 @@ sessions=$work/sessions
 cleanup() {
   systemctl --user stop "$DOTS_DEKHO_UNIT.service" "$DOTS_DEKHO_UNIT-trailer.service" 2>/dev/null
   [ -f "$sessions" ] && xargs -r rm -f <"$sessions"
-  rm -f "$runtime/$DOTS_DEKHO_UNIT.log" "$runtime/$DOTS_DEKHO_UNIT.session" "$DOTS_DEV_DIR/dekho-play-fails"
+  rm -f "$runtime/$DOTS_DEKHO_UNIT.log" "$runtime/$DOTS_DEKHO_UNIT.session" "$runtime/$DOTS_DEKHO_UNIT.show" "$DOTS_DEV_DIR/dekho-play-fails"
   rm -rf "$work"
 }
 log=$work/dekho.log

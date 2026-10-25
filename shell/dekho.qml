@@ -240,7 +240,7 @@ ShellRoot {
                 if (!s)
                     return;
                 if (s.active && s.session && s.session !== app.playSession)
-                    app.follow(s.session);
+                    app.follow(s.session, s.show);
                 else if (!s.active && app.nowPlaying)
                     app.ended();
             }

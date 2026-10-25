@@ -13,7 +13,7 @@ sessions=$work/sessions
 cleanup() {
   systemctl --user stop "$DOTS_DEKHO_UNIT.service" "$DOTS_DEKHO_UNIT-trailer.service" 2>/dev/null
   [ -f "$sessions" ] && xargs -r rm -f <"$sessions"
-  rm -f "$runtime/$DOTS_DEKHO_UNIT.log" "$runtime/$DOTS_DEKHO_UNIT.session"
+  rm -f "$runtime/$DOTS_DEKHO_UNIT.log" "$runtime/$DOTS_DEKHO_UNIT.session" "$runtime/$DOTS_DEKHO_UNIT.show"
   rm -rf "$work"
 }
 log=$work/dekho.log
@@ -215,6 +215,42 @@ until_ok 2000 dekho_is '.rows.continue[0].line == "S3 · E5 · 39 min left"'
 check "stopped, Continue watching holds the episode on screen, S3 E5 ($(continued_first))" \
   dekho_is '.rows.continue[0] | .title == "The Long Tide" and .line == "S3 · E5 · 39 min left"'
 rm -f "$DOTS_DEV_DIR/dekho-advance"
+
+# A Dekho opened mid-play splits a series' label where dekho joined the show's name to the episode's, and either can hold an episode tag: the bar names the episode playing, never a tag in the show's name, even with api title failing as it does offline.
+forged='The Long Tide — S09E09  x'
+# TMDB's names draw as one line, their runs of spaces as one.
+drawn='The Long Tide — S09E09 x'
+mkdir -p "$DOTS_DEV_DIR/dekho-fixtures"
+cp "$repo"/dev/dekho/* "$DOTS_DEV_DIR/dekho-fixtures/"
+jq --arg t "$forged" '.title = $t' "$repo/dev/dekho/title-101.json" >"$DOTS_DEV_DIR/dekho-fixtures/title-101.json"
+until_ok 1000 dekho_is '.page == "home"' || { wtype -k Escape; until_ok 1000 dekho_is '.page == "home"'; }
+wtype -k Escape
+until_ok 3000 dekho_gone
+open_dekho
+go series 1
+wtype -k Return
+forged_resume() { dekho_is --arg t "$drawn" '.page == "title" and .title.name == $t and ([.title.buttons[].kind] | index("resume")) != null'; }
+until_ok 3000 forged_resume
+wtype r
+until_ok 3000 unit_active
+note_session
+until_ok 8000 mpv_up "$forged — S03E05  What the Bell Said"
+until_ok 3000 dekho_is '.releases.mode == ""'
+refocus
+until_ok 2000 bar_on title "$drawn" "S3 · E5"
+check "a series whose name holds S09E09 plays with the bar on S3 · E5 ($(bar))" bar_on title "$drawn" "S3 · E5"
+wtype -k Escape
+until_ok 1000 dekho_is '.page == "home"'
+wtype -k Escape
+until_ok 3000 dekho_gone
+printf 'not json' >"$DOTS_DEV_DIR/dekho-fixtures/title-101.json"
+open_dekho
+until_ok 3000 bar_on home "$drawn" "S3 · E5"
+check "reopened with api title failing, the bar still names S3 · E5, not the S9 · E9 in the show's name ($(bar))" bar_on home "$drawn" "S3 · E5"
+wtype -k Shift_L
+shift_s
+until_ok 2000 nothing_left
+rm -rf "$DOTS_DEV_DIR/dekho-fixtures"
 
 if ! dekho_is '.page == "home"'; then
   wtype -k Escape

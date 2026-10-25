@@ -11,7 +11,7 @@ sessions=$work/sessions
 cleanup() {
   systemctl --user stop "$DOTS_DEKHO_UNIT.service" "$DOTS_DEKHO_UNIT-trailer.service" 2>/dev/null
   [ -f "$sessions" ] && xargs -r rm -f <"$sessions"
-  rm -f "$runtime/$DOTS_DEKHO_UNIT.log" "$runtime/$DOTS_DEKHO_UNIT.session" "$runtime/$DOTS_DEKHO_UNIT-trailer.log" "$runtime/$DOTS_DEKHO_UNIT-trailer.session"
+  rm -f "$runtime/$DOTS_DEKHO_UNIT.log" "$runtime/$DOTS_DEKHO_UNIT.session" "$runtime/$DOTS_DEKHO_UNIT.show" "$runtime/$DOTS_DEKHO_UNIT-trailer.log" "$runtime/$DOTS_DEKHO_UNIT-trailer.session" "$runtime/$DOTS_DEKHO_UNIT-trailer.show"
   pointer_stop
 }
 fake_log=$DOTS_DEV_DIR/dekho.log

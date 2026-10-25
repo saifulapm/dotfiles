@@ -4,6 +4,8 @@ set -euo pipefail
 {
 [ -n "${DOTS_DEV_DIR:-}" ] || { echo "dev-fake-dekho: run it from a sourced just dev env" >&2; exit 1; }
 fixtures=$(dirname "$(realpath "$0")")/../dev/dekho
+# With DOTS_DEV_DIR/dekho-fixtures present, a check's own edited copy of them answers instead.
+[ ! -d "$DOTS_DEV_DIR/dekho-fixtures" ] || fixtures=$DOTS_DEV_DIR/dekho-fixtures
 echo "$*" >>"$DOTS_DEV_DIR/dekho.log"
 
 # The real dekho prints one compact JSON object on stdout.
@@ -40,7 +42,7 @@ title_of() {
 
 # fake-mpv.qml stands in for mpv, its window titled as the real one is; it runs as this script's child so the script can write what the real backend writes once mpv quits. It ends by SIGTERM when its window closes, so its status is not this script's. A second title and a delay in seconds have it move on to that title then, as mpv does to an appended episode.
 mpv() {
-  FAKE_MPV_TITLE=$1 FAKE_MPV_NEXT_TITLE=${2:-} FAKE_MPV_NEXT_SECS=${3:-} FAKE_MPV_NEXT_MARK=${4:-} env -u QS_CONFIG_PATH qs -p "$fixtures/../fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1 &
+  FAKE_MPV_TITLE=$1 FAKE_MPV_NEXT_TITLE=${2:-} FAKE_MPV_NEXT_SECS=${3:-} FAKE_MPV_NEXT_MARK=${4:-} env -u QS_CONFIG_PATH qs -p "$(dirname "$(realpath "$0")")/../dev/fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1 &
   wait $! || true
 }
 

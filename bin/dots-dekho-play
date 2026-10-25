@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots-dekho-play: runs `dekho play --json` in a transient user unit, so playback outlives Dekho's window and qs, and writes its NDJSON to a file Dekho tails; --stop stops it (mpv is in its cgroup) and waits, --status prints {active, session}. With --trailer first, each of these runs `dekho trailer --json` under a unit of its own instead, so a trailer never stops a film.
+# dots-dekho-play: runs `dekho play --json` in a transient user unit, so playback outlives Dekho's window and qs, and writes its NDJSON to a file Dekho tails; --stop stops it (mpv is in its cgroup) and waits, --status prints {active, session, show}. With --trailer first, each of these runs `dekho trailer --json` under a unit of its own instead, so a trailer never stops a film.
 
 # The caller names the file, a new path each run: its tail starts at once, and a reused path would replay the last run's events.
 set -uo pipefail
@@ -14,6 +14,8 @@ runtime=${XDG_RUNTIME_DIR:-/tmp}/dekho
 log=$runtime/$unit.log
 # --status reads the session back from here, since the unit's own properties do not name it plainly.
 current=$runtime/$unit.session
+# A series' name as the starting Dekho had it, which a Dekho opened mid-play needs to split dekho's label, since either name can hold an episode tag.
+named=$runtime/$unit.show
 
 active() { systemctl --user is-active --quiet "$unit.service"; }
 
@@ -34,7 +36,7 @@ case "${1:-}" in
   ;;
 --status)
   if active && [ -f "$current" ]; then
-    jq -nc --arg s "$(cat "$current")" '{active: true, session: $s}'
+    jq -nc --arg s "$(cat "$current")" --arg n "$(cat "$named" 2>/dev/null)" '{active: true, session: $s, show: $n}'
   else
     echo '{"active":false,"session":""}'
   fi
@@ -43,9 +45,14 @@ case "${1:-}" in
 --session)
   session=${2:?dots-dekho-play: --session needs a path}
   shift 2
+  show=
+  if [ "${1:-}" = --show ]; then
+    show=${2:?dots-dekho-play: --show needs a name}
+    shift 2
+  fi
   ;;
 *)
-  echo "dots-dekho-play: usage: [--trailer] --session <file> <play args...> | [--trailer] --stop | [--trailer] --status" >&2
+  echo "dots-dekho-play: usage: [--trailer] --session <file> [--show <name>] <play args...> | [--trailer] --stop | [--trailer] --status" >&2
   exit 2
   ;;
 esac
@@ -55,6 +62,7 @@ mkdir -p "$runtime"
 find "$runtime" -maxdepth 1 -name 'session-*.ndjson' -mmin +1440 -delete 2>/dev/null
 stop_wait
 printf '%s\n' "$session" >"$current"
+printf '%s' "$show" >"$named"
 # The unit gets the user manager's environment, not this one's, so whatever dekho reads (its hosts, key and dirs, and the display mpv opens on) is passed on by name when set, as is a nested check's fake dir.
 pass=()
 for name in $(compgen -e); do

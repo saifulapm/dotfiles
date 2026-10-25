@@ -127,3 +127,27 @@ test('--trailer --stop and --trailer --status act on the trailer unit alone', (t
   assert.ok(ctl().length > 0);
   assert.ok(ctl().every((l) => l.includes('dekho-play-unit-test-trailer.service')), ctl().join('\n'));
 });
+
+// A Dekho opened mid-play splits a series' label at the show's name, which only the Dekho that started it knew, so --status hands back the --show it was started with; a later film's run clears it.
+test('--status names the show a run was started with, and a run without --show names none', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'dekho-play-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const runLog = join(dir, 'run-argv');
+  writeFileSync(join(dir, 'systemd-run'), `#!/bin/sh\nprintf '%s\\n' "$@" > "${runLog}"\nfor a; do case $a in StandardOutput=truncate:*) echo '{"event":"status"}' > "\${a#StandardOutput=truncate:}" ;; esac; done\n`);
+  // Inactive until the run is started, so the stop before it returns at once and --status after it finds the unit up.
+  writeFileSync(join(dir, 'systemctl'), `#!/bin/sh\n[ -f "${dir}/up" ]\n`);
+  chmodSync(join(dir, 'systemd-run'), 0o755);
+  chmodSync(join(dir, 'systemctl'), 0o755);
+  const env = { PATH: `${dir}:${process.env.PATH}`, HOME: dir, XDG_RUNTIME_DIR: dir, DOTS_DEKHO_UNIT: 'dekho-play-unit-test', DOTS_DEKHO: '/opt/dekho' };
+  const run = (...args) => spawnSync('bash', [bin, ...args], { env, encoding: 'utf8', timeout: 5000 });
+  const show = 'The Long Tide — S09E09  x';
+  assert.equal(run('--session', `${dir}/s.ndjson`, '--show', show, '--id', '101', '--kind', 'tv', '--resume').status, 0);
+  const argv = readFileSync(runLog, 'utf8').trimEnd().split('\n');
+  assert.deepEqual(argv.slice(argv.indexOf('--')), ['--', '/opt/dekho', 'play', '--json', '--id', '101', '--kind', 'tv', '--resume']);
+  writeFileSync(join(dir, 'up'), '');
+  assert.deepEqual(JSON.parse(run('--status').stdout), { active: true, session: `${dir}/s.ndjson`, show });
+  rmSync(join(dir, 'up'));
+  assert.equal(run('--session', `${dir}/f.ndjson`, '--id', '1', '--kind', 'movie').status, 0);
+  writeFileSync(join(dir, 'up'), '');
+  assert.deepEqual(JSON.parse(run('--status').stdout), { active: true, session: `${dir}/f.ndjson`, show: '' });
+});

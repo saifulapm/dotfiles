@@ -18,7 +18,7 @@ cleanup() {
   systemctl --user stop "$DOTS_DEKHO_UNIT.service" 2>/dev/null
   [ -z "$fake_pid" ] || { kill "$fake_pid" 2>/dev/null; wait "$fake_pid" 2>/dev/null; }
   [ -f "$sessions" ] && xargs -r rm -f <"$sessions"
-  rm -f "$runtime/$DOTS_DEKHO_UNIT.log" "$runtime/$DOTS_DEKHO_UNIT.session"
+  rm -f "$runtime/$DOTS_DEKHO_UNIT.log" "$runtime/$DOTS_DEKHO_UNIT.session" "$runtime/$DOTS_DEKHO_UNIT.show"
   rm -rf "$work"
 }
 

@@ -271,9 +271,10 @@ FocusScope {
         };
     }
 
+    // A series' name goes with the run, so a Dekho opened mid-play splits its label as this one does.
     Process {
         id: starter
-        command: [page.bin, "--session", page.session].concat(page.playArgs)
+        command: [page.bin, "--session", page.session].concat(page.target && page.target.kind === "tv" ? ["--show", page.target.title] : []).concat(page.playArgs)
         onExited: {
             if (page.cancelled)
                 stopper.running = true;
