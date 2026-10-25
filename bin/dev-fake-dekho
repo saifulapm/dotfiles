@@ -85,9 +85,9 @@ case "${1:-} ${2:-}" in
   if [ "${*,,}" = tide ]; then answer search-tide; else echo '{"items":[]}'; fi
   ;;
 "api title")
-  # Harbour Lights has no backdrop, A Quiet Verdict is a film; every other id answers as The Long Tide under its own id.
+  # Harbour Lights has a backdrop and no poster, A Quiet Verdict is a film with neither; every other id answers as The Long Tide under its own id, its picture paths renamed for that id, so one title's pictures never match another's.
   id=$(sed -n 's/.*--id \([0-9]*\).*/\1/p' <<<"$*")
-  if [ "$id" = 300 ] || [ "$id" = 400 ]; then answer "title-$id"; else jq -c --argjson id "$id" '.id = $id' "$fixtures/title-101.json"; fi
+  if [ "$id" = 300 ] || [ "$id" = 400 ]; then answer "title-$id"; else jq -c --argjson id "$id" '.id = $id | (.poster, .backdrop, (.cast, .crew)[].profile) |= (strings |= sub("101"; $id | tostring))' "$fixtures/title-101.json"; fi
   ;;
 "api episodes")
   # Air dates count in days from today, so one to come still reads airs; w's marks are kept in DOTS_DEV_DIR and outlast the call.
@@ -99,6 +99,7 @@ case "${1:-} ${2:-}" in
     {items: [(.[$key | split(" ")[1]] // [])[]
       | .watched = ($marks[0][$key + " " + (.episode | tostring)] // .watched)
       | .air_date = (($today + "T00:00:00Z" | fromdate) + .days * 86400 | strftime("%Y-%m-%d"))
+      | .still |= (strings |= sub("101"; $key | split(" ")[0]))
       | del(.days)]}' "$fixtures/episodes.json"
   ;;
 "api watched")
@@ -154,6 +155,11 @@ case "${1:-} ${2:-}" in
 "api prefetch")
   # As the real one: a path that is not one /name refuses the whole call; each image it holds is copied into img/<size> and named, a named fixture if there is one, else that size's sample; a name starting gone is left out, as a 404 is; offline, only what is already in img/<size> is named.
   size=$4
+  # With DOTS_DEV_DIR/dekho-slow-prefetch present each answer comes that many seconds late, as a slow CDN's would, and dekho-slow.log records when it lands.
+  if [ -f "$DOTS_DEV_DIR/dekho-slow-prefetch" ]; then
+    sleep "$(cat "$DOTS_DEV_DIR/dekho-slow-prefetch")"
+    echo "$*" >>"$DOTS_DEV_DIR/dekho-slow.log"
+  fi
   [ -f "$fixtures/$size.png" ] || { echo "{\"error\":\"unknown --size \\\"$size\\\"\"}"; exit 1; }
   dir=$DOTS_DEV_DIR/img/$size
   for path in "${@:5}"; do

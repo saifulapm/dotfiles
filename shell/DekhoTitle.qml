@@ -30,7 +30,6 @@ FocusScope {
     property int row: 0
     property int crewCol: 0
     property int castCol: 0
-    property string image: ""
     property string today: ""
     // The title whose answers are awaited; an older title's answer is dropped.
     property string asked: ""
@@ -44,7 +43,13 @@ FocusScope {
     readonly property var seasonNumbers: (detail && detail.seasons ? detail.seasons : []).map(s => s.number).filter(n => n > 0)
     readonly property var items: bySeason[season] || []
     readonly property int next: T.nextUp(items, today)
-    readonly property var crew: T.notableCrew(detail ? detail.crew : [])
+    // notableCrew keeps a person's id, name and role; the face comes from the title's own crew entry.
+    readonly property var crew: {
+        const all = detail && Array.isArray(detail.crew) ? detail.crew : [];
+        return T.notableCrew(all).map(m => Object.assign({
+                profile: (all.find(c => c.id === m.id) || {}).profile ?? null
+            }, m));
+    }
     readonly property var cast: detail && Array.isArray(detail.cast) ? detail.cast : []
     // The board shows three cast names; the cursor slides that window along the rest.
     readonly property int castStart: Math.max(0, Math.min(cast.length - 3, castCol - 2))
@@ -65,7 +70,6 @@ FocusScope {
             row: row,
             crewCol: crewCol,
             castCol: castCol,
-            image: image,
             today: today
         };
     }
@@ -80,7 +84,6 @@ FocusScope {
         row = s.row;
         crewCol = s.crewCol;
         castCol = s.castCol;
-        image = s.image;
         today = s.today;
     }
 
@@ -94,7 +97,6 @@ FocusScope {
         row = 0;
         crewCol = 0;
         castCol = 0;
-        image = "";
         chose = null;
         person = null;
         filter = null;
@@ -105,11 +107,10 @@ FocusScope {
             if (page.asked !== key || !answer)
                 return;
             page.detail = answer;
-            if (answer.backdrop)
-                page.dekho.api(["api", "prefetch", "--size", "w780", answer.backdrop], files => {
-                    if (page.asked === key && files && files.files && files.files[answer.backdrop])
-                        page.image = files.files[answer.backdrop];
-                });
+            // Both, since the slot falls back to the backdrop when the poster is not on disk.
+            page.dekho.prefetch("w342", [answer.poster]);
+            page.dekho.prefetch("w780", [answer.backdrop]);
+            page.dekho.prefetch("w185", page.crew.concat(page.cast).map(p => p.profile));
             page.loadSeasons(key, page.seasonNumbers);
         });
     }
@@ -122,6 +123,7 @@ FocusScope {
                 if (page.asked !== key)
                     return;
                 got[n] = answer && Array.isArray(answer.items) ? answer.items : [];
+                page.dekho.prefetch("w342", got[n].map(e => e.still));
                 page.bySeason = Object.assign({}, page.bySeason, {
                     [n]: got[n]
                 });
@@ -261,12 +263,7 @@ FocusScope {
                     blockTop: sideColumn.mapToItem(page, 0, 0).y,
                     nameTop: bigName.mapToItem(page, 0, 0).y
                 },
-                backdrop: {
-                    image: picture.status === Image.Ready,
-                    placeholder: placeholder.visible,
-                    width: placeholder.width,
-                    height: placeholder.height
-                },
+                slot: (posterPicture.shown ? posterPicture : backdropPicture).drawn(),
                 look: {
                     ink: String(c.ink),
                     muted: String(c.muted),
@@ -413,12 +410,11 @@ FocusScope {
                 Layout.alignment: Qt.AlignTop
                 spacing: 12
 
-                // The image's place: the backdrop once it is on disk, else each board's empty image, Paper's hatch, Artboard's grey tile and picture icon, Blueprint's crossed box.
+                // The picture's place: the poster once it is on disk, else the backdrop, else each board's empty image, Paper's hatch, Artboard's grey tile and picture icon, Blueprint's crossed box.
                 Rectangle {
                     id: placeholder
                     Layout.fillWidth: true
                     Layout.preferredHeight: 300
-                    visible: picture.status !== Image.Ready
                     radius: plain ? 14 : 0
                     color: plain ? "#E9ECF1" : "transparent"
                     border.width: plain ? 0 : 1
@@ -470,16 +466,23 @@ FocusScope {
                         path: "M6 1H34A5 5 0 0 1 39 6V24A5 5 0 0 1 34 29H6A5 5 0 0 1 1 24V6A5 5 0 0 1 6 1ZM5 25L14 15L21 22L26 17L35 25M31 9A3 3 0 1 1 25 9A3 3 0 1 1 31 9"
                         color: page.c.muted ?? "gray"
                     }
-                }
-                Image {
-                    id: picture
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 300
-                    visible: status === Image.Ready
-                    source: page.image ? "file://" + page.image : ""
-                    asynchronous: true
-                    fillMode: Image.PreserveAspectCrop
-                    sourceSize.width: 440
+                    // The backdrop loads only while the poster is not drawn, so the two never decode at once.
+                    DekhoPicture {
+                        id: backdropPicture
+                        anchors.fill: parent
+                        dekho: page.dekho
+                        size: "w780"
+                        path: posterPicture.shown || !page.detail ? null : page.detail.backdrop
+                        radius: placeholder.radius
+                    }
+                    DekhoPicture {
+                        id: posterPicture
+                        anchors.fill: parent
+                        dekho: page.dekho
+                        size: "w342"
+                        path: page.detail ? page.detail.poster : null
+                        radius: placeholder.radius
+                    }
                 }
                 Text {
                     id: sideText
@@ -861,7 +864,8 @@ FocusScope {
                 name: nameText.text,
                 role: roleText.text,
                 lines: nameText.lineCount,
-                focused: focused
+                focused: focused,
+                face: face.drawn()
             };
         }
 
@@ -901,6 +905,14 @@ FocusScope {
                             path: "M6 0L0 6M12 0L0 12M18 0L0 18M24 0L4 20M30 0L10 20M36 0L16 20"
                         }
                     }
+                }
+                DekhoPicture {
+                    id: face
+                    anchors.fill: parent
+                    dekho: page.dekho
+                    size: "w185"
+                    path: chip.modelData.profile
+                    radius: parent.radius
                 }
             }
             Text {
@@ -960,7 +972,8 @@ FocusScope {
                 italic: dateText.font.italic,
                 watched: tick.visible,
                 color: String(nameText.color),
-                cursor: cursor
+                cursor: cursor,
+                still: still.drawn()
             };
         }
 
@@ -1035,6 +1048,40 @@ FocusScope {
                             sweepAngle: 360
                         }
                     }
+                }
+            }
+            // The still's place, marked as each board marks an empty picture: Paper's hatch, Artboard's grey tile, Blueprint's crossed box.
+            Rectangle {
+                id: stillPlace
+                Layout.preferredWidth: 40
+                Layout.preferredHeight: 22
+                radius: page.plain ? 4 : 0
+                color: page.plain ? "#E9ECF1" : "transparent"
+                border.width: page.plain ? 0 : 1
+                border.color: (page.bracket ? page.c.line : page.c.muted) ?? "gray"
+                clip: true
+
+                Shape {
+                    anchors.fill: parent
+                    visible: !page.plain
+                    preferredRendererType: Shape.GeometryRenderer
+
+                    ShapePath {
+                        strokeColor: page.c.line ?? "gray"
+                        strokeWidth: 1
+                        fillColor: "transparent"
+                        PathSvg {
+                            path: page.bracket ? "M0 0L40 22M40 0L0 22" : "M6 0L0 6M12 0L0 12M18 0L0 18M24 0L2 22M30 0L8 22M36 0L14 22M42 0L20 22M48 0L26 22M54 0L32 22M60 0L38 22"
+                        }
+                    }
+                }
+                DekhoPicture {
+                    id: still
+                    anchors.fill: parent
+                    dekho: page.dekho
+                    size: "w342"
+                    path: ep.modelData.still
+                    radius: stillPlace.radius
                 }
             }
             Text {

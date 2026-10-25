@@ -52,64 +52,141 @@
    "id": 2001,
    "name": "Lena\nHart\u202e\u001b",
    "character": "Captain Ruth Maren",
-   "profile": null,
+   "profile": "/f101-2001.jpg",
    "order": 0
   },
   {
    "id": 2002,
    "name": "Omar Reyes",
    "character": "Dev Calloway",
-   "profile": null,
+   "profile": "/f101-2002.jpg",
    "order": 1
   },
   {
    "id": 2003,
    "name": "Priya Nand",
    "character": "Ana Quill",
-   "profile": null,
+   "profile": "/f101-2003.jpg",
    "order": 2
   },
   {
    "id": 2004,
    "name": "Jon Bell",
    "character": "Harbour Master",
-   "profile": null,
+   "profile": "/f101-2004.jpg",
    "order": 3
   },
   {
    "id": 2005,
    "name": "Ada Voss",
    "character": "Kit Maren",
-   "profile": null,
+   "profile": "/f101-2005.jpg",
    "order": 4
   },
   {
    "id": 2006,
    "name": "Rui Costa",
    "character": "Pastor Elm",
-   "profile": null,
+   "profile": "/f101-2006.jpg",
    "order": 5
   },
   {
    "id": 2007,
    "name": "Mei Lin",
    "character": "Dr. Sato",
-   "profile": null,
+   "profile": "/f101-2007.jpg",
    "order": 6
   },
   {
    "id": 2008,
    "name": "Ola Berg",
    "character": "Finn",
-   "profile": null,
+   "profile": "/f101-2008.jpg",
    "order": 7
   },
   {
    "id": 2009,
    "name": "Tess Ward",
    "character": "Nell",
-   "profile": null,
+   "profile": "/f101-2009.jpg",
    "order": 8
+  },
+  {
+   "id": 2010,
+   "name": "Sven Aal",
+   "character": "Old Pike",
+   "profile": "/f101-2010.jpg",
+   "order": 9
+  },
+  {
+   "id": 2011,
+   "name": "Nia Cole",
+   "character": "Bea Maren",
+   "profile": "/f101-2011.jpg",
+   "order": 10
+  },
+  {
+   "id": 2012,
+   "name": "Leo Hask",
+   "character": "Constable Dunn",
+   "profile": "/f101-2012.jpg",
+   "order": 11
+  },
+  {
+   "id": 2013,
+   "name": "Rosa Lund",
+   "character": "Widow Fell",
+   "profile": "/f101-2013.jpg",
+   "order": 12
+  },
+  {
+   "id": 2014,
+   "name": "Kai Moe",
+   "character": "Ferryman",
+   "profile": "/f101-2014.jpg",
+   "order": 13
+  },
+  {
+   "id": 2015,
+   "name": "Ines Paz",
+   "character": "Clerk",
+   "profile": "/f101-2015.jpg",
+   "order": 14
+  },
+  {
+   "id": 2016,
+   "name": "Bo Strand",
+   "character": "Young Ruth",
+   "profile": "/f101-2016.jpg",
+   "order": 15
+  },
+  {
+   "id": 2017,
+   "name": "Elif Tan",
+   "character": "Mira",
+   "profile": "/f101-2017.jpg",
+   "order": 16
+  },
+  {
+   "id": 2018,
+   "name": "Hugo Rist",
+   "character": "Diver",
+   "profile": "/f101-2018.jpg",
+   "order": 17
+  },
+  {
+   "id": 2019,
+   "name": "Saga Holm",
+   "character": "Teacher",
+   "profile": "/f101-2019.jpg",
+   "order": 18
+  },
+  {
+   "id": 2020,
+   "name": "Arne Vik",
+   "character": "Lighthouse Keeper",
+   "profile": "/f101-2020.jpg",
+   "order": 19
   }
  ],
  "crew": [
@@ -117,7 +194,7 @@
    "id": 1001,
    "name": "Mara Lindqvist",
    "job": "Director",
-   "profile": null
+   "profile": "/f101-1001.jpg"
   },
   {
    "id": 1002,
@@ -129,13 +206,13 @@
    "id": 1004,
    "name": "Ann Exec",
    "job": "Executive Producer",
-   "profile": null
+   "profile": "/f101-1004.jpg"
   },
   {
    "id": 1003,
    "name": "Ingrid Sol",
    "job": "Composer",
-   "profile": null
+   "profile": "/gone101-1003.jpg"
   }
  ],
  "studios": [

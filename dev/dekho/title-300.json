@@ -4,8 +4,8 @@
  "title": "Harbour Lights",
  "year": "2026",
  "vote": 8.4,
- "poster": "/p300.jpg",
- "backdrop": null,
+ "poster": null,
+ "backdrop": "/b300.jpg",
  "overview": "Harbour Lights, a sample overview.",
  "genres": [
   "Drama",
