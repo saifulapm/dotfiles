@@ -88,6 +88,7 @@ FocusScope {
             row: row,
             crewCol: crewCol,
             castCol: castCol,
+            linkCol: linkCol,
             similarCol: similarCol,
             posterKnown: posterKnown,
             today: today,
@@ -106,6 +107,7 @@ FocusScope {
         row = s.row;
         crewCol = s.crewCol;
         castCol = s.castCol;
+        linkCol = s.linkCol;
         similarCol = s.similarCol;
         posterKnown = s.posterKnown;
         today = s.today;
@@ -125,6 +127,7 @@ FocusScope {
         row = 0;
         crewCol = 0;
         castCol = 0;
+        linkCol = 0;
         similarCol = 0;
         posterKnown = false;
         seen = null;

@@ -115,6 +115,26 @@ check "blueprint: the film's links read TMDB, IMDB and HOMEPAGE, and still no ta
 in_theme paper
 until_ok 3000 dekho_is '.voice == "caps"'
 
+# The cursor left on the film's third link must not outlive it: The Long Tide has two, and Tab to them focuses TMDB.
+wtype -k Escape
+until_ok 1000 dekho_is '.page == "home"'
+click_on series:1
+until_ok 3000 title_loaded
+until_ok 3000 dekho_is '.title.name == "The Long Tide"'
+wtype -k Tab
+wtype -k Tab
+wtype -k Tab
+wtype -k Tab
+until_ok 1000 dekho_is '.title.zone == "buttons"'
+wtype -k Tab
+until_ok 1000 dekho_is '.title.zone == "links"'
+check "after the film's Homepage, the next title's links open on TMDB ($(dekho_state | jq -c '[.title.zone, [.title.links[] | [.kind, .focused]]]'))" \
+  dekho_is '[.title.links[] | [.kind, .focused]] == [["tmdb", true], ["imdb", false]]'
+wtype -k Return
+opened_twice() { [ "$(opened "$1")" = 2 ]; }
+until_ok 3000 opened_twice https://www.themoviedb.org/tv/101
+check "and Enter opens TMDB, the second time it was asked" opened_twice https://www.themoviedb.org/tv/101
+
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable|Binding loop' "$log")
 check "Dekho's log has no QML errors${errs:+: $(head -c 900 <<<"$errs")}" test -z "$errs"
 
