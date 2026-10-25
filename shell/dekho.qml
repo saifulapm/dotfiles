@@ -239,10 +239,25 @@ ShellRoot {
     Tick {
         interval: 2000
         repeat: true
+        triggeredOnStart: true
         running: app.nowPlaying !== null
         onTriggered: {
             if (!playStatus.running)
                 playStatus.running = true;
+            if (!playWindow.running)
+                playWindow.running = true;
+        }
+    }
+    // A series moves on with no event of dekho's: the windows' JSON on the first line, then the pids in the film's unit, whose mpv window names the episode on screen.
+    Process {
+        id: playWindow
+        command: ["sh", "-c", "niri msg -j windows; echo; cg=$(systemctl --user show -p ControlGroup --value \"$1.service\"); [ -z \"$cg\" ] || cat \"/sys/fs/cgroup$cg/cgroup.procs\" 2>/dev/null", "sh", Quickshell.env("DOTS_DEKHO_UNIT") || "dekho-play"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const lines = text.split("\n");
+                if (app.nowPlaying)
+                    app.nowPlaying = P.fromWindow(app.nowPlaying, lines[0], lines.slice(1).filter(l => l !== "").map(Number));
+            }
         }
     }
 

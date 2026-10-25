@@ -30,3 +30,24 @@ test("the bar's words in each board's voice", () => {
   assert.equal(P.barText('caps').tag, 'NOW PLAYING');
   assert.equal(P.barText('bracket').tag, '[NOW PLAYING]');
 });
+
+const win = (pid, title, app_id = 'mpv') => ({ id: pid * 10, pid, app_id, title });
+const tide = { id: 101, kind: 'tv', title: 'The Long Tide', episode: 'S3 · E4' };
+
+test("a series moves on to the episode its own mpv window names, as mpv titles it '<media-title> - mpv'", () => {
+  const text = JSON.stringify([win(7, 'The Long Tide — S03E05  Neap - mpv'), win(9, 'Seven Stations (2026) — Trailer - mpv')]);
+  assert.deepEqual(P.fromWindow(tide, text, [7]), { id: 101, kind: 'tv', title: 'The Long Tide', episode: 'S3 · E5' });
+  // The fake's stand-in titles its window with the bare label.
+  assert.equal(P.fromWindow(tide, JSON.stringify([win(7, 'The Long Tide — S03E06  Spring')]), [7]).episode, 'S3 · E6');
+});
+
+test("only the film unit's own mpv window counts, and anything else leaves what plays as it was", () => {
+  const other = JSON.stringify([win(9, 'The Long Tide — S03E05  Neap - mpv')]);
+  assert.equal(P.fromWindow(tide, other, [7]), tide);
+  assert.equal(P.fromWindow(tide, JSON.stringify([win(7, 'No file - mpv')]), [7]), tide);
+  assert.equal(P.fromWindow(tide, JSON.stringify([win(7, 'Another Show — S01E02  x - mpv')]), [7]), tide);
+  assert.equal(P.fromWindow(tide, 'not json', [7]), tide);
+  const film = { id: 401, kind: 'movie', title: 'Seven Stations (2026)', episode: '' };
+  assert.equal(P.fromWindow(film, JSON.stringify([win(7, 'Seven Stations (2026) - mpv')]), [7]), film);
+  assert.equal(P.fromWindow(null, JSON.stringify([win(7, 'The Long Tide — S03E05  Neap')]), [7]), null);
+});

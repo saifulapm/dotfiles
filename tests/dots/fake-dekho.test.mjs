@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -13,7 +13,7 @@ function rig(t) {
   const dir = mkdtempSync(join(tmpdir(), 'fake-dekho-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'bin'));
-  writeFileSync(join(dir, 'bin', 'qs'), `#!/bin/sh\necho "$FAKE_MPV_TITLE" >>"${dir}/mpv-titles"\nsleep \${FAKE_QS_SECS:-0.1}\nkill -TERM $$\n`);
+  writeFileSync(join(dir, 'bin', 'qs'), `#!/bin/sh\necho "$FAKE_MPV_TITLE|$FAKE_MPV_NEXT_TITLE|$FAKE_MPV_NEXT_SECS" >>"${dir}/mpv-titles"\nsleep \${FAKE_QS_SECS:-0.1}\nkill -TERM $$\n`);
   chmodSync(join(dir, 'bin', 'qs'), 0o755);
   const env = { PATH: `${dir}/bin:${process.env.PATH}`, HOME: dir, DOTS_DEV_DIR: dir };
   const run = (...args) => spawnSync('bash', [bin, ...args], { env, encoding: 'utf8', timeout: 15000 });
@@ -47,25 +47,53 @@ test('a play that ends puts its title first in history, ten minutes past where i
   assert.deepEqual(history(run).slice(0, 2).map((h) => [h.id, h.position]), [[401, 600], [202, before.position + 600]]);
 });
 
-test('a stopped play records its history and exits 143 with no event, as the real one does on SIGTERM', async (t) => {
-  const { env, run } = rig(t);
+// Starts a play and sends SIGTERM once its playing event is out and after waitMs more; resolves with the exit and the events.
+async function stopped(env, waitMs) {
   const child = spawn('bash', [bin, 'play', '--json', '--id', '202', '--kind', 'movie'], { env: { ...env, FAKE_QS_SECS: '30' } });
   let out = '';
   child.stdout.on('data', (d) => (out += d));
   await new Promise((resolve) => {
     const poll = setInterval(() => {
-      if (out.includes('"playing"')) {
+      if (out.includes(waitMs === null ? '"buffer"' : '"playing"')) {
         clearInterval(poll);
-        // Past the playing event's 1.5 s wait, so the stand-in for mpv is up.
-        setTimeout(() => child.kill('SIGTERM'), 2000);
+        setTimeout(() => child.kill('SIGTERM'), waitMs ?? 0);
         resolve();
       }
-    }, 100);
+    }, 50);
   });
   const code = await new Promise((resolve) => child.on('exit', (c, s) => resolve(c ?? s)));
-  assert.equal(code, 143);
-  assert.equal(out.trimEnd().split('\n').map((l) => JSON.parse(l).event).at(-1), 'playing');
+  return { code, events: out.trimEnd().split('\n').map((l) => JSON.parse(l)) };
+}
+
+test('a play stopped once mpv is up ends as when mpv quits, history first, as the real one does on SIGTERM', async (t) => {
+  const { env, run } = rig(t);
+  // Past the playing event's 1.5 s wait, so the stand-in for mpv is up.
+  const { code, events } = await stopped(env, 2000);
+  assert.equal(code, 0);
+  assert.deepEqual(events.slice(-2).map((e) => e.event), ['ended', 'exit']);
+  assert.equal(events.at(-1).code, 0);
   assert.deepEqual([history(run)[0].id, history(run)[0].position], [202, 600]);
+});
+
+test('a play stopped before mpv opens exits 143 with no event and leaves history alone', async (t) => {
+  const { env, run } = rig(t);
+  const before = history(run);
+  const { code, events } = await stopped(env, null);
+  assert.equal(code, 143);
+  assert.ok(!events.some((e) => e.event === 'ended' || e.event === 'exit'));
+  assert.deepEqual(history(run), before);
+});
+
+test('with dekho-advance a series moves on to its next episode only by its mpv window title, and history then holds that one', (t) => {
+  const { dir, run } = rig(t);
+  writeFileSync(join(dir, 'dekho-advance'), '1');
+  const r = spawnSync('bash', [bin, 'play', '--json', '--id', '101', '--kind', 'tv', '-s', '3', '-e', '4'], { env: { PATH: `${dir}/bin:${process.env.PATH}`, HOME: dir, DOTS_DEV_DIR: dir, FAKE_QS_SECS: '2' }, encoding: 'utf8', timeout: 15000 });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(events(r).filter((e) => e.event === 'playing').map((e) => e.title), ['The Long Tide — S03E04  Quay Nine']);
+  const [title, next, secs] = readFileSync(join(dir, 'mpv-titles'), 'utf8').trim().split('|');
+  assert.deepEqual([title, secs], ['The Long Tide — S03E04  Quay Nine', '1']);
+  assert.match(next, /^The Long Tide — S03E05  \S/);
+  assert.deepEqual([history(run)[0].id, history(run)[0].season, history(run)[0].episode, history(run)[0].position], [101, 3, 5, 600]);
 });
 
 test('any film answers as a film named as Home has it, with a trailer, and A Quiet Verdict and Harbour Lights have none', (t) => {

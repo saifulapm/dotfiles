@@ -135,6 +135,7 @@ wtype t
 until_ok 3000 trailer_active
 note_session
 until_ok 8000 mpv_up "$trailer"
+check "a trailer started with the film playing leaves the film's unit active and its window open" bash -c "systemctl --user is-active --quiet '$DOTS_DEKHO_UNIT.service' && [ \"\$(niri msg -j windows | jq --arg f '$film' '[.[] | select(.app_id == \"mpv\" and .title == \$f)] | length')\" = 1 ]"
 "$repo/bin/dots-dekho-play" --stop
 until_ok 3000 mpv_gone "$film"
 check "the film's stop ends the film's unit and its window" bash -c "! systemctl --user is-active --quiet '$DOTS_DEKHO_UNIT.service' && [ \"\$(niri msg -j windows | jq --arg f '$film' '[.[] | select(.app_id == \"mpv\" and .title == \$f)] | length')\" = 0 ]"

@@ -157,7 +157,10 @@ for _ in 1 2 3; do
 done
 until_ok 1000 dekho_is '.focus == {"row": "series", "col": 1}'
 wtype -k Return
-until_ok 3000 dekho_is '.page == "title" and .title.name == "The Long Tide" and (.title.buttons | length) == 2'
+# r waits on Resume, which comes with history's answer.
+has_resume() { dekho_is '.page == "title" and .title.name == "The Long Tide" and ([.title.buttons[].kind] | index("resume")) != null'; }
+until_ok 3000 has_resume
+check "The Long Tide's page offers Resume ($(dekho_state | jq -c '[.title.buttons[].text]'))" has_resume
 wtype r
 until_ok 3000 unit_active
 note_session
@@ -176,8 +179,36 @@ check "and its Resume reads the new time too ($(dekho_state | jq -c '[.title.but
   dekho_is '[.title.buttons[].text][1] == "▶ Resume · S3 E4 · 21 min left"'
 refocus
 
+# mpv moving on to the next episode says nothing to dekho's events; the bar reads it off the film's own mpv window title, also in a reopened Dekho.
+echo 4 >"$DOTS_DEV_DIR/dekho-advance"
+wtype r
+until_ok 3000 unit_active
+note_session
+until_ok 8000 mpv_up "The Long Tide — S03E04  Quay Nine"
+until_ok 3000 dekho_is '.releases.mode == ""'
+refocus
+until_ok 2000 bar_on title "The Long Tide" "S3 · E4"
+until_ok 8000 bar_on title "The Long Tide" "S3 · E5"
+check "once mpv moves on to the next episode, the bar names S3 · E5 ($(bar))" bar_on title "The Long Tide" "S3 · E5"
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
+wtype -k Escape
+until_ok 3000 dekho_gone
+open_dekho
+until_ok 3000 bar_on home "The Long Tide" "S3 · E5"
+check "reopened, the bar names S3 · E5 within 3 s, not the S3 · E4 the playing event said ($(bar))" bar_on home "The Long Tide" "S3 · E5"
+wtype -k Shift_L
+shift_s
+until_ok 2000 nothing_left
+until_ok 2000 dekho_is '.rows.continue[0].line == "S3 E5 · 39 min left"'
+check "stopped, Continue watching holds the episode on screen, S3 E5 ($(continued_first))" \
+  dekho_is '.rows.continue[0] | .title == "The Long Tide" and .line == "S3 E5 · 39 min left"'
+rm -f "$DOTS_DEV_DIR/dekho-advance"
+
+if ! dekho_is '.page == "home"'; then
+  wtype -k Escape
+  until_ok 1000 dekho_is '.page == "home"'
+fi
 wtype -k Escape
 until_ok 3000 dekho_gone
 check "esc on Home closes Dekho" dekho_gone

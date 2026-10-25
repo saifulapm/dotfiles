@@ -7,6 +7,21 @@ export function nowPlaying(e) {
   return { id: e.id, kind: e.kind, title: line(m ? m[1] : e.title), episode: m ? `S${Number(m[2])} · E${Number(m[3])}` : '' };
 }
 
+// dekho sends no event when mpv moves on to a series' next episode, but titles each file it appends, and mpv titles its window "<media-title> - mpv": the film unit's own mpv window names the episode on screen. Anything else leaves what plays as it was.
+export function fromWindow(now, text, pids) {
+  if (!now || now.kind !== 'tv') return now;
+  let windows;
+  try {
+    windows = JSON.parse(String(text));
+  } catch (e) {
+    return now;
+  }
+  const own = Array.isArray(windows) ? windows.find((w) => w && w.app_id === 'mpv' && pids.includes(w.pid)) : null;
+  if (!own) return now;
+  const seen = nowPlaying({ kind: 'tv', id: now.id, title: String(own.title ?? '').replace(/ - mpv$/, '') });
+  return seen.episode && seen.title === now.title && seen.episode !== now.episode ? Object.assign({}, now, { episode: seen.episode }) : now;
+}
+
 // What plays after these events, in their order: the last playing event's, until the run exits; a run that never played shows nothing.
 export function fromEvents(events) {
   let now = null;

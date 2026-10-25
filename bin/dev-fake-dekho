@@ -38,9 +38,9 @@ title_of() {
   fi
 }
 
-# fake-mpv.qml stands in for mpv, its window titled as the real one is; it runs as this script's child so the script can write what the real backend writes once mpv quits. It ends by SIGTERM when its window closes, so its status is not this script's.
+# fake-mpv.qml stands in for mpv, its window titled as the real one is; it runs as this script's child so the script can write what the real backend writes once mpv quits. It ends by SIGTERM when its window closes, so its status is not this script's. A second title and a delay in seconds have it move on to that title then, as mpv does to an appended episode.
 mpv() {
-  FAKE_MPV_TITLE=$1 env -u QS_CONFIG_PATH qs -p "$fixtures/../fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1 &
+  FAKE_MPV_TITLE=$1 FAKE_MPV_NEXT_TITLE=${2:-} FAKE_MPV_NEXT_SECS=${3:-} env -u QS_CONFIG_PATH qs -p "$fixtures/../fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1 &
   wait $! || true
 }
 
@@ -160,6 +160,8 @@ case "${1:-} ${2:-}" in
     echo '{"event":"exit","code":1}'
     exit 1
   fi
+  # As the real one on SIGTERM: before mpv there is nothing to save, and it exits 143 with no event; once mpv is up, it quits mpv and the run ends as when mpv quits.
+  trap 'exit 143' TERM
   id=$(flag --id "$*")
   kind=$(flag --kind "$*")
   season=$(flag -s "$*")
@@ -202,6 +204,19 @@ case "${1:-} ${2:-}" in
   jq -nc --arg t "$label" --arg kind "$kind" --argjson id "$id" --argjson at "$start" '{event: "playing", title: $t, kind: $kind, id: $id, resumed_at: $at, bitrate: 4000000}'
   # Each play watches ten minutes, so what it leaves is known to a check: history holds the title first, 600 s past where it started.
   position=$((start + 600 > duration ? duration : start + 600))
+  # With DOTS_DEV_DIR/dekho-advance holding seconds, a series moves on to its next episode that long after mpv opens, with no event, as dekho appends it: only mpv's window title says so, and history then holds that episode, 600 s in.
+  next_label='' advance=''
+  if [ "$kind" = tv ] && [ -f "$DOTS_DEV_DIR/dekho-advance" ]; then
+    next=$(jq -c --argjson s "$season" --argjson e "$((episode + 1))" 'first((.[$s | tostring] // [])[] | select(.episode == $e)) // null' "$fixtures/episodes.json")
+    if [ "$next" != null ]; then
+      advance=$(cat "$DOTS_DEV_DIR/dekho-advance")
+      next_label=$(printf '%s — S%02dE%02d  %s' "$name" "$season" "$((episode + 1))" "$(jq -r .name <<<"$next")")
+    fi
+  fi
+  moved_on() {
+    [ -n "$advance" ] && [ $(($(date +%s) - opened)) -ge "$advance" ] || return 1
+    episode=$((episode + 1)) ep=$next duration=$(jq .runtime <<<"$next") position=$((600 > $(jq .runtime <<<"$next") ? $(jq .runtime <<<"$next") : 600))
+  }
   record() {
     jq --argjson e "$(jq -nc --argjson t "$title" --arg kind "$kind" --argjson s "${season:-null}" --argjson ep "${episode:-null}" --arg epname "$( [ "$kind" = tv ] && jq -r .name <<<"$ep")" --argjson p "$position" --argjson d "$duration" --argjson now "$(date +%s)" '
       {id: $t.id, kind: $kind, title: $t.title, year: $t.year, poster: $t.poster, backdrop: $t.backdrop,
@@ -211,15 +226,19 @@ case "${1:-} ${2:-}" in
       '.items = [$e] + [.items[] | select((.id == $e.id and .kind == $e.kind) | not)]' "$history" >"$history.new"
     mv "$history.new" "$history"
   }
-  # A stopped unit's backend flushes history and exits 143 with no event of its own, as the real one does on SIGTERM.
-  trap 'record; exit 143' TERM
+  ended() {
+    moved_on || true
+    record
+    jq -nc --argjson p "$position" --argjson d "$duration" '{event: "ended", reason: "quit", position: $p, duration: $d}'
+    echo '{"event":"exit","code":0}'
+  }
   # mpv maps its window a while after playing.
   sleep 1.5 &
   wait $!
-  mpv "$label"
-  record
-  jq -nc --argjson p "$position" --argjson d "$duration" '{event: "ended", reason: "quit", position: $p, duration: $d}'
-  echo '{"event":"exit","code":0}'
+  opened=$(date +%s)
+  trap 'ended; exit 0' TERM
+  mpv "$label" "$next_label" "$advance"
+  ended
   ;;
 "trailer --json")
   # A trailer is never a playback run: no buffering and no history, only mpv on the title's trailer, which ends by itself.
