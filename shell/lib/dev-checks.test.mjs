@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -130,4 +130,22 @@ test('every tests/dev script that starts Files keeps its stdout and stderr in on
       });
   }
   assert.deepEqual(found, []);
+});
+
+// bash runs `${1:+FAKE_CUT=$1} "$bin"` with FAKE_CUT=... as the command, not as an assignment, so an expanded assignment goes through env.
+test('no line in tests/ or bin/ starts with an assignment that comes from an expansion', () => {
+  const root = new URL('../../', import.meta.url).pathname;
+  const files = readdirSync(root + 'tests', { recursive: true })
+    .map((f) => 'tests/' + f)
+    .concat(readdirSync(root + 'bin').map((f) => 'bin/' + f))
+    .filter((f) => statSync(root + f).isFile());
+  const found = [];
+  for (const f of files) {
+    readFileSync(root + f, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (/^\s*"?\$\{\w+:\+\w+=/.test(line)) found.push(`${f}:${i + 1}`);
+      });
+  }
+  assert.deepEqual(found, [], 'start the line with env');
 });
