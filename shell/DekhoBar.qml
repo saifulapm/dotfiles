@@ -109,6 +109,11 @@ Item {
                 radius: 6
                 color: bar.plain ? bar.look.tile.fill : "transparent"
 
+                // A click on the key stops the film as the key does.
+                DekhoClick {
+                    name: "bar-stop"
+                    onTapped: bar.dekho.stopPlay()
+                }
                 Row {
                     id: keyPair
                     anchors.centerIn: parent
