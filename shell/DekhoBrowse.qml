@@ -130,8 +130,9 @@ FocusScope {
             dekho.openTitle(hit);
     }
 
-    // A click on a row moves the cursor there and does what Enter does.
+    // A click on a row moves the cursor there and does what Enter does; the picker, if open beside it, closes, as a facet's click closes it.
     function pickRow(at) {
+        picking = false;
         row = at;
         move(0);
         resultKeys.forceActiveFocus();

@@ -115,6 +115,19 @@ until_ok 3000 dekho_is '.browse.picker.open == false and (.browse.rows | length)
 check "a click on the second person asks for her films and series ($(asked))" test "$(asked)" = 'api discover --kind movie --sort top-rated --person 1002;api discover --kind tv --sort top-rated --person 1002;'
 check "  and the chips read Mara Okoye, the picker closed ($(chips))" test "$(chips)" = '["Mara Okoye"]'
 
+# With the picker open, a click on the left of a row, which the picker leaves uncovered, opens that title and closes the picker, so Esc comes back to the rows alone.
+wtype x
+until_ok 3000 dekho_is '(.browse.chips | length) == 0 and (.browse.rows | length) > 0'
+wtype p
+until_ok 1000 dekho_is '.browse.picker.open'
+# shellcheck disable=SC2046
+point click $(spot browse-row:0 0.1)
+until_ok 3000 dekho_is '.page == "title"'
+check "with the picker open, a click on a row's left opens its title ($(dekho_state | jq -c '[.page, .opened]'))" dekho_is '.page == "title"'
+wtype -k Escape
+until_ok 1000 dekho_is '.page == "browse"'
+check "  and back on Browse the picker is closed ($(dekho_state | jq -c '[.page, .browse.picker.open]'))" dekho_is '.page == "browse" and .browse.picker.open == false'
+
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable|Binding loop' "$log")
 check "Dekho's log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"
 
