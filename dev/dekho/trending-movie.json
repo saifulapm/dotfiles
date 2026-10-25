@@ -26,7 +26,7 @@
    "title": "The Last Cartographer",
    "year": "2025",
    "vote": 7.5,
-   "poster": "/p402.jpg",
+   "poster": null,
    "backdrop": "/b402.jpg",
    "overview": "The Last Cartographer, a sample overview."
   },
@@ -36,7 +36,7 @@
    "title": "Night Ferry",
    "year": "2025",
    "vote": 7.3,
-   "poster": "/p403.jpg",
+   "poster": "/gone403.jpg",
    "backdrop": "/b403.jpg",
    "overview": "Night Ferry, a sample overview."
   },

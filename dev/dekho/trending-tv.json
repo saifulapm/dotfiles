@@ -76,7 +76,7 @@
    "title": "Glass Harbour",
    "year": "2022",
    "vote": 7.2,
-   "poster": "/p307.jpg",
+   "poster": null,
    "backdrop": "/b307.jpg",
    "overview": "Glass Harbour, a sample overview."
   },
@@ -86,7 +86,7 @@
    "title": "The Weather House",
    "year": "2022",
    "vote": 7.1,
-   "poster": "/p308.jpg",
+   "poster": "/gone308.jpg",
    "backdrop": "/b308.jpg",
    "overview": "The Weather House, a sample overview."
   },

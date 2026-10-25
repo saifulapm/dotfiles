@@ -81,19 +81,26 @@ FocusScope {
         if (kind === "tv") {
             seriesKind = k;
             seriesSaved = saved;
-            if (k !== "error")
+            if (k !== "error") {
                 series = listOf(answer, 10);
+                dekho.prefetch("w342", series.map(t => t.poster));
+            }
         } else {
             moviesKind = k;
             moviesSaved = saved;
-            if (k !== "error")
+            if (k !== "error") {
                 movies = listOf(answer, 10);
+                dekho.prefetch("w342", movies.map(t => t.poster));
+            }
         }
     }
 
     // Every home row is asked for again; r runs it, and a fresh answer replaces a saved one.
     function reload() {
-        dekho.api(["api", "history", "--limit", "20"], answer => home.continued = home.listOf(answer, 20));
+        dekho.api(["api", "history", "--limit", "20"], answer => {
+            home.continued = home.listOf(answer, 20);
+            home.dekho.prefetch("w342", home.continued.map(t => t.poster));
+        });
         dekho.api(["api", "trending", "--kind", "tv"], answer => home.take("tv", answer));
         dekho.api(["api", "trending", "--kind", "movie"], answer => home.take("movie", answer));
     }
@@ -109,8 +116,10 @@ FocusScope {
         asked = words;
         rowKeys.forceActiveFocus();
         dekho.api(["api", "search"].concat(words.split(" ")), answer => {
-            if (home.asked === words)
-                home.results = home.listOf(answer, 20);
+            if (home.asked !== words)
+                return;
+            home.results = home.listOf(answer, 20);
+            home.dekho.prefetch("w342", home.results.map(t => t.poster));
         });
     }
 
@@ -716,6 +725,7 @@ FocusScope {
                 line: lineText.text,
                 lines: titleText.lineCount,
                 elided: titleText.truncated,
+                poster: poster.drawn(),
                 shown: card.visible && viewport.visible && at.x >= -0.5 && at.x + card.width <= viewport.width + 0.5
             };
             if (progressed)
@@ -747,8 +757,9 @@ FocusScope {
                 Layout.fillWidth: true
                 spacing: 12
 
-                // The poster's place, as each board marks it: Paper's hatch, Artboard's grey tile, Blueprint's crossed box.
+                // The poster's place, as each board marks it until the poster is on disk: Paper's hatch, Artboard's grey tile, Blueprint's crossed box.
                 Rectangle {
+                    id: place
                     implicitWidth: card.page.plain ? 36 : 38
                     implicitHeight: card.page.plain ? 54 : 56
                     radius: card.page.plain ? 8 : 0
@@ -770,6 +781,14 @@ FocusScope {
                                 path: card.page.bracket ? "M0 0L38 56M38 0L0 56" : "M6 0L0 6M12 0L0 12M18 0L0 18M24 0L0 24M30 0L0 30M36 0L0 36M42 0L0 42M48 0L0 48M54 0L0 54M60 0L4 56M66 0L10 56M72 0L16 56M78 0L22 56M84 0L28 56M90 0L34 56M96 0L40 56"
                             }
                         }
+                    }
+                    DekhoPicture {
+                        id: poster
+                        anchors.fill: parent
+                        dekho: card.page.dekho
+                        size: "w342"
+                        path: card.modelData.poster
+                        radius: place.radius
                     }
                 }
                 ColumnLayout {

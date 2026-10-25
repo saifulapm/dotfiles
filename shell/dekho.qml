@@ -24,6 +24,8 @@ ShellRoot {
     // The id Enter last opened, for checks.
     property var opened: null
     readonly property string backend: Quickshell.env("DOTS_DEKHO") || "dekho"
+    // The TMDB images on disk, by size and then path, as prefetch has listed them; each picture binds its own path, so an answer for another title or older rows only adds paths nothing drawn names.
+    property var pictures: ({})
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -64,6 +66,24 @@ ShellRoot {
         });
         call.done = done;
         call.running = true;
+    }
+
+    // One prefetch call for one list's images of one size; a path it does not list keeps its place's empty mark.
+    function prefetch(size, paths) {
+        const want = D.wanted(paths, pictures[size] || {});
+        if (want.length === 0)
+            return;
+        api(["api", "prefetch", "--size", size].concat(want), answer => {
+            app.pictures = Object.assign({}, app.pictures, {
+                [size]: D.withFiles(app.pictures[size] || {}, answer, want)
+            });
+        });
+    }
+
+    // A picture's file URL once it is on disk, else "".
+    function picture(size, path) {
+        const file = D.picturePath(path) && pictures[size] ? pictures[size][path] : "";
+        return file ? "file://" + file : "";
     }
 
     function openTitle(hit) {

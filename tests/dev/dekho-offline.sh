@@ -30,14 +30,27 @@ stamps=()
 for back in 0 1 2; do stamps+=("$(LC_ALL=C date -d "2 days ago - $back minutes" '+%-d %b %H:%M')"); done
 notice_is() { dekho_is --arg a "TMDB is unreachable. Showing saved rows from ${stamps[0]}." --arg b "TMDB is unreachable. Showing saved rows from ${stamps[1]}." --arg c "TMDB is unreachable. Showing saved rows from ${stamps[2]}." '.offline.notice as $n | $n == $a or $n == $b or $n == $c'; }
 
-touch "$DOTS_DEV_DIR/dekho-offline"
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
+posters_on() { dekho_is "[.rows.continue[], .rows.series[], .rows.movies[] | select(.poster.shown)] | length == $1"; }
+
+# A warm run first, with TMDB up, puts the rows' posters on disk.
+niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
+until_ok 5000 dekho_up
+until_ok 3000 posters_on 19
+check "with TMDB up, the rows draw the 19 posters the fake holds ($(dekho_state | jq -c '[.rows.continue[], .rows.series[], .rows.movies[] | select(.poster.shown)] | length'))" posters_on 19
+wtype -k Escape
+until_ok 3000 dekho_gone
+
+touch "$DOTS_DEV_DIR/dekho-offline"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 dekho_up
 until_ok 3000 dekho_is '(.rows.series | length) > 0 and (.rows.continue | length) > 0'
+until_ok 3000 posters_on 17
+check "with TMDB blocked, reopening draws the posters already on disk for the saved rows ($(dekho_state | jq -c '[.rows.series, .rows.movies | map(.poster.shown)]'))" \
+  dekho_is '[.rows.continue, .rows.series, .rows.movies | map(.poster.shown)] == [[true, true, false, false, true], [true, true, true, true, true, true, true, false, false], [true, true, false, false, true, true, true, true, true]]'
 
 check "Home draws the saved trending series, 9 of the copy's titles ($(dekho_state | jq -c '[.rows.series[] | .title][0:3]'))" \
-  dekho_is '(.rows.series | length) == 9 and (.rows.movies | length) == 9 and .rows.series[0] == {"title": "Harbour Lights", "line": "2026 · ★ 8.4", "lines": 1, "elided": false, "shown": true}'
+  dekho_is '(.rows.series | length) == 9 and (.rows.movies | length) == 9 and (.rows.series[0] | del(.poster)) == {"title": "Harbour Lights", "line": "2026 · ★ 8.4", "lines": 1, "elided": false, "shown": true}'
 check "each saved row is marked with the day it was saved, saved $day ($(dekho_state | jq -c .marks))" \
   dekho_is --arg m "saved $day" '.marks.series == $m and .marks.movies == $m'
 check "the notice reads \"TMDB is unreachable. Showing saved rows from ${stamps[0]}.\" ($(dekho_state | jq -c .offline.notice))" notice_is

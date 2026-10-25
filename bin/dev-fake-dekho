@@ -152,14 +152,26 @@ case "${1:-} ${2:-}" in
   fi
   ;;
 "api prefetch")
-  # As the real one: each image it holds is copied into the cache and named; one it lacks is left out, as a 404 is.
-  dir=$DOTS_DEV_DIR/img/w780
+  # As the real one: a path that is not one /name refuses the whole call; each image it holds is copied into img/<size> and named, a named fixture if there is one, else that size's sample; a name starting gone is left out, as a 404 is; offline, only what is already in img/<size> is named.
+  size=$4
+  [ -f "$fixtures/$size.png" ] || { echo "{\"error\":\"unknown --size \\\"$size\\\"\"}"; exit 1; }
+  dir=$DOTS_DEV_DIR/img/$size
+  for path in "${@:5}"; do
+    name=${path#/}
+    if [ -z "$name" ] || [[ $name == */* ]] || [[ $name == *..* ]]; then
+      echo "{\"error\":\"image path \\\"$path\\\" is not one segment\"}"
+      exit 1
+    fi
+  done
   mkdir -p "$dir"
   files='{}'
   for path in "${@:5}"; do
     name=${path#/}
-    [ -f "$fixtures/$name" ] || continue
-    cp "$fixtures/$name" "$dir/$name"
+    if ! [ -f "$dir/$name" ]; then
+      offline && continue
+      [[ $name == gone* ]] && continue
+      if [ -f "$fixtures/$name" ]; then cp "$fixtures/$name" "$dir/$name"; else cp "$fixtures/$size.png" "$dir/$name"; fi
+    fi
     files=$(jq -c --arg p "$path" --arg f "$dir/$name" '.[$p] = $f' <<<"$files")
   done
   jq -nc --arg dir "$dir" --argjson files "$files" '{dir: $dir, files: $files}'
