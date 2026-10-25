@@ -1,6 +1,7 @@
 // dots secrets on a fresh scratch machine: fake iCloud and Dropbox alias remotes, a test age key, GPG key, ssh blob and pass repo.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -79,6 +80,12 @@ before(async () => {
 
 after(async () => {
   for (const env of [w.fixture, w.m]) await run(env, 'gpgconf', ['--kill', 'gpg-agent']);
+});
+
+// The login agent holds the real passphrase; a scratch gpg that reached it would keep test keys there, and its gpgconf --kill would drop the cache.
+test('a scratch home talks to a gpg-agent of its own, never the login one', async () => {
+  const login = execFileSync('gpgconf', ['--list-dirs', 'agent-socket'], { encoding: 'utf8' });
+  assert.notEqual(await must(w.fixture, 'gpgconf', ['--list-dirs', 'agent-socket']), login);
 });
 
 test('with no iCloud: remote it exits 1 and names rclone config as the next step', async () => {

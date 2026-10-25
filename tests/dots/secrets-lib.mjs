@@ -28,7 +28,8 @@ export function home(root, id, conf) {
     XDG_STATE_HOME: join(h, '.local/state'),
     XDG_RUNTIME_DIR: join(root, id + '-run'),
     RCLONE_CONFIG: join(h, '.config/rclone/rclone.conf'),
-    GNUPGHOME: join(h, '.gnupg'),
+    // gpg gives $HOME/.gnupg the login agent's socket, /run/user/<uid>/gnupg/S.gpg-agent, whatever $HOME is; any other folder gets a socket and an agent of its own.
+    GNUPGHOME: join(h, 'gnupg'),
     PASSWORD_STORE_DIR: join(h, '.password-store'),
     GH_CONFIG_DIR: join(h, '.config/gh'),
     DOTS_MACHINE: id,
