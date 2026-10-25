@@ -10,6 +10,8 @@ FocusScope {
     id: page
 
     required property var dekho
+    // The now-playing bar at its foot, for the state the checks read.
+    property alias playingBar: nowBar
 
     readonly property var c: dekho.c
     readonly property var fonts: dekho.fonts
@@ -668,9 +670,17 @@ FocusScope {
             color: caps ? c.ink ?? "black" : c.line ?? "gray"
         }
 
+        // While a film plays, the now-playing bar takes the keys' place.
+        DekhoBar {
+            id: nowBar
+            Layout.fillWidth: true
+            dekho: page.dekho
+        }
+
         // The keys, as Home strips them.
         Flow {
             Layout.fillWidth: true
+            visible: page.dekho.nowPlaying === null
             Layout.leftMargin: plain ? 14 : 16
             Layout.rightMargin: plain ? 14 : 16
             Layout.topMargin: plain ? 10 : 11

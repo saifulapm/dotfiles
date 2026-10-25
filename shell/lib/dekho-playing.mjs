@@ -16,3 +16,11 @@ export function fromEvents(events) {
   }
   return now;
 }
+
+// The bar's words: its tag in each board's voice, and its key as the keys strip names keys.
+export function barText(voice) {
+  return {
+    tag: voice === 'bracket' ? '[NOW PLAYING]' : voice === 'caps' ? 'NOW PLAYING' : 'Now playing',
+    keys: [['⇧S', 'stop']],
+  };
+}

@@ -9,6 +9,8 @@ FocusScope {
     id: page
 
     required property var dekho
+    // The now-playing bar at its foot, for the state the checks read.
+    property alias playingBar: nowBar
 
     readonly property var c: dekho.c
     readonly property var fonts: dekho.fonts
@@ -134,6 +136,15 @@ FocusScope {
             page.dekho.prefetch("w185", page.crew.concat(page.cast).map(p => p.profile));
             page.loadSeasons(key, page.seasonNumbers);
         });
+        refreshSeen();
+    }
+
+    // Resume shows from history, asked again when a play ends.
+    function refreshSeen() {
+        const key = asked;
+        const h = entry;
+        if (!h.id)
+            return;
         dekho.api(["api", "history", "--limit", "20"], answer => {
             if (page.asked === key && answer)
                 page.seen = T.watching(answer.items, h);
@@ -895,9 +906,17 @@ FocusScope {
             color: caps ? c.ink ?? "black" : c.line ?? "gray"
         }
 
+        // While a film plays, the now-playing bar takes the keys' place.
+        DekhoBar {
+            id: nowBar
+            Layout.fillWidth: true
+            dekho: page.dekho
+        }
+
         // The keys, as Home strips them.
         Flow {
             Layout.fillWidth: true
+            visible: page.dekho.nowPlaying === null
             Layout.leftMargin: plain ? 14 : 16
             Layout.rightMargin: plain ? 14 : 16
             Layout.topMargin: plain ? 10 : 11

@@ -9,6 +9,8 @@ FocusScope {
     id: home
 
     required property var dekho
+    // The now-playing bar at its foot, for the state the checks read.
+    property alias playingBar: nowBar
 
     readonly property var c: dekho.c
     readonly property var fonts: dekho.fonts
@@ -97,12 +99,17 @@ FocusScope {
 
     // Every home row is asked for again; r runs it, and a fresh answer replaces a saved one.
     function reload() {
+        reloadHistory();
+        dekho.api(["api", "trending", "--kind", "tv"], answer => home.take("tv", answer));
+        dekho.api(["api", "trending", "--kind", "movie"], answer => home.take("movie", answer));
+    }
+
+    // Continue watching alone, as when a play ends.
+    function reloadHistory() {
         dekho.api(["api", "history", "--limit", "20"], answer => {
             home.continued = home.listOf(answer, 20);
             home.dekho.prefetch("w342", home.continued.map(t => t.poster));
         });
-        dekho.api(["api", "trending", "--kind", "tv"], answer => home.take("tv", answer));
-        dekho.api(["api", "trending", "--kind", "movie"], answer => home.take("movie", answer));
     }
 
     function search() {
@@ -546,9 +553,17 @@ FocusScope {
             color: voice === "caps" ? c.ink ?? "black" : c.line ?? "gray"
         }
 
+        // While a film plays, the now-playing bar takes the keys' place.
+        DekhoBar {
+            id: nowBar
+            Layout.fillWidth: true
+            dekho: home.dekho
+        }
+
         // The keys, as each board strips them: Paper's tracked caps, Artboard's grey chips, Blueprint's bracketed accent keys.
         Flow {
             Layout.fillWidth: true
+            visible: home.dekho.nowPlaying === null
             Layout.leftMargin: plain ? 14 : 16
             Layout.rightMargin: plain ? 14 : 16
             Layout.topMargin: plain ? 10 : 11

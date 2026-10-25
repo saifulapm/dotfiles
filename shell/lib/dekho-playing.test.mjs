@@ -24,3 +24,9 @@ test('the run plays from its last playing event until it exits; a stop or a fail
   assert.equal(P.fromEvents([playing, { event: 'ended' }, { event: 'exit', code: 0 }]), null);
   assert.equal(P.fromEvents([{ event: 'error', text: 'x' }, { event: 'exit', code: 1 }]), null);
 });
+
+test("the bar's words in each board's voice", () => {
+  assert.deepEqual(P.barText('plain'), { tag: 'Now playing', keys: [['⇧S', 'stop']] });
+  assert.equal(P.barText('caps').tag, 'NOW PLAYING');
+  assert.equal(P.barText('bracket').tag, '[NOW PLAYING]');
+});

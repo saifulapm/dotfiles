@@ -121,6 +121,7 @@ FocusScope {
         playArgs = args;
         mode = "starting";
         starter.running = true;
+        dekho.follow(session);
     }
 
     // r on a failed start runs the same play again, in a new session; the old tail would follow the old file.
@@ -159,6 +160,7 @@ FocusScope {
 
     function cancel() {
         tail.running = false;
+        dekho.unfollow();
         if (starter.running)
             cancelled = true;
         else

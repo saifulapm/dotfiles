@@ -5,6 +5,7 @@ import QtQuick
 import Qt.labs.folderlistmodel
 import "services" as Services
 import "lib/dekho.mjs" as D
+import "lib/dekho-playing.mjs" as P
 import "lib/status.mjs" as Status
 import "lib/voice.mjs" as L
 
@@ -29,6 +30,13 @@ ShellRoot {
     property var pictures: ({})
     // Each size's cache folder as the backend names it, "" while asked; a file there draws at once, so a picture on disk never waits for a prefetch held up by the network.
     property var folders: ({})
+    // What plays in the film's unit, from its session's events: {id, kind, title, episode}, else null. Every page's bar draws it.
+    property var nowPlaying: null
+    property var playEvents: []
+    // The session followed: Starting's run, or the run a reopened Dekho finds active.
+    property string playSession: ""
+    property var playTail: null
+    readonly property string playBin: Quickshell.shellDir + "/../bin/dots-dekho-play"
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -118,6 +126,56 @@ ShellRoot {
         return file ? "file://" + file : "";
     }
 
+    // Follows a film's session file from its first line; a play that never plays shows no bar.
+    function follow(session) {
+        if (playTail)
+            playTail.running = false;
+        playSession = session;
+        playEvents = [];
+        nowPlaying = null;
+        playTail = tailer.createObject(app, {
+            session: session
+        });
+        playTail.running = true;
+    }
+
+    function playHeard(session, line) {
+        const e = D.answer(line);
+        if (!e || session !== playSession)
+            return;
+        playEvents = playEvents.concat([e]);
+        const was = nowPlaying;
+        nowPlaying = P.fromEvents(playEvents);
+        if (was && !nowPlaying)
+            ended();
+        else if (e.event === "exit")
+            unfollow();
+    }
+
+    // A run that ended before it played, or was cancelled in Starting, needs no tail.
+    function unfollow() {
+        if (playTail)
+            playTail.running = false;
+        playTail = null;
+        playSession = "";
+    }
+
+    // The run is over, by mpv quitting, a stop, or its unit gone: the bar goes, and Continue watching and Resume read history again.
+    function ended() {
+        if (playTail)
+            playTail.running = false;
+        playTail = null;
+        playSession = "";
+        nowPlaying = null;
+        home.reloadHistory();
+        titlePage.refreshSeen();
+    }
+
+    function stopPlay() {
+        if (nowPlaying && !stopper.running)
+            stopper.running = true;
+    }
+
     function openTitle(hit) {
         opened = hit.id;
         titlePage.load(hit);
@@ -137,6 +195,56 @@ ShellRoot {
             showDirs: false
             onCountChanged: app.seen(modelData, this)
         }
+    }
+
+    Component {
+        id: tailer
+
+        // tail ends with the App, even one killed outright, by watching qs's pid; it never stops the unit.
+        Process {
+            property string session: ""
+            command: ["sh", "-c", "exec tail --pid=\"$PPID\" -n +1 -s 0.1 -F \"$1\"", "sh", session]
+            stdout: SplitParser {
+                onRead: line => app.playHeard(session, line)
+            }
+            onRunningChanged: {
+                if (!running)
+                    destroy();
+            }
+        }
+    }
+
+    // A run already playing when Dekho opens is adopted, never started again; while one plays, a unit gone without its exit event ends it too.
+    Process {
+        id: playStatus
+        command: [app.playBin, "--status"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const s = D.answer(text);
+                if (!s)
+                    return;
+                if (s.active && s.session && s.session !== app.playSession)
+                    app.follow(s.session);
+                else if (!s.active && app.nowPlaying)
+                    app.ended();
+            }
+        }
+    }
+    Tick {
+        interval: 2000
+        repeat: true
+        running: app.nowPlaying !== null
+        onTriggered: {
+            if (!playStatus.running)
+                playStatus.running = true;
+        }
+    }
+
+    Process {
+        id: stopper
+        command: [app.playBin, "--stop"]
+        onExited: app.ended()
     }
 
     Component {
@@ -199,7 +307,14 @@ ShellRoot {
                 rssKiB: Status.rssKiB(procStatus.text()),
                 voice: app.voice,
                 opened: app.opened,
-                toast: toastItem.state()
+                toast: toastItem.state(),
+                playing: app.nowPlaying,
+                bar: ({
+                        home: home.playingBar,
+                        title: titlePage.playingBar,
+                        browse: browsePage.playingBar,
+                        person: personPage.playingBar
+                    })[app.page].drawn()
             }, home.state(), titlePage.state(),
             releases.state(),
             browsePage.state(),
@@ -290,6 +405,13 @@ ShellRoot {
                 app.stack = app.stack.slice(0, 1);
                 home.focusSearch();
             }
+        }
+
+        // Shift+S stops the film from any page; a text field takes its own S first.
+        Shortcut {
+            sequence: "Shift+S"
+            enabled: app.nowPlaying !== null && releases.mode === ""
+            onActivated: app.stopPlay()
         }
 
         // Last, so it draws over every page and the release overlay; 56 px up keeps it off a page's keys strip.
