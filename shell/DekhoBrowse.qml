@@ -135,7 +135,7 @@ FocusScope {
                     return;
                 const hits = B.merge(answers.map(a => a && Array.isArray(a.items) ? a.items : []), sort);
                 page.pages = list.reduce((p, a, j) => B.landed(p, a[3], answers[j]), page.pages);
-                page.results = page.results.concat(hits);
+                page.results = B.appended(page.results, hits);
                 page.loading = false;
                 page.dekho.prefetch("w342", hits.map(h => h.poster));
             });

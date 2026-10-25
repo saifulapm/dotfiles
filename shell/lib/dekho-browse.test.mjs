@@ -163,3 +163,10 @@ test('a failed page keeps the page before it, so the same page is asked again', 
   assert.deepEqual(B.landed(pages, 'movie', null), { movie: { page: 1, total: 3 } });
   assert.equal(B.done(B.landed({}, 'tv', null)), true);
 });
+
+test('a next page drops the titles already listed, as TMDB repeats one when its order shifts between pages', () => {
+  const shown = [{ id: 1, kind: 'movie' }, { id: 2, kind: 'movie' }, { id: 2, kind: 'tv' }];
+  const page = [{ id: 2, kind: 'movie' }, { id: 3, kind: 'movie' }, { id: 1, kind: 'tv' }, { id: 3, kind: 'movie' }];
+  assert.deepEqual(B.appended(shown, page), shown.concat([{ id: 3, kind: 'movie' }, { id: 1, kind: 'tv' }]));
+  assert.deepEqual(B.appended([], []), []);
+});

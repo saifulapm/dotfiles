@@ -118,6 +118,12 @@ export function nextCalls(f, genres, pages) {
     .map((k) => calls(Object.assign({}, f, { kind: k }), genres, pages[k].page + 1)[0]);
 }
 
+// The list with a next page under it, past each title already in it or earlier in the page: TMDB's order shifts between requests, so a title can come back on the next page.
+export function appended(shown, page) {
+  const seen = new Set(shown.map((h) => `${h.kind} ${h.id}`));
+  return shown.concat(page.filter((h) => !seen.has(`${h.kind} ${h.id}`) && seen.add(`${h.kind} ${h.id}`)));
+}
+
 // Both kinds' answers as one list: a hit carries no popularity, so popular alternates the two; the other sorts order by rating or year.
 export function merge(lists, sort) {
   if (sort === 'popular' || sort === 'box-office') {

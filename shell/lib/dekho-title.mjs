@@ -107,6 +107,6 @@ export function titleText(voice) {
     nextUp: voice === 'bracket' ? '[NEXT UP]' : caps ? 'NEXT UP' : 'next up',
     filters: upper(voice, 'f filters by these'),
     more: (n) => upper(voice, `${n > 0 ? `+ ${n} · ` : ''}tab to reach, ↵ opens a person`),
-    keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['r', 'resume'], ['t', 'trailer'], ['w', 'mark watched'], ['tab', 'buttons, links, seasons, episodes, crew, cast'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],
+    keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['r', 'resume'], ['t', 'trailer'], ['w', 'mark watched'], ['tab', 'buttons, links, seasons, episodes, crew, cast, more like this'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],
   };
 }
