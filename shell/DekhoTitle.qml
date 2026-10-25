@@ -44,7 +44,7 @@ FocusScope {
     // History's entry for this title while it is still being watched, else null; it adds Resume.
     property var seen: null
     property int button: 0
-    readonly property var buttons: T.buttons(voice, seen)
+    readonly property var buttons: T.buttons(voice, seen, detail ? detail.trailer : null)
 
     readonly property var shown: detail || entry
     readonly property bool tv: shown.kind === "tv"
@@ -254,6 +254,19 @@ FocusScope {
             play();
         else if (id === "resume")
             resumeSeen();
+        else if (id === "trailer")
+            playTrailer();
+    }
+
+    // t, and the Trailer button, play the title's trailer; a title without one has nothing to play.
+    function playTrailer() {
+        if (!detail || !detail.trailer)
+            return;
+        dekho.trailer({
+            id: page.entry.id,
+            kind: shown.kind,
+            title: shown.title
+        });
     }
 
     function openPerson(p) {
@@ -376,6 +389,8 @@ FocusScope {
                 page.choose();
             else if (t === "r")
                 page.resumeSeen();
+            else if (t === "t")
+                page.playTrailer();
             else if (t === "w")
                 page.toggleWatched();
             else if (t === "f") {
@@ -605,7 +620,7 @@ FocusScope {
                     }
                 }
 
-                // Play, Resume while history holds the title: buttons as the chips are drawn, the focused one as the release list draws its cursor.
+                // Play, Resume while history holds the title, Trailer when it has one: buttons as the chips are drawn, the focused one as the release list draws its cursor.
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8

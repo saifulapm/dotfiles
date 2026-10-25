@@ -53,6 +53,11 @@ ShellRoot {
         toastItem.show(text);
     }
 
+    // Plays a title's trailer, {id, kind, title}, in its own mpv window.
+    function trailer(target) {
+        trailers.play(target);
+    }
+
     function open(page, args) {
         // Leaving a Title page keeps it, since a credit's title opened further on reloads the one shared page.
         const top = stack[stack.length - 1];
@@ -318,7 +323,8 @@ ShellRoot {
             }, home.state(), titlePage.state(),
             releases.state(),
             browsePage.state(),
-            personPage.state()));
+            personPage.state(),
+            trailers.state()));
         }
     }
 
@@ -384,6 +390,11 @@ ShellRoot {
             function onResume(item) {
                 releases.resume(item, home);
             }
+        }
+
+        DekhoTrailer {
+            id: trailers
+            dekho: app
         }
 
         DekhoBrowse {
