@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# dots clean: lists the build output, agent worktrees and caches nothing has used for 14 days, plus the package caches to prune; --yes removes them.
+set -uo pipefail
+{
+
+days=14
+cache=${XDG_CACHE_HOME:-$HOME/.cache}
+
+case ${1:-} in
+  '') yes='' ;;
+  --yes) yes=1 ;;
+  *)
+    echo "usage: dots clean [--yes]" >&2
+    exit 2
+    ;;
+esac
+
+# Reading a file moves its atime (relatime, at most once a day) and listing a folder moves only the folder's, so files say when a tree was last used; an empty folder has its own mtime.
+fresh() {
+  [[ -n $(find "$1" -maxdepth 0 -mtime -"$days" 2>/dev/null) ||
+    -n $(find "$1" -type f \( -atime -"$days" -o -mtime -"$days" \) -print -quit 2>/dev/null) ]]
+}
+
+human() { numfmt --to=iec --from-unit=1024 "$1"; }
+free_kb() { df -k --output=avail "$HOME" | tail -n 1 | tr -d ' '; }
+
+paths=() kinds=() kept=() failed=0
+
+# One walk: hidden folders are skipped except .local/src (the pins' checkouts) and a project's .claude, where agent worktrees live; a worktree is never walked into.
+while IFS= read -r line; do
+  p=${line#? }
+  case $line in
+    w*)
+      fresh "$p" && continue
+      if [[ ! -f $p/.git ]]; then
+        kept+=("$p: not a git worktree")
+      elif [[ -n $(git -C "$p" status --porcelain 2>/dev/null | head -n 1) ]]; then
+        kept+=("$p: uncommitted work")
+      else
+        paths+=("$p") kinds+=(worktree)
+      fi
+      ;;
+    b*)
+      dir=${p%/*}
+      git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+      [[ -z $(git -C "$dir" ls-files -- "$p" | head -n 1) ]] || continue
+      # Outside the pins' checkouts an untracked folder may be new work, so only one git ignores counts as output.
+      case $p in
+        "$HOME"/.local/src/*) ;;
+        *) git -C "$dir" check-ignore -q "$p" || continue ;;
+      esac
+      fresh "$p" || { paths+=("$p") kinds+=(build); }
+      ;;
+  esac
+done < <(find "$HOME" -xdev \
+  \( -path "$HOME/.local/*" ! -path "$HOME/.local/src" ! -path "$HOME/.local/src/*" \) -prune -o \
+  -path '*/.claude/worktrees/*' -prune -printf 'w %p\n' -o \
+  -type d \( -name target -o -name node_modules -o -name vendor -o -name build -o -name .turbo -o -name .next \) -prune -printf 'b %p\n' -o \
+  -name '.*' ! -path "$HOME/.local" ! \( -name .claude ! -path "$HOME/.claude" \) -prune 2>/dev/null)
+
+# Playwright's browsers sit in the cache but nothing downloads them again on its own.
+for p in "$cache"/*; do
+  [[ -e $p && ${p##*/} != ms-playwright ]] || continue
+  fresh "$p" || { paths+=("$p") kinds+=(cache); }
+done
+
+sizes=()
+for p in "${paths[@]}"; do sizes+=("$(du -sk "$p" 2>/dev/null | cut -f1)"); done
+
+before=$(free_kb)
+total=0 small=0 small_kb=0
+echo "dots clean: unused for $days days"
+while IFS=$'\t' read -r kb i; do
+  [[ -n $kb ]] || continue
+  total=$((total + kb))
+  if ((kb >= 51200)); then
+    printf '  %6s  %s  %s\n' "$(human "$kb")" "${paths[i]/#$HOME/\~}" "${kinds[i]}"
+  else
+    small=$((small + 1)) small_kb=$((small_kb + kb))
+  fi
+done < <(for i in "${!paths[@]}"; do printf '%s\t%s\n' "${sizes[i]}" "$i"; done | sort -rn)
+((small)) && echo "  and $small smaller ($(human "$small_kb"))"
+for k in "${kept[@]}"; do echo "  kept ${k/#$HOME/\~}"; done
+
+tools=()
+command -v pnpm >/dev/null && tools+=("pnpm store prune")
+command -v npm >/dev/null && tools+=("npm cache clean --force")
+command -v uv >/dev/null && tools+=("uv cache prune")
+if command -v podman >/dev/null; then
+  untagged=$(podman images -q -f dangling=true 2>/dev/null | wc -l)
+  ((untagged)) && tools+=("podman image prune -f")
+fi
+if ((${#tools[@]})); then
+  line=$(printf '%s · ' "${tools[@]}")
+  echo "then: ${line% · }"
+fi
+
+if [[ -z $yes ]]; then
+  echo "dots clean: $(human "$total") unused, $(human "$before") free. dots clean --yes removes it."
+  exit 0
+fi
+
+for i in "${!paths[@]}"; do
+  p=${paths[i]}
+  if [[ ${kinds[i]} == worktree ]]; then
+    git -C "${p%/.claude/worktrees/*}" worktree remove "$p" 2>/dev/null || { echo "  kept ${p/#$HOME/\~}: git worktree remove refused"; }
+  else
+    rm -rf "$p" || { echo "dots clean: could not remove $p" >&2; failed=1; }
+  fi
+done
+# The store keeps a package while any node_modules links it, so the prune runs after the builds are gone.
+for t in "${tools[@]}"; do
+  # shellcheck disable=SC2086 # each entry is a command and its words
+  $t >/dev/null 2>&1 || { echo "dots clean: $t failed" >&2; failed=1; }
+done
+echo "dots clean: $(human "$before") free before, $(human "$(free_kb)") now"
+exit "$failed"
+}
