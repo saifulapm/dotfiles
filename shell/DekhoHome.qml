@@ -130,16 +130,22 @@ FocusScope {
         });
     }
 
-    function search() {
+    // Enter, and the timer below, ask for the field's words. Enter takes the cursor to the results; the timer leaves the keys in the field. Only the newest query's answer is drawn.
+    function search(keepKeys) {
         const words = D.title(field.text);
         if (!words)
             return;
+        timer.stop();
+        const fresh = words !== asked;
         searching = true;
-        results = [];
         row = "results";
         col = 0;
+        if (!keepKeys)
+            rowKeys.forceActiveFocus();
+        if (!fresh)
+            return;
+        results = [];
         asked = words;
-        rowKeys.forceActiveFocus();
         dekho.api(["api", "search"].concat(words.split(" ")), answer => {
             if (home.asked !== words)
                 return;
@@ -148,12 +154,31 @@ FocusScope {
         });
     }
 
+    // Every edit restarts the wait; under 2 characters the home rows come back and an answer still on its way is dropped.
+    function edited() {
+        if (offline)
+            return;
+        if (D.title(field.text).length >= 2) {
+            timer.restart();
+            return;
+        }
+        timer.stop();
+        if (!searching && !asked)
+            return;
+        searching = false;
+        asked = "";
+        results = [];
+        row = rowNames.length ? rowNames[0] : "continue";
+        col = 0;
+    }
+
     function focusSearch() {
         if (!offline)
             field.forceActiveFocus();
     }
 
     function leaveSearch() {
+        timer.stop();
         searching = false;
         asked = "";
         results = [];
@@ -217,6 +242,12 @@ FocusScope {
     // The trending rows land in either order, so the cursor follows the first row with titles until a key moves it.
     onRowNamesChanged: if (!searching)
         row = H.cursorRow(rowNames, row, moved)
+
+    Tick {
+        id: timer
+        interval: 250
+        onTriggered: home.search(true)
+    }
 
     Item {
         id: rowKeys
@@ -465,9 +496,10 @@ FocusScope {
                 selectedTextColor: c.surface ?? "white"
                 font.family: home.bodyFont
                 font.pixelSize: bracket ? 14 : 15
+                onTextChanged: home.edited()
                 Keys.onPressed: event => {
                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                        home.search();
+                        home.search(false);
                     else if (event.key === Qt.Key_Escape)
                         home.leaveSearch();
                     else

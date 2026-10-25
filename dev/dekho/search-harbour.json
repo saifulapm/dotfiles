@@ -1,0 +1,24 @@
+{
+ "items": [
+  {
+   "id": 300,
+   "kind": "tv",
+   "title": "Harbour Lights",
+   "year": "2026",
+   "vote": 8.4,
+   "poster": null,
+   "backdrop": "/b300.jpg",
+   "overview": "Harbour Lights, a sample overview."
+  },
+  {
+   "id": 407,
+   "kind": "movie",
+   "title": "Harbour Master",
+   "year": "2018",
+   "vote": 6.9,
+   "poster": null,
+   "backdrop": "/b407.jpg",
+   "overview": "Harbour Master, a sample overview."
+  }
+ ]
+}

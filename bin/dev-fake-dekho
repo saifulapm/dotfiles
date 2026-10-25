@@ -114,7 +114,10 @@ case "${1:-} ${2:-}" in
     exit 1
   fi
   shift 2
-  if [ "${*,,}" = tide ]; then answer search-tide; else echo '{"items":[]}'; fi
+  # A query that is part of "tide" finds search-tide, any other finds search-harbour. A query held in DOTS_DEV_DIR/dekho-slow-search is answered 1.5 s late, so a check can have an older answer land after a newer one.
+  q=${*,,}
+  [ "$q" = "$(cat "$DOTS_DEV_DIR/dekho-slow-search" 2>/dev/null)" ] && sleep 1.5
+  if [[ tide == *"$q"* ]]; then answer search-tide; else answer search-harbour; fi
   ;;
 "api title")
   title_of "$(flag --id "$*")" "$(flag --kind "$*")"
