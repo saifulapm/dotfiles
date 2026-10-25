@@ -13,9 +13,41 @@ answer() { jq -c . "$fixtures/$1.json"; }
 offline() { [ -f "$DOTS_DEV_DIR/dekho-offline" ]; }
 saved() { jq -c '.items |= .[:9] | . + {cached: true, stale: true, age_secs: 172800}' "$fixtures/$1.json"; }
 
+# A flag's value in this call's arguments, else "".
+flag() {
+  local name=$1
+  shift
+  sed -n "s/.* $name \([0-9a-z]*\).*/\1/p" <<<" $* "
+}
+
+# What a play leaves is kept in DOTS_DEV_DIR and outlasts the call, as the real history file does; until a play ends it is the fixture's.
+history=$DOTS_DEV_DIR/dekho-history.json
+[ -f "$history" ] || cp "$fixtures/history.json" "$history"
+
+# api title's answer. Harbour Lights has a backdrop and no poster, A Quiet Verdict is a film with neither and no trailer; any other film answers as A Quiet Verdict under its own id, named, dated and pictured as Home's rows have it, with a trailer of its own; every other series answers as The Long Tide under its own id, its picture paths renamed for that id, so one title's pictures never match another's.
+title_of() {
+  if [ "$1" = 300 ] || [ "$1" = 400 ]; then
+    answer "title-$1"
+  elif [ "$2" = movie ]; then
+    jq -c --argjson id "$1" --slurpfile t "$fixtures/trending-movie.json" --slurpfile h "$history" '
+      (first($t[0].items[], $h[0].items[] | select(.id == $id and .kind == "movie")) // {title: "Film \($id)", year: "2026", poster: null, backdrop: null}) as $m
+      | .id = $id | .title = $m.title | .year = $m.year | .poster = $m.poster | .backdrop = $m.backdrop
+      | .trailer = "https://www.youtube.com/watch?v=fake\($id)"' "$fixtures/title-400.json"
+  else
+    jq -c --argjson id "$1" '.id = $id | (.poster, .backdrop, (.cast, .crew)[].profile) |= (strings |= sub("101"; $id | tostring))' "$fixtures/title-101.json"
+  fi
+}
+
+# fake-mpv.qml stands in for mpv, its window titled as the real one is; it runs as this script's child so the script can write what the real backend writes once mpv quits.
+mpv() {
+  FAKE_MPV_TITLE=$1 env -u QS_CONFIG_PATH qs -p "$fixtures/../fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1 &
+  wait $!
+}
+
 case "${1:-} ${2:-}" in
 "api history")
-  answer history
+  limit=$(flag --limit "$*")
+  jq -c --argjson n "${limit:-20}" '.items |= .[:$n]' "$history"
   ;;
 "api trending")
   case "$*" in
@@ -85,9 +117,7 @@ case "${1:-} ${2:-}" in
   if [ "${*,,}" = tide ]; then answer search-tide; else echo '{"items":[]}'; fi
   ;;
 "api title")
-  # Harbour Lights has a backdrop and no poster, A Quiet Verdict is a film with neither; every other id answers as The Long Tide under its own id, its picture paths renamed for that id, so one title's pictures never match another's.
-  id=$(sed -n 's/.*--id \([0-9]*\).*/\1/p' <<<"$*")
-  if [ "$id" = 300 ] || [ "$id" = 400 ]; then answer "title-$id"; else jq -c --argjson id "$id" '.id = $id | (.poster, .backdrop, (.cast, .crew)[].profile) |= (strings |= sub("101"; $id | tostring))' "$fixtures/title-101.json"; fi
+  title_of "$(flag --id "$*")" "$(flag --kind "$*")"
   ;;
 "api episodes")
   # Air dates count in days from today, so one to come still reads airs; w's marks are kept in DOTS_DEV_DIR and outlast the call.
@@ -121,7 +151,7 @@ case "${1:-} ${2:-}" in
   esac
   ;;
 "play --json")
-  # The Starting events contract over about 3 s, then dev/fake-mpv.qml stands in for mpv until the unit is stopped.
+  # The Starting events contract over about 3 s, then dev/fake-mpv.qml stands in for mpv until its window closes or the unit is stopped.
   emit() { printf '%s\n' "$1"; sleep 0.35; }
   # With DOTS_DEV_DIR/dekho-play-fails present the play fails before it plays: the file's text is the error's, then the backend exits 1.
   if [ -f "$DOTS_DEV_DIR/dekho-play-fails" ]; then
@@ -130,6 +160,38 @@ case "${1:-} ${2:-}" in
     echo '{"event":"exit","code":1}'
     exit 1
   fi
+  id=$(flag --id "$*")
+  kind=$(flag --kind "$*")
+  season=$(flag -s "$*")
+  episode=$(flag -e "$*")
+  case " $* " in *" --resume "*) resume=1 ;; *) resume= ;; esac
+  title=$(title_of "$id" "$kind")
+  name=$(jq -r .title <<<"$title")
+  year=$(jq -r '.year // ""' <<<"$title")
+  seen=$(jq -c --argjson id "$id" --arg kind "$kind" 'first(.items[] | select(.id == $id and .kind == $kind)) // null' "$history")
+  # As the real one: --resume plays a series at the episode history holds unless -s/-e say otherwise, and from where it stopped only in that same episode.
+  if [ "$kind" = tv ]; then
+    if [ -z "$season" ] && [ -n "$resume" ] && [ "$seen" != null ]; then
+      season=$(jq .season <<<"$seen")
+      episode=$(jq .episode <<<"$seen")
+    fi
+    season=${season:-1} episode=${episode:-1}
+    ep=$(jq -c --argjson s "$season" --argjson e "$episode" 'first((.[$s | tostring] // [])[] | select(.episode == $e)) // {name: "Episode \($e)", runtime: 3120}' "$fixtures/episodes.json")
+    label=$(printf '%s — S%02dE%02d  %s' "$name" "$season" "$episode" "$(jq -r .name <<<"$ep")")
+    duration=$(jq .runtime <<<"$ep")
+    same=$(jq --argjson s "$season" --argjson e "$episode" '. != null and .season == $s and .episode == $e' <<<"$seen")
+  else
+    label=$name
+    [ -z "$year" ] || label="$name ($year)"
+    duration=$(jq '.runtime // 6300' <<<"$title")
+    same=$(jq '. != null' <<<"$seen")
+  fi
+  # The length history holds for the same episode or film wins, as mpv measured it.
+  [ "$same" != true ] || duration=$(jq --argjson d "$duration" 'if .duration > 0 then .duration else $d end' <<<"$seen")
+  start=0
+  if [ -n "$resume" ] && [ "$same" = true ]; then
+    start=$(jq --argjson d "$duration" 'if .position > 0 and .position + 60 < $d then .position else 0 end' <<<"$seen")
+  fi
   mb=1048576
   emit '{"event":"status","text":"looking for releases"}'
   emit '{"event":"trying","quality":"720p","size":"1.1 GB","seeders":530,"audio":"EN 2.0","needed_bps":4000000}'
@@ -137,10 +199,49 @@ case "${1:-} ${2:-}" in
     emit "{\"event\":\"buffer\",\"buffered\":$((i * 27 * mb)),\"rate_bps\":31876710,\"live_peers\":$((i * 4)),\"seen_peers\":20,\"needed_bps\":4000000,\"bytes\":$((i * 27 * mb)),\"needed_bytes\":$((108 * mb)),\"peers\":$((i * 4)),\"sending\":$((i * 2)),\"down_bps\":$((i * 8000000)),\"up_bps\":3355443}"
   done
   emit "{\"event\":\"ready\",\"rate_bps\":31876710,\"buffered\":$((108 * mb)),\"cached\":false}"
-  printf '%s\n' '{"event":"playing","title":"The Long Tide","kind":"tv","id":101,"resumed_at":0,"bitrate":4000000}'
-  # mpv maps its window a while after playing; the stand-in runs in place of the backend, so it lives and dies with the unit, and keeps its output out of the session file.
-  sleep 1.5
-  exec env -u QS_CONFIG_PATH qs -p "$fixtures/../fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1
+  jq -nc --arg t "$label" --arg kind "$kind" --argjson id "$id" --argjson at "$start" '{event: "playing", title: $t, kind: $kind, id: $id, resumed_at: $at, bitrate: 4000000}'
+  # Each play watches ten minutes, so what it leaves is known to a check: history holds the title first, 600 s past where it started.
+  position=$((start + 600 > duration ? duration : start + 600))
+  record() {
+    jq --argjson e "$(jq -nc --argjson t "$title" --arg kind "$kind" --argjson s "${season:-null}" --argjson ep "${episode:-null}" --arg epname "$( [ "$kind" = tv ] && jq -r .name <<<"$ep")" --argjson p "$position" --argjson d "$duration" --argjson now "$(date +%s)" '
+      {id: $t.id, kind: $kind, title: $t.title, year: $t.year, poster: $t.poster, backdrop: $t.backdrop,
+       season: (if $kind == "tv" then $s else null end), episode: (if $kind == "tv" then $ep else null end),
+       episode_name: (if $kind == "tv" then $epname else null end),
+       position: $p, duration: $d, finished: ($p >= $d * 0.9), updated: $now, progress: ($p / $d)}')" \
+      '.items = [$e] + [.items[] | select((.id == $e.id and .kind == $e.kind) | not)]' "$history" >"$history.new"
+    mv "$history.new" "$history"
+  }
+  # A stopped unit's backend flushes history and exits 143 with no event of its own, as the real one does on SIGTERM.
+  trap 'record; exit 143' TERM
+  # mpv maps its window a while after playing.
+  sleep 1.5 &
+  wait $!
+  mpv "$label"
+  record
+  jq -nc --argjson p "$position" --argjson d "$duration" '{event: "ended", reason: "quit", position: $p, duration: $d}'
+  echo '{"event":"exit","code":0}'
+  ;;
+"trailer --json")
+  # A trailer is never a playback run: no buffering and no history, only mpv on the title's trailer, which ends by itself.
+  printf '%s\n' '{"event":"status","text":"Looking up the trailer…"}'
+  # With DOTS_DEV_DIR/dekho-trailer-fails present the trailer fails with the file's text as its error.
+  if [ -f "$DOTS_DEV_DIR/dekho-trailer-fails" ]; then
+    jq -nc --rawfile text "$DOTS_DEV_DIR/dekho-trailer-fails" '{event: "error", text: $text}'
+    echo '{"event":"exit","code":1}'
+    exit 1
+  fi
+  title=$(title_of "$(flag --id "$*")" "$(flag --kind "$*")")
+  url=$(jq -r '.trailer // ""' <<<"$title")
+  if [ -z "$url" ]; then
+    jq -nc --argjson t "$title" '{event: "error", text: "TMDB has no trailer for \($t.title)"}'
+    echo '{"event":"exit","code":1}'
+    exit 1
+  fi
+  label=$(jq -r 'if (.year // "") == "" then "\(.title) — Trailer" else "\(.title) (\(.year)) — Trailer" end' <<<"$title")
+  jq -nc --arg t "$label" --argjson a "$title" --arg url "$url" '{event: "playing", title: $t, kind: $a.kind, id: $a.id, url: $url}'
+  trap 'exit 143' TERM
+  mpv "$label"
+  echo '{"event":"exit","code":0}'
   ;;
 "api person")
   # Only the ids with a fixture are known people, as TMDB knows only its own.
