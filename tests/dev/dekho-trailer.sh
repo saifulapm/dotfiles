@@ -53,6 +53,7 @@ trailer_line='trailer --json --id 401 --kind movie'
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 dekho_up
+wtype -k Shift_L
 until_ok 3000 dekho_is '(.rows.movies | length) == 10'
 
 # A Quiet Verdict, the first trending film, has no trailer.

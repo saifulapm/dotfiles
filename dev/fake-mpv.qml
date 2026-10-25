@@ -13,11 +13,18 @@ ShellRoot {
         title: Quickshell.env("FAKE_MPV_TITLE") || "fake mpv"
     }
 
-    // An appended episode: mpv retitles its window when it moves on, and says nothing else.
+    // An appended episode: mpv retitles its window when it moves on, and says nothing else; the mark tells the fake backend, as mpv's own state tells dekho.
     Timer {
         interval: Number(Quickshell.env("FAKE_MPV_NEXT_SECS") || 0) * 1000
         running: (Quickshell.env("FAKE_MPV_NEXT_TITLE") || "") !== ""
-        onTriggered: win.title = Quickshell.env("FAKE_MPV_NEXT_TITLE")
+        onTriggered: {
+            win.title = Quickshell.env("FAKE_MPV_NEXT_TITLE");
+            marker.running = true;
+        }
+    }
+    Process {
+        id: marker
+        command: ["touch", Quickshell.env("FAKE_MPV_NEXT_MARK") || "/dev/null"]
     }
 
     // mpv quits when its window closes, and qs has no quit of its own, so a child ends it.

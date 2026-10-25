@@ -45,9 +45,11 @@ refocus() {
   until_ok 1000 dekho_focused
   wtype -k Shift_L
 }
+# A window opened since wtype's last key gets niri's keymap; a Shift first hands it wtype's.
 open_dekho() {
   niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
   until_ok 5000 dekho_up
+  wtype -k Shift_L
 }
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
@@ -56,9 +58,22 @@ until_ok 3000 dekho_is '(.rows.movies | length) == 10 and (.rows.continue | leng
 check "with nothing playing, no page shows the bar and the keys are drawn ($(bar))" \
   dekho_is '.bar.shown == false and .playing == null and (.offline.keys | length) > 0'
 
+# Keys typed into a window can be lost while it settles, so Home's cursor is moved one key at a time, read back after each, until it is where the check means.
+go() {
+  local rows='["continue","series","movies"]' _ at
+  for _ in $(seq 1 12); do
+    at=$(dekho_state | jq -c --argjson rows "$rows" --arg r "$1" --argjson c "$2" '.focus as $f | ($rows | index($f.row)) as $i | ($rows | index($r)) as $j | if $i == null then "" elif $i < $j then "j" elif $i > $j then "k" elif $f.col < $c then "l" elif $f.col > $c then "h" else "=" end' -r)
+    [ "$at" = "=" ] && return 0
+    [ -n "$at" ] || return 1
+    wtype -k Shift_L
+    wtype "$at"
+    sleep 0.2
+  done
+  return 1
+}
+
 # Seven Stations: Play, then Enter on Auto.
-wtype jjl
-until_ok 1000 dekho_is '.focus == {"row": "movies", "col": 1}'
+go movies 1
 wtype -k Return
 until_ok 3000 dekho_is '.page == "title" and .title.name == "Seven Stations"'
 wtype -k Tab
@@ -144,18 +159,12 @@ until_ok 2000 nothing_left
 check "Shift+S leaves no unit, dekho or mpv within 2 s" nothing_left
 until_ok 1000 bar_off
 check "and the bar goes, the keys back ($(bar))" bar_off
-until_ok 2000 dekho_is '.rows.continue[0].title == "Seven Stations"'
+until_ok 3000 dekho_is '.rows.continue[0].title == "Seven Stations"' || echo "  history: $(jq -c '.items[0] | [.id, .position]' "$DOTS_DEV_DIR/dekho-history.json"); session tail: $(tail -2 "$(tail -1 "$sessions")" | tr '\n' ' ')"
 check "Continue watching lists Seven Stations first with its new time left ($(continued_first))" \
   dekho_is '.rows.continue[0] | .title == "Seven Stations" and .line == "1h 45 · 1h 35 left"'
 
 # The Long Tide resumed at S3 E4: the bar names the episode; mpv quitting on its own ends it. Up to Continue watching first, then down a row, wherever the cursor was left.
-for _ in 1 2 3; do
-  dekho_is '.focus == {"row": "series", "col": 1}' && break
-  wtype -k Shift_L
-  wtype kkjhhl
-  sleep 0.3
-done
-until_ok 1000 dekho_is '.focus == {"row": "series", "col": 1}'
+go series 1
 wtype -k Return
 # r waits on Resume, which comes with history's answer.
 has_resume() { dekho_is '.page == "title" and .title.name == "The Long Tide" and ([.title.buttons[].kind] | index("resume")) != null'; }

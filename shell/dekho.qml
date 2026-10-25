@@ -261,10 +261,14 @@ ShellRoot {
         }
     }
 
+    // The run ends on its own exit event, or once its unit is found gone: dekho may take 3 s to save history on SIGTERM, past --stop's 2 s wait, and Continue watching must read it after.
     Process {
         id: stopper
         command: [app.playBin, "--stop"]
-        onExited: app.ended()
+        onExited: {
+            if (app.nowPlaying && !playStatus.running)
+                playStatus.running = true;
+        }
     }
 
     Component {

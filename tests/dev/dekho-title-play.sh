@@ -48,6 +48,7 @@ history_first() { "$repo/bin/dev-fake-dekho" api history --limit 1 | jq -c '.ite
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 dekho_up
+wtype -k Shift_L
 until_ok 3000 dekho_is '(.rows.movies | length) == 10'
 
 # Seven Stations, the second trending film, has never been played here.

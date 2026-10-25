@@ -40,7 +40,7 @@ title_of() {
 
 # fake-mpv.qml stands in for mpv, its window titled as the real one is; it runs as this script's child so the script can write what the real backend writes once mpv quits. It ends by SIGTERM when its window closes, so its status is not this script's. A second title and a delay in seconds have it move on to that title then, as mpv does to an appended episode.
 mpv() {
-  FAKE_MPV_TITLE=$1 FAKE_MPV_NEXT_TITLE=${2:-} FAKE_MPV_NEXT_SECS=${3:-} env -u QS_CONFIG_PATH qs -p "$fixtures/../fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1 &
+  FAKE_MPV_TITLE=$1 FAKE_MPV_NEXT_TITLE=${2:-} FAKE_MPV_NEXT_SECS=${3:-} FAKE_MPV_NEXT_MARK=${4:-} env -u QS_CONFIG_PATH qs -p "$fixtures/../fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1 &
   wait $! || true
 }
 
@@ -213,8 +213,11 @@ case "${1:-} ${2:-}" in
       next_label=$(printf '%s — S%02dE%02d  %s' "$name" "$season" "$((episode + 1))" "$(jq -r .name <<<"$next")")
     fi
   fi
+  # The stand-in leaves this mark once it has moved on.
+  mark=$DOTS_DEV_DIR/fake-mpv-moved-$$
+  rm -f "$mark"
   moved_on() {
-    [ -n "$advance" ] && [ $(($(date +%s) - opened)) -ge "$advance" ] || return 1
+    [ -n "$advance" ] && [ -f "$mark" ] || return 1
     episode=$((episode + 1)) ep=$next duration=$(jq .runtime <<<"$next") position=$((600 > $(jq .runtime <<<"$next") ? $(jq .runtime <<<"$next") : 600))
   }
   record() {
@@ -226,7 +229,10 @@ case "${1:-} ${2:-}" in
       '.items = [$e] + [.items[] | select((.id == $e.id and .kind == $e.kind) | not)]' "$history" >"$history.new"
     mv "$history.new" "$history"
   }
+  # Once: the stand-in can quit on the same SIGTERM that runs the trap.
   ended() {
+    [ -z "${over:-}" ] || return 0
+    over=1
     moved_on || true
     record
     jq -nc --argjson p "$position" --argjson d "$duration" '{event: "ended", reason: "quit", position: $p, duration: $d}'
@@ -235,9 +241,8 @@ case "${1:-} ${2:-}" in
   # mpv maps its window a while after playing.
   sleep 1.5 &
   wait $!
-  opened=$(date +%s)
   trap 'ended; exit 0' TERM
-  mpv "$label" "$next_label" "$advance"
+  mpv "$label" "$next_label" "$advance" "$mark"
   ended
   ;;
 "trailer --json")
