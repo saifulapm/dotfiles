@@ -59,15 +59,31 @@ case "${1:-} ${2:-}" in
 "api discover")
   # Filters the fixture catalog as TMDB would, then prints only the fields a real hit carries.
   shift 2
-  kind='' sort=popular genre='' lang='' rating='' year='' person=''
+  kind='' sort=popular genre='' lang='' rating='' year='' person='' page=1
   while [ $# -gt 0 ]; do
     case $1 in
     --kind) kind=$2 ;; --sort) sort=$2 ;; --genre) genre=$2 ;; --lang) lang=$2 ;;
-    --min-rating) rating=$2 ;; --year) year=$2 ;; --person) person=$2 ;; --page) ;;
+    --min-rating) rating=$2 ;; --year) year=$2 ;; --person) person=$2 ;; --page) page=$2 ;;
     *) echo "dev-fake-dekho: unknown discover flag: $1" >&2; exit 2 ;;
     esac
     shift 2
   done
+  # With DOTS_DEV_DIR/dekho-many-pages holding a count, every filter answers that many pages of 20 made-up hits each, "Film 2-07" the seventh film of page 2, and a page past the count answers none. A page past the first comes as late as DOTS_DEV_DIR/dekho-slow-pages says in seconds, and with DOTS_DEV_DIR/dekho-pages-fail present it fails as an unreachable TMDB does.
+  if [ -f "$DOTS_DEV_DIR/dekho-many-pages" ]; then
+    if [ "$page" -gt 1 ]; then
+      [ -f "$DOTS_DEV_DIR/dekho-slow-pages" ] && sleep "$(cat "$DOTS_DEV_DIR/dekho-slow-pages")"
+      if [ -f "$DOTS_DEV_DIR/dekho-pages-fail" ]; then
+        echo '{"error":"tmdb: network unreachable"}'
+        exit 1
+      fi
+    fi
+    jq -nc --argjson n "$(cat "$DOTS_DEV_DIR/dekho-many-pages")" --argjson p "$page" --arg kind "$kind" '
+      (if $kind == "tv" then "Series" else "Film" end) as $name
+      | {items: (if $p > $n then [] else [range(1; 21) as $i | {id: ((if $kind == "tv" then 200000 else 100000 end) + $p * 100 + $i), kind: $kind,
+          title: "\($name) \($p)-\($i | tostring | if length == 1 then "0" + . else . end)", year: "2026", vote: 7, poster: null, language: "English", genres: ["Drama"]}] end),
+        page: $p, total_pages: $n}'
+    exit 0
+  fi
   if [ "$kind" = tv ] && [ "$sort" = box-office ]; then
     echo '{"error":"--sort box-office only applies to movies"}'
     exit 1

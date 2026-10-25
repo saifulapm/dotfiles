@@ -35,6 +35,11 @@ FocusScope {
     property bool prefilled: false
     // Each refresh counts up; an answer for an older count is dropped.
     property int asked: 0
+    // Each kind's page and total_pages as its last answer gave them, and whether the next page is on its way.
+    property var pages: ({})
+    property bool loading: false
+    readonly property bool moreShown: !B.done(pages)
+    readonly property var moreKey: look.keys([words.more])[0]
     // The stack entry last loaded, so going back to Browse keeps its filters.
     property var loaded: null
     readonly property var entry: dekho.stack[dekho.stack.length - 1]
@@ -55,6 +60,7 @@ FocusScope {
         prefilled = !!ctx.kind || !!ctx.person;
         picking = false;
         results = [];
+        pages = {};
         withTables(() => {
             const base = ctx.kind ? B.fromTitle(ctx, page.tables.languages) : B.empty();
             page.filters = ctx.person ? B.withPerson(base, ctx.person) : base;
@@ -92,17 +98,46 @@ FocusScope {
         const answers = [];
         let left = list.length;
         results = [];
+        pages = {};
+        loading = false;
         row = 0;
         resultView.contentY = 0;
         list.forEach((args, i) => {
             dekho.api(args, answer => {
                 if (page.asked !== n)
                     return;
-                answers[i] = answer && Array.isArray(answer.items) ? answer.items : [];
+                answers[i] = answer;
                 if (--left > 0)
                     return;
-                page.results = B.merge(answers, sort);
+                page.results = B.merge(answers.map(a => a && Array.isArray(a.items) ? a.items : []), sort);
+                page.pages = list.reduce((p, a, j) => B.landed(p, a[3], answers[j]), {});
                 page.dekho.prefetch("w342", page.results.map(h => h.poster));
+            });
+        });
+    }
+
+    // The next page of each kind that has one, merged as page 1 is and put under the rows; one at a time, and dropped once a refresh has come since.
+    function more() {
+        if (loading || B.done(pages))
+            return;
+        const n = asked;
+        const list = B.nextCalls(filters, tables.genres, pages);
+        const sort = filters.sort;
+        const answers = [];
+        let left = list.length;
+        loading = true;
+        list.forEach((args, i) => {
+            dekho.api(args, answer => {
+                if (page.asked !== n)
+                    return;
+                answers[i] = answer;
+                if (--left > 0)
+                    return;
+                const hits = B.merge(answers.map(a => a && Array.isArray(a.items) ? a.items : []), sort);
+                page.pages = list.reduce((p, a, j) => B.landed(p, a[3], answers[j]), page.pages);
+                page.results = page.results.concat(hits);
+                page.loading = false;
+                page.dekho.prefetch("w342", hits.map(h => h.poster));
             });
         });
     }
@@ -112,9 +147,12 @@ FocusScope {
         refresh();
     }
 
+    // The cursor can stand on load more, one past the last row; reaching the last row asks the next page.
     function move(by) {
-        row = Math.max(0, Math.min(results.length - 1, row + by));
-        const r = resultRows.itemAt(row);
+        row = Math.max(0, Math.min(results.length - (moreShown ? 0 : 1), row + by));
+        if (row === results.length - 1)
+            more();
+        const r = row < results.length ? resultRows.itemAt(row) : moreRow;
         if (!r)
             return;
         if (r.y < resultView.contentY)
@@ -123,8 +161,10 @@ FocusScope {
             resultView.contentY = r.y + r.height - resultView.height;
     }
 
-    // Enter on the cursor's row opens its title.
+    // Enter on the cursor's row opens its title, and on load more asks the next page.
     function enter() {
+        if (row === results.length)
+            return more();
         const hit = results[row];
         if (hit)
             dekho.openTitle(hit);
@@ -232,6 +272,8 @@ FocusScope {
                 facets: drawnList(facetBoxes),
                 chips: drawnList(chipRow),
                 rows: drawnList(resultRows),
+                more: moreRow.drawn(),
+                loading: loading,
                 cursor: row,
                 filters: filters,
                 picker: {
@@ -725,6 +767,68 @@ FocusScope {
                                 name: "browse-row:" + resultRow.index
                                 onTapped: page.pickRow(resultRow.index)
                             }
+                        }
+                    }
+
+                    // Under the rows while a page is left: load more, a row the cursor stands on, written as the keys strip writes ↵ and its word.
+                    Rectangle {
+                        id: moreRow
+                        readonly property bool cursor: page.row === page.results.length
+                        function drawn() {
+                            const at = moreRow.mapToItem(resultView, 0, 0);
+                            return {
+                                shown: moreRow.visible,
+                                text: moreKeyText.text + " " + moreWordText.text,
+                                cursor: cursor,
+                                inView: moreRow.visible && at.y >= -0.5 && at.y + moreRow.height <= resultView.height + 0.5
+                            };
+                        }
+                        visible: page.moreShown
+                        width: resultColumn.width
+                        implicitHeight: page.plain ? 44 : 46
+                        radius: page.plain ? 10 : 0
+                        color: cursor ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : "transparent"
+                        border.width: cursor && page.plain ? 1.5 : 0
+                        border.color: page.c.accent ?? "blue"
+
+                        // Lined up with the titles, past the poster's place, in Artboard's grey key chip.
+                        Rectangle {
+                            x: 12 + 36 + 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitWidth: moreText.implicitWidth + (page.plain ? 14 : 0)
+                            implicitHeight: moreText.implicitHeight + (page.plain ? 6 : 0)
+                            radius: 6
+                            color: page.plain ? page.look.tile.fill : "transparent"
+
+                            Row {
+                                id: moreText
+                                anchors.centerIn: parent
+                                spacing: page.bracket ? 8 : 6
+
+                                Text {
+                                    id: moreKeyText
+                                    textFormat: Text.PlainText
+                                    text: page.moreKey.key
+                                    color: (moreRow.cursor && !page.plain ? page.c.surface : page.bracket ? page.c.accent : page.c.ink) ?? "black"
+                                    font.family: page.bodyFont
+                                    font.pixelSize: page.caps ? 10 : 11
+                                    font.weight: page.plain ? Font.Medium : Font.Bold
+                                    font.letterSpacing: page.caps ? 1 : page.bracket ? 1.5 : 0
+                                }
+                                Text {
+                                    id: moreWordText
+                                    textFormat: Text.PlainText
+                                    text: page.moreKey.word
+                                    color: moreRow.cursor && !page.plain ? page.onInk : page.c.muted ?? "gray"
+                                    font.family: page.bodyFont
+                                    font.pixelSize: page.caps ? 10 : 11
+                                    font.letterSpacing: page.caps ? 1 : page.bracket ? 1.5 : 0
+                                }
+                            }
+                        }
+                        DekhoClick {
+                            name: "browse-more"
+                            onTapped: page.pickRow(page.results.length)
                         }
                     }
                 }
