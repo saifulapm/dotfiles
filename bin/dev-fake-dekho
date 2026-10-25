@@ -144,10 +144,18 @@ case "${1:-} ${2:-}" in
   echo "{\"watched\":$to}"
   ;;
 "api releases")
-  # The Long Tide's S3 E3 has no releases, so a check can draw that board; every other choice lists the fixture's, out of rank order.
+  # With DOTS_DEV_DIR/dekho-slow-releases holding seconds the answer comes that late, as a slow tracker's would.
+  [ -f "$DOTS_DEV_DIR/dekho-slow-releases" ] && sleep "$(cat "$DOTS_DEV_DIR/dekho-slow-releases")"
+  # The Long Tide's S3 E3 has no releases, so a check can draw that board; every other choice lists the fixture's, out of rank order, or with DOTS_DEV_DIR/dekho-many-releases holding a count that many, each its own.
   case "$*" in
   *"--id 101 "*"-s 3 -e 3"*) echo '{"items":[],"dropped":0,"failed":[]}' ;;
-  *) answer releases ;;
+  *)
+    if [ -f "$DOTS_DEV_DIR/dekho-many-releases" ]; then
+      jq -c --argjson n "$(cat "$DOTS_DEV_DIR/dekho-many-releases")" '.items as $r | .items = [range($n) as $i | $r[$i % ($r | length)] | .hash = ("\($i + 10)" + .hash[2:]) | .title = "\(.title).\($i + 1)" | .seeders = 100 - $i]' "$fixtures/releases.json"
+    else
+      answer releases
+    fi
+    ;;
   esac
   ;;
 "play --json")

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dekho's release list by mouse: a click on a row, Auto included, starts it as Enter does with the cursor there, a double click starts once, a click on the dimmer or the card's header acts on nothing, a click on a filtered row starts that row, and the wheel moves no cursor.
+# Dekho's release list by mouse: a click on a row, Auto included, starts it as Enter does with the cursor there, a double click starts once, a click on the dimmer or the card's header acts on nothing, as does one while the rows are asked for, a click on a filtered row starts that row, and the wheel scrolls a long list without moving the cursor, stopping at its ends.
 {
 # The nested App and its units run on this machine's real user manager, so this run's unit has a name of its own, set before lib.sh starts the session that inherits it.
 export DOTS_DEKHO_UNIT=dekho-mouse-releases-test-$$
@@ -86,13 +86,50 @@ point click "$ax" $((ay - 70))
 check "a click on the dimmer and two on the card above the rows change nothing ($(rel ' | [.mode, .cursor]') $(dekho_state | jq -c '[.page, (.title | [.cursor, .zone])]'))" \
   dekho_is --argjson t "$beneath" '.releases.mode == "list" and .releases.cursor == 0 and .page == "title" and (.title | [.cursor, .zone]) == $t'
 
-# Six rows of 40 px fit the card, so the wheel has nothing to scroll: the rows stay and the cursor with them.
-y1=$(row_y release:1)
+# While the list still asks for its rows, a click where a row will be acts on nothing: the fake answers 2 s late.
+read -r rx ry <<<"$(spot release:1)"
+wtype -k Escape
+until_ok 1000 dekho_is '.releases.mode == ""'
+echo 2 >"$DOTS_DEV_DIR/dekho-slow-releases"
+before=$(plays)
+wtype -k Return
+until_ok 1000 dekho_is '.releases.mode != "" and (.releases.rows | length) == 0'
+point click "$rx" "$ry"
+until_ok 4000 listed
+check "a click where row 1 will be, while the rows are asked for, starts nothing ($(rel ' | [.mode, .cursor]'), $before then $(plays) plays)" \
+  bash -c "[ $before = \$(grep -c '^$play_line' '$fake_log') ] && timeout 0.5 qs ipc -p '$dekho_qml' call dekho state | jq -e '.releases.mode == \"list\" and .releases.cursor == 0' >/dev/null"
+rm -f "$DOTS_DEV_DIR/dekho-slow-releases"
+
+# 24 releases overflow the list's 420 px, so the wheel has something to scroll.
+wtype -k Escape
+until_ok 1000 dekho_is '.releases.mode == ""'
+echo 24 >"$DOTS_DEV_DIR/dekho-many-releases"
+wtype -k Return
+until_ok 3000 dekho_is '.releases.mode == "list" and (.releases.rows | length) == 25'
+top=$(row_y release:0)
 wheel_on release:2 3
-wheel_on release:2 -30
-check "the wheel over the rows moves no cursor and no row, as they all fit (row 1 at $(row_y release:1), was $y1)" \
-  test "$y1" != null -a "$y1" = "$(row_y release:1)"
-check "and the list is still open on Auto" dekho_is '.releases.mode == "list" and .releases.cursor == 0'
+until_ok 1000 bash -c "[ \"\$(timeout 0.5 qs ipc -p '$dekho_qml' call dekho box release:0 | jq .y)\" != '$top' ]"
+check "three notches down move the rows up 180 px, Auto out of view (Auto at $(row_y release:0), was $top)" \
+  jq -ne --argjson y "$(row_y release:0)" --argjson t "$top" '$y == $t - 180'
+check "and leave the cursor on Auto ($(rel .cursor))" dekho_is '.releases.cursor == 0 and .releases.mode == "list"'
+wheel_on release:5 30
+last_end() { dekho_box release:24 | jq '.y + .h'; }
+end1=$(last_end)
+wheel_on release:12 30
+check "thirty notches stop with the last row at the list's foot, and thirty more move nothing ($end1, then $(last_end), list from $top)" \
+  jq -ne --argjson a "$end1" --argjson b "$(last_end)" --argjson t "$top" '$a == $b and ($a - ($t + 420) | fabs) <= 1'
+wheel_on release:20 -60
+until_ok 1000 bash -c "[ \"\$(timeout 0.5 qs ipc -p '$dekho_qml' call dekho box release:0 | jq .y)\" = '$top' ]"
+check "sixty up bring Auto back to the top ($(row_y release:0), was $top)" test "$(row_y release:0)" = "$top"
+read -r ox oy <<<"$dekho_at"
+point move $((ox + 10)) $((oy + 300))
+point wheel 5
+check "the wheel over the dimmer moves neither the rows nor the cursor ($(rel .cursor))" \
+  dekho_is '.releases.mode == "list" and .releases.cursor == 0'
+rm -f "$DOTS_DEV_DIR/dekho-many-releases"
+wtype -k Escape
+until_ok 1000 dekho_is '.releases.mode == ""'
+open_list
 
 wtype -M ctrl f -m ctrl
 until_ok 1000 dekho_is '.releases.filter.focused'

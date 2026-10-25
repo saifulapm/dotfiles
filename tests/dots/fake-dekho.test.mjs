@@ -124,3 +124,18 @@ test("a trailer plays the title's trailer in mpv and leaves history alone; a tit
   writeFileSync(join(dir, 'dekho-trailer-fails'), 'yt-dlp: no formats');
   assert.deepEqual(events(run('trailer', '--json', '--id', '401', '--kind', 'movie')).slice(-2), [{ event: 'error', text: 'yt-dlp: no formats' }, { event: 'exit', code: 1 }]);
 });
+
+test('with dekho-many-releases a release list holds that many rows, each its own, and dekho-slow-releases makes it late', (t) => {
+  const { dir, run } = rig(t);
+  const releases = () => JSON.parse(run('api', 'releases', '--id', '401', '--kind', 'movie').stdout).items;
+  assert.equal(releases().length, 5);
+  writeFileSync(join(dir, 'dekho-many-releases'), '24\n');
+  const many = releases();
+  assert.equal(many.length, 24);
+  assert.equal(new Set(many.map((r) => r.hash)).size, 24);
+  assert.equal(new Set(many.map((r) => r.title)).size, 24);
+  writeFileSync(join(dir, 'dekho-slow-releases'), '1\n');
+  const t0 = Date.now();
+  assert.equal(releases().length, 24);
+  assert.ok(Date.now() - t0 >= 1000);
+});

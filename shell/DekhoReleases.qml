@@ -364,10 +364,11 @@ FocusScope {
         radius: plain ? 14 : 0
     }
 
-    // The overlay takes every click, so none reaches the page beneath; the rows' own click areas sit above it.
+    // The overlay takes every click and wheel, so none reaches the page beneath; the rows' own click areas and the list's wheel sit above it.
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.AllButtons
+        onWheel: event => event.accepted = true
     }
 
     Item {
