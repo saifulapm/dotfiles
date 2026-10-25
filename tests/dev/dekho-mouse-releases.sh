@@ -121,14 +121,27 @@ check "thirty notches stop with the last row at the list's foot, and thirty more
 wheel_on release:20 -60
 until_ok 1000 bash -c "[ \"\$(timeout 0.5 qs ipc -p '$dekho_qml' call dekho box release:0 | jq .y)\" = '$top' ]"
 check "sixty up bring Auto back to the top ($(row_y release:0), was $top)" test "$(row_y release:0)" = "$top"
-read -r ox oy <<<"$dekho_at"
-point move $((ox + 10)) $((oy + 300))
+# A window short enough that the Title page's episodes beneath could scroll: the wheel over the dimmer right of the card, above them, moves neither them nor the list.
+wtype -k Escape
+until_ok 1000 dekho_is '.releases.mode == ""'
+tall=$(niri msg -j windows | jq '.[] | select(.app_id == "dekho") | .layout.window_size[1]')
+niri msg action set-window-height --id "$(dekho_id)" 630
+until_ok 2000 dekho_is '(.title.episodes[-1].shown | not)'
+episodes() { dekho_state | jq -c '[.title.episodes[].shown]'; }
+before_eps=$(episodes)
+read -r _ ey <<<"$(spot title-episode:1)"
+wtype -k Return
+until_ok 3000 dekho_is '.releases.mode == "list" and (.releases.rows | length) == 25'
+read -r ox _ <<<"$dekho_at"
+point move $((ox + 1100)) "$ey"
 point wheel 5
-check "the wheel over the dimmer moves neither the rows nor the cursor ($(rel .cursor))" \
-  dekho_is '.releases.mode == "list" and .releases.cursor == 0'
+sleep 0.3
+check "the wheel over the dimmer moves neither the list's cursor nor the episodes beneath ($(rel .cursor), $before_eps then $(episodes))" \
+  dekho_is --argjson e "$before_eps" '.releases.mode == "list" and .releases.cursor == 0 and [.title.episodes[].shown] == $e'
 rm -f "$DOTS_DEV_DIR/dekho-many-releases"
 wtype -k Escape
 until_ok 1000 dekho_is '.releases.mode == ""'
+niri msg action set-window-height --id "$(dekho_id)" "$tall"
 open_list
 
 wtype -M ctrl f -m ctrl
