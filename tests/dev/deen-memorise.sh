@@ -22,14 +22,7 @@ cue13=$(jq -r '.due[1].ayah.ar | split(" ") | .[0]' "$fixture")
 deen_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "deen")] | length'; }
 deen_up() { [ "$(deen_windows)" = 1 ] && deen_is '.firstFrameMs != null'; }
 deen_gone() { [ "$(deen_windows)" = 0 ]; }
-# The App's own qs, found by its command line, never by pgrep -f, which matches this shell too.
-deen_pids() {
-  local pid
-  for pid in $(pgrep -x qs); do
-    tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "-p $deen_qml" && echo "$pid"
-  done
-  return 0
-}
+deen_pids() { session_qs_pids "-p $deen_qml"; }
 no_deen_process() { [ -z "$(deen_pids)" ]; }
 logged() { grep -qxF -- "$1" "$calls"; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }

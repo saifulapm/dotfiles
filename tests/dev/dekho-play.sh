@@ -38,13 +38,7 @@ buffering() { dekho_is '.releases.mode == "starting" and .releases.starting.down
 mpv_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "mpv")] | length'; }
 mpv_up() { [ "$(mpv_windows)" -gt 0 ]; }
 no_mpv() { [ "$(mpv_windows)" = 0 ]; }
-fake_mpv_pids() {
-  local pid
-  for pid in $(pgrep -x qs); do
-    tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "/fake-mpv.qml" && echo "$pid"
-  done
-  return 0
-}
+fake_mpv_pids() { session_qs_pids "/fake-mpv.qml"; }
 no_fake_mpv() { [ -z "$(fake_mpv_pids)" ]; }
 opening() { dekho_is '.releases.mode == "starting" and .releases.starting.steps[-1] == {"text": "mpv is opening", "state": "current"}'; }
 waiting_on_mpv() {

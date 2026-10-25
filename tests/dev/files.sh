@@ -23,14 +23,7 @@ files_is() { files_state | jq -e "$@" >/dev/null 2>&1; }
 files_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "files")] | length'; }
 files_up() { [ "$(files_windows)" = 1 ] && files_is '.firstFrameMs != null'; }
 files_gone() { [ "$(files_windows)" = 0 ]; }
-# The App's own qs, found by its command line, never by pgrep -f, which matches this shell too; one that exits mid-scan has no cmdline left.
-files_pids() {
-  local pid
-  for pid in $(pgrep -x qs); do
-    tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "-p $files_qml" && echo "$pid"
-  done
-  return 0
-}
+files_pids() { session_qs_pids "-p $files_qml"; }
 no_files_process() { [ -z "$(files_pids)" ]; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command, dots-files, through niri.
 mod_y() { niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"; }

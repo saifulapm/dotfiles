@@ -35,6 +35,16 @@ until_ok() {
   done
 }
 
+# The qs processes whose command line holds $1 and that this nested session started, by its NIRI_SOCKET, so an App open on the live desktop is never counted; never pgrep -f, which matches this shell too, and one that exits mid-scan has no cmdline left.
+session_qs_pids() {
+  local pid
+  for pid in $(pgrep -x qs); do
+    tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "$1" || continue
+    tr '\0' '\n' 2>/dev/null <"/proc/$pid/environ" | grep -qxF -- "NIRI_SOCKET=$NIRI_SOCKET" && echo "$pid"
+  done
+  return 0
+}
+
 # Mean colour of a binary PPM on stdin, as "r g b".
 mean_rgb() {
   node -e '

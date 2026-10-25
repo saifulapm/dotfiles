@@ -14,14 +14,7 @@ dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
-# The App's own qs, found by its command line, never by pgrep -f, which matches this shell too.
-dekho_pids() {
-  local pid
-  for pid in $(pgrep -x qs); do
-    tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "-p $dekho_qml" && echo "$pid"
-  done
-  return 0
-}
+dekho_pids() { session_qs_pids "-p $dekho_qml"; }
 no_dekho_process() { [ -z "$(dekho_pids)" ]; }
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 launcher_is() { launcher_state | jq -e "$1" >/dev/null 2>&1; }

@@ -70,13 +70,7 @@ show() { deen_state | jq -c "$1"; }
 deen_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "deen")] | length'; }
 deen_up() { [ "$(deen_windows)" = 1 ] && deen_is '.firstFrameMs != null'; }
 deen_gone() { [ "$(deen_windows)" = 0 ]; }
-deen_pids() {
-  local pid
-  for pid in $(pgrep -x qs); do
-    tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "-p $deen_qml" && echo "$pid"
-  done
-  return 0
-}
+deen_pids() { session_qs_pids "-p $deen_qml"; }
 no_deen_process() { [ -z "$(deen_pids)" ]; }
 # Whatever this run's Deen started (mpv, deen, its curl and python3) names the run's work dir in its command line or environment.
 left_over() {

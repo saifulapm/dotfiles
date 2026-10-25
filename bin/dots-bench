@@ -182,14 +182,7 @@ bench_app() {
   app_is() { app_state | jq -e "$1" >/dev/null 2>&1; }
   app_windows() { niri msg -j windows | jq --arg a "$appid" '[.[] | select(.app_id == $a)] | length'; }
   app_up() { [ "$(app_windows)" = 1 ] && app_is '.firstFrameMs != null'; }
-  # The App's own qs, found by its command line, never by pgrep -f, which matches this shell too; one that exits mid-scan has no cmdline left.
-  app_pids() {
-    local pid
-    for pid in $(pgrep -x qs); do
-      tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "-p $qml" && echo "$pid"
-    done
-    return 0
-  }
+  app_pids() { session_qs_pids "-p $qml"; }
   app_gone() { [ -z "$(app_pids)" ]; }
   local frames=()
   app_rss_kib=0 app_left=0

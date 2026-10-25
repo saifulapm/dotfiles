@@ -19,13 +19,7 @@ dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
-dekho_pids() {
-  local pid
-  for pid in $(pgrep -x qs); do
-    tr '\0' ' ' 2>/dev/null <"/proc/$pid/cmdline" | grep -qF -- "-p $dekho_qml" && echo "$pid"
-  done
-  return 0
-}
+dekho_pids() { session_qs_pids "-p $dekho_qml"; }
 no_dekho_process() { [ -z "$(dekho_pids)" ]; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
