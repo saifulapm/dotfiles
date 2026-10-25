@@ -95,8 +95,8 @@ wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 wtype -k Return
 until_ok 3000 title_is "Seven Stations"
-until_ok 3000 buttons_are '["▶ Play", "▶ Resume · 1h 45 · 1h 35 left", "▶ Trailer"]'
-check "with history it shows ▶ Play and ▶ Resume with its length and time left ($(buttons))" buttons_are '["▶ Play", "▶ Resume · 1h 45 · 1h 35 left", "▶ Trailer"]'
+until_ok 3000 buttons_are '["▶ Play", "▶ Resume · 1h 35 left", "▶ Trailer"]'
+check "with history it shows ▶ Play and ▶ Resume with its time left ($(buttons))" buttons_are '["▶ Play", "▶ Resume · 1h 35 left", "▶ Trailer"]'
 wtype r
 until_ok 3000 unit_active
 note_session
@@ -135,8 +135,8 @@ wtype khl
 until_ok 1000 dekho_is '.focus == {"row": "series", "col": 1}'
 wtype -k Return
 until_ok 3000 dekho_is '.page == "title" and .title.name == "The Long Tide" and .title.cursor == 4'
-until_ok 3000 buttons_are '["▶ Play", "▶ Resume · S3 E4 · 31 min left", "▶ Trailer"]'
-check "a series in history shows ▶ Resume with its episode and time left ($(buttons))" buttons_are '["▶ Play", "▶ Resume · S3 E4 · 31 min left", "▶ Trailer"]'
+until_ok 3000 buttons_are '["▶ Play", "▶ Resume · S3 · E4 · 31 min left", "▶ Trailer"]'
+check "a series in history shows ▶ Resume with its episode and time left ($(buttons))" buttons_are '["▶ Play", "▶ Resume · S3 · E4 · 31 min left", "▶ Trailer"]'
 wtype r
 until_ok 3000 unit_active
 note_session

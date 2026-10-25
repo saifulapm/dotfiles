@@ -161,7 +161,7 @@ until_ok 1000 bar_off
 check "and the bar goes, the keys back ($(bar))" bar_off
 until_ok 3000 dekho_is '.rows.continue[0].title == "Seven Stations"' || echo "  history: $(jq -c '.items[0] | [.id, .position]' "$DOTS_DEV_DIR/dekho-history.json"); session tail: $(tail -2 "$(tail -1 "$sessions")" | tr '\n' ' ')"
 check "Continue watching lists Seven Stations first with its new time left ($(continued_first))" \
-  dekho_is '.rows.continue[0] | .title == "Seven Stations" and .line == "1h 45 · 1h 35 left"'
+  dekho_is '.rows.continue[0] | .title == "Seven Stations" and .line == "RESUME · 1h 35 left"'
 
 # The Long Tide resumed at S3 E4: the bar names the episode; mpv quitting on its own ends it. Up to Continue watching first, then down a row, wherever the cursor was left.
 go series 1
@@ -181,11 +181,11 @@ check "a series' bar shows its title and S3 · E4 ($(bar))" bar_on title "The Lo
 niri msg action close-window --id "$(mpv_window "The Long Tide — S03E04  Quay Nine" | jq '.[0].id')"
 until_ok 2000 bar_off
 check "within 2 s of mpv quitting, the bar goes ($(bar))" bar_off
-until_ok 2000 dekho_is '.rows.continue[0].title == "The Long Tide" and .rows.continue[0].line == "S3 E4 · 21 min left"'
+until_ok 2000 dekho_is '.rows.continue[0].title == "The Long Tide" and .rows.continue[0].line == "S3 · E4 · 21 min left"'
 check "and Continue watching lists The Long Tide first with its new time left ($(continued_first))" \
-  dekho_is '.rows.continue[0] | .title == "The Long Tide" and .line == "S3 E4 · 21 min left"'
+  dekho_is '.rows.continue[0] | .title == "The Long Tide" and .line == "S3 · E4 · 21 min left"'
 check "and its Resume reads the new time too ($(dekho_state | jq -c '[.title.buttons[].text]'))" \
-  dekho_is '[.title.buttons[].text][1] == "▶ Resume · S3 E4 · 21 min left"'
+  dekho_is '[.title.buttons[].text][1] == "▶ Resume · S3 · E4 · 21 min left"'
 refocus
 
 # mpv moving on to the next episode says nothing to dekho's events; the bar reads it off the film's own mpv window title, also in a reopened Dekho.
@@ -209,9 +209,9 @@ check "reopened, the bar names S3 · E5 within 3 s, not the S3 · E4 the playing
 wtype -k Shift_L
 shift_s
 until_ok 2000 nothing_left
-until_ok 2000 dekho_is '.rows.continue[0].line == "S3 E5 · 39 min left"'
+until_ok 2000 dekho_is '.rows.continue[0].line == "S3 · E5 · 39 min left"'
 check "stopped, Continue watching holds the episode on screen, S3 E5 ($(continued_first))" \
-  dekho_is '.rows.continue[0] | .title == "The Long Tide" and .line == "S3 E5 · 39 min left"'
+  dekho_is '.rows.continue[0] | .title == "The Long Tide" and .line == "S3 · E5 · 39 min left"'
 rm -f "$DOTS_DEV_DIR/dekho-advance"
 
 if ! dekho_is '.page == "home"'; then

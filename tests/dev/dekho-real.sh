@@ -148,7 +148,7 @@ open_dekho
 until_ok 15000 dekho_up
 until_ok 5000 dekho_is '(.rows.continue | length) > 0'
 check "reopened, Continue watching's first card is the series at S1 E1 with its time left ($(dekho_state | jq -c '.rows.continue[0] | [.title, .line, .progress]'))" \
-  dekho_is '.focus == {"row": "continue", "col": 0} and .rows.continue[0].title == "Test Pattern Show" and .rows.continue[0].line == "S1 E1 · 2 min left"'
+  dekho_is '.focus == {"row": "continue", "col": 0} and .rows.continue[0].title == "Test Pattern Show" and .rows.continue[0].line == "S1 · E1 · 2 min left"'
 # A window opened since wtype's last key is handed niri's own keymap, and niri does not resend wtype's when it has not changed, so a Return after the last run's Return reads as Escape and closes Dekho; a Shift first carries wtype's keymap over and does nothing.
 wtype -k Shift_L
 t0=$(now_ms)

@@ -45,7 +45,7 @@ check "it opens on Home ($(dekho_state | jq -c .page))" dekho_is '.page == "home
 
 until_ok 3000 dekho_is '(.rows.continue | length) == 5 and (.rows.series | length) == 10 and (.rows.movies | length) == 10'
 check "continue watching draws 5 titles with their time left ($(dekho_state | jq -c '[.rows.continue[] | .line]'))" \
-  dekho_is '[.rows.continue[] | [.title, .line]] == [["The Long Tide", "S3 E4 · 31 min left"], ["Night Ferry", "1h 52 · 40 min left"], ["Ninth Floor", "S1 E7 · 12 min left"], ["Salt Road", "S2 E2 · 44 min left"], ["Copper Hill", "2h 04 · 1h 31 left"]]'
+  dekho_is '[.rows.continue[] | [.title, .line]] == [["The Long Tide", "S3 · E4 · 31 min left"], ["Night Ferry", "RESUME · 40 min left"], ["Ninth Floor", "S1 · E7 · 12 min left"], ["Salt Road", "S2 · E2 · 44 min left"], ["Copper Hill", "RESUME · 1h 31 left"]]'
 check "and a progress bar each, as far as each has played ($(dekho_state | jq -c '[.rows.continue[] | .progress]'))" \
   dekho_is '[.rows.continue[] | .progress] == [0.4, 0.64, 0.79, 0.08, 0.27]'
 check "trending series draws 10 of the fake's 12, each with year and rating ($(dekho_state | jq -c '[.rows.series[] | .line]'))" \
@@ -123,7 +123,7 @@ check "artboard: the poster is masked to its grey tile's 8 px corners ($(dekho_s
 in_theme blueprint
 until_ok 3000 dekho_is '.voice == "bracket"'
 check "blueprint: the header rule is dashed and the time left reads MIN LEFT, as the Blueprint board writes it ($(dekho_state | jq -c '[.look, .rows.continue[1].line]'))" \
-  dekho_is '.look.ruleDashed and .look.cardRadius == 0 and .rows.continue[1].line == "1h 52 · 40 MIN LEFT"'
+  dekho_is '.look.ruleDashed and .look.cardRadius == 0 and .rows.continue[1].line == "RESUME · 40 MIN LEFT"'
 check "blueprint: the poster fills its crossed box square, and a null one keeps the cross ($(dekho_state | jq -c '[.rows.continue[0].poster, .rows.continue[2].poster.shown]'))" \
   dekho_is '(.rows.continue[0].poster | .shown and .radius == 0) and .rows.continue[2].poster.shown == false'
 

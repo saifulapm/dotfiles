@@ -1,6 +1,6 @@
 // The Title page's words and choices: which episode is next up, how a date and the watched count read, which crew to name, in each theme's voice.
 import { stars } from './dekho.mjs';
-import { continueLine } from './dekho-home.mjs';
+import { resumeLine } from './dekho-home.mjs';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const upper = (voice, s) => (voice === 'bracket' ? s.toUpperCase() : s);
@@ -72,10 +72,10 @@ export function watching(history, title) {
   return seen && !seen.finished ? seen : null;
 }
 
-// The title's buttons: Play always, Resume with what is left, as Continue watching words it, while history holds it, and Trailer when the title has one.
+// The title's buttons: Play always, Resume with what is left while history holds it, and Trailer when the title has one.
 export function buttons(voice, seen, trailer) {
   const out = [{ id: 'play', text: upper(voice, '▶ Play') }];
-  if (seen) out.push({ id: 'resume', text: upper(voice, ['▶ Resume', continueLine(voice, seen)].filter((p) => p).join(' · ')) });
+  if (seen) out.push({ id: 'resume', text: upper(voice, ['▶ Resume', resumeLine(voice, seen)].filter((p) => p).join(' · ')) });
   if (trailer) out.push({ id: 'trailer', text: upper(voice, '▶ Trailer') });
   return out;
 }

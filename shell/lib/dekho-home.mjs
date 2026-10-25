@@ -10,11 +10,16 @@ const leftText = (voice, min) => {
   return voice === 'bracket' ? t.replace(/min left$/, 'MIN LEFT').replace(/left$/, 'LEFT') : t;
 };
 
+const left = (voice, item) => (item.duration ? leftText(voice, Math.round(Math.max(0, item.duration - item.position) / 60)) : '');
+
+// A card says where Saiful is: a series' season and episode as the now-playing bar writes them, a film RESUME, then the time left.
 export function continueLine(voice, item) {
-  const head = item.kind === 'tv' ? `S${item.season} E${item.episode}` : item.duration ? clock(Math.round(item.duration / 60)) : '';
-  if (!item.duration) return head;
-  return [head, leftText(voice, Math.round(Math.max(0, item.duration - item.position) / 60))].filter((p) => p).join(' · ');
+  const head = item.kind === 'tv' ? `S${item.season} · E${item.episode}` : 'RESUME';
+  return [head, left(voice, item)].filter((p) => p).join(' · ');
 }
+
+// What Resume's button adds after its own word: a series' episode and the time left, a film's time left alone.
+export const resumeLine = (voice, item) => (item.kind === 'tv' ? continueLine(voice, item) : left(voice, item));
 
 export function hitLine(hit) {
   return [hit.year, stars(hit.vote)].filter((p) => p).join(' · ');

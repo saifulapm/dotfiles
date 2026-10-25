@@ -105,11 +105,11 @@ test("a title is being watched when history holds it by id and kind and it is no
   assert.equal(T.watching(null, { id: 101, kind: 'tv' }), null);
 });
 
-test('Play always shows; Resume joins it with the time left as Continue watching words it', () => {
+test('Play always shows; Resume joins it with a series\' episode and the time left, never RESUME twice', () => {
   assert.deepEqual(T.buttons('plain', null), [{ id: 'play', text: '▶ Play' }]);
-  assert.deepEqual(T.buttons('caps', seen[1]), [{ id: 'play', text: '▶ Play' }, { id: 'resume', text: '▶ Resume · 1h 52 · 40 min left' }]);
-  assert.deepEqual(T.buttons('plain', seen[0]).map((b) => b.text), ['▶ Play', '▶ Resume · S3 E4 · 31 min left']);
-  assert.deepEqual(T.buttons('bracket', seen[0]).map((b) => b.text), ['▶ PLAY', '▶ RESUME · S3 E4 · 31 MIN LEFT']);
+  assert.deepEqual(T.buttons('caps', seen[1]), [{ id: 'play', text: '▶ Play' }, { id: 'resume', text: '▶ Resume · 40 min left' }]);
+  assert.deepEqual(T.buttons('plain', seen[0]).map((b) => b.text), ['▶ Play', '▶ Resume · S3 · E4 · 31 min left']);
+  assert.deepEqual(T.buttons('bracket', seen[0]).map((b) => b.text), ['▶ PLAY', '▶ RESUME · S3 · E4 · 31 MIN LEFT']);
 });
 
 test('a title with a trailer adds Trailer after Play and Resume; a null or empty one adds none', () => {
