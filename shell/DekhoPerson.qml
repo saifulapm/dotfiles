@@ -59,6 +59,7 @@ FocusScope {
             if (page.asked !== n || !answer)
                 return;
             page.detail = answer;
+            page.dekho.prefetch("w342", P.groups(answer.credits).map(g => g.rows.map(r => r.poster)).reduce((all, posters) => all.concat(posters), []));
             if (answer.profile)
                 page.dekho.api(["api", "prefetch", "--size", "w185", answer.profile], files => {
                     if (page.asked === n && files && files.files && files.files[answer.profile])
@@ -573,7 +574,8 @@ FocusScope {
                                         role: roleText.text,
                                         roleLines: roleText.lineCount,
                                         vote: voteText.text,
-                                        cursor: cursor
+                                        cursor: cursor,
+                                        poster: poster.drawn()
                                     };
                                 }
 
@@ -637,6 +639,54 @@ FocusScope {
                                         anchors.rightMargin: 12
                                         spacing: 12
 
+                                        // The poster's place, as each board marks it until the poster is on disk: Paper's hatch, Artboard's grey tile, Blueprint's crossed box.
+                                        Rectangle {
+                                            id: place
+                                            Layout.preferredWidth: 18
+                                            Layout.preferredHeight: 27
+                                            radius: page.plain ? 4 : 0
+                                            color: page.plain ? "#E9ECF1" : page.bracket ? page.c.surface ?? "black" : "transparent"
+                                            border.width: page.plain ? 0 : 1
+                                            border.color: (page.bracket ? ln.soft : page.c.muted) ?? "gray"
+                                            clip: true
+
+                                            Shape {
+                                                anchors.fill: parent
+                                                visible: page.caps
+                                                preferredRendererType: Shape.GeometryRenderer
+
+                                                ShapePath {
+                                                    strokeColor: "#D8CDB6"
+                                                    strokeWidth: 1
+                                                    fillColor: "transparent"
+                                                    PathSvg {
+                                                        path: "M6 0L0 6M12 0L0 12M18 0L0 18M24 0L0 24M30 0L0 30M36 0L0 36M42 0L0 42"
+                                                    }
+                                                }
+                                            }
+                                            Shape {
+                                                anchors.fill: parent
+                                                visible: page.bracket
+                                                preferredRendererType: Shape.GeometryRenderer
+
+                                                ShapePath {
+                                                    strokeColor: ln.soft
+                                                    strokeWidth: 1
+                                                    fillColor: "transparent"
+                                                    PathSvg {
+                                                        path: "M0 0L18 27M18 0L0 27"
+                                                    }
+                                                }
+                                            }
+                                            DekhoPicture {
+                                                id: poster
+                                                anchors.fill: parent
+                                                dekho: page.dekho
+                                                size: "w342"
+                                                path: ln.head ? null : ln.modelData.row.poster
+                                                radius: place.radius
+                                            }
+                                        }
                                         Text {
                                             id: yearText
                                             Layout.preferredWidth: 48

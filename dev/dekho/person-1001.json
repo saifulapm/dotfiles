@@ -17,7 +17,7 @@
         "title": "The Long Tide",
         "year": "2024",
         "vote": 8.1,
-        "poster": null,
+        "poster": "/c101.jpg",
         "backdrop": null,
         "overview": "",
         "role": "Director"
@@ -28,7 +28,7 @@
         "title": "Night Ferry",
         "year": "2025",
         "vote": 7.3,
-        "poster": null,
+        "poster": "/c102.jpg",
         "backdrop": null,
         "overview": "",
         "role": "Director"
@@ -52,7 +52,7 @@
         "title": "A Quiet\nVerdict‮\u001b",
         "year": "2026",
         "vote": 7.8,
-        "poster": null,
+        "poster": "/gone104.jpg",
         "backdrop": null,
         "overview": "",
         "role": "Judge\nHale‮\u001b"
@@ -63,7 +63,7 @@
         "title": "Salt Road",
         "year": "2025",
         "vote": 7.4,
-        "poster": null,
+        "poster": "/c105.jpg",
         "backdrop": null,
         "overview": "",
         "role": "Nora Vell"
@@ -74,7 +74,7 @@
         "title": "Copper Hill",
         "year": "2024",
         "vote": 7.1,
-        "poster": null,
+        "poster": "/c106.jpg",
         "backdrop": null,
         "overview": "",
         "role": "Dr. Anya Rask"
@@ -87,7 +87,7 @@
         "title": "Night Ferry",
         "year": "2025",
         "vote": 7.3,
-        "poster": null,
+        "poster": "/c102.jpg",
         "backdrop": null,
         "overview": "",
         "role": "Screenplay"
@@ -98,7 +98,7 @@
         "title": "The Long Tide",
         "year": "2024",
         "vote": 8.1,
-        "poster": null,
+        "poster": "/c101.jpg",
         "backdrop": null,
         "overview": "",
         "role": "Creator"

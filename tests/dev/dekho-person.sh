@@ -58,6 +58,28 @@ check "the cursor starts on her first credit, The Long Tide, directing ($(dekho_
   dekho_is '.personPage.cursor == 0 and .personPage.group == "directing"'
 check "paper: her name is set in Instrument Serif, as the Paper board sets it ($(dekho_state | jq -c .personPage.look.nameFont))" \
   dekho_is '.personPage.look.nameFont == "Instrument Serif"'
+posters() { dekho_state | jq -c '[.personPage.lines[] | select(.head | not) | .poster.file]'; }
+until_ok 3000 dekho_is '[.personPage.lines[] | select(.head | not) | select(.poster.shown)] | length == 6'
+check "each credit with a poster the fake holds draws its own in the 18 x 27 place, under directing, acting and writing ($(posters))" \
+  dekho_is '[.personPage.lines[] | select(.head | not) | [.group, .title, .poster.file]] == [["directing", "The Long Tide", "c101.jpg"], ["directing", "Night Ferry", "c102.jpg"], ["directing", "Seven Stations", ""], ["acting", "A Quiet Verdict", ""], ["acting", "Salt Road", "c105.jpg"], ["acting", "Copper Hill", "c106.jpg"], ["writing", "Night Ferry", "c102.jpg"], ["writing", "The Long Tide", "c101.jpg"]] and ([.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | all(.width == 18 and .height == 27 and .radius == 0))'
+check "a null poster (Seven Stations) and a gone one (A Quiet Verdict) keep the empty mark ($(dekho_state | jq -c '[.personPage.lines[] | select(.head | not) | select(.poster.shown | not) | [.title, .poster.shown]]'))" \
+  dekho_is '[.personPage.lines[] | select(.head | not) | select(.poster.shown | not) | .title] == ["Seven Stations", "A Quiet Verdict"]'
+check "a credit poster decodes at no more than twice its drawn 18 x 27 ($(dekho_state | jq -c '.personPage.lines[1].poster'))" \
+  dekho_is '[.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | length == 6 and all(.decodedWidth > 0 and .decodedWidth <= 36 and .decodedHeight <= 56)'
+check "all the credits' posters came from one prefetch call, each path once, the gone one asked and left out" \
+  bash -c "[ \$(grep -c '/c101.jpg' '$calls') = 1 ] && grep -qx 'api prefetch --size w342 /c101.jpg /c102.jpg /gone104.jpg /c105.jpg /c106.jpg' '$calls'"
+in_theme artboard
+until_ok 3000 dekho_is '.voice == "plain"'
+until_ok 3000 dekho_is '[.personPage.lines[] | select(.head | not) | select(.poster.shown)] | length == 6'
+check "artboard: a credit's poster is masked to its grey tile's 4 px corners ($(dekho_state | jq -c '[.personPage.lines[] | select(.head | not) | .poster | [.shown, .radius]] | unique'))" \
+  dekho_is '[.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | length == 6 and all(.radius == 4 and .width == 18 and .height == 27)'
+in_theme blueprint
+until_ok 3000 dekho_is '.voice == "bracket"'
+until_ok 3000 dekho_is '[.personPage.lines[] | select(.head | not) | select(.poster.shown)] | length == 6'
+check "blueprint: a credit's poster fills its crossed box square ($(dekho_state | jq -c '[.personPage.lines[] | select(.head | not) | .poster | [.shown, .radius]] | unique'))" \
+  dekho_is '[.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | length == 6 and all(.radius == 0 and .width == 18 and .height == 27)'
+in_theme paper
+until_ok 3000 dekho_is '.voice == "caps"'
 
 wtype -k Tab
 until_ok 1000 dekho_is '.personPage.group == "acting"'
