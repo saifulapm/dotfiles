@@ -106,16 +106,16 @@ until_ok 5000 dekho_is '.page == "title" and (.title.episodes | length) == 2'
 check "Enter on it opens its page on S1 E1, next up ($(dekho_state | jq -c '[.title.name, .title.season, .title.cursor, [.title.episodes[].name]]'))" \
   dekho_is '.title.name == "Test Pattern Show" and .title.season == 1 and .title.cursor == 1'
 wtype -k Return
-until_ok 8000 dekho_is '.releases.mode == "list" and (.releases.rows | length) == 1'
-check "Enter on S1 E1 lists the fake Torrentio's one release ($(dekho_state | jq -c '[.releases.heading, (.releases.rows[] | [.quality, .size, .seeders])]'))" \
-  dekho_is '.releases.rows[0] | .quality == "720p" and .size == "3.8 MB" and .seeders == "25"'
+until_ok 8000 dekho_is '.releases.mode == "list" and (.releases.rows | length) == 2'
+check "Enter on S1 E1 lists the fake Torrentio's one release under Auto ($(dekho_state | jq -c '[.releases.heading, (.releases.rows[] | [.quality, .size, .seeders])]'))" \
+  dekho_is '.releases.rows[0].auto and .releases.cursor == 0 and (.releases.rows[1] | .quality == "720p" and .size == "3.8 MB" and .seeders == "25")'
 
 t0=$(now_ms)
 wtype -k Return
 watch_starting
 play_ms=$(($(now_ms) - t0))
 note_session
-check "Enter on the release starts the unit and Starting draws the real events: $release, steps $steps" \
+check "Enter on Auto starts the unit, the real dekho picks the one release, and Starting draws the real events: $release, steps $steps" \
   test "$release|$steps" = "720p · 3.8 MB|Found 25 seeders|Connected to peers|Buffering the start of the file|mpv starts at 3.8 MB"
 check "dekho says playing, ${play_ms} ms after Enter ($(session_event playing))" \
   dekho_is '.releases.playing.event == "playing" and .releases.playing.id == 900002'

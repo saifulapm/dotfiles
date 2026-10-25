@@ -126,19 +126,20 @@ check "reopened, Home shows the bar ${adopted} ms after its first frame, within 
   bash -c "[ $adopted -le 1000 ] && timeout 0.5 qs ipc -p '$dekho_qml' call dekho state | jq -e '.bar.shown and .bar.title == \"Seven Stations (2026)\"' >/dev/null"
 check "and no second play started ($before then $(plays) plays)" test "$(plays)" = "$before"
 
-# A capital S typed into the search field is text, not a stop.
+# A capital S typed into the search field is text, not a stop. wtype's own S holds no Shift, so Shift+S is pressed as a keyboard presses it.
+shift_s() { wtype -M shift s -m shift; }
 wtype /
 until_ok 1000 dekho_is '.search.focused'
-wtype S
+shift_s
 sleep 0.5
-check "S typed into search is text, and the film plays on ($(dekho_state | jq -c .search.text))" \
-  bash -c "systemctl --user is-active --quiet '$DOTS_DEKHO_UNIT.service' && timeout 0.5 qs ipc -p '$dekho_qml' call dekho state | jq -e '.search.text == \"S\" and .bar.shown' >/dev/null"
+check "Shift+S typed into search is text, and the film plays on ($(dekho_state | jq -c .search.text))" \
+  bash -c "systemctl --user is-active --quiet '$DOTS_DEKHO_UNIT.service' && timeout 0.5 qs ipc -p '$dekho_qml' call dekho state | jq -e '(.search.text | ascii_downcase) == \"s\" and .bar.shown' >/dev/null"
 wtype -k BackSpace
 wtype -k Escape
 until_ok 1000 dekho_is '.search.focused == false'
 
 # Shift+S stops it: within 2 s no dekho or mpv is left, the bar goes and Continue watching lists the film first.
-wtype S
+shift_s
 until_ok 2000 nothing_left
 check "Shift+S leaves no unit, dekho or mpv within 2 s" nothing_left
 until_ok 1000 bar_off
@@ -148,7 +149,12 @@ check "Continue watching lists Seven Stations first with its new time left ($(co
   dekho_is '.rows.continue[0] | .title == "Seven Stations" and .line == "1h 45 · 1h 35 left"'
 
 # The Long Tide resumed at S3 E4: the bar names the episode; mpv quitting on its own ends it. Up to Continue watching first, then down a row, wherever the cursor was left.
-wtype kkjhhl
+for _ in 1 2 3; do
+  dekho_is '.focus == {"row": "series", "col": 1}' && break
+  wtype -k Shift_L
+  wtype kkjhhl
+  sleep 0.3
+done
 until_ok 1000 dekho_is '.focus == {"row": "series", "col": 1}'
 wtype -k Return
 until_ok 3000 dekho_is '.page == "title" and .title.name == "The Long Tide" and (.title.buttons | length) == 2'
