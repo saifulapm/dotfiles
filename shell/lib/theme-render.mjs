@@ -78,6 +78,7 @@ const files = {
   'chromium-newtab/theme.css': renderNewtabCss(theme),
   'chromium-newtab/newtab.css': readFileSync(new URL('../newtab/newtab.css', import.meta.url), 'utf8'),
   'chromium-newtab/newtab.js': readFileSync(new URL('../newtab/newtab.js', import.meta.url), 'utf8'),
+  'chromium-newtab/bg.js': readFileSync(new URL('../newtab/bg.js', import.meta.url), 'utf8'),
   'chromium-newtab/words.mjs': readFileSync(new URL('./newtab.mjs', import.meta.url), 'utf8'),
   'mpv.conf': renderMpv(theme),
   'mpv.ipc': renderMpvIpc(theme),

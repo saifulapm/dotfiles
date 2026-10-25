@@ -295,7 +295,9 @@ const NEWTAB_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxNRYiohE0fP20hRq
 export function renderNewtabManifest() {
   const m = {
     manifest_version: 3, name: 'dots new tab', version: '1', description: "The theme's new-tab page", key: NEWTAB_KEY,
-    chrome_url_overrides: { newtab: 'newtab.html' }, permissions: ['topSites', 'search'],
+    chrome_url_overrides: { newtab: 'newtab.html' }, permissions: ['topSites', 'search', 'tabs'],
+    // tabs lets the worker read the address of the tab Chromium starts on.
+    background: { service_worker: 'bg.js' },
   };
   return JSON.stringify(m, null, 2) + '\n';
 }

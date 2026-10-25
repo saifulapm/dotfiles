@@ -38,7 +38,8 @@ test('renders the new-tab extension beside the theme, with the page\'s words cop
   t.after(() => rmSync(state, { recursive: true, force: true }));
   execFileSync('node', [cli, 'blueprint'], { env: { ...process.env, XDG_STATE_HOME: state } });
   const dir = join(state, 'dots/theme-out/chromium-newtab');
-  assert.deepEqual(readdirSync(dir).sort(), ['manifest.json', 'newtab.css', 'newtab.html', 'newtab.js', 'theme.css', 'words.mjs']);
+  assert.deepEqual(readdirSync(dir).sort(), ['bg.js', 'manifest.json', 'newtab.css', 'newtab.html', 'newtab.js', 'theme.css', 'words.mjs']);
+  assert.equal(readFileSync(join(dir, 'bg.js'), 'utf8'), readFileSync(new URL('../newtab/bg.js', import.meta.url), 'utf8'));
   assert.equal(readFileSync(join(dir, 'words.mjs'), 'utf8'), readFileSync(new URL('./newtab.mjs', import.meta.url), 'utf8'));
   assert.match(readFileSync(join(dir, 'newtab.html'), 'utf8'), /data-voice="bracket"/);
   assert.match(readFileSync(join(dir, 'newtab.js'), 'utf8'), /from '\.\/words\.mjs'/);

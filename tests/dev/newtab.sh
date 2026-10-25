@@ -63,12 +63,17 @@ page() { cdp eval newtab.html "$1"; }
 # A check on the page passes only when the expression is true; eval itself succeeds whatever it returns.
 is() { page "$1" | grep -qx true; }
 
-# Chromium reads the managed policy from /etc, so an empty policy dir is bound there, as on a machine the apply has cleaned; each profile is the check's own.
-chromium() {
+# Chromium reads the managed policy from /etc, so an empty policy dir is bound there, as on a machine the apply has cleaned; each profile is the check's own. Any address after the profile is the tab it starts on.
+launch() {
+  local profile=$1
+  shift
   niri msg action spawn -- bwrap --dev-bind / / --bind "$work/policy" /etc/chromium/policies/managed \
-    chromium-browser --user-data-dir="$work/$1" --no-first-run --ozone-platform=wayland --remote-debugging-port="$dport" \
-    --disable-features=NtpFooter "--load-extension=$out/chromium-theme,$out/chromium-newtab" 'data:text/html,<title>start</title><input id="k" autofocus>'
+    chromium-browser --user-data-dir="$work/$profile" --no-first-run --ozone-platform=wayland --remote-debugging-port="$dport" \
+    --disable-features=NtpFooter "--load-extension=$out/chromium-theme,$out/chromium-newtab" "$@"
   until_ok 15000 cdp urls >/dev/null
+}
+chromium() {
+  launch "$1" 'data:text/html,<title>start</title><input id="k" autofocus>'
   until_ok 15000 bash -c 'niri msg -j windows | jq -e "any(.[]; .app_id == \"chromium-browser\")" >/dev/null'
   # For some seconds after it starts, Chromium drops the keys it is sent, so the start page's field must take a typed key before any check types.
   until_ok 20000 keys_reach
@@ -173,6 +178,13 @@ check "after dots theme paper and a restart, Ctrl+T draws Paper's paper ($(page_
 check "and Paper's date, $(date_line paper), in $(cdp fonts newtab.html '#date')" \
   is "document.documentElement.dataset.theme === 'paper' && [document.getElementById('day').textContent, document.getElementById('date').textContent].join(' ') === '$(date_line paper)'"
 check "and its date face is Instrument Serif as drawn ($(cdp fonts newtab.html '#date'))" drawn_in '#date' "Instrument Serif"
+quit_chromium
+
+# Started with no address, as a person opens it, Chromium makes its first tab its own new-tab page even with the extension installed; the extension's worker sends that tab to the theme's page.
+launch seeded
+start_themed() { [ "$(cdp urls | wc -l)" = 1 ] && cdp eval newtab.html location.href | grep -q '^"chrome-extension://aakconifmcmaooplokgfeaepglecbmaf/newtab.html'; }
+until_ok 5000 start_themed
+check "started with no address, Chromium's one tab is the theme's page ($(cdp urls | tr '\n' ' '))" start_themed
 quit_chromium
 
 # A title is whatever a page sets: controls, a bidi override and 300 characters must draw on one elided line, and a page with no title or icon still gets a letter tile.

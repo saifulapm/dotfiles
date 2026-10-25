@@ -127,7 +127,8 @@ test('the new-tab extension overrides the new tab with a fixed id and reads the 
   const m = JSON.parse(renderNewtabManifest());
   assert.equal(m.manifest_version, 3);
   assert.deepEqual(m.chrome_url_overrides, { newtab: 'newtab.html' });
-  assert.deepEqual(m.permissions, ['topSites', 'search']);
+  assert.deepEqual(m.permissions, ['topSites', 'search', 'tabs']);
+  assert.deepEqual(m.background, { service_worker: 'bg.js' });
   assert.equal(m.theme, undefined);
   const der = Buffer.from(m.key, 'base64');
   const id = createHash('sha256').update(der).digest('hex').slice(0, 32).replace(/[0-9a-f]/g, (c) => 'abcdefghijklmnop'[parseInt(c, 16)]);
