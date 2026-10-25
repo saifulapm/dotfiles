@@ -100,6 +100,14 @@ FocusScope {
             dekho.openTitle(flat[cursor].row);
     }
 
+    // A click on a credit moves the cursor there and does what Enter does.
+    function pick(at) {
+        cursor = at;
+        reveal();
+        keys.forceActiveFocus();
+        choose();
+    }
+
     function drawnList(repeater) {
         const out = [];
         for (let i = 0; i < repeater.count; i++)
@@ -536,8 +544,15 @@ FocusScope {
                     Layout.fillHeight: true
                     contentWidth: width
                     contentHeight: creditColumn.height
+                    interactive: false
                     clip: true
-                    boundsBehavior: Flickable.StopAtBounds
+
+                    // Under the credits, the wheel scrolls them and leaves the cursor where it is.
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.NoButton
+                        onWheel: event => creditView.contentY = D.wheeled(creditView.contentY, event.angleDelta.y, creditView.contentHeight, creditView.height)
+                    }
 
                     Column {
                         id: creditColumn
@@ -577,6 +592,7 @@ FocusScope {
                                         roleLines: roleText.lineCount,
                                         vote: voteText.text,
                                         cursor: cursor,
+                                        shown: ln.y >= creditView.contentY - 0.5 && ln.y + ln.height <= creditView.contentY + creditView.height + 0.5,
                                         poster: poster.drawn()
                                     };
                                 }
@@ -630,6 +646,11 @@ FocusScope {
                                     id: card
                                     anchors.fill: parent
                                     visible: !ln.head
+
+                                    DekhoClick {
+                                        name: "person-credit:" + ln.modelData.index
+                                        onTapped: page.pick(ln.modelData.index)
+                                    }
                                     radius: page.plain ? 10 : 0
                                     color: ln.cursor ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : "transparent"
                                     border.width: ln.cursor && page.plain ? 1.5 : 0
