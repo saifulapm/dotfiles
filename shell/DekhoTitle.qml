@@ -43,8 +43,10 @@ FocusScope {
     property var filter: null
     // History's entry for this title while it is still being watched, else null; it adds Resume.
     property var seen: null
-    property int button: 0
     readonly property var buttons: T.buttons(voice, seen, detail ? detail.trailer : null)
+    // The focused button by what it does, so Resume or Trailer arriving, or Resume going once a title is finished, never moves the focus onto another button or off the row.
+    property string buttonKind: "play"
+    readonly property int button: Math.max(0, buttons.findIndex(b => b.id === buttonKind))
 
     readonly property var shown: detail || entry
     readonly property bool tv: shown.kind === "tv"
@@ -83,7 +85,7 @@ FocusScope {
             posterKnown: posterKnown,
             today: today,
             seen: seen,
-            button: button
+            buttonKind: buttonKind
         };
     }
 
@@ -100,7 +102,7 @@ FocusScope {
         posterKnown = s.posterKnown;
         today = s.today;
         seen = s.seen;
-        button = s.button;
+        buttonKind = s.buttonKind;
     }
 
     function load(h) {
@@ -115,7 +117,7 @@ FocusScope {
         castCol = 0;
         posterKnown = false;
         seen = null;
-        button = 0;
+        buttonKind = "play";
         chose = null;
         person = null;
         filter = null;
@@ -378,9 +380,9 @@ FocusScope {
             else if (t === "k" || k === Qt.Key_Up)
                 page.moveRow(-1);
             else if ((t === "l" || k === Qt.Key_Right) && page.zone === "buttons")
-                page.button = Math.min(page.buttons.length - 1, page.button + 1);
+                page.buttonKind = page.buttons[Math.min(page.buttons.length - 1, page.button + 1)].id;
             else if ((t === "h" || k === Qt.Key_Left) && page.zone === "buttons")
-                page.button = Math.max(0, page.button - 1);
+                page.buttonKind = page.buttons[Math.max(0, page.button - 1)].id;
             else if (t === "l" || k === Qt.Key_Right)
                 page.zone === "crew" || page.zone === "cast" ? page.moveCol(1) : page.moveSeason(1);
             else if (t === "h" || k === Qt.Key_Left)
