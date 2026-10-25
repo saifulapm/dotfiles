@@ -210,6 +210,44 @@ FocusScope {
             zone = "episodes";
     }
 
+    // A click moves the cursor onto what it hit, as the keys would, and does what Enter does there; at is an episode's or a person's index, a season tab's index or a button's kind.
+    function pick(to, at) {
+        // The release list over the page holds the keys, so a click beneath it does nothing, as Enter there would not reach the page.
+        if (!activeFocus)
+            return;
+        zone = to;
+        if (to === "episodes") {
+            row = at;
+            episodeView.reveal(row);
+        } else if (to === "seasons") {
+            season = seasonNumbers[at];
+            row = Math.max(0, next);
+            episodeView.reveal(row);
+        } else if (to === "crew")
+            crewCol = at;
+        else if (to === "cast")
+            castCol = castStart + at;
+        else if (to === "buttons")
+            buttonKind = at;
+        keys.forceActiveFocus();
+        choose();
+    }
+
+    // A genre or language chip opens Browse filtered by that one alone.
+    function browseBy(genre, language) {
+        if (!activeFocus)
+            return;
+        filter = {
+            kind: "all",
+            genre: genre,
+            language: language
+        };
+        dekho.open("browse", Object.assign({
+            language_code: language ? shown.language_code || null : null,
+            from: shown.title
+        }, filter));
+    }
+
     // Play opens the release list: a series' for the episode under the cursor, once it has aired.
     function play() {
         const ep = items[row];
@@ -665,6 +703,10 @@ FocusScope {
                                 font.letterSpacing: page.bracket ? 0.7 : 0
                                 maximumLineCount: 1
                             }
+                            DekhoClick {
+                                name: "title-button:" + modelData.id
+                                onTapped: page.pick("buttons", modelData.id)
+                            }
                         }
                     }
                     Item {
@@ -682,6 +724,9 @@ FocusScope {
 
                         Rectangle {
                             required property var modelData
+                            required property int index
+                            // T.chips puts the language after the genres.
+                            readonly property bool language: index >= (page.detail.genres || []).length
                             function drawn() {
                                 return {
                                     text: chipText.text,
@@ -704,6 +749,10 @@ FocusScope {
                                 font.family: page.bodyFont
                                 font.pixelSize: page.plain ? 12 : 11
                                 maximumLineCount: 1
+                            }
+                            DekhoClick {
+                                name: parent.language ? "title-language" : "title-genre:" + parent.index
+                                onTapped: parent.language ? page.browseBy(null, parent.modelData) : page.browseBy(parent.modelData, null)
                             }
                         }
                     }
@@ -764,6 +813,11 @@ FocusScope {
                                 name: modelData.name
                                 role: modelData.role
                                 focused: page.zone === "crew" && page.crewCol === index
+
+                                DekhoClick {
+                                    name: "title-crew:" + parent.index
+                                    onTapped: page.pick("crew", parent.index)
+                                }
                             }
                         }
                         Item {
@@ -792,6 +846,11 @@ FocusScope {
                                 name: modelData.name
                                 role: modelData.character
                                 focused: page.zone === "cast" && page.castCol === page.castStart + index
+
+                                DekhoClick {
+                                    name: "title-cast:" + parent.index
+                                    onTapped: page.pick("cast", parent.index)
+                                }
                             }
                         }
                         Text {
@@ -823,6 +882,7 @@ FocusScope {
                         Rectangle {
                             id: tab
                             required property var modelData
+                            required property int index
                             readonly property bool current: modelData === page.season
                             function drawn() {
                                 return {
@@ -858,6 +918,10 @@ FocusScope {
                                 font.weight: tab.current && !page.caps ? (page.plain ? Font.Medium : Font.Bold) : Font.Normal
                                 font.letterSpacing: tab.current && !page.plain ? 1.4 : page.bracket ? 0.7 : 0
                             }
+                            DekhoClick {
+                                name: "title-season:" + tab.index
+                                onTapped: page.pick("seasons", tab.index)
+                            }
                         }
                     }
                     Item {
@@ -883,6 +947,13 @@ FocusScope {
                     contentHeight: episodeColumn.implicitHeight
                     interactive: false
                     clip: true
+
+                    // Under the rows, the wheel scrolls the episodes and leaves the cursor where it is.
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.NoButton
+                        onWheel: event => episodeView.contentY = D.wheeled(episodeView.contentY, event.angleDelta.y, episodeView.contentHeight, episodeView.height)
+                    }
 
                     function reveal(i) {
                         const r = episodeRows.itemAt(i);
@@ -1112,6 +1183,7 @@ FocusScope {
         readonly property color soft: inverse ? (page.caps ? page.c.line : page.c.surface) ?? "white" : page.c.muted ?? "gray"
 
         function drawn() {
+            const at = ep.mapToItem(episodeView, 0, 0);
             return {
                 episode: modelData.episode,
                 name: nameText.text,
@@ -1124,6 +1196,7 @@ FocusScope {
                 watched: tick.visible,
                 color: String(nameText.color),
                 cursor: cursor,
+                shown: episodeView.visible && at.y >= -0.5 && at.y + ep.height <= episodeView.height + 0.5,
                 still: still.drawn()
             };
         }
@@ -1299,6 +1372,10 @@ FocusScope {
                 font.pixelSize: page.caps && ep.due ? 17 : 12
                 font.letterSpacing: page.bracket ? 0.7 : 0
             }
+        }
+        DekhoClick {
+            name: "title-episode:" + ep.index
+            onTapped: page.pick("episodes", ep.index)
         }
     }
 }
