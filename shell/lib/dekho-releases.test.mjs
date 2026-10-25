@@ -106,6 +106,44 @@ test('the list opens on Auto, then the releases best first', () => {
   assert.equal(R.releasesText('plain').auto, 'Auto: let dekho decide');
 });
 
+const named = (hash, title) => ({ hash, title });
+const listed = [
+  named('b2', 'The.Long.Tide.S03E04.720p.WEB-DL.x264'),
+  named('a1', 'The.Long.Tide.S03E04.1080p.WEB-DL.x265'),
+  named('d4', 'The\nLong‮Tide\u001b[31m S03E04 1080p BluRay x264'),
+];
+const hashes = (rows) => rows.map((r) => (r.auto ? 'auto' : r.hash));
+
+test('a filter keeps Auto first and the releases whose name holds it', () => {
+  assert.deepEqual(hashes(R.rows(listed, '1080')), ['auto', 'a1', 'd4']);
+});
+
+test('an empty or missing filter keeps every release', () => {
+  assert.deepEqual(hashes(R.rows(listed, '')), ['auto', 'b2', 'a1', 'd4']);
+  assert.deepEqual(hashes(R.rows(listed)), ['auto', 'b2', 'a1', 'd4']);
+});
+
+test('a filter ignores case', () => {
+  assert.deepEqual(hashes(R.rows(listed, 'WEB-dl')), ['auto', 'b2', 'a1']);
+});
+
+// The last name draws as "The LongTide [31m S03E04 ...": the newline is a space, the U+202E goes, ESC is a space.
+test('a filter matches a name on its one-lined form', () => {
+  assert.deepEqual(hashes(R.rows(listed, 'The LongTide [31m S03')), ['auto', 'd4']);
+  assert.deepEqual(hashes(R.rows(listed, 'Long‮Tide')), ['auto']);
+  assert.deepEqual(hashes(R.rows(listed, '\n')), ['auto']);
+});
+
+test('a filter that matches nothing leaves Auto alone', () => {
+  assert.deepEqual(hashes(R.rows(listed, 'xyz')), ['auto']);
+});
+
+test('a no-match line and the filter key are worded in each voice', () => {
+  assert.equal(R.releasesText('plain').noMatch('xyz'), 'No release matches xyz');
+  assert.equal(R.releasesText('bracket').noMatch('xyz'), 'NO RELEASE MATCHES XYZ');
+  assert.deepEqual(R.releasesText('plain').keys[3], ['ctrl+f', 'filter']);
+});
+
 test('Auto plays with no release, so dekho decides; a release plays by its hash', () => {
   const film = { id: 401, kind: 'movie' };
   const ep = { id: 101, kind: 'tv', season: 3, episode: 4 };

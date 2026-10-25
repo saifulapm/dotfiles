@@ -1,4 +1,6 @@
 // The release list and Starting: releases best first, and the steps, progress and rates read from dekho play's events.
+import { title } from './dekho.mjs';
+
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 const MB = 1024 * 1024;
 
@@ -7,8 +9,11 @@ export function rank(items) {
   return items.slice().sort((a, b) => (b.seeders ?? -1) - (a.seeders ?? -1) || (b.size_bytes ?? -1) - (a.size_bytes ?? -1));
 }
 
-// The list's rows: Auto first, which lets dekho pick, then the releases as given.
-export const rows = (items) => [{ auto: true }].concat(items);
+// The list's rows: Auto first, which lets dekho pick, then the releases as given. A filter keeps the releases whose name, as it draws on one line, holds it, ignoring case; Auto stays.
+export const rows = (items, filter = '') => {
+  const want = filter.toLowerCase();
+  return [{ auto: true }].concat(items.filter((r) => title(r.title).toLowerCase().includes(want)));
+};
 
 // What a row plays: Auto names no release, so dekho decides; a release is played by its hash.
 export function playArgs(target, row) {
@@ -90,7 +95,8 @@ export function releasesText(voice) {
     best: voice === 'bracket' ? '[BEST]' : caps ? 'BEST' : 'best',
     auto: 'Auto: let dekho decide',
     up,
-    keys: [['↵', 'stream'], ['j/k', 'move'], ['esc', 'back']],
+    noMatch: (t) => up(`No release matches ${t}`),
+    keys: [['↵', 'stream'], ['j/k', 'move'], ['esc', 'back'], ['ctrl+f', 'filter']],
     startKeys: [['esc', 'cancel and stop the download']],
     none: 'No releases found',
     noneWhy: (kind) => `Both sources answered and neither lists this ${kind === 'movie' ? 'film' : 'episode'} yet.`,
