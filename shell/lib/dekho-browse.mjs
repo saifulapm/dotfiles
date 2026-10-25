@@ -80,8 +80,8 @@ export function chips(f) {
   ].filter((c) => c);
 }
 
-// One discover call per kind asked: box office is movies only, and a genre is asked of the kinds that have it, by that kind's id.
-export function calls(f, genres) {
+// One discover call per kind asked: box office is movies only, and a genre is asked of the kinds that have it, by that kind's id. Page 1 is the backend's default, so only a later page is named.
+export function calls(f, genres, page = 1) {
   return kindsOf(f.kind)
     .filter((k) => f.sort !== 'box-office' || k === 'movie')
     .map((k) => {
@@ -94,9 +94,28 @@ export function calls(f, genres) {
       if (f.decade) args.push('--year', years(f.decade));
       if (f.rating) args.push('--min-rating', String(f.rating));
       if (f.person) args.push('--person', String(f.person.id));
+      if (page > 1) args.push('--page', String(page));
       return args;
     })
     .filter((a) => a);
+}
+
+// Each kind's paging, {kind: {page, total}}, after one answer for it; an answer without its page numbers, as a failed call's, leaves the kind where it was.
+export function landed(pages, kind, answer) {
+  if (!answer || !Number.isInteger(answer.page) || !Number.isInteger(answer.total_pages)) return pages;
+  return Object.assign({}, pages, { [kind]: { page: answer.page, total: answer.total_pages } });
+}
+
+const hasMore = (pages, kind) => !!pages[kind] && pages[kind].page < pages[kind].total;
+
+export const done = (pages) => !Object.keys(pages).some((k) => hasMore(pages, k));
+
+// The next page's calls: each kind asked that still has pages, at its own next page.
+export function nextCalls(f, genres, pages) {
+  return calls(f, genres)
+    .map((a) => a[3])
+    .filter((k) => hasMore(pages, k))
+    .map((k) => calls(Object.assign({}, f, { kind: k }), genres, pages[k].page + 1)[0]);
 }
 
 // Both kinds' answers as one list: a hit carries no popularity, so popular alternates the two; the other sorts order by rating or year.
@@ -150,6 +169,7 @@ export function browseText(voice) {
     columns: caps ? ['TITLE', 'YEAR', 'RATING', 'LANGUAGE', 'GENRES'] : ['Title', 'Year', 'Rating', 'Language', 'Genres'],
     hitCells: (hit) => [up(oneLine(hit.language || '')), up((hit.genres || []).map((g) => oneLine(g)).join(' · '))],
     pick: [['↵', 'add as a filter'], ['esc', 'close']],
+    more: ['↵', 'load more'],
     keys: [['f', 'filters'], ['s g l d r p', 'sort genre language decade rating person'], ['t', 'movies / series'], ['x', 'clear'], ['j/k', 'move'], ['↵', 'open'], ['esc', 'back']],
   };
 }

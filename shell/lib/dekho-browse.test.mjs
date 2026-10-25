@@ -133,3 +133,33 @@ test('a result row names its language and genres as each board writes them', () 
   assert.deepEqual(B.browseText('plain').hitCells({}), ['', '']);
   assert.deepEqual(B.browseText('plain').hitCells({ language: 'Sw\nedish‮', genres: ['Dra\u001bma'] }), ['Sw edish', 'Dra ma']);
 });
+
+// The next page: each kind keeps its own page and total_pages, and asks page N+1 only while it has more.
+test('a page past the first asks --page N; page 1 asks none', () => {
+  const f = { ...B.empty(), kind: 'movie', sort: 'top-rated' };
+  assert.deepEqual(B.calls(f, genres, 1), [['api', 'discover', '--kind', 'movie', '--sort', 'top-rated']]);
+  assert.deepEqual(B.calls(f, genres, 2), [['api', 'discover', '--kind', 'movie', '--sort', 'top-rated', '--page', '2']]);
+});
+
+test('each kind asks its own next page until its last, and then the list is done', () => {
+  let pages = {};
+  assert.equal(B.done(pages), true);
+  pages = B.landed(pages, 'movie', { items: [], page: 1, total_pages: 500 });
+  pages = B.landed(pages, 'tv', { items: [], page: 1, total_pages: 2 });
+  assert.deepEqual(pages, { movie: { page: 1, total: 500 }, tv: { page: 1, total: 2 } });
+  assert.equal(B.done(pages), false);
+  assert.deepEqual(B.nextCalls(B.empty(), genres, pages), [['api', 'discover', '--kind', 'movie', '--page', '2'], ['api', 'discover', '--kind', 'tv', '--page', '2']]);
+  pages = B.landed(B.landed(pages, 'movie', { items: [], page: 2, total_pages: 500 }), 'tv', { items: [], page: 2, total_pages: 2 });
+  assert.equal(B.done(pages), false);
+  assert.deepEqual(B.nextCalls(B.empty(), genres, pages), [['api', 'discover', '--kind', 'movie', '--page', '3']]);
+  pages = B.landed(pages, 'movie', { items: [], page: 500, total_pages: 500 });
+  assert.equal(B.done(pages), true);
+  assert.deepEqual(B.nextCalls(B.empty(), genres, pages), []);
+});
+
+test('a failed page keeps the page before it, so the same page is asked again', () => {
+  const pages = B.landed({}, 'movie', { items: [], page: 1, total_pages: 3 });
+  assert.deepEqual(B.landed(pages, 'movie', { error: 'tmdb: network unreachable' }), { movie: { page: 1, total: 3 } });
+  assert.deepEqual(B.landed(pages, 'movie', null), { movie: { page: 1, total: 3 } });
+  assert.equal(B.done(B.landed({}, 'tv', null)), true);
+});
