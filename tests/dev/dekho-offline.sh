@@ -9,7 +9,7 @@ dekho_qml=$repo/shell/dekho.qml
 entry=$repo/home/dot_local/share/applications/dekho.desktop
 work=$(mktemp -d)
 cleanup() {
-  systemctl --user stop "$DOTS_DEKHO_UNIT.service" 2>/dev/null
+  systemctl --user stop "$DOTS_DEKHO_UNIT.service" "$DOTS_DEKHO_UNIT-trailer.service" 2>/dev/null
   rm -rf "$work"
 }
 log=$work/dekho.log
