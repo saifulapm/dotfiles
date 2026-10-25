@@ -35,15 +35,19 @@ const after = (list, value) => {
   return at + 1 < list.length ? list[at + 1] : null;
 };
 
+// The filters with this kind. Series have no box office, and a genre only the other kind has goes with it.
+export function withKind(f, kind, tables) {
+  const g = Object.assign({}, f, { kind });
+  if (kind === 'tv' && g.sort === 'box-office') g.sort = 'popular';
+  if (g.genre && !genreNames(kind, tables.genres).includes(g.genre)) g.genre = null;
+  return g;
+}
+
 // One key press on a facet: its next value, wrapping to none (kind to all, sort to popular).
 export function next(f, facet, tables) {
   const g = Object.assign({}, f);
-  if (facet === 'kind') {
-    g.kind = after(KINDS, f.kind) ?? 'all';
-    // Series have no box office, and a genre only the other kind has goes with it.
-    if (g.kind === 'tv' && g.sort === 'box-office') g.sort = 'popular';
-    if (g.genre && !genreNames(g.kind, tables.genres).includes(g.genre)) g.genre = null;
-  } else if (facet === 'sort') {
+  if (facet === 'kind') return withKind(f, after(KINDS, f.kind) ?? 'all', tables);
+  if (facet === 'sort') {
     const sorts = f.kind === 'tv' ? SORTS.filter((s) => s !== 'box-office') : SORTS;
     g.sort = after(sorts, f.sort) ?? 'popular';
   } else if (facet === 'genre') g.genre = after(genreNames(f.kind, tables.genres), f.genre);

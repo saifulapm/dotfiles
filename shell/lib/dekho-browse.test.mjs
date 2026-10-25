@@ -25,6 +25,14 @@ test('t walks all, movies, series and back to all', () => {
   assert.equal(B.next(series, 'kind', tables).kind, 'all');
 });
 
+test('a click on a kind tab picks that kind, and drops what the kind cannot have', () => {
+  const box = { ...B.empty(), sort: 'box-office', genre: 'Action' };
+  const series = B.withKind(box, 'tv', tables);
+  assert.deepEqual([series.kind, series.sort, series.genre], ['tv', 'popular', null]);
+  assert.equal(B.withKind({ ...B.empty(), genre: 'Kids' }, 'tv', tables).genre, 'Kids');
+  assert.equal(B.withKind(series, 'all', tables).kind, 'all');
+});
+
 test('s walks the sorts and asks each by its flag', () => {
   const sorts = [];
   let f = { ...B.empty(), kind: 'movie' };
