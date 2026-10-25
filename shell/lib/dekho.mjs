@@ -43,3 +43,8 @@ export function onDisk(held, dir, names) {
   for (const n of names) if (picturePath('/' + n)) out['/' + n] = dir + '/' + n;
   return out;
 }
+
+// Where a list's offset lands after one wheel event: a notch, 120 of Qt's angle, moves it 60 px, a touchpad's smaller angles as far in proportion, and it stops at either end.
+export function wheeled(at, angle, content, view) {
+  return Math.max(0, Math.min(Math.max(0, content - view), at - (angle / 120) * 60));
+}

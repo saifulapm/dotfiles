@@ -1,4 +1,4 @@
-// A virtual pointer for nested checks: it reads press, move, release and sleep lines on stdin and holds one pointer from press to release.
+// A virtual pointer for nested checks: it reads press, move, release, click, wheel and sleep lines on stdin and holds one pointer from press to release.
 #include <linux/input-event-codes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,6 +82,31 @@ int main(int argc, char **argv) {
 				pause_ms(50);
 				zwlr_virtual_pointer_v1_button(pointer, now_ms(), BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
 				zwlr_virtual_pointer_v1_frame(pointer);
+			}
+		} else if (strcmp(cmd, "click") == 0) {
+			// A click is a move, a press and a release, the button held 50 ms as a hand holds it.
+			zwlr_virtual_pointer_v1_motion_absolute(pointer, now_ms(), (uint32_t)tx, (uint32_t)ty, width, height);
+			zwlr_virtual_pointer_v1_frame(pointer);
+			wl_display_roundtrip(display);
+			x = tx;
+			y = ty;
+			pause_ms(50);
+			zwlr_virtual_pointer_v1_button(pointer, now_ms(), BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
+			zwlr_virtual_pointer_v1_frame(pointer);
+			wl_display_roundtrip(display);
+			pause_ms(50);
+			zwlr_virtual_pointer_v1_button(pointer, now_ms(), BTN_LEFT, WL_POINTER_BUTTON_STATE_RELEASED);
+			zwlr_virtual_pointer_v1_frame(pointer);
+		} else if (strcmp(cmd, "wheel") == 0) {
+			// wheel N turns a mouse wheel N notches where the pointer is, down when N is positive, one frame per notch; a notch is 15 as libinput reports one.
+			int notches = (int)tx;
+			for (int i = 0; i < abs(notches); i++) {
+				int dir = notches > 0 ? 1 : -1;
+				zwlr_virtual_pointer_v1_axis_source(pointer, WL_POINTER_AXIS_SOURCE_WHEEL);
+				zwlr_virtual_pointer_v1_axis_discrete(pointer, now_ms(), WL_POINTER_AXIS_VERTICAL_SCROLL, wl_fixed_from_int(15 * dir), dir);
+				zwlr_virtual_pointer_v1_frame(pointer);
+				wl_display_roundtrip(display);
+				pause_ms(30);
 			}
 		} else if (strcmp(cmd, "release") == 0) {
 			zwlr_virtual_pointer_v1_button(pointer, now_ms(), BTN_LEFT, WL_POINTER_BUTTON_STATE_RELEASED);

@@ -56,3 +56,20 @@ test('a cache folder\'s files join what is on disk, by the path each answers to'
   assert.deepEqual(held, { '/a.jpg': '/c/w342/a.jpg' });
   assert.deepEqual(D.onDisk(held, '', ['b.jpg']), held);
 });
+
+test('a wheel notch down moves a list 60 px on, and up moves it back', () => {
+  assert.equal(D.wheeled(0, -120, 1000, 400), 60);
+  assert.equal(D.wheeled(60, 120, 1000, 400), 0);
+  assert.equal(D.wheeled(0, -360, 1000, 400), 180);
+});
+
+test('a touchpad\'s small angles move a list in proportion', () => {
+  assert.equal(D.wheeled(100, -36, 1000, 400), 118);
+});
+
+test('the wheel stops a list at its first and last rows, and a list that fits never moves', () => {
+  assert.equal(D.wheeled(0, 120, 1000, 400), 0);
+  assert.equal(D.wheeled(580, -120, 1000, 400), 600);
+  assert.equal(D.wheeled(600, -1200, 1000, 400), 600);
+  assert.equal(D.wheeled(0, -120, 300, 400), 0);
+});

@@ -329,8 +329,36 @@ ShellRoot {
         blockAllReads: true
     }
 
+    // The drawn click area a check names, searched from the window down past every hidden page.
+    function clickArea(item, name) {
+        for (const child of item.children) {
+            if (!child.visible)
+                continue;
+            if (child.objectName === "click:" + name)
+                return child;
+            const found = clickArea(child, name);
+            if (found)
+                return found;
+        }
+        return null;
+    }
+
     IpcHandler {
         target: "dekho"
+
+        // Where a click area is in the window, {x, y, w, h}, or null when none by that name is drawn.
+        function box(name: string): string {
+            const area = app.clickArea(win.contentItem, name);
+            if (!area)
+                return "null";
+            const at = area.mapToItem(win.contentItem, 0, 0);
+            return JSON.stringify({
+                x: at.x,
+                y: at.y,
+                w: area.width,
+                h: area.height
+            });
+        }
 
         function state(): string {
             procStatus.reload();

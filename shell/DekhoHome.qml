@@ -76,6 +76,25 @@ FocusScope {
         stripOf(row).reveal(col);
     }
 
+    // Enter on the cursor's card: a title to continue plays on, any other opens its title.
+    function enter() {
+        const item = itemsOf(row)[col];
+        if (item && row === "continue")
+            resume(item);
+        else if (item)
+            dekho.openTitle(item);
+    }
+
+    // A click on a card moves the cursor there and does what Enter does.
+    function pick(name, at) {
+        moved = true;
+        row = name;
+        col = at;
+        stripOf(name).reveal(at);
+        rowKeys.forceActiveFocus();
+        enter();
+    }
+
     // A trending answer: a stale copy is drawn marked with its date; an error leaves the rows as they are.
     function take(kind, answer) {
         const k = H.kindOfAnswer(answer);
@@ -231,13 +250,9 @@ FocusScope {
                 home.moveCol(1);
             else if (t === "h" || k === Qt.Key_Left)
                 home.moveCol(-1);
-            else if (k === Qt.Key_Return || k === Qt.Key_Enter) {
-                const item = home.itemsOf(home.row)[home.col];
-                if (item && home.row === "continue")
-                    home.resume(item);
-                else if (item)
-                    home.dekho.openTitle(item);
-            } else
+            else if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                home.enter();
+            else
                 return;
             event.accepted = true;
         }
@@ -437,6 +452,8 @@ FocusScope {
             }
             TextInput {
                 id: field
+                // A click focuses the field as / does; the name is for the checks' `dekho box`.
+                objectName: "click:search"
                 visible: !home.offline
                 anchors.left: searchIcon.right
                 anchors.leftMargin: 12
@@ -699,6 +716,13 @@ FocusScope {
             interactive: false
             clip: true
 
+            // Under the cards, the wheel scrolls the strip along them and leaves the cursor where it is.
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.NoButton
+                onWheel: event => view.contentX = D.wheeled(view.contentX, event.angleDelta.y || event.angleDelta.x, view.contentWidth, view.width)
+            }
+
             Row {
                 id: cardRow
                 spacing: 14
@@ -709,6 +733,7 @@ FocusScope {
 
                     Card {
                         page: strip.page
+                        row: strip.name
                         viewport: view
                         width: strip.cardWidth
                         radius: strip.cardRadius
@@ -728,6 +753,7 @@ FocusScope {
         required property int index
         required property var page
         required property Item viewport
+        required property string row
         property bool progressed: false
         property bool focused: false
         readonly property var voiceText: progressed ? H.continueLine(page.voice, modelData) : H.hitLine(modelData)
@@ -752,6 +778,11 @@ FocusScope {
         color: page.plain ? (focused ? page.c.surface ?? "white" : "#F6F7F9") : page.bracket && focused ? Qt.alpha(page.c.accent ?? "cyan", 0.1) : "transparent"
         border.width: page.plain ? (focused ? 1.5 : 0) : 1
         border.color: (page.plain ? page.c.accent : page.bracket ? (focused ? page.c.accent : page.c.line) : page.c.ink) ?? "black"
+
+        DekhoClick {
+            name: card.row + ":" + card.index
+            onTapped: card.page.pick(card.row, card.index)
+        }
 
         // Paper rings the cursor's card in its accent, two pixels inside its ink border.
         Rectangle {
