@@ -91,6 +91,9 @@ export function links(voice, title) {
   return out.map((l) => Object.assign({}, l, { text: upper(voice, l.text) }));
 }
 
+// More like this draws the first 10 of the title's similar titles.
+export const similar = (title) => (Array.isArray(title.similar) ? title.similar.slice(0, 10) : []);
+
 // The words each board writes on the Title page.
 export function titleText(voice) {
   const caps = voice !== 'plain';
@@ -100,6 +103,7 @@ export function titleText(voice) {
     page: voice === 'bracket' ? 'TITLE' : 'title',
     crew: head('crew'),
     cast: head('cast'),
+    similar: head('more like this'),
     nextUp: voice === 'bracket' ? '[NEXT UP]' : caps ? 'NEXT UP' : 'next up',
     filters: upper(voice, 'f filters by these'),
     more: (n) => upper(voice, `${n > 0 ? `+ ${n} · ` : ''}tab to reach, ↵ opens a person`),

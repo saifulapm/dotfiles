@@ -192,8 +192,9 @@ ShellRoot {
 
     function openTitle(hit) {
         opened = hit.id;
-        titlePage.load(hit);
+        // open() first, so a title opened from a Title page snapshots the title it leaves before load() replaces it.
         open("title", hit);
+        titlePage.load(hit);
     }
 
     Services.Theme {

@@ -26,7 +26,8 @@ check "it links TMDB under /tv/ and IMDb, and no Homepage ($(links))" \
 check "the page opens on the episodes, so no link is focused ($(dekho_state | jq -c '[.title.zone, [.title.links[].focused]]'))" \
   dekho_is '.title.zone == "episodes" and ([.title.links[].focused] == [false, false])'
 
-# Episodes, crew and cast come before the buttons, which the links follow.
+# Episodes, crew, cast and More like this come before the buttons, which the links follow.
+wtype -k Tab
 wtype -k Tab
 wtype -k Tab
 wtype -k Tab

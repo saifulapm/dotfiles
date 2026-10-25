@@ -170,3 +170,17 @@ test('a missing or malformed imdb id hides IMDb, and a homepage that is not http
   assert.deepEqual(ids({ homepage: 'https://a b' }), ['tmdb']);
   assert.deepEqual(ids({ homepage: 'https://a.org/‮x' }), ['tmdb']);
 });
+
+test('More like this draws the first 10 similar titles, and none when the title has none', () => {
+  const cards = Array.from({ length: 12 }, (_, i) => ({ id: 500 + i, kind: 'tv', title: `Title ${i}` }));
+  assert.deepEqual(T.similar({ similar: cards }).map((s) => s.id), [500, 501, 502, 503, 504, 505, 506, 507, 508, 509]);
+  assert.deepEqual(T.similar({ similar: [] }), []);
+  assert.deepEqual(T.similar({ similar: null }), []);
+  assert.deepEqual(T.similar({}), []);
+});
+
+test('the More like this heading reads as Home writes its row heads', () => {
+  assert.equal(T.titleText('caps').similar, 'MORE LIKE THIS');
+  assert.equal(T.titleText('bracket').similar, 'MORE LIKE THIS');
+  assert.equal(T.titleText('plain').similar, 'More like this');
+});

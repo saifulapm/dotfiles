@@ -128,7 +128,38 @@
  ],
  "language": "English",
  "language_code": "en",
- "similar": [],
+ "similar": [
+  {
+   "id": 101,
+   "kind": "tv",
+   "title": "The Long Tide",
+   "year": "2024",
+   "vote": 8.1,
+   "poster": "/like300-1.jpg",
+   "backdrop": "/likeb300-1.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 302,
+   "kind": "tv",
+   "title": "Paper Birds",
+   "year": "2026",
+   "vote": 7.9,
+   "poster": "/like300-2.jpg",
+   "backdrop": "/likeb300-2.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 400,
+   "kind": "movie",
+   "title": "A Quiet Verdict",
+   "year": "2026",
+   "vote": 7.8,
+   "poster": "/like300-3.jpg",
+   "backdrop": "/likeb300-3.jpg",
+   "overview": "A similar title."
+  }
+ ],
  "season_count": 1,
  "episode_count": 8,
  "first_air": "2026-01-10",

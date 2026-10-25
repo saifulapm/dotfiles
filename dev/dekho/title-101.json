@@ -227,7 +227,128 @@
  ],
  "language": "English",
  "language_code": "en",
- "similar": [],
+ "similar": [
+  {
+   "id": 501,
+   "kind": "tv",
+   "title": "Salt Marsh",
+   "year": "2025",
+   "vote": 7.6,
+   "poster": "/like101-1.jpg",
+   "backdrop": "/likeb101-1.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 400,
+   "kind": "movie",
+   "title": "A Quiet Verdict",
+   "year": "2026",
+   "vote": 7.8,
+   "poster": "/like101-2.jpg",
+   "backdrop": "/likeb101-2.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 502,
+   "kind": "tv",
+   "title": "Drift\nwood\u202e Bay \u001b[31m and the tide turns again and the tide turns again and the tide turns again and the tide turns again and the tide turns again and the tide turns again and the tide turns again and the tide turns again and the tide turns again and the tide turns again and the tide turns again and the tide turns again ",
+   "year": "2024",
+   "vote": 7.1,
+   "poster": "/like101-3.jpg",
+   "backdrop": "/likeb101-3.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 503,
+   "kind": "tv",
+   "title": "The Lighthouse Year",
+   "year": "2023",
+   "vote": 7.0,
+   "poster": "/like101-4.jpg",
+   "backdrop": "/likeb101-4.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 504,
+   "kind": "movie",
+   "title": "Low Water",
+   "year": "2022",
+   "vote": 6.9,
+   "poster": "/like101-5.jpg",
+   "backdrop": "/likeb101-5.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 300,
+   "kind": "tv",
+   "title": "Harbour Lights",
+   "year": "2026",
+   "vote": 8.4,
+   "poster": "/like101-6.jpg",
+   "backdrop": "/likeb101-6.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 505,
+   "kind": "tv",
+   "title": "Fog Bell",
+   "year": "2021",
+   "vote": 6.8,
+   "poster": "/like101-7.jpg",
+   "backdrop": "/likeb101-7.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 506,
+   "kind": "movie",
+   "title": "The Pier",
+   "year": "2020",
+   "vote": 6.7,
+   "poster": "/like101-8.jpg",
+   "backdrop": "/likeb101-8.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 507,
+   "kind": "tv",
+   "title": "Ebb",
+   "year": "2019",
+   "vote": 6.6,
+   "poster": "/like101-9.jpg",
+   "backdrop": "/likeb101-9.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 508,
+   "kind": "tv",
+   "title": "Breakwater",
+   "year": "2018",
+   "vote": 6.5,
+   "poster": "/like101-10.jpg",
+   "backdrop": "/likeb101-10.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 509,
+   "kind": "tv",
+   "title": "Eleventh Like",
+   "year": "2017",
+   "vote": 6.4,
+   "poster": "/like101-11.jpg",
+   "backdrop": "/likeb101-11.jpg",
+   "overview": "A similar title."
+  },
+  {
+   "id": 510,
+   "kind": "tv",
+   "title": "Twelfth Like",
+   "year": "2016",
+   "vote": 6.3,
+   "poster": "/like101-12.jpg",
+   "backdrop": "/likeb101-12.jpg",
+   "overview": "A similar title."
+  }
+ ],
  "season_count": 4,
  "episode_count": 32,
  "first_air": "2024-03-01",

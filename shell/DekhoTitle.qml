@@ -34,6 +34,7 @@ FocusScope {
     property int crewCol: 0
     property int castCol: 0
     property int linkCol: 0
+    property int similarCol: 0
     property string today: ""
     // Set once the poster's prefetch has answered, so the backdrop is asked for and drawn only for a title whose poster is not on disk, never before a poster that follows.
     property bool posterKnown: false
@@ -67,7 +68,8 @@ FocusScope {
     readonly property int castStart: Math.max(0, Math.min(cast.length - 3, castCol - 2))
     // TMDB, IMDb and the homepage, each only while the title has it; they open in the browser.
     readonly property var links: detail ? T.links(voice, detail) : []
-    readonly property var zones: ["buttons"].concat(links.length ? ["links"] : [], tv ? ["seasons", "episodes"] : [], crew.length ? ["crew"] : [], cast.length ? ["cast"] : [])
+    readonly property var similar: detail ? T.similar(detail) : []
+    readonly property var zones: ["buttons"].concat(links.length ? ["links"] : [], tv ? ["seasons", "episodes"] : [], crew.length ? ["crew"] : [], cast.length ? ["cast"] : [], similar.length ? ["similar"] : [])
 
     signal search
     // Enter chose an episode, or the movie: the release list opens over this page.
@@ -86,6 +88,7 @@ FocusScope {
             row: row,
             crewCol: crewCol,
             castCol: castCol,
+            similarCol: similarCol,
             posterKnown: posterKnown,
             today: today,
             seen: seen,
@@ -103,10 +106,13 @@ FocusScope {
         row = s.row;
         crewCol = s.crewCol;
         castCol = s.castCol;
+        similarCol = s.similarCol;
         posterKnown = s.posterKnown;
         today = s.today;
         seen = s.seen;
         buttonKind = s.buttonKind;
+        // The strip starts at its first card when its items change; this brings the cursor's card back in view.
+        Qt.callLater(() => similarStrip.reveal(page.similarCol));
     }
 
     function load(h) {
@@ -119,6 +125,7 @@ FocusScope {
         row = 0;
         crewCol = 0;
         castCol = 0;
+        similarCol = 0;
         posterKnown = false;
         seen = null;
         buttonKind = "play";
@@ -140,6 +147,7 @@ FocusScope {
                     page.dekho.prefetch("w780", [answer.backdrop]);
             });
             page.dekho.prefetch("w185", page.crew.concat(page.cast).map(p => p.profile));
+            page.dekho.prefetch("w342", page.similar.map(s => s.poster));
             page.loadSeasons(key, page.seasonNumbers);
         });
         refreshSeen();
@@ -201,6 +209,11 @@ FocusScope {
             castCol = Math.max(0, Math.min(cast.length - 1, castCol + by));
     }
 
+    function moveSimilar(by) {
+        similarCol = Math.max(0, Math.min(similar.length - 1, similarCol + by));
+        similarStrip.reveal(similarCol);
+    }
+
     function choose() {
         if (zone === "buttons")
             press(buttons[button].id);
@@ -212,6 +225,8 @@ FocusScope {
             openPerson(crew[crewCol]);
         else if (zone === "cast" && cast[castCol])
             openPerson(cast[castCol]);
+        else if (zone === "similar" && similar[similarCol])
+            dekho.openTitle(similar[similarCol]);
         else if (zone === "seasons")
             zone = "episodes";
     }
@@ -232,6 +247,8 @@ FocusScope {
             castCol = castStart + at;
         else if (to === "links")
             linkCol = at;
+        else if (to === "similar")
+            moveSimilar(at - similarCol);
         else if (to === "buttons")
             buttonKind = at;
         keys.forceActiveFocus();
@@ -367,6 +384,14 @@ FocusScope {
                     shown: taglineText.visible
                 },
                 links: drawnList(linkRow),
+                similar: {
+                    head: similarStrip.headText,
+                    cursor: similarCol,
+                    shown: similarStrip.visible && similarStrip.height > 0,
+                    top: similarStrip.mapToItem(page, 0, 0).y,
+                    bottom: similarStrip.mapToItem(page, 0, similarStrip.height).y,
+                    cards: similarStrip.drawn()
+                },
                 side: sideText.text,
                 chips: drawnList(chipRow),
                 overview: {
@@ -390,6 +415,7 @@ FocusScope {
                 layout: {
                     header: headRule.y,
                     blockTop: sideColumn.mapToItem(page, 0, 0).y,
+                    episodesBottom: episodeView.mapToItem(page, 0, episodeView.height).y,
                     nameTop: bigName.mapToItem(page, 0, 0).y
                 },
                 slot: (posterPicture.shown ? posterPicture : backdropPicture).drawn(),
@@ -435,6 +461,10 @@ FocusScope {
                 page.linkCol = Math.min(page.links.length - 1, page.linkCol + 1);
             else if ((t === "h" || k === Qt.Key_Left) && page.zone === "links")
                 page.linkCol = Math.max(0, page.linkCol - 1);
+            else if ((t === "l" || k === Qt.Key_Right) && page.zone === "similar")
+                page.moveSimilar(1);
+            else if ((t === "h" || k === Qt.Key_Left) && page.zone === "similar")
+                page.moveSimilar(-1);
             else if (t === "l" || k === Qt.Key_Right)
                 page.zone === "crew" || page.zone === "cast" ? page.moveCol(1) : page.moveSeason(1);
             else if (t === "h" || k === Qt.Key_Left)
@@ -1059,6 +1089,20 @@ FocusScope {
                             }
                         }
                     }
+                }
+
+                // More like this, as Home's rows draw titles: under a series' episodes, and in their place for a film.
+                DekhoStrip {
+                    id: similarStrip
+                    Layout.fillWidth: true
+                    Layout.topMargin: page.plain ? 6 : 8
+                    visible: page.similar.length > 0
+                    page: page
+                    name: "title-similar"
+                    items: page.similar
+                    headText: page.words.similar
+                    cursor: page.zone === "similar" ? page.similarCol : -1
+                    onPicked: at => page.pick("similar", at)
                 }
 
                 // A film has no episodes to take the height; without a filler the page's layout spreads the spare height over the header and the keys too.
