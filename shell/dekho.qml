@@ -2,6 +2,7 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import Qt.labs.folderlistmodel
 import "services" as Services
 import "lib/dekho.mjs" as D
 import "lib/status.mjs" as Status
@@ -26,6 +27,8 @@ ShellRoot {
     readonly property string backend: Quickshell.env("DOTS_DEKHO") || "dekho"
     // The TMDB images on disk, by size and then path, as prefetch has listed them; each picture binds its own path, so an answer for another title or older rows only adds paths nothing drawn names.
     property var pictures: ({})
+    // Each size's cache folder as the backend names it, "" while asked; a file there draws at once, so a picture on disk never waits for a prefetch held up by the network.
+    property var folders: ({})
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -68,15 +71,39 @@ ShellRoot {
         call.running = true;
     }
 
-    // One prefetch call for one list's images of one size; a path it does not list keeps its place's empty mark.
-    function prefetch(size, paths) {
+    // One prefetch call for one list's images of one size, then done; a path it does not list keeps its place's empty mark.
+    function prefetch(size, paths, done) {
+        // The backend names a size's folder at once when asked for no paths, as nothing is missing.
+        if (folders[size] === undefined) {
+            folders = Object.assign({}, folders, {
+                [size]: ""
+            });
+            api(["api", "prefetch", "--size", size], answer => {
+                if (answer && typeof answer.dir === "string" && answer.dir.startsWith("/"))
+                    app.folders = Object.assign({}, app.folders, {
+                        [size]: answer.dir
+                    });
+            });
+        }
         const want = D.wanted(paths, pictures[size] || {});
         if (want.length === 0)
-            return;
+            return done ? done() : undefined;
         api(["api", "prefetch", "--size", size].concat(want), answer => {
             app.pictures = Object.assign({}, app.pictures, {
                 [size]: D.withFiles(app.pictures[size] || {}, answer, want)
             });
+            if (done)
+                done();
+        });
+    }
+
+    // What is in a size's folder joins what is on disk, as it is read and as each download lands.
+    function seen(size, folder) {
+        const names = [];
+        for (let i = 0; i < folder.count; i++)
+            names.push(folder.get(i, "fileName"));
+        pictures = Object.assign({}, pictures, {
+            [size]: D.onDisk(pictures[size] || {}, folders[size], names)
         });
     }
 
@@ -94,6 +121,17 @@ ShellRoot {
 
     Services.Theme {
         id: theme
+    }
+
+    Instantiator {
+        model: ["w185", "w342", "w780"]
+
+        FolderListModel {
+            required property string modelData
+            folder: app.folders[modelData] ? "file://" + app.folders[modelData] : ""
+            showDirs: false
+            onCountChanged: app.seen(modelData, this)
+        }
     }
 
     Component {

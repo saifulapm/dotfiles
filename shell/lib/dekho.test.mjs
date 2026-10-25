@@ -48,3 +48,11 @@ test('an answer adds the files it lists for the paths asked, and nothing else', 
   assert.deepEqual(D.withFiles(held, null, ['/a.jpg']), held);
   assert.deepEqual(D.withFiles(held, { error: 'tmdb: network unreachable' }, ['/a.jpg']), held);
 });
+
+// The backend renames a whole download into its size's folder, so a file listed there is a picture on disk; a .part is one still arriving.
+test('a cache folder\'s files join what is on disk, by the path each answers to', () => {
+  const held = { '/a.jpg': '/c/w342/a.jpg' };
+  assert.deepEqual(D.onDisk(held, '/c/w342', ['b.jpg', 'x.123.part', 'bad name.jpg', 'c.png']), { '/a.jpg': '/c/w342/a.jpg', '/b.jpg': '/c/w342/b.jpg', '/c.png': '/c/w342/c.png' });
+  assert.deepEqual(held, { '/a.jpg': '/c/w342/a.jpg' });
+  assert.deepEqual(D.onDisk(held, '', ['b.jpg']), held);
+});

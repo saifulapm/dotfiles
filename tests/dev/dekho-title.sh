@@ -45,8 +45,8 @@ wtype -k Return
 until_ok 3000 title_loaded
 check "Enter on The Long Tide opens its Title page ($(dekho_state | jq -c '[.page, .title.name]'))" dekho_is '.page == "title" and .title.name == "The Long Tide" and .title.lines == 1'
 # Home's Continue watching row already holds The Long Tide's poster at w342, so the page asks only for its backdrop.
-check "it asked the fake for the title, every season's episodes and the backdrop at w780" \
-  bash -c "grep -qx 'api title --id 101 --kind tv' '$DOTS_DEV_DIR/dekho.log' && [ \$(grep -c '^api episodes --id 101 -s [1-4]\$' '$DOTS_DEV_DIR/dekho.log') = 4 ] && grep -qx 'api prefetch --size w780 /b101.png' '$DOTS_DEV_DIR/dekho.log'"
+check "it asked the fake for the title and every season's episodes, and not for the backdrop, as its poster is on disk" \
+  bash -c "grep -qx 'api title --id 101 --kind tv' '$DOTS_DEV_DIR/dekho.log' && [ \$(grep -c '^api episodes --id 101 -s [1-4]\$' '$DOTS_DEV_DIR/dekho.log') = 4 ] && ! grep -q '^api prefetch --size w780 /b101.png' '$DOTS_DEV_DIR/dekho.log'"
 faces_asked() { [ "$(grep -c '^api prefetch --size w185 ' "$DOTS_DEV_DIR/dekho.log")" = 1 ] && grep -qx 'api prefetch --size w185 /f101-1001.jpg /gone101-1003.jpg /f101-2001.jpg /f101-2002.jpg /f101-2003.jpg /f101-2004.jpg /f101-2005.jpg /f101-2006.jpg /f101-2007.jpg /f101-2008.jpg /f101-2009.jpg /f101-2010.jpg /f101-2011.jpg /f101-2012.jpg /f101-2013.jpg /f101-2014.jpg /f101-2015.jpg /f101-2016.jpg /f101-2017.jpg /f101-2018.jpg /f101-2019.jpg /f101-2020.jpg' "$DOTS_DEV_DIR/dekho.log"; }
 until_ok 3000 faces_asked
 check "the crew's and the cast's faces came from one w185 prefetch, the null one left out ($(grep '^api prefetch --size w185 ' "$DOTS_DEV_DIR/dekho.log" | head -c 120))" faces_asked

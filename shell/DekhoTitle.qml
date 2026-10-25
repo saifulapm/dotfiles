@@ -31,6 +31,8 @@ FocusScope {
     property int crewCol: 0
     property int castCol: 0
     property string today: ""
+    // Set once the poster's prefetch has answered, so the backdrop is asked for and drawn only for a title whose poster is not on disk, never before a poster that follows.
+    property bool posterKnown: false
     // The title whose answers are awaited; an older title's answer is dropped.
     property string asked: ""
     // Set when a key hands over to a page still to come: a release list, a person, Browse.
@@ -70,6 +72,7 @@ FocusScope {
             row: row,
             crewCol: crewCol,
             castCol: castCol,
+            posterKnown: posterKnown,
             today: today
         };
     }
@@ -84,6 +87,7 @@ FocusScope {
         row = s.row;
         crewCol = s.crewCol;
         castCol = s.castCol;
+        posterKnown = s.posterKnown;
         today = s.today;
     }
 
@@ -97,6 +101,7 @@ FocusScope {
         row = 0;
         crewCol = 0;
         castCol = 0;
+        posterKnown = false;
         chose = null;
         person = null;
         filter = null;
@@ -107,9 +112,13 @@ FocusScope {
             if (page.asked !== key || !answer)
                 return;
             page.detail = answer;
-            // Both, since the slot falls back to the backdrop when the poster is not on disk.
-            page.dekho.prefetch("w342", [answer.poster]);
-            page.dekho.prefetch("w780", [answer.backdrop]);
+            page.dekho.prefetch("w342", [answer.poster], () => {
+                if (page.asked !== key)
+                    return;
+                page.posterKnown = true;
+                if (!page.dekho.picture("w342", answer.poster))
+                    page.dekho.prefetch("w780", [answer.backdrop]);
+            });
             page.dekho.prefetch("w185", page.crew.concat(page.cast).map(p => p.profile));
             page.loadSeasons(key, page.seasonNumbers);
         });
@@ -466,13 +475,13 @@ FocusScope {
                         path: "M6 1H34A5 5 0 0 1 39 6V24A5 5 0 0 1 34 29H6A5 5 0 0 1 1 24V6A5 5 0 0 1 6 1ZM5 25L14 15L21 22L26 17L35 25M31 9A3 3 0 1 1 25 9A3 3 0 1 1 31 9"
                         color: page.c.muted ?? "gray"
                     }
-                    // The backdrop loads only while the poster is not on disk, so the two never decode at once and a poster never follows a backdrop.
+                    // The backdrop loads only once the poster is known not to be on disk, so the two never decode at once and a poster never follows a backdrop.
                     DekhoPicture {
                         id: backdropPicture
                         anchors.fill: parent
                         dekho: page.dekho
                         size: "w780"
-                        path: !page.detail || page.dekho.picture("w342", page.detail.poster) ? null : page.detail.backdrop
+                        path: !page.detail || !page.posterKnown || page.dekho.picture("w342", page.detail.poster) ? null : page.detail.backdrop
                         radius: placeholder.radius
                     }
                     DekhoPicture {

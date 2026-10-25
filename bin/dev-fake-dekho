@@ -171,16 +171,19 @@ case "${1:-} ${2:-}" in
   done
   mkdir -p "$dir"
   files='{}'
+  missed=
   for path in "${@:5}"; do
     name=${path#/}
     if ! [ -f "$dir/$name" ]; then
-      offline && continue
+      offline && { missed=1; continue; }
       [[ $name == gone* ]] && continue
       # A still (s<id>-<season>-<episode>) is landscape, as TMDB's are; every other sample has its size's shape.
       if [ -f "$fixtures/$name" ]; then cp "$fixtures/$name" "$dir/$name"; elif [[ $name == s[0-9]*-* ]]; then cp "$fixtures/still.png" "$dir/$name"; else cp "$fixtures/$size.png" "$dir/$name"; fi
     fi
     files=$(jq -c --arg p "$path" --arg f "$dir/$name" '.[$p] = $f' <<<"$files")
   done
+  # The real one answers only once each missing download has failed, which offline is its 20 s timeout; 4 s here.
+  [ -z "$missed" ] || sleep 4
   jq -nc --arg dir "$dir" --argjson files "$files" '{dir: $dir, files: $files}'
   ;;
 *)

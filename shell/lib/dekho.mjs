@@ -35,3 +35,11 @@ export function withFiles(held, answer, asked) {
   for (const p of asked) if (typeof files[p] === 'string' && files[p].startsWith('/')) out[p] = files[p];
   return out;
 }
+
+// What is on disk once a size's cache folder is read: each file there whose name a picture path could have, which leaves out a download still arriving as name.<pid>.part.
+export function onDisk(held, dir, names) {
+  const out = Object.assign({}, held);
+  if (!dir) return out;
+  for (const n of names) if (picturePath('/' + n)) out['/' + n] = dir + '/' + n;
+  return out;
+}

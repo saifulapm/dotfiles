@@ -44,9 +44,9 @@ until_ok 3000 dekho_gone
 touch "$DOTS_DEV_DIR/dekho-offline"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 dekho_up
-until_ok 3000 dekho_is '(.rows.series | length) > 0 and (.rows.continue | length) > 0'
+# Each row still holds a poster the fake lacks, so its prefetch answers only after the fake's 4 s timeout: posters within 3 s come from the disk.
 until_ok 3000 posters_on 17
-check "with TMDB blocked, reopening draws the posters already on disk for the saved rows ($(dekho_state | jq -c '[.rows.series, .rows.movies | map(.poster.shown)]'))" \
+check "with TMDB blocked, reopening draws the posters already on disk for the saved rows within 3 s, before any prefetch answers ($(dekho_state | jq -c '[.rows.series, .rows.movies | map(.poster.shown)]'))" \
   dekho_is '[.rows.continue, .rows.series, .rows.movies | map(.poster.shown)] == [[true, true, false, false, true], [true, true, true, true, true, true, true, false, false], [true, true, false, false, true, true, true, true, true]]'
 
 check "Home draws the saved trending series, 9 of the copy's titles ($(dekho_state | jq -c '[.rows.series[] | .title][0:3]'))" \
