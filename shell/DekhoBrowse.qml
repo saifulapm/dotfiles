@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Shapes
 import "lib/dekho.mjs" as D
 import "lib/dekho-browse.mjs" as B
+import "lib/dekho-toast.mjs" as Toast
 
 // Dekho's Browse: the catalog under the filters each key sets, opened with the page it came from already chosen as chips.
 FocusScope {
@@ -154,7 +155,9 @@ FocusScope {
         if (!p)
             return;
         closePicker();
-        set(B.withPerson(filters, p));
+        const f = B.withPerson(filters, p);
+        set(f);
+        dekho.toast(Toast.filterToast(f, "person"));
     }
 
     function drawnList(repeater) {
@@ -213,13 +216,17 @@ FocusScope {
                 page.dekho.back();
             else if (!page.tables)
                 return;
-            else if (facet)
-                page.set(B.next(page.filters, facet, page.tables));
+            else if (facet) {
+                const f = B.next(page.filters, facet, page.tables);
+                page.set(f);
+                page.dekho.toast(Toast.filterToast(f, facet));
+            }
             else if (t === "p")
                 page.openPicker();
             else if (t === "x") {
                 page.prefilled = false;
                 page.set(B.clear());
+                page.dekho.toast(Toast.FILTERS_CLEARED);
             } else if (t === "j" || k === Qt.Key_Down)
                 page.move(1);
             else if (t === "k" || k === Qt.Key_Up)

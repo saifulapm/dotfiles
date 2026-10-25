@@ -40,6 +40,11 @@ ShellRoot {
         ender.running = true;
     }
 
+    // A one-line notice at the window's bottom for 2.4 s; a second one takes its place.
+    function toast(text) {
+        toastItem.show(text);
+    }
+
     function open(page, args) {
         // Leaving a Title page keeps it, since a credit's title opened further on reloads the one shared page.
         const top = stack[stack.length - 1];
@@ -193,7 +198,8 @@ ShellRoot {
                 firstFrameMs: app.firstFrameMs,
                 rssKiB: Status.rssKiB(procStatus.text()),
                 voice: app.voice,
-                opened: app.opened
+                opened: app.opened,
+                toast: toastItem.state()
             }, home.state(), titlePage.state(),
             releases.state(),
             browsePage.state(),
@@ -281,6 +287,15 @@ ShellRoot {
                 app.stack = app.stack.slice(0, 1);
                 home.focusSearch();
             }
+        }
+
+        // Last, so it draws over every page and the release overlay; 56 px up keeps it off a page's keys strip.
+        DekhoToast {
+            id: toastItem
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 56
+            dekho: app
         }
     }
 }

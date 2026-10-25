@@ -63,6 +63,12 @@ FocusScope {
 
     visible: mode !== ""
 
+    // The fail box stays on the card; the toast says it again where the keys are not.
+    onFailureChanged: {
+        if (failure !== "" && mode === "starting")
+            dekho.toast("Could not start: " + failure);
+    }
+
     // Enter on an episode, or a movie: its releases, best first.
     function choose(t, from) {
         target = t;

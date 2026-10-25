@@ -228,6 +228,7 @@ FocusScope {
             page.bySeason = Object.assign({}, page.bySeason, {
                 [s]: list
             });
+            page.dekho.toast(answer.watched ? "Marked watched" : "Marked unwatched");
         });
     }
 
