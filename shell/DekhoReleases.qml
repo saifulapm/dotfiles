@@ -472,9 +472,9 @@ FocusScope {
                                     text = "";
                                 else
                                     page.close();
-                            } else if (event.text === "j" || k === Qt.Key_Down)
+                            } else if (k === Qt.Key_Down)
                                 page.move(1);
-                            else if (event.text === "k" || k === Qt.Key_Up)
+                            else if (k === Qt.Key_Up)
                                 page.move(-1);
                             else if (k === Qt.Key_Return || k === Qt.Key_Enter)
                                 page.stream();

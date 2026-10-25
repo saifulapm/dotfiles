@@ -81,9 +81,9 @@ check "the cursor is back on Auto, and nothing says no match ($(rel ' | [.cursor
 check "a release name with a newline, U+202E and ESC is matched as it draws ($(rel '.rows[2].name'))" \
   dekho_is '.releases.rows[2].name == "The LongTide [31m S03E04 1080p BluRay x264"'
 
-wtype j
+wtype -k Down
 until_ok 1000 dekho_is '.releases.cursor == 1 and .releases.rows[1].cursor'
-check "j in the field still moves the cursor, and types nothing ($(rel ' | [.cursor, .filter.text]'))" \
+check "Down in the field moves the cursor, and types nothing ($(rel ' | [.cursor, .filter.text]'))" \
   dekho_is '.releases.cursor == 1 and .releases.filter.text == "1080" and .releases.filter.focused'
 wtype -k Return
 until_ok 3000 unit_active
@@ -103,10 +103,11 @@ until_ok 3000 listed
 check "reopened after a play, the list has no filter and all six rows ($(rel .filter))" \
   dekho_is '.releases.filter.text == "" and .releases.filter.shown == false'
 ctrl_f
-type_filter xyz
-check "xyz leaves Auto alone ($(rel '.rows | map(.auto)'))" dekho_is '[.releases.rows[] | .auto] == [true] and .releases.rows[0].cursor'
-check "and the line below it reads No release matches xyz ($(rel .noMatch))" \
-  dekho_is '.releases.noMatch == {"text": "No release matches xyz", "shown": true}'
+# j and k are text in the field, as a release name can hold them.
+type_filter xjk
+check "xjk, j and k typed as text, leaves Auto alone ($(rel '.rows | map(.auto)'))" dekho_is '[.releases.rows[] | .auto] == [true] and .releases.rows[0].cursor'
+check "and the line below it reads No release matches xjk ($(rel .noMatch))" \
+  dekho_is '.releases.noMatch == {"text": "No release matches xjk", "shown": true}'
 check "the count reads 0 releases ($(rel .count))" dekho_is '.releases.count == "0 releases"'
 
 wtype -k Escape
