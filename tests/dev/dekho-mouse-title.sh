@@ -144,6 +144,17 @@ note_session
 check "a click on Trailer starts the trailer as t does ($(($(lines '^trailer --json --id 101 --kind tv$') - trailers)) asks)" \
   bash -c "systemctl --user is-active --quiet '$DOTS_DEKHO_UNIT-trailer.service' && [ \$(grep -c '^trailer --json --id 101 --kind tv\$' '$fake_log') = $((trailers + 1)) ]"
 check "with the cursor on it ($(dekho_state | jq -c '[.title.zone, [.title.buttons[].focused]]'))" dekho_is '.title.zone == "buttons" and .title.buttons[-1].focused'
+# The trailer's mpv window took the focus: the first click back on Dekho acts at once, with no click first to focus it. mpv floats over Dekho, so it moves off it first.
+until_ok 3000 bash -c "niri msg -j focused-window | jq -e '.app_id == \"mpv\"' >/dev/null"
+niri msg action move-floating-window --id "$(niri msg -j focused-window | jq .id)" -x 1300 -y 700
+until_ok 2000 bash -c "niri msg -j focused-window | jq -e '.app_id == \"mpv\" and .layout.tile_pos_in_workspace_view[0] >= 1300' >/dev/null"
+click_on title-episode:1
+until_ok 3000 dekho_is '.releases.mode == "list" and (.releases.rows | length) == 6'
+check "with mpv focused, one click on E2 opens its release list ($(dekho_state | jq -c '[.releases.mode, .chose]'))" \
+  dekho_is '.releases.mode == "list" and .chose == {"season": 3, "episode": 2}'
+wtype -k Shift_L
+wtype -k Escape
+until_ok 1000 dekho_is '.releases.mode == ""'
 "$repo/bin/dots-dekho-play" --trailer --stop
 refocus
 

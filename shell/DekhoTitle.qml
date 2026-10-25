@@ -212,9 +212,6 @@ FocusScope {
 
     // A click moves the cursor onto what it hit, as the keys would, and does what Enter does there; at is an episode's or a person's index, a season tab's index or a button's kind.
     function pick(to, at) {
-        // The release list over the page holds the keys, so a click beneath it does nothing, as Enter there would not reach the page.
-        if (!activeFocus)
-            return;
         zone = to;
         if (to === "episodes") {
             row = at;
@@ -235,8 +232,6 @@ FocusScope {
 
     // A genre or language chip opens Browse filtered by that one alone.
     function browseBy(genre, language) {
-        if (!activeFocus)
-            return;
         filter = {
             kind: "all",
             genre: genre,
