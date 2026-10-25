@@ -102,6 +102,8 @@ wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 wtype -k Return
 until_ok 3000 dekho_is '.page == "title" and .title.name == "Seven Stations" and (.title.crew | length) > 0'
+# A film's Tab goes buttons, links, then crew.
+wtype -k Tab
 wtype -k Tab
 wtype -k Tab
 until_ok 1000 dekho_is '.title.zone == "crew"'
