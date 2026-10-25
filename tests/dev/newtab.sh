@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Ctrl+T in Chromium opens the theme's new-tab page: its paper, the date, a field that takes the keys typed first, and the six most visited sites.
 {
+# The nested session puts a stand-in chromium-browser first on its PATH, so the real one is found before lib.sh joins it.
+real_chromium=$(command -v chromium-browser) || { echo "FAIL no chromium-browser on PATH"; exit 1; }
 source "$(dirname "$0")/lib.sh"
 
 work=$DOTS_DEV_DIR/newtab
@@ -68,7 +70,7 @@ launch() {
   local profile=$1
   shift
   niri msg action spawn -- bwrap --dev-bind / / --bind "$work/policy" /etc/chromium/policies/managed \
-    chromium-browser --user-data-dir="$work/$profile" --no-first-run --ozone-platform=wayland --remote-debugging-port="$dport" \
+    "$real_chromium" --user-data-dir="$work/$profile" --no-first-run --ozone-platform=wayland --remote-debugging-port="$dport" \
     --disable-features=NtpFooter "--load-extension=$out/chromium-theme,$out/chromium-newtab" "$@"
   until_ok 15000 cdp urls >/dev/null
 }

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # dots theme recolours an open zathura, imv and mpv in each theme, and Chromium wears the theme's exact colours from its next start.
 {
+# The nested session puts a stand-in chromium-browser first on its PATH, so the real one is found before lib.sh joins it.
+real_chromium=$(command -v chromium-browser) || { echo "FAIL no chromium-browser on PATH"; exit 1; }
 source "$(dirname "$0")/lib.sh"
 
 work=$DOTS_DEV_DIR/app-themes
@@ -149,7 +151,7 @@ until_ok 3000 bash -c '! niri msg -j windows | jq -e "any(.[]; .app_id == \"imv\
 # Chromium reads the managed policy from /etc, so it runs with an empty policy dir bound there, as on a machine the apply has cleaned; its profile is the check's own.
 chromium() {
   niri msg action spawn -- bwrap --dev-bind / / --bind "$work/policy" /etc/chromium/policies/managed \
-    chromium-browser --user-data-dir="$work/profile" --no-first-run --ozone-platform=wayland "--load-extension=$1" \
+    "$real_chromium" --user-data-dir="$work/profile" --no-first-run --ozone-platform=wayland "--load-extension=$1" \
     'data:text/html,<body style="background:magenta">'
 }
 mkdir -p "$work/policy"
