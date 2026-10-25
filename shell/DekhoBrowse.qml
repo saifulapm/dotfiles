@@ -123,6 +123,51 @@ FocusScope {
             resultView.contentY = r.y + r.height - resultView.height;
     }
 
+    // Enter on the cursor's row opens its title.
+    function enter() {
+        const hit = results[row];
+        if (hit)
+            dekho.openTitle(hit);
+    }
+
+    // A click on a row moves the cursor there and does what Enter does.
+    function pickRow(at) {
+        row = at;
+        move(0);
+        resultKeys.forceActiveFocus();
+        enter();
+    }
+
+    // A facet's key: its next value, with the toast that names it.
+    function cycle(facet) {
+        const f = B.next(filters, facet, tables);
+        set(f);
+        dekho.toast(Toast.filterToast(f, facet));
+    }
+
+    // A click on a facet does what its key does, the person facet opening the picker. Like the keys, it waits for the tables.
+    function tapFacet(facet) {
+        if (!tables)
+            return;
+        picking = false;
+        resultKeys.forceActiveFocus();
+        if (facet === "person")
+            openPicker();
+        else
+            cycle(facet);
+    }
+
+    // A click on a kind tab picks that kind, where t reaches it by cycling.
+    function tapKind(kind) {
+        if (!tables || filters.kind === kind)
+            return;
+        picking = false;
+        resultKeys.forceActiveFocus();
+        const f = B.withKind(filters, kind, tables);
+        set(f);
+        dekho.toast(Toast.filterToast(f, "kind"));
+    }
+
     function openPicker() {
         picking = true;
         people = [];
@@ -149,6 +194,12 @@ FocusScope {
             if (page.peopleAsked === words)
                 page.people = answer && Array.isArray(answer.items) ? answer.items.slice(0, 6) : [];
         });
+    }
+
+    // A click on a person picks them as Enter does.
+    function pickPerson(at) {
+        pick = at;
+        choosePerson();
     }
 
     // Enter on a person only adds the filter; their own page is a later key's.
@@ -218,11 +269,8 @@ FocusScope {
                 page.dekho.back();
             else if (!page.tables)
                 return;
-            else if (facet) {
-                const f = B.next(page.filters, facet, page.tables);
-                page.set(f);
-                page.dekho.toast(Toast.filterToast(f, facet));
-            }
+            else if (facet)
+                page.cycle(facet);
             else if (t === "p")
                 page.openPicker();
             else if (t === "x") {
@@ -233,11 +281,9 @@ FocusScope {
                 page.move(1);
             else if (t === "k" || k === Qt.Key_Up)
                 page.move(-1);
-            else if (k === Qt.Key_Return || k === Qt.Key_Enter) {
-                const hit = page.results[page.row];
-                if (hit)
-                    page.dekho.openTitle(hit);
-            } else
+            else if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                page.enter();
+            else
                 return;
             event.accepted = true;
         }
@@ -365,6 +411,10 @@ FocusScope {
                             font.weight: kindTab.current && !page.caps ? (page.plain ? Font.Medium : Font.Bold) : Font.Normal
                             font.letterSpacing: kindTab.current && !page.plain ? 1.4 : page.bracket ? 0.7 : 0
                         }
+                        DekhoClick {
+                            name: "browse-kind:" + kindTab.modelData
+                            onTapped: page.tapKind(kindTab.modelData)
+                        }
                     }
                 }
             }
@@ -462,6 +512,11 @@ FocusScope {
                             elide: Text.ElideRight
                             maximumLineCount: 1
                         }
+                    }
+                    // Named by the facet's own word, the one the toast and the key's cycle go by.
+                    DekhoClick {
+                        name: "browse-facet:" + facetBox.modelData[1].toLowerCase()
+                        onTapped: page.tapFacet(facetBox.modelData[1].toLowerCase())
                     }
                 }
             }
@@ -615,6 +670,13 @@ FocusScope {
                 interactive: false
                 clip: true
 
+                // Under the rows, the wheel scrolls the results and leaves the cursor where it is.
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    onWheel: event => resultView.contentY = D.wheeled(resultView.contentY, event.angleDelta.y, resultView.contentHeight, resultView.height)
+                }
+
                 Column {
                     id: resultColumn
                     width: resultView.width
@@ -657,6 +719,10 @@ FocusScope {
                                 inverse: resultRow.cursor && !page.plain
                                 lit: resultRow.cursor && page.plain
                                 cells: [D.title(resultRow.modelData.title), String(resultRow.modelData.year || ""), D.stars(resultRow.modelData.vote)].concat(page.words.hitCells(resultRow.modelData))
+                            }
+                            DekhoClick {
+                                name: "browse-row:" + resultRow.index
+                                onTapped: page.pickRow(resultRow.index)
                             }
                         }
                     }
@@ -708,6 +774,12 @@ FocusScope {
         border.width: page.plain ? 1.5 : page.caps ? 1.5 : 1
         border.color: (page.plain || page.bracket ? page.c.accent : page.c.ink) ?? "black"
         clip: true
+
+        // The picker lies over rows with click areas of their own; neither a click nor the wheel on it goes on to them.
+        MouseArea {
+            anchors.fill: parent
+            onWheel: event => event.accepted = true
+        }
 
         ColumnLayout {
             id: pickerColumn
@@ -797,6 +869,10 @@ FocusScope {
                         radius: page.plain ? 10 : 0
                         color: cursor ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : "transparent"
 
+                        DekhoClick {
+                            name: "browse-person:" + personRow.index
+                            onTapped: page.pickPerson(personRow.index)
+                        }
                         ColumnLayout {
                             id: personText
                             anchors.left: parent.left
