@@ -38,10 +38,10 @@ title_of() {
   fi
 }
 
-# fake-mpv.qml stands in for mpv, its window titled as the real one is; it runs as this script's child so the script can write what the real backend writes once mpv quits.
+# fake-mpv.qml stands in for mpv, its window titled as the real one is; it runs as this script's child so the script can write what the real backend writes once mpv quits. It ends by SIGTERM when its window closes, so its status is not this script's.
 mpv() {
   FAKE_MPV_TITLE=$1 env -u QS_CONFIG_PATH qs -p "$fixtures/../fake-mpv.qml" >>"$DOTS_DEV_DIR/fake-mpv.log" 2>&1 &
-  wait $!
+  wait $! || true
 }
 
 case "${1:-} ${2:-}" in

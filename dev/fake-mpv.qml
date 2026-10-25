@@ -1,5 +1,6 @@
 //@ pragma AppId mpv
 import Quickshell
+import Quickshell.Io
 import QtQuick
 
 // The play check's stand-in for mpv: one window with mpv's app id, which dev-fake-dekho's play opens a moment after its playing event, as the real mpv maps late, titled as the real one titles it.
@@ -9,5 +10,18 @@ ShellRoot {
         implicitHeight: 180
         color: "#101010"
         title: Quickshell.env("FAKE_MPV_TITLE") || "fake mpv"
+    }
+
+    // mpv quits when its window closes, and qs has no quit of its own, so a child ends it.
+    Process {
+        id: ender
+        command: ["sh", "-c", "kill -TERM $PPID"]
+    }
+
+    Connections {
+        target: Quickshell
+        function onLastWindowClosed() {
+            ender.running = true;
+        }
     }
 }

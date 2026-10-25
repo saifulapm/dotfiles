@@ -8,12 +8,12 @@ import { join } from 'node:path';
 
 const bin = new URL('../../bin/dev-fake-dekho', import.meta.url).pathname;
 
-// A scratch DOTS_DEV_DIR with a qs that stands in for fake-mpv.qml: it logs the window title it was given and quits after a moment, as a closed window would.
+// A scratch DOTS_DEV_DIR with a qs that stands in for fake-mpv.qml: it logs the window title it was given and, after a moment, ends by SIGTERM, as fake-mpv.qml does when its window closes.
 function rig(t) {
   const dir = mkdtempSync(join(tmpdir(), 'fake-dekho-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'bin'));
-  writeFileSync(join(dir, 'bin', 'qs'), `#!/bin/sh\necho "$FAKE_MPV_TITLE" >>"${dir}/mpv-titles"\nsleep \${FAKE_QS_SECS:-0.1}\n`);
+  writeFileSync(join(dir, 'bin', 'qs'), `#!/bin/sh\necho "$FAKE_MPV_TITLE" >>"${dir}/mpv-titles"\nsleep \${FAKE_QS_SECS:-0.1}\nkill -TERM $$\n`);
   chmodSync(join(dir, 'bin', 'qs'), 0o755);
   const env = { PATH: `${dir}/bin:${process.env.PATH}`, HOME: dir, DOTS_DEV_DIR: dir };
   const run = (...args) => spawnSync('bash', [bin, ...args], { env, encoding: 'utf8', timeout: 15000 });
