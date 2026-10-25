@@ -72,10 +72,11 @@ export function watching(history, title) {
   return seen && !seen.finished ? seen : null;
 }
 
-// The title's buttons: Play always, and Resume with what is left, as Continue watching words it, while history holds it.
-export function buttons(voice, seen) {
+// The title's buttons: Play always, Resume with what is left, as Continue watching words it, while history holds it, and Trailer when the title has one.
+export function buttons(voice, seen, trailer) {
   const out = [{ id: 'play', text: upper(voice, '▶ Play') }];
   if (seen) out.push({ id: 'resume', text: upper(voice, ['▶ Resume', continueLine(voice, seen)].filter((p) => p).join(' · ')) });
+  if (trailer) out.push({ id: 'trailer', text: upper(voice, '▶ Trailer') });
   return out;
 }
 
@@ -91,6 +92,6 @@ export function titleText(voice) {
     nextUp: voice === 'bracket' ? '[NEXT UP]' : caps ? 'NEXT UP' : 'next up',
     filters: upper(voice, 'f filters by these'),
     more: (n) => upper(voice, `${n > 0 ? `+ ${n} · ` : ''}tab to reach, ↵ opens a person`),
-    keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['r', 'resume'], ['w', 'mark watched'], ['tab', 'buttons, seasons, episodes, crew, cast'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],
+    keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['r', 'resume'], ['t', 'trailer'], ['w', 'mark watched'], ['tab', 'buttons, seasons, episodes, crew, cast'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],
   };
 }

@@ -112,8 +112,18 @@ test('Play always shows; Resume joins it with the time left as Continue watching
   assert.deepEqual(T.buttons('bracket', seen[0]).map((b) => b.text), ['▶ PLAY', '▶ RESUME · S3 E4 · 31 MIN LEFT']);
 });
 
-test('the footer names r for resume and tab reaches the buttons', () => {
+test('a title with a trailer adds Trailer after Play and Resume; a null or empty one adds none', () => {
+  const url = 'https://www.youtube.com/watch?v=abc';
+  assert.deepEqual(T.buttons('plain', null, url), [{ id: 'play', text: '▶ Play' }, { id: 'trailer', text: '▶ Trailer' }]);
+  assert.deepEqual(T.buttons('caps', seen[1], url).map((b) => b.id), ['play', 'resume', 'trailer']);
+  assert.deepEqual(T.buttons('bracket', null, url).map((b) => b.text), ['▶ PLAY', '▶ TRAILER']);
+  assert.deepEqual(T.buttons('plain', null, null), [{ id: 'play', text: '▶ Play' }]);
+  assert.deepEqual(T.buttons('plain', null, ''), [{ id: 'play', text: '▶ Play' }]);
+});
+
+test('the footer names r for resume, t for trailer, and tab reaches the buttons', () => {
   const keys = T.titleText('plain').keys;
   assert.ok(keys.some(([k, w]) => k === 'r' && w === 'resume'));
+  assert.deepEqual(keys[keys.findIndex(([k]) => k === 'r') + 1], ['t', 'trailer']);
   assert.ok(keys.some(([k, w]) => k === 'tab' && w.startsWith('buttons')));
 });
