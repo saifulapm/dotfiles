@@ -32,7 +32,11 @@ FocusScope {
     property Item under: null
     property var items: []
     // Auto first, once the releases are in; Auto with none to choose from would play nothing.
-    readonly property var rows: asking || items.length === 0 ? [] : R.rows(items)
+    readonly property var rows: asking || items.length === 0 ? [] : R.rows(items, filter)
+    // What Ctrl+F's field holds; only the releases whose name contains it are listed after Auto.
+    readonly property string filter: filterField.text
+    // The field shows once Ctrl+F opens it, and stays while it holds text.
+    property bool filterOpen: false
     property bool asking: false
     property int row: 0
     property string asked: ""
@@ -88,6 +92,8 @@ FocusScope {
         asking = true;
         items = [];
         row = 0;
+        filterField.text = "";
+        filterOpen = false;
         mode = "list";
         dekho.api(["api", "releases", "--id", String(t.id), "--kind", t.kind].concat(t.kind === "tv" ? ["-s", String(t.season), "-e", String(t.episode)] : []), answer => {
             if (page.asked !== key)
@@ -123,14 +129,28 @@ FocusScope {
         start(playArgs);
     }
 
+    // Ctrl+F: the filter field, with the keys.
+    function openFilter() {
+        filterOpen = true;
+        filterField.forceActiveFocus();
+    }
+
+    function move(by) {
+        row = Math.max(0, Math.min(rows.length - 1, row + by));
+        listView.reveal(row);
+    }
+
     function stream() {
         const r = rows[row];
         if (!r)
             return;
+        // The filter field may hold the focus, and Starting takes its keys from the page's own item.
+        keys.forceActiveFocus();
         start(R.playArgs(target, r));
     }
 
     function close() {
+        keys.forceActiveFocus();
         mode = "";
         asked = "";
         if (under)
@@ -188,6 +208,16 @@ FocusScope {
                 heads: [headQuality.text, headSize.text, headSeeders.text, headAudio.text],
                 cursor: row,
                 rows: drawnRows(),
+                filter: {
+                    text: filterField.text,
+                    shown: filterBox.visible,
+                    focused: filterField.activeFocus,
+                    family: filterField.font.family
+                },
+                noMatch: {
+                    text: noMatchText.text,
+                    shown: noMatchText.visible
+                },
                 none: {
                     head: noneHead.text,
                     why: noneWhy.text,
@@ -304,13 +334,13 @@ FocusScope {
             else if (page.mode === "none" && t === "/") {
                 page.close();
                 page.search();
-            } else if (page.mode === "list" && (t === "j" || k === Qt.Key_Down)) {
-                page.row = Math.min(page.rows.length - 1, page.row + 1);
-                listView.reveal(page.row);
-            } else if (page.mode === "list" && (t === "k" || k === Qt.Key_Up)) {
-                page.row = Math.max(0, page.row - 1);
-                listView.reveal(page.row);
-            } else if (page.mode === "list" && (k === Qt.Key_Return || k === Qt.Key_Enter))
+            } else if (page.mode === "list" && page.rows.length > 0 && k === Qt.Key_F && (event.modifiers & Qt.ControlModifier))
+                page.openFilter();
+            else if (page.mode === "list" && (t === "j" || k === Qt.Key_Down))
+                page.move(1);
+            else if (page.mode === "list" && (t === "k" || k === Qt.Key_Up))
+                page.move(-1);
+            else if (page.mode === "list" && (k === Qt.Key_Return || k === Qt.Key_Enter))
                 page.stream();
             event.accepted = true;
         }
@@ -418,6 +448,49 @@ FocusScope {
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
+                Item {
+                    id: filterBox
+                    visible: page.mode === "list" && (page.filterOpen || filterField.text !== "")
+                    Layout.preferredWidth: 180
+                    implicitHeight: filterField.implicitHeight + 6
+
+                    TextInput {
+                        id: filterField
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        clip: true
+                        color: page.c.ink ?? "black"
+                        selectionColor: page.c.accent ?? "red"
+                        selectedTextColor: page.c.surface ?? "white"
+                        font.family: page.bodyFont
+                        font.pixelSize: page.bracket ? 12 : 13
+                        onTextChanged: page.row = 0
+                        Keys.onPressed: event => {
+                            const k = event.key;
+                            if (k === Qt.Key_Escape) {
+                                if (text !== "")
+                                    text = "";
+                                else
+                                    page.close();
+                            } else if (event.text === "j" || k === Qt.Key_Down)
+                                page.move(1);
+                            else if (event.text === "k" || k === Qt.Key_Up)
+                                page.move(-1);
+                            else if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                                page.stream();
+                            else if (!(k === Qt.Key_F && (event.modifiers & Qt.ControlModifier)))
+                                return;
+                            event.accepted = true;
+                        }
+                    }
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 1
+                        color: page.c.accent ?? "gray"
+                    }
+                }
                 Rectangle {
                     visible: page.mode === "list"
                     implicitWidth: countText.implicitWidth + (plain ? 18 : 0)
@@ -429,7 +502,7 @@ FocusScope {
                         id: countText
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
-                        text: page.asking ? "" : page.words.count(page.items.length)
+                        text: page.asking ? "" : page.words.count(Math.max(0, page.rows.length - 1))
                         color: page.c.muted ?? "gray"
                         font.family: page.bodyFont
                         font.pixelSize: page.bracket ? 10 : 11
@@ -518,6 +591,21 @@ FocusScope {
                             }
                         }
                     }
+                }
+                Text {
+                    id: noMatchText
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 14
+                    Layout.rightMargin: 14
+                    Layout.topMargin: 8
+                    visible: page.filter !== "" && page.rows.length === 1
+                    textFormat: Text.PlainText
+                    text: page.words.noMatch(D.title(page.filter))
+                    color: page.c.muted ?? "gray"
+                    font.family: page.bodyFont
+                    font.pixelSize: 13
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
                 }
             }
 
@@ -860,8 +948,8 @@ FocusScope {
                 }
                 Rectangle {
                     id: bestBox
-                    // The best release is the first after Auto.
-                    visible: rel.index === 1
+                    // The best release is the first after Auto, which a filter may have removed.
+                    visible: !rel.auto && rel.modelData.hash === page.items[0].hash
                     implicitWidth: bestText.implicitWidth + (page.bracket ? 0 : page.plain ? 16 : 12)
                     implicitHeight: bestText.implicitHeight + (page.bracket ? 0 : page.plain ? 4 : 2)
                     radius: page.plain ? 8 : 0
