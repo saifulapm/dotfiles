@@ -20,9 +20,12 @@ test('before playing, the steps are the buffering ones alone', () => {
   assert.deepEqual(S.steps({ steps, playing: false }), [{ text: 'Found 530 seeders', state: 'current' }]);
 });
 
-test("mpv has mapped once niri lists a window with mpv's app id", () => {
-  assert.equal(S.mpvMapped('[{"id":3,"app_id":"dekho"},{"id":9,"app_id":"mpv"}]'), true);
-  assert.equal(S.mpvMapped('[{"id":3,"app_id":"dekho"}]'), false);
-  assert.equal(S.mpvMapped(''), false);
-  assert.equal(S.mpvMapped('{"Err":"no niri"}'), false);
+test("mpv has mapped once niri lists a window with mpv's app id whose process is in the film's unit", () => {
+  const both = '[{"id":3,"app_id":"dekho","pid":10},{"id":7,"app_id":"mpv","pid":71},{"id":9,"app_id":"mpv","pid":92}]';
+  assert.equal(S.mpvMapped(both, [90, 92]), true);
+  assert.equal(S.mpvMapped('[{"id":3,"app_id":"dekho","pid":10},{"id":7,"app_id":"mpv","pid":71}]', [90, 92]), false);
+  assert.equal(S.mpvMapped(both, []), false);
+  assert.equal(S.mpvMapped('[{"id":3,"app_id":"dekho","pid":92}]', [92]), false);
+  assert.equal(S.mpvMapped('', [92]), false);
+  assert.equal(S.mpvMapped('{"Err":"no niri"}', [92]), false);
 });

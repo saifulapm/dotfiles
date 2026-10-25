@@ -4,13 +4,13 @@ export function steps(st) {
   return st.playing ? st.steps.concat([{ text: 'mpv is opening', state: 'current' }]) : st.steps;
 }
 
-// True once `niri msg -j windows` lists a window with mpv's app id.
-export function mpvMapped(text) {
+// True once `niri msg -j windows` lists a window with mpv's app id whose process is one of pids, the film's unit's; a trailer's mpv runs in a unit of its own.
+export function mpvMapped(text, pids) {
   let windows;
   try {
     windows = JSON.parse(String(text));
   } catch (e) {
     return false;
   }
-  return Array.isArray(windows) && windows.some((w) => w && w.app_id === 'mpv');
+  return Array.isArray(windows) && windows.some((w) => w && w.app_id === 'mpv' && pids.includes(w.pid));
 }

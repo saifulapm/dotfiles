@@ -289,7 +289,7 @@ FocusScope {
         command: [page.bin, "--stop"]
     }
 
-    // Starting closes once niri lists mpv's window, asked every 500 ms only while it waits, or after 120 s.
+    // Starting closes once niri lists the film's mpv window, asked every 500 ms only while it waits, or after 120 s.
     Tick {
         interval: 500
         repeat: true
@@ -305,12 +305,14 @@ FocusScope {
         running: page.opening
         onTriggered: page.opened()
     }
+    // The windows' JSON on its first line, then the pids in the film's unit, so a trailer's mpv window, in a unit of its own, does not count.
     Process {
         id: mpvProbe
-        command: ["niri", "msg", "-j", "windows"]
+        command: ["sh", "-c", "niri msg -j windows; echo; cg=$(systemctl --user show -p ControlGroup --value \"$1.service\"); [ -z \"$cg\" ] || cat \"/sys/fs/cgroup$cg/cgroup.procs\" 2>/dev/null", "sh", Quickshell.env("DOTS_DEKHO_UNIT") || "dekho-play"]
         stdout: StdioCollector {
             onStreamFinished: {
-                if (page.opening && S.mpvMapped(text))
+                const lines = text.split("\n");
+                if (page.opening && S.mpvMapped(lines[0], lines.slice(1).filter(l => l !== "").map(Number)))
                     page.opened();
             }
         }
