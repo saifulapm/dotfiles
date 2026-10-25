@@ -99,3 +99,17 @@ test('the no-releases words name an episode for a series and the film for a film
   assert.ok(w.tries('tv').some(([, t]) => /earlier episode/.test(t)));
   assert.ok(w.tries('movie').every(([, t]) => !/episode|season/.test(t)));
 });
+
+test('the list opens on Auto, then the releases best first', () => {
+  const items = [rel('b', 530, 1), rel('c', 412, 2)];
+  assert.deepEqual(R.rows(items), [{ auto: true }, items[0], items[1]]);
+  assert.equal(R.releasesText('plain').auto, 'Auto: let dekho decide');
+});
+
+test('Auto plays with no release, so dekho decides; a release plays by its hash', () => {
+  const film = { id: 401, kind: 'movie' };
+  const ep = { id: 101, kind: 'tv', season: 3, episode: 4 };
+  assert.deepEqual(R.playArgs(film, { auto: true }), ['--id', '401', '--kind', 'movie']);
+  assert.deepEqual(R.playArgs(ep, { auto: true }), ['--id', '101', '--kind', 'tv', '-s', '3', '-e', '4']);
+  assert.deepEqual(R.playArgs(ep, rel('b', 530, 1)), ['--id', '101', '--kind', 'tv', '-s', '3', '-e', '4', '--release', 'b']);
+});

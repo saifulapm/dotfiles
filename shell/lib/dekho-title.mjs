@@ -1,5 +1,6 @@
 // The Title page's words and choices: which episode is next up, how a date and the watched count read, which crew to name, in each theme's voice.
 import { stars } from './dekho.mjs';
+import { continueLine } from './dekho-home.mjs';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const upper = (voice, s) => (voice === 'bracket' ? s.toUpperCase() : s);
@@ -65,6 +66,19 @@ export function sideText(voice, title) {
   return upper(voice, (title.genres || []).concat(seasons ? [seasons] : []).join(' · '));
 }
 
+// History's entry for a title still being watched: the same id and kind, not finished; else null.
+export function watching(history, title) {
+  const seen = (history || []).find((h) => h && h.id === title.id && h.kind === title.kind);
+  return seen && !seen.finished ? seen : null;
+}
+
+// The title's buttons: Play always, and Resume with what is left, as Continue watching words it, while history holds it.
+export function buttons(voice, seen) {
+  const out = [{ id: 'play', text: upper(voice, '▶ Play') }];
+  if (seen) out.push({ id: 'resume', text: upper(voice, ['▶ Resume', continueLine(voice, seen)].filter((p) => p).join(' · ')) });
+  return out;
+}
+
 // The words each board writes on the Title page.
 export function titleText(voice) {
   const caps = voice !== 'plain';
@@ -77,6 +91,6 @@ export function titleText(voice) {
     nextUp: voice === 'bracket' ? '[NEXT UP]' : caps ? 'NEXT UP' : 'next up',
     filters: upper(voice, 'f filters by these'),
     more: (n) => upper(voice, `${n > 0 ? `+ ${n} · ` : ''}tab to reach, ↵ opens a person`),
-    keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['w', 'mark watched'], ['tab', 'seasons, episodes, crew, cast'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],
+    keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['r', 'resume'], ['w', 'mark watched'], ['tab', 'buttons, seasons, episodes, crew, cast'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],
   };
 }

@@ -31,6 +31,8 @@ FocusScope {
     // The page beneath, which gets the keys back on close.
     property Item under: null
     property var items: []
+    // Auto first, once the releases are in; Auto with none to choose from would play nothing.
+    readonly property var rows: asking || items.length === 0 ? [] : R.rows(items)
     property bool asking: false
     property int row: 0
     property string asked: ""
@@ -122,10 +124,10 @@ FocusScope {
     }
 
     function stream() {
-        const r = items[row];
+        const r = rows[row];
         if (!r)
             return;
-        start(["--id", String(target.id), "--kind", target.kind].concat(tv ? ["-s", String(target.season), "-e", String(target.episode)] : [], ["--release", r.hash]));
+        start(R.playArgs(target, r));
     }
 
     function close() {
@@ -303,7 +305,7 @@ FocusScope {
                 page.close();
                 page.search();
             } else if (page.mode === "list" && (t === "j" || k === Qt.Key_Down)) {
-                page.row = Math.min(page.items.length - 1, page.row + 1);
+                page.row = Math.min(page.rows.length - 1, page.row + 1);
                 listView.reveal(page.row);
             } else if (page.mode === "list" && (t === "k" || k === Qt.Key_Up)) {
                 page.row = Math.max(0, page.row - 1);
@@ -509,7 +511,7 @@ FocusScope {
 
                         Repeater {
                             id: rowRepeater
-                            model: page.items
+                            model: page.rows
 
                             ReleaseRow {
                                 width: listColumn.width
@@ -809,6 +811,7 @@ FocusScope {
 
         required property var modelData
         required property int index
+        readonly property bool auto: modelData.auto === true
         readonly property bool cursor: page.row === index
         readonly property bool inverse: cursor && !page.plain
         readonly property color fore: inverse ? page.c.surface ?? "white" : page.c.ink ?? "black"
@@ -825,6 +828,7 @@ FocusScope {
                 audio: audioText.text,
                 audioLines: audioText.lineCount,
                 best: bestBox.visible ? bestText.text : "",
+                auto: auto,
                 cursor: cursor
             };
         }
@@ -848,7 +852,7 @@ FocusScope {
                 Text {
                     id: qualityText
                     textFormat: Text.PlainText
-                    text: D.title(rel.modelData.quality)
+                    text: rel.auto ? page.words.auto : D.title(rel.modelData.quality)
                     color: rel.cursor && page.plain ? "#2638C9" : rel.fore
                     font.family: page.bodyFont
                     font.pixelSize: page.plain ? 14 : 13
@@ -856,7 +860,8 @@ FocusScope {
                 }
                 Rectangle {
                     id: bestBox
-                    visible: rel.index === 0
+                    // The best release is the first after Auto.
+                    visible: rel.index === 1
                     implicitWidth: bestText.implicitWidth + (page.bracket ? 0 : page.plain ? 16 : 12)
                     implicitHeight: bestText.implicitHeight + (page.bracket ? 0 : page.plain ? 4 : 2)
                     radius: page.plain ? 8 : 0

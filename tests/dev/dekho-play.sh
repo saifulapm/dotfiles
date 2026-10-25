@@ -31,7 +31,7 @@ rel() { dekho_state | jq -c ".releases$1"; }
 unit_active() { systemctl --user is-active --quiet "$DOTS_DEKHO_UNIT.service"; }
 unit_inactive() { ! unit_active; }
 note_session() { rel .session | jq -r . >>"$sessions"; }
-listed() { dekho_is '.releases.mode == "list" and (.releases.rows | length) == 5'; }
+listed() { dekho_is '.releases.mode == "list" and (.releases.rows | length) == 6'; }
 started() { dekho_is '.releases.mode == "starting" and (.releases.starting.steps | length) > 0'; }
 buffering() { dekho_is '.releases.mode == "starting" and .releases.starting.down != ""'; }
 # The fake's play opens dev/fake-mpv.qml, a window with mpv's app id, about 1.5 s after playing.
@@ -70,18 +70,22 @@ until_ok 3000 listed
 check "Enter on next up, S3 E4, draws the release list over the title page ($(dekho_state | jq -c '[.page, .releases.mode, .releases.header, .releases.heading, .releases.count]'))" \
   dekho_is '.page == "title" and .releases.shown and .releases.header == "RELEASE" and .releases.heading == "The Long Tide · S3 E4 · Quay Nine" and .releases.count == "5 releases" and .chose == {"season": 3, "episode": 4}'
 check "the fake heard the releases call for S3 E4" grep -qx 'api releases --id 101 --kind tv -s 3 -e 4' "$fake_log"
-check "the rows draw best first, by seeders then size, with quality, size, seeders and audio ($(rel '.rows | map([.quality, .size, .seeders, .audio])'))" \
-  dekho_is '[.releases.rows[] | [.quality, .size, .seeders, .audio]] == [["720p", "1.1 GB", "530", "EN 2.0"], ["1080p", "2.1 GB", "412", "EN 5.1"], ["720p", "614 MB", "412", ""], ["2160p", "12.4 GB", "88", "EN 5.1"], ["1080p", "8.4 GB", "37", "EN 5.1 ES 2.0"]]'
-check "the cursor is on the best, the only row tagged ($(rel '.rows | map([.best, .cursor])'))" \
-  dekho_is '.releases.cursor == 0 and [.releases.rows[] | .best] == ["BEST", "", "", "", ""] and .releases.rows[0].cursor'
-check "a release name and audio with a newline, U+202E and ESC draw on one line without them ($(rel '.rows[4] | [.name, .lines, .audio]'))" \
-  dekho_is '.releases.rows[4] | .lines == 1 and .audioLines == 1 and (.name | test("[\n‮\u001b]") | not) and (.audio | test("[\n‮]") | not)'
-check "a 300-character release name draws on one elided line ($(rel '.rows[2] | [.lines, .truncated]'))" \
-  dekho_is '.releases.rows[2] | .lines == 1 and .truncated'
+check "the first row reads Auto: let dekho decide, and nothing else ($(rel '.rows[0]'))" \
+  dekho_is '.releases.rows[0] | .auto and .quality == "Auto: let dekho decide" and .name == "" and .size == "" and .seeders == "" and .audio == ""'
+check "the rows after it draw best first, by seeders then size, with quality, size, seeders and audio ($(rel '.rows[1:] | map([.quality, .size, .seeders, .audio])'))" \
+  dekho_is '[.releases.rows[1:][] | [.quality, .size, .seeders, .audio]] == [["720p", "1.1 GB", "530", "EN 2.0"], ["1080p", "2.1 GB", "412", "EN 5.1"], ["720p", "614 MB", "412", ""], ["2160p", "12.4 GB", "88", "EN 5.1"], ["1080p", "8.4 GB", "37", "EN 5.1 ES 2.0"]]'
+check "the cursor is on Auto, and the best, the first release, is the only row tagged ($(rel '.rows | map([.best, .cursor])'))" \
+  dekho_is '.releases.cursor == 0 and [.releases.rows[] | .best] == ["", "BEST", "", "", "", ""] and .releases.rows[0].cursor'
+check "a release name and audio with a newline, U+202E and ESC draw on one line without them ($(rel '.rows[5] | [.name, .lines, .audio]'))" \
+  dekho_is '.releases.rows[5] | .lines == 1 and .audioLines == 1 and (.name | test("[\n‮\u001b]") | not) and (.audio | test("[\n‮]") | not)'
+check "a 300-character release name draws on one elided line ($(rel '.rows[3] | [.lines, .truncated]'))" \
+  dekho_is '.releases.rows[3] | .lines == 1 and .truncated'
 check "paper: the cursor row inverts in ink and the card casts Paper's hard shadow ($(rel '.look | [.cursorFill, .ink, .shadow]'))" \
   dekho_is '.releases.look | (.cursorFill | ascii_downcase) == (.ink | ascii_downcase) and .shadow and .chamfer == false'
 
 check "no mpv window is up before the play ($(mpv_windows))" no_mpv
+wtype j
+until_ok 1000 dekho_is '.releases.cursor == 1 and .releases.rows[1].cursor'
 wtype -k Return
 until_ok 3000 unit_active
 note_session
@@ -128,7 +132,8 @@ refocus
 
 # A play that fails before it plays: the fake answers an error event and exit 1 with the text in this file.
 failing=$DOTS_DEV_DIR/dekho-play-fails
-play_line='play --json --id 101 --kind tv -s 3 -e 4 --release b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2'
+# Enter as the list opens is on Auto, which names no release.
+play_line='play --json --id 101 --kind tv -s 3 -e 4'
 plays() { grep -cx "$play_line" "$fake_log"; }
 failed() { dekho_is '.releases.mode == "starting" and .releases.starting.fail.shown'; }
 fail_fills() { dekho_is --arg t "$1" '.releases.starting.fail.text == $t and .releases.starting.fail.lines == 1'; }
@@ -241,7 +246,7 @@ board() {
   until_ok 3000 dekho_is --arg v "$2" '.voice == $v'
   wtype -k Return
   until_ok 3000 listed
-  check "$1: $3 ($(rel .look) $(rel '.rows[0].best'))" dekho_is "$4"
+  check "$1: $3 ($(rel .look) $(rel '.rows[1].best'))" dekho_is "$4"
   wtype -k Return
   until_ok 4000 buffering
   note_session
@@ -251,11 +256,11 @@ board() {
   until_ok 1000 dekho_is '.releases.mode == ""'
 }
 board artboard plain "the card is rounded 14 px, the cursor row 10 px, and best is written small, as the Artboard board draws them" \
-  '.releases.look.cardRadius == 14 and .releases.look.cursorRadius == 10 and .releases.rows[0].best == "best" and .releases.header == "Release"' \
+  '.releases.look.cardRadius == 14 and .releases.look.cursorRadius == 10 and .releases.rows[1].best == "best" and .releases.header == "Release"' \
   "the step marks are circles and the bar is rounded 4 px, as the Artboard board draws them" \
   '.releases.look.markRadius == 8 and .releases.look.barRadius == 4'
 board blueprint bracket "the card's corners are cut and best reads [BEST], as the Blueprint board draws them" \
-  '.releases.look.chamfer and .releases.look.shadow == false and .releases.rows[0].best == "[BEST]" and .releases.count == "5 RELEASES"' \
+  '.releases.look.chamfer and .releases.look.shadow == false and .releases.rows[1].best == "[BEST]" and .releases.count == "5 RELEASES"' \
   "Starting writes its numbers in capitals, BUFFERING and MB/S DOWN, as the Blueprint board writes them" \
   '(.releases.starting.percent | test("^BUFFERING [0-9]+%$")) and (.releases.starting.down | test("^[0-9.]+ MB/S DOWN$")) and .releases.header == "STARTING"'
 

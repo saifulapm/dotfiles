@@ -7,6 +7,15 @@ export function rank(items) {
   return items.slice().sort((a, b) => (b.seeders ?? -1) - (a.seeders ?? -1) || (b.size_bytes ?? -1) - (a.size_bytes ?? -1));
 }
 
+// The list's rows: Auto first, which lets dekho pick, then the releases as given.
+export const rows = (items) => [{ auto: true }].concat(items);
+
+// What a row plays: Auto names no release, so dekho decides; a release is played by its hash.
+export function playArgs(target, row) {
+  const args = ['--id', String(target.id), '--kind', target.kind].concat(target.kind === 'tv' ? ['-s', String(target.season), '-e', String(target.episode)] : []);
+  return row.auto ? args : args.concat(['--release', row.hash]);
+}
+
 // 1024-based like the backend's format_bytes: whole numbers from 10 up, one decimal below.
 const unitOf = (n) => {
   let i = 0;
@@ -79,6 +88,7 @@ export function releasesText(voice) {
     count: (n) => up(`${n} release${n === 1 ? '' : 's'}`),
     columns: (caps ? ['QUALITY', 'SIZE', 'SEEDERS', 'AUDIO'] : ['Quality', 'Size', 'Seeders', 'Audio']),
     best: voice === 'bracket' ? '[BEST]' : caps ? 'BEST' : 'best',
+    auto: 'Auto: let dekho decide',
     up,
     keys: [['↵', 'stream'], ['j/k', 'move'], ['esc', 'back']],
     startKeys: [['esc', 'cancel and stop the download']],

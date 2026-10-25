@@ -39,6 +39,10 @@ FocusScope {
     property var chose: null
     property var person: null
     property var filter: null
+    // History's entry for this title while it is still being watched, else null; it adds Resume.
+    property var seen: null
+    property int button: 0
+    readonly property var buttons: T.buttons(voice, seen)
 
     readonly property var shown: detail || entry
     readonly property bool tv: shown.kind === "tv"
@@ -55,11 +59,13 @@ FocusScope {
     readonly property var cast: detail && Array.isArray(detail.cast) ? detail.cast : []
     // The board shows three cast names; the cursor slides that window along the rest.
     readonly property int castStart: Math.max(0, Math.min(cast.length - 3, castCol - 2))
-    readonly property var zones: (tv ? ["seasons", "episodes"] : []).concat(crew.length ? ["crew"] : [], cast.length ? ["cast"] : [])
+    readonly property var zones: ["buttons"].concat(tv ? ["seasons", "episodes"] : [], crew.length ? ["crew"] : [], cast.length ? ["cast"] : [])
 
     signal search
     // Enter chose an episode, or the movie: the release list opens over this page.
     signal release(var target)
+    // Resume plays history's entry where it stopped, with no list.
+    signal resume(var item)
 
     // The router keeps one Title page, so a title opened from a person's credits replaces this one; it keeps what was drawn and where the cursor was, to come back to.
     function snapshot() {
@@ -73,7 +79,9 @@ FocusScope {
             crewCol: crewCol,
             castCol: castCol,
             posterKnown: posterKnown,
-            today: today
+            today: today,
+            seen: seen,
+            button: button
         };
     }
 
@@ -89,6 +97,8 @@ FocusScope {
         castCol = s.castCol;
         posterKnown = s.posterKnown;
         today = s.today;
+        seen = s.seen;
+        button = s.button;
     }
 
     function load(h) {
@@ -102,6 +112,8 @@ FocusScope {
         crewCol = 0;
         castCol = 0;
         posterKnown = false;
+        seen = null;
+        button = 0;
         chose = null;
         person = null;
         filter = null;
@@ -121,6 +133,10 @@ FocusScope {
             });
             page.dekho.prefetch("w185", page.crew.concat(page.cast).map(p => p.profile));
             page.loadSeasons(key, page.seasonNumbers);
+        });
+        dekho.api(["api", "history", "--limit", "20"], answer => {
+            if (page.asked === key && answer)
+                page.seen = T.watching(answer.items, h);
         });
     }
 
@@ -169,8 +185,22 @@ FocusScope {
     }
 
     function choose() {
+        if (zone === "buttons")
+            press(buttons[button].id);
+        else if (zone === "episodes" || (!tv && zone === ""))
+            play();
+        else if (zone === "crew" && crew[crewCol])
+            openPerson(crew[crewCol]);
+        else if (zone === "cast" && cast[castCol])
+            openPerson(cast[castCol]);
+        else if (zone === "seasons")
+            zone = "episodes";
+    }
+
+    // Play opens the release list: a series' for the episode under the cursor, once it has aired.
+    function play() {
         const ep = items[row];
-        if (zone === "episodes" && ep && T.aired(ep, today)) {
+        if (tv && ep && T.aired(ep, today)) {
             chose = {
                 season: ep.season,
                 episode: ep.episode
@@ -184,7 +214,7 @@ FocusScope {
                 name: ep.name,
                 air_date: ep.air_date
             });
-        } else if (!tv && zone === "") {
+        } else if (!tv) {
             chose = {
                 season: null,
                 episode: null
@@ -194,12 +224,25 @@ FocusScope {
                 kind: shown.kind,
                 title: shown.title
             });
-        } else if (zone === "crew" && crew[crewCol])
-            openPerson(crew[crewCol]);
-        else if (zone === "cast" && cast[castCol])
-            openPerson(cast[castCol]);
-        else if (zone === "seasons")
-            zone = "episodes";
+        }
+    }
+
+    function resumeSeen() {
+        if (!seen)
+            return;
+        chose = {
+            resume: true
+        };
+        resume(Object.assign({}, seen, {
+            title: shown.title
+        }));
+    }
+
+    function press(id) {
+        if (id === "play")
+            play();
+        else if (id === "resume")
+            resumeSeen();
     }
 
     function openPerson(p) {
@@ -258,6 +301,8 @@ FocusScope {
                     truncated: overviewText.truncated,
                     maxLines: overviewText.maximumLineCount
                 },
+                buttons: drawnList(buttonRow),
+                keys: drawnList(keyRow),
                 crew: drawnList(crewRow),
                 cast: drawnList(castRow),
                 more: moreText.text,
@@ -308,12 +353,18 @@ FocusScope {
                 page.moveRow(1);
             else if (t === "k" || k === Qt.Key_Up)
                 page.moveRow(-1);
+            else if ((t === "l" || k === Qt.Key_Right) && page.zone === "buttons")
+                page.button = Math.min(page.buttons.length - 1, page.button + 1);
+            else if ((t === "h" || k === Qt.Key_Left) && page.zone === "buttons")
+                page.button = Math.max(0, page.button - 1);
             else if (t === "l" || k === Qt.Key_Right)
                 page.zone === "crew" || page.zone === "cast" ? page.moveCol(1) : page.moveSeason(1);
             else if (t === "h" || k === Qt.Key_Left)
                 page.zone === "crew" || page.zone === "cast" ? page.moveCol(-1) : page.moveSeason(-1);
             else if (k === Qt.Key_Return || k === Qt.Key_Enter)
                 page.choose();
+            else if (t === "r")
+                page.resumeSeen();
             else if (t === "w")
                 page.toggleWatched();
             else if (t === "f") {
@@ -540,6 +591,56 @@ FocusScope {
                         font.letterSpacing: bracket ? 0.7 : 0
                         elide: Text.ElideRight
                         maximumLineCount: 1
+                    }
+                }
+
+                // Play, Resume while history holds the title: buttons as the chips are drawn, the focused one as the release list draws its cursor.
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Repeater {
+                        id: buttonRow
+                        model: page.buttons
+
+                        Rectangle {
+                            required property var modelData
+                            required property int index
+                            readonly property bool focused: page.zone === "buttons" && page.button === index
+                            readonly property bool inverse: focused && !page.plain
+                            function drawn() {
+                                return {
+                                    kind: modelData.id,
+                                    text: buttonText.text,
+                                    lines: buttonText.lineCount,
+                                    focused: focused,
+                                    radius: radius,
+                                    fill: String(color)
+                                };
+                            }
+                            implicitWidth: buttonText.implicitWidth + 24
+                            implicitHeight: buttonText.implicitHeight + (page.plain ? 10 : 8)
+                            radius: page.plain ? 8 : 0
+                            color: focused ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : page.plain ? page.look.tile.fill : "transparent"
+                            border.width: focused && page.plain ? 1.5 : page.plain ? 0 : 1
+                            border.color: (page.plain ? page.c.accent : page.bracket ? page.c.line : page.c.ink) ?? "gray"
+
+                            Text {
+                                id: buttonText
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: D.title(modelData.text)
+                                color: (parent.inverse ? page.c.surface : page.c.ink) ?? "black"
+                                font.family: page.bodyFont
+                                font.pixelSize: page.plain ? 13 : 12
+                                font.weight: Font.Medium
+                                font.letterSpacing: page.bracket ? 0.7 : 0
+                                maximumLineCount: 1
+                            }
+                        }
+                    }
+                    Item {
+                        Layout.fillWidth: true
                     }
                 }
 
@@ -804,10 +905,14 @@ FocusScope {
             spacing: plain ? 8 : 16
 
             Repeater {
+                id: keyRow
                 model: page.look.keys(page.words.keys)
 
                 Rectangle {
                     required property var modelData
+                    function drawn() {
+                        return [modelData.key, modelData.word];
+                    }
                     implicitWidth: keyPair.implicitWidth + (page.plain ? 14 : 0)
                     implicitHeight: keyPair.implicitHeight + (page.plain ? 6 : 0)
                     radius: 6

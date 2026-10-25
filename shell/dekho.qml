@@ -260,6 +260,9 @@ ShellRoot {
             function onRelease(t) {
                 releases.choose(t, titlePage);
             }
+            function onResume(item) {
+                releases.resume(item, titlePage);
+            }
         }
         Connections {
             target: home

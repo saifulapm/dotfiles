@@ -91,3 +91,29 @@ test('an episode with no air date can be opened and be next up, and draws no dat
   assert.equal(T.nextUp(items, '2026-10-24'), 0);
   assert.equal(T.dateText('caps', null, '2026-10-24'), '');
 });
+
+const seen = [
+  { id: 101, kind: 'tv', season: 3, episode: 4, position: 1260, duration: 3120, finished: false },
+  { id: 202, kind: 'movie', position: 4320, duration: 6720, finished: false },
+  { id: 205, kind: 'movie', position: 6700, duration: 6720, finished: true },
+];
+
+test("a title is being watched when history holds it by id and kind and it is not finished", () => {
+  assert.equal(T.watching(seen, { id: 202, kind: 'movie' }), seen[1]);
+  assert.equal(T.watching(seen, { id: 202, kind: 'tv' }), null);
+  assert.equal(T.watching(seen, { id: 205, kind: 'movie' }), null);
+  assert.equal(T.watching(null, { id: 101, kind: 'tv' }), null);
+});
+
+test('Play always shows; Resume joins it with the time left as Continue watching words it', () => {
+  assert.deepEqual(T.buttons('plain', null), [{ id: 'play', text: '▶ Play' }]);
+  assert.deepEqual(T.buttons('caps', seen[1]), [{ id: 'play', text: '▶ Play' }, { id: 'resume', text: '▶ Resume · 1h 52 · 40 min left' }]);
+  assert.deepEqual(T.buttons('plain', seen[0]).map((b) => b.text), ['▶ Play', '▶ Resume · S3 E4 · 31 min left']);
+  assert.deepEqual(T.buttons('bracket', seen[0]).map((b) => b.text), ['▶ PLAY', '▶ RESUME · S3 E4 · 31 MIN LEFT']);
+});
+
+test('the footer names r for resume and tab reaches the buttons', () => {
+  const keys = T.titleText('plain').keys;
+  assert.ok(keys.some(([k, w]) => k === 'r' && w === 'resume'));
+  assert.ok(keys.some(([k, w]) => k === 'tab' && w.startsWith('buttons')));
+});
