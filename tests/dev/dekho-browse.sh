@@ -36,6 +36,20 @@ answer_for() {
     console.log(JSON.stringify(lines.map((l) => JSON.parse(l).items.map((h) => oneLine(h.title)))));
   ' "$repo/shell/lib/picker.mjs"
 }
+# Every hit of those calls as [title, poster path, the file a row draws for it]; a null path, or a gone one the fake answers as a 404, draws no file.
+hits_for() {
+  local args
+  while read -r args; do
+    # shellcheck disable=SC2086
+    DOTS_DEV_DIR=$work "$repo/bin/dev-fake-dekho" $args
+  done | node --input-type=module -e '
+    import { readFileSync } from "node:fs";
+    const { oneLine } = await import(process.argv[1]);
+    const lines = readFileSync(0, "utf8").split("\n").filter((l) => l);
+    const file = (p) => (p && !p.startsWith("/gone") ? p.slice(1) : "");
+    console.log(JSON.stringify(lines.flatMap((l) => JSON.parse(l).items.map((h) => [oneLine(h.title), h.poster, file(h.poster)]))));
+  ' "$repo/shell/lib/picker.mjs"
+}
 # One call's rows drawn in the fake's order; two calls' rows are both answers' titles, in the order the sort merges them.
 drawn_matches() {
   local answers
@@ -51,8 +65,18 @@ press() {
   until_ok 3000 drawn_matches "$mark"
 }
 asked() { asked_since "$mark" | tr '\n' ';'; }
+# Every row draws the file of its own hit in those calls' answers, whatever order the rows are in.
+own_posters() {
+  local hits
+  hits=$(asked_since "$1" | hits_for)
+  [ -n "$hits" ] && dekho_state | jq -e --argjson h "$hits" '[.browse.rows[] | [.title, .poster.file]] | sort == ($h | map([.[0], .[2]]) | sort)' >/dev/null
+}
+# The poster paths those calls' answers carry, and the paths the prefetch calls since the log had $1 lines asked for.
+hit_paths() { asked_since "$1" | hits_for | jq -c '[.[] | .[1] | select(. != null)] | sort'; }
+prefetched_since() { tail -n +"$(($1 + 1))" "$calls" | grep '^api prefetch '; }
+prefetched_paths() { prefetched_since "$1" | tr ' ' '\n' | grep '^/' | jq -R . | jq -sc 'sort'; }
 # The checks run their conditions in bash -c, which needs these.
-export -f asked_since answer_for drawn_matches dekho_state titles chips
+export -f asked_since answer_for hits_for hit_paths prefetched_since prefetched_paths own_posters drawn_matches dekho_state titles chips
 export calls work repo dekho_qml
 
 no_code() { dekho_is '[.browse.chips[].text, (.browse.rows[] | .title, .year, .rating)] | all(test("^[a-z]{2}$") or test("^[A-Z]{2}$") | not)'; }
@@ -65,17 +89,26 @@ until_ok 3000 dekho_is '(.rows.series | length) == 10'
 # From Home: nothing chosen, both kinds by popularity.
 mark=$(wc -l <"$calls")
 wtype f
-until_ok 3000 dekho_is '.page == "browse" and (.browse.rows | length) == 27'
+until_ok 3000 dekho_is '.page == "browse" and (.browse.rows | length) == 34'
 check "f on Home opens Browse with no chip and nothing prefilled ($(dekho_state | jq -c '.browse | [.chips, .from, .prefilled]'))" \
   dekho_is '.page == "browse" and .browse.chips == [] and .browse.prefilled == "" and .browse.from == "from home"'
-check "it asks both kinds unfiltered ($(asked)) and draws all 27, a movie then a series ($(titles | jq -c '.[0:4]'))" \
+check "it asks both kinds unfiltered ($(asked)) and draws all 34, a movie then a series ($(titles | jq -c '.[0:4]'))" \
   bash -c "asked_since $mark | sort | tr '\n' ';' | grep -qx 'api discover --kind movie;api discover --kind tv;' && [ \"\$(titles | jq -c '.[0:4]')\" = '[\"A Quiet Verdict\",\"Harbour Lights\",\"Seven Stations\",\"The Long Tide\"]' ]"
 check "a title with a newline, U+202E and ESC draws on one line without them ($(dekho_state | jq -c '[.browse.rows[] | select(.title | test("Radio"))][0]'))" \
   dekho_is '[.browse.rows[] | select(.title | test("Radio"))][0] | .title == "Low Tide Radio" and .lines == 1'
 check "the 308-character title draws on one elided line ($(dekho_state | jq -c '[.browse.rows[] | select(.title | test("^The Very")) | {lines, elided}]'))" \
   dekho_is '[.browse.rows[] | select(.title | test("^The Very"))][0] | .lines == 1 and .elided'
-check "the summary reads All · Popular and the count 27 titles ($(dekho_state | jq -c '[.browse.summary, .browse.count]'))" \
-  dekho_is '.browse.summary == "All · Popular" and .browse.count == "27 titles"'
+check "the summary reads All · Popular and the count 34 titles ($(dekho_state | jq -c '[.browse.summary, .browse.count]'))" \
+  dekho_is '.browse.summary == "All · Popular" and .browse.count == "34 titles"'
+until_ok 3000 own_posters "$mark"
+check "each row whose poster the fake holds draws its own title's within 3 s ($(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown)] | length') of 34)" \
+  own_posters "$mark"
+check "a null poster and a gone one keep the empty mark ($(dekho_state | jq -c '[.browse.rows[] | select(.title | test("^(Salt Road|The Weather House|Lantern Season|North of Rain)$")) | [.title, .poster.shown, .poster.file]]'))" \
+  dekho_is '([.browse.rows[] | select(.poster.shown | not) | .title] | sort) == ["Lantern Season", "North of Rain", "Salt Road", "The Weather House"]'
+check "it asks prefetch once for the page's posters, all at w342 ($(prefetched_since "$mark" | cut -c1-60))" \
+  bash -c "[ \$(tail -n +$((mark + 1)) '$calls' | grep -c '^api prefetch ') = 1 ] && tail -n +$((mark + 1)) '$calls' | grep -q '^api prefetch --size w342 /d' && [ \"\$(prefetched_paths $mark)\" = \"\$(hit_paths $mark)\" ]"
+check "a poster decodes at no more than twice its drawn 24 x 34 ($(dekho_state | jq -c '.browse.rows[0].poster'))" \
+  dekho_is '[.browse.rows[] | select(.poster.shown) | .poster] | length == 30 and all(.width == 24 and .height == 34 and .decodedWidth > 0 and .decodedWidth <= 2 * .width and .decodedHeight <= 2 * .height + 4)'
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 check "esc on Browse goes back to Home ($(dekho_state | jq -c .page))" dekho_is '.page == "home" and .focus.row != "search"'
@@ -107,12 +140,19 @@ step() {
   check "$key asks $(asked) and the rows redraw from the fake's answer ($(titles | jq -c '.[0:3]'), was $(jq -c '.[0:3]' <<<"$before"))" \
     bash -c "[ \"\$(asked_since $mark | sort | tr '\n' ';')\" = '$want' ] && drawn_matches $mark && [ '$before' != \"\$(titles)\" ] && [ \"\$(titles)\" != '[]' ]"
   check "  and the chips read $chips_want ($(chips))" bash -c "[ \"\$(chips)\" = '$chips_want' ]"
+  until_ok 3000 own_posters "$mark"
+  check "  and every row's poster file is its own hit's ($(dekho_state | jq -c '[.browse.rows[] | .poster.file]'))" own_posters "$mark"
 }
 step s 1 'api discover --kind tv --sort top-rated --genre 18 --lang en;' '["Series","Drama","English"]'
 check "s reads Top rated in its box and the summary ($(dekho_state | jq -c '[.browse.facets[0].value, .browse.summary]'))" \
   dekho_is '.browse.facets[0].value == "Top rated" and .browse.summary == "Series · Top rated · Drama · English"'
 step g 1 'api discover --kind tv --sort top-rated --genre 10751 --lang en;' '["Series","Family","English"]'
+old_files=$(dekho_state | jq -c '[.browse.rows[].poster.file]')
 step l 1 'api discover --kind tv --sort top-rated --genre 10751 --lang sv;' '["Series","Family","Swedish"]'
+check "  the Swedish family series share no poster file with the English ones before them ($old_files, now $(dekho_state | jq -c '[.browse.rows[].poster.file]'))" \
+  dekho_is --argjson old "$old_files" '[.browse.rows[].poster.file] as $now | ($now | length) > 0 and all($now[]; . as $f | $f != "" and ($old | index($f) | not))'
+check "  and no prefetch was asked, their posters being on disk already from the unfiltered page" \
+  test -z "$(prefetched_since "$mark")"
 step d 1 'api discover --kind tv --sort top-rated --genre 10751 --lang sv --year 1970-1979;' '["Series","Family","Swedish","1970s"]'
 step r 1 'api discover --kind tv --sort top-rated --genre 10751 --lang sv --year 1970-1979 --min-rating 6;' '["Series","Family","Swedish","1970s","★ 6+"]'
 step t 2 'api discover --kind movie --sort top-rated --genre 10751 --lang sv --year 1970-1979 --min-rating 6;api discover --kind tv --sort top-rated --genre 10751 --lang sv --year 1970-1979 --min-rating 6;' '["Family","Swedish","1970s","★ 6+"]'
@@ -140,7 +180,7 @@ check "no chip or row reads a two-letter code" no_code
 
 mark=$(wc -l <"$calls")
 wtype x
-until_ok 3000 dekho_is '(.browse.rows | length) == 27'
+until_ok 3000 dekho_is '(.browse.rows | length) == 34'
 check "x clears every chip and the prefilled mark ($(chips))" dekho_is '.browse.chips == [] and .browse.prefilled == "" and .browse.summary == "All · Popular"'
 check "and the rows are the unfiltered set again ($(asked); $(titles | jq -c '.[0:4]'))" \
   bash -c "[ \"\$(asked_since $mark | sort | tr '\n' ';')\" = 'api discover --kind movie;api discover --kind tv;' ] && drawn_matches $mark && [ \"\$(titles | jq -c '.[0:4]')\" = '[\"A Quiet Verdict\",\"Harbour Lights\",\"Seven Stations\",\"The Long Tide\"]' ]"
@@ -154,14 +194,23 @@ wtype f
 until_ok 3000 dekho_is '.page == "browse" and (.browse.chips | length) == 3 and (.browse.rows | length) > 0'
 check "paper: Browse is set in Instrument Serif and the chips filled #F3E6CF, as the Paper board draws them ($(dekho_state | jq -c '.browse.look'))" \
   dekho_is '.browse.look.pageFont == "Instrument Serif" and (.browse.look.chipFill | ascii_downcase) == "#f3e6cf" and .browse.look.chipRadius == 0'
+until_ok 3000 dekho_is '[.browse.rows[] | select(.poster.shown)] | length == 7'
+check "paper: the poster fills its hatched place square, and a null or gone one keeps the hatch ($(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown) | .poster | [.radius, .width, .height]] | unique'), unshown $(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown | not) | .title]'))" \
+  dekho_is '([.browse.rows[] | select(.poster.shown) | .poster] | all(.radius == 0 and .width == 24 and .height == 34)) and ([.browse.rows[] | select(.poster.shown | not) | .title] | sort) == ["Salt Road", "The Weather House"]'
 in_theme artboard
 until_ok 3000 dekho_is '.voice == "plain"'
 check "artboard: chips are rounded 13 px on #EEF1FF and kind tabs 10 px, as the Artboard board draws them ($(dekho_state | jq -c '.browse.look'))" \
   dekho_is '.browse.look.chipRadius == 13 and (.browse.look.chipFill | ascii_downcase) == "#eef1ff" and .browse.look.kindRadius == 10 and .browse.prefilled == "prefilled from The Long Tide" and .browse.kinds[2].text == "Series"'
+until_ok 3000 dekho_is '[.browse.rows[] | select(.poster.shown)] | length == 7'
+check "artboard: the poster is masked to its grey tile's 6 px corners, and a null or gone one keeps the tile ($(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown) | .poster | [.radius, .width, .height]] | unique'), unshown $(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown | not) | .title]'))" \
+  dekho_is '([.browse.rows[] | select(.poster.shown) | .poster] | all(.radius == 6 and .width == 24 and .height == 34)) and ([.browse.rows[] | select(.poster.shown | not) | .title] | sort) == ["Salt Road", "The Weather House"]'
 in_theme blueprint
 until_ok 3000 dekho_is '.voice == "bracket"'
 check "blueprint: the header and the prefilled mark are capitals in brackets, kinds in capitals, rules dashed, as the Blueprint board writes them ($(dekho_state | jq -c '.browse | [.from, .prefilled, [.kinds[].text], .look.ruleDashed]'))" \
   dekho_is '.browse.from == "FROM THE LONG TIDE" and .browse.prefilled == "[PREFILLED FROM THE LONG TIDE]" and [.browse.kinds[].text] == ["ALL", "MOVIES", "SERIES"] and .browse.look.ruleDashed and .browse.count == "9 TITLES"'
+until_ok 3000 dekho_is '[.browse.rows[] | select(.poster.shown)] | length == 7'
+check "blueprint: the poster fills its crossed box square, and a null or gone one keeps the cross ($(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown) | .poster | [.radius, .width, .height]] | unique'), unshown $(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown | not) | .title]'))" \
+  dekho_is '([.browse.rows[] | select(.poster.shown) | .poster] | all(.radius == 0 and .width == 24 and .height == 34)) and ([.browse.rows[] | select(.poster.shown | not) | .title] | sort) == ["Salt Road", "The Weather House"]'
 in_theme paper
 until_ok 3000 dekho_is '.voice == "caps"'
 

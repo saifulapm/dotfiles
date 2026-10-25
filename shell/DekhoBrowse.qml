@@ -96,8 +96,10 @@ FocusScope {
                 if (page.asked !== n)
                     return;
                 answers[i] = answer && Array.isArray(answer.items) ? answer.items : [];
-                if (--left === 0)
-                    page.results = B.merge(answers, sort);
+                if (--left > 0)
+                    return;
+                page.results = B.merge(answers, sort);
+                page.dekho.prefetch("w342", page.results.map(h => h.poster));
             });
         });
     }
@@ -628,6 +630,7 @@ FocusScope {
                                     lines: rowCells.lines(1),
                                     elided: rowCells.elided(1),
                                     cursor: cursor,
+                                    poster: rowCells.picture(),
                                     shown: at.y >= -0.5 && at.y + resultRow.height <= resultView.height + 0.5
                                 };
                             }
@@ -641,6 +644,7 @@ FocusScope {
                             Columns {
                                 id: rowCells
                                 anchors.fill: parent
+                                path: resultRow.modelData.poster
                                 inverse: resultRow.cursor && !page.plain
                                 lit: resultRow.cursor && page.plain
                                 cells: [D.title(resultRow.modelData.title), String(resultRow.modelData.year || ""), D.stars(resultRow.modelData.vote)].concat(page.words.hitCells(resultRow.modelData))
@@ -860,11 +864,16 @@ FocusScope {
     component Columns: Item {
         id: columns
         property var cells: []
+        // The poster's path in the hit this row draws; the column heads have none.
+        property var path: null
         property bool head: false
         property bool inverse: false
         property bool lit: false
         readonly property color soft: inverse ? page.onInk : page.c.muted ?? "gray"
 
+        function picture() {
+            return poster.drawn();
+        }
         function text(i) {
             return [null, titleCell, yearCell, ratingCell, languageCell, genresCell][i].text;
         }
@@ -908,6 +917,14 @@ FocusScope {
                                 path: "M6 0L0 6M12 0L0 12M18 0L0 18M24 0L0 24M24 6L0 30M24 12L0 36M24 18L4 38M24 24L10 38M24 30L16 38"
                             }
                         }
+                    }
+                    DekhoPicture {
+                        id: poster
+                        anchors.fill: parent
+                        dekho: page.dekho
+                        size: "w342"
+                        path: columns.path
+                        radius: parent.radius
                     }
                 }
             }
