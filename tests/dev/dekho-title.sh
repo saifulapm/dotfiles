@@ -85,8 +85,8 @@ check "each cast chip draws its own person's face ($(dekho_state | jq -c '[.titl
 until_ok 3000 dekho_is '.title.episodes[0].still.shown and .title.episodes[7].still.shown'
 check "each episode row draws its still at 40x22, a null and a gone still keep the mark ($(dekho_state | jq -c '[.title.episodes[0:4][].still | [.shown, .file]]'))" \
   dekho_is '[.title.episodes[0:4][].still | [.shown, .file, .width, .height]] == [[true, "s101-3-1.jpg", 40, 22], [false, "", 40, 22], [false, "", 40, 22], [true, "s101-3-4.jpg", 40, 22]]'
-check "a still decodes at no more than twice its drawn size ($(dekho_state | jq -c .title.episodes[0].still))" \
-  dekho_is '.title.episodes[0].still | .decodedWidth > 0 and .decodedWidth <= 2 * .width and .decodedHeight > 0 and .decodedHeight <= 2 * .height + 2'
+check "the slot's poster, each face and each still decode at no more than twice their drawn size on the side that fills the place ($(dekho_state | jq -c '[.title.slot, .title.cast[0].face, .title.episodes[0].still] | map([.width, .height, .decodedWidth, .decodedHeight])'))" \
+  dekho_is '[.title.slot, (.title.crew[], .title.cast[] | .face), (.title.episodes[] | .still) | select(.shown)] | length >= 6 and all(.decodedWidth > 0 and .decodedHeight > 0 and (([.decodedWidth / .width, .decodedHeight / .height] | min) <= 2))'
 
 wtype j
 until_ok 1000 dekho_is '.title.cursor == 5'

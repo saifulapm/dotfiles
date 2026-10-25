@@ -65,7 +65,7 @@ check "each credit with a poster the fake holds draws its own in the 18 x 27 pla
 check "a null poster (Seven Stations) and a gone one (A Quiet Verdict) keep the empty mark ($(dekho_state | jq -c '[.personPage.lines[] | select(.head | not) | select(.poster.shown | not) | [.title, .poster.shown]]'))" \
   dekho_is '[.personPage.lines[] | select(.head | not) | select(.poster.shown | not) | .title] == ["Seven Stations", "A Quiet Verdict"]'
 check "a credit poster decodes at no more than twice its drawn 18 x 27 ($(dekho_state | jq -c '.personPage.lines[1].poster'))" \
-  dekho_is '[.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | length == 6 and all(.decodedWidth > 0 and .decodedWidth <= 36 and .decodedHeight <= 56)'
+  dekho_is '[.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | length == 6 and all(.decodedWidth > 0 and .decodedHeight > 0 and (([.decodedWidth / .width, .decodedHeight / .height] | min) <= 2))'
 check "all the credits' posters came from one prefetch call, each path once, the gone one asked and left out" \
   bash -c "[ \$(grep -c '/c101.jpg' '$calls') = 1 ] && grep -qx 'api prefetch --size w342 /c101.jpg /c102.jpg /gone104.jpg /c105.jpg /c106.jpg' '$calls'"
 in_theme artboard

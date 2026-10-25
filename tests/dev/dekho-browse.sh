@@ -108,7 +108,7 @@ check "a null poster and a gone one keep the empty mark ($(dekho_state | jq -c '
 check "it asks prefetch once for the page's posters, all at w342 ($(prefetched_since "$mark" | cut -c1-60))" \
   bash -c "[ \$(tail -n +$((mark + 1)) '$calls' | grep -c '^api prefetch ') = 1 ] && tail -n +$((mark + 1)) '$calls' | grep -q '^api prefetch --size w342 /d' && [ \"\$(prefetched_paths $mark)\" = \"\$(hit_paths $mark)\" ]"
 check "a poster decodes at no more than twice its drawn 24 x 34 ($(dekho_state | jq -c '.browse.rows[0].poster'))" \
-  dekho_is '[.browse.rows[] | select(.poster.shown) | .poster] | length == 30 and all(.width == 24 and .height == 34 and .decodedWidth > 0 and .decodedWidth <= 2 * .width and .decodedHeight <= 2 * .height + 4)'
+  dekho_is '[.browse.rows[] | select(.poster.shown) | .poster] | length == 30 and all(.width == 24 and .height == 34 and .decodedWidth > 0 and .decodedHeight > 0 and (([.decodedWidth / .width, .decodedHeight / .height] | min) <= 2))'
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 check "esc on Browse goes back to Home ($(dekho_state | jq -c .page))" dekho_is '.page == "home" and .focus.row != "search"'

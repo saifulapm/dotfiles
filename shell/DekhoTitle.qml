@@ -466,13 +466,13 @@ FocusScope {
                         path: "M6 1H34A5 5 0 0 1 39 6V24A5 5 0 0 1 34 29H6A5 5 0 0 1 1 24V6A5 5 0 0 1 6 1ZM5 25L14 15L21 22L26 17L35 25M31 9A3 3 0 1 1 25 9A3 3 0 1 1 31 9"
                         color: page.c.muted ?? "gray"
                     }
-                    // The backdrop loads only while the poster is not drawn, so the two never decode at once.
+                    // The backdrop loads only while the poster is not on disk, so the two never decode at once and a poster never follows a backdrop.
                     DekhoPicture {
                         id: backdropPicture
                         anchors.fill: parent
                         dekho: page.dekho
                         size: "w780"
-                        path: posterPicture.shown || !page.detail ? null : page.detail.backdrop
+                        path: !page.detail || page.dekho.picture("w342", page.detail.poster) ? null : page.detail.backdrop
                         radius: placeholder.radius
                     }
                     DekhoPicture {

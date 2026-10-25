@@ -175,9 +175,9 @@ status=$(shell_status) || die "status did not answer after the switches"
 switched_kib=$(jq -r .rssKiB <<<"$status")
 timers=$(jq -r .timers <<<"$status")
 
-# Files, Dekho and Deen are Apps, each its own qs process, started the way the desktop starts them and closed by window, before the idle window so they cannot skew idle cpu; bench_app <entry qml> <bin> <app id> sets app_first_frame (median of five), app_rss_kib (largest) and app_left (most left over).
+# Files, Dekho and Deen are Apps, each its own qs process, started the way the desktop starts them and closed by window, before the idle window so they cannot skew idle cpu; bench_app <entry qml> <bin> <app id> [walk] sets app_first_frame (median of five), app_rss_kib (largest) and app_left (most left over).
 bench_app() {
-  local qml=$repo/shell/$1 bin=$repo/bin/$2 appid=$3 i kib left
+  local qml=$repo/shell/$1 bin=$repo/bin/$2 appid=$3 walk=${4:-} i kib left
   app_state() { timeout 0.5 qs ipc -p "$qml" call "$appid" state 2>/dev/null; }
   app_is() { app_state | jq -e "$1" >/dev/null 2>&1; }
   app_windows() { niri msg -j windows | jq --arg a "$appid" '[.[] | select(.app_id == $a)] | length'; }
@@ -190,6 +190,7 @@ bench_app() {
     niri msg action spawn -- "$bin" >/dev/null || die "spawning $2 failed"
     until_ok 5000 app_up || die "$appid never drew its first frame"
     frames+=("$(app_state | jq -r .firstFrameMs)")
+    [ -z "$walk" ] || "$walk"
     # Its rows have a second to settle before the memory is read; the largest of the five starts is kept.
     sleep 1
     kib=$(app_state | jq -r .rssKiB) || die "$appid did not report rssKiB"
@@ -206,7 +207,20 @@ bench_app() {
   echo "     $appid first frames: ${frames[*]}"
   app_first_frame=$(median "${frames[@]}")
 }
-bench_app dekho.qml dots-dekho dekho
+# Dekho's memory is read with its pictures out: Home's posters, a title with 20 cast faces, then Browse's rows.
+dekho_walk() {
+  until_ok 3000 app_is '[.rows.series[] | select(.poster.shown)] | length >= 8' || die "Dekho's Home drew no posters"
+  wtype -k Shift_L
+  wtype jl
+  until_ok 1000 app_is '.focus == {"row": "series", "col": 1}' || die "Dekho's cursor never reached The Long Tide"
+  wtype -k Return
+  until_ok 3000 app_is '.page == "title" and .title.slot.shown and .title.cast[2].face.shown' || die "Dekho's title page drew no faces"
+  wtype -k Escape
+  until_ok 1000 app_is '.page == "home"' || die "Esc never took Dekho back to Home"
+  wtype f
+  until_ok 3000 app_is '.page == "browse" and ([.browse.rows[] | select(.poster.shown)] | length) >= 20' || die "Dekho's Browse drew fewer than 20 posters"
+}
+bench_app dekho.qml dots-dekho dekho dekho_walk
 dekho_first_frame=$app_first_frame dekho_rss_kib=$app_rss_kib dekho_left=$app_left
 bench_app deen.qml dots-deen deen
 deen_first_frame=$app_first_frame deen_rss_kib=$app_rss_kib deen_left=$app_left

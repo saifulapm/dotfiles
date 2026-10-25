@@ -153,7 +153,7 @@ case "${1:-} ${2:-}" in
   fi
   ;;
 "api prefetch")
-  # As the real one: a path that is not one /name refuses the whole call; each image it holds is copied into img/<size> and named, a named fixture if there is one, else that size's sample; a name starting gone is left out, as a 404 is; offline, only what is already in img/<size> is named.
+  # As the real one: a path that is not one /name refuses the whole call; each image it holds is copied into img/<size> and named, a named fixture if there is one, else a sample; a name starting gone is left out, as a 404 is; offline, only what is already in img/<size> is named.
   size=$4
   # With DOTS_DEV_DIR/dekho-slow-prefetch present each answer comes that many seconds late, as a slow CDN's would, and dekho-slow.log records when it lands.
   if [ -f "$DOTS_DEV_DIR/dekho-slow-prefetch" ]; then
@@ -176,7 +176,8 @@ case "${1:-} ${2:-}" in
     if ! [ -f "$dir/$name" ]; then
       offline && continue
       [[ $name == gone* ]] && continue
-      if [ -f "$fixtures/$name" ]; then cp "$fixtures/$name" "$dir/$name"; else cp "$fixtures/$size.png" "$dir/$name"; fi
+      # A still (s<id>-<season>-<episode>) is landscape, as TMDB's are; every other sample has its size's shape.
+      if [ -f "$fixtures/$name" ]; then cp "$fixtures/$name" "$dir/$name"; elif [[ $name == s[0-9]*-* ]]; then cp "$fixtures/still.png" "$dir/$name"; else cp "$fixtures/$size.png" "$dir/$name"; fi
     fi
     files=$(jq -c --arg p "$path" --arg f "$dir/$name" '.[$p] = $f' <<<"$files")
   done
