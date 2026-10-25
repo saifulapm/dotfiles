@@ -100,9 +100,9 @@ wtype -k Return
 until_ok 3000 dekho_is '(.search.results | length) > 0'
 check "Enter finds the fixture's series, The Long Tide, first in the results ($(dekho_state | jq -c '[.search.results[] | .title]'))" \
   dekho_is '(.search.results[0] | del(.poster)) == {"title": "The Long Tide", "line": "2024 · ★ 8.1", "lines": 1, "elided": false, "shown": true} and (.search.results | length) == 3'
-check "the results draw the posters already on disk, with no prefetch of their own, and a null one keeps the mark ($(dekho_state | jq -c '[.search.results[] | .poster.file]'))" \
-  dekho_is '[.search.results[] | .poster.file] == ["p101.jpg", "p305.jpg", ""] and ([.search.results[] | .poster.shown] == [true, true, false])'
-check "and the fake heard no prefetch after the search" bash -c "! sed -n '/^api search tide\$/,\$p' '$DOTS_DEV_DIR/dekho.log' | grep -q '^api prefetch'"
+check "the results draw their posters, one Home had and one only the search found, and a null one keeps the mark ($(dekho_state | jq -c '[.search.results[] | .poster.file]'))" \
+  until_ok 3000 dekho_is '[.search.results[] | .poster.file] == ["p101.jpg", "q305.jpg", ""] and ([.search.results[] | .poster.shown] == [true, true, false])'
+check "the search asked prefetch once, only for the poster Home did not hold" bash -c "[ \"\$(sed -n '/^api search tide\$/,\$p' '$DOTS_DEV_DIR/dekho.log' | grep '^api prefetch')\" = 'api prefetch --size w342 /q305.jpg' ]"
 check "the results take the home rows' place ($(dekho_state | jq -c '{focus, shown: .rows.shown}'))" dekho_is '.rows.shown == false and .focus.row == "results"'
 check "the fake heard the search for tide" grep -qx 'api search tide' "$DOTS_DEV_DIR/dekho.log"
 wtype -k Escape
