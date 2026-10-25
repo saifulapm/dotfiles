@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
@@ -32,6 +33,7 @@ FocusScope {
     property int row: 0
     property int crewCol: 0
     property int castCol: 0
+    property int linkCol: 0
     property string today: ""
     // Set once the poster's prefetch has answered, so the backdrop is asked for and drawn only for a title whose poster is not on disk, never before a poster that follows.
     property bool posterKnown: false
@@ -63,7 +65,9 @@ FocusScope {
     readonly property var cast: detail && Array.isArray(detail.cast) ? detail.cast : []
     // The board shows three cast names; the cursor slides that window along the rest.
     readonly property int castStart: Math.max(0, Math.min(cast.length - 3, castCol - 2))
-    readonly property var zones: ["buttons"].concat(tv ? ["seasons", "episodes"] : [], crew.length ? ["crew"] : [], cast.length ? ["cast"] : [])
+    // TMDB, IMDb and the homepage, each only while the title has it; they open in the browser.
+    readonly property var links: detail ? T.links(voice, detail) : []
+    readonly property var zones: ["buttons"].concat(links.length ? ["links"] : [], tv ? ["seasons", "episodes"] : [], crew.length ? ["crew"] : [], cast.length ? ["cast"] : [])
 
     signal search
     // Enter chose an episode, or the movie: the release list opens over this page.
@@ -202,6 +206,8 @@ FocusScope {
             press(buttons[button].id);
         else if (zone === "episodes" || (!tv && zone === ""))
             play();
+        else if (zone === "links" && links[linkCol])
+            Quickshell.execDetached(["chromium-browser", links[linkCol].url]);
         else if (zone === "crew" && crew[crewCol])
             openPerson(crew[crewCol]);
         else if (zone === "cast" && cast[castCol])
@@ -224,6 +230,8 @@ FocusScope {
             crewCol = at;
         else if (to === "cast")
             castCol = castStart + at;
+        else if (to === "links")
+            linkCol = at;
         else if (to === "buttons")
             buttonKind = at;
         keys.forceActiveFocus();
@@ -352,6 +360,13 @@ FocusScope {
                 name: bigName.text,
                 lines: bigName.lineCount,
                 meta: metaText.text,
+                tagline: {
+                    text: taglineText.text,
+                    lines: taglineText.lineCount,
+                    truncated: taglineText.truncated,
+                    shown: taglineText.visible
+                },
+                links: drawnList(linkRow),
                 side: sideText.text,
                 chips: drawnList(chipRow),
                 overview: {
@@ -416,6 +431,10 @@ FocusScope {
                 page.buttonKind = page.buttons[Math.min(page.buttons.length - 1, page.button + 1)].id;
             else if ((t === "h" || k === Qt.Key_Left) && page.zone === "buttons")
                 page.buttonKind = page.buttons[Math.max(0, page.button - 1)].id;
+            else if ((t === "l" || k === Qt.Key_Right) && page.zone === "links")
+                page.linkCol = Math.min(page.links.length - 1, page.linkCol + 1);
+            else if ((t === "h" || k === Qt.Key_Left) && page.zone === "links")
+                page.linkCol = Math.max(0, page.linkCol - 1);
             else if (t === "l" || k === Qt.Key_Right)
                 page.zone === "crew" || page.zone === "cast" ? page.moveCol(1) : page.moveSeason(1);
             else if (t === "h" || k === Qt.Key_Left)
@@ -653,6 +672,21 @@ FocusScope {
                         elide: Text.ElideRight
                         maximumLineCount: 1
                     }
+                    // The title's tagline; a title without one draws no line, so no gap.
+                    Text {
+                        id: taglineText
+                        Layout.fillWidth: true
+                        visible: text !== ""
+                        textFormat: Text.PlainText
+                        text: page.detail ? D.title(T.tagline(page.detail)) : ""
+                        color: c.muted ?? "gray"
+                        font.family: page.bodyFont
+                        font.pixelSize: 12
+                        font.italic: !bracket
+                        font.letterSpacing: bracket ? 0.7 : 0
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
                 }
 
                 // Play, Resume while history holds the title, Trailer when it has one: buttons as the chips are drawn, the focused one as the release list draws its cursor.
@@ -701,6 +735,58 @@ FocusScope {
                             DekhoClick {
                                 name: "title-button:" + modelData.id
                                 onTapped: page.pick("buttons", modelData.id)
+                            }
+                        }
+                    }
+                    Item {
+                        Layout.fillWidth: true
+                    }
+                }
+
+                // TMDB, IMDb and Homepage drawn as the chips are, the focused one as a focused button.
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Repeater {
+                        id: linkRow
+                        model: page.links
+
+                        Rectangle {
+                            required property var modelData
+                            required property int index
+                            readonly property bool focused: page.zone === "links" && page.linkCol === index
+                            readonly property bool inverse: focused && !page.plain
+                            function drawn() {
+                                return {
+                                    kind: modelData.id,
+                                    text: linkText.text,
+                                    url: modelData.url,
+                                    lines: linkText.lineCount,
+                                    focused: focused
+                                };
+                            }
+                            implicitWidth: linkText.implicitWidth + 20
+                            implicitHeight: linkText.implicitHeight + (page.plain ? 6 : 4)
+                            radius: page.plain ? 8 : 0
+                            color: focused ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : page.plain ? page.look.tile.fill : "transparent"
+                            border.width: focused && page.plain ? 1.5 : page.plain ? 0 : 1
+                            border.color: (page.plain ? page.c.accent : page.bracket ? page.c.line : page.c.ink) ?? "gray"
+
+                            Text {
+                                id: linkText
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: D.title(modelData.text)
+                                color: (parent.inverse ? page.c.surface : page.c.ink) ?? "black"
+                                font.family: page.bodyFont
+                                font.pixelSize: page.plain ? 12 : 11
+                                font.letterSpacing: page.bracket ? 0.7 : 0
+                                maximumLineCount: 1
+                            }
+                            DekhoClick {
+                                name: "title-link:" + modelData.id
+                                onTapped: page.pick("links", index)
                             }
                         }
                     }

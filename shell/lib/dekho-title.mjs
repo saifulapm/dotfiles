@@ -80,6 +80,17 @@ export function buttons(voice, seen, trailer) {
   return out;
 }
 
+// The line under the meta line; the page cleans its text for drawing, this only picks it.
+export const tagline = (title) => (typeof title.tagline === 'string' ? title.tagline.trim() : '');
+
+// The title's links in the order drawn. The imdb id lands in a URL and the homepage is opened as given, so each is checked: an id as tt and digits, a homepage as http(s) with no space, control or bidi character.
+export function links(voice, title) {
+  const out = [{ id: 'tmdb', text: 'TMDB', url: `https://www.themoviedb.org/${title.kind === 'tv' ? 'tv' : 'movie'}/${title.id}` }];
+  if (typeof title.imdb_id === 'string' && /^tt[0-9]+$/.test(title.imdb_id)) out.push({ id: 'imdb', text: 'IMDb', url: `https://www.imdb.com/title/${title.imdb_id}` });
+  if (typeof title.homepage === 'string' && /^https?:\/\/[^\s\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩﻿]+$/.test(title.homepage)) out.push({ id: 'homepage', text: 'Homepage', url: title.homepage });
+  return out.map((l) => Object.assign({}, l, { text: upper(voice, l.text) }));
+}
+
 // The words each board writes on the Title page.
 export function titleText(voice) {
   const caps = voice !== 'plain';

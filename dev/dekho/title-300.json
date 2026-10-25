@@ -12,7 +12,6 @@
   "Mystery"
  ],
  "runtime": 3000,
- "imdb_id": "tt0000101",
  "seasons": [
   {
    "number": 1,
@@ -22,9 +21,9 @@
    "year": "2026"
   }
  ],
- "tagline": "The water remembers.",
+ "tagline": "Every harbour keeps\na light\u202e burning \u001b[31m until the tide turns and the last boat is home again, and the keeper counts the lamps one by one until the tide turns and the last boat is home again, and the keeper counts the lamps one by one until the tide turns and the last boat is home again, and the keeper counts the lamps one by one",
  "status": "Returning Series",
- "homepage": "",
+ "homepage": "javascript:alert(1)",
  "trailer": null,
  "cast": [
   {

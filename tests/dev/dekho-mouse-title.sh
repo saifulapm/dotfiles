@@ -61,13 +61,13 @@ check "so Enter opens the same release list again ($(dekho_state | jq -c '[.rele
 wtype -k Escape
 until_ok 1000 dekho_is '.releases.mode == ""'
 
-# At its own 716 px Dekho draws a season's eight 30 px rows whole, so the window is cut to 630 px for a list longer than its view.
+# The window is cut to 690 px so a season's eight 30 px rows are longer than the list's view.
 dekho_tall() { niri msg -j windows | jq -e --argjson h "$1" '.[] | select(.app_id == "dekho") | .layout.window_size[1] == $h' >/dev/null; }
-niri msg action set-window-height --id "$(dekho_id)" 630
-until_ok 2000 dekho_tall 630
+niri msg action set-window-height --id "$(dekho_id)" 690
+until_ok 2000 dekho_tall 690
 dekho_at=$(dekho_origin)
 until_ok 1000 dekho_is '.title.episodes[7].shown == false'
-check "in a 630 px window S3's list holds its first four rows and not its last ($(shown))" \
+check "in a 690 px window S3's list holds its first four rows and not its last ($(shown))" \
   dekho_is '[.title.episodes[0:4][].shown] == [true, true, true, true] and .title.episodes[7].shown == false'
 
 click_on title-season:0

@@ -127,3 +127,46 @@ test('the footer names r for resume, t for trailer, and tab reaches the buttons'
   assert.deepEqual(keys[keys.findIndex(([k]) => k === 'r') + 1], ['t', 'trailer']);
   assert.ok(keys.some(([k, w]) => k === 'tab' && w.startsWith('buttons')));
 });
+
+test('the tagline is the title\'s own text, trimmed, and empty when it has none', () => {
+  assert.equal(T.tagline({ tagline: 'The water remembers.' }), 'The water remembers.');
+  assert.equal(T.tagline({ tagline: '  Hold on.  ' }), 'Hold on.');
+  assert.equal(T.tagline({ tagline: '' }), '');
+  assert.equal(T.tagline({ tagline: null }), '');
+  assert.equal(T.tagline({}), '');
+  assert.equal(T.tagline({ tagline: 7 }), '');
+});
+
+test('a series links TMDB under /tv/ and IMDb, in the voice\'s words', () => {
+  const tide = { id: 101, kind: 'tv', imdb_id: 'tt0000101', homepage: '' };
+  assert.deepEqual(T.links('plain', tide), [
+    { id: 'tmdb', text: 'TMDB', url: 'https://www.themoviedb.org/tv/101' },
+    { id: 'imdb', text: 'IMDb', url: 'https://www.imdb.com/title/tt0000101' },
+  ]);
+  assert.deepEqual(T.links('bracket', tide).map((l) => l.text), ['TMDB', 'IMDB']);
+});
+
+test('a film links TMDB under /movie/ and its http(s) homepage last', () => {
+  const film = { id: 400, kind: 'movie', imdb_id: 'tt0000400', homepage: 'https://example.org/a-quiet-verdict' };
+  assert.deepEqual(T.links('caps', film).map((l) => [l.id, l.text, l.url]), [
+    ['tmdb', 'TMDB', 'https://www.themoviedb.org/movie/400'],
+    ['imdb', 'IMDb', 'https://www.imdb.com/title/tt0000400'],
+    ['homepage', 'Homepage', 'https://example.org/a-quiet-verdict'],
+  ]);
+  assert.equal(T.links('bracket', film)[2].text, 'HOMEPAGE');
+  assert.equal(T.links('plain', { ...film, homepage: 'http://example.org/' })[2].url, 'http://example.org/');
+});
+
+test('a missing or malformed imdb id hides IMDb, and a homepage that is not http(s) shows no link', () => {
+  const base = { id: 300, kind: 'tv' };
+  const ids = (t) => T.links('plain', { ...base, ...t }).map((l) => l.id);
+  assert.deepEqual(ids({}), ['tmdb']);
+  assert.deepEqual(ids({ imdb_id: '', homepage: '' }), ['tmdb']);
+  assert.deepEqual(ids({ imdb_id: 'tt12/../x' }), ['tmdb']);
+  assert.deepEqual(ids({ imdb_id: 'tt1\n' }), ['tmdb']);
+  assert.deepEqual(ids({ homepage: 'javascript:alert(1)' }), ['tmdb']);
+  assert.deepEqual(ids({ homepage: 'ftp://example.org/' }), ['tmdb']);
+  assert.deepEqual(ids({ homepage: 'https://' }), ['tmdb']);
+  assert.deepEqual(ids({ homepage: 'https://a b' }), ['tmdb']);
+  assert.deepEqual(ids({ homepage: 'https://a.org/‮x' }), ['tmdb']);
+});

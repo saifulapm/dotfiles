@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Stands in for chromium-browser in a nested session: it logs its arguments as one line and opens nothing.
+echo "$*" >>"$DOTS_DEV_DIR/chromium.log"
