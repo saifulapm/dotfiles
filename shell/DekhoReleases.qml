@@ -121,7 +121,7 @@ FocusScope {
         playArgs = args;
         mode = "starting";
         starter.running = true;
-        dekho.follow(session);
+        dekho.follow(session, target.kind === "tv" ? target.title : "");
     }
 
     // r on a failed start runs the same play again, in a new session; the old tail would follow the old file.

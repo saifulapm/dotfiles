@@ -229,10 +229,11 @@ case "${1:-} ${2:-}" in
       '.items = [$e] + [.items[] | select((.id == $e.id and .kind == $e.kind) | not)]' "$history" >"$history.new"
     mv "$history.new" "$history"
   }
-  # Once: the stand-in can quit on the same SIGTERM that runs the trap.
+  # The stop's SIGTERM reaches every process in the unit at once, the ones this forks to save history among them, so once ending it ignores SIGTERM, and so do they.
   ended() {
     [ -z "${over:-}" ] || return 0
     over=1
+    trap '' TERM
     moved_on || true
     record
     jq -nc --argjson p "$position" --argjson d "$duration" '{event: "ended", reason: "quit", position: $p, duration: $d}'
@@ -241,7 +242,8 @@ case "${1:-} ${2:-}" in
   # mpv maps its window a while after playing.
   sleep 1.5 &
   wait $!
-  trap 'ended; exit 0' TERM
+  # The stand-in can quit on the same SIGTERM, so the run may already be ending when the trap runs; it then lets that finish.
+  trap 'if [ -z "${over:-}" ]; then ended; exit 0; fi' TERM
   mpv "$label" "$next_label" "$advance" "$mark"
   ended
   ;;

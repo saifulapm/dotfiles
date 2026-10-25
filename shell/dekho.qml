@@ -32,7 +32,7 @@ ShellRoot {
     property var folders: ({})
     // What plays in the film's unit, from its session's events: {id, kind, title, episode}, else null. Every page's bar draws it.
     property var nowPlaying: null
-    property var playEvents: []
+    property string playShow: ""
     // The session followed: Starting's run, or the run a reopened Dekho finds active.
     property string playSession: ""
     property var playTail: null
@@ -131,12 +131,12 @@ ShellRoot {
         return file ? "file://" + file : "";
     }
 
-    // Follows a film's session file from its first line; a play that never plays shows no bar.
-    function follow(session) {
+    // Follows a film's session file from its first line; a play that never plays shows no bar. show is a series' name as TMDB gave it, which splits its label where dekho joined it to the episode's; a run adopted on opening asks for it.
+    function follow(session, show) {
         if (playTail)
             playTail.running = false;
         playSession = session;
-        playEvents = [];
+        playShow = show || "";
         nowPlaying = null;
         playTail = tailer.createObject(app, {
             session: session
@@ -144,17 +144,26 @@ ShellRoot {
         playTail.running = true;
     }
 
+    // Only playing and exit change what plays: the queued and status lines between them must not undo the episode mpv's window has moved on to.
     function playHeard(session, line) {
         const e = D.answer(line);
         if (!e || session !== playSession)
             return;
-        playEvents = playEvents.concat([e]);
-        const was = nowPlaying;
-        nowPlaying = P.fromEvents(playEvents);
-        if (was && !nowPlaying)
-            ended();
-        else if (e.event === "exit")
-            unfollow();
+        if (e.event === "playing") {
+            nowPlaying = P.nowPlaying(e, playShow);
+            if (e.kind === "tv" && !playShow)
+                api(["api", "title", "--id", String(e.id), "--kind", "tv"], answer => {
+                    if (session === app.playSession && answer && typeof answer.title === "string") {
+                        app.playShow = answer.title;
+                        app.nowPlaying = P.nowPlaying(e, answer.title);
+                    }
+                });
+        } else if (e.event === "exit") {
+            if (nowPlaying)
+                ended();
+            else
+                unfollow();
+        }
     }
 
     // A run that ended before it played, or was cancelled in Starting, needs no tail.
