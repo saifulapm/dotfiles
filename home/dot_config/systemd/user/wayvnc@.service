@@ -3,8 +3,8 @@ Description=wayvnc, one output of this screen served on localhost and published 
 Documentation=https://github.com/any1/wayvnc
 
 [Service]
-# The instance is the output's name, as in wayvnc@DP-3.service; -r draws the pointer, and ~/.config/wayvnc/config sets the address and port.
-ExecStart=/usr/bin/wayvnc -r -o %i
+# The instance is the output's name, as in wayvnc@DP-3.service; -r draws the pointer, and ~/.config/wayvnc/config sets the address and port. wl-uinput-proxy hands wayvnc's virtual keyboard and pointer to niri as uinput devices, since niri 26.04 runs no bind for a virtual key (niri #403).
+ExecStart=%h/.local/bin/wl-uinput-proxy /usr/bin/wayvnc -r -o %i
 MemoryMax=256M
 # A machine whose tailscaled is down, has no operator or hangs on a prompt still serves on localhost.
 ExecStartPost=-/usr/bin/timeout 30 /usr/bin/tailscale serve --bg --yes --tcp=5900 tcp://127.0.0.1:5900

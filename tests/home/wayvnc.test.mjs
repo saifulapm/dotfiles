@@ -27,8 +27,10 @@ test('the config listens on 127.0.0.1:5900 and sets nothing else', () => {
   assert.equal(readFileSync(join(repo, 'home/dot_config/wayvnc/config'), 'utf8'), 'address=127.0.0.1\nport=5900\n');
 });
 
-test('the unit runs wayvnc for one output, capped at 256M, and nothing starts it at login', () => {
-  assert.deepEqual(lines('ExecStart'), ['/usr/bin/wayvnc -r -o %i']);
+test('the unit runs wayvnc for one output through wl-uinput-proxy, capped at 256M, and nothing starts it at login', () => {
+  // systemd looks a bare name up in its own fixed path, which has no ~/.local/bin, so the pin's binary is named by %h.
+  assert.deepEqual(lines('ExecStart'), ['%h/.local/bin/wl-uinput-proxy /usr/bin/wayvnc -r -o %i']);
+  assert.deepEqual(lines('ExecStart')[0].split(' ').slice(0, 2).map((w) => w.split('/').at(-1)), ['wl-uinput-proxy', 'wayvnc']);
   assert.deepEqual(lines('MemoryMax'), ['256M']);
   assert.doesNotMatch(unit, /^\[Install\]/m);
   assert.deepEqual(lines('WantedBy'), []);
@@ -48,20 +50,23 @@ test('starting the unit opens tailscale serve on 5900 and stopping it closes it,
     return p;
   };
   const wayvnc = stub('wayvnc', `echo "wayvnc $*" >>${log}\nexec sleep 600`);
+  // The real proxy would add uinput devices to this machine's niri.
+  const proxy = stub('wl-uinput-proxy', `echo "wl-uinput-proxy $*" >>${log}\nexec "$@"`);
   const timeout = stub('timeout', 'shift\nexec "$@"');
   const tailscale = stub('tailscale', `echo "tailscale $*" >>${log}`);
   const fill = (v) =>
-    v.replaceAll('%i', OUTPUT).replace('/usr/bin/wayvnc', wayvnc).replace('/usr/bin/timeout', timeout).replace('/usr/bin/tailscale', tailscale);
+    v.replaceAll('%i', OUTPUT).replace('%h/.local/bin/wl-uinput-proxy', proxy).replace('/usr/bin/wayvnc', wayvnc).replace('/usr/bin/timeout', timeout).replace('/usr/bin/tailscale', tailscale);
   const props = ['ExecStartPost', 'ExecStopPost'].flatMap((k) => lines(k).flatMap((v) => ['-p', `${k}=${fill(v)}`]));
   const argv = fill(lines('ExecStart')[0]).split(/\s+/);
   const up = spawnSync('systemd-run', ['--user', '--unit', name, ...props, '--', ...argv], { encoding: 'utf8' });
   assert.equal(up.status, 0, up.stderr);
   const read = () => (existsSync(log) ? readFileSync(log, 'utf8') : '');
-  for (let i = 0; i < 100 && !(read().includes('tailscale serve --bg') && read().includes('wayvnc -r')); i++) spawnSync('sleep', ['0.05']);
+  for (let i = 0; i < 100 && !(read().includes('tailscale serve --bg') && /^wayvnc -r/m.test(read())); i++) spawnSync('sleep', ['0.05']);
   const down = spawnSync('systemctl', ['--user', 'stop', name], { encoding: 'utf8' });
   assert.equal(down.status, 0, down.stderr);
   // wayvnc and ExecStartPost start together, so only the tailscale lines have an order.
   const logged = read().trim().split('\n');
+  assert.ok(logged.includes(`wl-uinput-proxy ${wayvnc} -r -o ${OUTPUT}`), logged.join('|'));
   assert.ok(logged.includes(`wayvnc -r -o ${OUTPUT}`), logged.join('|'));
   assert.deepEqual(logged.filter((l) => l.startsWith('tailscale')), [
     'tailscale serve --bg --yes --tcp=5900 tcp://127.0.0.1:5900',
