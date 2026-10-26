@@ -262,3 +262,12 @@ repo = "any1/aml"
 install = "nothing of its own: wlvncc's pin builds it in as its meson subproject"
 url = "https://github.com/any1/aml/archive/refs/tags/v{version}.tar.gz"
 sha256 = "b2b8f743213af39f40e8bc611147d69e2ea9e010b9b19cb65246582338f28d96"
+
+[[pin]]
+name = "wl-uinput-proxy"
+version = "0.0.4"
+repo = "pgaskin/wl-uinput-proxy"
+install = "~/.local/bin/wl-uinput-proxy, built with cargo, which wayvnc's unit runs in front of wayvnc so niri takes a viewer's keys as a real keyboard's, binds included"
+runs = "wl-uinput-proxy >/dev/null; test $? -eq 2"
+url = "https://github.com/pgaskin/wl-uinput-proxy/archive/refs/tags/v{version}.tar.gz"
+sha256 = "b939dcaa5a6c4a49cac7e728887d3665b0a923568c532b1935d28937750aaf61"

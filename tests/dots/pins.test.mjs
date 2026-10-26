@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -268,4 +268,59 @@ test("changing only aml's sha256 re-renders aml's and wlvncc's scripts and no ot
   const base = render(versions);
   const after = render(moved);
   assert.deepEqual(scripts.filter((f) => after[f] !== base[f]).sort(), ['run_onchange_after_29-pin-aml.sh.tmpl', WLVNCC]);
+});
+
+// wl-uinput-proxy's pin script against a scratch source whose pin is a local tarball, with a stub cargo that logs its argv and builds a stand-in binary unless FAIL is set.
+const PROXY = 'run_onchange_after_29-pin-wl-uinput-proxy.sh.tmpl';
+const PROXY_CARGO = `#!/bin/sh
+echo "cargo $*" >> "$HOME/calls"
+[ -n "$FAIL" ] && { echo 'error: could not compile wl-uinput-proxy' >&2; exit 101; }
+while [ $# -gt 0 ]; do [ "$1" = --target-dir ] && t=$2; shift; done
+mkdir -p "$t/release" && printf '#!/bin/sh\\necho proxy\\n' > "$t/release/wl-uinput-proxy" && chmod 700 "$t/release/wl-uinput-proxy"
+`;
+function proxySource() {
+  const root = source('0'.repeat(64));
+  const dir = join(root, 'src', 'wl-uinput-proxy-0.0.4');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'Cargo.toml'), '[package]\nname = "wl-uinput-proxy"\n');
+  const tar = join(root, 'wl-uinput-proxy.tar.gz');
+  assert.equal(spawnSync('tar', ['-czf', tar, '-C', join(root, 'src'), 'wl-uinput-proxy-0.0.4']).status, 0);
+  writeFileSync(join(root, 'versions.toml'), `[[pin]]\nname = "wl-uinput-proxy"\nversion = "0.0.4"\nrepo = "pgaskin/wl-uinput-proxy"\nurl = "file://${tar}"\nsha256 = "${sha(readFileSync(tar))}"\n`);
+  mkdirSync(join(root, 'stubs'));
+  writeFileSync(join(root, 'stubs/cargo'), PROXY_CARGO, { mode: 0o755 });
+  return root;
+}
+const proxyScript = () => readFileSync(join(repo, 'home/.chezmoiscripts', PROXY), 'utf8');
+
+test("the wl-uinput-proxy pin is pgaskin's v0.0.4 tag, checked by its own sha256", () => {
+  const rendered = spawnSync('chezmoi', ['--config', join(tmpdir(), 'dots-none.toml'), '--source', repo, 'execute-template'], {
+    input: proxyScript(),
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH, HOME: tmpdir() },
+  });
+  assert.equal(rendered.status, 0, rendered.stderr);
+  assert.match(rendered.stdout, /^pin_url="https:\/\/github\.com\/pgaskin\/wl-uinput-proxy\/archive\/refs\/tags\/v0\.0\.4\.tar\.gz"$/m);
+  assert.match(rendered.stdout, /^pin_sha256="b939dcaa5a6c4a49cac7e728887d3665b0a923568c532b1935d28937750aaf61"$/m);
+});
+
+test('wl-uinput-proxy builds with cargo --release --locked and lands in ~/.local/bin with mode 755', () => {
+  const root = proxySource();
+  const r = run(root, proxyScript(), '', { DOTS_CARGO: `${root}/stubs/cargo` });
+  assert.equal(r.status, 0, r.stderr);
+  const calls = readFileSync(join(root, 'calls'), 'utf8').trim().split('\n');
+  assert.equal(calls.length, 1, calls.join('\n'));
+  assert.match(calls[0], /^cargo build --release --locked --manifest-path \S+\/wl-uinput-proxy-0\.0\.4\/Cargo\.toml /);
+  const bin = join(root, '.local/bin/wl-uinput-proxy');
+  assert.equal(statSync(bin).mode & 0o777, 0o755);
+  assert.equal(spawnSync(bin, { encoding: 'utf8' }).stdout, 'proxy\n');
+  assert.match(r.stdout, /dots: pin wl-uinput-proxy 0\.0\.4/);
+  assert.deepEqual(readdirSync(join(root, '.cache')), []);
+});
+
+test('a failing cargo stops the wl-uinput-proxy pin, naming it, and installs nothing', () => {
+  const root = proxySource();
+  const r = run(root, proxyScript(), '', { DOTS_CARGO: `${root}/stubs/cargo`, FAIL: '1' });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /pin wl-uinput-proxy: cargo build failed/);
+  assert.equal(existsSync(join(root, '.local/bin/wl-uinput-proxy')), false);
 });
