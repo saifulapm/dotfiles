@@ -28,9 +28,9 @@ esac
 online=$(timeout 3 tailscale status --json 2>/dev/null | jq -r --arg n "$name." '[.Peer[]? | select(.DNSName | startswith($n)) | .Online][0] | values' 2>/dev/null)
 [ "$online" = false ] && die "$name is off"
 
-# The remote's login shell is fish, so each remote side goes to bash as a script on stdin, its arguments after bash -s.
+# The remote's login shell is fish, so each remote side goes to bash as a script on stdin, its arguments after bash -s. A connection ~/.ssh/config still shares from an earlier viewer would outlive a machine gone since by ServerAlive's 45 s, so each call dials anew.
 remote() {
-  ssh -o BatchMode=yes -o ConnectTimeout=5 "$name" bash -s "$@"
+  ssh -o BatchMode=yes -o ConnectTimeout=5 -o ControlPath=none "$name" bash -s "$@"
 }
 
 # Prints the instance (an output name) whose wayvnc now listens on 5900. The braces make bash read the whole script before a command can read stdin.

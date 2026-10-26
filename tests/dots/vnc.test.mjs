@@ -22,10 +22,11 @@ if (host !== fs.readFileSync(ctl + '/host', 'utf8')) {
   process.stderr.write('ssh: Could not resolve hostname ' + host + ': Name or service not known\\n');
   process.exit(255);
 }
-// A machine tailscale still lists as online after it went away drops the connect, so ssh fails only at its ConnectTimeout.
+// A machine tailscale still lists as online after it went away drops the connect, so ssh fails only at its ConnectTimeout. ~/.ssh/config shares connections for 10 minutes, and a shared one that went quiet is dropped only by ServerAlive, 15 s times 3.
 if (fs.existsSync(ctl + '/down')) {
   const o = args.find((a) => a.startsWith('ConnectTimeout='));
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, (o ? Number(o.split('=')[1]) : 30) * 1000);
+  const shared = fs.existsSync(ctl + '/master') && !args.includes('ControlPath=none');
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, shared ? 45000 : (o ? Number(o.split('=')[1]) : 30) * 1000);
   process.stderr.write('ssh: connect to host ' + host + ' port 22: Connection timed out\\n');
   process.exit(255);
 }
@@ -160,8 +161,8 @@ function exe(path, body) {
   chmodSync(path, 0o755);
 }
 
-// outputs: the remote's outputs in niri's order; focused: the one with focus; active: units already running; online: what tailscale status says of each peer, or null when tailscaled is not running; proxy: the remote has built wl-uinput-proxy; binds: its wayvnc ever listens on 127.0.0.1.
-function run(args, { host = 'nuc', down = false, niri = true, outputs = ['DP-3'], focused = 'DP-3', active = [], clients = [], wlvnccStatus = 0, online = { mini: true, nuc: true }, proxy = true, binds = true } = {}) {
+// outputs: the remote's outputs in niri's order; focused: the one with focus; active: units already running; master: an earlier viewer's ssh connection to the host is still held open; online: what tailscale status says of each peer, or null when tailscaled is not running; proxy: the remote has built wl-uinput-proxy; binds: its wayvnc ever listens on 127.0.0.1.
+function run(args, { host = 'nuc', down = false, master = false, niri = true, outputs = ['DP-3'], focused = 'DP-3', active = [], clients = [], wlvnccStatus = 0, online = { mini: true, nuc: true }, proxy = true, binds = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'dots-vnc-'));
   const ctl = join(dir, 'ctl');
   const stubs = join(dir, 'stubs');
@@ -171,6 +172,7 @@ function run(args, { host = 'nuc', down = false, niri = true, outputs = ['DP-3']
   mkdirSync(join(remote, 'active'));
   writeFileSync(join(ctl, 'host'), host);
   if (down) writeFileSync(join(ctl, 'down'), '');
+  if (master) writeFileSync(join(ctl, 'master'), '');
   writeFileSync(join(ctl, 'wlvncc-status'), String(wlvnccStatus));
   exe(join(stubs, 'ssh'), SSH);
   exe(join(stubs, 'wlvncc'), WLVNCC);
@@ -283,6 +285,12 @@ test('a machine tailscale still lists online but ssh cannot reach is unreachable
   assert.notEqual(r.status, 0);
   assert.equal(r.ssh.length, 1);
   assert.deepEqual(r.wlvncc, []);
+});
+
+test('a connection an earlier viewer left open is not reused, so a machine gone since is unreachable within 10 s', () => {
+  const r = run(['nuc'], { down: true, master: true });
+  assert.deepEqual(bodies(r), ['nuc is unreachable']);
+  assert.ok(r.ms < 10000, `took ${r.ms} ms`);
 });
 
 test('with tailscaled not answering, the check falls to ssh: a reachable remote still opens', () => {
