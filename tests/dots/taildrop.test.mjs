@@ -122,6 +122,8 @@ async function scratch(t, { socketUp = true, notifyFails = 0 } = {}) {
 }
 
 const saved = (s) => (existsSync(s.downloads) ? readdirSync(s.downloads).sort() : []);
+// A file still downloading sits in Downloads under its temp name until the rename, so a wait counts only the files that landed.
+const landed = (s) => saved(s).filter((f) => !/^\.dots-taildrop-\d+\.tmp$/.test(f));
 
 test('an arrival lands in Downloads, leaves the inbox, and raises one notification naming it', async (t) => {
   const s = await scratch(t);
@@ -141,23 +143,23 @@ test('an arrival lands in Downloads, leaves the inbox, and raises one notificati
 test('a second file with the same name is renamed with a counter and the first stays', async (t) => {
   const s = await scratch(t);
   s.api.inbox.set('IMG_2041.HEIC', Buffer.from('one'));
-  await until('the first file', () => saved(s).length === 1);
+  await until('the first file', () => landed(s).length === 1);
   await until('the first inbox drain', () => s.api.inbox.size === 0);
   s.api.inbox.set('IMG_2041.HEIC', Buffer.from('two'));
-  await until('the second file', () => saved(s).length === 2);
+  await until('the second file', () => landed(s).length === 2);
   assert.deepEqual(saved(s), ['IMG_2041 (1).HEIC', 'IMG_2041.HEIC']);
   assert.equal(readFileSync(join(s.downloads, 'IMG_2041.HEIC'), 'utf8'), 'one');
   assert.equal(readFileSync(join(s.downloads, 'IMG_2041 (1).HEIC'), 'utf8'), 'two');
   await until('the drain', () => s.api.inbox.size === 0);
   s.api.inbox.set('IMG_2041.HEIC', Buffer.from('three'));
-  await until('the third file', () => saved(s).length === 3);
+  await until('the third file', () => landed(s).length === 3);
   assert.equal(readFileSync(join(s.downloads, 'IMG_2041 (2).HEIC'), 'utf8'), 'three');
 });
 
 test('ten files arriving together give ten files and one notification with the count', async (t) => {
   const s = await scratch(t);
   for (let i = 0; i < 10; i++) s.api.inbox.set(`photo-${i}.jpg`, Buffer.from('p' + i));
-  await until('ten files', () => saved(s).length === 10);
+  await until('ten files', () => landed(s).length === 10);
   await until('the notification', () => s.notes().length >= 1);
   await sleep(2500);
   assert.equal(s.notes().length, 1);
@@ -179,7 +181,7 @@ test('a file still arriving when the others have landed joins their notification
   // tailscaled 1.98.8 announces a transfer once as it starts and never sends the empty list, so a file is done once the inbox lists it.
   s.api.inbox.set('b.mov', Buffer.from('b'));
   const listed = Date.now();
-  await until('both files', () => saved(s).length === 2);
+  await until('both files', () => landed(s).length === 2);
   await until('the notification', () => s.notes().length >= 1);
   assert.ok(Date.now() - listed < 5000, `the batch closed ${Date.now() - listed} ms after its last file was listed`);
   await sleep(2500);
@@ -199,7 +201,7 @@ test('a tailscaled that refuses file access says how to fix it once, not on ever
   assert.deepEqual(argv.slice(argv.indexOf('--') + 1), ['Taildrop cannot save files', 'tailscaled refuses file access: run sudo tailscale set --operator=$USER once']);
   assert.ok(argv.includes('critical'));
   s.api.denied = false;
-  await until('the file once allowed', () => saved(s).length === 1);
+  await until('the file once allowed', () => landed(s).length === 1);
 });
 
 test('a notification sent before anything shows notifications is sent again until one does', async (t) => {
@@ -226,7 +228,7 @@ test('a sender-controlled name never escapes Downloads or reaches notify-send ra
   s.api.inbox.set('../evil', Buffer.from('x'));
   s.api.inbox.set('a\nb.txt', Buffer.from('y'));
   s.api.inbox.set('invoice‮fdp.exe', Buffer.from('z'));
-  await until('the two safe files', () => saved(s).length === 2);
+  await until('the two safe files', () => landed(s).length === 2);
   await until('the notification', () => s.notes().length >= 1);
   await sleep(2500);
   assert.deepEqual(saved(s), ['a_b.txt', 'invoice_fdp.exe']);
