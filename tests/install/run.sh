@@ -157,6 +157,8 @@ done < <(pins)
 while IFS=$'\t' read -r pin cmd; do
   check "$pin: '$cmd' exits 0" as_user "$cmd >/dev/null"
 done < <(runs)
+wayvnc=$(as_user "wayvnc --version" 2>&1)
+check "wayvnc --version prints 0.9.1 (got '${wayvnc%%$'\n'*}')" grep -qx 'wayvnc: 0.9.1' <<<"$wayvnc"
 claude=$(as_user "claude --version" 2>&1)
 check "claude --version prints a version (got '$claude')" grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' <<<"$claude"
 pi=$(as_user "fish -c 'pi --version'" 2>&1)
