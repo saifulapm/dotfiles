@@ -1,0 +1,6 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "aml") }}
+# aml installs nothing of its own: wlvncc's pin script fetches it again and builds it in, so this run only checks the download.
+pin_fetch >/dev/null
+pin_done

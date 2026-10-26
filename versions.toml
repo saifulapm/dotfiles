@@ -244,3 +244,21 @@ name = "swift"
 version = "6.3.3"
 latest = "swift"
 platform = "fedora39"
+
+[[pin]]
+name = "wlvncc"
+version = "cc0abf87c37920540f2439a556e6a480c28f8f46"
+repo = "any1/wlvncc"
+track = "commit"
+install = "~/.local/bin/wlvncc, built with meson against the aml pin, the viewer dots-vnc opens"
+runs = "~/.local/bin/wlvncc --help"
+url = "https://github.com/any1/wlvncc/archive/{version}.tar.gz"
+sha256 = "0576997905b57399fb678b590bf14fdb21941b9f4d25d1f579769418ec602b36"
+
+[[pin]]
+name = "aml"
+version = "1.0.0"
+repo = "any1/aml"
+install = "nothing of its own: wlvncc's pin builds it in as its meson subproject"
+url = "https://github.com/any1/aml/archive/refs/tags/v{version}.tar.gz"
+sha256 = "b2b8f743213af39f40e8bc611147d69e2ea9e010b9b19cb65246582338f28d96"

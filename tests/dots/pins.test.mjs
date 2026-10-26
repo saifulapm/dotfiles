@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -192,4 +192,80 @@ test('the kakoune pin installs over a kak that is running', () => {
   } finally {
     running.kill();
   }
+});
+
+// wlvncc's pin script against a scratch source whose wlvncc and aml pins point at local tarballs, with stub meson and ninja that log their argv and build a stand-in binary.
+const WLVNCC = 'run_onchange_after_29-pin-wlvncc.sh.tmpl';
+// As the real one does with --wrap-mode=nodownload, meson finds no aml unless it is unpacked in the source's subprojects/.
+const MESON = `#!/bin/sh
+echo "meson $*" >> "$HOME/calls"
+[ -f "$3/subprojects/aml/meson.build" ] || { echo 'ERROR: Dependency "aml1" not found' >&2; exit 1; }
+mkdir -p "$2"
+`;
+const NINJA = `#!/bin/sh
+echo "ninja $*" >> "$HOME/calls"
+printf '#!/bin/sh\\necho wlvncc\\n' > "$2/wlvncc" && chmod +x "$2/wlvncc"
+`;
+function wlvnccSource({ amlSum } = {}) {
+  const root = source('0'.repeat(64));
+  const tarball = (dir, file, body) => {
+    mkdirSync(join(root, 'src', dir), { recursive: true });
+    writeFileSync(join(root, 'src', dir, file), body);
+    assert.equal(spawnSync('tar', ['-czf', join(root, `${dir}.tar.gz`), '-C', join(root, 'src'), dir]).status, 0);
+    return sha(readFileSync(join(root, `${dir}.tar.gz`)));
+  };
+  const wlvncc = tarball(`wlvncc-${'c'.repeat(40)}`, 'meson.build', "project('wlvncc')\n");
+  const aml = tarball('aml-1.0.0', 'meson.build', "project('aml')\n");
+  writeFileSync(
+    join(root, 'versions.toml'),
+    `[[pin]]\nname = "wlvncc"\nversion = "${'c'.repeat(40)}"\nrepo = "any1/wlvncc"\ntrack = "commit"\nurl = "file://${root}/wlvncc-{version}.tar.gz"\nsha256 = "${wlvncc}"\n\n` +
+      `[[pin]]\nname = "aml"\nversion = "1.0.0"\nrepo = "any1/aml"\nurl = "file://${root}/aml-{version}.tar.gz"\nsha256 = "${amlSum ?? aml}"\n`,
+  );
+  mkdirSync(join(root, 'stubs'));
+  writeFileSync(join(root, 'stubs/meson'), MESON, { mode: 0o755 });
+  writeFileSync(join(root, 'stubs/ninja'), NINJA, { mode: 0o755 });
+  return root;
+}
+const wlvnccScript = () => readFileSync(join(repo, 'home/.chezmoiscripts', WLVNCC), 'utf8');
+
+test('wlvncc builds with aml unpacked as its subproject, never downloading, and installs into ~/.local/bin', () => {
+  const root = wlvnccSource();
+  const r = run(root, wlvnccScript(), `${root}/stubs:`);
+  assert.equal(r.status, 0, r.stderr);
+  const calls = readFileSync(join(root, 'calls'), 'utf8').trim().split('\n');
+  assert.equal(calls.length, 2, calls.join('\n'));
+  assert.match(calls[0], /^meson setup \S+ \S+ /);
+  assert.match(calls[0], / --wrap-mode=nodownload( |$)/);
+  // Installed shared, libaml.so would sit in ~/.local/lib64, where the loader never looks.
+  assert.match(calls[0], / -Daml:default_library=static( |$)/);
+  assert.match(calls[1], /^ninja -C \S+$/);
+  assert.equal(spawnSync(join(root, '.local/bin/wlvncc'), { encoding: 'utf8' }).stdout, 'wlvncc\n');
+  assert.match(r.stdout, new RegExp(`dots: pin wlvncc ${'c'.repeat(40)}`));
+  assert.deepEqual(readdirSync(join(root, '.cache')), []);
+});
+
+test("a wrong aml sha256 stops wlvncc's build before meson, naming aml", () => {
+  const root = wlvnccSource({ amlSum: '0'.repeat(64) });
+  const r = run(root, wlvnccScript(), `${root}/stubs:`);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /pin aml: sha256/);
+  assert.equal(existsSync(join(root, 'calls')), false);
+  assert.equal(existsSync(join(root, '.local/bin/wlvncc')), false);
+});
+
+// aml is built into wlvncc, so a change to aml's pin alone must re-render, and so rerun, wlvncc's script.
+test("changing only aml's sha256 re-renders aml's and wlvncc's scripts and no other", () => {
+  const dir = join(repo, 'home/.chezmoiscripts');
+  const scripts = readdirSync(dir).filter((f) => /^run_onchange_after_2\d-pin-.+\.sh\.tmpl$/.test(f));
+  const versions = readFileSync(join(repo, 'versions.toml'), 'utf8');
+  const render = (toml) => {
+    const root = source('0'.repeat(64));
+    writeFileSync(join(root, 'versions.toml'), toml);
+    return Object.fromEntries(scripts.map((f) => [f, renderOnly(root, readFileSync(join(dir, f), 'utf8'))]));
+  };
+  const moved = versions.replace(/(name = "aml"\n(?:[^[\n][^\n]*\n)*?sha256 = ")[0-9a-f]+/, `$1${'e'.repeat(64)}`);
+  assert.notEqual(moved, versions, 'versions.toml has an aml pin with a sha256');
+  const base = render(versions);
+  const after = render(moved);
+  assert.deepEqual(scripts.filter((f) => after[f] !== base[f]).sort(), ['run_onchange_after_29-pin-aml.sh.tmpl', WLVNCC]);
 });

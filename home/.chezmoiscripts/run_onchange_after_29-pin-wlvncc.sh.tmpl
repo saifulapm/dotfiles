@@ -1,0 +1,25 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "wlvncc") }}
+{{- $versions := include (joinPath .chezmoi.workingTree "versions.toml") | fromToml }}
+{{- $aml := dict }}
+{{- range $versions.pin }}{{ if eq .name "aml" }}{{ $aml = . }}{{ end }}{{ end }}
+{{- if not $aml }}{{ fail "versions.toml has no pin aml" }}{{ end }}
+# aml, wlvncc's event loop, builds as its meson subproject; its pin's values are rendered here, so a change to aml rebuilds wlvncc.
+aml_url={{ $aml.url | replace "{version}" $aml.version | quote }}
+aml_sha256={{ $aml.sha256 | quote }}
+aml=$pin_tmp/aml.tar.gz
+curl -fsSL -o "$aml" "$aml_url" || die "pin aml: could not download $aml_url"
+echo "$aml_sha256  $aml" | sha256sum -c --status || die "pin aml: sha256 of $aml_url is not $aml_sha256"
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+src=$pin_tmp/wlvncc-$pin_version
+mkdir -p "$src/subprojects/aml"
+tar -xzf "$aml" -C "$src/subprojects/aml" --strip-components=1
+# nodownload: meson takes aml from subprojects/ and fetches nothing. Static: a shared libaml would land in ~/.local/lib64, where the loader never looks.
+meson setup "$pin_tmp/build" "$src" --buildtype=release --wrap-mode=nodownload -Daml:default_library=static >/dev/null || die "pin $pin_name: meson setup failed"
+ninja -C "$pin_tmp/build" >/dev/null || die "pin $pin_name: build failed"
+mkdir -p "$HOME/.local/bin"
+# A rename, not a write over the old file, which an open viewer still holds.
+install -m 0755 "$pin_tmp/build/wlvncc" "$HOME/.local/bin/.wlvncc.new" && mv -f "$HOME/.local/bin/.wlvncc.new" "$HOME/.local/bin/wlvncc" || die "pin $pin_name: could not install wlvncc"
+pin_done
