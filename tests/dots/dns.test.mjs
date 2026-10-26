@@ -12,6 +12,7 @@ const bin = new URL('../../bin/dots-dns', import.meta.url).pathname;
 const fixture = (name) => new URL('./fixtures/' + name, import.meta.url).pathname;
 const DEVICES = JSON.parse(readFileSync(fixture('dns-devices.json'), 'utf8'));
 const PROFILE = readFileSync(fixture('dns-apple-profile.mobileconfig'));
+const TAILNET_PROFILE = readFileSync(fixture('dns-apple-profile-tailnet.mobileconfig'));
 const TOKEN = 'apple-banana-cherry-delta';
 const T0 = 1792670000;
 const FORGED = ['Fa\nke', 'Fake\u202Eevil', 'Fake\u001b[31m', '', 'x'.repeat(200)];
@@ -24,7 +25,7 @@ const QUERIES = {
 
 // The stub keeps its own copy of the devices, answers under /api, and records every request. `session` is the cookie it accepts; `down` answers 503 to everything.
 async function stub(t) {
-  const s = { seen: [], devices: structuredClone(DEVICES), session: 'GOODSESSION', auth: 200, down: false, hold: 0, queries: QUERIES };
+  const s = { seen: [], devices: structuredClone(DEVICES), session: 'GOODSESSION', auth: 200, down: false, hold: 0, queries: QUERIES, profile: PROFILE };
   const server = createServer((req, res) => {
     let body = '';
     req.on('data', (d) => (body += d));
@@ -49,7 +50,7 @@ async function stub(t) {
         const dev = s.devices.find((d) => d.id === m[1]);
         if (!dev) return send(404, { error: 'not found' });
         if (m[2] === '/queries') return send(200, s.queries);
-        if (m[2] === '/apple-profile') return send(200, PROFILE, 'application/x-apple-aspen-config');
+        if (m[2] === '/apple-profile') return send(200, s.profile, 'application/x-apple-aspen-config');
         if (req.method === 'GET') {
           const read = structuredClone(dev);
           return setTimeout(() => send(200, read), s.hold);
@@ -277,7 +278,7 @@ test('state one-lines and strips controls and bidi marks from server text', asyn
   assert.deepEqual(carried(out)[0].blocks, [{ domain: 'evil.example', at: T0 }]);
 });
 
-test('profiles prints one line per carried device and profile writes its apple-profile to Downloads', async (t) => {
+test('profiles prints one line per carried device and profile writes its apple-profile to Downloads, with ts.net left to the phone', async (t) => {
   const s = await stub(t);
   const ctx = scratch(t, s.url);
   const list = await run(ctx, 'profiles');
@@ -287,7 +288,18 @@ test('profiles prints one line per carried device and profile writes its apple-p
   assert.equal(r.status, 0, r.stderr);
   const path = join(ctx.home, 'Downloads', 'iPad.mobileconfig');
   assert.equal(r.stdout, path + '\n');
-  assert.deepEqual(readFileSync(path), PROFILE);
+  assert.equal(readFileSync(path, 'utf8'), TAILNET_PROFILE.toString());
+});
+
+test('profile refuses an apple-profile with no on-demand rules to add ts.net to, and writes nothing', async (t) => {
+  const s = await stub(t);
+  s.profile = readFileSync(fixture('dns-apple-profile.mobileconfig'), 'utf8').replace(/\t*<key>OnDemandRules<\/key>[\s\S]*?\n\t{3}<\/array>\n/, '');
+  assert.doesNotMatch(s.profile, /OnDemandRules/);
+  const ctx = scratch(t, s.url);
+  const r = await run(ctx, 'profile', 'carried:dev00ipad');
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /no on-demand rules/);
+  assert.equal(existsSync(join(ctx.home, 'Downloads', 'iPad.mobileconfig')), false);
 });
 
 test('a valid cookie means no login', async (t) => {

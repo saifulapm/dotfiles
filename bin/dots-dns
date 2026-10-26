@@ -382,12 +382,18 @@ async function profiles() {
   return (await devices(await account())).map((d) => `${clean(d.name)}\t${d.id}\n`).join('');
 }
 
+// Only Tailscale's MagicDNS knows tailnet names, so the profile leaves ts.net to the phone's own resolver, the way uBlockDNS leaves carrier names.
+const TAILNET_RULE = (i) => `${i}<dict>\n${i}\t<key>DomainAction</key>\n${i}\t<string>NeverConnect</string>\n${i}\t<key>Domains</key>\n${i}\t<array>\n${i}\t\t<string>ts.net</string>\n${i}\t</array>\n${i}</dict>\n`;
+
 // The file is named after the device, with the characters a file name cannot hold replaced.
 async function profile(id) {
   const acct = await account();
   const dev = (await devices(acct)).find((d) => d.id === id);
   if (!dev) throw new Failure('no such carried device');
-  const body = await api('read apple-profile', 'GET', `/account/${acct}/device/${id}/apple-profile`, null, true);
+  const raw = (await api('read apple-profile', 'GET', `/account/${acct}/device/${id}/apple-profile`, null, true)).toString('utf8');
+  const rules = /^(\t*)<key>ActionParameters<\/key>\n\1<array>\n/m;
+  if (!rules.test(raw)) throw new Failure('the apple-profile has no on-demand rules to leave ts.net out of');
+  const body = raw.replace(rules, (m, i) => m + TAILNET_RULE(i + '\t'));
   const name = clean(dev.name).replace(/[/\\:*?"<>|]/g, '-').replace(/^\.+/, '').slice(0, 100) || id;
   const dir = join(env.HOME, 'Downloads');
   mkdirSync(dir, { recursive: true });

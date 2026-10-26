@@ -2,9 +2,62 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>DNSSettings</key>
+			<dict>
+				<key>DNSProtocol</key>
+				<string>HTTPS</string>
+				<key>ServerURL</key>
+				<string>https://my.ublockdns.com/dev00ipad</string>
+			</dict>
+			<key>OnDemandRules</key>
+			<array>
+				<dict>
+					<key>Action</key>
+					<string>EvaluateConnection</string>
+					<key>ActionParameters</key>
+					<array>
+						<dict>
+							<!-- Carrier IMS names (RCS, Wi-Fi Calling) only resolve via carrier DNS. -->
+							<key>DomainAction</key>
+							<string>NeverConnect</string>
+							<key>Domains</key>
+							<array>
+								<string>3gppnetwork.org</string>
+							</array>
+						</dict>
+					</array>
+				</dict>
+			</array>
+			<key>PayloadDisplayName</key>
+			<string>uBlockDNS</string>
+			<key>PayloadIdentifier</key>
+			<string>com.ublockdns.dns.dev00ipad</string>
+			<key>PayloadType</key>
+			<string>com.apple.dnsSettings.managed</string>
+			<key>PayloadUUID</key>
+			<string>B5E3B4A0-1234-4F5A-8B6C-646576303069</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+		</dict>
+	</array>
+	<key>PayloadDescription</key>
+	<string>Routes all DNS queries through uBlockDNS for ad and tracker blocking.</string>
 	<key>PayloadDisplayName</key>
-	<string>Fake DNS profile for tests</string>
+	<string>uBlockDNS</string>
 	<key>PayloadIdentifier</key>
-	<string>com.example.dns.dev00ipad</string>
+	<string>com.ublockdns.profile.dev00ipad</string>
+	<key>PayloadOrganization</key>
+	<string>ublockdns.com</string>
+	<key>PayloadRemovalDisallowed</key>
+	<false/>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadUUID</key>
+	<string>A4E3B4A0-5678-4F5A-8B6C-646576303069</string>
+	<key>PayloadVersion</key>
+	<integer>1</integer>
 </dict>
 </plist>
