@@ -1,0 +1,9 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+if root firewall-cmd --state >/dev/null 2>&1; then
+  # tailscale0 falls in the default zone, which drops tailscale serve's 5900, so only the tailnet's own addresses get through.
+  for rule in 'rule family="ipv4" source address="100.64.0.0/10" port port="5900" protocol="tcp" accept' \
+    'rule family="ipv6" source address="fd7a:115c:a1e0::/48" port port="5900" protocol="tcp" accept'; do
+    root firewall-cmd -q --add-rich-rule="$rule" && root firewall-cmd -q --permanent --add-rich-rule="$rule" || die "could not let the tailnet reach wayvnc on 5900"
+  done
+fi

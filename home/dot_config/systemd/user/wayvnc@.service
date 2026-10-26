@@ -1,0 +1,12 @@
+[Unit]
+Description=wayvnc, one output of this screen served on localhost and published to the tailnet
+Documentation=https://github.com/any1/wayvnc
+
+[Service]
+# The instance is the output's name, as in wayvnc@DP-3.service; -r draws the pointer, and ~/.config/wayvnc/config sets the address and port.
+ExecStart=/usr/bin/wayvnc -r -o %i
+MemoryMax=256M
+# A machine whose tailscaled is down, has no operator or hangs on a prompt still serves on localhost.
+ExecStartPost=-/usr/bin/timeout 30 /usr/bin/tailscale serve --bg --yes --tcp=5900 tcp://127.0.0.1:5900
+# Stopped, wayvnc takes the mapping with it, so :5900 on the tailnet is open only while someone views.
+ExecStopPost=-/usr/bin/timeout 30 /usr/bin/tailscale serve --tcp=5900 off
