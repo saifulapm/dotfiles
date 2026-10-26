@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# dots-vnc [--tight] <name>: shows another machine's screen in wlvncc. Over ssh it starts the remote's wayvnc for its focused output, and after wlvncc closes it stops that wayvnc unless another viewer still has it.
+set -uo pipefail
+{
+
+die() {
+  echo "dots-vnc: $1" >&2
+  exit "${2:-1}"
+}
+
+usage() {
+  echo "usage: dots-vnc [--tight] mini|nuc|macbook" >&2
+  exit 2
+}
+
+# ZRLE is lossless and keeps text sharp; Tight's JPEG costs less on a slow link but smears coloured text.
+encoding=zrle
+[ "${1:-}" = --tight ] && { encoding=tight; shift; }
+[ $# -eq 1 ] || usage
+case $1 in
+  mini | nuc | macbook) name=$1 ;;
+  *) usage ;;
+esac
+
+# The remote's login shell is fish, so each remote side goes to bash as a script on stdin, its arguments after bash -s.
+remote() {
+  ssh -o BatchMode=yes -o ConnectTimeout=5 "$name" bash -s "$@"
+}
+
+# Prints the instance (an output name) whose wayvnc now listens on 5900. The braces make bash read the whole script before a command can read stdin.
+instance=$(remote <<'EOF'
+{
+set -uo pipefail
+# An ssh session has no NIRI_SOCKET; niri-session put it in the user manager's environment.
+NIRI_SOCKET=
+while IFS= read -r line; do
+  case $line in NIRI_SOCKET=*) NIRI_SOCKET=${line#NIRI_SOCKET=} ;; esac
+done < <(systemctl --user show-environment 2>/dev/null)
+export NIRI_SOCKET
+focused=$(niri msg -j focused-output 2>/dev/null | jq -r '.name // empty' 2>/dev/null)
+[ -n "$focused" ] || exit 3
+# Every instance listens on 127.0.0.1:5900, so a second could not bind: an active one is reused as it is.
+read -r unit _ < <(systemctl --user list-units --state=active --plain --no-legend 'wayvnc@*.service')
+if [ -z "${unit:-}" ]; then
+  unit=wayvnc@$focused.service
+  systemctl --user start "$unit" || exit 1
+fi
+for ((i = 0; i < 40; i++)); do
+  if [ -n "$(ss -Hltn 'sport = :5900')" ]; then
+    unit=${unit#wayvnc@}
+    echo "${unit%.service}"
+    exit 0
+  fi
+  sleep 0.2
+done
+exit 4
+}
+EOF
+)
+case $? in
+  0) ;;
+  255) die "$name is unreachable" ;;
+  3) die "$name has no niri session" ;;
+  4) die "wayvnc on $name did not listen on 5900 within 8 s" ;;
+  *) die "could not start wayvnc on $name" ;;
+esac
+
+# Not exec: the remote's wayvnc is stopped after wlvncc ends, however it ends. open-h264 is never offered, since it needs VA-API the Macs lack.
+wlvncc -e "$encoding" -i -n -a dots-vnc "$name" 5900
+
+remote "$instance" <<'EOF' || die "could not reach $name to stop its wayvnc"
+{
+set -uo pipefail
+# wayvnc may still list the viewer that just left for a moment, so the list is read for up to 3 s; a client that stays is another viewer, whose wayvnc keeps running.
+for ((i = 0; ; i++)); do
+  if wayvncctl --json client-list 2>/dev/null | jq -e 'length == 0' >/dev/null 2>&1; then
+    systemctl --user stop "wayvnc@$1.service"
+    exit
+  fi
+  ((i < 6)) || exit 0
+  sleep 0.5
+done
+}
+EOF
+exit
+}
