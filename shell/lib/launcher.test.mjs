@@ -69,8 +69,23 @@ test('commands filter by name, lock first for lo', () => {
 test('an empty commands query lists the five capture rows first, then the others in their own order', () => {
   assert.deepEqual(commandRows('').map((r) => r.title), [
     'Annotate region', 'Annotate clipboard image', 'Copy text from region (OCR)', 'Read QR code from region', 'Pick colour',
-    'lock', 'theme', 'record', 'sync',
+    'lock', 'theme', 'record', 'sync', 'Remote: mini', 'Remote: nuc', 'Remote: macbook',
   ]);
+});
+
+test('each machine lists a Remote row for the other two, each running dots-vnc with the name in its title', () => {
+  const remotes = (machine) => commandRows('remote', undefined, machine).map((r) => [r.title, r.exec]);
+  assert.deepEqual(remotes('macbook-m2'), [['Remote: mini', ['dots-vnc', 'mini']], ['Remote: nuc', ['dots-vnc', 'nuc']]]);
+  assert.deepEqual(remotes('nuc'), [['Remote: macbook', ['dots-vnc', 'macbook']], ['Remote: mini', ['dots-vnc', 'mini']]]);
+  assert.deepEqual(remotes('mac-mini-m2'), [['Remote: macbook', ['dots-vnc', 'macbook']], ['Remote: nuc', ['dots-vnc', 'nuc']]]);
+});
+
+test('a machine that is none of the three, like the install container or a nested session, lists all three Remote rows', () => {
+  for (const machine of ['test', 'dev', 'unknown']) {
+    assert.deepEqual(commandRows('remote', '/srv/b', machine).map((r) => r.exec), [
+      ['/srv/b/dots-vnc', 'macbook'], ['/srv/b/dots-vnc', 'mini'], ['/srv/b/dots-vnc', 'nuc'],
+    ]);
+  }
 });
 
 test('each capture row runs dots-capture, and a row with a global key names it', () => {

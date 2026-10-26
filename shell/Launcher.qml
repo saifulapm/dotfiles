@@ -9,6 +9,7 @@ import "lib/clips.mjs" as Clips
 import "lib/emoji.mjs" as Emoji
 import "lib/voice.mjs" as L
 import "lib/reminders.mjs" as Rem
+import "lib/notes.mjs" as N
 
 // Apps, windows, clipboard, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
 Item {
@@ -41,6 +42,8 @@ Item {
     // bin/dots-zones' answer as of entering calculator mode, for `= 17:00 nyc`; null until it answers.
     property var zones: null
     property bool emojiWanted: false
+    // This machine's id, read as Goals reads it; the Remote rows leave this machine out.
+    readonly property string machine: N.machineId(Quickshell.env("DOTS_MACHINE"), chezmoiFile.text(), hostnameFile.text())
     readonly property string clipDb: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/clips.db"
     // Every mode supplies rows as {title, detail, exec?, copy?}; a new mode adds a case here.
     readonly property var found: {
@@ -59,7 +62,7 @@ Item {
         case "reminder":
             return Rem.reminderRows(parsed.q, Date.now(), pending, reminders ? reminders.broken : false);
         case "commands":
-            return Lib.commandRows(parsed.q, Quickshell.shellDir + "/../bin");
+            return Lib.commandRows(parsed.q, Quickshell.shellDir + "/../bin", machine);
         case "apps":
             return Lib.rank(apps, parsed.q).map(a => ({
                         title: a.name,
@@ -210,6 +213,20 @@ Item {
             emojiWanted = true;
         if (mode === "calculator" && !zoner.running)
             zoner.running = true;
+    }
+
+    FileView {
+        id: chezmoiFile
+        path: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/chezmoi/chezmoi.toml"
+        blockLoading: true
+        printErrors: false
+    }
+
+    FileView {
+        id: hostnameFile
+        path: "/etc/hostname"
+        blockLoading: true
+        printErrors: false
     }
 
     FileView {

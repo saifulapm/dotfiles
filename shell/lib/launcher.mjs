@@ -67,8 +67,14 @@ const COMMANDS = [
 // The user manager's PATH lacks the repo's bin/, so a dots script runs from bin, the one beside the shell.
 const fromBin = (c, bin) => (bin && /^dots(-|$)/.test(c.exec[0]) ? Object.assign({}, c, { exec: [`${bin}/${c.exec[0]}`].concat(c.exec.slice(1)) }) : c);
 
-export function commandRows(q, bin) {
-  const entries = COMMANDS.map((c) => ({ name: c.title, keywords: [], row: Object.assign({ glyph: '>' }, fromBin(c, bin)) }));
+// Each machine's tailnet name by its machine id; a Remote row opens every one but this machine, so an id outside the map lists all three.
+const REMOTES = { 'mac-mini-m2': 'mini', nuc: 'nuc', 'macbook-m2': 'macbook' };
+
+export function commandRows(q, bin, machine) {
+  const remotes = Object.keys(REMOTES)
+    .filter((id) => id !== machine)
+    .map((id) => ({ title: `Remote: ${REMOTES[id]}`, detail: `Show ${REMOTES[id]}'s screen`, exec: ['dots-vnc', REMOTES[id]] }));
+  const entries = COMMANDS.concat(remotes).map((c) => ({ name: c.title, keywords: [], row: Object.assign({ glyph: '>' }, fromBin(c, bin)) }));
   return q.trim() ? rows(entries, q) : entries.map((e) => e.row);
 }
 
