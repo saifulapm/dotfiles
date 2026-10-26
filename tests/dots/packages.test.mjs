@@ -16,7 +16,7 @@ const everyArch = [
   'mpv', 'imv', 'zathura', 'zathura-pdf-mupdf', 'yt-dlp', 'pass-otp', 'ffmpeg', 'ruby', 'rubypick', 'golang',
   'gtk4', 'libadwaita', 'lynx', 'php-cli', 'php-fpm', 'php-mbstring', 'php-xml', 'php-pdo', 'php-intl', 'php-process', 'php-mysqlnd', 'php-pgsql', 'php-gd', 'php-bcmath', 'php-pecl-redis6', 'composer', 'caddy', 'podman',
 ];
-const macOnly = ['meson', 'ninja-build', 'arm-none-eabi-gcc-cs', 'libva-devel', 'binutils', 'pkgconf-pkg-config', 'libdrm-devel', 'kernel-headers'];
+const macOnly = ['arm-none-eabi-gcc-cs', 'libva-devel', 'binutils', 'kernel-headers'];
 
 test('every daily package is declared for every arch with a reason', () => {
   for (const name of everyArch) {
@@ -66,7 +66,20 @@ test('the NUC\'s wifi firmware, VA driver and vainfo are declared for x86_64 onl
 // Google's adb, aapt2 and NDK hosts are x86_64 only, so the Macs take adb from Fedora and build scrcpy against RPM Fusion's ffmpeg.
 test('the mobile toolchain\'s packages: JDK 25, clang and lld everywhere, adb and scrcpy\'s build deps on the Macs', () => {
   for (const name of ['java-25-openjdk-devel', 'clang', 'lld']) assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
-  for (const name of ['android-tools', 'SDL3-devel', 'libusb1-devel', 'ffmpeg-devel']) assert.equal(byName.get(name)?.arch, 'aarch64', `${name} arch`);
+  for (const name of ['android-tools', 'SDL3-devel', 'libusb1-devel']) assert.equal(byName.get(name)?.arch, 'aarch64', `${name} arch`);
   assert.equal(byName.get('ffmpeg-devel').rpmfusion, 'free');
   for (const name of ['java-25-openjdk-devel', 'clang', 'lld', 'android-tools', 'SDL3-devel', 'libusb1-devel', 'ffmpeg-devel']) assert.match(byName.get(name).why, /\w/, `${name} why`);
+});
+
+// Every machine is a remote and a viewer: wayvnc serves, and wlvncc builds from its pin against these on both arches.
+test('wayvnc and everything wlvncc builds against are declared for every arch', () => {
+  const build = [
+    'meson', 'ninja-build', 'pkgconf-pkg-config', 'libdrm-devel', 'ffmpeg-devel', 'mesa-libgbm-devel',
+    'libxkbcommon-devel', 'pixman-devel', 'wayland-devel', 'libglvnd-devel', 'lzo-devel', 'zlib-ng-compat-devel', 'libjpeg-turbo-devel', 'openssl-devel',
+  ];
+  for (const name of ['wayvnc', ...build]) {
+    assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
+    assert.match(byName.get(name).why, /\w/, `${name} why`);
+  }
+  assert.equal(byName.get('ffmpeg-devel').rpmfusion, 'free');
 });

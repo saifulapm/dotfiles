@@ -503,13 +503,13 @@ why = "kak-mail renders HTML mail with it"
 
 [[package]]
 name = "meson"
-arch = "aarch64"
-why = "builds the libva-v4l2-request and scrcpy pins on the Macs"
+arch = "all"
+why = "builds the wlvncc pin, and the libva-v4l2-request and scrcpy pins on the Macs"
 
 [[package]]
 name = "ninja-build"
-arch = "aarch64"
-why = "meson's build backend for the libva-v4l2-request and scrcpy pins"
+arch = "all"
+why = "meson's build backend for the wlvncc, libva-v4l2-request and scrcpy pins"
 
 [[package]]
 name = "arm-none-eabi-gcc-cs"
@@ -523,8 +523,8 @@ why = "builds the libva-v4l2-request pin on the Macs"
 
 [[package]]
 name = "libdrm-devel"
-arch = "aarch64"
-why = "builds the libva-v4l2-request pin on the Macs"
+arch = "all"
+why = "builds the wlvncc pin, and the libva-v4l2-request pin on the Macs"
 
 [[package]]
 name = "kernel-headers"
@@ -538,8 +538,8 @@ why = "nm, which the AVD firmware build reads symbols with"
 
 [[package]]
 name = "pkgconf-pkg-config"
-arch = "aarch64"
-why = "pkg-config, which meson finds libva, libdrm and scrcpy's libraries with"
+arch = "all"
+why = "pkg-config, which meson finds libva, libdrm, wlvncc's and scrcpy's libraries with"
 
 [[package]]
 name = "iwlwifi-mvm-firmware"
@@ -699,6 +699,56 @@ why = "builds the scrcpy pin's USB support on the Macs"
 
 [[package]]
 name = "ffmpeg-devel"
-arch = "aarch64"
+arch = "all"
 rpmfusion = "free"
-why = "builds the scrcpy pin on the Macs against RPM Fusion's ffmpeg, which Fedora's -free devel packages conflict with"
+why = "builds the wlvncc pin, and the scrcpy pin on the Macs, against RPM Fusion's ffmpeg, which Fedora's -free devel packages conflict with"
+
+[[package]]
+name = "wayvnc"
+arch = "all"
+why = "serves this machine's screen to dots-vnc on another"
+
+[[package]]
+name = "mesa-libgbm-devel"
+arch = "all"
+why = "builds the wlvncc pin"
+
+[[package]]
+name = "libxkbcommon-devel"
+arch = "all"
+why = "builds the wlvncc pin"
+
+[[package]]
+name = "pixman-devel"
+arch = "all"
+why = "builds the wlvncc pin"
+
+[[package]]
+name = "wayland-devel"
+arch = "all"
+why = "builds the wlvncc pin"
+
+[[package]]
+name = "libglvnd-devel"
+arch = "all"
+why = "builds the wlvncc pin, with its EGL and GLES headers"
+
+[[package]]
+name = "lzo-devel"
+arch = "all"
+why = "builds the wlvncc pin, whose rfbproto includes minilzo.h"
+
+[[package]]
+name = "zlib-ng-compat-devel"
+arch = "all"
+why = "builds the wlvncc pin with zrle and tight"
+
+[[package]]
+name = "libjpeg-turbo-devel"
+arch = "all"
+why = "builds the wlvncc pin with tight"
+
+[[package]]
+name = "openssl-devel"
+arch = "all"
+why = "builds the wlvncc pin, whose crypto falls back to headers it lacks without it"
