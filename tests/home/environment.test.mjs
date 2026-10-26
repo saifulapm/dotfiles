@@ -1,4 +1,4 @@
-// environment.d gives the systemd user manager Electron's Wayland hint, Chromium's flags, the ssh-agent socket and the Android SDK.
+// environment.d gives the systemd user manager Electron's Wayland hint, Chromium's flags and OAuth client, the ssh-agent socket and the Android SDK.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -19,6 +19,12 @@ test('chromium gets v1\'s flags, no new-tab footer, and the rendered theme and n
     'CHROMIUM_USER_FLAGS=--ozone-platform-hint=auto --force-color-profile=srgb --no-default-browser-check --enable-features=TouchpadOverscrollHistoryNavigation,WaylandPerSurfaceScale,WaylandUiScale,OverlayScrollbar --disable-features=AimEnabled,AiMode,AiModeOmniboxEntryPoint,AiModePageActionIconView,AiModeEntryPointAlwaysNavigates,AiModeStartPack,AimEligibilityService,AimUrlNavigation,AimUrlInterceptPassthrough,Compose,LensOverlay,OptimizationGuideOnDeviceModel,OptimizationGuideModelDownloading,WallpaperSearch,NtpFooter --load-extension=${HOME}/.local/state/dots/theme-out/chromium-theme,${HOME}/.local/state/dots/theme-out/chromium-newtab',
   );
   assert.doesNotMatch(read('60-chromium.conf'), /\.dotfiles/);
+});
+
+// Fedora's build leaves the remoting OAuth clients unset, so --oauth2-client-id alone (Omarchy's way) still reads as no client and keeps sign-in off; the defaults fill every client.
+test('chromium gets Google Chrome\'s OAuth client as its default, so Google sign-in and sync work', () => {
+  assert.match(read('60-chromium.conf'), /^GOOGLE_DEFAULT_CLIENT_ID=77185425430\.apps\.googleusercontent\.com$/m);
+  assert.match(read('60-chromium.conf'), /^GOOGLE_DEFAULT_CLIENT_SECRET=OTJgUOQcT7lO7GsGZq2G4IlT$/m);
 });
 
 test('Electron apps draw on Wayland', () => {
@@ -48,5 +54,6 @@ test('the environment.d generator expands every file', { skip: !existsSync(gener
   assert.match(out, new RegExp(`^ANDROID_HOME=${home}/Android/Sdk$`, 'm'));
   assert.match(out, new RegExp(`^PATH=${home}/\\.cargo/bin:/usr/bin:${home}/\\.local/bin:${home}/Android/Sdk/platform-tools:${home}/Android/Sdk/cmdline-tools/latest/bin:${home}/Android/Sdk/emulator$`, 'm'));
   assert.match(out, /^CHROMIUM_USER_FLAGS=.*--force-color-profile=srgb.*AimEnabled/m);
+  assert.match(out, /^GOOGLE_DEFAULT_CLIENT_ID=77185425430\.apps\.googleusercontent\.com$/m);
   assert.match(out, new RegExp(`^CHROMIUM_USER_FLAGS=.* --load-extension=${home}/\\.local/state/dots/theme-out/chromium-theme,${home}/\\.local/state/dots/theme-out/chromium-newtab"?$`, 'm'));
 });
