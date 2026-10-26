@@ -45,8 +45,9 @@ if [ -z "${unit:-}" ]; then
   unit=wayvnc@$focused.service
   systemctl --user start "$unit" || exit 1
 fi
+# tailscale serve listens on the tailnet's 5900 before wayvnc binds 127.0.0.1, and a viewer let in early has its dial refused, so only wayvnc's own listener counts.
 for ((i = 0; i < 40; i++)); do
-  if [ -n "$(ss -Hltn 'sport = :5900')" ]; then
+  if [ -n "$(ss -Hltn 'src 127.0.0.1 and sport = :5900')" ]; then
     unit=${unit#wayvnc@}
     echo "${unit%.service}"
     exit 0

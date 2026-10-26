@@ -48,7 +48,7 @@ case $1 in
     if [ -e "$s/active/$2" ]; then echo active; else echo inactive; exit 3; fi
     ;;
   start | restart) : >"$s/active/$2" ;;
-  stop) rm -f "$s/active/$2" ;;
+  stop) rm -f "$s/active/$2" "$s/loopback" "$s/ss.count" ;;
   list-units)
     for f in "$s"/active/*; do
       [ -e "$f" ] || continue
@@ -77,14 +77,23 @@ case "$*" in
 esac
 `;
 
-// A 5900 listener shows only while some wayvnc unit is active.
+// As on the nuc: while a wayvnc unit is active, tailscale serve's tailnet listeners show at once (15 ms after start), and wayvnc's own on 127.0.0.1 only from the third read (40-90 ms). A src filter keeps only its address's lines.
 const SS = `#!/bin/bash
 # The stub's own tools, which the remote side's PATH leaves out.
 PATH=/usr/bin
-echo "$*" >>"$STUB_REMOTE/ss.log"
-for f in "$STUB_REMOTE"/active/wayvnc@*; do
-  [ -e "$f" ] && echo "LISTEN 0      16         127.0.0.1:5900      0.0.0.0:*" && break
-done
+s=$STUB_REMOTE
+echo "$*" >>"$s/ss.log"
+up=
+for f in "$s"/active/wayvnc@*; do [ -e "$f" ] && up=1; done
+[ -n "$up" ] || exit 0
+n=$(($(cat "$s/ss.count" 2>/dev/null || echo 0) + 1))
+echo "$n" >"$s/ss.count"
+[ "$n" -ge 3 ] && : >"$s/loopback"
+{
+  [ -e "$s/loopback" ] && echo "LISTEN 0      16                       127.0.0.1:5900 0.0.0.0:*"
+  echo "LISTEN 0      4096                100.103.142.87:5900 0.0.0.0:*"
+  echo "LISTEN 0      4096   [fd7a:115c:a1e0::6034:8e58]:5900    [::]:*"
+} | if [[ "$*" == *"src 127.0.0.1"* ]]; then grep ' 127.0.0.1:'; else cat; fi
 exit 0
 `;
 
@@ -95,10 +104,17 @@ echo "$*" >>"$STUB_REMOTE/wayvncctl.log"
 cat "$STUB_REMOTE/clients.json"
 `;
 
+// Through tailscale serve, a viewer reaches wayvnc only once it listens on 127.0.0.1; before that tailscaled's dial is refused and wlvncc gives up, as it did live on 2026-10-27.
 const WLVNCC = `#!${process.execPath}
 const fs = require('node:fs');
-fs.appendFileSync(process.env.STUB_CTL + '/wlvncc.log', JSON.stringify(process.argv.slice(2)) + '\\n');
-process.exit(Number(fs.readFileSync(process.env.STUB_CTL + '/wlvncc-status', 'utf8')));
+const ctl = process.env.STUB_CTL;
+if (!fs.existsSync(ctl + '/remote/loopback')) {
+  fs.appendFileSync(ctl + '/refused.log', JSON.stringify(process.argv.slice(2)) + '\\n');
+  process.stderr.write('Failed to connect to server\\n');
+  process.exit(1);
+}
+fs.appendFileSync(ctl + '/wlvncc.log', JSON.stringify(process.argv.slice(2)) + '\\n');
+process.exit(Number(fs.readFileSync(ctl + '/wlvncc-status', 'utf8')));
 `;
 
 // Every log of every run, for the open-h264 check at the end.
@@ -128,6 +144,7 @@ function run(args, { host = 'nuc', down = false, niri = true, outputs = ['DP-3']
   writeFileSync(join(remote, 'focused.json'), JSON.stringify({ name: focused, make: 'Dell', model: 'U2723QE' }));
   writeFileSync(join(remote, 'clients.json'), JSON.stringify(clients) + '\n');
   for (const u of active) writeFileSync(join(remote, 'active', u), '');
+  if (active.length) writeFileSync(join(remote, 'loopback'), '');
   exe(join(remote, 'bin', 'systemctl'), SYSTEMCTL);
   exe(join(remote, 'bin', 'niri'), NIRI);
   exe(join(remote, 'bin', 'ss'), SS);
@@ -148,7 +165,7 @@ function run(args, { host = 'nuc', down = false, niri = true, outputs = ['DP-3']
     systemctl: lines(join(remote, 'systemctl.log')),
     wayvncctl: lines(join(remote, 'wayvncctl.log')),
   };
-  for (const f of ['ssh.log', 'wlvncc.log', 'remote/systemctl.log', 'remote/niri.log', 'remote/ss.log', 'remote/wayvncctl.log']) seen.push(read(join(ctl, f)));
+  for (const f of ['ssh.log', 'wlvncc.log', 'refused.log', 'remote/systemctl.log', 'remote/niri.log', 'remote/ss.log', 'remote/wayvncctl.log']) seen.push(read(join(ctl, f)));
   rmSync(dir, { recursive: true, force: true });
   return out;
 }
