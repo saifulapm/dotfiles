@@ -194,10 +194,15 @@ PanelWindow {
         id: noInput
     }
 
-    // Holds focus while the overview is open and no surface shows; a printable key opens the launcher with it typed.
+    // Holds focus while the overview is open and no surface shows; a printable key opens the launcher with it typed, and Esc or Enter closes the overview on the window it shows focused.
     Item {
         id: overviewKeys
         Keys.onPressed: event => {
+            if (event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                Quickshell.execDetached(["niri", "msg", "action", "close-overview"]);
+                event.accepted = true;
+                return;
+            }
             const typed = Lib.overviewChar(event.text, {
                 ctrl: event.modifiers & Qt.ControlModifier,
                 alt: event.modifiers & Qt.AltModifier,
