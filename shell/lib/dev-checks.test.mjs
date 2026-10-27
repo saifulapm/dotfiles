@@ -149,3 +149,17 @@ test('no line in tests/ or bin/ starts with an assignment that comes from an exp
   }
   assert.deepEqual(found, [], 'start the line with env');
 });
+
+// lib.sh's EXIT trap reads the shell's QML errors, runs cleanup() and stops the nested niri; config-rejected.sh replaced it with its own and left seven sessions running (m47), so a check's teardown goes in cleanup().
+test('no tests/dev script sets an EXIT trap after sourcing lib.sh', () => {
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh') && f !== 'lib.sh')) {
+    const lines = readFileSync(dir + f, 'utf8').split('\n');
+    const from = lines.findIndex((l) => /^\s*(source|\.)\s.*\blib\.sh\b/.test(l));
+    if (from < 0) continue;
+    lines.forEach((line, i) => {
+      if (i > from && /^\s*trap\s.*\bEXIT\b/.test(line)) found.push(`${f}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(found, [], 'put the teardown in cleanup()');
+});

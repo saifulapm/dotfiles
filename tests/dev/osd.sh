@@ -12,7 +12,7 @@ chmod +x "$fake/brightnessctl"
 # bin/dots-dev hands this PATH to the shell, so the shell runs the fake and never the real backlight.
 export PATH=$fake:$PATH
 source "$(dirname "$0")/lib.sh"
-trap 'dev_stop; rm -f "$dev_out" "$dev_log"; rm -rf "$fake"' EXIT
+cleanup() { rm -rf "$fake"; }
 
 under_dev() { case $1 in "$DOTS_DEV_DIR"/*) true ;; *) false ;; esac; }
 under_dev "${PIPEWIRE_RUNTIME_DIR:-}" || { echo "FAIL PIPEWIRE_RUNTIME_DIR is not the nested one"; exit 1; }
