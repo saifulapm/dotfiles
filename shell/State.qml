@@ -11,6 +11,8 @@ Singleton {
     property list<QtObject> ticks: []
     // When the running recording started, in ms since the epoch; 0 while nothing records.
     property real recordingSince: 0
+    // The running recording's wf-recorder, so its own cast never reads as sharing; 0 while nothing records.
+    property int recordingPid: 0
     // How many times slower surfaces move, read once at start; only bin/dots-dev sets it.
     readonly property real slowdown: M.slowdownOf(Quickshell.env("DOTS_MOTION_SLOWDOWN"))
 

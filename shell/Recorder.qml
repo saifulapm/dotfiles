@@ -80,12 +80,14 @@ Item {
         const hint = [];
         for (let i = 0; i < hintRepeater.count; i++)
             hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
-        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), frameLabel: hintCard.frameLabel(), recording: recording, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
+        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), frameLabel: hintCard.frameLabel(), recording: recording, pid: Root.State.recordingPid, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
     }
 
     Process {
         id: proc
         onRunningChanged: Root.State.recordingSince = running ? Date.now() : 0
+        // sh execs wf-recorder, so this pid is the one niri reports for its cast.
+        onProcessIdChanged: Root.State.recordingPid = processId ?? 0
         // The recording ends with a notice either way, so one that failed at the start or was killed does not just vanish.
         onExited: (code, status) => {
             forceStop.stop();

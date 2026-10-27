@@ -15,6 +15,10 @@ Scope {
         return N.outputView(state, output);
     }
 
+    function shares(ownPid) {
+        return N.shares(state, ownPid);
+    }
+
     Socket {
         id: stream
         path: Quickshell.env("NIRI_SOCKET")

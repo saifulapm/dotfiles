@@ -40,6 +40,9 @@ PanelWindow {
     // Bumped each second while a recording runs, so its counter moves.
     property real recordingNow: 0
     readonly property var recording: recordingSince > 0 ? I.recordingText(recordingSince, Math.max(recordingNow, recordingSince)) : null
+    // Every niri cast but the shell's own recording; Do Not Disturb never hides it (2N83H6SJ).
+    readonly property var shares: niri.shares(Root.State.recordingPid)
+    readonly property var sharing: shares.length ? shares : null
     // An agent's lease, {who, left} in ms, while one holds the session; leaseNow is bumped each second so the time left moves.
     property real leaseNow: Date.now()
     readonly property var lease: lock.leased ? { who: lock.heldBy, left: Math.max(0, lock.leaseUntil - leaseNow) } : null
@@ -88,6 +91,7 @@ PanelWindow {
             lease,
             calendar,
             notification,
+            sharing,
             recording,
             osd,
             toast,
