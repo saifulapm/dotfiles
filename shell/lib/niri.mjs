@@ -1,6 +1,6 @@
 // Pure, so node can test it on captured events; services/Niri.qml feeds it one line at a time.
 
-export const initial = { workspaces: [], windows: [], overview: false, casts: [] };
+export const initial = { workspaces: [], windows: [], overview: false, casts: [], configFailed: false };
 
 const set = (o, fields) => Object.assign({}, o, fields);
 
@@ -53,9 +53,21 @@ export function reduce(state, event) {
     }
     case 'CastStopped':
       return set(state, { casts: state.casts.filter((c) => c.stream_id !== e.stream_id) });
+    case 'ConfigLoaded':
+      return set(state, { configFailed: e.failed });
     default:
       return state;
   }
+}
+
+// A rejected config notifies once per failure streak: the first rejection since the shell started, and the first after each good load.
+export function configNotifies(before, after) {
+  return after.configFailed && !before.configFailed;
+}
+
+// A reconnect starts niri's state over but keeps the failure, since the shell has already told this streak and niri's first burst replays the rejection.
+export function reconnected(state) {
+  return set(initial, { configFailed: state.configFailed });
 }
 
 // Null until niri has told us about that output.

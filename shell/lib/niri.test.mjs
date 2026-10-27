@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces } from './niri.mjs';
+import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, configNotifies, reconnected } from './niri.mjs';
 
 // Captured from niri 26.04's event stream: start, open foot, workspace 2, workspace 1, open and close a second foot.
 const LINES = [
@@ -160,4 +160,42 @@ test('a window keeps the urgency niri last reported for it', () => {
 
 test('before any event no workspace is urgent', () => {
   assert.deepEqual(urgentWorkspaces(initial, 'eDP-1'), []);
+});
+
+// Each line a ConfigLoaded, as niri sends it on every load and once in the first burst; counts the notifications along the way.
+const loads = (failures, state = initial) =>
+  failures.reduce(
+    ({ s, n }, failed) => {
+      const next = reduce(s, { ConfigLoaded: { failed } });
+      return { s: next, n: n + (configNotifies(s, next) ? 1 : 0) };
+    },
+    { s: state, n: 0 },
+  );
+
+test('the first rejected config since the shell started notifies', () => {
+  assert.equal(loads([true]).n, 1);
+  assert.equal(loads([false, true]).n, 1);
+});
+
+test('further rejections notify nothing until a good config loads', () => {
+  assert.equal(loads([true, true, true]).n, 1);
+  assert.equal(loads([true, false, true]).n, 2);
+  assert.equal(loads([true, true, false, false, true, true]).n, 2);
+});
+
+test('good loads alone never notify', () => {
+  assert.equal(loads([false, false]).n, 0);
+  assert.equal(loads([]).s.configFailed, false);
+});
+
+test("a reconnect's replayed rejection does not notify a streak twice", () => {
+  const { s } = loads([true]);
+  const again = reconnected(s);
+  assert.deepEqual(again.workspaces, []);
+  assert.equal(loads([true, true], again).n, 0);
+  assert.equal(loads([false, true], again).n, 1);
+});
+
+test('a reconnect after a good load notifies the next rejection', () => {
+  assert.equal(loads([true], reconnected(loads([true, false]).s)).n, 1);
 });
