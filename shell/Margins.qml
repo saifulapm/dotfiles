@@ -88,8 +88,10 @@ PanelWindow {
         const right = [syncLabel, goalLabel, mailLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).map(l => l.text).join(voice.sep ? " " + voice.sep + " " : " ");
         return {
             left: number.text + tail.text,
+            marks: Array.from(marks.children).filter(l => l.text !== undefined).map(l => l.text).join("").trim(),
+            markColors: Array.from(marks.children).filter(l => l.text !== undefined).map(l => String(l.color)),
             right: right,
-            leftEnd: tail.mapToItem(null, tail.width, 0).x,
+            leftEnd: marks.mapToItem(null, marks.width, 0).x,
             leftElided: tail.truncated,
             goalElided: goalLabel.truncated,
             rightStart: rightRow.mapToItem(null, 0, 0).x,
@@ -112,8 +114,23 @@ PanelWindow {
         Label {
             id: tail
             text: root.voice.tail(root.view)
-            width: Math.min(implicitWidth, Math.max(0, root.lineEnd - 32 - number.width))
+            width: Math.min(implicitWidth, Math.max(0, root.lineEnd - 32 - number.width - marks.width))
             elide: Text.ElideRight
+        }
+
+        // The workspaces holding a window that asked for attention; the title gives up their room.
+        Row {
+            id: marks
+
+            Repeater {
+                model: root.voice.marks(root.niri.urgent(root.screen.name))
+
+                Label {
+                    required property var modelData
+                    text: modelData.text
+                    color: modelData.color ?? "black"
+                }
+            }
         }
     }
 

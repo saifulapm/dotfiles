@@ -15,6 +15,10 @@ Scope {
         return N.outputView(state, output);
     }
 
+    function urgent(output) {
+        return N.urgentWorkspaces(state, output);
+    }
+
     function shares(ownPid) {
         return N.shares(state, ownPid);
     }
