@@ -61,5 +61,23 @@ zebra_focused() { test "$(focused_title)" = zebra; }
 until_ok 2000 zebra_focused
 check "and focuses zebra ($(focused_title))" zebra_focused
 
+open_overview
+wtype ab
+until_ok 2000 launcher_is '.open and .query == "ab"'
+niri msg action toggle-overview
+until_ok 2000 overview_is false
+until_ok 2000 launcher_is '.open == false'
+check "the overview closed another way closes the launcher it opened" launcher_is '.open == false'
+until_ok 2000 surfaces_focus None
+check "and the shell lets go of the keyboard" surfaces_focus None
+
+open_overview
+niri msg action spawn -- dots-call launcher toggle
+until_ok 2000 launcher_is '.open and .query == ""'
+niri msg action toggle-overview
+until_ok 2000 overview_is false
+sleep 0.3
+check "a launcher Mod+Space opened stays open when the overview closes" launcher_is '.open'
+
 exit $((fails > 0))
 }

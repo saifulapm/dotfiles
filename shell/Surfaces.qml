@@ -40,8 +40,14 @@ PanelWindow {
     readonly property bool shown: all.some(s => s?.shown ?? false)
     // While niri's overview is open the shell holds the keyboard, so no key reaches the window behind it.
     readonly property bool overview: niri?.overview ?? false
+    // A launcher opened by a key typed in the overview closes with it, however the overview closes.
+    property bool launcherFromOverview: false
 
-    onOverviewChanged: catchKeys()
+    onOverviewChanged: {
+        if (!overview && launcherFromOverview)
+            launcher.close();
+        catchKeys();
+    }
     onShownChanged: catchKeys()
 
     function catchKeys() {
@@ -61,6 +67,7 @@ PanelWindow {
 
     // t0 is taken before the first load, so a cold open's time includes loading.
     function openLauncher(t0, mode, typed) {
+        launcherFromOverview = !!typed;
         launcherLoader.active = true;
         closeOthers(launcher);
         launcher.open(t0, mode, typed);
