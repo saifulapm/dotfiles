@@ -220,8 +220,42 @@ test('Paper drops its windows in whole and lifts them out, 8 px either way, with
 test('Artboard springs its windows up from 96% and fades them in, and shrinks, sinks and fades them out', () => {
   const kdl = renderNiri(load('artboard'));
   const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
-  assert.match(shader('window-open'), /vec4 open_color[\s\S]*0\.96 \+ 0\.04 \* niri_progress[\s\S]*niri_clamped_progress \/ 0\.6/);
-  assert.match(shader('window-close'), /vec4 close_color[\s\S]*1\.0 - 0\.04 \* p[\s\S]*\* \(1\.0 - p\)/);
+  assert.match(shader('window-open'), /vec4 open_color[\s\S]*0\.96 \+ 0\.04 \* niri_progress[\s\S]*smoothstep\(0\.0, 0\.6, niri_clamped_progress\)/);
+  assert.match(shader('window-close'), /vec4 close_color[\s\S]*1\.0 - 0\.04 \* p[\s\S]*\* \(1\.0 - smoothstep\(0\.0, 1\.0, p\)\)/);
+});
+
+// One physical pixel, so a 1 px line stays one row on the 1.25 panel instead of flickering between one and two.
+test('a shader measures one physical pixel from niri_scale', () => {
+  for (const name of ['paper', 'blueprint']) {
+    const kdl = renderNiri(load(name));
+    assert.match(kdl, /float dots_px\(\) \{\n\s*return niri_scale > 0\.5 \? 1\.0 \/ niri_scale : 1\.0;\n\s*\}/, name);
+  }
+});
+
+test('Paper\'s 8 px drop and lift move in whole physical pixels, so its text stays sharp', () => {
+  const kdl = renderNiri(load('paper'));
+  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
+  assert.match(shader('window-open'), /floor\(8\.0 \* \(1\.0 - p\) \/ w \+ 0\.5\) \* w/);
+  assert.match(shader('window-close'), /floor\(8\.0 \* p \/ w \+ 0\.5\) \* w/);
+});
+
+// The glow is niri's shadow, drawn into niri_tex below the window too, so a scan that stopped at the window's edge popped it on at the end.
+test('Blueprint\'s scan runs past the window by its glow\'s reach, its pen one physical pixel wide with a bright tip', () => {
+  const kdl = renderNiri(load('blueprint'));
+  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
+  for (const glsl of [shader('window-open'), shader('window-close')]) {
+    assert.match(glsl, /float reach = 18\.0;/);
+    assert.match(glsl, /\* \(size_geo\.y \+ 2\.0 \* reach\)/);
+    assert.match(glsl, /dots_outline\(px, size_geo\.xy, w\)/);
+    assert.match(glsl, /px\.y < scan \+ w\)/);
+  }
+  assert.match(shader('window-open'), /mix\(vec4\(0\.498, 0\.890, 0\.941, 1\.0\), vec4\(1\.0\), 0\.7\)/);
+});
+
+test('a theme with no shadow scans no further than its window', () => {
+  const t = load('blueprint');
+  delete t.niri.shadow_color;
+  assert.match(renderNiri(t), /float reach = 0\.0;/);
 });
 
 test('a motion no board draws keeps niri\'s own open and close', () => {

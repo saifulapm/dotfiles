@@ -123,81 +123,97 @@ const TEX = `vec4 dots_tex(vec3 coords_geo) {
     return texture2D(niri_tex, t.st);
 }`;
 
-// How far along the 1 px outline, clockwise from the top-left corner, a pixel lies; -1.0 off the outline.
-const OUTLINE = `float dots_outline(vec2 px, vec2 size) {
+// One physical pixel in logical px, from the output scale niri passes as niri_scale (declared in its preludes, though not documented).
+const PX = `float dots_px() {
+    return niri_scale > 0.5 ? 1.0 / niri_scale : 1.0;
+}`;
+
+// How far along the outline w px wide, clockwise from the top-left corner, a pixel lies; -1.0 off the outline.
+const OUTLINE = `float dots_outline(vec2 px, vec2 size, float w) {
     if (px.x < 0.0 || px.y < 0.0 || px.x >= size.x || px.y >= size.y) return -1.0;
-    if (px.y < 1.0) return px.x;
-    if (px.x >= size.x - 1.0) return size.x + px.y;
-    if (px.y >= size.y - 1.0) return 2.0 * size.x + size.y - px.x;
-    if (px.x < 1.0) return 2.0 * (size.x + size.y) - px.y;
+    if (px.y < w) return px.x;
+    if (px.x >= size.x - w) return size.x + px.y;
+    if (px.y >= size.y - w) return 2.0 * size.x + size.y - px.x;
+    if (px.x < w) return 2.0 * (size.x + size.y) - px.y;
     return -1.0;
 }`;
 
-// The open and close shaders the Motion boards draw, by motion; the Blueprint pen is the accent.
+// The open and close shaders the Motion boards draw, by motion; the Blueprint pen is the accent, and reach is how far its glow lies past the window.
 const SHADERS = {
   snappy: () => ({
-    // Whole from the first frame, 8 px above its place, dropping into it.
+    // Whole from the first frame, 8 px above its place, dropping into it a whole physical pixel at a time, so its text never blurs.
     open: `${TEX}
+${PX}
 vec4 open_color(vec3 coords_geo, vec3 size_geo) {
     float p = niri_clamped_progress;
-    return dots_tex(vec3(coords_geo.x, coords_geo.y + 8.0 * (1.0 - p) / size_geo.y, 1.0));
+    float w = dots_px();
+    return dots_tex(vec3(coords_geo.x, coords_geo.y + floor(8.0 * (1.0 - p) / w + 0.5) * w / size_geo.y, 1.0));
 }`,
-    // Lifts 8 px while a cut climbs from just below its shadow to its top.
+    // Lifts 8 px, a whole physical pixel at a time, while a cut climbs from just below its shadow to its top.
     close: `${TEX}
+${PX}
 vec4 close_color(vec3 coords_geo, vec3 size_geo) {
     float p = niri_clamped_progress;
-    vec3 c = vec3(coords_geo.x, coords_geo.y + 8.0 * p / size_geo.y, 1.0);
+    float w = dots_px();
+    vec3 c = vec3(coords_geo.x, coords_geo.y + floor(8.0 * p / w + 0.5) * w / size_geo.y, 1.0);
     if (c.y > (1.0 - p) * (1.0 + 8.0 / size_geo.y)) return vec4(0.0);
     return dots_tex(c);
 }`,
   }),
   spring: () => ({
-    // From 96% around its centre and 8 px low, overshooting with the spring, faded in over the first 60%.
+    // From 96% around its centre and 8 px low, overshooting with the spring, eased in over the first 60%.
     open: `${TEX}
 vec4 open_color(vec3 coords_geo, vec3 size_geo) {
     float s = 0.96 + 0.04 * niri_progress;
     vec3 c = vec3((coords_geo.xy - vec2(0.5)) / s + vec2(0.5), 1.0);
     c.y -= 8.0 * (1.0 - niri_progress) / size_geo.y;
-    return dots_tex(c) * clamp(niri_clamped_progress / 0.6, 0.0, 1.0);
+    return dots_tex(c) * smoothstep(0.0, 0.6, niri_clamped_progress);
 }`,
-    // Shrinks to 96%, sinks 8 px and fades.
+    // Shrinks to 96%, sinks 8 px and eases out.
     close: `${TEX}
 vec4 close_color(vec3 coords_geo, vec3 size_geo) {
     float p = niri_clamped_progress;
     float s = 1.0 - 0.04 * p;
     vec3 c = vec3((coords_geo.xy - vec2(0.5)) / s + vec2(0.5), 1.0);
     c.y -= 8.0 * p / size_geo.y;
-    return dots_tex(c) * (1.0 - p);
+    return dots_tex(c) * (1.0 - smoothstep(0.0, 1.0, p));
 }`,
   }),
-  linear: (c) => {
+  linear: (c, reach) => {
     const pen = glslColor(c.accent);
     return {
-      // The outline is traced until 55%; from 45% a scan line comes down and shows the window above it.
+      // The outline is traced until 55%, its last 6 px a bright pen tip; from 45% a scan line comes down from above the glow to below it and shows the window above it.
       open: `${TEX}
+${PX}
 ${OUTLINE}
 vec4 open_color(vec3 coords_geo, vec3 size_geo) {
     float p = niri_clamped_progress;
+    float w = dots_px();
+    float reach = ${reach.toFixed(1)};
     vec2 px = coords_geo.xy * size_geo.xy;
-    float scan = (p - 0.45) / 0.55 * size_geo.y;
+    float scan = -reach + (p - 0.45) / 0.55 * (size_geo.y + 2.0 * reach);
     vec4 color = px.y < scan ? dots_tex(coords_geo) : vec4(0.0);
-    float d = dots_outline(px, size_geo.xy);
+    float d = dots_outline(px, size_geo.xy, w);
+    float len = min(p / 0.55, 1.0) * 2.0 * (size_geo.x + size_geo.y);
     bool inside = px.x >= 0.0 && px.x < size_geo.x && px.y >= 0.0 && px.y < size_geo.y;
-    if (inside && p < 1.0 && px.y >= scan && px.y < scan + 1.0) color = ${pen};
-    if (d >= 0.0 && d <= min(p / 0.55, 1.0) * 2.0 * (size_geo.x + size_geo.y)) color = ${pen};
+    if (inside && p < 1.0 && px.y >= scan && px.y < scan + w) color = ${pen};
+    if (d >= 0.0 && d <= len) color = p < 0.55 && d > len - 6.0 ? mix(${pen}, vec4(1.0), 0.7) : ${pen};
     return color;
 }`,
-      // A scan line goes up and takes the window with it in the first 60%; then the outline is lifted, last drawn first.
+      // A scan line goes up from below the glow and takes the window with it in the first 60%; then the outline is lifted, last drawn first.
       close: `${TEX}
+${PX}
 ${OUTLINE}
 vec4 close_color(vec3 coords_geo, vec3 size_geo) {
     float p = niri_clamped_progress;
+    float w = dots_px();
+    float reach = ${reach.toFixed(1)};
     vec2 px = coords_geo.xy * size_geo.xy;
-    float scan = (1.0 - p / 0.6) * size_geo.y;
+    float scan = -reach + (1.0 - p / 0.6) * (size_geo.y + 2.0 * reach);
     vec4 color = px.y < scan ? dots_tex(coords_geo) : vec4(0.0);
-    float d = dots_outline(px, size_geo.xy);
+    float d = dots_outline(px, size_geo.xy, w);
     bool inside = px.x >= 0.0 && px.x < size_geo.x && px.y >= 0.0 && px.y < size_geo.y;
-    if (inside && p < 0.6 && px.y >= scan && px.y < scan + 1.0) color = ${pen};
+    if (inside && p < 0.6 && px.y >= scan && px.y < scan + w) color = ${pen};
     if (d >= 0.0 && d <= clamp((1.0 - p) / 0.4, 0.0, 1.0) * 2.0 * (size_geo.x + size_geo.y)) color = ${pen};
     return color;
 }`,
@@ -239,7 +255,9 @@ export function renderNiri(t) {
     : 'tab-indicator {\n        hide-when-single-tab\n    }';
   const motion = MOTION[t.primitive.motion]
     ?? { 'window-open': CURVES[t.primitive.motion], 'window-close': CURVES[t.primitive.motion] };
-  const shaders = SHADERS[t.primitive.motion]?.(c) ?? {};
+  // The glow's farthest edge past the window: its blur, spread and offset.
+  const reach = n.shadow_color ? (n.shadow_softness ?? 30) + (n.shadow_spread ?? 0) + Math.max(Math.abs(ox), Math.abs(oy)) : 0;
+  const shaders = SHADERS[t.primitive.motion]?.(c, reach) ?? {};
   const shader = (name) => {
     const glsl = shaders[{ 'window-open': 'open', 'window-close': 'close' }[name]];
     return glsl ? `\n        custom-shader r"\n${indent(glsl, '            ')}\n        "` : '';
