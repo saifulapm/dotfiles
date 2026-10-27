@@ -28,8 +28,8 @@ Scope {
         path: Quickshell.env("NIRI_SOCKET")
         connected: true
         onConnectedChanged: {
-            // The stream starts with the whole state again, so nothing from before a drop is kept.
-            niri.state = N.initial;
+            // The stream starts with the whole state again, so nothing from before a drop is kept but a failed config, which the shell has already told.
+            niri.state = N.reconnected(niri.state);
             if (connected) {
                 write('"EventStream"\n');
                 flush();
@@ -39,7 +39,12 @@ Scope {
             }
         }
         parser: SplitParser {
-            onRead: line => niri.state = N.reduce(niri.state, JSON.parse(line))
+            onRead: line => {
+                const before = niri.state;
+                niri.state = N.reduce(before, JSON.parse(line));
+                if (N.configNotifies(before, niri.state))
+                    Quickshell.execDetached(["notify-send", "-a", "niri", "Config rejected", "niri still runs the last good config"]);
+            }
         }
     }
 }
