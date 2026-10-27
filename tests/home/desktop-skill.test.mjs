@@ -73,3 +73,13 @@ test('screen type gets past the guard once lock state reads unlocked', () => {
   assert.equal(r.status, 0, r.stderr);
   assert.equal(readFileSync(log, 'utf8'), 'dots-call lock state\nwtype -- hi\n');
 });
+
+// dots-pointer is the skill's pointer, built at apply from wlr-protocols' XML like dots-dshift, and rebuilt when its source changes.
+test('apply builds dots-pointer from bin/dots-pointer.c and the virtual-pointer XML', () => {
+  const script = text(join(repo, 'home/.chezmoiscripts/run_onchange_after_13-pointer.sh.tmpl'));
+  assert.match(script, /^# pointer source hash: \{\{ joinPath \.chezmoi\.workingTree "bin\/dots-pointer\.c" \| include \| sha256sum \}\}$/m);
+  assert.match(script, /^xml=\/usr\/share\/wlr-protocols\/unstable\/wlr-virtual-pointer-unstable-v1\.xml$/m);
+  assert.match(script, /wayland-scanner client-header "\$xml"/);
+  assert.match(script, /wayland-scanner private-code "\$xml"/);
+  assert.match(script, /gcc -O2 -Wall .*-o "\$HOME\/\.local\/bin\/dots-pointer" .*bin\/dots-pointer\.c.* -lwayland-client \|\| \{/);
+});

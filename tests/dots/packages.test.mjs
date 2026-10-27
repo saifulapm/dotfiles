@@ -14,7 +14,7 @@ const everyArch = [
   'chromium', 'tailscale', 'pipewire', 'wireplumber', 'brightnessctl', 'wf-recorder', 'grim', 'slurp', 'wlrctl',
   'ydotool', 'tesseract', 'tesseract-langpack-eng', 'tesseract-langpack-ben', 'zbar', 'python3-gobject', 'just',
   'mpv', 'imv', 'zathura', 'zathura-pdf-mupdf', 'yt-dlp', 'pass-otp', 'ffmpeg', 'ruby', 'rubypick', 'golang',
-  'gtk4', 'libadwaita', 'lynx', 'php-cli', 'php-fpm', 'php-mbstring', 'php-xml', 'php-pdo', 'php-intl', 'php-process', 'php-mysqlnd', 'php-pgsql', 'php-gd', 'php-bcmath', 'php-pecl-redis6', 'composer', 'caddy', 'podman',
+  'gtk4', 'gtk4-devel-tools', 'wlr-protocols-devel', 'wayland-devel', 'libadwaita', 'lynx', 'php-cli', 'php-fpm', 'php-mbstring', 'php-xml', 'php-pdo', 'php-intl', 'php-process', 'php-mysqlnd', 'php-pgsql', 'php-gd', 'php-bcmath', 'php-pecl-redis6', 'composer', 'caddy', 'podman',
 ];
 const macOnly = ['arm-none-eabi-gcc-cs', 'libva-devel', 'binutils', 'kernel-headers'];
 

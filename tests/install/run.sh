@@ -115,6 +115,8 @@ check "\$HOME/.local/state/dots/theme-out/shell.json exists" \
 
 check "\$HOME/.local/bin/dots-dshift is executable" podman exec "$name" test -x "$home/.local/bin/dots-dshift"
 
+check "\$HOME/.local/bin/dots-pointer is executable" podman exec "$name" test -x "$home/.local/bin/dots-pointer"
+
 check "saiful is in the input group" podman exec "$name" bash -c "id -nG saiful | tr ' ' '\n' | grep -qx input"
 
 unit=$(podman exec "$name" readlink -f "$home/.config/systemd/user/dots-dshift.service")

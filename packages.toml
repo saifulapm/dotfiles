@@ -403,7 +403,12 @@ why = "the desktop skill's mouse script moves the pointer with it"
 [[package]]
 name = "ydotool"
 arch = "all"
-why = "the desktop skill presses and drags with it through ydotoold"
+why = "the keyboard binds that need uinput press through ydotoold"
+
+[[package]]
+name = "gtk4-devel-tools"
+arch = "all"
+why = "gtk4-widget-factory, the app the desktop skill's nested checks drive"
 
 [[package]]
 name = "tesseract"
@@ -731,7 +736,12 @@ why = "builds the wlvncc pin"
 [[package]]
 name = "wayland-devel"
 arch = "all"
-why = "builds the wlvncc pin"
+why = "builds the wlvncc pin and dots-pointer, with the wayland-scanner both run"
+
+[[package]]
+name = "wlr-protocols-devel"
+arch = "all"
+why = "the virtual-pointer protocol XML dots-pointer is built from"
 
 [[package]]
 name = "libglvnd-devel"
