@@ -1,6 +1,6 @@
 // Pure, so node can test it on captured events; services/Niri.qml feeds it one line at a time.
 
-export const initial = { workspaces: [], windows: [] };
+export const initial = { workspaces: [], windows: [], overview: false };
 
 const set = (o, fields) => Object.assign({}, o, fields);
 
@@ -39,6 +39,8 @@ export function reduce(state, event) {
       return set(state, { windows: state.windows.map((w) => set(w, { is_focused: w.id === e.id })) });
     case 'WindowClosed':
       return set(state, { windows: state.windows.filter((w) => w.id !== e.id) });
+    case 'OverviewOpenedOrClosed':
+      return set(state, { overview: e.is_open });
     default:
       return state;
   }

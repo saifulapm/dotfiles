@@ -9,6 +9,7 @@ Scope {
 
     property var state: N.initial
     readonly property string focusedOutput: N.focusedOutput(state) ?? ""
+    readonly property bool overview: state.overview
 
     function view(output) {
         return N.outputView(state, output);
@@ -19,6 +20,8 @@ Scope {
         connected: true
         onConnectedChanged: {
             if (connected) {
+                // The stream starts with the whole state again, so nothing from before a drop is kept.
+                niri.state = N.initial;
                 write('"EventStream"\n');
                 flush();
             }

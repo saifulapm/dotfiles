@@ -18,6 +18,8 @@ PanelWindow {
     required property var sync
     // The Desk's reminders service, null until the Desk loads.
     required property var reminders
+    // The Desk's niri service, null until the Desk loads.
+    required property var niri
     readonly property var launcher: launcherLoader.item
     readonly property var themes: themesLoader.item
     readonly property var notifications: notifsLoader.item
@@ -35,6 +37,16 @@ PanelWindow {
     // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
     readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass, tailscale, accounts, dns, picker]
     readonly property bool shown: all.some(s => s?.shown ?? false)
+    // While niri's overview is open the shell holds the keyboard, so no key reaches the window behind it.
+    readonly property bool overview: niri?.overview ?? false
+
+    onOverviewChanged: catchKeys()
+    onShownChanged: catchKeys()
+
+    function catchKeys() {
+        if (overview && !shown)
+            overviewKeys.forceActiveFocus();
+    }
 
     // Only one surface shows at a time, so another's close is cut short.
     function closeOthers(keep) {
@@ -165,7 +177,7 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "dots-surfaces"
-    WlrLayershell.keyboardFocus: shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: shown || overview ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
     anchors {
         top: true
@@ -179,6 +191,12 @@ PanelWindow {
 
     Region {
         id: noInput
+    }
+
+    // Holds focus while the overview is open and no surface shows.
+    Item {
+        id: overviewKeys
+        Keys.onPressed: event => event.accepted = true
     }
 
     Loader {

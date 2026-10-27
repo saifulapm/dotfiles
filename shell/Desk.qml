@@ -20,6 +20,8 @@ Scope {
     readonly property alias sync: syncService
     // The launcher's r mode sets and deletes through this.
     readonly property alias reminders: remindersService
+    // The Surfaces window takes the keyboard while niri's overview is open, which it reads through this.
+    readonly property alias niri: niriService
 
     Services.Niri {
         id: niriService

@@ -70,3 +70,17 @@ test('a focus change moves is_focused to that window, or to none', () => {
   assert.deepEqual(focused(reduce(s, { WindowFocusChanged: { id: 2 } })), [2]);
   assert.deepEqual(focused(reduce(s, { WindowFocusChanged: { id: null } })), []);
 });
+
+// Captured from niri 26.04: the first burst says the overview is closed, then Mod+O opens and closes it.
+const OVERVIEW_START = '{"OverviewOpenedOrClosed":{"is_open":false}}';
+const OVERVIEW_OPEN = '{"OverviewOpenedOrClosed":{"is_open":true}}';
+
+test('the overview reads open after niri opens it and closed after it closes', () => {
+  assert.equal(run([...LINES, OVERVIEW_START]).overview, false);
+  assert.equal(run([...LINES, OVERVIEW_START, OVERVIEW_OPEN]).overview, true);
+  assert.equal(run([...LINES, OVERVIEW_OPEN, OVERVIEW_START]).overview, false);
+});
+
+test('a shell that starts while the overview is open reads it open from the first burst', () => {
+  assert.equal(run([...LINES, OVERVIEW_OPEN]).overview, true);
+});
