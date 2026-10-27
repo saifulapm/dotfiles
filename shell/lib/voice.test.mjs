@@ -540,3 +540,24 @@ test('the margin draws a window title on one line, with no control characters or
     assert.match(margin(name).tail({ idx: 1, app: 'zathura', title: 'line1\nline2 INJECT.pdf' }), /line1 line2 INJECT\.pdf/i);
   }
 });
+
+// The marks as drawn: each segment's text joined, without the gap that sets them off from the title.
+const marks = (name, idxs) => margin(name).marks(idxs).map((s) => s.text).join('').trim();
+
+test('the urgency marks read !05 !07, • 05  • 07 and [!05][!07]', () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => marks(n, [5, 7])), ['!05 !07', '• 05  • 07', '[!05][!07]']);
+});
+
+test('past three urgent workspaces the marks end in a count of the rest', () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => marks(n, [2, 3, 5, 7, 9])), ['!02 !03 !05 +2', '• 02  • 03  • 05  +2', '[!02][!03][!05][+2]']);
+});
+
+test('no urgent workspace draws no mark', () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => margin(n).marks([])), [[], [], []]);
+});
+
+test("the marks are danger red in Paper, accent dots before ink in Artboard and amber in Blueprint, set off from the title", () => {
+  const colors = (n) => [...new Set(margin(n).marks([5, 7]).map((s) => s.color))];
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map(colors), [['#C8381E'], ['#3D5AFE', '#15171B'], ['#FFB547']]);
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => margin(n).marks([5])[0].text.slice(0, 4)), ['   !', '   •', '   [']);
+});

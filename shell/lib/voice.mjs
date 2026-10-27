@@ -666,6 +666,18 @@ export function marginLook(tokens) {
     date: (d) => (bracket ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : say(dateText(d))),
     sep: plain ? '' : bracket ? '·' : '—',
     spacing: plain ? 16 : 14,
+    // The urgent workspaces after the title, three spaces on: at most 3, then a count of the rest; each segment is drawn in its own colour.
+    marks(idxs) {
+      if (idxs.length === 0) return [];
+      const rest = idxs.length - 3;
+      if (plain) {
+        const shown = idxs.slice(0, 3).reduce((segs, idx, i) => segs.concat([{ text: `${i ? '  ' : '   '}•`, color: c.accent }, { text: ` ${pad2(idx)}`, color: c.ink }]), []);
+        return rest > 0 ? shown.concat([{ text: `  +${rest}`, color: c.ink }]) : shown;
+      }
+      const words = idxs.slice(0, 3).map((idx) => (bracket ? `[!${pad2(idx)}]` : `!${pad2(idx)}`));
+      if (rest > 0) words.push(bracket ? `[+${rest}]` : `+${rest}`);
+      return [{ text: `   ${words.join(bracket ? '' : ' ')}`, color: c.danger }];
+    },
   };
   // The words on screen, in order, for `qs ipc call margins state`.
   look.drawn = (view, now, right) => ({
