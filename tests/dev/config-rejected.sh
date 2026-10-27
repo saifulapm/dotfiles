@@ -15,14 +15,15 @@ frag=$XDG_STATE_HOME/dots/theme-out/niri.kdl
 events=$DOTS_DEV_DIR/config-events
 niri msg -j event-stream >"$events" 2>/dev/null &
 stream=$!
-trap 'kill $stream 2>/dev/null' EXIT
+cleanup() { kill $stream 2>/dev/null; }
 loads() { grep -c '^{"ConfigLoaded"' "$events"; }
 until_ok 3000 eval '[ "$(loads)" -ge 1 ]'
 load() {
   local n
   n=$(loads)
   "$@"
-  until_ok 5000 eval '[ "$(loads)" -gt '"$n"' ]' || echo "     no ConfigLoaded after: $*"
+  # A quiet check passes on a load that never came, so a missing one fails here.
+  until_ok 5000 eval '[ "$(loads)" -gt '"$n"' ]' || { echo "FAIL niri loaded a config after: $*"; fails=$((fails + 1)); }
   # The shell reads the same stream; the notification it sends then has to reach its own server.
   sleep 0.5
 }
