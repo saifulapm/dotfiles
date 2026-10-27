@@ -16,14 +16,18 @@ Scope {
     }
 
     Socket {
+        id: stream
         path: Quickshell.env("NIRI_SOCKET")
         connected: true
         onConnectedChanged: {
+            // The stream starts with the whole state again, so nothing from before a drop is kept.
+            niri.state = N.initial;
             if (connected) {
-                // The stream starts with the whole state again, so nothing from before a drop is kept.
-                niri.state = N.initial;
                 write('"EventStream"\n');
                 flush();
+            } else {
+                // niri drops a client 64 events behind and Quickshell connects only once, so the shell connects again, after Quickshell's own handler returns.
+                Qt.callLater(() => stream.connected = true);
             }
         }
         parser: SplitParser {
