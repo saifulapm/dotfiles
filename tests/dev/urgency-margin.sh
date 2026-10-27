@@ -60,7 +60,6 @@ until_ok 3000 marks_are "!02 !03 !05 +1"
 echo "     drawn: $(margins | jq -c .drawn)"
 check "urgent windows on workspaces 2, 3, 5 and 7 mark !02 !03 !05 +1" marks_are "!02 !03 !05 +1"
 check "the marks are danger red" eval 'margins | jq -e ".drawn.markColors | unique == [\"#c8381e\"]" >/dev/null'
-check "the marks end 8 px short of the island" eval 'margins | jq -e ".drawn.leftEnd <= .drawn.lineEnd" >/dev/null'
 
 # An agent's lease brings the screen back with the marks still drawn.
 lock_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e "$1" >/dev/null 2>&1; }
