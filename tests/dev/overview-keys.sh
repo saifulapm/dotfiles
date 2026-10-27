@@ -36,7 +36,7 @@ until_ok 2000 launcher_is '.open and .query == "chr"'
 check "chr in one call reads chr, no key lost ($(query))" launcher_is '.open and .query == "chr"'
 close_launcher
 
-# wtype's -M shift capitalises nothing in any Qt field, so the check types A, which Qt reads as Shift+a's text; the live walk presses a real Shift+a.
+# wtype's -M shift capitalises nothing in any Qt field, so the check types A, which Qt reads as Shift+a's text.
 wtype A
 until_ok 2000 launcher_is '.open and .query == "A"'
 check "A reads A ($(query))" launcher_is '.open and .query == "A"'
@@ -44,9 +44,10 @@ close_launcher
 
 wtype -M ctrl c -m ctrl
 wtype -M alt x -m alt
+# The nested niri's Mod is Alt, so Alt+x is a Mod chord here too; niri runs no binds for wtype's keys.
 wtype -M logo o -m logo
 sleep 0.5
-check "Ctrl+c, Alt+x and Mod+o leave the launcher closed" launcher_is '.open == false'
+check "Ctrl+c, Alt+x and Super+o leave the launcher closed" launcher_is '.open == false'
 check "and the overview open" overview_is true
 
 niri msg action close-overview
