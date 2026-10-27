@@ -206,6 +206,9 @@ test('sharing reads LIVE and what is seen; two or more read as a count (M5W7ZJ8V
   assert.equal(live(share({ target: 'nothing', active: false })), 'LIVE PAUSED');
   assert.equal(live(share(), share({ stream: 2, active: false })), 'LIVE ×2');
   assert.equal(live(share({ target: 'window', app: 'a\nb‮evil\u001b[31m' })), 'LIVE A BEVIL [31M');
+  // An app id is the app's to choose, so one with nothing left to draw reads as a window.
+  assert.equal(live(share({ target: 'window', app: '' })), 'LIVE WINDOW');
+  assert.equal(live(share({ target: 'window', app: '\n\u202E\u001b' })), 'LIVE WINDOW');
 });
 
 test('each card row is its target, who watches, and a stop only on PipeWire (MGX0WWS8, XPRY7NFD)', () => {

@@ -31,7 +31,7 @@ const oneLine = (s) =>
 export const filesText = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;
 
 // What a share shows, as niri.mjs's shares give it: SCREEN, the window's app, or NOTHING while its target is cleared.
-const seen = (s) => (s.target === 'screen' ? 'SCREEN' : s.target === 'nothing' ? 'NOTHING' : oneLine(s.app ?? 'window').toUpperCase());
+const seen = (s) => (s.target === 'screen' ? 'SCREEN' : s.target === 'nothing' ? 'NOTHING' : (oneLine(s.app ?? '') || 'window').toUpperCase());
 
 // Two or more shares read as a count; one names its target, or PAUSED while niri holds it inactive (M5W7ZJ8V, SN5W2JY5).
 export const liveText = (shares) => `LIVE ${shares.length > 1 ? `×${shares.length}` : shares[0].active ? seen(shares[0]) : 'PAUSED'}`;

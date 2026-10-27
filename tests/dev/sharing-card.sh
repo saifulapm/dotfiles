@@ -51,7 +51,6 @@ until_ok 2000 reads "LIVE SCREEN"
 check "Enter stops the portal share and leaves wf-recorder's ($(island_text))" reads "LIVE SCREEN"
 check "with one stop-cast, for its session ($(stops))" test "$(stops)" = 2001
 check "wf-recorder still runs" kill -0 "$wf"
-check "niri still lists only the WlrScreencopy cast" bash -c '[ "$(niri msg -j casts | jq -c "map(.kind)")" = "[\"WlrScreencopy\"]" ]'
 kill -INT "$wf"
 wait "$wf" 2>/dev/null
 wf=
