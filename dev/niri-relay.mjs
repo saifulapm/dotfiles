@@ -1,8 +1,4 @@
-// A relay in front of niri's IPC socket for nested checks. niri's nested (winit) backend cannot start a
-// PipeWire cast, so a check injects cast events into every event stream and the relay answers StopCast
-// for the casts it made up. Everything else passes through untouched.
-//   node niri-relay.mjs serve <listen-path> <niri-path> <stops-log>
-//   node niri-relay.mjs inject <listen-path> '<event json>'
+// A relay in front of niri's socket for nested checks: it injects cast events and answers StopCast for casts a check made up, because nested niri cannot start a PipeWire cast.
 import net from 'node:net';
 import { appendFileSync, rmSync } from 'node:fs';
 

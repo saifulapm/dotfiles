@@ -10,8 +10,18 @@ export DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS
 # A user manager need not have bin/ on PATH, so the nested shell runs without it, and starts what it needs from bin/ by absolute path.
 shell_path=$(tr ':' '\n' <<<"$PATH" | grep -vxF "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" | paste -sd:)
 
+# A check that sets DOTS_DEV_FAKE_CASTS=1 gets the shell behind a relay that can show casts niri cannot make here; the env file below keeps niri's own socket.
+shell_socket=$NIRI_SOCKET
+if [ "${DOTS_DEV_FAKE_CASTS:-}" = 1 ]; then
+  shell_socket=$DOTS_DEV_DIR/niri-relay.sock
+  systemd-run --user --quiet --collect --unit "$DOTS_DEV_UNIT-relay" \
+    "$(command -v node)" "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../dev/niri-relay.mjs" \
+    serve "$shell_socket" "$NIRI_SOCKET" "$DOTS_DEV_DIR/niri-relay-stops"
+  for _ in $(seq 100); do [ -S "$shell_socket" ] && break; sleep 0.05; done
+fi
+
 # qs drops console.log and console.debug unless qml.debug is on, and a check that reads the journal for a leaked secret must see them.
-PATH=$shell_path systemd-run --user --quiet --collect --unit "$DOTS_DEV_UNIT" \
+NIRI_SOCKET=$shell_socket PATH=$shell_path systemd-run --user --quiet --collect --unit "$DOTS_DEV_UNIT" \
   -p Restart=always -p RestartSec=500ms -p StartLimitIntervalSec=0 \
   -E WAYLAND_DISPLAY -E NIRI_SOCKET -E DBUS_SESSION_BUS_ADDRESS \
   -E DBUS_SYSTEM_BUS_ADDRESS -E PATH \
