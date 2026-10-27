@@ -4,8 +4,8 @@ import { clockText } from './margins.mjs';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease that holds the session, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
-const PRIORITY = ['question', 'leaseCard', 'lease', 'calendar', 'sharingCard', 'notification', 'sharing', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing'];
+// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease card, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS), and an agent's lease slot, so a share shows while an agent holds the session (X1WV1TFF); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
+const PRIORITY = ['question', 'leaseCard', 'calendar', 'sharingCard', 'notification', 'sharing', 'lease', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing'];
 
 export const MAX_WIDTH = 560;
 

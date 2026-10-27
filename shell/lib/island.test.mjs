@@ -132,10 +132,12 @@ test('the one-line modes close; the cards open', () => {
   assert.deepEqual(['notification', 'question', 'calendar', 'osd'].map(isCompact), [false, false, false, false]);
 });
 
-test("an agent's lease sits just below a question and above the calendar and notifications (5G53CWPV)", () => {
+test("an agent's lease sits just below LIVE, so a share shows while an agent holds the session (X1WV1TFF)", () => {
   const lease = { who: 'claude', left: 60000 };
   assert.equal(pick({ question: { text: 'q', options: [] }, lease }), 'question');
-  assert.equal(pick({ lease, calendar: { year: 2026, month: 9 }, notification: { app: 'a' }, osd: { kind: 'volume', value: 1 } }), 'lease');
+  assert.equal(pick({ lease, sharing: [share()] }), 'sharing');
+  assert.equal(pick({ lease, notification: { app: 'a' } }), 'notification');
+  assert.equal(pick({ lease, recording: '00:12', osd: { kind: 'volume', value: 1 } }), 'lease');
   assert.equal(isCompact('lease'), true);
 });
 
@@ -182,11 +184,11 @@ const share = (o) => ({ stream: 1, session: 1, kind: 'PipeWire', target: 'screen
 test('sharing sits below a notification and above the recording timer (7WVQMXDS)', () => {
   const slots = { question, leaseCard: true, lease: true, calendar: true, notification: note, sharing: [share()], recording: '00:12', osd: { kind: 'volume', value: 40 }, toast: 'Captured', capture: true, sending: true, playing: true };
   const order = [];
-  for (const k of ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'sharing', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing']) {
+  for (const k of ['question', 'leaseCard', 'calendar', 'notification', 'sharing', 'lease', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing']) {
     order.push(pick(slots));
     delete slots[k];
   }
-  assert.deepEqual(order, ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'sharing', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing']);
+  assert.deepEqual(order, ['question', 'leaseCard', 'calendar', 'notification', 'sharing', 'lease', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing']);
   assert.equal(isCompact('sharing'), true);
 });
 

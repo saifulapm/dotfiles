@@ -57,6 +57,23 @@ settled() { island | jq -e '.animating == false' >/dev/null; }
 until_ok 3000 settled
 check "a 200-character app id stays inside the 560 px box ($(island | jq -c '{width, drawn}'))" bash -c '[ "$(timeout 0.5 qs ipc call island state | jq ".drawn <= 560 and .width == 560")" = true ]'
 uncast 1004
+until_ok 2000 mode_is rest
+
+# An agent holding the session is no reason to hide a share (X1WV1TFF).
+lock_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e "$1" >/dev/null 2>&1; }
+niri msg action spawn -- dots-call lock lock
+until_ok 3000 lock_is '.locked and .secure'
+n=$(timeout 0.5 qs ipc call lock state | jq .monitorsOff)
+timeout 0.5 qs ipc call lock unlock claude 2 >/dev/null
+until_ok 3000 lock_is ".locked == false and .monitorsOff > $n"
+niri msg action power-on-monitors
+until_ok 3000 mode_is lease
+cast 1005 1005 '{"Output":{"name":"winit"}}'
+until_ok 2000 reads "LIVE SCREEN"
+check "under an agent's lease a share reads LIVE SCREEN ($(island_text))" reads "LIVE SCREEN"
+uncast 1005
+until_ok 2000 mode_is lease
+check "and the lease slot comes back when it ends" mode_is lease
 
 exit $((fails > 0))
 }
