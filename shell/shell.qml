@@ -58,6 +58,15 @@ ShellRoot {
         }
     }
 
+    // A shell started under niri's open overview makes the surfaces at once, so it takes the overview's keys without the warm-up's second.
+    Connections {
+        target: root.desk?.niri ?? null
+        function onOverviewChanged() {
+            if (root.desk.niri.overview)
+                surfacesLoader.active = true;
+        }
+    }
+
     // A DNS Shield open whose time passed while the machine was off ends at start, whether or not DNS Shield ever opens.
     Process {
         id: dnsReconcile
