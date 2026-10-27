@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf, shareRow, stopSessions } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf, shareRow, shareRowText, commNames, stopSessions } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -222,4 +222,17 @@ test('Enter stops each PipeWire session once and leaves screencopy alone', () =>
   const all = [share({ stream: 1, session: 5 }), share({ stream: 2, session: 5 }), share({ stream: 3, session: 6 }), share({ stream: 4, session: 7, kind: 'WlrScreencopy', pid: 9 })];
   assert.deepEqual(stopSessions(all), [5, 6]);
   assert.deepEqual(stopSessions([share({ kind: 'WlrScreencopy', pid: 9 })]), []);
+});
+
+test('a card row reads its target, who watches, then ↵ stop on PipeWire', () => {
+  assert.equal(shareRowText({ target: 'SCREEN', watcher: 'wf-recorder', stop: false }), 'SCREEN  wf-recorder');
+  assert.equal(shareRowText({ target: 'SCREEN', watcher: 'portal share', stop: true }), 'SCREEN  portal share  ↵ stop');
+});
+
+test("each pid's comm reads back by pid, with only its own trailing newline taken off", () => {
+  assert.deepEqual(commNames('4242\twf-recorder\n\u0000'), { 4242: 'wf-recorder' });
+  assert.deepEqual(commNames('7\ta\nb\n\u00008\tobs\n\u0000'), { 7: 'a\nb', 8: 'obs' });
+  // A pid gone before it was read has no comm, and stays unnamed.
+  assert.deepEqual(commNames('9\t\u0000'), {});
+  assert.deepEqual(commNames(''), {});
 });

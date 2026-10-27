@@ -42,6 +42,19 @@ export function shareRow(share, names) {
   return { target: seen(share), watcher: pipewire ? 'portal share' : oneLine(names[share.pid] ?? '') || `pid ${share.pid}`, stop: pipewire };
 }
 
+export const shareRowText = (row) => [row.target, row.watcher, row.stop ? '↵ stop' : ''].filter((p) => p).join('  ');
+
+// The reader prints each pid, a tab, its /proc comm (which ends in a newline) and a NUL; comm itself is the process's to name, so only that last newline goes.
+export function commNames(text) {
+  const names = {};
+  for (const record of text.split('\0')) {
+    const tab = record.indexOf('\t');
+    const name = record.slice(tab + 1).replace(/\n$/, '');
+    if (tab > 0 && name) names[record.slice(0, tab)] = name;
+  }
+  return names;
+}
+
 // niri stops a PipeWire share by its session, and a session can hold more than one stream (XPRY7NFD).
 export const stopSessions = (shares) => [...new Set(shares.filter((s) => s.kind === 'PipeWire').map((s) => s.session))];
 

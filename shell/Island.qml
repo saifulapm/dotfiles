@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
@@ -43,6 +44,20 @@ PanelWindow {
     // Every niri cast but the shell's own recording; Do Not Disturb never hides it (2N83H6SJ).
     readonly property var shares: niri.shares(Root.State.recordingPid)
     readonly property var sharing: shares.length ? shares : null
+    // Mod+I on LIVE opens a card of the shares, with who watches each; Enter stops every PipeWire share, Esc closes (MGX0WWS8).
+    property bool sharingOpen: false
+    readonly property var sharingCard: sharingOpen && sharing ? sharing : null
+    // Each screencopy share's process name by pid, read from /proc whenever the pids change.
+    property var watcherNames: ({})
+    readonly property string screencopyPids: shares.filter(s => s.kind !== "PipeWire").map(s => s.pid).join(" ")
+    onScreencopyPidsChanged: {
+        if (!screencopyPids)
+            return;
+        comms.running = false;
+        comms.command = ["sh", "-c", 'for p; do printf "%s\t" "$p"; cat "/proc/$p/comm" 2>/dev/null; printf "\\0"; done', "sh"].concat(screencopyPids.split(" "));
+        comms.running = true;
+    }
+    readonly property var shareRows: (sharingCard ?? []).map(s => I.shareRow(s, watcherNames))
     // An agent's lease, {who, left} in ms, while one holds the session; leaseNow is bumped each second so the time left moves.
     property real leaseNow: Date.now()
     readonly property var lease: lock.leased ? { who: lock.heldBy, left: Math.max(0, lock.leaseUntil - leaseNow) } : null
@@ -73,6 +88,9 @@ PanelWindow {
     property var heldNotification: null
     property var heldQuestion: null
     property var heldOsd: null
+    property var heldShareRows: []
+    onShareRowsChanged: if (shareRows.length)
+        heldShareRows = shareRows
     property string heldText: ""
     onCalendarChanged: if (calendar)
         heldCalendar = calendar
@@ -90,6 +108,7 @@ PanelWindow {
             leaseCard,
             lease,
             calendar,
+            sharingCard,
             notification,
             sharing,
             recording,
@@ -107,11 +126,11 @@ PanelWindow {
         modeSince = Date.now();
         holdCaptureNote();
         // The keyboard goes back once what it was given for is gone, such as a notification whose 5 s ran out.
-        if (focused && ["calendar", "question", "notification", "leaseCard"].indexOf(mode) < 0)
+        if (focused && ["calendar", "question", "notification", "leaseCard", "sharingCard"].indexOf(mode) < 0)
             release();
     }
     // The lease's text is read back from what is drawn, since each theme words it its own way.
-    readonly property string text: mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLabel.text, leaseWho.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(mode, slots, clock.now)
+    readonly property string text: mode === "sharingCard" ? shareRows.map(I.shareRowText).join(" · ") : mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLabel.text, leaseWho.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(mode, slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var chipLook: V.chipLook(theme.tokens)
@@ -126,20 +145,21 @@ PanelWindow {
             lease: [leaseLook.slot.width, leaseLook.slot.height],
             sending: [sendingLook.width, sendingLook.height],
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
+            sharingCard: [noteLook.width, shareColumn.implicitHeight + 24],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
             question: [I.MAX_WIDTH, ask.implicitHeight + 32],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
             osd: [osdLook.width, osdLook.height]
         })
     // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
-    readonly property string part: mode === "capture" ? (captureLook.card ? "notification" : "capture") : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sending"].indexOf(mode) < 0 ? "label" : mode
+    readonly property string part: mode === "capture" ? (captureLook.card ? "notification" : "capture") : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "sending"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
     readonly property var motion: I.islandMotion(theme.tokens?.primitive.motion)
-    readonly property bool animating: morphing.running || [labelPart, capturePart, leasePart, sendingPart, leaseCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
+    readonly property bool animating: morphing.running || [labelPart, capturePart, leasePart, sendingPart, leaseCardPart, sharingCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -523,6 +543,14 @@ PanelWindow {
         };
     }
 
+    // The sharing card's rows as drawn, each with its width against the card's.
+    function sharingState() {
+        const rows = [];
+        for (let i = 0; i < shareRepeater.count; i++)
+            rows.push(shareRepeater.itemAt(i).drawn);
+        return { rows, inner: shareColumn.width };
+    }
+
     // What the lease slot and card draw, for `island state`.
     function leaseState() {
         if (mode === "leaseCard")
@@ -589,13 +617,15 @@ PanelWindow {
     function focusIsland() {
         if (mode === "lease")
             leaseOpen = true;
+        else if (mode === "sharing")
+            sharingOpen = true;
         else if (mode === "rest" || mode === "playing") {
             calendar = {
                 year: clock.now.getFullYear(),
                 month: clock.now.getMonth()
             };
             zones.need();
-        } else if (mode !== "question" && mode !== "notification" && mode !== "leaseCard")
+        } else if (mode !== "question" && mode !== "notification" && mode !== "leaseCard" && mode !== "sharingCard")
             return;
         focused = true;
         keys.forceActiveFocus();
@@ -629,6 +659,7 @@ PanelWindow {
     function release() {
         focused = false;
         leaseOpen = false;
+        sharingOpen = false;
         calendar = null;
         replying = false;
         reply.text = "";
@@ -691,6 +722,13 @@ PanelWindow {
         to: 1
         onRunningChanged: if (!running)
             island.heldHeight = 0
+    }
+
+    Process {
+        id: comms
+        stdout: StdioCollector {
+            onStreamFinished: island.watcherNames = I.commNames(text)
+        }
     }
 
     Tick {
@@ -1495,6 +1533,62 @@ PanelWindow {
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // One row per share, as plain as the label: its target and who watches, and ↵ stop where Enter can stop it.
+            IslandPart {
+                id: sharingCardPart
+                shown: island.part === "sharingCard"
+                key: ""
+                swap: island.motion?.swap ?? null
+                x: Math.round((parent.width - width) / 2)
+                width: island.sizes.sharingCard[0]
+                height: island.sizes.sharingCard[1]
+
+                Column {
+                    id: shareColumn
+                    x: 14
+                    y: 12
+                    width: parent.width - 28
+                    spacing: 8
+
+                    Repeater {
+                        id: shareRepeater
+                        model: island.heldShareRows
+
+                        Item {
+                            id: shareRow
+                            required property var modelData
+                            readonly property var drawn: ({ text: rowText.text, stop: stopText.visible, lines: rowText.lineCount, elided: rowText.truncated, width: Math.ceil(rowText.width + (stopText.visible ? stopText.width + 12 : 0)) })
+                            width: shareColumn.width
+                            height: rowText.implicitHeight
+
+                            Text {
+                                id: rowText
+                                width: parent.width - (stopText.visible ? stopText.implicitWidth + 12 : 0)
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                text: I.shareRowText(Object.assign({}, shareRow.modelData, { stop: false }))
+                                color: box.style.text
+                                font.family: island.theme.tokens?.type.mono ?? ""
+                                font.pixelSize: 13
+                                font.weight: Font.Medium
+                            }
+
+                            Text {
+                                id: stopText
+                                anchors.right: parent.right
+                                visible: shareRow.modelData.stop
+                                textFormat: Text.PlainText
+                                text: "↵ stop"
+                                color: island.theme.tokens?.color.accent ?? box.style.text
+                                font.family: island.theme.tokens?.type.mono ?? ""
+                                font.pixelSize: 13
                             }
                         }
                     }
@@ -2389,6 +2483,16 @@ PanelWindow {
                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         island.release();
                         island.lock.lockNow();
+                    } else if (event.key === Qt.Key_Escape) {
+                        island.release();
+                    }
+                    return;
+                }
+                if (island.mode === "sharingCard") {
+                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        for (const id of I.stopSessions(island.sharingCard))
+                            Quickshell.execDetached(["niri", "msg", "action", "stop-cast", "--session-id", String(id)]);
+                        island.release();
                     } else if (event.key === Qt.Key_Escape) {
                         island.release();
                     }
