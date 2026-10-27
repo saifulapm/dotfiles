@@ -39,6 +39,10 @@ export function reduce(state, event) {
       return set(state, { windows: state.windows.map((w) => set(w, { is_focused: w.id === e.id })) });
     case 'WindowClosed':
       return set(state, { windows: state.windows.filter((w) => w.id !== e.id) });
+    case 'WorkspaceUrgencyChanged':
+      return set(state, { workspaces: state.workspaces.map((w) => (w.id === e.id ? set(w, { is_urgent: e.urgent }) : w)) });
+    case 'WindowUrgencyChanged':
+      return set(state, { windows: state.windows.map((w) => (w.id === e.id ? set(w, { is_urgent: e.urgent }) : w)) });
     case 'OverviewOpenedOrClosed':
       return set(state, { overview: e.is_open });
     case 'CastsChanged':
@@ -60,6 +64,14 @@ export function outputView(state, output) {
   if (!ws) return null;
   const win = state.windows.find((w) => w.id === ws.active_window_id);
   return { idx: ws.idx, app: win ? win.app_id : null, title: win ? win.title : null };
+}
+
+// The numbers of the output's workspaces holding an urgent window, in workspace order.
+export function urgentWorkspaces(state, output) {
+  return state.workspaces
+    .filter((w) => w.output === output && w.is_urgent)
+    .map((w) => w.idx)
+    .sort((a, b) => a - b);
 }
 
 export function focusedOutput(state) {

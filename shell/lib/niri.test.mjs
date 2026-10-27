@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initial, reduce, outputView, focusedOutput, shares } from './niri.mjs';
+import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces } from './niri.mjs';
 
 // Captured from niri 26.04's event stream: start, open foot, workspace 2, workspace 1, open and close a second foot.
 const LINES = [
@@ -121,4 +121,43 @@ test('a share started before the shell arrives in the first burst', () => {
   const first = JSON.stringify({ CastsChanged: { casts: [JSON.parse(WF).CastStartedOrChanged.cast] } });
   assert.deepEqual(shares(run([...LINES, first]), 0).map((s) => s.stream), [1]);
   assert.deepEqual(shares(initial, 0), []);
+});
+
+// niri 26.04's urgency events, as server.rs sends them: a workspace is urgent while any window on it is.
+const ws = (id, idx, output, urgent = false, active = false) => ({ id, idx, name: null, output, is_urgent: urgent, is_active: active, is_focused: active, active_window_id: null });
+const workspaces = (...list) => JSON.stringify({ WorkspacesChanged: { workspaces: list } });
+const wsUrgency = (id, urgent) => JSON.stringify({ WorkspaceUrgencyChanged: { id, urgent } });
+
+test("an output's urgent workspaces read in workspace order, the current one included", () => {
+  const s = run([workspaces(ws(1, 1, 'eDP-1', false, true), ws(2, 2, 'eDP-1'), ws(3, 3, 'eDP-1'), ws(4, 4, 'eDP-1')), wsUrgency(3, true), wsUrgency(2, true), wsUrgency(1, true)]);
+  assert.deepEqual(urgentWorkspaces(s, 'eDP-1'), [1, 2, 3]);
+});
+
+test('a workspace no longer urgent drops out of the list', () => {
+  const s = run([workspaces(ws(1, 1, 'eDP-1', false, true), ws(2, 2, 'eDP-1')), wsUrgency(2, true), wsUrgency(2, false)]);
+  assert.deepEqual(urgentWorkspaces(s, 'eDP-1'), []);
+});
+
+test('each output lists only its own urgent workspaces, though their numbers repeat', () => {
+  const s = run([workspaces(ws(1, 1, 'eDP-1', false, true), ws(2, 2, 'eDP-1'), ws(3, 1, 'HDMI-A-1', false, true), ws(4, 2, 'HDMI-A-1')), wsUrgency(4, true)]);
+  assert.deepEqual(urgentWorkspaces(s, 'eDP-1'), []);
+  assert.deepEqual(urgentWorkspaces(s, 'HDMI-A-1'), [2]);
+});
+
+test('an empty workspace above dropping out moves the mark to the new number', () => {
+  const before = run([workspaces(ws(1, 1, 'eDP-1'), ws(2, 2, 'eDP-1', false, true), ws(3, 3, 'eDP-1')), wsUrgency(3, true)]);
+  assert.deepEqual(urgentWorkspaces(before, 'eDP-1'), [3]);
+  // A renumbering arrives as WorkspacesChanged alone, carrying each workspace's urgency.
+  const after = run([workspaces(ws(2, 1, 'eDP-1', false, true), ws(3, 2, 'eDP-1', true))], before);
+  assert.deepEqual(urgentWorkspaces(after, 'eDP-1'), [2]);
+});
+
+test('a window keeps the urgency niri last reported for it', () => {
+  const s = run([...LINES, '{"WindowUrgencyChanged":{"id":2,"urgent":true}}']);
+  assert.equal(s.windows.find((w) => w.id === 2).is_urgent, true);
+  assert.equal(run(['{"WindowUrgencyChanged":{"id":2,"urgent":false}}'], s).windows.find((w) => w.id === 2).is_urgent, false);
+});
+
+test('before any event no workspace is urgent', () => {
+  assert.deepEqual(urgentWorkspaces(initial, 'eDP-1'), []);
 });
