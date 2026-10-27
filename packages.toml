@@ -709,6 +709,11 @@ arch = "all"
 why = "serves this machine's screen to dots-vnc on another"
 
 [[package]]
+name = "mosh"
+arch = "all"
+why = "a shell on another machine that rides out sleep, roaming and a dropped link"
+
+[[package]]
 name = "mesa-libgbm-devel"
 arch = "all"
 why = "builds the wlvncc pin"
