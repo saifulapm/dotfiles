@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots bump: moves each versions.toml pin to its upstream's latest release (or head commit for track = "commit"), rewriting only that pin's version and sha256 lines; the commit is left to the user. A [[toolchain]] entry is only listed beside its upstream's newest stable version, since another repo pins the same numbers and the two move by hand.
+# dots bump: moves each versions.toml pin to its upstream's latest release (or head commit for track = "commit", or crates.io's newest stable version for a crate pin), rewriting only that pin's version and sha256 lines; the commit is left to the user. A [[toolchain]] entry is only listed beside its upstream's newest stable version, since another repo pins the same numbers and the two move by hand.
 set -euo pipefail
 {
 
@@ -26,7 +26,10 @@ upstream() {
 # bump_pin: the pin's keys are in the globals set by flush; queues edits only when every download worked.
 bump_pin() {
   local latest
-  if [[ $track == commit ]]; then
+  if [[ -n $crate ]]; then
+    # crates.io turns away a request without a user agent; a pre-release never counts as newest.
+    latest=$(curl -fsSL -A dots-bump "https://crates.io/api/v1/crates/$crate" | jq -er .crate.max_stable_version) || { echo "dots bump: $name: could not ask crates.io for $crate" >&2; return 1; }
+  elif [[ $track == commit ]]; then
     latest=$(upstream "repos/$repo_name/commits/HEAD" --jq .sha) || { echo "dots bump: $name: could not ask $repo_name for its head commit" >&2; return 1; }
   else
     latest=$(upstream "repos/$repo_name/releases/latest" --jq .tag_name) || { echo "dots bump: $name: could not ask $repo_name for its latest release" >&2; return 1; }
@@ -117,7 +120,7 @@ flush() {
     check_toolchain || failed=1
     return 0
   fi
-  [[ -n $repo_name && -n $version_line ]] || { echo "dots bump: ${name:-?}: needs repo and version" >&2; failed=1; return 0; }
+  [[ ( -n $repo_name || -n $crate ) && -n $version_line ]] || { echo "dots bump: ${name:-?}: needs repo or crate, and version" >&2; failed=1; return 0; }
   bump_pin || failed=1
 }
 
@@ -128,7 +131,7 @@ failed=0
 : >"$work/toolchain"
 
 reset() {
-  name='' repo_name='' version='' version_line='' track='' fetch='' latest_from='' package=''
+  name='' repo_name='' crate='' version='' version_line='' track='' fetch='' latest_from='' package=''
   urls=() sha_lines=()
 }
 reset
@@ -150,6 +153,7 @@ while IFS= read -r line || [[ -n $line ]]; do
   case $key in
     name) name=$value ;;
     repo) repo_name=$value ;;
+    crate) crate=$value ;;
     track) track=$value ;;
     fetch) fetch=$value ;;
     latest) latest_from=$value ;;

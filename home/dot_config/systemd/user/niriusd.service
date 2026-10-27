@@ -1,0 +1,10 @@
+[Unit]
+Description=nirius, the scratchpad and follow-mode daemon behind niri's Mod+Z binds
+PartOf=graphical-session.target
+After=graphical-session.target
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=%h/.local/bin/niriusd
+Restart=always
+RestartSec=1s

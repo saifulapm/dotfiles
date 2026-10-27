@@ -13,7 +13,7 @@ export const TOUCHPAD = [
 ].map(([key, title]) => ({ title, key, group: 'TOUCHPAD' }));
 
 const MODS = { Mod: 'Mod', Shift: '⇧', Ctrl: '⌃', Alt: '⌥', Super: 'Super' };
-const KEYS = { Slash: '/', Return: '↵', Page_Up: 'PgUp', Page_Down: 'PgDn', Escape: 'Esc', Period: '.', Comma: ',' };
+const KEYS = { Slash: '/', Return: '↵', Page_Up: 'PgUp', Page_Down: 'PgDn', Escape: 'Esc', Period: '.', Comma: ',', Semicolon: ';' };
 
 // media: each bare media key's title, which names that key under a modifier too.
 function keyText(combo, title, media) {
@@ -27,6 +27,8 @@ function keyText(combo, title, media) {
 function groupOf(combo, action) {
   if (combo.split('+').pop().startsWith('XF86')) return 'SYSTEM';
   if (/^spawn "(qs" "ipc" "call|dots-call)"/.test(action)) return 'SURFACES';
+  // nirius moves windows, so its binds are window binds though they spawn.
+  if (/^spawn "nirius"/.test(action)) return 'WINDOWS';
   if (/^spawn\b/.test(action)) return 'WORK';
   if (/window|column|workspace/.test(action)) return 'WINDOWS';
   return 'SYSTEM';

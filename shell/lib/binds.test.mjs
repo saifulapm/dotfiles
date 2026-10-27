@@ -150,6 +150,17 @@ test('Mod+Shift+3, 4 and 5 take the screen, a region and the window, and 8, 9 an
   assert.match(binds, acts('Mod+Shift+0', 'clear-dynamic-cast-target'));
 });
 
+test('Mod+; clicks a detected target with wl-kbptr, and Mod+Shift+; picks a tile then bisects it', () => {
+  assert.match(binds, spawns('Mod+Semicolon', ['wl-kbptr', '-o', 'modes=floating,click', '-o', 'mode_floating.source=detect']));
+  assert.match(binds, spawns('Mod+Shift+Semicolon', ['wl-kbptr', '-o', 'modes=tile,bisect']));
+});
+
+test('Mod+Z shows the nirius scratchpad, Mod+Shift+Z sends a window to it or back, and Mod+Shift+S makes a window follow', () => {
+  assert.match(binds, spawns('Mod+Z', ['nirius', 'scratchpad-show']));
+  assert.match(binds, spawns('Mod+Shift+Z', ['nirius', 'scratchpad-toggle']));
+  assert.match(binds, spawns('Mod+Shift+S', ['nirius', 'toggle-follow-mode']));
+});
+
 test('the Touch Bar keys light the keyboard and search, and Alt and Shift fine-tune volume and brightness', () => {
   assert.match(binds, spawns('XF86KbdBrightnessUp', ['brightnessctl', '-q', '-d', 'kbd_backlight', 'set', '10%+']));
   assert.match(binds, spawns('XF86KbdBrightnessDown', ['brightnessctl', '-q', '-d', 'kbd_backlight', 'set', '10%-']));

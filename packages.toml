@@ -757,3 +757,18 @@ why = "builds the wlvncc pin with tight"
 name = "openssl-devel"
 arch = "all"
 why = "builds the wlvncc pin, whose crypto falls back to headers it lacks without it"
+
+[[package]]
+name = "wl-kbptr"
+arch = "all"
+why = "clicks from the keyboard on Mod+; (a detected target) and Mod+Shift+; (a tile, then bisect)"
+
+[[package]]
+name = "wev"
+arch = "all"
+why = "prints the raw Wayland input events a key or button sends, for debugging binds"
+
+[[package]]
+name = "waypipe"
+arch = "all"
+why = "runs one app from another machine over ssh: waypipe ssh <machine> <app>"

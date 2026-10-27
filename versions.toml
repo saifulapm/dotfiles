@@ -271,3 +271,12 @@ install = "~/.local/bin/wl-uinput-proxy, built with cargo, which wayvnc's unit r
 runs = "wl-uinput-proxy >/dev/null; test $? -eq 2"
 url = "https://github.com/pgaskin/wl-uinput-proxy/archive/refs/tags/v{version}.tar.gz"
 sha256 = "b939dcaa5a6c4a49cac7e728887d3665b0a923568c532b1935d28937750aaf61"
+
+[[pin]]
+name = "nirius"
+version = "0.10.0"
+crate = "nirius"
+install = "~/.local/bin/nirius and ~/.local/bin/niriusd, built with cargo: the scratchpad and follow-mode daemon behind Mod+Z, Mod+Shift+Z and Mod+Shift+S"
+runs = "nirius --version"
+url = "https://static.crates.io/crates/nirius/nirius-{version}.crate"
+sha256 = "a9130f5f62ae13e497b5419b104dde7f48e42961c2d28ddae2c9f3a03a98cb15"

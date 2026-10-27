@@ -1,0 +1,10 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "nirius") }}
+{{ template "cargo.sh" . }}
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+pin_cargo "$pin_tmp/nirius-$pin_version" nirius niriusd
+# A running niriusd keeps the old binary until it restarts.
+systemctl --user try-restart niriusd.service 2>/dev/null || true
+pin_done

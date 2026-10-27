@@ -6,6 +6,8 @@ binds {
     Mod+E hotkey-overlay-title="Editor: kak" { spawn "dots-foot" "kak"; }
     Mod+Y repeat=false hotkey-overlay-title="Files" { spawn "dots-files"; }
     Mod+Shift+M hotkey-overlay-title="Mail: kak-mail" { spawn "mail-open" "Imbox"; }
+    Mod+Semicolon repeat=false hotkey-overlay-title="Click a Target" { spawn "wl-kbptr" "-o" "modes=floating,click" "-o" "mode_floating.source=detect"; }
+    Mod+Shift+Semicolon repeat=false hotkey-overlay-title="Click by Grid" { spawn "wl-kbptr" "-o" "modes=tile,bisect"; }
     Mod+Space hotkey-overlay-title="Launcher" { spawn "dots-call" "launcher" "toggle"; }
     Mod+V hotkey-overlay-title="Clipboard" { spawn "dots-call" "launcher" "mode" "clipboard"; }
     Mod+Period hotkey-overlay-title="Emoji" { spawn "dots-call" "launcher" "mode" "emoji"; }
@@ -84,6 +86,9 @@ binds {
     Mod+Shift+V hotkey-overlay-title="Focus Floating or Tiled" { switch-focus-between-floating-and-tiling; }
     Mod+Shift+C hotkey-overlay-title="Center Column" { center-column; }
     Mod+Ctrl+C hotkey-overlay-title="Center Visible Columns" { center-visible-columns; }
+    Mod+Z repeat=false hotkey-overlay-title="Show Scratchpad" { spawn "nirius" "scratchpad-show"; }
+    Mod+Shift+Z repeat=false hotkey-overlay-title="Window to Scratchpad or Back" { spawn "nirius" "scratchpad-toggle"; }
+    Mod+Shift+S repeat=false hotkey-overlay-title="Window Follows Workspaces" { spawn "nirius" "toggle-follow-mode"; }
 
     Mod+Page_Down hotkey-overlay-title="Focus Workspace Down" { focus-workspace-down; }
     Mod+Page_Up hotkey-overlay-title="Focus Workspace Up" { focus-workspace-up; }

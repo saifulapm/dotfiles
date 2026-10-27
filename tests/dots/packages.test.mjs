@@ -71,6 +71,14 @@ test('the mobile toolchain\'s packages: JDK 25, clang and lld everywhere, adb an
   for (const name of ['java-25-openjdk-devel', 'clang', 'lld', 'android-tools', 'SDL3-devel', 'libusb1-devel', 'ffmpeg-devel']) assert.match(byName.get(name).why, /\w/, `${name} why`);
 });
 
+// The add-ons picked from awesome-niri (2026-10-27): clicking from the keyboard, reading raw input events, one app over ssh.
+test('wl-kbptr, wev and waypipe are declared for every arch', () => {
+  for (const name of ['wl-kbptr', 'wev', 'waypipe']) {
+    assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
+    assert.match(byName.get(name).why, /\w/, `${name} why`);
+  }
+});
+
 // Every machine is a remote and a viewer: wayvnc serves, and wlvncc builds from its pin against these on both arches.
 test('wayvnc and everything wlvncc builds against are declared for every arch', () => {
   const build = [

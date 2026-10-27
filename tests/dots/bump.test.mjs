@@ -137,7 +137,7 @@ test('a gh failure leaves that pin untouched, bumps the other and exits 1', () =
 test('the agent tools move to their repos\' head commits, one line each', () => {
   const file = readFileSync(new URL('../../versions.toml', import.meta.url), 'utf8');
   const entries = (table) => file.split(/^(?=\[\[)/m).filter((b) => b.startsWith(`[[${table}]]`))
-    .map((p) => Object.fromEntries([...p.matchAll(/^(name|version|repo|track|url|latest|package) = "([^"]*)"/gm)].map((m) => [m[1], m[2]])));
+    .map((p) => Object.fromEntries([...p.matchAll(/^(name|version|repo|crate|track|url|latest|package) = "([^"]*)"/gm)].map((m) => [m[1], m[2]])));
   const pins = entries('pin');
   const toolchain = entries('toolchain');
   const w = world({ yaziTag: 'v26.9.1', kakSha: KAK_OLD, file });
@@ -148,6 +148,10 @@ test('the agent tools move to their repos\' head commits, one line each', () => 
   for (const t of toolchain.filter((t) => t.latest === 'github')) writeFileSync(join(w.fix, 'gh', t.repo.replace('/', '_')), `v${t.version}\n`);
   const head = { amx: 'a'.repeat(40), workflow: 'b'.repeat(40), pxy: 'c'.repeat(40) };
   for (const p of pins) {
+    if (p.crate) {
+      w.serve(`https://crates.io/api/v1/crates/${p.crate}`, JSON.stringify({ crate: { max_stable_version: p.version } }));
+      continue;
+    }
     const latest = head[p.name] ?? (p.track === 'commit' ? p.version : `v${p.version}`);
     writeFileSync(join(w.fix, 'gh', p.repo.replace('/', '_')), latest + '\n');
     if (head[p.name]) w.serve(p.url.replace('{version}', latest), `${p.name} head`);
@@ -157,6 +161,26 @@ test('the agent tools move to their repos\' head commits, one line each', () => 
   const old = Object.fromEntries(pins.map((p) => [p.name, p.version]));
   assert.equal(r.stdout, ['amx', 'workflow', 'pxy'].map((n) => `${n} ${old[n]} → ${head[n]}\n`).join('') + toolchain.map((t) => `toolchain ${t.name} ${t.version} is current\n`).join(''));
   for (const n of ['amx', 'workflow', 'pxy']) assert.match(w.read(), new RegExp(`name = "${n}"\nversion = "${head[n]}"`));
+});
+
+// nirius lives on sourcehut and crates.io, not GitHub: a crate pin asks crates.io for its newest stable version, never a pre-release.
+test('a crate pin moves to crates.io\'s newest stable version and hashes the new .crate', () => {
+  const file = FILE + `
+[[pin]]
+name = "nirius"
+version = "0.10.0"
+crate = "nirius"
+url = "https://static.crates.io/crates/nirius/nirius-{version}.crate"
+sha256 = "${OLD}"
+`;
+  const w = world({ yaziTag: 'v26.9.1', kakSha: KAK_OLD, file });
+  w.serve('https://crates.io/api/v1/crates/nirius', JSON.stringify({ crate: { max_stable_version: '0.11.0', newest_version: '0.12.0-beta.1' } }));
+  w.serve('https://static.crates.io/crates/nirius/nirius-0.11.0.crate', 'nirius 0.11.0');
+  const before = w.read();
+  const r = w.bump();
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, 'nirius 0.10.0 → 0.11.0\n');
+  assert.deepEqual(changed(before, w.read()), ['version = "0.11.0"', `sha256 = "${sha('nirius 0.11.0')}"`]);
 });
 
 // kakfeed is private: its pin says fetch = "gh", so the new tarball comes from gh api, never curl (the stub curl has no fixture for it).
