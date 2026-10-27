@@ -25,6 +25,8 @@ Item {
     property real openT0: -1
 
     readonly property var c: theme.color
+    // Enter acted on a row and closed the launcher; Esc never sends it.
+    signal launched
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     // {id, name, genericName, keywords, icon, entry} per desktop entry, from the shell's scan.
     required property var apps
@@ -142,11 +144,14 @@ Item {
         if (row.remind) {
             // "20m" counts from Enter, not from when it was typed; a refusal keeps the launcher open on the row that says why.
             const now = Date.now();
-            if (!reminders.add(Rem.parseReminder(parsed.q, now), now))
+            if (!reminders.add(Rem.parseReminder(parsed.q, now), now)) {
                 close();
+                launched();
+            }
             return;
         }
         close();
+        launched();
         if (row.exec)
             Quickshell.execDetached(row.exec);
         else if (row.copy)

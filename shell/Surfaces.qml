@@ -222,6 +222,11 @@ PanelWindow {
             theme: host.theme
             apps: host.apps
             reminders: host.reminders
+            // A launch or a picked window from the overview closes it too; Esc returns to it.
+            onLaunched: {
+                if (host.overview)
+                    Quickshell.execDetached(["niri", "msg", "action", "close-overview"]);
+            }
         }
     }
 
