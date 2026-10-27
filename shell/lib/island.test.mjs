@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf, shareRow, stopSessions } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -175,4 +175,51 @@ test('a capture from any caller is one plain line, a swatch only for a colour he
   assert.equal(captureOf('colour', ' \n ', ''), null);
   assert.equal(captureOf('colour', 'Copied', 'red').swatch, null);
   assert.equal(captureOf('colour', 'Copied', '#C8381E; x').swatch, null);
+});
+
+const share = (o) => ({ stream: 1, session: 1, kind: 'PipeWire', target: 'screen', app: null, active: true, pid: null, ...o });
+
+test('sharing sits below a notification and above the recording timer (7WVQMXDS)', () => {
+  const slots = { question, leaseCard: true, lease: true, calendar: true, notification: note, sharing: [share()], recording: '00:12', osd: { kind: 'volume', value: 40 }, toast: 'Captured', capture: true, sending: true, playing: true };
+  const order = [];
+  for (const k of ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'sharing', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing']) {
+    order.push(pick(slots));
+    delete slots[k];
+  }
+  assert.deepEqual(order, ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'sharing', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing']);
+  assert.equal(isCompact('sharing'), true);
+});
+
+test('the sharing card opened by Mod+I holds against a notification, like the calendar', () => {
+  assert.equal(pick({ sharingCard: [share()], notification: note, sharing: [share()] }), 'sharingCard');
+  assert.equal(pick({ sharingCard: [share()], question }), 'question');
+  assert.equal(isCompact('sharingCard'), false);
+});
+
+test('sharing reads LIVE and what is seen; two or more read as a count (M5W7ZJ8V, SN5W2JY5)', () => {
+  const live = (...s) => islandText('sharing', { sharing: s }, AT);
+  assert.equal(live(share()), 'LIVE SCREEN');
+  assert.equal(live(share({ target: 'window', app: 'foot' })), 'LIVE FOOT');
+  assert.equal(live(share({ target: 'window', app: null })), 'LIVE WINDOW');
+  assert.equal(live(share({ target: 'nothing' })), 'LIVE NOTHING');
+  assert.equal(live(share({ active: false })), 'LIVE PAUSED');
+  assert.equal(live(share({ target: 'nothing', active: false })), 'LIVE PAUSED');
+  assert.equal(live(share(), share({ stream: 2, active: false })), 'LIVE ×2');
+  assert.equal(live(share({ target: 'window', app: 'a\nb‮evil\u001b[31m' })), 'LIVE A BEVIL [31M');
+});
+
+test('each card row is its target, who watches, and a stop only on PipeWire (MGX0WWS8, XPRY7NFD)', () => {
+  const names = { 4242: 'wf-recorder' };
+  assert.deepEqual(shareRow(share({ kind: 'WlrScreencopy', pid: 4242 }), names), { target: 'SCREEN', watcher: 'wf-recorder', stop: false });
+  assert.deepEqual(shareRow(share(), names), { target: 'SCREEN', watcher: 'portal share', stop: true });
+  assert.deepEqual(shareRow(share({ target: 'window', app: 'x'.repeat(200) }), names).target, 'X'.repeat(200));
+  // A process names itself, and its 15 bytes of comm can hold any control or bidi mark.
+  assert.equal(shareRow(share({ kind: 'WlrScreencopy', pid: 7 }), { 7: 'a\nb‮\u001b[31m' }).watcher, 'a b [31m');
+  assert.equal(shareRow(share({ kind: 'WlrScreencopy', pid: 8 }), names).watcher, 'pid 8');
+});
+
+test('Enter stops each PipeWire session once and leaves screencopy alone', () => {
+  const all = [share({ stream: 1, session: 5 }), share({ stream: 2, session: 5 }), share({ stream: 3, session: 6 }), share({ stream: 4, session: 7, kind: 'WlrScreencopy', pid: 9 })];
+  assert.deepEqual(stopSessions(all), [5, 6]);
+  assert.deepEqual(stopSessions([share({ kind: 'WlrScreencopy', pid: 9 })]), []);
 });

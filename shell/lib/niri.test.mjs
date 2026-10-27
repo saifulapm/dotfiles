@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initial, reduce, outputView, focusedOutput } from './niri.mjs';
+import { initial, reduce, outputView, focusedOutput, shares } from './niri.mjs';
 
 // Captured from niri 26.04's event stream: start, open foot, workspace 2, workspace 1, open and close a second foot.
 const LINES = [
@@ -83,4 +83,42 @@ test('the overview reads open after niri opens it and closed after it closes', (
 
 test('a shell that starts while the overview is open reads it open from the first burst', () => {
   assert.equal(run([...LINES, OVERVIEW_OPEN]).overview, true);
+});
+
+// Captured from a nested niri 26.04 while wf-recorder started and stopped; the PipeWire casts follow niri-ipc's Cast, since a nested niri cannot start one.
+const NO_CASTS = '{"CastsChanged":{"casts":[]}}';
+const WF = '{"CastStartedOrChanged":{"cast":{"stream_id":1,"session_id":1,"kind":"WlrScreencopy","target":{"Output":{"name":"winit"}},"is_dynamic_target":false,"is_active":true,"pid":1315790,"pw_node_id":null}}}';
+const WF_STOPPED = '{"CastStopped":{"stream_id":1}}';
+const pw = (stream, session, target, active = true) => JSON.stringify({ CastStartedOrChanged: { cast: { stream_id: stream, session_id: session, kind: 'PipeWire', target, is_dynamic_target: true, is_active: active, pid: null, pw_node_id: 40 + stream } } });
+
+test('a cast reads as a share until niri says it stopped', () => {
+  const live = run([NO_CASTS, WF]);
+  assert.deepEqual(shares(live, 0), [{ stream: 1, session: 1, kind: 'WlrScreencopy', target: 'screen', app: null, active: true, pid: 1315790 }]);
+  assert.deepEqual(shares(run([WF_STOPPED], live), 0), []);
+});
+
+test("the shell's own wf-recorder is no share, and no recording leaves every cast in", () => {
+  const live = run([NO_CASTS, WF, pw(2, 2, { Output: { name: 'winit' } })]);
+  assert.deepEqual(shares(live, 1315790).map((s) => s.stream), [2]);
+  assert.deepEqual(shares(live, 0).map((s) => s.stream), [1, 2]);
+});
+
+test('a window share names its app as the margin does, and a cleared or paused one says so', () => {
+  const live = run([...LINES, pw(2, 2, { Window: { id: 2 } }), pw(3, 3, 'Nothing'), pw(4, 4, { Window: { id: 99 } }, false)]);
+  assert.deepEqual(
+    shares(live, 0).map((s) => [s.target, s.app, s.active]),
+    [['window', 'foot', true], ['nothing', null, true], ['window', null, false]],
+  );
+});
+
+test('a change to a cast replaces it in place, and a fresh CastsChanged replaces them all', () => {
+  const live = run([NO_CASTS, pw(2, 2, { Output: { name: 'winit' } }), WF, pw(2, 2, 'Nothing')]);
+  assert.deepEqual(shares(live, 0).map((s) => [s.stream, s.target]), [[2, 'nothing'], [1, 'screen']]);
+  assert.deepEqual(shares(run([NO_CASTS], live), 0), []);
+});
+
+test('a share started before the shell arrives in the first burst', () => {
+  const first = JSON.stringify({ CastsChanged: { casts: [JSON.parse(WF).CastStartedOrChanged.cast] } });
+  assert.deepEqual(shares(run([...LINES, first]), 0).map((s) => s.stream), [1]);
+  assert.deepEqual(shares(initial, 0), []);
 });

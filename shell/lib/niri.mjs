@@ -1,6 +1,6 @@
 // Pure, so node can test it on captured events; services/Niri.qml feeds it one line at a time.
 
-export const initial = { workspaces: [], windows: [], overview: false };
+export const initial = { workspaces: [], windows: [], overview: false, casts: [] };
 
 const set = (o, fields) => Object.assign({}, o, fields);
 
@@ -41,6 +41,14 @@ export function reduce(state, event) {
       return set(state, { windows: state.windows.filter((w) => w.id !== e.id) });
     case 'OverviewOpenedOrClosed':
       return set(state, { overview: e.is_open });
+    case 'CastsChanged':
+      return set(state, { casts: e.casts });
+    case 'CastStartedOrChanged': {
+      const at = state.casts.findIndex((c) => c.stream_id === e.cast.stream_id);
+      return set(state, { casts: at < 0 ? state.casts.concat([e.cast]) : state.casts.map((c, i) => (i === at ? e.cast : c)) });
+    }
+    case 'CastStopped':
+      return set(state, { casts: state.casts.filter((c) => c.stream_id !== e.stream_id) });
     default:
       return state;
   }
@@ -56,4 +64,22 @@ export function outputView(state, output) {
 
 export function focusedOutput(state) {
   return state.workspaces.find((w) => w.is_focused)?.output ?? null;
+}
+
+// Every cast but the shell's own recording, whose wf-recorder pid is ownPid (0 while it records nothing); a window's app is its app_id, as the margin names it.
+export function shares(state, ownPid) {
+  return state.casts
+    .filter((c) => !(ownPid && c.pid === ownPid))
+    .map((c) => {
+      const window = c.target.Window ? state.windows.find((w) => w.id === c.target.Window.id) : null;
+      return {
+        stream: c.stream_id,
+        session: c.session_id,
+        kind: c.kind,
+        target: c.target.Output ? 'screen' : c.target.Window ? 'window' : 'nothing',
+        app: window ? window.app_id : null,
+        active: c.is_active,
+        pid: c.pid,
+      };
+    });
 }

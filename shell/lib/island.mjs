@@ -4,8 +4,8 @@ import { clockText } from './margins.mjs';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// The calendar is opened by hand from rest, so only a question, or an agent's lease that holds the session, takes the island from it; a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
-const PRIORITY = ['question', 'leaseCard', 'lease', 'calendar', 'notification', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing'];
+// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease that holds the session, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
+const PRIORITY = ['question', 'leaseCard', 'lease', 'calendar', 'sharingCard', 'notification', 'sharing', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing'];
 
 export const MAX_WIDTH = 560;
 
@@ -30,6 +30,21 @@ const oneLine = (s) =>
     .trim();
 export const filesText = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;
 
+// What a share shows, as niri.mjs's shares give it: SCREEN, the window's app, or NOTHING while its target is cleared.
+const seen = (s) => (s.target === 'screen' ? 'SCREEN' : s.target === 'nothing' ? 'NOTHING' : oneLine(s.app ?? 'window').toUpperCase());
+
+// Two or more shares read as a count; one names its target, or PAUSED while niri holds it inactive (M5W7ZJ8V, SN5W2JY5).
+export const liveText = (shares) => `LIVE ${shares.length > 1 ? `×${shares.length}` : shares[0].active ? seen(shares[0]) : 'PAUSED'}`;
+
+// A card row: who watches a PipeWire share is a portal's client, and a screencopy one is its pid's process name, from names, until read its pid (MGX0WWS8).
+export function shareRow(share, names) {
+  const pipewire = share.kind === 'PipeWire';
+  return { target: seen(share), watcher: pipewire ? 'portal share' : oneLine(names[share.pid] ?? '') || `pid ${share.pid}`, stop: pipewire };
+}
+
+// niri stops a PipeWire share by its session, and a session can hold more than one stream (XPRY7NFD).
+export const stopSessions = (shares) => [...new Set(shares.filter((s) => s.kind === 'PipeWire').map((s) => s.session))];
+
 // dots-capture's result, from any caller of the IPC: its kind, a title (empty for a miss, which copied nothing) and a detail, each one line; a colour's detail is its hex, and a #RRGGBB one gives the swatch. No words or an unknown kind shows nothing.
 export function captureOf(kind, title, detail) {
   const t = oneLine(title);
@@ -48,6 +63,8 @@ export function islandText(mode, slots, now) {
       return [slots.question.text, ...slots.question.options.map((o, i) => `[${i + 1}] ${o}`)].join('  ');
     case 'notification':
       return joined([slots.notification.app, slots.notification.summary, slots.notification.body]);
+    case 'sharing':
+      return liveText(slots.sharing);
     case 'recording':
       return `REC ${slots.recording}`;
     case 'osd':
@@ -86,7 +103,7 @@ export function shiftMonth(year, month, by) {
 }
 
 // The one-line modes the island closes into; the rest open it into a card.
-export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'recording', 'toast', 'capture'].includes(mode);
+export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'sharing', 'recording', 'toast', 'capture'].includes(mode);
 
 // Curves are 61 samples at even steps of time, which ease reads as CSS linear() does; Qt's BezierSpline crashed on a sampled curve.
 const STEPS = 60;
