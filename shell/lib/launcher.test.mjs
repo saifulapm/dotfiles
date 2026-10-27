@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows } from './launcher.mjs';
+import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows, overviewChar } from './launcher.mjs';
 
 const app = (name, keywords = []) => ({ id: name.toLowerCase(), name, genericName: '', keywords });
 const names = (entries) => entries.map((e) => e.name);
@@ -125,4 +125,25 @@ test('a window row keeps the icon its window was given, and calculator and comma
   assert.equal(windowRows([{ id: 1, title: 'a', app_id: 'foot', icon: 'image://icon/foot' }], '')[0].icon, 'image://icon/foot');
   assert.equal(calcRows('1 + 1')[0].glyph, '=');
   assert.equal(commandRows('lock')[0].glyph, '>');
+});
+
+test('a bare letter in the overview types itself, a shifted one its capital', () => {
+  assert.equal(overviewChar('c', {}), 'c');
+  assert.equal(overviewChar('A', {}), 'A');
+  assert.equal(overviewChar('=', {}), '=');
+});
+
+test('a key with Ctrl, Alt or Mod in the overview types nothing', () => {
+  assert.equal(overviewChar('\u0003', { ctrl: true }), '');
+  assert.equal(overviewChar('c', { ctrl: true }), '');
+  assert.equal(overviewChar('x', { alt: true }), '');
+  assert.equal(overviewChar('o', { meta: true }), '');
+});
+
+test('a key with no text or a control character in the overview types nothing', () => {
+  assert.equal(overviewChar('', {}), '');
+  assert.equal(overviewChar('\u001b', {}), '');
+  assert.equal(overviewChar('\r', {}), '');
+  assert.equal(overviewChar('\t', {}), '');
+  assert.equal(overviewChar('\u007f', {}), '');
 });

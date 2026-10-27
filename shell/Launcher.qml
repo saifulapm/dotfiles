@@ -80,12 +80,12 @@ Item {
         tokens: launcher.theme.tokens
     }
 
-    // mode is clipboard or emoji when a key opened the launcher straight into one.
-    function open(t0, mode) {
+    // mode is clipboard or emoji when a key opened the launcher straight into one; typed is the key that opened it from the overview.
+    function open(t0, mode, typed) {
         openT0 = t0;
         openMs = null;
         opens += 1;
-        input.text = ({ clipboard: "v ", emoji: ": " })[mode] || "";
+        input.text = typed || ({ clipboard: "v ", emoji: ": " })[mode] || "";
         selected = 0;
         shown = true;
         // Mod+V lands on the results so plain j/k move; a second Mod+V keeps the mode, so it lists again here.

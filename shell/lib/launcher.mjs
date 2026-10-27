@@ -30,6 +30,12 @@ export function parseQuery(text) {
   return mode ? { mode, q: text.slice(2) } : { mode: 'apps', q: text };
 }
 
+// The character a key opens the launcher with from niri's overview: one printable key with no Ctrl, Alt or Mod, else "".
+export function overviewChar(text, { ctrl, alt, meta }) {
+  if (ctrl || alt || meta || [...text].length !== 1 || /[\u0000-\u001f\u007f]/.test(text)) return '';
+  return text;
+}
+
 // A row is {title, detail, exec?: argv run detached, copy?: text for wl-copy, icon?, glyph?}; a mode adds one function returning rows.
 const rows = (entries, q) => rank(entries, q).map((e) => e.row);
 

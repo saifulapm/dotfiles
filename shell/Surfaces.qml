@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import "." as Root
+import "lib/launcher.mjs" as Lib
 
 // The one Overlay window every surface draws in; it stays mapped, since a remap costs 20 to 30 ms.
 PanelWindow {
@@ -59,10 +60,10 @@ PanelWindow {
     }
 
     // t0 is taken before the first load, so a cold open's time includes loading.
-    function openLauncher(t0, mode) {
+    function openLauncher(t0, mode, typed) {
         launcherLoader.active = true;
         closeOthers(launcher);
-        launcher.open(t0, mode);
+        launcher.open(t0, mode, typed);
     }
 
     function openThemes(t0) {
@@ -193,10 +194,19 @@ PanelWindow {
         id: noInput
     }
 
-    // Holds focus while the overview is open and no surface shows.
+    // Holds focus while the overview is open and no surface shows; a printable key opens the launcher with it typed.
     Item {
         id: overviewKeys
-        Keys.onPressed: event => event.accepted = true
+        Keys.onPressed: event => {
+            const typed = Lib.overviewChar(event.text, {
+                ctrl: event.modifiers & Qt.ControlModifier,
+                alt: event.modifiers & Qt.AltModifier,
+                meta: event.modifiers & Qt.MetaModifier
+            });
+            if (typed)
+                host.openLauncher(Date.now(), null, typed);
+            event.accepted = true;
+        }
     }
 
     Loader {
